@@ -6,11 +6,23 @@ göstermek için kullanılır.
 
 ## Otomatik Duman Testi
 
+Tam yerel demo provası için:
+
+```bash
+npm run smoke:local-demo
+```
+
+Bu komut ortam doktoru, yerel web laboratuvarı, web/PC demo veri akışı,
+desktop UI smoke testi ve bağlı Android cihaz UI smoke testini sırayla
+çalıştırır. Telefonsuz hızlı deneme için `npm run smoke:local-demo -- --skip-android` kullanılabilir.
+
+Sadece headless web/PC veri akışı için:
+
 ```bash
 npm run smoke:demo-flow
 ```
 
-Bu komut:
+`smoke:demo-flow` komutu:
 
 - `demo-data/web-module-requests.json` içindeki örnek talepleri web modülüne yükler.
 - PHP web modülünü geçici portta çalıştırır.

@@ -345,6 +345,19 @@ listesi görünürlüğünü birlikte doğrulamak için:
 npm run smoke:android-device-ui
 ```
 
+Web modülü, PC demo veri akışı, desktop UI ve bağlı Android telefonu tek demo
+provasında kontrol etmek için:
+
+```bash
+npm run smoke:local-demo
+```
+
+Telefonsuz hızlı prova gerektiğinde:
+
+```bash
+npm run smoke:local-demo -- --skip-android
+```
+
 İlk Android build hattı Gradle'a bağlı değildir; kurulu Android SDK içindeki `aapt2`, `d8`, `zipalign` ve `apksigner` araçlarını kullanır. Debug imzası `apps/android-app/.debug/` altında yerel olarak korunur; böylece telefona tekrar kurulumda debug imzası değişmez. Bağlantı kararı için `docs/dev/ANDROID_CONNECTION_PLAN.md` dosyasına bakın.
 
 ## Tek Komut Kontrol
