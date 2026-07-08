@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const artifactDir = join(repoRoot, "artifacts", "android-device-ui");
 const packageName = "com.yardimciasistan.android";
+const syncSecret = "change-this-secret";
 
 const options = parseArgs(process.argv.slice(2));
 let phoneTest = null;
@@ -27,6 +28,7 @@ async function main() {
 
   phoneTest = startPhoneTest();
   await waitForReady(phoneTest, options.readyTimeoutMs);
+  const baseUrl = getPhoneTestBaseUrl(phoneTest.output);
   await delay(options.settleMs);
 
   let topXml = dumpUi("top.xml");
@@ -50,6 +52,23 @@ async function main() {
   captureScreenshot("requests.png");
   assertContains(requestsXml, ["Canlı müşteri talepleri", "3 talep görüntüleniyor", "Demo Aile"]);
 
+  tap(centerOf(findBoundsByText(requestsXml, "Demo Aile")));
+  await delay(500);
+  swipe(360, 1120, 360, 260, 450);
+  await delay(700);
+  swipe(360, 1120, 360, 260, 450);
+  await delay(700);
+
+  const detailXml = dumpUi("request-detail.xml");
+  captureScreenshot("request-detail.png");
+  assertContains(detailXml, ["Demo Aile", "Cevaplandı"]);
+
+  tap(centerOf(findBoundsByText(detailXml, "Cevaplandı")));
+  await waitForRequestStatus(baseUrl, "request_demo_web_001", "answered", 12000);
+  const answeredXml = dumpUi("answered.xml");
+  captureScreenshot("answered.png");
+  assertContains(answeredXml, ["Demo Aile", "Cevaplandı"]);
+
   console.log("android-device-ui-smoke-ok");
   cleanup();
   await waitForPhoneTestExit();
@@ -57,7 +76,7 @@ async function main() {
 
 function parseArgs(args) {
   const parsed = {
-    holdMs: 22000,
+    holdMs: 30000,
     readyTimeoutMs: 45000,
     settleMs: 1800,
     noBuild: false
@@ -151,6 +170,15 @@ function waitForReady(child, timeoutMs) {
   });
 }
 
+function getPhoneTestBaseUrl(output) {
+  const match = output.match(/Yerel kontrol:\s+(http:\/\/127\.0\.0\.1:\d+)\/api\/sync\.php/);
+  if (!match) {
+    throw new Error(`android-phone-test yerel kontrol adresi bulunamadı.\n${output.trim()}`);
+  }
+
+  return match[1];
+}
+
 function ensureAdbDevice() {
   const result = adb(["devices"], { capture: true, allowFailure: true });
   if (result.status !== 0) {
@@ -209,6 +237,33 @@ async function waitForUiText(text, timeoutMs) {
   }
 
   throw new Error(`Android UI metni beklenirken zaman aşımı: ${text}`);
+}
+
+async function waitForRequestStatus(baseUrl, requestId, expectedStatus, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const response = await fetch(`${baseUrl}/api/sync.php`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-YA-Sync-Secret": syncSecret
+      },
+      body: JSON.stringify({
+        action: "android_summary",
+        sync_secret: syncSecret,
+        limit: 10
+      })
+    });
+    const json = await response.json();
+    const request = json.requests?.find((candidate) => candidate.id === requestId);
+    if (request?.status === expectedStatus) {
+      return;
+    }
+
+    await delay(500);
+  }
+
+  throw new Error(`${requestId} beklenen duruma geçmedi: ${expectedStatus}`);
 }
 
 function findBoundsByText(xml, text) {

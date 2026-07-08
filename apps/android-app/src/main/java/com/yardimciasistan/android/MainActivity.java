@@ -459,9 +459,13 @@ public class MainActivity extends Activity {
     Button button = new Button(this);
     button.setText(label);
     button.setTextColor(INK);
-    button.setTextSize(14);
+    button.setTextSize(13);
     button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
     button.setAllCaps(false);
+    button.setSingleLine(true);
+    button.setMinWidth(0);
+    button.setMinimumWidth(0);
+    button.setPadding(dp(4), 0, dp(4), 0);
     button.setMinHeight(dp(48));
     button.setBackground(round(BG, LINE, 8));
     button.setOnClickListener(listener);
