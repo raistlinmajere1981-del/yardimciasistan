@@ -104,4 +104,4 @@ Desktop tarafındaki oda, masa, menü, rezervasyon, günlük iş ve WhatsApp ör
 ## Kalan Canlı Demo Genişletmeleri
 
 - Android uygulamasının hosting hazırlığı `npm run smoke:android-hosting` ile cihazsız doğrulanır; gerçek telefonda canlı web modül testi `npm run android:phone-test` ile hazırlanır ve cihaz üzerinde ekran/ağ davranışı manuel doğrulanır.
-- AI cevap önerisinin gerçek provider ve gerçek API anahtarıyla canlı denenmesi.
+- Gerçek AI provider bağlantısı `npm run smoke:ai-live` ile ortam değişkenlerinden alınan OpenAI uyumlu endpoint üzerinde denenir.

@@ -197,6 +197,17 @@ export YARDIMCI_ASISTAN_AI_MODEL=<model-adı>
 export YARDIMCI_ASISTAN_AI_API_KEY=<api-anahtarı>
 ```
 
+Provider bağlantısını PHP veya desktop açmadan hızlı denemek için:
+
+```bash
+npm run smoke:ai-live
+```
+
+Bu komut aynı ortam değişkenleriyle `packages/ai-core` üzerinden gerçek
+`/chat/completions` isteği atar, kısa web sohbet cevabını ve işletme sahibi cevap
+taslağını doğrular. API anahtarı dosyaya yazılmamalı, sadece ortam değişkeni
+olarak verilmelidir.
+
 Desktop uygulamada `AI Taslak Yenile` komutu da aynı ortam değişkenlerini okur.
 Bu değişkenler verilmeden veya AI ayarı kapalıyken desktop güvenli yerel taslak
 üretir; provider hata dönerse manuel WhatsApp akışı devam eder.
@@ -263,6 +274,12 @@ Scripti sadece hızlı doğrulamak için:
 
 ```bash
 npm run android:phone-test -- --once --no-adb --no-build
+```
+
+ADB ile uygulamayı açıp sunucuyu kısa süre canlı tutmak için:
+
+```bash
+npm run android:phone-test -- --once --hold-ms 12000
 ```
 
 İlk Android build hattı Gradle'a bağlı değildir; kurulu Android SDK içindeki `aapt2`, `d8`, `zipalign` ve `apksigner` araçlarını kullanır. Debug imzası `apps/android-app/.debug/` altında yerel olarak korunur; böylece telefona tekrar kurulumda debug imzası değişmez. Bağlantı kararı için `docs/dev/ANDROID_CONNECTION_PLAN.md` dosyasına bakın.

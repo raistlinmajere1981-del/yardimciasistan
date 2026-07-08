@@ -1271,7 +1271,7 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. `packages/ai-core` içindeki `generateOwnerReplySuggestion()` desktop Electron IPC hattına bağlandı. Desktop talep kartlarında `AI Taslak Yenile` komutu seçili talep için özet ve WhatsApp cevap taslağı üretir, SQLite `requests.ai_summary` / `requests.ai_suggested_reply` alanlarını ve hazırlanan WhatsApp mesajını günceller. Provider ortam değişkenleri verilirse OpenAI uyumlu endpointten JSON taslak alınır; provider kapalıysa, hata dönerse, eksik JSON üretirse veya bağlayıcı onay dili kullanırsa yerel güvenli taslağa dönülür. Taslaklar bağlayıcı rezervasyon veya fiyat onayı vermez; Electron dışı önizlemede hata mesajı gösterilerek manuel WhatsApp akışı korunur.
+* Tamamlandı. `packages/ai-core` içindeki `generateOwnerReplySuggestion()` desktop Electron IPC hattına bağlandı. Desktop talep kartlarında `AI Taslak Yenile` komutu seçili talep için özet ve WhatsApp cevap taslağı üretir, SQLite `requests.ai_summary` / `requests.ai_suggested_reply` alanlarını ve hazırlanan WhatsApp mesajını günceller. Provider ortam değişkenleri verilirse OpenAI uyumlu endpointten JSON taslak alınır; provider kapalıysa, hata dönerse, eksik JSON üretirse veya bağlayıcı onay dili kullanırsa yerel güvenli taslağa dönülür. Taslaklar bağlayıcı rezervasyon veya fiyat onayı vermez; Electron dışı önizlemede hata mesajı gösterilerek manuel WhatsApp akışı korunur. Gerçek provider bağlantısı ve cevap örneği `npm run smoke:ai-live` ile anahtar dosyaya yazılmadan denenebilir.
 
 ---
 
@@ -1618,7 +1618,7 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. `npm run smoke:demo-flow` demo web taleplerini yükler, çalışan `chat.php` üzerinden ek bir `source=web_ai` talep oluşturur, yanlış sync anahtarı hatasını, Android canlı özetini, Android durum güncellemesini, PC SQLite'a talep çekmeyi, müşteri kaydı oluşturmayı, synced işaretlemeyi, AI cevap taslağını, talebi rezervasyona çevirip onaylamayı, Android operasyon snapshot yayınını ve ikinci kez çekmeme akışını doğrular. Demo web formu API varsa kayıt dener, API yoksa WhatsApp hazır mesaj akışı devam eder. `npm run smoke:android-hosting` cihazsız Android hosting hazırlığını doğrular. Gerçek telefonda canlı kurulum hazırlığı `npm run android:phone-test` ile yapılır; fiziksel cihaz üzerinde ekran/ağ davranışı manuel doğrulanacaktır.
+* Tamamlandı. `npm run smoke:demo-flow` demo web taleplerini yükler, çalışan `chat.php` üzerinden ek bir `source=web_ai` talep oluşturur, yanlış sync anahtarı hatasını, Android canlı özetini, Android durum güncellemesini, PC SQLite'a talep çekmeyi, müşteri kaydı oluşturmayı, synced işaretlemeyi, AI cevap taslağını, talebi rezervasyona çevirip onaylamayı, Android operasyon snapshot yayınını ve ikinci kez çekmeme akışını doğrular. Demo web formu API varsa kayıt dener, API yoksa WhatsApp hazır mesaj akışı devam eder. `npm run smoke:android-hosting` cihazsız Android hosting hazırlığını doğrular. Gerçek telefonda canlı kurulum hazırlığı `npm run android:phone-test` ile yapılır; `--hold-ms` seçeneği adb ile açılan uygulamaya ilk senkron için kısa süre tanır. Gerçek AI provider cevabı `npm run smoke:ai-live` ile ortam değişkenlerinden denenir; fiziksel cihaz üzerinde ekran/ağ davranışı manuel doğrulanacaktır.
 
 ---
 

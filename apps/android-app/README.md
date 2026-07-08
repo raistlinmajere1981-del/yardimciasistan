@@ -35,6 +35,12 @@ sonraki açılışta tekrar yazmak gerekmez. Sadece script doğrulaması yapmak 
 npm run android:phone-test -- --once --no-adb --no-build
 ```
 
+ADB ile kurulumdan sonra PHP sunucusunu kısa süre açık tutmak için:
+
+```bash
+npm run android:phone-test -- --once --hold-ms 12000
+```
+
 ## İlk Ekran
 
 - Yardımcı Asistan marka başlığı.

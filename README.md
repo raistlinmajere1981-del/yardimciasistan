@@ -55,6 +55,7 @@ npm run smoke:web-form-api
 npm run e2e
 npm test
 npm run smoke:demo-flow
+npm run smoke:ai-live
 npm run android:phone-test
 ```
 

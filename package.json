@@ -30,6 +30,7 @@
     "smoke:desktop-package": "npm run pack:desktop:dir && node scripts/smoke-desktop-package.mjs",
     "smoke:android:build": "npm run smoke -w @yardimci-asistan/android-app",
     "smoke:android-hosting": "npm run build:android && node scripts/android-phone-test.mjs --once --no-adb --no-build",
+    "smoke:ai-live": "npm run build -w @yardimci-asistan/ai-core && node scripts/smoke-live-ai.mjs",
     "smoke:demo-flow": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-demo-flow.mjs",
     "smoke:web-form-api": "node scripts/smoke-web-form-api.mjs",
     "smoke:web-module": "node scripts/smoke-web-module-menu.mjs",

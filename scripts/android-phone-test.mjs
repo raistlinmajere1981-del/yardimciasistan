@@ -68,6 +68,11 @@ async function main() {
   printReady({ port, localBaseUrl, lanUrls, adbResult });
 
   if (options.once) {
+    if (options.holdMs > 0) {
+      console.log(`Sunucu ${options.holdMs} ms daha açık tutuluyor.`);
+      await delay(options.holdMs);
+    }
+
     cleanup();
     return;
   }
@@ -83,7 +88,8 @@ function parseArgs(args) {
     noBuild: false,
     noReverse: false,
     keepData: false,
-    once: false
+    once: false,
+    holdMs: 0
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -98,6 +104,11 @@ function parseArgs(args) {
       parsed.keepData = true;
     } else if (arg === "--once") {
       parsed.once = true;
+    } else if (arg.startsWith("--hold-ms=")) {
+      parsed.holdMs = Number(arg.slice("--hold-ms=".length));
+    } else if (arg === "--hold-ms") {
+      parsed.holdMs = Number(args[index + 1]);
+      index += 1;
     } else if (arg.startsWith("--port=")) {
       parsed.port = Number(arg.slice("--port=".length));
     } else if (arg === "--port") {
@@ -115,6 +126,10 @@ function parseArgs(args) {
 
   if (!Number.isInteger(parsed.port) || parsed.port < 1 || parsed.port > 65535) {
     throw new Error("Port 1-65535 arasında sayısal olmalı.");
+  }
+
+  if (!Number.isInteger(parsed.holdMs) || parsed.holdMs < 0 || parsed.holdMs > 300000) {
+    throw new Error("Bekleme süresi 0-300000 ms arasında sayısal olmalı.");
   }
 
   return parsed;
