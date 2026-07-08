@@ -170,7 +170,7 @@ npm run smoke:desktop-renderer
 npm run smoke:desktop:linux
 ```
 
-`smoke:desktop-renderer` QR menü yönetim ekranını tarayıcı önizlemesiyle kontrol eder. `smoke:desktop:linux` desktop build sonrası local SQLite menü kaydetme smoke testini ve Electron Xvfb pencere açılışını birlikte çalıştırır.
+`smoke:desktop-renderer` QR menü yönetimi, WhatsApp çalışma alanı, web talebi çekme, kurulum ekranı ve ana panel işlemlerini tarayıcı önizlemesiyle kontrol eder. `smoke:desktop:linux` desktop build sonrası local SQLite menü kaydetme smoke testini ve Electron Xvfb pencere açılışını birlikte çalıştırır.
 
 PHP endpoint söz dizimi kontrolü:
 

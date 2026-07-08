@@ -61,6 +61,8 @@ npm run smoke:desktop-package
 npm run smoke:desktop:linux
 ```
 
+`smoke:desktop-renderer` ana paneldeki `Web Taleplerini Çek` komutunu da sahte preload köprüsüyle dener; boş talep listesinden web talebi çekme, sonuç mesajı ve yeni talep kartının görünmesi doğrulanır.
+
 Web modülü için ayrıca:
 
 ```bash

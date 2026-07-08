@@ -282,6 +282,88 @@ try {
   await conversionPage.getByRole("button", { name: "Filtreyi Temizle" }).click();
   await expect(conversionPage.getByRole("button", { name: "WhatsApp Onay" })).toBeVisible();
 
+  const pullPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await pullPage.addInitScript(({ setupData, dashboardData, pulledRequest }) => {
+    let currentDashboardData = dashboardData;
+    window.yardimciDesktop = {
+      getBootstrapData: async () => ({
+        appName: "Yardımcı Asistan",
+        version: "0.1.0",
+        platform: "linux",
+        syncSettings: {
+          webModuleUrl: setupData.webModuleUrl,
+          hasSyncSecret: true
+        },
+        databasePath: "/tmp/yardimci-asistan.sqlite",
+        userDataPath: "/tmp/yardimci-asistan",
+        backupPath: "/tmp/yardimci-asistan/backups",
+        setup: setupData
+      }),
+      getDashboardData: async () => currentDashboardData,
+      getSetupData: async () => setupData,
+      saveInitialSetup: async () => ({ ok: false, message: "smoke" }),
+      createManualBackup: async () => ({ ok: false, message: "smoke" }),
+      createManualRequest: async () => ({ ok: false, message: "smoke" }),
+      convertRequestToReservation: async () => ({ ok: false, message: "smoke" }),
+      updateRequestStatus: async () => ({ ok: false, message: "smoke" }),
+      updateRoomStatus: async () => ({ ok: false, message: "smoke" }),
+      updateTableStatus: async () => ({ ok: false, message: "smoke" }),
+      updateReservationStatus: async () => ({ ok: false, message: "smoke" }),
+      updateDailyTaskStatus: async () => ({ ok: false, message: "smoke" }),
+      createOwnerReplySuggestion: async () => ({ ok: false, message: "smoke" }),
+      pullRequests: async () => {
+        currentDashboardData = {
+          ...dashboardData,
+          summary: {
+            ...dashboardData.summary,
+            newRequests: 1
+          },
+          requests: [pulledRequest],
+          customers: [
+            ...dashboardData.customers,
+            {
+              id: pulledRequest.customer_id,
+              fullName: pulledRequest.customer_name,
+              phone: pulledRequest.customer_phone,
+              email: "",
+              source: "web_form",
+              notes: pulledRequest.message,
+              tags: ["web", "sync"],
+              lastContactAt: pulledRequest.created_at,
+              requestCount: 1,
+              reservationCount: 0,
+              updatedAt: pulledRequest.updated_at
+            }
+          ]
+        };
+        return {
+          ok: true,
+          message: "Talepler alındı.",
+          requests: [pulledRequest],
+          count: 1,
+          pulled_at: "2026-07-11T10:45:00+03:00"
+        };
+      },
+      markRequestsSynced: async () => ({ ok: true, count: 1 }),
+      pushMenu: async () => ({ ok: false, message: "smoke" }),
+      pushAndroidSnapshot: async () => ({ ok: false, message: "smoke" }),
+      saveMenuCategory: async () => ({ ok: false, message: "smoke" }),
+      saveMenuItem: async () => ({ ok: false, message: "smoke" }),
+      openExternal: async () => true
+    };
+  }, {
+    setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345" },
+    dashboardData: createDashboardFixture(),
+    pulledRequest: createPulledRequestFixture()
+  });
+  await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await expect(pullPage.getByText("Henüz yeni talep yok.")).toBeVisible();
+  await pullPage.getByRole("button", { name: "Web Taleplerini Çek" }).click();
+  await expect(pullPage.getByText("1 talep alındı.")).toBeVisible();
+  await expect(pullPage.getByRole("heading", { name: "Web Sync Smoke" })).toBeVisible();
+  await expect(pullPage.getByText("Bahçe masa için canlı web talebi.")).toBeVisible();
+  await pullPage.screenshot({ path: "artifacts/screenshots/desktop-web-pull-flow.png", fullPage: true });
+
   const setupPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await setupPage.addInitScript(({ setupData, dashboardData }) => {
     window.yardimciDesktop = {
@@ -594,5 +676,34 @@ function createDashboardConversionFixture() {
       ...createDashboardFixture().summary,
       newRequests: 1
     }
+  };
+}
+
+function createPulledRequestFixture() {
+  return {
+    id: "request_web_pull_smoke_001",
+    customer_id: "customer_web_pull_smoke_001",
+    source: "web_form",
+    request_type: "restaurant_reservation",
+    status: "new",
+    customer_name: "Web Sync Smoke",
+    customer_phone: "+905551112233",
+    date_text: "Bu akşam",
+    start_date: "2026-07-18",
+    end_date: "",
+    time: "20:30",
+    guest_count: 4,
+    adult_count: 4,
+    child_count: 0,
+    message: "Bahçe masa için canlı web talebi.",
+    ai_summary: "",
+    ai_suggested_reply: "",
+    whatsapp_message: "Merhaba, masa talebinizi aldık. Uygunluğu kontrol edip size dönüş yapacağız.",
+    assigned_to: "",
+    priority: "normal",
+    sync_status: "synced",
+    synced_at: "2026-07-11T10:45:00+03:00",
+    created_at: "2026-07-11T10:44:00+03:00",
+    updated_at: "2026-07-11T10:45:00+03:00"
   };
 }

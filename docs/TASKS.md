@@ -1691,7 +1691,7 @@ Sync başarısız olunca local çalışma
 
 Durum:
 
-* Tamamlandı. `packages/sync-core` testleri endpoint, pull, mark, menü yayınlama, Android operasyon snapshot yayınlama ve bağlantı hatası dönüşlerini kapsar. `npm run smoke:demo-flow` yeni talep çekme, yanlış sync secret, Android summary, Android operasyon snapshot, synced işaretleme ve aynı talebi tekrar çekmeme akışını doğrular. `smoke:desktop:linux` local SQLite menü/dönüşüm işlemlerinin web sync başarısına bağımlı olmadığını doğrular.
+* Tamamlandı. `packages/sync-core` testleri endpoint, pull, mark, menü yayınlama, Android operasyon snapshot yayınlama ve bağlantı hatası dönüşlerini kapsar. `npm run smoke:demo-flow` yeni talep çekme, yanlış sync secret, Android summary, Android operasyon snapshot, synced işaretleme ve aynı talebi tekrar çekmeme akışını doğrular. `smoke:desktop-renderer` ana paneldeki `Web Taleplerini Çek` kullanıcı akışını boş listeden yeni web talebi kartına kadar kontrol eder. `smoke:desktop:linux` local SQLite menü/dönüşüm işlemlerinin web sync başarısına bağımlı olmadığını doğrular.
 
 ---
 
