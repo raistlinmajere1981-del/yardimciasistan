@@ -338,6 +338,13 @@ yazılır ve git'e eklenmez. Canlı ekran aynalama ve fare/klavye kontrolü içi
 npm run android:mirror
 ```
 
+Bağlı telefonda kurulum, canlı veri butonu, ekran görüntüsü, UI dump ve talep
+listesi görünürlüğünü birlikte doğrulamak için:
+
+```bash
+npm run smoke:android-device-ui
+```
+
 İlk Android build hattı Gradle'a bağlı değildir; kurulu Android SDK içindeki `aapt2`, `d8`, `zipalign` ve `apksigner` araçlarını kullanır. Debug imzası `apps/android-app/.debug/` altında yerel olarak korunur; böylece telefona tekrar kurulumda debug imzası değişmez. Bağlantı kararı için `docs/dev/ANDROID_CONNECTION_PLAN.md` dosyasına bakın.
 
 ## Tek Komut Kontrol

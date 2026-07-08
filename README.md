@@ -60,6 +60,7 @@ npm run smoke:local-lab
 npm run dev:local
 npm run android:phone-test
 npm run android:screenshot
+npm run smoke:android-device-ui
 npm run android:mirror
 ```
 
@@ -100,7 +101,9 @@ Android tarafında `apps/android-app` native companion ekranını ve `hosting_li
 Android ekran kontrolü için `npm run android:screenshot` ekran görüntüsünü
 `artifacts/android-control/` altına kaydeder, `npm run android:dump` UI ağacını
 XML olarak çıkarır, `npm run android:control -- tap <x> <y>` adb üzerinden
-dokunma gönderir. `npm run android:mirror` scrcpy ile canlı ekran aynalama açar.
+dokunma gönderir. `npm run smoke:android-device-ui` bağlı telefonda kurulum,
+ekran, canlı veri butonu ve talep listesi akışını doğrular. `npm run android:mirror`
+scrcpy ile canlı ekran aynalama açar.
 
 Demo hosting ve domain kararı firma sunumu aşamasına bırakılmıştır. Güncel ana
 test hattı Linux'ta yerel PHP/demo web/desktop ve adb bağlı Android telefondur.

@@ -27,6 +27,7 @@ Bu plan Yardımcı Asistan'ın Linux'ta rahat geliştirilebilmesi, Android telef
 - Sonra yeni talepler, PC'den yayınlanan oda/masa/günlük iş özeti ve arama/WhatsApp kısayolları test edilir.
 - `npm run android:phone-test` ile demo web modülü LAN'da açılır, demo talepleri yüklenir ve adb cihazı bağlıysa APK kurularak uygulama otomatik başlatılır.
 - `npm run android:screenshot`, `npm run android:dump` ve `npm run android:control -- tap <x> <y>` ile ekran durumu ve temel kontrol komutları doğrulanır.
+- `npm run smoke:android-device-ui` ile gerçek telefonda canlı veri butonu ve talep listesi akışı otomatik doğrulanır.
 - `npm run android:mirror` ile scrcpy canlı ekran aynalama açılır.
 - USB bağlantısında `adb reverse`, aynı Wi-Fi ağında ise yazdırılan LAN adresi denenir.
 - Hosting üzerinden sınırlı takip modu gerçek firma alan adıyla ayrıca test edilir.
@@ -72,6 +73,7 @@ Android gerçek cihaz hazırlığı için:
 ```bash
 npm run smoke:android-hosting
 npm run android:phone-test
+npm run smoke:android-device-ui
 ```
 
 Linux tam zincir:

@@ -56,6 +56,12 @@ Canlı ekran aynalama ve fare/klavye kontrolü için:
 npm run android:mirror
 ```
 
+Bağlı telefonda görsel/UI smoke testi için:
+
+```bash
+npm run smoke:android-device-ui
+```
+
 ## İlk Ekran
 
 - Yardımcı Asistan marka başlığı.
