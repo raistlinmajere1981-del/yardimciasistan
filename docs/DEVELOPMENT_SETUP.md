@@ -320,6 +320,24 @@ ADB ile uygulamayı açıp sunucuyu kısa süre canlı tutmak için:
 npm run android:phone-test -- --once --hold-ms 12000
 ```
 
+ADB üzerinden ekran görme ve kontrol:
+
+```bash
+npm run android:control -- info
+npm run android:screenshot
+npm run android:dump
+npm run android:control -- tap 360 640
+npm run android:control -- swipe 360 1050 360 300 450
+npm run android:control -- key back
+```
+
+Ekran görüntüleri ve UI dump dosyaları `artifacts/android-control/` altına
+yazılır ve git'e eklenmez. Canlı ekran aynalama ve fare/klavye kontrolü için:
+
+```bash
+npm run android:mirror
+```
+
 İlk Android build hattı Gradle'a bağlı değildir; kurulu Android SDK içindeki `aapt2`, `d8`, `zipalign` ve `apksigner` araçlarını kullanır. Debug imzası `apps/android-app/.debug/` altında yerel olarak korunur; böylece telefona tekrar kurulumda debug imzası değişmez. Bağlantı kararı için `docs/dev/ANDROID_CONNECTION_PLAN.md` dosyasına bakın.
 
 ## Tek Komut Kontrol

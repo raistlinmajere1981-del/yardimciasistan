@@ -59,6 +59,8 @@ npm run smoke:ai-live
 npm run smoke:local-lab
 npm run dev:local
 npm run android:phone-test
+npm run android:screenshot
+npm run android:mirror
 ```
 
 Linux'ta web modülü ve demo web sayfasını birlikte denemek için:
@@ -94,6 +96,11 @@ AI tarafında `packages/ai-core` provider bağımsız prompt/knowledge/adapter k
 WhatsApp tarafında `packages/whatsapp-bridge` Türkiye cep telefonu normalizasyonu, `wa.me` link üretimi, manuel kopyalama ve WebView/resmi API geçişleri için ortak adapter yüzeyini sağlar.
 
 Android tarafında `apps/android-app` native companion ekranını ve `hosting_limited` canlı talep akışını sağlar. Desktop ana panelindeki `Android'e Yayınla` komutu PC'deki oda/masa, günlük iş ve bekleyen onay özetini web modülüne gönderir; Android `android_summary` cevabından bu operasyon snapshot'ını okur. Debug APK, kurulu Android SDK araçlarıyla `npm run build:android` komutu üzerinden üretilebilir. `npm run smoke:android-hosting` cihazsız hosting hazırlığını doğrular; gerçek telefonda yerel test için `npm run android:phone-test` demo veriyi yükler, PHP web modülünü LAN'da açar ve adb cihazı bağlıysa uygulamayı doğru web modül adresiyle başlatır.
+
+Android ekran kontrolü için `npm run android:screenshot` ekran görüntüsünü
+`artifacts/android-control/` altına kaydeder, `npm run android:dump` UI ağacını
+XML olarak çıkarır, `npm run android:control -- tap <x> <y>` adb üzerinden
+dokunma gönderir. `npm run android:mirror` scrcpy ile canlı ekran aynalama açar.
 
 Demo hosting ve domain kararı firma sunumu aşamasına bırakılmıştır. Güncel ana
 test hattı Linux'ta yerel PHP/demo web/desktop ve adb bağlı Android telefondur.

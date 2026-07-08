@@ -41,6 +41,21 @@ ADB ile kurulumdan sonra PHP sunucusunu kısa süre açık tutmak için:
 npm run android:phone-test -- --once --hold-ms 12000
 ```
 
+ADB üzerinden ekran görüntüsü, UI ağacı ve dokunma kontrolü için:
+
+```bash
+npm run android:screenshot
+npm run android:dump
+npm run android:control -- tap 360 640
+npm run android:control -- key back
+```
+
+Canlı ekran aynalama ve fare/klavye kontrolü için:
+
+```bash
+npm run android:mirror
+```
+
 ## İlk Ekran
 
 - Yardımcı Asistan marka başlığı.

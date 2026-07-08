@@ -15,6 +15,7 @@ checkCommand("Xvfb", ["-help"], false);
 checkCommand("xvfb-run", ["--help"], false);
 checkCommand("magick", ["-version"], false);
 checkCommand("adb", ["version"], false);
+checkCommand("scrcpy", ["--version"], false);
 checkCommand("java", ["-version"], true);
 checkCommand("keytool", ["-help"], true);
 
