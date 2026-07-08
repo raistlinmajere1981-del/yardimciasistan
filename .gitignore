@@ -1,0 +1,16 @@
+node_modules/
+dist/
+dist-electron/
+dist-renderer/
+apps/android-app/build/
+apps/android-app/.debug/
+coverage/
+artifacts/
+test-results/
+playwright-report/
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

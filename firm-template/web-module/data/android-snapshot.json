@@ -1,0 +1,15 @@
+{
+  "summary": {
+    "pending_daily_tasks": 0,
+    "available_rooms": 0,
+    "total_rooms": 0,
+    "available_tables": 0,
+    "pending_reservations": 0,
+    "prepared_whatsapp_messages": 0,
+    "active_menu_categories": 0,
+    "available_menu_items": 0,
+    "customer_count": 0
+  },
+  "daily_tasks": [],
+  "updated_at": ""
+}

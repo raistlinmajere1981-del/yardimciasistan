@@ -1,0 +1,310 @@
+export type WhatsAppMode = "wa_link" | "manual_copy" | "webview" | "official_api";
+
+export type WhatsAppBridgeMode = WhatsAppMode | "official_api_future";
+
+export type WhatsAppBridgeErrorCode = "invalid_phone" | "empty_message" | "unsupported_mode";
+
+export interface WhatsAppLinkSuccess {
+  ok: true;
+  mode: "wa_link";
+  url: string;
+  whatsappPhone: string;
+  phoneDisplay: string;
+  message: string;
+  encodedMessage: string;
+}
+
+export interface WhatsAppBridgeError {
+  ok: false;
+  mode: WhatsAppBridgeMode;
+  code: WhatsAppBridgeErrorCode;
+  message: string;
+}
+
+export type WhatsAppLinkResult = WhatsAppLinkSuccess | WhatsAppBridgeError;
+
+export interface ManualCopyPayload {
+  ok: true;
+  mode: "manual_copy";
+  phoneInput: string;
+  phoneDisplay: string;
+  whatsappPhone: string;
+  message: string;
+}
+
+export interface WebViewPayload {
+  ok: true;
+  mode: "webview";
+  phoneDisplay: string;
+  whatsappPhone: string;
+  message: string;
+  url: string;
+  webviewTarget: {
+    url: string;
+    customerPhone: string;
+  };
+  fallback: ManualCopyPayload;
+}
+
+export interface OfficialApiFuturePayload {
+  ok: false;
+  mode: "official_api_future";
+  code: "unsupported_mode";
+  message: string;
+  fallback: ManualCopyPayload;
+}
+
+export type WhatsAppAction = WhatsAppLinkSuccess | ManualCopyPayload | WebViewPayload | OfficialApiFuturePayload | WhatsAppBridgeError;
+
+export interface PrepareWhatsAppActionInput {
+  phone: string;
+  message: string;
+  preferredMode?: WhatsAppBridgeMode;
+}
+
+export type CustomerRequestType = "pension_reservation" | "restaurant_reservation" | "general_info" | string;
+
+export interface CustomerRequestWhatsAppMessageInput {
+  request_type: CustomerRequestType;
+  customer_name: string;
+  customer_phone: string;
+  date_text: string;
+  guest_count: number | string;
+  message?: string;
+  time_text?: string;
+}
+
+const REQUEST_TYPE_TEXT: Record<string, string> = {
+  pension_reservation: "Pansiyon rezervasyonu",
+  restaurant_reservation: "Masa rezervasyonu",
+  general_info: "Bilgi talebi"
+};
+
+const DEFAULT_REPLY_MESSAGE = "Merhaba, talebiniz için teşekkür ederiz. Size en kısa sürede dönüş yapacağız.";
+const TR_MOBILE_PATTERN = /^5\d{9}$/;
+const PHONE_ERROR = "Telefon numarası Türkiye cep telefonu formatında olmalı. Örnek: 05xx xxx xx xx";
+
+export function createWhatsAppLink(phone: string, message: string): WhatsAppLinkResult {
+  const normalizedPhone = normalizeTRMobilePhone(phone);
+  if (!normalizedPhone.ok) {
+    return {
+      ok: false,
+      mode: "wa_link",
+      code: "invalid_phone",
+      message: normalizedPhone.error
+    };
+  }
+
+  const cleanMessage = message.trim();
+  if (!cleanMessage) {
+    return {
+      ok: false,
+      mode: "wa_link",
+      code: "empty_message",
+      message: "WhatsApp mesajı boş olmamalı."
+    };
+  }
+
+  const encodedMessage = encodeURIComponent(cleanMessage);
+  return {
+    ok: true,
+    mode: "wa_link",
+    url: `https://wa.me/${normalizedPhone.whatsapp}?text=${encodedMessage}`,
+    whatsappPhone: normalizedPhone.whatsapp,
+    phoneDisplay: normalizedPhone.display,
+    message: cleanMessage,
+    encodedMessage
+  };
+}
+
+export function createWhatsAppUrl(phone: string, message: string): string {
+  const link = createWhatsAppLink(phone, message);
+  return link.ok ? link.url : "";
+}
+
+export function createManualCopyPayload(phone: string, message: string): ManualCopyPayload | WhatsAppBridgeError {
+  const cleanMessage = message.trim();
+  if (!cleanMessage) {
+    return {
+      ok: false,
+      mode: "manual_copy",
+      code: "empty_message",
+      message: "WhatsApp mesajı boş olmamalı."
+    };
+  }
+
+  const normalizedPhone = normalizeTRMobilePhone(phone);
+  return {
+    ok: true,
+    mode: "manual_copy",
+    phoneInput: phone.trim(),
+    phoneDisplay: normalizedPhone.ok ? normalizedPhone.display : phone.trim(),
+    whatsappPhone: normalizedPhone.ok ? normalizedPhone.whatsapp : "",
+    message: cleanMessage
+  };
+}
+
+export function prepareWhatsAppAction(input: PrepareWhatsAppActionInput): WhatsAppAction {
+  const mode = normalizeBridgeMode(input.preferredMode ?? "wa_link");
+  const message = input.message.trim();
+
+  if (!message) {
+    return {
+      ok: false,
+      mode,
+      code: "empty_message",
+      message: "WhatsApp mesajı boş olmamalı."
+    };
+  }
+
+  if (mode === "manual_copy") {
+    return createManualCopyPayload(input.phone, message);
+  }
+
+  const link = createWhatsAppLink(input.phone, message);
+  if (!link.ok) {
+    return {
+      ...link,
+      mode
+    };
+  }
+
+  if (mode === "webview") {
+    return {
+      ok: true,
+      mode: "webview",
+      phoneDisplay: link.phoneDisplay,
+      whatsappPhone: link.whatsappPhone,
+      message: link.message,
+      url: link.url,
+      webviewTarget: {
+        url: link.url,
+        customerPhone: link.whatsappPhone
+      },
+      fallback: {
+        ok: true,
+        mode: "manual_copy",
+        phoneInput: input.phone.trim(),
+        phoneDisplay: link.phoneDisplay,
+        whatsappPhone: link.whatsappPhone,
+        message: link.message
+      }
+    };
+  }
+
+  if (mode === "official_api_future") {
+    return {
+      ok: false,
+      mode: "official_api_future",
+      code: "unsupported_mode",
+      message: "Resmi WhatsApp API adaptörü sonraki faz için ayrıldı.",
+      fallback: {
+        ok: true,
+        mode: "manual_copy",
+        phoneInput: input.phone.trim(),
+        phoneDisplay: link.phoneDisplay,
+        whatsappPhone: link.whatsappPhone,
+        message: link.message
+      }
+    };
+  }
+
+  return link;
+}
+
+export function buildCustomerRequestWhatsAppMessage(input: CustomerRequestWhatsAppMessageInput, businessName: string): string {
+  const typeText = REQUEST_TYPE_TEXT[input.request_type] ?? "Bilgi talebi";
+
+  return [
+    `Merhaba, ${businessName} için talep oluşturmak istiyorum.`,
+    `Talep türü: ${typeText}`,
+    `Ad soyad: ${input.customer_name}`,
+    `Telefon: ${input.customer_phone}`,
+    `Tarih: ${input.date_text}`,
+    input.time_text ? `Saat: ${input.time_text}` : "",
+    `Kişi sayısı: ${input.guest_count}`,
+    input.message ? `Not: ${input.message}` : "",
+    "Lütfen bilgileri kontrol edip gönder tuşuna basın."
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function buildOwnerReplyWhatsAppMessage(message?: string): string {
+  return message?.trim() || DEFAULT_REPLY_MESSAGE;
+}
+
+export function normalizeTRMobilePhone(phone: string): { ok: true; whatsapp: string; e164: string; national: string; display: string } | { ok: false; error: string } {
+  const normalizedPhone = normalizePhone(phone);
+  if (!normalizedPhone.ok) {
+    return {
+      ok: false,
+      error: normalizedPhone.error
+    };
+  }
+
+  return {
+    ok: true,
+    whatsapp: normalizedPhone.whatsapp,
+    e164: normalizedPhone.e164,
+    national: normalizedPhone.national,
+    display: formatPhoneForDisplay(phone)
+  };
+}
+
+function normalizeBridgeMode(mode: WhatsAppBridgeMode): Exclude<WhatsAppBridgeMode, "official_api"> {
+  return mode === "official_api" ? "official_api_future" : mode;
+}
+
+function normalizePhone(phone: string): { ok: true; e164: string; national: string; whatsapp: string } | { ok: false; error: string } {
+  const input = phone.trim();
+  const digits = input.replace(/[^\d+]/g, "").replace(/^00/, "+");
+  const national = toTRNationalNumber(digits);
+
+  if (!national || !TR_MOBILE_PATTERN.test(national)) {
+    return {
+      ok: false,
+      error: PHONE_ERROR
+    };
+  }
+
+  return {
+    ok: true,
+    e164: `+90${national}`,
+    national,
+    whatsapp: `90${national}`
+  };
+}
+
+function formatPhoneForDisplay(phone: string): string {
+  const result = normalizePhone(phone);
+  if (!result.ok) {
+    return phone.trim();
+  }
+
+  const part1 = result.national.slice(0, 3);
+  const part2 = result.national.slice(3, 6);
+  const part3 = result.national.slice(6, 8);
+  const part4 = result.national.slice(8, 10);
+  return `+90 ${part1} ${part2} ${part3} ${part4}`;
+}
+
+function toTRNationalNumber(value: string): string | null {
+  if (value.startsWith("+90")) {
+    return value.slice(3);
+  }
+
+  if (value.startsWith("90") && value.length === 12) {
+    return value.slice(2);
+  }
+
+  if (value.startsWith("0") && value.length === 11) {
+    return value.slice(1);
+  }
+
+  if (value.length === 10) {
+    return value;
+  }
+
+  return null;
+}

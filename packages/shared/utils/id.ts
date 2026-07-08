@@ -1,0 +1,66 @@
+export type IdPrefix =
+  | "business_"
+  | "user_"
+  | "customer_"
+  | "request_"
+  | "reservation_"
+  | "room_"
+  | "table_"
+  | "cat_"
+  | "item_"
+  | "knowledge_"
+  | "ai_conv_"
+  | "wa_msg_"
+  | "notification_"
+  | "task_"
+  | "sync_"
+  | "settings_"
+  | "event_";
+
+export const ID_PREFIXES: readonly IdPrefix[] = [
+  "business_",
+  "user_",
+  "customer_",
+  "request_",
+  "reservation_",
+  "room_",
+  "table_",
+  "cat_",
+  "item_",
+  "knowledge_",
+  "ai_conv_",
+  "wa_msg_",
+  "notification_",
+  "task_",
+  "sync_",
+  "settings_",
+  "event_"
+] as const;
+
+export interface CreateIdOptions {
+  now?: Date;
+  random?: () => string;
+}
+
+export function createId(prefix: IdPrefix, options: CreateIdOptions = {}): string {
+  const timestamp = (options.now ?? new Date()).getTime().toString(36);
+  const randomPart = sanitizeRandomPart(options.random?.() ?? Math.random().toString(36).slice(2, 10));
+  return `${prefix}${timestamp}_${randomPart}`;
+}
+
+export function isSupportedIdPrefix(prefix: string): prefix is IdPrefix {
+  return ID_PREFIXES.includes(prefix as IdPrefix);
+}
+
+export function extractIdPrefix(id: string): IdPrefix | null {
+  return ID_PREFIXES.find((prefix) => id.startsWith(prefix)) ?? null;
+}
+
+export function hasIdPrefix(id: string, prefix: IdPrefix): boolean {
+  return id.startsWith(prefix);
+}
+
+function sanitizeRandomPart(value: string): string {
+  const safeValue = value.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return safeValue.slice(0, 12) || "000000";
+}

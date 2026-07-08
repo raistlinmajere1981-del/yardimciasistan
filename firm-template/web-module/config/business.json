@@ -1,0 +1,27 @@
+{
+  "id": "business_demo_001",
+  "name": "deniz-cicegi",
+  "display_name": "Deniz Çiçeği Pansiyon & Kafe",
+  "business_type": "pension_restaurant",
+  "phone": "+90 532 123 45 67",
+  "whatsapp": "+90 532 123 45 67",
+  "email": "merhaba@denizcicegi.example",
+  "website": "https://denizcicegi.example",
+  "address": "Sahil Yolu No: 18, Akyaka / Muğla",
+  "map_url": "https://maps.google.com/?q=Akyaka%20Mugla",
+  "primary_color": "#2F6F5E",
+  "accent_color": "#E47863",
+  "sync_secret": "change-this-secret",
+  "allowed_origins": [
+    "https://denizcicegi.example",
+    "http://localhost:5173"
+  ],
+  "modules": {
+    "rooms": true,
+    "tables": true,
+    "qr_menu": true,
+    "ai": false,
+    "whatsapp": true,
+    "android": true
+  }
+}

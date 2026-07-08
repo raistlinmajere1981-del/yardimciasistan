@@ -1,0 +1,49 @@
+appId: com.yardimciasistan.desktop
+productName: Yardımcı Asistan
+copyright: Copyright © 2026 Yardımcı Asistan
+electronVersion: 40.10.6
+asar: true
+
+directories:
+  output: ../../dist/desktop
+
+files:
+  - package.json
+  - dist-electron/**/*
+  - dist-renderer/**/*
+  - db/**/*
+  - "!**/*.map"
+  - "!electron/**"
+  - "!src/**"
+  - "!scripts/**"
+  - "!*.ts"
+  - "!tsconfig*.json"
+  - "!vite*.ts"
+
+extraMetadata:
+  main: dist-electron/main.js
+  name: yardimci-asistan-desktop
+  version: 0.1.0
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: YardimciAsistan-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Yardımcı Asistan
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  category: Office
+  artifactName: YardimciAsistan-${version}-${arch}.${ext}

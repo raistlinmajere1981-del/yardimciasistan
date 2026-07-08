@@ -1,0 +1,165 @@
+{
+  "id": "business_demo_001",
+  "name": "deniz-cicegi",
+  "display_name": "Deniz Çiçeği Pansiyon & Kafe",
+  "business_type": "pension_restaurant",
+  "logo_url": "",
+  "colors": {
+    "primary": "#2F6F5E",
+    "accent": "#E47863",
+    "ink": "#172033"
+  },
+  "phone": "+90 532 123 45 67",
+  "whatsapp": "+90 532 123 45 67",
+  "email": "merhaba@denizcicegi.example",
+  "website": "https://denizcicegi.example",
+  "address": "Sahil Yolu No: 18, Akyaka / Muğla",
+  "map_url": "https://maps.google.com/?q=Akyaka%20Mugla",
+  "description": "Denize yakın, küçük ve sakin bir konaklama alanı; kahvaltı, kafe ve restoran hizmetiyle gün boyu sıcak bir durak.",
+  "working_hours": [
+    "Her gün 08:00 - 23:00",
+    "Kahvaltı 08:30 - 11:30",
+    "Akşam servis 18:00 - 22:30"
+  ],
+  "modules": {
+    "rooms": true,
+    "tables": true,
+    "qr_menu": true,
+    "ai": true,
+    "whatsapp": true,
+    "android": true
+  },
+  "hero": {
+    "image_url": "/assets/demo-hero.webp",
+    "eyebrow": "Pansiyon • Restoran • Kafe",
+    "title": "Deniz Çiçeği Pansiyon & Kafe",
+    "summary": "Konaklama, kahvaltı ve masa taleplerinizi hızlıca iletin; işletme size en kısa sürede dönüş yapsın."
+  },
+  "highlights": [
+    {
+      "label": "8 oda",
+      "description": "Sade, temiz ve balkonlu seçenekler"
+    },
+    {
+      "label": "Bahçe masaları",
+      "description": "Kahvaltı ve akşam servisinde sakin alan"
+    },
+    {
+      "label": "WhatsApp dönüşü",
+      "description": "Talebiniz işletmeye hazır mesajla ulaşır"
+    }
+  ],
+  "services": [
+    {
+      "title": "Konaklama",
+      "description": "Kısa tatiller ve hafta sonu kaçamakları için temiz, sakin odalar.",
+      "icon": "bed"
+    },
+    {
+      "title": "Kahvaltı ve Kafe",
+      "description": "Sabah kahvaltısı, gün boyu içecekler ve hafif atıştırmalıklar.",
+      "icon": "coffee"
+    },
+    {
+      "title": "Masa Talebi",
+      "description": "Bahçe veya iç mekan için hızlı masa talebi oluşturma.",
+      "icon": "table"
+    }
+  ],
+  "rooms": [
+    {
+      "id": "room_101",
+      "name": "Balkonlu Standart Oda",
+      "capacity": 2,
+      "bed_info": "1 çift kişilik yatak",
+      "features": ["Klima", "Balkon", "Duş", "Wi-Fi"],
+      "description": "Kısa konaklamalar için ferah ve sakin oda.",
+      "price_note": "Fiyat bilgisi için işletme dönüş yapar.",
+      "image_url": "/assets/demo-room.webp"
+    },
+    {
+      "id": "room_102",
+      "name": "Aile Odası",
+      "capacity": 4,
+      "bed_info": "1 çift kişilik yatak + 2 tek kişilik yatak",
+      "features": ["Klima", "Ek yatak", "Duş", "Mini dolap"],
+      "description": "Çocuklu aileler için daha geniş kullanım alanı.",
+      "price_note": "Müsaitlik ve fiyat onayla netleşir.",
+      "image_url": "/assets/demo-room.webp"
+    }
+  ],
+  "tables": [
+    {
+      "name": "Bahçe Masası",
+      "capacity": 4,
+      "area": "Bahçe"
+    },
+    {
+      "name": "İç Mekan Masa",
+      "capacity": 2,
+      "area": "Salon"
+    }
+  ],
+  "menu": {
+    "categories": [
+      {
+        "id": "cat_breakfast",
+        "name": "Kahvaltı"
+      },
+      {
+        "id": "cat_drinks",
+        "name": "İçecekler"
+      },
+      {
+        "id": "cat_food",
+        "name": "Hafif Lezzetler"
+      }
+    ],
+    "items": [
+      {
+        "id": "item_001",
+        "category_id": "cat_breakfast",
+        "name": "Serpme Kahvaltı",
+        "description": "Yöresel ürünler, sıcak lezzetler ve taze çay.",
+        "price": 450,
+        "currency": "TRY",
+        "is_featured": true
+      },
+      {
+        "id": "item_002",
+        "category_id": "cat_drinks",
+        "name": "Türk Kahvesi",
+        "description": "Yanında küçük ikramla servis edilir.",
+        "price": 90,
+        "currency": "TRY",
+        "is_featured": false
+      },
+      {
+        "id": "item_003",
+        "category_id": "cat_food",
+        "name": "Günün Tostu",
+        "description": "Kaşar, domates ve mevsim yeşillikleriyle.",
+        "price": 180,
+        "currency": "TRY",
+        "is_featured": false
+      }
+    ]
+  },
+  "gallery": [
+    {
+      "title": "Bahçe ve giriş",
+      "image_url": "/assets/demo-hero.webp"
+    },
+    {
+      "title": "Oda örneği",
+      "image_url": "/assets/demo-room.webp"
+    },
+    {
+      "title": "Kahvaltı masası",
+      "image_url": "/assets/demo-breakfast.webp"
+    }
+  ],
+  "social_media": {
+    "instagram": "https://instagram.com/denizcicegi.example"
+  }
+}

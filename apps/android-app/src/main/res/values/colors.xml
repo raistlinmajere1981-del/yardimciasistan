@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ya_bg">#FFF8EE</color>
+    <color name="ya_ink">#172033</color>
+    <color name="ya_primary">#2F6F5E</color>
+    <color name="ya_accent">#E47863</color>
+</resources>

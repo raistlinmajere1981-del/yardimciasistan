@@ -1,0 +1,9 @@
+{
+  "name": "@yardimci-asistan/android-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node ../../scripts/build-android-app.mjs",
+    "smoke": "node ../../scripts/build-android-app.mjs --verify"
+  }
+}

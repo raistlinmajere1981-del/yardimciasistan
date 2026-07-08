@@ -1,0 +1,47 @@
+{
+  "name": "yardimci-asistan",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Küçük işletmeler için local-first Yardımcı Asistan monorepo iskeleti.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build:packages && npm run build:apps",
+    "build:apps": "npm run build -w @yardimci-asistan/demo-web && npm run build -w @yardimci-asistan/desktop-app && npm run build -w @yardimci-asistan/android-app",
+    "build:packages": "npm run build -w @yardimci-asistan/shared && npm run build -w @yardimci-asistan/whatsapp-bridge && npm run build -w @yardimci-asistan/ai-core && npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/web-widget",
+    "check": "npm run typecheck && npm test && npm run build && npm run e2e",
+    "check:linux": "npm run doctor && npm run lint:php && npm run smoke:web-form-api && npm run smoke:web-module && npm run check && npm run smoke:android-hosting && npm run smoke:demo-flow && npm run smoke:desktop-renderer && npm run smoke:desktop-package && npm run smoke:desktop:linux",
+    "build:android": "npm run build -w @yardimci-asistan/android-app",
+    "android:phone-test": "node scripts/android-phone-test.mjs",
+    "demo:data:apply": "node scripts/seed-demo-data.mjs apply",
+    "demo:data:clear": "node scripts/seed-demo-data.mjs clear",
+    "demo:data:print": "node scripts/seed-demo-data.mjs print",
+    "dev:demo-web": "npm run dev -w @yardimci-asistan/demo-web",
+    "dev:demo-web:lan": "npm run dev:lan -w @yardimci-asistan/demo-web",
+    "dev:desktop": "npm run dev -w @yardimci-asistan/desktop-app",
+    "dev:php-module": "php -S 127.0.0.1:8080 -t firm-template/web-module",
+    "doctor": "node scripts/dev-doctor.mjs",
+    "e2e": "playwright test",
+    "lint:php": "node scripts/php-lint.mjs",
+    "screenshots:demo-web": "node scripts/capture-demo-web.mjs",
+    "smoke:desktop-renderer": "node scripts/smoke-desktop-renderer.mjs",
+    "smoke:desktop-package": "npm run pack:desktop:dir && node scripts/smoke-desktop-package.mjs",
+    "smoke:android:build": "npm run smoke -w @yardimci-asistan/android-app",
+    "smoke:android-hosting": "npm run build:android && node scripts/android-phone-test.mjs --once --no-adb --no-build",
+    "smoke:demo-flow": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-demo-flow.mjs",
+    "smoke:web-form-api": "node scripts/smoke-web-form-api.mjs",
+    "smoke:web-module": "node scripts/smoke-web-module-menu.mjs",
+    "smoke:desktop:linux": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-menu-db.mjs && node scripts/smoke-desktop-xvfb.mjs",
+    "pack:desktop:dir": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:dir -w @yardimci-asistan/desktop-app",
+    "pack:desktop:win": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app",
+    "pack:desktop:linux": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:linux -w @yardimci-asistan/desktop-app",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "typescript": "^5.9.2"
+  }
+}
