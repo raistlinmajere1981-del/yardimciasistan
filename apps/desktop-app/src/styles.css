@@ -55,14 +55,14 @@ button {
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
-.setup-brand span {
-  display: grid;
+.setup-brand-symbol {
   width: 48px;
   height: 48px;
-  place-items: center;
+  flex: 0 0 auto;
+  object-fit: contain;
+  padding: 4px;
   border-radius: 8px;
-  background: var(--primary);
-  font-weight: 900;
+  background: #ffffff;
 }
 
 .setup-brand strong,
@@ -295,15 +295,14 @@ button {
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.brand span {
-  display: grid;
+.brand-symbol {
   width: 44px;
   height: 44px;
-  place-items: center;
+  flex: 0 0 auto;
+  object-fit: contain;
+  padding: 4px;
   border-radius: 8px;
-  color: #ffffff;
-  background: var(--primary);
-  font-weight: 900;
+  background: #ffffff;
 }
 
 .brand strong,

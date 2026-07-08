@@ -15,6 +15,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.GridLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -131,9 +132,9 @@ public class MainActivity extends Activity {
     header.setGravity(Gravity.CENTER_VERTICAL);
     header.setPadding(0, 0, 0, dp(18));
 
-    TextView mark = text("YA", 18, Color.WHITE, Typeface.BOLD);
-    mark.setGravity(Gravity.CENTER);
-    mark.setBackground(round(PRIMARY, PRIMARY, 8));
+    ImageView mark = new ImageView(this);
+    mark.setImageResource(R.mipmap.ic_launcher);
+    mark.setScaleType(ImageView.ScaleType.FIT_CENTER);
     LinearLayout.LayoutParams markParams = new LinearLayout.LayoutParams(dp(52), dp(52));
     header.addView(mark, markParams);
 

@@ -1117,7 +1117,7 @@ function App() {
     <div className="desktop-shell">
       <aside className="sidebar">
         <div className="brand">
-          <span>YA</span>
+          <img className="brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
           <div>
             <strong>Yardımcı Asistan</strong>
             <small>İşletme Paneli</small>
@@ -1520,7 +1520,7 @@ function SetupWizard({ form, setupData, saveState, message, onFormChange, onSave
     <main className="setup-shell">
       <section className="setup-hero" aria-label="İlk kurulum">
         <div className="setup-brand">
-          <span>YA</span>
+          <img className="setup-brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
           <div>
             <strong>Yardımcı Asistan</strong>
             <small>{setupData.setupRequired ? "İlk Kurulum" : "Ayarlar"}</small>

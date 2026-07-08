@@ -50,6 +50,7 @@ function createMainWindow() {
     minWidth: 1080,
     minHeight: 720,
     title: "Yardımcı Asistan",
+    icon: getAppIconPath(),
     backgroundColor: "#fff8ee",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -73,6 +74,11 @@ function createMainWindow() {
   } else {
     void window.loadFile(path.join(__dirname, "..", "dist-renderer", "index.html"));
   }
+}
+
+function getAppIconPath() {
+  const iconFile = process.platform === "win32" ? "app-icon.ico" : "app-icon.png";
+  return path.join(app.getAppPath(), "assets", iconFile);
 }
 
 app.whenReady().then(() => {

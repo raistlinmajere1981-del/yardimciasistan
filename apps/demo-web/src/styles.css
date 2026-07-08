@@ -74,15 +74,11 @@ a {
   font-size: 0.75rem;
 }
 
-.brand-mark {
-  display: grid;
+.brand-symbol {
   width: 42px;
   height: 42px;
-  place-items: center;
-  border-radius: 8px;
-  color: #ffffff;
-  background: var(--primary);
-  font-weight: 800;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .site-nav {

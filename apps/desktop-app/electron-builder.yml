@@ -9,6 +9,7 @@ directories:
 
 files:
   - package.json
+  - assets/**/*
   - dist-electron/**/*
   - dist-renderer/**/*
   - db/**/*
@@ -26,6 +27,7 @@ extraMetadata:
   version: 0.1.0
 
 win:
+  icon: assets/app-icon.ico
   target:
     - target: nsis
       arch:
@@ -41,6 +43,7 @@ nsis:
   shortcutName: Yardımcı Asistan
 
 linux:
+  icon: assets/app-icon.png
   target:
     - target: AppImage
       arch:

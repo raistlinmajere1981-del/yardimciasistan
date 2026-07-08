@@ -13,6 +13,8 @@ assert.ok(existsSync(appAsar), `app.asar bulunamadı: ${appAsar}`);
 const entries = new Set(listPackage(appAsar));
 const requiredEntries = [
   "/package.json",
+  "/assets/app-icon.ico",
+  "/assets/app-icon.png",
   "/dist-electron/main.js",
   "/dist-electron/preload.js",
   "/dist-electron/database.js",

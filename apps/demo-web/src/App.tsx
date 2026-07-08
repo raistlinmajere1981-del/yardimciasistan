@@ -73,7 +73,7 @@ function Header({ activePage, onNavigate }: { activePage: PageKey; onNavigate: (
   return (
     <header className="site-header">
       <button className="brand-button" onClick={() => onNavigate("home")} aria-label="Ana sayfaya git">
-        <span className="brand-mark">YA</span>
+        <img className="brand-symbol" src="/assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
         <span>
           <strong>{business.display_name}</strong>
           <small>Yardımcı Asistan Demo</small>
