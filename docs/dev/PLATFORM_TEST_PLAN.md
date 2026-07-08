@@ -4,6 +4,8 @@ Bu plan Yardımcı Asistan'ın Linux'ta rahat geliştirilebilmesi, Android telef
 
 ## Linux Ana Testleri
 
+- `npm run smoke:local-lab` ile PHP web modülü, demo web bağlantısı ve Android summary endpointi hızlı doğrulanır.
+- `npm run dev:local` ile PHP web modülü ve demo web sitesi aynı yerel test oturumunda açık tutulur.
 - Demo web sitesi Vite ile açılır.
 - Web widget build edilir ve `firm-template/web-module/widget.js` dosyasına kopyalanır.
 - Mini API PHP built-in server ile denenir.
@@ -59,6 +61,7 @@ npm run smoke:desktop:linux
 Web modülü için ayrıca:
 
 ```bash
+npm run smoke:local-lab
 npm run smoke:web-module
 ```
 

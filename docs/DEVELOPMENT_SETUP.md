@@ -214,6 +214,44 @@ Bu değişkenler verilmeden veya AI ayarı kapalıyken desktop güvenli yerel ta
 
 Anahtar frontend dosyalarına yazılmamalıdır.
 
+## Yerel Test Laboratuvarı
+
+Linux üzerinde demo web sitesi ve firma web modülünü birlikte açmak için:
+
+```bash
+npm run dev:local
+```
+
+Bu komut demo web modülü verisini hazırlar, PHP server'ı başlatır, demo web
+sitesini `VITE_YA_WEB_MODULE_URL` ile yerel web modülüne bağlar ve terminalde
+desktop/Android testlerinde kullanılacak adresleri yazdırır. Bitirmek için
+terminalde Ctrl+C kullanılır.
+
+Kısa doğrulama için:
+
+```bash
+npm run smoke:local-lab
+```
+
+Bu smoke testi PHP web modülünü ve demo web sitesini kısa süre açar,
+`android_summary` endpointini doğrular, sonra sunucuları kapatır ve demo veri
+dosyalarını eski haline alır.
+
+Yerel laboratuvar açıkken desktop uygulamayı aynı web modülüne bağlamak için:
+
+```bash
+YA_WEB_MODULE_URL=http://127.0.0.1:8080 YA_SYNC_SECRET=change-this-secret npm run dev:desktop
+```
+
+Android telefonu hazırlamak için:
+
+```bash
+npm run android:phone-test -- --once --hold-ms 12000
+```
+
+Demo hosting ve domain kararı firma sunumu aşamasına bırakılmıştır; günlük
+geliştirme hattı Linux yerel sunucuları ve adb bağlı Android telefondur.
+
 ## Desktop Yerel Yedek
 
 Desktop ana panelindeki `Yedek Al` komutu mevcut SQLite veritabanını uygulama
@@ -300,4 +338,4 @@ Linux üzerinde tüm yerel zinciri kontrol etmek için:
 npm run check:linux
 ```
 
-Bu komut ortam doktoru, PHP lint, web modül QR menü smoke testi, genel kontrol, Android APK build, Android hosting hazırlık smoke testi, desktop renderer smoke testi, desktop menü DB smoke testi ve Electron Xvfb smoke testini birlikte çalıştırır.
+Bu komut ortam doktoru, PHP lint, yerel laboratuvar smoke testi, web modül QR menü smoke testi, genel kontrol, Android APK build, Android hosting hazırlık smoke testi, desktop renderer smoke testi, desktop menü DB smoke testi ve Electron Xvfb smoke testini birlikte çalıştırır.
