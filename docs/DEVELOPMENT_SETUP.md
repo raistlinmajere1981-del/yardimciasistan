@@ -86,12 +86,16 @@ Playwright ile temel web akışı:
 npm run e2e
 ```
 
-Masaüstü ve mobil ekran görüntüsü almak için önce demo web sunucusu açık olmalıdır:
+Masaüstü ve mobil ekran görüntüsü almak için:
 
 ```bash
-npm run dev:demo-web
 npm run screenshots:demo-web
 ```
+
+Bu komut demo web sunucusunu geçici olarak açar, masaüstü ve mobil ekran
+görüntülerini alır, sonra sunucuyu kapatır. Zaten çalışan bir sunucuyu kullanmak
+isterseniz `DEMO_WEB_URL=http://127.0.0.1:5173 npm run screenshots:demo-web`
+şeklinde adres verebilirsiniz.
 
 Ekran görüntüleri `artifacts/screenshots/` altına yazılır. Bu klasör repoya dahil edilmez.
 
