@@ -209,8 +209,10 @@ npm run smoke:ai-live
 
 Bu komut aynı ortam değişkenleriyle `packages/ai-core` üzerinden gerçek
 `/chat/completions` isteği atar, kısa web sohbet cevabını ve işletme sahibi cevap
-taslağını doğrular. API anahtarı dosyaya yazılmamalı, sadece ortam değişkeni
-olarak verilmelidir.
+taslağını doğrular. Test yalnızca bağlantıyı değil, cevabın Türkçe işletme
+bağlamında kalmasını, bağlayıcı rezervasyon/fiyat onayı vermemesini ve desktop
+owner taslağının provider JSON cevabından gelmesini de kontrol eder. API anahtarı
+dosyaya yazılmamalı, sadece ortam değişkeni olarak verilmelidir.
 
 Desktop uygulamada `AI Taslak Yenile` komutu da aynı ortam değişkenlerini okur.
 Bu değişkenler verilmeden veya AI ayarı kapalıyken desktop güvenli yerel taslak

@@ -113,7 +113,7 @@ gösterir. Kayıtlar gerçek kişi bilgisi içermez.
 Desktop tarafındaki oda, masa, menü, rezervasyon, günlük iş ve WhatsApp örnekleri
 `apps/desktop-app/db/seeds/001_demo.sql` içinde tutulur.
 
-## Kalan Canlı Demo Genişletmeleri
+## Canlı Demo Doğrulamaları
 
-- Android uygulamasının hosting hazırlığı `npm run smoke:android-hosting` ile cihazsız doğrulanır; gerçek telefonda canlı web modül testi `npm run android:phone-test` ile hazırlanır ve cihaz üzerinde ekran/ağ davranışı manuel doğrulanır.
-- Gerçek AI provider bağlantısı `npm run smoke:ai-live` ile ortam değişkenlerinden alınan OpenAI uyumlu endpoint üzerinde denenir.
+- Android uygulamasının hosting hazırlığı `npm run smoke:android-hosting` ile cihazsız, gerçek telefon UI akışı `npm run smoke:android-device-ui` ve tam yerel demo provası `npm run smoke:local-demo` ile adb bağlı cihazda otomatik doğrulanır.
+- Gerçek AI provider bağlantısı `npm run smoke:ai-live` ile ortam değişkenlerinden alınan OpenAI uyumlu endpoint üzerinde doğrulanır; test bağlantıyla birlikte Türkçe işletme bağlamı, bağlayıcı olmayan cevap dili ve provider JSON taslağı kalitesini de kontrol eder.

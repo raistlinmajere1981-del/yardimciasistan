@@ -45,6 +45,13 @@ if (!webResult.ok || webResult.fallback) {
   process.exit(1);
 }
 
+const webQualityFailure = validateWebReply(webResult.answer);
+if (webQualityFailure) {
+  console.error(`live-ai-smoke-failed: web cevabı bağlam doğrulamasından geçmedi (${webQualityFailure})`);
+  console.error(`web-reply: ${shorten(webResult.answer)}`);
+  process.exit(1);
+}
+
 const ownerResult = await generateOwnerReplySuggestion(
   {
     businessName: "Deniz Çiçeği Pansiyon & Kafe",
@@ -58,15 +65,22 @@ const ownerResult = await generateOwnerReplySuggestion(
   config
 );
 
+if (ownerResult.fallback) {
+  console.error(`live-ai-smoke-failed: işletme sahibi taslağı provider cevabı yerine fallback kullandı (${ownerResult.providerMessage ?? "sebep yok"})`);
+  console.error(`owner-reply-text: ${shorten(ownerResult.suggestedReply)}`);
+  process.exit(1);
+}
+
+const ownerQualityFailure = validateOwnerReply(ownerResult.suggestedReply);
+if (ownerQualityFailure) {
+  console.error(`live-ai-smoke-failed: işletme sahibi taslağı bağlam doğrulamasından geçmedi (${ownerQualityFailure})`);
+  console.error(`owner-reply: ${shorten(ownerResult.suggestedReply)}`);
+  process.exit(1);
+}
+
 console.log("live-ai-smoke-ok");
 console.log(`web-reply: ${shorten(webResult.answer)}`);
-
-if (ownerResult.fallback) {
-  console.log(`owner-reply: fallback (${ownerResult.providerMessage ?? "model JSON taslağı güvenli doğrulamadan geçmedi"})`);
-  console.log(`owner-reply-text: ${shorten(ownerResult.suggestedReply)}`);
-} else {
-  console.log(`owner-reply: ${shorten(ownerResult.suggestedReply)}`);
-}
+console.log(`owner-reply: ${shorten(ownerResult.suggestedReply)}`);
 
 function readConfig() {
   return {
@@ -130,4 +144,41 @@ function shorten(value) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 500);
+}
+
+function validateWebReply(answer) {
+  const normalized = normalize(answer);
+  if (!/[ğüşıöçİĞÜŞÖÇ]/.test(answer) && /\b(hello|how are you|thank you)\b/i.test(answer)) {
+    return "Türkçe işletme cevabı yerine genel İngilizce cevap döndü";
+  }
+
+  if (!/(müsait|musait|fiyat|işletme|isletme|kontrol|dönüş|donus|whatsapp|talep|rezervasyon)/.test(normalized)) {
+    return "müsaitlik/fiyat/talep bağlamı yok";
+  }
+
+  if (/(kesin.*(rezervasyon|müsait|musait|fiyat)|onaylandı|onaylandi|garanti)/.test(normalized)) {
+    return "bağlayıcı onay dili içeriyor";
+  }
+
+  return "";
+}
+
+function validateOwnerReply(reply) {
+  const normalized = normalize(reply);
+  if (!/(müsait|musait|fiyat|kontrol|dönüş|donus|talep)/.test(normalized)) {
+    return "işletme sahibinin kontrol/dönüş sınırı yok";
+  }
+
+  if (/(rezervasyonunuz onaylandı|rezervasyonunuz onaylandi|kesin rezervasyon|fiyat garantili|garanti)/.test(normalized)) {
+    return "bağlayıcı onay dili içeriyor";
+  }
+
+  return "";
+}
+
+function normalize(value) {
+  return String(value ?? "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\s+/g, " ")
+    .trim();
 }
