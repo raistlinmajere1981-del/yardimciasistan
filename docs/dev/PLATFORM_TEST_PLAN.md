@@ -69,6 +69,7 @@ Web modülü için ayrıca:
 ```bash
 npm run smoke:local-lab
 npm run smoke:web-module
+npm run smoke:web-widget-branding
 ```
 
 Android gerçek cihaz hazırlığı için:

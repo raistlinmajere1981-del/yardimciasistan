@@ -25,5 +25,6 @@ packages/web-widget/dist/widget.js
   data-whatsapp-phone="+90 532 123 45 67"
   data-api-base-url="/yardimci-asistan"
   data-menu-url="/yardimci-asistan/menu.html"
+  data-logo-url="/yardimci-asistan/assets/yardimci-asistan-symbol.png"
 ></script>
 ```

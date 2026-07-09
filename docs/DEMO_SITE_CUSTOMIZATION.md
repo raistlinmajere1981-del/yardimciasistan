@@ -65,7 +65,7 @@ other
 
 ## 3. Logo ve Marka Alanı
 
-Şu an demo site marka işareti olarak `YA` yazı markasını kullanır. Logo dosyası eklemek için:
+Demo site varsayılan olarak Yardımcı Asistan marka sembolünü kullanır. Firmaya özel logo dosyası eklemek için:
 
 1. Logoyu `apps/demo-web/public/assets/` içine koyun.
 2. `business.json` içinde `logo_url` alanına yol yazın.
@@ -78,7 +78,7 @@ other
 }
 ```
 
-Logo entegrasyonu ileride ayrı görsel bileşenle genişletilebilir; şu an en güçlü marka sinyali `display_name`, renkler ve hero görselidir.
+`logo_url` boş bırakılırsa demo site Yardımcı Asistan marka sembolüne döner. Aynı logo widget balonunda da kullanılacaksa script etiketinde `data-logo-url="/assets/logo.webp"` değeri verilebilir.
 
 ## 4. Renkleri Değiştirme
 

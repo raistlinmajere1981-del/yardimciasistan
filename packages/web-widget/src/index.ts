@@ -12,6 +12,7 @@ interface WidgetConfig {
   whatsappPhone: string;
   apiBaseUrl: string;
   menuUrl: string;
+  logoUrl: string;
   primaryColor: string;
   accentColor: string;
 }
@@ -51,6 +52,7 @@ const defaultConfig: WidgetConfig = {
   whatsappPhone: "",
   apiBaseUrl: "",
   menuUrl: "",
+  logoUrl: "",
   primaryColor: "#2F6F5E",
   accentColor: "#E47863"
 };
@@ -115,7 +117,7 @@ function render() {
 function buttonTemplate() {
   return `
     <button class="ya-widget-button" type="button" data-ya-open aria-label="Yardımcı Asistan'ı aç">
-      <span>YA</span>
+      ${brandMarkTemplate()}
       <strong>Yardımcı Asistan</strong>
     </button>
   `;
@@ -126,7 +128,7 @@ function panelTemplate() {
     <section class="ya-widget-panel" aria-label="Yardımcı Asistan">
       <header class="ya-widget-header">
         <div>
-          <span>YA</span>
+          ${brandMarkTemplate()}
           <strong>${escapeHtml(config.businessName)}</strong>
         </div>
         <button type="button" data-ya-close aria-label="Kapat">x</button>
@@ -137,6 +139,14 @@ function panelTemplate() {
       ${state.status ? `<p class="ya-widget-status">${escapeHtml(state.status)}</p>` : ""}
     </section>
   `;
+}
+
+function brandMarkTemplate() {
+  if (!config.logoUrl) {
+    return `<span class="ya-widget-mark ya-widget-mark-fallback">YA</span>`;
+  }
+
+  return `<img class="ya-widget-mark" src="${escapeAttribute(config.logoUrl)}" alt="" aria-hidden="true" />`;
 }
 
 function homeTemplate() {
@@ -342,15 +352,19 @@ function injectStyles(widgetConfig: WidgetConfig) {
       cursor: pointer;
     }
 
-    .ya-widget-button span,
-    .ya-widget-header span {
-      display: grid;
+    .ya-widget-mark {
       width: 36px;
       height: 36px;
-      place-items: center;
+      flex: 0 0 auto;
+      object-fit: contain;
       border-radius: 8px;
-      color: ${widgetConfig.primaryColor};
       background: #ffffff;
+    }
+
+    .ya-widget-mark-fallback {
+      display: grid;
+      place-items: center;
+      color: ${widgetConfig.primaryColor};
       font-weight: 800;
     }
 
@@ -517,6 +531,7 @@ function getScriptConfig(): Partial<WidgetConfig> {
     whatsappPhone: dataset.whatsappPhone,
     apiBaseUrl: dataset.apiBaseUrl,
     menuUrl: dataset.menuUrl,
+    logoUrl: dataset.logoUrl,
     primaryColor: dataset.primaryColor,
     accentColor: dataset.accentColor
   });

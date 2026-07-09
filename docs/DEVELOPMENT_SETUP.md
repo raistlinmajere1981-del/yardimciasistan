@@ -186,11 +186,12 @@ QR menü sayfasını PHP server ve mobil Chromium viewport ile kontrol etmek iç
 
 ```bash
 npm run smoke:web-module
+npm run smoke:web-widget-branding
 ```
 
-Bu smoke testi QR menü yayınlama akışını ve `api/chat.php` AI fallback cevabını birlikte kontrol eder. AI provider gerçek anahtar olmadan kapalı kalır.
+`smoke:web-module` QR menü yayınlama akışını ve `api/chat.php` AI fallback cevabını birlikte kontrol eder. AI provider gerçek anahtar olmadan kapalı kalır. `smoke:web-widget-branding` widget bundle çıktısında logosuz `YA` fallback'ini ve `data-logo-url`/`logoUrl` ile görsel marka kullanımını Playwright üzerinden doğrular.
 
-WhatsApp linkleri, manuel kopyalama ve ilerideki resmi API geçişi için ortak mantık `packages/whatsapp-bridge` içindedir. Web widget, demo web ve desktop app aynı paketi kullanır; paket testleri Türkiye cep telefonu normalizasyonunu, boş mesaj/telefon hatalarını ve WebView fallback aksiyonunu kontrol eder. Desktop app içinde WhatsApp sayfası WebView alanını, bağlantı durumunu ve manuel kopyalama alternatifini birlikte sunar.
+WhatsApp linkleri, manuel kopyalama ve ilerideki resmi API geçişi için ortak mantık `packages/whatsapp-bridge` içindedir. Web widget, demo web ve desktop app aynı paketi kullanır; paket testleri Türkiye cep telefonu normalizasyonunu, boş mesaj/telefon hatalarını ve WebView fallback aksiyonunu kontrol eder. Web widget `data-logo-url` ile firma veya Yardımcı Asistan marka sembolünü gösterebilir. Desktop app içinde WhatsApp sayfası WebView alanını, bağlantı durumunu ve manuel kopyalama alternatifini birlikte sunar.
 
 AI endpointini gerçek OpenAI uyumlu provider ile denemek için PHP server açılmadan önce şu ortam değişkenleri verilebilir:
 
