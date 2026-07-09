@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, statSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import { listPackage } from "@electron/asar";
 
 const packageRoot = join(process.cwd(), "dist", "desktop", "linux-unpacked");
+const packageExecutable = join(packageRoot, "yardimci-asistan-desktop");
 const appAsar = join(packageRoot, "resources", "app.asar");
 
 assert.ok(existsSync(packageRoot), `Paket klasörü bulunamadı: ${packageRoot}`);
-assert.ok(existsSync(join(packageRoot, "yardimci-asistan-desktop")), "Linux paket çalıştırılabilir dosyası bulunamadı.");
+assert.ok(existsSync(packageExecutable), "Linux paket çalıştırılabilir dosyası bulunamadı.");
 assert.ok(existsSync(appAsar), `app.asar bulunamadı: ${appAsar}`);
 
 const entries = new Set(listPackage(appAsar));
@@ -27,4 +30,120 @@ for (const entry of requiredEntries) {
   assert.ok(entries.has(entry), `Paket içinde eksik dosya: ${entry}`);
 }
 
+await smokePackagedRuntime(packageExecutable);
+
 console.log(`desktop-package-ok: ${packageRoot}`);
+
+async function smokePackagedRuntime(executablePath) {
+  const xvfbCheck = spawnSync("xvfb-run", ["--help"], {
+    encoding: "utf8"
+  });
+  assert.equal(xvfbCheck.status, 0, "xvfb-run bulunamadı. Paketli Electron smoke testi için xorg-server-xvfb gerekli.");
+
+  const dataDir = join(process.cwd(), "artifacts", "desktop-package-smoke-data", String(Date.now()));
+  mkdirSync(dataDir, { recursive: true });
+  const databasePath = join(dataDir, "yardimci-asistan.sqlite");
+  const backupPath = join(dataDir, "backups");
+  const child = spawn("xvfb-run", ["-a", executablePath, "--no-sandbox"], {
+    cwd: packageRoot,
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ELECTRON_ENABLE_LOGGING: "1",
+      XDG_CONFIG_HOME: join(dataDir, "xdg-config"),
+      YA_DESKTOP_DATA_DIR: dataDir
+    }
+  });
+
+  let output = "";
+  child.stdout.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk.toString();
+  });
+
+  try {
+    await waitForPackagedDatabase({ child, databasePath, backupPath, output: () => output });
+  } finally {
+    await stopProcess(child);
+  }
+}
+
+async function waitForPackagedDatabase({ child, databasePath, backupPath, output }) {
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    if (child.exitCode !== null) {
+      throw new Error(`Paketli Electron erken kapandı (${child.exitCode}).\n${output().trim()}`);
+    }
+
+    if (existsSync(databasePath) && existsSync(backupPath)) {
+      try {
+        assert.ok(statSync(databasePath).size > 0);
+        assert.ok(statSync(backupPath).isDirectory());
+        assertPackagedDatabase(databasePath);
+        return;
+      } catch {
+        // Database may still be initializing.
+      }
+    }
+
+    await delay(100);
+  }
+
+  throw new Error(`Paketli Electron veri dosyalarını oluşturmadı.\n${output().trim()}`);
+}
+
+function assertPackagedDatabase(databasePath) {
+  const database = new DatabaseSync(databasePath);
+
+  try {
+    assert.equal(String(scalar(database, "PRAGMA integrity_check")), "ok");
+    assert.ok(Number(scalar(database, "SELECT COUNT(*) FROM schema_migrations")) >= 1);
+    assert.equal(scalar(database, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Deniz Çiçeği Pansiyon & Kafe");
+    assert.equal(scalar(database, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1"), "change-this-secret");
+    assert.ok(Number(scalar(database, "SELECT COUNT(*) FROM requests WHERE deleted_at = ''")) >= 1);
+  } finally {
+    database.close();
+  }
+}
+
+function scalar(database, sql) {
+  const row = database.prepare(sql).get();
+  assert.ok(row, `Sorgu sonuç döndürmedi: ${sql}`);
+  return Object.values(row)[0];
+}
+
+function stopProcess(child) {
+  return new Promise((resolve) => {
+    if (child.exitCode !== null) {
+      resolve();
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      killProcessTree(child, "SIGKILL");
+      resolve();
+    }, 3000);
+
+    child.once("exit", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+    killProcessTree(child, "SIGTERM");
+  });
+}
+
+function killProcessTree(child, signal) {
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    child.kill(signal);
+  }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
