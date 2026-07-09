@@ -41,6 +41,47 @@ try {
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Pansiyon & Kafe");
 
+  await page.evaluate(() => {
+    window.open = (url) => {
+      window.__yardimciAsistanLastOpenedUrl = String(url);
+      return null;
+    };
+  });
+
+  await page.locator('[data-ya-view="form"]').click();
+  await page.locator('.ya-widget-form select[name="request_type"]').selectOption("restaurant_reservation");
+  await page.locator('.ya-widget-form input[name="customer_name"]').fill("Widget Misafir");
+  await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 444 33 22");
+  await page.locator('.ya-widget-form input[name="date_text"]').fill("Bu akşam");
+  await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
+  await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
+  const requestResponsePromise = page.waitForResponse((response) => response.url() === `${baseUrl}/api/request.php` && response.request().method() === "POST");
+  await page.locator('.ya-widget-form button[type="submit"]').click();
+  const requestResponse = await requestResponsePromise;
+  expect(requestResponse.status()).toBe(201);
+  const requestResult = await requestResponse.json();
+  expect(requestResult.ok).toBe(true);
+  expect(requestResult.request_id).toMatch(/^request_/);
+  await expect(page.locator(".ya-widget-status")).toContainText("WhatsApp mesajı hazırlandı");
+
+  const openedUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
+  expect(openedUrl).toContain("https://wa.me/905321234567");
+  expect(decodeURIComponent(openedUrl)).toContain("Masa rezervasyonu");
+  expect(decodeURIComponent(openedUrl)).toContain("Widget Misafir");
+
+  const requestsAfterForm = JSON.parse(readFileSync(requestsFile, "utf8"));
+  expect(requestsAfterForm).toHaveLength(1);
+  expect(requestsAfterForm[0].id).toBe(requestResult.request_id);
+  expect(requestsAfterForm[0].source).toBe("web_form");
+  expect(requestsAfterForm[0].request_type).toBe("restaurant_reservation");
+  expect(requestsAfterForm[0].customer_name).toBe("Widget Misafir");
+  expect(requestsAfterForm[0].customer_phone).toBe("+905554443322");
+  expect(requestsAfterForm[0].date_text).toBe("Bu akşam");
+  expect(requestsAfterForm[0].guest_count).toBe(4);
+  expect(requestsAfterForm[0].message).toContain("Bahçede sakin");
+  expect(requestsAfterForm[0].sync_status).toBe("pending");
+
+  await page.locator('[data-ya-view="home"]').click();
   await page.locator('[data-ya-view="info"]').click();
   await expect(page.locator(".ya-widget-ai textarea")).toBeVisible();
   await page.locator(".ya-widget-ai textarea").fill("Bu akşam 4 kişilik masa var mı?");
@@ -58,7 +99,8 @@ try {
   expect(conversations[0].messages_json).toContain("işletme sahibi");
 
   const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
-  expect(requests).toHaveLength(0);
+  expect(requests).toHaveLength(1);
+  expect(requests[0].id).toBe(requestResult.request_id);
 
   console.log(`web-widget-module-smoke-ok: ${baseUrl}/widget.js`);
 } catch (error) {
