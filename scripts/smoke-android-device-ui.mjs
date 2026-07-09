@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const artifactDir = join(repoRoot, "artifacts", "android-device-ui");
 const packageName = "com.yardimciasistan.android";
+const activityName = ".MainActivity";
 const syncSecret = "change-this-secret";
 
 const options = parseArgs(process.argv.slice(2));
@@ -29,7 +30,9 @@ async function main() {
   phoneTest = startPhoneTest();
   await waitForReady(phoneTest, options.readyTimeoutMs);
   const baseUrl = getPhoneTestBaseUrl(phoneTest.output);
+  prepareAppForUi(baseUrl);
   await delay(options.settleMs);
+  scrollToTop();
 
   let topXml = dumpUi("top.xml");
   captureScreenshot("top.png");
@@ -224,6 +227,33 @@ function tap(point) {
 
 function swipe(x1, y1, x2, y2, durationMs) {
   adb(["shell", "input", "swipe", String(x1), String(y1), String(x2), String(y2), String(durationMs)]);
+}
+
+function prepareAppForUi(baseUrl) {
+  adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"], { allowFailure: true });
+  adb(["shell", "wm", "dismiss-keyguard"], { allowFailure: true });
+  adb(["shell", "input", "keyevent", "KEYCODE_MENU"], { allowFailure: true });
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
+  adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
+  adb([
+    "shell",
+    "am",
+    "start",
+    "-n",
+    `${packageName}/${activityName}`,
+    "--es",
+    "ya_web_module_url",
+    baseUrl,
+    "--es",
+    "ya_sync_secret",
+    syncSecret
+  ]);
+}
+
+function scrollToTop() {
+  for (let index = 0; index < 3; index += 1) {
+    swipe(360, 300, 360, 1120, 300);
+  }
 }
 
 async function waitForUiText(text, timeoutMs) {
