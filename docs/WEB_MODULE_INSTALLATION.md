@@ -40,7 +40,9 @@ Bu komut `packages/web-widget` çıktısını günceller, web modül dosyaların
 artifacts/web-module-deploy/yardimci-asistan/
 ```
 
-Yanındaki `artifacts/web-module-deploy/manifest.json` dosyası paketlenen dosyaların boyut ve SHA-256 özetlerini içerir.
+Yanındaki `artifacts/web-module-deploy/manifest.json` dosyası paketlenen dosyaların boyut, SHA-256 özetlerini, canlı kurulum uyarılarını ve üretilen arşivleri içerir. Komut her zaman `yardimci-asistan.tar.gz` üretmeye çalışır; sistemde `zip` komutu varsa ayrıca `yardimci-asistan.zip` oluşturur.
+
+Hosting panelinde arşiv çıkarma desteği varsa `yardimci-asistan.zip` veya `yardimci-asistan.tar.gz` dosyasını yükleyip açabilirsiniz. Destek yoksa `yardimci-asistan/` klasörünün içeriğini FTP veya dosya yöneticisiyle kopyalayın.
 
 ## 2. Config Ayarları
 

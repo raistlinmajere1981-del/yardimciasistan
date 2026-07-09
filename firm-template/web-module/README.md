@@ -176,7 +176,13 @@ npm run pack:web-module
 
 ```text
 artifacts/web-module-deploy/yardimci-asistan/
+artifacts/web-module-deploy/yardimci-asistan.tar.gz
+artifacts/web-module-deploy/manifest.json
 ```
+
+Sistemde `zip` komutu varsa aynı klasörde `yardimci-asistan.zip` de oluşturulur.
+Manifest canlı kurulum öncesi değiştirilmesi gereken varsayılan `sync_secret`,
+geliştirme origin değerleri ve örnek alan adı gibi uyarıları listeler.
 
 Ayrıntılı canlı kurulum adımları için:
 

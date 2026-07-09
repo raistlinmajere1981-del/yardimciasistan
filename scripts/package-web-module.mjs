@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -9,6 +10,8 @@ const sourceRoot = join(repoRoot, "firm-template", "web-module");
 const outputRoot = join(repoRoot, "artifacts", "web-module-deploy");
 const packageRoot = join(outputRoot, "yardimci-asistan");
 const manifestPath = join(outputRoot, "manifest.json");
+const tarballPath = join(outputRoot, "yardimci-asistan.tar.gz");
+const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
   "README.md",
   "widget.js",
@@ -38,6 +41,8 @@ const requiredFiles = [
 
 validateSource();
 rmSync(packageRoot, { recursive: true, force: true });
+rmSync(tarballPath, { force: true });
+rmSync(zipPath, { force: true });
 mkdirSync(outputRoot, { recursive: true });
 cpSync(sourceRoot, packageRoot, {
   recursive: true,
@@ -45,12 +50,16 @@ cpSync(sourceRoot, packageRoot, {
 });
 
 const packageFiles = listFiles(packageRoot);
+const businessConfig = JSON.parse(readFileSync(join(sourceRoot, "config", "business.json"), "utf8"));
+const archives = createArchives();
 const manifest = {
   package_name: "yardimci-asistan",
   source: relative(repoRoot, sourceRoot),
   output: relative(repoRoot, packageRoot),
   generated_at: new Date().toISOString(),
   file_count: packageFiles.length,
+  warnings: createDeploymentWarnings(businessConfig),
+  archives,
   files: packageFiles.map((file) => {
     const absolutePath = join(packageRoot, file);
     return {
@@ -64,7 +73,8 @@ const manifest = {
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 validatePackage(manifest);
 
-console.log(`web-module-package-ok: ${relative(repoRoot, packageRoot)} (${manifest.file_count} dosya)`);
+const archiveSummary = archives.filter((archive) => archive.status === "created").map((archive) => archive.path).join(", ") || "arşiv yok";
+console.log(`web-module-package-ok: ${relative(repoRoot, packageRoot)} (${manifest.file_count} dosya, ${archiveSummary})`);
 
 function validateSource() {
   assert.ok(existsSync(sourceRoot), `Web modül kaynak klasörü bulunamadı: ${sourceRoot}`);
@@ -112,6 +122,106 @@ function validatePackage(manifest) {
 
   const manifestOnDisk = JSON.parse(readFileSync(manifestPath, "utf8"));
   assert.equal(manifestOnDisk.file_count, manifest.files.length);
+
+  for (const archive of manifest.archives) {
+    if (archive.status !== "created") {
+      continue;
+    }
+
+    const archivePath = join(repoRoot, archive.path);
+    assert.ok(existsSync(archivePath), `Arşiv dosyası bulunamadı: ${archive.path}`);
+    assert.equal(statSync(archivePath).size, archive.bytes);
+    assert.equal(sha256(archivePath), archive.sha256);
+  }
+}
+
+function createArchives() {
+  return [
+    createTarGzArchive(),
+    createZipArchiveIfAvailable()
+  ];
+}
+
+function createTarGzArchive() {
+  const result = spawnSync("tar", ["-czf", tarballPath, "-C", outputRoot, "yardimci-asistan"], {
+    encoding: "utf8"
+  });
+
+  if (result.error?.code === "ENOENT") {
+    return skippedArchive("tar.gz", "tar komutu bulunamadı.");
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`tar.gz arşivi oluşturulamadı.\n${result.stderr || result.stdout}`.trim());
+  }
+
+  return createdArchive("tar.gz", tarballPath);
+}
+
+function createZipArchiveIfAvailable() {
+  const result = spawnSync("zip", ["-qr", zipPath, "yardimci-asistan"], {
+    cwd: outputRoot,
+    encoding: "utf8"
+  });
+
+  if (result.error?.code === "ENOENT") {
+    return skippedArchive("zip", "zip komutu bulunamadı.");
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`zip arşivi oluşturulamadı.\n${result.stderr || result.stdout}`.trim());
+  }
+
+  return createdArchive("zip", zipPath);
+}
+
+function createdArchive(format, path) {
+  return {
+    format,
+    status: "created",
+    path: relative(repoRoot, path),
+    bytes: statSync(path).size,
+    sha256: sha256(path)
+  };
+}
+
+function skippedArchive(format, reason) {
+  return {
+    format,
+    status: "skipped",
+    reason
+  };
+}
+
+function createDeploymentWarnings(business) {
+  const warnings = [];
+  const syncSecret = String(business.sync_secret ?? "");
+  const allowedOrigins = Array.isArray(business.allowed_origins) ? business.allowed_origins.map(String) : [];
+
+  if (syncSecret === "change-this-secret") {
+    warnings.push({
+      code: "default_sync_secret",
+      message: "Canlı kurulumdan önce config/business.json içindeki sync_secret değiştirilmelidir."
+    });
+  }
+
+  const developmentOrigins = allowedOrigins.filter((origin) => /localhost|127\.0\.0\.1/.test(origin));
+  if (developmentOrigins.length > 0) {
+    warnings.push({
+      code: "development_allowed_origins",
+      message: `Canlı kurulumda gerekli değilse geliştirme origin değerlerini kaldırın: ${developmentOrigins.join(", ")}`
+    });
+  }
+
+  const website = String(business.website ?? "");
+  if (/\.example\b/.test(website)) {
+    warnings.push({
+      code: "example_website",
+      message: "config/business.json içindeki website alanı gerçek firma alan adıyla değiştirilmelidir."
+    });
+  }
+
+  return warnings;
 }
 
 function assertJsonObject(path) {
