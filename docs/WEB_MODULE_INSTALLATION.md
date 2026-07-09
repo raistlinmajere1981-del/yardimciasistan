@@ -28,6 +28,19 @@ firm-template/web-module/
 ```
 
 Bu klasörün içeriğini hostingdeki `yardimci-asistan/` klasörüne kopyalayın.
+Yükleme öncesi doğrulanmış bir kopya üretmek için:
+
+```bash
+npm run pack:web-module
+```
+
+Bu komut `packages/web-widget` çıktısını günceller, web modül dosyalarını kontrol eder ve hosting paneline yüklenebilecek klasörü şurada hazırlar:
+
+```text
+artifacts/web-module-deploy/yardimci-asistan/
+```
+
+Yanındaki `artifacts/web-module-deploy/manifest.json` dosyası paketlenen dosyaların boyut ve SHA-256 özetlerini içerir.
 
 ## 2. Config Ayarları
 

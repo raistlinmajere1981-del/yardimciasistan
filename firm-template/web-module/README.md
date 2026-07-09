@@ -166,6 +166,18 @@ Lokal smoke testi:
 npm run smoke:web-module
 ```
 
+Hosting paneline yükleme öncesi doğrulanmış klasör üretmek için:
+
+```bash
+npm run pack:web-module
+```
+
+Çıktı:
+
+```text
+artifacts/web-module-deploy/yardimci-asistan/
+```
+
 Ayrıntılı canlı kurulum adımları için:
 
 ```text

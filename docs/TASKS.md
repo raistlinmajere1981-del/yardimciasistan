@@ -1502,6 +1502,7 @@ Kabul kriterleri:
 Durum:
 
 * Tamamlandı. Mevcut web sitesi için dosya kopyalama, config, widget, AI key, WhatsApp, izinler, WordPress ve düz HTML notları `docs/WEB_MODULE_INSTALLATION.md` içinde belgelendi.
+* `npm run pack:web-module` web widget bundle'ını günceller, web modül dosyalarını doğrular ve hosting paneline yüklenebilecek `artifacts/web-module-deploy/yardimci-asistan/` klasörünü manifest ile üretir.
 
 ---
 

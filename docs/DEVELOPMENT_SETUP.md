@@ -182,6 +182,12 @@ PHP endpoint söz dizimi kontrolü:
 npm run lint:php
 ```
 
+Hosting'e kopyalanacak web modül klasörünü üretmek ve dosya listesini doğrulamak için:
+
+```bash
+npm run pack:web-module
+```
+
 QR menü sayfasını PHP server ve mobil Chromium viewport ile kontrol etmek için:
 
 ```bash
