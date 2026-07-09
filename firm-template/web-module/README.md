@@ -183,6 +183,14 @@ artifacts/web-module-deploy/manifest.json
 Sistemde `zip` komutu varsa aynı klasörde `yardimci-asistan.zip` de oluşturulur.
 Manifest canlı kurulum öncesi değiştirilmesi gereken varsayılan `sync_secret`,
 geliştirme origin değerleri ve örnek alan adı gibi uyarıları listeler.
+Deploy paketindeki `config/business.json` değerleri, kaynak template'i değiştirmeden
+`YARDIMCI_ASISTAN_DEPLOY_*` ortam değişkenleriyle doldurulabilir. Örnek:
+
+```bash
+YARDIMCI_ASISTAN_DEPLOY_ALLOWED_ORIGINS="https://firma.com" \
+YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET="uzun-gizli-anahtar" \
+npm run pack:web-module
+```
 
 Ayrıntılı canlı kurulum adımları için:
 

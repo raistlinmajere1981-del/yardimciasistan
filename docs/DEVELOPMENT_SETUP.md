@@ -190,6 +190,8 @@ npm run pack:web-module
 
 Bu komut `artifacts/web-module-deploy/yardimci-asistan/` klasörünü, `manifest.json`
 dosyasını ve sistem destekliyorsa yükleme arşivlerini üretir.
+Canlı firma değerleri sadece deploy paketine yazılacaksa `YARDIMCI_ASISTAN_DEPLOY_*`
+ortam değişkenleri kullanılabilir; kaynak template dosyaları değişmez.
 
 QR menü sayfasını PHP server ve mobil Chromium viewport ile kontrol etmek için:
 

@@ -38,6 +38,17 @@ const requiredFiles = [
   "knowledge/menu.md",
   "knowledge/sik-sorulan-sorular.md"
 ];
+const businessOverrideFields = [
+  ["display_name", "YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME"],
+  ["phone", "YARDIMCI_ASISTAN_DEPLOY_PHONE"],
+  ["whatsapp", "YARDIMCI_ASISTAN_DEPLOY_WHATSAPP"],
+  ["email", "YARDIMCI_ASISTAN_DEPLOY_EMAIL"],
+  ["website", "YARDIMCI_ASISTAN_DEPLOY_WEBSITE"],
+  ["address", "YARDIMCI_ASISTAN_DEPLOY_ADDRESS"],
+  ["primary_color", "YARDIMCI_ASISTAN_DEPLOY_PRIMARY_COLOR"],
+  ["accent_color", "YARDIMCI_ASISTAN_DEPLOY_ACCENT_COLOR"],
+  ["sync_secret", "YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET", true]
+];
 
 validateSource();
 rmSync(packageRoot, { recursive: true, force: true });
@@ -49,8 +60,10 @@ cpSync(sourceRoot, packageRoot, {
   filter: (path) => !path.includes(`${sourceRoot}/.DS_Store`)
 });
 
+const appliedOverrides = applyPackageOverrides();
 const packageFiles = listFiles(packageRoot);
-const businessConfig = JSON.parse(readFileSync(join(sourceRoot, "config", "business.json"), "utf8"));
+const businessConfig = JSON.parse(readFileSync(join(packageRoot, "config", "business.json"), "utf8"));
+validateBusinessConfig(businessConfig, "paket config/business.json");
 const archives = createArchives();
 const manifest = {
   package_name: "yardimci-asistan",
@@ -58,6 +71,7 @@ const manifest = {
   output: relative(repoRoot, packageRoot),
   generated_at: new Date().toISOString(),
   file_count: packageFiles.length,
+  applied_overrides: appliedOverrides,
   warnings: createDeploymentWarnings(businessConfig),
   archives,
   files: packageFiles.map((file) => {
@@ -91,11 +105,7 @@ function validateSource() {
   assertJsonObject("data/android-snapshot.json");
 
   const business = JSON.parse(readFileSync(join(sourceRoot, "config", "business.json"), "utf8"));
-  assert.equal(typeof business.display_name, "string");
-  assert.ok(business.display_name.trim().length > 0, "business.json display_name boş olmamalı.");
-  assert.equal(typeof business.sync_secret, "string");
-  assert.ok(business.sync_secret.trim().length > 0, "business.json sync_secret boş olmamalı.");
-  assert.ok(Array.isArray(business.allowed_origins), "business.json allowed_origins dizi olmalı.");
+  validateBusinessConfig(business, "kaynak config/business.json");
 
   const aiConfig = readFileSync(join(sourceRoot, "config", "ai.php"), "utf8");
   assert.ok(aiConfig.includes("getenv('YARDIMCI_ASISTAN_AI_API_KEY')"), "config/ai.php API anahtarını ortam değişkeninden okumalı.");
@@ -107,6 +117,42 @@ function validateSource() {
     const htaccess = readFileSync(join(sourceRoot, folder, ".htaccess"), "utf8");
     assert.match(htaccess, /(Deny from all|Require all denied)/, `${folder}/.htaccess doğrudan erişimi kapatmalı.`);
   }
+}
+
+function applyPackageOverrides() {
+  const businessConfigPath = join(packageRoot, "config", "business.json");
+  const business = JSON.parse(readFileSync(businessConfigPath, "utf8"));
+  const applied = [];
+
+  for (const [field, envName, redacted = false] of businessOverrideFields) {
+    const value = String(process.env[envName] ?? "").trim();
+    if (!value) {
+      continue;
+    }
+
+    business[field] = value;
+    applied.push({
+      field,
+      env: envName,
+      redacted: Boolean(redacted)
+    });
+  }
+
+  const allowedOrigins = parseList(process.env.YARDIMCI_ASISTAN_DEPLOY_ALLOWED_ORIGINS ?? "");
+  if (allowedOrigins.length > 0) {
+    business.allowed_origins = allowedOrigins;
+    applied.push({
+      field: "allowed_origins",
+      env: "YARDIMCI_ASISTAN_DEPLOY_ALLOWED_ORIGINS",
+      redacted: false
+    });
+  }
+
+  if (applied.length > 0) {
+    writeFileSync(businessConfigPath, `${JSON.stringify(business, null, 2)}\n`);
+  }
+
+  return applied;
 }
 
 function validatePackage(manifest) {
@@ -133,6 +179,14 @@ function validatePackage(manifest) {
     assert.equal(statSync(archivePath).size, archive.bytes);
     assert.equal(sha256(archivePath), archive.sha256);
   }
+}
+
+function validateBusinessConfig(business, label) {
+  assert.equal(typeof business.display_name, "string", `${label} display_name string olmalı.`);
+  assert.ok(business.display_name.trim().length > 0, `${label} display_name boş olmamalı.`);
+  assert.equal(typeof business.sync_secret, "string", `${label} sync_secret string olmalı.`);
+  assert.ok(business.sync_secret.trim().length > 0, `${label} sync_secret boş olmamalı.`);
+  assert.ok(Array.isArray(business.allowed_origins), `${label} allowed_origins dizi olmalı.`);
 }
 
 function createArchives() {
@@ -222,6 +276,13 @@ function createDeploymentWarnings(business) {
   }
 
   return warnings;
+}
+
+function parseList(value) {
+  return value
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function assertJsonObject(path) {

@@ -44,6 +44,20 @@ Yanındaki `artifacts/web-module-deploy/manifest.json` dosyası paketlenen dosya
 
 Hosting panelinde arşiv çıkarma desteği varsa `yardimci-asistan.zip` veya `yardimci-asistan.tar.gz` dosyasını yükleyip açabilirsiniz. Destek yoksa `yardimci-asistan/` klasörünün içeriğini FTP veya dosya yöneticisiyle kopyalayın.
 
+Kaynak template dosyasını değiştirmeden, sadece üretilecek deploy paketindeki `config/business.json` değerlerini doldurmak için şu ortam değişkenleri kullanılabilir:
+
+```bash
+YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME="Firma Adı" \
+YARDIMCI_ASISTAN_DEPLOY_WHATSAPP="+90 532 123 45 67" \
+YARDIMCI_ASISTAN_DEPLOY_PHONE="+90 532 123 45 67" \
+YARDIMCI_ASISTAN_DEPLOY_WEBSITE="https://firma.com" \
+YARDIMCI_ASISTAN_DEPLOY_ALLOWED_ORIGINS="https://firma.com" \
+YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET="uzun-ve-tahmin-edilemeyen-bir-anahtar" \
+npm run pack:web-module
+```
+
+Desteklenen ek alanlar: `YARDIMCI_ASISTAN_DEPLOY_EMAIL`, `YARDIMCI_ASISTAN_DEPLOY_ADDRESS`, `YARDIMCI_ASISTAN_DEPLOY_PRIMARY_COLOR`, `YARDIMCI_ASISTAN_DEPLOY_ACCENT_COLOR`. Bu değerler sadece `artifacts/web-module-deploy/yardimci-asistan/config/business.json` içine yazılır; repo içindeki kaynak template değişmez. Hâssas `sync_secret` değerini commit etmeyin.
+
 ## 2. Config Ayarları
 
 Ana firma ayarı:
