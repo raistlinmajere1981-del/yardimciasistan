@@ -310,6 +310,14 @@ Build komutu:
 npm run build -w @yardimci-asistan/demo-web
 ```
 
+Demo siteyi firma web modülündeki gerçek widget ile birlikte açmak için:
+
+```bash
+VITE_YA_WEB_MODULE_URL=https://firma.com/yardimci-asistan npm run build -w @yardimci-asistan/demo-web
+```
+
+Yerel testte aynı bağlantı `npm run dev:local` veya `npm run smoke:demo-web-widget` ile doğrulanır.
+
 Çıktı:
 
 ```text

@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { buildCustomerRequestWhatsAppMessage, createWhatsAppUrl } from "@yardimci-asistan/whatsapp-bridge";
 import {
   BedDouble,
@@ -20,6 +20,15 @@ import type { BusinessConfig, PageKey } from "./types";
 
 const business = businessJson as BusinessConfig;
 type RequestSubmitState = "idle" | "saving" | "saved" | "fallback" | "error";
+const DEMO_WIDGET_SCRIPT_ID = "yardimci-asistan-demo-widget-script";
+
+declare global {
+  interface Window {
+    YardimciAsistanWidget?: {
+      init: (config?: Record<string, string>) => void;
+    };
+  }
+}
 
 const navItems: Array<{ key: PageKey; label: string; icon: typeof Home }> = [
   { key: "home", label: "Ana Sayfa", icon: Home },
@@ -46,6 +55,8 @@ function App() {
     "--ink": business.colors.ink
   } as CSSProperties;
 
+  useDemoWidget();
+
   function goToPage(page: PageKey) {
     setActivePage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -67,6 +78,44 @@ function App() {
       <Footer onNavigate={goToPage} />
     </div>
   );
+}
+
+function useDemoWidget() {
+  useEffect(() => {
+    const webModuleBaseUrl = getWebModuleBaseUrl();
+    if (!webModuleBaseUrl) {
+      return;
+    }
+
+    const config = {
+      businessName: business.display_name,
+      whatsappPhone: business.whatsapp,
+      apiBaseUrl: webModuleBaseUrl,
+      menuUrl: `${webModuleBaseUrl}/menu.html`,
+      logoUrl: `${webModuleBaseUrl}/assets/yardimci-asistan-symbol.png`,
+      primaryColor: business.colors.primary,
+      accentColor: business.colors.accent
+    };
+
+    const existingScript = document.getElementById(DEMO_WIDGET_SCRIPT_ID);
+    if (existingScript) {
+      window.YardimciAsistanWidget?.init(config);
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = DEMO_WIDGET_SCRIPT_ID;
+    script.src = `${webModuleBaseUrl}/widget.js`;
+    script.async = true;
+    script.dataset.businessName = config.businessName;
+    script.dataset.whatsappPhone = config.whatsappPhone;
+    script.dataset.apiBaseUrl = config.apiBaseUrl;
+    script.dataset.menuUrl = config.menuUrl;
+    script.dataset.logoUrl = config.logoUrl;
+    script.dataset.primaryColor = config.primaryColor;
+    script.dataset.accentColor = config.accentColor;
+    document.body.appendChild(script);
+  }, []);
 }
 
 function Header({ activePage, onNavigate }: { activePage: PageKey; onNavigate: (page: PageKey) => void }) {
@@ -535,8 +584,12 @@ function toRequestApiPayload(
 }
 
 function getRequestApiEndpoint() {
-  const baseUrl = String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? "").trim();
-  return baseUrl ? `${baseUrl.replace(/\/+$/, "")}/api/request.php` : "";
+  const baseUrl = getWebModuleBaseUrl();
+  return baseUrl ? `${baseUrl}/api/request.php` : "";
+}
+
+function getWebModuleBaseUrl() {
+  return String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? "").trim().replace(/\/+$/, "");
 }
 
 async function submitRequestToMiniApi(endpoint: string, payload: Record<string, string | number>) {

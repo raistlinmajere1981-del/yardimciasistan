@@ -1,0 +1,180 @@
+import { chromium, expect } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import { join } from "node:path";
+import process from "node:process";
+
+const repoRoot = process.cwd();
+const demoWebRoot = join(repoRoot, "apps", "demo-web");
+const businessConfigFile = "firm-template/web-module/config/business.json";
+const conversationsFile = "firm-template/web-module/data/ai-conversations.json";
+const requestsFile = "firm-template/web-module/data/requests.json";
+const originalBusinessConfigJson = readFileSync(businessConfigFile, "utf8");
+const originalConversationsJson = readFileSync(conversationsFile, "utf8");
+const originalRequestsJson = readFileSync(requestsFile, "utf8");
+const phpPort = await getFreePort();
+let demoPort = await getFreePort();
+while (demoPort === phpPort) {
+  demoPort = await getFreePort();
+}
+const webModuleUrl = `http://127.0.0.1:${phpPort}`;
+const demoWebUrl = `http://127.0.0.1:${demoPort}`;
+const processes = [];
+
+let browser;
+
+try {
+  writeFileSync(conversationsFile, "[]\n");
+  writeFileSync(requestsFile, "[]\n");
+  allowDemoOrigin(demoWebUrl);
+
+  const phpServer = startProcess("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "firm-template/web-module"], repoRoot);
+  await waitForUrl(`${webModuleUrl}/api/menu.php`, phpServer);
+
+  const demoServer = startProcess("npx", ["vite", "--host", "127.0.0.1", "--port", String(demoPort), "--strictPort"], demoWebRoot, {
+    VITE_YA_WEB_MODULE_URL: webModuleUrl
+  });
+  await waitForUrl(demoWebUrl, demoServer);
+
+  browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 420, height: 760 } });
+  await page.goto(demoWebUrl, { waitUntil: "networkidle" });
+
+  await expect(page.getByRole("heading", { name: "Deniz Çiçeği Pansiyon & Kafe" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Yardımcı Asistan'ı aç" })).toBeVisible();
+  await expect(page.locator(".ya-widget-button img.ya-widget-mark")).toHaveAttribute("src", `${webModuleUrl}/assets/yardimci-asistan-symbol.png`);
+
+  await page.evaluate(() => {
+    window.open = (url) => {
+      window.__yardimciAsistanLastOpenedUrl = String(url);
+      return null;
+    };
+  });
+
+  await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
+  await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Pansiyon & Kafe");
+  await page.locator('[data-ya-view="form"]').click();
+  await page.locator('.ya-widget-form select[name="request_type"]').selectOption("pension_reservation");
+  await page.locator('.ya-widget-form input[name="customer_name"]').fill("Demo Web Widget");
+  await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 222 11 00");
+  await page.locator('.ya-widget-form input[name="date_text"]').fill("23 Temmuz");
+  await page.locator('.ya-widget-form input[name="guest_count"]').fill("2");
+  await page.locator('.ya-widget-form textarea[name="message"]').fill("Sessiz oda için bilgi rica ederiz.");
+  const requestResponsePromise = page.waitForResponse((response) => response.url() === `${webModuleUrl}/api/request.php` && response.request().method() === "POST");
+  await page.locator('.ya-widget-form button[type="submit"]').click();
+  const requestResponse = await requestResponsePromise;
+  expect(requestResponse.status()).toBe(201);
+  await expect(page.locator(".ya-widget-status")).toContainText("WhatsApp mesajı hazırlandı");
+
+  const openedUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
+  expect(openedUrl).toContain("https://wa.me/905321234567");
+  expect(decodeURIComponent(openedUrl)).toContain("Demo Web Widget");
+
+  const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
+  expect(requests).toHaveLength(1);
+  expect(requests[0].source).toBe("web_form");
+  expect(requests[0].customer_name).toBe("Demo Web Widget");
+  expect(requests[0].customer_phone).toBe("+905552221100");
+  expect(requests[0].sync_status).toBe("pending");
+
+  await page.locator('[data-ya-view="home"]').click();
+  await page.locator('[data-ya-view="info"]').click();
+  await page.locator(".ya-widget-ai textarea").fill("Bu akşam 2 kişilik masa var mı?");
+  const chatResponsePromise = page.waitForResponse((response) => response.url() === `${webModuleUrl}/api/chat.php` && response.request().method() === "POST");
+  await page.locator('.ya-widget-ai button[type="submit"]').click();
+  const chatResponse = await chatResponsePromise;
+  expect(chatResponse.status()).toBe(200);
+  await expect(page.locator(".ya-widget-ai-answer")).toContainText("işletme sahibi");
+  await expect(page.locator(".ya-widget-status")).toContainText("güvenli yanıt");
+
+  const conversations = JSON.parse(readFileSync(conversationsFile, "utf8"));
+  expect(conversations).toHaveLength(1);
+  expect(conversations[0].source).toBe("web_ai");
+  expect(conversations[0].status).toBe("fallback");
+
+  console.log(`demo-web-widget-smoke-ok: ${demoWebUrl} -> ${webModuleUrl}`);
+} finally {
+  if (browser) {
+    await browser.close();
+  }
+  writeFileSync(businessConfigFile, originalBusinessConfigJson);
+  writeFileSync(conversationsFile, originalConversationsJson);
+  writeFileSync(requestsFile, originalRequestsJson);
+  stopProcesses();
+}
+
+function allowDemoOrigin(origin) {
+  const config = JSON.parse(originalBusinessConfigJson);
+  const allowedOrigins = Array.isArray(config.allowed_origins) ? config.allowed_origins : [];
+  config.allowed_origins = Array.from(new Set([...allowedOrigins, origin]));
+  writeFileSync(businessConfigFile, `${JSON.stringify(config, null, 2)}\n`);
+}
+
+function startProcess(command, args, cwd, env = {}) {
+  const child = spawn(command, args, {
+    cwd,
+    env: {
+      ...process.env,
+      ...env
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+    shell: process.platform === "win32"
+  });
+  child.output = "";
+  child.stdout.on("data", (chunk) => {
+    child.output += chunk.toString();
+  });
+  child.stderr.on("data", (chunk) => {
+    child.output += chunk.toString();
+  });
+  processes.push(child);
+  return child;
+}
+
+function stopProcesses() {
+  for (const child of [...processes].reverse()) {
+    if (child.exitCode === null) {
+      child.kill();
+    }
+  }
+}
+
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = http.createServer();
+    probe.on("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const freePort = typeof address === "object" && address ? address.port : 0;
+      probe.close(() => resolve(freePort));
+    });
+  });
+}
+
+async function waitForUrl(url, processHandle) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (processHandle.exitCode !== null) {
+      throw new Error(`Server erken kapandı: ${url}\n${processHandle.output.trim()}`);
+    }
+
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // Server is still starting.
+    }
+
+    await delay(100);
+  }
+
+  throw new Error(`Server hazır olmadı: ${url}\n${processHandle.output.trim()}`);
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}

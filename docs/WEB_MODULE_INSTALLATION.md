@@ -58,7 +58,7 @@ Değiştirilecek temel alanlar:
 
 `sync_secret` değerini kurulumda mutlaka değiştirin. Bu anahtar PC uygulamasının hostingdeki talepleri çekmesi ve QR menüyü yayınlaması için kullanılır.
 
-`allowed_origins` içine sitenin gerçek alan adını yazın. Geliştirme sırasında `http://localhost:5173` kalabilir; canlı kurulumda gerekli değilse kaldırın.
+`allowed_origins` içine sitenin gerçek alan adını yazın. Geliştirme sırasında `http://localhost:5173` ve `http://127.0.0.1:5173` kalabilir; canlı kurulumda gerekli değilse kaldırın.
 
 ## 3. WhatsApp Numarası
 
