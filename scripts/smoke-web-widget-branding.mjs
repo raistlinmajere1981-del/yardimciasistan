@@ -12,6 +12,27 @@ try {
   await page.setContent("<!doctype html><html><head></head><body><main>Firma sitesi</main></body></html>", {
     waitUntil: "domcontentloaded"
   });
+  await page.route("https://demo.test/yardimci-asistan/api/chat.php", async (route) => {
+    const payload = route.request().postDataJSON();
+    if (payload.message !== "Bu akşam 4 kişilik masa var mı?") {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: false, message: "unexpected_message" })
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        answer: "Müsaitlik ve fiyat için işletme sahibi kontrol edip size dönüş yapacaktır.",
+        fallback: true
+      })
+    });
+  });
   await page.addScriptTag({ path: widgetBundlePath });
 
   await page.evaluate(() => {
@@ -25,7 +46,8 @@ try {
   await page.evaluate(() => {
     window.YardimciAsistanWidget?.init({
       businessName: "Logo Firma",
-      logoUrl: "/assets/yardimci-asistan-symbol.png"
+      logoUrl: "/assets/yardimci-asistan-symbol.png",
+      apiBaseUrl: "https://demo.test/yardimci-asistan"
     });
   });
 
@@ -33,6 +55,11 @@ try {
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", "/assets/yardimci-asistan-symbol.png");
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Logo Firma");
+  await page.locator('[data-ya-view="info"]').click();
+  await page.locator(".ya-widget-ai textarea").fill("Bu akşam 4 kişilik masa var mı?");
+  await page.locator('.ya-widget-ai button[type="submit"]').click();
+  await expect(page.locator(".ya-widget-ai-answer")).toContainText("Müsaitlik ve fiyat");
+  await expect(page.locator(".ya-widget-status")).toContainText("güvenli yanıt");
 
   console.log("web-widget-branding-smoke-ok");
 } finally {

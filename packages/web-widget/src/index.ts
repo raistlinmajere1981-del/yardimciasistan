@@ -32,6 +32,8 @@ interface WidgetState {
   isOpen: boolean;
   view: WidgetView;
   status: string;
+  aiAnswer: string;
+  aiLoading: boolean;
 }
 
 declare global {
@@ -61,7 +63,9 @@ let config: WidgetConfig = { ...defaultConfig };
 let state: WidgetState = {
   isOpen: false,
   view: "home",
-  status: ""
+  status: "",
+  aiAnswer: "",
+  aiLoading: false
 };
 
 export function init(userConfig: Partial<WidgetConfig> = {}) {
@@ -81,7 +85,7 @@ export function open() {
 }
 
 export function close() {
-  state = { ...state, isOpen: false, view: "home", status: "" };
+  state = { ...state, isOpen: false, view: "home", status: "", aiLoading: false };
   render();
 }
 
@@ -212,9 +216,27 @@ function infoTemplate() {
     <div class="ya-widget-info">
       <p><strong>${escapeHtml(config.businessName)}</strong></p>
       ${config.whatsappPhone ? `<p>${escapeHtml(config.whatsappPhone)}</p>` : ""}
+      ${aiChatTemplate()}
       <a href="${createWhatsAppLink(config.whatsappPhone, "Merhaba, bilgi almak istiyorum.")}" target="_blank" rel="noreferrer">WhatsApp'tan Yaz</a>
       <button type="button" class="ya-widget-back" data-ya-view="home">Geri</button>
     </div>
+  `;
+}
+
+function aiChatTemplate() {
+  if (!config.apiBaseUrl) {
+    return "";
+  }
+
+  return `
+    <form class="ya-widget-ai" data-ya-ai-form>
+      <label>
+        Kısa soru
+        <textarea name="message" required maxlength="1200" placeholder="Örn. Bu akşam 4 kişilik masa var mı?"></textarea>
+      </label>
+      <button type="submit" ${state.aiLoading ? "disabled" : ""}>${state.aiLoading ? "Yanıt Hazırlanıyor" : "AI Yardımcıya Sor"}</button>
+    </form>
+    ${state.aiAnswer ? `<p class="ya-widget-ai-answer"><strong>AI Yardımcı</strong><span>${escapeHtml(state.aiAnswer)}</span></p>` : ""}
   `;
 }
 
@@ -228,13 +250,15 @@ function bindEvents(root: HTMLElement) {
         ...state,
         isOpen: true,
         view: button.dataset.yaView as WidgetView,
-        status: ""
+        status: "",
+        aiLoading: false
       };
       render();
     });
   });
 
   root.querySelector<HTMLFormElement>("[data-ya-form]")?.addEventListener("submit", handleFormSubmit);
+  root.querySelector<HTMLFormElement>("[data-ya-ai-form]")?.addEventListener("submit", handleAiSubmit);
 }
 
 function handleFormSubmit(event: Event) {
@@ -300,6 +324,53 @@ async function saveRequest(payload: RequestPayload) {
     state = {
       ...state,
       status: "Talep kaydı sırasında sorun oldu. WhatsApp mesajınız hazırlandı."
+    };
+    render();
+  }
+}
+
+async function handleAiSubmit(event: Event) {
+  event.preventDefault();
+  const form = event.currentTarget as HTMLFormElement;
+  const formData = new FormData(form);
+  const message = String(formData.get("message") ?? "").trim();
+
+  if (!message) {
+    state = { ...state, status: "Lütfen kısa sorunuzu yazın." };
+    render();
+    return;
+  }
+
+  state = { ...state, status: "Yanıt hazırlanıyor.", aiLoading: true };
+  render();
+
+  try {
+    const endpoint = `${config.apiBaseUrl.replace(/\/$/, "")}/api/chat.php`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ message })
+    });
+    const result = await response.json().catch(() => null) as { ok?: boolean; answer?: string; message?: string; fallback?: boolean } | null;
+
+    if (!response.ok || !result?.ok || !result.answer) {
+      throw new Error(result?.message || "ai_failed");
+    }
+
+    state = {
+      ...state,
+      aiAnswer: result.answer,
+      aiLoading: false,
+      status: result.fallback ? "AI kapalıyken güvenli yanıt gösterildi." : ""
+    };
+    render();
+  } catch {
+    state = {
+      ...state,
+      aiLoading: false,
+      status: "AI yanıtı alınamadı. WhatsApp üzerinden yazabilirsiniz."
     };
     render();
   }
@@ -414,7 +485,8 @@ function injectStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-home,
     .ya-widget-info,
-    .ya-widget-form {
+    .ya-widget-form,
+    .ya-widget-ai {
       display: grid;
       gap: 10px;
       padding: 12px;
@@ -423,7 +495,8 @@ function injectStyles(widgetConfig: WidgetConfig) {
     .ya-widget-home button,
     .ya-widget-home a,
     .ya-widget-info a,
-    .ya-widget-form button {
+    .ya-widget-form button,
+    .ya-widget-ai button {
       display: grid;
       gap: 4px;
       width: 100%;
@@ -441,6 +514,7 @@ function injectStyles(widgetConfig: WidgetConfig) {
     .ya-widget-home span,
     .ya-widget-form p,
     .ya-widget-info p,
+    .ya-widget-ai-answer span,
     .ya-widget-status {
       margin: 0;
       color: #58606f;
@@ -455,7 +529,8 @@ function injectStyles(widgetConfig: WidgetConfig) {
       font-weight: 800;
     }
 
-    .ya-widget-form label {
+    .ya-widget-form label,
+    .ya-widget-ai label {
       display: grid;
       gap: 5px;
       color: #172033;
@@ -465,7 +540,8 @@ function injectStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-form input,
     .ya-widget-form select,
-    .ya-widget-form textarea {
+    .ya-widget-form textarea,
+    .ya-widget-ai textarea {
       width: 100%;
       min-height: 40px;
       padding: 9px 10px;
@@ -476,12 +552,14 @@ function injectStyles(widgetConfig: WidgetConfig) {
       font: inherit;
     }
 
-    .ya-widget-form textarea {
+    .ya-widget-form textarea,
+    .ya-widget-ai textarea {
       min-height: 76px;
       resize: vertical;
     }
 
     .ya-widget-form button[type="submit"],
+    .ya-widget-ai button[type="submit"],
     .ya-widget-info a {
       display: inline-flex;
       align-items: center;
@@ -490,6 +568,26 @@ function injectStyles(widgetConfig: WidgetConfig) {
       background: ${widgetConfig.primaryColor};
       text-align: center;
       font-weight: 800;
+    }
+
+    .ya-widget-ai button[disabled] {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    .ya-widget-ai-answer {
+      display: grid;
+      gap: 5px;
+      margin: 0;
+      padding: 10px;
+      border: 1px solid #ded8ce;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
+    .ya-widget-ai-answer strong {
+      color: #172033;
+      font-size: 13px;
     }
 
     .ya-widget-form .ya-widget-back,

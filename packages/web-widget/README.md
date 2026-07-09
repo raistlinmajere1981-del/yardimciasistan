@@ -2,7 +2,7 @@
 
 Mevcut web sitelerine tek script ile eklenebilecek Yardımcı Asistan widget'ı burada geliştirilir.
 
-Widget; sağ altta Yardımcı Asistan butonu, açılır panel, kısa talep formu, WhatsApp hazır mesajı ve QR menü bağlantısı sunar. Mini API adresi verilirse talebi arka planda kaydetmeyi dener; bu deneme başarısız olsa bile WhatsApp mesajı hazırlanır.
+Widget; sağ altta Yardımcı Asistan butonu, açılır panel, kısa talep formu, bilgi panelinde AI soru/cevap alanı, WhatsApp hazır mesajı ve QR menü bağlantısı sunar. Mini API adresi verilirse talebi arka planda kaydetmeyi ve bilgi panelindeki kısa soruları `api/chat.php` üzerinden yanıtlamayı dener; bu denemeler başarısız olsa bile WhatsApp akışı devam eder.
 
 ## Build
 

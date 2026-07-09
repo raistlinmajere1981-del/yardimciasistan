@@ -443,7 +443,7 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. `packages/web-widget` tek script ile gömülebilen sağ alt widget'ı, mobil uyumlu açılır paneli, rezervasyon/bilgi formunu, WhatsApp ve QR menü aksiyonlarını içerir. `data-logo-url` ile firma veya Yardımcı Asistan marka sembolü gösterilebilir; değer verilmezse kompakt `YA` metin rozeti kullanılır. `npm run smoke:web-widget-branding` build edilmiş widget bundle'ında iki marka durumunu da doğrular.
+* Tamamlandı. `packages/web-widget` tek script ile gömülebilen sağ alt widget'ı, mobil uyumlu açılır paneli, rezervasyon/bilgi formunu, bilgi panelinde mini API `chat.php` üzerinden AI soru/cevap alanını, WhatsApp ve QR menü aksiyonlarını içerir. `data-logo-url` ile firma veya Yardımcı Asistan marka sembolü gösterilebilir; değer verilmezse kompakt `YA` metin rozeti kullanılır. `npm run smoke:web-widget-branding` build edilmiş widget bundle'ında iki marka durumunu ve AI cevap alanını doğrular.
 
 ---
 

@@ -77,6 +77,8 @@ Türkiye cep telefonu formatı kullanın. Sabit hatlar WhatsApp linki için uygu
 ## 4. Widget Ekleme
 
 Müşteri talep formu ve hızlı WhatsApp butonu için `widget.js` dosyası siteye eklenir.
+`data-api-base-url` verildiğinde widget bilgi panelindeki kısa soru alanı da
+`api/chat.php` üzerinden güvenli AI cevabı gösterebilir.
 
 ### Düz HTML Site
 
