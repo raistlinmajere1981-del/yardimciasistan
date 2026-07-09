@@ -161,4 +161,4 @@ npm run smoke:desktop-package
 npm run smoke:desktop:linux
 ```
 
-`smoke-desktop-menu-db` setup state, manuel yedek dosyası ve kaydetme akışını kontrol eder. `smoke-desktop-renderer` ilk kurulum ekranını ve ana paneldeki `Yedek Al` komutunu tarayıcı önizlemesinde fake preload köprüsüyle açar. `smoke-desktop-package` paket içeriğinin kurulum için gerekli dosyaları taşıdığını doğrular.
+`smoke-desktop-menu-db` setup state, manuel yedek dosyası, yedeğin SQLite olarak açılabilirliğini, `PRAGMA integrity_check` sonucunu ve kaydetme akışını kontrol eder. `smoke-desktop-renderer` ilk kurulum ekranını ve ana paneldeki `Yedek Al` komutunu tarayıcı önizlemesinde fake preload köprüsüyle açar. `smoke-desktop-package` paket içeriğinin kurulum için gerekli dosyaları taşıdığını doğrular.

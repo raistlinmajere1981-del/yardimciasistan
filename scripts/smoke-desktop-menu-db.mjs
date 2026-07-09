@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, statSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import process from "node:process";
 
@@ -57,6 +58,7 @@ try {
   assert.equal(backupResult.dashboardData.backupPath, database.backupPath);
   assert.equal(existsSync(backupResult.backupFilePath), true);
   assert.ok(statSync(backupResult.backupFilePath).size > 0);
+  assertReadableSqliteBackup(backupResult.backupFilePath);
 
   const createdRequestEventCount = database.countEventsByType("request.created");
   const manualRequestResult = database.createManualRequest({
@@ -233,4 +235,25 @@ try {
   console.log(`desktop-menu-db-ok: setup ${categoryResult.savedId} ${itemResult.savedId}`);
 } finally {
   database.close();
+}
+
+function assertReadableSqliteBackup(backupFilePath) {
+  const backupDb = new DatabaseSync(backupFilePath);
+
+  try {
+    assert.equal(String(scalar(backupDb, "PRAGMA integrity_check")), "ok");
+    assert.equal(scalar(backupDb, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Smoke Pansiyon");
+    assert.equal(scalar(backupDb, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1"), "smoke-secret-12345");
+    assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")) >= 3);
+    assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM tables WHERE deleted_at = ''")) >= 3);
+    assert.equal(scalar(backupDb, "SELECT customer_name FROM requests WHERE id = 'request_demo_001'"), "Demo Misafir");
+  } finally {
+    backupDb.close();
+  }
+}
+
+function scalar(database, sql) {
+  const row = database.prepare(sql).get();
+  assert.ok(row, `Sorgu sonuç döndürmedi: ${sql}`);
+  return Object.values(row)[0];
 }

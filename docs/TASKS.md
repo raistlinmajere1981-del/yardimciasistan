@@ -1557,7 +1557,7 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. Desktop uygulama `electron-builder` konfigürasyonu ile Windows NSIS hedefi ve Linux paket dizini üretebilir. `npm run smoke:desktop-package` Linux'ta paketlenmiş `app.asar` içinde Electron main/preload/database, renderer ve SQL migration/seed dosyalarının bulunduğunu doğrular. Uygulama yeni kurulumda ilk ayar ekranını açar; SQLite ve manuel yedekler işletim sistemi kullanıcı veri klasörü altında tutulur.
+* Tamamlandı. Desktop uygulama `electron-builder` konfigürasyonu ile Windows NSIS hedefi ve Linux paket dizini üretebilir. `npm run smoke:desktop-package` Linux'ta paketlenmiş `app.asar` içinde Electron main/preload/database, renderer ve SQL migration/seed dosyalarının bulunduğunu doğrular. Uygulama yeni kurulumda ilk ayar ekranını açar; SQLite ve manuel yedekler işletim sistemi kullanıcı veri klasörü altında tutulur. `smoke-desktop-menu-db` manuel yedek dosyasını ayrıca SQLite olarak açar, `PRAGMA integrity_check` sonucunu ve temel firma/ayar/oda/masa/talep verilerini doğrular.
 
 ---
 
