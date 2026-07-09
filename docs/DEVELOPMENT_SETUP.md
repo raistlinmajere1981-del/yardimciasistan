@@ -193,6 +193,21 @@ dosyasını ve sistem destekliyorsa yükleme arşivlerini üretir.
 Canlı firma değerleri sadece deploy paketine yazılacaksa `YARDIMCI_ASISTAN_DEPLOY_*`
 ortam değişkenleri kullanılabilir; kaynak template dosyaları değişmez.
 
+Demo siteyi ve web modülünü tek hosting kökü için birlikte paketlemek gerekirse:
+
+```bash
+YARDIMCI_ASISTAN_HOSTING_ORIGIN="https://demo-domain.com" \
+YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME="Demo İşletme" \
+YARDIMCI_ASISTAN_DEPLOY_WHATSAPP="+90 532 123 45 67" \
+YARDIMCI_ASISTAN_DEPLOY_PHONE="+90 532 123 45 67" \
+YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET="uzun-ve-tahmin-edilemeyen-bir-anahtar" \
+npm run pack:hosting-demo
+```
+
+Bu komut `artifacts/hosting-demo-deploy/public_html/` klasörünü üretir. Kökünde
+demo site, `/yardimci-asistan` altında PHP web modülü bulunur. Detaylı canlı
+prova akışı `docs/dev/HOSTING_TEST_PLAN.md` içindedir.
+
 QR menü sayfasını PHP server ve mobil Chromium viewport ile kontrol etmek için:
 
 ```bash

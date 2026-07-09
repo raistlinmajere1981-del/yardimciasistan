@@ -8,3 +8,4 @@ Kod yazmadan önce özellikle `CODEX_RULES.md` ve `TASKS.md` kontrol edilmelidir
 
 - `WEB_MODULE_INSTALLATION.md`: Mevcut web sitesine firma web modülünü ve widget'ı kurma adımları.
 - `DEMO_SITE_CUSTOMIZATION.md`: Web sitesi olmayan firmalar için demo siteyi özelleştirme adımları.
+- `dev/HOSTING_TEST_PLAN.md`: Demo site, web modülü, PC ve Android uygulamasını canlı hosting üzerinde birlikte test etme planı.

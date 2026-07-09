@@ -119,3 +119,4 @@ Desktop tarafındaki oda, masa, menü, rezervasyon, günlük iş ve WhatsApp ör
 
 - Android uygulamasının hosting hazırlığı `npm run smoke:android-hosting` ile cihazsız, gerçek telefon UI akışı `npm run smoke:android-device-ui` ve tam yerel demo provası `npm run smoke:local-demo` ile adb bağlı cihazda otomatik doğrulanır.
 - Gerçek AI provider bağlantısı `npm run smoke:ai-live` ile ortam değişkenlerinden alınan OpenAI uyumlu endpoint üzerinde doğrulanır; test bağlantıyla birlikte Türkçe işletme bağlamı, bağlayıcı olmayan cevap dili ve provider JSON taslağı kalitesini de kontrol eder.
+- Gerçek hosting üzerinde demo site, web modülü, PC uygulaması ve Android uygulamasını birlikte doğrulamak için `docs/dev/HOSTING_TEST_PLAN.md` kullanılır. Upload öncesi `npm run pack:hosting-demo` kök demo siteyi ve `/yardimci-asistan` web modülünü tek `public_html/` çıktısında hazırlar.

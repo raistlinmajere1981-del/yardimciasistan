@@ -50,6 +50,7 @@
     "pack:desktop:win": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app",
     "pack:desktop:linux": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:linux -w @yardimci-asistan/desktop-app",
     "pack:web-module": "npm run build -w @yardimci-asistan/web-widget && node scripts/package-web-module.mjs",
+    "pack:hosting-demo": "node scripts/package-hosting-demo.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
   },
