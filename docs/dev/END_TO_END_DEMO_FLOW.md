@@ -26,10 +26,12 @@ npm run smoke:demo-flow
 
 - `demo-data/web-module-requests.json` içindeki örnek talepleri web modülüne yükler.
 - PHP web modülünü geçici portta çalıştırır.
+- `request.php` üzerinden demo sırasında yeni bir `source=web_form` talebi oluşturur.
 - Web AI sohbet endpointiyle ek bir `source=web_ai` talep oluşturur.
 - Yanlış sync anahtarıyla hata döndüğünü doğrular.
 - Doğru anahtarla pending talepleri çeker.
 - Talepleri desktop SQLite veritabanına işler.
+- Yeni `web_form` ve `web_ai` taleplerinin desktop dashboard ve müşteri listesine işlendiğini doğrular.
 - Web tarafında talepleri `synced` olarak işaretler.
 - Desktop içinde talep için AI cevap taslağını yeniler.
 - İlk talebi desktop tarafında rezervasyona çevirip onaylar.
@@ -39,7 +41,7 @@ npm run smoke:demo-flow
 - Aynı taleplerin ikinci kez çekilmediğini doğrular.
 - Test sonunda `requests.json`, `ai-conversations.json`, `android-snapshot.json` ve `sync-state.json` dosyalarını eski haline getirir.
 
-Web modülü için ayrı duman testi `npm run smoke:web-module` komutudur. Bu test QR menü yayınını, AI kapalıyken güvenli sohbet cevabını ve yeterli müşteri bilgisiyle `source=web_ai` talep oluşturmayı PHP sunucusu üzerinden doğrular.
+Web modülü için ayrı duman testi `npm run smoke:web-module` komutudur. Bu test QR menü yayınını, AI kapalıyken güvenli sohbet cevabını ve yeterli müşteri bilgisiyle `source=web_ai` talep oluşturmayı PHP sunucusu üzerinden doğrular. Widget'ın gerçek web modülünden yüklenip `api/request.php` ve `api/chat.php` akışlarını tarayıcıda kullanması `npm run smoke:web-widget-module` ile doğrulanır.
 
 ## Manuel Demo
 

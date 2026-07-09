@@ -50,8 +50,9 @@ try {
   writeJson(conversationsFile, []);
 
   await waitForUrl(`${baseUrl}/api/menu.php`);
+  const formRequestResult = await createWebFormRequest(baseUrl);
   const aiRequestResult = await createWebAiRequest(baseUrl);
-  const expectedRequestCount = demoRequests.length + 1;
+  const expectedRequestCount = demoRequests.length + 2;
 
   const unauthorized = await pullRequests({
     baseUrl,
@@ -137,6 +138,7 @@ try {
   });
   assert.equal(pullResult.ok, true);
   assert.equal(pullResult.count, expectedRequestCount);
+  assert.ok(pullResult.requests.some((request) => request.id === formRequestResult.request_id && request.source === "web_form"));
   assert.ok(pullResult.requests.some((request) => request.id === aiRequestResult.request_id && request.source === "web_ai"));
 
   const dataDir = join(process.cwd(), "artifacts", "desktop-demo-flow", String(Date.now()));
@@ -174,6 +176,16 @@ try {
   assert.equal(localAiRequest.guest_count, 2);
   assert.equal(localAiRequest.ai_summary, "Web AI sohbetinden oluşturuldu.");
   assert.ok(dashboardData.customers.some((customer) => customer.phone === "+905553339900" && customer.source === "web_ai"));
+
+  const localFormRequest = dashboardData.requests.find((request) => request.id === formRequestResult.request_id);
+  assert.ok(localFormRequest, "web form talebi desktop dashboard listesinde bulunmali");
+  assert.equal(localFormRequest.source, "web_form");
+  assert.equal(localFormRequest.customer_name, "Widget Demo Misafir");
+  assert.equal(localFormRequest.customer_phone, "+905553338800");
+  assert.equal(localFormRequest.date_text, "22 Temmuz");
+  assert.equal(localFormRequest.guest_count, 3);
+  assert.ok(localFormRequest.whatsapp_message.includes("Pansiyon rezervasyonu"));
+  assert.ok(dashboardData.customers.some((customer) => customer.phone === "+905553338800" && customer.source === "web_form"));
 
   const conversionResult = database.convertRequestToReservation(requestIds[0]);
   assert.equal(conversionResult.ok, true);
@@ -215,7 +227,7 @@ try {
   assert.equal(secondPull.ok, true);
   assert.equal(secondPull.count, 0);
 
-  console.log(`demo-flow-ok: ${requestIds.length} web requests pulled including web_ai, 1 converted to approved reservation`);
+  console.log(`demo-flow-ok: ${requestIds.length} web requests pulled including web_form and web_ai, 1 converted to approved reservation`);
 } catch (error) {
   if (serverOutput.trim()) {
     console.error(serverOutput.trim());
@@ -250,6 +262,43 @@ function emptyAndroidSnapshot() {
     daily_tasks: [],
     updated_at: ""
   };
+}
+
+async function createWebFormRequest(baseUrl) {
+  const response = await fetch(`${baseUrl}/api/request.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      request_type: "pension_reservation",
+      customer_name: "Widget Demo Misafir",
+      customer_phone: "0555 333 88 00",
+      date_text: "22 Temmuz",
+      guest_count: 3,
+      message: "Deniz manzarali oda icin bilgi almak istiyoruz.",
+      source: "web_form"
+    })
+  });
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.ok, true);
+  assert.match(result.request_id, /^request_/);
+  assert.equal(result.whatsapp_phone, "905553338800");
+  assert.match(result.whatsapp_message, /Pansiyon rezervasyonu/);
+
+  const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
+  const request = requests.find((record) => record.id === result.request_id);
+  assert.ok(request, "request.php ile olusan web form talebi requests.json icinde bulunmali");
+  assert.equal(request.source, "web_form");
+  assert.equal(request.request_type, "pension_reservation");
+  assert.equal(request.customer_name, "Widget Demo Misafir");
+  assert.equal(request.customer_phone, "+905553338800");
+  assert.equal(request.date_text, "22 Temmuz");
+  assert.equal(request.guest_count, 3);
+  assert.equal(request.sync_status, "pending");
+
+  return result;
 }
 
 async function createWebAiRequest(baseUrl) {
