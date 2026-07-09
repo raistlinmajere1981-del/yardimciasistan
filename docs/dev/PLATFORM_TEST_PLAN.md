@@ -14,6 +14,7 @@ Bu plan Yardımcı Asistan'ın Linux'ta rahat geliştirilebilmesi, Android telef
 - Desktop sync akışında `sync.completed`, `sync.failed`, QR menü yayında `menu.published` ve Android snapshot yayınında sync event kayıtları kontrol edilir.
 - QR menü sayfası PHP server üzerinden mobil viewport ile denenir.
 - Web AI `chat.php` endpointi AI kapalıyken güvenli fallback cevapla denenir; yeterli müşteri bilgisi geldiğinde `source=web_ai` talebinin `requests.json` içine yazıldığı doğrulanır.
+- Web widget gerçek PHP server'dan yüklenir; `data-logo-url` görseli, bilgi paneli AI kısa soru formu, `api/chat.php` fallback cevabı ve `ai-conversations.json` kaydı doğrulanır.
 - Desktop app Electron ile Linux üzerinde çalıştırılır.
 - Desktop app ana paneli, web talebi çekme butonu ve local-first uyarı metinleri kontrol edilir.
 - Desktop app talep kartındaki `AI Taslak Yenile` komutu ve WhatsApp hazır mesaj akışı kontrol edilir.
@@ -70,6 +71,7 @@ Web modülü için ayrıca:
 npm run smoke:local-lab
 npm run smoke:web-module
 npm run smoke:web-widget-branding
+npm run smoke:web-widget-module
 ```
 
 Android gerçek cihaz hazırlığı için:
