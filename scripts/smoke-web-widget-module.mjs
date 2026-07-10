@@ -65,7 +65,7 @@ try {
   await expect(page.locator(".ya-widget-status")).toContainText("WhatsApp mesajı hazırlandı");
 
   const openedUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
-  expect(openedUrl).toContain("https://wa.me/905321234567");
+  expect(openedUrl).toContain("https://wa.me/905316969334");
   expect(decodeURIComponent(openedUrl)).toContain("Masa rezervasyonu");
   expect(decodeURIComponent(openedUrl)).toContain("Widget Misafir");
 
@@ -124,7 +124,7 @@ async function injectWidget(page, widgetBaseUrl) {
     const script = document.createElement("script");
     script.src = `${url}/widget.js`;
     script.dataset.businessName = "Deniz Çiçeği Pansiyon & Kafe";
-    script.dataset.whatsappPhone = "+90 532 123 45 67";
+    script.dataset.whatsappPhone = "+90 531 696 9334";
     script.dataset.apiBaseUrl = url;
     script.dataset.menuUrl = `${url}/menu.html`;
     script.dataset.logoUrl = `${url}/assets/yardimci-asistan-symbol.png`;

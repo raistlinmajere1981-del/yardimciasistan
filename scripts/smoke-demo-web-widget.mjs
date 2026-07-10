@@ -68,7 +68,7 @@ try {
   await expect(page.locator(".ya-widget-status")).toContainText("WhatsApp mesajı hazırlandı");
 
   const openedUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
-  expect(openedUrl).toContain("https://wa.me/905321234567");
+  expect(openedUrl).toContain("https://wa.me/905316969334");
   expect(decodeURIComponent(openedUrl)).toContain("Demo Web Widget");
 
   const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
