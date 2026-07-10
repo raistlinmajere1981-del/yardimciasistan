@@ -42,6 +42,7 @@ assert.ok(existsSync(webModuleDeployRoot), `Web modül deploy çıktısı buluna
 cpSync(demoDistRoot, publicHtmlRoot, { recursive: true });
 cpSync(webModuleDeployRoot, join(publicHtmlRoot, stripLeadingSlash(webModulePath)), { recursive: true });
 
+const aiConfig = writeDeployAiConfig();
 const files = listFiles(publicHtmlRoot);
 validatePackage(files);
 const archives = createArchives();
@@ -53,6 +54,7 @@ const manifest = {
   public_root: relative(repoRoot, publicHtmlRoot),
   generated_at: new Date().toISOString(),
   file_count: files.length,
+  ai_config: aiConfig,
   archives,
   files: files.map((file) => {
     const absolutePath = join(publicHtmlRoot, file);
@@ -98,10 +100,68 @@ function validatePackage(files) {
   assert.ok(Array.isArray(business.allowed_origins), "Hosting demo business.json allowed_origins dizi olmalı.");
   assert.ok(business.allowed_origins.includes(hostingOrigin), "Hosting demo allowed_origins canlı site origin değerini içermeli.");
 
+  const aiLocalPath = join(publicHtmlRoot, `${webModulePrefix}/config/ai.local.php`);
+  if (existsSync(aiLocalPath)) {
+    const aiLocal = readText(aiLocalPath);
+    assert.ok(aiLocal.includes("'enabled' => true"), "AI local config etkin üretilmeli.");
+    assert.ok(aiLocal.includes("'api_key' =>"), "AI local config API anahtarını içermeli.");
+  }
+
   const forbidden = files.filter((file) => {
     return file.startsWith("node_modules/") || file.endsWith(".ts") || file.includes("/.env");
   });
   assert.deepEqual(forbidden, [], `Hosting demo paketinde yayınlanmaması gereken dosya var: ${forbidden.join(", ")}`);
+}
+
+function writeDeployAiConfig() {
+  const enabled = readBoolean(process.env.YARDIMCI_ASISTAN_DEPLOY_AI_ENABLED ?? "", false);
+  const apiKey = String(process.env.YARDIMCI_ASISTAN_DEPLOY_AI_API_KEY ?? "").trim();
+
+  if (!enabled && apiKey === "") {
+    return {
+      enabled: false,
+      source: "none"
+    };
+  }
+
+  assert.ok(enabled, "AI deploy config için YARDIMCI_ASISTAN_DEPLOY_AI_ENABLED=1 olmalı.");
+  assert.ok(apiKey.length > 0, "AI deploy config için YARDIMCI_ASISTAN_DEPLOY_AI_API_KEY gerekli.");
+
+  const provider = String(process.env.YARDIMCI_ASISTAN_DEPLOY_AI_PROVIDER ?? "openai_compatible").trim();
+  const baseUrl = String(process.env.YARDIMCI_ASISTAN_DEPLOY_AI_BASE_URL ?? "").trim();
+  const model = String(process.env.YARDIMCI_ASISTAN_DEPLOY_AI_MODEL ?? "").trim();
+  const timeoutSeconds = readPositiveInteger(process.env.YARDIMCI_ASISTAN_DEPLOY_AI_TIMEOUT_SECONDS ?? "30", 30);
+
+  assert.equal(provider, "openai_compatible", "Hosting demo şimdilik openai_compatible AI provider destekler.");
+  assert.ok(baseUrl.length > 0, "AI deploy config için YARDIMCI_ASISTAN_DEPLOY_AI_BASE_URL gerekli.");
+  assert.ok(model.length > 0, "AI deploy config için YARDIMCI_ASISTAN_DEPLOY_AI_MODEL gerekli.");
+
+  const webModulePrefix = stripLeadingSlash(webModulePath);
+  const aiLocalPath = join(publicHtmlRoot, webModulePrefix, "config", "ai.local.php");
+  writeFileSync(aiLocalPath, [
+    "<?php",
+    "declare(strict_types=1);",
+    "",
+    "return [",
+    "    'enabled' => true,",
+    `    'provider' => ${phpString(provider)},`,
+    `    'base_url' => ${phpString(baseUrl)},`,
+    `    'model' => ${phpString(model)},`,
+    `    'api_key' => ${phpString(apiKey)},`,
+    `    'timeout_seconds' => ${timeoutSeconds}`,
+    "];",
+    ""
+  ].join("\n"));
+
+  return {
+    enabled: true,
+    source: "ai.local.php",
+    provider,
+    base_url: baseUrl,
+    model,
+    api_key_redacted: true,
+    timeout_seconds: timeoutSeconds
+  };
 }
 
 function createArchives() {
@@ -229,6 +289,28 @@ function mergeList(value, requiredValue) {
       .filter(Boolean),
     requiredValue
   ]));
+}
+
+function readBoolean(value, fallback) {
+  const text = String(value ?? "").trim();
+  if (text === "") {
+    return fallback;
+  }
+
+  return /^(1|true|yes|on)$/i.test(text);
+}
+
+function readPositiveInteger(value, fallback) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1) {
+    return fallback;
+  }
+
+  return number;
+}
+
+function phpString(value) {
+  return `'${String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
 
 function run(command, args, env) {

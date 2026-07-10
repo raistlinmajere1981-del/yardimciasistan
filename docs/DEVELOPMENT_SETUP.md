@@ -207,6 +207,9 @@ npm run pack:hosting-demo
 Bu komut `artifacts/hosting-demo-deploy/public_html/` klasörünü üretir. Kökünde
 demo site, `/yardimci-asistan` altında PHP web modülü bulunur. Detaylı canlı
 prova akışı `docs/dev/HOSTING_TEST_PLAN.md` içindedir.
+Canlı AI testi için `YARDIMCI_ASISTAN_DEPLOY_AI_*` ortam değişkenleri verilebilir;
+bu durumda API anahtarı sadece ignored `artifacts/` deploy çıktısındaki
+`config/ai.local.php` dosyasına yazılır.
 
 QR menü sayfasını PHP server ve mobil Chromium viewport ile kontrol etmek için:
 

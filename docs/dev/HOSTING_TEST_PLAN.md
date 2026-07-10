@@ -37,6 +37,20 @@ YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET="uzun-ve-tahmin-edilemeyen-bir-anahtar" \
 npm run pack:hosting-demo
 ```
 
+Canlı demo AI cevabı da test edilecekse, API anahtarı kaynak template'e
+yazılmaz; paket içinde `config/ai.local.php` olarak üretilir ve
+`artifacts/` altında kalır:
+
+```bash
+YARDIMCI_ASISTAN_DEPLOY_AI_ENABLED=1 \
+YARDIMCI_ASISTAN_DEPLOY_AI_PROVIDER="openai_compatible" \
+YARDIMCI_ASISTAN_DEPLOY_AI_BASE_URL="https://provider.example/v1/chat/completions" \
+YARDIMCI_ASISTAN_DEPLOY_AI_MODEL="model-id" \
+YARDIMCI_ASISTAN_DEPLOY_AI_API_KEY="test-api-key" \
+YARDIMCI_ASISTAN_DEPLOY_AI_TIMEOUT_SECONDS=45 \
+npm run pack:hosting-demo
+```
+
 Komut şu çıktıları üretir:
 
 ```text
