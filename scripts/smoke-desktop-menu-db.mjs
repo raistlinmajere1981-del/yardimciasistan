@@ -24,7 +24,7 @@ try {
   assert.ok(database.backupPath.endsWith("backups"));
 
   const setupResult = database.saveInitialSetup({
-    businessName: "Smoke Pansiyon",
+    businessName: "Deniz Çiçeği Pansiyon & Kafe",
     businessType: "pension_restaurant",
     phone: "+905321234567",
     whatsapp: "+905321234567",
@@ -242,8 +242,9 @@ function assertReadableSqliteBackup(backupFilePath) {
 
   try {
     assert.equal(String(scalar(backupDb, "PRAGMA integrity_check")), "ok");
-    assert.equal(scalar(backupDb, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Smoke Pansiyon");
+    assert.equal(scalar(backupDb, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Deniz Çiçeği Pansiyon & Kafe");
     assert.equal(scalar(backupDb, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1"), "smoke-secret-12345");
+    assert.equal(Number(scalar(backupDb, "SELECT setup_completed FROM settings WHERE deleted_at = '' LIMIT 1")), 1);
     assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")) >= 3);
     assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM tables WHERE deleted_at = ''")) >= 3);
     assert.equal(scalar(backupDb, "SELECT customer_name FROM requests WHERE id = 'request_demo_001'"), "Demo Misafir");

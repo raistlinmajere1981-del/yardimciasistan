@@ -41,7 +41,34 @@ try {
   await expect(page.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
   await expect(page.locator(".whatsapp-webview-frame")).toBeVisible();
+  await expect(page.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
+
+  const [requestPanelBox, copyPanelBox, livePanelBox, webviewFrameBox, webviewBox] = await Promise.all([
+    page.locator(".whatsapp-request-panel").boundingBox(),
+    page.locator(".whatsapp-copy-panel").boundingBox(),
+    page.locator(".whatsapp-live-panel").boundingBox(),
+    page.locator(".whatsapp-webview-frame").boundingBox(),
+    page.locator(".whatsapp-webview").boundingBox()
+  ]);
+  expect(requestPanelBox).not.toBeNull();
+  expect(copyPanelBox).not.toBeNull();
+  expect(livePanelBox).not.toBeNull();
+  expect(webviewFrameBox).not.toBeNull();
+  expect(webviewBox).not.toBeNull();
+  expect(Math.abs(requestPanelBox.y - copyPanelBox.y)).toBeLessThanOrEqual(1);
+  expect(copyPanelBox.x).toBeGreaterThan(requestPanelBox.x + requestPanelBox.width);
+  expect(livePanelBox.y).toBeGreaterThan(copyPanelBox.y + copyPanelBox.height);
+  expect(Math.abs(livePanelBox.x - requestPanelBox.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(livePanelBox.width - (copyPanelBox.x + copyPanelBox.width - requestPanelBox.x))).toBeLessThanOrEqual(2);
+  expect(Math.abs(webviewBox.width - webviewFrameBox.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(webviewBox.height - webviewFrameBox.height)).toBeLessThanOrEqual(2);
+  expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
   await page.screenshot({ path: "artifacts/screenshots/desktop-whatsapp-workspace.png", fullPage: true });
+  await page.getByRole("button", { name: "Müşteri Numarasına Git" }).click();
+  await expect(page.locator(".whatsapp-webview")).toHaveAttribute(
+    "src",
+    /^https:\/\/web\.whatsapp\.com\/send\?phone=905321234567&text=/
+  );
 
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await conversionPage.addInitScript(({ setupData, dashboardData }) => {

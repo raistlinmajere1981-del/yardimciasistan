@@ -23,6 +23,7 @@ const requiredEntries = [
   "/dist-electron/database.js",
   "/dist-renderer/index.html",
   "/db/migrations/001_initial_schema.sql",
+  "/db/migrations/002_setup_completion.sql",
   "/db/seeds/001_demo.sql"
 ];
 
@@ -99,9 +100,10 @@ function assertPackagedDatabase(databasePath) {
 
   try {
     assert.equal(String(scalar(database, "PRAGMA integrity_check")), "ok");
-    assert.ok(Number(scalar(database, "SELECT COUNT(*) FROM schema_migrations")) >= 1);
+    assert.ok(Number(scalar(database, "SELECT COUNT(*) FROM schema_migrations")) >= 2);
     assert.equal(scalar(database, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Deniz Çiçeği Pansiyon & Kafe");
     assert.equal(scalar(database, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1"), "change-this-secret");
+    assert.equal(Number(scalar(database, "SELECT setup_completed FROM settings WHERE deleted_at = '' LIMIT 1")), 0);
     assert.ok(Number(scalar(database, "SELECT COUNT(*) FROM requests WHERE deleted_at = ''")) >= 1);
   } finally {
     database.close();

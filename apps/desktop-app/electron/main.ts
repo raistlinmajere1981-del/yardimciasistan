@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { generateOwnerReplySuggestion } from "@yardimci-asistan/ai-core";
 import type { AIProviderName } from "@yardimci-asistan/ai-core";
@@ -27,6 +27,7 @@ import {
 } from "./database";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
 let desktopDatabase: DesktopDatabase | null = null;
 
 interface DesktopBootstrapData {
@@ -45,6 +46,7 @@ interface DesktopBootstrapData {
 
 function createMainWindow() {
   const window = new BrowserWindow({
+    show: false,
     width: 1280,
     height: 820,
     minWidth: 1080,
@@ -68,9 +70,13 @@ function createMainWindow() {
     return { action: "deny" };
   });
 
+  window.once("ready-to-show", () => {
+    window.maximize();
+    window.show();
+  });
+
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     void window.loadURL(process.env.VITE_DEV_SERVER_URL);
-    window.webContents.openDevTools({ mode: "detach" });
   } else {
     void window.loadFile(path.join(__dirname, "..", "dist-renderer", "index.html"));
   }
@@ -82,6 +88,8 @@ function getAppIconPath() {
 }
 
 app.whenReady().then(() => {
+  session.fromPartition(WHATSAPP_WEB_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
+
   desktopDatabase = new DesktopDatabase({
     appPath: app.getAppPath(),
     userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData")
@@ -96,6 +104,18 @@ app.whenReady().then(() => {
     }
   });
 });
+
+function createChromeUserAgent() {
+  const chromeMajorVersion = process.versions.chrome.split(".")[0] || "144";
+  const platform =
+    process.platform === "win32"
+      ? "Windows NT 10.0; Win64; x64"
+      : process.platform === "darwin"
+        ? "Macintosh; Intel Mac OS X 10_15_7"
+        : "X11; Linux x86_64";
+
+  return `Mozilla/5.0 (${platform}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeMajorVersion}.0.0.0 Safari/537.36`;
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

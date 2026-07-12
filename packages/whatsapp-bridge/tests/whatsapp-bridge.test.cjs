@@ -35,6 +35,16 @@ test("manual copy mode prepares copy text even when link opening is not used", a
   assert.equal(payload.message, "Hazır cevap");
 });
 
+test("web URL targets WhatsApp Web without invoking the installed application", async () => {
+  const { createWhatsAppWebUrl, WHATSAPP_WEB_HOME_URL } = await bridgePromise;
+
+  assert.equal(WHATSAPP_WEB_HOME_URL, "https://web.whatsapp.com/");
+  assert.equal(
+    createWhatsAppWebUrl("0532 123 45 67", "Merhaba, bilgi alabilir miyim?"),
+    "https://web.whatsapp.com/send?phone=905321234567&text=Merhaba%2C%20bilgi%20alabilir%20miyim%3F"
+  );
+});
+
 test("webview mode returns a connectable target and a manual fallback", async () => {
   const { prepareWhatsAppAction } = await bridgePromise;
   const action = prepareWhatsAppAction({
@@ -45,8 +55,10 @@ test("webview mode returns a connectable target and a manual fallback", async ()
 
   assert.equal(action.ok, true);
   assert.equal(action.mode, "webview");
+  assert.equal(action.homeUrl, "https://web.whatsapp.com/");
   assert.equal(action.webviewTarget.customerPhone, "905321234567");
-  assert.equal(action.webviewTarget.url, "https://wa.me/905321234567?text=Merhaba");
+  assert.equal(action.webviewTarget.homeUrl, "https://web.whatsapp.com/");
+  assert.equal(action.webviewTarget.url, "https://web.whatsapp.com/send?phone=905321234567&text=Merhaba");
   assert.equal(action.fallback.mode, "manual_copy");
 });
 

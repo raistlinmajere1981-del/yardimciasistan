@@ -728,10 +728,11 @@ export class DesktopDatabase {
     const modules = this.parseModulesJson(String(business?.modules_json ?? "{}"));
     const syncSecret = String(settings?.sync_secret ?? "");
     const businessName = String(business?.display_name ?? "");
+    const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
     const setupRequired =
+      !setupCompleted ||
       !businessName.trim() ||
-      businessName === "Deniz Çiçeği Pansiyon & Kafe" ||
-      !syncSecret.trim() ||
+      syncSecret.length < 12 ||
       syncSecret === "change-this-secret";
 
     return {
@@ -871,10 +872,11 @@ export class DesktopDatabase {
             rooms_enabled,
             tables_enabled,
             qr_menu_enabled,
+            setup_completed,
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             business_id = excluded.business_id,
             web_module_url = excluded.web_module_url,
@@ -887,6 +889,7 @@ export class DesktopDatabase {
             rooms_enabled = excluded.rooms_enabled,
             tables_enabled = excluded.tables_enabled,
             qr_menu_enabled = excluded.qr_menu_enabled,
+            setup_completed = 1,
             updated_at = excluded.updated_at,
             deleted_at = '',
             sync_status = 'local_only'

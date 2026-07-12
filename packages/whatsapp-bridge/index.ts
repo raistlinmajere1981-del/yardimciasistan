@@ -35,11 +35,13 @@ export interface ManualCopyPayload {
 export interface WebViewPayload {
   ok: true;
   mode: "webview";
+  homeUrl: string;
   phoneDisplay: string;
   whatsappPhone: string;
   message: string;
   url: string;
   webviewTarget: {
+    homeUrl: string;
     url: string;
     customerPhone: string;
   };
@@ -83,6 +85,7 @@ const REQUEST_TYPE_TEXT: Record<string, string> = {
 const DEFAULT_REPLY_MESSAGE = "Merhaba, talebiniz için teşekkür ederiz. Size en kısa sürede dönüş yapacağız.";
 const TR_MOBILE_PATTERN = /^5\d{9}$/;
 const PHONE_ERROR = "Telefon numarası Türkiye cep telefonu formatında olmalı. Örnek: 05xx xxx xx xx";
+export const WHATSAPP_WEB_HOME_URL = "https://web.whatsapp.com/";
 
 export function createWhatsAppLink(phone: string, message: string): WhatsAppLinkResult {
   const normalizedPhone = normalizeTRMobilePhone(phone);
@@ -120,6 +123,11 @@ export function createWhatsAppLink(phone: string, message: string): WhatsAppLink
 export function createWhatsAppUrl(phone: string, message: string): string {
   const link = createWhatsAppLink(phone, message);
   return link.ok ? link.url : "";
+}
+
+export function createWhatsAppWebUrl(phone: string, message: string): string {
+  const link = createWhatsAppLink(phone, message);
+  return link.ok ? `${WHATSAPP_WEB_HOME_URL}send?phone=${link.whatsappPhone}&text=${link.encodedMessage}` : "";
 }
 
 export function createManualCopyPayload(phone: string, message: string): ManualCopyPayload | WhatsAppBridgeError {
@@ -170,15 +178,19 @@ export function prepareWhatsAppAction(input: PrepareWhatsAppActionInput): WhatsA
   }
 
   if (mode === "webview") {
+    const webUrl = `${WHATSAPP_WEB_HOME_URL}send?phone=${link.whatsappPhone}&text=${link.encodedMessage}`;
+
     return {
       ok: true,
       mode: "webview",
+      homeUrl: WHATSAPP_WEB_HOME_URL,
       phoneDisplay: link.phoneDisplay,
       whatsappPhone: link.whatsappPhone,
       message: link.message,
-      url: link.url,
+      url: webUrl,
       webviewTarget: {
-        url: link.url,
+        homeUrl: WHATSAPP_WEB_HOME_URL,
+        url: webUrl,
         customerPhone: link.whatsappPhone
       },
       fallback: {

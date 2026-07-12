@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildOwnerReplyWhatsAppMessage, createWhatsAppUrl, prepareWhatsAppAction } from "@yardimci-asistan/whatsapp-bridge";
+import {
+  buildOwnerReplyWhatsAppMessage,
+  createWhatsAppUrl,
+  createWhatsAppWebUrl,
+  prepareWhatsAppAction,
+  WHATSAPP_WEB_HOME_URL
+} from "@yardimci-asistan/whatsapp-bridge";
 import {
   BarChart3,
   Bell,
@@ -508,6 +514,9 @@ function App() {
       setSetupData(data.setup);
       setSetupForm(toSetupForm(data.setup));
       setSetupMode(data.setup.setupRequired);
+      if (!data.setup.setupRequired) {
+        setActivePage("dashboard");
+      }
       setSetupMessage(data.setup.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
     });
     void loadDashboardData();
@@ -584,7 +593,7 @@ function App() {
     [selectedWhatsAppRequest]
   );
   const selectedWhatsAppUrl = useMemo(
-    () => (selectedWhatsAppRequest ? createWhatsAppUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage) : ""),
+    () => (selectedWhatsAppRequest ? createWhatsAppWebUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage) : ""),
     [selectedWhatsAppMessage, selectedWhatsAppRequest]
   );
   const aiPreviewRequest = useMemo(
@@ -1689,16 +1698,15 @@ interface WhatsAppWorkspaceProps {
 }
 
 type WhatsAppWebViewElement = HTMLElement & {
-  loadURL?: (url: string) => void;
   reload?: () => void;
 };
 
 function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selectedUrl, onSelectRequest, onOpenExternal }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const [connectionState, setConnectionState] = useState<WhatsAppConnectionState>("idle");
-  const [connectionMessage, setConnectionMessage] = useState("Talep seçin.");
+  const [connectionMessage, setConnectionMessage] = useState("WhatsApp Web yükleniyor.");
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
-  const [webViewUrl, setWebViewUrl] = useState("");
+  const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
   const webViewAction = useMemo(
     () => (selectedRequest ? prepareWhatsAppAction({ phone: selectedRequest.customer_phone, message: selectedMessage, preferredMode: "webview" }) : null),
     [selectedMessage, selectedRequest]
@@ -1711,7 +1719,7 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
       setConnectionState("idle");
       setConnectionMessage("Talep seçin.");
       setCopyMessage("Hazır mesaj bekliyor.");
-      setWebViewUrl("");
+      setWebViewUrl(WHATSAPP_WEB_HOME_URL);
       return;
     }
 
@@ -1719,14 +1727,14 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
       setConnectionState("error");
       setConnectionMessage(webViewAction?.message ?? "WhatsApp hedefi hazırlanamadı.");
       setCopyMessage("Mesaj elle kopyalanabilir.");
-      setWebViewUrl("");
+      setWebViewUrl(WHATSAPP_WEB_HOME_URL);
       return;
     }
 
     setConnectionState("loading");
     setConnectionMessage("QR girişi bekliyor.");
     setCopyMessage("Hazır mesaj bekliyor.");
-    setWebViewUrl(webViewPayload.url);
+    setWebViewUrl(webViewPayload.homeUrl);
   }, [selectedRequest, webViewAction, webViewPayload]);
 
   useEffect(() => {
@@ -1782,11 +1790,6 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
 
     setConnectionState("loading");
     setConnectionMessage("Müşteri numarası açılıyor.");
-    if (typeof webViewRef.current?.loadURL === "function") {
-      void webViewRef.current.loadURL(webViewPayload.url);
-      return;
-    }
-
     setWebViewUrl(webViewPayload.url);
   }
 
