@@ -15,8 +15,6 @@ import {
   ClipboardList,
   Copy,
   ExternalLink,
-  Home,
-  Menu as MenuIcon,
   MessageCircle,
   Phone,
   Plus,
@@ -40,9 +38,13 @@ import type {
   SaveInitialSetupInput
 } from "../electron/database";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
+import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
+import { CustomerWorkPage } from "./pages/CustomerWorkPage";
+import { MessagesPage } from "./pages/MessagesPage";
+import { PensionPage } from "./pages/PensionPage";
+import { RestaurantPage } from "./pages/RestaurantPage";
 
 type SyncState = "idle" | "loading" | "success" | "error";
-type DesktopPage = "dashboard" | "requests" | "customers" | "reports" | "tasks" | "reservations" | "rooms" | "tables" | "menu" | "whatsapp" | "ai";
 type WhatsAppConnectionState = "idle" | "loading" | "ready" | "error";
 
 interface CategoryFormState {
@@ -440,15 +442,15 @@ const defaultSetupData: DesktopSetupData = {
   aiApiKeyConfigured: false,
   aiLastPublishedAt: "",
   modules: {
-    rooms: true,
-    tables: true,
-    qrMenu: true,
-    whatsapp: true,
-    android: true
+    rooms: false,
+    tables: false,
+    qrMenu: false,
+    whatsapp: false,
+    android: false
   },
   initialCounts: {
-    rooms: 2,
-    tables: 2
+    rooms: 0,
+    tables: 0
   }
 };
 
@@ -489,7 +491,7 @@ const aiServicePresets = [
   { id: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1" },
   { id: "openrouter", label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
   { id: "groq", label: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
-  { id: "gemini", label: "Google AI Studio (Gemini API)", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
+  { id: "gemini", label: "Google AI Studio (Gemini)", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
   { id: "custom", label: "Özel OpenAI uyumlu servis", baseUrl: "" }
 ] as const;
 
@@ -499,7 +501,7 @@ function App() {
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Web talepleri için henüz güncelleme yapılmadı.");
   const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
-  const [menuStatusMessage, setMenuStatusMessage] = useState("QR menü henüz bu oturumda yayınlanmadı.");
+  const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
   const [menuEditMessage, setMenuEditMessage] = useState("Düzenleme bekliyor.");
   const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryForm.id);
@@ -531,6 +533,7 @@ function App() {
   const [aiWorkspaceHistory, setAiWorkspaceHistory] = useState<AiWorkspaceHistoryEntry[]>([]);
   const [aiWorkspaceState, setAiWorkspaceState] = useState<SyncState>("idle");
   const [aiWorkspaceMessage, setAiWorkspaceMessage] = useState("Bir araç seçip AI sonucunu hazırlayın.");
+  const [messagesAiOpen, setMessagesAiOpen] = useState(false);
   const [backupState, setBackupState] = useState<SyncState>("idle");
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidPublishState, setAndroidPublishState] = useState<SyncState>("idle");
@@ -545,6 +548,7 @@ function App() {
     }),
     [setupData]
   );
+  const navigationItems = useMemo(() => buildNavigation(setupData), [setupData]);
 
   useEffect(() => {
     void window.yardimciDesktop?.getBootstrapData().then((data) => {
@@ -566,11 +570,23 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (activePage !== "ai" || !window.yardimciDesktop) {
+    if (activePage !== "messages" || !messagesAiOpen || !window.yardimciDesktop) {
       return;
     }
     void window.yardimciDesktop.getAiWorkspaceHistory(16).then(setAiWorkspaceHistory);
-  }, [activePage]);
+  }, [activePage, messagesAiOpen]);
+
+  useEffect(() => {
+    if (!navigationItems.some((item) => item.id === activePage)) {
+      setActivePage("dashboard");
+    }
+  }, [activePage, navigationItems]);
+
+  useEffect(() => {
+    if (activePage === "messages" && setupData.aiEnabled && !setupData.modules.whatsapp) {
+      setMessagesAiOpen(true);
+    }
+  }, [activePage, setupData.aiEnabled, setupData.modules.whatsapp]);
 
   useEffect(() => {
     setAiModelOptions([]);
@@ -604,7 +620,7 @@ function App() {
         enabled: true
       },
       {
-        title: "Oda Durumu",
+        title: "Boş Odalar",
         value: `${summary.availableRooms} boş`,
         detail: `${summary.totalRooms} odadan ${summary.availableRooms} oda uygun`,
         tone: "ok",
@@ -612,7 +628,7 @@ function App() {
         enabled: modules.rooms
       },
       {
-        title: "Masa Durumu",
+        title: "Boş Masalar",
         value: `${summary.availableTables} boş`,
         detail: "Bahçe ve salon masaları uygun",
         tone: "ok",
@@ -628,12 +644,12 @@ function App() {
         enabled: true
       },
       {
-        title: "WhatsApp Hazır Cevaplar",
+        title: "Hazır WhatsApp Cevapları",
         value: String(summary.preparedWhatsAppMessages),
         detail: summary.preparedWhatsAppMessages > 0 ? "Gönderilmeyi bekleyen taslak" : "Hazır cevap beklemiyor",
         tone: summary.preparedWhatsAppMessages > 0 ? "info" : "neutral",
         icon: MessageCircle,
-        enabled: modules.whatsapp
+        enabled: modules.whatsapp || modules.ai
       }
     ];
 
@@ -657,11 +673,6 @@ function App() {
     () => (selectedWhatsAppRequest ? createWhatsAppWebUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage) : ""),
     [selectedWhatsAppMessage, selectedWhatsAppRequest]
   );
-  const aiPreviewRequest = useMemo(
-    () => dashboardData.requests.find((request) => request.ai_suggested_reply.trim().length > 0) ?? dashboardData.requests[0],
-    [dashboardData.requests]
-  );
-  const aiPreviewMessage = aiPreviewRequest?.ai_suggested_reply || aiPreviewRequest?.whatsapp_message || "";
   const pageMeta = getPageMeta(activePage);
 
   async function loadDashboardData() {
@@ -679,7 +690,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setSyncState("error");
-      setStatusMessage("Masaüstü bağlantısı hazır değil. Uygulamayı Electron içinde açın.");
+      setStatusMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -699,7 +710,7 @@ function App() {
     if (!window.yardimciDesktop) {
       return {
         ok: false as const,
-        message: "Gönderim kaydı için uygulamayı Electron içinde açın."
+        message: "Gönderim kaydı hazır değil. Uygulamayı yeniden başlatın."
       };
     }
 
@@ -712,24 +723,24 @@ function App() {
 
   async function handlePublishMenu() {
     setMenuPublishState("loading");
-    setMenuStatusMessage("QR menü web modülüne gönderiliyor...");
+    setMenuStatusMessage("Menü webde güncelleniyor...");
 
     if (!window.yardimciDesktop) {
       setMenuPublishState("error");
-      setMenuStatusMessage("Masaüstü bağlantısı hazır değil. Uygulamayı Electron içinde açın.");
+      setMenuStatusMessage("Menü yayınlanamadı. Bağlantıyı kontrol edin.");
       return;
     }
 
     const result = await window.yardimciDesktop.pushMenu();
     if (!result.ok) {
       setMenuPublishState("error");
-      setMenuStatusMessage(result.message);
+      setMenuStatusMessage("Menü yayınlanamadı. Bağlantıyı kontrol edin.");
       return;
     }
 
     await loadDashboardData();
     setMenuPublishState("success");
-    setMenuStatusMessage(`${result.category_count} kategori ve ${result.item_count} ürün yayınlandı.`);
+    setMenuStatusMessage("Menü webde güncellendi.");
   }
 
   async function handlePublishAndroidSnapshot() {
@@ -738,7 +749,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setAndroidPublishState("error");
-      setAndroidPublishMessage("Android özeti için uygulamayı Electron içinde açın.");
+      setAndroidPublishMessage("Telefon özeti yayınlanamadı. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -788,7 +799,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setMenuEditState("error");
-      setMenuEditMessage("Masaüstü bağlantısı hazır değil. Uygulamayı Electron içinde açın.");
+      setMenuEditMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -815,7 +826,7 @@ function App() {
     setMenuEditState("success");
     setMenuEditMessage(result.message);
     setMenuPublishState("idle");
-    setMenuStatusMessage("QR menüde yayınlanmamış değişiklik var.");
+    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
   }
 
   async function handleSaveItem() {
@@ -824,7 +835,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setMenuEditState("error");
-      setMenuEditMessage("Masaüstü bağlantısı hazır değil. Uygulamayı Electron içinde açın.");
+      setMenuEditMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -858,12 +869,12 @@ function App() {
     setMenuEditState("success");
     setMenuEditMessage(result.message);
     setMenuPublishState("idle");
-    setMenuStatusMessage("QR menüde yayınlanmamış değişiklik var.");
+    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
   }
 
   function openWhatsApp(request: SyncedCustomerRequest) {
     setSelectedWhatsAppRequestId(request.id);
-    setActivePage("whatsapp");
+    setActivePage("messages");
   }
 
   function callCustomer(request: SyncedCustomerRequest) {
@@ -880,7 +891,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setManualRequestState("error");
-      setManualRequestMessage("Manuel talep için uygulamayı Electron içinde açın.");
+      setManualRequestMessage("Talep kaydı hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -938,7 +949,7 @@ function App() {
     if (!window.yardimciDesktop) {
       setConvertingRequestId("");
       setSyncState("error");
-      setStatusMessage("Rezervasyon işlemi için uygulamayı Electron içinde açın.");
+      setStatusMessage("Rezervasyon işlemi hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -964,7 +975,7 @@ function App() {
     if (!window.yardimciDesktop) {
       setSuggestingRequestId("");
       setAiState("error");
-      setAiMessage("AI taslağı için uygulamayı Electron içinde açın.");
+      setAiMessage("AI cevabı alınamadı. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -986,7 +997,7 @@ function App() {
   async function handleGenerateAiWorkspace() {
     if (!window.yardimciDesktop) {
       setAiWorkspaceState("error");
-      setAiWorkspaceMessage("AI çalışma alanı için uygulamayı Electron içinde açın.");
+      setAiWorkspaceMessage("AI araçları hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
     setAiWorkspaceState("loading");
@@ -1060,8 +1071,66 @@ function App() {
     }
     if (await persistAiWorkspaceResult()) {
       setSelectedWhatsAppRequestId(aiWorkspaceEntry.requestId);
-      setActivePage("whatsapp");
+      setActivePage("messages");
     }
+  }
+
+  function openAiTools(mode: AiWorkspaceMode, requestId = "", instructions = "") {
+    setAiWorkspaceMode(mode);
+    if (requestId) {
+      setAiWorkspaceRequestId(requestId);
+    }
+    setAiWorkspaceInstructions(instructions);
+    setAiWorkspaceEntry(null);
+    setAiWorkspaceContent("");
+    setAiWorkspaceState("idle");
+    setAiWorkspaceMessage("AI sonucunu hazırlamak için düğmeye basın.");
+    setMessagesAiOpen(true);
+    setActivePage("messages");
+  }
+
+  async function handleRewriteWhatsAppMessage(instructions: string) {
+    if (!selectedWhatsAppRequest || !window.yardimciDesktop) {
+      setAiState("error");
+      setAiMessage("Mesajı yenilemek için bir müşteri talebi seçin.");
+      return;
+    }
+
+    setAiState("loading");
+    setAiMessage("Mesaj yeniden hazırlanıyor...");
+    const result = await window.yardimciDesktop.generateAiWorkspace({
+      mode: "reply",
+      requestId: selectedWhatsAppRequest.id,
+      instructions
+    });
+    if (!result.ok) {
+      setAiState("error");
+      setAiMessage("AI cevabı alınamadı. Biraz sonra tekrar deneyin.");
+      return;
+    }
+
+    const saveResult = await window.yardimciDesktop.saveAiWorkspaceResult({
+      mode: result.entry.mode,
+      requestId: result.entry.requestId,
+      content: result.entry.content,
+      summary: result.entry.summary,
+      missingFields: result.entry.missingFields
+    });
+    if (!saveResult.ok) {
+      setAiState("error");
+      setAiMessage(saveResult.message);
+      return;
+    }
+
+    setDashboardData(saveResult.dashboardData);
+    setAiWorkspaceMode("reply");
+    setAiWorkspaceRequestId(selectedWhatsAppRequest.id);
+    setAiWorkspaceInstructions(instructions);
+    setAiWorkspaceEntry(result.entry);
+    setAiWorkspaceContent(result.entry.content);
+    setAiWorkspaceHistory((current) => [result.entry, ...current.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
+    setAiState("success");
+    setAiMessage("Hazır mesaj yenilendi. Göndermeden önce kontrol edin.");
   }
 
   function selectAiWorkspaceHistoryEntry(entry: AiWorkspaceHistoryEntry) {
@@ -1092,11 +1161,11 @@ function App() {
 
   async function handleCreateManualBackup() {
     setBackupState("loading");
-    setBackupMessage("Yerel veritabanı yedeği oluşturuluyor...");
+    setBackupMessage("Yerel kayıtların yedeği oluşturuluyor...");
 
     if (!window.yardimciDesktop) {
       setBackupState("error");
-      setBackupMessage("Yedekleme için uygulamayı Electron içinde açın.");
+      setBackupMessage("Yedekleme hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -1118,7 +1187,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setSyncState("error");
-      setStatusMessage("Talep durumu için uygulamayı Electron içinde açın.");
+      setStatusMessage("Talep durumu güncellenemedi. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -1140,7 +1209,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setSyncState("error");
-      setStatusMessage("Oda durumu için uygulamayı Electron içinde açın.");
+      setStatusMessage("Oda durumu güncellenemedi. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -1162,7 +1231,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setSyncState("error");
-      setStatusMessage("Masa durumu için uygulamayı Electron içinde açın.");
+      setStatusMessage("Masa durumu güncellenemedi. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -1184,7 +1253,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setSyncState("error");
-      setStatusMessage("Rezervasyon durumu için uygulamayı Electron içinde açın.");
+      setStatusMessage("Rezervasyon durumu güncellenemedi. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -1206,7 +1275,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setSyncState("error");
-      setStatusMessage("Günlük iş durumu için uygulamayı Electron içinde açın.");
+      setStatusMessage("Günlük iş güncellenemedi. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -1228,7 +1297,7 @@ function App() {
       return;
     }
 
-    const message = buildReservationWhatsAppMessage(reservation);
+    const message = buildReservationWhatsAppMessage(reservation, dashboardData.rooms, dashboardData.tables);
     void window.yardimciDesktop?.openExternal(createWhatsAppUrl(reservation.customerPhone, message));
   }
 
@@ -1247,7 +1316,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setAiConnectionTestState("error");
-      setAiConnectionTestMessage("Bağlantı denemesi için uygulamayı Electron içinde açın.");
+      setAiConnectionTestMessage("Bağlantı kontrolü hazır değil. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -1308,7 +1377,7 @@ function App() {
 
     if (!window.yardimciDesktop) {
       setSetupSaveState("error");
-      setSetupMessage("Kurulum ayarları sadece Electron uygulaması içinde kaydedilebilir.");
+      setSetupMessage("Ayarlar kaydedilemedi. Masaüstü uygulamasını yeniden başlatın.");
       return;
     }
 
@@ -1353,9 +1422,10 @@ function App() {
     setSetupData(result.setupData);
     setDashboardData(result.dashboardData);
     setSetupForm(toSetupForm(result.setupData));
-    setSetupSaveState(result.aiWebSync?.ok === false ? "error" : "success");
-    setSetupMessage(result.message);
-    if (result.aiWebSync?.ok !== false) {
+    const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
+    setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
+    setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
+    if (!aiConnectionCouldNotBePublished) {
       setSetupMode(false);
     }
   }
@@ -1390,64 +1460,15 @@ function App() {
         </div>
 
         <nav aria-label="Masaüstü menü">
-          <button className={activePage === "dashboard" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("dashboard")}>
-            <Home size={18} aria-hidden="true" />
-            Ana Ekran
-          </button>
-          <button className={activePage === "requests" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("requests")}>
-            <Bell size={18} aria-hidden="true" />
-            Talepler
-          </button>
-          <button className={activePage === "customers" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("customers")}>
-            <Users size={18} aria-hidden="true" />
-            Müşteriler
-          </button>
-          <button className={activePage === "reports" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("reports")}>
-            <BarChart3 size={18} aria-hidden="true" />
-            Raporlar
-          </button>
-          <button className={activePage === "tasks" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("tasks")}>
-            <ClipboardList size={18} aria-hidden="true" />
-            Günlük İşler
-          </button>
-          <button className={activePage === "reservations" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("reservations")}>
-            <CalendarCheck size={18} aria-hidden="true" />
-            Rezervasyonlar
-          </button>
-          {modules.rooms && (
-            <button className={activePage === "rooms" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("rooms")}>
-              <BedDouble size={18} aria-hidden="true" />
-              Odalar
-            </button>
-          )}
-          {modules.tables && (
-            <button className={activePage === "tables" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("tables")}>
-              <UtensilsCrossed size={18} aria-hidden="true" />
-              Masalar
-            </button>
-          )}
-          {modules.qrMenu && (
-            <button className={activePage === "menu" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("menu")}>
-              <MenuIcon size={18} aria-hidden="true" />
-              QR Menü
-            </button>
-          )}
-          {modules.whatsapp && (
-            <button className={activePage === "whatsapp" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("whatsapp")}>
-              <MessageCircle size={18} aria-hidden="true" />
-              WhatsApp
-            </button>
-          )}
-          {modules.ai && (
-            <button className={activePage === "ai" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("ai")}>
-              <Sparkles size={18} aria-hidden="true" />
-              AI Yardımcı
-            </button>
-          )}
-          <button className="nav-item" type="button" onClick={() => setSetupMode(true)}>
-            <Settings size={18} aria-hidden="true" />
-            Ayarlar
-          </button>
+          {navigationItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button className={activePage === item.id ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage(item.id)} key={item.id}>
+                <Icon size={18} aria-hidden="true" />
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
       </aside>
 
@@ -1465,20 +1486,24 @@ function App() {
                 Web'e Yayınla
               </button>
             </div>
-          ) : activePage === "whatsapp" ? (
+          ) : activePage === "messages" ? (
             <div className="sync-pill sync-idle">
-              <span>{selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "WhatsApp için talep seçin"}</span>
-              <button type="button" onClick={openSelectedWhatsAppExternal} disabled={!selectedWhatsAppUrl}>
-                <ExternalLink size={16} aria-hidden="true" />
-                Dışarıda Aç
+              <span>{setupData.modules.whatsapp ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin") : "AI araçları kullanıma hazır."}</span>
+              <button
+                type="button"
+                onClick={setupData.modules.whatsapp ? openSelectedWhatsAppExternal : () => setMessagesAiOpen(true)}
+                disabled={setupData.modules.whatsapp && !selectedWhatsAppUrl}
+              >
+                {setupData.modules.whatsapp ? <ExternalLink size={16} aria-hidden="true" /> : <Sparkles size={16} aria-hidden="true" />}
+                {setupData.modules.whatsapp ? "WhatsApp'ı Aç" : "AI Araçlarını Aç"}
               </button>
             </div>
-          ) : activePage === "ai" ? (
+          ) : activePage === "settings" ? (
             <div className="sync-pill sync-idle">
-              <span>{setupData.aiEnabled ? `${aiServicePresets.find((service) => service.id === setupData.aiService)?.label ?? "Özel servis"} • ${setupData.aiModel || "Model seçilmedi"}` : "AI yardımcısı kapalı"}</span>
-              <button type="button" onClick={() => setSetupMode(true)}>
-                <Settings size={16} aria-hidden="true" />
-                AI Ayarlarını Aç
+              <span>İşletme ve bağlantı ayarlarını yönetin.</span>
+              <button type="button" onClick={handleSaveSetup} disabled={setupSaveState === "loading"}>
+                <Save size={16} aria-hidden="true" />
+                Ayarları Kaydet
               </button>
             </div>
           ) : (
@@ -1564,7 +1589,7 @@ function App() {
                           disabled={suggestingRequestId === request.id}
                         >
                           <Sparkles size={16} aria-hidden="true" />
-                          {suggestingRequestId === request.id ? "Hazırlanıyor" : "AI Taslak Yenile"}
+                          {suggestingRequestId === request.id ? "Hazırlanıyor" : "AI Cevap Hazırla"}
                         </button>
                       )}
                       <button className="whatsapp-action" type="button" onClick={() => openWhatsApp(request)}>
@@ -1578,189 +1603,133 @@ function App() {
             </div>
           </article>
 
-          <aside className="side-column">
+          <aside className="side-column dashboard-operations">
             <article className="panel">
               <div className="panel-heading compact">
-                <div>
-                  <p>Yerel Çalışma</p>
-                  <h2>Bağlantı</h2>
-                </div>
+                <div><p>Bugün</p><h2>Servis ve konaklama işleri</h2></div>
+                <span className="status-badge wait">{dashboardData.dailyTasks.filter((task) => task.status === "pending").length} bekliyor</span>
               </div>
-              <dl className="info-list">
-                <div>
-                  <dt>Web modül adresi</dt>
-                  <dd>{dashboardData.webModuleUrl}</dd>
-                </div>
-                <div>
-                  <dt>Yerel kayıt dosyası</dt>
-                  <dd>{dashboardData.databasePath}</dd>
-                </div>
-                <div>
-                  <dt>Yedek klasörü</dt>
-                  <dd>{dashboardData.backupPath}</dd>
-                </div>
-                <div>
-                  <dt>Çalışma şekli</dt>
-                  <dd>PC dışarıya açılmaz, talepleri hostingden çeker.</dd>
-                </div>
-              </dl>
-              <div className="local-command-stack">
-                <button className="primary-command full-width-command" type="button" onClick={handleCreateManualBackup} disabled={backupState === "loading"}>
-                  <Save size={16} aria-hidden="true" />
-                  {backupState === "loading" ? "Yedekleniyor" : "Yedek Al"}
-                </button>
-                <button className="primary-command full-width-command android-publish-command" type="button" onClick={handlePublishAndroidSnapshot} disabled={androidPublishState === "loading"}>
-                  <UploadCloud size={16} aria-hidden="true" />
-                  {androidPublishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}
-                </button>
+              <div className="dashboard-compact-list">
+                {dashboardData.dailyTasks.filter((task) => task.status === "pending").slice(0, 4).map((task) => (
+                  <article key={task.id}>
+                    <div><strong>{task.title}</strong><span>{formatTaskDue(task)}</span></div>
+                    <button type="button" onClick={() => handleUpdateDailyTaskStatus(task.id, "done")}>Tamamla</button>
+                  </article>
+                ))}
+                {dashboardData.dailyTasks.filter((task) => task.status === "pending").length === 0 && <p className="quiet-message">Bugün için bekleyen iş yok.</p>}
               </div>
-              <p className={`menu-status ${backupState === "error" ? "sync-error" : backupState === "success" ? "sync-success" : ""}`}>{backupMessage}</p>
-              <p className={`menu-status ${androidPublishState === "error" ? "sync-error" : androidPublishState === "success" ? "sync-success" : ""}`}>{androidPublishMessage}</p>
             </article>
 
             <article className="panel">
               <div className="panel-heading compact">
-                <div>
-                  <p>AI Yardımcı</p>
-                  <h2>Cevap Taslağı</h2>
-                </div>
-                <span className={`status-badge ${aiState === "success" ? "ok" : aiState === "error" ? "wait" : "info"}`}>
-                  {aiState === "loading" ? "Hazırlanıyor" : "Taslak"}
-                </span>
+                <div><p>Takip</p><h2>Cevap bekleyen müşteriler</h2></div>
               </div>
-              {aiPreviewRequest ? (
-                <>
-                  <dl className="info-list compact-info ai-preview-meta">
-                    <div>
-                      <dt>Müşteri</dt>
-                      <dd>{aiPreviewRequest.customer_name}</dd>
-                    </div>
-                    <div>
-                      <dt>Özet</dt>
-                      <dd>{aiPreviewRequest.ai_summary || `${formatRequestType(aiPreviewRequest.request_type)} • ${aiPreviewRequest.date_text || aiPreviewRequest.start_date}`}</dd>
-                    </div>
-                  </dl>
-                  <p className="suggestion">{aiPreviewMessage}</p>
-                  <p className={`menu-status ${aiState === "error" ? "sync-error" : aiState === "success" ? "sync-success" : ""}`}>{aiMessage}</p>
-                </>
-              ) : (
-                <div className="empty-state compact-empty">
-                  <Sparkles size={24} aria-hidden="true" />
-                  <strong>Talep yok.</strong>
-                  <p>Web talepleri çekildiğinde cevap taslağı burada görünür.</p>
-                </div>
-              )}
+              <div className="dashboard-compact-list">
+                {dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status)).slice(0, 4).map((request) => (
+                  <article key={request.id}>
+                    <div><strong>{request.customer_name}</strong><span>{formatRequestType(request.request_type)}</span></div>
+                    <button type="button" onClick={() => openWhatsApp(request)}>Yanıtla</button>
+                  </article>
+                ))}
+                {dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status)).length === 0 && <p className="quiet-message">Cevap bekleyen müşteri yok.</p>}
+              </div>
             </article>
 
-            <article className="panel menu-panel">
+            <article className="panel">
               <div className="panel-heading compact">
-                <div>
-                  <p>QR Menü</p>
-                  <h2>Web Yayını</h2>
-                </div>
-                <span className="status-badge info">{dashboardData.menu.items.length} ürün</span>
+                <div><p>Yaklaşan</p><h2>Giriş, çıkış ve rezervasyonlar</h2></div>
               </div>
-
-              <div className="menu-summary">
-                <div>
-                  <strong>{dashboardData.summary.activeMenuCategories}</strong>
-                  <span>aktif kategori</span>
-                </div>
-                <div>
-                  <strong>{dashboardData.summary.availableMenuItems}</strong>
-                  <span>yayında ürün</span>
-                </div>
-              </div>
-
-              <div className="mini-menu-list">
-                {dashboardData.menu.items.slice(0, 4).map((item) => (
-                  <div className="mini-menu-item" key={item.id}>
-                    <div>
-                      <strong>{item.name}</strong>
-                      <span>{findMenuCategoryName(item.category_id, dashboardData.menu.categories)}</span>
-                    </div>
-                    <span>{formatCurrency(item.price, item.currency)}</span>
-                  </div>
+              <div className="dashboard-compact-list">
+                {dashboardData.reservations.filter((reservation) => !["rejected", "cancelled", "completed"].includes(reservation.status)).slice(0, 4).map((reservation) => (
+                  <article key={reservation.id}>
+                    <div><strong>{reservation.customerName || reservation.title}</strong><span>{formatReservationDate(reservation)}</span></div>
+                    <span className={`status-badge ${reservation.status === "pending" ? "wait" : "ok"}`}>{formatReservationStatus(reservation.status)}</span>
+                  </article>
                 ))}
               </div>
-
-              <p className={`menu-status sync-${menuPublishState}`}>{menuStatusMessage}</p>
-              <div className="menu-actions">
-                <button type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
-                  <UploadCloud size={16} aria-hidden="true" />
-                  Web'e Yayınla
+              {setupData.aiEnabled && (
+                <button className="primary-command dashboard-ai-command" type="button" onClick={() => openAiTools("daily")}>
+                  <Sparkles size={16} aria-hidden="true" />
+                  Bugünü Değerlendir
                 </button>
-                <button type="button" onClick={openMenuPreview}>
-                  <ExternalLink size={16} aria-hidden="true" />
-                  Önizle
-                </button>
-              </div>
+              )}
             </article>
           </aside>
         </section>
           </>
-        ) : activePage === "requests" ? (
-          <RequestsWorkspace
-            requests={dashboardData.requests}
-            selectedRequest={selectedRequest}
-            aiEnabled={setupData.aiEnabled}
-            convertingRequestId={convertingRequestId}
-            suggestingRequestId={suggestingRequestId}
-            manualRequestForm={manualRequestForm}
-            manualRequestState={manualRequestState}
-            manualRequestMessage={manualRequestMessage}
-            onSelectRequest={setSelectedRequestId}
-            onManualRequestFormChange={setManualRequestForm}
-            onCreateManualRequest={handleCreateManualRequest}
-            onCall={callCustomer}
-            onWhatsApp={openWhatsApp}
-            onConvert={handleConvertRequestToReservation}
-            onSuggest={handleCreateOwnerReplySuggestion}
-            onUpdateStatus={handleUpdateRequestStatus}
+        ) : activePage === "customerWork" ? (
+          <CustomerWorkPage
+            requests={(
+              <RequestsWorkspace
+                requests={dashboardData.requests}
+                selectedRequest={selectedRequest}
+                aiEnabled={setupData.aiEnabled}
+                convertingRequestId={convertingRequestId}
+                suggestingRequestId={suggestingRequestId}
+                manualRequestForm={manualRequestForm}
+                manualRequestState={manualRequestState}
+                manualRequestMessage={manualRequestMessage}
+                onSelectRequest={setSelectedRequestId}
+                onManualRequestFormChange={setManualRequestForm}
+                onCreateManualRequest={handleCreateManualRequest}
+                onCall={callCustomer}
+                onWhatsApp={openWhatsApp}
+                onConvert={handleConvertRequestToReservation}
+                onSuggest={handleCreateOwnerReplySuggestion}
+                onUpdateStatus={handleUpdateRequestStatus}
+              />
+            )}
+            customers={(
+              <CustomersWorkspace
+                customers={dashboardData.customers}
+                requests={dashboardData.requests}
+                reservations={dashboardData.reservations}
+                aiEnabled={setupData.aiEnabled}
+                onCall={callCustomerRecord}
+                onWhatsApp={openCustomerWhatsApp}
+                onSummarize={(requestId) => openAiTools("summary", requestId)}
+              />
+            )}
+            waiting={(
+              <RequestsWorkspace
+                requests={dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status))}
+                selectedRequest={dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status)).find((request) => request.id === selectedRequestId) ?? dashboardData.requests.find((request) => isRequestWaitingForReply(request.status))}
+                aiEnabled={setupData.aiEnabled}
+                convertingRequestId={convertingRequestId}
+                suggestingRequestId={suggestingRequestId}
+                manualRequestForm={manualRequestForm}
+                manualRequestState={manualRequestState}
+                manualRequestMessage={manualRequestMessage}
+                showManualForm={false}
+                onSelectRequest={setSelectedRequestId}
+                onManualRequestFormChange={setManualRequestForm}
+                onCreateManualRequest={handleCreateManualRequest}
+                onCall={callCustomer}
+                onWhatsApp={openWhatsApp}
+                onConvert={handleConvertRequestToReservation}
+                onSuggest={handleCreateOwnerReplySuggestion}
+                onUpdateStatus={handleUpdateRequestStatus}
+              />
+            )}
           />
-        ) : activePage === "customers" ? (
-          <CustomersWorkspace
-            customers={dashboardData.customers}
-            requests={dashboardData.requests}
-            reservations={dashboardData.reservations}
-            onCall={callCustomerRecord}
-            onWhatsApp={openCustomerWhatsApp}
+        ) : activePage === "pension" ? (
+          <PensionPage
+            data={dashboardData}
+            reservations={(
+              <ReservationsWorkspace
+                reservations={dashboardData.reservations}
+                rooms={dashboardData.rooms}
+                onUpdateStatus={handleUpdateReservationStatus}
+                onOpenWhatsApp={openReservationWhatsApp}
+              />
+            )}
+            rooms={<RoomsWorkspace rooms={dashboardData.rooms} onUpdateStatus={handleUpdateRoomStatus} />}
           />
-        ) : activePage === "reports" ? (
-          <ReportsWorkspace dashboardData={dashboardData} />
-        ) : activePage === "tasks" ? (
-          <DailyTasksWorkspace tasks={dashboardData.dailyTasks} onUpdateStatus={handleUpdateDailyTaskStatus} />
-        ) : activePage === "reservations" ? (
-          <ReservationsWorkspace
-            reservations={dashboardData.reservations}
-            onUpdateStatus={handleUpdateReservationStatus}
-            onOpenWhatsApp={openReservationWhatsApp}
-          />
-        ) : activePage === "rooms" ? (
-          <RoomsWorkspace rooms={dashboardData.rooms} onUpdateStatus={handleUpdateRoomStatus} />
-        ) : activePage === "tables" ? (
-          <TablesWorkspace tables={dashboardData.tables} onUpdateStatus={handleUpdateTableStatus} />
-        ) : activePage === "ai" ? (
-          <AiWorkspace
-            setupData={setupData}
-            dashboardData={dashboardData}
-            mode={aiWorkspaceMode}
-            selectedRequestId={aiWorkspaceRequestId}
-            instructions={aiWorkspaceInstructions}
-            entry={aiWorkspaceEntry}
-            content={aiWorkspaceContent}
-            history={aiWorkspaceHistory}
-            state={aiWorkspaceState}
-            message={aiWorkspaceMessage}
-            onModeChange={changeAiWorkspaceMode}
-            onRequestChange={changeAiWorkspaceRequest}
-            onInstructionsChange={setAiWorkspaceInstructions}
-            onContentChange={setAiWorkspaceContent}
-            onGenerate={handleGenerateAiWorkspace}
-            onSave={handleSaveAiWorkspace}
-            onCopy={handleCopyAiWorkspace}
-            onWhatsApp={handlePrepareAiWorkspaceWhatsApp}
-            onSelectHistory={selectAiWorkspaceHistoryEntry}
+        ) : activePage === "restaurant" ? (
+          <RestaurantPage
+            data={dashboardData}
+            tables={<TablesWorkspace tables={dashboardData.tables} onUpdateStatus={handleUpdateTableStatus} />}
+            tasks={<DailyTasksWorkspace tasks={dashboardData.dailyTasks} onUpdateStatus={handleUpdateDailyTaskStatus} />}
           />
         ) : activePage === "menu" ? (
           <MenuManager
@@ -1771,7 +1740,6 @@ function App() {
             selectedItemId={selectedItemId}
             menuEditState={menuEditState}
             menuEditMessage={menuEditMessage}
-            menuPreviewUrl={menuPreviewUrl}
             onCategoryFormChange={setCategoryForm}
             onItemFormChange={setItemForm}
             onSelectCategory={selectCategory}
@@ -1784,15 +1752,91 @@ function App() {
             onOpenPreview={openMenuPreview}
             isPublishing={menuPublishState === "loading"}
           />
+        ) : activePage === "messages" ? (
+          <MessagesPage
+            aiEnabled={setupData.aiEnabled}
+            whatsappEnabled={setupData.modules.whatsapp}
+            aiOpen={messagesAiOpen}
+            onAiOpenChange={setMessagesAiOpen}
+            safeMode={(
+              <WhatsAppWorkspace
+                view="safe"
+                requests={dashboardData.requests}
+                selectedRequest={selectedWhatsAppRequest}
+                selectedMessage={selectedWhatsAppMessage}
+                selectedUrl={selectedWhatsAppUrl}
+                aiEnabled={setupData.aiEnabled}
+                aiState={aiState}
+                aiMessage={aiMessage}
+                onSelectRequest={setSelectedWhatsAppRequestId}
+                onOpenExternal={openSelectedWhatsAppExternal}
+                onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
+                onRewrite={handleRewriteWhatsAppMessage}
+                onMessageSent={handleWhatsAppMessageSent}
+              />
+            )}
+            webMode={(
+              <WhatsAppWorkspace
+                view="web"
+                requests={dashboardData.requests}
+                selectedRequest={selectedWhatsAppRequest}
+                selectedMessage={selectedWhatsAppMessage}
+                selectedUrl={selectedWhatsAppUrl}
+                aiEnabled={setupData.aiEnabled}
+                aiState={aiState}
+                aiMessage={aiMessage}
+                onSelectRequest={setSelectedWhatsAppRequestId}
+                onOpenExternal={openSelectedWhatsAppExternal}
+                onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
+                onRewrite={handleRewriteWhatsAppMessage}
+                onMessageSent={handleWhatsAppMessageSent}
+              />
+            )}
+            aiTools={(
+              <AiWorkspace
+                setupData={setupData}
+                dashboardData={dashboardData}
+                mode={aiWorkspaceMode}
+                selectedRequestId={aiWorkspaceRequestId}
+                instructions={aiWorkspaceInstructions}
+                entry={aiWorkspaceEntry}
+                content={aiWorkspaceContent}
+                history={aiWorkspaceHistory}
+                state={aiWorkspaceState}
+                message={aiWorkspaceMessage}
+                onModeChange={changeAiWorkspaceMode}
+                onRequestChange={changeAiWorkspaceRequest}
+                onInstructionsChange={setAiWorkspaceInstructions}
+                onContentChange={setAiWorkspaceContent}
+                onGenerate={handleGenerateAiWorkspace}
+                onSave={handleSaveAiWorkspace}
+                onCopy={handleCopyAiWorkspace}
+                onWhatsApp={handlePrepareAiWorkspaceWhatsApp}
+                onSelectHistory={selectAiWorkspaceHistoryEntry}
+              />
+            )}
+          />
         ) : (
-          <WhatsAppWorkspace
-            requests={dashboardData.requests}
-            selectedRequest={selectedWhatsAppRequest}
-            selectedMessage={selectedWhatsAppMessage}
-            selectedUrl={selectedWhatsAppUrl}
-            onSelectRequest={setSelectedWhatsAppRequestId}
-            onOpenExternal={openSelectedWhatsAppExternal}
-            onMessageSent={handleWhatsAppMessageSent}
+          <SetupWizard
+            embedded
+            form={setupForm}
+            setupData={setupData}
+            dashboardData={dashboardData}
+            saveState={setupSaveState}
+            message={setupMessage}
+            backupState={backupState}
+            backupMessage={backupMessage}
+            androidPublishState={androidPublishState}
+            androidPublishMessage={androidPublishMessage}
+            aiConnectionTestState={aiConnectionTestState}
+            aiConnectionTestMessage={aiConnectionTestMessage}
+            aiModelOptions={aiModelOptions}
+            onFormChange={setSetupForm}
+            onTestAiConnection={handleTestAiConnection}
+            onCreateBackup={handleCreateManualBackup}
+            onPublishAndroid={handlePublishAndroidSnapshot}
+            onSave={handleSaveSetup}
+            onSkip={() => setActivePage("dashboard")}
           />
         )}
       </main>
@@ -1803,13 +1847,21 @@ function App() {
 interface SetupWizardProps {
   form: SetupFormState;
   setupData: DesktopSetupData;
+  dashboardData?: DesktopDashboardData;
+  embedded?: boolean;
   saveState: SyncState;
   message: string;
+  backupState?: SyncState;
+  backupMessage?: string;
+  androidPublishState?: SyncState;
+  androidPublishMessage?: string;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
   aiModelOptions: Array<{ id: string; label: string }>;
   onFormChange: (form: SetupFormState) => void;
   onTestAiConnection: () => void;
+  onCreateBackup?: () => void;
+  onPublishAndroid?: () => void;
   onSave: () => void;
   onSkip: () => void;
 }
@@ -1817,18 +1869,27 @@ interface SetupWizardProps {
 function SetupWizard({
   form,
   setupData,
+  dashboardData,
+  embedded = false,
   saveState,
   message,
+  backupState = "idle",
+  backupMessage = "Yedekleme bekliyor.",
+  androidPublishState = "idle",
+  androidPublishMessage = "Telefon özeti henüz yayınlanmadı.",
   aiConnectionTestState,
   aiConnectionTestMessage,
   aiModelOptions,
   onFormChange,
   onTestAiConnection,
+  onCreateBackup,
+  onPublishAndroid,
   onSave,
   onSkip
 }: SetupWizardProps) {
   const [showAiApiKey, setShowAiApiKey] = useState(false);
   const [showGoogleCurl, setShowGoogleCurl] = useState(false);
+  const [settingsLevel, setSettingsLevel] = useState<"basic" | "advanced">("basic");
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
   };
@@ -1845,8 +1906,8 @@ function SetupWizard({
   };
 
   return (
-    <main className="setup-shell">
-      <section className="setup-hero" aria-label="İlk kurulum">
+    <main className={embedded ? "setup-shell is-embedded" : "setup-shell"}>
+      {!embedded && <section className="setup-hero" aria-label="İlk kurulum">
         <div className="setup-brand">
           <img className="setup-brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
           <div>
@@ -1862,16 +1923,21 @@ function SetupWizard({
         <dl className="setup-paths">
           <div>
             <dt>Veri dosyası</dt>
-            <dd>{setupData.setupRequired ? "İlk kayıt sonrası oluşur" : "Yerel SQLite içinde kayıtlı"}</dd>
+            <dd>{setupData.setupRequired ? "İlk kayıt sonrası oluşur" : "Bu bilgisayarda güvenle saklanır"}</dd>
           </div>
           <div>
             <dt>Yedekleme</dt>
             <dd>Uygulama veri klasöründe backups klasörü ayrıldı</dd>
           </div>
         </dl>
-      </section>
+      </section>}
 
       <section className="setup-form-surface">
+        <div className="settings-level-tabs" role="tablist" aria-label="Ayar düzeyi">
+          <button className={settingsLevel === "basic" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "basic"} onClick={() => setSettingsLevel("basic")}>Temel Ayarlar</button>
+          <button className={settingsLevel === "advanced" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "advanced"} onClick={() => setSettingsLevel("advanced")}>Gelişmiş Ayarlar</button>
+        </div>
+        {settingsLevel === "basic" && <>
         <div className="setup-section">
           <div className="setup-section-title">
             <p>Firma Bilgileri</p>
@@ -1942,6 +2008,28 @@ function SetupWizard({
 
         <div className="setup-section">
           <div className="setup-section-title">
+            <p>Kapasite ve Yardımcı</p>
+            <h2>Günlük Kullanım</h2>
+          </div>
+          <div className="setup-count-row">
+            <label>
+              Oda sayısı
+              <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" />
+            </label>
+            <label>
+              Masa sayısı
+              <input value={form.tableCount} onChange={(event) => update("tableCount", event.target.value)} inputMode="numeric" />
+            </label>
+          </div>
+          <label className="setup-checkline settings-ai-toggle">
+            <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
+            AI cevap önerileri açık
+          </label>
+        </div>
+        </>}
+
+        {settingsLevel === "advanced" && <><div className="setup-section">
+          <div className="setup-section-title">
             <p>Web Bağlantısı</p>
             <h2>Hosting Modülü</h2>
           </div>
@@ -1965,12 +2053,8 @@ function SetupWizard({
           </div>
           <p className="setup-section-description">Seçtiğiniz bağlantı masaüstündeki cevap taslaklarında kullanılır ve kaydettiğinizde web modülüne güvenli biçimde uygulanır.</p>
           <div className="setup-grid two">
-            <label className="setup-checkline">
-              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
-              AI yardımcı açık
-            </label>
             <label>
-              Kullanılacak servis
+              Servis sağlayıcı
               <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
                 {aiServicePresets.map((preset) => (
                   <option value={preset.id} key={preset.id}>{preset.label}</option>
@@ -1985,7 +2069,7 @@ function SetupWizard({
                     <ExternalLink size={16} aria-hidden="true" />
                     Google AI Studio'yu Aç
                   </button>
-                  <small>API anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
+                  <small>Bağlantı anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
                 </div>
                 <div className="setup-field setup-grid-wide">
                   <span>Google AI Studio cURL bağlantısı</span>
@@ -2004,7 +2088,7 @@ function SetupWizard({
                       {showGoogleCurl ? "Gizle" : "Göster"}
                     </button>
                   </div>
-                  <small>Komut yalnız bağlantı kontrolünde okunur; API adresi, anahtar ve örnek model otomatik ayrıştırılır.</small>
+                  <small>Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır.</small>
                 </div>
               </>
             ) : (
@@ -2025,7 +2109,7 @@ function SetupWizard({
                 <input value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} placeholder={form.aiService === "gemini" ? "Bağlantı kontrolünden sonra listelenir" : "Serviste görünen model adı"} disabled={!form.aiEnabled || form.aiService === "gemini"} spellCheck={false} />
               )}
               {form.aiService === "gemini" && (
-                <small>{aiModelOptions.length > 0 ? `${aiModelOptions.length} model API üzerinden alındı.` : "Bağlantıyı Dene ile kullanılabilir modeller otomatik alınır."}</small>
+                <small>{aiModelOptions.length > 0 ? `${aiModelOptions.length} model servisten alındı.` : "Bağlantıyı Dene ile kullanılabilir modeller otomatik alınır."}</small>
               )}
             </label>
             <label>
@@ -2033,10 +2117,10 @@ function SetupWizard({
               <input value={form.aiTimeoutSeconds} onChange={(event) => update("aiTimeoutSeconds", event.target.value)} inputMode="numeric" min="5" max="120" disabled={!form.aiEnabled} />
             </label>
             {form.aiService !== "gemini" && <div className="setup-field setup-grid-wide">
-              <span>Gizli erişim anahtarı</span>
+              <span>AI güvenlik anahtarı</span>
               <div className="setup-secret-input">
                 <input
-                  aria-label="Gizli erişim anahtarı"
+                  aria-label="AI güvenlik anahtarı"
                   value={form.aiApiKey}
                   onChange={(event) => update("aiApiKey", event.target.value)}
                   type={showAiApiKey ? "text" : "password"}
@@ -2077,21 +2161,19 @@ function SetupWizard({
         </div>
 
         <div className="setup-section">
-          <div className="setup-section-title">
-            <p>İlk Kayıtlar</p>
-            <h2>Oda ve Masa Sayısı</h2>
+          <div className="setup-section-title"><p>Bu Bilgisayar</p><h2>Kayıt ve Yedekleme</h2></div>
+          <dl className="info-list settings-technical-info">
+            <div><dt>Yerel kayıt dosyası</dt><dd>{dashboardData?.databasePath ?? "İlk kayıt sonrası oluşur"}</dd></div>
+            <div><dt>Yedek klasörü</dt><dd>{dashboardData?.backupPath ?? "İlk kayıt sonrası oluşur"}</dd></div>
+          </dl>
+          <div className="settings-action-row">
+            <button className="setup-secondary" type="button" onClick={onCreateBackup} disabled={!onCreateBackup || backupState === "loading"}><Save size={16} aria-hidden="true" />{backupState === "loading" ? "Yedekleniyor" : "Yedek Al"}</button>
+            {form.androidEnabled && <button className="setup-secondary" type="button" onClick={onPublishAndroid} disabled={!onPublishAndroid || androidPublishState === "loading"}><UploadCloud size={16} aria-hidden="true" />{androidPublishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}</button>}
           </div>
-          <div className="setup-count-row">
-            <label>
-              Oda sayısı
-              <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" />
-            </label>
-            <label>
-              Masa sayısı
-              <input value={form.tableCount} onChange={(event) => update("tableCount", event.target.value)} inputMode="numeric" />
-            </label>
-          </div>
+          <p className={`menu-status sync-${backupState}`}>{backupMessage}</p>
+          {form.androidEnabled && <p className={`menu-status sync-${androidPublishState}`}>{androidPublishMessage}</p>}
         </div>
+        </>}
 
         <footer className={`setup-footer sync-${saveState}`}>
           <span>{message}</span>
@@ -2157,26 +2239,25 @@ function AiWorkspace({
 }: AiWorkspaceProps) {
   const needsRequest = mode !== "daily";
   const selectedRequest = dashboardData.requests.find((request) => request.id === selectedRequestId);
-  const serviceLabel = aiServicePresets.find((service) => service.id === setupData.aiService)?.label ?? "Özel servis";
-  const generateDisabled = state === "loading" || (needsRequest && !selectedRequest);
+  const generateDisabled = !setupData.aiEnabled || state === "loading" || (needsRequest && !selectedRequest);
 
   return (
     <section className="ai-workspace" aria-label="AI Yardımcı çalışma alanı">
       <div className="ai-status-grid">
         <article className="ai-status-card">
-          <span>Bağlantı</span>
-          <strong className={setupData.aiEnabled ? "is-online" : "is-offline"}>{setupData.aiEnabled ? "AI açık" : "AI kapalı"}</strong>
-          <small>{serviceLabel}</small>
+          <span>AI önerileri</span>
+          <strong className={setupData.aiEnabled ? "is-online" : "is-offline"}>{setupData.aiEnabled ? "Kullanıma hazır" : "Kapalı"}</strong>
+          <small>Hazır mesaj ve özetler</small>
         </article>
         <article className="ai-status-card">
-          <span>Kullanılan model</span>
-          <strong>{setupData.aiModel || "Model seçilmedi"}</strong>
-          <small>{setupData.aiBaseUrl || "Bağlantı adresi yok"}</small>
+          <span>Son çalışmalar</span>
+          <strong>{history.length} kayıt</strong>
+          <small>Bu bilgisayarda saklanır</small>
         </article>
         <article className="ai-status-card">
-          <span>Web yayını</span>
-          <strong>{setupData.aiLastPublishedAt ? "Güncel" : "Bekliyor"}</strong>
-          <small>{setupData.aiLastPublishedAt ? formatDateTime(setupData.aiLastPublishedAt) : "Henüz yayınlanmadı"}</small>
+          <span>Gönderim kontrolü</span>
+          <strong>Her zaman sizde</strong>
+          <small>Metinler otomatik gönderilmez</small>
         </article>
       </div>
 
@@ -2255,7 +2336,7 @@ function AiWorkspace({
             <>
               <div className="ai-result-meta">
                 <span>{entry.requestLabel}</span>
-                <span>{entry.model || entry.provider}</span>
+                <span>{entry.fallback ? "Güvenli taslak" : "AI taslağı"}</span>
                 <span>{formatDateTime(entry.createdAt)}</span>
               </div>
               {entry.missingFields.length > 0 && (
@@ -2315,12 +2396,18 @@ function AiWorkspace({
 }
 
 interface WhatsAppWorkspaceProps {
+  view: "safe" | "web";
   requests: SyncedCustomerRequest[];
   selectedRequest: SyncedCustomerRequest | undefined;
   selectedMessage: string;
   selectedUrl: string;
+  aiEnabled: boolean;
+  aiState: SyncState;
+  aiMessage: string;
   onSelectRequest: (requestId: string) => void;
   onOpenExternal: () => void;
+  onCall?: () => void;
+  onRewrite: (instructions: string) => void;
   onMessageSent: (requestId: string, message: string) => Promise<{ ok: boolean; message: string }>;
 }
 
@@ -2487,7 +2574,7 @@ function createWhatsAppSendScript(expectedMessage: string, expectedChatTitle: st
   })()`;
 }
 
-function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selectedUrl, onSelectRequest, onOpenExternal, onMessageSent }: WhatsAppWorkspaceProps) {
+function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, onSelectRequest, onOpenExternal, onCall, onRewrite, onMessageSent }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const [connectionState, setConnectionState] = useState<WhatsAppConnectionState>("idle");
   const [connectionMessage, setConnectionMessage] = useState("WhatsApp Web yükleniyor.");
@@ -2547,7 +2634,7 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
     };
     const handleFail = () => {
       setConnectionState("error");
-      setConnectionMessage("WebView bağlantısı kurulamadı.");
+      setConnectionMessage("WhatsApp Web bağlantısı kurulamadı.");
     };
 
     webView.addEventListener("did-start-loading", handleStart);
@@ -2654,12 +2741,12 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
       );
     } catch {
       setSendState("error");
-      setSendMessage("WhatsApp Web DOM denetimi tamamlanamadı. Sohbeti yeniden açıp tekrar deneyin.");
+      setSendMessage("WhatsApp Web güvenlik kontrolü tamamlanamadı. Sohbeti yeniden açıp tekrar deneyin.");
     }
   }
 
   return (
-    <section className="whatsapp-workspace" aria-label="WhatsApp çalışma alanı">
+    <section className={`whatsapp-workspace whatsapp-view-${view}`} aria-label={view === "safe" ? "Güvenli mesaj alanı" : "WhatsApp Web alanı"}>
       <aside className="panel whatsapp-request-panel">
         <div className="panel-heading compact">
           <div>
@@ -2694,7 +2781,7 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
         </div>
       </aside>
 
-      <section className="panel whatsapp-live-panel">
+      {view === "web" && <section className="panel whatsapp-live-panel">
         <div className="panel-heading compact">
           <div>
             <p>WhatsApp Web</p>
@@ -2733,17 +2820,17 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
           ) : (
             <div className="empty-state compact-empty">
               <MessageCircle size={24} aria-hidden="true" />
-              <strong>WhatsApp hedefi hazır değil.</strong>
+              <strong>WhatsApp bağlantısı hazır değil.</strong>
               <p>{connectionMessage}</p>
             </div>
           )}
         </div>
-      </section>
+      </section>}
 
-      <aside className="panel whatsapp-copy-panel">
+      {view === "safe" && <aside className="panel whatsapp-copy-panel">
         <div className="panel-heading compact">
           <div>
-            <p>Manuel Kopyalama</p>
+            <p>Güvenli Mod</p>
             <h2>Hazır Mesaj</h2>
           </div>
         </div>
@@ -2771,8 +2858,24 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
             <ExternalLink size={16} aria-hidden="true" />
             WhatsApp Linkini Aç
           </button>
+          <button type="button" onClick={onCall} disabled={!onCall}>
+            <Phone size={16} aria-hidden="true" />
+            Müşteriyi Ara
+          </button>
         </div>
-      </aside>
+        {aiEnabled && (
+          <div className="message-ai-actions">
+            <strong>AI ile mesajı düzenle</strong>
+            <div>
+              <button type="button" onClick={() => onRewrite("Mesajı daha kısa ve doğrudan yaz.")} disabled={aiState === "loading"}>Daha Kısa</button>
+              <button type="button" onClick={() => onRewrite("Mesajı daha samimi ve sıcak yaz.")} disabled={aiState === "loading"}>Daha Samimi</button>
+              <button type="button" onClick={() => onRewrite("Mesajı daha resmi ve ölçülü yaz.")} disabled={aiState === "loading"}>Daha Resmi</button>
+              <button type="button" onClick={() => onRewrite("Mesajı mevcut talep bilgilerine göre yeniden hazırla.")} disabled={aiState === "loading"}>AI ile Yenile</button>
+            </div>
+            <p className={`menu-status sync-${aiState}`}>{aiMessage}</p>
+          </div>
+        )}
+      </aside>}
     </section>
   );
 }
@@ -2786,6 +2889,7 @@ interface RequestsWorkspaceProps {
   manualRequestForm: ManualRequestFormState;
   manualRequestState: SyncState;
   manualRequestMessage: string;
+  showManualForm?: boolean;
   onSelectRequest: (requestId: string) => void;
   onManualRequestFormChange: (form: ManualRequestFormState) => void;
   onCreateManualRequest: () => void;
@@ -2805,6 +2909,7 @@ function RequestsWorkspace({
   manualRequestForm,
   manualRequestState,
   manualRequestMessage,
+  showManualForm = true,
   onSelectRequest,
   onManualRequestFormChange,
   onCreateManualRequest,
@@ -2814,6 +2919,7 @@ function RequestsWorkspace({
   onSuggest,
   onUpdateStatus
 }: RequestsWorkspaceProps) {
+  const [manualFormOpen, setManualFormOpen] = useState(false);
   const updateManualRequestForm = <Key extends keyof ManualRequestFormState,>(key: Key, value: ManualRequestFormState[Key]) => {
     onManualRequestFormChange({ ...manualRequestForm, [key]: value });
   };
@@ -2852,7 +2958,13 @@ function RequestsWorkspace({
           )}
         </div>
 
-        <form
+        {showManualForm && (
+          <button className="manual-request-toggle" type="button" aria-expanded={manualFormOpen} onClick={() => setManualFormOpen((open) => !open)}>
+            <Plus size={17} aria-hidden="true" />
+            {manualFormOpen ? "Formu Kapat" : "Elle Talep Ekle"}
+          </button>
+        )}
+        {showManualForm && manualFormOpen && <form
           className="manager-form manual-request-form"
           onSubmit={(event) => {
             event.preventDefault();
@@ -2863,28 +2975,14 @@ function RequestsWorkspace({
             <p>Manuel Kayıt</p>
             <h3>Yeni talep</h3>
           </div>
-          <div className="form-row">
-            <label>
-              Talep türü
-              <select value={manualRequestForm.requestType} onChange={(event) => updateManualRequestForm("requestType", event.target.value)}>
-                {manualRequestTypeOptions.map((requestType) => (
-                  <option key={requestType} value={requestType}>
-                    {formatRequestType(requestType)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Öncelik
-              <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
-                {manualPriorityOptions.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label>
+            Talep türü
+            <select value={manualRequestForm.requestType} onChange={(event) => updateManualRequestForm("requestType", event.target.value)}>
+              {manualRequestTypeOptions.map((requestType) => (
+                <option key={requestType} value={requestType}>{formatRequestType(requestType)}</option>
+              ))}
+            </select>
+          </label>
           <label>
             Ad soyad
             <input value={manualRequestForm.customerName} onChange={(event) => updateManualRequestForm("customerName", event.target.value)} placeholder="Müşteri adı" />
@@ -2897,36 +2995,45 @@ function RequestsWorkspace({
             Tarih notu
             <input value={manualRequestForm.dateText} onChange={(event) => updateManualRequestForm("dateText", event.target.value)} placeholder="12-14 Temmuz veya bugün" />
           </label>
-          <div className="form-row">
-            <label>
-              Giriş tarihi
-              <input type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
-            </label>
-            <label>
-              Çıkış tarihi
-              <input type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
-            </label>
-          </div>
-          <div className="form-row">
-            <label>
-              Saat
-              <input type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
-            </label>
-            <label>
-              Kişi
-              <input min="1" type="number" value={manualRequestForm.guestCount} onChange={(event) => updateManualRequestForm("guestCount", event.target.value)} />
-            </label>
-          </div>
+          <label>
+            Kişi sayısı
+            <input min="1" type="number" value={manualRequestForm.guestCount} onChange={(event) => updateManualRequestForm("guestCount", event.target.value)} />
+          </label>
           <label>
             Not
             <textarea value={manualRequestForm.message} onChange={(event) => updateManualRequestForm("message", event.target.value)} placeholder="Talep detayı" />
           </label>
+          <details className="form-details">
+            <summary>Detaylı bilgi</summary>
+            <div className="form-row">
+              <label>
+                Giriş tarihi
+                <input type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
+              </label>
+              <label>
+                Çıkış tarihi
+                <input type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
+              </label>
+            </div>
+            <div className="form-row">
+              <label>
+                Saat
+                <input type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
+              </label>
+              <label>
+                Öncelik
+                <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
+                  {manualPriorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+            </div>
+          </details>
           <p className={`menu-status sync-${manualRequestState}`}>{manualRequestMessage}</p>
           <button className="primary-command" type="submit" disabled={manualRequestState === "loading"}>
             <Save size={16} aria-hidden="true" />
             {manualRequestState === "loading" ? "Kaydediliyor" : "Manuel Talep Kaydet"}
           </button>
-        </form>
+        </form>}
       </aside>
 
       <section className="panel operations-detail-panel">
@@ -2975,7 +3082,7 @@ function RequestsWorkspace({
               {aiEnabled && (
                 <button type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
                   <Sparkles size={16} aria-hidden="true" />
-                  {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Taslak Yenile"}
+                  {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Cevap Hazırla"}
                 </button>
               )}
               {selectedRequest.status !== "converted_to_reservation" && (
@@ -3128,11 +3235,13 @@ interface CustomersWorkspaceProps {
   customers: DesktopDashboardData["customers"];
   requests: SyncedCustomerRequest[];
   reservations: DesktopDashboardData["reservations"];
+  aiEnabled: boolean;
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
+  onSummarize: (requestId: string) => void;
 }
 
-function CustomersWorkspace({ customers, requests, reservations, onCall, onWhatsApp }: CustomersWorkspaceProps) {
+function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCall, onWhatsApp, onSummarize }: CustomersWorkspaceProps) {
   const [searchText, setSearchText] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? "");
   const filteredCustomers = useMemo(
@@ -3241,6 +3350,12 @@ function CustomersWorkspace({ customers, requests, reservations, onCall, onWhats
                 <MessageCircle size={16} aria-hidden="true" />
                 WhatsApp'tan Yaz
               </button>
+              {aiEnabled && (
+                <button type="button" onClick={() => onSummarize(selectedRequests[0]?.id ?? "")} disabled={selectedRequests.length === 0}>
+                  <Sparkles size={16} aria-hidden="true" />
+                  Geçmişi Özetle
+                </button>
+              )}
             </div>
             <div className="customer-history-grid">
               <section>
@@ -3356,7 +3471,7 @@ function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps
                   <dd>{formatTaskDue(task)}</dd>
                 </div>
                 <div>
-                  <dt>Bağlantı</dt>
+                  <dt>İlgili kayıt</dt>
                   <dd>{formatTaskRelation(task)}</dd>
                 </div>
               </dl>
@@ -3383,11 +3498,12 @@ function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps
 
 interface ReservationsWorkspaceProps {
   reservations: DesktopDashboardData["reservations"];
+  rooms: DesktopDashboardData["rooms"];
   onUpdateStatus: (reservationId: string, status: string) => void;
   onOpenWhatsApp: (reservation: DesktopDashboardData["reservations"][number]) => void;
 }
 
-function ReservationsWorkspace({ reservations, onUpdateStatus, onOpenWhatsApp }: ReservationsWorkspaceProps) {
+function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhatsApp }: ReservationsWorkspaceProps) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const filteredReservations = useMemo(
@@ -3474,8 +3590,8 @@ function ReservationsWorkspace({ reservations, onUpdateStatus, onOpenWhatsApp }:
                   <dd>{reservation.guestCount} kişi</dd>
                 </div>
                 <div>
-                  <dt>Bağlantı</dt>
-                  <dd>{formatResourceLinks(reservation)}</dd>
+                  <dt>Oda</dt>
+                  <dd>{formatReservationRooms(reservation, rooms)}</dd>
                 </div>
               </dl>
               <p className="resource-note">{reservation.notes || reservation.priceNote || "Not yok."}</p>
@@ -3511,6 +3627,9 @@ interface RoomsWorkspaceProps {
 function RoomsWorkspace({ rooms, onUpdateStatus }: RoomsWorkspaceProps) {
   return (
     <section className="operations-grid" aria-label="Oda yönetimi">
+      {rooms.length === 0 && (
+        <div className="panel empty-state"><BedDouble size={28} aria-hidden="true" /><strong>Oda kaydı yok.</strong><p>Oda sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
+      )}
       {rooms.map((room) => (
         <article className="panel resource-card" key={room.id}>
           <div className="resource-card-heading">
@@ -3535,7 +3654,7 @@ function RoomsWorkspace({ rooms, onUpdateStatus }: RoomsWorkspaceProps) {
             </div>
             <div>
               <dt>Rezervasyon</dt>
-              <dd>{room.activeReservationTitle || "Bağlantı yok"}</dd>
+              <dd>{room.activeReservationTitle || "Aktif rezervasyon yok"}</dd>
             </div>
           </dl>
           <p className="resource-note">{room.description || room.features.join(", ") || "Açıklama yok."}</p>
@@ -3559,6 +3678,9 @@ interface TablesWorkspaceProps {
 function TablesWorkspace({ tables, onUpdateStatus }: TablesWorkspaceProps) {
   return (
     <section className="operations-grid" aria-label="Masa yönetimi">
+      {tables.length === 0 && (
+        <div className="panel empty-state"><UtensilsCrossed size={28} aria-hidden="true" /><strong>Masa kaydı yok.</strong><p>Masa sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
+      )}
       {tables.map((table) => (
         <article className="panel resource-card" key={table.id}>
           <div className="resource-card-heading">
@@ -3579,7 +3701,7 @@ function TablesWorkspace({ tables, onUpdateStatus }: TablesWorkspaceProps) {
             </div>
             <div>
               <dt>Rezervasyon</dt>
-              <dd>{table.activeReservationTitle || table.currentReservationId || "Bağlantı yok"}</dd>
+              <dd>{table.activeReservationTitle || "Rezervasyon yok"}</dd>
             </div>
             <div>
               <dt>Not</dt>
@@ -3606,7 +3728,6 @@ interface MenuManagerProps {
   selectedItemId: string;
   menuEditState: SyncState;
   menuEditMessage: string;
-  menuPreviewUrl: string;
   onCategoryFormChange: (form: CategoryFormState) => void;
   onItemFormChange: (form: ItemFormState) => void;
   onSelectCategory: (category: PublishedMenuCategory) => void;
@@ -3628,7 +3749,6 @@ function MenuManager({
   selectedItemId,
   menuEditState,
   menuEditMessage,
-  menuPreviewUrl,
   onCategoryFormChange,
   onItemFormChange,
   onSelectCategory,
@@ -3655,7 +3775,6 @@ function MenuManager({
           </div>
         </div>
         <div className="menu-preview-actions">
-          <span>{menuPreviewUrl}</span>
           <button type="button" onClick={onOpenPreview}>
             <ExternalLink size={16} aria-hidden="true" />
             Önizle
@@ -3689,7 +3808,7 @@ function MenuManager({
               >
                 <span>
                   <strong>{category.name}</strong>
-                  <small>{category.is_active ? "Aktif" : "Pasif"} · {category.sort_order}</small>
+                  <small>{category.is_active ? "Aktif" : "Pasif"}</small>
                 </span>
                 <span className={category.is_active ? "dot is-on" : "dot"} />
               </button>
@@ -3776,29 +3895,19 @@ function MenuManager({
           </div>
 
           <div className="manager-form item-form">
-            <div className="form-row">
-              <label>
-                Kategori
-                <select value={itemForm.category_id} onChange={(event) => onItemFormChange({ ...itemForm, category_id: event.target.value })}>
-                  {dashboardData.menu.categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Sıra
-                <input
-                  value={itemForm.sort_order}
-                  onChange={(event) => onItemFormChange({ ...itemForm, sort_order: event.target.value })}
-                  inputMode="numeric"
-                />
-              </label>
-            </div>
             <label>
               Ürün adı
               <input value={itemForm.name} onChange={(event) => onItemFormChange({ ...itemForm, name: event.target.value })} placeholder="Serpme Kahvaltı" />
+            </label>
+            <label>
+              Kategori
+              <select value={itemForm.category_id} onChange={(event) => onItemFormChange({ ...itemForm, category_id: event.target.value })}>
+                {dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </label>
+            <label>
+              Fiyat
+              <input value={itemForm.price} onChange={(event) => onItemFormChange({ ...itemForm, price: event.target.value })} inputMode="decimal" />
             </label>
             <label>
               Açıklama
@@ -3806,28 +3915,6 @@ function MenuManager({
                 value={itemForm.description}
                 onChange={(event) => onItemFormChange({ ...itemForm, description: event.target.value })}
                 placeholder="Ürün açıklaması"
-              />
-            </label>
-            <div className="form-row">
-              <label>
-                Fiyat
-                <input value={itemForm.price} onChange={(event) => onItemFormChange({ ...itemForm, price: event.target.value })} inputMode="decimal" />
-              </label>
-              <label>
-                Para birimi
-                <select value={itemForm.currency} onChange={(event) => onItemFormChange({ ...itemForm, currency: event.target.value })}>
-                  <option value="TRY">TRY</option>
-                  <option value="EUR">EUR</option>
-                  <option value="USD">USD</option>
-                </select>
-              </label>
-            </div>
-            <label>
-              Görsel yolu
-              <input
-                value={itemForm.image_url}
-                onChange={(event) => onItemFormChange({ ...itemForm, image_url: event.target.value })}
-                placeholder="/assets/menu-breakfast.webp"
               />
             </label>
             <div className="form-row">
@@ -3845,19 +3932,38 @@ function MenuManager({
                   onChange={(event) => onItemFormChange({ ...itemForm, is_featured: event.target.checked })}
                   type="checkbox"
                 />
-                Öne çıkan
+                Öne çıkar
               </label>
             </div>
-            <div className="form-row">
+            <details className="form-details item-details">
+              <summary>Detaylı ayarlar</summary>
               <label>
-                Etiketler
-                <input value={itemForm.tags} onChange={(event) => onItemFormChange({ ...itemForm, tags: event.target.value })} placeholder="popüler, kahvaltı" />
+                Görsel yolu
+                <input value={itemForm.image_url} onChange={(event) => onItemFormChange({ ...itemForm, image_url: event.target.value })} placeholder="/assets/menu-breakfast.webp" />
               </label>
-              <label>
-                Alerjenler
-                <input value={itemForm.allergens} onChange={(event) => onItemFormChange({ ...itemForm, allergens: event.target.value })} placeholder="gluten, süt" />
-              </label>
-            </div>
+              <div className="form-row">
+                <label>
+                  Sıra
+                  <input value={itemForm.sort_order} onChange={(event) => onItemFormChange({ ...itemForm, sort_order: event.target.value })} inputMode="numeric" />
+                </label>
+                <label>
+                  Para birimi
+                  <select value={itemForm.currency} onChange={(event) => onItemFormChange({ ...itemForm, currency: event.target.value })}>
+                    <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
+                  </select>
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Etiketler
+                  <input value={itemForm.tags} onChange={(event) => onItemFormChange({ ...itemForm, tags: event.target.value })} placeholder="popüler, kahvaltı" />
+                </label>
+                <label>
+                  Alerjenler
+                  <input value={itemForm.allergens} onChange={(event) => onItemFormChange({ ...itemForm, allergens: event.target.value })} placeholder="gluten, süt" />
+                </label>
+              </div>
+            </details>
             <p className={`menu-status sync-${menuEditState}`}>{menuEditMessage}</p>
             <button className="primary-command" type="button" onClick={onSaveItem}>
               <Save size={16} aria-hidden="true" />
@@ -4144,6 +4250,10 @@ function formatRequestStatus(value: string) {
   return labels[value] ?? "Onay bekliyor";
 }
 
+function isRequestWaitingForReply(status: string) {
+  return ["new", "seen", "waiting_owner", "pending", "in_progress"].includes(status);
+}
+
 function formatCustomerSource(value: string) {
   const labels: Record<string, string> = {
     web_form: "Web form",
@@ -4213,10 +4323,18 @@ function formatTaskDue(task: DesktopDashboardData["dailyTasks"][number]) {
 
 function formatTaskRelation(task: DesktopDashboardData["dailyTasks"][number]) {
   if (!task.relatedType && !task.relatedId) {
-    return "Bağlantı yok";
+    return "İlgili kayıt yok";
   }
 
-  return [task.relatedType || "kayıt", task.relatedId].filter(Boolean).join(" · ");
+  const labels: Record<string, string> = {
+    reservation: "İlgili rezervasyon",
+    room: "İlgili oda",
+    table: "İlgili masa",
+    customer: "İlgili müşteri",
+    request: "İlgili talep"
+  };
+
+  return labels[task.relatedType] ?? "İlgili kayıt";
 }
 
 function formatRoomStatus(value: string) {
@@ -4270,10 +4388,24 @@ function matchesReservationDate(reservation: DesktopDashboardData["reservations"
   return date >= startDate && date <= endDate;
 }
 
-function formatResourceLinks(reservation: DesktopDashboardData["reservations"][number]) {
-  const roomText = reservation.roomIds.length > 0 ? `Oda: ${reservation.roomIds.join(", ")}` : "";
-  const tableText = reservation.tableIds.length > 0 ? `Masa: ${reservation.tableIds.join(", ")}` : "";
-  return [roomText, tableText].filter(Boolean).join(" · ") || "Kaynak atanmamış";
+function formatReservationRooms(
+  reservation: DesktopDashboardData["reservations"][number],
+  rooms: DesktopDashboardData["rooms"]
+) {
+  const names = reservation.roomIds.map((roomId) => rooms.find((room) => room.id === roomId)?.name).filter(Boolean);
+  return names.length > 0 ? names.join(", ") : "Henüz oda atanmadı";
+}
+
+function formatResourceLinks(
+  reservation: DesktopDashboardData["reservations"][number],
+  rooms: DesktopDashboardData["rooms"],
+  tables: DesktopDashboardData["tables"]
+) {
+  const roomNames = reservation.roomIds.map((roomId) => rooms.find((room) => room.id === roomId)?.name).filter(Boolean);
+  const tableNames = reservation.tableIds.map((tableId) => tables.find((table) => table.id === tableId)?.name).filter(Boolean);
+  const roomText = roomNames.length > 0 ? `Oda: ${roomNames.join(", ")}` : reservation.roomIds.length > 0 ? "Oda atandı" : "";
+  const tableText = tableNames.length > 0 ? `Masa: ${tableNames.join(", ")}` : reservation.tableIds.length > 0 ? "Masa atandı" : "";
+  return [roomText, tableText].filter(Boolean).join(" · ") || "Yer bilgisi daha sonra paylaşılacak";
 }
 
 function formatReservationWhatsAppButton(status: string) {
@@ -4287,7 +4419,11 @@ function formatReservationWhatsAppButton(status: string) {
   return labels[status] ?? "WhatsApp Taslak";
 }
 
-function buildReservationWhatsAppMessage(reservation: DesktopDashboardData["reservations"][number]) {
+function buildReservationWhatsAppMessage(
+  reservation: DesktopDashboardData["reservations"][number],
+  rooms: DesktopDashboardData["rooms"],
+  tables: DesktopDashboardData["tables"]
+) {
   const greeting = `Merhaba ${reservation.customerName || "Misafir"},`;
   const dateText = formatReservationDate(reservation);
   const typeText = formatReservationType(reservation.reservationType).toLowerCase();
@@ -4296,7 +4432,7 @@ function buildReservationWhatsAppMessage(reservation: DesktopDashboardData["rese
     return [
       greeting,
       `${dateText} tarihli ${typeText} rezervasyonunuz işletme tarafından onaylandı.`,
-      formatResourceLinks(reservation),
+      formatResourceLinks(reservation, rooms, tables),
       "Geliş saatiniz veya özel notunuz varsa bize yazabilirsiniz."
     ].join(" ");
   }
@@ -4334,57 +4470,6 @@ function formatCurrency(value: number, currency: string) {
     currency,
     maximumFractionDigits: 0
   }).format(value);
-}
-
-function getPageMeta(page: DesktopPage) {
-  const pages: Record<DesktopPage, { eyebrow: string; title: string }> = {
-    dashboard: {
-      eyebrow: "Bugün Ne Var?",
-      title: "Ana Ekran"
-    },
-    requests: {
-      eyebrow: "Müşteri Talepleri",
-      title: "Talepler"
-    },
-    customers: {
-      eyebrow: "Müşteri Hafızası",
-      title: "Müşteriler"
-    },
-    reports: {
-      eyebrow: "İşletme Özeti",
-      title: "Raporlar"
-    },
-    tasks: {
-      eyebrow: "Günlük Takip",
-      title: "Günlük İşler"
-    },
-    reservations: {
-      eyebrow: "Onay ve Takip",
-      title: "Rezervasyonlar"
-    },
-    rooms: {
-      eyebrow: "Pansiyon Durumu",
-      title: "Odalar"
-    },
-    tables: {
-      eyebrow: "Servis Durumu",
-      title: "Masalar"
-    },
-    menu: {
-      eyebrow: "Menü Yönetimi",
-      title: "QR Menü"
-    },
-    whatsapp: {
-      eyebrow: "Müşteri Yanıtları",
-      title: "WhatsApp"
-    },
-    ai: {
-      eyebrow: "İşletme Asistanı",
-      title: "AI Yardımcı"
-    }
-  };
-
-  return pages[page];
 }
 
 function toSetupForm(setupData: DesktopSetupData): SetupFormState {

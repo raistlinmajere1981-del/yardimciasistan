@@ -14,7 +14,7 @@ export function parseGoogleAiStudioCurl(value: string): GoogleAiStudioCurlParseR
     return { ok: false, message: "cURL komutunda geçerli Google generateContent adresi bulunamadı." };
   }
   if (!keyMatch?.[1]) {
-    return { ok: false, message: "cURL komutunda X-goog-api-key başlığı bulunamadı." };
+    return { ok: false, message: "Google AI Studio bağlantısında güvenlik anahtarı bulunamadı." };
   }
 
   const endpoint = new URL(urlMatch[0]);

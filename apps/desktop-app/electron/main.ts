@@ -365,7 +365,7 @@ function registerIpcHandlers() {
     if (service === "gemini" && !isGoogleAiStudioUrl(baseUrl)) {
       return {
         ok: false,
-        message: "Google AI Studio için resmi generativelanguage.googleapis.com bağlantı adresi kullanılmalı."
+        message: "Google AI Studio için resmi Gemini bağlantı adresi kullanılmalı."
       };
     }
 

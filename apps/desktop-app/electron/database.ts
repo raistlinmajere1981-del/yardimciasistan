@@ -868,7 +868,7 @@ export class DesktopDatabase {
 
       return {
         ok: true,
-        message: "Yerel veritabanı yedeği oluşturuldu.",
+      message: "Yerel kayıtların yedeği oluşturuldu.",
         backupDirectory: this.backupPath,
         backupFileName,
         backupFilePath,
@@ -1004,7 +1004,7 @@ export class DesktopDatabase {
     if (syncSecret.length < 12 || syncSecret === "change-this-secret") {
       return {
         ok: false,
-        message: "Sync güvenlik anahtarı en az 12 karakter olmalı ve varsayılan değer olmamalı."
+        message: "Web güvenlik anahtarı en az 12 karakter olmalı ve varsayılan değer olmamalı."
       };
     }
 
@@ -1015,7 +1015,7 @@ export class DesktopDatabase {
     if (input.aiEnabled && aiProvider !== "openai_compatible") {
       return {
         ok: false,
-        message: "AI provider openai_compatible olmalı."
+        message: "AI servis sağlayıcı ayarı geçerli değil."
       };
     }
 
@@ -1036,14 +1036,14 @@ export class DesktopDatabase {
     if (input.aiEnabled && !aiBaseUrl) {
       return {
         ok: false,
-        message: "AI base URL geçerli bir http veya https adresi olmalı ve kullanıcı bilgisi içermemeli."
+        message: "AI bağlantı adresi http veya https ile başlamalı ve kullanıcı bilgisi içermemeli."
       };
     }
 
     if (input.aiEnabled && aiService === "gemini" && aiBaseUrl !== GOOGLE_AI_STUDIO_BASE_URL) {
       return {
         ok: false,
-        message: "Google AI Studio için resmi Gemini API bağlantı adresi kullanılmalı."
+        message: "Google AI Studio için resmi Gemini bağlantı adresi kullanılmalı."
       };
     }
 
@@ -1057,7 +1057,7 @@ export class DesktopDatabase {
     if (input.aiEnabled && !aiApiKeyResolution.encryptedValue) {
       return {
         ok: false,
-        message: "AI API anahtarı gerekli."
+        message: "AI güvenlik anahtarı gerekli."
       };
     }
 
@@ -2741,7 +2741,7 @@ function resolveEncryptedAiApiKey(input: {
     if (input.rawKeyProvided || input.write.mode !== "clear" || encryptedValue) {
       return {
         ok: false,
-        message: "AI API anahtarını silme isteği güvenli depolama işlemiyle eşleşmiyor."
+        message: "AI güvenlik anahtarını silme isteği güvenli depolama işlemiyle eşleşmiyor."
       };
     }
 
@@ -2752,7 +2752,7 @@ function resolveEncryptedAiApiKey(input: {
     if (input.write.mode !== "replace" || !encryptedValue) {
       return {
         ok: false,
-        message: "Yeni AI API anahtarı şifrelenmeden kaydedilemez."
+        message: "Yeni AI güvenlik anahtarı şifrelenmeden kaydedilemez."
       };
     }
 
@@ -2762,7 +2762,7 @@ function resolveEncryptedAiApiKey(input: {
   if (input.write.mode !== "keep" || encryptedValue) {
     return {
       ok: false,
-      message: "Boş AI API anahtarı mevcut kayıt korunarak kaydedilmeli."
+      message: "Boş AI güvenlik anahtarı mevcut kayıt korunarak kaydedilmeli."
     };
   }
 

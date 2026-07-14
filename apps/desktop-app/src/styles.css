@@ -2001,6 +2001,343 @@ button {
   border-radius: 8px;
 }
 
+.combined-page {
+  display: grid;
+  gap: 18px;
+}
+
+.page-tabs,
+.settings-level-tabs {
+  display: inline-flex;
+  width: fit-content;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #eee9df;
+}
+
+.page-tabs button,
+.settings-level-tabs button {
+  min-height: 38px;
+  padding: 8px 14px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.page-tabs button.is-active,
+.settings-level-tabs button.is-active {
+  color: var(--primary);
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(23, 32, 51, 0.08);
+}
+
+.operation-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.operation-summary-grid article {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 78px;
+  padding: 14px;
+  color: var(--primary);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(23, 32, 51, 0.05);
+}
+
+.operation-summary-grid article span {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.operation-summary-grid article strong {
+  color: var(--ink);
+  font-size: 1.65rem;
+}
+
+.pension-layout,
+.restaurant-layout {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.pension-layout {
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.85fr);
+}
+
+.restaurant-layout {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.combined-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.combined-section-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.combined-section-heading span {
+  color: var(--accent);
+  font-size: 0.77rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.combined-section-heading strong {
+  font-size: 1.1rem;
+}
+
+.pension-layout .operations-grid,
+.restaurant-layout .operations-grid {
+  grid-template-columns: 1fr;
+}
+
+.pension-layout .reservation-toolbar,
+.restaurant-layout .reservation-toolbar {
+  grid-template-columns: 1fr;
+}
+
+.dashboard-compact-list {
+  display: grid;
+  gap: 0;
+}
+
+.dashboard-compact-list article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dashboard-compact-list article:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-compact-list article > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dashboard-compact-list article strong,
+.dashboard-compact-list article span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-compact-list article span,
+.quiet-message {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.dashboard-compact-list article button {
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--primary);
+  background: #edf6f1;
+  border: 1px solid #bfd9cf;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.dashboard-ai-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.manual-request-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 40px;
+  color: var(--primary);
+  background: #edf6f1;
+  border: 1px solid #bfd9cf;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.form-details {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffaf2;
+}
+
+.form-details summary {
+  color: var(--primary);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.form-details[open] summary {
+  margin-bottom: 12px;
+}
+
+.form-details > label,
+.form-details > .form-row {
+  margin-top: 10px;
+}
+
+.message-mode-switch {
+  display: grid;
+  grid-template-columns: minmax(230px, 1fr) minmax(230px, 1fr) auto;
+  gap: 10px;
+}
+
+.message-mode-switch > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 64px;
+  padding: 10px 13px;
+  color: var(--muted);
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.message-mode-switch > button span {
+  display: grid;
+  gap: 3px;
+}
+
+.message-mode-switch > button small {
+  color: var(--muted);
+}
+
+.message-mode-switch > button.is-active {
+  color: var(--primary);
+  background: #edf6f1;
+  border-color: #9dc7b6;
+  box-shadow: inset 4px 0 0 var(--primary);
+}
+
+.message-mode-switch .ai-tools-toggle {
+  grid-template-columns: auto auto;
+  color: #765319;
+  background: #fff5df;
+  border-color: #ecd39e;
+  font-weight: 900;
+}
+
+.optional-mode-note {
+  margin: 0;
+  padding: 11px 13px;
+  color: #765319;
+  background: #fff5df;
+  border: 1px solid #ecd39e;
+  border-radius: 8px;
+  line-height: 1.45;
+}
+
+.whatsapp-view-safe {
+  grid-template-columns: minmax(300px, 0.75fr) minmax(520px, 1.25fr);
+  grid-template-areas: "requests copy";
+}
+
+.whatsapp-view-web {
+  grid-template-columns: 1fr;
+  grid-template-areas: "requests" "live";
+}
+
+.whatsapp-view-web .whatsapp-request-list {
+  max-height: 260px;
+}
+
+.whatsapp-copy-panel {
+  grid-template-areas:
+    "copy-heading copy-heading"
+    "copy-info copy-message"
+    "copy-info copy-status"
+    "copy-info copy-actions"
+    "copy-ai copy-ai";
+}
+
+.message-ai-actions {
+  grid-area: copy-ai;
+  display: grid;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.message-ai-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.message-ai-actions button {
+  min-height: 34px;
+  padding: 6px 9px;
+  color: #765319;
+  background: #fff5df;
+  border: 1px solid #ecd39e;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.messages-ai-tools {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.setup-shell.is-embedded {
+  display: block;
+  min-height: 0;
+  background: transparent;
+}
+
+.setup-shell.is-embedded .setup-form-surface {
+  padding: 0;
+}
+
+.settings-ai-toggle {
+  margin-top: 14px;
+}
+
+.settings-technical-info {
+  margin-bottom: 14px;
+}
+
+.settings-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 1180px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2024,7 +2361,11 @@ button {
   }
 
   .ai-status-grid,
-  .ai-history-list {
+  .ai-history-list,
+  .operation-summary-grid,
+  .pension-layout,
+  .restaurant-layout,
+  .message-mode-switch {
     grid-template-columns: 1fr;
   }
 

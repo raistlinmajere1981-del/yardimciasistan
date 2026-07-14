@@ -24,10 +24,33 @@ try {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
+  await page.addInitScript(({ setupData, dashboardData }) => {
+    window.yardimciDesktop = {
+      getBootstrapData: async () => ({
+        appName: "Yardımcı Asistan",
+        version: "0.1.0",
+        platform: "linux",
+        syncSettings: { webModuleUrl: setupData.webModuleUrl, hasSyncSecret: true },
+        databasePath: dashboardData.databasePath,
+        userDataPath: "/tmp/yardimci-asistan",
+        backupPath: dashboardData.backupPath,
+        setup: setupData
+      }),
+      getDashboardData: async () => dashboardData,
+      getAiWorkspaceHistory: async () => [],
+      markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
+      openExternal: async () => true
+    };
+  }, {
+    setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345", aiApiKeyConfigured: false },
+    dashboardData: createDashboardConversionFixture()
+  });
+
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Ayarlar" }).click();
-  await page.getByLabel("AI yardımcı açık").check();
-  await page.getByLabel("Kullanılacak servis").selectOption("gemini");
+  await page.getByLabel("AI cevap önerileri açık").check();
+  await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
+  await page.getByLabel("Servis sağlayıcı").selectOption("gemini");
   await expect(page.getByRole("button", { name: "Google AI Studio'yu Aç" })).toBeVisible();
   await expect(page.getByLabel("Google AI Studio cURL bağlantısı")).toBeVisible();
   await expect(page.getByLabel("Model adı")).toHaveAttribute("placeholder", "Bağlantı kontrolünden sonra listelenir");
@@ -36,42 +59,47 @@ try {
   await page.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
   await page.getByRole("button", { name: "Panele Dön" }).click();
-  await page.getByRole("button", { name: "QR Menü" }).click();
-  await expect(page.getByRole("heading", { name: "QR Menü" })).toBeVisible();
+  await expect(page.locator(".nav-item")).toHaveCount(7);
+  await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Web modül adresi")).toHaveCount(0);
+  await expect(page.getByText("Yerel kayıt dosyası")).toHaveCount(0);
+  await expect(page.getByText("Yedek klasörü")).toHaveCount(0);
+  await page.getByRole("button", { name: "Menü", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Menü", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Düzenle" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürünü Kaydet" })).toBeVisible();
   await page.screenshot({ path: "artifacts/screenshots/desktop-qr-menu-manager.png", fullPage: true });
 
-  const rows = await page.locator(".manager-row").count();
-  expect(rows).toBeGreaterThanOrEqual(8);
+  await expect(page.locator(".menu-management-grid")).toBeVisible();
 
-  await page.getByRole("button", { name: "WhatsApp" }).click();
-  await expect(page.getByRole("heading", { name: "WhatsApp" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Demo Misafir" })).toBeVisible();
+  await page.getByRole("button", { name: "Mesajlar" }).click();
+  await expect(page.getByRole("heading", { name: "Mesajlar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Hazır Mesaj" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
+  await expect(page.locator(".whatsapp-webview-frame")).toHaveCount(0);
+  await page.screenshot({ path: "artifacts/screenshots/desktop-messages-safe-mode.png", fullPage: true });
+  await page.getByRole("tab", { name: /WhatsApp Web Modu/ }).click();
+  await expect(page.getByText("WhatsApp Web modu isteğe bağlıdır.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Onayla ve Gönder" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
   await expect(page.locator(".whatsapp-webview-frame")).toBeVisible();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
 
-  const [requestPanelBox, copyPanelBox, livePanelBox, webviewFrameBox, webviewBox] = await Promise.all([
+  const [requestPanelBox, livePanelBox, webviewFrameBox, webviewBox] = await Promise.all([
     page.locator(".whatsapp-request-panel").boundingBox(),
-    page.locator(".whatsapp-copy-panel").boundingBox(),
     page.locator(".whatsapp-live-panel").boundingBox(),
     page.locator(".whatsapp-webview-frame").boundingBox(),
     page.locator(".whatsapp-webview").boundingBox()
   ]);
   expect(requestPanelBox).not.toBeNull();
-  expect(copyPanelBox).not.toBeNull();
   expect(livePanelBox).not.toBeNull();
   expect(webviewFrameBox).not.toBeNull();
   expect(webviewBox).not.toBeNull();
-  expect(Math.abs(requestPanelBox.y - copyPanelBox.y)).toBeLessThanOrEqual(1);
-  expect(copyPanelBox.x).toBeGreaterThan(requestPanelBox.x + requestPanelBox.width);
-  expect(livePanelBox.y).toBeGreaterThan(copyPanelBox.y + copyPanelBox.height);
+  expect(livePanelBox.y).toBeGreaterThan(requestPanelBox.y + requestPanelBox.height);
   expect(Math.abs(livePanelBox.x - requestPanelBox.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(livePanelBox.width - (copyPanelBox.x + copyPanelBox.width - requestPanelBox.x))).toBeLessThanOrEqual(2);
+  expect(Math.abs(livePanelBox.width - requestPanelBox.width)).toBeLessThanOrEqual(2);
   expect(Math.abs(webviewBox.width - webviewFrameBox.width)).toBeLessThanOrEqual(2);
   expect(Math.abs(webviewBox.height - webviewFrameBox.height)).toBeLessThanOrEqual(2);
   expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
@@ -327,19 +355,22 @@ try {
     dashboardData: createDashboardConversionFixture()
   });
   await conversionPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await conversionPage.getByRole("button", { name: "Ayarlar" }).click();
+  await conversionPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await expect(conversionPage.getByRole("button", { name: "Yedek Al" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Yedek Al" }).click();
   await expect(conversionPage.getByText("yardimci-asistan-smoke.sqlite")).toBeVisible();
   await expect(conversionPage.getByRole("button", { name: "Android'e Yayınla" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Android'e Yayınla" }).click();
   await expect(conversionPage.getByText("2 günlük iş ile Android özeti yayınlandı.")).toBeVisible();
-  await expect(conversionPage.getByRole("button", { name: "AI Taslak Yenile" })).toBeVisible();
-  await conversionPage.getByRole("button", { name: "AI Taslak Yenile" }).click();
-  await expect(conversionPage.getByText("Smoke Misafir için balkonlu oda talebi.")).toBeVisible();
-  await expect(conversionPage.getByText("AI cevap taslağı yenilendi.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "AI Yardımcı", exact: true }).click();
-  await expect(conversionPage.getByRole("heading", { name: "AI Yardımcı" })).toBeVisible();
-  await expect(conversionPage.getByText("smoke-model", { exact: true })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Panele Dön" }).click();
+  await expect(conversionPage.getByRole("button", { name: "AI Cevap Hazırla" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "AI Cevap Hazırla" }).click();
+  await conversionPage.getByRole("button", { name: "WhatsApp'tan Yaz" }).click();
+  await expect(conversionPage.getByLabel("Hazır WhatsApp mesajı")).toHaveValue(/Merhaba Smoke Misafir/);
+  await conversionPage.getByRole("button", { name: "AI Araçları", exact: true }).click();
+  await expect(conversionPage.getByRole("heading", { name: "Mesajlar" })).toBeVisible();
+  await expect(conversionPage.getByText("AI önerileri")).toBeVisible();
   await conversionPage.getByLabel("Ek talimat isteğe bağlı").fill("Kısa ve samimi yaz.");
   await conversionPage.getByRole("button", { name: "AI Sonucunu Hazırla" }).click();
   await expect(conversionPage.getByLabel("AI sonucu")).toHaveValue(/Merhaba Smoke Misafir/);
@@ -357,44 +388,38 @@ try {
   await conversionPage.getByRole("button", { name: "Rezervasyona Çevir" }).click();
   await expect(conversionPage.getByText("Rezervasyona çevrildi", { exact: true })).toBeVisible();
   await expect(conversionPage.getByText("Talep rezervasyona çevrildi ve onaylandı.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Talepler", exact: true }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Talepler" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
+  await expect(conversionPage.getByRole("heading", { name: "Müşteri İşleri" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Elle Talep Ekle" }).click();
   await conversionPage.getByLabel("Ad soyad").fill("Manuel Smoke");
   await conversionPage.getByLabel("Telefon").fill("0555 333 44 66");
   await conversionPage.getByLabel("Tarih notu").fill("Bu akşam");
+  await conversionPage.getByLabel("Kişi sayısı").fill("3");
+  await conversionPage.getByLabel("Not", { exact: true }).fill("Telefonla alınan bahçe masası talebi.");
+  await conversionPage.getByText("Detaylı bilgi", { exact: true }).click();
   await conversionPage.getByLabel("Giriş tarihi").fill("2026-07-18");
   await conversionPage.getByLabel("Saat").fill("21:00");
-  await conversionPage.getByLabel("Kişi").fill("3");
-  await conversionPage.getByLabel("Not", { exact: true }).fill("Telefonla alınan bahçe masası talebi.");
   await conversionPage.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
   await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Manuel talep kaydedildi.")).toBeVisible();
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" }).click();
   await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Müşteriler" }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Müşteriler" })).toBeVisible();
+  await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
+  await expect(conversionPage.getByLabel("Müşteri yönetimi")).toBeVisible();
   await expect(conversionPage.getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
   await conversionPage.getByLabel("Ara").fill("Smoke");
   await expect(conversionPage.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Raporlar" }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Raporlar" })).toBeVisible();
-  await expect(conversionPage.getByText("Talep dönüşümü")).toBeVisible();
-  await expect(conversionPage.getByText("Kritik İşler")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Günlük İşler" }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Günlük İşler" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Restoran" }).click();
+  await expect(conversionPage.getByRole("heading", { name: "Restoran" })).toBeVisible();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Tamamla" }).first().click();
   await expect(conversionPage.getByText("Günlük iş durumu güncellendi.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Odalar" }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Odalar" })).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Dolu" }).first().click();
-  await expect(conversionPage.getByText("Oda durumu güncellendi.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Masalar" }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Masalar" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Hesap" }).first().click();
   await expect(conversionPage.getByText("Masa durumu güncellendi.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Rezervasyonlar" }).click();
-  await expect(conversionPage.getByRole("heading", { name: "Rezervasyonlar" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Pansiyon" }).click();
+  await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Dolu" }).first().click();
+  await expect(conversionPage.getByText("Oda durumu güncellendi.")).toBeVisible();
   await expect(conversionPage.getByLabel("Durum")).toBeVisible();
   await conversionPage.getByLabel("Tarih").fill("2026-07-18");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
@@ -593,13 +618,14 @@ try {
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(setupPage.getByRole("heading", { name: "İşletme panelini kullanıma hazırlayın." })).toBeVisible();
   await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Deniz Çiçeği Pansiyon & Kafe");
+  await setupPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await expect(setupPage.getByText("Anahtar bu cihazda güvenli biçimde kayıtlı.")).toBeVisible();
-  await setupPage.getByLabel("Kullanılacak servis").selectOption("openrouter");
+  await setupPage.getByLabel("Servis sağlayıcı").selectOption("openrouter");
   await expect(setupPage.getByLabel("Bağlantı adresi")).toHaveValue("https://openrouter.ai/api/v1");
   await setupPage.getByLabel("Model adı").fill("smoke/provider-model");
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
   await expect(setupPage.getByText("OpenRouter bağlantısı çalışıyor.")).toBeVisible();
-  await setupPage.getByLabel("Kullanılacak servis").selectOption("gemini");
+  await setupPage.getByLabel("Servis sağlayıcı").selectOption("gemini");
   await setupPage.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
   await expect(setupPage.getByText(/2 kullanılabilir Gemini modeli bulundu/)).toBeVisible();
@@ -609,10 +635,11 @@ try {
   await setupPage.waitForTimeout(100);
   expect(await setupPage.evaluate(() => window.__aiConnectionTestCount)).toBe(2);
   await setupPage.screenshot({ path: "artifacts/screenshots/desktop-setup-wizard.png", fullPage: true });
-  await setupPage.getByLabel("Firma adı").fill("Smoke Pansiyon");
   await setupPage.getByLabel("Web modül adresi").fill("https://yardimciasistan.alwaysdata.net/yardimci-asistan");
+  await setupPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
+  await setupPage.getByLabel("Firma adı").fill("Smoke Pansiyon");
   await setupPage.getByRole("button", { name: "Kurulumu Kaydet" }).click();
-  await expect(setupPage.getByRole("heading", { name: "Ana Ekran" })).toBeVisible();
+  await expect(setupPage.getByRole("heading", { name: "Bugün ne var?" })).toBeVisible();
 
   await browser.close();
   console.log(`desktop-renderer-ok: ${baseUrl}`);

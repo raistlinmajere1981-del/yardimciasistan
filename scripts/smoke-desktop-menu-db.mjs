@@ -99,9 +99,9 @@ try {
   assert.equal(database.getEncryptedAiApiKey(), firstEncryptedAiApiKey);
 
   const invalidAiCases = [
-    [{ aiProvider: "unsupported" }, "provider"],
+    [{ aiProvider: "unsupported" }, "servis sağlayıcı"],
     [{ aiService: "unsupported" }, "servisi"],
-    [{ aiBaseUrl: "https://user:pass@provider.example/v1" }, "base URL"],
+    [{ aiBaseUrl: "https://user:pass@provider.example/v1" }, "bağlantı adresi"],
     [{ aiModel: "" }, "model"],
     [{ aiTimeoutSeconds: 121 }, "zaman aşımı"]
   ];
@@ -144,7 +144,7 @@ try {
     { mode: "keep" }
   );
   assert.equal(invalidGoogleUrlResult.ok, false);
-  assert.match(invalidGoogleUrlResult.message, /resmi Gemini API/i);
+  assert.match(invalidGoogleUrlResult.message, /resmi Gemini bağlantı/i);
 
   const googleSetupResult = database.saveInitialSetup(
     {
@@ -213,7 +213,7 @@ try {
     { mode: "keep" }
   );
   assert.equal(enableWithoutKeyResult.ok, false);
-  assert.match(enableWithoutKeyResult.message, /API anahtarı/i);
+  assert.match(enableWithoutKeyResult.message, /güvenlik anahtarı/i);
 
   const createdRequestEventCount = database.countEventsByType("request.created");
   const manualRequestResult = database.createManualRequest({
