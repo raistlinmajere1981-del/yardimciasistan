@@ -25,6 +25,17 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Ayarlar" }).click();
+  await page.getByLabel("AI yardımcı açık").check();
+  await page.getByLabel("Kullanılacak servis").selectOption("gemini");
+  await expect(page.getByRole("button", { name: "Google AI Studio'yu Aç" })).toBeVisible();
+  await expect(page.getByLabel("Google AI Studio cURL bağlantısı")).toBeVisible();
+  await expect(page.getByLabel("Model adı")).toHaveAttribute("placeholder", "Bağlantı kontrolünden sonra listelenir");
+  await expect(page.getByLabel("Model adı")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeDisabled();
+  await page.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
+  await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
+  await page.getByRole("button", { name: "Panele Dön" }).click();
   await page.getByRole("button", { name: "QR Menü" }).click();
   await expect(page.getByRole("heading", { name: "QR Menü" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Düzenle" })).toBeVisible();
@@ -39,6 +50,7 @@ try {
   await expect(page.getByRole("heading", { name: "WhatsApp" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Demo Misafir" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Onayla ve Gönder" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
   await expect(page.locator(".whatsapp-webview-frame")).toBeVisible();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
@@ -69,6 +81,47 @@ try {
     "src",
     /^https:\/\/web\.whatsapp\.com\/send\?phone=905321234567&text=/
   );
+  await page.locator(".whatsapp-webview").evaluate((element) => {
+    let executionCount = 0;
+    Object.defineProperty(element, "getURL", {
+      configurable: true,
+      value: () => element.getAttribute("src") || ""
+    });
+    Object.defineProperty(element, "executeJavaScript", {
+      configurable: true,
+      value: async (code) => {
+        executionCount += 1;
+        if (executionCount === 1) {
+          if (!code.includes("message_mismatch") || !code.includes("location.origin")) {
+            throw new Error("WhatsApp DOM inspection guards are missing");
+          }
+          return {
+            ok: true,
+            code: "ready",
+            message: "Sohbet ve mesaj doğrulandı.",
+            chatTitle: "Demo Misafir",
+            composerText: "Hazır mesaj"
+          };
+        }
+        if (!code.includes("approval_changed") || !code.includes("sendControl.click()")) {
+          throw new Error("WhatsApp approved send guards are missing");
+        }
+        return {
+          ok: true,
+          code: "sent",
+          message: "Gönderim tamamlandı.",
+          chatTitle: "Demo Misafir"
+        };
+      }
+    });
+  });
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("WhatsApp Web üzerinden mesaj gönderilecek");
+    expect(dialog.message()).toContain("Açık sohbet: Demo Misafir");
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: "Onayla ve Gönder" }).click();
+  await expect(page.locator(".whatsapp-send-status")).toContainText("Mesaj WhatsApp Web'e gönderildi");
 
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await conversionPage.addInitScript(({ setupData, dashboardData }) => {
@@ -228,6 +281,33 @@ try {
           )
         }
       }),
+      getAiWorkspaceHistory: async () => [],
+      generateAiWorkspace: async (input) => ({
+        ok: true,
+        message: "AI sonucu hazırlandı. Düzenleyip kullanabilirsiniz.",
+        entry: {
+          id: "ai_conv_smoke_001",
+          mode: input.mode,
+          requestId: input.requestId,
+          requestLabel: input.mode === "daily" ? "Günlük işletme özeti" : "Smoke Misafir • Pansiyon rezervasyonu",
+          instructions: input.instructions,
+          content: input.mode === "daily"
+            ? "Öncelikler\n• Yeni talepleri kontrol edin.\nRiskler\n• Bekleyen rezervasyonları değerlendirin."
+            : "Merhaba Smoke Misafir, talebinizi aldık. Müsaitlik ve fiyat bilgisi kontrol edilip size dönüş yapılacaktır.",
+          summary: input.mode === "daily" ? "Günlük işletme değerlendirmesi" : "Smoke Misafir için balkonlu oda talebi.",
+          missingFields: [],
+          provider: "openai_compatible",
+          model: "smoke-model",
+          fallback: false,
+          createdAt: "2026-07-13T15:30:00+03:00"
+        }
+      }),
+      saveAiWorkspaceResult: async (input) => ({
+        ok: true,
+        message: input.mode === "summary" ? "AI özeti talebe kaydedildi." : "AI cevap taslağı talebe kaydedildi.",
+        requestId: input.requestId,
+        dashboardData
+      }),
       pullRequests: async () => ({ ok: true, count: 0, requests: [] }),
       markRequestsSynced: async () => ({ ok: true, count: 0 }),
       pushMenu: async () => ({ ok: true, category_count: 0, item_count: 0 }),
@@ -257,6 +337,22 @@ try {
   await conversionPage.getByRole("button", { name: "AI Taslak Yenile" }).click();
   await expect(conversionPage.getByText("Smoke Misafir için balkonlu oda talebi.")).toBeVisible();
   await expect(conversionPage.getByText("AI cevap taslağı yenilendi.")).toBeVisible();
+  await conversionPage.getByRole("button", { name: "AI Yardımcı", exact: true }).click();
+  await expect(conversionPage.getByRole("heading", { name: "AI Yardımcı" })).toBeVisible();
+  await expect(conversionPage.getByText("smoke-model", { exact: true })).toBeVisible();
+  await conversionPage.getByLabel("Ek talimat isteğe bağlı").fill("Kısa ve samimi yaz.");
+  await conversionPage.getByRole("button", { name: "AI Sonucunu Hazırla" }).click();
+  await expect(conversionPage.getByLabel("AI sonucu")).toHaveValue(/Merhaba Smoke Misafir/);
+  await expect(conversionPage.getByText("AI sonucu hazırlandı. Düzenleyip kullanabilirsiniz.")).toBeVisible();
+  await conversionPage.screenshot({ path: "artifacts/screenshots/desktop-ai-workspace.png", fullPage: true });
+  await conversionPage.getByRole("button", { name: "Talebe Kaydet" }).click();
+  await expect(conversionPage.getByText("AI cevap taslağı talebe kaydedildi.")).toBeVisible();
+  await conversionPage.getByRole("tab", { name: /Günü değerlendir/ }).click();
+  await expect(conversionPage.getByLabel("Talep / müşteri")).toBeDisabled();
+  await conversionPage.getByRole("button", { name: "AI Sonucunu Hazırla" }).click();
+  await expect(conversionPage.getByLabel("AI sonucu")).toHaveValue(/Öncelikler/);
+  await expect(conversionPage.getByRole("button", { name: "Talebe Kaydet" })).toBeDisabled();
+  await conversionPage.getByRole("button", { name: "Ana Ekran" }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Rezervasyona Çevir" }).click();
   await expect(conversionPage.getByText("Rezervasyona çevrildi", { exact: true })).toBeVisible();
@@ -393,6 +489,7 @@ try {
 
   const setupPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await setupPage.addInitScript(({ setupData, dashboardData }) => {
+    window.__aiConnectionTestCount = 0;
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -411,7 +508,7 @@ try {
       getSetupData: async () => setupData,
       saveInitialSetup: async (input) => ({
         ok: true,
-        message: "İlk kurulum ayarları kaydedildi.",
+        message: "Ayarlar kaydedildi ve AI bağlantısı web sitesinde güncellendi.",
         setupData: {
           ...setupData,
           setupRequired: false,
@@ -425,15 +522,45 @@ try {
           syncSecret: input.syncSecret,
           aiEnabled: input.aiEnabled,
           aiProvider: input.aiProvider,
+          aiService: input.aiService,
+          aiBaseUrl: input.aiBaseUrl,
           aiModel: input.aiModel,
+          aiTimeoutSeconds: input.aiTimeoutSeconds,
+          aiApiKeyConfigured: Boolean(input.aiApiKey) || setupData.aiApiKeyConfigured,
+          aiLastPublishedAt: "2026-07-12T10:00:00.000Z",
           modules: input.modules,
           initialCounts: input.initialCounts
         },
         dashboardData: {
           ...dashboardData,
           webModuleUrl: input.webModuleUrl
+        },
+        aiWebSync: {
+          ok: true,
+          message: "AI ayarları web modülüne uygulandı.",
+          published_at: "2026-07-12T10:00:00.000Z"
         }
       }),
+      testAiConnection: async (input) => {
+        window.__aiConnectionTestCount += 1;
+        if (input.service === "gemini") {
+          return {
+            ok: true,
+            message: "Google AI Studio bağlantısı doğrulandı; 2 kullanılabilir Gemini modeli bulundu.",
+            model: "gemini-3.5-flash",
+            models: [
+              { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+              { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" }
+            ]
+          };
+        }
+        return {
+          ok: true,
+          message: `${input.service === "openrouter" ? "OpenRouter" : "AI servisi"} bağlantısı çalışıyor.`,
+          model: input.model,
+          models: []
+        };
+      },
       createManualBackup: async () => ({
         ok: true,
         message: "Yerel veritabanı yedeği oluşturuldu.",
@@ -454,6 +581,7 @@ try {
       updateDailyTaskStatus: async () => ({ ok: false, message: "smoke" }),
       pushMenu: async () => ({ ok: true, category_count: 0, item_count: 0 }),
       pushAndroidSnapshot: async () => ({ ok: false, message: "smoke" }),
+      pushAiSettings: async () => ({ ok: false, message: "smoke" }),
       saveMenuCategory: async () => ({ ok: false, message: "smoke" }),
       saveMenuItem: async () => ({ ok: false, message: "smoke" }),
       openExternal: async () => true
@@ -465,9 +593,24 @@ try {
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(setupPage.getByRole("heading", { name: "İşletme panelini kullanıma hazırlayın." })).toBeVisible();
   await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Deniz Çiçeği Pansiyon & Kafe");
+  await expect(setupPage.getByText("Anahtar bu cihazda güvenli biçimde kayıtlı.")).toBeVisible();
+  await setupPage.getByLabel("Kullanılacak servis").selectOption("openrouter");
+  await expect(setupPage.getByLabel("Bağlantı adresi")).toHaveValue("https://openrouter.ai/api/v1");
+  await setupPage.getByLabel("Model adı").fill("smoke/provider-model");
+  await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
+  await expect(setupPage.getByText("OpenRouter bağlantısı çalışıyor.")).toBeVisible();
+  await setupPage.getByLabel("Kullanılacak servis").selectOption("gemini");
+  await setupPage.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
+  await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
+  await expect(setupPage.getByText(/2 kullanılabilir Gemini modeli bulundu/)).toBeVisible();
+  await expect(setupPage.getByLabel("Model adı")).toHaveValue("gemini-3.5-flash");
+  expect(await setupPage.evaluate(() => window.__aiConnectionTestCount)).toBe(2);
+  await setupPage.getByLabel("Model adı").selectOption("gemini-3.1-flash-lite");
+  await setupPage.waitForTimeout(100);
+  expect(await setupPage.evaluate(() => window.__aiConnectionTestCount)).toBe(2);
   await setupPage.screenshot({ path: "artifacts/screenshots/desktop-setup-wizard.png", fullPage: true });
   await setupPage.getByLabel("Firma adı").fill("Smoke Pansiyon");
-  await setupPage.getByLabel("Web modül adresi").fill("http://127.0.0.1:8080");
+  await setupPage.getByLabel("Web modül adresi").fill("https://yardimciasistan.alwaysdata.net/yardimci-asistan");
   await setupPage.getByRole("button", { name: "Kurulumu Kaydet" }).click();
   await expect(setupPage.getByRole("heading", { name: "Ana Ekran" })).toBeVisible();
 
@@ -526,11 +669,17 @@ function createSetupFixture() {
     whatsapp: "+905321234567",
     email: "merhaba@denizcicegi.example",
     address: "Sahil Yolu No: 18, Akyaka / Muğla",
-    webModuleUrl: "http://127.0.0.1:8080",
+    webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     syncSecret: "change-this-secret",
-    aiEnabled: false,
+    aiEnabled: true,
     aiProvider: "openai_compatible",
-    aiModel: "",
+    aiService: "openai",
+    aiProjectName: "",
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiModel: "smoke-model",
+    aiTimeoutSeconds: 30,
+    aiApiKeyConfigured: true,
+    aiLastPublishedAt: "",
     modules: {
       rooms: true,
       tables: true,
@@ -549,7 +698,7 @@ function createDashboardFixture() {
   return {
     databasePath: "/tmp/yardimci-asistan.sqlite",
     backupPath: "/tmp/yardimci-asistan/backups",
-    webModuleUrl: "http://127.0.0.1:8080",
+    webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     requests: [],
     rooms: [
       {

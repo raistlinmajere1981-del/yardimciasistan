@@ -1,15 +1,61 @@
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import process from "node:process";
 
 const menuFile = "firm-template/web-module/data/menu.json";
 const conversationsFile = "firm-template/web-module/data/ai-conversations.json";
 const requestsFile = "firm-template/web-module/data/requests.json";
+const syncStateFile = "firm-template/web-module/data/sync-state.json";
+const aiSettingsFile = "firm-template/web-module/data/ai-settings.local.php";
 const originalMenuJson = readFileSync(menuFile, "utf8");
 const originalConversationsJson = readFileSync(conversationsFile, "utf8");
 const originalRequestsJson = readFileSync(requestsFile, "utf8");
+const originalSyncStateJson = readFileSync(syncStateFile, "utf8");
+const originalAiSettings = existsSync(aiSettingsFile)
+  ? {
+      contents: readFileSync(aiSettingsFile, "utf8"),
+      mode: statSync(aiSettingsFile).mode & 0o777
+    }
+  : null;
+const mockAiApiKey = "smoke-ai-key-do-not-log";
+const mockAiModel = "smoke-model-001";
+const mockAiRequests = [];
+const mockAiServer = http.createServer(async (request, response) => {
+  const body = await readJsonRequest(request);
+  mockAiRequests.push({
+    url: request.url,
+    authorization: String(request.headers.authorization ?? ""),
+    googleApiKey: String(request.headers["x-goog-api-key"] ?? ""),
+    body
+  });
+  if (String(request.url).includes(":generateContent")) {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: "Mock Gemini yanıtı hazırlandı." }] } }]
+    }));
+    return;
+  }
+  const lastMessage = Array.isArray(body?.messages) ? String(body.messages.at(-1)?.content ?? "") : "";
+  if (lastMessage.includes("limit testi")) {
+    response.writeHead(429, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "Rate limit exceeded. Please try again later." } }));
+    return;
+  }
+  response.writeHead(200, { "Content-Type": "application/json" });
+  response.end(JSON.stringify({
+    choices: [
+      {
+        message: {
+          content: "Mock AI yanıtı hazırlandı; kesin bilgi için işletme sahibi kontrol edecektir."
+        }
+      }
+    ]
+  }));
+});
+const mockAiPort = await listenOnRandomPort(mockAiServer);
+const mockAiBaseUrl = `http://127.0.0.1:${mockAiPort}/v1`;
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", "firm-template/web-module"], {
@@ -18,6 +64,7 @@ const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", "firm-template/web
 });
 
 let serverOutput = "";
+let browser;
 server.stdout.on("data", (chunk) => {
   serverOutput += chunk.toString();
 });
@@ -26,11 +73,14 @@ server.stderr.on("data", (chunk) => {
 });
 
 try {
+  if (existsSync(aiSettingsFile)) {
+    unlinkSync(aiSettingsFile);
+  }
   writeFileSync(conversationsFile, "[]\n");
   writeFileSync(requestsFile, "[]\n");
   await waitForUrl(`${baseUrl}/api/menu.php`);
 
-  const browser = await chromium.launch();
+  browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
   await page.goto(`${baseUrl}/menu.html`);
@@ -112,10 +162,124 @@ try {
   const chatResult = await chatResponse.json();
   expect(chatResult.ok).toBe(true);
   expect(chatResult.fallback).toBe(true);
+  expect(chatResult.error).toMatchObject({
+    code: "ai_disabled",
+    retryable: false,
+    provider_status: null
+  });
   expect(chatResult.answer).toContain("işletme sahibi");
   expect(chatResult.conversation_id).toMatch(/^ai_conv_/);
   expect(chatResult.request_created).toBe(false);
   expect(chatResult.request_missing_fields).toEqual(["customer_name", "customer_phone"]);
+
+  const aiSettingsPayload = {
+    enabled: true,
+    provider: "openai_compatible",
+    service: "custom",
+    base_url: `${mockAiBaseUrl}/`,
+    model: mockAiModel,
+    api_key: mockAiApiKey,
+    timeout_seconds: 10
+  };
+  const headerlessAiPublishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    data: {
+      action: "publish_ai_settings",
+      sync_secret: "change-this-secret",
+      ai_settings: aiSettingsPayload
+    }
+  });
+  expect(headerlessAiPublishResponse.status()).toBe(401);
+  expect(await headerlessAiPublishResponse.text()).not.toContain(mockAiApiKey);
+
+  const getAiPublishResponse = await page.request.get(`${baseUrl}/api/sync.php?action=publish_ai_settings`, {
+    headers: {
+      "X-YA-Sync-Secret": "change-this-secret"
+    }
+  });
+  expect(getAiPublishResponse.status()).toBe(405);
+
+  const invalidUrlAiPublishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: {
+      "X-YA-Sync-Secret": "change-this-secret"
+    },
+    data: {
+      action: "publish_ai_settings",
+      ai_settings: {
+        ...aiSettingsPayload,
+        base_url: "https://user:password@provider.example/v1"
+      }
+    }
+  });
+  expect(invalidUrlAiPublishResponse.status()).toBe(422);
+  expect(await invalidUrlAiPublishResponse.text()).not.toContain(mockAiApiKey);
+  expect(existsSync(aiSettingsFile)).toBe(false);
+
+  const aiPublishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: {
+      "X-YA-Sync-Secret": "change-this-secret"
+    },
+    data: {
+      action: "publish_ai_settings",
+      ai_settings: aiSettingsPayload
+    }
+  });
+  expect(aiPublishResponse.ok()).toBe(true);
+  const aiPublishResponseText = await aiPublishResponse.text();
+  expect(aiPublishResponseText).not.toContain(mockAiApiKey);
+  const aiPublishResult = JSON.parse(aiPublishResponseText);
+  expect(aiPublishResult).toMatchObject({
+    ok: true,
+    enabled: true,
+    provider: "openai_compatible",
+    service: "custom",
+    base_url: mockAiBaseUrl,
+    model: mockAiModel,
+    timeout_seconds: 10,
+    has_api_key: true
+  });
+  expect(aiPublishResult.api_key).toBeUndefined();
+  expect(statSync(aiSettingsFile).mode & 0o777).toBe(0o600);
+
+  const directAiSettingsResponse = await page.request.get(`${baseUrl}/data/ai-settings.local.php`);
+  expect(await directAiSettingsResponse.text()).toBe("");
+
+  const liveChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: {
+      message: "Merhaba, kısaca yardımcı olabilir misiniz?"
+    }
+  });
+  expect(liveChatResponse.ok()).toBe(true);
+  const liveChatResult = await liveChatResponse.json();
+  expect(liveChatResult.ok).toBe(true);
+  expect(liveChatResult.fallback).toBe(false);
+  expect(liveChatResult.answer).toContain("Mock AI yanıtı");
+  expect(liveChatResult.model).toBe(mockAiModel);
+  expect(JSON.stringify(liveChatResult)).not.toContain(mockAiApiKey);
+  expect(mockAiRequests).toHaveLength(1);
+  expect(mockAiRequests[0]).toMatchObject({
+    url: "/v1/chat/completions",
+    authorization: `Bearer ${mockAiApiKey}`
+  });
+  expect(mockAiRequests[0].body).toMatchObject({
+    model: mockAiModel,
+    store: false
+  });
+
+  const rateLimitedResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: {
+      message: "Sağlayıcı limit testi"
+    }
+  });
+  expect(rateLimitedResponse.ok()).toBe(true);
+  const rateLimitedResult = await rateLimitedResponse.json();
+  expect(rateLimitedResult.fallback).toBe(true);
+  expect(rateLimitedResult.error).toMatchObject({
+    code: "provider_rate_limited",
+    retryable: true,
+    provider_status: 429
+  });
+  expect(rateLimitedResult.answer).toContain("istek sınırına ulaştı");
+  expect(JSON.stringify(rateLimitedResult)).not.toContain(mockAiApiKey);
 
   const aiRequestResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: {
@@ -153,7 +317,31 @@ try {
   expect(aiConversation.request_id).toBe(aiRequestResult.request_id);
   expect(aiConversation.status).toBe("converted_to_request");
 
-  await browser.close();
+  writeFileSync(aiSettingsFile, `<?php
+return ${toPhpArray({
+    enabled: true,
+    provider: "openai_compatible",
+    service: "gemini",
+    base_url: `${mockAiBaseUrl}/openai`,
+    model: "gemini-smoke",
+    api_key: mockAiApiKey,
+    timeout_seconds: 10
+  })};
+`);
+  const geminiChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: { message: "Gemini authorization key testi" }
+  });
+  expect(geminiChatResponse.ok()).toBe(true);
+  const geminiChatResult = await geminiChatResponse.json();
+  expect(geminiChatResult.fallback).toBe(false);
+  expect(geminiChatResult.answer).toContain("Mock Gemini yanıtı");
+  const geminiRequest = mockAiRequests.at(-1);
+  expect(geminiRequest.url).toBe("/v1/models/gemini-smoke:generateContent");
+  expect(geminiRequest.googleApiKey).toBe(mockAiApiKey);
+  expect(geminiRequest.authorization).toBe("");
+  expect(geminiRequest.body.systemInstruction.parts[0].text).toContain("kesin müsaitlik");
+  expect(geminiRequest.body.contents.at(-1)).toMatchObject({ role: "user" });
+
   console.log(`web-module-menu-ok: ${baseUrl}/menu.html`);
 } catch (error) {
   if (serverOutput.trim()) {
@@ -161,10 +349,50 @@ try {
   }
   throw error;
 } finally {
+  if (browser) {
+    await browser.close().catch(() => undefined);
+  }
   writeFileSync(menuFile, originalMenuJson);
   writeFileSync(conversationsFile, originalConversationsJson);
   writeFileSync(requestsFile, originalRequestsJson);
+  writeFileSync(syncStateFile, originalSyncStateJson);
+  if (originalAiSettings) {
+    writeFileSync(aiSettingsFile, originalAiSettings.contents);
+    chmodSync(aiSettingsFile, originalAiSettings.mode);
+  } else if (existsSync(aiSettingsFile)) {
+    unlinkSync(aiSettingsFile);
+  }
   server.kill();
+  await closeServer(mockAiServer);
+}
+
+async function readJsonRequest(request) {
+  let rawBody = "";
+  for await (const chunk of request) {
+    rawBody += chunk.toString();
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+}
+
+function listenOnRandomPort(httpServer) {
+  return new Promise((resolve, reject) => {
+    httpServer.once("error", reject);
+    httpServer.listen(0, "127.0.0.1", () => {
+      const address = httpServer.address();
+      resolve(typeof address === "object" && address ? address.port : 0);
+    });
+  });
+}
+
+function closeServer(httpServer) {
+  return new Promise((resolve) => {
+    httpServer.close(() => resolve());
+  });
 }
 
 function getFreePort() {
@@ -200,4 +428,13 @@ function delay(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function toPhpArray(value) {
+  if (value === null) return "null";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") return `'${value.replaceAll("\\", "\\\\").replaceAll("'", "\\'")}'`;
+  if (Array.isArray(value)) return `[${value.map(toPhpArray).join(", ")}]`;
+  return `[${Object.entries(value).map(([key, item]) => `${toPhpArray(key)} => ${toPhpArray(item)}`).join(", ")}]`;
 }

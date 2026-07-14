@@ -23,6 +23,7 @@ export interface AIMessage {
 export interface AIProviderConfig {
   enabled: boolean;
   provider: AIProviderName;
+  service?: string;
   baseUrl: string;
   model: string;
   apiKey: string;
@@ -63,6 +64,7 @@ export interface OwnerReplyInput {
   guestCount: number;
   message: string;
   tone?: "warm" | "formal" | "short";
+  instructions?: string;
 }
 
 export interface OwnerReplySuggestion {

@@ -1,9 +1,16 @@
-import { app, BrowserWindow, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from "electron";
 import path from "node:path";
-import { generateOwnerReplySuggestion } from "@yardimci-asistan/ai-core";
+import { generateConfiguredChat, generateOwnerReplySuggestion, listGoogleAiStudioModels, rankGoogleAiStudioModels } from "@yardimci-asistan/ai-core";
 import type { AIProviderName } from "@yardimci-asistan/ai-core";
-import { pullRequests, markRequestsSynced, pushAndroidSnapshot, pushMenu } from "@yardimci-asistan/sync-core";
-import type { AndroidOperationsSnapshot, PullRequestsResult, MarkRequestsSyncedResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
+import { pullRequests, markRequestsSynced, pushAiSettings, pushAndroidSnapshot, pushMenu } from "@yardimci-asistan/sync-core";
+import type {
+  AndroidOperationsSnapshot,
+  PullRequestsResult,
+  MarkRequestsSyncedResult,
+  PushAiSettingsResult,
+  PushAndroidSnapshotResult,
+  PushMenuResult
+} from "@yardimci-asistan/sync-core";
 import {
   DesktopDatabase,
   type DesktopDashboardData,
@@ -17,18 +24,40 @@ import {
   type CreateManualRequestResult,
   type RequestReservationConversionResult,
   type RequestAiSuggestionResult,
+  type GenerateAiWorkspaceInput,
+  type GenerateAiWorkspaceResult,
+  type SaveAiWorkspaceResultInput,
+  type SaveAiWorkspaceResult,
+  type AiWorkspaceHistoryEntry,
   type DesktopBackupResult,
   type DesktopStatusUpdateResult,
   type UpdateRequestStatusInput,
   type UpdateRoomStatusInput,
   type UpdateTableStatusInput,
   type UpdateReservationStatusInput,
-  type UpdateDailyTaskStatusInput
+  type UpdateDailyTaskStatusInput,
+  type MarkWhatsAppMessageSentInput
 } from "./database";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
+const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 let desktopDatabase: DesktopDatabase | null = null;
+
+interface AiConnectionTestInput {
+  provider: string;
+  service: string;
+  projectName: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  useStoredApiKey: boolean;
+  timeoutSeconds: number;
+}
+
+type AiConnectionTestResult =
+  | { ok: true; message: string; model: string; models: Array<{ id: string; label: string }> }
+  | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string }> };
 
 interface DesktopBootstrapData {
   appName: string;
@@ -143,8 +172,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle("sync:pullRequests", async (): Promise<PullRequestsResult> => {
     const setup = getDatabase().getSetupData();
-    const baseUrl = process.env.YA_WEB_MODULE_URL ?? setup.webModuleUrl;
-    const syncSecret = process.env.YA_SYNC_SECRET ?? setup.syncSecret;
+    const { baseUrl, syncSecret } = getWebSyncConfig(setup);
     const result = await pullRequests({
       baseUrl,
       syncSecret,
@@ -194,9 +222,9 @@ function registerIpcHandlers() {
 
   ipcMain.handle("sync:markRequestsSynced", async (_event, requestIds: string[]): Promise<MarkRequestsSyncedResult> => {
     const setup = getDatabase().getSetupData();
+    const syncConfig = getWebSyncConfig(setup);
     const result = await markRequestsSynced({
-      baseUrl: process.env.YA_WEB_MODULE_URL ?? setup.webModuleUrl,
-      syncSecret: process.env.YA_SYNC_SECRET ?? setup.syncSecret,
+      ...syncConfig,
       requestIds
     });
     getDatabase().recordSyncEvent({
@@ -214,8 +242,7 @@ function registerIpcHandlers() {
   ipcMain.handle("sync:pushMenu", async (): Promise<PushMenuResult> => {
     const setup = getDatabase().getSetupData();
     const result = await pushMenu({
-      baseUrl: process.env.YA_WEB_MODULE_URL ?? setup.webModuleUrl,
-      syncSecret: process.env.YA_SYNC_SECRET ?? setup.syncSecret,
+      ...getWebSyncConfig(setup),
       menu: getDatabase().getPublishedMenu()
     });
 
@@ -244,8 +271,7 @@ function registerIpcHandlers() {
     const setup = getDatabase().getSetupData();
     const snapshot = createAndroidOperationsSnapshot(getDatabase().getDashboardData());
     const result = await pushAndroidSnapshot({
-      baseUrl: process.env.YA_WEB_MODULE_URL ?? setup.webModuleUrl,
-      syncSecret: process.env.YA_SYNC_SECRET ?? setup.syncSecret,
+      ...getWebSyncConfig(setup),
       snapshot
     });
 
@@ -261,6 +287,10 @@ function registerIpcHandlers() {
     return result;
   });
 
+  ipcMain.handle("sync:pushAiSettings", async (): Promise<PushAiSettingsResult> => {
+    return publishSavedAiSettings();
+  });
+
   ipcMain.handle("menu:saveCategory", (_event, input: SaveMenuCategoryInput): DesktopMenuSaveResult => {
     return getDatabase().saveMenuCategory(input);
   });
@@ -273,8 +303,172 @@ function registerIpcHandlers() {
     return getDatabase().getSetupData();
   });
 
-  ipcMain.handle("setup:saveInitial", (_event, input: SaveInitialSetupInput): DesktopSetupSaveResult => {
-    return getDatabase().saveInitialSetup(input);
+  ipcMain.handle("setup:saveInitial", async (_event, input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> => {
+    const secretUpdate = createAiApiKeyUpdate(input);
+    if (!secretUpdate.ok) {
+      return secretUpdate;
+    }
+
+    const localResult = getDatabase().saveInitialSetup({
+      ...input,
+      aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : ""
+    }, secretUpdate.update);
+    if (!localResult.ok) {
+      return localResult;
+    }
+
+    const aiWebSync = await publishSavedAiSettings();
+    const setupData = getDatabase().getSetupData();
+    const dashboardData = getDatabase().getDashboardData();
+
+    if (!aiWebSync.ok) {
+      return {
+        ...localResult,
+        message: `Ayarlar bu bilgisayarda kaydedildi. Web sitesine uygulanamadı: ${aiWebSync.message}`,
+        setupData,
+        dashboardData,
+        aiWebSync
+      };
+    }
+
+    return {
+      ...localResult,
+      message: "Ayarlar kaydedildi ve AI bağlantısı web sitesinde güncellendi.",
+      setupData,
+      dashboardData,
+      aiWebSync
+    };
+  });
+
+  ipcMain.handle("ai:testConnection", async (_event, input: AiConnectionTestInput): Promise<AiConnectionTestResult> => {
+    const provider = String(input?.provider ?? "").trim();
+    const service = String(input?.service ?? "").trim();
+    const projectName = String(input?.projectName ?? "").trim();
+    const baseUrl = normalizeAiConnectionUrl(input?.baseUrl);
+    let model = String(input?.model ?? "").trim();
+    let models: Array<{ id: string; label: string }> = [];
+
+    if (provider !== "openai_compatible") {
+      return {
+        ok: false,
+        message: "Bu AI bağlantı türü henüz desteklenmiyor."
+      };
+    }
+
+    if (!baseUrl) {
+      return {
+        ok: false,
+        message: "AI bağlantı adresi geçerli bir http veya https adresi olmalı ve kullanıcı bilgisi içermemeli."
+      };
+    }
+
+    if (service === "gemini" && !isGoogleAiStudioUrl(baseUrl)) {
+      return {
+        ok: false,
+        message: "Google AI Studio için resmi generativelanguage.googleapis.com bağlantı adresi kullanılmalı."
+      };
+    }
+
+    const timeoutCandidate = Number(input?.timeoutSeconds);
+    if (!Number.isInteger(timeoutCandidate) || timeoutCandidate < 5 || timeoutCandidate > 120) {
+      return {
+        ok: false,
+        message: "Yanıt bekleme süresi 5 ile 120 saniye arasında olmalı."
+      };
+    }
+
+    const apiKey = String(input?.apiKey ?? "").trim() || (input?.useStoredApiKey ? getEffectiveAiApiKey() : "");
+    const timeoutSeconds = normalizeAiTimeoutSeconds(timeoutCandidate);
+
+    if (service === "gemini") {
+      const modelListResult = await listGoogleAiStudioModels({
+        baseUrl,
+        apiKey,
+        timeoutMs: timeoutSeconds * 1000
+      });
+      if (!modelListResult.ok) {
+        return {
+          ok: false,
+          message: modelListResult.message
+        };
+      }
+
+      models = modelListResult.models.map((item) => ({
+        id: item.id,
+        label: item.displayName && item.displayName !== item.id
+          ? `${item.displayName} (${item.id})`
+          : item.id
+      }));
+      const rankedIds = rankGoogleAiStudioModels(models.map((item) => item.id));
+      models.sort((left, right) => rankedIds.indexOf(left.id) - rankedIds.indexOf(right.id));
+      if (!models.some((item) => item.id === model)) {
+        model = "";
+      }
+    }
+
+    const rankedGoogleModels = service === "gemini"
+      ? rankGoogleAiStudioModels(models.map((item) => item.id))
+      : [];
+    const modelCandidates = model
+      ? [model]
+      : rankedGoogleModels.slice(0, 6);
+    if (modelCandidates.length === 0) {
+      return {
+        ok: false,
+        message: "AI model adı gerekli."
+      };
+    }
+
+    let result: Awaited<ReturnType<typeof generateConfiguredChat>> | null = null;
+    const attemptedModels: string[] = [];
+    for (const candidate of modelCandidates) {
+      attemptedModels.push(candidate);
+      result = await generateConfiguredChat({
+        enabled: true,
+        provider: "openai_compatible",
+        service,
+        baseUrl,
+        model: candidate,
+        apiKey,
+        authMode: service === "gemini" ? "google_api_key" : "bearer",
+        timeoutMs: timeoutSeconds * 1000,
+        messages: [
+          {
+            role: "system",
+            content: "Bu bir bağlantı kontrolüdür. Türkçe ve tek kısa cümleyle bağlantının çalıştığını belirt."
+          },
+          {
+            role: "user",
+            content: "Bağlantı kontrolü"
+          }
+        ]
+      });
+      if (result.ok) {
+        model = candidate;
+        break;
+      }
+      if (service !== "gemini" || modelCandidates.length === 1 || !shouldTryNextGoogleModel(result)) {
+        break;
+      }
+    }
+
+    if (!result || !result.ok) {
+      return {
+        ok: false,
+        message: formatAiConnectionFailure(attemptedModels.at(-1) || modelCandidates[0], result, attemptedModels),
+        model: service === "gemini" ? attemptedModels.at(-1) : undefined,
+        models: service === "gemini" ? models : undefined
+      };
+    }
+
+    return {
+      ok: true,
+      message: service === "gemini"
+        ? `${projectName || "Google AI Studio"} bağlantısı ${model} modeliyle doğrulandı; ${models.length} kullanılabilir Gemini modeli bulundu.`
+        : `${getAiServiceLabel(service)} bağlantısı çalışıyor.`,
+      model: result.model || model,
+      models
+    };
   });
 
   ipcMain.handle("request:createManual", (_event, input: CreateManualRequestInput): CreateManualRequestResult => {
@@ -287,6 +481,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle("request:updateStatus", (_event, input: UpdateRequestStatusInput): DesktopStatusUpdateResult => {
     return getDatabase().updateRequestStatus(input);
+  });
+
+  ipcMain.handle("whatsapp:markMessageSent", (_event, input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult => {
+    return getDatabase().markWhatsAppMessageSent(input);
   });
 
   ipcMain.handle("room:updateStatus", (_event, input: UpdateRoomStatusInput): DesktopStatusUpdateResult => {
@@ -349,6 +547,18 @@ function registerIpcHandlers() {
     return saveResult;
   });
 
+  ipcMain.handle("ai:generateWorkspace", async (_event, input: GenerateAiWorkspaceInput): Promise<GenerateAiWorkspaceResult> => {
+    return generateAiWorkspaceEntry(input);
+  });
+
+  ipcMain.handle("ai:getWorkspaceHistory", (_event, limit?: number): AiWorkspaceHistoryEntry[] => {
+    return getDatabase().getAiWorkspaceHistory(limit);
+  });
+
+  ipcMain.handle("ai:saveWorkspaceResult", (_event, input: SaveAiWorkspaceResultInput): SaveAiWorkspaceResult => {
+    return getDatabase().saveAiWorkspaceResult(input);
+  });
+
   ipcMain.handle("shell:openExternal", async (_event, url: string) => {
     if (!/^https?:\/\//.test(url) && !/^tel:/.test(url)) {
       return false;
@@ -406,21 +616,410 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
 }
 
 function createDesktopAiConfig(setup: DesktopSetupData) {
-  const envEnabled = process.env.YARDIMCI_ASISTAN_AI_ENABLED;
-  const enabled = envEnabled === undefined ? setup.aiEnabled : parseEnvBoolean(envEnabled);
-  const provider = (process.env.YARDIMCI_ASISTAN_AI_PROVIDER ?? setup.aiProvider ?? "openai_compatible") as AIProviderName;
-  const timeoutSeconds = Number(process.env.YARDIMCI_ASISTAN_AI_TIMEOUT_SECONDS ?? 15);
+  const legacyEnvApiKey = (process.env.YARDIMCI_ASISTAN_AI_API_KEY ?? process.env.OPENAI_API_KEY ?? "").trim();
+  const useLegacyEnvironment = !setup.aiApiKeyConfigured && legacyEnvApiKey !== "";
+  const enabled = setup.aiEnabled;
+  const provider = (setup.aiProvider || "openai_compatible") as AIProviderName;
+  const timeoutSeconds = normalizeAiTimeoutSeconds(
+    useLegacyEnvironment ? Number(process.env.YARDIMCI_ASISTAN_AI_TIMEOUT_SECONDS ?? setup.aiTimeoutSeconds) : setup.aiTimeoutSeconds
+  );
 
   return {
     enabled,
     provider: enabled ? provider : "disabled" as AIProviderName,
-    baseUrl: process.env.YARDIMCI_ASISTAN_AI_BASE_URL ?? "https://api.openai.com/v1",
-    model: process.env.YARDIMCI_ASISTAN_AI_MODEL ?? setup.aiModel,
-    apiKey: process.env.YARDIMCI_ASISTAN_AI_API_KEY ?? process.env.OPENAI_API_KEY ?? "",
-    timeoutMs: Number.isFinite(timeoutSeconds) ? timeoutSeconds * 1000 : 15000
+    service: setup.aiService,
+    baseUrl: useLegacyEnvironment ? process.env.YARDIMCI_ASISTAN_AI_BASE_URL || setup.aiBaseUrl : setup.aiBaseUrl,
+    model: useLegacyEnvironment ? process.env.YARDIMCI_ASISTAN_AI_MODEL || setup.aiModel : setup.aiModel,
+    apiKey: getEffectiveAiApiKey(),
+    authMode: setup.aiService === "gemini" ? "google_api_key" as const : "bearer" as const,
+    timeoutMs: timeoutSeconds * 1000
   };
 }
 
-function parseEnvBoolean(value: string) {
-  return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+async function generateAiWorkspaceEntry(input: GenerateAiWorkspaceInput): Promise<GenerateAiWorkspaceResult> {
+  const mode = input?.mode;
+  if (mode !== "reply" && mode !== "summary" && mode !== "daily") {
+    return { ok: false, message: "AI çalışma türü geçersiz." };
+  }
+
+  const setup = getDatabase().getSetupData();
+  const instructions = String(input?.instructions ?? "").trim().slice(0, 800);
+  const request = mode === "daily" ? null : getDatabase().getRequestById(String(input?.requestId ?? ""));
+  if (mode !== "daily" && !request) {
+    return { ok: false, message: "Bu çalışma için bir talep seçin." };
+  }
+
+  const config = createDesktopAiConfig(setup);
+  let content = "";
+  let summary = "";
+  let missingFields: string[] = [];
+  let provider = String(config.provider);
+  let model = setup.aiModel;
+  let fallback = false;
+  let providerMessage = "";
+  const requestLabel = request ? `${request.customer_name} • ${formatWorkspaceRequestType(request.request_type)}` : "Günlük işletme özeti";
+
+  if (mode === "reply" && request) {
+    const suggestion = await generateOwnerReplySuggestion(
+      {
+        businessName: setup.businessName || "Yardımcı Asistan",
+        customerName: request.customer_name,
+        requestType: request.request_type,
+        dateText: request.date_text || request.start_date,
+        guestCount: request.guest_count,
+        message: request.message,
+        tone: "warm",
+        instructions
+      },
+      config
+    );
+    content = suggestion.suggestedReply;
+    summary = suggestion.summary;
+    missingFields = suggestion.missingFields;
+    provider = String(suggestion.provider ?? provider);
+    model = suggestion.model || model;
+    fallback = suggestion.fallback === true;
+    providerMessage = suggestion.providerMessage ?? "";
+  } else {
+    const dashboard = getDatabase().getDashboardData();
+    const localFallback = mode === "summary" && request
+      ? buildLocalRequestSummary(request)
+      : buildLocalDailyEvaluation(dashboard);
+    if (!config.enabled || config.provider === "disabled") {
+      content = localFallback;
+      summary = mode === "summary" ? localFallback.slice(0, 1600) : "Günlük işletme değerlendirmesi";
+      provider = "disabled";
+      fallback = true;
+      providerMessage = "AI Yardımcı kapalı.";
+    } else {
+      const completion = await generateConfiguredChat({
+        ...config,
+        messages: buildAiWorkspaceMessages({
+          mode: mode as "summary" | "daily",
+          businessName: setup.businessName || "Yardımcı Asistan",
+          request,
+          dashboard,
+          instructions
+        })
+      });
+
+      if (completion.ok) {
+        content = completion.answer.trim().slice(0, 6000);
+        summary = mode === "summary" ? content.slice(0, 1600) : "Günlük işletme değerlendirmesi";
+        provider = completion.provider;
+        model = completion.model || model;
+      } else {
+        content = localFallback;
+        summary = mode === "summary" ? localFallback.slice(0, 1600) : "Günlük işletme değerlendirmesi";
+        provider = completion.provider;
+        fallback = true;
+        providerMessage = completion.message;
+      }
+    }
+  }
+
+  if (!content.trim()) {
+    return { ok: false, message: "AI Yardımcı boş sonuç döndürdü." };
+  }
+
+  const entry = getDatabase().saveAiWorkspaceHistory({
+    mode,
+    requestId: request?.id ?? "",
+    requestLabel,
+    instructions,
+    content,
+    summary,
+    missingFields,
+    provider,
+    model,
+    fallback
+  });
+
+  return {
+    ok: true,
+    message: fallback
+      ? `AI servisi kullanılamadı; güvenli yerel sonuç hazırlandı.${providerMessage ? ` ${providerMessage}` : ""}`
+      : "AI sonucu hazırlandı. Düzenleyip kullanabilirsiniz.",
+    entry
+  };
+}
+
+function buildAiWorkspaceMessages(input: {
+  mode: "summary" | "daily";
+  businessName: string;
+  request: ReturnType<DesktopDatabase["getRequestById"]>;
+  dashboard: DesktopDashboardData;
+  instructions: string;
+}) {
+  const commonRules = [
+    `${input.businessName} için işletme sahibine yardımcı ol.`,
+    "Türkçe, kısa, açık ve uygulanabilir yaz.",
+    "Kesin rezervasyon, müsaitlik veya bağlayıcı fiyat onayı verme.",
+    "Olmayan bilgi üretme."
+  ];
+  if (input.mode === "summary" && input.request) {
+    return [
+      {
+        role: "system" as const,
+        content: [...commonRules, "Talebi en fazla 5 kısa maddede özetle; eksik ve dikkat gerektiren bilgileri belirt."].join("\n")
+      },
+      {
+        role: "user" as const,
+        content: JSON.stringify({
+          request: input.request,
+          additionalInstructions: input.instructions
+        })
+      }
+    ];
+  }
+
+  return [
+    {
+      role: "system" as const,
+      content: [...commonRules, "Günlük operasyonu Öncelikler, Riskler ve Önerilen Sıra başlıklarıyla değerlendir."].join("\n")
+    },
+    {
+      role: "user" as const,
+      content: JSON.stringify({
+        summary: input.dashboard.summary,
+        pendingTasks: input.dashboard.dailyTasks.filter((task) => task.status !== "completed").slice(0, 20),
+        pendingReservations: input.dashboard.reservations.filter((reservation) => !["confirmed", "cancelled", "completed"].includes(reservation.status)).slice(0, 20),
+        recentRequests: input.dashboard.requests.slice(0, 15).map((request) => ({
+          customer: request.customer_name,
+          type: request.request_type,
+          status: request.status,
+          date: request.date_text || request.start_date,
+          message: request.message
+        })),
+        additionalInstructions: input.instructions
+      })
+    }
+  ];
+}
+
+function buildLocalRequestSummary(request: NonNullable<ReturnType<DesktopDatabase["getRequestById"]>>) {
+  const fields = [
+    `Müşteri: ${request.customer_name || "Belirtilmedi"}`,
+    `Talep: ${formatWorkspaceRequestType(request.request_type)}`,
+    `Tarih: ${request.date_text || request.start_date || "Belirtilmedi"}`,
+    `Kişi: ${request.guest_count > 0 ? request.guest_count : "Belirtilmedi"}`,
+    `Not: ${request.message || "Belirtilmedi"}`
+  ];
+  return fields.map((field) => `• ${field}`).join("\n");
+}
+
+function buildLocalDailyEvaluation(dashboard: DesktopDashboardData) {
+  const pendingTasks = dashboard.dailyTasks.filter((task) => task.status !== "completed");
+  return [
+    "Öncelikler",
+    `• ${dashboard.summary.newRequests} yeni talebi kontrol edin.`,
+    `• ${dashboard.summary.pendingReservations} bekleyen rezervasyonu değerlendirin.`,
+    `• ${pendingTasks.length} tamamlanmamış günlük işi takip edin.`,
+    "Riskler",
+    `• Boş oda: ${dashboard.summary.availableRooms}/${dashboard.summary.totalRooms}; boş masa: ${dashboard.summary.availableTables}.`,
+    "Önerilen Sıra",
+    "• Önce yeni talepler, sonra rezervasyon onayları, ardından günlük işler."
+  ].join("\n");
+}
+
+function formatWorkspaceRequestType(value: string) {
+  const labels: Record<string, string> = {
+    pension_reservation: "Pansiyon rezervasyonu",
+    restaurant_reservation: "Masa rezervasyonu",
+    breakfast_request: "Kahvaltı talebi",
+    general_info: "Bilgi talebi",
+    price_question: "Fiyat sorusu"
+  };
+  return labels[value] ?? "Genel talep";
+}
+
+async function publishSavedAiSettings(): Promise<PushAiSettingsResult> {
+  const setup = getDatabase().getSetupData();
+  const result = await pushAiSettings({
+    ...getWebSyncConfig(setup),
+    aiSettings: {
+      enabled: setup.aiEnabled,
+      provider: setup.aiProvider || "openai_compatible",
+      service: setup.aiService || "custom",
+      baseUrl: setup.aiBaseUrl,
+      model: setup.aiModel,
+      apiKey: setup.aiEnabled ? getEffectiveAiApiKey() : "",
+      timeoutSeconds: normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds)
+    }
+  });
+
+  if (result.ok) {
+    try {
+      getDatabase().markAiSettingsPublished(result.published_at);
+    } catch {
+      const invalidResponse: PushAiSettingsResult = {
+        ok: false,
+        message: "Web modülü AI ayarını aldı ancak yayın zamanı doğrulanamadı. Web modülünü güncelleyip tekrar deneyin."
+      };
+      getDatabase().recordSyncEvent({
+        direction: "push",
+        entityType: "ai_settings",
+        ok: false,
+        recordCount: 0,
+        message: invalidResponse.message
+      });
+      return invalidResponse;
+    }
+  }
+
+  getDatabase().recordSyncEvent({
+    direction: "push",
+    entityType: "ai_settings",
+    ok: result.ok,
+    recordCount: result.ok ? 1 : 0,
+    message: result.message,
+    status: result.ok ? undefined : result.status
+  });
+
+  return result;
+}
+
+function getWebSyncConfig(setup: DesktopSetupData) {
+  const baseUrl = process.env.YA_WEB_MODULE_URL ?? setup.webModuleUrl;
+  const syncSecret = process.env.YA_SYNC_SECRET ?? setup.syncSecret;
+
+  return { baseUrl, syncSecret };
+}
+
+type AiApiKeyUpdate =
+  | { mode: "keep" }
+  | { mode: "replace"; encryptedValue: string }
+  | { mode: "clear" };
+
+function createAiApiKeyUpdate(input: SaveInitialSetupInput): { ok: true; update: AiApiKeyUpdate } | { ok: false; message: string } {
+  if (!input || typeof input !== "object") {
+    return {
+      ok: false,
+      message: "Kaydedilecek ayarlar okunamadı."
+    };
+  }
+
+  if (input.clearAiApiKey) {
+    return {
+      ok: true,
+      update: { mode: "clear" }
+    };
+  }
+
+  const apiKey = String(input.aiApiKey ?? "").trim();
+  if (!apiKey) {
+    return {
+      ok: true,
+      update: { mode: "keep" }
+    };
+  }
+
+  if (!safeStorage.isEncryptionAvailable()) {
+    return {
+      ok: false,
+      message: "Gizli erişim anahtarı bu cihazda güvenli biçimde saklanamıyor. İşletim sistemi anahtar kasasını kontrol edin."
+    };
+  }
+
+  try {
+    const encryptedValue = safeStorage.encryptString(apiKey).toString("base64");
+    return {
+      ok: true,
+      update: {
+        mode: "replace",
+        encryptedValue: `safe-storage:v1:${encryptedValue}`
+      }
+    };
+  } catch {
+    return {
+      ok: false,
+      message: "Gizli erişim anahtarı güvenli biçimde kaydedilemedi."
+    };
+  }
+}
+
+function getEffectiveAiApiKey() {
+  const encryptedValue = getDatabase().getEncryptedAiApiKey();
+  if (encryptedValue.startsWith("safe-storage:v1:")) {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return "";
+    }
+
+    try {
+      const payload = encryptedValue.slice("safe-storage:v1:".length);
+      return safeStorage.decryptString(Buffer.from(payload, "base64")).trim();
+    } catch {
+      return "";
+    }
+  }
+
+  return (process.env.YARDIMCI_ASISTAN_AI_API_KEY ?? process.env.OPENAI_API_KEY ?? "").trim();
+}
+
+function normalizeAiTimeoutSeconds(value: number) {
+  if (!Number.isFinite(value)) {
+    return 30;
+  }
+
+  return Math.max(5, Math.min(120, Math.trunc(value)));
+}
+
+function normalizeAiConnectionUrl(value: unknown) {
+  const candidate = String(value ?? "").trim();
+  try {
+    const parsed = new URL(candidate);
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname || parsed.username || parsed.password) {
+      return "";
+    }
+
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function isGoogleAiStudioUrl(value: string) {
+  return value === GOOGLE_AI_STUDIO_BASE_URL;
+}
+
+function shouldTryNextGoogleModel(result: { status?: number; message: string }) {
+  return result.status === 404
+    || result.status === 429
+    || (result.status === 400 && /model|not found|support/i.test(result.message));
+}
+
+function formatAiConnectionFailure(
+  model: string,
+  result: { status?: number; message: string } | null,
+  attemptedModels: string[]
+) {
+  if (!result) {
+    return "AI bağlantı testi tamamlanamadı.";
+  }
+
+  const attempted = attemptedModels.length > 1 ? ` Denenen modeller: ${attemptedModels.join(", ")}.` : "";
+  if (result.status === 429) {
+    return `${model} modeli için kullanılabilir Google kotası bulunamadı (HTTP 429). Rate Limit ekranında limiti 0'dan büyük bir model seçin veya faturalandırmayı etkinleştirin.${attempted}`;
+  }
+  if (result.status === 401 || result.status === 403) {
+    return `Google AI Studio erişim anahtarı veya proje yetkisi kabul edilmedi (HTTP ${result.status}). Anahtar durumunu ve proje erişimini kontrol edin.`;
+  }
+  if (result.status === 404) {
+    return `${model} modeli bu proje için bulunamadı (HTTP 404).${attempted}`;
+  }
+
+  const shortMessage = result.message.replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").trim().slice(0, 280);
+  return `${model} modeliyle bağlantı kurulamadı${result.status ? ` (HTTP ${result.status})` : ""}: ${shortMessage || "Bilinmeyen sağlayıcı hatası."}${attempted}`;
+}
+
+function getAiServiceLabel(service: string) {
+  const labels: Record<string, string> = {
+    openai: "OpenAI",
+    openrouter: "OpenRouter",
+    groq: "Groq",
+    gemini: "Google Gemini",
+    custom: "Özel AI servisi"
+  };
+
+  return labels[service] || "AI servisi";
 }

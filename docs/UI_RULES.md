@@ -427,6 +427,52 @@ Rezervasyon ve fiyat gibi konularda şu tarz ifadeler kullanılmalıdır:
 Talebinizi işletmeye iletebilirim. Müsaitlik ve detaylar işletme sahibi tarafından kontrol edilip size dönüş yapılacaktır.
 ```
 
+## Masaüstü AI Ayarları
+
+Masaüstü Ayarlar ekranındaki AI alanı, teknik olmayan kullanıcıya hangi servisin kullanılacağını anlaşılır biçimde seçtirmelidir.
+
+Gösterilecek temel bilgiler:
+
+```text
+AI yardımcı açık / kapalı
+Servis seçimi
+Bağlantı adresi
+Model adı
+Gizli erişim anahtarı
+Yanıt bekleme süresi
+Bağlantıyı dene
+Web sitesine uygula durumu
+```
+
+Gizli erişim anahtarı kayıttan sonra ekrana geri basılmamalıdır. Bunun yerine `Anahtar kayıtlı` bilgisi gösterilmeli; boş alan mevcut anahtarı korumalı ve silme işlemi ayrıca seçilmelidir.
+
+Yerel kayıt ile web sitesine uygulama sonucu ayrı anlatılmalıdır. Web bağlantısı kurulamazsa kullanıcıya yerel ayarın kaybolmadığı ve daha sonra yeniden deneyebileceği söylenmelidir.
+
+## Masaüstü AI Yardımcı Çalışma Alanı
+
+AI Yardımcı menüsü sohbet ekranı gibi davranmamalı; işletme sahibinin mevcut kayıtlarla çalıştığı, sonucu kontrol edip düzenleyebildiği bir üretim alanı olmalıdır.
+
+Çalışma türleri:
+
+```text
+Cevap taslağı — seçili talep için WhatsApp'a uygun yanıt
+Talebi özetle — eksikleri ve önemli noktaları çıkaran iç not
+Günü değerlendir — açık işler, riskler ve öncelikler
+```
+
+Ekranın üstünde bağlantının açık/kapalı durumu, aktif model ve web yayın durumu gösterilmelidir. Talep gerektiren çalışma türlerinde müşteri bağlamı görünür olmalı; isteğe bağlı ek talimat teknik prompt terimleri kullanılmadan sunulmalıdır.
+
+AI sonucu her zaman düzenlenebilir olmalıdır. Kullanıcı sonucu kopyalayabilmeli, ilgili talebe kaydedebilmeli ve cevap taslağını WhatsApp ekranına hazırlayabilmelidir. Son çalışmalar yerel geçmişte gösterilir; geçmiş kaydı seçildiğinde kullanılan model, üretim zamanı ve fallback durumu korunur.
+
+Sonuç alanında şu sınır sürekli görünür olmalıdır:
+
+```text
+AI kesin rezervasyon, müsaitlik veya fiyat onayı vermez.
+Son karar ve gönderim her zaman işletme sahibindedir.
+```
+
+AI bağlantısı kapalı veya servis hatalı olduğunda ekran kullanılmaz hâle gelmemeli; güvenli yerel taslak/özet üretilmeli ve bunun yerel sonuç olduğu açıkça belirtilmelidir.
+
 ## Boş Durum Ekranları
 
 Boş ekranlar kullanıcıyı endişelendirmemelidir.

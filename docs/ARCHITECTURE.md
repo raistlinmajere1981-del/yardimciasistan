@@ -210,6 +210,22 @@ AI Provider
 
 PC uygulaması da AI istekleri için aynı adapter mantığını kullanır.
 
+AI bağlantı ayarlarının ana yönetim yeri PC uygulamasındaki Ayarlar ekranıdır. Kullanıcı servis seçimi, OpenAI uyumlu bağlantı adresi, model, API anahtarı ve zaman aşımı bilgisini burada yönetir. API anahtarı renderer'a geri okunmaz; yalnız Electron ana sürecinde çözülerek masaüstü AI çağrısında veya yetkili senkron isteğinde kullanılır.
+
+Web tarafında aynı bağlantının kullanım akışı:
+
+```text
+PC Ayarlar
+  ↓ HTTPS + sync_secret
+Firma Hosting Mini API
+  ↓ korumalı sunucu ayarı
+Web AI chat.php
+  ↓
+Seçilen AI Servisi
+```
+
+Web widget'a servis anahtarı, model veya gizli bağlantı bilgisi gönderilmez. PC kapalıyken web AI çalışmaya devam eder; hostingde son başarıyla yayınlanan ayar kullanılır. Ayar yayını başarısız olursa PC'deki yerel ayar korunur ve kullanıcı yayını yeniden deneyebilir.
+
 AI görevleri:
 
 * Müşteri sorularını cevaplamak

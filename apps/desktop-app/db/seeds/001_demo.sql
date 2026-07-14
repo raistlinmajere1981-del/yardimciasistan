@@ -20,9 +20,9 @@ INSERT OR IGNORE INTO settings (
 ) VALUES (
   'settings_demo_001',
   'business_demo_001',
-  'http://127.0.0.1:8080',
+  'https://yardimciasistan.alwaysdata.net/yardimci-asistan',
   'change-this-secret',
-  1,
+  0,
   1,
   'webview',
   1,

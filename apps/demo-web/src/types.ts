@@ -77,4 +77,4 @@ export interface BusinessConfig {
   social_media: Record<string, string>;
 }
 
-export type PageKey = "home" | "rooms" | "restaurant" | "menu" | "gallery" | "location" | "contact" | "request";
+export type PageKey = "home" | "rooms" | "restaurant" | "menu" | "gallery" | "location" | "contact" | "request" | "settings";

@@ -57,7 +57,7 @@ rmSync(zipPath, { force: true });
 mkdirSync(outputRoot, { recursive: true });
 cpSync(sourceRoot, packageRoot, {
   recursive: true,
-  filter: (path) => !path.includes(`${sourceRoot}/.DS_Store`)
+  filter: shouldCopySourcePath
 });
 
 const appliedOverrides = applyPackageOverrides();
@@ -109,6 +109,11 @@ function validateSource() {
 
   const aiConfig = readFileSync(join(sourceRoot, "config", "ai.php"), "utf8");
   assert.ok(aiConfig.includes("getenv('YARDIMCI_ASISTAN_AI_API_KEY')"), "config/ai.php API anahtarını ortam değişkeninden okumalı.");
+  assert.ok(aiConfig.includes("data/ai-settings.local.php"), "config/ai.php masaüstünden yayınlanan korumalı AI ayarını okumalı.");
+
+  const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
+  assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
+  assert.ok(syncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "AI ayar yayını header güvenlik anahtarını doğrulamalı.");
 
   const widget = readFileSync(join(sourceRoot, "widget.js"), "utf8");
   assert.ok(widget.includes("YardimciAsistanWidget"), "widget.js YardimciAsistanWidget globalini içermeli.");
@@ -161,6 +166,10 @@ function validatePackage(manifest) {
     assert.ok(manifestFiles.has(file), `Paket manifestinde eksik dosya: ${file}`);
   }
 
+  for (const secretFile of ["config/ai.local.php", "data/ai-settings.local.php"]) {
+    assert.equal(manifestFiles.has(secretFile), false, `Paket gizli runtime ayarı içermemeli: ${secretFile}`);
+  }
+
   const forbidden = manifest.files.filter((file) => {
     return file.path.startsWith("node_modules/") || file.path.startsWith("dist/") || file.path.endsWith(".ts") || file.path.includes("/.env");
   });
@@ -179,6 +188,19 @@ function validatePackage(manifest) {
     assert.equal(statSync(archivePath).size, archive.bytes);
     assert.equal(sha256(archivePath), archive.sha256);
   }
+}
+
+function shouldCopySourcePath(sourcePath) {
+  const relativePath = relative(sourceRoot, sourcePath).replaceAll("\\", "/");
+  if (relativePath === ".DS_Store" || relativePath.endsWith("/.DS_Store")) {
+    return false;
+  }
+
+  if (relativePath === "config/ai.local.php" || relativePath === "data/ai-settings.local.php") {
+    return false;
+  }
+
+  return !relativePath.startsWith("data/.ai-settings.");
 }
 
 function validateBusinessConfig(business, label) {

@@ -88,13 +88,15 @@ try {
   await page.locator('.ya-widget-ai button[type="submit"]').click();
 
   await expect(page.locator(".ya-widget-ai-answer")).toContainText("işletme sahibi");
-  await expect(page.locator(".ya-widget-status")).toContainText("güvenli yanıt");
+  await expect(page.locator(".ya-widget-status")).toContainText("AI bağlantısı işletme ayarlarında kapalı");
+  await expect(page.locator(".ya-widget-status")).toContainText("ai_disabled");
 
   const conversations = JSON.parse(readFileSync(conversationsFile, "utf8"));
   expect(conversations).toHaveLength(1);
   expect(conversations[0].source).toBe("web_ai");
   expect(conversations[0].request_id).toBe("");
   expect(conversations[0].status).toBe("fallback");
+  expect(conversations[0].error_code).toBe("ai_disabled");
   expect(conversations[0].messages_json).toContain("Bu akşam 4 kişilik masa var mı?");
   expect(conversations[0].messages_json).toContain("işletme sahibi");
 

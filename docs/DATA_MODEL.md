@@ -502,7 +502,12 @@ Web AI veya PC AI ile yapılan konuşmaları temsil eder.
 web_ai
 desktop_ai
 android_ai
+desktop_workspace:reply
+desktop_workspace:summary
+desktop_workspace:daily
 ```
+
+`desktop_workspace:*` kaynakları AI Yardımcı sayfasındaki yerel çalışma geçmişini temsil eder. `messages` alanında çalışma türü, isteğe bağlı ek talimat, düzenlenebilir sonuç, eksik alanlar, kullanılan provider/model ve fallback bilgisi tutulur. `reply` ve `summary` kayıtları bir talebe bağlanabilir; günlük değerlendirme talep bağı olmadan saklanır.
 
 ## status Değerleri
 
@@ -741,11 +746,16 @@ Firma kurulum ayarlarını temsil eder.
 {
   "id": "settings_001",
   "business_id": "business_001",
-  "web_module_url": "https://example.com/yardimci-asistan",
+  "web_module_url": "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
   "sync_secret": "change-this-secret",
   "ai_enabled": true,
   "ai_provider": "openai_compatible",
-  "ai_model": "free-model-name",
+  "ai_service": "openrouter",
+  "ai_base_url": "https://openrouter.ai/api/v1",
+  "ai_model": "provider/model-name",
+  "ai_api_key_encrypted": "<opaque-encrypted-value>",
+  "ai_timeout_seconds": 30,
+  "ai_last_published_at": "2026-01-01T10:00:00+03:00",
   "whatsapp_enabled": true,
   "whatsapp_mode": "webview",
   "android_enabled": true,
@@ -756,6 +766,12 @@ Firma kurulum ayarlarını temsil eder.
   "updated_at": "2026-01-01T10:00:00+03:00"
 }
 ```
+
+`ai_provider` kullanılan adapter protokolünü, `ai_service` ise kullanıcıya gösterilen servis hazır ayarını temsil eder. v1 bağlantısı OpenAI uyumlu `chat/completions` protokolünü kullanır; özel servis seçildiğinde bağlantı adresi kullanıcı tarafından girilebilir.
+
+`ai_api_key_encrypted` yalnız masaüstü ana süreç tarafından çözülebilen yerel gizli değerdir. Renderer'a, bootstrap verisine, loglara veya web istemcisine gönderilmez. Hosting tarafına yalnız `sync_secret` ile yetkilendirilmiş HTTPS isteğinde aktarılır ve doğrudan web erişimine kapalı sunucu dosyasında tutulur. API cevapları anahtarın kendisini hiçbir zaman döndürmez.
+
+AI kapalıysa sistemin form, WhatsApp, talep yönetimi ve yerel işletme özellikleri çalışmaya devam eder.
 
 ## whatsapp_mode Değerleri
 

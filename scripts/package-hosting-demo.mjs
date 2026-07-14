@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, resolve } from "node:path";
 import process from "node:process";
 
 const repoRoot = process.cwd();
@@ -13,15 +13,43 @@ const publicHtmlRoot = join(outputRoot, "public_html");
 const manifestPath = join(outputRoot, "manifest.json");
 const tarballPath = join(outputRoot, "hosting-demo-public_html.tar.gz");
 const zipPath = join(outputRoot, "hosting-demo-public_html.zip");
+const desktopPackage = JSON.parse(readFileSync(join(repoRoot, "apps", "desktop-app", "package.json"), "utf8"));
+const androidPackage = JSON.parse(readFileSync(join(repoRoot, "apps", "android-app", "package.json"), "utf8"));
+const desktopInstallerVersion = String(desktopPackage.version ?? "").trim();
+const androidAppVersion = String(androidPackage.version ?? "").trim();
+const desktopInstallerFileName = `YardimciAsistan-Setup-${desktopInstallerVersion}.exe`;
+const desktopInstallerX86FileName = `YardimciAsistan-Setup-${desktopInstallerVersion}-x86.exe`;
+const androidApkFileName = `YardimciAsistan-Android-${androidAppVersion}.apk`;
+const desktopInstallerSource = resolve(
+  repoRoot,
+  String(process.env.YARDIMCI_ASISTAN_DESKTOP_INSTALLER_PATH || join("dist", "desktop", desktopInstallerFileName))
+);
+const desktopInstallerX86Source = resolve(
+  repoRoot,
+  String(process.env.YARDIMCI_ASISTAN_DESKTOP_INSTALLER_X86_PATH || join("dist", "desktop", desktopInstallerX86FileName))
+);
+const androidApkSource = resolve(
+  repoRoot,
+  String(process.env.YARDIMCI_ASISTAN_ANDROID_APK_PATH || join("apps", "android-app", "build", "outputs", "apk", "debug", "yardimci-asistan-debug.apk"))
+);
+const desktopInstallerPublicPath = `downloads/${desktopInstallerFileName}`;
+const desktopInstallerX86PublicPath = `downloads/${desktopInstallerX86FileName}`;
+const androidApkPublicPath = `downloads/${androidApkFileName}`;
 
 const hostingOrigin = normalizeOrigin(requiredEnv("YARDIMCI_ASISTAN_HOSTING_ORIGIN"));
 const webModulePath = normalizePublicPath(process.env.YARDIMCI_ASISTAN_HOSTING_WEB_MODULE_PATH || "/yardimci-asistan");
 const webModuleUrl = `${hostingOrigin}${webModulePath}`;
+const desktopInstallerUrl = `${hostingOrigin}/${desktopInstallerPublicPath}`;
+const desktopInstallerX86Url = `${hostingOrigin}/${desktopInstallerX86PublicPath}`;
+const androidApkUrl = `${hostingOrigin}/${androidApkPublicPath}`;
 const syncSecret = String(process.env.YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET ?? "").trim();
 const allowedOrigins = mergeList(process.env.YARDIMCI_ASISTAN_DEPLOY_ALLOWED_ORIGINS || "", hostingOrigin);
 
 assert.ok(syncSecret.length >= 12, "YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET en az 12 karakter olmalı.");
 assert.notEqual(syncSecret, "change-this-secret", "Canlı hosting paketi varsayılan sync secret ile üretilemez.");
+validateDesktopInstaller();
+validateWindowsInstaller(desktopInstallerX86Source, "Windows 32 bit", "npm run pack:desktop:win32");
+validateAndroidApk();
 
 rmSync(outputRoot, { recursive: true, force: true });
 mkdirSync(outputRoot, { recursive: true });
@@ -33,7 +61,12 @@ run("npm", ["run", "pack:web-module"], {
 });
 run("npm", ["run", "build", "-w", "@yardimci-asistan/demo-web"], {
   ...process.env,
-  VITE_YA_WEB_MODULE_URL: webModuleUrl
+  VITE_YA_WEB_MODULE_URL: webModuleUrl,
+  VITE_YA_DESKTOP_INSTALLER_URL: desktopInstallerUrl,
+  VITE_YA_DESKTOP_INSTALLER_X86_URL: desktopInstallerX86Url,
+  VITE_YA_DESKTOP_INSTALLER_VERSION: desktopInstallerVersion,
+  VITE_YA_ANDROID_APK_URL: androidApkUrl,
+  VITE_YA_ANDROID_APP_VERSION: androidAppVersion
 });
 
 assert.ok(existsSync(demoDistRoot), `Demo web build çıktısı bulunamadı: ${demoDistRoot}`);
@@ -41,6 +74,10 @@ assert.ok(existsSync(webModuleDeployRoot), `Web modül deploy çıktısı buluna
 
 cpSync(demoDistRoot, publicHtmlRoot, { recursive: true });
 cpSync(webModuleDeployRoot, join(publicHtmlRoot, stripLeadingSlash(webModulePath)), { recursive: true });
+mkdirSync(join(publicHtmlRoot, "downloads"), { recursive: true });
+cpSync(desktopInstallerSource, join(publicHtmlRoot, desktopInstallerPublicPath));
+cpSync(desktopInstallerX86Source, join(publicHtmlRoot, desktopInstallerX86PublicPath));
+cpSync(androidApkSource, join(publicHtmlRoot, androidApkPublicPath));
 
 const aiConfig = writeDeployAiConfig();
 const files = listFiles(publicHtmlRoot);
@@ -55,6 +92,16 @@ const manifest = {
   generated_at: new Date().toISOString(),
   file_count: files.length,
   ai_config: aiConfig,
+  desktop_installer: {
+    version: desktopInstallerVersion,
+    source: relative(repoRoot, desktopInstallerSource),
+    path: desktopInstallerPublicPath,
+    url: desktopInstallerUrl,
+    bytes: statSync(desktopInstallerSource).size,
+    sha256: sha256(desktopInstallerSource)
+  },
+  desktop_installer_x86: artifactManifest(desktopInstallerVersion, desktopInstallerX86Source, desktopInstallerX86PublicPath, desktopInstallerX86Url),
+  android_apk: artifactManifest(androidAppVersion, androidApkSource, androidApkPublicPath, androidApkUrl),
   archives,
   files: files.map((file) => {
     const absolutePath = join(publicHtmlRoot, file);
@@ -75,6 +122,9 @@ function validatePackage(files) {
   const requiredFiles = [
     "index.html",
     "favicon.png",
+    desktopInstallerPublicPath,
+    desktopInstallerX86PublicPath,
+    androidApkPublicPath,
     `${webModulePrefix}/widget.js`,
     `${webModulePrefix}/menu.html`,
     `${webModulePrefix}/api/request.php`,
@@ -94,6 +144,15 @@ function validatePackage(files) {
     return readText(join(publicHtmlRoot, file)).includes(webModuleUrl);
   });
   assert.ok(bundleHasWebModuleUrl, "Demo site build çıktısı canlı web modül URL'ini içermeli.");
+  const bundleHasDesktopInstallerUrl = jsFiles.some((file) => {
+    return readText(join(publicHtmlRoot, file)).includes(desktopInstallerUrl);
+  });
+  assert.ok(bundleHasDesktopInstallerUrl, "Demo site build çıktısı masaüstü installer URL'ini içermeli.");
+  const bundleHasAdditionalDownloads = jsFiles.some((file) => {
+    const bundle = readText(join(publicHtmlRoot, file));
+    return bundle.includes(desktopInstallerX86Url) && bundle.includes(androidApkUrl);
+  });
+  assert.ok(bundleHasAdditionalDownloads, "Demo site build çıktısı Windows 32 bit ve Android indirme URL'lerini içermeli.");
 
   const business = JSON.parse(readText(join(publicHtmlRoot, `${webModulePrefix}/config/business.json`)));
   assert.notEqual(business.sync_secret, "change-this-secret", "Hosting demo paketi varsayılan sync secret içeremez.");
@@ -111,6 +170,39 @@ function validatePackage(files) {
     return file.startsWith("node_modules/") || file.endsWith(".ts") || file.includes("/.env");
   });
   assert.deepEqual(forbidden, [], `Hosting demo paketinde yayınlanmaması gereken dosya var: ${forbidden.join(", ")}`);
+}
+
+function validateDesktopInstaller() {
+  assert.ok(desktopInstallerVersion, "Desktop uygulama sürümü package.json içinde tanımlı olmalı.");
+  validateWindowsInstaller(desktopInstallerSource, "Windows 64 bit", "npm run pack:desktop:win");
+}
+
+function validateWindowsInstaller(source, label, buildCommand) {
+  assert.ok(existsSync(source), `${label} kurulum dosyası bulunamadı: ${source}\nDosyayı \`${buildCommand}\` ile üretin.`);
+  const installerStats = statSync(source);
+  assert.ok(installerStats.isFile(), `${label} kurulum yolu dosya olmalı: ${source}`);
+  assert.ok(installerStats.size >= 20 * 1024 * 1024, `${label} kurulum dosyası eksik veya yarım görünüyor (20 MB altında).`);
+  assert.equal(readFileSync(source).subarray(0, 2).toString("ascii"), "MZ", `${label} kurulum dosyası geçerli PE başlığı taşımıyor.`);
+}
+
+function validateAndroidApk() {
+  assert.ok(androidAppVersion, "Android uygulama sürümü package.json içinde tanımlı olmalı.");
+  assert.ok(existsSync(androidApkSource), `Android APK bulunamadı: ${androidApkSource}\nDosyayı \`npm run build:android\` ile üretin.`);
+  const apkStats = statSync(androidApkSource);
+  assert.ok(apkStats.isFile(), `Android APK yolu dosya olmalı: ${androidApkSource}`);
+  assert.ok(apkStats.size >= 20 * 1024, "Android APK eksik veya yarım görünüyor (20 KB altında).");
+  assert.equal(readFileSync(androidApkSource).subarray(0, 2).toString("ascii"), "PK", "Android APK geçerli ZIP/APK başlığı taşımıyor.");
+}
+
+function artifactManifest(version, source, publicPath, url) {
+  return {
+    version,
+    source: relative(repoRoot, source),
+    path: publicPath,
+    url,
+    bytes: statSync(source).size,
+    sha256: sha256(source)
+  };
 }
 
 function writeDeployAiConfig() {

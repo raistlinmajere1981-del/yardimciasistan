@@ -28,8 +28,14 @@ try {
       contentType: "application/json",
       body: JSON.stringify({
         ok: true,
-        answer: "Müsaitlik ve fiyat için işletme sahibi kontrol edip size dönüş yapacaktır.",
-        fallback: true
+        answer: "AI servisi istek sınırına ulaştı. Müsaitlik ve fiyat için işletme sahibi kontrol edip size dönüş yapacaktır.",
+        fallback: true,
+        error: {
+          code: "provider_rate_limited",
+          message: "AI servisi istek sınırına ulaştı. Lütfen birkaç dakika sonra yeniden deneyin.",
+          retryable: true,
+          provider_status: 429
+        }
       })
     });
   });
@@ -59,7 +65,8 @@ try {
   await page.locator(".ya-widget-ai textarea").fill("Bu akşam 4 kişilik masa var mı?");
   await page.locator('.ya-widget-ai button[type="submit"]').click();
   await expect(page.locator(".ya-widget-ai-answer")).toContainText("Müsaitlik ve fiyat");
-  await expect(page.locator(".ya-widget-status")).toContainText("güvenli yanıt");
+  await expect(page.locator(".ya-widget-status")).toContainText("istek sınırına ulaştı");
+  await expect(page.locator(".ya-widget-status")).toContainText("provider_rate_limited (HTTP 429)");
 
   console.log("web-widget-branding-smoke-ok");
 } finally {

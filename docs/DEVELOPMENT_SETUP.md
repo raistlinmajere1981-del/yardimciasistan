@@ -147,14 +147,12 @@ Bu komut önce ortak paketleri derler, sonra masaüstü uygulamanın Vite render
 Varsayılan web modül adresi:
 
 ```text
-http://127.0.0.1:8080
+https://yardimciasistan.alwaysdata.net/yardimci-asistan
 ```
 
-Gerçek mini API ile denemek için ayrı terminalde PHP CLI kurulu olmalıdır:
-
-```bash
-npm run dev:php-module
-```
+Normal geliştirme akışında masaüstü ve demo web bu HTTPS kurulumuyla haberleşir.
+Hostingdeki `sync_secret` masaüstü Ayarlar ekranına girilmelidir; bu değer kaynak
+koda veya paketlere gömülmez.
 
 Desktop app ilk SQLite şema dosyaları:
 
@@ -220,7 +218,7 @@ npm run smoke:web-widget-module
 npm run smoke:demo-web-widget
 ```
 
-`smoke:web-module` QR menü yayınlama akışını ve `api/chat.php` AI fallback cevabını birlikte kontrol eder. AI provider gerçek anahtar olmadan kapalı kalır. `smoke:web-widget-branding` widget bundle çıktısında logosuz `YA` fallback'ini, `data-logo-url`/`logoUrl` ile görsel marka kullanımını ve bilgi panelindeki AI cevap alanını mock API ile Playwright üzerinden doğrular. `smoke:web-widget-module` ise build edilmiş `firm-template/web-module/widget.js` dosyasını gerçek PHP server'dan yükler; widget rezervasyon formunun `api/request.php` üzerinden `requests.json` kaydı açtığını, WhatsApp taslak linkini hazırladığını, AI kısa soru formunun `api/chat.php` fallback cevabını gösterdiğini ve `ai-conversations.json` içine kayıt açtığını kontrol eder. `smoke:demo-web-widget` demo web sitesini `VITE_YA_WEB_MODULE_URL` ile açar ve gerçek gömülü widget'ın aynı PHP modülüne talep/AI kayıtlarını yazabildiğini doğrular.
+`smoke:web-module` QR menü yayınını, AI kapalı fallback'ini, yetkili `publish_ai_settings` akışını ve yayınlanan ayarla mock OpenAI uyumlu servise giden model/Authorization bilgisini birlikte kontrol eder. `smoke:web-widget-branding` widget bundle çıktısında logosuz `YA` fallback'ini, `data-logo-url`/`logoUrl` ile görsel marka kullanımını ve bilgi panelindeki AI cevap alanını mock API ile Playwright üzerinden doğrular. `smoke:web-widget-module` ise build edilmiş `firm-template/web-module/widget.js` dosyasını gerçek PHP server'dan yükler; widget rezervasyon formunun `api/request.php` üzerinden `requests.json` kaydı açtığını, WhatsApp taslak linkini hazırladığını, AI kısa soru formunun `api/chat.php` fallback cevabını gösterdiğini ve `ai-conversations.json` içine kayıt açtığını kontrol eder. `smoke:demo-web-widget` demo web sitesini `VITE_YA_WEB_MODULE_URL` ile açar ve gerçek gömülü widget'ın aynı PHP modülüne talep/AI kayıtlarını yazabildiğini doğrular.
 
 WhatsApp linkleri, manuel kopyalama ve ilerideki resmi API geçişi için ortak mantık `packages/whatsapp-bridge` içindedir. Web widget, demo web ve desktop app aynı paketi kullanır; paket testleri Türkiye cep telefonu normalizasyonunu, boş mesaj/telefon hatalarını ve WebView fallback aksiyonunu kontrol eder. Web widget `data-logo-url` ile firma veya Yardımcı Asistan marka sembolünü gösterebilir. Desktop app içinde WhatsApp sayfası WebView alanını, bağlantı durumunu ve manuel kopyalama alternatifini birlikte sunar.
 
@@ -246,9 +244,11 @@ bağlamında kalmasını, bağlayıcı rezervasyon/fiyat onayı vermemesini ve d
 owner taslağının provider JSON cevabından gelmesini de kontrol eder. API anahtarı
 dosyaya yazılmamalı, sadece ortam değişkeni olarak verilmelidir.
 
-Desktop uygulamada `AI Taslak Yenile` komutu da aynı ortam değişkenlerini okur.
-Bu değişkenler verilmeden veya AI ayarı kapalıyken desktop güvenli yerel taslak
-üretir; provider hata dönerse manuel WhatsApp akışı devam eder.
+Desktop uygulamada normal bağlantı kaynağı Ayarlar ekranıdır. Servis, bağlantı adresi,
+model, anahtar ve zaman aşımı SQLite + işletim sistemi güvenli saklama alanında tutulur;
+anahtar renderer'a geri okunmaz. Eski env tabanlı masaüstü kurulumları, henüz yerel
+şifreli anahtar yoksa fallback olarak çalışmaya devam eder. AI kapalıyken desktop
+güvenli yerel taslak üretir; provider hata dönerse manuel WhatsApp akışı devam eder.
 
 Anahtar frontend dosyalarına yazılmamalıdır.
 
@@ -275,11 +275,15 @@ Bu smoke testi PHP web modülünü ve demo web sitesini kısa süre açar,
 `android_summary` endpointini doğrular, sonra sunucuları kapatır ve demo veri
 dosyalarını eski haline alır.
 
-Yerel laboratuvar açıkken desktop uygulamayı aynı web modülüne bağlamak için:
+Canlı demo modülüyle desktop uygulamayı başlatmak için:
 
 ```bash
-YA_WEB_MODULE_URL=http://127.0.0.1:8080 YA_SYNC_SECRET=change-this-secret npm run dev:desktop
+npm run dev:desktop
 ```
+
+Farklı bir kurulum deneniyorsa `YA_WEB_MODULE_URL` ve `YA_SYNC_SECRET` ortam
+değişkenleriyle açıkça override edilebilir. Yerel PHP laboratuvarı yalnız izole
+smoke testleri ve web modülü geliştirmesi için tutulur; uygulama varsayılanı değildir.
 
 Android telefonu hazırlamak için:
 

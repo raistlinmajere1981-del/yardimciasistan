@@ -48,6 +48,7 @@
     "smoke:desktop:linux": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-menu-db.mjs && node scripts/smoke-desktop-xvfb.mjs",
     "pack:desktop:dir": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:dir -w @yardimci-asistan/desktop-app",
     "pack:desktop:win": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app",
+    "pack:desktop:win32": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:win32 -w @yardimci-asistan/desktop-app",
     "pack:desktop:linux": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:linux -w @yardimci-asistan/desktop-app",
     "pack:web-module": "npm run build -w @yardimci-asistan/web-widget && node scripts/package-web-module.mjs",
     "pack:hosting-demo": "node scripts/package-hosting-demo.mjs",

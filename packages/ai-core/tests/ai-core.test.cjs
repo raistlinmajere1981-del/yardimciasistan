@@ -6,11 +6,16 @@ const test = require("node:test");
 const {
   buildWebChatMessages,
   createChatCompletionsUrl,
+  createGoogleGenerateContentUrl,
+  createGoogleModelsUrl,
   createOwnerReplySuggestion,
   generateOwnerReplySuggestion,
+  generateConfiguredChat,
   generateOpenAICompatibleChat,
   generateWebChatReply,
-  loadKnowledgeDocuments
+  listGoogleAiStudioModels,
+  loadKnowledgeDocuments,
+  rankGoogleAiStudioModels
 } = require("../dist");
 
 test("loadKnowledgeDocuments reads known markdown files with limits", () => {
@@ -112,6 +117,124 @@ test("generateOpenAICompatibleChat posts chat completion request", async () => {
   assert.equal(calls[0].body.store, false);
 });
 
+test("generateOpenAICompatibleChat uses x-goog-api-key for Google authorization keys", async () => {
+  let capturedHeaders;
+  const result = await generateOpenAICompatibleChat(
+    {
+      enabled: true,
+      provider: "openai_compatible",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "gemini-flash",
+      apiKey: "AQ.google-auth-key",
+      authMode: "google_api_key",
+      messages: [{ role: "user", content: "Merhaba" }]
+    },
+    async (_url, init) => {
+      capturedHeaders = init.headers;
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: "Bağlantı çalışıyor." } }]
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(capturedHeaders["x-goog-api-key"], "AQ.google-auth-key");
+  assert.equal("Authorization" in capturedHeaders, false);
+});
+
+test("generateConfiguredChat uses native generateContent for Google AI Studio", async () => {
+  const calls = [];
+  const result = await generateConfiguredChat(
+    {
+      enabled: true,
+      provider: "openai_compatible",
+      service: "gemini",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "gemini-flash",
+      apiKey: "AQ.google-auth-key",
+      messages: [
+        { role: "system", content: "Kısa cevap ver." },
+        { role: "user", content: "Merhaba" }
+      ]
+    },
+    async (url, init) => {
+      calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: "Bağlantı çalışıyor." }] } }]
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.answer, "Bağlantı çalışıyor.");
+  assert.equal(calls[0].url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash:generateContent");
+  assert.equal(calls[0].headers["x-goog-api-key"], "AQ.google-auth-key");
+  assert.equal("Authorization" in calls[0].headers, false);
+  assert.equal(calls[0].body.systemInstruction.parts[0].text, "Kısa cevap ver.");
+  assert.deepEqual(calls[0].body.contents[0], { role: "user", parts: [{ text: "Merhaba" }] });
+});
+
+test("listGoogleAiStudioModels returns only generateContent models without exposing the key in the URL", async () => {
+  const calls = [];
+  const result = await listGoogleAiStudioModels(
+    {
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      apiKey: "google-secret"
+    },
+    async (url, init) => {
+      calls.push({ url, headers: init.headers });
+      return new Response(JSON.stringify({
+        models: [
+          {
+            name: "models/gemini-flash",
+            baseModelId: "gemini-flash",
+            displayName: "Gemini Flash",
+            supportedGenerationMethods: ["generateContent"],
+            inputTokenLimit: 1000
+          },
+          {
+            name: "models/text-embedding",
+            supportedGenerationMethods: ["embedContent"]
+          }
+        ]
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.models.map((model) => model.id), ["gemini-flash"]);
+  assert.equal(calls[0].url, "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000");
+  assert.equal(calls[0].headers["x-goog-api-key"], "google-secret");
+  assert.equal(calls[0].url.includes("google-secret"), false);
+});
+
+test("createGoogleModelsUrl accepts the configured OpenAI-compatible Gemini endpoint", () => {
+  assert.equal(
+    createGoogleModelsUrl("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"),
+    "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000"
+  );
+  assert.equal(createGoogleModelsUrl("https://provider.example.test/v1beta/openai"), "");
+  assert.equal(
+    createGoogleGenerateContentUrl("https://generativelanguage.googleapis.com/v1beta", "models/gemini-flash"),
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash:generateContent"
+  );
+});
+
+test("rankGoogleAiStudioModels prefers current stable text models over quota-closed legacy variants", () => {
+  const ranked = rankGoogleAiStudioModels([
+    "gemini-2.0-flash-lite",
+    "gemini-3.1-flash-image-preview",
+    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3-flash-preview"
+  ]);
+
+  assert.equal(ranked[0], "gemini-3.5-flash");
+  assert.ok(ranked.indexOf("gemini-2.5-flash-lite") < ranked.indexOf("gemini-2.0-flash-lite"));
+  assert.ok(ranked.indexOf("gemini-2.0-flash-lite") < ranked.indexOf("gemini-3.1-flash-image-preview"));
+});
+
+
 test("generateWebChatReply returns fallback answer when provider request fails", async () => {
   const result = await generateWebChatReply(
     {
@@ -198,7 +321,8 @@ test("generateOwnerReplySuggestion uses provider JSON when available", async () 
       requestType: "pension_reservation",
       dateText: "18-20 Temmuz",
       guestCount: 2,
-      message: "Balkonlu oda var mı?"
+      message: "Balkonlu oda var mı?",
+      instructions: "Kısa ve samimi yaz."
     },
     {
       enabled: true,
@@ -239,6 +363,7 @@ test("generateOwnerReplySuggestion uses provider JSON when available", async () 
   assert.match(suggestion.suggestedReply, /kontrol edip/);
   assert.equal(calls[0].url, "https://api.example.test/v1/chat/completions");
   assert.match(calls[0].body.messages[0].content, /Kesin rezervasyon/);
+  assert.match(calls[0].body.messages[1].content, /Kısa ve samimi yaz/);
 });
 
 test("generateOwnerReplySuggestion falls back on provider errors or unsafe approval language", async () => {

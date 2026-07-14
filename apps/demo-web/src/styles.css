@@ -282,7 +282,8 @@ a {
 .menu-category,
 .gallery-item,
 .info-panel,
-.prepared-message {
+.prepared-message,
+.desktop-download-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--paper);
@@ -547,6 +548,126 @@ a {
   white-space: pre-wrap;
 }
 
+.desktop-download-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 38px);
+  align-items: flex-start;
+  padding: clamp(24px, 4vw, 40px);
+  background:
+    linear-gradient(135deg, rgba(47, 111, 94, 0.08), rgba(228, 120, 99, 0.08)),
+    var(--paper);
+}
+
+.download-icon {
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  border-radius: 8px;
+  color: #ffffff;
+  background: var(--primary);
+  box-shadow: 0 12px 28px rgba(47, 111, 94, 0.22);
+}
+
+.download-copy h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+}
+
+.download-copy > p:not(.eyebrow) {
+  max-width: 720px;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.download-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 22px;
+}
+
+.download-meta span {
+  padding: 7px 10px;
+  border: 1px solid rgba(47, 111, 94, 0.18);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--soft-green);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.download-button {
+  min-height: 48px;
+}
+
+.installer-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.additional-downloads {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.platform-download-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 12px 35px rgba(23, 32, 51, 0.06);
+}
+
+.platform-download-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--primary);
+  background: var(--soft-green);
+}
+
+.platform-download-icon.android {
+  color: #ffffff;
+  background: #3b7f51;
+}
+
+.platform-download-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.55rem;
+}
+
+.platform-download-card p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.58;
+}
+
+.platform-download-button {
+  min-height: 46px;
+}
+
+.installer-warning {
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border: 1px solid #ead5c7;
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fff7f0;
+  line-height: 1.55;
+}
+
 .site-footer {
   display: flex;
   align-items: center;
@@ -628,6 +749,8 @@ a {
   .menu-layout,
   .gallery-grid,
   .contact-layout,
+  .additional-downloads,
+  .installer-notes,
   .request-form {
     grid-template-columns: 1fr;
   }
@@ -658,6 +781,22 @@ a {
   .inline-actions,
   .inline-actions .primary-button,
   .inline-actions .ghost-button {
+    width: 100%;
+  }
+
+  .desktop-download-card {
+    grid-template-columns: 1fr;
+  }
+
+  .download-button {
+    width: 100%;
+  }
+
+  .platform-download-card {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-download-button {
     width: 100%;
   }
 }

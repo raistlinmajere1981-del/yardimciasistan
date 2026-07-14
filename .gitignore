@@ -16,3 +16,5 @@ playwright-report/
 .env.*
 !.env.example
 firm-template/web-module/config/ai.local.php
+firm-template/web-module/data/ai-settings.local.php
+firm-template/web-module/data/.ai-settings.*

@@ -3,6 +3,7 @@ const test = require("node:test");
 const {
   createSyncEndpointUrl,
   markRequestsSynced,
+  pushAiSettings,
   pushAndroidSnapshot,
   pushMenu,
   pullRequests
@@ -241,6 +242,211 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
   assert.equal(calls[0].body.sync_secret, "secret");
 });
 
+test("pushAiSettings sends the complete snake_case settings and strips the API key from its response", async () => {
+  const calls = [];
+  const apiKey = "sk-super-secret";
+  const fetchImpl = async (url, init) => {
+    calls.push({
+      url,
+      headers: init.headers,
+      body: JSON.parse(init.body)
+    });
+
+    return new Response(JSON.stringify({
+      ok: true,
+      message: `AI ayarları yayınlandı. ${apiKey}`,
+      published_at: "2026-07-12T16:30:00+03:00",
+      enabled: true,
+      provider: apiKey,
+      service: apiKey,
+      base_url: apiKey,
+      model: apiKey,
+      timeout_seconds: 30,
+      has_api_key: true,
+      api_key: apiKey
+    }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  };
+
+  const result = await pushAiSettings({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "sync-secret",
+    aiSettings: {
+      enabled: true,
+      provider: "openai_compatible",
+      service: "openrouter",
+      baseUrl: "https://openrouter.ai/api/v1",
+      model: "demo-model",
+      apiKey,
+      timeoutSeconds: 30
+    },
+    fetchImpl
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result, {
+    ok: true,
+    message: "AI ayarları yayınlandı. [gizlendi]",
+    published_at: "2026-07-12T16:30:00+03:00",
+    enabled: true,
+    provider: "openai_compatible",
+    service: "openrouter",
+    base_url: "https://openrouter.ai/api/v1",
+    model: "demo-model",
+    timeout_seconds: 30,
+    has_api_key: true
+  });
+  assert.equal(JSON.stringify(result).includes(apiKey), false);
+  assert.equal(calls[0].url, "https://firma.example/yardimci-asistan/api/sync.php");
+  assert.equal(calls[0].headers["X-YA-Sync-Secret"], "sync-secret");
+  assert.equal(calls[0].body.action, "publish_ai_settings");
+  assert.equal(calls[0].body.sync_secret, "sync-secret");
+  assert.deepEqual(calls[0].body.ai_settings, {
+    enabled: true,
+    provider: "openai_compatible",
+    service: "openrouter",
+    base_url: "https://openrouter.ai/api/v1",
+    model: "demo-model",
+    api_key: apiKey,
+    timeout_seconds: 30
+  });
+});
+
+test("pushAiSettings rejects insecure remote HTTP without calling fetch", async () => {
+  let fetchCalled = false;
+  const result = await pushAiSettings({
+    baseUrl: "http://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    aiSettings: {
+      enabled: true,
+      provider: "openai_compatible",
+      service: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      model: "demo-model",
+      apiKey: "secret",
+      timeoutSeconds: 15
+    },
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error("fetch should not be called");
+    }
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.message, /HTTPS/);
+  assert.equal(fetchCalled, false);
+});
+
+test("pushAiSettings allows HTTP for localhost, 127.0.0.1 and ::1", async () => {
+  const targets = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://[::1]:8080"
+  ];
+
+  for (const baseUrl of targets) {
+    let fetchCalled = false;
+    const result = await pushAiSettings({
+      baseUrl,
+      syncSecret: "secret",
+      aiSettings: {
+        enabled: false,
+        provider: "openai_compatible",
+        service: "custom",
+        baseUrl: "",
+        model: "",
+        apiKey: "",
+        timeoutSeconds: 15
+      },
+      fetchImpl: async () => {
+        fetchCalled = true;
+        return new Response(JSON.stringify({
+          ok: true,
+          message: "AI ayarları yayınlandı.",
+          published_at: "2026-07-12T16:30:00+03:00",
+          enabled: false,
+          provider: "openai_compatible",
+          service: "custom",
+          base_url: "",
+          model: "",
+          timeout_seconds: 15,
+          has_api_key: false
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    });
+
+    assert.equal(result.ok, true, baseUrl);
+    assert.equal(fetchCalled, true, baseUrl);
+  }
+});
+
+test("pushAiSettings reports network and old web module failures", async (context) => {
+  const options = {
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    aiSettings: {
+      enabled: true,
+      provider: "openai_compatible",
+      service: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      model: "demo-model",
+      apiKey: "secret",
+      timeoutSeconds: 15
+    }
+  };
+
+  await context.test("network failure", async () => {
+    const result = await pushAiSettings({
+      ...options,
+      fetchImpl: async () => {
+        throw new Error("network down");
+      }
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.message, /Web modülüne ulaşılamadı/);
+    assert.match(result.message, /firma\.example\/yardimci-asistan/);
+    assert.equal(result.error, "network down");
+  });
+
+  await context.test("local server failure", async () => {
+    const result = await pushAiSettings({
+      ...options,
+      baseUrl: "http://127.0.0.1:8080",
+      fetchImpl: async () => {
+        throw new TypeError("fetch failed", { cause: { code: "ECONNREFUSED" } });
+      }
+    });
+
+    assert.equal(result.ok, false);
+    assert.match(result.message, /Yerel web modülüne ulaşılamadı/);
+    assert.match(result.message, /sunucusunu başlatın/);
+    assert.equal(result.error, "fetch failed (ECONNREFUSED)");
+  });
+
+  await context.test("old module failure", async () => {
+    const result = await pushAiSettings({
+      ...options,
+      fetchImpl: async () => new Response(JSON.stringify({
+        ok: false,
+        message: "Güncelleme isteği anlaşılamadı."
+      }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" }
+      })
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.equal(result.message, "Güncelleme isteği anlaşılamadı.");
+  });
+});
+
 test("pullRequests returns a clear message when connection fails", async () => {
   const result = await pullRequests({
     baseUrl: "https://firma.example/yardimci-asistan",
@@ -251,6 +457,33 @@ test("pullRequests returns a clear message when connection fails", async () => {
   });
 
   assert.equal(result.ok, false);
-  assert.match(result.message, /Bağlantı/);
+  assert.match(result.message, /Web modülüne ulaşılamadı/);
   assert.equal(result.error, "network down");
+});
+
+test("sync requests explain missing and invalid web module endpoints", async (context) => {
+  await context.test("missing endpoint", async () => {
+    const result = await pullRequests({
+      baseUrl: "https://firma.example/yardimci-asistan",
+      syncSecret: "secret",
+      fetchImpl: async () => new Response("not found", { status: 404 })
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 404);
+    assert.match(result.message, /senkron uç noktası bulunamadı/);
+    assert.match(result.message, /Hosting paketini güncelleyip/);
+  });
+
+  await context.test("invalid successful response", async () => {
+    const result = await pullRequests({
+      baseUrl: "https://firma.example/yardimci-asistan",
+      syncSecret: "secret",
+      fetchImpl: async () => new Response("<html></html>", { status: 200 })
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 200);
+    assert.match(result.message, /geçerli bir senkron yanıtı vermedi/);
+  });
 });

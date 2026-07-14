@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { createId, normalizePhone } from "@yardimci-asistan/shared";
-import type { PublishedQrMenu, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import type { PublishedQrMenu, PushAiSettingsResult, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
@@ -117,6 +117,13 @@ export interface DesktopDashboardData {
   summary: DashboardSummary;
 }
 
+export type DesktopAiService = "openai" | "openrouter" | "groq" | "gemini" | "custom";
+
+export interface AiApiKeyWrite {
+  mode: "keep" | "replace" | "clear";
+  encryptedValue?: string;
+}
+
 export interface DesktopSetupData {
   setupRequired: boolean;
   businessName: string;
@@ -129,7 +136,13 @@ export interface DesktopSetupData {
   syncSecret: string;
   aiEnabled: boolean;
   aiProvider: string;
+  aiService: DesktopAiService;
+  aiProjectName: string;
   aiModel: string;
+  aiBaseUrl: string;
+  aiTimeoutSeconds: number;
+  aiApiKeyConfigured: boolean;
+  aiLastPublishedAt: string;
   modules: {
     rooms: boolean;
     tables: boolean;
@@ -154,7 +167,13 @@ export interface SaveInitialSetupInput {
   syncSecret: string;
   aiEnabled: boolean;
   aiProvider: string;
+  aiService: string;
+  aiProjectName: string;
   aiModel: string;
+  aiBaseUrl: string;
+  aiTimeoutSeconds: number;
+  aiApiKey: string;
+  clearAiApiKey: boolean;
   modules: {
     rooms: boolean;
     tables: boolean;
@@ -174,6 +193,7 @@ export type DesktopSetupSaveResult =
       message: string;
       setupData: DesktopSetupData;
       dashboardData: DesktopDashboardData;
+      aiWebSync?: PushAiSettingsResult;
     }
   | {
       ok: false;
@@ -276,6 +296,60 @@ export type RequestAiSuggestionResult =
       message: string;
     };
 
+export type AiWorkspaceMode = "reply" | "summary" | "daily";
+
+export interface AiWorkspaceHistoryEntry {
+  id: string;
+  mode: AiWorkspaceMode;
+  requestId: string;
+  requestLabel: string;
+  instructions: string;
+  content: string;
+  summary: string;
+  missingFields: string[];
+  provider: string;
+  model: string;
+  fallback: boolean;
+  createdAt: string;
+}
+
+export interface GenerateAiWorkspaceInput {
+  mode: AiWorkspaceMode;
+  requestId: string;
+  instructions: string;
+}
+
+export type GenerateAiWorkspaceResult =
+  | {
+      ok: true;
+      message: string;
+      entry: AiWorkspaceHistoryEntry;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export interface SaveAiWorkspaceResultInput {
+  mode: AiWorkspaceMode;
+  requestId: string;
+  content: string;
+  summary: string;
+  missingFields: string[];
+}
+
+export type SaveAiWorkspaceResult =
+  | {
+      ok: true;
+      message: string;
+      requestId: string;
+      dashboardData: DesktopDashboardData;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
 export type DesktopBackupResult =
   | {
       ok: true;
@@ -325,6 +399,11 @@ export interface UpdateReservationStatusInput {
 export interface UpdateDailyTaskStatusInput {
   taskId: string;
   status: string;
+}
+
+export interface MarkWhatsAppMessageSentInput {
+  requestId: string;
+  message: string;
 }
 
 export interface RecordSyncEventInput {
@@ -392,7 +471,7 @@ export class DesktopDatabase {
     return {
       databasePath: this.databasePath,
       backupPath: this.backupPath,
-      webModuleUrl: settings?.web_module_url ?? "http://127.0.0.1:8080",
+      webModuleUrl: settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
       requests: this.getRequests(),
       rooms: this.getRooms(),
       tables: this.getTables(),
@@ -509,6 +588,89 @@ export class DesktopDatabase {
     return {
       ok: true,
       message: "Talep durumu güncellendi.",
+      dashboardData: this.getDashboardData()
+    };
+  }
+
+  markWhatsAppMessageSent(input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult {
+    const requestId = input.requestId.trim();
+    const message = input.message.trim();
+    if (!requestId || !message) {
+      return {
+        ok: false,
+        message: "Gönderilen WhatsApp mesajı için talep ve metin bilgisi gerekli."
+      };
+    }
+
+    const preparedMessage = this.db
+      .prepare(`
+        SELECT id, message, status
+        FROM whatsapp_messages
+        WHERE request_id = ?
+          AND direction = 'outgoing'
+          AND deleted_at = ''
+        ORDER BY updated_at DESC
+        LIMIT 1
+      `)
+      .get(requestId) as { id?: string; message?: string; status?: string } | undefined;
+
+    if (!preparedMessage?.id) {
+      return {
+        ok: false,
+        message: "Talebe ait hazır WhatsApp mesajı bulunamadı."
+      };
+    }
+
+    if (String(preparedMessage.message ?? "").trim() !== message) {
+      return {
+        ok: false,
+        message: "Gönderilen metin yerel AI taslağıyla eşleşmediği için kayıt güncellenmedi."
+      };
+    }
+
+    if (preparedMessage.status === "sent") {
+      return {
+        ok: true,
+        message: "WhatsApp mesajı daha önce gönderildi olarak kaydedilmiş.",
+        dashboardData: this.getDashboardData()
+      };
+    }
+
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN");
+    try {
+      this.db
+        .prepare(`
+          UPDATE whatsapp_messages
+          SET mode = 'webview',
+              status = 'sent',
+              sent_at = ?,
+              updated_at = ?,
+              sync_status = 'local_only'
+          WHERE id = ?
+        `)
+        .run(now, now, preparedMessage.id);
+
+      this.insertEvent({
+        type: "whatsapp.message_sent",
+        entityType: "whatsapp_message",
+        entityId: preparedMessage.id,
+        payload: {
+          request_id: requestId,
+          mode: "webview",
+          user_approved: true
+        },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return {
+      ok: true,
+      message: "WhatsApp mesajı gönderildi olarak kaydedildi.",
       dashboardData: this.getDashboardData()
     };
   }
@@ -743,11 +905,17 @@ export class DesktopDatabase {
       whatsapp: String(business?.whatsapp ?? ""),
       email: String(business?.email ?? ""),
       address: String(business?.address ?? ""),
-      webModuleUrl: String(settings?.web_module_url ?? "http://127.0.0.1:8080"),
+      webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
       syncSecret,
       aiEnabled: Number(settings?.ai_enabled ?? 0) === 1,
       aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
+      aiService: normalizeStoredAiService(settings?.ai_service),
+      aiProjectName: String(settings?.ai_project_name ?? ""),
       aiModel: String(settings?.ai_model ?? ""),
+      aiBaseUrl: normalizeStoredAiBaseUrl(settings?.ai_base_url),
+      aiTimeoutSeconds: normalizeStoredAiTimeout(settings?.ai_timeout_seconds),
+      aiApiKeyConfigured: Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
+      aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
       modules: {
         rooms: modules.rooms,
         tables: modules.tables,
@@ -762,10 +930,55 @@ export class DesktopDatabase {
     };
   }
 
-  saveInitialSetup(input: SaveInitialSetupInput): DesktopSetupSaveResult {
+  getEncryptedAiApiKey(): string {
+    const settings = this.db
+      .prepare("SELECT ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1")
+      .get() as { ai_api_key_encrypted?: string } | undefined;
+
+    return String(settings?.ai_api_key_encrypted ?? "").trim();
+  }
+
+  markAiSettingsPublished(timestamp: string): DesktopSetupData {
+    const publishedAt = normalizePublishedTimestamp(timestamp);
+    if (!publishedAt) {
+      throw new Error("AI ayarları için geçerli yayın zamanı gerekli.");
+    }
+
+    const result = this.db
+      .prepare(`
+        UPDATE settings
+        SET ai_last_published_at = ?,
+            updated_at = ?
+        WHERE deleted_at = ''
+      `)
+      .run(publishedAt, new Date().toISOString());
+
+    if (Number(result.changes) === 0) {
+      throw new Error("Yayınlandı olarak işaretlenecek AI ayarı bulunamadı.");
+    }
+
+    return this.getSetupData();
+  }
+
+  saveInitialSetup(input: SaveInitialSetupInput, aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" }): DesktopSetupSaveResult {
     const businessName = input.businessName.trim();
     const syncSecret = input.syncSecret.trim();
     const webModuleUrl = normalizeUrl(input.webModuleUrl);
+    const aiProvider = input.aiProvider.trim() || "openai_compatible";
+    const aiService = normalizeAiService(input.aiService);
+    const aiProjectName = String(input.aiProjectName ?? "").trim();
+    const aiModel = input.aiModel.trim();
+    const aiBaseUrl = normalizeAiBaseUrl(input.aiBaseUrl);
+    const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
+    const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
+    const existingSettings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+    const existingEncryptedAiApiKey = String(existingSettings?.ai_api_key_encrypted ?? "").trim();
+    const aiApiKeyResolution = resolveEncryptedAiApiKey({
+      rawKeyProvided: rawAiApiKeyProvided,
+      clearRequested: Boolean(input.clearAiApiKey),
+      write: aiApiKeyWrite,
+      existingEncryptedValue: existingEncryptedAiApiKey
+    });
 
     if (!businessName) {
       return {
@@ -795,13 +1008,88 @@ export class DesktopDatabase {
       };
     }
 
+    if (!aiApiKeyResolution.ok) {
+      return aiApiKeyResolution;
+    }
+
+    if (input.aiEnabled && aiProvider !== "openai_compatible") {
+      return {
+        ok: false,
+        message: "AI provider openai_compatible olmalı."
+      };
+    }
+
+    if (input.aiEnabled && !aiService) {
+      return {
+        ok: false,
+        message: "AI servisi desteklenmiyor."
+      };
+    }
+
+    if (aiProjectName.length > 120 || /[\x00-\x1F\x7F]/.test(aiProjectName)) {
+      return {
+        ok: false,
+        message: "Google AI Studio proje adı geçersiz."
+      };
+    }
+
+    if (input.aiEnabled && !aiBaseUrl) {
+      return {
+        ok: false,
+        message: "AI base URL geçerli bir http veya https adresi olmalı ve kullanıcı bilgisi içermemeli."
+      };
+    }
+
+    if (input.aiEnabled && aiService === "gemini" && aiBaseUrl !== GOOGLE_AI_STUDIO_BASE_URL) {
+      return {
+        ok: false,
+        message: "Google AI Studio için resmi Gemini API bağlantı adresi kullanılmalı."
+      };
+    }
+
+    if (input.aiEnabled && !aiModel) {
+      return {
+        ok: false,
+        message: "AI model adı gerekli."
+      };
+    }
+
+    if (input.aiEnabled && !aiApiKeyResolution.encryptedValue) {
+      return {
+        ok: false,
+        message: "AI API anahtarı gerekli."
+      };
+    }
+
+    if (input.aiEnabled && aiTimeoutSeconds === null) {
+      return {
+        ok: false,
+        message: "AI zaman aşımı 5 ile 120 saniye arasında olmalı."
+      };
+    }
+
     const now = new Date().toISOString();
     const existingBusiness = this.db.prepare("SELECT id, created_at FROM business WHERE deleted_at = '' LIMIT 1").get() as { id?: string; created_at?: string } | undefined;
-    const existingSettings = this.db.prepare("SELECT id, created_at FROM settings WHERE deleted_at = '' LIMIT 1").get() as { id?: string; created_at?: string } | undefined;
     const businessId = existingBusiness?.id || createId("business_");
-    const settingsId = existingSettings?.id || "settings_primary";
+    const settingsId = String(existingSettings?.id ?? "") || "settings_primary";
     const createdAt = existingBusiness?.created_at || now;
-    const settingsCreatedAt = existingSettings?.created_at || now;
+    const settingsCreatedAt = String(existingSettings?.created_at ?? "") || now;
+    const storedAiProvider = aiProvider === "openai_compatible" ? aiProvider : "openai_compatible";
+    const storedAiService = aiService ?? "openai";
+    const storedAiBaseUrl = aiBaseUrl || DEFAULT_AI_BASE_URL;
+    const storedAiTimeoutSeconds = aiTimeoutSeconds ?? DEFAULT_AI_TIMEOUT_SECONDS;
+    const storedEncryptedAiApiKey = aiApiKeyResolution.encryptedValue;
+    const aiSettingsChanged =
+      !existingSettings ||
+      Number(existingSettings.ai_enabled ?? 0) !== (input.aiEnabled ? 1 : 0) ||
+      String(existingSettings.ai_provider ?? "") !== storedAiProvider ||
+      String(existingSettings.ai_service ?? "") !== storedAiService ||
+      String(existingSettings.ai_project_name ?? "") !== aiProjectName ||
+      String(existingSettings.ai_model ?? "") !== aiModel ||
+      normalizeStoredAiBaseUrl(existingSettings.ai_base_url) !== storedAiBaseUrl ||
+      normalizeStoredAiTimeout(existingSettings.ai_timeout_seconds) !== storedAiTimeoutSeconds ||
+      existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
+    const aiLastPublishedAt = aiSettingsChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
     const modules = {
       rooms: input.modules.rooms,
       tables: input.modules.tables,
@@ -866,6 +1154,12 @@ export class DesktopDatabase {
             ai_enabled,
             ai_provider,
             ai_model,
+            ai_service,
+            ai_project_name,
+            ai_base_url,
+            ai_timeout_seconds,
+            ai_api_key_encrypted,
+            ai_last_published_at,
             whatsapp_enabled,
             whatsapp_mode,
             android_enabled,
@@ -876,7 +1170,7 @@ export class DesktopDatabase {
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             business_id = excluded.business_id,
             web_module_url = excluded.web_module_url,
@@ -884,6 +1178,12 @@ export class DesktopDatabase {
             ai_enabled = excluded.ai_enabled,
             ai_provider = excluded.ai_provider,
             ai_model = excluded.ai_model,
+            ai_service = excluded.ai_service,
+            ai_project_name = excluded.ai_project_name,
+            ai_base_url = excluded.ai_base_url,
+            ai_timeout_seconds = excluded.ai_timeout_seconds,
+            ai_api_key_encrypted = excluded.ai_api_key_encrypted,
+            ai_last_published_at = excluded.ai_last_published_at,
             whatsapp_enabled = excluded.whatsapp_enabled,
             android_enabled = excluded.android_enabled,
             rooms_enabled = excluded.rooms_enabled,
@@ -900,8 +1200,14 @@ export class DesktopDatabase {
           webModuleUrl,
           syncSecret,
           input.aiEnabled ? 1 : 0,
-          input.aiProvider.trim() || "openai_compatible",
-          input.aiModel.trim(),
+          storedAiProvider,
+          aiModel,
+          storedAiService,
+          aiProjectName,
+          storedAiBaseUrl,
+          storedAiTimeoutSeconds,
+          storedEncryptedAiApiKey,
+          aiLastPublishedAt,
           input.modules.whatsapp ? 1 : 0,
           input.modules.android ? 1 : 0,
           input.modules.rooms ? 1 : 0,
@@ -1434,6 +1740,129 @@ export class DesktopDatabase {
       summary,
       suggestedReply,
       missingFields,
+      dashboardData: this.getDashboardData()
+    };
+  }
+
+  saveAiWorkspaceHistory(input: Omit<AiWorkspaceHistoryEntry, "id" | "createdAt">): AiWorkspaceHistoryEntry {
+    const id = createId("ai_conv_");
+    const createdAt = new Date().toISOString();
+    const entry: AiWorkspaceHistoryEntry = {
+      ...input,
+      id,
+      createdAt,
+      instructions: input.instructions.trim().slice(0, 800),
+      content: input.content.trim().slice(0, 6000),
+      summary: input.summary.trim().slice(0, 1600),
+      missingFields: input.missingFields.map((field) => field.trim()).filter(Boolean).slice(0, 8)
+    };
+
+    this.db
+      .prepare(`
+        INSERT INTO ai_conversations (
+          id, source, request_id, status, messages_json, summary,
+          created_at, updated_at, sync_status
+        ) VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, 'local_only')
+      `)
+      .run(
+        entry.id,
+        `desktop_workspace:${entry.mode}`,
+        entry.requestId,
+        JSON.stringify({
+          instructions: entry.instructions,
+          content: entry.content,
+          missing_fields: entry.missingFields,
+          provider: entry.provider,
+          model: entry.model,
+          fallback: entry.fallback,
+          request_label: entry.requestLabel
+        }),
+        entry.summary,
+        entry.createdAt,
+        entry.createdAt
+      );
+
+    return entry;
+  }
+
+  getAiWorkspaceHistory(limit = 12): AiWorkspaceHistoryEntry[] {
+    const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit) || 12));
+    const rows = this.db
+      .prepare(`
+        SELECT id, source, request_id, messages_json, summary, created_at
+        FROM ai_conversations
+        WHERE source LIKE 'desktop_workspace:%' AND deleted_at = ''
+        ORDER BY created_at DESC
+        LIMIT ?
+      `)
+      .all(safeLimit) as Record<string, unknown>[];
+
+    return rows.map((row) => {
+      const payload = parseAiWorkspacePayload(row.messages_json);
+      const modeCandidate = String(row.source ?? "").replace("desktop_workspace:", "");
+      const mode: AiWorkspaceMode = modeCandidate === "summary" || modeCandidate === "daily" ? modeCandidate : "reply";
+      return {
+        id: String(row.id ?? ""),
+        mode,
+        requestId: String(row.request_id ?? ""),
+        requestLabel: String(payload.request_label ?? ""),
+        instructions: String(payload.instructions ?? ""),
+        content: String(payload.content ?? ""),
+        summary: String(row.summary ?? ""),
+        missingFields: Array.isArray(payload.missing_fields) ? payload.missing_fields.map(String).filter(Boolean) : [],
+        provider: String(payload.provider ?? "disabled"),
+        model: String(payload.model ?? ""),
+        fallback: Boolean(payload.fallback),
+        createdAt: String(row.created_at ?? "")
+      };
+    });
+  }
+
+  saveAiWorkspaceResult(input: SaveAiWorkspaceResultInput): SaveAiWorkspaceResult {
+    const requestId = input.requestId.trim();
+    const content = input.content.trim();
+    const summary = input.summary.trim();
+    if (input.mode === "daily") {
+      return { ok: false, message: "Günlük değerlendirme belirli bir talebe kaydedilemez." };
+    }
+    if (!requestId) {
+      return { ok: false, message: "Sonucu kaydetmek için talep seçin." };
+    }
+    if (!content) {
+      return { ok: false, message: "Kaydedilecek AI sonucu boş olamaz." };
+    }
+
+    if (input.mode === "reply") {
+      const result = this.saveRequestAiSuggestion({
+        requestId,
+        summary,
+        suggestedReply: content,
+        missingFields: input.missingFields
+      });
+      return result.ok
+        ? { ok: true, message: "AI cevap taslağı talebe kaydedildi.", requestId, dashboardData: result.dashboardData }
+        : result;
+    }
+
+    const request = this.db.prepare("SELECT id FROM requests WHERE id = ? AND deleted_at = ''").get(requestId);
+    if (!request) {
+      return { ok: false, message: "Talep bulunamadı." };
+    }
+    const now = new Date().toISOString();
+    this.db
+      .prepare("UPDATE requests SET ai_summary = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(content.slice(0, 1600), now, requestId);
+    this.insertEvent({
+      type: "ai.request_summarized",
+      entityType: "request",
+      entityId: requestId,
+      payload: { summary: content.slice(0, 1600) },
+      now
+    });
+    return {
+      ok: true,
+      message: "AI özeti talebe kaydedildi.",
+      requestId,
       dashboardData: this.getDashboardData()
     };
   }
@@ -2246,6 +2675,100 @@ export class DesktopDatabase {
   }
 }
 
+const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(["openai", "openrouter", "groq", "gemini", "custom"]);
+const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
+const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_AI_TIMEOUT_SECONDS = 30;
+
+function normalizeAiService(value: unknown): DesktopAiService | null {
+  const service = String(value ?? "").trim().toLowerCase();
+  return SUPPORTED_AI_SERVICES.has(service as DesktopAiService) ? service as DesktopAiService : null;
+}
+
+function normalizeStoredAiService(value: unknown): DesktopAiService {
+  return normalizeAiService(value) ?? "openai";
+}
+
+function normalizeAiBaseUrl(value: unknown): string {
+  const candidate = String(value ?? "").trim();
+  if (!candidate) {
+    return "";
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname || parsed.username || parsed.password) {
+      return "";
+    }
+
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return "";
+  }
+}
+
+function normalizeStoredAiBaseUrl(value: unknown): string {
+  return normalizeAiBaseUrl(value) || DEFAULT_AI_BASE_URL;
+}
+
+function normalizeAiTimeout(value: unknown): number | null {
+  const timeout = Number(value);
+  return Number.isInteger(timeout) && timeout >= 5 && timeout <= 120 ? timeout : null;
+}
+
+function normalizeStoredAiTimeout(value: unknown): number {
+  return normalizeAiTimeout(value) ?? DEFAULT_AI_TIMEOUT_SECONDS;
+}
+
+function normalizeStoredTimestamp(value: unknown): string {
+  const timestamp = String(value ?? "").trim();
+  return timestamp && Number.isFinite(Date.parse(timestamp)) ? timestamp : "";
+}
+
+function normalizePublishedTimestamp(value: string): string {
+  return normalizeStoredTimestamp(value);
+}
+
+function resolveEncryptedAiApiKey(input: {
+  rawKeyProvided: boolean;
+  clearRequested: boolean;
+  write: AiApiKeyWrite;
+  existingEncryptedValue: string;
+}): { ok: true; encryptedValue: string } | { ok: false; message: string } {
+  const encryptedValue = String(input.write.encryptedValue ?? "").trim();
+
+  if (input.clearRequested) {
+    if (input.rawKeyProvided || input.write.mode !== "clear" || encryptedValue) {
+      return {
+        ok: false,
+        message: "AI API anahtarını silme isteği güvenli depolama işlemiyle eşleşmiyor."
+      };
+    }
+
+    return { ok: true, encryptedValue: "" };
+  }
+
+  if (input.rawKeyProvided) {
+    if (input.write.mode !== "replace" || !encryptedValue) {
+      return {
+        ok: false,
+        message: "Yeni AI API anahtarı şifrelenmeden kaydedilemez."
+      };
+    }
+
+    return { ok: true, encryptedValue };
+  }
+
+  if (input.write.mode !== "keep" || encryptedValue) {
+    return {
+      ok: false,
+      message: "Boş AI API anahtarı mevcut kayıt korunarak kaydedilmeli."
+    };
+  }
+
+  return { ok: true, encryptedValue: input.existingEncryptedValue };
+}
+
 function normalizeInteger(value: number) {
   return Number.isFinite(value) ? Math.trunc(value) : 0;
 }
@@ -2257,6 +2780,17 @@ function normalizePrice(value: number) {
 function normalizeCurrency(value: string) {
   const currency = value.trim().toUpperCase();
   return currency || "TRY";
+}
+
+function parseAiWorkspacePayload(value: unknown): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 function normalizeStringArray(value: string[]) {

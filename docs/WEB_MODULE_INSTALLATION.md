@@ -161,11 +161,28 @@ QR kod bu adrese üretilebilir. Menü verisi `api/menu.php` üzerinden okunur; P
 
 ## 6. AI Ayarları
 
-AI varsayılan olarak kapalıdır. Kapalıyken `api/chat.php` güvenli fallback cevap döndürür.
+AI varsayılan olarak kapalıdır. Kapalıyken `api/chat.php` güvenli fallback cevap döndürür. Endpoint AI sorunlarını `ai_disabled`, `configuration_incomplete`, `provider_authentication_failed`, `provider_model_or_endpoint_not_found`, `provider_rate_limited`, `provider_timeout`, `provider_connection_failed` ve `provider_unavailable` gibi güvenli hata kodlarıyla ayırır. Widget açıklamayı, varsa sağlayıcı HTTP durumunu ve yeniden deneme bilgisini gösterir; API anahtarı ve ham sağlayıcı cevabı frontend'e gönderilmez.
 
 `api/chat.php`, sohbet yanıtını üretirken konuşmayı `data/ai-conversations.json` içine kaydeder. İstek gövdesinde veya mesaj içinde talep niyeti bulunduğunda ve `customer_name` ile geçerli Türkiye cep telefonu geldiğinde ayrıca `data/requests.json` içine `source=web_ai`, `sync_status=pending` olan müşteri talebi açar. Tarih, saat ve kişi sayısı varsa kayda eklenir; eksik bilgiler işletme sahibi tarafından konuşmada tamamlanabilir.
 
-AI anahtarı frontend dosyalarına veya `widget.js` içine yazılmamalıdır. En iyi yöntem hosting panelinden ortam değişkeni tanımlamaktır:
+AI anahtarı frontend dosyalarına veya `widget.js` içine yazılmamalıdır. Ana kullanım yolu masaüstü uygulamasındaki `Ayarlar → AI Bağlantısı` alanıdır:
+
+1. Kullanılacak servisi seçin veya özel OpenAI uyumlu bağlantı adresini girin.
+2. Model adını, gizli erişim anahtarını ve yanıt bekleme süresini girin.
+3. `Bağlantıyı Dene` ile masaüstü bağlantısını kontrol edin.
+4. Ayarları kaydedin. Uygulama aynı ayarı web modülüne otomatik uygular.
+
+Canlı web modül adresi HTTPS olmalıdır. HTTP üzerinden gizli anahtar yayını yalnız yerel geliştirmede `localhost`, `127.0.0.1` veya `::1` için kabul edilir. Web yayını başarısız olursa masaüstü ayarı kaybolmaz; Ayarlar ekranında hata gösterilir ve kaydetme tekrar denenebilir.
+
+Başarılı yayından sonra hostingde şu ignored runtime dosyası oluşur:
+
+```text
+yardimci-asistan/data/ai-settings.local.php
+```
+
+Dosya `0600` izinle oluşturulur, API anahtarı hiçbir sync cevabında dönmez ve paketleme sırasında deploy arşivine alınmaz. `data/` klasörü PHP tarafından yazılabilir olmalıdır.
+
+Eski kurulumlar ve geliştirme ortamı için ortam değişkenleri fallback olarak desteklenir:
 
 ```bash
 YARDIMCI_ASISTAN_AI_ENABLED=1
@@ -174,7 +191,7 @@ YARDIMCI_ASISTAN_AI_MODEL=<model-adı>
 YARDIMCI_ASISTAN_AI_API_KEY=<api-anahtarı>
 ```
 
-Hosting paneli ortam değişkeni desteklemiyorsa, `config/ai.php` dosyası sunucu tarafında kalacak şekilde düzenlenebilir. Bu dosyanın içeriği tarayıcıya düz metin olarak servis edilmemelidir.
+Varsa `config/ai.local.php` da fallback olarak okunur. Masaüstünden başarıyla yayınlanan runtime ayarı bunların üzerinde önceliğe sahiptir. Masaüstü yönetimine geçerken eski anahtarı frontend dosyalarından mutlaka kaldırın.
 
 AI bilgi dosyaları:
 
@@ -198,6 +215,7 @@ config/*.json ve config/*.php: 644
 knowledge/*.md: 644
 data/ klasörü: 755
 data/*.json: 664
+data/ai-settings.local.php: uygulama tarafından 600
 ```
 
 Bazı paylaşımlı hostinglerde PHP'nin `data/*.json` dosyalarına yazabilmesi için `data/` klasörü `775`, JSON dosyaları `666` gerekebilir. Daha geniş izin gerekiyorsa yalnızca `data/` klasöründe kullanın; `config/` klasörünü yazılabilir yapmayın.
@@ -249,7 +267,9 @@ Talep kaydedilmiyor:
 AI cevap vermiyor:
 
 - AI varsayılan olarak kapalıdır.
-- Ortam değişkenleri eksik olabilir.
+- Masaüstü Ayarlar ekranında AI bağlantısının açık, modelin ve anahtarın kayıtlı olduğunu kontrol edin.
+- Web'e uygulama başarısızsa web modül adresinin HTTPS olduğunu, `sync_secret` değerini ve `data/` yazma iznini kontrol edin.
+- Eski web modülü `publish_ai_settings` aksiyonunu tanımayabilir; güncel web modül paketini yükleyin.
 - API anahtarı frontend dosyasına yazılmışsa kaldırılmalıdır.
 
 AI sohbetinden talep oluşmuyor:

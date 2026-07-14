@@ -1279,6 +1279,99 @@ Durum:
 
 ---
 
+## TASK-0705 — AI bağlantısını masaüstü ayarlarından yönet ve web'e yayınla
+
+Amaç:
+
+Masaüstü ve web AI işlemlerinin aynı kullanıcı tarafından yönetilen bağlantı ayarını kullanmasını sağlamak.
+
+Özellikler:
+
+```text
+Servis hazır ayarı ve özel OpenAI uyumlu adres
+Model ve zaman aşımı
+Geri okunmayan güvenli API anahtarı
+Masaüstü bağlantı testi
+HTTPS ve sync_secret ile web'e yayınlama
+Web yayın hatasında yerel ayarı koruma
+```
+
+Kabul kriterleri:
+
+* API anahtarı renderer bootstrap verisine, loglara veya web widget'a dönmemeli.
+* Masaüstü AI çağrısı kaydedilmiş bağlantı bilgisini kullanmalı.
+* Web `chat.php`, hostingde son başarıyla yayınlanan aynı bağlantı bilgisini kullanmalı.
+* Canlı hostinge anahtar aktarımı HTTPS olmadan yapılmamalı; yalnız localhost geliştirme istisnası bulunmalı.
+* Web yayın hatası yerel masaüstü ayarını geri almamalı.
+* AI kapalıyken güvenli yerel ve web fallback akışları devam etmeli.
+
+Durum:
+
+* Tamamlandı. Masaüstü Ayarlar ekranına OpenAI/OpenRouter/Groq/Gemini/özel OpenAI uyumlu servis hazır seçimleri, bağlantı adresi, model, maskeli anahtar, 5–120 saniye zaman aşımı ve bağlantı testi eklendi. API anahtarı Electron `safeStorage` ile şifrelenerek SQLite'ta opaque değer olarak tutulur ve renderer'a geri dönmez. Kaydetme `pushAiSettings()` ile ayarı HTTPS + header güvenlik anahtarı üzerinden web modülüne yollar; `sync.php` ayarı doğrudan erişime kapalı `data/ai-settings.local.php` dosyasına atomik ve `0600` izinle yazar. `chat.php` böylece masaüstüyle aynı bağlantıyı kullanır. Yerel kayıt, web yayını hata verse de korunur. Sync-core, desktop DB/renderer ve gerçek PHP + mock provider smoke testleri bu akışı doğrular.
+
+---
+
+## TASK-0706 — Uygulama web iletişimini canlı demo modülüne taşı
+
+Amaç:
+
+Masaüstü, demo web ve Android uygulamalarının varsayılan web modülünü canlı HTTPS
+demo kurulumuna yönlendirmek; localhost geliştirme varsayımını kullanıcı akışından
+çıkarmak.
+
+Kabul kriterleri:
+
+* Varsayılan modül adresi `https://yardimciasistan.alwaysdata.net/yardimci-asistan` olmalı.
+* Eski localhost ve demo-site kök adresleri migration ile doğru alt yola taşınmalı.
+* Canlı `sync.php` HTTPS üzerinden erişilebilir ve güvenlik anahtarıyla doğrulanmalı.
+* Canlı güvenlik anahtarı kaynak koda veya dağıtım arşivine gömülmemeli.
+
+Durum:
+
+* Tamamlandı. Masaüstü seed/renderer/database varsayımları, demo web
+  widget fallback'i ve Android bağlantı başlangıcı canlı modüle taşındı.
+  `004_live_demo_web_module.sql` eski localhost ve Alwaysdata kök kayıtlarını doğru
+  modül alt yoluna geçirir. Bu cihazdaki ayar ignored dağıtım anahtarıyla
+  eşleştirilmiş ve canlı `pull_requests` isteği HTTP 200 ile doğrulanmıştır. Güncel
+  demo web, `sync.php` ve `ai.php` dosyaları Alwaysdata'ya yedekli SSH dağıtımıyla
+  aktarılmış; masaüstündeki `deepseek-v4-flash-free` ayarı canlı web modülüne
+  yayınlanmış ve web sohbetinde `fallback=false` sonucuyla doğrulanmıştır.
+
+---
+
+## TASK-0707 — Masaüstü AI Yardımcı çalışma alanını oluştur
+
+Amaç:
+
+İşletme sahibinin kayıtlı AI bağlantısını günlük masaüstü işlerinde, sonucu görüp düzenleyerek kullanabileceği tek bir çalışma alanı sağlamak.
+
+Özellikler:
+
+```text
+Cevap taslağı, talep özeti ve günlük değerlendirme çalışma türleri
+Talep / müşteri bağlamı ve isteğe bağlı ek talimat
+Düzenlenebilir AI sonucu
+Kopyalama, talebe kaydetme ve WhatsApp'a hazırlama
+SQLite üzerinde yerel çalışma geçmişi
+Aktif servis, model ve web yayın durumu
+Güvenli yerel fallback ve bağlayıcı karar sınırı
+```
+
+Kabul kriterleri:
+
+* AI Yardımcı yan menüden bağımsız sayfa olarak açılmalı.
+* Talep gerektiren çalışma türleri seçili kayıt bağlamıyla üretilmeli.
+* Kullanıcı üretilen metni kaydetmeden veya göndermeden önce düzenleyebilmeli.
+* Sonuçlar API anahtarını içermeden yerel geçmişe yazılmalı.
+* AI kapalı veya hatalıysa manuel akış güvenli yerel sonuçla devam etmeli.
+* AI kesin rezervasyon, müsaitlik veya fiyat onayı vermemeli.
+
+Durum:
+
+* Tamamlandı. Masaüstüne üç çalışma türü, talep bağlamı, ek talimat, düzenlenebilir sonuç alanı, talebe kaydetme, WhatsApp'a hazırlama ve yerel geçmiş içeren AI Yardımcı sayfası eklendi. Electron IPC çağrıları ayarlarda kayıtlı bağlantıyı kullanır; `ai_conversations` geçmişinde provider/model/fallback metadatası tutulur ve gizli anahtar renderer'a aktarılmaz. Yanıt üretimi güvenli JSON akışını, özet ve günlük değerlendirme ayrı sistem talimatlarını kullanır; provider çalışmadığında bağlayıcı olmayan yerel sonuçlar döner. AI core birim testi, SQLite smoke testi ve Playwright masaüstü kullanıcı akışı bu davranışları doğrular.
+
+---
+
 # Faz 8 — WhatsApp Bridge
 
 ## TASK-0801 — WhatsApp bridge paketini oluştur

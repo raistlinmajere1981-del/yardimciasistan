@@ -11,6 +11,7 @@
     "pack:dir": "electron-builder --dir --config electron-builder.yml --publish never",
     "pack:linux": "electron-builder --linux AppImage --config electron-builder.yml --publish never",
     "pack:win": "electron-builder --win nsis --config electron-builder.yml --publish never",
+    "pack:win32": "electron-builder --win nsis --ia32 --config electron-builder.win32.yml --publish never",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
   },
   "dependencies": {

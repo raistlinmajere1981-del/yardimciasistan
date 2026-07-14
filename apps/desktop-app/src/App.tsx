@@ -22,6 +22,7 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Send,
   Settings,
   Sparkles,
   TrendingUp,
@@ -30,10 +31,18 @@ import {
   UtensilsCrossed
 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
-import type { CreateManualRequestInput, DesktopDashboardData, DesktopSetupData, SaveInitialSetupInput } from "../electron/database";
+import type {
+  AiWorkspaceHistoryEntry,
+  AiWorkspaceMode,
+  CreateManualRequestInput,
+  DesktopDashboardData,
+  DesktopSetupData,
+  SaveInitialSetupInput
+} from "../electron/database";
+import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 
 type SyncState = "idle" | "loading" | "success" | "error";
-type DesktopPage = "dashboard" | "requests" | "customers" | "reports" | "tasks" | "reservations" | "rooms" | "tables" | "menu" | "whatsapp";
+type DesktopPage = "dashboard" | "requests" | "customers" | "reports" | "tasks" | "reservations" | "rooms" | "tables" | "menu" | "whatsapp" | "ai";
 type WhatsAppConnectionState = "idle" | "loading" | "ready" | "error";
 
 interface CategoryFormState {
@@ -94,7 +103,14 @@ interface SetupFormState {
   syncSecret: string;
   aiEnabled: boolean;
   aiProvider: string;
+  aiService: string;
+  aiProjectName: string;
+  aiGoogleCurl: string;
+  aiBaseUrl: string;
   aiModel: string;
+  aiApiKey: string;
+  clearAiApiKey: boolean;
+  aiTimeoutSeconds: string;
   roomsEnabled: boolean;
   tablesEnabled: boolean;
   qrMenuEnabled: boolean;
@@ -120,7 +136,7 @@ interface ManualRequestFormState {
 const defaultDashboardData: DesktopDashboardData = {
   databasePath: "Tarayıcı önizleme modu",
   backupPath: "Tarayıcı önizleme modu",
-  webModuleUrl: "http://127.0.0.1:8080",
+  webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
   summary: {
     newRequests: 1,
     pendingDailyTasks: 4,
@@ -404,14 +420,6 @@ const defaultDashboardData: DesktopDashboardData = {
   ]
 };
 
-const modules = {
-  rooms: true,
-  tables: true,
-  qrMenu: true,
-  whatsapp: true,
-  ai: true
-};
-
 const defaultSetupData: DesktopSetupData = {
   setupRequired: false,
   businessName: "Deniz Çiçeği Pansiyon & Kafe",
@@ -420,11 +428,17 @@ const defaultSetupData: DesktopSetupData = {
   whatsapp: "+905321234567",
   email: "merhaba@denizcicegi.example",
   address: "Sahil Yolu No: 18, Akyaka / Muğla",
-  webModuleUrl: "http://127.0.0.1:8080",
+  webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
   syncSecret: "change-this-secret",
   aiEnabled: false,
   aiProvider: "openai_compatible",
+  aiService: "openai",
+  aiProjectName: "",
+  aiBaseUrl: "https://api.openai.com/v1",
   aiModel: "",
+  aiTimeoutSeconds: 30,
+  aiApiKeyConfigured: false,
+  aiLastPublishedAt: "",
   modules: {
     rooms: true,
     tables: true,
@@ -471,6 +485,14 @@ const manualPriorityOptions = [
   ["low", "Düşük"]
 ];
 
+const aiServicePresets = [
+  { id: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1" },
+  { id: "openrouter", label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
+  { id: "groq", label: "Groq", baseUrl: "https://api.groq.com/openai/v1" },
+  { id: "gemini", label: "Google AI Studio (Gemini API)", baseUrl: "https://generativelanguage.googleapis.com/v1beta" },
+  { id: "custom", label: "Özel OpenAI uyumlu servis", baseUrl: "" }
+] as const;
+
 function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
@@ -494,14 +516,35 @@ function App() {
   const [setupMode, setSetupMode] = useState(false);
   const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
+  const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
+  const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
+  const [aiModelOptions, setAiModelOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [convertingRequestId, setConvertingRequestId] = useState("");
   const [suggestingRequestId, setSuggestingRequestId] = useState("");
   const [aiState, setAiState] = useState<SyncState>("idle");
   const [aiMessage, setAiMessage] = useState("AI cevap taslağı hazır.");
+  const [aiWorkspaceMode, setAiWorkspaceMode] = useState<AiWorkspaceMode>("reply");
+  const [aiWorkspaceRequestId, setAiWorkspaceRequestId] = useState(defaultDashboardData.requests[0]?.id ?? "");
+  const [aiWorkspaceInstructions, setAiWorkspaceInstructions] = useState("");
+  const [aiWorkspaceEntry, setAiWorkspaceEntry] = useState<AiWorkspaceHistoryEntry | null>(null);
+  const [aiWorkspaceContent, setAiWorkspaceContent] = useState("");
+  const [aiWorkspaceHistory, setAiWorkspaceHistory] = useState<AiWorkspaceHistoryEntry[]>([]);
+  const [aiWorkspaceState, setAiWorkspaceState] = useState<SyncState>("idle");
+  const [aiWorkspaceMessage, setAiWorkspaceMessage] = useState("Bir araç seçip AI sonucunu hazırlayın.");
   const [backupState, setBackupState] = useState<SyncState>("idle");
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidPublishState, setAndroidPublishState] = useState<SyncState>("idle");
   const [androidPublishMessage, setAndroidPublishMessage] = useState("Android özeti henüz yayınlanmadı.");
+  const modules = useMemo(
+    () => ({
+      rooms: setupData.modules.rooms,
+      tables: setupData.modules.tables,
+      qrMenu: setupData.modules.qrMenu,
+      whatsapp: setupData.modules.whatsapp,
+      ai: setupData.aiEnabled
+    }),
+    [setupData]
+  );
 
   useEffect(() => {
     void window.yardimciDesktop?.getBootstrapData().then((data) => {
@@ -521,6 +564,24 @@ function App() {
     });
     void loadDashboardData();
   }, []);
+
+  useEffect(() => {
+    if (activePage !== "ai" || !window.yardimciDesktop) {
+      return;
+    }
+    void window.yardimciDesktop.getAiWorkspaceHistory(16).then(setAiWorkspaceHistory);
+  }, [activePage]);
+
+  useEffect(() => {
+    setAiModelOptions([]);
+  }, [setupForm.aiService, setupForm.aiApiKey]);
+
+  useEffect(() => {
+    if (aiWorkspaceRequestId && dashboardData.requests.some((request) => request.id === aiWorkspaceRequestId)) {
+      return;
+    }
+    setAiWorkspaceRequestId(dashboardData.requests[0]?.id ?? "");
+  }, [aiWorkspaceRequestId, dashboardData.requests]);
 
   const metrics = useMemo<DashboardMetric[]>(() => {
     const summary = dashboardData.summary;
@@ -577,7 +638,7 @@ function App() {
     ];
 
     return dashboardMetrics.filter((metric) => metric.enabled);
-  }, [dashboardData.summary]);
+  }, [dashboardData.summary, modules]);
 
   const menuPreviewUrl = useMemo(() => `${dashboardData.webModuleUrl.replace(/\/+$/, "")}/menu.html`, [dashboardData.webModuleUrl]);
   const selectedWhatsAppRequest = useMemo(
@@ -632,6 +693,21 @@ function App() {
     await loadDashboardData();
     setSyncState("success");
     setStatusMessage(result.count > 0 ? `${result.count} talep alındı.` : "Yeni talep bulunmuyor.");
+  }
+
+  async function handleWhatsAppMessageSent(requestId: string, message: string) {
+    if (!window.yardimciDesktop) {
+      return {
+        ok: false as const,
+        message: "Gönderim kaydı için uygulamayı Electron içinde açın."
+      };
+    }
+
+    const result = await window.yardimciDesktop.markWhatsAppMessageSent({ requestId, message });
+    if (result.ok) {
+      setDashboardData(result.dashboardData);
+    }
+    return result;
   }
 
   async function handlePublishMenu() {
@@ -907,6 +983,113 @@ function App() {
     setAiMessage(result.missingFields.length > 0 ? `${result.message} Eksik: ${result.missingFields.join(", ")}.` : result.message);
   }
 
+  async function handleGenerateAiWorkspace() {
+    if (!window.yardimciDesktop) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("AI çalışma alanı için uygulamayı Electron içinde açın.");
+      return;
+    }
+    setAiWorkspaceState("loading");
+    setAiWorkspaceMessage("AI sonucu hazırlanıyor...");
+    const result = await window.yardimciDesktop.generateAiWorkspace({
+      mode: aiWorkspaceMode,
+      requestId: aiWorkspaceMode === "daily" ? "" : aiWorkspaceRequestId,
+      instructions: aiWorkspaceInstructions
+    });
+    if (!result.ok) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage(result.message);
+      return;
+    }
+    setAiWorkspaceEntry(result.entry);
+    setAiWorkspaceContent(result.entry.content);
+    setAiWorkspaceHistory((current) => [result.entry, ...current.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
+    setAiWorkspaceState("success");
+    setAiWorkspaceMessage(result.message);
+  }
+
+  async function persistAiWorkspaceResult() {
+    if (!window.yardimciDesktop || !aiWorkspaceEntry) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("Önce bir AI sonucu hazırlayın.");
+      return false;
+    }
+    const result = await window.yardimciDesktop.saveAiWorkspaceResult({
+      mode: aiWorkspaceEntry.mode,
+      requestId: aiWorkspaceEntry.requestId,
+      content: aiWorkspaceContent,
+      summary: aiWorkspaceEntry.summary,
+      missingFields: aiWorkspaceEntry.missingFields
+    });
+    if (!result.ok) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage(result.message);
+      return false;
+    }
+    setDashboardData(result.dashboardData);
+    setAiWorkspaceState("success");
+    setAiWorkspaceMessage(result.message);
+    return true;
+  }
+
+  async function handleSaveAiWorkspace() {
+    await persistAiWorkspaceResult();
+  }
+
+  async function handleCopyAiWorkspace() {
+    if (!aiWorkspaceContent.trim()) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("Kopyalanacak bir AI sonucu yok.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(aiWorkspaceContent);
+      setAiWorkspaceState("success");
+      setAiWorkspaceMessage("AI sonucu panoya kopyalandı.");
+    } catch {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("Panoya kopyalama başarısız oldu.");
+    }
+  }
+
+  async function handlePrepareAiWorkspaceWhatsApp() {
+    if (!aiWorkspaceEntry || aiWorkspaceEntry.mode !== "reply") {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("WhatsApp için cevap taslağı türünde bir sonuç hazırlayın.");
+      return;
+    }
+    if (await persistAiWorkspaceResult()) {
+      setSelectedWhatsAppRequestId(aiWorkspaceEntry.requestId);
+      setActivePage("whatsapp");
+    }
+  }
+
+  function selectAiWorkspaceHistoryEntry(entry: AiWorkspaceHistoryEntry) {
+    setAiWorkspaceMode(entry.mode);
+    setAiWorkspaceRequestId(entry.requestId);
+    setAiWorkspaceInstructions(entry.instructions);
+    setAiWorkspaceEntry(entry);
+    setAiWorkspaceContent(entry.content);
+    setAiWorkspaceState("idle");
+    setAiWorkspaceMessage("Geçmiş sonuç açıldı; düzenleyip yeniden kullanabilirsiniz.");
+  }
+
+  function changeAiWorkspaceMode(mode: AiWorkspaceMode) {
+    setAiWorkspaceMode(mode);
+    setAiWorkspaceEntry(null);
+    setAiWorkspaceContent("");
+    setAiWorkspaceState("idle");
+    setAiWorkspaceMessage("Yeni çalışma türü seçildi; sonucu hazırlayın.");
+  }
+
+  function changeAiWorkspaceRequest(requestId: string) {
+    setAiWorkspaceRequestId(requestId);
+    setAiWorkspaceEntry(null);
+    setAiWorkspaceContent("");
+    setAiWorkspaceState("idle");
+    setAiWorkspaceMessage("Talep seçildi; AI sonucunu hazırlayın.");
+  }
+
   async function handleCreateManualBackup() {
     setBackupState("loading");
     setBackupMessage("Yerel veritabanı yedeği oluşturuluyor...");
@@ -1058,6 +1241,67 @@ function App() {
     void window.yardimciDesktop?.openExternal(selectedWhatsAppUrl);
   }
 
+  async function handleTestAiConnection() {
+    setAiConnectionTestState("loading");
+    setAiConnectionTestMessage("AI servisine bağlanılıyor...");
+
+    if (!window.yardimciDesktop) {
+      setAiConnectionTestState("error");
+      setAiConnectionTestMessage("Bağlantı denemesi için uygulamayı Electron içinde açın.");
+      return;
+    }
+
+    let baseUrl = setupForm.aiBaseUrl;
+    let model = setupForm.aiModel;
+    let apiKey = setupForm.clearAiApiKey ? "" : setupForm.aiApiKey;
+    if (setupForm.aiService === "gemini" && setupForm.aiGoogleCurl.trim()) {
+      const parsed = parseGoogleAiStudioCurl(setupForm.aiGoogleCurl);
+      if (!parsed.ok) {
+        setAiConnectionTestState("error");
+        setAiConnectionTestMessage(parsed.message);
+        return;
+      }
+
+      baseUrl = parsed.baseUrl;
+      model = "";
+      apiKey = parsed.apiKey;
+      setSetupForm((current) => ({
+        ...current,
+        aiProjectName: current.aiProjectName || "Google AI Studio",
+        aiGoogleCurl: "",
+        aiBaseUrl: parsed.baseUrl,
+        aiModel: "",
+        aiApiKey: parsed.apiKey,
+        clearAiApiKey: false
+      }));
+    }
+
+    const result = await window.yardimciDesktop.testAiConnection({
+      provider: setupForm.aiProvider,
+      service: setupForm.aiService,
+      projectName: setupForm.aiProjectName,
+      baseUrl,
+      model,
+      apiKey,
+      useStoredApiKey: !setupForm.clearAiApiKey && apiKey.trim() === "",
+      timeoutSeconds: Number(setupForm.aiTimeoutSeconds)
+    });
+
+    setAiConnectionTestState(result.ok ? "success" : "error");
+    setAiConnectionTestMessage(result.message);
+    if (result.ok) {
+      setAiModelOptions(result.models);
+      if (result.model !== setupForm.aiModel) {
+        setSetupForm((current) => ({ ...current, aiModel: result.model }));
+      }
+    } else if (setupForm.aiService === "gemini") {
+      setAiModelOptions(result.models ?? []);
+      if (result.model) {
+        setSetupForm((current) => ({ ...current, aiModel: result.model || current.aiModel }));
+      }
+    }
+  }
+
   async function handleSaveSetup() {
     setSetupSaveState("loading");
     setSetupMessage("Kurulum ayarları kaydediliyor...");
@@ -1079,7 +1323,13 @@ function App() {
       syncSecret: setupForm.syncSecret,
       aiEnabled: setupForm.aiEnabled,
       aiProvider: setupForm.aiProvider,
+      aiService: setupForm.aiService,
+      aiProjectName: setupForm.aiProjectName,
+      aiBaseUrl: setupForm.aiBaseUrl,
       aiModel: setupForm.aiModel,
+      aiApiKey: setupForm.aiApiKey,
+      clearAiApiKey: setupForm.clearAiApiKey,
+      aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
       modules: {
         rooms: setupForm.roomsEnabled,
         tables: setupForm.tablesEnabled,
@@ -1103,9 +1353,11 @@ function App() {
     setSetupData(result.setupData);
     setDashboardData(result.dashboardData);
     setSetupForm(toSetupForm(result.setupData));
-    setSetupSaveState("success");
+    setSetupSaveState(result.aiWebSync?.ok === false ? "error" : "success");
     setSetupMessage(result.message);
-    setSetupMode(false);
+    if (result.aiWebSync?.ok !== false) {
+      setSetupMode(false);
+    }
   }
 
   if (setupMode) {
@@ -1115,7 +1367,11 @@ function App() {
         setupData={setupData}
         saveState={setupSaveState}
         message={setupMessage}
+        aiConnectionTestState={aiConnectionTestState}
+        aiConnectionTestMessage={aiConnectionTestMessage}
+        aiModelOptions={aiModelOptions}
         onFormChange={setSetupForm}
+        onTestAiConnection={handleTestAiConnection}
         onSave={handleSaveSetup}
         onSkip={() => setSetupMode(false)}
       />
@@ -1183,7 +1439,7 @@ function App() {
             </button>
           )}
           {modules.ai && (
-            <button className="nav-item" type="button">
+            <button className={activePage === "ai" ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage("ai")}>
               <Sparkles size={18} aria-hidden="true" />
               AI Yardımcı
             </button>
@@ -1215,6 +1471,14 @@ function App() {
               <button type="button" onClick={openSelectedWhatsAppExternal} disabled={!selectedWhatsAppUrl}>
                 <ExternalLink size={16} aria-hidden="true" />
                 Dışarıda Aç
+              </button>
+            </div>
+          ) : activePage === "ai" ? (
+            <div className="sync-pill sync-idle">
+              <span>{setupData.aiEnabled ? `${aiServicePresets.find((service) => service.id === setupData.aiService)?.label ?? "Özel servis"} • ${setupData.aiModel || "Model seçilmedi"}` : "AI yardımcısı kapalı"}</span>
+              <button type="button" onClick={() => setSetupMode(true)}>
+                <Settings size={16} aria-hidden="true" />
+                AI Ayarlarını Aç
               </button>
             </div>
           ) : (
@@ -1292,15 +1556,17 @@ function App() {
                           {convertingRequestId === request.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
                         </button>
                       )}
-                      <button
-                        className="ai-action"
-                        type="button"
-                        onClick={() => handleCreateOwnerReplySuggestion(request)}
-                        disabled={suggestingRequestId === request.id}
-                      >
-                        <Sparkles size={16} aria-hidden="true" />
-                        {suggestingRequestId === request.id ? "Hazırlanıyor" : "AI Taslak Yenile"}
-                      </button>
+                      {setupData.aiEnabled && (
+                        <button
+                          className="ai-action"
+                          type="button"
+                          onClick={() => handleCreateOwnerReplySuggestion(request)}
+                          disabled={suggestingRequestId === request.id}
+                        >
+                          <Sparkles size={16} aria-hidden="true" />
+                          {suggestingRequestId === request.id ? "Hazırlanıyor" : "AI Taslak Yenile"}
+                        </button>
+                      )}
                       <button className="whatsapp-action" type="button" onClick={() => openWhatsApp(request)}>
                         <MessageCircle size={16} aria-hidden="true" />
                         WhatsApp'tan Yaz
@@ -1437,6 +1703,7 @@ function App() {
           <RequestsWorkspace
             requests={dashboardData.requests}
             selectedRequest={selectedRequest}
+            aiEnabled={setupData.aiEnabled}
             convertingRequestId={convertingRequestId}
             suggestingRequestId={suggestingRequestId}
             manualRequestForm={manualRequestForm}
@@ -1473,6 +1740,28 @@ function App() {
           <RoomsWorkspace rooms={dashboardData.rooms} onUpdateStatus={handleUpdateRoomStatus} />
         ) : activePage === "tables" ? (
           <TablesWorkspace tables={dashboardData.tables} onUpdateStatus={handleUpdateTableStatus} />
+        ) : activePage === "ai" ? (
+          <AiWorkspace
+            setupData={setupData}
+            dashboardData={dashboardData}
+            mode={aiWorkspaceMode}
+            selectedRequestId={aiWorkspaceRequestId}
+            instructions={aiWorkspaceInstructions}
+            entry={aiWorkspaceEntry}
+            content={aiWorkspaceContent}
+            history={aiWorkspaceHistory}
+            state={aiWorkspaceState}
+            message={aiWorkspaceMessage}
+            onModeChange={changeAiWorkspaceMode}
+            onRequestChange={changeAiWorkspaceRequest}
+            onInstructionsChange={setAiWorkspaceInstructions}
+            onContentChange={setAiWorkspaceContent}
+            onGenerate={handleGenerateAiWorkspace}
+            onSave={handleSaveAiWorkspace}
+            onCopy={handleCopyAiWorkspace}
+            onWhatsApp={handlePrepareAiWorkspaceWhatsApp}
+            onSelectHistory={selectAiWorkspaceHistoryEntry}
+          />
         ) : activePage === "menu" ? (
           <MenuManager
             dashboardData={dashboardData}
@@ -1503,6 +1792,7 @@ function App() {
             selectedUrl={selectedWhatsAppUrl}
             onSelectRequest={setSelectedWhatsAppRequestId}
             onOpenExternal={openSelectedWhatsAppExternal}
+            onMessageSent={handleWhatsAppMessageSent}
           />
         )}
       </main>
@@ -1515,14 +1805,43 @@ interface SetupWizardProps {
   setupData: DesktopSetupData;
   saveState: SyncState;
   message: string;
+  aiConnectionTestState: SyncState;
+  aiConnectionTestMessage: string;
+  aiModelOptions: Array<{ id: string; label: string }>;
   onFormChange: (form: SetupFormState) => void;
+  onTestAiConnection: () => void;
   onSave: () => void;
   onSkip: () => void;
 }
 
-function SetupWizard({ form, setupData, saveState, message, onFormChange, onSave, onSkip }: SetupWizardProps) {
+function SetupWizard({
+  form,
+  setupData,
+  saveState,
+  message,
+  aiConnectionTestState,
+  aiConnectionTestMessage,
+  aiModelOptions,
+  onFormChange,
+  onTestAiConnection,
+  onSave,
+  onSkip
+}: SetupWizardProps) {
+  const [showAiApiKey, setShowAiApiKey] = useState(false);
+  const [showGoogleCurl, setShowGoogleCurl] = useState(false);
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
+  };
+
+  const updateAiService = (service: string) => {
+    const preset = aiServicePresets.find((item) => item.id === service);
+    onFormChange({
+      ...form,
+      aiService: service,
+      aiBaseUrl: preset?.baseUrl || form.aiBaseUrl,
+      aiGoogleCurl: "",
+      aiModel: service === form.aiService ? form.aiModel : ""
+    });
   };
 
   return (
@@ -1627,45 +1946,150 @@ function SetupWizard({ form, setupData, saveState, message, onFormChange, onSave
             <h2>Hosting Modülü</h2>
           </div>
           <div className="setup-grid two">
-            <label>
+            <label className="setup-field">
               Web modül adresi
-              <input value={form.webModuleUrl} onChange={(event) => update("webModuleUrl", event.target.value)} placeholder="https://firma.com/yardimci-asistan" />
+              <input value={form.webModuleUrl} onChange={(event) => update("webModuleUrl", event.target.value)} placeholder="https://yardimciasistan.alwaysdata.net/yardimci-asistan" />
+              <small>Demo sitenin kurulu web modülü kullanılır; sonuna api/sync.php eklemeyin.</small>
             </label>
             <label>
-              Sync güvenlik anahtarı
+              Web güvenlik anahtarı
               <input value={form.syncSecret} onChange={(event) => update("syncSecret", event.target.value)} placeholder="uzun-gizli-anahtar" />
             </label>
           </div>
         </div>
 
-        <div className="setup-section">
+        <div className="setup-section setup-ai-section">
           <div className="setup-section-title">
-            <p>AI ve İlk Kayıtlar</p>
-            <h2>İsteğe Bağlı</h2>
+            <p>AI Bağlantısı</p>
+            <h2>Masaüstü ve Web İçin Tek Ayar</h2>
           </div>
+          <p className="setup-section-description">Seçtiğiniz bağlantı masaüstündeki cevap taslaklarında kullanılır ve kaydettiğinizde web modülüne güvenli biçimde uygulanır.</p>
           <div className="setup-grid two">
             <label className="setup-checkline">
               <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
-              AI cevap önerileri açık
+              AI yardımcı açık
             </label>
             <label>
-              AI provider
-              <input value={form.aiProvider} onChange={(event) => update("aiProvider", event.target.value)} placeholder="openai_compatible" disabled={!form.aiEnabled} />
+              Kullanılacak servis
+              <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
+                {aiServicePresets.map((preset) => (
+                  <option value={preset.id} key={preset.id}>{preset.label}</option>
+                ))}
+              </select>
+            </label>
+            {form.aiService === "gemini" ? (
+              <>
+                <div className="setup-field setup-grid-wide setup-ai-studio-help">
+                  <span>Google AI Studio hızlı kurulum</span>
+                  <button className="setup-secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
+                    <ExternalLink size={16} aria-hidden="true" />
+                    Google AI Studio'yu Aç
+                  </button>
+                  <small>API anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
+                </div>
+                <div className="setup-field setup-grid-wide">
+                  <span>Google AI Studio cURL bağlantısı</span>
+                  <div className="setup-secret-input">
+                    <input
+                      aria-label="Google AI Studio cURL bağlantısı"
+                      value={form.aiGoogleCurl}
+                      onChange={(event) => update("aiGoogleCurl", event.target.value)}
+                      type={showGoogleCurl ? "text" : "password"}
+                      placeholder={setupData.aiApiKeyConfigured ? "Kayıtlı bağlantıyı kullanmak için boş bırakabilirsiniz" : "Copy cURL quickstart çıktısını buraya yapıştırın"}
+                      disabled={!form.aiEnabled || form.clearAiApiKey}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button type="button" onClick={() => setShowGoogleCurl((current) => !current)} disabled={!form.aiEnabled || form.clearAiApiKey}>
+                      {showGoogleCurl ? "Gizle" : "Göster"}
+                    </button>
+                  </div>
+                  <small>Komut yalnız bağlantı kontrolünde okunur; API adresi, anahtar ve örnek model otomatik ayrıştırılır.</small>
+                </div>
+              </>
+            ) : (
+              <label className="setup-grid-wide">
+                Bağlantı adresi
+                <input value={form.aiBaseUrl} onChange={(event) => update("aiBaseUrl", event.target.value)} placeholder="https://servis.example/v1" disabled={!form.aiEnabled} spellCheck={false} />
+              </label>
+            )}
+            <label>
+              Model adı
+              {form.aiService === "gemini" && aiModelOptions.length > 0 ? (
+                <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
+                  {aiModelOptions.map((model) => (
+                    <option value={model.id} key={model.id}>{model.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} placeholder={form.aiService === "gemini" ? "Bağlantı kontrolünden sonra listelenir" : "Serviste görünen model adı"} disabled={!form.aiEnabled || form.aiService === "gemini"} spellCheck={false} />
+              )}
+              {form.aiService === "gemini" && (
+                <small>{aiModelOptions.length > 0 ? `${aiModelOptions.length} model API üzerinden alındı.` : "Bağlantıyı Dene ile kullanılabilir modeller otomatik alınır."}</small>
+              )}
             </label>
             <label>
-              AI model
-              <input value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} placeholder="Model adı" disabled={!form.aiEnabled} />
+              Yanıt bekleme süresi (saniye)
+              <input value={form.aiTimeoutSeconds} onChange={(event) => update("aiTimeoutSeconds", event.target.value)} inputMode="numeric" min="5" max="120" disabled={!form.aiEnabled} />
             </label>
-            <div className="setup-count-row">
-              <label>
-                Oda sayısı
-                <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" />
+            {form.aiService !== "gemini" && <div className="setup-field setup-grid-wide">
+              <span>Gizli erişim anahtarı</span>
+              <div className="setup-secret-input">
+                <input
+                  aria-label="Gizli erişim anahtarı"
+                  value={form.aiApiKey}
+                  onChange={(event) => update("aiApiKey", event.target.value)}
+                  type={showAiApiKey ? "text" : "password"}
+                  placeholder={setupData.aiApiKeyConfigured ? "Yeni anahtar girmezseniz kayıtlı anahtar korunur" : "Servis erişim anahtarını girin"}
+                  disabled={!form.aiEnabled || form.clearAiApiKey}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                />
+                <button type="button" onClick={() => setShowAiApiKey((current) => !current)} disabled={!form.aiEnabled || form.clearAiApiKey}>
+                  {showAiApiKey ? "Gizle" : "Göster"}
+                </button>
+              </div>
+              <small>{setupData.aiApiKeyConfigured ? "Anahtar bu cihazda güvenli biçimde kayıtlı." : "Anahtar henüz kayıtlı değil."}</small>
+            </div>}
+            {setupData.aiApiKeyConfigured && (
+              <label className="setup-checkline setup-grid-wide setup-danger-checkline">
+                <input
+                  checked={form.clearAiApiKey}
+                  onChange={(event) => onFormChange({
+                    ...form,
+                    clearAiApiKey: event.target.checked,
+                    aiEnabled: event.target.checked ? false : form.aiEnabled
+                  })}
+                  type="checkbox"
+                />
+                Kayıtlı erişim anahtarını sil ve AI yardımcıyı kapat
               </label>
-              <label>
-                Masa sayısı
-                <input value={form.tableCount} onChange={(event) => update("tableCount", event.target.value)} inputMode="numeric" />
-              </label>
-            </div>
+            )}
+          </div>
+          <div className={`setup-ai-actions sync-${aiConnectionTestState}`}>
+            <button className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !setupData.aiApiKeyConfigured)}>
+              <RefreshCw size={16} aria-hidden="true" />
+              {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
+            </button>
+            <span>{aiConnectionTestMessage}</span>
+            <small>{setupData.aiLastPublishedAt ? `Web ayarı son yayın: ${formatDateTime(setupData.aiLastPublishedAt)}` : "Web ayarı henüz bu cihazdan yayınlanmadı."}</small>
+          </div>
+        </div>
+
+        <div className="setup-section">
+          <div className="setup-section-title">
+            <p>İlk Kayıtlar</p>
+            <h2>Oda ve Masa Sayısı</h2>
+          </div>
+          <div className="setup-count-row">
+            <label>
+              Oda sayısı
+              <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" />
+            </label>
+            <label>
+              Masa sayısı
+              <input value={form.tableCount} onChange={(event) => update("tableCount", event.target.value)} inputMode="numeric" />
+            </label>
           </div>
         </div>
 
@@ -1679,12 +2103,214 @@ function SetupWizard({ form, setupData, saveState, message, onFormChange, onSave
             )}
             <button className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
               <Save size={16} aria-hidden="true" />
-              Kurulumu Kaydet
+              {setupData.setupRequired ? "Kurulumu Kaydet" : "Ayarları Kaydet"}
             </button>
           </div>
         </footer>
       </section>
     </main>
+  );
+}
+
+interface AiWorkspaceProps {
+  setupData: DesktopSetupData;
+  dashboardData: DesktopDashboardData;
+  mode: AiWorkspaceMode;
+  selectedRequestId: string;
+  instructions: string;
+  entry: AiWorkspaceHistoryEntry | null;
+  content: string;
+  history: AiWorkspaceHistoryEntry[];
+  state: SyncState;
+  message: string;
+  onModeChange: (mode: AiWorkspaceMode) => void;
+  onRequestChange: (requestId: string) => void;
+  onInstructionsChange: (value: string) => void;
+  onContentChange: (value: string) => void;
+  onGenerate: () => void;
+  onSave: () => void;
+  onCopy: () => void;
+  onWhatsApp: () => void;
+  onSelectHistory: (entry: AiWorkspaceHistoryEntry) => void;
+}
+
+function AiWorkspace({
+  setupData,
+  dashboardData,
+  mode,
+  selectedRequestId,
+  instructions,
+  entry,
+  content,
+  history,
+  state,
+  message,
+  onModeChange,
+  onRequestChange,
+  onInstructionsChange,
+  onContentChange,
+  onGenerate,
+  onSave,
+  onCopy,
+  onWhatsApp,
+  onSelectHistory
+}: AiWorkspaceProps) {
+  const needsRequest = mode !== "daily";
+  const selectedRequest = dashboardData.requests.find((request) => request.id === selectedRequestId);
+  const serviceLabel = aiServicePresets.find((service) => service.id === setupData.aiService)?.label ?? "Özel servis";
+  const generateDisabled = state === "loading" || (needsRequest && !selectedRequest);
+
+  return (
+    <section className="ai-workspace" aria-label="AI Yardımcı çalışma alanı">
+      <div className="ai-status-grid">
+        <article className="ai-status-card">
+          <span>Bağlantı</span>
+          <strong className={setupData.aiEnabled ? "is-online" : "is-offline"}>{setupData.aiEnabled ? "AI açık" : "AI kapalı"}</strong>
+          <small>{serviceLabel}</small>
+        </article>
+        <article className="ai-status-card">
+          <span>Kullanılan model</span>
+          <strong>{setupData.aiModel || "Model seçilmedi"}</strong>
+          <small>{setupData.aiBaseUrl || "Bağlantı adresi yok"}</small>
+        </article>
+        <article className="ai-status-card">
+          <span>Web yayını</span>
+          <strong>{setupData.aiLastPublishedAt ? "Güncel" : "Bekliyor"}</strong>
+          <small>{setupData.aiLastPublishedAt ? formatDateTime(setupData.aiLastPublishedAt) : "Henüz yayınlanmadı"}</small>
+        </article>
+      </div>
+
+      <div className="ai-workspace-grid">
+        <aside className="panel ai-tool-panel">
+          <div className="panel-heading compact">
+            <div>
+              <p>Çalışma Türü</p>
+              <h2>Ne hazırlayalım?</h2>
+            </div>
+          </div>
+          <div className="ai-mode-list" role="tablist" aria-label="AI çalışma türleri">
+            {([
+              ["reply", "Cevap taslağı", "WhatsApp için sıcak ve kontrollü yanıt"],
+              ["summary", "Talebi özetle", "Eksikleri ve önemli noktaları çıkar"],
+              ["daily", "Günü değerlendir", "İşleri, riskleri ve öncelikleri sırala"]
+            ] as Array<[AiWorkspaceMode, string, string]>).map(([value, label, description]) => (
+              <button
+                className={mode === value ? "ai-mode-button is-active" : "ai-mode-button"}
+                type="button"
+                role="tab"
+                aria-selected={mode === value}
+                onClick={() => onModeChange(value)}
+                key={value}
+              >
+                <Sparkles size={17} aria-hidden="true" />
+                <span><strong>{label}</strong><small>{description}</small></span>
+              </button>
+            ))}
+          </div>
+
+          <label className="ai-field">
+            Talep / müşteri
+            <select value={selectedRequestId} onChange={(event) => onRequestChange(event.target.value)} disabled={!needsRequest}>
+              {dashboardData.requests.length === 0 && <option value="">Talep bulunmuyor</option>}
+              {dashboardData.requests.map((request) => (
+                <option value={request.id} key={request.id}>{request.customer_name} — {formatRequestType(request.request_type)}</option>
+              ))}
+            </select>
+          </label>
+          {selectedRequest && needsRequest && (
+            <div className="ai-request-context">
+              <strong>{selectedRequest.customer_name}</strong>
+              <span>{selectedRequest.date_text || selectedRequest.start_date || "Tarih yok"} • {selectedRequest.guest_count || "?"} kişi</span>
+              <p>{selectedRequest.message || "Talep notu bulunmuyor."}</p>
+            </div>
+          )}
+          <label className="ai-field">
+            Ek talimat <small>isteğe bağlı</small>
+            <textarea
+              value={instructions}
+              onChange={(event) => onInstructionsChange(event.target.value.slice(0, 800))}
+              placeholder={mode === "reply" ? "Örn. Daha kısa ve samimi yaz." : "Örn. Bugünkü girişleri öne al."}
+              rows={4}
+            />
+            <small>{instructions.length}/800</small>
+          </label>
+          <button className="primary-command ai-generate-button" type="button" onClick={onGenerate} disabled={generateDisabled}>
+            <Sparkles size={17} aria-hidden="true" />
+            {state === "loading" ? "Hazırlanıyor" : "AI Sonucunu Hazırla"}
+          </button>
+        </aside>
+
+        <article className="panel ai-result-panel">
+          <div className="panel-heading compact">
+            <div>
+              <p>Düzenlenebilir Sonuç</p>
+              <h2>{entry ? getAiWorkspaceModeLabel(entry.mode) : "Henüz sonuç yok"}</h2>
+            </div>
+            <span className={`status-badge ${state === "success" ? "ok" : state === "error" ? "wait" : "info"}`}>
+              {state === "loading" ? "Çalışıyor" : entry?.fallback ? "Yerel güvenli" : entry ? "AI hazır" : "Bekliyor"}
+            </span>
+          </div>
+
+          {entry ? (
+            <>
+              <div className="ai-result-meta">
+                <span>{entry.requestLabel}</span>
+                <span>{entry.model || entry.provider}</span>
+                <span>{formatDateTime(entry.createdAt)}</span>
+              </div>
+              {entry.missingFields.length > 0 && (
+                <div className="ai-missing-fields"><strong>Eksik bilgiler:</strong> {entry.missingFields.join(", ")}</div>
+              )}
+              <textarea
+                className="ai-result-editor"
+                aria-label="AI sonucu"
+                value={content}
+                onChange={(event) => onContentChange(event.target.value)}
+                rows={16}
+              />
+              <div className="ai-result-actions">
+                <button type="button" onClick={onCopy}><Copy size={16} aria-hidden="true" />Kopyala</button>
+                <button type="button" onClick={onSave} disabled={entry.mode === "daily"}><Save size={16} aria-hidden="true" />Talebe Kaydet</button>
+                <button className="whatsapp-action" type="button" onClick={onWhatsApp} disabled={entry.mode !== "reply"}>
+                  <MessageCircle size={16} aria-hidden="true" />WhatsApp'a Hazırla
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state ai-empty-result">
+              <Sparkles size={34} aria-hidden="true" />
+              <strong>AI çalışma alanı hazır.</strong>
+              <p>Sol taraftan araç ve talep seçip sonucu hazırlayın. Üretilen metin gönderilmeden önce mutlaka sizin kontrolünüzden geçer.</p>
+            </div>
+          )}
+          <p className={`ai-workspace-message sync-${state}`}>{message}</p>
+          <div className="ai-guardrail-note">
+            <CheckCircle2 size={18} aria-hidden="true" />
+            <span>AI kesin rezervasyon, müsaitlik veya fiyat onayı vermez. Son karar ve gönderim her zaman işletme sahibindedir.</span>
+          </div>
+        </article>
+      </div>
+
+      <article className="panel ai-history-panel">
+        <div className="panel-heading compact">
+          <div><p>Yerel Geçmiş</p><h2>Son çalışmalar</h2></div>
+          <span className="status-badge info">{history.length} kayıt</span>
+        </div>
+        {history.length === 0 ? (
+          <div className="empty-state compact-empty"><strong>Henüz geçmiş yok.</strong><p>Hazırlanan sonuçlar yalnız bu bilgisayarda saklanır.</p></div>
+        ) : (
+          <div className="ai-history-list">
+            {history.map((historyEntry) => (
+              <button type="button" onClick={() => onSelectHistory(historyEntry)} key={historyEntry.id}>
+                <span className="ai-history-icon"><Sparkles size={16} aria-hidden="true" /></span>
+                <span><strong>{getAiWorkspaceModeLabel(historyEntry.mode)}</strong><small>{historyEntry.requestLabel}</small></span>
+                <time>{formatDateTime(historyEntry.createdAt)}</time>
+              </button>
+            ))}
+          </div>
+        )}
+      </article>
+    </section>
   );
 }
 
@@ -1695,17 +2321,179 @@ interface WhatsAppWorkspaceProps {
   selectedUrl: string;
   onSelectRequest: (requestId: string) => void;
   onOpenExternal: () => void;
+  onMessageSent: (requestId: string, message: string) => Promise<{ ok: boolean; message: string }>;
 }
 
 type WhatsAppWebViewElement = HTMLElement & {
   reload?: () => void;
+  getURL?: () => string;
+  executeJavaScript?: (code: string, userGesture?: boolean) => Promise<unknown>;
 };
 
-function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selectedUrl, onSelectRequest, onOpenExternal }: WhatsAppWorkspaceProps) {
+interface WhatsAppDomResult {
+  ok: boolean;
+  code: string;
+  message: string;
+  chatTitle?: string;
+  composerText?: string;
+}
+
+function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
+  if (!value || typeof value !== "object") {
+    return {
+      ok: false,
+      code: "invalid_result",
+      message: "WhatsApp Web beklenen doğrulama sonucunu döndürmedi."
+    };
+  }
+
+  const result = value as Partial<WhatsAppDomResult>;
+  return {
+    ok: result.ok === true,
+    code: String(result.code ?? "unknown"),
+    message: String(result.message ?? "WhatsApp Web işlemi tamamlanamadı."),
+    chatTitle: typeof result.chatTitle === "string" ? result.chatTitle : "",
+    composerText: typeof result.composerText === "string" ? result.composerText : ""
+  };
+}
+
+function createWhatsAppInspectionScript(expectedMessage: string) {
+  return `(() => {
+    const expectedMessage = ${JSON.stringify(expectedMessage.trim())};
+    const clean = (value) => String(value || "")
+      .replace(/\\r\\n/g, "\\n")
+      .replace(/\\u00a0/g, " ")
+      .replace(/\\u200b/g, "")
+      .split("\\n")
+      .map((line) => line.trimEnd())
+      .join("\\n")
+      .trim();
+    const visible = (element) => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+    const firstVisible = (root, selectors) => {
+      for (const selector of selectors) {
+        const match = Array.from(root.querySelectorAll(selector)).find(visible);
+        if (match) return match;
+      }
+      return null;
+    };
+    if (location.origin !== "https://web.whatsapp.com") {
+      return { ok: false, code: "wrong_origin", message: "Güvenlik kontrolü: açık sayfa WhatsApp Web değil." };
+    }
+    const root = document.querySelector("#main");
+    if (!root) {
+      return { ok: false, code: "chat_missing", message: "Açık bir WhatsApp sohbeti bulunamadı. Önce Müşteri Numarasına Git düğmesini kullanın." };
+    }
+    const composer = firstVisible(root, [
+      'footer [contenteditable="true"][role="textbox"]',
+      'footer [contenteditable="true"][data-tab]',
+      '[contenteditable="true"][role="textbox"]'
+    ]);
+    if (!composer) {
+      return { ok: false, code: "composer_missing", message: "WhatsApp mesaj kutusu bulunamadı. Oturumun açık ve sohbetin yüklenmiş olduğunu kontrol edin." };
+    }
+    const composerText = clean(composer.innerText || composer.textContent);
+    if (composerText !== clean(expectedMessage)) {
+      return { ok: false, code: "message_mismatch", message: "Güvenlik kontrolü: WhatsApp mesaj kutusundaki metin onaylanacak AI taslağıyla birebir eşleşmiyor.", composerText };
+    }
+    const titleNode = firstVisible(root, [
+      'header [data-testid="conversation-info-header-chat-title"]',
+      'header span[title]',
+      'header [role="button"] span[dir="auto"]'
+    ]);
+    const chatTitle = clean(titleNode && (titleNode.getAttribute("title") || titleNode.textContent));
+    if (!chatTitle) {
+      return { ok: false, code: "recipient_missing", message: "Açık sohbetin alıcı bilgisi okunamadı; gönderim güvenlik nedeniyle durduruldu." };
+    }
+    const sendIcon = firstVisible(root, ['footer span[data-icon="send"]', 'footer [data-testid="compose-btn-send"]']);
+    const sendControl = firstVisible(root, [
+      'footer button[aria-label="Send"]',
+      'footer button[aria-label="Gönder"]',
+      'footer [role="button"][aria-label="Send"]',
+      'footer [role="button"][aria-label="Gönder"]'
+    ]) || (sendIcon && sendIcon.closest('button, [role="button"]'));
+    if (!sendControl || sendControl.hasAttribute("disabled") || sendControl.getAttribute("aria-disabled") === "true") {
+      return { ok: false, code: "send_missing", message: "WhatsApp Gönder düğmesi hazır değil. Sohbet ve mesaj kutusunu kontrol edin." };
+    }
+    return { ok: true, code: "ready", message: "Sohbet ve mesaj doğrulandı.", chatTitle, composerText };
+  })()`;
+}
+
+function createWhatsAppSendScript(expectedMessage: string, expectedChatTitle: string) {
+  return `(() => {
+    const expectedMessage = ${JSON.stringify(expectedMessage.trim())};
+    const expectedChatTitle = ${JSON.stringify(expectedChatTitle.trim())};
+    const clean = (value) => String(value || "")
+      .replace(/\\r\\n/g, "\\n")
+      .replace(/\\u00a0/g, " ")
+      .replace(/\\u200b/g, "")
+      .split("\\n")
+      .map((line) => line.trimEnd())
+      .join("\\n")
+      .trim();
+    const visible = (element) => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+    const firstVisible = (root, selectors) => {
+      for (const selector of selectors) {
+        const match = Array.from(root.querySelectorAll(selector)).find(visible);
+        if (match) return match;
+      }
+      return null;
+    };
+    if (location.origin !== "https://web.whatsapp.com") {
+      return { ok: false, code: "wrong_origin", message: "Güvenlik kontrolü: açık sayfa WhatsApp Web değil." };
+    }
+    const root = document.querySelector("#main");
+    if (!root) {
+      return { ok: false, code: "chat_changed", message: "Sohbet onaydan sonra değişti; mesaj gönderilmedi." };
+    }
+    const composer = firstVisible(root, [
+      'footer [contenteditable="true"][role="textbox"]',
+      'footer [contenteditable="true"][data-tab]',
+      '[contenteditable="true"][role="textbox"]'
+    ]);
+    const titleNode = firstVisible(root, [
+      'header [data-testid="conversation-info-header-chat-title"]',
+      'header span[title]',
+      'header [role="button"] span[dir="auto"]'
+    ]);
+    const chatTitle = clean(titleNode && (titleNode.getAttribute("title") || titleNode.textContent));
+    const composerText = clean(composer && (composer.innerText || composer.textContent));
+    if (!composer || composerText !== clean(expectedMessage) || chatTitle !== clean(expectedChatTitle)) {
+      return { ok: false, code: "approval_changed", message: "Sohbet veya mesaj onaydan sonra değişti; mesaj gönderilmedi." };
+    }
+    const sendIcon = firstVisible(root, ['footer span[data-icon="send"]', 'footer [data-testid="compose-btn-send"]']);
+    const sendControl = firstVisible(root, [
+      'footer button[aria-label="Send"]',
+      'footer button[aria-label="Gönder"]',
+      'footer [role="button"][aria-label="Send"]',
+      'footer [role="button"][aria-label="Gönder"]'
+    ]) || (sendIcon && sendIcon.closest('button, [role="button"]'));
+    if (!sendControl || sendControl.hasAttribute("disabled") || sendControl.getAttribute("aria-disabled") === "true") {
+      return { ok: false, code: "send_missing", message: "WhatsApp Gönder düğmesi onaydan sonra kullanılamaz oldu; mesaj gönderilmedi." };
+    }
+    sendControl.click();
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const currentComposer = firstVisible(root, [
+          'footer [contenteditable="true"][role="textbox"]',
+          'footer [contenteditable="true"][data-tab]',
+          '[contenteditable="true"][role="textbox"]'
+        ]);
+        const remainingText = clean(currentComposer && (currentComposer.innerText || currentComposer.textContent));
+        resolve(remainingText === ""
+          ? { ok: true, code: "sent", message: "WhatsApp Web mesaj kutusu temizlendi; gönderim tamamlandı.", chatTitle }
+          : { ok: false, code: "send_unconfirmed", message: "Gönderim sonucu kesin doğrulanamadı. Yinelenen mesajı önlemek için tekrar göndermeden önce sohbeti kontrol edin.", chatTitle, composerText: remainingText });
+      }, 1200);
+    });
+  })()`;
+}
+
+function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selectedUrl, onSelectRequest, onOpenExternal, onMessageSent }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const [connectionState, setConnectionState] = useState<WhatsAppConnectionState>("idle");
   const [connectionMessage, setConnectionMessage] = useState("WhatsApp Web yükleniyor.");
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
+  const [sendState, setSendState] = useState<SyncState>("idle");
+  const [sendMessage, setSendMessage] = useState("Müşteri sohbetini açın, metni kontrol edin ve gönderimi onaylayın.");
   const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
   const webViewAction = useMemo(
     () => (selectedRequest ? prepareWhatsAppAction({ phone: selectedRequest.customer_phone, message: selectedMessage, preferredMode: "webview" }) : null),
@@ -1719,6 +2507,8 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
       setConnectionState("idle");
       setConnectionMessage("Talep seçin.");
       setCopyMessage("Hazır mesaj bekliyor.");
+      setSendState("idle");
+      setSendMessage("Gönderim için talep seçin.");
       setWebViewUrl(WHATSAPP_WEB_HOME_URL);
       return;
     }
@@ -1727,6 +2517,8 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
       setConnectionState("error");
       setConnectionMessage(webViewAction?.message ?? "WhatsApp hedefi hazırlanamadı.");
       setCopyMessage("Mesaj elle kopyalanabilir.");
+      setSendState("error");
+      setSendMessage("Geçerli telefon ve hazır mesaj olmadan gönderim yapılamaz.");
       setWebViewUrl(WHATSAPP_WEB_HOME_URL);
       return;
     }
@@ -1734,6 +2526,8 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
     setConnectionState("loading");
     setConnectionMessage("QR girişi bekliyor.");
     setCopyMessage("Hazır mesaj bekliyor.");
+    setSendState("idle");
+    setSendMessage("Müşteri sohbetini açın, metni kontrol edin ve gönderimi onaylayın.");
     setWebViewUrl(webViewPayload.homeUrl);
   }, [selectedRequest, webViewAction, webViewPayload]);
 
@@ -1790,7 +2584,78 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
 
     setConnectionState("loading");
     setConnectionMessage("Müşteri numarası açılıyor.");
+    setSendState("idle");
+    setSendMessage("WhatsApp Web sohbeti ve hazır metin yükleniyor.");
     setWebViewUrl(webViewPayload.url);
+  }
+
+  async function approveAndSendMessage() {
+    const webView = webViewRef.current;
+    if (!selectedRequest || !selectedMessage.trim() || !webView?.executeJavaScript) {
+      setSendState("error");
+      setSendMessage("Onaylı gönderim yalnızca masaüstü uygulamasındaki hazır WhatsApp Web ekranında kullanılabilir.");
+      return;
+    }
+
+    const currentUrl = webView.getURL?.() || webViewUrl;
+    if (!currentUrl.startsWith(WHATSAPP_WEB_HOME_URL)) {
+      setSendState("error");
+      setSendMessage("Güvenlik kontrolü: açık sayfa WhatsApp Web olmadığı için gönderim durduruldu.");
+      return;
+    }
+
+    setSendState("loading");
+    setSendMessage("Açık sohbet ve mesaj metni doğrulanıyor...");
+
+    try {
+      const inspection = asWhatsAppDomResult(await webView.executeJavaScript(createWhatsAppInspectionScript(selectedMessage), true));
+      if (!inspection.ok) {
+        setSendState("error");
+        setSendMessage(inspection.message);
+        return;
+      }
+
+      const approved = window.confirm(
+        [
+          "WhatsApp Web üzerinden mesaj gönderilecek.",
+          "",
+          `Açık sohbet: ${inspection.chatTitle || "Bilinmeyen sohbet"}`,
+          `Talep sahibi: ${selectedRequest.customer_name} (${selectedRequest.customer_phone})`,
+          "",
+          "Gönderilecek mesaj:",
+          selectedMessage,
+          "",
+          "Bu mesajı göndermeyi onaylıyor musunuz?"
+        ].join("\n")
+      );
+
+      if (!approved) {
+        setSendState("idle");
+        setSendMessage("Gönderim kullanıcı tarafından iptal edildi.");
+        return;
+      }
+
+      setSendMessage("Onay alındı; WhatsApp Web gönderimi yapılıyor...");
+      const sendResult = asWhatsAppDomResult(
+        await webView.executeJavaScript(createWhatsAppSendScript(selectedMessage, inspection.chatTitle || ""), true)
+      );
+      if (!sendResult.ok) {
+        setSendState("error");
+        setSendMessage(sendResult.message);
+        return;
+      }
+
+      const recordResult = await onMessageSent(selectedRequest.id, selectedMessage);
+      setSendState("success");
+      setSendMessage(
+        recordResult.ok
+          ? "Mesaj kullanıcı onayıyla WhatsApp Web üzerinden gönderildi."
+          : `Mesaj WhatsApp Web'e gönderildi; yerel kayıt güncellenemedi: ${recordResult.message}`
+      );
+    } catch {
+      setSendState("error");
+      setSendMessage("WhatsApp Web DOM denetimi tamamlanamadı. Sohbeti yeniden açıp tekrar deneyin.");
+    }
   }
 
   return (
@@ -1847,7 +2712,13 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
             <ExternalLink size={16} aria-hidden="true" />
             Dışarıda Aç
           </button>
+          <button className="whatsapp-approved-send" type="button" onClick={approveAndSendMessage} disabled={!webViewPayload || sendState === "loading"}>
+            <Send size={16} aria-hidden="true" />
+            {sendState === "loading" ? "Doğrulanıyor" : "Onayla ve Gönder"}
+          </button>
         </div>
+
+        <p className={`whatsapp-send-status sync-${sendState}`} role="status">{sendMessage}</p>
 
         <div className="whatsapp-webview-frame">
           {webViewUrl ? (
@@ -1909,6 +2780,7 @@ function WhatsAppWorkspace({ requests, selectedRequest, selectedMessage, selecte
 interface RequestsWorkspaceProps {
   requests: SyncedCustomerRequest[];
   selectedRequest: SyncedCustomerRequest | undefined;
+  aiEnabled: boolean;
   convertingRequestId: string;
   suggestingRequestId: string;
   manualRequestForm: ManualRequestFormState;
@@ -1927,6 +2799,7 @@ interface RequestsWorkspaceProps {
 function RequestsWorkspace({
   requests,
   selectedRequest,
+  aiEnabled,
   convertingRequestId,
   suggestingRequestId,
   manualRequestForm,
@@ -2099,10 +2972,12 @@ function RequestsWorkspace({
                 <MessageCircle size={16} aria-hidden="true" />
                 WhatsApp'tan Yaz
               </button>
-              <button type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
-                <Sparkles size={16} aria-hidden="true" />
-                {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Taslak Yenile"}
-              </button>
+              {aiEnabled && (
+                <button type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
+                  <Sparkles size={16} aria-hidden="true" />
+                  {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Taslak Yenile"}
+                </button>
+              )}
               {selectedRequest.status !== "converted_to_reservation" && (
                 <button type="button" onClick={() => onConvert(selectedRequest)} disabled={convertingRequestId === selectedRequest.id}>
                   <CalendarCheck size={16} aria-hidden="true" />
@@ -3243,6 +4118,15 @@ function formatRequestType(value: string) {
   return labels[value] ?? "Bilgi talebi";
 }
 
+function getAiWorkspaceModeLabel(mode: AiWorkspaceMode) {
+  const labels: Record<AiWorkspaceMode, string> = {
+    reply: "Cevap taslağı",
+    summary: "Talep özeti",
+    daily: "Günlük değerlendirme"
+  };
+  return labels[mode];
+}
+
 function formatRequestStatus(value: string) {
   const labels: Record<string, string> = {
     new: "Onay bekliyor",
@@ -3493,6 +4377,10 @@ function getPageMeta(page: DesktopPage) {
     whatsapp: {
       eyebrow: "Müşteri Yanıtları",
       title: "WhatsApp"
+    },
+    ai: {
+      eyebrow: "İşletme Asistanı",
+      title: "AI Yardımcı"
     }
   };
 
@@ -3507,11 +4395,18 @@ function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     whatsapp: setupData.whatsapp || "+905321234567",
     email: setupData.email || "",
     address: setupData.address || "",
-    webModuleUrl: setupData.webModuleUrl || "http://127.0.0.1:8080",
+    webModuleUrl: setupData.webModuleUrl || "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : generateSyncSecret(),
     aiEnabled: setupData.aiEnabled,
     aiProvider: setupData.aiProvider || "openai_compatible",
+    aiService: setupData.aiService || "openai",
+    aiProjectName: setupData.aiProjectName || "",
+    aiGoogleCurl: "",
+    aiBaseUrl: setupData.aiBaseUrl || "https://api.openai.com/v1",
     aiModel: setupData.aiModel,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    aiTimeoutSeconds: String(setupData.aiTimeoutSeconds || 30),
     roomsEnabled: setupData.modules.rooms,
     tablesEnabled: setupData.modules.tables,
     qrMenuEnabled: setupData.modules.qrMenu,
@@ -3520,6 +4415,18 @@ function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
     tableCount: String(Math.max(0, setupData.initialCounts.tables || 2))
   };
+}
+
+function formatDateTime(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(timestamp));
 }
 
 function generateSyncSecret() {

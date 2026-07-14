@@ -92,7 +92,7 @@ Firma web modülünde müşteriye açık `menu.html` QR menü sayfası ve `api/m
 
 QR menü için PC tarafında kategori/ürün yönetim ekranı bulunur; local SQLite verisi `pushMenu()` ile firma web modülündeki `publish_menu` aksiyonuna gönderilebilir.
 
-AI tarafında `packages/ai-core` provider bağımsız prompt/knowledge/adapter katmanını sağlar. Firma web modülündeki `api/chat.php`, AI kapalıyken güvenli fallback cevap döner; ortam değişkenleriyle OpenAI uyumlu endpoint aktif edilebilir. Sohbet içinde müşteri adı, geçerli cep telefonu ve talep niyeti geldiğinde web modülü `source=web_ai` talebi de `requests.json` içine kaydeder.
+AI tarafında `packages/ai-core` provider bağımsız prompt/knowledge/adapter katmanını sağlar. Servis, bağlantı adresi, model, gizli anahtar ve zaman aşımı masaüstü Ayarlar ekranından yönetilir; anahtar işletim sistemi güvenli saklama alanıyla şifrelenir ve renderer'a geri dönmez. Aynı ayar HTTPS + `sync_secret` ile firma web modülüne yayınlanır; `api/chat.php` son yayınlanan sunucu ayarını kullanır, AI kapalıyken güvenli fallback cevap döner. Sohbet içinde müşteri adı, geçerli cep telefonu ve talep niyeti geldiğinde web modülü `source=web_ai` talebi de `requests.json` içine kaydeder.
 
 WhatsApp tarafında `packages/whatsapp-bridge` Türkiye cep telefonu normalizasyonu, `wa.me` link üretimi, manuel kopyalama ve WebView/resmi API geçişleri için ortak adapter yüzeyini sağlar.
 

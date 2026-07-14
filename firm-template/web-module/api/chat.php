@@ -76,6 +76,9 @@ try {
         'customer_id' => '',
         'request_id' => $requestId,
         'status' => $requestId !== '' ? 'converted_to_request' : ($result['fallback'] ? 'fallback' : 'answered'),
+        'provider' => $result['provider'],
+        'model' => $result['model'],
+        'error_code' => (string) ($result['error']['code'] ?? ''),
         'messages_json' => json_encode([
             [
                 'role' => 'user',
@@ -88,7 +91,7 @@ try {
                 'created_at' => $now
             ]
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-        'summary' => '',
+        'summary' => $result['fallback'] ? (string) ($result['error']['message'] ?? '') : '',
         'created_at' => $now,
         'updated_at' => $now,
         'sync_status' => 'local_only'
@@ -104,6 +107,7 @@ ya_chat_response(200, [
     'ok' => true,
     'answer' => $result['answer'],
     'fallback' => $result['fallback'],
+    'error' => $result['fallback'] ? $result['error'] : null,
     'provider' => $result['provider'],
     'model' => $result['model'],
     'conversation_id' => $conversationId,
@@ -117,63 +121,59 @@ ya_chat_response(200, [
 
 function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $payload, string $message, array $knowledgeDocuments): array
 {
-    $fallbackAnswer = ya_chat_fallback_answer();
     $enabled = ya_chat_bool($aiConfig['enabled'] ?? false);
     $provider = ya_chat_string($aiConfig['provider'] ?? 'disabled') ?: 'disabled';
 
     if (!$enabled) {
-        return [
-            'answer' => $fallbackAnswer,
-            'fallback' => true,
-            'provider' => 'disabled',
-            'model' => ''
-        ];
+        return ya_chat_fallback_result('disabled', '', ya_chat_error(
+            'ai_disabled',
+            'AI bağlantısı işletme ayarlarında kapalı.',
+            false
+        ));
     }
 
     if ($provider !== 'openai_compatible') {
-        return [
-            'answer' => $fallbackAnswer,
-            'fallback' => true,
-            'provider' => $provider,
-            'model' => ''
-        ];
+        return ya_chat_fallback_result($provider, '', ya_chat_error(
+            'unsupported_provider',
+            'Seçili AI sağlayıcısı web sohbeti tarafından desteklenmiyor.',
+            false
+        ));
     }
 
     $baseUrl = ya_chat_string($aiConfig['base_url'] ?? '');
     $model = ya_chat_string($aiConfig['model'] ?? '');
     $apiKey = ya_chat_string($aiConfig['api_key'] ?? '');
+    $service = ya_chat_string($aiConfig['service'] ?? 'custom');
 
     if ($baseUrl === '' || $model === '' || $apiKey === '') {
-        return [
-            'answer' => $fallbackAnswer,
-            'fallback' => true,
-            'provider' => 'openai_compatible',
-            'model' => $model
-        ];
+        return ya_chat_fallback_result('openai_compatible', $model, ya_chat_error(
+            'configuration_incomplete',
+            'AI bağlantı adresi, model veya erişim anahtarı ayarlarından biri eksik.',
+            false
+        ));
     }
 
-    $chatResult = ya_chat_call_openai_compatible([
+    $chatOptions = [
         'base_url' => $baseUrl,
         'model' => $model,
         'api_key' => $apiKey,
         'timeout_seconds' => ya_chat_int($aiConfig['timeout_seconds'] ?? 15, 15),
         'messages' => ya_chat_build_messages($businessConfig, $payload, $message, $knowledgeDocuments)
-    ]);
+    ];
+    $chatResult = $service === 'gemini'
+        ? ya_chat_call_google_ai_studio($chatOptions)
+        : ya_chat_call_openai_compatible($chatOptions);
 
     if (!$chatResult['ok']) {
-        return [
-            'answer' => $fallbackAnswer,
-            'fallback' => true,
-            'provider' => 'openai_compatible',
-            'model' => $model
-        ];
+        return ya_chat_fallback_result('openai_compatible', $model, $chatResult['error']);
     }
 
     return [
         'answer' => $chatResult['answer'],
         'fallback' => false,
         'provider' => 'openai_compatible',
-        'model' => $model
+        'model' => $model,
+        'error' => null
     ];
 }
 
@@ -251,7 +251,7 @@ function ya_chat_call_openai_compatible(array $options): array
     if (!$response['ok']) {
         return [
             'ok' => false,
-            'message' => 'AI cevabı alınamadı.'
+            'error' => ya_chat_classify_provider_error($response)
         ];
     }
 
@@ -259,7 +259,11 @@ function ya_chat_call_openai_compatible(array $options): array
     if (!is_array($data)) {
         return [
             'ok' => false,
-            'message' => 'AI cevabı okunamadı.'
+            'error' => ya_chat_error(
+                'provider_invalid_response',
+                'AI servisi geçerli bir JSON yanıtı döndürmedi.',
+                true
+            )
         ];
     }
 
@@ -274,14 +278,94 @@ function ya_chat_call_openai_compatible(array $options): array
     if ($answer === '') {
         return [
             'ok' => false,
-            'message' => 'AI cevabı boş döndü.'
+            'error' => ya_chat_error(
+                'provider_empty_response',
+                'AI servisi boş bir yanıt döndürdü.',
+                true
+            )
         ];
     }
 
     return [
         'ok' => true,
-        'answer' => $answer
+        'answer' => $answer,
+        'error' => null
     ];
+}
+
+function ya_chat_call_google_ai_studio(array $options): array
+{
+    $systemParts = [];
+    $contents = [];
+    foreach ($options['messages'] as $message) {
+        $role = ya_chat_string($message['role'] ?? '');
+        $text = ya_chat_string($message['content'] ?? '');
+        if ($text === '') {
+            continue;
+        }
+        if (in_array($role, ['system', 'developer'], true)) {
+            $systemParts[] = $text;
+            continue;
+        }
+        if (!in_array($role, ['user', 'assistant'], true)) {
+            continue;
+        }
+        $contents[] = [
+            'role' => $role === 'assistant' ? 'model' : 'user',
+            'parts' => [['text' => $text]]
+        ];
+    }
+
+    $requestBody = ['contents' => $contents];
+    if ($systemParts !== []) {
+        $requestBody['systemInstruction'] = [
+            'parts' => [['text' => implode("\n\n", $systemParts)]]
+        ];
+    }
+
+    $response = ya_chat_post_json(
+        ya_chat_google_generate_content_url($options['base_url'], $options['model']),
+        $requestBody,
+        [
+            'x-goog-api-key: ' . $options['api_key'],
+            'Content-Type: application/json'
+        ],
+        max(1, ya_chat_int($options['timeout_seconds'] ?? 15, 15))
+    );
+
+    if (!$response['ok']) {
+        return [
+            'ok' => false,
+            'error' => ya_chat_classify_provider_error($response)
+        ];
+    }
+
+    $data = json_decode($response['body'], true);
+    if (!is_array($data)) {
+        return [
+            'ok' => false,
+            'error' => ya_chat_error('provider_invalid_response', 'Google AI Studio geçerli bir JSON yanıtı döndürmedi.', true)
+        ];
+    }
+
+    $parts = $data['candidates'][0]['content']['parts'] ?? [];
+    $answerParts = [];
+    if (is_array($parts)) {
+        foreach ($parts as $part) {
+            if (is_array($part)) {
+                $answerParts[] = ya_chat_string($part['text'] ?? '');
+            }
+        }
+    }
+    $answer = trim(implode('', $answerParts));
+    if ($answer === '') {
+        return [
+            'ok' => false,
+            'error' => ya_chat_error('provider_empty_response', 'Google AI Studio boş bir yanıt döndürdü.', true)
+        ];
+    }
+
+    return ['ok' => true, 'answer' => $answer, 'error' => null];
 }
 
 function ya_chat_post_json(string $url, array $body, array $headers, int $timeoutSeconds): array
@@ -290,7 +374,10 @@ function ya_chat_post_json(string $url, array $body, array $headers, int $timeou
     if ($json === false) {
         return [
             'ok' => false,
-            'body' => ''
+            'body' => '',
+            'status' => 0,
+            'network_error' => 0,
+            'network_message' => ''
         ];
     }
 
@@ -305,11 +392,16 @@ function ya_chat_post_json(string $url, array $body, array $headers, int $timeou
         ]);
         $bodyText = curl_exec($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        $curlErrorNumber = curl_errno($handle);
+        $curlError = curl_error($handle);
         curl_close($handle);
 
         return [
             'ok' => is_string($bodyText) && $status >= 200 && $status < 300,
-            'body' => is_string($bodyText) ? $bodyText : ''
+            'body' => is_string($bodyText) ? $bodyText : '',
+            'status' => $status,
+            'network_error' => $curlErrorNumber,
+            'network_message' => $curlError
         ];
     }
 
@@ -329,7 +421,98 @@ function ya_chat_post_json(string $url, array $body, array $headers, int $timeou
 
     return [
         'ok' => is_string($bodyText) && $status >= 200 && $status < 300,
-        'body' => is_string($bodyText) ? $bodyText : ''
+        'body' => is_string($bodyText) ? $bodyText : '',
+        'status' => $status,
+        'network_error' => $bodyText === false ? 1 : 0,
+        'network_message' => ''
+    ];
+}
+
+function ya_chat_classify_provider_error(array $response): array
+{
+    $status = (int) ($response['status'] ?? 0);
+    $networkError = (int) ($response['network_error'] ?? 0);
+    $networkMessage = strtolower((string) ($response['network_message'] ?? ''));
+
+    if ($status === 429) {
+        return ya_chat_error(
+            'provider_rate_limited',
+            'AI servisi istek sınırına ulaştı. Lütfen birkaç dakika sonra yeniden deneyin.',
+            true,
+            429
+        );
+    }
+
+    if (in_array($status, [401, 403], true)) {
+        return ya_chat_error(
+            'provider_authentication_failed',
+            'AI servisi erişim anahtarını kabul etmedi. İşletme AI ayarları kontrol edilmeli.',
+            false,
+            $status
+        );
+    }
+
+    if ($status === 404) {
+        return ya_chat_error(
+            'provider_model_or_endpoint_not_found',
+            'AI servis adresi veya seçili model bulunamadı. İşletme AI ayarları kontrol edilmeli.',
+            false,
+            404
+        );
+    }
+
+    if (in_array($status, [408, 504], true) || str_contains($networkMessage, 'timed out')) {
+        return ya_chat_error(
+            'provider_timeout',
+            'AI servisi zamanında yanıt vermedi. Lütfen kısa süre sonra yeniden deneyin.',
+            true,
+            $status
+        );
+    }
+
+    if ($status >= 500) {
+        return ya_chat_error(
+            'provider_unavailable',
+            'AI sağlayıcısında geçici bir servis sorunu var. Lütfen daha sonra yeniden deneyin.',
+            true,
+            $status
+        );
+    }
+
+    if ($status === 0 || $networkError !== 0) {
+        return ya_chat_error(
+            'provider_connection_failed',
+            'AI sağlayıcısına ağ bağlantısı kurulamadı. Sunucu bağlantısı kontrol edilmeli.',
+            true
+        );
+    }
+
+    return ya_chat_error(
+        'provider_request_failed',
+        'AI sağlayıcısı isteği kabul etmedi. İşletme AI ayarları ve servis durumu kontrol edilmeli.',
+        $status >= 500,
+        $status
+    );
+}
+
+function ya_chat_error(string $code, string $message, bool $retryable, int $httpStatus = 0): array
+{
+    return [
+        'code' => $code,
+        'message' => $message,
+        'retryable' => $retryable,
+        'provider_status' => $httpStatus > 0 ? $httpStatus : null
+    ];
+}
+
+function ya_chat_fallback_result(string $provider, string $model, array $error): array
+{
+    return [
+        'answer' => ya_chat_fallback_answer((string) ($error['message'] ?? '')),
+        'fallback' => true,
+        'provider' => $provider,
+        'model' => $model,
+        'error' => $error
     ];
 }
 
@@ -341,6 +524,12 @@ function ya_chat_completions_url(string $baseUrl): string
     }
 
     return $baseUrl . '/chat/completions';
+}
+
+function ya_chat_google_generate_content_url(string $baseUrl, string $model): string
+{
+    $apiBaseUrl = preg_replace('#/openai/?$#', '', rtrim($baseUrl, '/'));
+    return rtrim((string) $apiBaseUrl, '/') . '/models/' . rawurlencode(preg_replace('#^models/#', '', trim($model))) . ':generateContent';
 }
 
 function ya_chat_load_knowledge(string $directory): array
@@ -392,9 +581,14 @@ function ya_chat_markdown_title(string $content): string
     return '';
 }
 
-function ya_chat_fallback_answer(): string
+function ya_chat_fallback_answer(string $reason = ''): string
 {
-    return 'AI yardımcı şu anda aktif değil. Talebinizi form veya WhatsApp üzerinden iletebilirsiniz; işletme sahibi müsaitlik ve fiyat bilgisini kontrol edip dönüş yapacaktır.';
+    $prefix = trim($reason);
+    if ($prefix !== '') {
+        $prefix .= ' ';
+    }
+
+    return $prefix . 'Talebinizi form veya WhatsApp üzerinden iletebilirsiniz; işletme sahibi müsaitlik ve fiyat bilgisini kontrol edip dönüş yapacaktır.';
 }
 
 function ya_chat_extract_request(array $businessConfig, array $payload, string $message, string $now): array

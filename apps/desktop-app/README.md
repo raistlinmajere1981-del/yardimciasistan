@@ -11,6 +11,7 @@ npm run dev
 npm run build
 npm run pack:dir
 npm run pack:win
+npm run pack:win32
 npm run typecheck
 ```
 
@@ -19,6 +20,11 @@ Kökten çalıştırmak için:
 ```bash
 npm run dev:desktop
 ```
+
+Masaüstü uygulamasının varsayılan web modülü
+`https://yardimciasistan.alwaysdata.net/yardimci-asistan` adresindeki canlı demo
+kurulumudur. Ayarlar ekranındaki güvenlik anahtarı hosting kurulumundaki
+`config/business.json → sync_secret` değeriyle eşleşmelidir.
 
 ## İlk Durum
 
@@ -32,7 +38,10 @@ Bu iskelet şu parçaları içerir:
 - Talepler, müşteriler, basit raporlar, günlük işler, odalar, masalar ve rezervasyonlar için yan menüden açılan günlük yönetim ekranları, manuel talep oluşturma formu ve local status update IPC akışları.
 - QR menü kategori/ürün yönetimi, local SQLite kaydı ve web modülüne yayınlama akışı.
 - WhatsApp WebView çalışma ekranı, müşteri numarasına gitme ve manuel hazır mesaj kopyalama akışı.
+- AI Yardımcı çalışma alanında seçili talep için düzenlenebilir cevap taslağı ve özet, günlük operasyon değerlendirmesi, ek talimat, yerel çalışma geçmişi, talebe kaydetme ve WhatsApp'a hazırlama akışları.
 - İlk kurulum sihirbazı, uygulama veri klasörü altında SQLite dosyası ve ana panelden manuel `backups/` yedeği alma akışı.
+- Ayarlar ekranında masaüstü ve web için ortak AI servisi/adres/model/anahtar/zaman aşımı yönetimi, bağlantı testi ve web modülüne otomatik yayınlama. Gizli anahtar Electron `safeStorage` ile şifrelenir ve renderer'a geri okunmaz.
+- Google AI Studio seçildiğinde API anahtarı ayrıntısındaki `Copy cURL quickstart` çıktısı tek alana yapıştırılır. Uygulama adres, authorization key ve örnek modeli ayıklayıp Models API'den metin modellerini çeker; model seçimi ek istek çalıştırmadan yalnız ayar değerini günceller.
 
 Installer hazırlığı için:
 
@@ -45,3 +54,13 @@ Kökten paketleme doğrulaması için:
 ```bash
 npm run smoke:desktop-package
 ```
+
+Windows 64 bit ve 32 bit installer çıktıları için:
+
+```bash
+npm run pack:desktop:win
+npm run pack:desktop:win32
+```
+
+32 bit paket `electron-builder.win32.yml` üzerinden ayrı
+`YardimciAsistan-Setup-<sürüm>-x86.exe` çıktısı üretir.

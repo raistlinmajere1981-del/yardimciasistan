@@ -42,6 +42,7 @@ public class MainActivity extends Activity {
   private static final int ACCENT = Color.rgb(228, 120, 99);
   private static final String PREFS_NAME = "yardimci_asistan_android";
   private static final String KEY_WEB_MODULE_URL = "web_module_url";
+  private static final String DEFAULT_WEB_MODULE_URL = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
   private static final String KEY_SYNC_SECRET = "sync_secret";
   private static final String DEMO_PHONE = "+905321234567";
   private static final String DEMO_WHATSAPP = "905321234567";
@@ -168,7 +169,7 @@ public class MainActivity extends Activity {
     title.setPadding(0, dp(8), 0, dp(8));
     card.addView(title);
 
-    webModuleUrlInput = input("https://firma.com/yardimci-asistan", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+    webModuleUrlInput = input(DEFAULT_WEB_MODULE_URL, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
     syncSecretInput = input("Sync güvenlik anahtarı", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
     card.addView(labelWithInput("Web modül adresi", webModuleUrlInput));
     card.addView(labelWithInput("Sync anahtarı", syncSecretInput));
@@ -482,7 +483,7 @@ public class MainActivity extends Activity {
     String extraSecret = getIntent().getStringExtra("ya_sync_secret");
     boolean hasExtraUrl = extraUrl != null && extraUrl.trim().length() > 0;
     boolean hasExtraSecret = extraSecret != null && extraSecret.trim().length() > 0;
-    webModuleUrlInput.setText(hasExtraUrl ? extraUrl.trim() : preferences.getString(KEY_WEB_MODULE_URL, ""));
+    webModuleUrlInput.setText(hasExtraUrl ? extraUrl.trim() : preferences.getString(KEY_WEB_MODULE_URL, DEFAULT_WEB_MODULE_URL));
     syncSecretInput.setText(hasExtraSecret ? extraSecret.trim() : preferences.getString(KEY_SYNC_SECRET, ""));
 
     if (hasExtraUrl || hasExtraSecret) {

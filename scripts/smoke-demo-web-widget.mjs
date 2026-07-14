@@ -86,7 +86,8 @@ try {
   const chatResponse = await chatResponsePromise;
   expect(chatResponse.status()).toBe(200);
   await expect(page.locator(".ya-widget-ai-answer")).toContainText("işletme sahibi");
-  await expect(page.locator(".ya-widget-status")).toContainText("güvenli yanıt");
+  await expect(page.locator(".ya-widget-status")).toContainText("AI bağlantısı işletme ayarlarında kapalı");
+  await expect(page.locator(".ya-widget-status")).toContainText("ai_disabled");
 
   const conversations = JSON.parse(readFileSync(conversationsFile, "utf8"));
   expect(conversations).toHaveLength(1);

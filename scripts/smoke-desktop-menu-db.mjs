@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import process from "node:process";
@@ -8,11 +8,12 @@ import process from "node:process";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 
+const appPath = join(process.cwd(), "apps", "desktop-app");
 const dataDir = join(process.cwd(), "artifacts", "desktop-menu-db-smoke", String(Date.now()));
 mkdirSync(dataDir, { recursive: true });
 
 const database = new DesktopDatabase({
-  appPath: join(process.cwd(), "apps", "desktop-app"),
+  appPath,
   userDataPath: dataDir
 });
 
@@ -21,20 +22,36 @@ try {
 
   const initialSetup = database.getSetupData();
   assert.equal(initialSetup.setupRequired, true);
+  assert.equal(initialSetup.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
+  assert.equal(initialSetup.aiEnabled, false);
+  assert.equal(initialSetup.aiService, "openai");
+  assert.equal(initialSetup.aiProjectName, "");
+  assert.equal(initialSetup.aiBaseUrl, "https://api.openai.com/v1");
+  assert.equal(initialSetup.aiTimeoutSeconds, 30);
+  assert.equal(initialSetup.aiApiKeyConfigured, false);
+  assert.equal(initialSetup.aiLastPublishedAt, "");
   assert.ok(database.backupPath.endsWith("backups"));
 
-  const setupResult = database.saveInitialSetup({
+  const firstRawAiApiKey = "smoke-raw-ai-key-never-persist-001";
+  const firstEncryptedAiApiKey = "safe-storage:v1:opaque-smoke-value-001";
+  const setupInput = {
     businessName: "Deniz Çiçeği Pansiyon & Kafe",
     businessType: "pension_restaurant",
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "smoke@example.test",
     address: "Smoke adresi",
-    webModuleUrl: "http://127.0.0.1:8080",
+    webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     syncSecret: "smoke-secret-12345",
-    aiEnabled: false,
+    aiEnabled: true,
     aiProvider: "openai_compatible",
-    aiModel: "",
+    aiService: "openrouter",
+    aiProjectName: "",
+    aiModel: "smoke-model-v1",
+    aiBaseUrl: "https://openrouter.example.test/api/v1/",
+    aiTimeoutSeconds: 30,
+    aiApiKey: firstRawAiApiKey,
+    clearAiApiKey: false,
     modules: {
       rooms: true,
       tables: true,
@@ -46,11 +63,121 @@ try {
       rooms: 3,
       tables: 3
     }
+  };
+  const setupResult = database.saveInitialSetup(setupInput, {
+    mode: "replace",
+    encryptedValue: firstEncryptedAiApiKey
   });
   assert.equal(setupResult.ok, true);
   assert.equal(setupResult.setupData.setupRequired, false);
-  assert.equal(setupResult.dashboardData.webModuleUrl, "http://127.0.0.1:8080");
+  assert.equal(setupResult.setupData.aiEnabled, true);
+  assert.equal(setupResult.setupData.aiProvider, "openai_compatible");
+  assert.equal(setupResult.setupData.aiService, "openrouter");
+  assert.equal(setupResult.setupData.aiModel, "smoke-model-v1");
+  assert.equal(setupResult.setupData.aiBaseUrl, "https://openrouter.example.test/api/v1");
+  assert.equal(setupResult.setupData.aiTimeoutSeconds, 30);
+  assert.equal(setupResult.setupData.aiApiKeyConfigured, true);
+  assert.equal(setupResult.setupData.aiLastPublishedAt, "");
+  assert.equal(database.getEncryptedAiApiKey(), firstEncryptedAiApiKey);
+  assert.equal(setupResult.dashboardData.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
   assert.ok(setupResult.dashboardData.backupPath.endsWith("backups"));
+
+  const publishedAt = "2026-07-12T09:30:00.000Z";
+  const publishedSetup = database.markAiSettingsPublished(publishedAt);
+  assert.equal(publishedSetup.aiLastPublishedAt, publishedAt);
+
+  const keepResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiApiKey: ""
+    },
+    { mode: "keep" }
+  );
+  assert.equal(keepResult.ok, true);
+  assert.equal(keepResult.setupData.aiApiKeyConfigured, true);
+  assert.equal(keepResult.setupData.aiLastPublishedAt, publishedAt);
+  assert.equal(database.getEncryptedAiApiKey(), firstEncryptedAiApiKey);
+
+  const invalidAiCases = [
+    [{ aiProvider: "unsupported" }, "provider"],
+    [{ aiService: "unsupported" }, "servisi"],
+    [{ aiBaseUrl: "https://user:pass@provider.example/v1" }, "base URL"],
+    [{ aiModel: "" }, "model"],
+    [{ aiTimeoutSeconds: 121 }, "zaman aşımı"]
+  ];
+  for (const [override, expectedMessage] of invalidAiCases) {
+    const invalidResult = database.saveInitialSetup(
+      {
+        ...setupInput,
+        ...override,
+        aiApiKey: ""
+      },
+      { mode: "keep" }
+    );
+    assert.equal(invalidResult.ok, false);
+    assert.match(invalidResult.message, new RegExp(expectedMessage, "i"));
+  }
+
+  const missingGoogleProjectResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiService: "gemini",
+      aiProjectName: "",
+      aiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      aiModel: "gemini-smoke",
+      aiApiKey: ""
+    },
+    { mode: "keep" }
+  );
+  assert.equal(missingGoogleProjectResult.ok, true);
+  assert.equal(missingGoogleProjectResult.setupData.aiProjectName, "");
+
+  const invalidGoogleUrlResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiService: "gemini",
+      aiProjectName: "",
+      aiBaseUrl: "https://provider.example.test/v1",
+      aiModel: "gemini-smoke",
+      aiApiKey: ""
+    },
+    { mode: "keep" }
+  );
+  assert.equal(invalidGoogleUrlResult.ok, false);
+  assert.match(invalidGoogleUrlResult.message, /resmi Gemini API/i);
+
+  const googleSetupResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiService: "gemini",
+      aiProjectName: "",
+      aiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      aiModel: "gemini-smoke",
+      aiApiKey: ""
+    },
+    { mode: "keep" }
+  );
+  assert.equal(googleSetupResult.ok, true);
+  assert.equal(googleSetupResult.setupData.aiService, "gemini");
+  assert.equal(googleSetupResult.setupData.aiProjectName, "");
+  assert.equal(googleSetupResult.setupData.aiBaseUrl, "https://generativelanguage.googleapis.com/v1beta");
+
+  const secondRawAiApiKey = "smoke-raw-ai-key-never-persist-002";
+  const secondEncryptedAiApiKey = "safe-storage:v1:opaque-smoke-value-002";
+  const replaceResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiApiKey: secondRawAiApiKey
+    },
+    {
+      mode: "replace",
+      encryptedValue: secondEncryptedAiApiKey
+    }
+  );
+  assert.equal(replaceResult.ok, true);
+  assert.equal(replaceResult.setupData.aiApiKeyConfigured, true);
+  assert.equal(replaceResult.setupData.aiLastPublishedAt, "");
+  assert.equal(database.getEncryptedAiApiKey(), secondEncryptedAiApiKey);
 
   const backupResult = database.createManualBackup();
   assert.equal(backupResult.ok, true);
@@ -59,6 +186,34 @@ try {
   assert.equal(existsSync(backupResult.backupFilePath), true);
   assert.ok(statSync(backupResult.backupFilePath).size > 0);
   assertReadableSqliteBackup(backupResult.backupFilePath);
+  assertFilesDoNotContainSecrets(
+    [database.databasePath, backupResult.backupFilePath],
+    [firstRawAiApiKey, secondRawAiApiKey]
+  );
+
+  const clearResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiEnabled: false,
+      aiApiKey: "",
+      clearAiApiKey: true
+    },
+    { mode: "clear" }
+  );
+  assert.equal(clearResult.ok, true);
+  assert.equal(clearResult.setupData.aiEnabled, false);
+  assert.equal(clearResult.setupData.aiApiKeyConfigured, false);
+  assert.equal(database.getEncryptedAiApiKey(), "");
+
+  const enableWithoutKeyResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiApiKey: ""
+    },
+    { mode: "keep" }
+  );
+  assert.equal(enableWithoutKeyResult.ok, false);
+  assert.match(enableWithoutKeyResult.message, /API anahtarı/i);
 
   const createdRequestEventCount = database.countEventsByType("request.created");
   const manualRequestResult = database.createManualRequest({
@@ -138,6 +293,49 @@ try {
   assert.equal(aiSuggestionResult.ok, true);
   assert.ok(aiSuggestionResult.dashboardData.requests.some((request) => request.id === "request_demo_001" && request.ai_suggested_reply.includes("smoke AI")));
   assert.ok(aiSuggestionResult.dashboardData.summary.preparedWhatsAppMessages >= 1);
+
+  const rejectedWhatsAppSentResult = database.markWhatsAppMessageSent({
+    requestId: "request_demo_001",
+    message: "AI taslağından farklı bir metin"
+  });
+  assert.equal(rejectedWhatsAppSentResult.ok, false);
+
+  const preparedBeforeSend = aiSuggestionResult.dashboardData.summary.preparedWhatsAppMessages;
+  const whatsappSentResult = database.markWhatsAppMessageSent({
+    requestId: "request_demo_001",
+    message: "Merhaba Demo Misafir, smoke AI cevap taslağı hazır."
+  });
+  assert.equal(whatsappSentResult.ok, true);
+  assert.equal(whatsappSentResult.dashboardData.summary.preparedWhatsAppMessages, preparedBeforeSend - 1);
+  assert.ok(database.countEventsByType("whatsapp.message_sent") >= 1);
+
+  const workspaceEntry = database.saveAiWorkspaceHistory({
+    mode: "summary",
+    requestId: "request_demo_001",
+    requestLabel: "Demo Misafir • Pansiyon rezervasyonu",
+    instructions: "Eksik bilgileri öne çıkar.",
+    content: "Demo Misafir balkonlu oda için bilgi istiyor.",
+    summary: "AI çalışma alanı smoke özeti",
+    missingFields: ["giriş saati"],
+    provider: "openai_compatible",
+    model: "smoke-model-v1",
+    fallback: false
+  });
+  assert.ok(workspaceEntry.id.startsWith("ai_conv_"));
+  const workspaceHistory = database.getAiWorkspaceHistory();
+  assert.equal(workspaceHistory[0].id, workspaceEntry.id);
+  assert.equal(workspaceHistory[0].mode, "summary");
+  assert.deepEqual(workspaceHistory[0].missingFields, ["giriş saati"]);
+
+  const workspaceSaveResult = database.saveAiWorkspaceResult({
+    mode: "summary",
+    requestId: "request_demo_001",
+    content: "Düzenlenen çalışma alanı özeti.",
+    summary: workspaceEntry.summary,
+    missingFields: workspaceEntry.missingFields
+  });
+  assert.equal(workspaceSaveResult.ok, true);
+  assert.ok(workspaceSaveResult.dashboardData.requests.some((request) => request.id === "request_demo_001" && request.ai_summary === "Düzenlenen çalışma alanı özeti."));
 
   const conversionResult = database.convertRequestToReservation("request_demo_001");
   assert.equal(conversionResult.ok, true);
@@ -232,6 +430,8 @@ try {
   });
   assert.equal(database.countEventsByType("sync.failed"), failedSyncCount + 1);
 
+  assertLegacyAiMigration(appPath, join(dataDir, "legacy-migration"));
+
   console.log(`desktop-menu-db-ok: setup ${categoryResult.savedId} ${itemResult.savedId}`);
 } finally {
   database.close();
@@ -245,11 +445,82 @@ function assertReadableSqliteBackup(backupFilePath) {
     assert.equal(scalar(backupDb, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Deniz Çiçeği Pansiyon & Kafe");
     assert.equal(scalar(backupDb, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1"), "smoke-secret-12345");
     assert.equal(Number(scalar(backupDb, "SELECT setup_completed FROM settings WHERE deleted_at = '' LIMIT 1")), 1);
+    assert.equal(scalar(backupDb, "SELECT ai_service FROM settings WHERE deleted_at = '' LIMIT 1"), "openrouter");
+    assert.equal(scalar(backupDb, "SELECT ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1"), "safe-storage:v1:opaque-smoke-value-002");
     assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")) >= 3);
     assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM tables WHERE deleted_at = ''")) >= 3);
     assert.equal(scalar(backupDb, "SELECT customer_name FROM requests WHERE id = 'request_demo_001'"), "Demo Misafir");
   } finally {
     backupDb.close();
+  }
+}
+
+function assertLegacyAiMigration(desktopAppPath, legacyDataDir) {
+  mkdirSync(legacyDataDir, { recursive: true });
+  const legacyDatabasePath = join(legacyDataDir, "yardimci-asistan.sqlite");
+  const legacyDb = new DatabaseSync(legacyDatabasePath);
+
+  try {
+    legacyDb.exec(`
+      CREATE TABLE schema_migrations (
+        id TEXT PRIMARY KEY,
+        applied_at TEXT NOT NULL
+      );
+    `);
+    legacyDb.exec(readFileSync(join(desktopAppPath, "db", "migrations", "001_initial_schema.sql"), "utf8"));
+    legacyDb.exec(readFileSync(join(desktopAppPath, "db", "migrations", "002_setup_completion.sql"), "utf8"));
+    legacyDb.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run("001_initial_schema.sql", "2026-07-10T10:00:00.000Z");
+    legacyDb.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run("002_setup_completion.sql", "2026-07-10T10:00:01.000Z");
+    legacyDb.exec(`
+      INSERT INTO business (
+        id, name, display_name, business_type, whatsapp, modules_json, created_at, updated_at
+      ) VALUES (
+        'business_demo_001', 'legacy-smoke', 'Legacy Smoke', 'other', '+905551112233', '{}',
+        '2026-07-10T10:00:00.000Z', '2026-07-10T10:00:00.000Z'
+      );
+
+      INSERT INTO settings (
+        id, business_id, web_module_url, sync_secret, ai_enabled, ai_provider, ai_model,
+        created_at, updated_at, setup_completed
+      ) VALUES (
+        'settings_demo_001', 'business_demo_001', 'https://yardimciasistan.alwaysdata.net/', 'legacy-secret-12345',
+        1, 'openai_compatible', 'legacy-model',
+        '2026-07-10T10:00:00.000Z', '2026-07-10T10:00:00.000Z', 1
+      );
+    `);
+  } finally {
+    legacyDb.close();
+  }
+
+  const migratedDatabase = new DesktopDatabase({
+    appPath: desktopAppPath,
+    userDataPath: legacyDataDir
+  });
+
+  try {
+    migratedDatabase.initialize();
+    const migratedSetup = migratedDatabase.getSetupData();
+    assert.equal(migratedSetup.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
+    assert.equal(migratedSetup.aiEnabled, true);
+    assert.equal(migratedSetup.aiProvider, "openai_compatible");
+    assert.equal(migratedSetup.aiService, "openai");
+    assert.equal(migratedSetup.aiModel, "legacy-model");
+    assert.equal(migratedSetup.aiBaseUrl, "https://api.openai.com/v1");
+    assert.equal(migratedSetup.aiTimeoutSeconds, 30);
+    assert.equal(migratedSetup.aiApiKeyConfigured, false);
+    assert.equal(migratedSetup.aiLastPublishedAt, "");
+    assert.equal(migratedDatabase.getEncryptedAiApiKey(), "");
+  } finally {
+    migratedDatabase.close();
+  }
+}
+
+function assertFilesDoNotContainSecrets(filePaths, secrets) {
+  for (const filePath of filePaths) {
+    const contents = readFileSync(filePath);
+    for (const secret of secrets) {
+      assert.equal(contents.includes(Buffer.from(secret, "utf8")), false, `${filePath} ham AI API anahtarını içermemeli.`);
+    }
   }
 }
 

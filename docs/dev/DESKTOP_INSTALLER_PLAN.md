@@ -135,9 +135,12 @@ Windows installer üretim komutu:
 
 ```bash
 npm run pack:desktop:win
+npm run pack:desktop:win32
 ```
 
-Bu komut `apps/desktop-app/electron-builder.yml` içindeki NSIS hedefini kullanır. İlk gerçek kurulum testi Windows işletim sisteminde yapılacaktır.
+64 bit komutu `apps/desktop-app/electron-builder.yml`, 32 bit komutu ise aynı
+ayarları genişleten `apps/desktop-app/electron-builder.win32.yml` içindeki NSIS
+hedefini kullanır. İlk gerçek kurulum testi Windows işletim sisteminde yapılacaktır.
 
 İlk Windows denemesinde doğrulanacaklar:
 

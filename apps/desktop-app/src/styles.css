@@ -141,6 +141,12 @@ button {
   letter-spacing: 0;
 }
 
+.setup-section-description {
+  margin: -4px 0 16px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .setup-grid {
   display: grid;
   gap: 12px;
@@ -151,7 +157,8 @@ button {
 }
 
 .setup-grid label,
-.setup-count-row label {
+.setup-count-row label,
+.setup-field {
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -162,7 +169,8 @@ button {
 
 .setup-grid input,
 .setup-grid select,
-.setup-count-row input {
+.setup-count-row input,
+.setup-field input {
   width: 100%;
   min-width: 0;
   min-height: 42px;
@@ -175,9 +183,56 @@ button {
   font-weight: 500;
 }
 
-.setup-grid input:disabled {
+.setup-grid input:disabled,
+.setup-grid select:disabled,
+.setup-field input:disabled {
   color: var(--muted);
   background: #f6f3ec;
+}
+
+.setup-grid-wide {
+  grid-column: 1 / -1;
+}
+
+.setup-field > small,
+.setup-grid label > small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.setup-ai-studio-help .setup-secondary {
+  width: 100%;
+}
+
+.setup-ai-studio-help .setup-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.setup-secret-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.setup-secret-input button {
+  min-width: 76px;
+  padding: 8px 12px;
+  color: var(--primary);
+  background: #edf6f1;
+  border: 1px solid #bcd8cc;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+}
+
+.setup-secret-input button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  background: #f6f3ec;
+  border-color: var(--line);
 }
 
 .setup-toggle-grid {
@@ -204,6 +259,40 @@ button {
 .setup-checkline input {
   width: 17px;
   min-height: 17px;
+}
+
+.setup-danger-checkline {
+  color: var(--red);
+  border-color: #efc7c2;
+  background: #fff7f6;
+}
+
+.setup-ai-actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.setup-ai-actions span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.setup-ai-actions small {
+  grid-column: 2;
+  color: var(--muted);
+}
+
+.setup-ai-actions.sync-success span {
+  color: var(--green);
+}
+
+.setup-ai-actions.sync-error span {
+  color: var(--red);
 }
 
 .setup-count-row {
@@ -1085,10 +1174,22 @@ button {
   font-weight: 800;
 }
 
-.whatsapp-command-row button:last-child {
+.whatsapp-command-row button:nth-child(2) {
   color: var(--ink);
   background: #fff8ee;
   border: 1px solid var(--line);
+}
+
+.whatsapp-command-row .whatsapp-approved-send {
+  margin-left: auto;
+  background: var(--green);
+}
+
+.whatsapp-send-status {
+  min-height: 22px;
+  margin: -2px 0 0;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .whatsapp-command-row button:disabled,
@@ -1586,6 +1687,320 @@ button {
   line-height: 1.45;
 }
 
+.ai-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.ai-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ai-status-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 16px 18px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.04);
+}
+
+.ai-status-card > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.ai-status-card strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 1.05rem;
+}
+
+.ai-status-card strong.is-online {
+  color: var(--green);
+}
+
+.ai-status-card strong.is-offline {
+  color: var(--red);
+}
+
+.ai-status-card small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.ai-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.72fr) minmax(460px, 1.28fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.ai-tool-panel,
+.ai-result-panel,
+.ai-history-panel {
+  min-width: 0;
+}
+
+.ai-mode-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ai-mode-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  color: var(--ink);
+  text-align: left;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.ai-mode-button span {
+  display: grid;
+  gap: 3px;
+}
+
+.ai-mode-button small {
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.ai-mode-button.is-active {
+  color: var(--primary);
+  background: #edf6f1;
+  border-color: #9dc7b6;
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
+.ai-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.ai-field > small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.ai-field select,
+.ai-field textarea,
+.ai-result-editor {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 11px;
+  color: var(--ink);
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.ai-field select:disabled {
+  color: var(--muted);
+  background: #f4f1ea;
+}
+
+.ai-request-context {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  padding: 11px 12px;
+  background: #f7f9fc;
+  border: 1px solid #dce3ec;
+  border-radius: 8px;
+}
+
+.ai-request-context span,
+.ai-request-context p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.ai-generate-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.ai-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ai-result-meta span {
+  padding: 5px 8px;
+  color: var(--muted);
+  background: #f2f5f9;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.ai-missing-fields {
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  color: #8c4f12;
+  background: #fff4dc;
+  border: 1px solid #efd19b;
+  border-radius: 8px;
+  line-height: 1.4;
+}
+
+.ai-result-editor {
+  min-height: 285px;
+  resize: vertical;
+}
+
+.ai-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ai-result-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: #fff8ee;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.ai-result-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.ai-result-actions .whatsapp-action {
+  color: #fff;
+  background: #1f8f68;
+  border-color: #1f8f68;
+}
+
+.ai-empty-result {
+  min-height: 330px;
+}
+
+.ai-workspace-message {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.ai-workspace-message.sync-success {
+  color: var(--green);
+}
+
+.ai-workspace-message.sync-error {
+  color: var(--red);
+}
+
+.ai-guardrail-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  color: #315d50;
+  background: #edf6f1;
+  border: 1px solid #c5ded3;
+  border-radius: 8px;
+  line-height: 1.45;
+}
+
+.ai-guardrail-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.ai-history-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ai-history-list button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px 12px;
+  color: var(--ink);
+  text-align: left;
+  background: #fffdf8;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.ai-history-list button:hover {
+  border-color: #9dc7b6;
+}
+
+.ai-history-list button > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.ai-history-list small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-history-list time {
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.ai-history-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: var(--primary);
+  background: #edf6f1;
+  border-radius: 8px;
+}
+
 @media (max-width: 1180px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1603,7 +2018,13 @@ button {
   .operations-grid,
   .report-metric-grid,
   .report-grid,
-  .setup-shell {
+  .setup-shell,
+  .ai-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-status-grid,
+  .ai-history-list {
     grid-template-columns: 1fr;
   }
 

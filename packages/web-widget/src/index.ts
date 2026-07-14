@@ -36,6 +36,21 @@ interface WidgetState {
   aiLoading: boolean;
 }
 
+interface AiErrorDetail {
+  code?: string;
+  message?: string;
+  retryable?: boolean;
+  provider_status?: number | null;
+}
+
+interface AiChatResponse {
+  ok?: boolean;
+  answer?: string;
+  message?: string;
+  fallback?: boolean;
+  error?: AiErrorDetail | null;
+}
+
 declare global {
   interface Window {
     YardimciAsistanWidget?: {
@@ -344,6 +359,7 @@ async function handleAiSubmit(event: Event) {
   state = { ...state, status: "Yanıt hazırlanıyor.", aiLoading: true };
   render();
 
+  let failureStatus = "";
   try {
     const endpoint = `${config.apiBaseUrl.replace(/\/$/, "")}/api/chat.php`;
     const response = await fetch(endpoint, {
@@ -353,27 +369,38 @@ async function handleAiSubmit(event: Event) {
       },
       body: JSON.stringify({ message })
     });
-    const result = await response.json().catch(() => null) as { ok?: boolean; answer?: string; message?: string; fallback?: boolean } | null;
+    const result = await response.json().catch(() => null) as AiChatResponse | null;
 
     if (!response.ok || !result?.ok || !result.answer) {
-      throw new Error(result?.message || "ai_failed");
+      failureStatus = formatAiError(result?.error, result?.message);
+      throw new Error("ai_failed");
     }
 
     state = {
       ...state,
       aiAnswer: result.answer,
       aiLoading: false,
-      status: result.fallback ? "AI kapalıyken güvenli yanıt gösterildi." : ""
+      status: result.fallback ? formatAiError(result.error) : ""
     };
     render();
   } catch {
     state = {
       ...state,
       aiLoading: false,
-      status: "AI yanıtı alınamadı. WhatsApp üzerinden yazabilirsiniz."
+      status: failureStatus || "AI servisine ulaşılamadı. İnternet veya sunucu bağlantısını kontrol edin. Hata kodu: widget_connection_failed."
     };
     render();
   }
+}
+
+function formatAiError(error?: AiErrorDetail | null, fallbackMessage = ""): string {
+  const message = String(error?.message || fallbackMessage || "AI yanıtı alınamadı.").trim();
+  const code = String(error?.code || "unknown_ai_error").trim();
+  const providerStatus = Number(error?.provider_status || 0);
+  const statusText = providerStatus > 0 ? ` (HTTP ${providerStatus})` : "";
+  const retryText = error?.retryable === true ? " Biraz sonra yeniden deneyebilirsiniz." : "";
+
+  return `${message} Hata kodu: ${code}${statusText}.${retryText}`;
 }
 
 function getOrCreateRoot() {

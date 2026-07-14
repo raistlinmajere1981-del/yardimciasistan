@@ -2,6 +2,7 @@ import type { AICompletionFailure, AICompletionResult, AIMessage, AIProviderConf
 
 export interface OpenAICompatibleChatOptions extends AIProviderConfig {
   messages: AIMessage[];
+  authMode?: "bearer" | "google_api_key";
 }
 
 interface ChatCompletionResponse {
@@ -38,7 +39,9 @@ export async function generateOpenAICompatibleChat(options: OpenAICompatibleChat
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${options.apiKey}`
+        ...(options.authMode === "google_api_key"
+          ? { "x-goog-api-key": options.apiKey }
+          : { Authorization: `Bearer ${options.apiKey}` })
       },
       body: JSON.stringify({
         model: options.model,

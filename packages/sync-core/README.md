@@ -47,6 +47,20 @@ pushAndroidSnapshot({
     updated_at: "2026-07-10T10:00:00+03:00"
   }
 });
+
+pushAiSettings({
+  baseUrl: "https://firma.example/yardimci-asistan",
+  syncSecret: "change-this-secret",
+  aiSettings: {
+    enabled: true,
+    provider: "openai_compatible",
+    service: "openrouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    model: "provider/model-name",
+    apiKey: "yalnız-main-process-değeri",
+    timeoutSeconds: 30
+  }
+});
 ```
 
 Başarısız bağlantı veya hatalı güvenlik anahtarı durumunda fonksiyonlar uygulamayı kilitlemez; `ok: false` ve kullanıcıya sade gösterilebilecek bir `message` döndürür.
@@ -54,6 +68,8 @@ Başarısız bağlantı veya hatalı güvenlik anahtarı durumunda fonksiyonlar 
 `pushMenu()` PC'deki QR menü verisini `api/sync.php` içindeki `publish_menu` aksiyonuna gönderir. Başarılı yayın sonrası müşteri menüsü `menu.html` üzerinden güncel veriyi okur.
 
 `pushAndroidSnapshot()` PC'deki local oda, masa, rezervasyon, günlük iş ve müşteri özetini `publish_android_snapshot` aksiyonuna gönderir. Android uygulama aynı veriyi `android_summary` cevabındaki `operations` ve `daily_tasks` alanlarından okur.
+
+`pushAiSettings()` masaüstünde kaydedilen AI bağlantısını `publish_ai_settings` aksiyonuna yollar. Uzak hedeflerde HTTPS zorunludur; HTTP yalnız loopback geliştirme adreslerinde kabul edilir. API anahtarı istekten sonra sonuç nesnesine veya hata mesajına geri taşınmaz.
 
 ## Komutlar
 

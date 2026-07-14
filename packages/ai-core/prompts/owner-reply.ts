@@ -1,5 +1,5 @@
 import type { AIMessage, AIProviderConfig, OwnerReplyInput, OwnerReplySuggestion } from "../types";
-import { generateOpenAICompatibleChat } from "../providers/openai-compatible";
+import { generateConfiguredChat } from "../providers/generate-chat";
 
 const requestTypeLabels: Record<string, string> = {
   general_info: "bilgi talebi",
@@ -65,6 +65,7 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         guestCount: input.guestCount,
         message: input.message,
         tone: input.tone ?? "warm",
+        additionalInstructions: String(input.instructions ?? "").trim().slice(0, 800),
         fallbackSummary: fallbackSuggestion.summary,
         fallbackMissingFields: fallbackSuggestion.missingFields,
         fallbackSuggestedReply: fallbackSuggestion.suggestedReply
@@ -89,7 +90,7 @@ export async function generateOwnerReplySuggestion(input: OwnerReplyInput, confi
     };
   }
 
-  const result = await generateOpenAICompatibleChat(
+  const result = await generateConfiguredChat(
     {
       ...config,
       messages: buildOwnerReplyMessages(input, fallbackSuggestion)

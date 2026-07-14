@@ -23,6 +23,20 @@ export interface PushAndroidSnapshotOptions extends SyncCoreConfig {
   snapshot: AndroidOperationsSnapshot;
 }
 
+export interface AiConnectionSettings {
+  enabled: boolean;
+  provider: string;
+  service: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  timeoutSeconds: number;
+}
+
+export interface PushAiSettingsOptions extends SyncCoreConfig {
+  aiSettings: AiConnectionSettings;
+}
+
 export interface SyncedCustomerRequest extends CustomerRequest {
   synced_at?: ISODateTimeString | "";
 }
@@ -132,10 +146,24 @@ export interface PushAndroidSnapshotSuccess {
   task_count: number;
 }
 
+export interface PushAiSettingsSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  enabled: boolean;
+  provider: string;
+  service: string;
+  base_url: string;
+  model: string;
+  timeout_seconds: number;
+  has_api_key: boolean;
+}
+
 export type PullRequestsResult = PullRequestsSuccess | SyncFailure;
 export type MarkRequestsSyncedResult = MarkRequestsSyncedSuccess | SyncFailure;
 export type PushMenuResult = PushMenuSuccess | SyncFailure;
 export type PushAndroidSnapshotResult = PushAndroidSnapshotSuccess | SyncFailure;
+export type PushAiSettingsResult = PushAiSettingsSuccess | SyncFailure;
 
 export function createSyncEndpointUrl(baseUrl: string): string {
   const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
@@ -171,6 +199,57 @@ export async function pushAndroidSnapshot(options: PushAndroidSnapshotOptions): 
   });
 }
 
+export async function pushAiSettings(options: PushAiSettingsOptions): Promise<PushAiSettingsResult> {
+  const targetValidationError = validateAiSettingsTarget(options.baseUrl);
+  if (targetValidationError) {
+    return targetValidationError;
+  }
+
+  const result = await syncRequest<PushAiSettingsSuccess>(options, {
+    action: "publish_ai_settings",
+    ai_settings: {
+      enabled: options.aiSettings.enabled,
+      provider: options.aiSettings.provider,
+      service: options.aiSettings.service,
+      base_url: options.aiSettings.baseUrl,
+      model: options.aiSettings.model,
+      api_key: options.aiSettings.apiKey,
+      timeout_seconds: options.aiSettings.timeoutSeconds
+    }
+  });
+
+  if (!result.ok) {
+    return {
+      ...result,
+      message: redactSecret(result.message, options.aiSettings.apiKey),
+      error: result.error ? redactSecret(result.error, options.aiSettings.apiKey) : undefined
+    };
+  }
+
+  const publishedAt = typeof result.published_at === "string" && Number.isFinite(Date.parse(result.published_at))
+    ? result.published_at
+    : "";
+  if (!publishedAt) {
+    return {
+      ok: false,
+      message: "Web modülü AI ayarını aldı ancak geçerli bir yayın zamanı döndürmedi. Web modülünü güncelleyip tekrar deneyin."
+    };
+  }
+
+  return {
+    ok: true,
+    message: redactSecret(result.message, options.aiSettings.apiKey),
+    published_at: publishedAt,
+    enabled: options.aiSettings.enabled,
+    provider: options.aiSettings.provider,
+    service: options.aiSettings.service,
+    base_url: options.aiSettings.baseUrl.replace(/\/+$/, ""),
+    model: options.aiSettings.model,
+    timeout_seconds: options.aiSettings.timeoutSeconds,
+    has_api_key: options.aiSettings.apiKey.trim() !== ""
+  };
+}
+
 async function syncRequest<SuccessResult extends { ok: true }>(
   config: SyncCoreConfig,
   body: Record<string, unknown>
@@ -189,7 +268,8 @@ async function syncRequest<SuccessResult extends { ok: true }>(
   }
 
   try {
-    const response = await fetcher(createSyncEndpointUrl(config.baseUrl), {
+    const endpointUrl = createSyncEndpointUrl(config.baseUrl);
+    const response = await fetcher(endpointUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -206,7 +286,9 @@ async function syncRequest<SuccessResult extends { ok: true }>(
       return {
         ok: false,
         status: response.status,
-        message: typeof payload?.message === "string" ? payload.message : "Güncelleme sırasında bir sorun oldu."
+        message: typeof payload?.message === "string"
+          ? payload.message
+          : describeInvalidSyncResponse(response.status, endpointUrl)
       };
     }
 
@@ -214,10 +296,66 @@ async function syncRequest<SuccessResult extends { ok: true }>(
   } catch (error) {
     return {
       ok: false,
-      message: "Bağlantı sırasında bir sorun oldu. İnternet bağlantısını kontrol edip tekrar deneyin.",
-      error: error instanceof Error ? error.message : String(error)
+      message: describeSyncConnectionFailure(config.baseUrl),
+      error: describeError(error)
     };
   }
+}
+
+function describeSyncConnectionFailure(baseUrl: string) {
+  const target = getSafeSyncTarget(baseUrl);
+  if (target?.isLoopback) {
+    return `Yerel web modülüne ulaşılamadı (${target.displayUrl}). Web modülü sunucusunu başlatın veya canlı hosting adresini girin.`;
+  }
+
+  if (target) {
+    return `Web modülüne ulaşılamadı (${target.displayUrl}). Adresi, internet bağlantısını ve sitenin SSL sertifikasını kontrol edin.`;
+  }
+
+  return "Web modülüne ulaşılamadı. Web modül adresini ve internet bağlantısını kontrol edin.";
+}
+
+function describeInvalidSyncResponse(status: number, endpointUrl: string) {
+  const target = getSafeSyncTarget(endpointUrl)?.displayUrl ?? "web modülü";
+  if (status === 404) {
+    return `Web modülü senkron uç noktası bulunamadı (${target}). Hosting paketini güncelleyip web modül adresini kontrol edin.`;
+  }
+
+  if (status === 405) {
+    return `Web modülü senkron isteğini kabul etmedi (${target}). Hosting paketini güncelleyip tekrar deneyin.`;
+  }
+
+  return `Web modülü geçerli bir senkron yanıtı vermedi (HTTP ${status}, ${target}).`;
+}
+
+function getSafeSyncTarget(value: string) {
+  try {
+    const url = new URL(value.trim());
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+    return {
+      displayUrl: url.toString().replace(/\/$/, ""),
+      isLoopback
+    };
+  } catch {
+    return null;
+  }
+}
+
+function describeError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return String(error);
+  }
+
+  const cause = error.cause;
+  if (cause && typeof cause === "object" && "code" in cause && typeof cause.code === "string") {
+    return `${error.message} (${cause.code})`;
+  }
+
+  return error.message;
 }
 
 function validateConfig(config: SyncCoreConfig): SyncFailure | null {
@@ -238,6 +376,32 @@ function validateConfig(config: SyncCoreConfig): SyncFailure | null {
   return null;
 }
 
+function validateAiSettingsTarget(baseUrl: string): SyncFailure | null {
+  let target: URL;
+  try {
+    target = new URL(baseUrl.trim());
+  } catch {
+    return {
+      ok: false,
+      message: "AI ayarlarını yayınlamak için geçerli bir web modül adresi gerekli."
+    };
+  }
+
+  if (target.protocol === "https:") {
+    return null;
+  }
+
+  const isLoopbackHost = target.hostname === "localhost" || target.hostname === "127.0.0.1" || target.hostname === "[::1]";
+  if (target.protocol === "http:" && isLoopbackHost) {
+    return null;
+  }
+
+  return {
+    ok: false,
+    message: "AI ayarları uzak hedefe yalnız HTTPS üzerinden yayınlanabilir. HTTP yalnız localhost bağlantılarında kullanılabilir."
+  };
+}
+
 async function readJsonResponse(response: Response): Promise<Record<string, unknown> | null> {
   try {
     const payload = (await response.json()) as unknown;
@@ -249,4 +413,14 @@ async function readJsonResponse(response: Response): Promise<Record<string, unkn
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function redactSecret(value: unknown, secret: string) {
+  const text = String(value ?? "");
+  const normalizedSecret = secret.trim();
+  if (!normalizedSecret) {
+    return text;
+  }
+
+  return text.split(normalizedSecret).join("[gizlendi]");
 }

@@ -23,6 +23,7 @@ data/
   menu.json
   ai-conversations.json
   sync-state.json
+  ai-settings.local.php (masaüstünden yayınlanınca oluşur)
 knowledge/
   firma.md
   odalar.md
@@ -44,7 +45,7 @@ data/*.json dosyaları: 664 veya hosting gerektiriyorsa 666
 
 `config/`, `data/` ve `knowledge/` klasörlerinde Apache için doğrudan tarayıcı erişimini kapatan `.htaccess` dosyaları bulunur. Nginx kullanılan hostinglerde aynı kural sunucu panelinden eklenmelidir.
 
-`config/ai.php` içindeki API anahtarı tarayıcıdan erişilebilir bir dosyada gösterilmemelidir. PHP dosyası sunucu tarafında çalışır; yine de mümkünse anahtar ortam değişkeninden okunmalıdır.
+AI anahtarı tarayıcıdan erişilebilir bir dosyada gösterilmemelidir. Masaüstünden yayınlanan anahtar `data/ai-settings.local.php` içinde `0600` izinle tutulur; bu dosya deploy paketine ve Git'e dahil edilmez. `data/.htaccess` doğrudan erişimi kapatır; Nginx kullanılan hostingde aynı engel panelden tanımlanmalıdır.
 
 ## AI Chat Endpoint
 
@@ -54,11 +55,13 @@ Web AI sohbet endpointi:
 api/chat.php
 ```
 
-AI varsayılan olarak kapalıdır. Kapalıyken endpoint müşteriye form veya WhatsApp yönlendirmesi yapan güvenli fallback cevap döndürür ve konuşmayı `data/ai-conversations.json` içine kaydeder.
+AI varsayılan olarak kapalıdır. Kapalıyken endpoint müşteriye form veya WhatsApp yönlendirmesi yapan güvenli fallback cevap döndürür ve konuşmayı `data/ai-conversations.json` içine kaydeder. Kapalı ayar, eksik yapılandırma, kimlik doğrulama, model/adres, istek sınırı, zaman aşımı, ağ ve sağlayıcı kesintileri ayrı güvenli hata kodlarıyla döner; konuşma kaydında `error_code` saklanır.
 
 Sohbet isteğinde `customer_name`, geçerli Türkiye cep telefonu `customer_phone` ve açık talep niyeti varsa endpoint ayrıca `data/requests.json` içine `source=web_ai`, `sync_status=pending` olan talep kaydı açar. Yanıtta `request_created`, `request_id` ve `request_missing_fields` alanları bulunur.
 
-OpenAI uyumlu endpoint için ortam değişkenleri:
+Normal kullanımda servis, bağlantı adresi, model ve anahtar masaüstü uygulamasındaki `Ayarlar → AI Bağlantısı` alanından girilir. Kaydetme, aynı ayarı HTTPS ve `sync_secret` ile web modülüne yayınlar. Hostingde son başarıyla yayınlanan ayar PC kapalıyken de kullanılmaya devam eder. Google AI Studio seçildiğinde yeni authorization key'lerle uyumlu `x-goog-api-key` doğrulaması kullanılır.
+
+Eski kurulum ve geliştirme için ortam değişkenleri fallback olarak desteklenir:
 
 ```bash
 YARDIMCI_ASISTAN_AI_ENABLED=1
@@ -91,7 +94,11 @@ android_summary
 mark_requests_synced
 update_request_status
 publish_menu
+publish_android_snapshot
+publish_ai_settings
 ```
+
+`publish_ai_settings` yalnız `POST` ve `X-YA-Sync-Secret` header'ı ile çalışır. API anahtarı hiçbir HTTP cevabına eklenmez.
 
 Örnek `pull_requests` gövdesi:
 

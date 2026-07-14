@@ -7,6 +7,7 @@ const YA_REQUESTS_FILE = YA_BASE_DIR . '/data/requests.json';
 const YA_MENU_FILE = YA_BASE_DIR . '/data/menu.json';
 const YA_ANDROID_SNAPSHOT_FILE = YA_BASE_DIR . '/data/android-snapshot.json';
 const YA_SYNC_STATE_FILE = YA_BASE_DIR . '/data/sync-state.json';
+const YA_AI_SETTINGS_FILE = YA_BASE_DIR . '/data/ai-settings.local.php';
 
 $businessConfig = ya_sync_load_json(YA_CONFIG_FILE, []);
 ya_sync_apply_cors($businessConfig);
@@ -19,7 +20,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (!ya_sync_is_authorized($businessConfig, $payload)) {
+if ($action === 'publish_ai_settings' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST, OPTIONS');
+    ya_sync_response(405, [
+        'ok' => false,
+        'message' => 'AI ayarlarını yayınlamak için POST isteği gerekli.'
+    ]);
+}
+
+$isAuthorized = $action === 'publish_ai_settings'
+    ? ya_sync_is_header_authorized($businessConfig)
+    : ya_sync_is_authorized($businessConfig, $payload);
+
+if (!$isAuthorized) {
     ya_sync_response(401, [
         'ok' => false,
         'message' => 'Güncelleme izni alınamadı. Güvenlik anahtarını kontrol edin.'
@@ -49,6 +62,10 @@ try {
 
     if ($action === 'publish_android_snapshot') {
         ya_sync_publish_android_snapshot($payload);
+    }
+
+    if ($action === 'publish_ai_settings') {
+        ya_sync_publish_ai_settings($payload);
     }
 
     ya_sync_response(400, [
@@ -355,6 +372,148 @@ function ya_sync_publish_android_snapshot(array $payload): void
     ]);
 }
 
+function ya_sync_publish_ai_settings(array $payload): void
+{
+    $candidate = $payload['ai_settings'] ?? null;
+    if (!is_array($candidate)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Yayınlanacak AI ayarları bulunamadı.'
+        ]);
+    }
+
+    $requiredStringFields = ['provider', 'service', 'base_url', 'model', 'api_key'];
+    foreach ($requiredStringFields as $field) {
+        if (!array_key_exists($field, $candidate) || !is_string($candidate[$field])) {
+            ya_sync_response(422, [
+                'ok' => false,
+                'message' => 'AI ayar alanları eksik veya geçersiz.'
+            ]);
+        }
+    }
+
+    if (!array_key_exists('enabled', $candidate) || !is_bool($candidate['enabled'])) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI etkinlik ayarı geçersiz.'
+        ]);
+    }
+
+    $timeoutSeconds = $candidate['timeout_seconds'] ?? null;
+    if (!is_int($timeoutSeconds) || $timeoutSeconds < 5 || $timeoutSeconds > 120) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI zaman aşımı 5 ile 120 saniye arasında olmalı.'
+        ]);
+    }
+
+    $enabled = $candidate['enabled'];
+    $provider = trim($candidate['provider']);
+    $service = trim($candidate['service']);
+    $baseUrl = trim($candidate['base_url']);
+    $model = trim($candidate['model']);
+    $apiKey = trim($candidate['api_key']);
+    $allowedServices = ['openai', 'openrouter', 'groq', 'gemini', 'custom'];
+
+    if ($provider !== 'openai_compatible') {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Yalnız OpenAI uyumlu AI sağlayıcısı destekleniyor.'
+        ]);
+    }
+
+    if (!in_array($service, $allowedServices, true)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI servisi desteklenmiyor.'
+        ]);
+    }
+
+    if ($baseUrl !== '' && !ya_sync_is_valid_ai_base_url($baseUrl)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI servis adresi geçerli bir HTTP veya HTTPS adresi olmalı.'
+        ]);
+    }
+
+    if ($service === 'gemini' && rtrim($baseUrl, '/') !== 'https://generativelanguage.googleapis.com/v1beta') {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Google AI Studio için resmi Gemini API bağlantı adresi kullanılmalı.'
+        ]);
+    }
+
+    if (strlen($baseUrl) > 2048 || mb_strlen($model) > 255 || strlen($apiKey) > 8192) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI ayar alanlarından biri izin verilen uzunluğu aşıyor.'
+        ]);
+    }
+
+    if (preg_match('/[\x00-\x1F\x7F]/', $model . $apiKey) === 1) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI model veya API anahtarı geçersiz karakter içeriyor.'
+        ]);
+    }
+
+    if ($enabled && ($baseUrl === '' || $model === '' || $apiKey === '')) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI açıkken servis adresi, model ve API anahtarı gerekli.'
+        ]);
+    }
+
+    $settings = [
+        'enabled' => $enabled,
+        'provider' => $provider,
+        'service' => $service,
+        'base_url' => rtrim($baseUrl, '/'),
+        'model' => $model,
+        'api_key' => $apiKey,
+        'timeout_seconds' => $timeoutSeconds
+    ];
+    $publishedAt = date(DATE_ATOM);
+
+    ya_sync_write_php_array_atomic(YA_AI_SETTINGS_FILE, $settings);
+    ya_sync_update_state([
+        'last_ai_settings_publish_at' => $publishedAt
+    ]);
+
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'AI ayarları web modülüne uygulandı.',
+        'published_at' => $publishedAt,
+        'enabled' => $settings['enabled'],
+        'provider' => $settings['provider'],
+        'service' => $settings['service'],
+        'base_url' => $settings['base_url'],
+        'model' => $settings['model'],
+        'timeout_seconds' => $settings['timeout_seconds'],
+        'has_api_key' => $settings['api_key'] !== ''
+    ]);
+}
+
+function ya_sync_is_valid_ai_base_url(string $baseUrl): bool
+{
+    if (filter_var($baseUrl, FILTER_VALIDATE_URL) === false) {
+        return false;
+    }
+
+    $parts = parse_url($baseUrl);
+    if (!is_array($parts)) {
+        return false;
+    }
+
+    $scheme = strtolower(ya_sync_string($parts['scheme'] ?? ''));
+    $host = ya_sync_string($parts['host'] ?? '');
+
+    return in_array($scheme, ['http', 'https'], true)
+        && $host !== ''
+        && !array_key_exists('user', $parts)
+        && !array_key_exists('pass', $parts);
+}
+
 function ya_sync_public_request(array $record): array
 {
     $allowedFields = [
@@ -549,6 +708,16 @@ function ya_sync_is_authorized(array $businessConfig, array $payload): bool
     return $providedSecret !== '' && hash_equals($configuredSecret, $providedSecret);
 }
 
+function ya_sync_is_header_authorized(array $businessConfig): bool
+{
+    $configuredSecret = ya_sync_string($businessConfig['sync_secret'] ?? '');
+    $headerSecret = ya_sync_header('HTTP_X_YA_SYNC_SECRET');
+
+    return $configuredSecret !== ''
+        && $headerSecret !== ''
+        && hash_equals($configuredSecret, $headerSecret);
+}
+
 function ya_sync_apply_cors(array $businessConfig): void
 {
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -655,6 +824,60 @@ function ya_sync_write_json(string $path, mixed $data): void
     }
 
     file_put_contents($path, $json . PHP_EOL, LOCK_EX);
+}
+
+function ya_sync_write_php_array_atomic(string $path, array $data): void
+{
+    $directory = dirname($path);
+    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
+        throw new RuntimeException('data_directory_missing');
+    }
+
+    if (!is_writable($directory)) {
+        throw new RuntimeException('data_directory_not_writable');
+    }
+
+    $temporaryPath = tempnam($directory, '.ai-settings.');
+    if ($temporaryPath === false) {
+        throw new RuntimeException('ai_settings_temp_file_failed');
+    }
+
+    $realDirectory = realpath($directory);
+    $realTemporaryDirectory = realpath(dirname($temporaryPath));
+    if ($realDirectory === false || $realTemporaryDirectory === false || $realDirectory !== $realTemporaryDirectory) {
+        if (is_file($temporaryPath)) {
+            unlink($temporaryPath);
+        }
+        throw new RuntimeException('ai_settings_temp_location_invalid');
+    }
+
+    try {
+        if (!chmod($temporaryPath, 0600)) {
+            throw new RuntimeException('ai_settings_permissions_failed');
+        }
+
+        $contents = implode("\n", [
+            '<?php',
+            'declare(strict_types=1);',
+            '',
+            'return ' . var_export($data, true) . ';',
+            ''
+        ]);
+        $bytesWritten = file_put_contents($temporaryPath, $contents, LOCK_EX);
+        if ($bytesWritten === false || $bytesWritten !== strlen($contents)) {
+            throw new RuntimeException('ai_settings_write_failed');
+        }
+
+        if (!rename($temporaryPath, $path)) {
+            throw new RuntimeException('ai_settings_publish_failed');
+        }
+
+        $temporaryPath = '';
+    } finally {
+        if ($temporaryPath !== '' && is_file($temporaryPath)) {
+            unlink($temporaryPath);
+        }
+    }
 }
 
 function ya_sync_update_state(array $changes): void

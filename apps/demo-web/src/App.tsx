@@ -4,14 +4,19 @@ import {
   BedDouble,
   CalendarPlus,
   Coffee,
+  Download,
   Home,
   Images,
   MapPin,
   Menu as MenuIcon,
   MessageCircle,
+  MonitorDown,
   Navigation,
   Phone,
   Send,
+  Settings,
+  ShieldCheck,
+  Smartphone,
   UtensilsCrossed,
   Users
 } from "lucide-react";
@@ -21,6 +26,18 @@ import type { BusinessConfig, PageKey } from "./types";
 const business = businessJson as BusinessConfig;
 type RequestSubmitState = "idle" | "saving" | "saved" | "fallback" | "error";
 const DEMO_WIDGET_SCRIPT_ID = "yardimci-asistan-demo-widget-script";
+const DEFAULT_WEB_MODULE_URL = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
+const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.0").trim() || "0.1.0";
+const DESKTOP_INSTALLER_URL =
+  String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_URL ?? "").trim() ||
+  `/downloads/YardimciAsistan-Setup-${DESKTOP_INSTALLER_VERSION}.exe`;
+const DESKTOP_INSTALLER_X86_URL =
+  String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_X86_URL ?? "").trim() ||
+  `/downloads/YardimciAsistan-Setup-${DESKTOP_INSTALLER_VERSION}-x86.exe`;
+const ANDROID_APP_VERSION = String(import.meta.env.VITE_YA_ANDROID_APP_VERSION ?? "0.1.0").trim() || "0.1.0";
+const ANDROID_APK_URL =
+  String(import.meta.env.VITE_YA_ANDROID_APK_URL ?? "").trim() ||
+  `/downloads/YardimciAsistan-Android-${ANDROID_APP_VERSION}.apk`;
 
 declare global {
   interface Window {
@@ -38,7 +55,8 @@ const navItems: Array<{ key: PageKey; label: string; icon: typeof Home }> = [
   { key: "gallery", label: "Galeri", icon: Images },
   { key: "location", label: "Ulaşım", icon: MapPin },
   { key: "contact", label: "İletişim", icon: Phone },
-  { key: "request", label: "Talep Oluştur", icon: CalendarPlus }
+  { key: "request", label: "Talep Oluştur", icon: CalendarPlus },
+  { key: "settings", label: "Ayarlar", icon: Settings }
 ];
 
 const serviceIcons = {
@@ -74,6 +92,7 @@ function App() {
         {activePage === "location" && <LocationPage />}
         {activePage === "contact" && <ContactPage onNavigate={goToPage} />}
         {activePage === "request" && <RequestPage />}
+        {activePage === "settings" && <SettingsPage />}
       </main>
       <Footer onNavigate={goToPage} />
     </div>
@@ -90,7 +109,7 @@ function useDemoWidget() {
     const config = {
       businessName: business.display_name,
       whatsappPhone: business.whatsapp,
-      apiBaseUrl: webModuleBaseUrl,
+      apiBaseUrl: getWebModuleApiBaseUrl(),
       menuUrl: `${webModuleBaseUrl}/menu.html`,
       logoUrl: `${webModuleBaseUrl}/assets/yardimci-asistan-symbol.png`,
       primaryColor: business.colors.primary,
@@ -490,6 +509,96 @@ function RequestPage() {
   );
 }
 
+function SettingsPage() {
+  return (
+    <PageShell
+      title="Ayarlar"
+      text="Yardımcı Asistan masaüstü uygulamasını bu bilgisayara indirip işletme ayarlarınızı yerel olarak yönetin."
+    >
+      <section className="desktop-download-card" aria-labelledby="desktop-download-title">
+        <div className="download-icon" aria-hidden="true">
+          <MonitorDown size={34} />
+        </div>
+        <div className="download-copy">
+          <p className="eyebrow">Masaüstü Uygulaması</p>
+          <h2 id="desktop-download-title">Windows kurulum dosyası</h2>
+          <p>
+            Talep takibi, QR menü, AI yardımcı ve işletme ayarlarına masaüstünden erişmek için Yardımcı Asistan'ı kurun.
+          </p>
+          <div className="download-meta" aria-label="Kurulum dosyası bilgileri">
+            <span>Windows 10 / 11</span>
+            <span>64 bit (x64)</span>
+            <span>Sürüm {DESKTOP_INSTALLER_VERSION}</span>
+          </div>
+          <a className="primary-button download-button" href={DESKTOP_INSTALLER_URL} download>
+            <Download size={19} aria-hidden="true" />
+            Kurulum Dosyasını İndir
+          </a>
+        </div>
+      </section>
+
+      <section className="additional-downloads" aria-label="Diğer uygulama indirmeleri">
+        <article className="platform-download-card">
+          <div className="platform-download-icon" aria-hidden="true">
+            <MonitorDown size={27} />
+          </div>
+          <div>
+            <p className="eyebrow">Eski Windows Cihazlar</p>
+            <h2>Windows 32 bit</h2>
+            <p>32 bit işlemci veya 32 bit Windows kullanan bilgisayarlar için ayrı NSIS kurulum paketidir.</p>
+            <div className="download-meta" aria-label="Windows 32 bit kurulum bilgileri">
+              <span>Windows 10 / 11</span>
+              <span>32 bit (x86)</span>
+              <span>Sürüm {DESKTOP_INSTALLER_VERSION}</span>
+            </div>
+            <a className="ghost-button platform-download-button" href={DESKTOP_INSTALLER_X86_URL} download>
+              <Download size={18} aria-hidden="true" />
+              Windows 32 Bit İndir
+            </a>
+          </div>
+        </article>
+
+        <article className="platform-download-card">
+          <div className="platform-download-icon android" aria-hidden="true">
+            <Smartphone size={27} />
+          </div>
+          <div>
+            <p className="eyebrow">Android Uygulaması</p>
+            <h2>Android APK</h2>
+            <p>Telefon üzerinden talepleri ve işletme özetini takip etmek için Android test uygulamasıdır.</p>
+            <div className="download-meta" aria-label="Android APK bilgileri">
+              <span>Android 8.0+</span>
+              <span>APK</span>
+              <span>Sürüm {ANDROID_APP_VERSION}</span>
+            </div>
+            <a className="ghost-button platform-download-button" href={ANDROID_APK_URL} download>
+              <Download size={18} aria-hidden="true" />
+              Android APK İndir
+            </a>
+          </div>
+        </article>
+      </section>
+
+      <section className="installer-notes" aria-label="Kurulum bilgileri">
+        <article className="info-panel">
+          <ShieldCheck size={24} aria-hidden="true" />
+          <h3>Veriler bu bilgisayarda kalır</h3>
+          <p>Masaüstü uygulaması işletme verilerini yerel SQLite veritabanında saklar ve manuel yedek almanızı sağlar.</p>
+        </article>
+        <article className="info-panel">
+          <Settings size={24} aria-hidden="true" />
+          <h3>Kurulumdan sonra</h3>
+          <p>Firma, web modülü, WhatsApp ve isteğe bağlı AI bağlantısı bilgilerini ilk açılış ekranında tamamlayabilirsiniz.</p>
+        </article>
+      </section>
+
+      <p className="installer-warning">
+        Windows geliştirme paketleri henüz ticari kod imzasına sahip değildir ve yayıncı uyarısı gösterebilir. Android APK debug/test anahtarıyla imzalıdır; kurulum için tarayıcıya “bilinmeyen uygulama yükleme” izni vermeniz gerekebilir.
+      </p>
+    </PageShell>
+  );
+}
+
 function SectionHeading({ title, text }: { title: string; text: string }) {
   return (
     <section className="section-heading">
@@ -521,6 +630,10 @@ function Footer({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
         <p>{business.address}</p>
       </div>
       <div className="footer-actions">
+        <button className="ghost-button" onClick={() => onNavigate("settings")}>
+          <Download size={17} aria-hidden="true" />
+          Uygulamayı İndir
+        </button>
         <button className="ghost-button" onClick={() => onNavigate("location")}>
           <MapPin size={17} aria-hidden="true" />
           Ulaşım
@@ -584,12 +697,21 @@ function toRequestApiPayload(
 }
 
 function getRequestApiEndpoint() {
-  const baseUrl = getWebModuleBaseUrl();
+  const baseUrl = getWebModuleApiBaseUrl();
   return baseUrl ? `${baseUrl}/api/request.php` : "";
 }
 
 function getWebModuleBaseUrl() {
-  return String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? "").trim().replace(/\/+$/, "");
+  return String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? DEFAULT_WEB_MODULE_URL).trim().replace(/\/+$/, "");
+}
+
+function getWebModuleApiBaseUrl() {
+  const configuredUrl = String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? "").trim().replace(/\/+$/, "");
+  if (configuredUrl) {
+    return configuredUrl;
+  }
+
+  return import.meta.env.DEV ? "/__yardimci_asistan_live" : DEFAULT_WEB_MODULE_URL;
 }
 
 async function submitRequestToMiniApi(endpoint: string, payload: Record<string, string | number>) {

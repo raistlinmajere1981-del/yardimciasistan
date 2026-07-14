@@ -12,11 +12,19 @@ $config = [
     'timeout_seconds' => (int) (getenv('YARDIMCI_ASISTAN_AI_TIMEOUT_SECONDS') ?: 15)
 ];
 
-$localConfigFile = __DIR__ . '/ai.local.php';
-if (is_file($localConfigFile)) {
-    $localConfig = require $localConfigFile;
+$configFiles = [
+    __DIR__ . '/ai.local.php',
+    dirname(__DIR__) . '/data/ai-settings.local.php'
+];
+
+foreach ($configFiles as $configFile) {
+    if (!is_file($configFile)) {
+        continue;
+    }
+
+    $localConfig = require $configFile;
     if (is_array($localConfig)) {
-        return array_merge($config, $localConfig);
+        $config = array_merge($config, $localConfig);
     }
 }
 

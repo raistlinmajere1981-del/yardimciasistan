@@ -1,5 +1,5 @@
 import type { AICompletionResult, AIMessage, AIProviderConfig, WebChatRequest } from "../types";
-import { generateOpenAICompatibleChat } from "../providers/openai-compatible";
+import { generateConfiguredChat } from "../providers/generate-chat";
 
 const FALLBACK_WEB_ANSWER = "AI yardımcı şu anda aktif değil. Talebinizi form veya WhatsApp üzerinden iletebilirsiniz; işletme sahibi müsaitlik ve fiyat bilgisini kontrol edip dönüş yapacaktır.";
 
@@ -63,7 +63,7 @@ export async function generateWebChatReply(request: WebChatRequest, config: AIPr
     };
   }
 
-  const result = await generateOpenAICompatibleChat(
+  const result = await generateConfiguredChat(
     {
       ...config,
       messages: buildWebChatMessages(request)
