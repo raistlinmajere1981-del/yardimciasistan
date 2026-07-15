@@ -379,6 +379,8 @@ try {
   await conversionPage.getByRole("button", { name: "Android'e Yayınla" }).click();
   await expect(conversionPage.getByText("2 günlük iş ile Android özeti yayınlandı.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Panele Dön" }).click();
+  await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
+  await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "AI Cevap Hazırla" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "AI Cevap Hazırla" }).click();
   await conversionPage.getByRole("button", { name: "WhatsApp'tan Yaz" }).click();
@@ -403,7 +405,7 @@ try {
   await conversionPage.getByRole("button", { name: "AI Sonucunu Hazırla" }).click();
   await expect(conversionPage.getByLabel("AI sonucu")).toHaveValue(/Öncelikler/);
   await expect(conversionPage.getByRole("button", { name: "Talebe Kaydet" })).toBeDisabled();
-  await conversionPage.getByRole("button", { name: "Ana Ekran" }).click();
+  await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Rezervasyona Çevir" }).click();
   await expect(conversionPage.getByText("Rezervasyona çevrildi", { exact: true })).toBeVisible();
@@ -454,12 +456,12 @@ try {
   await conversionPage.getByRole("button", { name: "Pansiyon" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toBeVisible();
-  const roomCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-card").filter({ hasText: "Smoke Balkonlu Oda" });
+  const roomCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Balkonlu Oda" });
   await expect(roomCard.locator(".status-badge")).toHaveText("Rezerve");
-  await expect(roomCard.getByText("Smoke Misafir - 2 gece", { exact: true })).toBeVisible();
-  const roomWithoutReservationCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-card").filter({ hasText: "Smoke Aile Odası" });
+  await expect(roomCard.locator(".compact-reservation-line")).toContainText("Smoke Misafir - 2 gece");
+  const roomWithoutReservationCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Aile Odası" });
   await expect(roomWithoutReservationCard.locator(".status-badge")).toHaveText("Boş");
-  await expect(roomWithoutReservationCard.getByText("Aktif rezervasyon yok", { exact: true })).toBeVisible();
+  await expect(roomWithoutReservationCard.locator(".compact-reservation-line")).toContainText("Aktif rezervasyon yok");
   await conversionPage.getByRole("button", { name: "Dolu" }).first().click();
   await expect(conversionPage.getByText("Oda durumu güncellendi.")).toBeVisible();
   const reservationWorkspace = conversionPage.getByLabel("Rezervasyon yönetimi");
@@ -472,7 +474,112 @@ try {
   await conversionPage.getByRole("button", { name: "Onayla" }).first().click();
   await expect(conversionPage.getByText("Rezervasyon durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Filtreyi Temizle" }).click();
-  await expect(conversionPage.getByRole("button", { name: "WhatsApp Onay" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "WhatsApp", exact: true }).first()).toBeVisible();
+
+  const compactPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+  await compactPage.addInitScript(({ setupData, dashboardData }) => {
+    window.yardimciDesktop = {
+      getBootstrapData: async () => ({
+        appName: "Yardımcı Asistan",
+        version: "0.1.0",
+        platform: "linux",
+        syncSettings: { webModuleUrl: setupData.webModuleUrl, hasSyncSecret: true },
+        databasePath: dashboardData.databasePath,
+        userDataPath: "/tmp/yardimci-asistan",
+        backupPath: dashboardData.backupPath,
+        setup: setupData
+      }),
+      getDashboardData: async () => dashboardData,
+      getAiWorkspaceHistory: async () => [],
+      markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
+      openExternal: async () => true
+    };
+  }, {
+    setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "compact-smoke-secret" },
+    dashboardData: createCompactUiFixture()
+  });
+  await compactPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+
+  const dashboardRequestRows = compactPage.locator(".dashboard-request-row");
+  await expect(dashboardRequestRows).toHaveCount(8);
+  const metricHeights = await compactPage.locator(".metric-card").evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
+  expect(Math.min(...metricHeights)).toBeGreaterThanOrEqual(82);
+  expect(Math.max(...metricHeights)).toBeLessThanOrEqual(96);
+  const dashboardRowHeights = await dashboardRequestRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  expect(dashboardRowHeights.every((height) => height <= 96)).toBe(true);
+  await expect(dashboardRequestRows.first().locator("button")).toHaveCount(2);
+  const firstRequestNote = dashboardRequestRows.first().locator(".line-clamp-1");
+  expect(await firstRequestNote.evaluate((note) => getComputedStyle(note).whiteSpace)).toBe("nowrap");
+  expect(await firstRequestNote.evaluate((note) => note.scrollWidth > note.clientWidth)).toBe(true);
+  const fifthDashboardRow = await dashboardRequestRows.nth(4).boundingBox();
+  expect(fifthDashboardRow).not.toBeNull();
+  expect(fifthDashboardRow.y + fifthDashboardRow.height).toBeLessThanOrEqual(768);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-dashboard-1366x768.png" });
+
+  await compactPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
+  await compactPage.getByRole("button", { name: /Kompakt Misafir 4/ }).click();
+  const customerRequestRows = compactPage.locator(".requests-workspace .manager-row");
+  await expect(customerRequestRows).toHaveCount(8);
+  const customerRowHeights = await customerRequestRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  expect(customerRowHeights.every((height) => height <= 60)).toBe(true);
+  const requestDetailHeight = await compactPage.locator(".request-detail-panel").evaluate((panel) => panel.getBoundingClientRect().height);
+  expect(requestDetailHeight).toBeLessThan(420);
+  await expect(compactPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
+
+  await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
+  const reservationRows = compactPage.locator(".reservation-record-row");
+  await expect(reservationRows).toHaveCount(3);
+  const reservationHeights = await reservationRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  expect(reservationHeights.every((height) => height >= 72 && height <= 96)).toBe(true);
+  await expect(reservationRows.first().locator(".compact-action-bar button")).toHaveCount(2);
+  await reservationRows.first().locator("summary").click();
+  await expect(reservationRows.first().getByRole("button", { name: "Reddet" })).toBeVisible();
+  await expect(reservationRows.first().getByRole("button", { name: "İptal Et" })).toBeVisible();
+  await reservationRows.first().locator("summary").click();
+  const roomCardHeights = await compactPage.locator(".resource-compact-card").evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
+  expect(Math.max(...roomCardHeights)).toBeLessThan(170);
+  const firstRoomCard = await compactPage.locator(".resource-compact-card").first().boundingBox();
+  expect(firstRoomCard).not.toBeNull();
+  expect(firstRoomCard.y + firstRoomCard.height).toBeLessThanOrEqual(768);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-pension-1366x768.png" });
+
+  await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
+  const firstTableHeight = await compactPage.locator(".table-compact-card").first().evaluate((card) => card.getBoundingClientRect().height);
+  const firstTaskHeight = await compactPage.locator(".task-record-row").first().evaluate((card) => card.getBoundingClientRect().height);
+  expect(firstTableHeight).toBeLessThan(150);
+  expect(firstTaskHeight).toBeLessThan(120);
+  await expect(compactPage.locator(".table-compact-card").first().locator(".compact-status-actions button")).toHaveCount(4);
+  await expect(compactPage.locator(".task-record-row").first().locator(".compact-action-bar button")).toHaveCount(1);
+  await compactPage.locator(".task-record-row").first().locator("summary").click();
+  await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
+  await compactPage.locator(".task-record-row").first().locator("summary").click();
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-restaurant-1366x768.png" });
+
+  await compactPage.getByRole("button", { name: "Menü", exact: true }).click();
+  const menuRowHeights = await compactPage.locator(".menu-management-grid .manager-row").evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  expect(menuRowHeights.length).toBeGreaterThanOrEqual(8);
+  expect(menuRowHeights.every((height) => height >= 50 && height <= 60)).toBe(true);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-menu-1366x768.png" });
+
+  await compactPage.getByRole("button", { name: "Mesajlar", exact: true }).click();
+  const preparedMessageHeight = await compactPage.getByLabel("Hazır WhatsApp mesajı").evaluate((field) => field.getBoundingClientRect().height);
+  expect(preparedMessageHeight).toBeGreaterThanOrEqual(110);
+  expect(preparedMessageHeight).toBeLessThanOrEqual(180);
+  await expect(compactPage.locator(".whatsapp-request-list .manager-row")).toHaveCount(8);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-messages-1366x768.png" });
+
+  await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
+  await compactPage.locator(".content").evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const [settingsSectionBox, settingsFooterBox] = await Promise.all([
+    compactPage.locator(".setup-section").last().boundingBox(),
+    compactPage.locator(".setup-footer").boundingBox()
+  ]);
+  expect(settingsSectionBox).not.toBeNull();
+  expect(settingsFooterBox).not.toBeNull();
+  expect(settingsFooterBox.y).toBeGreaterThanOrEqual(settingsSectionBox.y + settingsSectionBox.height - 1);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-settings-1366x768.png" });
+  await compactPage.close();
 
   const pullPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await pullPage.addInitScript(({ setupData, dashboardData, pulledRequest }) => {
@@ -938,6 +1045,140 @@ function createDashboardConversionFixture() {
     summary: {
       ...createDashboardFixture().summary,
       newRequests: 1
+    }
+  };
+}
+
+function createCompactUiFixture() {
+  const base = createDashboardConversionFixture();
+  const requestTemplate = base.requests[0];
+  const reservationTemplate = base.reservations[0];
+  const roomTemplate = base.rooms[0];
+  const tableTemplate = base.tables[0];
+  const taskTemplate = base.dailyTasks[0];
+  const statuses = ["new", "answered", "new", "rejected", "new", "answered", "new", "closed"];
+  const requests = Array.from({ length: 8 }, (_, index) => ({
+    ...requestTemplate,
+    id: `compact_request_${index + 1}`,
+    customer_id: `compact_customer_${index + 1}`,
+    request_type: index % 2 === 0 ? "pension_reservation" : "restaurant_reservation",
+    status: statuses[index],
+    customer_name: `Kompakt Misafir ${index + 1}`,
+    customer_phone: `+9053212300${String(index + 1).padStart(2, "0")}`,
+    date_text: index % 2 === 0 ? "18-20 Temmuz" : "Bu akşam 20:30",
+    guest_count: (index % 4) + 1,
+    message: "Uzun talep notunun liste kartını büyütmeden ilk satırda kesilmesi ve detay alanında okunabilmesi kontrol ediliyor.",
+    ai_summary: "Tarih, kişi sayısı ve tercih bilgilerini içeren iki satırı geçmeyen kompakt AI özeti.",
+    created_at: `2026-07-${String(10 + index).padStart(2, "0")}T10:15:00+03:00`,
+    updated_at: `2026-07-${String(10 + index).padStart(2, "0")}T10:15:00+03:00`
+  }));
+  const rooms = Array.from({ length: 4 }, (_, index) => ({
+    ...roomTemplate,
+    id: `compact_room_${index + 1}`,
+    name: index % 2 === 0 ? "Balkonlu Standart Oda" : "Aile Odası",
+    number: String(101 + index),
+    capacity: index % 2 === 0 ? 2 : 4,
+    status: index === 3 ? "cleaning" : "available",
+    description: "Odanın uzun açıklaması kartı büyütmeden tek satırda gösterilir.",
+    sortOrder: index + 1
+  }));
+  const reservations = Array.from({ length: 3 }, (_, index) => ({
+    ...reservationTemplate,
+    id: `compact_reservation_${index + 1}`,
+    requestId: requests[index].id,
+    customerId: requests[index].customer_id,
+    customerName: requests[index].customer_name,
+    customerPhone: requests[index].customer_phone,
+    status: index === 1 ? "approved" : "pending",
+    title: `${requests[index].customer_name} - ${index + 1} gece`,
+    startDate: `2026-07-${18 + index}`,
+    endDate: `2026-07-${20 + index}`,
+    guestCount: index + 2,
+    roomIds: [rooms[index].id],
+    notes: "Balkon tercihi ve geç giriş notu uzun kart oluşturmadan özetlenir."
+  }));
+  const tables = Array.from({ length: 4 }, (_, index) => ({
+    ...tableTemplate,
+    id: `compact_table_${index + 1}`,
+    name: `${index % 2 === 0 ? "Bahçe" : "Salon"} Masası ${index + 1}`,
+    area: index % 2 === 0 ? "Bahçe" : "Salon",
+    capacity: index % 2 === 0 ? 4 : 2,
+    status: ["available", "occupied", "reserved", "bill_waiting"][index],
+    currentReservationId: index === 2 ? reservations[0].id : "",
+    activeReservationTitle: index === 2 ? `${requests[0].customer_name} - akşam` : "",
+    notes: "Servis öncesi kısa masa notu.",
+    sortOrder: index + 1
+  }));
+  const dailyTasks = Array.from({ length: 6 }, (_, index) => ({
+    ...taskTemplate,
+    id: `compact_task_${index + 1}`,
+    title: index < 3 ? `Oda ${101 + index} hazırlığı` : `${tables[index - 3].name} kontrolü`,
+    description: "Operasyon notu liste satırında tek satır olarak kalır ve gerektiğinde detay açılır.",
+    taskType: index < 3 ? "check_in" : "table_reservation",
+    status: index === 2 ? "done" : "pending",
+    dueDate: "2026-07-18",
+    dueTime: `${String(14 + index).padStart(2, "0")}:00`,
+    relatedType: index < 3 ? "reservation" : "table",
+    relatedId: index < 3 ? reservations[index].id : tables[index - 3].id
+  }));
+  const categories = Array.from({ length: 6 }, (_, index) => ({
+    id: `compact_category_${index + 1}`,
+    name: ["Kahvaltı", "Sıcaklar", "Atıştırmalıklar", "Tatlılar", "Sıcak İçecekler", "Soğuk İçecekler"][index],
+    description: "Kompakt kategori açıklaması.",
+    is_active: index !== 5,
+    sort_order: (index + 1) * 10,
+    created_at: "2026-07-10T10:00:00+03:00",
+    updated_at: "2026-07-10T10:00:00+03:00"
+  }));
+  const items = Array.from({ length: 10 }, (_, index) => ({
+    id: `compact_item_${index + 1}`,
+    category_id: categories[index % categories.length].id,
+    name: `Menü Ürünü ${index + 1}`,
+    description: "Uzun ürün açıklaması kendi alanında kaydırılabilir kalır.",
+    price: 90 + index * 15,
+    currency: "TRY",
+    image_url: "",
+    is_available: index !== 9,
+    is_featured: index < 2,
+    allergens: index % 2 === 0 ? ["gluten"] : [],
+    tags: ["smoke"],
+    sort_order: (index + 1) * 10,
+    created_at: "2026-07-10T10:00:00+03:00",
+    updated_at: "2026-07-10T10:00:00+03:00"
+  }));
+
+  return {
+    ...base,
+    requests,
+    rooms,
+    tables,
+    reservations,
+    dailyTasks,
+    customers: requests.map((request, index) => ({
+      id: request.customer_id,
+      fullName: request.customer_name,
+      phone: request.customer_phone,
+      email: `misafir${index + 1}@example.test`,
+      source: request.source,
+      notes: request.message,
+      tags: ["kompakt", index % 2 === 0 ? "pansiyon" : "restoran"],
+      lastContactAt: request.updated_at,
+      requestCount: 1,
+      reservationCount: index < reservations.length ? 1 : 0,
+      updatedAt: request.updated_at
+    })),
+    menu: { categories, items, updated_at: "2026-07-15T10:00:00+03:00" },
+    summary: {
+      ...base.summary,
+      newRequests: requests.filter((request) => request.status === "new").length,
+      pendingDailyTasks: dailyTasks.filter((task) => task.status === "pending").length,
+      availableRooms: 1,
+      totalRooms: rooms.length,
+      availableTables: tables.filter((table) => table.status === "available").length,
+      pendingReservations: reservations.filter((reservation) => reservation.status === "pending").length,
+      preparedWhatsAppMessages: requests.length,
+      activeMenuCategories: categories.filter((category) => category.is_active).length,
+      availableMenuItems: items.filter((item) => item.is_available).length
     }
   };
 }

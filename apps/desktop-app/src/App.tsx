@@ -1581,57 +1581,34 @@ function App() {
                   <p>Web sitesinden gelen talepler burada görünecek.</p>
                 </div>
               ) : (
-                dashboardData.requests.map((request) => {
-                  const actionMode = getRequestActionMode(request.status);
-                  return <article className="request-card" key={request.id}>
-                    <div>
-                      <span className={`status-badge ${getRequestStatusTone(request.status)}`}>
-                        {formatRequestStatus(request.status)}
-                      </span>
-                      <h3>{request.customer_name}</h3>
-                      <p>{formatRequestType(request.request_type)} • {request.date_text || formatDateForDisplay(request.start_date)} • {request.guest_count} kişi</p>
-                      <p>{request.message}</p>
+                dashboardData.requests.map((request) => (
+                  <article className="compact-list-item dashboard-request-row" key={request.id}>
+                    <div className="compact-list-main">
+                      <div className="compact-list-heading">
+                        <span className={`status-badge ${getRequestStatusTone(request.status)}`}>
+                          {formatRequestStatus(request.status)}
+                        </span>
+                        <h3>{request.customer_name}</h3>
+                      </div>
+                      <div className="compact-meta-row" aria-label="Talep özeti">
+                        <span>{formatRequestType(request.request_type)}</span>
+                        <span>{request.date_text || formatDateForDisplay(request.start_date) || "Tarih yok"}</span>
+                        <span>{request.guest_count} kişi</span>
+                      </div>
+                      {request.message && <p className="line-clamp-1">{request.message}</p>}
                     </div>
-                    <div className="request-actions">
-                      <button type="button" onClick={() => callCustomer(request)}>
-                        <Phone size={16} aria-hidden="true" />
-                        Müşteriyi Ara
+                    <div className="compact-action-bar" aria-label={`${request.customer_name} hızlı işlemleri`}>
+                      <button type="button" onClick={() => callCustomer(request)} aria-label={`${request.customer_name} isimli müşteriyi ara`}>
+                        <Phone size={15} aria-hidden="true" />
+                        Ara
                       </button>
-                      {(actionMode === "open" || actionMode === "answered") && (
-                        <button
-                          className="convert-action"
-                          type="button"
-                          onClick={() => handleConvertRequestToReservation(request)}
-                          disabled={convertingRequestId === request.id}
-                        >
-                          <CalendarCheck size={16} aria-hidden="true" />
-                          {convertingRequestId === request.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
-                        </button>
-                      )}
-                      {setupData.aiEnabled && actionMode === "open" && (
-                        <button
-                          className="ai-action"
-                          type="button"
-                          onClick={() => handleCreateOwnerReplySuggestion(request)}
-                          disabled={suggestingRequestId === request.id}
-                        >
-                          <Sparkles size={16} aria-hidden="true" />
-                          {suggestingRequestId === request.id ? "Hazırlanıyor" : "AI Cevap Hazırla"}
-                        </button>
-                      )}
-                      <button className="whatsapp-action" type="button" onClick={() => openWhatsApp(request)}>
-                        <MessageCircle size={16} aria-hidden="true" />
-                        WhatsApp'tan Yaz
+                      <button className="whatsapp-action" type="button" onClick={() => openWhatsApp(request)} aria-label={`${request.customer_name} için WhatsApp'ı aç`}>
+                        <MessageCircle size={15} aria-hidden="true" />
+                        WhatsApp
                       </button>
-                      {actionMode === "converted" && (
-                        <button type="button" onClick={() => openRequestReservation(request)}>
-                          <CalendarCheck size={16} aria-hidden="true" />
-                          Rezervasyonu Aç
-                        </button>
-                      )}
                     </div>
                   </article>
-                })
+                ))
               )}
             </div>
           </article>
@@ -3083,7 +3060,7 @@ function RequestsWorkspace({
         </form>}
       </aside>
 
-      <section className="panel operations-detail-panel">
+      <section className="panel operations-detail-panel request-detail-panel">
         {selectedRequest ? (
           <>
             <div className="panel-heading compact">
@@ -3095,7 +3072,7 @@ function RequestsWorkspace({
                 {formatRequestStatus(selectedRequest.status)}
               </span>
             </div>
-            <dl className="info-list detail-info-grid">
+            <dl className="info-list detail-info-grid compact-detail-meta">
               <div>
                 <dt>Telefon</dt>
                 <dd>{selectedRequest.customer_phone}</dd>
@@ -3113,11 +3090,17 @@ function RequestsWorkspace({
                 <dd>{formatCustomerSource(selectedRequest.source)}</dd>
               </div>
             </dl>
-            <p className="suggestion">{selectedRequest.message}</p>
+            <div className="compact-detail-copy">
+              <span>Not</span>
+              <p>{selectedRequest.message || "Talep notu yok."}</p>
+            </div>
             {selectedRequest.ai_summary && (
-              <p className="suggestion soft-suggestion">{selectedRequest.ai_summary}</p>
+              <div className="compact-detail-copy soft-suggestion">
+                <span>AI özeti</span>
+                <p className="line-clamp-2">{selectedRequest.ai_summary}</p>
+              </div>
             )}
-            <div className="operations-command-grid">
+            <div className="operations-command-grid request-detail-actions">
               <button type="button" onClick={() => onCall(selectedRequest)}>
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
@@ -3499,7 +3482,7 @@ function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps
         </div>
       </div>
 
-      <section className="operations-grid" aria-label="Günlük iş kartları">
+      <section className="operations-grid compact-record-list" aria-label="Günlük iş listesi">
         {tasks.length === 0 ? (
           <div className="panel empty-state">
             <ClipboardList size={28} aria-hidden="true" />
@@ -3514,37 +3497,34 @@ function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps
           </div>
         ) : (
           filteredTasks.map((task) => (
-            <article className="panel resource-card" key={task.id}>
-              <div className="resource-card-heading">
-                <div>
-                  <span>{formatTaskType(task.taskType)}</span>
+            <article className="compact-list-item operation-record-row task-record-row" key={task.id}>
+              <div className="compact-list-main">
+                <div className="compact-list-heading">
+                  <span className={`status-badge ${task.status === "done" ? "ok" : task.status === "pending" ? "wait" : "info"}`}>
+                    {formatTaskStatus(task.status)}
+                  </span>
                   <h2>{task.title}</h2>
                 </div>
-                <span className={`status-badge ${task.status === "done" ? "ok" : task.status === "pending" ? "wait" : "info"}`}>
-                  {formatTaskStatus(task.status)}
-                </span>
+                <div className="compact-meta-row">
+                  <span>{formatTaskType(task.taskType)}</span>
+                  <span>{formatTaskDue(task)}</span>
+                  <span>{formatTaskRelation(task)}</span>
+                </div>
+                <div className="compact-record-footer">
+                  <p className="line-clamp-1">{task.description || "Açıklama yok."}</p>
+                  <details className="expandable-details">
+                    <summary>Diğer işlemler</summary>
+                    <div className="secondary-detail-actions">
+                      <button type="button" onClick={() => onUpdateStatus(task.id, "cancelled")} disabled={task.status === "cancelled"}>İptal Et</button>
+                      <button type="button" onClick={() => onUpdateStatus(task.id, "pending")} disabled={task.status === "pending"}>Yeniden Aç</button>
+                    </div>
+                  </details>
+                </div>
               </div>
-              <dl className="info-list compact-info detail-info-grid">
-                <div>
-                  <dt>Zaman</dt>
-                  <dd>{formatTaskDue(task)}</dd>
-                </div>
-                <div>
-                  <dt>İlgili kayıt</dt>
-                  <dd>{formatTaskRelation(task)}</dd>
-                </div>
-              </dl>
-              <p className="resource-note">{task.description || "Açıklama yok."}</p>
-              <div className="operations-command-grid compact-actions three-actions">
+              <div className="compact-action-bar">
                 <button type="button" onClick={() => onUpdateStatus(task.id, "done")} disabled={task.status === "done"}>
-                  <CheckCircle2 size={16} aria-hidden="true" />
+                  <CheckCircle2 size={15} aria-hidden="true" />
                   Tamamla
-                </button>
-                <button className="secondary-command" type="button" onClick={() => onUpdateStatus(task.id, "cancelled")} disabled={task.status === "cancelled"}>
-                  İptal Et
-                </button>
-                <button className="secondary-command" type="button" onClick={() => onUpdateStatus(task.id, "pending")} disabled={task.status === "pending"}>
-                  Yeniden Aç
                 </button>
               </div>
             </article>
@@ -3611,7 +3591,7 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
         </div>
       </div>
 
-      <section className="operations-grid" aria-label="Rezervasyon kartları">
+      <section className="operations-grid compact-record-list" aria-label="Rezervasyon listesi">
         {reservations.length === 0 ? (
           <div className="panel empty-state">
             <CalendarCheck size={28} aria-hidden="true" />
@@ -3626,49 +3606,42 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
           </div>
         ) : (
           filteredReservations.map((reservation) => (
-            <article className="panel resource-card" key={reservation.id}>
-              <div className="resource-card-heading">
-                <div>
+            <article className="compact-list-item operation-record-row reservation-record-row" key={reservation.id}>
+              <div className="compact-list-main">
+                <div className="compact-list-heading">
+                  <span className={`status-badge ${getReservationStatusTone(reservation.status)}`}>
+                    {formatReservationStatus(reservation.status)}
+                  </span>
+                  <h2>{reservation.customerName || reservation.title || "Misafir"}</h2>
+                </div>
+                <div className="compact-meta-row">
                   <span>{formatReservationType(reservation.reservationType)}</span>
-                  <h2>{reservation.title}</h2>
+                  <span>{formatReservationDate(reservation)}</span>
+                  <span>{reservation.guestCount} kişi</span>
+                  <span>{formatReservationRooms(reservation, rooms)}</span>
                 </div>
-                <span className={`status-badge ${getReservationStatusTone(reservation.status)}`}>
-                  {formatReservationStatus(reservation.status)}
-                </span>
+                <div className="compact-record-footer">
+                  <p className="line-clamp-1">{reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}</p>
+                  <details className="expandable-details">
+                    <summary>Detay</summary>
+                    <div className="expanded-record-content">
+                      <p>{reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}</p>
+                      <div className="secondary-detail-actions">
+                        <button type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>Reddet</button>
+                        <button type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>İptal Et</button>
+                      </div>
+                    </div>
+                  </details>
+                </div>
               </div>
-              <dl className="info-list compact-info detail-info-grid">
-                <div>
-                  <dt>Müşteri</dt>
-                  <dd>{reservation.customerName || "Misafir"}</dd>
-                </div>
-                <div>
-                  <dt>Tarih</dt>
-                  <dd>{formatReservationDate(reservation)}</dd>
-                </div>
-                <div>
-                  <dt>Kişi</dt>
-                  <dd>{reservation.guestCount} kişi</dd>
-                </div>
-                <div>
-                  <dt>Oda</dt>
-                  <dd>{formatReservationRooms(reservation, rooms)}</dd>
-                </div>
-              </dl>
-              <p className="resource-note">{reservation.notes || reservation.priceNote || "Not yok."}</p>
-              <div className="operations-command-grid compact-actions">
-                <button type="button" onClick={() => onUpdateStatus(reservation.id, "approved")}>
-                  <CheckCircle2 size={16} aria-hidden="true" />
+              <div className="compact-action-bar">
+                <button type="button" onClick={() => onUpdateStatus(reservation.id, "approved")} disabled={reservation.status === "approved"}>
+                  <CheckCircle2 size={15} aria-hidden="true" />
                   Onayla
                 </button>
-                <button className="secondary-command" type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>
-                  Reddet
-                </button>
-                <button className="secondary-command" type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>
-                  İptal Et
-                </button>
-                <button className="secondary-command" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
-                  <MessageCircle size={16} aria-hidden="true" />
-                  {formatReservationWhatsAppButton(reservation.status)}
+                <button className="whatsapp-action" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
+                  <MessageCircle size={15} aria-hidden="true" />
+                  WhatsApp
                 </button>
               </div>
             </article>
@@ -3687,40 +3660,27 @@ interface RoomsWorkspaceProps {
 
 function RoomsWorkspace({ rooms, reservations, onUpdateStatus }: RoomsWorkspaceProps) {
   return (
-    <section className="operations-grid" aria-label="Oda yönetimi">
+    <section className="operations-grid compact-resource-grid" aria-label="Oda yönetimi">
       {rooms.length === 0 && (
         <div className="panel empty-state"><BedDouble size={28} aria-hidden="true" /><strong>Oda kaydı yok.</strong><p>Oda sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
       )}
       {rooms.map((room) => {
         const displayInfo = getRoomDisplayInfo(room, reservations);
-        return <article className="panel resource-card" key={room.id}>
+        return <article className="compact-card resource-compact-card" key={room.id}>
           <div className="resource-card-heading">
             <div>
-              <span>{room.number ? `Oda ${room.number}` : "Oda"}</span>
-              <h2>{room.name}</h2>
+              <h2>{room.number ? `Oda ${room.number} — ${room.name}` : room.name}</h2>
             </div>
             <span className={`status-badge ${getResourceStatusTone(displayInfo.status)}`}>{formatRoomStatus(displayInfo.status)}</span>
           </div>
-          <dl className="info-list compact-info detail-info-grid">
-            <div>
-              <dt>Kapasite</dt>
-              <dd>{room.capacity} kişi</dd>
-            </div>
-            <div>
-              <dt>Kat</dt>
-              <dd>{room.floor || "-"}</dd>
-            </div>
-            <div>
-              <dt>Yatak</dt>
-              <dd>{room.bedInfo || "-"}</dd>
-            </div>
-            <div>
-              <dt>Rezervasyon</dt>
-              <dd>{displayInfo.reservationTitle}</dd>
-            </div>
-          </dl>
-          <p className="resource-note">{room.description || room.features.join(", ") || "Açıklama yok."}</p>
-          <div className="status-button-row">
+          <div className="compact-meta-row">
+            <span>{room.capacity} kişi</span>
+            <span>{room.floor || "Kat bilgisi yok"}</span>
+            <span>{room.bedInfo || "Yatak bilgisi yok"}</span>
+          </div>
+          <p className="compact-reservation-line line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
+          {(room.description || room.features.length > 0) && <p className="resource-description line-clamp-1">{room.description || room.features.join(", ")}</p>}
+          <div className="status-button-row compact-status-actions" aria-label={`${room.name} durumunu değiştir`}>
             <button type="button" onClick={() => onUpdateStatus(room.id, "available")}>Boş</button>
             <button type="button" onClick={() => onUpdateStatus(room.id, "occupied")}>Dolu</button>
             <button type="button" onClick={() => onUpdateStatus(room.id, "cleaning")}>Temizlik</button>
@@ -3739,38 +3699,25 @@ interface TablesWorkspaceProps {
 
 function TablesWorkspace({ tables, onUpdateStatus }: TablesWorkspaceProps) {
   return (
-    <section className="operations-grid" aria-label="Masa yönetimi">
+    <section className="operations-grid compact-resource-grid" aria-label="Masa yönetimi">
       {tables.length === 0 && (
         <div className="panel empty-state"><UtensilsCrossed size={28} aria-hidden="true" /><strong>Masa kaydı yok.</strong><p>Masa sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
       )}
       {tables.map((table) => (
-        <article className="panel resource-card" key={table.id}>
+        <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
           <div className="resource-card-heading">
             <div>
-              <span>{table.area || "Genel"}</span>
               <h2>{table.name}</h2>
             </div>
             <span className={`status-badge ${getResourceStatusTone(table.status)}`}>{formatTableStatus(table.status)}</span>
           </div>
-          <dl className="info-list compact-info detail-info-grid">
-            <div>
-              <dt>Kapasite</dt>
-              <dd>{table.capacity} kişi</dd>
-            </div>
-            <div>
-              <dt>Alan</dt>
-              <dd>{table.area || "-"}</dd>
-            </div>
-            <div>
-              <dt>Rezervasyon</dt>
-              <dd>{table.activeReservationTitle || "Rezervasyon yok"}</dd>
-            </div>
-            <div>
-              <dt>Not</dt>
-              <dd>{table.notes || "-"}</dd>
-            </div>
-          </dl>
-          <div className="status-button-row">
+          <div className="compact-meta-row">
+            <span>{table.area || "Genel"}</span>
+            <span>{table.capacity} kişi</span>
+            <span>{table.activeReservationTitle || "Rezervasyon yok"}</span>
+          </div>
+          {table.notes && <p className="resource-description line-clamp-1">{table.notes}</p>}
+          <div className="status-button-row compact-status-actions" aria-label={`${table.name} durumunu değiştir`}>
             <button type="button" onClick={() => onUpdateStatus(table.id, "available")}>Boş</button>
             <button type="button" onClick={() => onUpdateStatus(table.id, "occupied")}>Dolu</button>
             <button type="button" onClick={() => onUpdateStatus(table.id, "reserved")}>Rezerve</button>
@@ -4502,17 +4449,6 @@ function formatResourceLinks(
   const roomText = roomNames.length > 0 ? `Oda: ${roomNames.join(", ")}` : reservation.roomIds.length > 0 ? "Oda atandı" : "";
   const tableText = tableNames.length > 0 ? `Masa: ${tableNames.join(", ")}` : reservation.tableIds.length > 0 ? "Masa atandı" : "";
   return [roomText, tableText].filter(Boolean).join(" · ") || "Yer bilgisi daha sonra paylaşılacak";
-}
-
-function formatReservationWhatsAppButton(status: string) {
-  const labels: Record<string, string> = {
-    approved: "WhatsApp Onay",
-    rejected: "WhatsApp Ret",
-    cancelled: "WhatsApp İptal",
-    completed: "WhatsApp Takip"
-  };
-
-  return labels[status] ?? "WhatsApp Taslak";
 }
 
 function buildReservationWhatsAppMessage(
