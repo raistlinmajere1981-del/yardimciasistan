@@ -1,6 +1,7 @@
 import { CalendarCheck, ClipboardList, ReceiptText, UtensilsCrossed } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DesktopDashboardData } from "../../electron/database";
+import { isRestaurantTask } from "../app/operations";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
@@ -9,11 +10,12 @@ interface RestaurantPageProps {
 }
 
 export function RestaurantPage({ data, tables, tasks }: RestaurantPageProps) {
+  const restaurantTasks = data.dailyTasks.filter((task) => isRestaurantTask(task, data.reservations));
   const metrics = [
     { label: "Boş masalar", value: data.tables.filter((table) => table.status === "available").length, icon: UtensilsCrossed },
     { label: "Rezerve masalar", value: data.tables.filter((table) => table.status === "reserved").length, icon: CalendarCheck },
     { label: "Hesap bekleyen", value: data.tables.filter((table) => table.status === "bill_waiting").length, icon: ReceiptText },
-    { label: "Bekleyen işler", value: data.dailyTasks.filter((task) => task.status === "pending").length, icon: ClipboardList }
+    { label: "Bekleyen işler", value: restaurantTasks.filter((task) => task.status === "pending").length, icon: ClipboardList }
   ];
 
   return (

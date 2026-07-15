@@ -39,6 +39,7 @@ import type {
 } from "../electron/database";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
+import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "./app/operations";
 import { CustomerWorkPage } from "./pages/CustomerWorkPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { PensionPage } from "./pages/PensionPage";
@@ -496,10 +497,11 @@ const aiServicePresets = [
 ] as const;
 
 function App() {
+  const contentRef = useRef<HTMLElement>(null);
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
   const [syncState, setSyncState] = useState<SyncState>("idle");
-  const [statusMessage, setStatusMessage] = useState("Web talepleri için henüz güncelleme yapılmadı.");
+  const [statusMessage, setStatusMessage] = useState("Webden yeni talep alınmadı.");
   const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
   const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
@@ -577,6 +579,11 @@ function App() {
   }, [activePage, messagesAiOpen]);
 
   useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    window.scrollTo(0, 0);
+  }, [activePage]);
+
+  useEffect(() => {
     if (!navigationItems.some((item) => item.id === activePage)) {
       setActivePage("dashboard");
     }
@@ -621,8 +628,8 @@ function App() {
       },
       {
         title: "Boş Odalar",
-        value: `${summary.availableRooms} boş`,
-        detail: `${summary.totalRooms} odadan ${summary.availableRooms} oda uygun`,
+        value: `${dashboardData.rooms.filter((room) => getRoomDisplayInfo(room, dashboardData.reservations).status === "available").length} boş`,
+        detail: `${summary.totalRooms} odadan ${dashboardData.rooms.filter((room) => getRoomDisplayInfo(room, dashboardData.reservations).status === "available").length} oda uygun`,
         tone: "ok",
         icon: BedDouble,
         enabled: modules.rooms
@@ -644,7 +651,7 @@ function App() {
         enabled: true
       },
       {
-        title: "Hazır WhatsApp Cevapları",
+        title: "Hazır WhatsApp cevapları",
         value: String(summary.preparedWhatsAppMessages),
         detail: summary.preparedWhatsAppMessages > 0 ? "Gönderilmeyi bekleyen taslak" : "Hazır cevap beklemiyor",
         tone: summary.preparedWhatsAppMessages > 0 ? "info" : "neutral",
@@ -654,7 +661,7 @@ function App() {
     ];
 
     return dashboardMetrics.filter((metric) => metric.enabled);
-  }, [dashboardData.summary, modules]);
+  }, [dashboardData.reservations, dashboardData.rooms, dashboardData.summary, modules]);
 
   const menuPreviewUrl = useMemo(() => `${dashboardData.webModuleUrl.replace(/\/+$/, "")}/menu.html`, [dashboardData.webModuleUrl]);
   const selectedWhatsAppRequest = useMemo(
@@ -1203,6 +1210,21 @@ function App() {
     setStatusMessage(result.message);
   }
 
+  function openRequestReservation(request: SyncedCustomerRequest) {
+    const reservation = dashboardData.reservations.find((item) => item.requestId === request.id);
+    if (!reservation) {
+      setSyncState("error");
+      setStatusMessage("Talebe bağlı rezervasyon bulunamadı.");
+      return;
+    }
+
+    if (["table", "breakfast"].includes(reservation.reservationType) && setupData.modules.tables) {
+      setActivePage("restaurant");
+      return;
+    }
+    setActivePage("pension");
+  }
+
   async function handleUpdateRoomStatus(roomId: string, status: string) {
     setSyncState("loading");
     setStatusMessage("Oda durumu güncelleniyor...");
@@ -1472,7 +1494,7 @@ function App() {
         </nav>
       </aside>
 
-      <main className="content">
+      <main className="content" ref={contentRef}>
         <header className="topbar">
           <div>
             <p>{pageMeta.eyebrow}</p>
@@ -1481,6 +1503,10 @@ function App() {
           {activePage === "menu" ? (
             <div className={`sync-pill sync-${menuPublishState}`}>
               <span>{menuStatusMessage}</span>
+              <button className="secondary-sync-action" type="button" onClick={openMenuPreview}>
+                <ExternalLink size={16} aria-hidden="true" />
+                Önizle
+              </button>
               <button type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
                 <UploadCloud size={16} aria-hidden="true" />
                 Web'e Yayınla
@@ -1555,14 +1581,15 @@ function App() {
                   <p>Web sitesinden gelen talepler burada görünecek.</p>
                 </div>
               ) : (
-                dashboardData.requests.map((request) => (
-                  <article className="request-card" key={request.id}>
+                dashboardData.requests.map((request) => {
+                  const actionMode = getRequestActionMode(request.status);
+                  return <article className="request-card" key={request.id}>
                     <div>
-                      <span className={`status-badge ${request.status === "converted_to_reservation" ? "ok" : "wait"}`}>
+                      <span className={`status-badge ${getRequestStatusTone(request.status)}`}>
                         {formatRequestStatus(request.status)}
                       </span>
                       <h3>{request.customer_name}</h3>
-                      <p>{formatRequestType(request.request_type)} • {request.date_text || request.start_date} • {request.guest_count} kişi</p>
+                      <p>{formatRequestType(request.request_type)} • {request.date_text || formatDateForDisplay(request.start_date)} • {request.guest_count} kişi</p>
                       <p>{request.message}</p>
                     </div>
                     <div className="request-actions">
@@ -1570,7 +1597,7 @@ function App() {
                         <Phone size={16} aria-hidden="true" />
                         Müşteriyi Ara
                       </button>
-                      {request.status !== "converted_to_reservation" && (
+                      {(actionMode === "open" || actionMode === "answered") && (
                         <button
                           className="convert-action"
                           type="button"
@@ -1581,7 +1608,7 @@ function App() {
                           {convertingRequestId === request.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
                         </button>
                       )}
-                      {setupData.aiEnabled && (
+                      {setupData.aiEnabled && actionMode === "open" && (
                         <button
                           className="ai-action"
                           type="button"
@@ -1596,9 +1623,15 @@ function App() {
                         <MessageCircle size={16} aria-hidden="true" />
                         WhatsApp'tan Yaz
                       </button>
+                      {actionMode === "converted" && (
+                        <button type="button" onClick={() => openRequestReservation(request)}>
+                          <CalendarCheck size={16} aria-hidden="true" />
+                          Rezervasyonu Aç
+                        </button>
+                      )}
                     </div>
                   </article>
-                ))
+                })
               )}
             </div>
           </article>
@@ -1677,6 +1710,7 @@ function App() {
                 onConvert={handleConvertRequestToReservation}
                 onSuggest={handleCreateOwnerReplySuggestion}
                 onUpdateStatus={handleUpdateRequestStatus}
+                onOpenReservation={openRequestReservation}
               />
             )}
             customers={(
@@ -1709,6 +1743,7 @@ function App() {
                 onConvert={handleConvertRequestToReservation}
                 onSuggest={handleCreateOwnerReplySuggestion}
                 onUpdateStatus={handleUpdateRequestStatus}
+                onOpenReservation={openRequestReservation}
               />
             )}
           />
@@ -1723,13 +1758,24 @@ function App() {
                 onOpenWhatsApp={openReservationWhatsApp}
               />
             )}
-            rooms={<RoomsWorkspace rooms={dashboardData.rooms} onUpdateStatus={handleUpdateRoomStatus} />}
+            rooms={<RoomsWorkspace rooms={dashboardData.rooms} reservations={dashboardData.reservations} onUpdateStatus={handleUpdateRoomStatus} />}
+            tasks={(
+              <DailyTasksWorkspace
+                tasks={dashboardData.dailyTasks.filter((task) => isAccommodationTask(task, dashboardData.reservations))}
+                onUpdateStatus={handleUpdateDailyTaskStatus}
+              />
+            )}
           />
         ) : activePage === "restaurant" ? (
           <RestaurantPage
             data={dashboardData}
             tables={<TablesWorkspace tables={dashboardData.tables} onUpdateStatus={handleUpdateTableStatus} />}
-            tasks={<DailyTasksWorkspace tasks={dashboardData.dailyTasks} onUpdateStatus={handleUpdateDailyTaskStatus} />}
+            tasks={(
+              <DailyTasksWorkspace
+                tasks={dashboardData.dailyTasks.filter((task) => isRestaurantTask(task, dashboardData.reservations))}
+                onUpdateStatus={handleUpdateDailyTaskStatus}
+              />
+            )}
           />
         ) : activePage === "menu" ? (
           <MenuManager
@@ -1748,16 +1794,12 @@ function App() {
             onNewItem={startNewItem}
             onSaveCategory={handleSaveCategory}
             onSaveItem={handleSaveItem}
-            onPublishMenu={handlePublishMenu}
-            onOpenPreview={openMenuPreview}
-            isPublishing={menuPublishState === "loading"}
           />
         ) : activePage === "messages" ? (
           <MessagesPage
             aiEnabled={setupData.aiEnabled}
             whatsappEnabled={setupData.modules.whatsapp}
             aiOpen={messagesAiOpen}
-            onAiOpenChange={setMessagesAiOpen}
             safeMode={(
               <WhatsAppWorkspace
                 view="safe"
@@ -2183,10 +2225,10 @@ function SetupWizard({
                 Panele Dön
               </button>
             )}
-            <button className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
+            {!embedded && <button className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
               <Save size={16} aria-hidden="true" />
               {setupData.setupRequired ? "Kurulumu Kaydet" : "Ayarları Kaydet"}
-            </button>
+            </button>}
           </div>
         </footer>
       </section>
@@ -2898,6 +2940,7 @@ interface RequestsWorkspaceProps {
   onConvert: (request: SyncedCustomerRequest) => void;
   onSuggest: (request: SyncedCustomerRequest) => void;
   onUpdateStatus: (request: SyncedCustomerRequest, status: string) => void;
+  onOpenReservation: (request: SyncedCustomerRequest) => void;
 }
 
 function RequestsWorkspace({
@@ -2917,9 +2960,11 @@ function RequestsWorkspace({
   onWhatsApp,
   onConvert,
   onSuggest,
-  onUpdateStatus
+  onUpdateStatus,
+  onOpenReservation
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
+  const selectedActionMode = selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
   const updateManualRequestForm = <Key extends keyof ManualRequestFormState,>(key: Key, value: ManualRequestFormState[Key]) => {
     onManualRequestFormChange({ ...manualRequestForm, [key]: value });
   };
@@ -3008,11 +3053,13 @@ function RequestsWorkspace({
             <div className="form-row">
               <label>
                 Giriş tarihi
-                <input type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
+                <input lang="tr" type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
+                <small className="date-field-hint">Gün / Ay / Yıl</small>
               </label>
               <label>
                 Çıkış tarihi
-                <input type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
+                <input lang="tr" type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
+                <small className="date-field-hint">Gün / Ay / Yıl</small>
               </label>
             </div>
             <div className="form-row">
@@ -3044,7 +3091,7 @@ function RequestsWorkspace({
                 <p>{formatRequestType(selectedRequest.request_type)}</p>
                 <h2>{selectedRequest.customer_name}</h2>
               </div>
-              <span className={`status-badge ${selectedRequest.status === "converted_to_reservation" ? "ok" : selectedRequest.status === "rejected" ? "wait" : "info"}`}>
+              <span className={`status-badge ${getRequestStatusTone(selectedRequest.status)}`}>
                 {formatRequestStatus(selectedRequest.status)}
               </span>
             </div>
@@ -3055,7 +3102,7 @@ function RequestsWorkspace({
               </div>
               <div>
                 <dt>Tarih</dt>
-                <dd>{selectedRequest.date_text || selectedRequest.start_date || "-"}</dd>
+                <dd>{selectedRequest.date_text || formatDateForDisplay(selectedRequest.start_date) || "-"}</dd>
               </div>
               <div>
                 <dt>Kişi</dt>
@@ -3079,26 +3126,38 @@ function RequestsWorkspace({
                 <MessageCircle size={16} aria-hidden="true" />
                 WhatsApp'tan Yaz
               </button>
-              {aiEnabled && (
+              {aiEnabled && selectedActionMode === "open" && (
                 <button type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
                   <Sparkles size={16} aria-hidden="true" />
                   {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Cevap Hazırla"}
                 </button>
               )}
-              {selectedRequest.status !== "converted_to_reservation" && (
+              {(selectedActionMode === "open" || selectedActionMode === "answered") && (
                 <button type="button" onClick={() => onConvert(selectedRequest)} disabled={convertingRequestId === selectedRequest.id}>
                   <CalendarCheck size={16} aria-hidden="true" />
                   {convertingRequestId === selectedRequest.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
                 </button>
               )}
-              <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
+              {selectedActionMode === "open" && <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
                 <CheckCircle2 size={16} aria-hidden="true" />
                 Cevaplandı İşaretle
-              </button>
-              <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
+              </button>}
+              {selectedActionMode === "open" && <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
                 <ClipboardList size={16} aria-hidden="true" />
                 Reddet
-              </button>
+              </button>}
+              {["answered", "rejected", "closed"].includes(selectedActionMode) && (
+                <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "new")}>
+                  <RefreshCw size={16} aria-hidden="true" />
+                  Yeniden Aç
+                </button>
+              )}
+              {selectedActionMode === "converted" && (
+                <button type="button" onClick={() => onOpenReservation(selectedRequest)}>
+                  <CalendarCheck size={16} aria-hidden="true" />
+                  Rezervasyonu Aç
+                </button>
+              )}
             </div>
           </>
         ) : (
@@ -3543,7 +3602,8 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
           </label>
           <label>
             Tarih
-            <input type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
+            <input lang="tr" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
+            <small className="date-field-hint">Gün / Ay / Yıl</small>
           </label>
           <button className="secondary-command" type="button" onClick={() => { setStatusFilter("all"); setDateFilter(""); }}>
             Filtreyi Temizle
@@ -3572,7 +3632,7 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
                   <span>{formatReservationType(reservation.reservationType)}</span>
                   <h2>{reservation.title}</h2>
                 </div>
-                <span className={`status-badge ${reservation.status === "approved" ? "ok" : reservation.status === "pending" ? "wait" : "info"}`}>
+                <span className={`status-badge ${getReservationStatusTone(reservation.status)}`}>
                   {formatReservationStatus(reservation.status)}
                 </span>
               </div>
@@ -3621,23 +3681,25 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
 
 interface RoomsWorkspaceProps {
   rooms: DesktopDashboardData["rooms"];
+  reservations: DesktopDashboardData["reservations"];
   onUpdateStatus: (roomId: string, status: string) => void;
 }
 
-function RoomsWorkspace({ rooms, onUpdateStatus }: RoomsWorkspaceProps) {
+function RoomsWorkspace({ rooms, reservations, onUpdateStatus }: RoomsWorkspaceProps) {
   return (
     <section className="operations-grid" aria-label="Oda yönetimi">
       {rooms.length === 0 && (
         <div className="panel empty-state"><BedDouble size={28} aria-hidden="true" /><strong>Oda kaydı yok.</strong><p>Oda sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
       )}
-      {rooms.map((room) => (
-        <article className="panel resource-card" key={room.id}>
+      {rooms.map((room) => {
+        const displayInfo = getRoomDisplayInfo(room, reservations);
+        return <article className="panel resource-card" key={room.id}>
           <div className="resource-card-heading">
             <div>
               <span>{room.number ? `Oda ${room.number}` : "Oda"}</span>
               <h2>{room.name}</h2>
             </div>
-            <span className={`status-badge ${getResourceStatusTone(room.status)}`}>{formatRoomStatus(room.status)}</span>
+            <span className={`status-badge ${getResourceStatusTone(displayInfo.status)}`}>{formatRoomStatus(displayInfo.status)}</span>
           </div>
           <dl className="info-list compact-info detail-info-grid">
             <div>
@@ -3654,7 +3716,7 @@ function RoomsWorkspace({ rooms, onUpdateStatus }: RoomsWorkspaceProps) {
             </div>
             <div>
               <dt>Rezervasyon</dt>
-              <dd>{room.activeReservationTitle || "Aktif rezervasyon yok"}</dd>
+              <dd>{displayInfo.reservationTitle}</dd>
             </div>
           </dl>
           <p className="resource-note">{room.description || room.features.join(", ") || "Açıklama yok."}</p>
@@ -3665,7 +3727,7 @@ function RoomsWorkspace({ rooms, onUpdateStatus }: RoomsWorkspaceProps) {
             <button type="button" onClick={() => onUpdateStatus(room.id, "maintenance")}>Bakım</button>
           </div>
         </article>
-      ))}
+      })}
     </section>
   );
 }
@@ -3736,9 +3798,6 @@ interface MenuManagerProps {
   onNewItem: () => void;
   onSaveCategory: () => void;
   onSaveItem: () => void;
-  onPublishMenu: () => void;
-  onOpenPreview: () => void;
-  isPublishing: boolean;
 }
 
 function MenuManager({
@@ -3756,36 +3815,10 @@ function MenuManager({
   onNewCategory,
   onNewItem,
   onSaveCategory,
-  onSaveItem,
-  onPublishMenu,
-  onOpenPreview,
-  isPublishing
+  onSaveItem
 }: MenuManagerProps) {
   return (
     <section className="menu-manager" aria-label="QR menü yönetimi">
-      <div className="menu-manager-toolbar">
-        <div className="menu-summary compact-summary">
-          <div>
-            <strong>{dashboardData.summary.activeMenuCategories}</strong>
-            <span>aktif kategori</span>
-          </div>
-          <div>
-            <strong>{dashboardData.summary.availableMenuItems}</strong>
-            <span>yayında ürün</span>
-          </div>
-        </div>
-        <div className="menu-preview-actions">
-          <button type="button" onClick={onOpenPreview}>
-            <ExternalLink size={16} aria-hidden="true" />
-            Önizle
-          </button>
-          <button type="button" onClick={onPublishMenu} disabled={isPublishing}>
-            <UploadCloud size={16} aria-hidden="true" />
-            Yayınla
-          </button>
-        </div>
-      </div>
-
       <div className="menu-management-grid">
         <section className="panel menu-list-panel">
           <div className="panel-heading compact">
@@ -3832,7 +3865,16 @@ function MenuManager({
                 placeholder="Kısa kategori açıklaması"
               />
             </label>
-            <div className="form-row">
+            <label className="toggle-label">
+              <input
+                checked={categoryForm.is_active}
+                onChange={(event) => onCategoryFormChange({ ...categoryForm, is_active: event.target.checked })}
+                type="checkbox"
+              />
+              Aktif
+            </label>
+            <details className="form-details category-details">
+              <summary>Detaylı ayarlar</summary>
               <label>
                 Sıra
                 <input
@@ -3841,15 +3883,7 @@ function MenuManager({
                   inputMode="numeric"
                 />
               </label>
-              <label className="toggle-label">
-                <input
-                  checked={categoryForm.is_active}
-                  onChange={(event) => onCategoryFormChange({ ...categoryForm, is_active: event.target.checked })}
-                  type="checkbox"
-                />
-                Aktif
-              </label>
-            </div>
+            </details>
             <button className="primary-command" type="button" onClick={onSaveCategory}>
               <Save size={16} aria-hidden="true" />
               Kategoriyi Kaydet
@@ -4250,6 +4284,37 @@ function formatRequestStatus(value: string) {
   return labels[value] ?? "Onay bekliyor";
 }
 
+type RequestActionMode = "open" | "answered" | "rejected" | "converted" | "closed";
+
+function getRequestActionMode(status: string): RequestActionMode {
+  if (status === "converted_to_reservation") {
+    return "converted";
+  }
+  if (status === "answered") {
+    return "answered";
+  }
+  if (status === "rejected") {
+    return "rejected";
+  }
+  if (["cancelled", "archived"].includes(status)) {
+    return "closed";
+  }
+  return "open";
+}
+
+function getRequestStatusTone(status: string) {
+  if (["rejected", "cancelled"].includes(status)) {
+    return "danger";
+  }
+  if (status === "converted_to_reservation" || status === "answered" || status === "approved") {
+    return "ok";
+  }
+  if (["new", "pending", "waiting_owner", "waiting_customer"].includes(status)) {
+    return "wait";
+  }
+  return "info";
+}
+
 function isRequestWaitingForReply(status: string) {
   return ["new", "seen", "waiting_owner", "pending", "in_progress"].includes(status);
 }
@@ -4290,6 +4355,19 @@ function formatReservationStatus(value: string) {
   return labels[value] ?? "Onay bekliyor";
 }
 
+function getReservationStatusTone(status: string) {
+  if (["rejected", "cancelled"].includes(status)) {
+    return "danger";
+  }
+  if (status === "pending") {
+    return "wait";
+  }
+  if (["approved", "completed"].includes(status)) {
+    return "ok";
+  }
+  return "info";
+}
+
 function formatTaskType(value: string) {
   const labels: Record<string, string> = {
     check_in: "Giriş hazırlığı",
@@ -4297,6 +4375,13 @@ function formatTaskType(value: string) {
     reservation_followup: "Rezervasyon takibi",
     customer_call: "Müşteri araması",
     table_reservation: "Masa takibi",
+    service: "Servis",
+    restaurant: "Restoran işi",
+    table_check: "Masa kontrolü",
+    payment: "Hesap takibi",
+    room_cleaning: "Oda temizliği",
+    room_maintenance: "Oda bakımı",
+    reservation: "Rezervasyon işi",
     cleaning: "Temizlik",
     maintenance: "Bakım",
     note: "Not",
@@ -4318,7 +4403,7 @@ function formatTaskStatus(value: string) {
 }
 
 function formatTaskDue(task: DesktopDashboardData["dailyTasks"][number]) {
-  return [task.dueDate, task.dueTime].filter(Boolean).join(" · ") || "Zaman yok";
+  return [formatDateForDisplay(task.dueDate), task.dueTime].filter(Boolean).join(" · ") || "Zaman yok";
 }
 
 function formatTaskRelation(task: DesktopDashboardData["dailyTasks"][number]) {
@@ -4366,16 +4451,27 @@ function getResourceStatusTone(value: string) {
     return "ok";
   }
 
-  if (value === "reserved" || value === "cleaning" || value === "bill_waiting") {
+  if (value === "reserved" || value === "bill_waiting") {
     return "wait";
+  }
+
+  if (value === "maintenance") {
+    return "danger";
   }
 
   return "info";
 }
 
 function formatReservationDate(reservation: DesktopDashboardData["reservations"][number]) {
-  const date = reservation.endDate ? `${reservation.startDate} - ${reservation.endDate}` : reservation.startDate;
+  const startDate = formatDateForDisplay(reservation.startDate);
+  const endDate = formatDateForDisplay(reservation.endDate);
+  const date = endDate ? `${startDate} - ${endDate}` : startDate;
   return [date, reservation.time].filter(Boolean).join(" · ") || "-";
+}
+
+function formatDateForDisplay(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : value;
 }
 
 function matchesReservationDate(reservation: DesktopDashboardData["reservations"][number], date: string) {

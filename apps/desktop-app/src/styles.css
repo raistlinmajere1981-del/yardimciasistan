@@ -364,7 +364,9 @@ button {
 .desktop-shell {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -372,6 +374,7 @@ button {
   flex-direction: column;
   gap: 22px;
   padding: 22px 16px;
+  overflow-y: auto;
   background: #172033;
   color: #ffffff;
 }
@@ -431,7 +434,10 @@ button {
 }
 
 .content {
+  height: 100%;
   min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 24px;
 }
 
@@ -499,6 +505,12 @@ button {
 .sync-pill button:disabled {
   cursor: wait;
   opacity: 0.72;
+}
+
+.sync-pill .secondary-sync-action {
+  color: var(--ink);
+  background: #fff8ee;
+  border: 1px solid var(--line);
 }
 
 .sync-error {
@@ -670,6 +682,11 @@ button {
 .status-badge.ok {
   color: var(--green);
   background: #e7f3ec;
+}
+
+.status-badge.danger {
+  color: var(--red);
+  background: #fdecea;
 }
 
 .empty-state {
@@ -848,13 +865,6 @@ button {
 .menu-manager {
   display: grid;
   gap: 16px;
-}
-
-.menu-manager-toolbar {
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 14px;
-  align-items: stretch;
 }
 
 .compact-summary {
@@ -1283,6 +1293,12 @@ button {
   color: var(--ink);
   font-size: 0.88rem;
   font-weight: 800;
+}
+
+.date-field-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 650;
 }
 
 .reservation-filters select,
@@ -2208,7 +2224,7 @@ button {
 
 .message-mode-switch {
   display: grid;
-  grid-template-columns: minmax(230px, 1fr) minmax(230px, 1fr) auto;
+  grid-template-columns: repeat(2, minmax(230px, 1fr));
   gap: 10px;
 }
 
@@ -2241,14 +2257,6 @@ button {
   background: #edf6f1;
   border-color: #9dc7b6;
   box-shadow: inset 4px 0 0 var(--primary);
-}
-
-.message-mode-switch .ai-tools-toggle {
-  grid-template-columns: auto auto;
-  color: #765319;
-  background: #fff5df;
-  border-color: #ecd39e;
-  font-weight: 900;
 }
 
 .optional-mode-note {
@@ -2347,7 +2355,6 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .menu-manager-toolbar,
   .reservation-toolbar,
   .menu-management-grid,
   .whatsapp-workspace,

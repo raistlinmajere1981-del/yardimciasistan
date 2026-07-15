@@ -48,6 +48,7 @@ try {
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Ayarlar" }).click();
+  await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await page.getByLabel("AI cevap önerileri açık").check();
   await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await page.getByLabel("Servis sağlayıcı").selectOption("gemini");
@@ -58,7 +59,10 @@ try {
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeDisabled();
   await page.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
+  await page.locator(".content").evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Panele Dön" }).click();
+  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.locator(".nav-item")).toHaveCount(7);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
   await expect(page.getByText("Web modül adresi")).toHaveCount(0);
@@ -69,14 +73,21 @@ try {
   await expect(page.getByRole("heading", { name: "Düzenle" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürünü Kaydet" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Önizle", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Yayınla", exact: true })).toHaveCount(0);
+  await expect(page.locator(".menu-list-panel").first().getByText("Sıra", { exact: true })).toBeHidden();
   await page.screenshot({ path: "artifacts/screenshots/desktop-qr-menu-manager.png", fullPage: true });
 
   await expect(page.locator(".menu-management-grid")).toBeVisible();
 
   await page.getByRole("button", { name: "Mesajlar" }).click();
+  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.getByRole("heading", { name: "Mesajlar" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Hazır Mesaj" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
+  await expect(page.getByText("AI ile mesajı düzenle", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "AI Araçları", exact: true })).toHaveCount(0);
   await expect(page.locator(".whatsapp-webview-frame")).toHaveCount(0);
   await page.screenshot({ path: "artifacts/screenshots/desktop-messages-safe-mode.png", fullPage: true });
   await page.getByRole("tab", { name: /WhatsApp Web Modu/ }).click();
@@ -153,6 +164,7 @@ try {
 
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await conversionPage.addInitScript(({ setupData, dashboardData }) => {
+    let currentDashboardData = dashboardData;
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -167,7 +179,7 @@ try {
         backupPath: "/tmp/yardimci-asistan/backups",
         setup: setupData
       }),
-      getDashboardData: async () => dashboardData,
+      getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
       saveInitialSetup: async () => ({ ok: false, message: "smoke" }),
       createManualRequest: async (input) => {
@@ -197,57 +209,60 @@ try {
           created_at: "2026-07-11T10:20:00+03:00",
           updated_at: "2026-07-11T10:20:00+03:00"
         };
+        currentDashboardData = {
+          ...currentDashboardData,
+          summary: {
+            ...currentDashboardData.summary,
+            newRequests: currentDashboardData.summary.newRequests + 1
+          },
+          requests: [request, ...currentDashboardData.requests],
+          customers: [
+            ...currentDashboardData.customers,
+            {
+              id: request.customer_id,
+              fullName: input.customerName,
+              phone: request.customer_phone,
+              email: "",
+              source: "manual",
+              notes: input.message,
+              tags: ["manuel", "talep"],
+              lastContactAt: "2026-07-11T10:20:00+03:00",
+              requestCount: 1,
+              reservationCount: 0,
+              updatedAt: "2026-07-11T10:20:00+03:00"
+            }
+          ]
+        };
         return {
           ok: true,
           message: "Manuel talep kaydedildi.",
           savedId,
-          dashboardData: {
-            ...dashboardData,
-            summary: {
-              ...dashboardData.summary,
-              newRequests: dashboardData.summary.newRequests + 1
-            },
-            requests: [request, ...dashboardData.requests],
-            customers: [
-              ...dashboardData.customers,
-              {
-                id: request.customer_id,
-                fullName: input.customerName,
-                phone: request.customer_phone,
-                email: "",
-                source: "manual",
-                notes: input.message,
-                tags: ["manuel", "talep"],
-                lastContactAt: "2026-07-11T10:20:00+03:00",
-                requestCount: 1,
-                reservationCount: 0,
-                updatedAt: "2026-07-11T10:20:00+03:00"
-              }
-            ]
-          }
+          dashboardData: currentDashboardData
         };
       },
-      convertRequestToReservation: async (requestId) => ({
-        ok: true,
-        message: "Talep rezervasyona çevrildi ve onaylandı.",
-        reservationId: "reservation_smoke_001",
-        dashboardData: {
-          ...dashboardData,
+      convertRequestToReservation: async (requestId) => {
+        currentDashboardData = {
+          ...currentDashboardData,
           summary: {
-            ...dashboardData.summary,
+            ...currentDashboardData.summary,
             newRequests: 0
           },
-          requests: dashboardData.requests.map((request) => request.id === requestId ? { ...request, status: "converted_to_reservation" } : request)
-        }
-      }),
-      updateRequestStatus: async ({ requestId, status }) => ({
-        ok: true,
-        message: "Talep durumu güncellendi.",
-        dashboardData: {
-          ...dashboardData,
-          requests: dashboardData.requests.map((request) => request.id === requestId ? { ...request, status } : request)
-        }
-      }),
+          requests: currentDashboardData.requests.map((request) => request.id === requestId ? { ...request, status: "converted_to_reservation" } : request)
+        };
+        return {
+          ok: true,
+          message: "Talep rezervasyona çevrildi ve onaylandı.",
+          reservationId: "reservation_smoke_001",
+          dashboardData: currentDashboardData
+        };
+      },
+      updateRequestStatus: async ({ requestId, status }) => {
+        currentDashboardData = {
+          ...currentDashboardData,
+          requests: currentDashboardData.requests.map((request) => request.id === requestId ? { ...request, status } : request)
+        };
+        return { ok: true, message: "Talep durumu güncellendi.", dashboardData: currentDashboardData };
+      },
       updateRoomStatus: async ({ roomId, status }) => ({
         ok: true,
         message: "Oda durumu güncellendi.",
@@ -368,7 +383,12 @@ try {
   await conversionPage.getByRole("button", { name: "AI Cevap Hazırla" }).click();
   await conversionPage.getByRole("button", { name: "WhatsApp'tan Yaz" }).click();
   await expect(conversionPage.getByLabel("Hazır WhatsApp mesajı")).toHaveValue(/Merhaba Smoke Misafir/);
-  await conversionPage.getByRole("button", { name: "AI Araçları", exact: true }).click();
+  await expect(conversionPage.getByRole("button", { name: "AI Araçları", exact: true })).toHaveCount(0);
+  await conversionPage.getByRole("button", { name: "AI ile Yenile" }).click();
+  await expect(conversionPage.getByText("Hazır mesaj yenilendi. Göndermeden önce kontrol edin.")).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
+  await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
+  await conversionPage.getByRole("button", { name: "Geçmişi Özetle" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Mesajlar" })).toBeVisible();
   await expect(conversionPage.getByText("AI önerileri")).toBeVisible();
   await conversionPage.getByLabel("Ek talimat isteğe bağlı").fill("Kısa ve samimi yaz.");
@@ -377,7 +397,7 @@ try {
   await expect(conversionPage.getByText("AI sonucu hazırlandı. Düzenleyip kullanabilirsiniz.")).toBeVisible();
   await conversionPage.screenshot({ path: "artifacts/screenshots/desktop-ai-workspace.png", fullPage: true });
   await conversionPage.getByRole("button", { name: "Talebe Kaydet" }).click();
-  await expect(conversionPage.getByText("AI cevap taslağı talebe kaydedildi.")).toBeVisible();
+  await expect(conversionPage.getByText("AI özeti talebe kaydedildi.")).toBeVisible();
   await conversionPage.getByRole("tab", { name: /Günü değerlendir/ }).click();
   await expect(conversionPage.getByLabel("Talep / müşteri")).toBeDisabled();
   await conversionPage.getByRole("button", { name: "AI Sonucunu Hazırla" }).click();
@@ -390,6 +410,10 @@ try {
   await expect(conversionPage.getByText("Talep rezervasyona çevrildi ve onaylandı.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(conversionPage.getByRole("heading", { name: "Müşteri İşleri" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Rezervasyonu Aç" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
+  await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
+  await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Elle Talep Ekle" }).click();
   await conversionPage.getByLabel("Ad soyad").fill("Manuel Smoke");
   await conversionPage.getByLabel("Telefon").fill("0555 333 44 66");
@@ -402,8 +426,18 @@ try {
   await conversionPage.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
   await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Manuel talep kaydedildi.")).toBeVisible();
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Reddet", exact: true }).click();
+  await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
+  await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
+  await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
+  await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Yeniden Aç" }).click();
   await conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" }).click();
   await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
+  await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
+  await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
   await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
   await expect(conversionPage.getByLabel("Müşteri yönetimi")).toBeVisible();
   await expect(conversionPage.getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
@@ -411,19 +445,29 @@ try {
   await expect(conversionPage.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Restoran" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Restoran" })).toBeVisible();
-  await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toBeVisible();
+  await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toHaveCount(0);
+  await expect(conversionPage.getByText("Bahçe masası kontrolü")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Tamamla" }).first().click();
   await expect(conversionPage.getByText("Günlük iş durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Hesap" }).first().click();
   await expect(conversionPage.getByText("Masa durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Pansiyon" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
+  await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toBeVisible();
+  const roomCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-card").filter({ hasText: "Smoke Balkonlu Oda" });
+  await expect(roomCard.locator(".status-badge")).toHaveText("Rezerve");
+  await expect(roomCard.getByText("Smoke Misafir - 2 gece", { exact: true })).toBeVisible();
+  const roomWithoutReservationCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-card").filter({ hasText: "Smoke Aile Odası" });
+  await expect(roomWithoutReservationCard.locator(".status-badge")).toHaveText("Boş");
+  await expect(roomWithoutReservationCard.getByText("Aktif rezervasyon yok", { exact: true })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Dolu" }).first().click();
   await expect(conversionPage.getByText("Oda durumu güncellendi.")).toBeVisible();
-  await expect(conversionPage.getByLabel("Durum")).toBeVisible();
-  await conversionPage.getByLabel("Tarih").fill("2026-07-18");
+  const reservationWorkspace = conversionPage.getByLabel("Rezervasyon yönetimi");
+  await expect(reservationWorkspace.getByLabel("Durum")).toBeVisible();
+  await expect(conversionPage.locator(".reservation-filters").getByText("Gün / Ay / Yıl", { exact: true })).toBeVisible();
+  await reservationWorkspace.getByLabel("Tarih").fill("2026-07-18");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
-  await conversionPage.getByLabel("Durum").selectOption("pending");
+  await reservationWorkspace.getByLabel("Durum").selectOption("pending");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
   await conversionPage.getByRole("button", { name: "Onayla" }).first().click();
   await expect(conversionPage.getByText("Rezervasyon durumu güncellendi.")).toBeVisible();
@@ -742,6 +786,22 @@ function createDashboardFixture() {
         isActive: true,
         sortOrder: 1,
         activeReservationTitle: "Smoke Misafir - 2 gece",
+        updatedAt: "2026-07-11T10:00:00+03:00"
+      },
+      {
+        id: "room_smoke_102",
+        name: "Smoke Aile Odası",
+        number: "102",
+        capacity: 4,
+        bedInfo: "1 çift kişilik yatak + 2 tek kişilik yatak",
+        floor: "1. Kat",
+        status: "reserved",
+        features: ["Klima"],
+        description: "Aktif rezervasyonu olmayan smoke oda kaydı.",
+        priceNote: "",
+        isActive: true,
+        sortOrder: 2,
+        activeReservationTitle: "Eski rezervasyon başlığı",
         updatedAt: "2026-07-11T10:00:00+03:00"
       }
     ],
