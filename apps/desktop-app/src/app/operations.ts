@@ -48,7 +48,7 @@ export function getRoomDisplayInfo(room: DesktopRoom, reservations: DesktopReser
 
   return {
     reservation: undefined,
-    reservationTitle: "Aktif rezervasyon yok",
+    reservationTitle: room.status === "reserved" ? "Manuel rezerve" : "Aktif rezervasyon yok",
     status: room.status
   };
 }

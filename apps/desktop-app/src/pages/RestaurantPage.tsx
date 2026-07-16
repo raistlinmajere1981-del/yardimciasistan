@@ -2,6 +2,7 @@ import { CalendarCheck, ClipboardList, ReceiptText, UtensilsCrossed } from "luci
 import type { ReactNode } from "react";
 import type { DesktopDashboardData } from "../../electron/database";
 import { isRestaurantTask } from "../app/operations";
+import { MetricCard, type MetricCardProps } from "../components/ui/MetricCard";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
@@ -11,26 +12,17 @@ interface RestaurantPageProps {
 
 export function RestaurantPage({ data, tables, tasks }: RestaurantPageProps) {
   const restaurantTasks = data.dailyTasks.filter((task) => isRestaurantTask(task, data.reservations));
-  const metrics = [
-    { label: "Boş masalar", value: data.tables.filter((table) => table.status === "available").length, icon: UtensilsCrossed },
-    { label: "Rezerve masalar", value: data.tables.filter((table) => table.status === "reserved").length, icon: CalendarCheck },
-    { label: "Hesap bekleyen", value: data.tables.filter((table) => table.status === "bill_waiting").length, icon: ReceiptText },
-    { label: "Bekleyen işler", value: restaurantTasks.filter((task) => task.status === "pending").length, icon: ClipboardList }
+  const metrics: MetricCardProps[] = [
+    { title: "Boş masalar", value: String(data.tables.filter((table) => table.status === "available").length), tone: "ok", icon: UtensilsCrossed, compact: true },
+    { title: "Rezerve masalar", value: String(data.tables.filter((table) => table.status === "reserved").length), tone: "wait", icon: CalendarCheck, compact: true },
+    { title: "Hesap bekleyen", value: String(data.tables.filter((table) => ["bill_waiting", "waiting_bill", "checkout", "payment"].includes(table.status)).length), tone: "info", icon: ReceiptText, compact: true },
+    { title: "Bekleyen işler", value: String(restaurantTasks.filter((task) => task.status === "pending").length), tone: "neutral", icon: ClipboardList, compact: true }
   ];
 
   return (
-    <section className="combined-page" aria-label="Restoran yönetimi">
+    <section className="combined-page restaurant-page" aria-label="Restoran yönetimi">
       <div className="operation-summary-grid">
-        {metrics.map((metric) => {
-          const Icon = metric.icon;
-          return (
-            <article key={metric.label}>
-              <Icon size={19} aria-hidden="true" />
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-            </article>
-          );
-        })}
+        {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
       </div>
       <div className="restaurant-layout">
         <section className="combined-section">

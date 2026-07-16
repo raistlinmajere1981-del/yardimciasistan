@@ -585,7 +585,7 @@ try {
   await expect(roomCard.getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "false");
   const roomWithoutReservationCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Aile Odası" });
   await expect(roomWithoutReservationCard.locator(".status-badge")).toHaveText("Rezerve");
-  await expect(roomWithoutReservationCard.locator(".compact-reservation-line")).toContainText("Aktif rezervasyon yok");
+  await expect(roomWithoutReservationCard.locator(".compact-reservation-line")).toContainText("Manuel rezerve");
   await expect(roomWithoutReservationCard.locator(".compact-status-actions .is-active")).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Dolu" }).first().click();
   await expect(conversionPage.getByText("Oda durumu güncellendi.")).toBeVisible();
@@ -708,17 +708,24 @@ try {
   expect(compactCustomerRowBoxes.every((box) => box.y >= compactCustomerListBox.y - 1 && box.y + box.height <= compactCustomerListBox.y + compactCustomerListBox.height + 1)).toBe(true);
 
   await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
+  const pensionMetricBoxes = await compactPage.locator(".pension-page .operation-summary-grid .metric-card").evaluateAll((cards) => cards.map((card) => {
+    const box = card.getBoundingClientRect();
+    return { height: box.height, y: box.y };
+  }));
+  expect(pensionMetricBoxes).toHaveLength(4);
+  expect(new Set(pensionMetricBoxes.map((box) => Math.round(box.y))).size).toBe(1);
+  expect(pensionMetricBoxes.every((box) => box.height >= 60 && box.height <= 72)).toBe(true);
   const reservationRows = compactPage.locator(".reservation-record-row");
   await expect(reservationRows).toHaveCount(3);
   const reservationHeights = await reservationRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
-  expect(reservationHeights.every((height) => height >= 72 && height <= 96)).toBe(true);
-  await expect(reservationRows.first().locator(".compact-action-bar button")).toHaveCount(2);
+  expect(reservationHeights.every((height) => height >= 64 && height <= 76)).toBe(true);
+  await expect(reservationRows.first().locator(".compact-action-bar > button")).toHaveCount(2);
   await reservationRows.first().locator("summary").click();
   await expect(reservationRows.first().getByRole("button", { name: "Reddet" })).toBeVisible();
   await expect(reservationRows.first().getByRole("button", { name: "İptal Et" })).toBeVisible();
   await reservationRows.first().locator("summary").click();
   const roomCardHeights = await compactPage.locator(".resource-compact-card").evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
-  expect(Math.max(...roomCardHeights)).toBeLessThan(170);
+  expect(roomCardHeights.every((height) => height >= 92 && height <= 120)).toBe(true);
   const compactRoomCards = compactPage.getByLabel("Oda yönetimi").locator(".resource-compact-card");
   await expect(compactRoomCards.first().locator(".compact-status-actions .is-active")).toHaveCount(0);
   await expect(compactRoomCards.first().getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "false");
@@ -726,20 +733,42 @@ try {
   const firstRoomCard = await compactPage.locator(".resource-compact-card").first().boundingBox();
   expect(firstRoomCard).not.toBeNull();
   expect(firstRoomCard.y + firstRoomCard.height).toBeLessThanOrEqual(768);
+  const pensionTaskRows = compactPage.locator(".pension-tasks-section .task-record-row");
+  await expect(pensionTaskRows).toHaveCount(2);
+  const pensionTaskHeights = await pensionTaskRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  expect(pensionTaskHeights.every((height) => height >= 56 && height <= 76)).toBe(true);
+  const firstPensionTask = await pensionTaskRows.first().boundingBox();
+  expect(firstPensionTask).not.toBeNull();
+  expect(firstPensionTask.y + firstPensionTask.height).toBeLessThanOrEqual(768);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-pension-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
+  const restaurantMetricBoxes = await compactPage.locator(".restaurant-page .operation-summary-grid .metric-card").evaluateAll((cards) => cards.map((card) => {
+    const box = card.getBoundingClientRect();
+    return { height: box.height, y: box.y };
+  }));
+  expect(restaurantMetricBoxes).toHaveLength(4);
+  expect(new Set(restaurantMetricBoxes.map((box) => Math.round(box.y))).size).toBe(1);
+  expect(restaurantMetricBoxes.every((box) => box.height >= 60 && box.height <= 72)).toBe(true);
   const firstTableHeight = await compactPage.locator(".table-compact-card").first().evaluate((card) => card.getBoundingClientRect().height);
   const firstTaskHeight = await compactPage.locator(".task-record-row").first().evaluate((card) => card.getBoundingClientRect().height);
-  expect(firstTableHeight).toBeLessThan(150);
-  expect(firstTaskHeight).toBeLessThan(120);
+  expect(firstTableHeight).toBeGreaterThanOrEqual(72);
+  expect(firstTableHeight).toBeLessThanOrEqual(100);
+  expect(firstTaskHeight).toBeGreaterThanOrEqual(56);
+  expect(firstTaskHeight).toBeLessThanOrEqual(76);
   const compactTableCards = compactPage.locator(".table-compact-card");
+  const compactTableBoxes = await compactTableCards.evaluateAll((cards) => cards.map((card) => {
+    const box = card.getBoundingClientRect();
+    return { x: box.x, y: box.y, height: box.height };
+  }));
+  expect(new Set(compactTableBoxes.map((box) => Math.round(box.x))).size).toBe(2);
+  expect(compactTableBoxes.every((box) => box.y + box.height <= 768)).toBe(true);
   await expect(compactTableCards.first().locator(".compact-status-actions button")).toHaveCount(4);
   for (const [index, label] of ["Boş", "Dolu", "Rezerve", "Hesap"].entries()) {
     await expect(compactTableCards.nth(index).getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(compactTableCards.nth(index).locator(".compact-status-actions .is-active")).toHaveCount(1);
   }
-  await expect(compactPage.locator(".task-record-row").first().locator(".compact-action-bar button")).toHaveCount(1);
+  await expect(compactPage.locator(".task-record-row").first().locator(".compact-action-bar > button")).toHaveCount(1);
   await compactPage.locator(".task-record-row").first().locator("summary").click();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
   await compactPage.locator(".task-record-row").first().locator("summary").click();
@@ -1396,7 +1425,7 @@ function createCompactUiFixture() {
     name: `${index % 2 === 0 ? "Bahçe" : "Salon"} Masası ${index + 1}`,
     area: index % 2 === 0 ? "Bahçe" : "Salon",
     capacity: index % 2 === 0 ? 4 : 2,
-    status: ["available", "occupied", "reserved", "bill_waiting"][index],
+    status: ["available", "occupied", "reserved", "payment"][index],
     currentReservationId: index === 2 ? reservations[0].id : "",
     activeReservationTitle: index === 2 ? `${requests[0].customer_name} - akşam` : "",
     notes: "Servis öncesi kısa masa notu.",

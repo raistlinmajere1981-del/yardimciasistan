@@ -828,6 +828,30 @@ button {
   overflow: hidden;
 }
 
+.metric-card-compact {
+  gap: 8px;
+  min-height: 68px;
+  padding: 8px 10px;
+}
+
+.metric-card.metric-card-compact > div:not(.metric-icon) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title value"
+    "detail detail";
+  align-items: center;
+  gap: 0 8px;
+}
+
+.metric-card-compact .metric-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.metric-card.metric-card-compact strong {
+  font-size: 1.3rem;
+}
+
 .metric-card > div:not(.metric-icon) {
   display: grid;
   flex: 1 1 auto;
@@ -3235,31 +3259,11 @@ button {
 .operation-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
-.operation-summary-grid article {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
+.operation-summary-grid .metric-card {
   min-height: 68px;
-  padding: 11px 12px;
-  color: var(--primary);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: 0 10px 28px rgba(23, 32, 51, 0.05);
-}
-
-.operation-summary-grid article span {
-  color: var(--muted);
-  font-weight: 750;
-}
-
-.operation-summary-grid article strong {
-  color: var(--ink);
-  font-size: 1.45rem;
 }
 
 .pension-layout,
@@ -3270,11 +3274,26 @@ button {
 }
 
 .pension-layout {
-  grid-template-columns: minmax(0, 1.6fr) minmax(350px, 0.8fr);
+  grid-template-columns: minmax(0, 1.65fr) minmax(350px, 0.78fr);
+  grid-template-areas:
+    "reservations rooms"
+    "tasks rooms";
 }
 
 .restaurant-layout {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.35fr) minmax(430px, 0.95fr);
+}
+
+.pension-reservations-section {
+  grid-area: reservations;
+}
+
+.pension-rooms-section {
+  grid-area: rooms;
+}
+
+.pension-tasks-section {
+  grid-area: tasks;
 }
 
 .combined-section {
@@ -3307,6 +3326,286 @@ button {
 .pension-layout .reservation-toolbar,
 .restaurant-layout .reservation-toolbar {
   grid-template-columns: 1fr;
+}
+
+.pension-page,
+.restaurant-page {
+  gap: 10px;
+}
+
+.pension-page .combined-section,
+.restaurant-page .combined-section {
+  gap: 6px;
+}
+
+.pension-page .combined-section-heading,
+.restaurant-page .combined-section-heading {
+  gap: 1px;
+}
+
+.pension-page .combined-section-heading strong,
+.restaurant-page .combined-section-heading strong {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.operation-filter-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.operation-filter-summary .status-badge {
+  min-height: 24px;
+  padding-inline: 7px;
+}
+
+.pension-page .reservations-workspace,
+.restaurant-page .reservations-workspace {
+  gap: 6px;
+}
+
+.pension-page .reservation-toolbar {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.restaurant-page .reservation-toolbar {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.pension-page .reservation-filters,
+.restaurant-page .reservation-filters {
+  gap: 7px;
+  padding: 5px 7px;
+}
+
+.pension-page .reservation-filters {
+  grid-template-columns: minmax(120px, 0.8fr) minmax(170px, 1fr) auto;
+}
+
+.pension-page .task-filters,
+.restaurant-page .task-filters {
+  grid-template-columns: minmax(120px, 1fr) auto;
+}
+
+.pension-page .reservation-filters label,
+.restaurant-page .reservation-filters label {
+  gap: 3px;
+  font-size: 0.78rem;
+}
+
+.pension-tasks-section .task-filters label,
+.restaurant-page .task-filters label {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.pension-page .reservation-filters select,
+.pension-page .reservation-filters input,
+.pension-page .reservation-filters button,
+.restaurant-page .reservation-filters select,
+.restaurant-page .reservation-filters input,
+.restaurant-page .reservation-filters button {
+  min-height: 30px;
+  padding: 4px 7px;
+  font-size: 0.78rem;
+}
+
+.pension-page .date-field-hint {
+  font-size: 0.68rem;
+}
+
+.pension-page .localized-date-display {
+  right: 30px;
+  padding-inline: 7px;
+  font-size: 0.78rem;
+}
+
+.pension-page .compact-record-list,
+.restaurant-page .compact-record-list {
+  gap: 6px;
+}
+
+.pension-reservations-section .compact-record-list {
+  max-height: 230px;
+}
+
+.pension-tasks-section .compact-record-list {
+  max-height: 142px;
+}
+
+.restaurant-page .compact-record-list {
+  max-height: 260px;
+}
+
+.pension-page .operation-record-row,
+.restaurant-page .operation-record-row {
+  gap: 8px;
+  padding: 6px 9px;
+}
+
+.pension-page .reservation-record-row {
+  min-height: 72px;
+}
+
+.pension-page .task-record-row,
+.restaurant-page .task-record-row {
+  min-height: 64px;
+}
+
+.pension-page .operation-record-row .compact-list-main,
+.restaurant-page .operation-record-row .compact-list-main {
+  gap: 2px;
+}
+
+.pension-page .operation-record-row .compact-list-heading,
+.restaurant-page .operation-record-row .compact-list-heading {
+  gap: 6px;
+}
+
+.pension-page .operation-record-row .compact-list-heading h3,
+.restaurant-page .operation-record-row .compact-list-heading h3 {
+  font-size: 0.9rem;
+}
+
+.pension-page .operation-record-row .compact-meta-row,
+.restaurant-page .operation-record-row .compact-meta-row {
+  flex-wrap: nowrap;
+  font-size: 0.75rem;
+}
+
+.pension-page .operation-record-row .compact-list-main > p,
+.restaurant-page .operation-record-row .compact-list-main > p {
+  font-size: 0.78rem;
+}
+
+.pension-page .operation-record-row .compact-action-bar,
+.restaurant-page .operation-record-row .compact-action-bar {
+  gap: 6px;
+}
+
+.pension-page .operation-record-row .action-button,
+.restaurant-page .operation-record-row .action-button,
+.pension-page .compact-action-details > summary,
+.restaurant-page .compact-action-details > summary {
+  min-height: 28px;
+  padding: 4px 7px;
+  font-size: 0.76rem;
+}
+
+.compact-action-details > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  list-style: none;
+  cursor: pointer;
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+}
+
+.compact-action-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.compact-action-details[open] {
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+.compact-action-details[open] > summary {
+  width: fit-content;
+  margin-left: auto;
+}
+
+.compact-action-details .compact-secondary-menu {
+  width: 100%;
+  min-width: 0;
+  margin-top: 5px;
+  padding: 7px;
+}
+
+.compact-action-details .secondary-detail-actions {
+  gap: 6px;
+  margin-top: 0;
+}
+
+.pension-page .secondary-detail-actions .action-button-danger,
+.restaurant-page .secondary-detail-actions .action-button-danger {
+  color: var(--status-red);
+  background: var(--status-red-bg);
+  border: 1px solid var(--danger-line);
+}
+
+.pension-page .secondary-detail-actions .action-button-secondary,
+.restaurant-page .secondary-detail-actions .action-button-secondary {
+  color: var(--ink);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+}
+
+.pension-rooms-section .compact-resource-grid {
+  gap: 6px;
+  max-height: calc(100vh - 188px);
+}
+
+.pension-page .resource-compact-card {
+  gap: 4px;
+  padding: 8px 10px;
+}
+
+.pension-page .resource-compact-card .resource-card-heading h2,
+.restaurant-page .table-compact-card .resource-card-heading h2 {
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.pension-page .resource-compact-card .compact-meta-row,
+.restaurant-page .table-compact-card .compact-meta-row {
+  flex-wrap: nowrap;
+  font-size: 0.75rem;
+}
+
+.pension-page .compact-reservation-line {
+  font-size: 0.78rem;
+}
+
+.pension-page .resource-description,
+.restaurant-page .table-compact-card .resource-description {
+  display: none;
+}
+
+.pension-page .status-button-row.compact-status-actions,
+.restaurant-page .status-button-row.compact-status-actions {
+  gap: 5px;
+}
+
+.pension-page .status-button-row.compact-status-actions button,
+.restaurant-page .status-button-row.compact-status-actions button {
+  min-height: 28px;
+  padding: 3px 5px;
+  font-size: 0.75rem;
+}
+
+.restaurant-page .compact-resource-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: calc(100vh - 188px);
+}
+
+.restaurant-page .table-compact-card {
+  gap: 5px;
+  min-height: 88px;
+  padding: 8px 10px;
 }
 
 .dashboard-compact-list {
@@ -4360,6 +4659,17 @@ button {
   .restaurant-layout,
   .message-mode-switch {
     grid-template-columns: 1fr;
+  }
+
+  .operation-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pension-layout {
+    grid-template-areas:
+      "reservations"
+      "rooms"
+      "tasks";
   }
 
   .whatsapp-workspace {

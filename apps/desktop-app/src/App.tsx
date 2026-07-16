@@ -48,7 +48,7 @@ import { PageHeader } from "./components/layout/PageHeader";
 import { Sidebar } from "./components/layout/Sidebar";
 import { ActionButton } from "./components/ui/ActionButton";
 import { CompactList } from "./components/ui/CompactList";
-import { CompactListButton } from "./components/ui/CompactListItem";
+import { CompactListButton, CompactListItem } from "./components/ui/CompactListItem";
 import { StatusBadge, type StatusTone } from "./components/ui/StatusBadge";
 import { CustomerWorkPage } from "./pages/CustomerWorkPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -3610,15 +3610,9 @@ function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps
   return (
     <section className="reservations-workspace" aria-label="Günlük işler">
       <div className="reservation-toolbar">
-        <div className="menu-summary compact-summary">
-          <div>
-            <strong>{tasks.filter((task) => task.status === "pending").length}</strong>
-            <span>bekleyen iş</span>
-          </div>
-          <div>
-            <strong>{tasks.filter((task) => task.status === "done").length}</strong>
-            <span>tamamlanan</span>
-          </div>
+        <div className="operation-filter-summary" aria-label="Günlük iş özeti">
+          <StatusBadge tone="wait">{tasks.filter((task) => task.status === "pending").length} bekleyen</StatusBadge>
+          <StatusBadge tone="ok">{tasks.filter((task) => task.status === "done").length} tamamlanan</StatusBadge>
         </div>
         <div className="reservation-filters task-filters">
           <label>
@@ -3630,9 +3624,9 @@ function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps
               <option value="all">Tümü</option>
             </select>
           </label>
-          <button className="secondary-command" type="button" onClick={() => setStatusFilter("all")}>
+          <ActionButton variant="secondary" size="sm" type="button" onClick={() => setStatusFilter("all")}>
             Tümünü Göster
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -3651,37 +3645,40 @@ function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps
           </div>
         ) : (
           filteredTasks.map((task) => (
-            <article className="compact-list-item operation-record-row task-record-row" key={task.id}>
-              <div className="compact-list-main">
-                <div className="compact-list-heading">
-                  <span className={`status-badge ${task.status === "done" ? "ok" : task.status === "pending" ? "wait" : "info"}`}>
-                    {formatTaskStatus(task.status)}
-                  </span>
-                  <h2>{task.title}</h2>
-                </div>
-                <div className="compact-meta-row">
-                  <span>{formatTaskType(task.taskType)}</span>
+            <CompactListItem
+              className="operation-record-row task-record-row"
+              key={task.id}
+              leading={(
+                <StatusBadge tone={task.status === "done" ? "ok" : task.status === "pending" ? "wait" : "info"}>
+                  {formatTaskStatus(task.status)}
+                </StatusBadge>
+              )}
+              title={task.title}
+              meta={(
+                <>
                   <span>{formatTaskDue(task)}</span>
                   <span>{formatTaskRelation(task)}</span>
-                </div>
-                <div className="compact-record-footer">
-                  <p className="line-clamp-1">{task.description || "Açıklama yok."}</p>
-                  <details className="expandable-details">
+                </>
+              )}
+              description={task.description || "Açıklama yok."}
+              actions={(
+                <>
+                  <ActionButton size="sm" type="button" onClick={() => onUpdateStatus(task.id, "done")} disabled={task.status === "done"}>
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                    Tamamla
+                  </ActionButton>
+                  <details className="expandable-details compact-action-details">
                     <summary>Diğer işlemler</summary>
-                    <div className="secondary-detail-actions">
-                      <button type="button" onClick={() => onUpdateStatus(task.id, "cancelled")} disabled={task.status === "cancelled"}>İptal Et</button>
-                      <button type="button" onClick={() => onUpdateStatus(task.id, "pending")} disabled={task.status === "pending"}>Yeniden Aç</button>
+                    <div className="expanded-record-content compact-secondary-menu">
+                      <div className="secondary-detail-actions">
+                        <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "cancelled")} disabled={task.status === "cancelled"}>İptal Et</ActionButton>
+                        <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "pending")} disabled={task.status === "pending"}>Yeniden Aç</ActionButton>
+                      </div>
                     </div>
                   </details>
-                </div>
-              </div>
-              <div className="compact-action-bar">
-                <button type="button" onClick={() => onUpdateStatus(task.id, "done")} disabled={task.status === "done"}>
-                  <CheckCircle2 size={15} aria-hidden="true" />
-                  Tamamla
-                </button>
-              </div>
-            </article>
+                </>
+              )}
+            />
           ))
         )}
       </section>
@@ -3712,15 +3709,9 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
   return (
     <section className="reservations-workspace" aria-label="Rezervasyon yönetimi">
       <div className="reservation-toolbar">
-        <div className="menu-summary compact-summary">
-          <div>
-            <strong>{filteredReservations.length}</strong>
-            <span>görünen kayıt</span>
-          </div>
-          <div>
-            <strong>{reservations.filter((reservation) => reservation.status === "pending").length}</strong>
-            <span>onay bekleyen</span>
-          </div>
+        <div className="operation-filter-summary" aria-label="Rezervasyon özeti">
+          <StatusBadge tone="info">{filteredReservations.length} görünen kayıt</StatusBadge>
+          <StatusBadge tone="wait">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
         </div>
         <div className="reservation-filters">
           <label>
@@ -3753,9 +3744,9 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
               </span>
             </div>
           </label>
-          <button className="secondary-command" type="button" onClick={() => { setStatusFilter("all"); setDateFilter(""); }}>
+          <ActionButton variant="secondary" size="sm" type="button" onClick={() => { setStatusFilter("all"); setDateFilter(""); }}>
             Filtreyi Temizle
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -3774,45 +3765,42 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
           </div>
         ) : (
           filteredReservations.map((reservation) => (
-            <article className="compact-list-item operation-record-row reservation-record-row" key={reservation.id}>
-              <div className="compact-list-main">
-                <div className="compact-list-heading">
-                  <span className={`status-badge ${getReservationStatusTone(reservation.status)}`}>
-                    {formatReservationStatus(reservation.status)}
-                  </span>
-                  <h2>{reservation.customerName || reservation.title || "Misafir"}</h2>
-                </div>
-                <div className="compact-meta-row">
-                  <span>{formatReservationType(reservation.reservationType)}</span>
+            <CompactListItem
+              className="operation-record-row reservation-record-row"
+              key={reservation.id}
+              leading={<StatusBadge tone={getReservationStatusTone(reservation.status)}>{formatReservationStatus(reservation.status)}</StatusBadge>}
+              title={reservation.title || reservation.customerName || "Misafir"}
+              meta={(
+                <>
                   <span>{formatReservationDate(reservation)}</span>
                   <span>{reservation.guestCount} kişi</span>
                   <span>{formatReservationRooms(reservation, rooms)}</span>
-                </div>
-                <div className="compact-record-footer">
-                  <p className="line-clamp-1">{reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}</p>
-                  <details className="expandable-details">
+                </>
+              )}
+              description={reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}
+              actions={(
+                <>
+                  <ActionButton size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "approved")} disabled={reservation.status === "approved"}>
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                    Onayla
+                  </ActionButton>
+                  <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
+                    <MessageCircle size={15} aria-hidden="true" />
+                    WhatsApp
+                  </ActionButton>
+                  <details className="expandable-details compact-action-details">
                     <summary>Detay</summary>
-                    <div className="expanded-record-content">
+                    <div className="expanded-record-content compact-secondary-menu">
                       <p>{reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}</p>
                       <div className="secondary-detail-actions">
-                        <button type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>Reddet</button>
-                        <button type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>İptal Et</button>
+                        <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>Reddet</ActionButton>
+                        <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>İptal Et</ActionButton>
                       </div>
                     </div>
                   </details>
-                </div>
-              </div>
-              <div className="compact-action-bar">
-                <button type="button" onClick={() => onUpdateStatus(reservation.id, "approved")} disabled={reservation.status === "approved"}>
-                  <CheckCircle2 size={15} aria-hidden="true" />
-                  Onayla
-                </button>
-                <button className="whatsapp-action" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
-                  <MessageCircle size={15} aria-hidden="true" />
-                  WhatsApp
-                </button>
-              </div>
-            </article>
+                </>
+              )}
+            />
           ))
         )}
       </section>
@@ -3839,7 +3827,7 @@ function RoomsWorkspace({ rooms, reservations, onUpdateStatus }: RoomsWorkspaceP
             <div>
               <h2>{room.number ? `Oda ${room.number} — ${room.name}` : room.name}</h2>
             </div>
-            <span className={`status-badge ${getResourceStatusTone(displayInfo.status)}`}>{formatRoomStatus(displayInfo.status)}</span>
+            <StatusBadge tone={getResourceStatusTone(displayInfo.status)}>{formatRoomStatus(displayInfo.status)}</StatusBadge>
           </div>
           <div className="compact-meta-row">
             <span>{room.capacity} kişi</span>
@@ -3878,7 +3866,7 @@ function TablesWorkspace({ tables, onUpdateStatus }: TablesWorkspaceProps) {
             <div>
               <h2>{table.name}</h2>
             </div>
-            <span className={`status-badge ${getResourceStatusTone(table.status)}`}>{formatTableStatus(table.status)}</span>
+            <StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
           </div>
           <div className="compact-meta-row">
             <span>{table.area || "Genel"}</span>
@@ -4468,7 +4456,7 @@ function formatReservationStatus(value: string) {
   return labels[value] ?? "Onay bekliyor";
 }
 
-function getReservationStatusTone(status: string) {
+function getReservationStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) {
     return "danger";
   }
@@ -4479,29 +4467,6 @@ function getReservationStatusTone(status: string) {
     return "ok";
   }
   return "info";
-}
-
-function formatTaskType(value: string) {
-  const labels: Record<string, string> = {
-    check_in: "Giriş hazırlığı",
-    check_out: "Çıkış takibi",
-    reservation_followup: "Rezervasyon takibi",
-    customer_call: "Müşteri araması",
-    table_reservation: "Masa takibi",
-    service: "Servis",
-    restaurant: "Restoran işi",
-    table_check: "Masa kontrolü",
-    payment: "Hesap takibi",
-    room_cleaning: "Oda temizliği",
-    room_maintenance: "Oda bakımı",
-    reservation: "Rezervasyon işi",
-    cleaning: "Temizlik",
-    maintenance: "Bakım",
-    note: "Not",
-    other: "Diğer"
-  };
-
-  return labels[value] ?? "Günlük iş";
 }
 
 function formatTaskStatus(value: string) {
@@ -4569,7 +4534,7 @@ function getTableStatusAction(value: string) {
   return ["available", "occupied", "reserved"].includes(value) ? value : "";
 }
 
-function getResourceStatusTone(value: string) {
+function getResourceStatusTone(value: string): StatusTone {
   if (value === "available") {
     return "ok";
   }
