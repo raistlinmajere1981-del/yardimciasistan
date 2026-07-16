@@ -1,7 +1,7 @@
 appId: com.yardimciasistan.desktop
 productName: Yardımcı Asistan
 copyright: Copyright © 2026 Yardımcı Asistan
-electronVersion: 40.10.6
+electronVersion: 43.1.1
 asar: true
 
 directories:

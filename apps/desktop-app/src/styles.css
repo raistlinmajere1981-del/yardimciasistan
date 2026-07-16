@@ -1,15 +1,37 @@
 :root {
   --bg: #fff8ee;
   --paper: #ffffff;
+  --field: #fffdf8;
+  --surface-tint: #fff8ee;
+  --surface-alt: #fffaf2;
+  --surface-disabled: #f6f3ec;
+  --surface-neutral: #f1f3f5;
+  --track: #edf1f4;
+  --tabs-bg: #eee9df;
   --ink: #172033;
   --muted: #667085;
   --line: #ded8ce;
   --primary: #2f6f5e;
+  --primary-solid: #2f6f5e;
+  --primary-soft: #edf6f1;
+  --primary-line: #bcd8cc;
   --accent: #e47863;
   --blue: #3c6f9f;
+  --blue-solid: #3c6f9f;
+  --blue-soft: #e7f0fb;
   --yellow: #b7791f;
+  --warning-soft: #fff3d7;
+  --warning-line: #ecd39e;
+  --warning-ink: #765319;
   --green: #2f7a52;
+  --green-solid: #2f7a52;
+  --green-soft: #e7f3ec;
   --red: #b42318;
+  --danger-soft: #fdecea;
+  --danger-line: #efc7c2;
+  --neutral-strong: #cbd5e1;
+  --logo-bg: #ffffff;
+  --ui-scale: 1;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
@@ -19,16 +41,57 @@
   background: var(--bg);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  zoom: var(--ui-scale);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f151e;
+  --paper: #19222e;
+  --field: #121a24;
+  --surface-tint: #151d28;
+  --surface-alt: #141c26;
+  --surface-disabled: #222c38;
+  --surface-neutral: #26313e;
+  --track: #303c4b;
+  --tabs-bg: #101721;
+  --ink: #edf3f7;
+  --muted: #a8b3c2;
+  --line: #354354;
+  --primary: #69bda3;
+  --primary-solid: #3e806c;
+  --primary-soft: #17382f;
+  --primary-line: #3d7564;
+  --accent: #f39580;
+  --blue: #7ab3e8;
+  --blue-solid: #3f78aa;
+  --blue-soft: #18334d;
+  --yellow: #e7ba5e;
+  --warning-soft: #3c3119;
+  --warning-line: #6f5828;
+  --warning-ink: #f0c76e;
+  --green: #71cc98;
+  --green-solid: #347d55;
+  --green-soft: #183a29;
+  --red: #ff8177;
+  --danger-soft: #432321;
+  --danger-line: #74413d;
+  --neutral-strong: #435163;
 }
 
 * {
   box-sizing: border-box;
 }
 
+input,
+select,
+textarea {
+  accent-color: var(--primary);
+}
+
 body {
   margin: 0;
-  min-width: 1080px;
-  min-height: 720px;
+  min-width: 900px;
+  min-height: 600px;
   background: var(--bg);
 }
 
@@ -67,7 +130,7 @@ button {
   object-fit: contain;
   padding: 4px;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--logo-bg);
 }
 
 .setup-brand strong,
@@ -181,7 +244,7 @@ button {
   min-height: 38px;
   padding: 8px 10px;
   color: var(--ink);
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
@@ -192,7 +255,7 @@ button {
 .setup-grid select:disabled,
 .setup-field input:disabled {
   color: var(--muted);
-  background: #f6f3ec;
+  background: var(--surface-disabled);
 }
 
 .setup-grid-wide {
@@ -204,6 +267,14 @@ button {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 600;
+}
+
+.setup-ai-studio-help {
+  padding-top: 24px;
+}
+
+.setup-ai-section > .setup-grid {
+  align-items: start;
 }
 
 .setup-ai-studio-help .setup-secondary {
@@ -225,8 +296,8 @@ button {
   min-width: 76px;
   padding: 8px 12px;
   color: var(--primary);
-  background: #edf6f1;
-  border: 1px solid #bcd8cc;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
   border-radius: 8px;
   cursor: pointer;
   font: inherit;
@@ -236,7 +307,7 @@ button {
 .setup-secret-input button:disabled {
   color: var(--muted);
   cursor: not-allowed;
-  background: #f6f3ec;
+  background: var(--surface-disabled);
   border-color: var(--line);
 }
 
@@ -256,7 +327,7 @@ button {
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
   font-weight: 800;
 }
 
@@ -268,8 +339,8 @@ button {
 
 .setup-danger-checkline {
   color: var(--red);
-  border-color: #efc7c2;
-  background: #fff7f6;
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
 }
 
 .setup-ai-actions {
@@ -298,6 +369,22 @@ button {
 
 .setup-ai-actions.sync-error span {
   color: var(--red);
+}
+
+.setup-ai-actions.is-inline {
+  grid-template-columns: 1fr;
+  align-content: start;
+  margin-top: 0;
+  padding-top: 24px;
+  border-top: 0;
+}
+
+.setup-ai-actions.is-inline .setup-secondary {
+  width: 100%;
+}
+
+.setup-ai-actions.is-inline small {
+  grid-column: 1;
 }
 
 .setup-count-row {
@@ -351,13 +438,13 @@ button {
 
 .setup-primary {
   color: #ffffff;
-  background: var(--primary);
+  background: var(--primary-solid);
   border: 0;
 }
 
 .setup-secondary {
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -399,7 +486,7 @@ button {
   object-fit: contain;
   padding: 4px;
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--logo-bg);
 }
 
 .brand strong,
@@ -500,7 +587,7 @@ button {
   min-height: 38px;
   padding: 8px 12px;
   color: #ffffff;
-  background: var(--primary);
+  background: var(--primary-solid);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -514,7 +601,7 @@ button {
 
 .sync-pill .secondary-sync-action {
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -577,22 +664,22 @@ button {
 
 .tone-info .metric-icon {
   color: var(--blue);
-  background: #e7f0fb;
+  background: var(--blue-soft);
 }
 
 .tone-ok .metric-icon {
   color: var(--green);
-  background: #e7f3ec;
+  background: var(--green-soft);
 }
 
 .tone-wait .metric-icon {
   color: var(--yellow);
-  background: #fff3d7;
+  background: var(--warning-soft);
 }
 
 .tone-neutral .metric-icon {
   color: var(--muted);
-  background: #f1f3f5;
+  background: var(--surface-neutral);
 }
 
 .metric-card span {
@@ -660,7 +747,7 @@ button {
   overflow-y: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .request-card {
@@ -684,11 +771,11 @@ button {
 }
 
 .request-actions .convert-action {
-  background: #2f6f5e;
+  background: var(--primary-solid);
 }
 
 .request-actions .ai-action {
-  background: #3c6f9f;
+  background: var(--blue-solid);
 }
 
 .request-actions .whatsapp-action {
@@ -795,7 +882,7 @@ button {
 .compact-meta-row span + span::before {
   content: "\2022";
   margin: 0 7px;
-  color: #a7a096;
+  color: var(--muted);
 }
 
 .compact-list-main > p,
@@ -822,7 +909,7 @@ button {
   min-height: 34px;
   padding: 6px 10px;
   color: #ffffff;
-  background: var(--primary);
+  background: var(--primary-solid);
   border: 0;
   border-radius: 7px;
   cursor: pointer;
@@ -865,22 +952,22 @@ button {
 
 .status-badge.info {
   color: var(--blue);
-  background: #e7f0fb;
+  background: var(--blue-soft);
 }
 
 .status-badge.wait {
   color: var(--yellow);
-  background: #fff3d7;
+  background: var(--warning-soft);
 }
 
 .status-badge.ok {
   color: var(--green);
-  background: #e7f3ec;
+  background: var(--green-soft);
 }
 
 .status-badge.danger {
   color: var(--red);
-  background: #fdecea;
+  background: var(--danger-soft);
 }
 
 .empty-state {
@@ -892,7 +979,7 @@ button {
   text-align: center;
   border: 1px dashed var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .empty-state svg {
@@ -911,7 +998,7 @@ button {
 }
 
 .android-publish-command {
-  background: var(--blue);
+  background: var(--blue-solid);
 }
 
 .info-list {
@@ -933,7 +1020,7 @@ button {
 .suggestion {
   padding: 14px;
   border-radius: 8px;
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -957,7 +1044,7 @@ button {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .menu-summary strong {
@@ -1038,7 +1125,7 @@ button {
   min-height: 38px;
   padding: 8px 10px;
   color: #ffffff;
-  background: var(--primary);
+  background: var(--primary-solid);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -1047,7 +1134,7 @@ button {
 
 .menu-actions button:last-child {
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -1111,13 +1198,13 @@ button {
 .primary-command {
   padding: 8px 12px;
   color: #ffffff;
-  background: var(--primary);
+  background: var(--primary-solid);
   border: 0;
 }
 
 .menu-preview-actions button:first-of-type {
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -1149,7 +1236,7 @@ button {
   width: 38px;
   padding: 0;
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -1159,7 +1246,7 @@ button {
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .product-list {
@@ -1187,7 +1274,7 @@ button {
 
 .manager-row.is-active,
 .manager-row:hover {
-  background: #eef7f1;
+  background: var(--primary-soft);
 }
 
 .manager-row span:first-child {
@@ -1211,11 +1298,11 @@ button {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: var(--neutral-strong);
 }
 
 .dot.is-on {
-  background: var(--green);
+  background: var(--green-solid);
 }
 
 .manager-form {
@@ -1240,7 +1327,7 @@ button {
   min-height: 38px;
   padding: 8px 10px;
   color: var(--ink);
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
@@ -1269,7 +1356,7 @@ button {
   padding: 9px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .toggle-label input {
@@ -1347,26 +1434,6 @@ button {
   padding: 18px;
 }
 
-.whatsapp-state-idle {
-  color: var(--muted);
-  background: #f1f3f5;
-}
-
-.whatsapp-state-loading {
-  color: var(--yellow);
-  background: #fff3d7;
-}
-
-.whatsapp-state-ready {
-  color: var(--green);
-  background: #e7f3ec;
-}
-
-.whatsapp-state-error {
-  color: var(--red);
-  background: #fff0ed;
-}
-
 .whatsapp-command-row {
   display: flex;
   gap: 8px;
@@ -1381,7 +1448,7 @@ button {
   min-height: 38px;
   padding: 8px 12px;
   color: #ffffff;
-  background: var(--primary);
+  background: var(--primary-solid);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -1390,13 +1457,13 @@ button {
 
 .whatsapp-command-row button:nth-child(2) {
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
 .whatsapp-command-row .whatsapp-approved-send {
   margin-left: auto;
-  background: var(--green);
+  background: var(--green-solid);
 }
 
 .whatsapp-send-status {
@@ -1420,7 +1487,7 @@ button {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .whatsapp-webview {
@@ -1431,7 +1498,7 @@ button {
   height: 100%;
   min-height: 0;
   border: 0;
-  background: #ffffff;
+  background: var(--logo-bg);
 }
 
 .compact-info {
@@ -1446,7 +1513,7 @@ button {
   overflow-y: auto;
   padding: 10px;
   color: var(--ink);
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
@@ -1515,7 +1582,7 @@ button {
   min-height: 34px;
   padding: 6px 9px;
   color: var(--ink);
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
@@ -1525,7 +1592,7 @@ button {
   min-height: 34px;
   padding: 6px 10px;
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
@@ -1599,7 +1666,7 @@ button {
   min-height: 40px;
   padding: 9px 10px;
   color: var(--ink);
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
@@ -1617,7 +1684,7 @@ button {
   min-height: 28px;
   padding: 4px 8px;
   color: var(--blue);
-  background: #e7f0fb;
+  background: var(--blue-soft);
   border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 800;
@@ -1634,7 +1701,7 @@ button {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .customer-history-grid h3 {
@@ -1754,7 +1821,7 @@ button {
   height: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: #edf1f4;
+  background: var(--track);
 }
 
 .report-bar-fill {
@@ -1762,7 +1829,7 @@ button {
   height: 100%;
   min-width: 4px;
   border-radius: inherit;
-  background: var(--primary);
+  background: var(--primary-solid);
 }
 
 .report-focus-list {
@@ -1779,7 +1846,7 @@ button {
   padding: 11px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .report-focus-item > span {
@@ -1789,19 +1856,19 @@ button {
   place-items: center;
   border-radius: 8px;
   color: var(--ink);
-  background: #f1f3f5;
+  background: var(--surface-neutral);
   font-size: 1.2rem;
   font-weight: 900;
 }
 
 .report-focus-item.tone-ok > span {
   color: var(--green);
-  background: #e7f3ec;
+  background: var(--green-soft);
 }
 
 .report-focus-item.tone-wait > span {
   color: var(--yellow);
-  background: #fff3d7;
+  background: var(--warning-soft);
 }
 
 .report-focus-item strong,
@@ -1829,7 +1896,7 @@ button {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffdf8;
+  background: var(--field);
 }
 
 .compact-detail-meta > div {
@@ -1860,7 +1927,7 @@ button {
   min-width: 0;
   padding: 10px 12px;
   color: var(--muted);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -1888,7 +1955,7 @@ button {
 }
 
 .soft-suggestion {
-  background: #eef7f1;
+  background: var(--primary-soft);
 }
 
 .compact-record-list {
@@ -1945,7 +2012,7 @@ button {
   margin-top: var(--space-sm);
   padding: 10px;
   color: var(--muted);
-  background: #fffaf2;
+  background: var(--surface-alt);
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -1964,7 +2031,7 @@ button {
 
 .secondary-detail-actions button {
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -2022,7 +2089,7 @@ button {
   min-height: 38px;
   padding: 8px 10px;
   color: #ffffff;
-  background: var(--primary);
+  background: var(--primary-solid);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -2038,7 +2105,7 @@ button {
 .operations-command-grid .secondary-command,
 .status-button-row button:nth-child(n + 2) {
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
 }
 
@@ -2105,7 +2172,7 @@ button {
   margin: 0;
   padding: 12px;
   color: var(--muted);
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   line-height: 1.45;
@@ -2188,7 +2255,7 @@ button {
   padding: 11px 12px;
   color: var(--ink);
   text-align: left;
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 9px;
   cursor: pointer;
@@ -2207,8 +2274,8 @@ button {
 
 .ai-mode-button.is-active {
   color: var(--primary);
-  background: #edf6f1;
-  border-color: #9dc7b6;
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
   box-shadow: inset 3px 0 0 var(--primary);
 }
 
@@ -2233,7 +2300,7 @@ button {
   min-width: 0;
   padding: 10px 11px;
   color: var(--ink);
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   font: inherit;
@@ -2243,7 +2310,7 @@ button {
 
 .ai-field select:disabled {
   color: var(--muted);
-  background: #f4f1ea;
+  background: var(--surface-disabled);
 }
 
 .ai-request-context {
@@ -2251,8 +2318,8 @@ button {
   gap: 5px;
   margin-top: 10px;
   padding: 11px 12px;
-  background: #f7f9fc;
-  border: 1px solid #dce3ec;
+  background: var(--surface-neutral);
+  border: 1px solid var(--line);
   border-radius: 8px;
 }
 
@@ -2282,7 +2349,7 @@ button {
 .ai-result-meta span {
   padding: 5px 8px;
   color: var(--muted);
-  background: #f2f5f9;
+  background: var(--surface-neutral);
   border-radius: 999px;
   font-size: 0.76rem;
   font-weight: 800;
@@ -2291,9 +2358,9 @@ button {
 .ai-missing-fields {
   margin-bottom: 10px;
   padding: 9px 11px;
-  color: #8c4f12;
-  background: #fff4dc;
-  border: 1px solid #efd19b;
+  color: var(--warning-ink);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-line);
   border-radius: 8px;
   line-height: 1.4;
 }
@@ -2318,7 +2385,7 @@ button {
   min-height: 38px;
   padding: 8px 12px;
   color: var(--ink);
-  background: #fff8ee;
+  background: var(--surface-tint);
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
@@ -2360,9 +2427,9 @@ button {
   gap: 9px;
   margin-top: 12px;
   padding: 10px 12px;
-  color: #315d50;
-  background: #edf6f1;
-  border: 1px solid #c5ded3;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
   border-radius: 8px;
   line-height: 1.45;
 }
@@ -2387,14 +2454,14 @@ button {
   padding: 10px 12px;
   color: var(--ink);
   text-align: left;
-  background: #fffdf8;
+  background: var(--field);
   border: 1px solid var(--line);
   border-radius: 8px;
   cursor: pointer;
 }
 
 .ai-history-list button:hover {
-  border-color: #9dc7b6;
+  border-color: var(--primary-line);
 }
 
 .ai-history-list button > span:nth-child(2) {
@@ -2421,7 +2488,7 @@ button {
   height: 30px;
   place-items: center;
   color: var(--primary);
-  background: #edf6f1;
+  background: var(--primary-soft);
   border-radius: 8px;
 }
 
@@ -2438,7 +2505,7 @@ button {
   padding: 5px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #eee9df;
+  background: var(--tabs-bg);
 }
 
 .page-tabs button,
@@ -2456,7 +2523,7 @@ button {
 .page-tabs button.is-active,
 .settings-level-tabs button.is-active {
   color: var(--primary);
-  background: #fff;
+  background: var(--paper);
   box-shadow: 0 4px 14px rgba(23, 32, 51, 0.08);
 }
 
@@ -2578,8 +2645,8 @@ button {
   min-height: 32px;
   padding: 6px 10px;
   color: var(--primary);
-  background: #edf6f1;
-  border: 1px solid #bfd9cf;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
   border-radius: 7px;
   cursor: pointer;
   font-weight: 800;
@@ -2601,8 +2668,8 @@ button {
   width: 100%;
   min-height: 40px;
   color: var(--primary);
-  background: #edf6f1;
-  border: 1px solid #bfd9cf;
+  background: var(--primary-soft);
+  border: 1px solid var(--primary-line);
   border-radius: 8px;
   cursor: pointer;
   font-weight: 900;
@@ -2612,7 +2679,7 @@ button {
   padding: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fffaf2;
+  background: var(--surface-alt);
 }
 
 .form-details summary {
@@ -2662,24 +2729,43 @@ button {
 
 .message-mode-switch > button.is-active {
   color: var(--primary);
-  background: #edf6f1;
-  border-color: #9dc7b6;
+  background: var(--primary-soft);
+  border-color: var(--primary-line);
   box-shadow: inset 4px 0 0 var(--primary);
 }
 
-.optional-mode-note {
-  margin: 0;
-  padding: 11px 13px;
-  color: #765319;
-  background: #fff5df;
-  border: 1px solid #ecd39e;
-  border-radius: 8px;
-  line-height: 1.45;
+.message-mode-content.is-hidden,
+.persistent-messages-page.is-hidden {
+  display: none;
 }
 
 .whatsapp-view-safe {
   grid-template-columns: minmax(300px, 0.75fr) minmax(520px, 1.25fr);
   grid-template-areas: "requests copy";
+  align-items: stretch;
+}
+
+.whatsapp-view-safe .whatsapp-request-panel,
+.whatsapp-view-safe .whatsapp-copy-panel {
+  height: clamp(480px, calc(100vh - 535px), 580px);
+  min-height: 0;
+}
+
+.whatsapp-view-safe .whatsapp-request-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.whatsapp-view-safe .whatsapp-request-list {
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+  align-content: start;
+  grid-auto-rows: min-content;
+}
+
+.whatsapp-view-safe .whatsapp-copy-panel {
+  overflow-y: auto;
+  align-content: start;
 }
 
 .whatsapp-view-web {
@@ -2717,9 +2803,9 @@ button {
 .message-ai-actions button {
   min-height: 34px;
   padding: 6px 9px;
-  color: #765319;
-  background: #fff5df;
-  border: 1px solid #ecd39e;
+  color: var(--warning-ink);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning-line);
   border-radius: 7px;
   cursor: pointer;
   font-weight: 800;
@@ -2742,6 +2828,10 @@ button {
 
 .settings-ai-toggle {
   margin-top: 14px;
+}
+
+.appearance-theme-toggle {
+  margin: 0;
 }
 
 .settings-technical-info {
@@ -2797,5 +2887,10 @@ button {
   .report-bar-row,
   .reservation-filters {
     grid-template-columns: 1fr;
+  }
+
+  .setup-ai-studio-help,
+  .setup-ai-actions.is-inline {
+    padding-top: 0;
   }
 }

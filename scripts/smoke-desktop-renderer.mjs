@@ -49,19 +49,60 @@ try {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Ayarlar" }).click();
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
+  await expect(page.locator(".setup-footer")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Panele Dön" })).toHaveCount(0);
+  await expect(page.getByText("İşletme", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Görünüm", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Firma Bilgileri", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Modüller", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Kapasite ve Yardımcı", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1");
+  await page.getByLabel("Arayüz ölçeği").selectOption("1.1");
+  await page.getByLabel("Karanlık tema").check();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1.1");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "dark", scale: 1.1 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Ayarlar" }).click();
+  await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1.1");
+  await expect(page.getByLabel("Karanlık tema")).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.screenshot({ path: "artifacts/screenshots/desktop-settings-dark.png", fullPage: true });
+  await page.getByLabel("Arayüz ölçeği").selectOption("1");
+  await page.getByLabel("Karanlık tema").uncheck();
   await page.getByLabel("AI cevap önerileri açık").check();
   await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
+  await expect(page.getByText("Web Bağlantısı", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("AI Bağlantısı", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Bu Bilgisayar", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Demo sitenin kurulu web modülü kullanılır; sonuna api/sync.php eklemeyin.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Seçtiğiniz bağlantı masaüstündeki cevap taslaklarında kullanılır ve kaydettiğinizde web modülüne güvenli biçimde uygulanır.", { exact: true })).toHaveCount(0);
   await page.getByLabel("Servis sağlayıcı").selectOption("gemini");
+  await expect(page.getByText("Google AI Studio hızlı kurulum", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Google AI Studio'yu Aç" })).toBeVisible();
   await expect(page.getByLabel("Google AI Studio cURL bağlantısı")).toBeVisible();
   await expect(page.getByLabel("Model adı")).toHaveAttribute("placeholder", "Bağlantı kontrolünden sonra listelenir");
   await expect(page.getByLabel("Model adı")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeDisabled();
+  const [serviceBox, studioButtonBox, curlInputBox, showButtonBox, connectionButtonBox] = await Promise.all([
+    page.locator(".setup-ai-service-field select").boundingBox(),
+    page.locator(".setup-ai-studio-help button").boundingBox(),
+    page.locator(".setup-ai-curl-field input").boundingBox(),
+    page.locator(".setup-ai-curl-field button").boundingBox(),
+    page.locator(".setup-ai-actions.is-inline > button").boundingBox()
+  ]);
+  expect(serviceBox).not.toBeNull();
+  expect(studioButtonBox).not.toBeNull();
+  expect(curlInputBox).not.toBeNull();
+  expect(showButtonBox).not.toBeNull();
+  expect(connectionButtonBox).not.toBeNull();
+  expect(Math.abs(serviceBox.y - studioButtonBox.y)).toBeLessThanOrEqual(2);
+  expect(studioButtonBox.x).toBeGreaterThan(serviceBox.x + serviceBox.width);
+  expect(Math.abs(curlInputBox.y - connectionButtonBox.y)).toBeLessThanOrEqual(2);
+  expect(showButtonBox.x).toBeLessThan(connectionButtonBox.x);
   await page.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
-  await page.locator(".content").evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-  await page.getByRole("button", { name: "Panele Dön" }).click();
+  await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.locator(".nav-item")).toHaveCount(7);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
@@ -84,22 +125,47 @@ try {
   await page.getByRole("button", { name: "Mesajlar" }).click();
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.getByRole("heading", { name: "Mesajlar" })).toBeVisible();
+  await expect(page.getByText("İletişim", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".whatsapp-request-panel .panel-heading")).toContainText("Talepler");
+  await expect(page.locator(".whatsapp-request-panel .panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
+  await expect(page.locator(".whatsapp-request-panel .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Hazır Mesaj" })).toBeVisible();
+  await expect(page.locator(".whatsapp-copy-panel .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
   await expect(page.getByText("AI ile mesajı düzenle", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "AI Araçları", exact: true })).toHaveCount(0);
   await expect(page.locator(".whatsapp-webview-frame")).toHaveCount(0);
+  const [safeRequestPanelBox, safeCopyPanelBox] = await Promise.all([
+    page.locator(".whatsapp-request-panel").boundingBox(),
+    page.locator(".whatsapp-copy-panel").boundingBox()
+  ]);
+  expect(safeRequestPanelBox).not.toBeNull();
+  expect(safeCopyPanelBox).not.toBeNull();
+  expect(Math.abs(safeRequestPanelBox.height - safeCopyPanelBox.height)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: "artifacts/screenshots/desktop-messages-safe-mode.png", fullPage: true });
   await page.getByRole("tab", { name: /WhatsApp Web Modu/ }).click();
-  await expect(page.getByText("WhatsApp Web modu isteğe bağlıdır.", { exact: false })).toBeVisible();
+  await expect(page.getByText("WhatsApp Web modu isteğe bağlıdır.", { exact: false })).toHaveCount(0);
+  await expect(page.locator(".whatsapp-live-panel .panel-heading p")).toHaveCount(0);
+  await expect(page.locator(".whatsapp-live-panel .panel-heading .status-badge")).toHaveCount(0);
+  await expect(page.locator(".whatsapp-send-status")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Onayla ve Gönder" })).toBeVisible();
   await expect(page.locator(".whatsapp-webview-frame")).toBeVisible();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
+  await page.locator(".whatsapp-webview").evaluate((element) => { element.dataset.persistenceMarker = "webview-kept-alive"; });
+  await page.getByRole("tab", { name: /Güvenli Mod/ }).click();
+  await expect(page.locator(".message-mode-content.is-hidden .whatsapp-webview")).toHaveCount(1);
+  await page.getByRole("tab", { name: /WhatsApp Web Modu/ }).click();
+  await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
+  await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  await expect(page.locator(".persistent-messages-page.is-hidden .whatsapp-webview")).toHaveCount(1);
+  await page.getByRole("button", { name: "Mesajlar", exact: true }).click();
+  await expect(page.getByRole("tab", { name: /WhatsApp Web Modu/ })).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
 
   const [requestPanelBox, livePanelBox, webviewFrameBox, webviewBox] = await Promise.all([
-    page.locator(".whatsapp-request-panel").boundingBox(),
+    page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-panel").boundingBox(),
     page.locator(".whatsapp-live-panel").boundingBox(),
     page.locator(".whatsapp-webview-frame").boundingBox(),
     page.locator(".whatsapp-webview").boundingBox()
@@ -378,7 +444,7 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Android'e Yayınla" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Android'e Yayınla" }).click();
   await expect(conversionPage.getByText("2 günlük iş ile Android özeti yayınlandı.")).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Panele Dön" }).click();
+  await conversionPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "AI Cevap Hazırla" })).toBeVisible();
@@ -567,17 +633,27 @@ try {
   expect(preparedMessageHeight).toBeGreaterThanOrEqual(110);
   expect(preparedMessageHeight).toBeLessThanOrEqual(180);
   await expect(compactPage.locator(".whatsapp-request-list .manager-row")).toHaveCount(8);
+  const [compactRequestPanelBox, compactCopyPanelBox, compactRequestScroll] = await Promise.all([
+    compactPage.locator(".whatsapp-request-panel").boundingBox(),
+    compactPage.locator(".whatsapp-copy-panel").boundingBox(),
+    compactPage.locator(".whatsapp-request-list").evaluate((list) => ({
+      clientHeight: list.clientHeight,
+      scrollHeight: list.scrollHeight
+    }))
+  ]);
+  expect(compactRequestPanelBox).not.toBeNull();
+  expect(compactCopyPanelBox).not.toBeNull();
+  expect(Math.abs(compactRequestPanelBox.height - compactCopyPanelBox.height)).toBeLessThanOrEqual(1);
+  expect(compactRequestScroll.scrollHeight).toBeGreaterThan(compactRequestScroll.clientHeight);
+  await compactPage.locator(".whatsapp-request-list").evaluate((list) => { list.scrollTop = list.scrollHeight; });
+  expect(await compactPage.locator(".whatsapp-request-list").evaluate((list) => list.scrollTop)).toBeGreaterThan(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-messages-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await compactPage.locator(".content").evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  const [settingsSectionBox, settingsFooterBox] = await Promise.all([
-    compactPage.locator(".setup-section").last().boundingBox(),
-    compactPage.locator(".setup-footer").boundingBox()
-  ]);
+  const settingsSectionBox = await compactPage.locator(".setup-section").last().boundingBox();
   expect(settingsSectionBox).not.toBeNull();
-  expect(settingsFooterBox).not.toBeNull();
-  expect(settingsFooterBox.y).toBeGreaterThanOrEqual(settingsSectionBox.y + settingsSectionBox.height - 1);
+  await expect(compactPage.locator(".setup-footer")).toHaveCount(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-settings-1366x768.png" });
   await compactPage.close();
 

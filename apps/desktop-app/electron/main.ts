@@ -44,6 +44,20 @@ const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
 const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 let desktopDatabase: DesktopDatabase | null = null;
 
+// Some Wayland compositors advertise color-management-v1 without every sRGB
+// capability Chromium expects, which otherwise produces repeated startup errors.
+if (process.platform === "linux" && process.env.XDG_SESSION_TYPE?.toLowerCase() === "wayland") {
+  const disabledFeatures = new Set(
+    app.commandLine
+      .getSwitchValue("disable-features")
+      .split(",")
+      .map((feature) => feature.trim())
+      .filter(Boolean)
+  );
+  disabledFeatures.add("WaylandWpColorManagerV1");
+  app.commandLine.appendSwitch("disable-features", [...disabledFeatures].join(","));
+}
+
 interface AiConnectionTestInput {
   provider: string;
   service: string;
@@ -90,6 +104,8 @@ function createMainWindow() {
       webviewTag: true
     }
   });
+
+  window.removeMenu();
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) {

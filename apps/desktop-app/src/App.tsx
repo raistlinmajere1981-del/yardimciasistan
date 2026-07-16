@@ -44,9 +44,15 @@ import { CustomerWorkPage } from "./pages/CustomerWorkPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { PensionPage } from "./pages/PensionPage";
 import { RestaurantPage } from "./pages/RestaurantPage";
+import {
+  applyUiPreferences,
+  readUiPreferences,
+  saveUiPreferences,
+  UI_SCALE_OPTIONS,
+  type UiPreferences
+} from "./ui-preferences";
 
 type SyncState = "idle" | "loading" | "success" | "error";
-type WhatsAppConnectionState = "idle" | "loading" | "ready" | "error";
 
 interface CategoryFormState {
   id: string;
@@ -498,6 +504,7 @@ const aiServicePresets = [
 
 function App() {
   const contentRef = useRef<HTMLElement>(null);
+  const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
   const [syncState, setSyncState] = useState<SyncState>("idle");
@@ -551,6 +558,11 @@ function App() {
     [setupData]
   );
   const navigationItems = useMemo(() => buildNavigation(setupData), [setupData]);
+
+  useEffect(() => {
+    applyUiPreferences(uiPreferences);
+    saveUiPreferences(uiPreferences);
+  }, [uiPreferences]);
 
   useEffect(() => {
     void window.yardimciDesktop?.getBootstrapData().then((data) => {
@@ -1466,9 +1478,76 @@ function App() {
         onTestAiConnection={handleTestAiConnection}
         onSave={handleSaveSetup}
         onSkip={() => setSetupMode(false)}
+        uiPreferences={uiPreferences}
+        onUiPreferencesChange={setUiPreferences}
       />
     );
   }
+
+  const persistentMessagesPage = (
+    <MessagesPage
+      aiEnabled={setupData.aiEnabled}
+      whatsappEnabled={setupData.modules.whatsapp}
+      aiOpen={messagesAiOpen}
+      safeMode={(
+        <WhatsAppWorkspace
+          view="safe"
+          requests={dashboardData.requests}
+          selectedRequest={selectedWhatsAppRequest}
+          selectedMessage={selectedWhatsAppMessage}
+          selectedUrl={selectedWhatsAppUrl}
+          aiEnabled={setupData.aiEnabled}
+          aiState={aiState}
+          aiMessage={aiMessage}
+          onSelectRequest={setSelectedWhatsAppRequestId}
+          onOpenExternal={openSelectedWhatsAppExternal}
+          onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
+          onRewrite={handleRewriteWhatsAppMessage}
+          onMessageSent={handleWhatsAppMessageSent}
+        />
+      )}
+      webMode={(
+        <WhatsAppWorkspace
+          view="web"
+          requests={dashboardData.requests}
+          selectedRequest={selectedWhatsAppRequest}
+          selectedMessage={selectedWhatsAppMessage}
+          selectedUrl={selectedWhatsAppUrl}
+          aiEnabled={setupData.aiEnabled}
+          aiState={aiState}
+          aiMessage={aiMessage}
+          onSelectRequest={setSelectedWhatsAppRequestId}
+          onOpenExternal={openSelectedWhatsAppExternal}
+          onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
+          onRewrite={handleRewriteWhatsAppMessage}
+          onMessageSent={handleWhatsAppMessageSent}
+        />
+      )}
+      aiTools={(
+        <AiWorkspace
+          setupData={setupData}
+          dashboardData={dashboardData}
+          mode={aiWorkspaceMode}
+          selectedRequestId={aiWorkspaceRequestId}
+          instructions={aiWorkspaceInstructions}
+          entry={aiWorkspaceEntry}
+          content={aiWorkspaceContent}
+          history={aiWorkspaceHistory}
+          state={aiWorkspaceState}
+          message={aiWorkspaceMessage}
+          onModeChange={changeAiWorkspaceMode}
+          onRequestChange={changeAiWorkspaceRequest}
+          onInstructionsChange={setAiWorkspaceInstructions}
+          onContentChange={setAiWorkspaceContent}
+          onGenerate={handleGenerateAiWorkspace}
+          onSave={handleSaveAiWorkspace}
+          onCopy={handleCopyAiWorkspace}
+          onWhatsApp={handlePrepareAiWorkspaceWhatsApp}
+          onSelectHistory={selectAiWorkspaceHistoryEntry}
+        />
+      )}
+    />
+  );
 
   return (
     <div className="desktop-shell">
@@ -1497,7 +1576,7 @@ function App() {
       <main className="content" ref={contentRef}>
         <header className="topbar">
           <div>
-            <p>{pageMeta.eyebrow}</p>
+            {activePage !== "settings" && activePage !== "messages" && <p>{pageMeta.eyebrow}</p>}
             <h1>{pageMeta.title}</h1>
           </div>
           {activePage === "menu" ? (
@@ -1772,70 +1851,7 @@ function App() {
             onSaveCategory={handleSaveCategory}
             onSaveItem={handleSaveItem}
           />
-        ) : activePage === "messages" ? (
-          <MessagesPage
-            aiEnabled={setupData.aiEnabled}
-            whatsappEnabled={setupData.modules.whatsapp}
-            aiOpen={messagesAiOpen}
-            safeMode={(
-              <WhatsAppWorkspace
-                view="safe"
-                requests={dashboardData.requests}
-                selectedRequest={selectedWhatsAppRequest}
-                selectedMessage={selectedWhatsAppMessage}
-                selectedUrl={selectedWhatsAppUrl}
-                aiEnabled={setupData.aiEnabled}
-                aiState={aiState}
-                aiMessage={aiMessage}
-                onSelectRequest={setSelectedWhatsAppRequestId}
-                onOpenExternal={openSelectedWhatsAppExternal}
-                onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
-                onRewrite={handleRewriteWhatsAppMessage}
-                onMessageSent={handleWhatsAppMessageSent}
-              />
-            )}
-            webMode={(
-              <WhatsAppWorkspace
-                view="web"
-                requests={dashboardData.requests}
-                selectedRequest={selectedWhatsAppRequest}
-                selectedMessage={selectedWhatsAppMessage}
-                selectedUrl={selectedWhatsAppUrl}
-                aiEnabled={setupData.aiEnabled}
-                aiState={aiState}
-                aiMessage={aiMessage}
-                onSelectRequest={setSelectedWhatsAppRequestId}
-                onOpenExternal={openSelectedWhatsAppExternal}
-                onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
-                onRewrite={handleRewriteWhatsAppMessage}
-                onMessageSent={handleWhatsAppMessageSent}
-              />
-            )}
-            aiTools={(
-              <AiWorkspace
-                setupData={setupData}
-                dashboardData={dashboardData}
-                mode={aiWorkspaceMode}
-                selectedRequestId={aiWorkspaceRequestId}
-                instructions={aiWorkspaceInstructions}
-                entry={aiWorkspaceEntry}
-                content={aiWorkspaceContent}
-                history={aiWorkspaceHistory}
-                state={aiWorkspaceState}
-                message={aiWorkspaceMessage}
-                onModeChange={changeAiWorkspaceMode}
-                onRequestChange={changeAiWorkspaceRequest}
-                onInstructionsChange={setAiWorkspaceInstructions}
-                onContentChange={setAiWorkspaceContent}
-                onGenerate={handleGenerateAiWorkspace}
-                onSave={handleSaveAiWorkspace}
-                onCopy={handleCopyAiWorkspace}
-                onWhatsApp={handlePrepareAiWorkspaceWhatsApp}
-                onSelectHistory={selectAiWorkspaceHistoryEntry}
-              />
-            )}
-          />
-        ) : (
+        ) : activePage === "messages" ? null : (
           <SetupWizard
             embedded
             form={setupForm}
@@ -1856,8 +1872,13 @@ function App() {
             onPublishAndroid={handlePublishAndroidSnapshot}
             onSave={handleSaveSetup}
             onSkip={() => setActivePage("dashboard")}
+            uiPreferences={uiPreferences}
+            onUiPreferencesChange={setUiPreferences}
           />
         )}
+        <div className={activePage === "messages" ? "persistent-messages-page" : "persistent-messages-page is-hidden"} aria-hidden={activePage !== "messages"}>
+          {persistentMessagesPage}
+        </div>
       </main>
     </div>
   );
@@ -1883,6 +1904,8 @@ interface SetupWizardProps {
   onPublishAndroid?: () => void;
   onSave: () => void;
   onSkip: () => void;
+  uiPreferences: UiPreferences;
+  onUiPreferencesChange: (preferences: UiPreferences) => void;
 }
 
 function SetupWizard({
@@ -1904,7 +1927,9 @@ function SetupWizard({
   onCreateBackup,
   onPublishAndroid,
   onSave,
-  onSkip
+  onSkip,
+  uiPreferences,
+  onUiPreferencesChange
 }: SetupWizardProps) {
   const [showAiApiKey, setShowAiApiKey] = useState(false);
   const [showGoogleCurl, setShowGoogleCurl] = useState(false);
@@ -1923,6 +1948,17 @@ function SetupWizard({
       aiModel: service === form.aiService ? form.aiModel : ""
     });
   };
+
+  const renderAiConnectionActions = (inline: boolean) => (
+    <div className={`setup-ai-actions${inline ? " is-inline" : ""} sync-${aiConnectionTestState}`}>
+      <button className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !setupData.aiApiKeyConfigured)}>
+        <RefreshCw size={16} aria-hidden="true" />
+        {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
+      </button>
+      <span>{aiConnectionTestMessage}</span>
+      <small>{setupData.aiLastPublishedAt ? `Web ayarı son yayın: ${formatDateTime(setupData.aiLastPublishedAt)}` : "Web ayarı henüz bu cihazdan yayınlanmadı."}</small>
+    </div>
+  );
 
   return (
     <main className={embedded ? "setup-shell is-embedded" : "setup-shell"}>
@@ -1957,9 +1993,41 @@ function SetupWizard({
           <button className={settingsLevel === "advanced" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "advanced"} onClick={() => setSettingsLevel("advanced")}>Gelişmiş Ayarlar</button>
         </div>
         {settingsLevel === "basic" && <>
+        {embedded && <div className="setup-section appearance-settings">
+          <div className="setup-section-title">
+            <h2>Uygulama Görünümü</h2>
+          </div>
+          <p className="setup-section-description">Ekranınıza uygun boyutu ve tema görünümünü seçin. Değişiklikler anında uygulanır ve bu bilgisayarda saklanır.</p>
+          <div className="setup-grid two">
+            <label>
+              Arayüz ölçeği
+              <select
+                value={String(uiPreferences.scale)}
+                onChange={(event) => onUiPreferencesChange({ ...uiPreferences, scale: Number(event.target.value) })}
+              >
+                {UI_SCALE_OPTIONS.map((scale) => (
+                  <option value={scale} key={scale}>{Math.round(scale * 100)}%</option>
+                ))}
+              </select>
+              <small>Metinler, menüler ve içerik alanları birlikte ölçeklenir.</small>
+            </label>
+            <div className="setup-field">
+              <span>Tema</span>
+              <label className="setup-checkline appearance-theme-toggle">
+                <input
+                  checked={uiPreferences.theme === "dark"}
+                  onChange={(event) => onUiPreferencesChange({ ...uiPreferences, theme: event.target.checked ? "dark" : "light" })}
+                  type="checkbox"
+                />
+                Karanlık tema
+              </label>
+              <small>Az ışıklı ortamlarda daha rahat bir görünüm sağlar.</small>
+            </div>
+          </div>
+        </div>}
         <div className="setup-section">
           <div className="setup-section-title">
-            <p>Firma Bilgileri</p>
+            {!embedded && <p>Firma Bilgileri</p>}
             <h2>Temel Tanım</h2>
           </div>
           <div className="setup-grid two">
@@ -1998,7 +2066,7 @@ function SetupWizard({
 
         <div className="setup-section">
           <div className="setup-section-title">
-            <p>Modüller</p>
+            {!embedded && <p>Modüller</p>}
             <h2>Kullanılacak Alanlar</h2>
           </div>
           <div className="setup-toggle-grid">
@@ -2027,7 +2095,7 @@ function SetupWizard({
 
         <div className="setup-section">
           <div className="setup-section-title">
-            <p>Kapasite ve Yardımcı</p>
+            {!embedded && <p>Kapasite ve Yardımcı</p>}
             <h2>Günlük Kullanım</h2>
           </div>
           <div className="setup-count-row">
@@ -2049,14 +2117,13 @@ function SetupWizard({
 
         {settingsLevel === "advanced" && <><div className="setup-section">
           <div className="setup-section-title">
-            <p>Web Bağlantısı</p>
+            {!embedded && <p>Web Bağlantısı</p>}
             <h2>Hosting Modülü</h2>
           </div>
           <div className="setup-grid two">
             <label className="setup-field">
               Web modül adresi
               <input value={form.webModuleUrl} onChange={(event) => update("webModuleUrl", event.target.value)} placeholder="https://yardimciasistan.alwaysdata.net/yardimci-asistan" />
-              <small>Demo sitenin kurulu web modülü kullanılır; sonuna api/sync.php eklemeyin.</small>
             </label>
             <label>
               Web güvenlik anahtarı
@@ -2067,12 +2134,11 @@ function SetupWizard({
 
         <div className="setup-section setup-ai-section">
           <div className="setup-section-title">
-            <p>AI Bağlantısı</p>
+            {!embedded && <p>AI Bağlantısı</p>}
             <h2>Masaüstü ve Web İçin Tek Ayar</h2>
           </div>
-          <p className="setup-section-description">Seçtiğiniz bağlantı masaüstündeki cevap taslaklarında kullanılır ve kaydettiğinizde web modülüne güvenli biçimde uygulanır.</p>
           <div className="setup-grid two">
-            <label>
+            <label className="setup-ai-service-field">
               Servis sağlayıcı
               <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
                 {aiServicePresets.map((preset) => (
@@ -2082,15 +2148,14 @@ function SetupWizard({
             </label>
             {form.aiService === "gemini" ? (
               <>
-                <div className="setup-field setup-grid-wide setup-ai-studio-help">
-                  <span>Google AI Studio hızlı kurulum</span>
+                <div className="setup-field setup-ai-studio-help">
                   <button className="setup-secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
                     <ExternalLink size={16} aria-hidden="true" />
                     Google AI Studio'yu Aç
                   </button>
                   <small>Bağlantı anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
                 </div>
-                <div className="setup-field setup-grid-wide">
+                <div className="setup-field setup-ai-curl-field">
                   <span>Google AI Studio cURL bağlantısı</span>
                   <div className="setup-secret-input">
                     <input
@@ -2109,6 +2174,7 @@ function SetupWizard({
                   </div>
                   <small>Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır.</small>
                 </div>
+                {renderAiConnectionActions(true)}
               </>
             ) : (
               <label className="setup-grid-wide">
@@ -2169,18 +2235,11 @@ function SetupWizard({
               </label>
             )}
           </div>
-          <div className={`setup-ai-actions sync-${aiConnectionTestState}`}>
-            <button className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !setupData.aiApiKeyConfigured)}>
-              <RefreshCw size={16} aria-hidden="true" />
-              {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
-            </button>
-            <span>{aiConnectionTestMessage}</span>
-            <small>{setupData.aiLastPublishedAt ? `Web ayarı son yayın: ${formatDateTime(setupData.aiLastPublishedAt)}` : "Web ayarı henüz bu cihazdan yayınlanmadı."}</small>
-          </div>
+          {form.aiService !== "gemini" && renderAiConnectionActions(false)}
         </div>
 
         <div className="setup-section">
-          <div className="setup-section-title"><p>Bu Bilgisayar</p><h2>Kayıt ve Yedekleme</h2></div>
+          <div className="setup-section-title">{!embedded && <p>Bu Bilgisayar</p>}<h2>Kayıt ve Yedekleme</h2></div>
           <dl className="info-list settings-technical-info">
             <div><dt>Yerel kayıt dosyası</dt><dd>{dashboardData?.databasePath ?? "İlk kayıt sonrası oluşur"}</dd></div>
             <div><dt>Yedek klasörü</dt><dd>{dashboardData?.backupPath ?? "İlk kayıt sonrası oluşur"}</dd></div>
@@ -2194,7 +2253,7 @@ function SetupWizard({
         </div>
         </>}
 
-        <footer className={`setup-footer sync-${saveState}`}>
+        {!embedded && <footer className={`setup-footer sync-${saveState}`}>
           <span>{message}</span>
           <div>
             {!setupData.setupRequired && (
@@ -2202,12 +2261,12 @@ function SetupWizard({
                 Panele Dön
               </button>
             )}
-            {!embedded && <button className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
+            <button className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
               <Save size={16} aria-hidden="true" />
               {setupData.setupRequired ? "Kurulumu Kaydet" : "Ayarları Kaydet"}
-            </button>}
+            </button>
           </div>
-        </footer>
+        </footer>}
       </section>
     </main>
   );
@@ -2595,11 +2654,9 @@ function createWhatsAppSendScript(expectedMessage: string, expectedChatTitle: st
 
 function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, onSelectRequest, onOpenExternal, onCall, onRewrite, onMessageSent }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
-  const [connectionState, setConnectionState] = useState<WhatsAppConnectionState>("idle");
-  const [connectionMessage, setConnectionMessage] = useState("WhatsApp Web yükleniyor.");
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
   const [sendState, setSendState] = useState<SyncState>("idle");
-  const [sendMessage, setSendMessage] = useState("Müşteri sohbetini açın, metni kontrol edin ve gönderimi onaylayın.");
+  const [sendMessage, setSendMessage] = useState("");
   const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
   const webViewAction = useMemo(
     () => (selectedRequest ? prepareWhatsAppAction({ phone: selectedRequest.customer_phone, message: selectedMessage, preferredMode: "webview" }) : null),
@@ -2610,8 +2667,6 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
 
   useEffect(() => {
     if (!selectedRequest) {
-      setConnectionState("idle");
-      setConnectionMessage("Talep seçin.");
       setCopyMessage("Hazır mesaj bekliyor.");
       setSendState("idle");
       setSendMessage("Gönderim için talep seçin.");
@@ -2620,8 +2675,6 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
     }
 
     if (!webViewPayload) {
-      setConnectionState("error");
-      setConnectionMessage(webViewAction?.message ?? "WhatsApp hedefi hazırlanamadı.");
       setCopyMessage("Mesaj elle kopyalanabilir.");
       setSendState("error");
       setSendMessage("Geçerli telefon ve hazır mesaj olmadan gönderim yapılamaz.");
@@ -2629,43 +2682,11 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
       return;
     }
 
-    setConnectionState("loading");
-    setConnectionMessage("QR girişi bekliyor.");
     setCopyMessage("Hazır mesaj bekliyor.");
     setSendState("idle");
-    setSendMessage("Müşteri sohbetini açın, metni kontrol edin ve gönderimi onaylayın.");
+    setSendMessage("");
     setWebViewUrl(webViewPayload.homeUrl);
   }, [selectedRequest, webViewAction, webViewPayload]);
-
-  useEffect(() => {
-    const webView = webViewRef.current;
-    if (!webView || !webViewUrl) {
-      return;
-    }
-
-    const handleStart = () => {
-      setConnectionState("loading");
-      setConnectionMessage("WhatsApp Web yükleniyor.");
-    };
-    const handleStop = () => {
-      setConnectionState("ready");
-      setConnectionMessage("WhatsApp Web hazır.");
-    };
-    const handleFail = () => {
-      setConnectionState("error");
-      setConnectionMessage("WhatsApp Web bağlantısı kurulamadı.");
-    };
-
-    webView.addEventListener("did-start-loading", handleStart);
-    webView.addEventListener("did-stop-loading", handleStop);
-    webView.addEventListener("did-fail-load", handleFail);
-
-    return () => {
-      webView.removeEventListener("did-start-loading", handleStart);
-      webView.removeEventListener("did-stop-loading", handleStop);
-      webView.removeEventListener("did-fail-load", handleFail);
-    };
-  }, [webViewUrl]);
 
   async function copyPreparedMessage() {
     if (!selectedMessage) {
@@ -2683,13 +2704,9 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
 
   function goToCustomerNumber() {
     if (!webViewPayload) {
-      setConnectionState("error");
-      setConnectionMessage("Geçerli müşteri telefonu gerekiyor.");
       return;
     }
 
-    setConnectionState("loading");
-    setConnectionMessage("Müşteri numarası açılıyor.");
     setSendState("idle");
     setSendMessage("WhatsApp Web sohbeti ve hazır metin yükleniyor.");
     setWebViewUrl(webViewPayload.url);
@@ -2768,10 +2785,8 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
     <section className={`whatsapp-workspace whatsapp-view-${view}`} aria-label={view === "safe" ? "Güvenli mesaj alanı" : "WhatsApp Web alanı"}>
       <aside className="panel whatsapp-request-panel">
         <div className="panel-heading compact">
-          <div>
-            <p>Talepler</p>
-            <h2>{requests.length} kayıt</h2>
-          </div>
+          <h2>Talepler</h2>
+          <span className="status-badge info">{requests.length} kayıt</span>
         </div>
 
         <div className="manager-list whatsapp-request-list">
@@ -2803,10 +2818,8 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
       {view === "web" && <section className="panel whatsapp-live-panel">
         <div className="panel-heading compact">
           <div>
-            <p>WhatsApp Web</p>
             <h2>{selectedRequest?.customer_name ?? "Talep Seçin"}</h2>
           </div>
-          <span className={`status-badge whatsapp-state-${connectionState}`}>{connectionMessage}</span>
         </div>
 
         <div className="whatsapp-command-row">
@@ -2824,7 +2837,7 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
           </button>
         </div>
 
-        <p className={`whatsapp-send-status sync-${sendState}`} role="status">{sendMessage}</p>
+        {sendMessage && <p className={`whatsapp-send-status sync-${sendState}`} role="status">{sendMessage}</p>}
 
         <div className="whatsapp-webview-frame">
           {webViewUrl ? (
@@ -2840,7 +2853,6 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
             <div className="empty-state compact-empty">
               <MessageCircle size={24} aria-hidden="true" />
               <strong>WhatsApp bağlantısı hazır değil.</strong>
-              <p>{connectionMessage}</p>
             </div>
           )}
         </div>
@@ -2849,7 +2861,6 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
       {view === "safe" && <aside className="panel whatsapp-copy-panel">
         <div className="panel-heading compact">
           <div>
-            <p>Güvenli Mod</p>
             <h2>Hazır Mesaj</h2>
           </div>
         </div>

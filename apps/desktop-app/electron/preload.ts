@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type { PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
   DesktopDashboardData,
@@ -43,6 +43,7 @@ export type AiConnectionTestResult =
   | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string }> };
 
 export interface DesktopBridge {
+  setUiScale: (scale: number) => void;
   getBootstrapData: () => Promise<{
     appName: string;
     version: string;
@@ -84,6 +85,7 @@ export interface DesktopBridge {
 }
 
 const bridge: DesktopBridge = {
+  setUiScale: (scale: number) => webFrame.setZoomFactor(scale),
   getBootstrapData: () => ipcRenderer.invoke("app:getBootstrapData"),
   getDashboardData: () => ipcRenderer.invoke("dashboard:getData"),
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
