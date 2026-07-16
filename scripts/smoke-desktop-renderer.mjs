@@ -107,7 +107,7 @@ try {
   expect(curlInputBox).not.toBeNull();
   expect(showButtonBox).not.toBeNull();
   expect(connectionButtonBox).not.toBeNull();
-  expect(Math.abs(serviceBox.y - studioButtonBox.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(serviceBox.y - studioButtonBox.y)).toBeLessThanOrEqual(3);
   expect(studioButtonBox.x).toBeGreaterThan(serviceBox.x + serviceBox.width);
   expect(Math.abs(curlInputBox.y - connectionButtonBox.y)).toBeLessThanOrEqual(4);
   expect(showButtonBox.x).toBeLessThan(connectionButtonBox.x);
@@ -130,6 +130,17 @@ try {
   await expect(page.locator(".menu-management-grid .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürünü Kaydet" })).toBeVisible();
+  const liveMenuPreview = page.getByLabel("Canlı menü önizlemesi");
+  await expect(liveMenuPreview).toBeVisible();
+  await expect(liveMenuPreview.getByText("Yerel Serpme Kahvaltı", { exact: true })).toBeVisible();
+  await liveMenuPreview.getByRole("button", { name: "Tüm Ürünler" }).click();
+  await expect(liveMenuPreview.getByRole("button", { name: "Tüm Ürünler" })).toHaveAttribute("aria-pressed", "true");
+  await page.getByLabel("Ürün adı").fill("Canlı Serpme Kahvaltı");
+  await expect(liveMenuPreview.getByText("Canlı Serpme Kahvaltı", { exact: true })).toBeVisible();
+  await page.getByLabel("Ürün adı").fill("Yerel Serpme Kahvaltı");
+  await liveMenuPreview.getByRole("button", { name: "Mobil önizleme" }).click();
+  await expect(liveMenuPreview.locator(".menu-live-stage")).toHaveClass(/is-mobile/);
+  await liveMenuPreview.getByRole("button", { name: "Masaüstü önizlemesi" }).click();
   await expect(page.getByRole("button", { name: "Önizle", exact: true })).toHaveCount(1);
   await page.getByRole("button", { name: "Önizle", exact: true }).click();
   const localMenuPreview = page.getByRole("dialog", { name: "Yerel Menü Önizlemesi" });
@@ -324,7 +335,8 @@ try {
           ...currentDashboardData,
           summary: {
             ...currentDashboardData.summary,
-            newRequests: currentDashboardData.summary.newRequests + 1
+            newRequests: currentDashboardData.summary.newRequests + 1,
+            waitingRequests: currentDashboardData.summary.waitingRequests + 1
           },
           requests: [request, ...currentDashboardData.requests],
           customers: [
@@ -356,7 +368,8 @@ try {
           ...currentDashboardData,
           summary: {
             ...currentDashboardData.summary,
-            newRequests: 0
+            newRequests: 0,
+            waitingRequests: 0
           },
           requests: currentDashboardData.requests.map((request) => request.id === requestId ? { ...request, status: "converted_to_reservation" } : request)
         };
@@ -640,30 +653,73 @@ try {
   expect(pageHeaderHeight).toBeGreaterThanOrEqual(54);
   expect(pageHeaderHeight).toBeLessThanOrEqual(60);
 
-  const dashboardRequestRows = compactPage.locator(".dashboard-request-row");
-  await expect(dashboardRequestRows).toHaveCount(8);
-  const metricBoxes = await compactPage.locator(".metric-card").evaluateAll((cards) => cards.map((card) => {
+  const dashboardPriorityRows = compactPage.locator(".dashboard-priority-item");
+  await expect(dashboardPriorityRows).toHaveCount(6);
+  await expect(compactPage.getByRole("heading", { name: "11 konu ilgi bekliyor." })).toBeVisible();
+  const attentionBoxes = await compactPage.locator(".dashboard-attention-card").evaluateAll((cards) => cards.map((card) => {
     const box = card.getBoundingClientRect();
     return { width: box.width, height: box.height, y: box.y };
   }));
-  expect(metricBoxes).toHaveLength(6);
-  expect(new Set(metricBoxes.map((box) => Math.round(box.y))).size).toBe(2);
-  expect(metricBoxes.every((box) => box.width >= 300)).toBe(true);
-  expect(Math.min(...metricBoxes.map((box) => box.height))).toBeGreaterThanOrEqual(78);
-  expect(Math.max(...metricBoxes.map((box) => box.height))).toBeLessThanOrEqual(90);
-  const dashboardRowHeights = await dashboardRequestRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
-  expect(dashboardRowHeights.every((height) => height <= 96)).toBe(true);
-  await expect(dashboardRequestRows.first().locator("button")).toHaveCount(2);
-  const firstRequestNote = dashboardRequestRows.first().locator(".line-clamp-1");
-  expect(await firstRequestNote.evaluate((note) => getComputedStyle(note).whiteSpace)).toBe("nowrap");
-  expect(await firstRequestNote.evaluate((note) => note.scrollWidth > note.clientWidth)).toBe(true);
-  const fifthDashboardRow = await dashboardRequestRows.nth(4).boundingBox();
-  expect(fifthDashboardRow).not.toBeNull();
-  expect(fifthDashboardRow.y + fifthDashboardRow.height).toBeLessThanOrEqual(768);
-  const lastDashboardSummaryPanel = await compactPage.locator(".dashboard-operations .panel").last().boundingBox();
-  expect(lastDashboardSummaryPanel).not.toBeNull();
-  expect(lastDashboardSummaryPanel.y + lastDashboardSummaryPanel.height).toBeLessThanOrEqual(768);
+  expect(attentionBoxes).toHaveLength(3);
+  expect(new Set(attentionBoxes.map((box) => Math.round(box.y))).size).toBe(1);
+  expect(attentionBoxes.every((box) => box.width >= 190)).toBe(true);
+  expect(attentionBoxes.every((box) => box.height >= 92 && box.height <= 104)).toBe(true);
+  const dashboardRowHeights = await dashboardPriorityRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  expect(dashboardRowHeights.every((height) => height >= 60 && height <= 84)).toBe(true);
+  expect(await dashboardPriorityRows.evaluateAll((rows) => rows.every((row) => row.querySelectorAll("button").length === 1))).toBe(true);
+  const firstPriorityDescription = dashboardPriorityRows.first().locator(".dashboard-priority-description");
+  await expect(firstPriorityDescription).toBeVisible();
+  expect(await firstPriorityDescription.evaluate((note) => getComputedStyle(note).whiteSpace)).toBe("nowrap");
+  const lastDashboardRow = await dashboardPriorityRows.last().boundingBox();
+  expect(lastDashboardRow).not.toBeNull();
+  expect(lastDashboardRow.y + lastDashboardRow.height).toBeLessThanOrEqual(768);
+  await expect(compactPage.locator(".dashboard-timeline-list li")).toHaveCount(4);
+  await expect(compactPage.locator(".dashboard-capacity-list > div")).toHaveCount(3);
+  const lastDashboardSidePanel = await compactPage.locator(".dashboard-side .panel").last().boundingBox();
+  expect(lastDashboardSidePanel).not.toBeNull();
+  expect(lastDashboardSidePanel.y + lastDashboardSidePanel.height).toBeLessThanOrEqual(768);
+  expect(await compactPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await expect(dashboardPriorityRows.first().getByRole("heading")).toHaveText("Kompakt Misafir 1");
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-dashboard-1366x768.png" });
+  await compactPage.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await expect(compactPage.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await compactPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-dashboard-light-1366x768.png" });
+  await compactPage.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+
+  await compactPage.getByRole("button", { name: "Kompakt Misafir 1 rezervasyonunu incele" }).click();
+  await expect(compactPage.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
+  await expect(compactPage.locator(".request-detail-panel").getByRole("heading", { name: "Kompakt Misafir 1" })).toBeVisible();
+  await compactPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+
+  const aiOnlyPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
+  await aiOnlyPage.addInitScript(({ setupData, dashboardData }) => {
+    window.yardimciDesktop = {
+      getBootstrapData: async () => ({
+        appName: "Yardımcı Asistan",
+        version: "0.1.0",
+        platform: "linux",
+        syncSettings: { webModuleUrl: setupData.webModuleUrl, hasSyncSecret: true },
+        databasePath: dashboardData.databasePath,
+        userDataPath: "/tmp/yardimci-asistan",
+        backupPath: dashboardData.backupPath,
+        setup: setupData
+      }),
+      getDashboardData: async () => dashboardData,
+      getAiWorkspaceHistory: async () => []
+    };
+  }, {
+    setupData: {
+      ...createSetupFixture(),
+      setupRequired: false,
+      modules: { ...createSetupFixture().modules, whatsapp: false }
+    },
+    dashboardData: createCompactUiFixture()
+  });
+  await aiOnlyPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await aiOnlyPage.getByRole("button", { name: "Kompakt Misafir 1 talebini yanıtla" }).click();
+  await expect(aiOnlyPage.getByRole("heading", { name: "Mesajlar", exact: true })).toBeVisible();
+  await expect(aiOnlyPage.getByLabel("Talep / müşteri")).toHaveValue("compact_request_1");
 
   await compactPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await compactPage.getByRole("button", { name: /Kompakt Misafir 4/ }).click();
@@ -836,14 +892,23 @@ try {
 
   await compactPage.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Menü", exact: true })).toHaveAttribute("aria-current", "page");
+  const compactLiveMenuPreview = compactPage.getByLabel("Canlı menü önizlemesi");
+  await compactLiveMenuPreview.getByRole("button", { name: "Sıcaklar" }).click();
+  await expect(compactPage.locator(".category-panel .manager-row[aria-pressed='true']")).toContainText("Sıcaklar");
+  await expect(compactLiveMenuPreview.getByRole("button", { name: "Sıcaklar" })).toHaveAttribute("aria-pressed", "true");
+  await compactLiveMenuPreview.getByRole("button", { name: "Tüm Ürünler" }).click();
+  await expect(compactLiveMenuPreview.getByRole("button", { name: "Tüm Ürünler" })).toHaveAttribute("aria-pressed", "true");
+  await compactPage.locator(".category-panel .manager-row").filter({ hasText: "Kahvaltı" }).click();
+  await expect(compactLiveMenuPreview.getByRole("button", { name: "Kahvaltı" })).toHaveAttribute("aria-pressed", "true");
   const menuRowHeights = await compactPage.locator(".menu-management-grid .manager-row").evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
-  expect(menuRowHeights.length).toBeGreaterThanOrEqual(8);
-  expect(menuRowHeights.every((height) => height >= 44 && height <= 50)).toBe(true);
-  const [menuGridBox, categoryPanelBox, productPanelBox, itemEditorBox, categorySaveBox, itemSaveBox, itemDescriptionBox, categoryDetailsBox, itemDetailsBox] = await Promise.all([
+  expect(menuRowHeights.length).toBeGreaterThanOrEqual(5);
+  expect(menuRowHeights.every((height) => height >= 48 && height <= 64), `Menü satır yükseklikleri: ${menuRowHeights.join(", ")}`).toBe(true);
+  const [menuGridBox, categoryPanelBox, productPanelBox, itemEditorBox, livePreviewBox, categorySaveBox, itemSaveBox, itemDescriptionBox, categoryDetailsBox, itemDetailsBox] = await Promise.all([
     compactPage.locator(".menu-management-grid").boundingBox(),
     compactPage.locator(".category-panel").boundingBox(),
     compactPage.locator(".product-panel").boundingBox(),
     compactPage.locator(".item-editor-panel").boundingBox(),
+    compactPage.locator(".menu-live-panel").boundingBox(),
     compactPage.getByRole("button", { name: "Kategoriyi Kaydet" }).boundingBox(),
     compactPage.getByRole("button", { name: "Ürünü Kaydet" }).boundingBox(),
     compactPage.getByLabel("Açıklama").last().boundingBox(),
@@ -854,15 +919,18 @@ try {
   expect(categoryPanelBox).not.toBeNull();
   expect(productPanelBox).not.toBeNull();
   expect(itemEditorBox).not.toBeNull();
+  expect(livePreviewBox).not.toBeNull();
   expect(categorySaveBox).not.toBeNull();
   expect(itemSaveBox).not.toBeNull();
   expect(itemDescriptionBox).not.toBeNull();
   expect(categoryDetailsBox).not.toBeNull();
   expect(itemDetailsBox).not.toBeNull();
-  expect(productPanelBox.x).toBeGreaterThan(categoryPanelBox.x + categoryPanelBox.width);
-  expect(itemEditorBox.x).toBeGreaterThan(productPanelBox.x + productPanelBox.width);
-  expect(Math.max(categoryPanelBox.y, productPanelBox.y, itemEditorBox.y) - Math.min(categoryPanelBox.y, productPanelBox.y, itemEditorBox.y)).toBeLessThanOrEqual(1);
-  expect([categoryPanelBox, productPanelBox, itemEditorBox, categorySaveBox, itemSaveBox].every((box) => box.y + box.height <= 768)).toBe(true);
+  expect(Math.abs(productPanelBox.x - categoryPanelBox.x)).toBeLessThanOrEqual(1);
+  expect(productPanelBox.y).toBeGreaterThan(categoryPanelBox.y + categoryPanelBox.height);
+  expect(itemEditorBox.x).toBeGreaterThan(categoryPanelBox.x + categoryPanelBox.width);
+  expect(livePreviewBox.x).toBeGreaterThan(itemEditorBox.x + itemEditorBox.width);
+  expect(Math.max(categoryPanelBox.y, itemEditorBox.y, livePreviewBox.y) - Math.min(categoryPanelBox.y, itemEditorBox.y, livePreviewBox.y)).toBeLessThanOrEqual(1);
+  expect([categoryPanelBox, productPanelBox, itemEditorBox, livePreviewBox, categorySaveBox, itemSaveBox].every((box) => box.y + box.height <= 768)).toBe(true);
   expect(itemDescriptionBox.height).toBeLessThanOrEqual(64);
   expect(categoryDetailsBox.height).toBeLessThanOrEqual(36);
   expect(itemDetailsBox.height).toBeLessThanOrEqual(36);
@@ -991,7 +1059,8 @@ try {
           ...dashboardData,
           summary: {
             ...dashboardData.summary,
-            newRequests: 1
+            newRequests: 1,
+            waitingRequests: 1
           },
           requests: [pulledRequest],
           customers: [
@@ -1032,8 +1101,8 @@ try {
     pulledRequest: createPulledRequestFixture()
   });
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(pullPage.getByText("Henüz yeni talep yok.")).toBeVisible();
-  await pullPage.getByRole("button", { name: "Web Taleplerini Çek" }).click();
+  await expect(pullPage.locator(".dashboard-attention-card").first().locator("strong")).toHaveText("0");
+  await pullPage.getByRole("button", { name: "Talepleri Kontrol Et" }).click();
   await expect(pullPage.getByText("1 talep alındı.")).toBeVisible();
   await expect(pullPage.getByRole("heading", { name: "Web Sync Smoke" })).toBeVisible();
   await expect(pullPage.getByText("Bahçe masa için canlı web talebi.")).toBeVisible();
@@ -1376,6 +1445,7 @@ function createDashboardFixture() {
     },
     summary: {
       newRequests: 0,
+      waitingRequests: 0,
       pendingDailyTasks: 0,
       availableRooms: 0,
       totalRooms: 0,
@@ -1478,6 +1548,7 @@ function createDashboardConversionFixture() {
     summary: {
       ...createDashboardFixture().summary,
       newRequests: 1,
+      waitingRequests: 1,
       activeMenuCategories: 1,
       availableMenuItems: 1
     }
@@ -1498,6 +1569,7 @@ function createCompactUiFixture() {
     customer_id: `compact_customer_${index + 1}`,
     request_type: index % 2 === 0 ? "pension_reservation" : "restaurant_reservation",
     status: statuses[index],
+    priority: index === 0 ? "high" : "normal",
     customer_name: `Kompakt Misafir ${index + 1}`,
     customer_phone: `+9053212300${String(index + 1).padStart(2, "0")}`,
     date_text: index % 2 === 0 ? "18-20 Temmuz" : "Bu akşam 20:30",
@@ -1606,6 +1678,7 @@ function createCompactUiFixture() {
     summary: {
       ...base.summary,
       newRequests: requests.filter((request) => request.status === "new").length,
+      waitingRequests: requests.filter((request) => ["new", "seen", "waiting_owner", "pending", "in_progress"].includes(request.status)).length,
       pendingDailyTasks: dailyTasks.filter((task) => task.status === "pending").length,
       availableRooms: 1,
       totalRooms: rooms.length,

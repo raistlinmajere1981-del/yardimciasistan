@@ -15,6 +15,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/ibm-plex-sans": "^5.2.8",
     "@vitejs/plugin-react": "^5.0.0",
     "@yardimci-asistan/ai-core": "0.1.0",
     "@yardimci-asistan/shared": "0.1.0",

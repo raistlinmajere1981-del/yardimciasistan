@@ -11,6 +11,7 @@ export interface DesktopDatabaseOptions {
 
 export interface DashboardSummary {
   newRequests: number;
+  waitingRequests: number;
   pendingDailyTasks: number;
   availableRooms: number;
   totalRooms: number;
@@ -480,6 +481,7 @@ export class DesktopDatabase {
       customers: this.getCustomers(),
       summary: {
         newRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status = 'new' AND deleted_at = ''"),
+        waitingRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND deleted_at = ''"),
         pendingDailyTasks: this.getScalarCount("SELECT COUNT(*) as count FROM daily_tasks WHERE status = 'pending' AND deleted_at = ''"),
         availableRooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE status = 'available' AND is_active = 1 AND deleted_at = ''"),
         totalRooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE is_active = 1 AND deleted_at = ''"),
@@ -2446,8 +2448,17 @@ export class DesktopDatabase {
           updated_at
         FROM requests
         WHERE deleted_at = ''
-        ORDER BY created_at DESC
-        LIMIT 20
+        ORDER BY
+          CASE
+            WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND priority = 'urgent' THEN 0
+            WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND priority = 'high' THEN 1
+            WHEN status = 'new' THEN 2
+            WHEN status IN ('seen', 'waiting_owner', 'pending', 'in_progress') AND priority <> 'low' THEN 3
+            WHEN status IN ('seen', 'waiting_owner', 'pending', 'in_progress') THEN 4
+            ELSE 5
+          END,
+          created_at DESC
+        LIMIT 80
       `)
       .all() as Array<Record<string, unknown>>;
 
