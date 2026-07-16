@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 
 interface CompactListItemProps extends Omit<HTMLAttributes<HTMLElement>, "title"> {
   title: ReactNode;
@@ -31,5 +31,44 @@ export function CompactListItem({
       </div>
       {actions && <div className="compact-action-bar">{actions}</div>}
     </article>
+  );
+}
+
+interface CompactListButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "title"> {
+  title: ReactNode;
+  leading?: ReactNode;
+  meta?: ReactNode;
+  description?: ReactNode;
+  trailing?: ReactNode;
+  selected?: boolean;
+}
+
+export function CompactListButton({
+  title,
+  leading,
+  meta,
+  description,
+  trailing,
+  selected = false,
+  className = "",
+  type = "button",
+  ...props
+}: CompactListButtonProps) {
+  return (
+    <button
+      className={`compact-list-item compact-list-button${selected ? " is-selected" : ""} ${className}`.trim()}
+      type={type}
+      {...props}
+    >
+      <span className="compact-list-main">
+        <span className="compact-list-heading">
+          {leading}
+          <strong className="compact-list-title">{title}</strong>
+        </span>
+        {meta && <span className="compact-meta-row">{meta}</span>}
+        {description && <span className="compact-list-description line-clamp-1">{description}</span>}
+      </span>
+      {trailing && <span className="compact-list-trailing">{trailing}</span>}
+    </button>
   );
 }

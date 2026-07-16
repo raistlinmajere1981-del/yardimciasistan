@@ -1,5 +1,6 @@
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import http from "node:http";
 import process from "node:process";
 
@@ -153,12 +154,14 @@ try {
   await expect(page.locator(".whatsapp-request-panel .panel-heading")).toContainText("Talepler");
   await expect(page.locator(".whatsapp-request-panel .panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
   await expect(page.locator(".whatsapp-request-panel .panel-heading p")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Hazır Mesaj" })).toBeVisible();
+  await expect(page.locator(".whatsapp-copy-panel").getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
+  await expect(page.locator(".whatsapp-copy-panel .detail-category-label")).toHaveText("Hazır yanıt");
   await expect(page.locator(".whatsapp-copy-panel .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
   await expect(page.getByText("AI ile mesajı düzenle", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "AI Araçları", exact: true })).toHaveCount(0);
   await expect(page.locator(".whatsapp-webview-frame")).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Güvenli Mod" })).toHaveAttribute("aria-selected", "true");
   const [safeRequestPanelBox, safeCopyPanelBox] = await Promise.all([
     page.locator(".whatsapp-request-panel").boundingBox(),
     page.locator(".whatsapp-copy-panel").boundingBox()
@@ -166,6 +169,13 @@ try {
   expect(safeRequestPanelBox).not.toBeNull();
   expect(safeCopyPanelBox).not.toBeNull();
   expect(Math.abs(safeRequestPanelBox.height - safeCopyPanelBox.height)).toBeLessThanOrEqual(1);
+  expect(safeRequestPanelBox.width).toBeGreaterThanOrEqual(280);
+  expect(safeRequestPanelBox.width).toBeLessThanOrEqual(320);
+  const preparedMessageBox = await page.getByLabel("Hazır WhatsApp mesajı").boundingBox();
+  expect(preparedMessageBox).not.toBeNull();
+  expect(preparedMessageBox.height).toBeGreaterThanOrEqual(110);
+  expect(preparedMessageBox.height).toBeLessThanOrEqual(150);
+  expect(await page.getByLabel("Hazır WhatsApp mesajı").evaluate((field) => getComputedStyle(field).overflowY)).toBe("auto");
   await page.screenshot({ path: "artifacts/screenshots/desktop-messages-safe-mode.png", fullPage: true });
   await page.getByRole("tab", { name: /WhatsApp Web Modu/ }).click();
   await expect(page.getByText("WhatsApp Web modu isteğe bağlıdır.", { exact: false })).toHaveCount(0);
@@ -173,12 +183,22 @@ try {
   await expect(page.locator(".whatsapp-live-panel .panel-heading .status-badge")).toHaveCount(0);
   await expect(page.locator(".whatsapp-send-status")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Onayla ve Gönder" })).toBeVisible();
+  const webControlBar = page.locator(".whatsapp-web-control-bar");
+  await expect(webControlBar).toContainText("+90 532 123 45 67");
+  await expect(webControlBar.getByText("Hazır mesaj var", { exact: true })).toBeVisible();
+  await expect(webControlBar.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
+  await expect(webControlBar.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
+  await expect(webControlBar.getByRole("button", { name: "Dışarıda Aç" })).toBeVisible();
+  await expect(webControlBar.getByRole("button", { name: "Güvenli Moda Dön" })).toBeVisible();
+  await expect(webControlBar.getByRole("button", { name: "Onayla ve Gönder" })).toBeVisible();
   await expect(page.locator(".whatsapp-webview-frame")).toBeVisible();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
+  await expect(page.locator(".whatsapp-webview")).toHaveAttribute("partition", "persist:yardimci-whatsapp");
+  expect(readFileSync("apps/desktop-app/src/App.tsx", "utf8")).toContain("allowpopups");
+  await expect(page.locator(".whatsapp-webview")).toHaveAttribute("webpreferences", "contextIsolation=yes,nodeIntegration=no");
   await page.locator(".whatsapp-webview").evaluate((element) => { element.dataset.persistenceMarker = "webview-kept-alive"; });
-  await page.getByRole("tab", { name: /Güvenli Mod/ }).click();
+  await webControlBar.getByRole("button", { name: "Güvenli Moda Dön" }).click();
+  await expect(page.getByRole("tab", { name: /Güvenli Mod/ })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".message-mode-content.is-hidden .whatsapp-webview")).toHaveCount(1);
   await page.getByRole("tab", { name: /WhatsApp Web Modu/ }).click();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
@@ -198,9 +218,10 @@ try {
   expect(livePanelBox).not.toBeNull();
   expect(webviewFrameBox).not.toBeNull();
   expect(webviewBox).not.toBeNull();
-  expect(livePanelBox.y).toBeGreaterThan(requestPanelBox.y + requestPanelBox.height);
-  expect(Math.abs(livePanelBox.x - requestPanelBox.x)).toBeLessThanOrEqual(1);
-  expect(Math.abs(livePanelBox.width - requestPanelBox.width)).toBeLessThanOrEqual(2);
+  expect(livePanelBox.x).toBeGreaterThan(requestPanelBox.x + requestPanelBox.width);
+  expect(Math.abs(livePanelBox.y - requestPanelBox.y)).toBeLessThanOrEqual(1);
+  expect(requestPanelBox.width).toBeGreaterThanOrEqual(280);
+  expect(requestPanelBox.width).toBeLessThanOrEqual(320);
   expect(Math.abs(webviewBox.width - webviewFrameBox.width)).toBeLessThanOrEqual(2);
   expect(Math.abs(webviewBox.height - webviewFrameBox.height)).toBeLessThanOrEqual(2);
   expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
@@ -498,7 +519,7 @@ try {
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Rezervasyona Çevir" }).click();
-  await expect(conversionPage.getByText("Rezervasyona çevrildi", { exact: true })).toBeVisible();
+  await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Rezervasyona çevrildi", { exact: true })).toBeVisible();
   await expect(conversionPage.getByText("Talep rezervasyona çevrildi ve onaylandı.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await expect(conversionPage.getByRole("heading", { name: "Müşteri İşleri" })).toBeVisible();
@@ -506,23 +527,29 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
+  await expect(conversionPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Elle Talep Ekle" }).click();
-  await conversionPage.getByLabel("Ad soyad").fill("Manuel Smoke");
-  await conversionPage.getByLabel("Telefon").fill("0555 333 44 66");
-  await conversionPage.getByLabel("Tarih notu").fill("Bu akşam");
-  await conversionPage.getByLabel("Kişi sayısı").fill("3");
-  await conversionPage.getByLabel("Not", { exact: true }).fill("Telefonla alınan bahçe masası talebi.");
-  await conversionPage.getByText("Detaylı bilgi", { exact: true }).click();
-  await conversionPage.getByLabel("Giriş tarihi").fill("2026-07-18");
-  await conversionPage.getByLabel("Saat").fill("21:00");
-  await conversionPage.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
+  const manualRequestDrawer = conversionPage.getByRole("dialog", { name: "Yeni talep ekle" });
+  await expect(manualRequestDrawer).toBeVisible();
+  await manualRequestDrawer.getByLabel("Ad soyad").fill("Manuel Smoke");
+  await manualRequestDrawer.getByLabel("Telefon").fill("0555 333 44 66");
+  await manualRequestDrawer.getByLabel("Tarih notu").fill("Bu akşam");
+  await manualRequestDrawer.getByLabel("Kişi sayısı").fill("3");
+  await manualRequestDrawer.getByLabel("Not", { exact: true }).fill("Telefonla alınan bahçe masası talebi.");
+  await manualRequestDrawer.getByText("Detaylı bilgi", { exact: true }).click();
+  await manualRequestDrawer.getByLabel("Giriş tarihi").fill("2026-07-18");
+  await manualRequestDrawer.getByLabel("Saat").fill("21:00");
+  await manualRequestDrawer.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
   await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Manuel talep kaydedildi.")).toBeVisible();
+  await manualRequestDrawer.getByRole("button", { name: "Elle talep formunu kapat" }).click();
+  await expect(manualRequestDrawer).toHaveCount(0);
   await expect(conversionPage.getByRole("heading", { name: "Manuel Smoke" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Reddet", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
+  await expect(conversionPage.locator(".request-detail-actions .action-button")).toHaveCount(3);
   await conversionPage.getByRole("button", { name: "Yeniden Aç" }).click();
   await conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" }).click();
   await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
@@ -642,12 +669,43 @@ try {
   await compactPage.getByRole("button", { name: /Kompakt Misafir 4/ }).click();
   const customerRequestRows = compactPage.locator(".requests-workspace .manager-row");
   await expect(customerRequestRows).toHaveCount(8);
-  const customerRowHeights = await customerRequestRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
-  expect(customerRowHeights.every((height) => height <= 60)).toBe(true);
+  const [customerRowBoxes, customerListBox, customerMasterPanelBox, customerTabsBox] = await Promise.all([
+    customerRequestRows.evaluateAll((rows) => rows.map((row) => {
+      const box = row.getBoundingClientRect();
+      return { y: box.y, height: box.height };
+    })),
+    compactPage.locator(".requests-workspace .operations-list").boundingBox(),
+    compactPage.locator(".requests-workspace .operations-list-panel").boundingBox(),
+    compactPage.locator(".customer-work-tabs").boundingBox()
+  ]);
+  expect(customerListBox).not.toBeNull();
+  expect(customerMasterPanelBox).not.toBeNull();
+  expect(customerTabsBox).not.toBeNull();
+  expect(customerRowBoxes.every((box) => box.height >= 48 && box.height <= 56)).toBe(true);
+  expect(customerRowBoxes.every((box) => box.y >= customerListBox.y - 1 && box.y + box.height <= customerListBox.y + customerListBox.height + 1)).toBe(true);
+  expect(customerMasterPanelBox.width).toBeGreaterThanOrEqual(280);
+  expect(customerMasterPanelBox.width).toBeLessThanOrEqual(320);
+  expect(customerTabsBox.height).toBeLessThanOrEqual(42);
   const requestDetailHeight = await compactPage.locator(".request-detail-panel").evaluate((panel) => panel.getBoundingClientRect().height);
   expect(requestDetailHeight).toBeLessThan(420);
   await expect(compactPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
+  await expect(compactPage.locator(".request-detail-actions .action-button")).toHaveCount(3);
+  await expect(compactPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
+
+  await compactPage.getByRole("tab", { name: "Müşteriler" }).click();
+  const compactCustomerRows = compactPage.locator(".customers-workspace .manager-row");
+  await expect(compactCustomerRows).toHaveCount(8);
+  const [compactCustomerRowBoxes, compactCustomerListBox] = await Promise.all([
+    compactCustomerRows.evaluateAll((rows) => rows.map((row) => {
+      const box = row.getBoundingClientRect();
+      return { y: box.y, height: box.height };
+    })),
+    compactPage.locator(".customers-workspace .operations-list").boundingBox()
+  ]);
+  expect(compactCustomerListBox).not.toBeNull();
+  expect(compactCustomerRowBoxes.every((box) => box.height >= 48 && box.height <= 56)).toBe(true);
+  expect(compactCustomerRowBoxes.every((box) => box.y >= compactCustomerListBox.y - 1 && box.y + box.height <= compactCustomerListBox.y + compactCustomerListBox.height + 1)).toBe(true);
 
   await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
   const reservationRows = compactPage.locator(".reservation-record-row");
@@ -696,23 +754,58 @@ try {
   await compactPage.getByRole("button", { name: "Mesajlar", exact: true }).click();
   const preparedMessageHeight = await compactPage.getByLabel("Hazır WhatsApp mesajı").evaluate((field) => field.getBoundingClientRect().height);
   expect(preparedMessageHeight).toBeGreaterThanOrEqual(110);
-  expect(preparedMessageHeight).toBeLessThanOrEqual(180);
-  await expect(compactPage.locator(".whatsapp-request-list .manager-row")).toHaveCount(8);
-  const [compactRequestPanelBox, compactCopyPanelBox, compactRequestScroll] = await Promise.all([
+  expect(preparedMessageHeight).toBeLessThanOrEqual(150);
+  const compactMessageRows = compactPage.locator(".whatsapp-request-list .manager-row");
+  await expect(compactMessageRows).toHaveCount(8);
+  const [compactRequestPanelBox, compactCopyPanelBox, compactMessageListBox, compactMessageRowBoxes, messageModeBox] = await Promise.all([
     compactPage.locator(".whatsapp-request-panel").boundingBox(),
     compactPage.locator(".whatsapp-copy-panel").boundingBox(),
-    compactPage.locator(".whatsapp-request-list").evaluate((list) => ({
-      clientHeight: list.clientHeight,
-      scrollHeight: list.scrollHeight
-    }))
+    compactPage.locator(".whatsapp-request-list").boundingBox(),
+    compactMessageRows.evaluateAll((rows) => rows.map((row) => {
+      const box = row.getBoundingClientRect();
+      return { y: box.y, height: box.height };
+    })),
+    compactPage.locator(".message-mode-switch").boundingBox()
   ]);
   expect(compactRequestPanelBox).not.toBeNull();
   expect(compactCopyPanelBox).not.toBeNull();
+  expect(compactMessageListBox).not.toBeNull();
+  expect(messageModeBox).not.toBeNull();
   expect(Math.abs(compactRequestPanelBox.height - compactCopyPanelBox.height)).toBeLessThanOrEqual(1);
-  expect(compactRequestScroll.scrollHeight).toBeGreaterThan(compactRequestScroll.clientHeight);
-  await compactPage.locator(".whatsapp-request-list").evaluate((list) => { list.scrollTop = list.scrollHeight; });
-  expect(await compactPage.locator(".whatsapp-request-list").evaluate((list) => list.scrollTop)).toBeGreaterThan(0);
+  expect(compactRequestPanelBox.width).toBeGreaterThanOrEqual(280);
+  expect(compactRequestPanelBox.width).toBeLessThanOrEqual(320);
+  expect(messageModeBox.height).toBeLessThanOrEqual(42);
+  expect(compactMessageRowBoxes.every((box) => box.height >= 48 && box.height <= 56)).toBe(true);
+  expect(compactMessageRowBoxes.every((box) => box.y >= compactMessageListBox.y - 1 && box.y + box.height <= compactMessageListBox.y + compactMessageListBox.height + 1)).toBe(true);
+  await expect(compactPage.locator(".whatsapp-copy-panel").getByRole("heading", { name: "Kompakt Misafir 1" })).toBeVisible();
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-messages-1366x768.png" });
+
+  await compactPage.getByRole("tab", { name: /WhatsApp Web Modu/ }).click();
+  const compactWebControlBar = compactPage.locator(".whatsapp-web-control-bar");
+  const [compactWebRequestPanelBox, compactLivePanelBox, compactControlBarBox, compactWebviewFrameBox] = await Promise.all([
+    compactPage.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-panel").boundingBox(),
+    compactPage.locator(".whatsapp-live-panel").boundingBox(),
+    compactWebControlBar.boundingBox(),
+    compactPage.locator(".whatsapp-webview-frame").boundingBox()
+  ]);
+  expect(compactWebRequestPanelBox).not.toBeNull();
+  expect(compactLivePanelBox).not.toBeNull();
+  expect(compactControlBarBox).not.toBeNull();
+  expect(compactWebviewFrameBox).not.toBeNull();
+  expect(compactLivePanelBox.x).toBeGreaterThan(compactWebRequestPanelBox.x + compactWebRequestPanelBox.width);
+  expect(Math.abs(compactLivePanelBox.y - compactWebRequestPanelBox.y)).toBeLessThanOrEqual(1);
+  expect(compactLivePanelBox.y + compactLivePanelBox.height).toBeLessThanOrEqual(768);
+  expect(compactWebviewFrameBox.y).toBeGreaterThan(compactControlBarBox.y + compactControlBarBox.height);
+  expect(compactWebviewFrameBox.height).toBeGreaterThanOrEqual(300);
+  await expect(compactWebControlBar).toContainText("Kompakt Misafir 1");
+  await expect(compactWebControlBar).toContainText("+90 532 123 00 01");
+  await expect(compactWebControlBar.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
+  await expect(compactWebControlBar.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
+  await expect(compactWebControlBar.getByRole("button", { name: "Dışarıda Aç" })).toBeVisible();
+  await expect(compactWebControlBar.getByRole("button", { name: "Güvenli Moda Dön" })).toBeVisible();
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-whatsapp-web-1366x768.png" });
+  await compactWebControlBar.getByRole("button", { name: "Güvenli Moda Dön" }).click();
+  await expect(compactPage.getByRole("tab", { name: "Güvenli Mod" })).toHaveAttribute("aria-selected", "true");
 
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await compactPage.locator(".content").evaluate((element) => { element.scrollTop = element.scrollHeight; });

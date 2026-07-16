@@ -23,6 +23,7 @@ import {
   Save,
   Send,
   Settings,
+  ShieldCheck,
   Sparkles,
   TrendingUp,
   UploadCloud,
@@ -45,7 +46,10 @@ import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "./app
 import { AppShell } from "./components/layout/AppShell";
 import { PageHeader } from "./components/layout/PageHeader";
 import { Sidebar } from "./components/layout/Sidebar";
-import type { StatusTone } from "./components/ui/StatusBadge";
+import { ActionButton } from "./components/ui/ActionButton";
+import { CompactList } from "./components/ui/CompactList";
+import { CompactListButton } from "./components/ui/CompactListItem";
+import { StatusBadge, type StatusTone } from "./components/ui/StatusBadge";
 import { CustomerWorkPage } from "./pages/CustomerWorkPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { MessagesPage } from "./pages/MessagesPage";
@@ -1505,6 +1509,7 @@ function App() {
       aiEnabled={setupData.aiEnabled}
       whatsappEnabled={setupData.modules.whatsapp}
       aiOpen={messagesAiOpen}
+      active={activePage === "messages"}
       safeMode={(
         <WhatsAppWorkspace
           view="safe"
@@ -1522,7 +1527,7 @@ function App() {
           onMessageSent={handleWhatsAppMessageSent}
         />
       )}
-      webMode={(
+      webMode={(onReturnToSafe) => (
         <WhatsAppWorkspace
           view="web"
           requests={dashboardData.requests}
@@ -1534,6 +1539,7 @@ function App() {
           aiMessage={aiMessage}
           onSelectRequest={setSelectedWhatsAppRequestId}
           onOpenExternal={openSelectedWhatsAppExternal}
+          onReturnToSafe={onReturnToSafe}
           onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
           onRewrite={handleRewriteWhatsAppMessage}
           onMessageSent={handleWhatsAppMessageSent}
@@ -1596,14 +1602,6 @@ function App() {
           ) : activePage === "messages" ? (
             <div className="sync-pill sync-idle">
               <span>{setupData.modules.whatsapp ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin") : "AI araçları kullanıma hazır."}</span>
-              <button
-                type="button"
-                onClick={setupData.modules.whatsapp ? openSelectedWhatsAppExternal : () => setMessagesAiOpen(true)}
-                disabled={setupData.modules.whatsapp && !selectedWhatsAppUrl}
-              >
-                {setupData.modules.whatsapp ? <ExternalLink size={16} aria-hidden="true" /> : <Sparkles size={16} aria-hidden="true" />}
-                {setupData.modules.whatsapp ? "WhatsApp'ı Aç" : "AI Araçlarını Aç"}
-              </button>
             </div>
           ) : activePage === "settings" ? (
             <div className="sync-pill sync-idle">
@@ -2552,6 +2550,7 @@ interface WhatsAppWorkspaceProps {
   aiMessage: string;
   onSelectRequest: (requestId: string) => void;
   onOpenExternal: () => void;
+  onReturnToSafe?: () => void;
   onCall?: () => void;
   onRewrite: (instructions: string) => void;
   onMessageSent: (requestId: string, message: string) => Promise<{ ok: boolean; message: string }>;
@@ -2720,7 +2719,7 @@ function createWhatsAppSendScript(expectedMessage: string, expectedChatTitle: st
   })()`;
 }
 
-function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, onSelectRequest, onOpenExternal, onCall, onRewrite, onMessageSent }: WhatsAppWorkspaceProps) {
+function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
   const [sendState, setSendState] = useState<SyncState>("idle");
@@ -2854,10 +2853,10 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
       <aside className="panel whatsapp-request-panel">
         <div className="panel-heading compact">
           <h2>Talepler</h2>
-          <span className="status-badge info">{requests.length} kayıt</span>
+          <StatusBadge tone="info">{requests.length} kayıt</StatusBadge>
         </div>
 
-        <div className="manager-list whatsapp-request-list">
+        <CompactList className="manager-list operation-compact-list whatsapp-request-list">
           {requests.length === 0 ? (
             <div className="empty-state compact-empty">
               <MessageCircle size={24} aria-hidden="true" />
@@ -2866,46 +2865,70 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
             </div>
           ) : (
             requests.map((request) => (
-              <button
-                className={selectedRequest?.id === request.id ? "manager-row is-active" : "manager-row"}
+              <CompactListButton
+                className="manager-row operation-list-item message-request-row"
                 key={request.id}
-                type="button"
+                title={request.customer_name}
+                leading={<span className={`status-dot tone-${getRequestStatusTone(request.status)}`} aria-hidden="true" />}
+                meta={(
+                  <>
+                    <span>{request.customer_phone || "Telefon yok"}</span>
+                    <span>{formatRequestType(request.request_type)}</span>
+                  </>
+                )}
+                selected={selectedRequest?.id === request.id}
+                aria-label={`${request.customer_name}, ${request.customer_phone || "telefon yok"}, ${formatRequestType(request.request_type)}, ${formatRequestStatus(request.status)}`}
+                aria-pressed={selectedRequest?.id === request.id}
                 onClick={() => onSelectRequest(request.id)}
-              >
-                <span>
-                  <strong>{request.customer_name}</strong>
-                  <small>{request.customer_phone} · {formatRequestType(request.request_type)}</small>
-                </span>
-                <span className="dot is-on" />
-              </button>
+              />
             ))
           )}
-        </div>
+        </CompactList>
       </aside>
 
       {view === "web" && <section className="panel whatsapp-live-panel">
-        <div className="panel-heading compact">
-          <div>
-            <h2>{selectedRequest?.customer_name ?? "Talep Seçin"}</h2>
+        <div className="whatsapp-web-control-bar">
+          <div className="whatsapp-web-recipient">
+            <div>
+              <span>WhatsApp Web</span>
+              <h2>{selectedRequest?.customer_name ?? "Talep seçin"}</h2>
+              <small>{phoneDisplay}</small>
+            </div>
+            <StatusBadge tone={selectedMessage ? "ok" : "neutral"}>{selectedMessage ? "Hazır mesaj var" : "Hazır mesaj yok"}</StatusBadge>
+          </div>
+
+          <p className="whatsapp-web-message-preview">
+            {selectedMessage || "Hazır mesaj oluşturmak veya düzenlemek için Güvenli Moda dönün."}
+          </p>
+
+          <div className="whatsapp-web-control-actions">
+            <ActionButton variant="ghost" size="sm" type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
+              <Copy size={15} aria-hidden="true" />
+              Hazır Mesajı Kopyala
+            </ActionButton>
+            <ActionButton variant="whatsapp" size="sm" type="button" onClick={goToCustomerNumber} disabled={!webViewPayload}>
+              <MessageCircle size={15} aria-hidden="true" />
+              Müşteri Numarasına Git
+            </ActionButton>
+            <ActionButton variant="secondary" size="sm" type="button" onClick={onOpenExternal} disabled={!selectedUrl}>
+              <ExternalLink size={15} aria-hidden="true" />
+              Dışarıda Aç
+            </ActionButton>
+            <ActionButton variant="secondary" size="sm" type="button" onClick={onReturnToSafe} disabled={!onReturnToSafe}>
+              <ShieldCheck size={15} aria-hidden="true" />
+              Güvenli Moda Dön
+            </ActionButton>
+            <ActionButton className="whatsapp-approved-send" size="sm" type="button" onClick={approveAndSendMessage} disabled={!webViewPayload || sendState === "loading"}>
+              <Send size={15} aria-hidden="true" />
+              {sendState === "loading" ? "Doğrulanıyor" : "Onayla ve Gönder"}
+            </ActionButton>
+          </div>
+
+          <div className="whatsapp-web-feedback">
+            <span className={copyMessage.includes("kopyalandı") ? "sync-success" : ""} role="status">{copyMessage}</span>
+            {sendMessage && <span className={`whatsapp-send-status sync-${sendState}`} role="status">{sendMessage}</span>}
           </div>
         </div>
-
-        <div className="whatsapp-command-row">
-          <button type="button" onClick={goToCustomerNumber} disabled={!webViewPayload}>
-            <MessageCircle size={16} aria-hidden="true" />
-            Müşteri Numarasına Git
-          </button>
-          <button type="button" onClick={onOpenExternal} disabled={!selectedUrl}>
-            <ExternalLink size={16} aria-hidden="true" />
-            Dışarıda Aç
-          </button>
-          <button className="whatsapp-approved-send" type="button" onClick={approveAndSendMessage} disabled={!webViewPayload || sendState === "loading"}>
-            <Send size={16} aria-hidden="true" />
-            {sendState === "loading" ? "Doğrulanıyor" : "Onayla ve Gönder"}
-          </button>
-        </div>
-
-        {sendMessage && <p className={`whatsapp-send-status sync-${sendState}`} role="status">{sendMessage}</p>}
 
         <div className="whatsapp-webview-frame">
           {webViewUrl ? (
@@ -2928,47 +2951,56 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
 
       {view === "safe" && <aside className="panel whatsapp-copy-panel">
         <div className="panel-heading compact">
-          <div>
-            <h2>Hazır Mesaj</h2>
+          <div className="detail-title-group">
+            <span className="detail-category-label">Hazır yanıt</span>
+            <h2>{selectedRequest?.customer_name ?? "Talep seçin"}</h2>
           </div>
+          {selectedRequest && <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>{formatRequestStatus(selectedRequest.status)}</StatusBadge>}
         </div>
 
-        <dl className="info-list compact-info">
-          <div>
-            <dt>Müşteri</dt>
-            <dd>{selectedRequest?.customer_name ?? "-"}</dd>
-          </div>
+        <dl className="info-list compact-detail-meta message-recipient-meta">
           <div>
             <dt>Telefon</dt>
             <dd>{phoneDisplay}</dd>
           </div>
+          <div>
+            <dt>Talep türü</dt>
+            <dd>{selectedRequest ? formatRequestType(selectedRequest.request_type) : "-"}</dd>
+          </div>
+          <div>
+            <dt>Kaynak</dt>
+            <dd>{selectedRequest ? formatCustomerSource(selectedRequest.source) : "-"}</dd>
+          </div>
         </dl>
 
-        <textarea className="prepared-whatsapp-message" readOnly value={selectedMessage} aria-label="Hazır WhatsApp mesajı" />
+        <label className="prepared-message-field">
+          <span>Mesaj</span>
+          <textarea className="prepared-whatsapp-message" readOnly value={selectedMessage} aria-label="Hazır WhatsApp mesajı" />
+        </label>
         <p className={`menu-status whatsapp-copy-status ${copyMessage.includes("kopyalandı") ? "sync-success" : ""}`}>{copyMessage}</p>
 
-        <div className="menu-actions single-column-actions">
-          <button type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
+        <div className="message-primary-actions">
+          <ActionButton size="sm" type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
             <Copy size={16} aria-hidden="true" />
             Hazır Mesajı Kopyala
-          </button>
-          <button type="button" onClick={onOpenExternal} disabled={!selectedUrl}>
+          </ActionButton>
+          <ActionButton variant="whatsapp" size="sm" type="button" onClick={onOpenExternal} disabled={!selectedUrl}>
             <ExternalLink size={16} aria-hidden="true" />
             WhatsApp Linkini Aç
-          </button>
-          <button type="button" onClick={onCall} disabled={!onCall}>
+          </ActionButton>
+          <ActionButton variant="secondary" size="sm" type="button" onClick={onCall} disabled={!onCall}>
             <Phone size={16} aria-hidden="true" />
             Müşteriyi Ara
-          </button>
+          </ActionButton>
         </div>
         {aiEnabled && (
           <div className="message-ai-actions">
             <strong>AI ile mesajı düzenle</strong>
             <div>
-              <button type="button" onClick={() => onRewrite("Mesajı daha kısa ve doğrudan yaz.")} disabled={aiState === "loading"}>Daha Kısa</button>
-              <button type="button" onClick={() => onRewrite("Mesajı daha samimi ve sıcak yaz.")} disabled={aiState === "loading"}>Daha Samimi</button>
-              <button type="button" onClick={() => onRewrite("Mesajı daha resmi ve ölçülü yaz.")} disabled={aiState === "loading"}>Daha Resmi</button>
-              <button type="button" onClick={() => onRewrite("Mesajı mevcut talep bilgilerine göre yeniden hazırla.")} disabled={aiState === "loading"}>AI ile Yenile</button>
+              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı daha kısa ve doğrudan yaz.")} disabled={aiState === "loading"}>Daha Kısa</ActionButton>
+              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı daha samimi ve sıcak yaz.")} disabled={aiState === "loading"}>Daha Samimi</ActionButton>
+              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı daha resmi ve ölçülü yaz.")} disabled={aiState === "loading"}>Daha Resmi</ActionButton>
+              <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı mevcut talep bilgilerine göre yeniden hazırla.")} disabled={aiState === "loading"}>AI ile Yenile</ActionButton>
             </div>
             <p className={`menu-status sync-${aiState}`}>{aiMessage}</p>
           </div>
@@ -3020,10 +3052,26 @@ function RequestsWorkspace({
   onOpenReservation
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
+  const manualDrawerCloseRef = useRef<HTMLButtonElement>(null);
   const selectedActionMode = selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
   const updateManualRequestForm = <Key extends keyof ManualRequestFormState,>(key: Key, value: ManualRequestFormState[Key]) => {
     onManualRequestFormChange({ ...manualRequestForm, [key]: value });
   };
+
+  useEffect(() => {
+    if (!manualFormOpen) {
+      return;
+    }
+
+    manualDrawerCloseRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setManualFormOpen(false);
+      }
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [manualFormOpen]);
 
   return (
     <section className="operations-workspace requests-workspace" aria-label="Talep yönetimi">
@@ -3034,7 +3082,7 @@ function RequestsWorkspace({
             <h2>{requests.length} kayıt</h2>
           </div>
         </div>
-        <div className="manager-list operations-list">
+        <CompactList className="manager-list operation-compact-list operations-list">
           {requests.length === 0 ? (
             <div className="empty-state compact-empty">
               <Bell size={24} aria-hidden="true" />
@@ -3043,113 +3091,40 @@ function RequestsWorkspace({
             </div>
           ) : (
             requests.map((request) => (
-              <button
-                className={selectedRequest?.id === request.id ? "manager-row is-active" : "manager-row"}
+              <CompactListButton
+                className="manager-row operation-list-item customer-request-row"
                 key={request.id}
-                type="button"
+                title={request.customer_name}
+                leading={<span className={`status-dot tone-${getRequestStatusTone(request.status)}`} aria-hidden="true" />}
+                description={`${formatRequestType(request.request_type)} · ${formatRequestStatus(request.status)}`}
+                trailing={formatCompactRequestDate(request) ? <time dateTime={request.start_date || request.created_at}>{formatCompactRequestDate(request)}</time> : undefined}
+                selected={selectedRequest?.id === request.id}
+                aria-pressed={selectedRequest?.id === request.id}
                 onClick={() => onSelectRequest(request.id)}
-              >
-                <span>
-                  <strong>{request.customer_name}</strong>
-                  <small>{formatRequestType(request.request_type)} · {formatRequestStatus(request.status)}</small>
-                </span>
-                <span className={request.status === "new" ? "dot is-on" : "dot"} />
-              </button>
+              />
             ))
           )}
-        </div>
+        </CompactList>
 
         {showManualForm && (
-          <button className="manual-request-toggle" type="button" aria-expanded={manualFormOpen} onClick={() => setManualFormOpen((open) => !open)}>
+          <ActionButton className="manual-request-toggle" variant="ghost" type="button" aria-expanded={manualFormOpen} onClick={() => setManualFormOpen(true)}>
             <Plus size={17} aria-hidden="true" />
-            {manualFormOpen ? "Formu Kapat" : "Elle Talep Ekle"}
-          </button>
+            Elle Talep Ekle
+          </ActionButton>
         )}
-        {showManualForm && manualFormOpen && <form
-          className="manager-form manual-request-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onCreateManualRequest();
-          }}
-        >
-          <div className="manual-request-heading">
-            <p>Manuel Kayıt</p>
-            <h3>Yeni talep</h3>
-          </div>
-          <label>
-            Talep türü
-            <select value={manualRequestForm.requestType} onChange={(event) => updateManualRequestForm("requestType", event.target.value)}>
-              {manualRequestTypeOptions.map((requestType) => (
-                <option key={requestType} value={requestType}>{formatRequestType(requestType)}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Ad soyad
-            <input value={manualRequestForm.customerName} onChange={(event) => updateManualRequestForm("customerName", event.target.value)} placeholder="Müşteri adı" />
-          </label>
-          <label>
-            Telefon
-            <input value={manualRequestForm.customerPhone} onChange={(event) => updateManualRequestForm("customerPhone", event.target.value)} placeholder="05xx xxx xx xx" />
-          </label>
-          <label>
-            Tarih notu
-            <input value={manualRequestForm.dateText} onChange={(event) => updateManualRequestForm("dateText", event.target.value)} placeholder="12-14 Temmuz veya bugün" />
-          </label>
-          <label>
-            Kişi sayısı
-            <input min="1" type="number" value={manualRequestForm.guestCount} onChange={(event) => updateManualRequestForm("guestCount", event.target.value)} />
-          </label>
-          <label>
-            Not
-            <textarea value={manualRequestForm.message} onChange={(event) => updateManualRequestForm("message", event.target.value)} placeholder="Talep detayı" />
-          </label>
-          <details className="form-details">
-            <summary>Detaylı bilgi</summary>
-            <div className="form-row">
-              <label>
-                Giriş tarihi
-                <input lang="tr" type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
-                <small className="date-field-hint">Gün / Ay / Yıl</small>
-              </label>
-              <label>
-                Çıkış tarihi
-                <input lang="tr" type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
-                <small className="date-field-hint">Gün / Ay / Yıl</small>
-              </label>
-            </div>
-            <div className="form-row">
-              <label>
-                Saat
-                <input type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
-              </label>
-              <label>
-                Öncelik
-                <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
-                  {manualPriorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </label>
-            </div>
-          </details>
-          <p className={`menu-status sync-${manualRequestState}`}>{manualRequestMessage}</p>
-          <button className="primary-command" type="submit" disabled={manualRequestState === "loading"}>
-            <Save size={16} aria-hidden="true" />
-            {manualRequestState === "loading" ? "Kaydediliyor" : "Manuel Talep Kaydet"}
-          </button>
-        </form>}
       </aside>
 
       <section className="panel operations-detail-panel request-detail-panel">
         {selectedRequest ? (
           <>
             <div className="panel-heading compact">
-              <div>
-                <p>{formatRequestType(selectedRequest.request_type)}</p>
+              <div className="detail-title-group">
+                <span className="detail-category-label">{formatRequestType(selectedRequest.request_type)}</span>
                 <h2>{selectedRequest.customer_name}</h2>
               </div>
-              <span className={`status-badge ${getRequestStatusTone(selectedRequest.status)}`}>
+              <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>
                 {formatRequestStatus(selectedRequest.status)}
-              </span>
+              </StatusBadge>
             </div>
             <dl className="info-list detail-info-grid compact-detail-meta">
               <div>
@@ -3171,54 +3146,54 @@ function RequestsWorkspace({
             </dl>
             <div className="compact-detail-copy">
               <span>Not</span>
-              <p>{selectedRequest.message || "Talep notu yok."}</p>
+              <p className="detail-scroll-copy">{selectedRequest.message || "Talep notu yok."}</p>
             </div>
-            {selectedRequest.ai_summary && (
+            {aiEnabled && (
               <div className="compact-detail-copy soft-suggestion">
                 <span>AI özeti</span>
-                <p className="line-clamp-2">{selectedRequest.ai_summary}</p>
+                <p className="detail-scroll-copy">{selectedRequest.ai_summary || "Bu talep için henüz AI özeti hazırlanmadı."}</p>
               </div>
             )}
             <div className="operations-command-grid request-detail-actions">
-              <button type="button" onClick={() => onCall(selectedRequest)}>
+              <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(selectedRequest)}>
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
-              </button>
-              <button type="button" onClick={() => onWhatsApp(selectedRequest)}>
+              </ActionButton>
+              <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
                 <MessageCircle size={16} aria-hidden="true" />
                 WhatsApp'tan Yaz
-              </button>
+              </ActionButton>
               {aiEnabled && selectedActionMode === "open" && (
-                <button type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
+                <ActionButton variant="ghost" size="sm" type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
                   <Sparkles size={16} aria-hidden="true" />
                   {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Cevap Hazırla"}
-                </button>
+                </ActionButton>
               )}
               {(selectedActionMode === "open" || selectedActionMode === "answered") && (
-                <button type="button" onClick={() => onConvert(selectedRequest)} disabled={convertingRequestId === selectedRequest.id}>
+                <ActionButton size="sm" type="button" onClick={() => onConvert(selectedRequest)} disabled={convertingRequestId === selectedRequest.id}>
                   <CalendarCheck size={16} aria-hidden="true" />
                   {convertingRequestId === selectedRequest.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
-                </button>
+                </ActionButton>
               )}
-              {selectedActionMode === "open" && <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
+              {selectedActionMode === "open" && <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
                 <CheckCircle2 size={16} aria-hidden="true" />
                 Cevaplandı İşaretle
-              </button>}
-              {selectedActionMode === "open" && <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
+              </ActionButton>}
+              {selectedActionMode === "open" && <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
                 <ClipboardList size={16} aria-hidden="true" />
                 Reddet
-              </button>}
+              </ActionButton>}
               {["answered", "rejected", "closed"].includes(selectedActionMode) && (
-                <button className="secondary-command" type="button" onClick={() => onUpdateStatus(selectedRequest, "new")}>
+                <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "new")}>
                   <RefreshCw size={16} aria-hidden="true" />
                   Yeniden Aç
-                </button>
+                </ActionButton>
               )}
               {selectedActionMode === "converted" && (
-                <button type="button" onClick={() => onOpenReservation(selectedRequest)}>
+                <ActionButton size="sm" type="button" onClick={() => onOpenReservation(selectedRequest)}>
                   <CalendarCheck size={16} aria-hidden="true" />
                   Rezervasyonu Aç
-                </button>
+                </ActionButton>
               )}
             </div>
           </>
@@ -3230,6 +3205,104 @@ function RequestsWorkspace({
           </div>
         )}
       </section>
+
+      {showManualForm && manualFormOpen && (
+        <div
+          className="manual-request-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setManualFormOpen(false);
+            }
+          }}
+        >
+          <aside className="manual-request-drawer" role="dialog" aria-modal="true" aria-labelledby="manual-request-title">
+            <header className="manual-request-drawer-header">
+              <div className="manual-request-heading">
+                <p>Manuel kayıt</p>
+                <h2 id="manual-request-title">Yeni talep ekle</h2>
+              </div>
+              <button ref={manualDrawerCloseRef} className="drawer-close-button" type="button" aria-label="Elle talep formunu kapat" onClick={() => setManualFormOpen(false)}>
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+            <form
+              className="manager-form manual-request-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                onCreateManualRequest();
+              }}
+            >
+              <div className="manual-request-core-grid">
+                <label>
+                  Talep türü
+                  <select value={manualRequestForm.requestType} onChange={(event) => updateManualRequestForm("requestType", event.target.value)}>
+                    {manualRequestTypeOptions.map((requestType) => (
+                      <option key={requestType} value={requestType}>{formatRequestType(requestType)}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Ad soyad
+                  <input value={manualRequestForm.customerName} onChange={(event) => updateManualRequestForm("customerName", event.target.value)} placeholder="Müşteri adı" />
+                </label>
+                <label>
+                  Telefon
+                  <input value={manualRequestForm.customerPhone} onChange={(event) => updateManualRequestForm("customerPhone", event.target.value)} placeholder="05xx xxx xx xx" />
+                </label>
+                <label>
+                  Tarih notu
+                  <input value={manualRequestForm.dateText} onChange={(event) => updateManualRequestForm("dateText", event.target.value)} placeholder="12-14 Temmuz veya bugün" />
+                </label>
+                <label>
+                  Kişi sayısı
+                  <input min="1" type="number" value={manualRequestForm.guestCount} onChange={(event) => updateManualRequestForm("guestCount", event.target.value)} />
+                </label>
+                <label className="manual-request-note-field">
+                  Not
+                  <textarea value={manualRequestForm.message} onChange={(event) => updateManualRequestForm("message", event.target.value)} placeholder="Talep detayı" />
+                </label>
+              </div>
+              <details className="form-details">
+                <summary>Detaylı bilgi</summary>
+                <div className="form-row">
+                  <label>
+                    Giriş tarihi
+                    <input lang="tr" type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
+                    <small className="date-field-hint">Gün / Ay / Yıl</small>
+                  </label>
+                  <label>
+                    Çıkış tarihi
+                    <input lang="tr" type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
+                    <small className="date-field-hint">Gün / Ay / Yıl</small>
+                  </label>
+                </div>
+                <div className="form-row">
+                  <label>
+                    Saat
+                    <input type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
+                  </label>
+                  <label>
+                    Öncelik
+                    <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
+                      {manualPriorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </label>
+                </div>
+              </details>
+              <div className="manual-request-drawer-footer">
+                <p className={`menu-status sync-${manualRequestState}`} role="status">{manualRequestMessage}</p>
+                <div>
+                  <ActionButton variant="secondary" type="button" onClick={() => setManualFormOpen(false)}>Vazgeç</ActionButton>
+                  <ActionButton type="submit" disabled={manualRequestState === "loading"}>
+                    <Save size={16} aria-hidden="true" />
+                    {manualRequestState === "loading" ? "Kaydediliyor" : "Manuel Talep Kaydet"}
+                  </ActionButton>
+                </div>
+              </div>
+            </form>
+          </aside>
+        </div>
+      )}
     </section>
   );
 }
@@ -3397,10 +3470,10 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
           </div>
         </div>
         <label className="customer-search">
-          Ara
+          <span>Ara</span>
           <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Ad, telefon veya etiket" />
         </label>
-        <div className="manager-list operations-list">
+        <CompactList className="manager-list operation-compact-list operations-list">
           {filteredCustomers.length === 0 ? (
             <div className="empty-state compact-empty">
               <Users size={24} aria-hidden="true" />
@@ -3409,34 +3482,33 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
             </div>
           ) : (
             filteredCustomers.map((customer) => (
-              <button
-                className={selectedCustomer?.id === customer.id ? "manager-row is-active" : "manager-row"}
+              <CompactListButton
+                className="manager-row operation-list-item customer-record-row"
                 key={customer.id}
-                type="button"
+                title={customer.fullName}
+                leading={<span className={`status-dot ${customer.requestCount > 0 ? "tone-info" : "tone-neutral"}`} aria-hidden="true" />}
+                description={`${customer.phone || "Telefon yok"} · ${formatCustomerSource(customer.source)}`}
+                trailing={formatShortDate(customer.lastContactAt || customer.updatedAt) ? <time dateTime={customer.lastContactAt || customer.updatedAt}>{formatShortDate(customer.lastContactAt || customer.updatedAt)}</time> : undefined}
+                selected={selectedCustomer?.id === customer.id}
+                aria-pressed={selectedCustomer?.id === customer.id}
                 onClick={() => setSelectedCustomerId(customer.id)}
-              >
-                <span>
-                  <strong>{customer.fullName}</strong>
-                  <small>{customer.phone || "-"} · {formatCustomerSource(customer.source)}</small>
-                </span>
-                <span className={customer.requestCount > 0 ? "dot is-on" : "dot"} />
-              </button>
+              />
             ))
           )}
-        </div>
+        </CompactList>
       </aside>
 
       <section className="panel operations-detail-panel">
         {selectedCustomer ? (
           <>
             <div className="panel-heading compact">
-              <div>
-                <p>{formatCustomerSource(selectedCustomer.source)}</p>
+              <div className="detail-title-group">
+                <span className="detail-category-label">{formatCustomerSource(selectedCustomer.source)}</span>
                 <h2>{selectedCustomer.fullName}</h2>
               </div>
-              <span className="status-badge info">{selectedCustomer.requestCount} talep</span>
+              <StatusBadge tone="info">{selectedCustomer.requestCount} talep</StatusBadge>
             </div>
-            <dl className="info-list detail-info-grid">
+            <dl className="info-list detail-info-grid compact-detail-meta">
               <div>
                 <dt>Telefon</dt>
                 <dd>{selectedCustomer.phone || "-"}</dd>
@@ -3454,7 +3526,10 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
                 <dd>{selectedCustomer.reservationCount} kayıt</dd>
               </div>
             </dl>
-            <p className="resource-note">{selectedCustomer.notes || "Müşteri notu yok."}</p>
+            <div className="compact-detail-copy customer-detail-note">
+              <span>Not</span>
+              <p className="detail-scroll-copy">{selectedCustomer.notes || "Müşteri notu yok."}</p>
+            </div>
             {selectedCustomer.tags.length > 0 && (
               <div className="tag-row">
                 {selectedCustomer.tags.map((tag) => (
@@ -3462,20 +3537,20 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
                 ))}
               </div>
             )}
-            <div className="operations-command-grid">
-              <button type="button" onClick={() => onCall(selectedCustomer)} disabled={!selectedCustomer.phone}>
+            <div className="operations-command-grid customer-detail-actions">
+              <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(selectedCustomer)} disabled={!selectedCustomer.phone}>
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
-              </button>
-              <button type="button" onClick={() => onWhatsApp(selectedCustomer)} disabled={!selectedCustomer.phone}>
+              </ActionButton>
+              <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedCustomer)} disabled={!selectedCustomer.phone}>
                 <MessageCircle size={16} aria-hidden="true" />
                 WhatsApp'tan Yaz
-              </button>
+              </ActionButton>
               {aiEnabled && (
-                <button type="button" onClick={() => onSummarize(selectedRequests[0]?.id ?? "")} disabled={selectedRequests.length === 0}>
+                <ActionButton variant="ghost" size="sm" type="button" onClick={() => onSummarize(selectedRequests[0]?.id ?? "")} disabled={selectedRequests.length === 0}>
                   <Sparkles size={16} aria-hidden="true" />
                   Geçmişi Özetle
-                </button>
+                </ActionButton>
               )}
             </div>
             <div className="customer-history-grid">
@@ -4520,6 +4595,30 @@ function formatReservationDate(reservation: DesktopDashboardData["reservations"]
 function formatDateForDisplay(value: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   return match ? `${match[3]}.${match[2]}.${match[1]}` : value;
+}
+
+function formatShortDate(value: string) {
+  if (!value) {
+    return "";
+  }
+
+  const isoDate = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (isoDate) {
+    return `${isoDate[3]}.${isoDate[2]}`;
+  }
+
+  const trimmedValue = value.trim();
+  return trimmedValue.length <= 14 ? trimmedValue : "";
+}
+
+function formatCompactRequestDate(request: SyncedCustomerRequest) {
+  for (const value of [request.start_date, request.date_text, request.created_at]) {
+    const formattedValue = formatShortDate(value);
+    if (formattedValue) {
+      return formattedValue;
+    }
+  }
+  return "";
 }
 
 function matchesReservationDate(reservation: DesktopDashboardData["reservations"][number], date: string) {

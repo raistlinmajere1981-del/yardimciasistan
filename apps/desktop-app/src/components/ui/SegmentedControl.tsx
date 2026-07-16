@@ -11,11 +11,12 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   ariaLabel: string;
   onChange: (value: T) => void;
+  className?: string;
 }
 
-export function SegmentedControl<T extends string>({ options, value, ariaLabel, onChange }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({ options, value, ariaLabel, onChange, className = "" }: SegmentedControlProps<T>) {
   return (
-    <div className="segmented-control" role="tablist" aria-label={ariaLabel}>
+    <div className={`segmented-control ${className}`.trim()} role="tablist" aria-label={ariaLabel}>
       {options.map((option) => (
         <button
           className={value === option.id ? "is-active" : ""}

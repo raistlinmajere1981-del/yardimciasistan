@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 
 export type CustomerWorkTab = "requests" | "customers" | "waiting";
 
@@ -13,25 +14,18 @@ export function CustomerWorkPage({ requests, customers, waiting }: CustomerWorkP
   const content = activeTab === "requests" ? requests : activeTab === "customers" ? customers : waiting;
 
   return (
-    <section className="combined-page" aria-label="Müşteri işleri">
-      <div className="page-tabs" role="tablist" aria-label="Müşteri işleri bölümleri">
-        {([
-          ["requests", "Yeni Talepler"],
-          ["customers", "Müşteriler"],
-          ["waiting", "Cevap Bekleyenler"]
-        ] as Array<[CustomerWorkTab, string]>).map(([id, label]) => (
-          <button
-            className={activeTab === id ? "is-active" : ""}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === id}
-            onClick={() => setActiveTab(id)}
-            key={id}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+    <section className="combined-page customer-work-page" aria-label="Müşteri işleri">
+      <SegmentedControl
+        className="customer-work-tabs"
+        value={activeTab}
+        ariaLabel="Müşteri işleri bölümleri"
+        onChange={setActiveTab}
+        options={[
+          { id: "requests", label: "Yeni Talepler" },
+          { id: "customers", label: "Müşteriler" },
+          { id: "waiting", label: "Cevap Bekleyenler" }
+        ]}
+      />
       {content}
     </section>
   );
