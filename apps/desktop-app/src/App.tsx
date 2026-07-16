@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Copy,
+  Eye,
   ExternalLink,
   MessageCircle,
   Phone,
@@ -26,7 +27,8 @@ import {
   TrendingUp,
   UploadCloud,
   Users,
-  UtensilsCrossed
+  UtensilsCrossed,
+  X
 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type {
@@ -513,6 +515,7 @@ function App() {
   const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
   const [menuEditMessage, setMenuEditMessage] = useState("Düzenleme bekliyor.");
+  const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryForm.id);
   const [selectedItemId, setSelectedItemId] = useState(initialItemForm.id);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(initialCategoryForm);
@@ -675,7 +678,6 @@ function App() {
     return dashboardMetrics.filter((metric) => metric.enabled);
   }, [dashboardData.reservations, dashboardData.rooms, dashboardData.summary, modules]);
 
-  const menuPreviewUrl = useMemo(() => `${dashboardData.webModuleUrl.replace(/\/+$/, "")}/menu.html`, [dashboardData.webModuleUrl]);
   const selectedWhatsAppRequest = useMemo(
     () => dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId) ?? dashboardData.requests[0],
     [dashboardData.requests, selectedWhatsAppRequestId]
@@ -783,8 +785,17 @@ function App() {
     setAndroidPublishMessage(`${result.task_count} günlük iş ile Android özeti yayınlandı.`);
   }
 
-  function openMenuPreview() {
-    void window.yardimciDesktop?.openExternal(menuPreviewUrl);
+  async function openMenuPreview() {
+    if (window.yardimciDesktop) {
+      try {
+        const currentDashboardData = await window.yardimciDesktop.getDashboardData();
+        setDashboardData(currentDashboardData);
+      } catch {
+        // Bellekteki son yerel veriyle önizlemeyi açmaya devam et.
+      }
+    }
+
+    setMenuPreviewOpen(true);
   }
 
   function selectCategory(category: PublishedMenuCategory) {
@@ -1576,14 +1587,13 @@ function App() {
       <main className="content" ref={contentRef}>
         <header className="topbar">
           <div>
-            {activePage !== "settings" && activePage !== "messages" && <p>{pageMeta.eyebrow}</p>}
             <h1>{pageMeta.title}</h1>
           </div>
           {activePage === "menu" ? (
             <div className={`sync-pill sync-${menuPublishState}`}>
               <span>{menuStatusMessage}</span>
               <button className="secondary-sync-action" type="button" onClick={openMenuPreview}>
-                <ExternalLink size={16} aria-hidden="true" />
+                <Eye size={16} aria-hidden="true" />
                 Önizle
               </button>
               <button type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
@@ -1880,6 +1890,178 @@ function App() {
           {persistentMessagesPage}
         </div>
       </main>
+      {menuPreviewOpen && (
+        <LocalMenuPreview
+          menu={dashboardData.menu}
+          setupData={setupData}
+          webModuleUrl={dashboardData.webModuleUrl}
+          onClose={() => setMenuPreviewOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface LocalMenuPreviewProps {
+  menu: DesktopDashboardData["menu"];
+  setupData: DesktopSetupData;
+  webModuleUrl: string;
+  onClose: () => void;
+}
+
+function LocalMenuPreview({ menu, setupData, webModuleUrl, onClose }: LocalMenuPreviewProps) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const [activeCategoryId, setActiveCategoryId] = useState("all");
+  const categories = useMemo(
+    () => menu.categories.filter((category) => category.is_active).sort(compareMenuRecords),
+    [menu.categories]
+  );
+  const activeCategoryIds = useMemo(() => new Set(categories.map((category) => category.id)), [categories]);
+  const items = useMemo(
+    () => menu.items
+      .filter((item) => item.is_available && activeCategoryIds.has(item.category_id))
+      .sort(compareMenuRecords),
+    [activeCategoryIds, menu.items]
+  );
+  const visibleCategories = activeCategoryId === "all"
+    ? categories
+    : categories.filter((category) => category.id === activeCategoryId);
+  const visibleSections = visibleCategories
+    .map((category) => ({
+      category,
+      items: items.filter((item) => item.category_id === category.id)
+    }))
+    .filter((section) => section.items.length > 0);
+  const heroImageUrl = resolveMenuPreviewImageUrl(
+    items.find((item) => item.is_featured && item.image_url)?.image_url
+      || items.find((item) => item.image_url)?.image_url
+      || "",
+    webModuleUrl
+  );
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose]);
+
+  return (
+    <div
+      className="local-menu-preview-overlay"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <section className="local-menu-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="local-menu-preview-title">
+        <header className="local-menu-preview-toolbar">
+          <div>
+            <strong id="local-menu-preview-title">Yerel Menü Önizlemesi</strong>
+            <span>Uygulamadaki son kaydedilen bilgiler gösteriliyor; web yayını etkilenmez.</span>
+          </div>
+          <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
+            <X size={18} aria-hidden="true" />
+            Kapat
+          </button>
+        </header>
+
+        <div className="local-menu-preview-viewport">
+          <article className="local-menu-preview-page">
+            <header className={heroImageUrl ? "local-menu-hero has-image" : "local-menu-hero"}>
+              {heroImageUrl && <img src={heroImageUrl} alt="" aria-hidden="true" />}
+              <div className="local-menu-hero-shade" />
+              <div className="local-menu-hero-content">
+                <p>QR Menü · Yerel Önizleme</p>
+                <h1>{setupData.businessName || "İşletme"} Menü</h1>
+                <span>Güncel ürünleri ve fiyatları yayınlamadan önce kontrol edin.</span>
+                <div className="local-menu-hero-meta" aria-label="Menü bilgileri">
+                  <span>Güncel fiyatlar</span>
+                  <span>{categories.length} kategori</span>
+                  <span>{items.length} ürün</span>
+                </div>
+              </div>
+            </header>
+
+            <main className="local-menu-preview-content">
+              <section className="local-menu-preview-categories" aria-label="Önizleme kategorileri">
+                <div>
+                  <button
+                    className={activeCategoryId === "all" ? "is-active" : ""}
+                    type="button"
+                    aria-pressed={activeCategoryId === "all"}
+                    onClick={() => setActiveCategoryId("all")}
+                  >
+                    Tüm Ürünler
+                  </button>
+                  {categories.map((category) => (
+                    <button
+                      className={activeCategoryId === category.id ? "is-active" : ""}
+                      type="button"
+                      aria-pressed={activeCategoryId === category.id}
+                      onClick={() => setActiveCategoryId(category.id)}
+                      key={category.id}
+                    >
+                      {category.name}
+                    </button>
+                  ))}
+                </div>
+                <p>{menu.updated_at ? `Yerel güncelleme: ${formatDateTime(menu.updated_at)}` : "Yerel güncelleme bekleniyor."}</p>
+              </section>
+
+              <div className="local-menu-preview-list">
+                {visibleSections.length === 0 ? (
+                  <p className="local-menu-preview-empty">Bu kategori için aktif ürün bulunmuyor.</p>
+                ) : visibleSections.map(({ category, items: categoryItems }) => (
+                  <section className="local-menu-preview-section" key={category.id}>
+                    <div className="local-menu-preview-section-title">
+                      <h2>{category.name}</h2>
+                      {category.description && <p>{category.description}</p>}
+                    </div>
+                    <div className="local-menu-preview-grid">
+                      {categoryItems.map((item) => {
+                        const imageUrl = resolveMenuPreviewImageUrl(item.image_url, webModuleUrl);
+                        return (
+                          <article className={imageUrl ? "local-menu-preview-item" : "local-menu-preview-item no-image"} key={item.id}>
+                            {imageUrl && <img src={imageUrl} alt={item.name} />}
+                            <div className="local-menu-preview-item-body">
+                              <div className="local-menu-preview-item-title">
+                                <strong className={item.is_featured ? "is-featured" : ""}>{item.name}</strong>
+                                <span>{formatCurrency(item.price, item.currency)}</span>
+                              </div>
+                              {item.description && <p>{item.description}</p>}
+                              {item.tags.length > 0 && (
+                                <div className="local-menu-preview-tags">
+                                  {item.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}
+                                </div>
+                              )}
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </main>
+
+            <footer className="local-menu-preview-footer">
+              <div>
+                <strong>{setupData.businessName || "İşletme"}</strong>
+                {setupData.address && <span>{setupData.address}</span>}
+              </div>
+              {setupData.whatsapp && <span className="local-menu-preview-whatsapp">WhatsApp</span>}
+            </footer>
+          </article>
+        </div>
+      </section>
     </div>
   );
 }
@@ -3780,13 +3962,13 @@ function MenuManager({
       <div className="menu-management-grid">
         <section className="panel menu-list-panel">
           <div className="panel-heading compact">
-            <div>
-              <p>Kategoriler</p>
-              <h2>{dashboardData.menu.categories.length} kayıt</h2>
+            <h2>Kategoriler</h2>
+            <div className="menu-heading-actions">
+              <span className="status-badge info">{dashboardData.menu.categories.length} kayıt</span>
+              <button className="icon-command" type="button" onClick={onNewCategory} aria-label="Kategori ekle">
+                <Plus size={18} aria-hidden="true" />
+              </button>
             </div>
-            <button className="icon-command" type="button" onClick={onNewCategory} aria-label="Kategori ekle">
-              <Plus size={18} aria-hidden="true" />
-            </button>
           </div>
 
           <div className="manager-list">
@@ -3851,13 +4033,13 @@ function MenuManager({
 
         <section className="panel menu-list-panel">
           <div className="panel-heading compact">
-            <div>
-              <p>Ürünler</p>
-              <h2>{dashboardData.menu.items.length} kayıt</h2>
+            <h2>Ürünler</h2>
+            <div className="menu-heading-actions">
+              <span className="status-badge info">{dashboardData.menu.items.length} kayıt</span>
+              <button className="icon-command" type="button" onClick={onNewItem} aria-label="Ürün ekle">
+                <Plus size={18} aria-hidden="true" />
+              </button>
             </div>
-            <button className="icon-command" type="button" onClick={onNewItem} aria-label="Ürün ekle">
-              <Plus size={18} aria-hidden="true" />
-            </button>
           </div>
 
           <div className="manager-list product-list">
@@ -3880,10 +4062,7 @@ function MenuManager({
 
         <section className="panel item-editor-panel">
           <div className="panel-heading compact">
-            <div>
-              <p>Ürün Detayı</p>
-              <h2>{itemForm.id ? "Düzenle" : "Yeni Ürün"}</h2>
-            </div>
+            <h2>Ürün Detayı</h2>
           </div>
 
           <div className="manager-form item-form">
@@ -4505,6 +4684,23 @@ function buildReservationWhatsAppMessage(
 
 function findMenuCategoryName(categoryId: string, categories: DesktopDashboardData["menu"]["categories"]) {
   return categories.find((category) => category.id === categoryId)?.name ?? "Kategori yok";
+}
+
+function compareMenuRecords(left: { sort_order: number; name: string }, right: { sort_order: number; name: string }) {
+  return left.sort_order - right.sort_order || left.name.localeCompare(right.name, "tr");
+}
+
+function resolveMenuPreviewImageUrl(imageUrl: string, webModuleUrl: string) {
+  const normalizedImageUrl = imageUrl.trim();
+  if (!normalizedImageUrl) {
+    return "";
+  }
+
+  try {
+    return new URL(normalizedImageUrl, `${webModuleUrl.replace(/\/+$/, "")}/`).toString();
+  } catch {
+    return normalizedImageUrl;
+  }
 }
 
 function formatCurrency(value: number, currency: string) {

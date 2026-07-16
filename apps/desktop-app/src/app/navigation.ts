@@ -47,14 +47,14 @@ export function buildNavigation(setup: DesktopSetupData): NavigationItem[] {
 }
 
 export function getPageMeta(page: DesktopPage) {
-  const meta: Record<DesktopPage, { eyebrow: string; title: string }> = {
-    dashboard: { eyebrow: "Günlük Özet", title: "Bugün ne var?" },
-    customerWork: { eyebrow: "Müşteri Takibi", title: "Müşteri İşleri" },
-    pension: { eyebrow: "Konaklama", title: "Pansiyon" },
-    restaurant: { eyebrow: "Servis", title: "Restoran" },
-    menu: { eyebrow: "Ürünler", title: "Menü" },
-    messages: { eyebrow: "İletişim", title: "Mesajlar" },
-    settings: { eyebrow: "İşletme", title: "Ayarlar" }
+  const meta: Record<DesktopPage, { title: string }> = {
+    dashboard: { title: "Bugün ne var?" },
+    customerWork: { title: "Müşteri İşleri" },
+    pension: { title: "Pansiyon" },
+    restaurant: { title: "Restoran" },
+    menu: { title: "Menü" },
+    messages: { title: "Mesajlar" },
+    settings: { title: "Ayarlar" }
   };
 
   return meta[page];

@@ -25,6 +25,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
   await page.addInitScript(({ setupData, dashboardData }) => {
+    window.__openedExternalUrls = [];
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -39,7 +40,10 @@ try {
       getDashboardData: async () => dashboardData,
       getAiWorkspaceHistory: async () => [],
       markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
-      openExternal: async () => true
+      openExternal: async (url) => {
+        window.__openedExternalUrls.push(url);
+        return true;
+      }
     };
   }, {
     setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345", aiApiKeyConfigured: false },
@@ -111,10 +115,24 @@ try {
   await expect(page.getByText("Yedek klasörü")).toHaveCount(0);
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Menü", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Düzenle" })).toBeVisible();
+  await expect(page.locator(".topbar > div > p")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Kategoriler", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ürünler", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ürün Detayı", exact: true })).toBeVisible();
+  await expect(page.locator(".menu-list-panel .panel-heading .status-badge")).toHaveText([/\d+ kayıt/, /\d+ kayıt/]);
+  await expect(page.locator(".menu-management-grid .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürünü Kaydet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Önizle", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Önizle", exact: true }).click();
+  const localMenuPreview = page.getByRole("dialog", { name: "Yerel Menü Önizlemesi" });
+  await expect(localMenuPreview).toBeVisible();
+  await expect(localMenuPreview.getByText("Yerel Serpme Kahvaltı", { exact: true })).toBeVisible();
+  await expect(localMenuPreview.getByText("Gizli Menü Ürünü", { exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__openedExternalUrls)).toEqual([]);
+  await page.screenshot({ path: "artifacts/screenshots/desktop-local-menu-preview.png", fullPage: true });
+  await localMenuPreview.getByRole("button", { name: "Önizlemeyi kapat" }).click();
+  await expect(localMenuPreview).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Yayınla", exact: true })).toHaveCount(0);
   await expect(page.locator(".menu-list-panel").first().getByText("Sıra", { exact: true })).toBeHidden();
@@ -1118,9 +1136,68 @@ function createDashboardConversionFixture() {
         updated_at: "2026-07-11T10:15:00+03:00"
       }
     ],
+    menu: {
+      categories: [
+        {
+          id: "category_local_preview",
+          name: "Yerel Kahvaltı",
+          description: "Henüz webde yayınlanmamış yerel kategori.",
+          is_active: true,
+          sort_order: 10,
+          created_at: "2026-07-16T10:00:00+03:00",
+          updated_at: "2026-07-16T10:30:00+03:00"
+        },
+        {
+          id: "category_hidden_preview",
+          name: "Pasif Kategori",
+          description: "Önizlemede gösterilmemeli.",
+          is_active: false,
+          sort_order: 20,
+          created_at: "2026-07-16T10:00:00+03:00",
+          updated_at: "2026-07-16T10:30:00+03:00"
+        }
+      ],
+      items: [
+        {
+          id: "item_local_preview",
+          category_id: "category_local_preview",
+          name: "Yerel Serpme Kahvaltı",
+          description: "Yalnızca uygulamadaki güncel kayıttan gelen ürün.",
+          price: 525,
+          currency: "TRY",
+          image_url: "",
+          is_available: true,
+          is_featured: true,
+          allergens: ["süt"],
+          tags: ["yerel", "yeni"],
+          sort_order: 10,
+          created_at: "2026-07-16T10:00:00+03:00",
+          updated_at: "2026-07-16T10:30:00+03:00"
+        },
+        {
+          id: "item_hidden_preview",
+          category_id: "category_local_preview",
+          name: "Gizli Menü Ürünü",
+          description: "Mevcut olmadığı için önizlemede gösterilmemeli.",
+          price: 100,
+          currency: "TRY",
+          image_url: "",
+          is_available: false,
+          is_featured: false,
+          allergens: [],
+          tags: [],
+          sort_order: 20,
+          created_at: "2026-07-16T10:00:00+03:00",
+          updated_at: "2026-07-16T10:30:00+03:00"
+        }
+      ],
+      updated_at: "2026-07-16T10:30:00+03:00"
+    },
     summary: {
       ...createDashboardFixture().summary,
-      newRequests: 1
+      newRequests: 1,
+      activeMenuCategories: 1,
+      availableMenuItems: 1
     }
   };
 }
