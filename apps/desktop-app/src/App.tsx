@@ -712,6 +712,18 @@ function App() {
 
     const nextDashboardData = await window.yardimciDesktop.getDashboardData();
     setDashboardData(nextDashboardData);
+
+    if (selectedCategoryId && !nextDashboardData.menu.categories.some((category) => category.id === selectedCategoryId)) {
+      const nextCategory = nextDashboardData.menu.categories[0];
+      setSelectedCategoryId(nextCategory?.id ?? "");
+      setCategoryForm(toCategoryForm(nextCategory));
+    }
+
+    if (selectedItemId && !nextDashboardData.menu.items.some((item) => item.id === selectedItemId)) {
+      const nextItem = nextDashboardData.menu.items[0];
+      setSelectedItemId(nextItem?.id ?? "");
+      setItemForm(toItemForm(nextItem, nextDashboardData.menu.categories[0]?.id ?? ""));
+    }
   }
 
   async function handlePullRequests() {
@@ -1604,8 +1616,8 @@ function App() {
               <span>{setupData.modules.whatsapp ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin") : "AI araçları kullanıma hazır."}</span>
             </div>
           ) : activePage === "settings" ? (
-            <div className="sync-pill sync-idle">
-              <span>İşletme ve bağlantı ayarlarını yönetin.</span>
+            <div className={`sync-pill sync-${setupSaveState}`}>
+              <span>{setupMessage}</span>
               <button type="button" onClick={handleSaveSetup} disabled={setupSaveState === "loading"}>
                 <Save size={16} aria-hidden="true" />
                 Ayarları Kaydet
@@ -2058,7 +2070,7 @@ function SetupWizard({
           <button className={settingsLevel === "basic" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "basic"} onClick={() => setSettingsLevel("basic")}>Temel Ayarlar</button>
           <button className={settingsLevel === "advanced" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "advanced"} onClick={() => setSettingsLevel("advanced")}>Gelişmiş Ayarlar</button>
         </div>
-        {settingsLevel === "basic" && <>
+        {settingsLevel === "basic" && <div className="settings-section-grid settings-basic-grid">
         {embedded && <div className="setup-section appearance-settings">
           <div className="setup-section-title">
             <h2>Uygulama Görünümü</h2>
@@ -2091,7 +2103,7 @@ function SetupWizard({
             </div>
           </div>
         </div>}
-        <div className="setup-section">
+        <div className="setup-section settings-identity-section">
           <div className="setup-section-title">
             {!embedded && <p>Firma Bilgileri</p>}
             <h2>Temel Tanım</h2>
@@ -2130,7 +2142,7 @@ function SetupWizard({
           </div>
         </div>
 
-        <div className="setup-section">
+        <div className="setup-section settings-modules-section">
           <div className="setup-section-title">
             {!embedded && <p>Modüller</p>}
             <h2>Kullanılacak Alanlar</h2>
@@ -2159,7 +2171,7 @@ function SetupWizard({
           </div>
         </div>
 
-        <div className="setup-section">
+        <div className="setup-section settings-daily-section">
           <div className="setup-section-title">
             {!embedded && <p>Kapasite ve Yardımcı</p>}
             <h2>Günlük Kullanım</h2>
@@ -2179,16 +2191,16 @@ function SetupWizard({
             AI cevap önerileri açık
           </label>
         </div>
-        </>}
+        </div>}
 
-        {settingsLevel === "advanced" && <><div className="setup-section">
+        {settingsLevel === "advanced" && <div className="settings-section-grid settings-advanced-grid"><div className="setup-section settings-web-section">
           <div className="setup-section-title">
             {!embedded && <p>Web Bağlantısı</p>}
-            <h2>Hosting Modülü</h2>
+            <h2>Web Bağlantısı</h2>
           </div>
           <div className="setup-grid two">
             <label className="setup-field">
-              Web modül adresi
+              Web eşitleme adresi
               <input value={form.webModuleUrl} onChange={(event) => update("webModuleUrl", event.target.value)} placeholder="https://yardimciasistan.alwaysdata.net/yardimci-asistan" />
             </label>
             <label>
@@ -2201,7 +2213,7 @@ function SetupWizard({
         <div className="setup-section setup-ai-section">
           <div className="setup-section-title">
             {!embedded && <p>AI Bağlantısı</p>}
-            <h2>Masaüstü ve Web İçin Tek Ayar</h2>
+            <h2>AI Servisi ve Model</h2>
           </div>
           <div className="setup-grid two">
             <label className="setup-ai-service-field">
@@ -2304,7 +2316,7 @@ function SetupWizard({
           {form.aiService !== "gemini" && renderAiConnectionActions(false)}
         </div>
 
-        <div className="setup-section">
+        <div className="setup-section settings-storage-section">
           <div className="setup-section-title">{!embedded && <p>Bu Bilgisayar</p>}<h2>Kayıt ve Yedekleme</h2></div>
           <dl className="info-list settings-technical-info">
             <div><dt>Yerel kayıt dosyası</dt><dd>{dashboardData?.databasePath ?? "İlk kayıt sonrası oluşur"}</dd></div>
@@ -2317,7 +2329,7 @@ function SetupWizard({
           <p className={`menu-status sync-${backupState}`}>{backupMessage}</p>
           {form.androidEnabled && <p className={`menu-status sync-${androidPublishState}`}>{androidPublishMessage}</p>}
         </div>
-        </>}
+        </div>}
 
         {!embedded && <footer className={`setup-footer sync-${saveState}`}>
           <span>{message}</span>
@@ -3924,11 +3936,11 @@ function MenuManager({
   return (
     <section className="menu-manager" aria-label="QR menü yönetimi">
       <div className="menu-management-grid">
-        <section className="panel menu-list-panel">
+        <section className="panel menu-list-panel category-panel">
           <div className="panel-heading compact">
             <h2>Kategoriler</h2>
             <div className="menu-heading-actions">
-              <span className="status-badge info">{dashboardData.menu.categories.length} kayıt</span>
+              <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
               <button className="icon-command" type="button" onClick={onNewCategory} aria-label="Kategori ekle">
                 <Plus size={18} aria-hidden="true" />
               </button>
@@ -3942,12 +3954,13 @@ function MenuManager({
                 key={category.id}
                 type="button"
                 onClick={() => onSelectCategory(category)}
+                aria-pressed={selectedCategoryId === category.id}
               >
                 <span>
                   <strong>{category.name}</strong>
                   <small>{category.is_active ? "Aktif" : "Pasif"}</small>
                 </span>
-                <span className={category.is_active ? "dot is-on" : "dot"} />
+                <span className={category.is_active ? "dot is-on" : "dot"} aria-hidden="true" />
               </button>
             ))}
           </div>
@@ -3995,11 +4008,11 @@ function MenuManager({
           </div>
         </section>
 
-        <section className="panel menu-list-panel">
+        <section className="panel menu-list-panel product-panel">
           <div className="panel-heading compact">
             <h2>Ürünler</h2>
             <div className="menu-heading-actions">
-              <span className="status-badge info">{dashboardData.menu.items.length} kayıt</span>
+              <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
               <button className="icon-command" type="button" onClick={onNewItem} aria-label="Ürün ekle">
                 <Plus size={18} aria-hidden="true" />
               </button>
@@ -4013,12 +4026,13 @@ function MenuManager({
                 key={item.id}
                 type="button"
                 onClick={() => onSelectItem(item)}
+                aria-pressed={selectedItemId === item.id}
               >
                 <span>
                   <strong>{item.name}</strong>
                   <small>{findMenuCategoryName(item.category_id, dashboardData.menu.categories)} · {formatCurrency(item.price, item.currency)}</small>
                 </span>
-                <span className={item.is_available ? "dot is-on" : "dot"} />
+                <span className={item.is_available ? "dot is-on" : "dot"} aria-hidden="true" />
               </button>
             ))}
           </div>
@@ -4030,21 +4044,21 @@ function MenuManager({
           </div>
 
           <div className="manager-form item-form">
-            <label>
+            <label className="item-name-field">
               Ürün adı
               <input value={itemForm.name} onChange={(event) => onItemFormChange({ ...itemForm, name: event.target.value })} placeholder="Serpme Kahvaltı" />
             </label>
-            <label>
+            <label className="item-category-field">
               Kategori
               <select value={itemForm.category_id} onChange={(event) => onItemFormChange({ ...itemForm, category_id: event.target.value })}>
                 {dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </label>
-            <label>
+            <label className="item-price-field">
               Fiyat
               <input value={itemForm.price} onChange={(event) => onItemFormChange({ ...itemForm, price: event.target.value })} inputMode="decimal" />
             </label>
-            <label>
+            <label className="item-description-field">
               Açıklama
               <textarea
                 value={itemForm.description}
@@ -4099,11 +4113,13 @@ function MenuManager({
                 </label>
               </div>
             </details>
-            <p className={`menu-status sync-${menuEditState}`}>{menuEditMessage}</p>
-            <button className="primary-command" type="button" onClick={onSaveItem}>
-              <Save size={16} aria-hidden="true" />
-              Ürünü Kaydet
-            </button>
+            <div className="menu-editor-footer">
+              <p className={`menu-status sync-${menuEditState}`}>{menuEditMessage}</p>
+              <button className="primary-command" type="button" onClick={onSaveItem}>
+                <Save size={16} aria-hidden="true" />
+                Ürünü Kaydet
+              </button>
+            </div>
           </div>
         </section>
       </div>

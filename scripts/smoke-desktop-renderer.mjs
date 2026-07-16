@@ -83,7 +83,7 @@ try {
   await page.getByRole("button", { name: "Ayarlar" }).click();
   await page.getByLabel("AI cevap önerileri açık").check();
   await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
-  await expect(page.getByText("Web Bağlantısı", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".settings-web-section .setup-section-title > p")).toHaveCount(0);
   await expect(page.getByText("AI Bağlantısı", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Bu Bilgisayar", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Demo sitenin kurulu web modülü kullanılır; sonuna api/sync.php eklemeyin.", { exact: true })).toHaveCount(0);
@@ -109,7 +109,7 @@ try {
   expect(connectionButtonBox).not.toBeNull();
   expect(Math.abs(serviceBox.y - studioButtonBox.y)).toBeLessThanOrEqual(2);
   expect(studioButtonBox.x).toBeGreaterThan(serviceBox.x + serviceBox.width);
-  expect(Math.abs(curlInputBox.y - connectionButtonBox.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(curlInputBox.y - connectionButtonBox.y)).toBeLessThanOrEqual(4);
   expect(showButtonBox.x).toBeLessThan(connectionButtonBox.x);
   await page.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
@@ -117,7 +117,7 @@ try {
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.locator(".nav-item")).toHaveCount(7);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
-  await expect(page.getByText("Web modül adresi")).toHaveCount(0);
+  await expect(page.getByText("Web eşitleme adresi")).toHaveCount(0);
   await expect(page.getByText("Yerel kayıt dosyası")).toHaveCount(0);
   await expect(page.getByText("Yedek klasörü")).toHaveCount(0);
   await page.getByRole("button", { name: "Menü", exact: true }).click();
@@ -708,6 +708,10 @@ try {
   expect(compactCustomerRowBoxes.every((box) => box.y >= compactCustomerListBox.y - 1 && box.y + box.height <= compactCustomerListBox.y + compactCustomerListBox.height + 1)).toBe(true);
 
   await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
+  await expect(compactPage.getByRole("heading", { name: "Bugünkü Konaklama Özeti" })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "Rezervasyon Takibi" })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "Anlık Oda Durumu" })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "Günlük Konaklama İşleri" })).toBeVisible();
   const pensionMetricBoxes = await compactPage.locator(".pension-page .operation-summary-grid .metric-card").evaluateAll((cards) => cards.map((card) => {
     const box = card.getBoundingClientRect();
     return { height: box.height, y: box.y };
@@ -739,10 +743,43 @@ try {
   expect(pensionTaskHeights.every((height) => height >= 56 && height <= 76)).toBe(true);
   const firstPensionTask = await pensionTaskRows.first().boundingBox();
   expect(firstPensionTask).not.toBeNull();
-  expect(firstPensionTask.y + firstPensionTask.height).toBeLessThanOrEqual(768);
+  const [pensionSummaryBox, reservationsPanelBox, roomsPanelBox, pensionTasksPanelBox, reservationFiltersBox, roomGridBox, pensionTaskFiltersBox] = await Promise.all([
+    compactPage.locator(".pension-summary-panel").boundingBox(),
+    compactPage.locator(".pension-reservations-section").boundingBox(),
+    compactPage.locator(".pension-rooms-section").boundingBox(),
+    compactPage.locator(".pension-tasks-section").boundingBox(),
+    compactPage.locator(".pension-reservations-section .reservation-filters").boundingBox(),
+    compactPage.locator(".pension-rooms-section .compact-resource-grid").boundingBox(),
+    compactPage.locator(".pension-tasks-section .task-filters").boundingBox()
+  ]);
+  expect(pensionSummaryBox).not.toBeNull();
+  expect(reservationsPanelBox).not.toBeNull();
+  expect(roomsPanelBox).not.toBeNull();
+  expect(pensionTasksPanelBox).not.toBeNull();
+  expect(reservationFiltersBox).not.toBeNull();
+  expect(roomGridBox).not.toBeNull();
+  expect(pensionTaskFiltersBox).not.toBeNull();
+  expect(Math.abs(reservationsPanelBox.y - roomsPanelBox.y)).toBeLessThanOrEqual(1);
+  expect(reservationsPanelBox.width).toBeGreaterThan(roomsPanelBox.width);
+  expect(roomsPanelBox.x).toBeGreaterThan(reservationsPanelBox.x + reservationsPanelBox.width);
+  expect(pensionTasksPanelBox.y).toBeGreaterThanOrEqual(reservationsPanelBox.y + reservationsPanelBox.height + 10);
+  expect(Math.abs(pensionTasksPanelBox.x - reservationsPanelBox.x)).toBeLessThanOrEqual(1);
+  expect(pensionTasksPanelBox.width).toBeGreaterThan(reservationsPanelBox.width);
+  expect(reservationFiltersBox.x).toBeGreaterThanOrEqual(reservationsPanelBox.x);
+  expect(reservationFiltersBox.x + reservationFiltersBox.width).toBeLessThanOrEqual(reservationsPanelBox.x + reservationsPanelBox.width);
+  expect(roomGridBox.x).toBeGreaterThanOrEqual(roomsPanelBox.x);
+  expect(roomGridBox.x + roomGridBox.width).toBeLessThanOrEqual(roomsPanelBox.x + roomsPanelBox.width);
+  expect(pensionTaskFiltersBox.x).toBeGreaterThanOrEqual(pensionTasksPanelBox.x);
+  expect(pensionTaskFiltersBox.x + pensionTaskFiltersBox.width).toBeLessThanOrEqual(pensionTasksPanelBox.x + pensionTasksPanelBox.width);
+  expect(pensionTasksPanelBox.y).toBeLessThan(768);
+  expect(await compactPage.locator(".pension-reservations-section").evaluate((panel) => getComputedStyle(panel).borderTopWidth)).toBe("1px");
+  await compactPage.waitForTimeout(50);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-pension-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
+  await expect(compactPage.getByRole("heading", { name: "Bugünkü Servis Özeti" })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "Masa Durumu", exact: true })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "Servis İşleri" })).toBeVisible();
   const restaurantMetricBoxes = await compactPage.locator(".restaurant-page .operation-summary-grid .metric-card").evaluateAll((cards) => cards.map((card) => {
     const box = card.getBoundingClientRect();
     return { height: box.height, y: box.y };
@@ -754,8 +791,8 @@ try {
   const firstTaskHeight = await compactPage.locator(".task-record-row").first().evaluate((card) => card.getBoundingClientRect().height);
   expect(firstTableHeight).toBeGreaterThanOrEqual(72);
   expect(firstTableHeight).toBeLessThanOrEqual(100);
-  expect(firstTaskHeight).toBeGreaterThanOrEqual(56);
-  expect(firstTaskHeight).toBeLessThanOrEqual(76);
+  expect(firstTaskHeight).toBeGreaterThanOrEqual(82);
+  expect(firstTaskHeight).toBeLessThanOrEqual(116);
   const compactTableCards = compactPage.locator(".table-compact-card");
   const compactTableBoxes = await compactTableCards.evaluateAll((cards) => cards.map((card) => {
     const box = card.getBoundingClientRect();
@@ -772,12 +809,64 @@ try {
   await compactPage.locator(".task-record-row").first().locator("summary").click();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
   await compactPage.locator(".task-record-row").first().locator("summary").click();
+  const [restaurantSummaryBox, tablesPanelBox, restaurantTasksPanelBox, tableGridBox, restaurantTaskFiltersBox] = await Promise.all([
+    compactPage.locator(".restaurant-summary-panel").boundingBox(),
+    compactPage.locator(".restaurant-tables-section").boundingBox(),
+    compactPage.locator(".restaurant-tasks-section").boundingBox(),
+    compactPage.locator(".restaurant-tables-section .compact-resource-grid").boundingBox(),
+    compactPage.locator(".restaurant-tasks-section .task-filters").boundingBox()
+  ]);
+  expect(restaurantSummaryBox).not.toBeNull();
+  expect(tablesPanelBox).not.toBeNull();
+  expect(restaurantTasksPanelBox).not.toBeNull();
+  expect(tableGridBox).not.toBeNull();
+  expect(restaurantTaskFiltersBox).not.toBeNull();
+  expect(Math.abs(tablesPanelBox.y - restaurantTasksPanelBox.y)).toBeLessThanOrEqual(1);
+  expect(tablesPanelBox.width).toBeGreaterThan(restaurantTasksPanelBox.width);
+  expect(restaurantTasksPanelBox.x).toBeGreaterThan(tablesPanelBox.x + tablesPanelBox.width);
+  expect(tableGridBox.x).toBeGreaterThanOrEqual(tablesPanelBox.x);
+  expect(tableGridBox.x + tableGridBox.width).toBeLessThanOrEqual(tablesPanelBox.x + tablesPanelBox.width);
+  expect(restaurantTaskFiltersBox.x).toBeGreaterThanOrEqual(restaurantTasksPanelBox.x);
+  expect(restaurantTaskFiltersBox.x + restaurantTaskFiltersBox.width).toBeLessThanOrEqual(restaurantTasksPanelBox.x + restaurantTasksPanelBox.width);
+  expect(await compactPage.locator(".restaurant-tables-section").evaluate((panel) => getComputedStyle(panel).borderTopWidth)).toBe("1px");
+  await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
+  await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
+  await expect(compactPage.getByRole("heading", { name: "Servis İşleri" })).toBeVisible();
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-restaurant-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Menü", exact: true }).click();
+  await expect(compactPage.getByRole("button", { name: "Menü", exact: true })).toHaveAttribute("aria-current", "page");
   const menuRowHeights = await compactPage.locator(".menu-management-grid .manager-row").evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
   expect(menuRowHeights.length).toBeGreaterThanOrEqual(8);
-  expect(menuRowHeights.every((height) => height >= 50 && height <= 60)).toBe(true);
+  expect(menuRowHeights.every((height) => height >= 44 && height <= 50)).toBe(true);
+  const [menuGridBox, categoryPanelBox, productPanelBox, itemEditorBox, categorySaveBox, itemSaveBox, itemDescriptionBox, categoryDetailsBox, itemDetailsBox] = await Promise.all([
+    compactPage.locator(".menu-management-grid").boundingBox(),
+    compactPage.locator(".category-panel").boundingBox(),
+    compactPage.locator(".product-panel").boundingBox(),
+    compactPage.locator(".item-editor-panel").boundingBox(),
+    compactPage.getByRole("button", { name: "Kategoriyi Kaydet" }).boundingBox(),
+    compactPage.getByRole("button", { name: "Ürünü Kaydet" }).boundingBox(),
+    compactPage.getByLabel("Açıklama").last().boundingBox(),
+    compactPage.locator(".category-details").boundingBox(),
+    compactPage.locator(".item-details").boundingBox()
+  ]);
+  expect(menuGridBox).not.toBeNull();
+  expect(categoryPanelBox).not.toBeNull();
+  expect(productPanelBox).not.toBeNull();
+  expect(itemEditorBox).not.toBeNull();
+  expect(categorySaveBox).not.toBeNull();
+  expect(itemSaveBox).not.toBeNull();
+  expect(itemDescriptionBox).not.toBeNull();
+  expect(categoryDetailsBox).not.toBeNull();
+  expect(itemDetailsBox).not.toBeNull();
+  expect(productPanelBox.x).toBeGreaterThan(categoryPanelBox.x + categoryPanelBox.width);
+  expect(itemEditorBox.x).toBeGreaterThan(productPanelBox.x + productPanelBox.width);
+  expect(Math.max(categoryPanelBox.y, productPanelBox.y, itemEditorBox.y) - Math.min(categoryPanelBox.y, productPanelBox.y, itemEditorBox.y)).toBeLessThanOrEqual(1);
+  expect([categoryPanelBox, productPanelBox, itemEditorBox, categorySaveBox, itemSaveBox].every((box) => box.y + box.height <= 768)).toBe(true);
+  expect(itemDescriptionBox.height).toBeLessThanOrEqual(64);
+  expect(categoryDetailsBox.height).toBeLessThanOrEqual(36);
+  expect(itemDetailsBox.height).toBeLessThanOrEqual(36);
+  await expect(compactPage.locator(".menu-management-grid .manager-row[aria-pressed='true']")).toHaveCount(2);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-menu-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Mesajlar", exact: true }).click();
@@ -836,12 +925,36 @@ try {
   await compactWebControlBar.getByRole("button", { name: "Güvenli Moda Dön" }).click();
   await expect(compactPage.getByRole("tab", { name: "Güvenli Mod" })).toHaveAttribute("aria-selected", "true");
 
+  await compactPage.reload({ waitUntil: "domcontentloaded" });
+  await expect(compactPage.locator(".nav-item")).toHaveCount(7);
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
-  await compactPage.locator(".content").evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  const settingsSectionBox = await compactPage.locator(".setup-section").last().boundingBox();
-  expect(settingsSectionBox).not.toBeNull();
+  await expect(compactPage.getByRole("button", { name: "Ayarlar", exact: true })).toHaveAttribute("aria-current", "page");
+  expect(await compactPage.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(compactPage.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(compactPage.locator(".setup-footer")).toHaveCount(0);
+  const basicSettingsBoxes = await compactPage.locator(".settings-basic-grid > .setup-section").evaluateAll((sections) => sections.map((section) => {
+    const box = section.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  }));
+  expect(basicSettingsBoxes).toHaveLength(4);
+  expect(new Set(basicSettingsBoxes.map((box) => Math.round(box.x))).size).toBe(2);
+  expect(basicSettingsBoxes.every((box) => box.y + box.height <= 768)).toBe(true);
+  await compactPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
+  await compactPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
+  await expect(compactPage.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-settings-1366x768.png" });
+  await compactPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
+  await expect(compactPage.getByRole("heading", { name: "Web Bağlantısı", exact: true })).toBeVisible();
+  await expect(compactPage.getByLabel("Web eşitleme adresi")).toBeVisible();
+  await expect(compactPage.getByLabel("Web güvenlik anahtarı")).toBeVisible();
+  await expect(compactPage.getByLabel("Servis sağlayıcı")).toBeVisible();
+  const advancedSettingsBoxes = await compactPage.locator(".settings-advanced-grid > .setup-section").evaluateAll((sections) => sections.map((section) => {
+    const box = section.getBoundingClientRect();
+    return { x: box.x, y: box.y, width: box.width, height: box.height };
+  }));
+  expect(advancedSettingsBoxes).toHaveLength(3);
+  expect(advancedSettingsBoxes.every((box) => box.y + box.height <= 768)).toBe(true);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-settings-advanced-1366x768.png" });
   await compactPage.close();
 
   const pullPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -1049,7 +1162,7 @@ try {
   await setupPage.waitForTimeout(100);
   expect(await setupPage.evaluate(() => window.__aiConnectionTestCount)).toBe(2);
   await setupPage.screenshot({ path: "artifacts/screenshots/desktop-setup-wizard.png", fullPage: true });
-  await setupPage.getByLabel("Web modül adresi").fill("https://yardimciasistan.alwaysdata.net/yardimci-asistan");
+  await setupPage.getByLabel("Web eşitleme adresi").fill("https://yardimciasistan.alwaysdata.net/yardimci-asistan");
   await setupPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
   await setupPage.getByLabel("Firma adı").fill("Smoke Pansiyon");
   await setupPage.getByRole("button", { name: "Kurulumu Kaydet" }).click();

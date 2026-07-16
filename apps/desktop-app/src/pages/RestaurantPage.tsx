@@ -21,17 +21,32 @@ export function RestaurantPage({ data, tables, tasks }: RestaurantPageProps) {
 
   return (
     <section className="combined-page restaurant-page" aria-label="Restoran yönetimi">
-      <div className="operation-summary-grid">
-        {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
-      </div>
+      <section className="operation-group-panel operation-summary-panel restaurant-summary-panel" aria-labelledby="restaurant-summary-title">
+        <header className="operation-panel-heading">
+          <span className="operation-panel-eyebrow">Servis</span>
+          <h2 id="restaurant-summary-title">Bugünkü Servis Özeti</h2>
+          <p>Masa doluluğu ve bekleyen servis işlerine hızlı bakış</p>
+        </header>
+        <div className="operation-summary-grid">
+          {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
+        </div>
+      </section>
       <div className="restaurant-layout">
-        <section className="combined-section">
-          <div className="combined-section-heading"><span>Masalar</span><strong>Salon ve alan durumu</strong></div>
-          {tables}
+        <section className="operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Servis</span>
+            <h2 id="restaurant-tables-title">Masa Durumu</h2>
+            <p>Salon ve bahçe masalarının güncel durumu</p>
+          </header>
+          <div className="operation-panel-content">{tables}</div>
         </section>
-        <section className="combined-section">
-          <div className="combined-section-heading"><span>Günlük işler</span><strong>Bekleyen ve tamamlanan işler</strong></div>
-          {tasks}
+        <section className="operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Servis</span>
+            <h2 id="restaurant-tasks-title">Servis İşleri</h2>
+            <p>Bekleyen ve tamamlanan servis görevleri</p>
+          </header>
+          <div className="operation-panel-content">{tasks}</div>
         </section>
       </div>
     </section>

@@ -29,21 +29,40 @@ export function PensionPage({ data, reservations, rooms, tasks }: PensionPagePro
 
   return (
     <section className="combined-page pension-page" aria-label="Pansiyon yönetimi">
-      <div className="operation-summary-grid">
-        {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
-      </div>
+      <section className="operation-group-panel operation-summary-panel pension-summary-panel" aria-labelledby="pension-summary-title">
+        <header className="operation-panel-heading">
+          <span className="operation-panel-eyebrow">Konaklama</span>
+          <h2 id="pension-summary-title">Bugünkü Konaklama Özeti</h2>
+          <p>Giriş, çıkış, onay ve oda uygunluğuna hızlı bakış</p>
+        </header>
+        <div className="operation-summary-grid">
+          {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
+        </div>
+      </section>
       <div className="pension-layout">
-        <section className="combined-section pension-reservations-section">
-          <div className="combined-section-heading"><span>Rezervasyonlar</span><strong>Konaklama takibi</strong></div>
-          {reservations}
+        <section className="operation-group-panel pension-reservations-section" aria-labelledby="pension-reservations-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Konaklama</span>
+            <h2 id="pension-reservations-title">Rezervasyon Takibi</h2>
+            <p>Onay bekleyen ve yaklaşan konaklamalar</p>
+          </header>
+          <div className="operation-panel-content">{reservations}</div>
         </section>
-        <aside className="combined-section pension-rooms-section">
-          <div className="combined-section-heading"><span>Odalar</span><strong>Anlık oda durumu</strong></div>
-          {rooms}
+        <aside className="operation-group-panel pension-rooms-section" aria-labelledby="pension-rooms-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Odalar</span>
+            <h2 id="pension-rooms-title">Anlık Oda Durumu</h2>
+            <p>Odaların güncel kullanım durumu</p>
+          </header>
+          <div className="operation-panel-content">{rooms}</div>
         </aside>
-        <section className="combined-section pension-tasks-section">
-          <div className="combined-section-heading"><span>Günlük işler</span><strong>Giriş, çıkış, temizlik ve bakım</strong></div>
-          {tasks}
+        <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Günlük İşler</span>
+            <h2 id="pension-tasks-title">Günlük Konaklama İşleri</h2>
+            <p>Giriş, çıkış, temizlik ve bakım görevleri</p>
+          </header>
+          <div className="operation-panel-content">{tasks}</div>
         </section>
       </div>
     </section>
