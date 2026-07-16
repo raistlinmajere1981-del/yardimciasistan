@@ -42,7 +42,12 @@ import type {
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "./app/operations";
+import { AppShell } from "./components/layout/AppShell";
+import { PageHeader } from "./components/layout/PageHeader";
+import { Sidebar } from "./components/layout/Sidebar";
+import type { StatusTone } from "./components/ui/StatusBadge";
 import { CustomerWorkPage } from "./pages/CustomerWorkPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { PensionPage } from "./pages/PensionPage";
 import { RestaurantPage } from "./pages/RestaurantPage";
@@ -510,7 +515,7 @@ function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
   const [syncState, setSyncState] = useState<SyncState>("idle");
-  const [statusMessage, setStatusMessage] = useState("Webden yeni talep alınmadı.");
+  const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
   const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
   const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
@@ -626,7 +631,7 @@ function App() {
 
     const dashboardMetrics: DashboardMetric[] = [
       {
-        title: "Yeni Talepler",
+        title: "Yeni talepler",
         value: String(summary.newRequests),
         detail: summary.newRequests > 0 ? "Dönüş bekleyen müşteri var" : "Henüz yeni talep yok",
         tone: summary.newRequests > 0 ? "info" : "neutral",
@@ -634,7 +639,7 @@ function App() {
         enabled: true
       },
       {
-        title: "Bugünkü İşler",
+        title: "Bugünkü işler",
         value: String(summary.pendingDailyTasks),
         detail: summary.pendingDailyTasks > 0 ? "Takip edilmesi gereken işler" : "Bugün için bekleyen iş yok",
         tone: summary.pendingDailyTasks > 0 ? "wait" : "neutral",
@@ -642,7 +647,7 @@ function App() {
         enabled: true
       },
       {
-        title: "Boş Odalar",
+        title: "Boş odalar",
         value: `${dashboardData.rooms.filter((room) => getRoomDisplayInfo(room, dashboardData.reservations).status === "available").length} boş`,
         detail: `${summary.totalRooms} odadan ${dashboardData.rooms.filter((room) => getRoomDisplayInfo(room, dashboardData.reservations).status === "available").length} oda uygun`,
         tone: "ok",
@@ -650,7 +655,7 @@ function App() {
         enabled: modules.rooms
       },
       {
-        title: "Boş Masalar",
+        title: "Boş masalar",
         value: `${summary.availableTables} boş`,
         detail: "Bahçe ve salon masaları uygun",
         tone: "ok",
@@ -658,7 +663,7 @@ function App() {
         enabled: modules.tables
       },
       {
-        title: "Bekleyen Rezervasyonlar",
+        title: "Rezervasyonlar",
         value: String(summary.pendingReservations),
         detail: summary.pendingReservations > 0 ? "Onay gerektiren kayıtlar" : "Bekleyen rezervasyon yok",
         tone: summary.pendingReservations > 0 ? "wait" : "neutral",
@@ -666,7 +671,7 @@ function App() {
         enabled: true
       },
       {
-        title: "Hazır WhatsApp cevapları",
+        title: "Hazır cevaplar",
         value: String(summary.preparedWhatsAppMessages),
         detail: summary.preparedWhatsAppMessages > 0 ? "Gönderilmeyi bekleyen taslak" : "Hazır cevap beklemiyor",
         tone: summary.preparedWhatsAppMessages > 0 ? "info" : "neutral",
@@ -1561,35 +1566,22 @@ function App() {
   );
 
   return (
-    <div className="desktop-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <img className="brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
-          <div>
-            <strong>Yardımcı Asistan</strong>
-            <small>İşletme Paneli</small>
-          </div>
-        </div>
-
-        <nav aria-label="Masaüstü menü">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button className={activePage === item.id ? "nav-item is-active" : "nav-item"} type="button" onClick={() => setActivePage(item.id)} key={item.id}>
-                <Icon size={18} aria-hidden="true" />
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
-
-      <main className="content" ref={contentRef}>
-        <header className="topbar">
-          <div>
-            <h1>{pageMeta.title}</h1>
-          </div>
-          {activePage === "menu" ? (
+    <AppShell
+      contentRef={contentRef}
+      sidebar={(
+        <Sidebar
+          items={navigationItems}
+          activePage={activePage}
+          businessName={setupData.businessName}
+          onNavigate={setActivePage}
+        />
+      )}
+      header={(
+        <PageHeader
+          eyebrow={pageMeta.eyebrow}
+          title={pageMeta.title}
+          description={pageMeta.description}
+          action={activePage === "menu" ? (
             <div className={`sync-pill sync-${menuPublishState}`}>
               <span>{menuStatusMessage}</span>
               <button className="secondary-sync-action" type="button" onClick={openMenuPreview}>
@@ -1630,132 +1622,35 @@ function App() {
               </button>
             </div>
           )}
-        </header>
+        />
+      )}
+      overlay={menuPreviewOpen ? (
+        <LocalMenuPreview
+          menu={dashboardData.menu}
+          setupData={setupData}
+          webModuleUrl={dashboardData.webModuleUrl}
+          onClose={() => setMenuPreviewOpen(false)}
+        />
+      ) : undefined}
+    >
 
         {activePage === "dashboard" ? (
-          <>
-        <section className="metric-grid" aria-label="Günlük durum">
-          {metrics.map((metric) => {
-            const Icon = metric.icon;
-            return (
-              <article className={`metric-card tone-${metric.tone}`} key={metric.title}>
-                <div className="metric-icon">
-                  <Icon size={22} aria-hidden="true" />
-                </div>
-                <div>
-                  <span>{metric.title}</span>
-                  <strong>{metric.value}</strong>
-                  <p>{metric.detail}</p>
-                </div>
-              </article>
-            );
-          })}
-        </section>
-
-        <section className="dashboard-grid">
-          <article className="panel requests-panel">
-            <div className="panel-heading">
-              <div>
-                <p>Yeni Gelenler</p>
-                <h2>Talepler</h2>
-              </div>
-              <span className="status-badge info">{dashboardData.requests.length} kayıt</span>
-            </div>
-
-            <div className="request-list">
-              {dashboardData.requests.length === 0 ? (
-                <div className="empty-state">
-                  <CheckCircle2 size={28} aria-hidden="true" />
-                  <strong>Henüz yeni talep yok.</strong>
-                  <p>Web sitesinden gelen talepler burada görünecek.</p>
-                </div>
-              ) : (
-                dashboardData.requests.map((request) => (
-                  <article className="compact-list-item dashboard-request-row" key={request.id}>
-                    <div className="compact-list-main">
-                      <div className="compact-list-heading">
-                        <span className={`status-badge ${getRequestStatusTone(request.status)}`}>
-                          {formatRequestStatus(request.status)}
-                        </span>
-                        <h3>{request.customer_name}</h3>
-                      </div>
-                      <div className="compact-meta-row" aria-label="Talep özeti">
-                        <span>{formatRequestType(request.request_type)}</span>
-                        <span>{request.date_text || formatDateForDisplay(request.start_date) || "Tarih yok"}</span>
-                        <span>{request.guest_count} kişi</span>
-                      </div>
-                      {request.message && <p className="line-clamp-1">{request.message}</p>}
-                    </div>
-                    <div className="compact-action-bar" aria-label={`${request.customer_name} hızlı işlemleri`}>
-                      <button type="button" onClick={() => callCustomer(request)} aria-label={`${request.customer_name} isimli müşteriyi ara`}>
-                        <Phone size={15} aria-hidden="true" />
-                        Ara
-                      </button>
-                      <button className="whatsapp-action" type="button" onClick={() => openWhatsApp(request)} aria-label={`${request.customer_name} için WhatsApp'ı aç`}>
-                        <MessageCircle size={15} aria-hidden="true" />
-                        WhatsApp
-                      </button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-          </article>
-
-          <aside className="side-column dashboard-operations">
-            <article className="panel">
-              <div className="panel-heading compact">
-                <div><p>Bugün</p><h2>Servis ve konaklama işleri</h2></div>
-                <span className="status-badge wait">{dashboardData.dailyTasks.filter((task) => task.status === "pending").length} bekliyor</span>
-              </div>
-              <div className="dashboard-compact-list">
-                {dashboardData.dailyTasks.filter((task) => task.status === "pending").slice(0, 4).map((task) => (
-                  <article key={task.id}>
-                    <div><strong>{task.title}</strong><span>{formatTaskDue(task)}</span></div>
-                    <button type="button" onClick={() => handleUpdateDailyTaskStatus(task.id, "done")}>Tamamla</button>
-                  </article>
-                ))}
-                {dashboardData.dailyTasks.filter((task) => task.status === "pending").length === 0 && <p className="quiet-message">Bugün için bekleyen iş yok.</p>}
-              </div>
-            </article>
-
-            <article className="panel">
-              <div className="panel-heading compact">
-                <div><p>Takip</p><h2>Cevap bekleyen müşteriler</h2></div>
-              </div>
-              <div className="dashboard-compact-list">
-                {dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status)).slice(0, 4).map((request) => (
-                  <article key={request.id}>
-                    <div><strong>{request.customer_name}</strong><span>{formatRequestType(request.request_type)}</span></div>
-                    <button type="button" onClick={() => openWhatsApp(request)}>Yanıtla</button>
-                  </article>
-                ))}
-                {dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status)).length === 0 && <p className="quiet-message">Cevap bekleyen müşteri yok.</p>}
-              </div>
-            </article>
-
-            <article className="panel">
-              <div className="panel-heading compact">
-                <div><p>Yaklaşan</p><h2>Giriş, çıkış ve rezervasyonlar</h2></div>
-              </div>
-              <div className="dashboard-compact-list">
-                {dashboardData.reservations.filter((reservation) => !["rejected", "cancelled", "completed"].includes(reservation.status)).slice(0, 4).map((reservation) => (
-                  <article key={reservation.id}>
-                    <div><strong>{reservation.customerName || reservation.title}</strong><span>{formatReservationDate(reservation)}</span></div>
-                    <span className={`status-badge ${reservation.status === "pending" ? "wait" : "ok"}`}>{formatReservationStatus(reservation.status)}</span>
-                  </article>
-                ))}
-              </div>
-              {setupData.aiEnabled && (
-                <button className="primary-command dashboard-ai-command" type="button" onClick={() => openAiTools("daily")}>
-                  <Sparkles size={16} aria-hidden="true" />
-                  Bugünü Değerlendir
-                </button>
-              )}
-            </article>
-          </aside>
-        </section>
-          </>
+          <DashboardPage
+            data={dashboardData}
+            metrics={metrics}
+            aiEnabled={setupData.aiEnabled}
+            onCallRequest={callCustomer}
+            onOpenWhatsApp={openWhatsApp}
+            onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
+            onOpenDailyAi={() => openAiTools("daily")}
+            formatRequestType={formatRequestType}
+            formatRequestStatus={formatRequestStatus}
+            getRequestStatusTone={getRequestStatusTone}
+            isRequestWaitingForReply={isRequestWaitingForReply}
+            formatTaskDue={formatTaskDue}
+            formatReservationDate={formatReservationDate}
+            formatReservationStatus={formatReservationStatus}
+          />
         ) : activePage === "customerWork" ? (
           <CustomerWorkPage
             requests={(
@@ -1886,19 +1781,10 @@ function App() {
             onUiPreferencesChange={setUiPreferences}
           />
         )}
-        <div className={activePage === "messages" ? "persistent-messages-page" : "persistent-messages-page is-hidden"} aria-hidden={activePage !== "messages"}>
-          {persistentMessagesPage}
-        </div>
-      </main>
-      {menuPreviewOpen && (
-        <LocalMenuPreview
-          menu={dashboardData.menu}
-          setupData={setupData}
-          webModuleUrl={dashboardData.webModuleUrl}
-          onClose={() => setMenuPreviewOpen(false)}
-        />
-      )}
-    </div>
+      <div className={activePage === "messages" ? "persistent-messages-page" : "persistent-messages-page is-hidden"} aria-hidden={activePage !== "messages"}>
+        {persistentMessagesPage}
+      </div>
+    </AppShell>
   );
 }
 
@@ -3774,9 +3660,23 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
             </select>
           </label>
           <label>
-            Tarih
-            <input lang="tr" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} />
-            <small className="date-field-hint">Gün / Ay / Yıl</small>
+            <span className="reservation-filter-label">
+              <span>Tarih</span>
+              <small className="date-field-hint" id="reservation-date-hint">Gün / Ay / Yıl</small>
+            </span>
+            <div className="localized-date-input">
+              <input
+                lang="tr"
+                type="date"
+                value={dateFilter}
+                aria-label="Tarih"
+                aria-describedby="reservation-date-hint"
+                onChange={(event) => setDateFilter(event.target.value)}
+              />
+              <span className={dateFilter ? "localized-date-display has-value" : "localized-date-display"} aria-hidden="true">
+                {dateFilter ? formatDateForDisplay(dateFilter) : "Tarih seç"}
+              </span>
+            </div>
           </label>
           <button className="secondary-command" type="button" onClick={() => { setStatusFilter("all"); setDateFilter(""); }}>
             Filtreyi Temizle
@@ -3874,10 +3774,10 @@ function RoomsWorkspace({ rooms, reservations, onUpdateStatus }: RoomsWorkspaceP
           <p className="compact-reservation-line line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
           {(room.description || room.features.length > 0) && <p className="resource-description line-clamp-1">{room.description || room.features.join(", ")}</p>}
           <div className="status-button-row compact-status-actions" aria-label={`${room.name} durumunu değiştir`}>
-            <button type="button" onClick={() => onUpdateStatus(room.id, "available")}>Boş</button>
-            <button type="button" onClick={() => onUpdateStatus(room.id, "occupied")}>Dolu</button>
-            <button type="button" onClick={() => onUpdateStatus(room.id, "cleaning")}>Temizlik</button>
-            <button type="button" onClick={() => onUpdateStatus(room.id, "maintenance")}>Bakım</button>
+            <button className={displayInfo.status === "available" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "available"} onClick={() => onUpdateStatus(room.id, "available")}>Boş</button>
+            <button className={displayInfo.status === "occupied" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "occupied"} onClick={() => onUpdateStatus(room.id, "occupied")}>Dolu</button>
+            <button className={displayInfo.status === "cleaning" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "cleaning"} onClick={() => onUpdateStatus(room.id, "cleaning")}>Temizlik</button>
+            <button className={displayInfo.status === "maintenance" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "maintenance"} onClick={() => onUpdateStatus(room.id, "maintenance")}>Bakım</button>
           </div>
         </article>
       })}
@@ -3896,8 +3796,9 @@ function TablesWorkspace({ tables, onUpdateStatus }: TablesWorkspaceProps) {
       {tables.length === 0 && (
         <div className="panel empty-state"><UtensilsCrossed size={28} aria-hidden="true" /><strong>Masa kaydı yok.</strong><p>Masa sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
       )}
-      {tables.map((table) => (
-        <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
+      {tables.map((table) => {
+        const activeStatusAction = getTableStatusAction(table.status);
+        return <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
           <div className="resource-card-heading">
             <div>
               <h2>{table.name}</h2>
@@ -3911,13 +3812,13 @@ function TablesWorkspace({ tables, onUpdateStatus }: TablesWorkspaceProps) {
           </div>
           {table.notes && <p className="resource-description line-clamp-1">{table.notes}</p>}
           <div className="status-button-row compact-status-actions" aria-label={`${table.name} durumunu değiştir`}>
-            <button type="button" onClick={() => onUpdateStatus(table.id, "available")}>Boş</button>
-            <button type="button" onClick={() => onUpdateStatus(table.id, "occupied")}>Dolu</button>
-            <button type="button" onClick={() => onUpdateStatus(table.id, "reserved")}>Rezerve</button>
-            <button type="button" onClick={() => onUpdateStatus(table.id, "bill_waiting")}>Hesap</button>
+            <button className={activeStatusAction === "available" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "available"} onClick={() => onUpdateStatus(table.id, "available")}>Boş</button>
+            <button className={activeStatusAction === "occupied" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "occupied"} onClick={() => onUpdateStatus(table.id, "occupied")}>Dolu</button>
+            <button className={activeStatusAction === "reserved" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "reserved"} onClick={() => onUpdateStatus(table.id, "reserved")}>Rezerve</button>
+            <button className={activeStatusAction === "bill_waiting" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "bill_waiting"} onClick={() => onUpdateStatus(table.id, "bill_waiting")}>Hesap</button>
           </div>
-        </article>
-      ))}
+        </article>;
+      })}
     </section>
   );
 }
@@ -4439,7 +4340,7 @@ function getRequestActionMode(status: string): RequestActionMode {
   return "open";
 }
 
-function getRequestStatusTone(status: string) {
+function getRequestStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) {
     return "danger";
   }
@@ -4577,10 +4478,20 @@ function formatTableStatus(value: string) {
     reserved: "Rezerve",
     occupied: "Dolu",
     bill_waiting: "Hesap bekliyor",
+    waiting_bill: "Hesap bekliyor",
+    checkout: "Hesap bekliyor",
+    payment: "Hesap bekliyor",
     cleaning: "Temizlik"
   };
 
   return labels[value] ?? "Boş";
+}
+
+function getTableStatusAction(value: string) {
+  if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) {
+    return "bill_waiting";
+  }
+  return ["available", "occupied", "reserved"].includes(value) ? value : "";
 }
 
 function getResourceStatusTone(value: string) {
@@ -4588,7 +4499,7 @@ function getResourceStatusTone(value: string) {
     return "ok";
   }
 
-  if (value === "reserved" || value === "bill_waiting") {
+  if (["reserved", "bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) {
     return "wait";
   }
 

@@ -9,7 +9,7 @@ export const UI_SCALE_OPTIONS = [0.8, 0.9, 1, 1.1, 1.2] as const;
 
 const UI_PREFERENCES_STORAGE_KEY = "yardimci-asistan.ui-preferences";
 const DEFAULT_UI_PREFERENCES: UiPreferences = {
-  theme: "light",
+  theme: "dark",
   scale: 1
 };
 
@@ -18,7 +18,7 @@ export function readUiPreferences(): UiPreferences {
     const stored = JSON.parse(window.localStorage.getItem(UI_PREFERENCES_STORAGE_KEY) ?? "null") as Partial<UiPreferences> | null;
 
     return {
-      theme: stored?.theme === "dark" ? "dark" : DEFAULT_UI_PREFERENCES.theme,
+      theme: isUiTheme(stored?.theme) ? stored.theme : DEFAULT_UI_PREFERENCES.theme,
       scale: isUiScale(stored?.scale) ? stored.scale : DEFAULT_UI_PREFERENCES.scale
     };
   } catch {
@@ -44,6 +44,10 @@ export function saveUiPreferences(preferences: UiPreferences) {
   } catch {
     // Görünüm tercihi uygulanmaya devam eder; depolama kapalıysa yalnız bu oturumda geçerli olur.
   }
+}
+
+function isUiTheme(value: unknown): value is UiTheme {
+  return value === "light" || value === "dark";
 }
 
 function isUiScale(value: unknown): value is number {

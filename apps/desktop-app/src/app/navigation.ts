@@ -47,14 +47,14 @@ export function buildNavigation(setup: DesktopSetupData): NavigationItem[] {
 }
 
 export function getPageMeta(page: DesktopPage) {
-  const meta: Record<DesktopPage, { title: string }> = {
-    dashboard: { title: "Bugün ne var?" },
-    customerWork: { title: "Müşteri İşleri" },
-    pension: { title: "Pansiyon" },
-    restaurant: { title: "Restoran" },
-    menu: { title: "Menü" },
-    messages: { title: "Mesajlar" },
-    settings: { title: "Ayarlar" }
+  const meta: Record<DesktopPage, { eyebrow: string; title: string; description: string }> = {
+    dashboard: { eyebrow: "Günlük özet", title: "Bugün ne var?", description: "Yeni talepler, işler ve bekleyen dönüşler." },
+    customerWork: { eyebrow: "Müşteri operasyonu", title: "Müşteri İşleri", description: "Talepleri, müşterileri ve bekleyen yanıtları yönetin." },
+    pension: { eyebrow: "Konaklama", title: "Pansiyon", description: "Rezervasyonları, odaları ve günlük işleri izleyin." },
+    restaurant: { eyebrow: "Servis", title: "Restoran", description: "Masa durumlarını ve servis işlerini takip edin." },
+    menu: { eyebrow: "İçerik", title: "Menü", description: "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın." },
+    messages: { eyebrow: "Mesaj merkezi", title: "Mesajlar", description: "Hazır yanıtları ve WhatsApp görüşmelerini yönetin." },
+    settings: { eyebrow: "Yapılandırma", title: "Ayarlar", description: "İşletme, görünüm ve bağlantı tercihlerini düzenleyin." }
   };
 
   return meta[page];

@@ -51,6 +51,7 @@ try {
   });
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByRole("button", { name: "Ayarlar" }).click();
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(page.locator(".setup-footer")).toHaveCount(0);
@@ -74,6 +75,11 @@ try {
   await page.screenshot({ path: "artifacts/screenshots/desktop-settings-dark.png", fullPage: true });
   await page.getByLabel("Arayüz ölçeği").selectOption("1");
   await page.getByLabel("Karanlık tema").uncheck();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "light", scale: 1 });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByRole("button", { name: "Ayarlar" }).click();
   await page.getByLabel("AI cevap önerileri açık").check();
   await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await expect(page.getByText("Web Bağlantısı", { exact: true })).toHaveCount(0);
@@ -115,7 +121,7 @@ try {
   await expect(page.getByText("Yedek klasörü")).toHaveCount(0);
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Menü", exact: true })).toBeVisible();
-  await expect(page.locator(".topbar > div > p")).toHaveCount(0);
+  await expect(page.locator(".page-header-copy > p")).toHaveText("Kategori ve ürünleri düzenleyip web menüsünü yayınlayın.");
   await expect(page.getByRole("heading", { name: "Kategoriler", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ürünler", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ürün Detayı", exact: true })).toBeVisible();
@@ -533,25 +539,37 @@ try {
   await expect(conversionPage.getByRole("heading", { name: "Restoran" })).toBeVisible();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toHaveCount(0);
   await expect(conversionPage.getByText("Bahçe masası kontrolü")).toBeVisible();
+  const smokeTableCard = conversionPage.getByLabel("Masa yönetimi").locator(".table-compact-card").filter({ hasText: "Smoke Bahçe Masası" });
+  await expect(smokeTableCard.getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(smokeTableCard.getByRole("button", { name: "Hesap", exact: true })).toHaveAttribute("aria-pressed", "false");
   await conversionPage.getByRole("button", { name: "Tamamla" }).first().click();
   await expect(conversionPage.getByText("Günlük iş durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Hesap" }).first().click();
   await expect(conversionPage.getByText("Masa durumu güncellendi.")).toBeVisible();
+  await expect(smokeTableCard.getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(smokeTableCard.getByRole("button", { name: "Hesap", exact: true })).toHaveAttribute("aria-pressed", "true");
   await conversionPage.getByRole("button", { name: "Pansiyon" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toBeVisible();
   const roomCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Balkonlu Oda" });
   await expect(roomCard.locator(".status-badge")).toHaveText("Rezerve");
   await expect(roomCard.locator(".compact-reservation-line")).toContainText("Smoke Misafir - 2 gece");
+  await expect(roomCard.locator(".compact-status-actions .is-active")).toHaveCount(0);
+  await expect(roomCard.getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "false");
   const roomWithoutReservationCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Aile Odası" });
-  await expect(roomWithoutReservationCard.locator(".status-badge")).toHaveText("Boş");
+  await expect(roomWithoutReservationCard.locator(".status-badge")).toHaveText("Rezerve");
   await expect(roomWithoutReservationCard.locator(".compact-reservation-line")).toContainText("Aktif rezervasyon yok");
+  await expect(roomWithoutReservationCard.locator(".compact-status-actions .is-active")).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Dolu" }).first().click();
   await expect(conversionPage.getByText("Oda durumu güncellendi.")).toBeVisible();
+  await expect(roomCard.getByRole("button", { name: "Dolu", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(roomCard.getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "false");
   const reservationWorkspace = conversionPage.getByLabel("Rezervasyon yönetimi");
   await expect(reservationWorkspace.getByLabel("Durum")).toBeVisible();
   await expect(conversionPage.locator(".reservation-filters").getByText("Gün / Ay / Yıl", { exact: true })).toBeVisible();
+  await expect(reservationWorkspace.locator(".localized-date-display")).toHaveText("Tarih seç");
   await reservationWorkspace.getByLabel("Tarih").fill("2026-07-18");
+  await expect(reservationWorkspace.locator(".localized-date-display")).toHaveText("18.07.2026");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
   await reservationWorkspace.getByLabel("Durum").selectOption("pending");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
@@ -584,11 +602,28 @@ try {
   });
   await compactPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
 
+  await expect(compactPage.locator("html")).toHaveAttribute("data-theme", "dark");
+  expect(await compactPage.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1");
+  const [sidebarWidth, pageHeaderHeight] = await Promise.all([
+    compactPage.locator(".sidebar").evaluate((sidebar) => sidebar.getBoundingClientRect().width),
+    compactPage.locator(".page-header").evaluate((header) => header.getBoundingClientRect().height)
+  ]);
+  expect(sidebarWidth).toBeGreaterThanOrEqual(198);
+  expect(sidebarWidth).toBeLessThanOrEqual(202);
+  expect(pageHeaderHeight).toBeGreaterThanOrEqual(54);
+  expect(pageHeaderHeight).toBeLessThanOrEqual(60);
+
   const dashboardRequestRows = compactPage.locator(".dashboard-request-row");
   await expect(dashboardRequestRows).toHaveCount(8);
-  const metricHeights = await compactPage.locator(".metric-card").evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
-  expect(Math.min(...metricHeights)).toBeGreaterThanOrEqual(82);
-  expect(Math.max(...metricHeights)).toBeLessThanOrEqual(96);
+  const metricBoxes = await compactPage.locator(".metric-card").evaluateAll((cards) => cards.map((card) => {
+    const box = card.getBoundingClientRect();
+    return { width: box.width, height: box.height, y: box.y };
+  }));
+  expect(metricBoxes).toHaveLength(6);
+  expect(new Set(metricBoxes.map((box) => Math.round(box.y))).size).toBe(2);
+  expect(metricBoxes.every((box) => box.width >= 300)).toBe(true);
+  expect(Math.min(...metricBoxes.map((box) => box.height))).toBeGreaterThanOrEqual(78);
+  expect(Math.max(...metricBoxes.map((box) => box.height))).toBeLessThanOrEqual(90);
   const dashboardRowHeights = await dashboardRequestRows.evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
   expect(dashboardRowHeights.every((height) => height <= 96)).toBe(true);
   await expect(dashboardRequestRows.first().locator("button")).toHaveCount(2);
@@ -598,6 +633,9 @@ try {
   const fifthDashboardRow = await dashboardRequestRows.nth(4).boundingBox();
   expect(fifthDashboardRow).not.toBeNull();
   expect(fifthDashboardRow.y + fifthDashboardRow.height).toBeLessThanOrEqual(768);
+  const lastDashboardSummaryPanel = await compactPage.locator(".dashboard-operations .panel").last().boundingBox();
+  expect(lastDashboardSummaryPanel).not.toBeNull();
+  expect(lastDashboardSummaryPanel.y + lastDashboardSummaryPanel.height).toBeLessThanOrEqual(768);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-dashboard-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
@@ -623,6 +661,10 @@ try {
   await reservationRows.first().locator("summary").click();
   const roomCardHeights = await compactPage.locator(".resource-compact-card").evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
   expect(Math.max(...roomCardHeights)).toBeLessThan(170);
+  const compactRoomCards = compactPage.getByLabel("Oda yönetimi").locator(".resource-compact-card");
+  await expect(compactRoomCards.first().locator(".compact-status-actions .is-active")).toHaveCount(0);
+  await expect(compactRoomCards.first().getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(compactRoomCards.nth(3).getByRole("button", { name: "Temizlik", exact: true })).toHaveAttribute("aria-pressed", "true");
   const firstRoomCard = await compactPage.locator(".resource-compact-card").first().boundingBox();
   expect(firstRoomCard).not.toBeNull();
   expect(firstRoomCard.y + firstRoomCard.height).toBeLessThanOrEqual(768);
@@ -633,7 +675,12 @@ try {
   const firstTaskHeight = await compactPage.locator(".task-record-row").first().evaluate((card) => card.getBoundingClientRect().height);
   expect(firstTableHeight).toBeLessThan(150);
   expect(firstTaskHeight).toBeLessThan(120);
-  await expect(compactPage.locator(".table-compact-card").first().locator(".compact-status-actions button")).toHaveCount(4);
+  const compactTableCards = compactPage.locator(".table-compact-card");
+  await expect(compactTableCards.first().locator(".compact-status-actions button")).toHaveCount(4);
+  for (const [index, label] of ["Boş", "Dolu", "Rezerve", "Hesap"].entries()) {
+    await expect(compactTableCards.nth(index).getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(compactTableCards.nth(index).locator(".compact-status-actions .is-active")).toHaveCount(1);
+  }
   await expect(compactPage.locator(".task-record-row").first().locator(".compact-action-bar button")).toHaveCount(1);
   await compactPage.locator(".task-record-row").first().locator("summary").click();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
