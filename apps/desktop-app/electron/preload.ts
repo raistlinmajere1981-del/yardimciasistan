@@ -22,6 +22,8 @@ import type {
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
+  DesktopTableOrder,
+  DesktopTableOrderResult,
   UpdateReservationStatusInput,
   UpdateDailyTaskStatusInput,
   MarkWhatsAppMessageSentInput
@@ -66,6 +68,16 @@ export interface DesktopBridge {
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => Promise<DesktopStatusUpdateResult>;
   updateRoomStatus: (input: UpdateRoomStatusInput) => Promise<DesktopStatusUpdateResult>;
   updateTableStatus: (input: UpdateTableStatusInput) => Promise<DesktopStatusUpdateResult>;
+  listTableOrders: () => Promise<DesktopTableOrder[]>;
+  getActiveTableOrder: (tableId: string) => Promise<DesktopTableOrder | null>;
+  openTableOrder: (tableId: string) => Promise<DesktopTableOrderResult>;
+  addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) => Promise<DesktopTableOrderResult>;
+  updateTableOrderItemQuantity: (itemId: string, quantity: number) => Promise<DesktopTableOrderResult>;
+  updateTableOrderItemNote: (itemId: string, note: string) => Promise<DesktopTableOrderResult>;
+  removeTableOrderItem: (itemId: string) => Promise<DesktopTableOrderResult>;
+  updateTableOrderStatus: (orderId: string, status: string) => Promise<DesktopTableOrderResult>;
+  closeTableOrder: (orderId: string, status: "paid" | "cancelled") => Promise<DesktopTableOrderResult>;
+  recalculateTableOrderTotal: (orderId: string) => Promise<DesktopTableOrderResult>;
   updateReservationStatus: (input: UpdateReservationStatusInput) => Promise<DesktopStatusUpdateResult>;
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => Promise<DesktopStatusUpdateResult>;
   createManualBackup: () => Promise<DesktopBackupResult>;
@@ -96,6 +108,19 @@ const bridge: DesktopBridge = {
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => ipcRenderer.invoke("whatsapp:markMessageSent", input),
   updateRoomStatus: (input: UpdateRoomStatusInput) => ipcRenderer.invoke("room:updateStatus", input),
   updateTableStatus: (input: UpdateTableStatusInput) => ipcRenderer.invoke("table:updateStatus", input),
+  listTableOrders: () => ipcRenderer.invoke("tableOrder:list"),
+  getActiveTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:getActive", tableId),
+  openTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:open", tableId),
+  addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) =>
+    ipcRenderer.invoke("tableOrder:addItem", { orderId, menuItemId, quantity, note }),
+  updateTableOrderItemQuantity: (itemId: string, quantity: number) =>
+    ipcRenderer.invoke("tableOrder:updateItemQuantity", { itemId, quantity }),
+  updateTableOrderItemNote: (itemId: string, note: string) =>
+    ipcRenderer.invoke("tableOrder:updateItemNote", { itemId, note }),
+  removeTableOrderItem: (itemId: string) => ipcRenderer.invoke("tableOrder:removeItem", itemId),
+  updateTableOrderStatus: (orderId: string, status: string) => ipcRenderer.invoke("tableOrder:updateStatus", { orderId, status }),
+  closeTableOrder: (orderId: string, status: "paid" | "cancelled") => ipcRenderer.invoke("tableOrder:close", { orderId, status }),
+  recalculateTableOrderTotal: (orderId: string) => ipcRenderer.invoke("tableOrder:recalculate", orderId),
   updateReservationStatus: (input: UpdateReservationStatusInput) => ipcRenderer.invoke("reservation:updateStatus", input),
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => ipcRenderer.invoke("dailyTask:updateStatus", input),
   createManualBackup: () => ipcRenderer.invoke("backup:createManual"),

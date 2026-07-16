@@ -392,6 +392,75 @@ export interface UpdateTableStatusInput {
   status: string;
 }
 
+export type TableOrderStatus = "open" | "preparing" | "served" | "payment" | "paid" | "cancelled";
+export type TableOrderItemStatus = "open" | "preparing" | "served" | "cancelled";
+
+export interface DesktopTableOrderItem {
+  id: string;
+  orderId: string;
+  menuItemId: string;
+  productName: string;
+  unitPrice: number;
+  currency: string;
+  quantity: number;
+  lineTotal: number;
+  note: string;
+  status: TableOrderItemStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DesktopTableOrder {
+  id: string;
+  tableId: string;
+  tableName: string;
+  status: TableOrderStatus;
+  openedAt: string;
+  closedAt: string;
+  subtotal: number;
+  discountTotal: number;
+  total: number;
+  note: string;
+  itemCount: number;
+  items: DesktopTableOrderItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddTableOrderItemInput {
+  orderId: string;
+  menuItemId: string;
+  quantity: number;
+  note: string;
+}
+
+export interface UpdateTableOrderItemQuantityInput {
+  itemId: string;
+  quantity: number;
+}
+
+export interface UpdateTableOrderItemNoteInput {
+  itemId: string;
+  note: string;
+}
+
+export interface UpdateTableOrderStatusInput {
+  orderId: string;
+  status: string;
+}
+
+export type DesktopTableOrderResult =
+  | {
+      ok: true;
+      message: string;
+      order: DesktopTableOrder;
+      dashboardData?: DesktopDashboardData;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
 export interface UpdateReservationStatusInput {
   reservationId: string;
   status: string;
@@ -431,6 +500,7 @@ export class DesktopDatabase {
     this.db = new DatabaseSync(this.databasePath);
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec("PRAGMA foreign_keys = ON;");
+    this.db.exec("PRAGMA busy_timeout = 5000;");
   }
 
   initialize() {
@@ -765,6 +835,504 @@ export class DesktopDatabase {
       message: "Masa durumu güncellendi.",
       dashboardData: this.getDashboardData()
     };
+  }
+
+  listTableOrders(): DesktopTableOrder[] {
+    const rows = this.db
+      .prepare(`
+        SELECT
+          table_orders.*,
+          tables.name AS table_name,
+          COALESCE(SUM(
+            CASE
+              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
+              ELSE 0
+            END
+          ), 0) AS item_count
+        FROM table_orders
+        INNER JOIN tables ON tables.id = table_orders.table_id
+        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
+        GROUP BY table_orders.id
+        ORDER BY table_orders.opened_at DESC, table_orders.created_at DESC
+      `)
+      .all() as Array<Record<string, unknown>>;
+
+    return rows.map((row) => this.mapTableOrderRow(row));
+  }
+
+  getActiveTableOrder(tableId: string): DesktopTableOrder | null {
+    const normalizedTableId = tableId.trim();
+    if (!normalizedTableId) {
+      return null;
+    }
+
+    const row = this.db
+      .prepare(`
+        SELECT
+          table_orders.*,
+          tables.name AS table_name,
+          COALESCE(SUM(
+            CASE
+              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
+              ELSE 0
+            END
+          ), 0) AS item_count
+        FROM table_orders
+        INNER JOIN tables ON tables.id = table_orders.table_id
+        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
+        WHERE table_orders.table_id = ?
+          AND table_orders.status IN ('open', 'preparing', 'served', 'payment')
+        GROUP BY table_orders.id
+        LIMIT 1
+      `)
+      .get(normalizedTableId) as Record<string, unknown> | undefined;
+
+    return row ? this.mapTableOrderRow(row) : null;
+  }
+
+  openTableOrder(tableId: string): DesktopTableOrderResult {
+    const normalizedTableId = tableId.trim();
+    if (!normalizedTableId) {
+      return { ok: false, message: "Sipariş açmak için geçerli bir masa seçin." };
+    }
+
+    const id = createTableOrderId("table_order_");
+    const now = new Date().toISOString();
+    let tableName = "Masa";
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const table = this.db
+        .prepare("SELECT id, name, status FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+        .get(normalizedTableId) as { id?: string; name?: string; status?: string } | undefined;
+      if (!table?.id) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Sipariş açılacak aktif masa bulunamadı." };
+      }
+      tableName = String(table.name ?? "Masa");
+
+      const activeOrder = this.getActiveTableOrder(normalizedTableId);
+      if (activeOrder) {
+        this.updateTableStatusForOrderInTransaction(
+          normalizedTableId,
+          activeOrder.status === "payment" ? "bill_waiting" : "occupied",
+          activeOrder.id,
+          now
+        );
+        this.db.exec("COMMIT");
+        return {
+          ok: true,
+          message: `${tableName} için açık adisyon gösteriliyor.`,
+          order: activeOrder,
+          dashboardData: this.getDashboardData()
+        };
+      }
+
+      this.db
+        .prepare(`
+          INSERT INTO table_orders (
+            id,
+            table_id,
+            status,
+            opened_at,
+            closed_at,
+            subtotal,
+            discount_total,
+            total,
+            note,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, 'open', ?, '', 0, 0, 0, '', ?, ?)
+        `)
+        .run(id, normalizedTableId, now, now, now);
+      this.updateTableStatusForOrderInTransaction(normalizedTableId, "occupied", id, now);
+      this.insertEvent({
+        type: "table_order.opened",
+        entityType: "table_order",
+        entityId: id,
+        payload: { table_id: normalizedTableId },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    const order = this.getTableOrderById(id);
+    if (!order) {
+      return { ok: false, message: "Adisyon açıldı ancak yeniden yüklenemedi." };
+    }
+
+    return {
+      ok: true,
+      message: `${tableName} için adisyon açıldı.`,
+      order,
+      dashboardData: this.getDashboardData()
+    };
+  }
+
+  addTableOrderItem(input: AddTableOrderItemInput): DesktopTableOrderResult {
+    const orderId = input.orderId.trim();
+    const menuItemId = input.menuItemId.trim();
+    const quantity = normalizeOrderQuantity(input.quantity);
+    const note = String(input.note ?? "").trim().slice(0, 500);
+    if (!orderId || !menuItemId || !quantity) {
+      return { ok: false, message: "Ürün, aktif adisyon ve geçerli adet bilgisi gerekli." };
+    }
+
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      if (!this.isActiveTableOrder(orderId)) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Ürün yalnızca aktif bir adisyona eklenebilir." };
+      }
+
+      const menuItem = this.db
+        .prepare(`
+          SELECT menu_items.id, menu_items.name, menu_items.price, menu_items.currency
+          FROM menu_items
+          INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
+          WHERE menu_items.id = ?
+            AND menu_items.is_available = 1
+            AND menu_items.deleted_at = ''
+            AND menu_categories.is_active = 1
+            AND menu_categories.deleted_at = ''
+          LIMIT 1
+        `)
+        .get(menuItemId) as { id?: string; name?: string; price?: number; currency?: string } | undefined;
+      if (!menuItem?.id) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Yalnızca aktif ve mevcut menü ürünleri siparişe eklenebilir." };
+      }
+
+      const productName = String(menuItem.name ?? "Ürün").trim() || "Ürün";
+      const unitPrice = roundMoney(Number(menuItem.price ?? 0));
+      const currency = normalizeTableOrderCurrency(menuItem.currency);
+      const orderCurrency = this.db
+        .prepare(`
+          SELECT currency
+          FROM table_order_items
+          WHERE order_id = ?
+            AND status != 'cancelled'
+          ORDER BY created_at ASC
+          LIMIT 1
+        `)
+        .get(orderId) as { currency?: string } | undefined;
+      if (orderCurrency?.currency && normalizeTableOrderCurrency(orderCurrency.currency) !== currency) {
+        this.db.exec("ROLLBACK");
+        return {
+          ok: false,
+          message: `Bu adisyon ${normalizeTableOrderCurrency(orderCurrency.currency)} para birimiyle açık; ${currency} ürün eklenemez.`
+        };
+      }
+
+      const existingItem = this.db
+        .prepare(`
+          SELECT id, quantity
+          FROM table_order_items
+          WHERE order_id = ?
+            AND menu_item_id = ?
+            AND product_name = ?
+            AND unit_price = ?
+            AND currency = ?
+            AND note = ?
+            AND status = 'open'
+          ORDER BY created_at DESC
+          LIMIT 1
+        `)
+        .get(orderId, menuItemId, productName, unitPrice, currency, note) as { id?: string; quantity?: number } | undefined;
+
+      let itemId: string;
+      if (existingItem?.id) {
+        itemId = existingItem.id;
+        const nextQuantity = Number(existingItem.quantity ?? 0) + quantity;
+        if (nextQuantity > 999) {
+          this.db.exec("ROLLBACK");
+          return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
+        }
+        this.db
+          .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
+          .run(nextQuantity, roundMoney(unitPrice * nextQuantity), now, itemId);
+      } else {
+        itemId = createTableOrderId("table_order_item_");
+        this.db
+          .prepare(`
+            INSERT INTO table_order_items (
+              id,
+              order_id,
+              menu_item_id,
+              product_name,
+              unit_price,
+              currency,
+              quantity,
+              line_total,
+              note,
+              status,
+              created_at,
+              updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
+          `)
+          .run(
+            itemId,
+            orderId,
+            menuItemId,
+            productName,
+            unitPrice,
+            currency,
+            quantity,
+            roundMoney(unitPrice * quantity),
+            note,
+            now,
+            now
+          );
+      }
+      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      this.insertEvent({
+        type: "table_order.item_added",
+        entityType: "table_order",
+        entityId: orderId,
+        payload: { item_id: itemId, menu_item_id: menuItemId, product_name: productName, quantity, unit_price: unitPrice, currency },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return this.getTableOrderMutationResult(orderId, "Ürün adisyona eklendi.");
+  }
+
+  updateTableOrderItemQuantity(input: UpdateTableOrderItemQuantityInput): DesktopTableOrderResult {
+    const itemId = input.itemId.trim();
+    const quantity = normalizeOrderQuantity(input.quantity);
+    if (!itemId || !quantity) {
+      return { ok: false, message: "Sipariş satırı için 1 ile 999 arasında bir adet girin." };
+    }
+
+    const now = new Date().toISOString();
+    let orderId = "";
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const item = this.getMutableTableOrderItem(itemId);
+      if (!item) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
+      }
+      orderId = String(item.order_id);
+      const lineTotal = roundMoney(Number(item.unit_price ?? 0) * quantity);
+      this.db
+        .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
+        .run(quantity, lineTotal, now, itemId);
+      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      this.insertEvent({
+        type: "table_order.item_quantity_changed",
+        entityType: "table_order",
+        entityId: orderId,
+        payload: { item_id: itemId, quantity },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return this.getTableOrderMutationResult(orderId, "Ürün adedi güncellendi.");
+  }
+
+  updateTableOrderItemNote(input: UpdateTableOrderItemNoteInput): DesktopTableOrderResult {
+    const itemId = input.itemId.trim();
+    const note = String(input.note ?? "").trim().slice(0, 500);
+    const now = new Date().toISOString();
+    let orderId = "";
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const item = this.getMutableTableOrderItem(itemId);
+      if (!item) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Not eklenecek aktif sipariş satırı bulunamadı." };
+      }
+      orderId = String(item.order_id);
+      this.db.prepare("UPDATE table_order_items SET note = ?, updated_at = ? WHERE id = ?").run(note, now, itemId);
+      this.db.prepare("UPDATE table_orders SET updated_at = ? WHERE id = ?").run(now, orderId);
+      this.insertEvent({
+        type: "table_order.item_note_changed",
+        entityType: "table_order",
+        entityId: orderId,
+        payload: { item_id: itemId, has_note: Boolean(note) },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return this.getTableOrderMutationResult(orderId, "Ürün notu kaydedildi.");
+  }
+
+  removeTableOrderItem(itemId: string): DesktopTableOrderResult {
+    const normalizedItemId = itemId.trim();
+    const now = new Date().toISOString();
+    let orderId = "";
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const item = this.getMutableTableOrderItem(normalizedItemId);
+      if (!item) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
+      }
+      orderId = String(item.order_id);
+      this.db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(now, normalizedItemId);
+      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      this.insertEvent({
+        type: "table_order.item_removed",
+        entityType: "table_order",
+        entityId: orderId,
+        payload: { item_id: normalizedItemId },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return this.getTableOrderMutationResult(orderId, "Ürün adisyondan kaldırıldı.");
+  }
+
+  updateTableOrderStatus(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
+    const orderId = input.orderId.trim();
+    const status = normalizeStatus(input.status, TABLE_ORDER_STATUSES) as TableOrderStatus;
+    if (!orderId || !status) {
+      return { ok: false, message: "Adisyon için geçerli bir durum seçin." };
+    }
+
+    if (status === "paid" || status === "cancelled") {
+      return this.closeTableOrder({ orderId, status });
+    }
+
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = this.db
+        .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+        .get(orderId) as { status?: string; table_id?: string } | undefined;
+      if (!current) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Durumu güncellenecek aktif adisyon bulunamadı." };
+      }
+
+      const updateResult = this.db
+        .prepare("UPDATE table_orders SET status = ?, updated_at = ? WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+        .run(status, now, orderId);
+      if (Number(updateResult.changes) !== 1) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Adisyon başka bir işlem tarafından güncellendi; yeniden yükleyin." };
+      }
+      if (status === "preparing") {
+        this.db
+          .prepare("UPDATE table_order_items SET status = 'preparing', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
+          .run(now, orderId);
+      } else if (status === "served") {
+        this.db
+          .prepare("UPDATE table_order_items SET status = 'served', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
+          .run(now, orderId);
+      }
+      this.updateTableStatusForOrderInTransaction(
+        String(current.table_id ?? ""),
+        status === "payment" ? "bill_waiting" : "occupied",
+        orderId,
+        now
+      );
+      this.insertEvent({
+        type: "table_order.status_changed",
+        entityType: "table_order",
+        entityId: orderId,
+        payload: { old_status: String(current.status ?? ""), new_status: status },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return this.getTableOrderMutationResult(orderId, "Adisyon durumu güncellendi.", true);
+  }
+
+  closeTableOrder(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
+    const orderId = input.orderId.trim();
+    const status = normalizeStatus(input.status, ["paid", "cancelled"]) as "paid" | "cancelled";
+    if (!orderId || !status) {
+      return { ok: false, message: "Adisyon yalnızca ödendi veya iptal durumuyla kapatılabilir." };
+    }
+
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const current = this.db
+        .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+        .get(orderId) as { status?: string; table_id?: string } | undefined;
+      if (!current) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
+      }
+      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      const updateResult = this.db
+        .prepare(`
+          UPDATE table_orders
+          SET status = ?, closed_at = ?, updated_at = ?
+          WHERE id = ?
+            AND status IN ('open', 'preparing', 'served', 'payment')
+        `)
+        .run(status, now, now, orderId);
+      if (Number(updateResult.changes) !== 1) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Adisyon başka bir işlem tarafından kapatıldı; yeniden yükleyin." };
+      }
+      this.updateTableStatusForOrderInTransaction(String(current.table_id ?? ""), "available", orderId, now);
+      this.insertEvent({
+        type: status === "paid" ? "table_order.paid" : "table_order.cancelled",
+        entityType: "table_order",
+        entityId: orderId,
+        payload: { old_status: String(current.status ?? ""), status },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return this.getTableOrderMutationResult(
+      orderId,
+      status === "paid" ? "Adisyon ödendi olarak kapatıldı." : "Adisyon iptal edildi.",
+      true
+    );
+  }
+
+  recalculateTableOrderTotal(orderId: string): DesktopTableOrderResult {
+    const normalizedOrderId = orderId.trim();
+    if (!normalizedOrderId) {
+      return { ok: false, message: "Toplamı hesaplanacak adisyon bulunamadı." };
+    }
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const exists = this.db.prepare("SELECT id FROM table_orders WHERE id = ?").get(normalizedOrderId);
+      if (!exists) {
+        this.db.exec("ROLLBACK");
+        return { ok: false, message: "Toplamı hesaplanacak adisyon bulunamadı." };
+      }
+      this.recalculateTableOrderTotalInTransaction(normalizedOrderId, new Date().toISOString());
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return this.getTableOrderMutationResult(normalizedOrderId, "Adisyon toplamı güncellendi.");
   }
 
   updateReservationStatus(input: UpdateReservationStatusInput): DesktopStatusUpdateResult {
@@ -2644,6 +3212,183 @@ export class DesktopDatabase {
     return customerId;
   }
 
+  private getTableOrderById(orderId: string): DesktopTableOrder | null {
+    const row = this.db
+      .prepare(`
+        SELECT
+          table_orders.*,
+          tables.name AS table_name,
+          COALESCE(SUM(
+            CASE
+              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
+              ELSE 0
+            END
+          ), 0) AS item_count
+        FROM table_orders
+        INNER JOIN tables ON tables.id = table_orders.table_id
+        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
+        WHERE table_orders.id = ?
+        GROUP BY table_orders.id
+        LIMIT 1
+      `)
+      .get(orderId) as Record<string, unknown> | undefined;
+
+    return row ? this.mapTableOrderRow(row) : null;
+  }
+
+  private mapTableOrderRow(row: Record<string, unknown>): DesktopTableOrder {
+    const id = String(row.id ?? "");
+    return {
+      id,
+      tableId: String(row.table_id ?? ""),
+      tableName: String(row.table_name ?? "Masa"),
+      status: String(row.status ?? "open") as TableOrderStatus,
+      openedAt: String(row.opened_at ?? ""),
+      closedAt: String(row.closed_at ?? ""),
+      subtotal: roundMoney(Number(row.subtotal ?? 0)),
+      discountTotal: roundMoney(Number(row.discount_total ?? 0)),
+      total: roundMoney(Number(row.total ?? 0)),
+      note: String(row.note ?? ""),
+      itemCount: Number(row.item_count ?? 0),
+      items: this.getTableOrderItems(id),
+      createdAt: String(row.created_at ?? ""),
+      updatedAt: String(row.updated_at ?? "")
+    };
+  }
+
+  private getTableOrderItems(orderId: string): DesktopTableOrderItem[] {
+    const rows = this.db
+      .prepare(`
+        SELECT *
+        FROM table_order_items
+        WHERE order_id = ?
+          AND status != 'cancelled'
+        ORDER BY created_at ASC, id ASC
+      `)
+      .all(orderId) as Array<Record<string, unknown>>;
+
+    return rows.map((row) => ({
+      id: String(row.id ?? ""),
+      orderId: String(row.order_id ?? ""),
+      menuItemId: String(row.menu_item_id ?? ""),
+      productName: String(row.product_name ?? "Ürün"),
+      unitPrice: roundMoney(Number(row.unit_price ?? 0)),
+      currency: normalizeTableOrderCurrency(row.currency),
+      quantity: Number(row.quantity ?? 0),
+      lineTotal: roundMoney(Number(row.line_total ?? 0)),
+      note: String(row.note ?? ""),
+      status: String(row.status ?? "open") as TableOrderItemStatus,
+      createdAt: String(row.created_at ?? ""),
+      updatedAt: String(row.updated_at ?? "")
+    }));
+  }
+
+  private getMutableTableOrderItem(itemId: string): Record<string, unknown> | null {
+    if (!itemId) {
+      return null;
+    }
+
+    const row = this.db
+      .prepare(`
+        SELECT table_order_items.order_id, table_order_items.unit_price
+        FROM table_order_items
+        INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
+        WHERE table_order_items.id = ?
+          AND table_order_items.status != 'cancelled'
+          AND table_orders.status IN ('open', 'preparing', 'served', 'payment')
+        LIMIT 1
+      `)
+      .get(itemId) as Record<string, unknown> | undefined;
+
+    return row ?? null;
+  }
+
+  private isActiveTableOrder(orderId: string): boolean {
+    return Boolean(
+      this.db
+        .prepare("SELECT id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+        .get(orderId)
+    );
+  }
+
+  private updateTableStatusForOrderInTransaction(
+    tableId: string,
+    status: "available" | "occupied" | "bill_waiting",
+    orderId: string,
+    now: string
+  ) {
+    if (!tableId) {
+      return;
+    }
+
+    const table = this.db
+      .prepare("SELECT status FROM tables WHERE id = ? AND deleted_at = ''")
+      .get(tableId) as { status?: string } | undefined;
+    if (!table || table.status === status) {
+      return;
+    }
+
+    const updateResult = this.db
+      .prepare("UPDATE tables SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+      .run(status, now, tableId);
+    if (Number(updateResult.changes) !== 1) {
+      throw new Error("Table status could not be synchronized with the active order.");
+    }
+    this.insertEvent({
+      type: "table.status_changed",
+      entityType: "table",
+      entityId: tableId,
+      payload: {
+        old_status: String(table.status ?? ""),
+        new_status: status,
+        source: "table_order",
+        order_id: orderId
+      },
+      now
+    });
+  }
+
+  private recalculateTableOrderTotalInTransaction(orderId: string, now: string) {
+    const row = this.db
+      .prepare(`
+        SELECT
+          COALESCE(SUM(
+            CASE
+              WHEN table_order_items.status != 'cancelled' THEN table_order_items.line_total
+              ELSE 0
+            END
+          ), 0) AS subtotal,
+          table_orders.discount_total AS discount_total
+        FROM table_orders
+        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
+        WHERE table_orders.id = ?
+        GROUP BY table_orders.id
+      `)
+      .get(orderId) as { subtotal?: number; discount_total?: number } | undefined;
+    if (!row) {
+      throw new Error("Table order not found while recalculating totals.");
+    }
+
+    const subtotal = roundMoney(Number(row.subtotal ?? 0));
+    const discountTotal = roundMoney(Number(row.discount_total ?? 0));
+    const total = roundMoney(Math.max(0, subtotal - discountTotal));
+    this.db
+      .prepare("UPDATE table_orders SET subtotal = ?, total = ?, updated_at = ? WHERE id = ?")
+      .run(subtotal, total, now, orderId);
+  }
+
+  private getTableOrderMutationResult(orderId: string, message: string, includeDashboardData = false): DesktopTableOrderResult {
+    const order = this.getTableOrderById(orderId);
+    return order
+      ? {
+          ok: true,
+          message,
+          order,
+          ...(includeDashboardData ? { dashboardData: this.getDashboardData() } : {})
+        }
+      : { ok: false, message: "Adisyon güncellendi ancak yeniden yüklenemedi." };
+  }
+
   private insertEvent(input: {
     type: string;
     entityType: string;
@@ -2690,6 +3435,7 @@ const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(["openai", "openrouter",
 const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
 const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_AI_TIMEOUT_SECONDS = 30;
+const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
 
 function normalizeAiService(value: unknown): DesktopAiService | null {
   const service = String(value ?? "").trim().toLowerCase();
@@ -2788,9 +3534,33 @@ function normalizePrice(value: number) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
+function normalizeOrderQuantity(value: number): number | null {
+  const quantity = Number(value);
+  return Number.isInteger(quantity) && quantity >= 1 && quantity <= 999 ? quantity : null;
+}
+
+function createTableOrderId(prefix: "table_order_" | "table_order_item_"): string {
+  const timestamp = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, "") || "000000";
+  return `${prefix}${timestamp}_${randomPart}`;
+}
+
+function roundMoney(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 function normalizeCurrency(value: string) {
   const currency = value.trim().toUpperCase();
   return currency || "TRY";
+}
+
+function normalizeTableOrderCurrency(value: unknown): string {
+  const currency = String(value ?? "TRY").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
 }
 
 function parseAiWorkspacePayload(value: unknown): Record<string, unknown> {

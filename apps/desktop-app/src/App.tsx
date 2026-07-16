@@ -69,6 +69,24 @@ import {
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "yardimci-asistan.sidebar-collapsed";
+
+function readSidebarCollapsedPreference() {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function saveSidebarCollapsedPreference(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(collapsed));
+  } catch {
+    // Depolama kapalıysa menü tercihi yalnız bu oturumda geçerli kalır.
+  }
+}
+
 interface CategoryFormState {
   id: string;
   name: string;
@@ -512,6 +530,7 @@ const aiServicePresets = [
 function App() {
   const contentRef = useRef<HTMLElement>(null);
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
   const [syncState, setSyncState] = useState<SyncState>("idle");
@@ -571,6 +590,10 @@ function App() {
     applyUiPreferences(uiPreferences);
     saveUiPreferences(uiPreferences);
   }, [uiPreferences]);
+
+  useEffect(() => {
+    saveSidebarCollapsedPreference(sidebarCollapsed);
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     void window.yardimciDesktop?.getBootstrapData().then((data) => {
@@ -1572,12 +1595,15 @@ function App() {
   return (
     <AppShell
       contentRef={contentRef}
+      sidebarCollapsed={sidebarCollapsed}
       sidebar={(
         <Sidebar
           items={navigationItems}
           activePage={activePage}
           businessName={setupData.businessName}
+          collapsed={sidebarCollapsed}
           onNavigate={setActivePage}
+          onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
         />
       )}
       header={(
@@ -1727,7 +1753,8 @@ function App() {
         ) : activePage === "restaurant" ? (
           <RestaurantPage
             data={dashboardData}
-            tables={<TablesWorkspace tables={dashboardData.tables} onUpdateStatus={handleUpdateTableStatus} />}
+            onDashboardDataChanged={setDashboardData}
+            onUpdateTableStatus={handleUpdateTableStatus}
             tasks={(
               <DailyTasksWorkspace
                 tasks={dashboardData.dailyTasks.filter((task) => isRestaurantTask(task, dashboardData.reservations))}
@@ -3810,8 +3837,8 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
           <StatusBadge tone="wait">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
         </div>
         <div className="reservation-filters">
-          <label>
-            Durum
+          <label className="reservation-status-filter">
+            <span className="reservation-control-label">Durum</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="all">Tümü</option>
               <option value="pending">Onay bekleyen</option>
@@ -3821,7 +3848,7 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
               <option value="completed">Tamamlandı</option>
             </select>
           </label>
-          <label>
+          <label className="reservation-date-filter">
             <span className="reservation-filter-label">
               <span>Tarih</span>
               <small className="date-field-hint" id="reservation-date-hint">Gün / Ay / Yıl</small>
@@ -3840,7 +3867,13 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
               </span>
             </div>
           </label>
-          <ActionButton variant="secondary" size="sm" type="button" onClick={() => { setStatusFilter("all"); setDateFilter(""); }}>
+          <ActionButton
+            variant="ghost"
+            size="sm"
+            type="button"
+            disabled={statusFilter === "all" && !dateFilter}
+            onClick={() => { setStatusFilter("all"); setDateFilter(""); }}
+          >
             Filtreyi Temizle
           </ActionButton>
         </div>
@@ -3939,44 +3972,6 @@ function RoomsWorkspace({ rooms, reservations, onUpdateStatus }: RoomsWorkspaceP
             <button className={displayInfo.status === "maintenance" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "maintenance"} onClick={() => onUpdateStatus(room.id, "maintenance")}>Bakım</button>
           </div>
         </article>
-      })}
-    </section>
-  );
-}
-
-interface TablesWorkspaceProps {
-  tables: DesktopDashboardData["tables"];
-  onUpdateStatus: (tableId: string, status: string) => void;
-}
-
-function TablesWorkspace({ tables, onUpdateStatus }: TablesWorkspaceProps) {
-  return (
-    <section className="operations-grid compact-resource-grid" aria-label="Masa yönetimi">
-      {tables.length === 0 && (
-        <div className="panel empty-state"><UtensilsCrossed size={28} aria-hidden="true" /><strong>Masa kaydı yok.</strong><p>Masa sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
-      )}
-      {tables.map((table) => {
-        const activeStatusAction = getTableStatusAction(table.status);
-        return <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
-          <div className="resource-card-heading">
-            <div>
-              <h2>{table.name}</h2>
-            </div>
-            <StatusBadge tone={getResourceStatusTone(table.status)}>{formatTableStatus(table.status)}</StatusBadge>
-          </div>
-          <div className="compact-meta-row">
-            <span>{table.area || "Genel"}</span>
-            <span>{table.capacity} kişi</span>
-            <span>{table.activeReservationTitle || "Rezervasyon yok"}</span>
-          </div>
-          {table.notes && <p className="resource-description line-clamp-1">{table.notes}</p>}
-          <div className="status-button-row compact-status-actions" aria-label={`${table.name} durumunu değiştir`}>
-            <button className={activeStatusAction === "available" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "available"} onClick={() => onUpdateStatus(table.id, "available")}>Boş</button>
-            <button className={activeStatusAction === "occupied" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "occupied"} onClick={() => onUpdateStatus(table.id, "occupied")}>Dolu</button>
-            <button className={activeStatusAction === "reserved" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "reserved"} onClick={() => onUpdateStatus(table.id, "reserved")}>Rezerve</button>
-            <button className={activeStatusAction === "bill_waiting" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "bill_waiting"} onClick={() => onUpdateStatus(table.id, "bill_waiting")}>Hesap</button>
-          </div>
-        </article>;
       })}
     </section>
   );

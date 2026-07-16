@@ -400,6 +400,7 @@ try {
     sort_order: 10
   });
   assert.equal(itemResult.ok, true);
+  assertTableOrderFlow(database, { appPath, dataDir, categoryId: categoryResult.savedId, menuItemId: itemResult.savedId });
 
   const dashboardData = database.getDashboardData();
   assert.ok(dashboardData.menu.categories.some((category) => category.id === categoryResult.savedId));
@@ -453,6 +454,161 @@ function assertReadableSqliteBackup(backupFilePath) {
   } finally {
     backupDb.close();
   }
+}
+
+function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItemId }) {
+  const reservedTable = database.updateTableStatus({ tableId: "table_002", status: "reserved" });
+  assert.equal(reservedTable.ok, true);
+  assert.equal(reservedTable.dashboardData.tables.find((table) => table.id === "table_002")?.status, "reserved");
+
+  const opened = database.openTableOrder("table_002");
+  assert.equal(opened.ok, true);
+  assert.equal(opened.order.status, "open");
+  assert.equal(opened.dashboardData.tables.find((table) => table.id === "table_002")?.status, "occupied");
+  assert.equal(database.openTableOrder("table_002").order.id, opened.order.id);
+
+  const added = database.addTableOrderItem({
+    orderId: opened.order.id,
+    menuItemId,
+    quantity: 1,
+    note: "İlk snapshot"
+  });
+  assert.equal(added.ok, true);
+  assert.equal(added.order.items[0].productName, "Smoke Ürün");
+  assert.equal(added.order.items[0].unitPrice, 42);
+  assert.equal(added.order.items[0].currency, "TRY");
+  const firstItemId = added.order.items[0].id;
+
+  const renamedMenuItem = database.saveMenuItem({
+    id: menuItemId,
+    category_id: categoryId,
+    name: "Yeni Smoke Ürün",
+    description: "Ad değişikliği snapshot testi.",
+    price: 42,
+    currency: "TRY",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["smoke"],
+    sort_order: 10
+  });
+  assert.equal(renamedMenuItem.ok, true);
+  const addedAfterRename = database.addTableOrderItem({
+    orderId: opened.order.id,
+    menuItemId,
+    quantity: 1,
+    note: ""
+  });
+  assert.equal(addedAfterRename.ok, true);
+  assert.deepEqual(addedAfterRename.order.items.map((item) => item.productName), ["Smoke Ürün", "Yeni Smoke Ürün"]);
+  assert.equal(addedAfterRename.order.total, 84);
+
+  const repricedMenuItem = database.saveMenuItem({
+    id: menuItemId,
+    category_id: categoryId,
+    name: "Yeni Smoke Ürün",
+    description: "Fiyat değişikliği snapshot testi.",
+    price: 57,
+    currency: "TRY",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["smoke"],
+    sort_order: 10
+  });
+  assert.equal(repricedMenuItem.ok, true);
+  const orderAfterMenuReprice = database.getActiveTableOrder("table_002");
+  assert.ok(orderAfterMenuReprice);
+  assert.deepEqual(orderAfterMenuReprice.items.map((item) => item.unitPrice), [42, 42]);
+  assert.equal(orderAfterMenuReprice.total, 84);
+  assert.equal(database.saveMenuItem({
+    id: menuItemId,
+    category_id: categoryId,
+    name: "Yeni Smoke Ürün",
+    description: "Ad değişikliği snapshot testi.",
+    price: 42,
+    currency: "TRY",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["smoke"],
+    sort_order: 10
+  }).ok, true);
+
+  const foreignCurrencyItem = database.saveMenuItem({
+    category_id: categoryId,
+    name: "Dövizli Smoke Ürün",
+    description: "Karma para birimi koruması.",
+    price: 10,
+    currency: "USD",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["smoke"],
+    sort_order: 20
+  });
+  assert.equal(foreignCurrencyItem.ok, true);
+  const mixedCurrencyResult = database.addTableOrderItem({
+    orderId: opened.order.id,
+    menuItemId: foreignCurrencyItem.savedId,
+    quantity: 1,
+    note: ""
+  });
+  assert.equal(mixedCurrencyResult.ok, false);
+  assert.match(mixedCurrencyResult.message, /TRY.*USD/);
+
+  const increased = database.updateTableOrderItemQuantity({ itemId: firstItemId, quantity: 2 });
+  assert.equal(increased.ok, true);
+  assert.equal(increased.order.itemCount, 3);
+  assert.equal(increased.order.total, 126);
+  const rejectedZeroQuantity = database.updateTableOrderItemQuantity({ itemId: firstItemId, quantity: 0 });
+  assert.equal(rejectedZeroQuantity.ok, false);
+  assert.equal(database.getActiveTableOrder("table_002").items.find((item) => item.id === firstItemId)?.quantity, 2);
+  const noted = database.updateTableOrderItemNote({ itemId: firstItemId, note: "Kalıcı ürün notu" });
+  assert.equal(noted.ok, true);
+  assert.equal(noted.order.items.find((item) => item.id === firstItemId)?.note, "Kalıcı ürün notu");
+  const secondItemId = noted.order.items.find((item) => item.id !== firstItemId)?.id;
+  assert.ok(secondItemId);
+  const removed = database.removeTableOrderItem(secondItemId);
+  assert.equal(removed.ok, true);
+  assert.equal(removed.order.total, 84);
+  const preparing = database.updateTableOrderStatus({ orderId: opened.order.id, status: "preparing" });
+  assert.equal(preparing.ok, true);
+  assert.equal(preparing.dashboardData.tables.find((table) => table.id === "table_002")?.status, "occupied");
+  const payment = database.updateTableOrderStatus({ orderId: opened.order.id, status: "payment" });
+  assert.equal(payment.ok, true);
+  assert.equal(payment.dashboardData.tables.find((table) => table.id === "table_002")?.status, "bill_waiting");
+
+  const secondConnection = new DesktopDatabase({ appPath, userDataPath: dataDir });
+  try {
+    secondConnection.initialize();
+    const paid = secondConnection.closeTableOrder({ orderId: opened.order.id, status: "paid" });
+    assert.equal(paid.ok, true);
+    assert.equal(paid.dashboardData.tables.find((table) => table.id === "table_002")?.status, "available");
+  } finally {
+    secondConnection.close();
+  }
+  const rejectedClosedMutation = database.addTableOrderItem({
+    orderId: opened.order.id,
+    menuItemId,
+    quantity: 1,
+    note: ""
+  });
+  assert.equal(rejectedClosedMutation.ok, false);
+  assert.equal(database.getActiveTableOrder("table_002"), null);
+
+  const reopened = database.openTableOrder("table_002");
+  assert.equal(reopened.ok, true);
+  assert.notEqual(reopened.order.id, opened.order.id);
+  assert.equal(reopened.dashboardData.tables.find((table) => table.id === "table_002")?.status, "occupied");
+  const cancelled = database.closeTableOrder({ orderId: reopened.order.id, status: "cancelled" });
+  assert.equal(cancelled.ok, true);
+  assert.equal(cancelled.dashboardData.tables.find((table) => table.id === "table_002")?.status, "available");
+  assert.equal(database.getActiveTableOrder("table_002"), null);
 }
 
 function assertLegacyAiMigration(desktopAppPath, legacyDataDir) {

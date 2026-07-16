@@ -34,6 +34,12 @@ import {
   type UpdateRequestStatusInput,
   type UpdateRoomStatusInput,
   type UpdateTableStatusInput,
+  type DesktopTableOrder,
+  type DesktopTableOrderResult,
+  type AddTableOrderItemInput,
+  type UpdateTableOrderItemQuantityInput,
+  type UpdateTableOrderItemNoteInput,
+  type UpdateTableOrderStatusInput,
   type UpdateReservationStatusInput,
   type UpdateDailyTaskStatusInput,
   type MarkWhatsAppMessageSentInput
@@ -43,6 +49,10 @@ const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
 const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 let desktopDatabase: DesktopDatabase | null = null;
+
+if (process.env.YA_DESKTOP_DATA_DIR) {
+  app.setPath("userData", path.resolve(process.env.YA_DESKTOP_DATA_DIR));
+}
 
 // Some Wayland compositors advertise color-management-v1 without every sRGB
 // capability Chromium expects, which otherwise produces repeated startup errors.
@@ -132,23 +142,41 @@ function getAppIconPath() {
   return path.join(app.getAppPath(), "assets", iconFile);
 }
 
-app.whenReady().then(() => {
-  session.fromPartition(WHATSAPP_WEB_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 
-  desktopDatabase = new DesktopDatabase({
-    appPath: app.getAppPath(),
-    userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData")
-  });
-  desktopDatabase.initialize();
-  registerIpcHandlers();
-  createMainWindow();
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const window = BrowserWindow.getAllWindows()[0];
+    if (!window) {
+      return;
     }
+    if (window.isMinimized()) {
+      window.restore();
+    }
+    window.show();
+    window.focus();
   });
-});
+
+  void app.whenReady().then(() => {
+    session.fromPartition(WHATSAPP_WEB_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
+
+    desktopDatabase = new DesktopDatabase({
+      appPath: app.getAppPath(),
+      userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData")
+    });
+    desktopDatabase.initialize();
+    registerIpcHandlers();
+    createMainWindow();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createMainWindow();
+      }
+    });
+  });
+}
 
 function createChromeUserAgent() {
   const chromeMajorVersion = process.versions.chrome.split(".")[0] || "144";
@@ -511,6 +539,67 @@ function registerIpcHandlers() {
     return getDatabase().updateTableStatus(input);
   });
 
+  ipcMain.handle("tableOrder:list", (): DesktopTableOrder[] => {
+    return getDatabase().listTableOrders();
+  });
+
+  ipcMain.handle("tableOrder:getActive", (_event, tableId: unknown): DesktopTableOrder | null => {
+    return typeof tableId === "string" ? getDatabase().getActiveTableOrder(tableId) : null;
+  });
+
+  ipcMain.handle("tableOrder:open", (_event, tableId: unknown): DesktopTableOrderResult => {
+    return typeof tableId === "string"
+      ? getDatabase().openTableOrder(tableId)
+      : invalidTableOrderPayload("Sipariş açmak için geçerli bir masa seçin.");
+  });
+
+  ipcMain.handle("tableOrder:addItem", (_event, input: unknown): DesktopTableOrderResult => {
+    const parsedInput = parseAddTableOrderItemInput(input);
+    return parsedInput
+      ? getDatabase().addTableOrderItem(parsedInput)
+      : invalidTableOrderPayload("Ürün ekleme bilgileri geçersiz.");
+  });
+
+  ipcMain.handle("tableOrder:updateItemQuantity", (_event, input: unknown): DesktopTableOrderResult => {
+    const parsedInput = parseUpdateTableOrderItemQuantityInput(input);
+    return parsedInput
+      ? getDatabase().updateTableOrderItemQuantity(parsedInput)
+      : invalidTableOrderPayload("Ürün adedi bilgisi geçersiz.");
+  });
+
+  ipcMain.handle("tableOrder:updateItemNote", (_event, input: unknown): DesktopTableOrderResult => {
+    const parsedInput = parseUpdateTableOrderItemNoteInput(input);
+    return parsedInput
+      ? getDatabase().updateTableOrderItemNote(parsedInput)
+      : invalidTableOrderPayload("Ürün notu bilgisi geçersiz.");
+  });
+
+  ipcMain.handle("tableOrder:removeItem", (_event, itemId: unknown): DesktopTableOrderResult => {
+    return typeof itemId === "string"
+      ? getDatabase().removeTableOrderItem(itemId)
+      : invalidTableOrderPayload("Silinecek sipariş satırı geçersiz.");
+  });
+
+  ipcMain.handle("tableOrder:updateStatus", (_event, input: unknown): DesktopTableOrderResult => {
+    const parsedInput = parseUpdateTableOrderStatusInput(input);
+    return parsedInput
+      ? getDatabase().updateTableOrderStatus(parsedInput)
+      : invalidTableOrderPayload("Adisyon durumu bilgisi geçersiz.");
+  });
+
+  ipcMain.handle("tableOrder:close", (_event, input: unknown): DesktopTableOrderResult => {
+    const parsedInput = parseUpdateTableOrderStatusInput(input);
+    return parsedInput
+      ? getDatabase().closeTableOrder(parsedInput)
+      : invalidTableOrderPayload("Adisyon kapatma bilgisi geçersiz.");
+  });
+
+  ipcMain.handle("tableOrder:recalculate", (_event, orderId: unknown): DesktopTableOrderResult => {
+    return typeof orderId === "string"
+      ? getDatabase().recalculateTableOrderTotal(orderId)
+      : invalidTableOrderPayload("Toplamı hesaplanacak adisyon geçersiz.");
+  });
+
   ipcMain.handle("reservation:updateStatus", (_event, input: UpdateReservationStatusInput): DesktopStatusUpdateResult => {
     return getDatabase().updateReservationStatus(input);
   });
@@ -587,6 +676,57 @@ function registerIpcHandlers() {
   ipcMain.handle("dashboard:getData", (): DesktopDashboardData => {
     return getDatabase().getDashboardData();
   });
+}
+
+function invalidTableOrderPayload(message: string): DesktopTableOrderResult {
+  return { ok: false, message };
+}
+
+function parseAddTableOrderItemInput(value: unknown): AddTableOrderItemInput | null {
+  const record = toUnknownRecord(value);
+  return record
+    && typeof record.orderId === "string"
+    && typeof record.menuItemId === "string"
+    && typeof record.quantity === "number"
+    && Number.isFinite(record.quantity)
+    && typeof record.note === "string"
+    ? {
+        orderId: record.orderId,
+        menuItemId: record.menuItemId,
+        quantity: record.quantity,
+        note: record.note
+      }
+    : null;
+}
+
+function parseUpdateTableOrderItemQuantityInput(value: unknown): UpdateTableOrderItemQuantityInput | null {
+  const record = toUnknownRecord(value);
+  return record
+    && typeof record.itemId === "string"
+    && typeof record.quantity === "number"
+    && Number.isFinite(record.quantity)
+    ? { itemId: record.itemId, quantity: record.quantity }
+    : null;
+}
+
+function parseUpdateTableOrderItemNoteInput(value: unknown): UpdateTableOrderItemNoteInput | null {
+  const record = toUnknownRecord(value);
+  return record && typeof record.itemId === "string" && typeof record.note === "string"
+    ? { itemId: record.itemId, note: record.note }
+    : null;
+}
+
+function parseUpdateTableOrderStatusInput(value: unknown): UpdateTableOrderStatusInput | null {
+  const record = toUnknownRecord(value);
+  return record && typeof record.orderId === "string" && typeof record.status === "string"
+    ? { orderId: record.orderId, status: record.status }
+    : null;
+}
+
+function toUnknownRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
 }
 
 function getDatabase() {
