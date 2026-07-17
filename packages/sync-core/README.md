@@ -34,16 +34,33 @@ pushAndroidSnapshot({
   snapshot: {
     summary: {
       pending_daily_tasks: 2,
+      today_tasks: 4,
       available_rooms: 5,
       total_rooms: 8,
       available_tables: 7,
+      occupied_tables: 2,
+      bill_waiting_tables: 1,
+      active_table_orders: 3,
       pending_reservations: 1,
       prepared_whatsapp_messages: 3,
+      waiting_responses: 2,
       active_menu_categories: 4,
       available_menu_items: 18,
       customer_count: 24
     },
     daily_tasks: [],
+    requests: [],
+    customers: [],
+    reservations: [],
+    rooms: [],
+    tables: [],
+    menu: {
+      categories: [],
+      items: [],
+      updated_at: "2026-07-10T10:00:00+03:00"
+    },
+    table_orders: [],
+    messages: [],
     updated_at: "2026-07-10T10:00:00+03:00"
   }
 });
@@ -68,6 +85,15 @@ Başarısız bağlantı veya hatalı güvenlik anahtarı durumunda fonksiyonlar 
 `pushMenu()` PC'deki QR menü verisini `api/sync.php` içindeki `publish_menu` aksiyonuna gönderir. Başarılı yayın sonrası müşteri menüsü `menu.html` üzerinden güncel veriyi okur.
 
 `pushAndroidSnapshot()` PC'deki local oda, masa, rezervasyon, günlük iş ve müşteri özetini `publish_android_snapshot` aksiyonuna gönderir. Android uygulama aynı veriyi `android_summary` cevabındaki `operations` ve `daily_tasks` alanlarından okur.
+
+Snapshot ayrıca Android operasyon ekranlarının ihtiyaç duyduğu talepler, müşteriler,
+rezervasyonlar, odalar, masalar, QR menü ürünleri, aktif adisyonlar ve hazır mesajları
+içerir.
+
+`pullAndroidActions()` hostingde bekleyen telefon işlemlerini masaüstüne çeker.
+Masaüstü yerel işlemi uyguladıktan sonra `markAndroidActionResult()` ile sonucu
+`applied` veya `failed` olarak kaydeder. Masaüstündeki action receipt kaydı aynı kimliğin
+yeniden gelmesi halinde işlemin ikinci kez uygulanmasını engeller.
 
 `pushAiSettings()` masaüstünde kaydedilen AI bağlantısını `publish_ai_settings` aksiyonuna yollar. Uzak hedeflerde HTTPS zorunludur; HTTP yalnız loopback geliştirme adreslerinde kabul edilir. API anahtarı istekten sonra sonuç nesnesine veya hata mesajına geri taşınmaz.
 

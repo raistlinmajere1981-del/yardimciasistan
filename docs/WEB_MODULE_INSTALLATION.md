@@ -85,7 +85,7 @@ Değiştirilecek temel alanlar:
 }
 ```
 
-`sync_secret` değerini kurulumda mutlaka değiştirin. Bu anahtar PC uygulamasının hostingdeki talepleri çekmesi ve QR menüyü yayınlaması için kullanılır.
+`sync_secret` değerini kurulumda mutlaka değiştirin. Bu anahtar PC uygulamasının hostingdeki talepleri ve Android işlem kuyruğunu çekmesi, QR menüyü ve Android operasyon snapshot'ını yayınlaması için kullanılır.
 
 `allowed_origins` içine sitenin gerçek alan adını yazın. Geliştirme sırasında `http://localhost:5173` ve `http://127.0.0.1:5173` kalabilir; canlı kurulumda gerekli değilse kaldırın.
 
@@ -157,7 +157,16 @@ Müşteriye açık QR menü sayfası:
 https://firma.com/yardimci-asistan/menu.html
 ```
 
-QR kod bu adrese üretilebilir. Menü verisi `api/menu.php` üzerinden okunur; PC uygulamasından yayınlanan menü `data/menu.json` dosyasına yazılır. Android companion için PC uygulamasından yayınlanan oda/masa/günlük iş özeti `data/android-snapshot.json` dosyasında tutulur ve `api/sync.php` içindeki `android_summary` aksiyonuyla okunur.
+QR kod bu adrese üretilebilir. Menü verisi `api/menu.php` üzerinden okunur; PC uygulamasından yayınlanan menü `data/menu.json` dosyasına yazılır.
+
+Android companion için PC uygulamasından yayınlanan talepler, müşteriler,
+rezervasyonlar, odalar, masalar, menü, aktif adisyonlar, günlük işler ve hazır
+mesajlar `data/android-snapshot.json` dosyasında tutulur; `api/sync.php` içindeki
+`android_summary` aksiyonuyla okunur. Telefonda yapılan işlemler
+`data/android-actions.json` kuyruğuna eklenir. PC kuyruğu periyodik çeker, her
+action kimliğini yerel veritabanına yalnız bir kez uygular, sonucu hostingde
+işaretler ve güncel snapshot'ı yeniden yayınlar. Telefonun PC'ye doğrudan ağ
+erişimi gerekmez.
 
 ## 6. AI Ayarları
 

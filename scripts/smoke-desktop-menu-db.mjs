@@ -284,6 +284,12 @@ try {
   assert.ok(reservationStatusResult.dashboardData.reservations.some((reservation) => reservation.id === "reservation_demo_001" && reservation.status === "approved"));
   assert.ok(reservationStatusResult.dashboardData.rooms.some((room) => room.id === "room_101" && room.status === "reserved"));
 
+  const reopenRequestForSuggestion = database.updateRequestStatus({
+    requestId: "request_demo_001",
+    status: "new"
+  });
+  assert.equal(reopenRequestForSuggestion.ok, true);
+
   const aiSuggestionResult = database.saveRequestAiSuggestion({
     requestId: "request_demo_001",
     summary: "Smoke AI özet",
@@ -293,6 +299,7 @@ try {
   assert.equal(aiSuggestionResult.ok, true);
   assert.ok(aiSuggestionResult.dashboardData.requests.some((request) => request.id === "request_demo_001" && request.ai_suggested_reply.includes("smoke AI")));
   assert.ok(aiSuggestionResult.dashboardData.summary.preparedWhatsAppMessages >= 1);
+  assert.ok(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_demo_001" && message.message.includes("smoke AI")));
 
   const rejectedWhatsAppSentResult = database.markWhatsAppMessageSent({
     requestId: "request_demo_001",
@@ -307,6 +314,7 @@ try {
   });
   assert.equal(whatsappSentResult.ok, true);
   assert.equal(whatsappSentResult.dashboardData.summary.preparedWhatsAppMessages, preparedBeforeSend - 1);
+  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_demo_001"), false);
   assert.ok(database.countEventsByType("whatsapp.message_sent") >= 1);
 
   const workspaceEntry = database.saveAiWorkspaceHistory({
@@ -351,7 +359,7 @@ try {
       customer_id: "",
       source: "web_form",
       request_type: "pension_reservation",
-      status: "answered",
+      status: "new",
       customer_name: "Smoke Yeni Misafir",
       customer_phone: "+905551112299",
       date_text: "22 Temmuz",
@@ -401,6 +409,7 @@ try {
   });
   assert.equal(itemResult.ok, true);
   assertTableOrderFlow(database, { appPath, dataDir, categoryId: categoryResult.savedId, menuItemId: itemResult.savedId });
+  assertAndroidActionFlow(database, itemResult.savedId, manualRequestResult.savedId);
 
   const dashboardData = database.getDashboardData();
   assert.ok(dashboardData.menu.categories.some((category) => category.id === categoryResult.savedId));
@@ -609,6 +618,321 @@ function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItem
   assert.equal(cancelled.ok, true);
   assert.equal(cancelled.dashboardData.tables.find((table) => table.id === "table_002")?.status, "available");
   assert.equal(database.getActiveTableOrder("table_002"), null);
+}
+
+function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
+  const preparedMessageResult = database.saveRequestAiSuggestion({
+    requestId: "request_smoke_customer_001",
+    summary: "Android cevap temizleme testi",
+    suggestedReply: "Merhaba Smoke Yeni Misafir, Android için hazır cevap.",
+    missingFields: []
+  });
+  assert.equal(preparedMessageResult.ok, true);
+  const preparedMessageCount = preparedMessageResult.dashboardData.summary.preparedWhatsAppMessages;
+  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_customer_001"), true);
+  const requestBeforeAnswer = preparedMessageResult.dashboardData.requests.find((request) => request.id === "request_smoke_customer_001");
+  assert.ok(requestBeforeAnswer);
+
+  const answeredRequestResult = database.applyAndroidAction(androidAction("android_action_request_answered_001", "customer_request_mark_answered", {
+    request_id: "request_smoke_customer_001",
+    expected_updated_at: requestBeforeAnswer.updated_at
+  }));
+  assert.equal(answeredRequestResult.ok, true);
+  assert.equal(database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001")?.status, "answered");
+  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_customer_001"), false);
+  assert.equal(database.getDashboardData().summary.preparedWhatsAppMessages, preparedMessageCount - 1);
+
+  const reopenedRequestResult = database.applyAndroidAction(androidAction("android_action_request_reopen_001", "customer_request_reopen", {
+    request_id: "request_smoke_customer_001"
+  }));
+  assert.equal(reopenedRequestResult.ok, true);
+  assert.equal(database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001")?.status, "new");
+
+  const staleRequestResult = database.applyAndroidAction(androidAction("android_action_request_stale_001", "customer_request_approve", {
+    request_id: "request_smoke_customer_001",
+    expected_updated_at: requestBeforeAnswer.updated_at
+  }));
+  assert.equal(staleRequestResult.ok, false);
+  assert.match(staleRequestResult.message, /değişmiş/i);
+  assert.equal(database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001")?.status, "new");
+
+  const approvedRequestResult = database.applyAndroidAction(androidAction("android_action_request_approve_001", "customer_request_approve", {
+    request_id: "request_smoke_customer_001"
+  }));
+  assert.equal(approvedRequestResult.ok, true);
+  assert.equal(database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001")?.status, "approved");
+
+  const rejectedRequestResult = database.applyAndroidAction(androidAction("android_action_request_reject_001", "customer_request_reject", {
+    request_id: "request_smoke_customer_001"
+  }));
+  assert.equal(rejectedRequestResult.ok, true);
+  assert.equal(database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001")?.status, "rejected");
+
+  const convertedRequestResult = database.applyAndroidAction(androidAction("android_action_request_convert_001", "customer_request_convert_to_reservation", {
+    request_id: convertibleRequestId
+  }));
+  assert.equal(convertedRequestResult.ok, true);
+  const convertedDashboard = database.getDashboardData();
+  assert.equal(convertedDashboard.requests.find((request) => request.id === convertibleRequestId)?.status, "converted_to_reservation");
+  assert.ok(convertedDashboard.reservations.some((reservation) => reservation.requestId === convertibleRequestId && reservation.status === "approved"));
+
+  const cancelledReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_cancel_001", "reservation_cancel", {
+    reservation_id: "reservation_demo_001"
+  }));
+  assert.equal(cancelledReservationResult.ok, true);
+  assert.equal(database.getDashboardData().reservations.find((reservation) => reservation.id === "reservation_demo_001")?.status, "cancelled");
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "available");
+
+  const approvedReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_approve_001", "reservation_approve", {
+    reservation_id: "reservation_demo_001"
+  }));
+  assert.equal(approvedReservationResult.ok, true);
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "reserved");
+
+  const rejectedReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_reject_001", "reservation_reject", {
+    reservation_id: "reservation_demo_001"
+  }));
+  assert.equal(rejectedReservationResult.ok, true);
+  assert.equal(database.getDashboardData().reservations.find((reservation) => reservation.id === "reservation_demo_001")?.status, "rejected");
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "available");
+
+  const roomEventCount = database.countEventsByType("room.status_changed");
+  const roomAction = androidAction("android_action_room_001", "room_status_update", {
+    room_id: "room_101",
+    status: "maintenance"
+  });
+  const roomResult = database.applyAndroidAction(roomAction);
+  assert.equal(roomResult.ok, true);
+  assert.equal(roomResult.alreadyApplied, false);
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "maintenance");
+  assert.equal(database.countEventsByType("room.status_changed"), roomEventCount + 1);
+
+  const duplicateRoomResult = database.applyAndroidAction(roomAction);
+  assert.equal(duplicateRoomResult.ok, true);
+  assert.equal(duplicateRoomResult.alreadyApplied, true);
+  assert.equal(database.countEventsByType("room.status_changed"), roomEventCount + 1);
+
+  const failedAction = database.applyAndroidAction(androidAction("android_action_missing_room", "room_status_update", {
+    room_id: "room_missing",
+    status: "cleaning"
+  }));
+  assert.equal(failedAction.ok, false);
+  assert.match(failedAction.message, /bulunamadı/i);
+
+  const taskCompleteResult = database.applyAndroidAction(androidAction("android_action_task_complete_001", "daily_task_complete", {
+    task_id: "task_demo_001"
+  }));
+  assert.equal(taskCompleteResult.ok, true);
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "done");
+
+  const taskCancelResult = database.applyAndroidAction(androidAction("android_action_task_cancel_001", "daily_task_cancel", {
+    task_id: "task_demo_001"
+  }));
+  assert.equal(taskCancelResult.ok, true);
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "cancelled");
+
+  const taskReopenResult = database.applyAndroidAction(androidAction("android_action_task_reopen_001", "daily_task_reopen", {
+    task_id: "task_demo_001"
+  }));
+  assert.equal(taskReopenResult.ok, true);
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "pending");
+
+  const tableStatusResult = database.applyAndroidAction(androidAction("android_action_table_status_001", "table_status_update", {
+    table_id: "table_001",
+    status: "available"
+  }));
+  assert.equal(tableStatusResult.ok, true);
+  assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "available");
+
+  const staleBatchTable = database.getDashboardData().tables.find((table) => table.id === "table_002");
+  assert.ok(staleBatchTable);
+  const competingOrder = database.openTableOrder("table_002");
+  assert.equal(competingOrder.ok, true);
+  const failedBatchParentId = "android_action_order_open_conflict_001";
+  const failedBatchParent = database.applyAndroidAction(androidAction(failedBatchParentId, "table_order_open", {
+    table_id: "table_002",
+    expected_table_updated_at: staleBatchTable.updatedAt
+  }));
+  assert.equal(failedBatchParent.ok, false);
+  assert.match(failedBatchParent.message, /değişmiş/i);
+  const rejectedBatchChild = database.applyAndroidAction(androidAction("android_action_order_child_conflict_001", "table_order_add_item", {
+    table_id: "table_002",
+    menu_item_id: menuItemId,
+    quantity: 1,
+    depends_on_action_id: failedBatchParentId
+  }));
+  assert.equal(rejectedBatchChild.ok, false);
+  assert.match(rejectedBatchChild.message, /bağlı adisyon açma/i);
+  assert.equal(database.getActiveTableOrder("table_002").items.length, 0);
+  assert.equal(database.closeTableOrder({ orderId: competingOrder.order.id, status: "cancelled" }).ok, true);
+
+  const openActionId = "android_action_order_open_001";
+  const openResult = database.applyAndroidAction(androidAction(openActionId, "table_order_open", {
+    table_id: "table_001"
+  }));
+  assert.equal(openResult.ok, true);
+  const openedOrder = database.getActiveTableOrder("table_001");
+  assert.ok(openedOrder);
+  assert.equal(openedOrder.status, "open");
+  assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "occupied");
+
+  const invariantDb = new DatabaseSync(database.databasePath);
+  try {
+    invariantDb
+      .prepare("UPDATE reservations SET status = 'pending', table_ids_json = '[\"table_001\"]', updated_at = ? WHERE id = 'reservation_demo_001'")
+      .run("2026-07-17T12:30:00.000Z");
+    invariantDb
+      .prepare("UPDATE tables SET current_customer_id = 'customer_demo_001', current_reservation_id = 'reservation_demo_001' WHERE id = 'table_001'")
+      .run();
+  } finally {
+    invariantDb.close();
+  }
+  const conflictingReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_order_conflict_001", "reservation_approve", {
+    reservation_id: "reservation_demo_001"
+  }));
+  assert.equal(conflictingReservationResult.ok, false);
+  assert.match(conflictingReservationResult.message, /aktif adisyon/i);
+  assert.equal(database.getActiveTableOrder("table_001")?.id, openedOrder.id);
+  assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "occupied");
+  const desktopReservationConflict = database.updateReservationStatus({
+    reservationId: "reservation_demo_001",
+    status: "cancelled"
+  });
+  assert.equal(desktopReservationConflict.ok, false);
+  assert.match(desktopReservationConflict.message, /aktif adisyon/i);
+
+  const addResult = database.applyAndroidAction(androidAction("android_action_order_item_001", "table_order_add_item", {
+    table_id: "table_001",
+    menu_item_id: menuItemId,
+    quantity: 2,
+    depends_on_action_id: openActionId
+  }));
+  assert.equal(addResult.ok, true);
+  const orderWithItem = database.getActiveTableOrder("table_001");
+  assert.equal(orderWithItem.items.length, 1);
+  assert.equal(orderWithItem.items[0].quantity, 2);
+  assert.equal(orderWithItem.items[0].productName, "Yeni Smoke Ürün");
+
+  const staleItemUpdatedAt = orderWithItem.items[0].updatedAt;
+  const concurrentQuantityResult = database.updateTableOrderItemQuantity({
+    itemId: orderWithItem.items[0].id,
+    quantity: 4
+  });
+  assert.equal(concurrentQuantityResult.ok, true);
+  const staleQuantityResult = database.applyAndroidAction(androidAction("android_action_order_quantity_stale_001", "table_order_update_item_quantity", {
+    item_id: orderWithItem.items[0].id,
+    quantity: 3,
+    expected_item_updated_at: staleItemUpdatedAt
+  }));
+  assert.equal(staleQuantityResult.ok, false);
+  assert.match(staleQuantityResult.message, /değişmiş/i);
+  assert.equal(database.getActiveTableOrder("table_001").items[0].quantity, 4);
+
+  const currentItem = database.getActiveTableOrder("table_001").items[0];
+  const quantityResult = database.applyAndroidAction(androidAction("android_action_order_quantity_001", "table_order_update_item_quantity", {
+    item_id: orderWithItem.items[0].id,
+    quantity: 3,
+    expected_item_updated_at: currentItem.updatedAt
+  }));
+  assert.equal(quantityResult.ok, true);
+  assert.equal(database.getActiveTableOrder("table_001").items[0].quantity, 3);
+  const repeatedQuantityResult = database.applyAndroidAction(androidAction("android_action_order_quantity_repeat_001", "table_order_update_item_quantity", {
+    item_id: orderWithItem.items[0].id,
+    quantity: 3,
+    expected_item_updated_at: currentItem.updatedAt
+  }));
+  assert.equal(repeatedQuantityResult.ok, false);
+  assert.match(repeatedQuantityResult.message, /değişmiş/i);
+  assert.equal(database.getActiveTableOrder("table_001").items[0].quantity, 3);
+
+  const preparingResult = database.applyAndroidAction(androidAction("android_action_order_preparing_001", "table_order_set_status", {
+    order_id: openedOrder.id,
+    status: "preparing"
+  }));
+  assert.equal(preparingResult.ok, true);
+  assert.equal(database.getActiveTableOrder("table_001").status, "preparing");
+  assert.equal(database.getActiveTableOrder("table_001").items[0].status, "preparing");
+
+  const servedResult = database.applyAndroidAction(androidAction("android_action_order_served_001", "table_order_set_status", {
+    order_id: openedOrder.id,
+    status: "served"
+  }));
+  assert.equal(servedResult.ok, true);
+  assert.equal(database.getActiveTableOrder("table_001").status, "served");
+  assert.equal(database.getActiveTableOrder("table_001").items[0].status, "served");
+
+  const removeResult = database.applyAndroidAction(androidAction("android_action_order_remove_001", "table_order_remove_item", {
+    item_id: orderWithItem.items[0].id
+  }));
+  assert.equal(removeResult.ok, true);
+  assert.equal(database.getActiveTableOrder("table_001").items.length, 0);
+  assert.equal(database.getActiveTableOrder("table_001").total, 0);
+
+  const replacementAddResult = database.applyAndroidAction(androidAction("android_action_order_item_002", "table_order_add_item", {
+    order_id: openedOrder.id,
+    menu_item_id: menuItemId,
+    quantity: 1
+  }));
+  assert.equal(replacementAddResult.ok, true);
+  assert.equal(database.getActiveTableOrder("table_001").items.length, 1);
+
+  const paymentResult = database.applyAndroidAction(androidAction("android_action_order_payment_001", "table_order_set_status", {
+    order_id: openedOrder.id,
+    status: "payment"
+  }));
+  assert.equal(paymentResult.ok, true);
+  assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "bill_waiting");
+
+  const closeResult = database.applyAndroidAction(androidAction("android_action_order_close_001", "table_order_close", {
+    order_id: openedOrder.id,
+    status: "paid"
+  }));
+  assert.equal(closeResult.ok, true);
+  assert.equal(database.getActiveTableOrder("table_001"), null);
+  const tableAfterClose = database.getDashboardData().tables.find((table) => table.id === "table_001");
+  assert.equal(tableAfterClose?.status, "available");
+  assert.equal(tableAfterClose?.currentReservationId, "");
+  assert.equal(tableAfterClose?.currentCustomerId, "");
+  const reservationAfterClose = database.updateReservationStatus({
+    reservationId: "reservation_demo_001",
+    status: "cancelled"
+  });
+  assert.equal(reservationAfterClose.ok, true);
+
+  const secondOpenResult = database.applyAndroidAction(androidAction("android_action_order_open_002", "table_order_open", {
+    table_id: "table_001"
+  }));
+  assert.equal(secondOpenResult.ok, true);
+  const secondOrder = database.getActiveTableOrder("table_001");
+  assert.ok(secondOrder);
+  const staleOrderAddResult = database.applyAndroidAction(androidAction("android_action_order_stale_id_001", "table_order_add_item", {
+    order_id: openedOrder.id,
+    table_id: "table_001",
+    menu_item_id: menuItemId,
+    quantity: 1
+  }));
+  assert.equal(staleOrderAddResult.ok, false);
+  assert.equal(database.getActiveTableOrder("table_001").items.length, 0);
+  const cancelResult = database.applyAndroidAction(androidAction("android_action_order_cancel_001", "table_order_close", {
+    order_id: secondOrder.id,
+    status: "cancelled"
+  }));
+  assert.equal(cancelResult.ok, true);
+  assert.equal(database.getActiveTableOrder("table_001"), null);
+  assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "available");
+}
+
+function androidAction(id, actionType, payload) {
+  return {
+    id,
+    action_type: actionType,
+    payload,
+    created_at: "2026-07-17T10:00:00.000Z",
+    device_id: "android-smoke-device",
+    status: "pending",
+    error_message: "",
+    processed_at: ""
+  };
 }
 
 function assertLegacyAiMigration(desktopAppPath, legacyDataDir) {

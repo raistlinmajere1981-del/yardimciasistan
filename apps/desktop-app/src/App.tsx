@@ -612,6 +612,11 @@ function App() {
       setSetupMessage(data.setup.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
     });
     void loadDashboardData();
+
+    const unsubscribe = window.yardimciDesktop?.onDashboardDataChanged?.((nextDashboardData) => {
+      setDashboardData(nextDashboardData);
+    });
+    return () => unsubscribe?.();
   }, []);
 
   useEffect(() => {

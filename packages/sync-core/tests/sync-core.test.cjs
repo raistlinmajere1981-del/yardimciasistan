@@ -2,7 +2,9 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   createSyncEndpointUrl,
+  markAndroidActionResult,
   markRequestsSynced,
+  pullAndroidActions,
   pushAiSettings,
   pushAndroidSnapshot,
   pushMenu,
@@ -112,6 +114,78 @@ test("markRequestsSynced sends processed ids", async () => {
   assert.equal(result.updated_count, 2);
   assert.deepEqual(calls[0].body.request_ids, ["request_001", "request_002"]);
   assert.equal(calls[0].body.action, "mark_requests_synced");
+});
+
+test("pullAndroidActions reads pending mobile commands", async () => {
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    calls.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "Telefon işlemleri alındı.",
+      actions: [{
+        id: "android_action_001",
+        action_type: "room_status_update",
+        payload: { room_id: "room_101", status: "cleaning" },
+        created_at: "2026-07-17T10:00:00+03:00",
+        device_id: "android-device-001",
+        status: "pending",
+        error_message: "",
+        processed_at: ""
+      }],
+      count: 1,
+      pulled_at: "2026-07-17T10:00:01+03:00"
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const result = await pullAndroidActions({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    limit: 25,
+    fetchImpl
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.actions[0].action_type, "room_status_update");
+  assert.equal(calls[0].action, "pull_android_actions");
+  assert.equal(calls[0].limit, 25);
+});
+
+test("markAndroidActionResult writes applied and failed outcomes", async () => {
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push(body);
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "Telefon işlemi uygulandı.",
+      action: {
+        id: body.action_id,
+        action_type: "room_status_update",
+        payload: {},
+        created_at: "2026-07-17T10:00:00+03:00",
+        device_id: "android-device-001",
+        status: body.status,
+        error_message: body.error_message,
+        processed_at: "2026-07-17T10:00:02+03:00"
+      },
+      updated_at: "2026-07-17T10:00:02+03:00"
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const result = await markAndroidActionResult({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    actionId: "android_action_001",
+    status: "failed",
+    errorMessage: "Oda bulunamadı.",
+    fetchImpl
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].action, "mark_android_action_result");
+  assert.equal(calls[0].status, "failed");
+  assert.equal(calls[0].error_message, "Oda bulunamadı.");
 });
 
 test("pushMenu sends QR menu data", async () => {

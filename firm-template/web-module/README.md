@@ -21,6 +21,8 @@ config/
 data/
   requests.json
   menu.json
+  android-snapshot.json
+  android-actions.json
   ai-conversations.json
   sync-state.json
   ai-settings.local.php (masaüstünden yayınlanınca oluşur)
@@ -91,6 +93,9 @@ Desteklenen aksiyonlar:
 ```text
 pull_requests
 android_summary
+enqueue_android_action
+pull_android_actions
+mark_android_action_result
 mark_requests_synced
 update_request_status
 publish_menu
@@ -116,9 +121,38 @@ publish_ai_settings
 {
   "action": "android_summary",
   "sync_secret": "change-this-secret",
+  "device_id": "android-telefon-01",
   "limit": 10
 }
 ```
+
+Android uygulaması yerel veritabanına veya PC'ye doğrudan yazmaz. Kullanıcı işlemi
+`enqueue_android_action` ile `data/android-actions.json` kuyruğuna eklenir. Masaüstü
+uygulaması bekleyen işlemleri `pull_android_actions` ile çeker, yerel veritabanında
+aynı action kimliğini yalnız bir kez uygular ve `mark_android_action_result` ile
+`applied` ya da `failed` sonucunu yayınlar. Ardından tam operasyon snapshot'ını
+yenileyerek Android ekranlarının güncel durumu çekmesini sağlar.
+
+Örnek Android işlemi:
+
+```json
+{
+  "action": "enqueue_android_action",
+  "sync_secret": "change-this-secret",
+  "action_id": "act_android-telefon-01_1752746400000_a1b2c3",
+  "action_type": "room_status_update",
+  "payload": {
+    "room_id": "room_101",
+    "status": "cleaning"
+  },
+  "device_id": "android-telefon-01"
+}
+```
+
+Kuyruk; müşteri talebi, rezervasyon, oda, günlük iş, masa durumu ve masa
+adisyonu işlemlerini kabul eder. Aynı `id` tekrar gönderildiğinde yeni kayıt
+oluşturulmaz. Başarısız işlemler hata mesajıyla korunur; teknik ayar veya gizli
+anahtar operasyon ekranlarında gösterilmez.
 
 Örnek `mark_requests_synced` gövdesi:
 

@@ -32,45 +32,86 @@ async function main() {
   const baseUrl = getPhoneTestBaseUrl(phoneTest.output);
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
+  await waitForUiText("Canlı veri alındı", 12000);
   scrollToTop();
+  await delay(400);
 
   let topXml = dumpUi("top.xml");
   captureScreenshot("top.png");
-  assertContains(topXml, ["Yardımcı Asistan", "Firma web modülünden canlı özet", "Canlı Veriyi Çek", "Yeni Talepler"]);
+  assertContains(topXml, ["Bugün", "GÜNLÜK OPERASYON", "Yeni talepler", "Pansiyon", "Restoran", "Mesajlar"]);
 
-  const buttonBounds = findBoundsByText(topXml, "Canlı Veriyi Çek");
+  const buttonBounds = findBoundsByText(topXml, "Yenile");
   tap(centerOf(buttonBounds));
   await waitForUiText("Canlı veri alındı", 12000);
 
   topXml = dumpUi("after-refresh.xml");
   captureScreenshot("after-refresh.png");
-  assertContains(topXml, ["Canlı veri alındı", "Toplam Web Kaydı"]);
+  assertContains(topXml, ["Canlı veri alındı", "Boş odalar", "Hesap bekleyen"]);
 
-  swipe(360, 1120, 360, 260, 450);
-  await delay(700);
-  swipe(360, 1120, 360, 260, 450);
-  await delay(700);
-
+  tap(centerOf(findBoundsByText(topXml, "Müşteri")));
+  await delay(500);
   const requestsXml = dumpUi("requests.xml");
   captureScreenshot("requests.png");
-  assertContains(requestsXml, ["Canlı müşteri talepleri", "3 talep görüntüleniyor", "Demo Aile"]);
+  assertContains(requestsXml, ["MÜŞTERİ İŞLERİ", "Yeni Talepler", "Cevap Bekleyenler", "Demo Aile"]);
 
   tap(centerOf(findBoundsByText(requestsXml, "Demo Aile")));
   await delay(500);
-  swipe(360, 1120, 360, 260, 450);
-  await delay(700);
-  swipe(360, 1120, 360, 260, 450);
-  await delay(700);
-
-  const detailXml = dumpUi("request-detail.xml");
+  let detailXml = dumpUi("request-detail.xml");
   captureScreenshot("request-detail.png");
-  assertContains(detailXml, ["Demo Aile", "Cevaplandı"]);
+  assertContains(detailXml, ["TALEP DETAYI", "Demo Aile", "Rezervasyona Çevir"]);
+  for (let index = 0; index < 3 && !detailXml.includes("Cevaplandı"); index += 1) {
+    swipe(360, 1080, 360, 350, 400);
+    await delay(400);
+    detailXml = dumpUi("request-detail-scrolled.xml");
+  }
+  assertContains(detailXml, ["Cevaplandı"]);
 
   tap(centerOf(findBoundsByText(detailXml, "Cevaplandı")));
-  await waitForRequestStatus(baseUrl, "request_demo_web_001", "answered", 12000);
-  const answeredXml = dumpUi("answered.xml");
-  captureScreenshot("answered.png");
-  assertContains(answeredXml, ["Demo Aile", "Cevaplandı"]);
+  await waitForAction(baseUrl, "customer_request_mark_answered", { request_id: "request_demo_web_001" }, 12000);
+  await waitForUiText("İşlem masaüstünü bekliyor", 12000);
+  const queuedXml = dumpUi("queued.xml");
+  captureScreenshot("queued.png");
+  assertContains(queuedXml, ["İşlem masaüstünü bekliyor", "Müşteri"]);
+
+  tap(centerOf(findBoundsByText(queuedXml, "Pansiyon")));
+  await delay(500);
+  const pensionXml = dumpUi("pension.xml");
+  captureScreenshot("pension.png");
+  assertContains(pensionXml, ["PANSİYON", "Konaklama operasyonu", "Rezervasyonlar"]);
+  swipe(360, 1080, 360, 350, 420);
+  await delay(400);
+  const pensionRoomsXml = dumpUi("pension-rooms.xml");
+  assertContains(pensionRoomsXml, ["Odalar", "Balkonlu Oda"]);
+
+  tap(centerOf(findBoundsByText(pensionRoomsXml, "Restoran")));
+  await delay(500);
+  let restaurantXml = dumpUi("restaurant.xml");
+  assertContains(restaurantXml, ["RESTORAN", "Servis ve masa yönetimi", "Masalar"]);
+  for (let index = 0; index < 4; index += 1) {
+    const bounds = findBoundsByTextIfPresent(restaurantXml, "Salon Masası 1");
+    if (bounds && bounds.top >= 100 && bounds.bottom <= 1160) {
+      break;
+    }
+    swipe(360, 1080, 360, 380, 420);
+    await delay(400);
+    restaurantXml = dumpUi("restaurant-scrolled.xml");
+  }
+  captureScreenshot("restaurant.png");
+  assertContains(restaurantXml, ["Salon Masası 1", "Siparişi Aç"]);
+  tap(centerOf(findBoundsByText(restaurantXml, "Siparişi Aç")));
+  await delay(500);
+  const orderXml = dumpUi("table-order.xml");
+  captureScreenshot("table-order.png");
+  assertContains(orderXml, ["MASA SİPARİŞİ", "Salon Masası 1", "Serpme Kahvaltı", "Aktif adisyon satırları"]);
+
+  tap(centerOf(findBoundsByText(orderXml, "Kapat")));
+  await delay(300);
+  const restaurantAfterDialog = dumpUi("restaurant-after-dialog.xml");
+  tap(centerOf(findBoundsByText(restaurantAfterDialog, "Mesajlar")));
+  await delay(500);
+  const messagesXml = dumpUi("messages.xml");
+  captureScreenshot("messages.png");
+  assertContains(messagesXml, ["MESAJLAR", "Hazır cevaplar", "Hazır mesaj"]);
 
   console.log("android-device-ui-smoke-ok");
   cleanup();
@@ -79,7 +120,7 @@ async function main() {
 
 function parseArgs(args) {
   const parsed = {
-    holdMs: 30000,
+    holdMs: 120000,
     readyTimeoutMs: 45000,
     settleMs: 1800,
     noBuild: false
@@ -235,6 +276,7 @@ function prepareAppForUi(baseUrl) {
   adb(["shell", "input", "keyevent", "KEYCODE_MENU"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
+  adb(["shell", "pm", "clear", packageName]);
   adb([
     "shell",
     "am",
@@ -269,7 +311,7 @@ async function waitForUiText(text, timeoutMs) {
   throw new Error(`Android UI metni beklenirken zaman aşımı: ${text}`);
 }
 
-async function waitForRequestStatus(baseUrl, requestId, expectedStatus, timeoutMs) {
+async function waitForAction(baseUrl, actionType, expectedPayload, timeoutMs) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     const response = await fetch(`${baseUrl}/api/sync.php`, {
@@ -279,33 +321,42 @@ async function waitForRequestStatus(baseUrl, requestId, expectedStatus, timeoutM
         "X-YA-Sync-Secret": syncSecret
       },
       body: JSON.stringify({
-        action: "android_summary",
+        action: "pull_android_actions",
         sync_secret: syncSecret,
-        limit: 10
+        limit: 100
       })
     });
     const json = await response.json();
-    const request = json.requests?.find((candidate) => candidate.id === requestId);
-    if (request?.status === expectedStatus) {
+    const action = json.actions?.find((candidate) => candidate.action_type === actionType
+      && Object.entries(expectedPayload).every(([key, value]) => candidate.payload?.[key] === value));
+    if (action) {
       return;
     }
 
     await delay(500);
   }
 
-  throw new Error(`${requestId} beklenen duruma geçmedi: ${expectedStatus}`);
+  throw new Error(`Beklenen Android action kuyruğa eklenmedi: ${actionType}`);
 }
 
 function findBoundsByText(xml, text) {
+  const bounds = findBoundsByTextIfPresent(xml, text);
+  if (!bounds) {
+    throw new Error(`UI node bulunamadı: ${text}`);
+  }
+  return bounds;
+}
+
+function findBoundsByTextIfPresent(xml, text) {
   const nodes = xml.match(/<node\b[^>]*>/g) ?? [];
   const node = nodes.find((candidate) => candidate.includes(`text="${escapeXmlAttribute(text)}"`));
   if (!node) {
-    throw new Error(`UI node bulunamadı: ${text}`);
+    return null;
   }
 
   const match = node.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
   if (!match) {
-    throw new Error(`UI node bounds bulunamadı: ${text}`);
+    return null;
   }
 
   return {

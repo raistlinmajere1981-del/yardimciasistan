@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -18,6 +18,7 @@ const aapt2 = join(buildTools.path, "aapt2");
 const d8 = join(buildTools.path, "d8");
 const zipalign = join(buildTools.path, "zipalign");
 const apksigner = join(buildTools.path, "apksigner");
+const lambdaStubs = join(buildTools.path, "core-lambda-stubs.jar");
 
 const compiledResources = join(buildDir, "intermediates", "compiled-res.zip");
 const resourceApk = join(buildDir, "intermediates", "resources.apk");
@@ -74,7 +75,7 @@ run("javac", [
   "-target",
   "8",
   "-bootclasspath",
-  androidJar,
+  `${androidJar}${delimiter}${lambdaStubs}`,
   "-d",
   classDir,
   ...javaFiles
@@ -163,7 +164,7 @@ function findBuildTools(sdk) {
       score: version.split(".").map((part) => Number(part) || 0),
       path: join(toolsDir, version)
     }))
-    .filter((tool) => ["aapt2", "d8", "zipalign", "apksigner"].every((binary) => existsSync(join(tool.path, binary))))
+    .filter((tool) => ["aapt2", "d8", "zipalign", "apksigner", "core-lambda-stubs.jar"].every((binary) => existsSync(join(tool.path, binary))))
     .sort((a, b) => compareVersionScore(b.score, a.score));
 
   if (tools.length === 0) {

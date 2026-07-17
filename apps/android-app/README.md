@@ -1,8 +1,53 @@
-# Android App
+# Android Operasyon Paneli
 
-PC uygulamasının sade companion uygulaması burada geliştirilecektir.
+Yardımcı Asistan Android uygulaması, işletme sahibinin telefondan hızlı takip ve
+karar vermesi için tasarlanmış koyu temalı companion uygulamadır. Masaüstü ana veri
+kaynağı olmaya devam eder.
 
-Android uygulama hızlı takip, arama, WhatsApp'tan yazma ve temel onay işlemlerine odaklanacaktır.
+## Ekranlar
+
+Alt navigasyonda beş operasyon ekranı bulunur:
+
+- **Bugün:** talepler, rezervasyonlar, işler, boş oda/masa, hesap bekleyen masalar ve
+  hazır cevaplar.
+- **Müşteri:** yeni talepler, müşteriler ve cevap bekleyenler; arama, WhatsApp,
+  onay/red, cevaplandı ve rezervasyona çevirme kısayolları.
+- **Pansiyon:** rezervasyon, oda durumu ve günlük iş yönetimi.
+- **Restoran:** masa durumu, aktif adisyonlar, menüden ürün ekleme, adet/satır
+  yönetimi ve servis/hesap/kapatma akışı.
+- **Mesajlar:** hazır mesajı gösterme, kopyalama, WhatsApp uygulamasında açma ve arama.
+
+Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
+`Ayarlar` ekranında gösterilir.
+
+## Veri Akışı
+
+Android SQLite'a veya PC'ye doğrudan bağlanmaz:
+
+```text
+Android → hosting action queue → Desktop uygular
+        → Desktop güncel snapshot yayınlar → Android canlı veriyi çeker
+```
+
+Gönderilen işlem önce `Bekliyor` görünür. Masaüstü uyguladıktan sonra `Uygulandı`,
+uygulayamazsa kullanıcı dostu hata metniyle `Uygulanamadı` olur. Masaüstündeki receipt
+tablosu aynı action kimliğinin iki kez uygulanmasını engeller.
+
+İşlem kimliği ağ çağrısından önce üretilir ve işlem telefondaki kalıcı outbox'a yazılır.
+Yanıt kaybolur veya uygulama kapanırsa aynı kimlik ve payload yeniden gönderilir; sunucu
+ve masaüstü idempotency kontrolleri işlemin iki kez uygulanmasını engeller. Bir kayıt
+masaüstünü beklerken yeni değişiklik alınmaz; güncel snapshot çekildikten sonra devam edilir.
+Outbox kaydı normalize hosting endpoint'i ve güvenlik anahtarı parmak izine bağlıdır;
+bekleyen işlem varken bağlantı başka bir firmaya değiştirilirse eski işlem yeni hedefe
+gönderilmez.
+
+Değiştirilebilir kayıtların payload'ı snapshot'taki `updated_at` değerini beklenti olarak
+taşır. Kayıt masaüstünde bu sırada değişmişse işlem uygulanmaz ve kullanıcıdan canlı veriyi
+yenilemesi istenir.
+
+Yeni masa için `adisyon aç + ürün ekle` iki bağlı action olarak saklanır. Ürün action'ı,
+adisyon açma action'ının masaüstü receipt kaydı ve o action kimliğinden türetilen aktif
+adisyon olmadan uygulanmaz.
 
 ## Komutlar
 
@@ -18,63 +63,30 @@ npm run build:android
 apps/android-app/build/outputs/apk/debug/yardimci-asistan-debug.apk
 ```
 
-Bu ilk sürüm Gradle gerektirmez; kurulu Android SDK `aapt2`, `d8`, `zipalign` ve `apksigner` araçlarıyla native Java APK üretir.
+Bu proje Gradle kullanmadan kurulu Android SDK araçlarıyla native Java APK üretir.
+Java 8 kaynakları `javac` ile derlenir, `d8` ile dex/desugar edilir, ardından APK
+`zipalign` ve `apksigner` ile hazırlanır.
 
-Gerçek telefonda yerel web modülüyle denemek için:
-
-```bash
-npm run android:phone-test
-```
-
-Bu komut demo veriyi hazırlar, PHP web modülünü LAN'da açar, cihaz adb ile
-görünüyorsa APK'yı kurup uygulamayı doğru `Web modül adresi` ve `Sync anahtarı`
-ile başlatır. ADB ile gelen bağlantı bilgileri uygulama tercihlerine kaydedilir;
-sonraki açılışta tekrar yazmak gerekmez. Sadece script doğrulaması yapmak için:
+Hosting ve demo operasyon verisiyle komut satırı smoke testi:
 
 ```bash
-npm run android:phone-test -- --once --no-adb --no-build
+npm run smoke:android-hosting
 ```
 
-ADB ile kurulumdan sonra PHP sunucusunu kısa süre açık tutmak için:
-
-```bash
-npm run android:phone-test -- --once --hold-ms 12000
-```
-
-ADB üzerinden ekran görüntüsü, UI ağacı ve dokunma kontrolü için:
-
-```bash
-npm run android:screenshot
-npm run android:dump
-npm run android:control -- tap 360 640
-npm run android:control -- key back
-```
-
-Canlı ekran aynalama ve fare/klavye kontrolü için:
-
-```bash
-npm run android:mirror
-```
-
-Bağlı telefonda görsel/UI smoke testi için:
+Bağlı telefonda gerçek UI ve action queue smoke testi:
 
 ```bash
 npm run smoke:android-device-ui
 ```
 
-## İlk Ekran
+ADB üzerinden ekran görüntüsü, UI ağacı ve aynalama:
 
-- Yardımcı Asistan marka başlığı.
-- Web modül adresi ve sync anahtarı alanları.
-- `android_summary` endpointinden canlı yeni talep, toplam kayıt, bekleyen ve PC'ye aktarılan talep özetleri.
-- PC uygulamasından web modülüne yayınlanan Android snapshot ile bugünkü işler, boş oda, boş masa ve bekleyen onay kartları.
-- PC'den yayınlanan günlük iş listesini telefonda sade takip alanı olarak gösterme.
-- Canlı talep listesi ve seçili talep detay kartı.
-- Seçili müşteri talebi üzerinde ara, WhatsApp'tan yaz, onayla, reddet ve cevaplandı kısayolları.
-- `update_request_status` aksiyonuyla onay, ret ve cevaplandı durumlarını firma web modülüne yazma.
-- Bağlantı yoksa demo verisiyle güvenli fallback ekranı.
+```bash
+npm run android:screenshot
+npm run android:dump
+npm run android:mirror
+```
 
-Yerel testte telefonun PC'deki PHP sunucusuna erişebilmesi için `localhost`
-yerine PC'nin yerel ağ IP adresini kullanın.
-`Web modül adresi` alanına web modül kök adresi, `/api` klasörü veya tam
-`/api/sync.php` adresi girilebilir.
+Telefonun yerel PHP sunucusuna erişmesi için script mümkünse `adb reverse` kullanır;
+aksi halde aynı ağdaki PC adresini verir. Web modül alanına modül kökü, `/api` klasörü
+veya tam `/api/sync.php` adresi girilebilir.

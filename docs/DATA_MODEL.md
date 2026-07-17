@@ -22,6 +22,41 @@ Web tarafında oluşan müşteri talepleri firma hostinginde saklanacak, PC uygu
 
 Android companion sadece gerekli özetleri ve işlem bilgilerini gösterecektir.
 
+Android'den gelen değişiklikler doğrudan PC verisine yazılmaz. Hosting action queue
+üzerinden masaüstüne taşınır; masaüstü aynı action kimliğini yalnız bir kez uygular.
+
+## Android Action Queue Modeli
+
+```json
+{
+  "id": "android_action_001",
+  "action_type": "room_status_update",
+  "payload": {
+    "room_id": "room_001",
+    "status": "cleaning",
+    "expected_updated_at": "2026-07-17T10:00:00.000Z"
+  },
+  "created_at": "2026-07-17T10:00:00+03:00",
+  "device_id": "android-device-001",
+  "status": "pending",
+  "error_message": "",
+  "processed_at": ""
+}
+```
+
+`status` değerleri `pending`, `applied` ve `failed` olabilir. Masaüstü başarılı
+uygulanan action kimliğini yerel receipt tablosunda saklar; aynı kimlik yeniden gelirse
+veriyi ikinci kez değiştirmeden uygulanmış sonucu döndürür.
+
+Android action kimliği ilk ağ çağrısından önce üretilir ve action telefondaki kalıcı
+outbox'a alınır. Yanıt alınamayan çağrı aynı kimlik ve payload ile yeniden denenir.
+Outbox kaydı normalize endpoint ve sync-secret parmak izini de taşır; farklı firma
+bağlantısına otomatik gönderilemez. Çok adımlı action payload'ları
+`depends_on_action_id` ile parent receipt'ine bağlanır.
+`expected_updated_at` (sipariş satırı ve masa açılışında eşdeğer beklenen sürüm alanları)
+yalnız gönderildiğinde kontrol edilir; bu sayede eski kuyruk kayıtları geriye dönük uyumlu
+kalırken yeni kayıtlar stale snapshot üzerine yazamaz.
+
 ## Temel Veri Prensipleri
 
 1. Her kayıt benzersiz bir `id` alanına sahip olmalıdır.

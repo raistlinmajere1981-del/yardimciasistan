@@ -1,8 +1,9 @@
 import { DatabaseSync } from "node:sqlite";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createId, normalizePhone } from "@yardimci-asistan/shared";
-import type { PublishedQrMenu, PushAiSettingsResult, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import type { AndroidSyncAction, PublishedQrMenu, PushAiSettingsResult, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
@@ -101,6 +102,16 @@ export interface DesktopCustomer {
   lastContactAt: string;
   requestCount: number;
   reservationCount: number;
+  updatedAt: string;
+}
+
+export interface DesktopPreparedMessage {
+  id: string;
+  requestId: string;
+  customerName: string;
+  customerPhone: string;
+  message: string;
+  status: string;
   updatedAt: string;
 }
 
@@ -485,6 +496,21 @@ export interface RecordSyncEventInput {
   status?: number;
 }
 
+export type ApplyAndroidActionResult =
+  | {
+      ok: true;
+      message: string;
+      alreadyApplied: boolean;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+type AndroidActionMutationResult =
+  | { ok: true; message: string }
+  | { ok: false; message: string };
+
 export class DesktopDatabase {
   private readonly db: DatabaseSync;
   readonly databasePath: string;
@@ -557,7 +583,18 @@ export class DesktopDatabase {
         totalRooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE is_active = 1 AND deleted_at = ''"),
         availableTables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE status = 'available' AND is_active = 1 AND deleted_at = ''"),
         pendingReservations: this.getScalarCount("SELECT COUNT(*) as count FROM reservations WHERE status = 'pending' AND deleted_at = ''"),
-        preparedWhatsAppMessages: this.getScalarCount("SELECT COUNT(*) as count FROM whatsapp_messages WHERE status = 'prepared' AND deleted_at = ''"),
+        preparedWhatsAppMessages: this.getScalarCount(`
+          SELECT COUNT(*) as count
+          FROM whatsapp_messages
+          LEFT JOIN requests ON requests.id = whatsapp_messages.request_id AND requests.deleted_at = ''
+          WHERE whatsapp_messages.direction = 'outgoing'
+            AND whatsapp_messages.status = 'prepared'
+            AND whatsapp_messages.deleted_at = ''
+            AND (
+              requests.id IS NULL
+              OR requests.status NOT IN ('answered', 'rejected', 'cancelled', 'archived', 'converted_to_reservation')
+            )
+        `),
         activeMenuCategories: this.getScalarCount("SELECT COUNT(*) as count FROM menu_categories WHERE is_active = 1 AND deleted_at = ''"),
         availableMenuItems: this.getScalarCount(`
           SELECT COUNT(*) as count
@@ -571,6 +608,134 @@ export class DesktopDatabase {
       },
       menu: this.getPublishedMenu()
     };
+  }
+
+  getAndroidPreparedMessages(): DesktopPreparedMessage[] {
+    const rows = this.db
+      .prepare(`
+        SELECT
+          whatsapp_messages.id,
+          whatsapp_messages.request_id,
+          COALESCE(NULLIF(customers.full_name, ''), NULLIF(requests.customer_name, ''), 'Misafir') AS customer_name,
+          COALESCE(NULLIF(whatsapp_messages.phone, ''), NULLIF(customers.phone, ''), requests.customer_phone, '') AS customer_phone,
+          whatsapp_messages.message,
+          whatsapp_messages.status,
+          whatsapp_messages.updated_at
+        FROM whatsapp_messages
+        LEFT JOIN requests ON requests.id = whatsapp_messages.request_id AND requests.deleted_at = ''
+        LEFT JOIN customers ON customers.id = whatsapp_messages.customer_id AND customers.deleted_at = ''
+        WHERE whatsapp_messages.direction = 'outgoing'
+          AND whatsapp_messages.status = 'prepared'
+          AND whatsapp_messages.deleted_at = ''
+          AND (
+            requests.id IS NULL
+            OR requests.status NOT IN ('answered', 'rejected', 'cancelled', 'archived', 'converted_to_reservation')
+          )
+        ORDER BY whatsapp_messages.updated_at DESC, whatsapp_messages.created_at DESC
+        LIMIT 300
+      `)
+      .all() as Array<Record<string, unknown>>;
+    const messages: DesktopPreparedMessage[] = rows.map((row) => ({
+      id: String(row.id ?? ""),
+      requestId: String(row.request_id ?? ""),
+      customerName: String(row.customer_name ?? "Misafir"),
+      customerPhone: String(row.customer_phone ?? ""),
+      message: String(row.message ?? ""),
+      status: String(row.status ?? "prepared"),
+      updatedAt: String(row.updated_at ?? "")
+    }));
+
+    const requestIdsWithMessage = new Set(
+      (this.db
+        .prepare("SELECT request_id FROM whatsapp_messages WHERE direction = 'outgoing' AND request_id != '' AND deleted_at = ''")
+        .all() as Array<{ request_id?: string }>)
+        .map((row) => String(row.request_id ?? ""))
+    );
+    for (const request of this.getRequests()) {
+      if (messages.length >= 300 || requestIdsWithMessage.has(request.id)
+          || ["answered", "rejected", "cancelled", "archived", "converted_to_reservation"].includes(request.status)) {
+        continue;
+      }
+      const message = String(request.ai_suggested_reply || request.whatsapp_message || "").trim();
+      if (!message) {
+        continue;
+      }
+      messages.push({
+        id: `message_${request.id}`,
+        requestId: request.id,
+        customerName: request.customer_name,
+        customerPhone: request.customer_phone,
+        message,
+        status: "prepared",
+        updatedAt: request.updated_at
+      });
+    }
+    return messages;
+  }
+
+  applyAndroidAction(action: AndroidSyncAction): ApplyAndroidActionResult {
+    const actionId = String(action.id ?? "").trim();
+    const actionType = String(action.action_type ?? "").trim();
+    const deviceId = String(action.device_id ?? "").trim();
+    if (!actionId || !actionType || !deviceId || !action.payload || typeof action.payload !== "object" || Array.isArray(action.payload)) {
+      return { ok: false, message: "Telefon işlemi eksik veya geçersiz." };
+    }
+
+    const existingReceipt = this.db.prepare("SELECT id FROM android_action_receipts WHERE id = ?").get(actionId);
+    if (existingReceipt) {
+      return {
+        ok: true,
+        message: "Telefon işlemi daha önce uygulanmış.",
+        alreadyApplied: true
+      };
+    }
+
+    const now = new Date().toISOString();
+    let transactionStarted = false;
+    try {
+      this.db.exec("BEGIN IMMEDIATE");
+      transactionStarted = true;
+      const concurrentReceipt = this.db.prepare("SELECT id FROM android_action_receipts WHERE id = ?").get(actionId);
+      if (concurrentReceipt) {
+        this.db.exec("COMMIT");
+        transactionStarted = false;
+        return {
+          ok: true,
+          message: "Telefon işlemi daha önce uygulanmış.",
+          alreadyApplied: true
+        };
+      }
+
+      const result = this.applyAndroidActionInTransaction(action, now);
+      if (!result.ok) {
+        this.db.exec("ROLLBACK");
+        transactionStarted = false;
+        return result;
+      }
+
+      this.db
+        .prepare("INSERT INTO android_action_receipts (id, action_type, device_id, applied_at) VALUES (?, ?, ?, ?)")
+        .run(actionId, actionType, deviceId, now);
+      this.db.exec("COMMIT");
+      transactionStarted = false;
+      return {
+        ok: true,
+        message: result.message,
+        alreadyApplied: false
+      };
+    } catch {
+      if (transactionStarted) {
+        try {
+          this.db.exec("ROLLBACK");
+        } catch {
+          // Preserve the action failure result even if SQLite already ended the transaction.
+        }
+      }
+      return {
+        ok: false,
+        message: "Telefon işlemi yerel kayıtlara uygulanamadı. Masaüstünde kayıtları kontrol edip tekrar deneyin."
+      };
+    }
   }
 
   updateDailyTaskStatus(input: UpdateDailyTaskStatusInput): DesktopStatusUpdateResult {
@@ -641,6 +806,9 @@ export class DesktopDatabase {
     this.db.exec("BEGIN");
     try {
       this.db.prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, requestId);
+      if (status === "answered") {
+        this.markPreparedWhatsAppMessagesSentInTransaction(requestId, now);
+      }
       this.insertEvent({
         type: "request.status_changed",
         entityType: "request",
@@ -1122,9 +1290,10 @@ export class DesktopDatabase {
       }
       orderId = String(item.order_id);
       const lineTotal = roundMoney(Number(item.unit_price ?? 0) * quantity);
+      const updatedAt = nextMutationTimestamp(item.updated_at, now);
       this.db
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
-        .run(quantity, lineTotal, now, itemId);
+        .run(quantity, lineTotal, updatedAt, itemId);
       this.recalculateTableOrderTotalInTransaction(orderId, now);
       this.insertEvent({
         type: "table_order.item_quantity_changed",
@@ -1155,7 +1324,8 @@ export class DesktopDatabase {
         return { ok: false, message: "Not eklenecek aktif sipariş satırı bulunamadı." };
       }
       orderId = String(item.order_id);
-      this.db.prepare("UPDATE table_order_items SET note = ?, updated_at = ? WHERE id = ?").run(note, now, itemId);
+      const updatedAt = nextMutationTimestamp(item.updated_at, now);
+      this.db.prepare("UPDATE table_order_items SET note = ?, updated_at = ? WHERE id = ?").run(note, updatedAt, itemId);
       this.db.prepare("UPDATE table_orders SET updated_at = ? WHERE id = ?").run(now, orderId);
       this.insertEvent({
         type: "table_order.item_note_changed",
@@ -1184,7 +1354,8 @@ export class DesktopDatabase {
         return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
       }
       orderId = String(item.order_id);
-      this.db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(now, normalizedItemId);
+      const updatedAt = nextMutationTimestamp(item.updated_at, now);
+      this.db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(updatedAt, normalizedItemId);
       this.recalculateTableOrderTotalInTransaction(orderId, now);
       this.insertEvent({
         type: "table_order.item_removed",
@@ -1345,19 +1516,30 @@ export class DesktopDatabase {
       };
     }
 
-    const reservation = this.db.prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''").get(reservationId) as Record<string, unknown> | undefined;
-    if (!reservation) {
-      return {
-        ok: false,
-        message: "Rezervasyon bulunamadı."
-      };
-    }
-
-    const roomIds = this.parseStringArray(reservation.room_ids_json);
-    const tableIds = this.parseStringArray(reservation.table_ids_json);
     const now = new Date().toISOString();
-    this.db.exec("BEGIN");
+    this.db.exec("BEGIN IMMEDIATE");
     try {
+      const reservation = this.db
+        .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
+        .get(reservationId) as Record<string, unknown> | undefined;
+      if (!reservation) {
+        this.db.exec("ROLLBACK");
+        return {
+          ok: false,
+          message: "Rezervasyon bulunamadı."
+        };
+      }
+
+      const roomIds = this.parseStringArray(reservation.room_ids_json);
+      const tableIds = this.parseStringArray(reservation.table_ids_json);
+      if (this.findActiveOrderForTables(tableIds)) {
+        this.db.exec("ROLLBACK");
+        return {
+          ok: false,
+          message: "Aktif adisyonu olan masaya bağlı rezervasyon değiştirilemez. Önce adisyonu kapatın."
+        };
+      }
+
       this.db.prepare("UPDATE reservations SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, reservationId);
 
       if (status === "approved") {
@@ -3212,6 +3394,592 @@ export class DesktopDatabase {
     return customerId;
   }
 
+  private applyAndroidActionInTransaction(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    switch (action.action_type) {
+      case "customer_request_mark_answered":
+        return this.applyAndroidRequestStatus(action, "answered", now);
+      case "customer_request_reopen":
+        return this.applyAndroidRequestStatus(action, "new", now);
+      case "customer_request_approve":
+        return this.applyAndroidRequestStatus(action, "approved", now);
+      case "customer_request_reject":
+        return this.applyAndroidRequestStatus(action, "rejected", now);
+      case "customer_request_convert_to_reservation":
+        return this.applyAndroidRequestConversion(action, now);
+      case "reservation_approve":
+        return this.applyAndroidReservationStatus(action, "approved", now);
+      case "reservation_reject":
+        return this.applyAndroidReservationStatus(action, "rejected", now);
+      case "reservation_cancel":
+        return this.applyAndroidReservationStatus(action, "cancelled", now);
+      case "room_status_update":
+        return this.applyAndroidRoomStatus(action, now);
+      case "daily_task_complete":
+        return this.applyAndroidDailyTaskStatus(action, "done", now);
+      case "daily_task_reopen":
+        return this.applyAndroidDailyTaskStatus(action, "pending", now);
+      case "daily_task_cancel":
+        return this.applyAndroidDailyTaskStatus(action, "cancelled", now);
+      case "table_status_update":
+        return this.applyAndroidTableStatus(action, now);
+      case "table_order_open":
+        return this.applyAndroidTableOrderOpen(action, now);
+      case "table_order_add_item":
+        return this.applyAndroidTableOrderAddItem(action, now);
+      case "table_order_update_item_quantity":
+        return this.applyAndroidTableOrderItemQuantity(action, now);
+      case "table_order_remove_item":
+        return this.applyAndroidTableOrderRemoveItem(action, now);
+      case "table_order_set_status":
+        return this.applyAndroidTableOrderStatus(action, now);
+      case "table_order_close":
+        return this.applyAndroidTableOrderClose(action, now);
+      default:
+        return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
+    }
+  }
+
+  private applyAndroidRequestStatus(action: AndroidSyncAction, status: string, now: string): AndroidActionMutationResult {
+    const requestId = androidPayloadString(action.payload, "request_id");
+    if (!requestId) {
+      return { ok: false, message: "Güncellenecek talep seçilmemiş." };
+    }
+    const request = this.db
+      .prepare("SELECT status, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
+      .get(requestId) as { status?: string; updated_at?: string } | undefined;
+    if (!request) {
+      return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", request.updated_at, "Talep");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(request.updated_at, now);
+
+    this.db
+      .prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(status, updatedAt, requestId);
+    if (status === "answered") {
+      this.markPreparedWhatsAppMessagesSentInTransaction(requestId, updatedAt);
+    }
+    this.insertAndroidActionEvent(action, "request.status_changed", "request", requestId, {
+      previous_status: String(request.status ?? ""),
+      status
+    }, now);
+    return { ok: true, message: "Talep durumu telefondan güncellendi." };
+  }
+
+  private applyAndroidRequestConversion(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const requestId = androidPayloadString(action.payload, "request_id");
+    if (!requestId) {
+      return { ok: false, message: "Rezervasyona çevrilecek talep seçilmemiş." };
+    }
+    const request = this.db
+      .prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''")
+      .get(requestId) as Record<string, unknown> | undefined;
+    if (!request) {
+      return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", request.updated_at, "Talep");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(request.updated_at, now);
+
+    const existingReservation = this.db
+      .prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1")
+      .get(requestId) as { id?: string } | undefined;
+    const reservationId = existingReservation?.id || createAndroidEntityId("reservation_", action.id);
+    const reservationType = getReservationTypeForRequest(String(request.request_type ?? ""));
+    const customerId = this.ensureCustomerForRequest(request, now);
+    this.db
+      .prepare(`
+        INSERT INTO reservations (
+          id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
+          guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+          payment_status, created_at, updated_at, sync_status
+        ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, 'not_required', ?, ?, 'local_only')
+        ON CONFLICT(id) DO UPDATE SET
+          customer_id = excluded.customer_id,
+          reservation_type = excluded.reservation_type,
+          status = 'approved',
+          title = excluded.title,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          time = excluded.time,
+          guest_count = excluded.guest_count,
+          adult_count = excluded.adult_count,
+          child_count = excluded.child_count,
+          notes = excluded.notes,
+          price_note = excluded.price_note,
+          updated_at = excluded.updated_at,
+          deleted_at = '',
+          sync_status = 'local_only'
+      `)
+      .run(
+        reservationId,
+        requestId,
+        customerId,
+        reservationType,
+        buildReservationTitle(request, reservationType),
+        String(request.start_date ?? ""),
+        String(request.end_date ?? ""),
+        String(request.time ?? ""),
+        Number(request.guest_count ?? 1),
+        Number(request.adult_count ?? 0),
+        Number(request.child_count ?? 0),
+        buildReservationNotes(request),
+        "Fiyat ve kaynak ataması işletme sahibi tarafından netleştirilecek.",
+        updatedAt,
+        updatedAt
+      );
+    this.db
+      .prepare("UPDATE requests SET status = 'converted_to_reservation', customer_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(customerId, updatedAt, requestId);
+    this.insertAndroidActionEvent(action, "request.converted_to_reservation", "request", requestId, {
+      reservation_id: reservationId,
+      customer_id: customerId,
+      previous_status: String(request.status ?? "")
+    }, now);
+    this.insertAndroidActionEvent(action, "reservation.approved", "reservation", reservationId, {
+      request_id: requestId,
+      customer_id: customerId,
+      reservation_type: reservationType
+    }, now);
+    return {
+      ok: true,
+      message: existingReservation ? "Mevcut rezervasyon telefondan onaylandı." : "Talep telefondan rezervasyona çevrildi."
+    };
+  }
+
+  private applyAndroidReservationStatus(action: AndroidSyncAction, status: "approved" | "rejected" | "cancelled", now: string): AndroidActionMutationResult {
+    const reservationId = androidPayloadString(action.payload, "reservation_id");
+    if (!reservationId) {
+      return { ok: false, message: "Güncellenecek rezervasyon seçilmemiş." };
+    }
+    const reservation = this.db
+      .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
+      .get(reservationId) as Record<string, unknown> | undefined;
+    if (!reservation) {
+      return { ok: false, message: "Rezervasyon masaüstü kayıtlarında bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", reservation.updated_at, "Rezervasyon");
+    if (versionConflict) {
+      return versionConflict;
+    }
+
+    const roomIds = this.parseStringArray(reservation.room_ids_json);
+    const tableIds = this.parseStringArray(reservation.table_ids_json);
+    const activeOrder = this.findActiveOrderForTables(tableIds);
+    if (activeOrder) {
+      return { ok: false, message: "Aktif adisyonu olan masaya bağlı rezervasyon değiştirilemez. Önce adisyonu kapatın." };
+    }
+    const updatedAt = nextMutationTimestamp(reservation.updated_at, now);
+    this.db
+      .prepare("UPDATE reservations SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(status, updatedAt, reservationId);
+    if (status === "approved") {
+      for (const roomId of roomIds) {
+        this.db
+          .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+          .run(updatedAt, roomId);
+      }
+      for (const tableId of tableIds) {
+        this.db
+          .prepare("UPDATE tables SET status = 'reserved', current_reservation_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+          .run(reservationId, updatedAt, tableId);
+      }
+    } else {
+      for (const roomId of roomIds) {
+        this.db
+          .prepare("UPDATE rooms SET status = 'available', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status = 'reserved' AND deleted_at = ''")
+          .run(updatedAt, roomId);
+      }
+      for (const tableId of tableIds) {
+        this.db
+          .prepare(`
+            UPDATE tables
+            SET status = 'available', current_reservation_id = '', updated_at = ?, sync_status = 'local_only'
+            WHERE id = ? AND current_reservation_id = ? AND deleted_at = ''
+          `)
+          .run(updatedAt, tableId, reservationId);
+      }
+    }
+    this.insertAndroidActionEvent(action, "reservation.status_changed", "reservation", reservationId, {
+      previous_status: String(reservation.status ?? ""),
+      status,
+      room_ids: roomIds,
+      table_ids: tableIds
+    }, now);
+    return { ok: true, message: "Rezervasyon durumu telefondan güncellendi." };
+  }
+
+  private applyAndroidRoomStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const roomId = androidPayloadString(action.payload, "room_id");
+    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["available", "reserved", "occupied", "cleaning", "maintenance"]);
+    if (!roomId || !status) {
+      return { ok: false, message: "Oda veya yeni oda durumu geçersiz." };
+    }
+    const room = this.db
+      .prepare("SELECT status, updated_at FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+      .get(roomId) as { status?: string; updated_at?: string } | undefined;
+    if (!room) {
+      return { ok: false, message: "Oda masaüstü kayıtlarında bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", room.updated_at, "Oda");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(room.updated_at, now);
+    this.db
+      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(status, updatedAt, roomId);
+    this.insertAndroidActionEvent(action, "room.status_changed", "room", roomId, {
+      old_status: String(room.status ?? ""),
+      new_status: status
+    }, now);
+    return { ok: true, message: "Oda durumu telefondan güncellendi." };
+  }
+
+  private applyAndroidDailyTaskStatus(action: AndroidSyncAction, status: "done" | "pending" | "cancelled", now: string): AndroidActionMutationResult {
+    const taskId = androidPayloadString(action.payload, "task_id");
+    if (!taskId) {
+      return { ok: false, message: "Güncellenecek günlük iş seçilmemiş." };
+    }
+    const task = this.db
+      .prepare("SELECT status, updated_at FROM daily_tasks WHERE id = ? AND deleted_at = ''")
+      .get(taskId) as { status?: string; updated_at?: string } | undefined;
+    if (!task) {
+      return { ok: false, message: "Günlük iş masaüstü kayıtlarında bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", task.updated_at, "Günlük iş");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(task.updated_at, now);
+    this.db
+      .prepare("UPDATE daily_tasks SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(status, updatedAt, taskId);
+    this.insertAndroidActionEvent(action, status === "done" ? "task.completed" : "task.status_changed", "daily_task", taskId, {
+      previous_status: String(task.status ?? ""),
+      status
+    }, now);
+    return { ok: true, message: "Günlük iş telefondan güncellendi." };
+  }
+
+  private applyAndroidTableStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const tableId = androidPayloadString(action.payload, "table_id");
+    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["available", "reserved", "occupied", "bill_waiting", "cleaning"]);
+    if (!tableId || !status) {
+      return { ok: false, message: "Masa veya yeni masa durumu geçersiz." };
+    }
+    const table = this.db
+      .prepare("SELECT status, updated_at FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+      .get(tableId) as { status?: string; updated_at?: string } | undefined;
+    if (!table) {
+      return { ok: false, message: "Masa masaüstü kayıtlarında bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", table.updated_at, "Masa");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const activeOrder = this.db
+      .prepare("SELECT id, status FROM table_orders WHERE table_id = ? AND status IN ('open', 'preparing', 'served', 'payment') LIMIT 1")
+      .get(tableId) as { id?: string; status?: string } | undefined;
+    if (activeOrder) {
+      return { ok: false, message: "Aktif adisyonu olan masanın durumu adisyon üzerinden değiştirilmelidir." };
+    }
+    const updatedAt = nextMutationTimestamp(table.updated_at, now);
+    this.db
+      .prepare("UPDATE tables SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(status, updatedAt, tableId);
+    this.insertAndroidActionEvent(action, "table.status_changed", "table", tableId, {
+      old_status: String(table.status ?? ""),
+      new_status: status
+    }, now);
+    return { ok: true, message: "Masa durumu telefondan güncellendi." };
+  }
+
+  private applyAndroidTableOrderOpen(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const tableId = androidPayloadString(action.payload, "table_id");
+    if (!tableId) {
+      return { ok: false, message: "Sipariş açılacak masa seçilmemiş." };
+    }
+    const table = this.db
+      .prepare("SELECT id, updated_at FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+      .get(tableId) as { id?: string; updated_at?: string } | undefined;
+    if (!table) {
+      return { ok: false, message: "Sipariş açılacak masa bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_table_updated_at", table.updated_at, "Masa");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const activeOrder = this.db
+      .prepare("SELECT id, status FROM table_orders WHERE table_id = ? AND status IN ('open', 'preparing', 'served', 'payment') LIMIT 1")
+      .get(tableId) as { id?: string; status?: string } | undefined;
+    if (activeOrder?.id) {
+      this.updateTableStatusForOrderInTransaction(tableId, activeOrder.status === "payment" ? "bill_waiting" : "occupied", activeOrder.id, now, action);
+      return { ok: true, message: "Masada zaten açık bir adisyon var." };
+    }
+
+    const orderId = createAndroidEntityId("table_order_", action.id);
+    this.db
+      .prepare(`
+        INSERT INTO table_orders (
+          id, table_id, status, opened_at, closed_at, subtotal, discount_total, total, note, created_at, updated_at
+        ) VALUES (?, ?, 'open', ?, '', 0, 0, 0, '', ?, ?)
+      `)
+      .run(orderId, tableId, now, now, now);
+    this.updateTableStatusForOrderInTransaction(tableId, "occupied", orderId, now, action);
+    this.insertAndroidActionEvent(action, "table_order.opened", "table_order", orderId, { table_id: tableId }, now);
+    return { ok: true, message: "Masa adisyonu telefondan açıldı." };
+  }
+
+  private applyAndroidTableOrderAddItem(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const explicitOrderId = androidPayloadString(action.payload, "order_id");
+    const dependencyActionId = androidPayloadString(action.payload, "depends_on_action_id");
+    let orderId = "";
+    if (explicitOrderId) {
+      orderId = this.resolveAndroidActiveOrderId(action.payload);
+    } else if (dependencyActionId) {
+      const dependencyReceipt = this.db
+        .prepare("SELECT action_type FROM android_action_receipts WHERE id = ?")
+        .get(dependencyActionId) as { action_type?: string } | undefined;
+      const dependentOrderId = createAndroidEntityId("table_order_", dependencyActionId);
+      if (dependencyReceipt?.action_type !== "table_order_open" || !this.isActiveTableOrder(dependentOrderId)) {
+        return { ok: false, message: "Ürün eklenemedi çünkü bağlı adisyon açma işlemi uygulanmadı." };
+      }
+      orderId = dependentOrderId;
+    } else {
+      return { ok: false, message: "Ürün eklemek için açık adisyon veya uygulanmış adisyon açma işlemi gerekli." };
+    }
+    const menuItemId = androidPayloadString(action.payload, "menu_item_id");
+    const quantity = normalizeOrderQuantity(androidPayloadNumber(action.payload, "quantity", 1));
+    if (!orderId || !menuItemId || !quantity) {
+      return { ok: false, message: "Ürün, adisyon veya adet bilgisi geçersiz." };
+    }
+    const order = this.db
+      .prepare("SELECT table_id, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+      .get(orderId) as { table_id?: string; updated_at?: string } | undefined;
+    if (!order) {
+      return { ok: false, message: "Ürün eklenecek aktif adisyon bulunamadı." };
+    }
+    const payloadTableId = androidPayloadString(action.payload, "table_id");
+    if (payloadTableId && payloadTableId !== String(order.table_id ?? "")) {
+      return { ok: false, message: "Ürün ile adisyonun masa bilgisi eşleşmiyor." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_order_updated_at", order.updated_at, "Adisyon");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const menuItem = this.db
+      .prepare(`
+        SELECT menu_items.id, menu_items.name, menu_items.price, menu_items.currency
+        FROM menu_items
+        INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
+        WHERE menu_items.id = ?
+          AND menu_items.is_available = 1
+          AND menu_items.deleted_at = ''
+          AND menu_categories.is_active = 1
+          AND menu_categories.deleted_at = ''
+        LIMIT 1
+      `)
+      .get(menuItemId) as { id?: string; name?: string; price?: number; currency?: string } | undefined;
+    if (!menuItem?.id) {
+      return { ok: false, message: "Menü ürünü artık satışta değil veya bulunamadı." };
+    }
+    const productName = String(menuItem.name ?? "Ürün").trim() || "Ürün";
+    const unitPrice = roundMoney(Number(menuItem.price ?? 0));
+    const currency = normalizeTableOrderCurrency(menuItem.currency);
+    const orderCurrency = this.db
+      .prepare("SELECT currency FROM table_order_items WHERE order_id = ? AND status != 'cancelled' ORDER BY created_at ASC LIMIT 1")
+      .get(orderId) as { currency?: string } | undefined;
+    if (orderCurrency?.currency && normalizeTableOrderCurrency(orderCurrency.currency) !== currency) {
+      return { ok: false, message: "Farklı para birimindeki ürün aynı adisyona eklenemez." };
+    }
+    const existingItem = this.db
+      .prepare(`
+        SELECT id, quantity, updated_at FROM table_order_items
+        WHERE order_id = ? AND menu_item_id = ? AND product_name = ? AND unit_price = ? AND currency = ? AND note = '' AND status = 'open'
+        ORDER BY created_at DESC LIMIT 1
+      `)
+      .get(orderId, menuItemId, productName, unitPrice, currency) as { id?: string; quantity?: number; updated_at?: string } | undefined;
+    let itemId = existingItem?.id || createAndroidEntityId("table_order_item_", action.id);
+    if (existingItem?.id) {
+      const nextQuantity = Number(existingItem.quantity ?? 0) + quantity;
+      if (nextQuantity > 999) {
+        return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
+      }
+      const itemUpdatedAt = nextMutationTimestamp(existingItem.updated_at, now);
+      this.db
+        .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
+        .run(nextQuantity, roundMoney(unitPrice * nextQuantity), itemUpdatedAt, itemId);
+    } else {
+      this.db
+        .prepare(`
+          INSERT INTO table_order_items (
+            id, order_id, menu_item_id, product_name, unit_price, currency, quantity, line_total, note, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 'open', ?, ?)
+        `)
+        .run(itemId, orderId, menuItemId, productName, unitPrice, currency, quantity, roundMoney(unitPrice * quantity), now, now);
+    }
+    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    this.insertAndroidActionEvent(action, "table_order.item_added", "table_order", orderId, {
+      item_id: itemId,
+      menu_item_id: menuItemId,
+      quantity,
+      unit_price: unitPrice,
+      currency
+    }, now);
+    return { ok: true, message: "Ürün telefondan adisyona eklendi." };
+  }
+
+  private applyAndroidTableOrderItemQuantity(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const itemId = androidPayloadString(action.payload, "item_id");
+    const quantity = normalizeOrderQuantity(androidPayloadNumber(action.payload, "quantity", 0));
+    if (!itemId || !quantity) {
+      return { ok: false, message: "Sipariş satırı veya adet bilgisi geçersiz." };
+    }
+    const item = this.getMutableTableOrderItem(itemId);
+    if (!item) {
+      return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_item_updated_at", item.updated_at, "Sipariş satırı");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(item.updated_at, now);
+    const orderId = String(item.order_id ?? "");
+    this.db
+      .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
+      .run(quantity, roundMoney(Number(item.unit_price ?? 0) * quantity), updatedAt, itemId);
+    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    this.insertAndroidActionEvent(action, "table_order.item_quantity_changed", "table_order", orderId, {
+      item_id: itemId,
+      quantity
+    }, now);
+    return { ok: true, message: "Ürün adedi telefondan güncellendi." };
+  }
+
+  private applyAndroidTableOrderRemoveItem(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const itemId = androidPayloadString(action.payload, "item_id");
+    const item = this.getMutableTableOrderItem(itemId);
+    if (!item) {
+      return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_item_updated_at", item.updated_at, "Sipariş satırı");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(item.updated_at, now);
+    const orderId = String(item.order_id ?? "");
+    this.db
+      .prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?")
+      .run(updatedAt, itemId);
+    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    this.insertAndroidActionEvent(action, "table_order.item_removed", "table_order", orderId, { item_id: itemId }, now);
+    return { ok: true, message: "Ürün telefondan adisyondan kaldırıldı." };
+  }
+
+  private applyAndroidTableOrderStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const orderId = this.resolveAndroidActiveOrderId(action.payload);
+    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["open", "preparing", "served", "payment"]);
+    if (!orderId || !status) {
+      return { ok: false, message: "Adisyon veya yeni durum bilgisi geçersiz." };
+    }
+    const current = this.db
+      .prepare("SELECT status, table_id, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+      .get(orderId) as { status?: string; table_id?: string; updated_at?: string } | undefined;
+    if (!current) {
+      return { ok: false, message: "Güncellenecek aktif adisyon bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", current.updated_at, "Adisyon");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(current.updated_at, now);
+    this.db.prepare("UPDATE table_orders SET status = ?, updated_at = ? WHERE id = ?").run(status, updatedAt, orderId);
+    if (status === "preparing") {
+      this.db
+        .prepare("UPDATE table_order_items SET status = 'preparing', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
+        .run(updatedAt, orderId);
+    } else if (status === "served") {
+      this.db
+        .prepare("UPDATE table_order_items SET status = 'served', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
+        .run(updatedAt, orderId);
+    }
+    this.updateTableStatusForOrderInTransaction(String(current.table_id ?? ""), status === "payment" ? "bill_waiting" : "occupied", orderId, now, action);
+    this.insertAndroidActionEvent(action, "table_order.status_changed", "table_order", orderId, {
+      old_status: String(current.status ?? ""),
+      new_status: status
+    }, now);
+    return { ok: true, message: "Adisyon durumu telefondan güncellendi." };
+  }
+
+  private applyAndroidTableOrderClose(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const orderId = this.resolveAndroidActiveOrderId(action.payload);
+    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["paid", "cancelled"]);
+    if (!orderId || !status) {
+      return { ok: false, message: "Kapatılacak adisyon veya kapanış durumu geçersiz." };
+    }
+    const current = this.db
+      .prepare("SELECT status, table_id, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
+      .get(orderId) as { status?: string; table_id?: string; updated_at?: string } | undefined;
+    if (!current) {
+      return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", current.updated_at, "Adisyon");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const updatedAt = nextMutationTimestamp(current.updated_at, now);
+    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    this.db
+      .prepare("UPDATE table_orders SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?")
+      .run(status, now, updatedAt, orderId);
+    this.updateTableStatusForOrderInTransaction(String(current.table_id ?? ""), "available", orderId, now, action);
+    this.insertAndroidActionEvent(action, status === "paid" ? "table_order.paid" : "table_order.cancelled", "table_order", orderId, {
+      old_status: String(current.status ?? ""),
+      status
+    }, now);
+    return { ok: true, message: status === "paid" ? "Adisyon telefondan ödendi olarak kapatıldı." : "Adisyon telefondan iptal edildi." };
+  }
+
+  private resolveAndroidActiveOrderId(payload: Record<string, unknown>): string {
+    const orderId = androidPayloadString(payload, "order_id");
+    if (orderId) {
+      return this.isActiveTableOrder(orderId) ? orderId : "";
+    }
+    const tableId = androidPayloadString(payload, "table_id");
+    if (!tableId) {
+      return "";
+    }
+    const order = this.db
+      .prepare("SELECT id FROM table_orders WHERE table_id = ? AND status IN ('open', 'preparing', 'served', 'payment') LIMIT 1")
+      .get(tableId) as { id?: string } | undefined;
+    return String(order?.id ?? "");
+  }
+
+  private insertAndroidActionEvent(
+    action: AndroidSyncAction,
+    type: string,
+    entityType: string,
+    entityId: string,
+    payload: Record<string, unknown>,
+    now: string
+  ) {
+    this.insertEvent({
+      type,
+      entityType,
+      entityId,
+      payload: { ...payload, android_action_id: action.id },
+      now,
+      actorType: "android",
+      actorId: action.device_id
+    });
+  }
+
   private getTableOrderById(orderId: string): DesktopTableOrder | null {
     const row = this.db
       .prepare(`
@@ -3290,7 +4058,7 @@ export class DesktopDatabase {
 
     const row = this.db
       .prepare(`
-        SELECT table_order_items.order_id, table_order_items.unit_price
+        SELECT table_order_items.order_id, table_order_items.unit_price, table_order_items.updated_at
         FROM table_order_items
         INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
         WHERE table_order_items.id = ?
@@ -3301,6 +4069,40 @@ export class DesktopDatabase {
       .get(itemId) as Record<string, unknown> | undefined;
 
     return row ?? null;
+  }
+
+  private findActiveOrderForTables(tableIds: string[]): { id: string; tableId: string } | null {
+    const statement = this.db.prepare(`
+      SELECT id, table_id
+      FROM table_orders
+      WHERE table_id = ?
+        AND status IN ('open', 'preparing', 'served', 'payment')
+      LIMIT 1
+    `);
+    for (const tableId of tableIds) {
+      const row = statement.get(tableId) as { id?: string; table_id?: string } | undefined;
+      if (row?.id) {
+        return { id: row.id, tableId: String(row.table_id ?? tableId) };
+      }
+    }
+    return null;
+  }
+
+  private markPreparedWhatsAppMessagesSentInTransaction(requestId: string, now: string) {
+    this.db
+      .prepare(`
+        UPDATE whatsapp_messages
+        SET mode = 'manual_copy',
+            status = 'sent',
+            sent_at = CASE WHEN sent_at = '' THEN ? ELSE sent_at END,
+            updated_at = ?,
+            sync_status = 'local_only'
+        WHERE request_id = ?
+          AND direction = 'outgoing'
+          AND status = 'prepared'
+          AND deleted_at = ''
+      `)
+      .run(now, now, requestId);
   }
 
   private isActiveTableOrder(orderId: string): boolean {
@@ -3315,37 +4117,54 @@ export class DesktopDatabase {
     tableId: string,
     status: "available" | "occupied" | "bill_waiting",
     orderId: string,
-    now: string
+    now: string,
+    androidAction?: AndroidSyncAction
   ) {
     if (!tableId) {
       return;
     }
 
     const table = this.db
-      .prepare("SELECT status FROM tables WHERE id = ? AND deleted_at = ''")
-      .get(tableId) as { status?: string } | undefined;
-    if (!table || table.status === status) {
+      .prepare("SELECT status, current_customer_id, current_reservation_id, updated_at FROM tables WHERE id = ? AND deleted_at = ''")
+      .get(tableId) as { status?: string; current_customer_id?: string; current_reservation_id?: string; updated_at?: string } | undefined;
+    const shouldClearAssignment = status === "available"
+      && (Boolean(String(table?.current_customer_id ?? "")) || Boolean(String(table?.current_reservation_id ?? "")));
+    if (!table || (table.status === status && !shouldClearAssignment)) {
       return;
     }
+    const updatedAt = nextMutationTimestamp(table.updated_at, now);
 
     const updateResult = this.db
-      .prepare("UPDATE tables SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-      .run(status, now, tableId);
+      .prepare(`
+        UPDATE tables
+        SET status = ?,
+            current_customer_id = CASE WHEN ? = 'available' THEN '' ELSE current_customer_id END,
+            current_reservation_id = CASE WHEN ? = 'available' THEN '' ELSE current_reservation_id END,
+            updated_at = ?,
+            sync_status = 'local_only'
+        WHERE id = ? AND deleted_at = ''
+      `)
+      .run(status, status, status, updatedAt, tableId);
     if (Number(updateResult.changes) !== 1) {
       throw new Error("Table status could not be synchronized with the active order.");
     }
-    this.insertEvent({
-      type: "table.status_changed",
-      entityType: "table",
-      entityId: tableId,
-      payload: {
-        old_status: String(table.status ?? ""),
-        new_status: status,
-        source: "table_order",
-        order_id: orderId
-      },
-      now
-    });
+    const payload = {
+      old_status: String(table.status ?? ""),
+      new_status: status,
+      source: "table_order",
+      order_id: orderId
+    };
+    if (androidAction) {
+      this.insertAndroidActionEvent(androidAction, "table.status_changed", "table", tableId, payload, now);
+    } else {
+      this.insertEvent({
+        type: "table.status_changed",
+        entityType: "table",
+        entityId: tableId,
+        payload,
+        now
+      });
+    }
   }
 
   private recalculateTableOrderTotalInTransaction(orderId: string, now: string) {
@@ -3358,13 +4177,14 @@ export class DesktopDatabase {
               ELSE 0
             END
           ), 0) AS subtotal,
-          table_orders.discount_total AS discount_total
+          table_orders.discount_total AS discount_total,
+          table_orders.updated_at AS updated_at
         FROM table_orders
         LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
         WHERE table_orders.id = ?
         GROUP BY table_orders.id
       `)
-      .get(orderId) as { subtotal?: number; discount_total?: number } | undefined;
+      .get(orderId) as { subtotal?: number; discount_total?: number; updated_at?: string } | undefined;
     if (!row) {
       throw new Error("Table order not found while recalculating totals.");
     }
@@ -3372,9 +4192,10 @@ export class DesktopDatabase {
     const subtotal = roundMoney(Number(row.subtotal ?? 0));
     const discountTotal = roundMoney(Number(row.discount_total ?? 0));
     const total = roundMoney(Math.max(0, subtotal - discountTotal));
+    const updatedAt = nextMutationTimestamp(row.updated_at, now);
     this.db
       .prepare("UPDATE table_orders SET subtotal = ?, total = ?, updated_at = ? WHERE id = ?")
-      .run(subtotal, total, now, orderId);
+      .run(subtotal, total, updatedAt, orderId);
   }
 
   private getTableOrderMutationResult(orderId: string, message: string, includeDashboardData = false): DesktopTableOrderResult {
@@ -3395,6 +4216,8 @@ export class DesktopDatabase {
     entityId: string;
     payload: Record<string, unknown>;
     now: string;
+    actorType?: "desktop" | "android";
+    actorId?: string;
   }) {
     this.db
       .prepare(`
@@ -3409,9 +4232,19 @@ export class DesktopDatabase {
           created_at,
           updated_at,
           sync_status
-        ) VALUES (?, ?, 'desktop', '', ?, ?, ?, ?, ?, 'local_only')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
       `)
-      .run(createId("event_"), input.type, input.entityType, input.entityId, JSON.stringify(input.payload), input.now, input.now);
+      .run(
+        createId("event_"),
+        input.type,
+        input.actorType ?? "desktop",
+        input.actorId ?? "",
+        input.entityType,
+        input.entityId,
+        JSON.stringify(input.payload),
+        input.now,
+        input.now
+      );
   }
 
   private readSqlFiles(relativeDir: string) {
@@ -3543,6 +4376,46 @@ function createTableOrderId(prefix: "table_order_" | "table_order_item_"): strin
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, "") || "000000";
   return `${prefix}${timestamp}_${randomPart}`;
+}
+
+function createAndroidEntityId(prefix: "reservation_" | "table_order_" | "table_order_item_", actionId: string): string {
+  const digest = createHash("sha256").update(actionId).digest("hex").slice(0, 48);
+  return `${prefix}android_${digest}`;
+}
+
+function androidPayloadString(payload: Record<string, unknown>, field: string): string {
+  return typeof payload[field] === "string" ? payload[field].trim() : "";
+}
+
+function getAndroidVersionConflict(
+  payload: Record<string, unknown>,
+  field: string,
+  actualUpdatedAt: unknown,
+  entityLabel: string
+): AndroidActionMutationResult | null {
+  const expectedUpdatedAt = androidPayloadString(payload, field);
+  if (!expectedUpdatedAt || expectedUpdatedAt === String(actualUpdatedAt ?? "")) {
+    return null;
+  }
+  return {
+    ok: false,
+    message: `${entityLabel} masaüstünde değişmiş. Telefonda canlı veriyi yenileyip tekrar deneyin.`
+  };
+}
+
+function nextMutationTimestamp(previousUpdatedAt: unknown, candidate: string): string {
+  const previous = String(previousUpdatedAt ?? "").trim();
+  const previousTime = Date.parse(previous);
+  const candidateTime = Date.parse(candidate);
+  if (!Number.isFinite(previousTime) || !Number.isFinite(candidateTime) || candidateTime > previousTime) {
+    return candidate;
+  }
+  return new Date(previousTime + 1).toISOString();
+}
+
+function androidPayloadNumber(payload: Record<string, unknown>, field: string, fallback: number): number {
+  const value = Number(payload[field]);
+  return Number.isFinite(value) ? value : fallback;
 }
 
 function roundMoney(value: number): number {

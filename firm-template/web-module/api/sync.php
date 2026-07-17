@@ -6,6 +6,7 @@ const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 const YA_REQUESTS_FILE = YA_BASE_DIR . '/data/requests.json';
 const YA_MENU_FILE = YA_BASE_DIR . '/data/menu.json';
 const YA_ANDROID_SNAPSHOT_FILE = YA_BASE_DIR . '/data/android-snapshot.json';
+const YA_ANDROID_ACTIONS_FILE = YA_BASE_DIR . '/data/android-actions.json';
 const YA_SYNC_STATE_FILE = YA_BASE_DIR . '/data/sync-state.json';
 const YA_AI_SETTINGS_FILE = YA_BASE_DIR . '/data/ai-settings.local.php';
 
@@ -56,6 +57,18 @@ try {
         ya_sync_update_request_status($payload);
     }
 
+    if ($action === 'enqueue_android_action') {
+        ya_sync_enqueue_android_action($payload);
+    }
+
+    if ($action === 'pull_android_actions') {
+        ya_sync_pull_android_actions($payload);
+    }
+
+    if ($action === 'mark_android_action_result') {
+        ya_sync_mark_android_action_result($payload);
+    }
+
     if ($action === 'publish_menu') {
         ya_sync_publish_menu($payload);
     }
@@ -81,27 +94,51 @@ try {
 
 function ya_sync_android_summary(array $payload, array $businessConfig): void
 {
-    $limit = ya_sync_int($payload['limit'] ?? $_GET['limit'] ?? 5, 5);
-    $limit = max(1, min($limit, 20));
+    $limit = ya_sync_int($payload['limit'] ?? $_GET['limit'] ?? 100, 100);
+    $limit = max(1, min($limit, 200));
+    $deviceId = ya_sync_string($payload['device_id'] ?? $_GET['device_id'] ?? '');
     $records = ya_sync_load_json(YA_REQUESTS_FILE, []);
-
     if (!is_array($records)) {
         $records = [];
     }
 
-    $publicRequests = [];
-    $totalRequests = 0;
+    $androidSnapshot = ya_sync_load_android_snapshot();
+    $requestsById = [];
+    foreach ($androidSnapshot['requests'] as $snapshotRequest) {
+        if (!is_array($snapshotRequest)) {
+            continue;
+        }
+        $requestId = ya_sync_string($snapshotRequest['id'] ?? '');
+        if ($requestId !== '') {
+            $requestsById[$requestId] = $snapshotRequest;
+        }
+    }
+
+    // Hosting-only web requests remain visible until the desktop imports and
+    // republishes them. For duplicate ids the desktop snapshot wins because it
+    // contains the authoritative post-action state.
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $publicRequest = ya_sync_public_request($record);
+        $requestId = ya_sync_string($publicRequest['id'] ?? '');
+        if ($requestId !== '' && !isset($requestsById[$requestId])) {
+            $requestsById[$requestId] = ya_sync_sanitize_android_request($publicRequest);
+        }
+    }
+
+    $publicRequests = array_values($requestsById);
+    usort($publicRequests, static function (array $left, array $right): int {
+        return strcmp(ya_sync_string($right['created_at'] ?? ''), ya_sync_string($left['created_at'] ?? ''));
+    });
+    $totalRequests = count($publicRequests);
     $newRequests = 0;
     $pendingRequests = 0;
     $syncedRequests = 0;
     $latestCreatedAt = '';
 
-    foreach ($records as $record) {
-        if (!is_array($record)) {
-            continue;
-        }
-
-        $totalRequests++;
+    foreach ($publicRequests as $record) {
         $status = ya_sync_string($record['status'] ?? 'new');
         $syncStatus = ya_sync_string($record['sync_status'] ?? 'pending');
         $createdAt = ya_sync_string($record['created_at'] ?? '');
@@ -122,13 +159,16 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             $latestCreatedAt = $createdAt;
         }
 
-        if (count($publicRequests) < $limit && !in_array($status, ['archived', 'cancelled'], true)) {
-            $publicRequests[] = ya_sync_public_request($record);
-        }
     }
 
+    $visibleRequests = array_values(array_filter($publicRequests, static function (array $record): bool {
+        return !in_array(ya_sync_string($record['status'] ?? ''), ['archived', 'cancelled'], true);
+    }));
+    $visibleRequests = array_slice($visibleRequests, 0, $limit);
+
     $now = date(DATE_ATOM);
-    $androidSnapshot = ya_sync_load_android_snapshot();
+    $actions = ya_sync_get_android_actions($deviceId, 40);
+    $pendingActionCount = ya_sync_count_pending_android_actions($deviceId);
     ya_sync_update_state([
         'last_android_summary_at' => $now
     ]);
@@ -146,14 +186,23 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'new_requests' => $newRequests,
             'pending_requests' => $pendingRequests,
             'synced_requests' => $syncedRequests,
-            'request_count' => count($publicRequests),
+            'request_count' => count($visibleRequests),
             'latest_created_at' => $latestCreatedAt,
             'pulled_at' => $now,
-            'android_snapshot_updated_at' => ya_sync_string($androidSnapshot['updated_at'] ?? '')
+            'android_snapshot_updated_at' => ya_sync_string($androidSnapshot['updated_at'] ?? ''),
+            'pending_action_count' => $pendingActionCount
         ],
         'operations' => $androidSnapshot['summary'],
         'daily_tasks' => $androidSnapshot['daily_tasks'],
-        'requests' => $publicRequests
+        'requests' => $visibleRequests,
+        'customers' => $androidSnapshot['customers'],
+        'reservations' => $androidSnapshot['reservations'],
+        'rooms' => $androidSnapshot['rooms'],
+        'tables' => $androidSnapshot['tables'],
+        'menu' => $androidSnapshot['menu'],
+        'table_orders' => $androidSnapshot['table_orders'],
+        'messages' => $androidSnapshot['messages'],
+        'actions' => $actions
     ]);
 }
 
@@ -305,6 +354,217 @@ function ya_sync_update_request_status(array $payload): void
         'status' => $nextStatus,
         'updated_at' => $now,
         'total_records' => count($records)
+    ]);
+}
+
+function ya_sync_enqueue_android_action(array $payload): void
+{
+    $actionId = ya_sync_string($payload['action_id'] ?? $payload['id'] ?? '');
+    $actionType = ya_sync_string($payload['action_type'] ?? '');
+    $deviceId = ya_sync_string($payload['device_id'] ?? '');
+    $actionPayload = $payload['payload'] ?? null;
+
+    if (!preg_match('/^[A-Za-z0-9_-]{12,120}$/', $actionId)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'İşlem kimliği geçersiz.'
+        ]);
+    }
+
+    if (!in_array($actionType, ya_sync_android_action_types(), true)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Telefon işlemi desteklenmiyor.'
+        ]);
+    }
+
+    if (!preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Telefon kimliği geçersiz.'
+        ]);
+    }
+
+    if (!is_array($actionPayload)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'İşlem bilgileri eksik.'
+        ]);
+    }
+
+    $encodedPayload = json_encode($actionPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($encodedPayload === false || strlen($encodedPayload) > 32768) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'İşlem bilgileri çok büyük veya geçersiz.'
+        ]);
+    }
+
+    $now = date(DATE_ATOM);
+    $created = false;
+    $storedAction = null;
+    $actions = ya_sync_edit_json_array(YA_ANDROID_ACTIONS_FILE, static function (array $actions) use (
+        $actionId,
+        $actionType,
+        $deviceId,
+        $actionPayload,
+        $now,
+        &$created,
+        &$storedAction
+    ): array {
+        foreach ($actions as $action) {
+            if (is_array($action) && ya_sync_string($action['id'] ?? '') === $actionId) {
+                $storedAction = ya_sync_public_android_action($action);
+                return $actions;
+            }
+        }
+
+        $storedAction = [
+            'id' => $actionId,
+            'action_type' => $actionType,
+            'payload' => $actionPayload,
+            'created_at' => $now,
+            'device_id' => $deviceId,
+            'status' => 'pending',
+            'error_message' => '',
+            'processed_at' => ''
+        ];
+        $actions[] = $storedAction;
+        $created = true;
+
+        // Retain every pending command and a bounded recent result history.
+        if (count($actions) > 2000) {
+            $pending = array_values(array_filter($actions, static function ($action): bool {
+                return is_array($action) && ya_sync_string($action['status'] ?? '') === 'pending';
+            }));
+            $finished = array_values(array_filter($actions, static function ($action): bool {
+                return is_array($action) && ya_sync_string($action['status'] ?? '') !== 'pending';
+            }));
+            $actions = array_merge(array_slice($finished, -1000), $pending);
+        }
+
+        return $actions;
+    });
+
+    if ($storedAction === null) {
+        throw new RuntimeException('android_action_not_stored');
+    }
+
+    ya_sync_update_state([
+        'last_android_action_enqueue_at' => $now,
+        'android_action_count' => count($actions)
+    ]);
+
+    ya_sync_response($created ? 201 : 200, [
+        'ok' => true,
+        'message' => $created ? 'İşlem masaüstüne gönderildi.' : 'İşlem daha önce gönderilmiş.',
+        'action' => $storedAction,
+        'deduplicated' => !$created,
+        'queued_at' => ya_sync_string($storedAction['created_at'] ?? $now)
+    ]);
+}
+
+function ya_sync_pull_android_actions(array $payload): void
+{
+    $limit = max(1, min(ya_sync_int($payload['limit'] ?? 50, 50), 200));
+    $records = ya_sync_load_json(YA_ANDROID_ACTIONS_FILE, []);
+    if (!is_array($records)) {
+        $records = [];
+    }
+
+    $actions = [];
+    foreach ($records as $record) {
+        if (!is_array($record) || ya_sync_string($record['status'] ?? '') !== 'pending') {
+            continue;
+        }
+        $actions[] = ya_sync_public_android_action($record);
+        if (count($actions) >= $limit) {
+            break;
+        }
+    }
+
+    $now = date(DATE_ATOM);
+    ya_sync_update_state(['last_android_action_pull_at' => $now]);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => $actions === [] ? 'Bekleyen telefon işlemi yok.' : 'Telefon işlemleri alındı.',
+        'actions' => $actions,
+        'count' => count($actions),
+        'pulled_at' => $now
+    ]);
+}
+
+function ya_sync_mark_android_action_result(array $payload): void
+{
+    $actionId = ya_sync_string($payload['action_id'] ?? '');
+    $status = ya_sync_string($payload['status'] ?? '');
+    $errorMessage = mb_substr(ya_sync_string($payload['error_message'] ?? ''), 0, 500);
+    if ($actionId === '' || !in_array($status, ['applied', 'failed'], true)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'İşlem sonucu geçersiz.'
+        ]);
+    }
+
+    if ($status === 'failed' && $errorMessage === '') {
+        $errorMessage = 'İşlem masaüstü tarafından uygulanamadı.';
+    }
+    if ($status === 'applied') {
+        $errorMessage = '';
+    }
+
+    $now = date(DATE_ATOM);
+    $updatedAction = null;
+    $conflict = false;
+    ya_sync_edit_json_array(YA_ANDROID_ACTIONS_FILE, static function (array $actions) use (
+        $actionId,
+        $status,
+        $errorMessage,
+        $now,
+        &$updatedAction,
+        &$conflict
+    ): array {
+        foreach ($actions as &$action) {
+            if (!is_array($action) || ya_sync_string($action['id'] ?? '') !== $actionId) {
+                continue;
+            }
+
+            $currentStatus = ya_sync_string($action['status'] ?? 'pending') ?: 'pending';
+            if ($currentStatus !== 'pending' && $currentStatus !== $status) {
+                $conflict = true;
+                $updatedAction = ya_sync_public_android_action($action);
+                break;
+            }
+
+            $action['status'] = $status;
+            $action['error_message'] = $errorMessage;
+            $action['processed_at'] = ya_sync_string($action['processed_at'] ?? '') ?: $now;
+            $updatedAction = ya_sync_public_android_action($action);
+            break;
+        }
+        unset($action);
+        return $actions;
+    });
+
+    if ($updatedAction === null) {
+        ya_sync_response(404, [
+            'ok' => false,
+            'message' => 'Telefon işlemi bulunamadı.'
+        ]);
+    }
+    if ($conflict) {
+        ya_sync_response(409, [
+            'ok' => false,
+            'message' => 'İşlem sonucu daha önce farklı bir durumla kaydedilmiş.'
+        ]);
+    }
+
+    ya_sync_update_state(['last_android_action_result_at' => $now]);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => $status === 'applied' ? 'Telefon işlemi uygulandı.' : 'Telefon işlemi hata olarak kaydedildi.',
+        'action' => $updatedAction,
+        'updated_at' => $now
     ]);
 }
 
@@ -550,6 +810,96 @@ function ya_sync_public_request(array $record): array
     return $public;
 }
 
+function ya_sync_android_action_types(): array
+{
+    return [
+        'customer_request_mark_answered',
+        'customer_request_reopen',
+        'customer_request_approve',
+        'customer_request_reject',
+        'customer_request_convert_to_reservation',
+        'reservation_approve',
+        'reservation_reject',
+        'reservation_cancel',
+        'room_status_update',
+        'daily_task_complete',
+        'daily_task_reopen',
+        'daily_task_cancel',
+        'table_status_update',
+        'table_order_open',
+        'table_order_add_item',
+        'table_order_update_item_quantity',
+        'table_order_remove_item',
+        'table_order_set_status',
+        'table_order_close'
+    ];
+}
+
+function ya_sync_public_android_action(array $record): array
+{
+    $status = ya_sync_string($record['status'] ?? 'pending');
+    if (!in_array($status, ['pending', 'applied', 'failed'], true)) {
+        $status = 'pending';
+    }
+
+    return [
+        'id' => ya_sync_string($record['id'] ?? ''),
+        'action_type' => ya_sync_string($record['action_type'] ?? ''),
+        'payload' => is_array($record['payload'] ?? null) ? $record['payload'] : [],
+        'created_at' => ya_sync_string($record['created_at'] ?? ''),
+        'device_id' => ya_sync_string($record['device_id'] ?? ''),
+        'status' => $status,
+        'error_message' => ya_sync_string($record['error_message'] ?? ''),
+        'processed_at' => ya_sync_string($record['processed_at'] ?? '')
+    ];
+}
+
+function ya_sync_get_android_actions(string $deviceId, int $limit): array
+{
+    if ($deviceId === '') {
+        return [];
+    }
+
+    $records = ya_sync_load_json(YA_ANDROID_ACTIONS_FILE, []);
+    if (!is_array($records)) {
+        return [];
+    }
+
+    $actions = [];
+    foreach (array_reverse($records) as $record) {
+        if (!is_array($record) || ya_sync_string($record['device_id'] ?? '') !== $deviceId) {
+            continue;
+        }
+        $actions[] = ya_sync_public_android_action($record);
+        if (count($actions) >= max(1, min($limit, 100))) {
+            break;
+        }
+    }
+    return $actions;
+}
+
+function ya_sync_count_pending_android_actions(string $deviceId): int
+{
+    if ($deviceId === '') {
+        return 0;
+    }
+
+    $records = ya_sync_load_json(YA_ANDROID_ACTIONS_FILE, []);
+    if (!is_array($records)) {
+        return 0;
+    }
+
+    $count = 0;
+    foreach ($records as $record) {
+        if (is_array($record)
+            && ya_sync_string($record['device_id'] ?? '') === $deviceId
+            && ya_sync_string($record['status'] ?? '') === 'pending') {
+            $count++;
+        }
+    }
+    return $count;
+}
+
 function ya_sync_load_android_snapshot(): array
 {
     $snapshot = ya_sync_load_json(YA_ANDROID_SNAPSHOT_FILE, []);
@@ -564,21 +914,43 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
 {
     $summary = is_array($snapshot['summary'] ?? null) ? $snapshot['summary'] : [];
     $tasks = is_array($snapshot['daily_tasks'] ?? null) ? $snapshot['daily_tasks'] : [];
+    $menu = is_array($snapshot['menu'] ?? null) ? $snapshot['menu'] : [];
     $updatedAt = ya_sync_string($snapshot['updated_at'] ?? $fallbackTimestamp);
+    $categories = ya_sync_sanitize_menu_categories($menu['categories'] ?? [], $updatedAt);
+    $categoryIds = array_map(static function (array $category): string {
+        return ya_sync_string($category['id'] ?? '');
+    }, $categories);
 
     return [
         'summary' => [
             'pending_daily_tasks' => max(0, ya_sync_int($summary['pending_daily_tasks'] ?? 0, 0)),
+            'today_tasks' => max(0, ya_sync_int($summary['today_tasks'] ?? 0, 0)),
             'available_rooms' => max(0, ya_sync_int($summary['available_rooms'] ?? 0, 0)),
             'total_rooms' => max(0, ya_sync_int($summary['total_rooms'] ?? 0, 0)),
             'available_tables' => max(0, ya_sync_int($summary['available_tables'] ?? 0, 0)),
+            'occupied_tables' => max(0, ya_sync_int($summary['occupied_tables'] ?? 0, 0)),
+            'bill_waiting_tables' => max(0, ya_sync_int($summary['bill_waiting_tables'] ?? 0, 0)),
+            'active_table_orders' => max(0, ya_sync_int($summary['active_table_orders'] ?? 0, 0)),
             'pending_reservations' => max(0, ya_sync_int($summary['pending_reservations'] ?? 0, 0)),
             'prepared_whatsapp_messages' => max(0, ya_sync_int($summary['prepared_whatsapp_messages'] ?? 0, 0)),
+            'waiting_responses' => max(0, ya_sync_int($summary['waiting_responses'] ?? 0, 0)),
             'active_menu_categories' => max(0, ya_sync_int($summary['active_menu_categories'] ?? 0, 0)),
             'available_menu_items' => max(0, ya_sync_int($summary['available_menu_items'] ?? 0, 0)),
             'customer_count' => max(0, ya_sync_int($summary['customer_count'] ?? 0, 0))
         ],
         'daily_tasks' => ya_sync_sanitize_android_tasks($tasks),
+        'requests' => ya_sync_sanitize_android_requests($snapshot['requests'] ?? []),
+        'customers' => ya_sync_sanitize_android_customers($snapshot['customers'] ?? []),
+        'reservations' => ya_sync_sanitize_android_reservations($snapshot['reservations'] ?? []),
+        'rooms' => ya_sync_sanitize_android_rooms($snapshot['rooms'] ?? []),
+        'tables' => ya_sync_sanitize_android_tables($snapshot['tables'] ?? []),
+        'menu' => [
+            'categories' => $categories,
+            'items' => ya_sync_sanitize_menu_items($menu['items'] ?? [], $categoryIds, $updatedAt),
+            'updated_at' => ya_sync_string($menu['updated_at'] ?? $updatedAt) ?: $updatedAt
+        ],
+        'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
+        'messages' => ya_sync_sanitize_android_messages($snapshot['messages'] ?? []),
         'updated_at' => $updatedAt
     ];
 }
@@ -610,12 +982,263 @@ function ya_sync_sanitize_android_tasks(array $tasks): array
             'updated_at' => ya_sync_string($task['updated_at'] ?? '')
         ];
 
-        if (count($records) >= 20) {
+        if (count($records) >= 200) {
             break;
         }
     }
 
     return $records;
+}
+
+function ya_sync_sanitize_android_request(array $record): array
+{
+    return [
+        'id' => ya_sync_string($record['id'] ?? ''),
+        'customer_id' => ya_sync_string($record['customer_id'] ?? ''),
+        'request_type' => ya_sync_string($record['request_type'] ?? 'general_info') ?: 'general_info',
+        'status' => ya_sync_string($record['status'] ?? 'new') ?: 'new',
+        'customer_name' => ya_sync_string($record['customer_name'] ?? ''),
+        'customer_phone' => ya_sync_string($record['customer_phone'] ?? ''),
+        'date_text' => ya_sync_string($record['date_text'] ?? ''),
+        'start_date' => ya_sync_string($record['start_date'] ?? ''),
+        'end_date' => ya_sync_string($record['end_date'] ?? ''),
+        'time' => ya_sync_string($record['time'] ?? ''),
+        'guest_count' => max(0, ya_sync_int($record['guest_count'] ?? 0, 0)),
+        'message' => ya_sync_string($record['message'] ?? ''),
+        'ai_summary' => ya_sync_string($record['ai_summary'] ?? ''),
+        'ai_suggested_reply' => ya_sync_string($record['ai_suggested_reply'] ?? ''),
+        'whatsapp_message' => ya_sync_string($record['whatsapp_message'] ?? ''),
+        'priority' => ya_sync_string($record['priority'] ?? 'normal') ?: 'normal',
+        'sync_status' => ya_sync_string($record['sync_status'] ?? ''),
+        'created_at' => ya_sync_string($record['created_at'] ?? ''),
+        'updated_at' => ya_sync_string($record['updated_at'] ?? '')
+    ];
+}
+
+function ya_sync_sanitize_android_requests(mixed $records): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+    $result = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $sanitized = ya_sync_sanitize_android_request($record);
+        if ($sanitized['id'] === '' || $sanitized['customer_name'] === '') {
+            continue;
+        }
+        $result[$sanitized['id']] = $sanitized;
+        if (count($result) >= 300) {
+            break;
+        }
+    }
+    return array_values($result);
+}
+
+function ya_sync_sanitize_android_customers(mixed $records): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+    $result = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $id = ya_sync_string($record['id'] ?? '');
+        $name = ya_sync_string($record['full_name'] ?? '');
+        if ($id === '' || $name === '') {
+            continue;
+        }
+        $result[$id] = [
+            'id' => $id,
+            'full_name' => $name,
+            'phone' => ya_sync_string($record['phone'] ?? ''),
+            'email' => ya_sync_string($record['email'] ?? ''),
+            'notes' => ya_sync_string($record['notes'] ?? ''),
+            'tags' => ya_sync_string_array($record['tags'] ?? []),
+            'request_count' => max(0, ya_sync_int($record['request_count'] ?? 0, 0)),
+            'reservation_count' => max(0, ya_sync_int($record['reservation_count'] ?? 0, 0)),
+            'updated_at' => ya_sync_string($record['updated_at'] ?? '')
+        ];
+        if (count($result) >= 300) {
+            break;
+        }
+    }
+    return array_values($result);
+}
+
+function ya_sync_sanitize_android_reservations(mixed $records): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+    $result = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $id = ya_sync_string($record['id'] ?? '');
+        if ($id === '') {
+            continue;
+        }
+        $result[$id] = [
+            'id' => $id,
+            'request_id' => ya_sync_string($record['request_id'] ?? ''),
+            'customer_id' => ya_sync_string($record['customer_id'] ?? ''),
+            'customer_name' => ya_sync_string($record['customer_name'] ?? ''),
+            'customer_phone' => ya_sync_string($record['customer_phone'] ?? ''),
+            'reservation_type' => ya_sync_string($record['reservation_type'] ?? ''),
+            'status' => ya_sync_string($record['status'] ?? 'pending') ?: 'pending',
+            'title' => ya_sync_string($record['title'] ?? ''),
+            'start_date' => ya_sync_string($record['start_date'] ?? ''),
+            'end_date' => ya_sync_string($record['end_date'] ?? ''),
+            'time' => ya_sync_string($record['time'] ?? ''),
+            'guest_count' => max(0, ya_sync_int($record['guest_count'] ?? 0, 0)),
+            'room_ids' => ya_sync_string_array($record['room_ids'] ?? []),
+            'table_ids' => ya_sync_string_array($record['table_ids'] ?? []),
+            'notes' => ya_sync_string($record['notes'] ?? ''),
+            'payment_status' => ya_sync_string($record['payment_status'] ?? ''),
+            'updated_at' => ya_sync_string($record['updated_at'] ?? '')
+        ];
+        if (count($result) >= 300) {
+            break;
+        }
+    }
+    return array_values($result);
+}
+
+function ya_sync_sanitize_android_rooms(mixed $records): array
+{
+    return ya_sync_sanitize_android_resources($records, 'number');
+}
+
+function ya_sync_sanitize_android_tables(mixed $records): array
+{
+    return ya_sync_sanitize_android_resources($records, 'area');
+}
+
+function ya_sync_sanitize_android_resources(mixed $records, string $secondaryField): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+    $result = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $id = ya_sync_string($record['id'] ?? '');
+        $name = ya_sync_string($record['name'] ?? '');
+        if ($id === '' || $name === '') {
+            continue;
+        }
+        $result[$id] = [
+            'id' => $id,
+            'name' => $name,
+            $secondaryField => ya_sync_string($record[$secondaryField] ?? ''),
+            'capacity' => max(0, ya_sync_int($record['capacity'] ?? 0, 0)),
+            'status' => ya_sync_string($record['status'] ?? 'available') ?: 'available',
+            'active_reservation_title' => ya_sync_string($record['active_reservation_title'] ?? ''),
+            'updated_at' => ya_sync_string($record['updated_at'] ?? '')
+        ];
+        if (count($result) >= 300) {
+            break;
+        }
+    }
+    return array_values($result);
+}
+
+function ya_sync_sanitize_android_table_orders(mixed $records): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+    $result = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $id = ya_sync_string($record['id'] ?? '');
+        $tableId = ya_sync_string($record['table_id'] ?? '');
+        if ($id === '' || $tableId === '') {
+            continue;
+        }
+        $items = [];
+        $orderItems = is_array($record['items'] ?? null) ? $record['items'] : [];
+        foreach ($orderItems as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $itemId = ya_sync_string($item['id'] ?? '');
+            if ($itemId === '') {
+                continue;
+            }
+            $items[] = [
+                'id' => $itemId,
+                'order_id' => $id,
+                'menu_item_id' => ya_sync_string($item['menu_item_id'] ?? ''),
+                'product_name' => ya_sync_string($item['product_name'] ?? 'Ürün') ?: 'Ürün',
+                'unit_price' => max(0, ya_sync_float($item['unit_price'] ?? 0, 0)),
+                'currency' => ya_sync_string($item['currency'] ?? 'TRY') ?: 'TRY',
+                'quantity' => max(1, ya_sync_int($item['quantity'] ?? 1, 1)),
+                'line_total' => max(0, ya_sync_float($item['line_total'] ?? 0, 0)),
+                'status' => ya_sync_string($item['status'] ?? 'open') ?: 'open',
+                'updated_at' => ya_sync_string($item['updated_at'] ?? '')
+            ];
+            if (count($items) >= 300) {
+                break;
+            }
+        }
+        $result[$id] = [
+            'id' => $id,
+            'table_id' => $tableId,
+            'table_name' => ya_sync_string($record['table_name'] ?? 'Masa') ?: 'Masa',
+            'status' => ya_sync_string($record['status'] ?? 'open') ?: 'open',
+            'opened_at' => ya_sync_string($record['opened_at'] ?? ''),
+            'total' => max(0, ya_sync_float($record['total'] ?? 0, 0)),
+            'item_count' => max(0, ya_sync_int($record['item_count'] ?? 0, 0)),
+            'items' => $items,
+            'updated_at' => ya_sync_string($record['updated_at'] ?? '')
+        ];
+        if (count($result) >= 150) {
+            break;
+        }
+    }
+    return array_values($result);
+}
+
+function ya_sync_sanitize_android_messages(mixed $records): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+    $result = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $id = ya_sync_string($record['id'] ?? '');
+        $message = ya_sync_string($record['message'] ?? '');
+        if ($id === '' || $message === '') {
+            continue;
+        }
+        $result[$id] = [
+            'id' => $id,
+            'request_id' => ya_sync_string($record['request_id'] ?? ''),
+            'customer_name' => ya_sync_string($record['customer_name'] ?? ''),
+            'customer_phone' => ya_sync_string($record['customer_phone'] ?? ''),
+            'message' => $message,
+            'status' => ya_sync_string($record['status'] ?? 'prepared') ?: 'prepared',
+            'updated_at' => ya_sync_string($record['updated_at'] ?? '')
+        ];
+        if (count($result) >= 300) {
+            break;
+        }
+    }
+    return array_values($result);
 }
 
 function ya_sync_sanitize_menu_categories(mixed $records, string $fallbackTimestamp): array
@@ -763,7 +1386,20 @@ function ya_sync_load_json(string $path, mixed $fallback): mixed
         return $fallback;
     }
 
-    $json = file_get_contents($path);
+    $handle = fopen($path, 'rb');
+    if ($handle === false) {
+        return $fallback;
+    }
+
+    try {
+        if (!flock($handle, LOCK_SH)) {
+            return $fallback;
+        }
+        $json = stream_get_contents($handle);
+        flock($handle, LOCK_UN);
+    } finally {
+        fclose($handle);
+    }
     $data = json_decode($json ?: '', true);
 
     return $data === null ? $fallback : $data;

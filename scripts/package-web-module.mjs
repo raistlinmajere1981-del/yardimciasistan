@@ -31,6 +31,7 @@ const requiredFiles = [
   "data/ai-conversations.json",
   "data/sync-state.json",
   "data/android-snapshot.json",
+  "data/android-actions.json",
   "knowledge/.htaccess",
   "knowledge/firma.md",
   "knowledge/odalar.md",
@@ -103,6 +104,7 @@ function validateSource() {
   assertJsonArray("data/ai-conversations.json");
   assertJsonObject("data/sync-state.json");
   assertJsonObject("data/android-snapshot.json");
+  assertJsonArray("data/android-actions.json");
 
   const business = JSON.parse(readFileSync(join(sourceRoot, "config", "business.json"), "utf8"));
   validateBusinessConfig(business, "kaynak config/business.json");
@@ -114,6 +116,7 @@ function validateSource() {
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "AI ayar yayını header güvenlik anahtarını doğrulamalı.");
+  assert.ok(syncEndpoint.includes("enqueue_android_action"), "api/sync.php Android action kuyruğunu içermeli.");
 
   const widget = readFileSync(join(sourceRoot, "widget.js"), "utf8");
   assert.ok(widget.includes("YardimciAsistanWidget"), "widget.js YardimciAsistanWidget globalini içermeli.");

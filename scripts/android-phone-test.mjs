@@ -14,13 +14,18 @@ const webModuleRoot = join(repoRoot, "firm-template", "web-module");
 const requestsFile = join(webModuleRoot, "data", "requests.json");
 const syncStateFile = join(webModuleRoot, "data", "sync-state.json");
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
+const androidSnapshotFile = join(webModuleRoot, "data", "android-snapshot.json");
+const androidActionsFile = join(webModuleRoot, "data", "android-actions.json");
 const demoRequestsFile = join(repoRoot, "demo-data", "web-module-requests.json");
+const demoAndroidSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
 
 const options = parseArgs(process.argv.slice(2));
 const backups = new Map([
   [requestsFile, readFileSync(requestsFile, "utf8")],
   [syncStateFile, readFileSync(syncStateFile, "utf8")],
-  [conversationsFile, readFileSync(conversationsFile, "utf8")]
+  [conversationsFile, readFileSync(conversationsFile, "utf8")],
+  [androidSnapshotFile, readFileSync(androidSnapshotFile, "utf8")],
+  [androidActionsFile, readFileSync(androidActionsFile, "utf8")]
 ]);
 
 let phpServer = null;
@@ -137,8 +142,11 @@ function parseArgs(args) {
 
 function seedDemoData() {
   const requests = JSON.parse(readFileSync(demoRequestsFile, "utf8"));
+  const androidSnapshot = JSON.parse(readFileSync(demoAndroidSnapshotFile, "utf8"));
   writeJson(requestsFile, requests);
   writeJson(conversationsFile, []);
+  writeJson(androidSnapshotFile, androidSnapshot);
+  writeJson(androidActionsFile, []);
   writeJson(syncStateFile, {
     demo_seeded_at: new Date().toISOString(),
     last_request_pull_at: "",
@@ -276,6 +284,12 @@ async function verifyAndroidSummary(baseUrl) {
 
   if ((json.summary?.request_count ?? 0) < 3) {
     throw new Error("Android özeti beklenen demo taleplerini döndürmedi.");
+  }
+  if ((json.rooms?.length ?? 0) < 2 || (json.tables?.length ?? 0) < 2 || (json.table_orders?.length ?? 0) < 1) {
+    throw new Error("Android operasyon snapshot'ı oda, masa ve aktif adisyon verisini döndürmedi.");
+  }
+  if ((json.menu?.items?.length ?? 0) < 3 || (json.messages?.length ?? 0) < 1) {
+    throw new Error("Android operasyon snapshot'ı menü ve hazır mesaj verisini döndürmedi.");
   }
 }
 

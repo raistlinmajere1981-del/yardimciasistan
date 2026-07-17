@@ -274,12 +274,16 @@ Android uygulamanın ana görevi hızlı takip ve hızlı aksiyondur.
 * Firma ayarları
 * AI bilgi dosyası düzenleme
 * Kapsamlı raporlar
-* Teknik bağlantı ayarları
+* Ana operasyon ekranlarının içinde teknik bağlantı ayarları
 * Karmaşık stok yönetimi
 
 ### Android Ana Ekran
 
 Android ana ekran mümkünse tek bakışta anlaşılmalıdır.
+
+Bağlantı adresi ve güvenlik anahtarı yalnız ayrı, küçük bir Ayarlar ekranında tutulabilir.
+Bu ekranda teknik hata kodları yerine bağlantı durumu, son güncelleme ve bekleyen işlem
+durumu kullanıcı dostu ifadelerle gösterilmelidir.
 
 Örnek kartlar:
 

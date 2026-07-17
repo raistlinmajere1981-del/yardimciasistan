@@ -163,25 +163,31 @@ Ana işlevleri:
 * Günlük işleri takip etmek
 * Bildirimleri göstermek
 
-Android uygulama iki modda çalışabilir:
+Android uygulama PC'ye veya SQLite veritabanına doğrudan bağlanmaz. Telefon işlemleri
+firma hostingindeki güvenli action queue'ya yazılır; PC uygulaması kuyruğu dışarı doğru
+bağlantıyla çeker, işlemi yerel veriye bir kez uygular ve güncel mobil snapshot'ı yeniden
+yayınlar.
 
-#### Yerel Ağ Modu
+Telefon action kimliğini gönderimden önce üretir ve action'ı kalıcı yerel outbox'ta tutar.
+Belirsiz HTTP yanıtlarında aynı kimlik tekrar kullanılır. Snapshot kaynaklı değişiklikler
+beklenen `updated_at` sürümünü taşır; masaüstü daha yeni bir kayıt görürse stale işlemi
+transaction içinde reddeder. Böylece hem ağ tekrarları hem de eşzamanlı masaüstü değişiklikleri
+veri kaybına yol açmaz.
 
-Telefon ve PC aynı Wi-Fi ağındaysa Android doğrudan PC uygulamasına bağlanabilir.
+Outbox her action'ı normalize endpoint ve sync-secret parmak izine bağlar; firma bağlantısı
+değiştiğinde bekleyen action yeni hedefe taşınmaz. Çok adımlı masa açma/sipariş akışında child
+action parent receipt'ine ve parent kimliğinden türetilen adisyona bağlıdır.
 
 ```text
-Android → Local PC
+Android → Firma Hosting Mini API action queue
+        → PC işlemi çeker ve SQLite'a uygular
+        → PC güncel Android snapshot'ını yayınlar
+        → Android güncel veriyi çeker
 ```
 
-#### Hosting Üzerinden Sınırlı Takip
-
-Firma sahibi dışarıdaysa Android firmanın hostingindeki mini API üzerinden sınırlı bilgi alabilir.
-
-```text
-Android → Firma Hosting Mini API
-```
-
-Bu modda sadece gerekli özet bilgiler gösterilir.
+Bu yapı hem firma sahibi dışarıdayken çalışır hem de PC'ye port açılmasını engeller.
+Android yalnız hızlı operasyon için gereken müşteri, rezervasyon, oda, masa, günlük iş,
+menü ve aktif adisyon verilerini görür.
 
 ### 6. AI Adapter
 
@@ -280,6 +286,7 @@ Temel senkron akışları:
 Web Form → Hosting Mini API → PC Uygulaması
 PC Menü Güncelleme → Hosting Mini API → QR Menü
 PC Talep Durumu → Hosting Mini API → Android özet ekranı
+Android İşlemi → Hosting Mini API action queue → PC Uygulaması → Android snapshot
 ```
 
 PC uygulaması offline çalışabilmelidir.

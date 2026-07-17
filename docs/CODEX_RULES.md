@@ -182,6 +182,7 @@ Android’de olması gerekenler:
 * WhatsApp’tan yaz
 * Oda durumu
 * Masa durumu
+* Masa siparişi ve aktif adisyon üzerinde hızlı servis işlemleri
 * Bugünkü işler
 * Bildirimler
 

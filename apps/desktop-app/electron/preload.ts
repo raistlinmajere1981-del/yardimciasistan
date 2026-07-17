@@ -60,6 +60,7 @@ export interface DesktopBridge {
     setup: DesktopSetupData;
   }>;
   getDashboardData: () => Promise<DesktopDashboardData>;
+  onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
   createManualRequest: (input: CreateManualRequestInput) => Promise<CreateManualRequestResult>;
@@ -100,6 +101,11 @@ const bridge: DesktopBridge = {
   setUiScale: (scale: number) => webFrame.setZoomFactor(scale),
   getBootstrapData: () => ipcRenderer.invoke("app:getBootstrapData"),
   getDashboardData: () => ipcRenderer.invoke("dashboard:getData"),
+  onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: DesktopDashboardData) => listener(data);
+    ipcRenderer.on("dashboard:dataChanged", handler);
+    return () => ipcRenderer.removeListener("dashboard:dataChanged", handler);
+  },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => ipcRenderer.invoke("setup:saveInitial", input),
   createManualRequest: (input: CreateManualRequestInput) => ipcRenderer.invoke("request:createManual", input),

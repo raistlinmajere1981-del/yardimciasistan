@@ -76,11 +76,16 @@ export interface PublishedQrMenu {
 
 export interface AndroidOperationsSummary {
   pending_daily_tasks: number;
+  today_tasks: number;
   available_rooms: number;
   total_rooms: number;
   available_tables: number;
+  occupied_tables: number;
+  bill_waiting_tables: number;
+  active_table_orders: number;
   pending_reservations: number;
   prepared_whatsapp_messages: number;
+  waiting_responses: number;
   active_menu_categories: number;
   available_menu_items: number;
   customer_count: number;
@@ -102,7 +107,184 @@ export interface AndroidSnapshotTask {
 export interface AndroidOperationsSnapshot {
   summary: AndroidOperationsSummary;
   daily_tasks: AndroidSnapshotTask[];
+  requests: AndroidSnapshotRequest[];
+  customers: AndroidSnapshotCustomer[];
+  reservations: AndroidSnapshotReservation[];
+  rooms: AndroidSnapshotRoom[];
+  tables: AndroidSnapshotTable[];
+  menu: PublishedQrMenu;
+  table_orders: AndroidSnapshotTableOrder[];
+  messages: AndroidSnapshotMessage[];
   updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotRequest {
+  id: string;
+  customer_id: string;
+  request_type: string;
+  status: string;
+  customer_name: string;
+  customer_phone: string;
+  date_text: string;
+  start_date: string;
+  end_date: string;
+  time: string;
+  guest_count: number;
+  message: string;
+  ai_summary: string;
+  ai_suggested_reply: string;
+  whatsapp_message: string;
+  priority: string;
+  created_at: ISODateTimeString | "";
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotCustomer {
+  id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  notes: string;
+  tags: string[];
+  request_count: number;
+  reservation_count: number;
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotReservation {
+  id: string;
+  request_id: string;
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+  reservation_type: string;
+  status: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  time: string;
+  guest_count: number;
+  room_ids: string[];
+  table_ids: string[];
+  notes: string;
+  payment_status: string;
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotRoom {
+  id: string;
+  name: string;
+  number: string;
+  capacity: number;
+  status: string;
+  active_reservation_title: string;
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotTable {
+  id: string;
+  name: string;
+  area: string;
+  capacity: number;
+  status: string;
+  active_reservation_title: string;
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotTableOrderItem {
+  id: string;
+  order_id: string;
+  menu_item_id: string;
+  product_name: string;
+  unit_price: number;
+  currency: string;
+  quantity: number;
+  line_total: number;
+  status: string;
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotTableOrder {
+  id: string;
+  table_id: string;
+  table_name: string;
+  status: string;
+  opened_at: ISODateTimeString | "";
+  total: number;
+  item_count: number;
+  items: AndroidSnapshotTableOrderItem[];
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotMessage {
+  id: string;
+  request_id: string;
+  customer_name: string;
+  customer_phone: string;
+  message: string;
+  status: string;
+  updated_at: ISODateTimeString | "";
+}
+
+export const ANDROID_ACTION_TYPES = [
+  "customer_request_mark_answered",
+  "customer_request_reopen",
+  "customer_request_approve",
+  "customer_request_reject",
+  "customer_request_convert_to_reservation",
+  "reservation_approve",
+  "reservation_reject",
+  "reservation_cancel",
+  "room_status_update",
+  "daily_task_complete",
+  "daily_task_reopen",
+  "daily_task_cancel",
+  "table_status_update",
+  "table_order_open",
+  "table_order_add_item",
+  "table_order_update_item_quantity",
+  "table_order_remove_item",
+  "table_order_set_status",
+  "table_order_close"
+] as const;
+
+export type AndroidActionType = typeof ANDROID_ACTION_TYPES[number];
+export type AndroidActionStatus = "pending" | "applied" | "failed";
+
+export interface AndroidSyncAction {
+  id: string;
+  action_type: AndroidActionType;
+  payload: Record<string, unknown>;
+  created_at: ISODateTimeString;
+  device_id: string;
+  status: AndroidActionStatus;
+  error_message: string;
+  processed_at?: ISODateTimeString | "";
+}
+
+export interface PullAndroidActionsOptions extends SyncCoreConfig {
+  limit?: number;
+}
+
+export interface MarkAndroidActionResultOptions extends SyncCoreConfig {
+  actionId: string;
+  status: Exclude<AndroidActionStatus, "pending">;
+  errorMessage?: string;
+}
+
+export interface PullAndroidActionsSuccess {
+  ok: true;
+  message: string;
+  actions: AndroidSyncAction[];
+  count: number;
+  pulled_at: ISODateTimeString;
+}
+
+export interface MarkAndroidActionResultSuccess {
+  ok: true;
+  message: string;
+  action: AndroidSyncAction;
+  updated_at: ISODateTimeString;
 }
 
 export interface SyncFailure {
@@ -164,6 +346,8 @@ export type MarkRequestsSyncedResult = MarkRequestsSyncedSuccess | SyncFailure;
 export type PushMenuResult = PushMenuSuccess | SyncFailure;
 export type PushAndroidSnapshotResult = PushAndroidSnapshotSuccess | SyncFailure;
 export type PushAiSettingsResult = PushAiSettingsSuccess | SyncFailure;
+export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
+export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
 
 export function createSyncEndpointUrl(baseUrl: string): string {
   const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
@@ -196,6 +380,22 @@ export async function pushAndroidSnapshot(options: PushAndroidSnapshotOptions): 
   return syncRequest<PushAndroidSnapshotSuccess>(options, {
     action: "publish_android_snapshot",
     snapshot: options.snapshot
+  });
+}
+
+export async function pullAndroidActions(options: PullAndroidActionsOptions): Promise<PullAndroidActionsResult> {
+  return syncRequest<PullAndroidActionsSuccess>(options, {
+    action: "pull_android_actions",
+    limit: options.limit ?? 50
+  });
+}
+
+export async function markAndroidActionResult(options: MarkAndroidActionResultOptions): Promise<MarkAndroidActionResultResult> {
+  return syncRequest<MarkAndroidActionResultSuccess>(options, {
+    action: "mark_android_action_result",
+    action_id: options.actionId,
+    status: options.status,
+    error_message: options.errorMessage ?? ""
   });
 }
 
