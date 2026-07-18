@@ -150,6 +150,16 @@ export interface DesktopAndroidDevice {
   revokedAt: string;
 }
 
+export interface DesktopAndroidActionFailure {
+  id: string;
+  actionType: string;
+  deviceId: string;
+  message: string;
+  targetPage: "dashboard" | "customerWork" | "pension" | "restaurant" | "settings";
+  relatedId: string;
+  createdAt: string;
+}
+
 export type DesktopAndroidDeviceMutationResult =
   | { ok: true; message: string; devices: DesktopAndroidDevice[] }
   | { ok: false; message: string; devices: DesktopAndroidDevice[] };
@@ -165,6 +175,8 @@ export interface DesktopDashboardData {
   dailyTasks: DesktopDailyTask[];
   customers: DesktopCustomer[];
   androidDevices: DesktopAndroidDevice[];
+  paymentWaitingTableOrders: DesktopPaymentWaitingTableOrder[];
+  androidActionFailures: DesktopAndroidActionFailure[];
   menu: PublishedQrMenu;
   summary: DashboardSummary;
 }
@@ -480,6 +492,16 @@ export interface DesktopTableOrder {
   updatedAt: string;
 }
 
+export interface DesktopPaymentWaitingTableOrder {
+  id: string;
+  tableId: string;
+  tableName: string;
+  total: number;
+  currency: string;
+  openedAt: string;
+  updatedAt: string;
+}
+
 export interface AddTableOrderItemInput {
   orderId: string;
   menuItemId: string;
@@ -645,6 +667,8 @@ export class DesktopDatabase {
       dailyTasks: this.getDailyTasks(),
       customers: this.getCustomers(),
       androidDevices: this.getAndroidDevices(),
+      paymentWaitingTableOrders: this.listPaymentWaitingTableOrders(),
+      androidActionFailures: this.getAndroidActionFailures(),
       summary: {
         newRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status = 'new' AND deleted_at = ''"),
         waitingRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND deleted_at = ''"),
@@ -1325,6 +1349,43 @@ export class DesktopDatabase {
       .all() as Array<Record<string, unknown>>;
 
     return rows.map((row) => this.mapTableOrderRow(row));
+  }
+
+  private listPaymentWaitingTableOrders(): DesktopPaymentWaitingTableOrder[] {
+    const rows = this.db
+      .prepare(`
+        SELECT
+          table_orders.id,
+          table_orders.table_id,
+          tables.name AS table_name,
+          table_orders.total,
+          table_orders.opened_at,
+          table_orders.updated_at,
+          COALESCE(MAX(
+            CASE
+              WHEN table_order_items.status != 'cancelled' THEN table_order_items.currency
+              ELSE NULL
+            END
+          ), 'TRY') AS currency
+        FROM table_orders
+        INNER JOIN tables ON tables.id = table_orders.table_id
+        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
+        WHERE table_orders.status = 'payment'
+        GROUP BY table_orders.id
+        ORDER BY table_orders.updated_at DESC, table_orders.opened_at DESC
+        LIMIT 100
+      `)
+      .all() as Array<Record<string, unknown>>;
+
+    return rows.map((row) => ({
+      id: String(row.id ?? ""),
+      tableId: String(row.table_id ?? ""),
+      tableName: String(row.table_name ?? "Masa"),
+      total: roundMoney(Number(row.total ?? 0)),
+      currency: normalizeTableOrderCurrency(row.currency),
+      openedAt: String(row.opened_at ?? ""),
+      updatedAt: String(row.updated_at ?? "")
+    }));
   }
 
   getActiveTableOrder(tableId: string): DesktopTableOrder | null {
@@ -3236,6 +3297,78 @@ export class DesktopDatabase {
     });
   }
 
+  recordAndroidActionResult(action: AndroidSyncAction, result: ApplyAndroidActionResult) {
+    const actionId = String(action.id ?? "").trim();
+    const actionType = String(action.action_type ?? "").trim();
+    const deviceId = String(action.device_id ?? "").trim();
+    if (!actionId || !actionType || !deviceId) {
+      return;
+    }
+    const now = new Date().toISOString();
+    const resolutionKey = androidActionResolutionKey(action);
+    if (result.ok) {
+      for (const failure of this.getActiveAndroidActionFailureRows(null)) {
+        const payload = parseEventPayload(failure.payload_json);
+        if (String(payload.resolution_key ?? "") !== resolutionKey) {
+          continue;
+        }
+        this.db
+          .prepare("UPDATE events SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at = ''")
+          .run(now, now, String(failure.id ?? ""));
+      }
+      return;
+    }
+
+    const existing = this.db
+      .prepare("SELECT id FROM events WHERE type = 'android.action_failed' AND entity_id = ? AND deleted_at = '' LIMIT 1")
+      .get(actionId);
+    if (existing) {
+      return;
+    }
+    this.insertEvent({
+      type: "android.action_failed",
+      actorType: "android",
+      actorId: deviceId,
+      entityType: "android_action",
+      entityId: actionId,
+      payload: {
+        action_type: actionType,
+        device_id: deviceId,
+        error_message: result.message,
+        resolution_key: resolutionKey,
+        target_page: androidActionTargetPage(actionType),
+        related_id: androidActionRelatedId(action)
+      },
+      now
+    });
+  }
+
+  getAndroidActionFailures(): DesktopAndroidActionFailure[] {
+    return this.getActiveAndroidActionFailureRows().map((row) => {
+      const payload = parseEventPayload(row.payload_json);
+      return {
+        id: String(row.entity_id ?? ""),
+        actionType: String(payload.action_type ?? ""),
+        deviceId: String(payload.device_id ?? row.actor_id ?? ""),
+        message: friendlyDesktopActionFailure(String(payload.error_message ?? "")),
+        targetPage: normalizeAndroidFailureTargetPage(payload.target_page),
+        relatedId: String(payload.related_id ?? ""),
+        createdAt: String(row.created_at ?? "")
+      };
+    });
+  }
+
+  private getActiveAndroidActionFailureRows(limit: number | null = 100): Array<Record<string, unknown>> {
+    const statement = this.db.prepare(`
+        SELECT id, actor_id, entity_id, payload_json, created_at
+        FROM events
+        WHERE type = 'android.action_failed' AND deleted_at = ''
+        ORDER BY created_at DESC
+        ${limit === null ? "" : "LIMIT ?"}
+      `);
+    return (limit === null ? statement.all() : statement.all(limit)) as Array<Record<string, unknown>>;
+  }
+
   countEventsByType(type: string) {
     const row = this.db.prepare("SELECT COUNT(*) as count FROM events WHERE type = ? AND deleted_at = ''").get(type.trim()) as { count?: number } | undefined;
     return Number(row?.count ?? 0);
@@ -5022,6 +5155,76 @@ function normalizeCurrency(value: string) {
 function normalizeTableOrderCurrency(value: unknown): string {
   const currency = String(value ?? "TRY").trim().toUpperCase();
   return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
+}
+
+function androidActionRelatedId(action: AndroidSyncAction): string {
+  const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
+    ? action.payload as Record<string, unknown>
+    : {};
+  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "room_id", "task_id", "item_id"]) {
+    const value = String(payload[key] ?? "").trim();
+    if (value) {
+      return value;
+    }
+  }
+  return "";
+}
+
+function androidActionResolutionKey(action: AndroidSyncAction): string {
+  return [
+    String(action.device_id ?? "").trim(),
+    String(action.action_type ?? "").trim(),
+    androidActionRelatedId(action)
+  ].join(":");
+}
+
+function androidActionTargetPage(actionType: string): DesktopAndroidActionFailure["targetPage"] {
+  if (actionType.startsWith("customer_")) {
+    return "customerWork";
+  }
+  if (actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {
+    return "pension";
+  }
+  if (actionType.startsWith("table_")) {
+    return "restaurant";
+  }
+  return "settings";
+}
+
+function normalizeAndroidFailureTargetPage(value: unknown): DesktopAndroidActionFailure["targetPage"] {
+  const target = String(value ?? "");
+  return ["dashboard", "customerWork", "pension", "restaurant", "settings"].includes(target)
+    ? target as DesktopAndroidActionFailure["targetPage"]
+    : "settings";
+}
+
+function friendlyDesktopActionFailure(value: string): string {
+  const message = value.trim();
+  const lower = message.toLocaleLowerCase("tr-TR");
+  if (lower.includes("hesap kapatma yetkisi") || (lower.includes("yetki") && lower.includes("kapat"))) {
+    return "Bu cihazın hesap kapatma yetkisi yok.";
+  }
+  if (lower.includes("pasif")) {
+    return "Bu cihaz pasifleştirilmiş.";
+  }
+  if (lower.includes("adisyon") && (lower.includes("kapalı") || lower.includes("kapat"))) {
+    return "Adisyon kapalı olduğu için işlem yapılamadı.";
+  }
+  if (lower.includes("yetki") || lower.includes("izin")) {
+    return "Bu cihazın bu işlem için yetkisi yok.";
+  }
+  return message || "İşlem masaüstü tarafından uygulanamadı.";
+}
+
+function parseEventPayload(value: unknown): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
 }
 
 function parseAiWorkspacePayload(value: unknown): Record<string, unknown> {

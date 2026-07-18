@@ -284,6 +284,13 @@ try {
   const forbiddenCloseResult = await getAndroidAction(forbiddenCloseActionId);
   assert.equal(forbiddenCloseResult.status, "failed");
   assert.equal(forbiddenCloseResult.error_message, "Bu cihazın hesap kapatma yetkisi yok.");
+  const failureDashboard = database.getDashboardData();
+  assert.equal(failureDashboard.paymentWaitingTableOrders.some((candidate) => candidate.id === order.id), true);
+  assert.equal(failureDashboard.androidActionFailures.some((failure) => (
+    failure.id === forbiddenCloseActionId
+      && failure.message === "Bu cihazın hesap kapatma yetkisi yok."
+      && failure.targetPage === "restaurant"
+  )), true);
 
   const cashierResult = database.setAndroidDevicePermissionGroups("android-auto-smoke", {
     service_orders: true,
@@ -310,6 +317,7 @@ try {
   assert.equal(cashierCloseCycle.appliedActions, 1);
   assert.equal(cashierCloseCycle.failedActions, 0);
   assert.equal(database.getActiveTableOrder(table.id), null);
+  assert.equal(database.getDashboardData().androidActionFailures.some((failure) => failure.id === forbiddenCloseActionId), false);
 
   const promoteResult = database.setAndroidDeviceRole("android-auto-smoke", "admin");
   assert.equal(promoteResult.ok, true);
@@ -354,6 +362,9 @@ try {
   const inactiveAction = await getAndroidAction(inactiveActionId);
   assert.equal(inactiveAction.status, "failed");
   assert.equal(inactiveAction.error_message, "Cihaz masaüstünde pasifleştirilmiş.");
+  assert.equal(database.getDashboardData().androidActionFailures.some((failure) => (
+    failure.id === inactiveActionId && failure.message === "Bu cihaz pasifleştirilmiş."
+  )), true);
 
   const automaticRequestResponse = await postJson(`${baseUrl}/api/request.php`, {
     request_type: "restaurant_reservation",
@@ -428,6 +439,33 @@ try {
     idempotency_key: "menu-api-smoke-revision-9"
   });
   assert.equal(stalePublication.status, 409);
+
+  const oldestFailureAction = {
+    id: "android_failure_limit_oldest",
+    action_type: "table_order_close_paid",
+    device_id: "android-limit-smoke",
+    payload: { order_id: "order-limit-oldest" }
+  };
+  database.recordAndroidActionResult(oldestFailureAction, { ok: false, message: "Limit smoke hatası." });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  for (let index = 0; index < 100; index += 1) {
+    database.recordAndroidActionResult({
+      id: `android_failure_limit_filler_${index}`,
+      action_type: "table_order_close_paid",
+      device_id: "android-limit-smoke",
+      payload: { order_id: `order-limit-filler-${index}` }
+    }, { ok: false, message: "Limit smoke dolgu hatası." });
+  }
+  database.recordAndroidActionResult({
+    ...oldestFailureAction,
+    id: "android_failure_limit_resolution"
+  }, { ok: true, message: "Limit smoke sorunu çözüldü." });
+  database.recordAndroidActionResult(oldestFailureAction, { ok: false, message: "Limit smoke yeniden oluştu." });
+  assert.equal(
+    database.getDashboardData().androidActionFailures.some((failure) => failure.id === oldestFailureAction.id),
+    true,
+    "Son 100 kaydın dışındaki Android action hatası başarıyla çözülemedi."
+  );
 
   assert.equal(readFileSync(join(webModuleRoot, "data", "requests.json"), "utf8"), "[]\n");
   assert.equal(existsSync(join(webModuleRoot, "data", "yardimci-asistan.sqlite")), true);

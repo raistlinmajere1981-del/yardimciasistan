@@ -857,6 +857,7 @@ async function processAndroidActionQueueOnce(allowPlaceholderSecret: boolean): P
   summary.pulled = pullResult.count;
   for (const action of pullResult.actions) {
     const applyResult = getDatabase().applyAndroidAction(action);
+    getDatabase().recordAndroidActionResult(action, applyResult);
     const actionStatus = applyResult.ok ? "applied" : "failed";
     const markResult = await markAndroidActionResult({
       ...syncConfig,
@@ -888,7 +889,7 @@ async function processAndroidActionQueueOnce(allowPlaceholderSecret: boolean): P
     recordCount: summary.pulled,
     message: `${summary.applied} telefon işlemi uygulandı, ${summary.failed} işlem uygulanamadı.`
   });
-  if (summary.applied > 0 || androidDevicesChanged > 0) {
+  if (summary.applied > 0 || summary.failed > 0 || androidDevicesChanged > 0) {
     notifyDesktopDashboardChanged(getDatabase().getDashboardData());
     androidSnapshotPublishPending = true;
   }

@@ -45,6 +45,20 @@ try {
         setup: setupData
       }),
       getDashboardData: async () => currentDashboardData,
+      getSyncStatus: async () => ({
+        enabled: true,
+        clientId: "desktop-smoke",
+        requestCursor: 1,
+        acknowledgedCursor: 1,
+        lastAttemptAt: "2026-07-18T12:35:00+03:00",
+        lastSuccessAt: "2026-07-18T12:00:00+03:00",
+        lastError: "Smoke sync bağlantısına ulaşılamadı.",
+        consecutiveFailures: 2,
+        pendingJobs: 0,
+        nextRetryAt: "",
+        phase: "offline",
+        message: "Smoke sync bağlantısına ulaşılamadı."
+      }),
       setAndroidDeviceRole: async (deviceId, role) => mutateDevice(deviceId, (device) => ({
         ...device,
         role,
@@ -79,6 +93,18 @@ try {
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  const notificationBell = page.getByRole("button", { name: /Bildirimler, \d+ uyarı/ });
+  await expect(notificationBell).toBeVisible();
+  await notificationBell.click();
+  const notificationCenter = page.getByRole("dialog", { name: "Bildirim merkezi" });
+  await expect(notificationCenter.getByText("Yeni müşteri talebi", { exact: true })).toBeVisible();
+  await expect(notificationCenter.getByText("Rezervasyon onay bekliyor", { exact: true })).toBeVisible();
+  await expect(notificationCenter.getByText("Masa hesap bekliyor", { exact: true })).toBeVisible();
+  await expect(notificationCenter.getByText("Günlük iş bekliyor", { exact: true })).toHaveCount(2);
+  await expect(notificationCenter.getByText("Sync bağlantı sorunu", { exact: true })).toBeVisible();
+  await expect(notificationCenter.getByText("Android işlemi uygulanamadı", { exact: true })).toBeVisible();
+  await notificationCenter.locator(".notification-item", { hasText: "Yeni müşteri talebi" }).getByRole("button", { name: /ilgili sayfaya git/ }).click();
+  await expect(page.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Ayarlar" }).click();
   const androidDeviceSection = page.locator(".settings-android-devices-section");
   await expect(androidDeviceSection.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
@@ -1774,6 +1800,28 @@ function createDashboardFixture() {
         createdAt: "2026-07-18T08:00:00+03:00",
         updatedAt: "2026-07-18T12:30:00+03:00",
         revokedAt: ""
+      }
+    ],
+    paymentWaitingTableOrders: [
+      {
+        id: "table_order_smoke_001",
+        tableId: "table_smoke_001",
+        tableName: "Smoke Bahçe Masası",
+        openedAt: "2026-07-18T11:30:00+03:00",
+        total: 450,
+        currency: "TRY",
+        updatedAt: "2026-07-18T12:20:00+03:00"
+      }
+    ],
+    androidActionFailures: [
+      {
+        id: "android_action_smoke_failed_001",
+        actionType: "table_order_close_paid",
+        deviceId: "android-smoke-device-001",
+        message: "Bu cihazın hesap kapatma yetkisi yok.",
+        targetPage: "restaurant",
+        relatedId: "table_order_smoke_001",
+        createdAt: "2026-07-18T12:25:00+03:00"
       }
     ],
     menu: {

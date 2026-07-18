@@ -38,7 +38,8 @@ public final class SyncJobService extends JobService {
       boolean retry = false;
       try {
         syncOnce();
-      } catch (Exception ignored) {
+      } catch (Exception error) {
+        recordSyncFailure(error);
         retry = true;
       }
       final boolean shouldRetry = retry;
@@ -76,6 +77,9 @@ public final class SyncJobService extends JobService {
     }
 
     HostingSyncClient client = new HostingSyncClient();
+    OperationCache cache = new OperationCache(preferences, identity.deviceId);
+    OperationData previousData = cache.load();
+    LocalNotificationCenter notifications = new LocalNotificationCenter(this, preferences);
     ActionOutbox outbox = new ActionOutbox(preferences);
     List<ActionOutbox.PendingAction> pendingActions = outbox.load();
     for (ActionOutbox.PendingAction pending : pendingActions) {
@@ -86,10 +90,26 @@ public final class SyncJobService extends JobService {
       outbox.remove(pending.id);
     }
 
-    OperationCache cache = new OperationCache(preferences, identity.deviceId);
     HostingSyncClient.FetchResult fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision());
     if (!fetched.notModified && fetched.data != null) {
       cache.save(fetched.payload);
+      OperationData currentData = cache.load();
+      notifications.processSnapshot(previousData, currentData == null ? fetched.data : currentData);
+    }
+    notifications.recordSyncSuccess();
+  }
+
+  private void recordSyncFailure(Exception error) {
+    try {
+      SharedPreferences preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
+      DeviceIdentity identity = DeviceIdentity.loadOrCreate(this, preferences);
+      OperationData cachedData = new OperationCache(preferences, identity.deviceId).load();
+      new LocalNotificationCenter(this, preferences).recordSyncFailure(
+          cachedData,
+          error == null ? "" : error.getMessage()
+      );
+    } catch (Exception ignored) {
+      // Background retry remains authoritative even if notification state cannot be loaded.
     }
   }
 }

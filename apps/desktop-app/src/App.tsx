@@ -54,10 +54,12 @@ import type {
 import type { AutomaticSyncStatus } from "../electron/sync-coordinator";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
+import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "./app/operations";
 import { AppShell } from "./components/layout/AppShell";
 import { PageHeader } from "./components/layout/PageHeader";
 import { Sidebar } from "./components/layout/Sidebar";
+import { NotificationCenter } from "./components/notifications/NotificationCenter";
 import { ActionButton } from "./components/ui/ActionButton";
 import { CompactList } from "./components/ui/CompactList";
 import { CompactListButton, CompactListItem } from "./components/ui/CompactListItem";
@@ -501,7 +503,9 @@ const defaultDashboardData: DesktopDashboardData = {
       updatedAt: "2026-07-10T14:30:00+03:00"
     }
   ],
-  androidDevices: []
+  androidDevices: [],
+  paymentWaitingTableOrders: [],
+  androidActionFailures: []
 };
 
 const defaultSetupData: DesktopSetupData = {
@@ -732,6 +736,10 @@ function App() {
     [selectedWhatsAppMessage, selectedWhatsAppRequest]
   );
   const pageMeta = getPageMeta(activePage);
+  const desktopNotifications = useMemo(
+    () => buildDesktopNotifications(dashboardData, automaticSyncStatus),
+    [automaticSyncStatus, dashboardData]
+  );
   const menuPreviewData = useMemo(
     () => buildMenuPreviewData(dashboardData.menu, categoryForm, itemForm),
     [categoryForm, dashboardData.menu, itemForm]
@@ -1408,6 +1416,16 @@ function App() {
     setActivePage("customerWork");
   }
 
+  function openDesktopNotification(item: DesktopNotificationItem) {
+    if (item.kind === "request" && item.relatedId) {
+      setSelectedRequestId(item.relatedId);
+    }
+    const destination = navigationItems.some((navigationItem) => navigationItem.id === item.destination)
+      ? item.destination
+      : "dashboard";
+    setActivePage(destination);
+  }
+
   function openDashboardReservation(reservation: DesktopDashboardData["reservations"][number]) {
     const request = dashboardData.requests.find((item) => item.id === reservation.requestId);
     if (request) {
@@ -1756,7 +1774,9 @@ function App() {
           eyebrow={pageMeta.eyebrow}
           title={pageMeta.title}
           description={pageMeta.description}
-          action={activePage === "menu" ? (
+          action={(
+            <div className="page-header-tools">
+              {activePage === "menu" ? (
             <div className={`sync-pill sync-${menuPublishState}`}>
               <span role="status" aria-live="polite">{menuStatusMessage}</span>
               <button className="secondary-sync-action" type="button" onClick={openMenuPreview}>
@@ -1795,6 +1815,9 @@ function App() {
                 <RefreshCw size={16} aria-hidden="true" />
                 {automaticSyncStatus.phase === "syncing" ? "Eşitleniyor" : "Şimdi Eşitle"}
               </button>
+            </div>
+              )}
+              <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />
             </div>
           )}
         />

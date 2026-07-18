@@ -27,6 +27,25 @@ Sunucu revision'ı değişmediyse tam snapshot indirilmez. Son başarılı JSON 
 yenilemek için en az 15 dakikalık periyotta çalışır; kesin zaman Android'in pil ve ağ
 politikasına bağlıdır.
 
+## Yerel Bildirimler
+
+Yeni snapshot, telefondaki son cache ile karşılaştırılır. Yeni müşteri talebi, onay
+bekleyen rezervasyon, masa siparişi veya hesap bekleme durumu ile oda/günlük iş uyarıları
+yalnız cihazın güncel effective permission listesi izin veriyorsa Android yerel bildirimi
+üretir. Cihazın kendi başarısız işlemi yetki reddi olsa bile kullanıcı dostu biçimde
+gösterilebilir. Uzun süreli bağlantı hataları yalnız yönetici/ayar görme yetkili cihazlarda
+gösterilir; Firebase veya başka bir push servisi kullanılmaz.
+
+Aynı olay anahtarı kalıcı yerel ledger'da `first_seen_at`, `notified_at` ve `cleared_at`
+alanlarıyla tutulur. Böylece foreground ve `JobScheduler` aynı snapshot'ı görse bile
+bildirim tekrarlanmaz; talep, rezervasyon, masa veya iş çözüldüğünde aktif bildirim
+kapatılır. Bildirime dokunmak ilgili ana sekmeyi açar.
+
+Yönetici cihazlarda `Ayarlar`, personel cihazlarda `Bildirimler` ekranı şu tercihleri
+gösterir: müşteri/rezervasyon, restoran/masa, oda/günlük iş ve işlem hataları. Teknik
+sync tercihi ile bağlantı ayrıntıları personelden gizlenir. Yerel tercihler cihaz
+yetkilerini hiçbir zaman genişletmez.
+
 Telefon kimliği normal APK güncellemelerinde uygulamanın kalıcı ayarlarında korunur.
 Bu ayar henüz yoksa kimlik, Android'in uygulama/imza/cihaz kapsamlı `ANDROID_ID`
 değerinin tek yönlü özetinden üretilir. Bu sürümle oluşturulan kararlı kimlikten sonra

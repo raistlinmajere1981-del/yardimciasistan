@@ -138,8 +138,15 @@ async function main() {
 
   topXml = dumpUi("staff-top.xml");
   captureScreenshot("staff-top.png");
-  assertContains(topXml, ["Personel", "Boş odalar", "Hesap bekleyen", "Pansiyon", "Restoran"]);
+  assertContains(topXml, ["Personel", "Bildirimler", "Boş odalar", "Hesap bekleyen", "Pansiyon", "Restoran"]);
   assertNotContains(topXml, ["Ayarlar", "Yenile", 'text="Müşteri"', 'text="Mesajlar"', syncSecret]);
+  tap(centerOf(findBoundsByText(topXml, "Bildirimler")));
+  await delay(400);
+  const staffNotificationsXml = dumpUi("staff-notification-preferences.xml");
+  assertContains(staffNotificationsXml, ["Bildirim tercihleri", "Restoran / Masa", "Oda / Günlük İş", "İşlem hataları"]);
+  assertNotContains(staffNotificationsXml, ["Sync bağlantısı", "Bağlantı özeti", "Güvenlik anahtarı", syncSecret]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await delay(300);
 
   relaunchAppWithConnectionExtras("https://override.invalid/device-hijack", "override-secret-not-allowed");
   await waitForUiCondition(
@@ -212,6 +219,75 @@ async function main() {
     "Oda / Günlük İşler kapatıldığında pansiyon aksiyonları gizlenmedi."
   );
   assertNotContains(serviceOnlyXml, ['text="Pansiyon"', 'text="Müşteri"', 'text="Mesajlar"', "Boş odalar"]);
+
+  const notificationRequestId = "request_android_notification_smoke_001";
+  const notificationCustomerName = "Bildirim Smoke Misafiri";
+  await publishNotificationRequest(baseUrl, deviceId, serviceOrderPermissions, notificationRequestId, notificationCustomerName, "new");
+  relaunchApp();
+  await waitForUiCondition(
+    (xml) => xml.includes("Personel") && xml.includes('text="Restoran"') && !xml.includes('text="Müşteri"'),
+    12000,
+    "Yetkisiz bildirim snapshot'ı servis profiliyle alınmadı."
+  );
+  await delay(700);
+  assert.equal(notificationDump().includes(notificationCustomerName), false, "customer.view olmayan cihaz müşteri bildirimi aldı.");
+
+  await publishNotificationRequest(baseUrl, deviceId, customerReservationPermissions, notificationRequestId, notificationCustomerName, "new");
+  relaunchApp();
+  await waitForUiCondition(
+    (xml) => xml.includes("Personel") && xml.includes('text="Müşteri"'),
+    12000,
+    "Müşteri yetkisi bildirim snapshot'ıyla uygulanmadı."
+  );
+  await waitForNotificationText(notificationCustomerName, 12000);
+  const notificationEventKey = `request:${notificationRequestId}:new`;
+  assert.equal(countOccurrences(readPreferenceValue("notification_event_ledger_v1"), notificationEventKey), 1, "Bildirim event key ledger'da tekil değil.");
+
+  const repeatedNotificationSnapshotAt = await publishNotificationRequest(
+    baseUrl,
+    deviceId,
+    customerReservationPermissions,
+    notificationRequestId,
+    notificationCustomerName,
+    "new"
+  );
+  await waitForCachedSnapshotText(repeatedNotificationSnapshotAt, 20000);
+  await waitForNotificationText(notificationCustomerName, 12000);
+  assert.equal(countOccurrences(readPreferenceValue("notification_event_ledger_v1"), notificationEventKey), 1, "Aynı snapshot bildirimi ledger'da çoğalttı.");
+
+  await publishNotificationRequest(baseUrl, deviceId, customerReservationPermissions, notificationRequestId, notificationCustomerName, "answered");
+  await waitForNotificationAbsence(notificationCustomerName, 20000);
+
+  const notificationClickRequestId = "request_android_notification_click_smoke_001";
+  const notificationClickCustomer = "Tıklama Smoke Misafiri";
+  const notificationClickSnapshotAt = await publishNotificationRequest(
+    baseUrl,
+    deviceId,
+    customerReservationPermissions,
+    notificationClickRequestId,
+    notificationClickCustomer,
+    "new"
+  );
+  await waitForCachedSnapshotText(notificationClickSnapshotAt, 20000);
+  await waitForNotificationText(notificationClickCustomer, 12000);
+  adb(["shell", "cmd", "statusbar", "expand-notifications"]);
+  await delay(800);
+  let notificationShadeXml = dumpUi("notification-shade.xml");
+  const notificationClickMessage = `${notificationClickCustomer} · Yerel bildirim izin ve spam testi.`;
+  assertContains(notificationShadeXml, [notificationClickMessage]);
+  const notificationGroupExpandBounds = findNotificationGroupExpandBounds(notificationShadeXml, notificationClickMessage);
+  if (notificationGroupExpandBounds) {
+    tap(centerOf(notificationGroupExpandBounds));
+    await delay(600);
+    notificationShadeXml = dumpUi("notification-shade-expanded.xml");
+    assertContains(notificationShadeXml, [notificationClickMessage]);
+  }
+  tap(centerOf(findNotificationClickBounds(notificationShadeXml, notificationClickMessage)));
+  await waitForUiCondition(
+    (xml) => xml.includes("MÜŞTERİ İŞLERİ") && xml.includes(notificationClickCustomer),
+    12000,
+    "Müşteri bildirimine dokununca Müşteri sekmesi açılmadı."
+  );
 
   await publishDeviceRole(baseUrl, deviceId, "staff", {
     permissions: [...new Set([...serviceOrderPermissions, ...cashierPermissions])]
@@ -701,10 +777,49 @@ async function publishMissingDeviceProfile(baseUrl) {
   return publishDeviceProfiles(baseUrl, {}, "eksik profil");
 }
 
+async function publishNotificationRequest(baseUrl, deviceId, permissions, requestId, customerName, status) {
+  const snapshot = JSON.parse(readFileSync(demoSnapshotFile, "utf8"));
+  snapshot.requests = [
+    {
+      id: requestId,
+      customer_id: "customer_android_notification_smoke_001",
+      request_type: "general_info",
+      status,
+      customer_name: customerName,
+      customer_phone: "+905550000001",
+      date_text: "",
+      start_date: "",
+      end_date: "",
+      time: "",
+      guest_count: 1,
+      message: "Yerel bildirim izin ve spam testi.",
+      ai_summary: "",
+      ai_suggested_reply: "",
+      whatsapp_message: "",
+      priority: "high",
+      created_at: "2026-07-18T13:00:00+03:00",
+      updated_at: new Date().toISOString()
+    },
+    ...(snapshot.requests ?? []).filter((request) => request.id !== requestId)
+  ];
+  snapshot.androidPermissions = {
+    [deviceId]: {
+      role: "staff",
+      is_active: true,
+      permissions
+    }
+  };
+  return publishSnapshot(baseUrl, snapshot, "bildirim testi");
+}
+
 async function publishDeviceProfiles(baseUrl, profiles, label) {
   const snapshot = JSON.parse(readFileSync(demoSnapshotFile, "utf8"));
-  snapshot.updated_at = new Date().toISOString();
   snapshot.androidPermissions = profiles;
+  await publishSnapshot(baseUrl, snapshot, label);
+}
+
+async function publishSnapshot(baseUrl, snapshot, label) {
+  snapshot.updated_at = new Date().toISOString();
   snapshotRevision += 1;
   const response = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
@@ -724,6 +839,54 @@ async function publishDeviceProfiles(baseUrl, profiles, label) {
   if (!response.ok || !result.ok) {
     throw new Error(result.message ?? `${label} Android profili yayınlanamadı.`);
   }
+  return snapshot.updated_at;
+}
+
+function notificationDump() {
+  const result = adb(["shell", "dumpsys", "notification", "--noredact"], { capture: true });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+  const listStart = output.indexOf("Notification List:");
+  const listEnd = output.indexOf("\n  mUseAttentionLight", listStart);
+  return listStart >= 0
+    ? output.slice(listStart, listEnd >= 0 ? listEnd : output.length)
+    : output;
+}
+
+async function waitForNotificationText(text, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (notificationDump().includes(text)) {
+      return;
+    }
+    await delay(500);
+  }
+  throw new Error(`Android bildirimi beklenirken zaman aşımı: ${text}`);
+}
+
+async function waitForNotificationAbsence(text, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (!notificationDump().includes(text)) {
+      return;
+    }
+    await delay(500);
+  }
+  throw new Error(`Çözülen Android bildirimi aktif listeden kalkmadı: ${text}`);
+}
+
+async function waitForCachedSnapshotText(text, timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (readPreferenceValueIfPresent("operations_cache_v1").includes(text)) {
+      return;
+    }
+    await delay(500);
+  }
+  throw new Error(`Android foreground sync snapshot'ı almadı: ${text}`);
+}
+
+function countOccurrences(value, search) {
+  return value.split(search).length - 1;
 }
 
 function scrollToTop() {
@@ -791,6 +954,129 @@ function findBoundsByText(xml, text) {
     throw new Error(`UI node bulunamadı: ${text}`);
   }
   return bounds;
+}
+
+function findNotificationGroupExpandBounds(xml, text) {
+  const target = findUiNodeByText(xml, text);
+  if (!target) {
+    return null;
+  }
+  let ancestor = target.parent;
+  while (ancestor) {
+    if (ancestor.resourceId === "com.android.systemui:id/expandableNotificationRow") {
+      const expandButton = findUiDescendant(
+        ancestor,
+        (node) => node.resourceId === "android:id/expand_button" && node.clickable
+      );
+      if (expandButton?.bounds) {
+        return expandButton.bounds;
+      }
+    }
+    ancestor = ancestor.parent;
+  }
+  return null;
+}
+
+function findNotificationClickBounds(xml, text) {
+  const target = findUiNodeByText(xml, text);
+  if (!target) {
+    throw new Error(`Bildirim UI node'u bulunamadı: ${text}`);
+  }
+  let ancestor = target.parent;
+  while (ancestor) {
+    if (ancestor.resourceId === "com.android.systemui:id/expandableNotificationRow") {
+      if (ancestor.clickable && ancestor.bounds) {
+        return ancestor.bounds;
+      }
+      break;
+    }
+    ancestor = ancestor.parent;
+  }
+  if (target.bounds) {
+    return target.bounds;
+  }
+  throw new Error(`Bildirim tıklama sınırı bulunamadı: ${text}`);
+}
+
+function findUiNodeByText(xml, text) {
+  return flattenUiNodes(parseUiNodes(xml)).find((node) => node.text === text) ?? null;
+}
+
+function findUiDescendant(node, predicate) {
+  for (const child of node.children) {
+    if (predicate(child)) {
+      return child;
+    }
+    const nested = findUiDescendant(child, predicate);
+    if (nested) {
+      return nested;
+    }
+  }
+  return null;
+}
+
+function flattenUiNodes(nodes) {
+  const flattened = [];
+  for (const node of nodes) {
+    flattened.push(node, ...flattenUiNodes(node.children));
+  }
+  return flattened;
+}
+
+function parseUiNodes(xml) {
+  const roots = [];
+  const stack = [];
+  const tokens = xml.match(/<node\b[^>]*\/?\s*>|<\/node>/g) ?? [];
+  for (const token of tokens) {
+    if (token === "</node>") {
+      stack.pop();
+      continue;
+    }
+    const node = {
+      text: readXmlAttribute(token, "text"),
+      resourceId: readXmlAttribute(token, "resource-id"),
+      clickable: readXmlAttribute(token, "clickable") === "true",
+      bounds: readBounds(token),
+      children: [],
+      parent: stack.at(-1) ?? null
+    };
+    if (node.parent) {
+      node.parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+    if (!/\/\s*>$/.test(token)) {
+      stack.push(node);
+    }
+  }
+  return roots;
+}
+
+function readXmlAttribute(node, name) {
+  const match = node.match(new RegExp(`${name}="([^"]*)"`));
+  return match ? unescapeXmlAttribute(match[1]) : "";
+}
+
+function unescapeXmlAttribute(value) {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+function readBounds(node) {
+  const match = node.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if (!match) {
+    return null;
+  }
+  return {
+    left: Number(match[1]),
+    top: Number(match[2]),
+    right: Number(match[3]),
+    bottom: Number(match[4])
+  };
 }
 
 function findClickableBoundsByText(xml, text) {

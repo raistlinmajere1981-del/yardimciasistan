@@ -242,7 +242,7 @@ export class SyncCoordinator {
     counts.pulledActions = actionResult.pulled;
     counts.appliedActions = actionResult.applied;
     counts.failedActions = actionResult.failed;
-    dashboardChanged ||= actionResult.applied > 0 || actionResult.devicesChanged > 0;
+    dashboardChanged ||= actionResult.applied > 0 || actionResult.failed > 0 || actionResult.devicesChanged > 0;
     if (actionResult.error) {
       errors.push(actionResult.error);
     }
@@ -343,6 +343,7 @@ export class SyncCoordinator {
     let failed = 0;
     for (const action of pulled.actions) {
       const local = this.options.database.applyAndroidAction(action);
+      this.options.database.recordAndroidActionResult(action, local);
       const status = local.ok ? "applied" : "failed";
       const completion = await transport.completeAndroidAction({
         actionId: action.id,

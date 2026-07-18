@@ -102,11 +102,16 @@ if (javaTestFiles.length > 0) {
     testClassDir,
     ...javaTestFiles
   ]);
-  run("java", [
-    "-classpath",
-    `${classDir}${delimiter}${testClassDir}`,
-    "com.yardimciasistan.android.StableDeviceIdSmoke"
-  ]);
+  for (const testMain of [
+    "com.yardimciasistan.android.StableDeviceIdSmoke",
+    "com.yardimciasistan.android.NotificationRulesSmoke"
+  ]) {
+    run("java", [
+      "-classpath",
+      `${androidJar}${delimiter}${classDir}${delimiter}${testClassDir}`,
+      testMain
+    ]);
+  }
 }
 
 run(d8, [

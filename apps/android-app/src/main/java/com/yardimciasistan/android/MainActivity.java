@@ -1,5 +1,6 @@
 package com.yardimciasistan.android;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
@@ -10,10 +11,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -30,6 +33,7 @@ import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -54,12 +58,15 @@ public final class MainActivity extends Activity {
   private static final String TAB_RESTAURANT = "restaurant";
   private static final String TAB_MESSAGES = "messages";
   private static final long FOREGROUND_SYNC_INTERVAL_MS = 15_000L;
+  private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 0x5941;
+  private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
 
   private final HostingSyncClient syncClient = new HostingSyncClient();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private SharedPreferences preferences;
   private ActionOutbox actionOutbox;
   private OperationCache operationCache;
+  private LocalNotificationCenter localNotifications;
   private OperationData data = new OperationData();
   private DeviceIdentity identity;
   private String activeTab = TAB_TODAY;
@@ -108,6 +115,7 @@ public final class MainActivity extends Activity {
     identity = DeviceIdentity.loadOrCreate(this, preferences);
     actionOutbox = new ActionOutbox(preferences);
     operationCache = new OperationCache(preferences, identity.deviceId);
+    localNotifications = new LocalNotificationCenter(this, preferences);
     OperationData cachedData = operationCache.load();
     if (cachedData != null) {
       data = cachedData;
@@ -115,8 +123,10 @@ public final class MainActivity extends Activity {
     }
     applyConnectionExtras();
     SyncJobService.schedule(this);
+    applyNotificationIntent(getIntent());
     buildShell();
     render();
+    requestNotificationPermissionIfNeeded();
     if (hasConnectionSettings()) {
       syncFromHosting(false);
     } else {
@@ -144,6 +154,22 @@ public final class MainActivity extends Activity {
     foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
     executor.shutdownNow();
     super.onDestroy();
+  }
+
+  @Override
+  protected void onNewIntent(Intent intent) {
+    super.onNewIntent(intent);
+    setIntent(intent);
+    applyNotificationIntent(intent);
+    render();
+  }
+
+  @Override
+  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE && localNotifications != null) {
+      localNotifications.refreshCurrentSnapshot(data);
+    }
   }
 
   @Override
@@ -201,6 +227,39 @@ public final class MainActivity extends Activity {
     return (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
   }
 
+  private void applyNotificationIntent(Intent intent) {
+    if (intent == null) {
+      return;
+    }
+    String route = intent.getStringExtra(LocalNotificationCenter.EXTRA_ROUTE);
+    if (route == null || route.trim().isEmpty()) {
+      return;
+    }
+    String normalized = route.trim();
+    settingsOpen = "settings".equals(normalized)
+        && (!data.permissionsResolved || data.hasPermission("settings.view"));
+    if (settingsOpen) {
+      return;
+    }
+    if (TAB_CUSTOMERS.equals(normalized)
+        || TAB_PENSION.equals(normalized)
+        || TAB_RESTAURANT.equals(normalized)
+        || TAB_MESSAGES.equals(normalized)
+        || TAB_TODAY.equals(normalized)) {
+      activeTab = canOpenTab(normalized) ? normalized : TAB_TODAY;
+    }
+  }
+
+  private void requestNotificationPermissionIfNeeded() {
+    if (Build.VERSION.SDK_INT < 33
+        || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        || preferences.getBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, false)) {
+      return;
+    }
+    preferences.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true).apply();
+    requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, NOTIFICATION_PERMISSION_REQUEST_CODE);
+  }
+
   private void buildShell() {
     root = UiKit.column(this);
     root.setBackgroundColor(UiKit.BG);
@@ -250,7 +309,7 @@ public final class MainActivity extends Activity {
 
   private void render() {
     rememberCurrentScrollPosition();
-    boolean canOpenSettings = !data.permissionsResolved || data.hasPermission("settings.view");
+    boolean canOpenSettings = !data.permissionsResolved || data.deviceActive;
     if (settingsOpen && !canOpenSettings) {
       settingsOpen = false;
     }
@@ -262,7 +321,9 @@ public final class MainActivity extends Activity {
       settingsOpen = false;
     }
     String screenKey = currentScreenKey(inactiveDevice);
-    settingsButton.setText(settingsOpen ? "Kapat" : "Ayarlar");
+    boolean technicalSettingsVisible = !data.permissionsResolved || data.hasPermission("settings.view");
+    settingsButton.setText(settingsOpen ? "Kapat" : (technicalSettingsVisible ? "Ayarlar" : "Bildirimler"));
+    settingsButton.setContentDescription(technicalSettingsVisible ? "Ayarları aç" : "Bildirim tercihlerini aç");
     settingsButton.setVisibility(canOpenSettings ? View.VISIBLE : View.GONE);
     bottomNavigation.setVisibility(settingsOpen || inactiveDevice ? View.GONE : View.VISIBLE);
     renderBottomNavigation();
@@ -687,7 +748,72 @@ public final class MainActivity extends Activity {
 
   private View settingsScreen() {
     LinearLayout page = UiKit.column(this);
-    page.addView(screenIntro("AYARLAR", "Bağlantı ve işlem durumu", "Telefon yalnız web modülü üzerinden masaüstüyle güvenli biçimde haberleşir.", false));
+    boolean canViewTechnicalSettings = !data.permissionsResolved || data.hasPermission("settings.view");
+    page.addView(screenIntro(
+        canViewTechnicalSettings ? "AYARLAR" : "BİLDİRİMLER",
+        canViewTechnicalSettings ? "Bildirim, bağlantı ve işlem durumu" : "Bildirim tercihleri",
+        canViewTechnicalSettings
+            ? "İzin verilen operasyon uyarılarını ve masaüstü bağlantısını yönetin."
+            : "Yalnız bu cihazın görev alanları için izin verilen uyarıları yönetin.",
+        false
+    ));
+
+    page.addView(UiKit.sectionTitle(this, "Bildirim tercihleri"));
+    LinearLayout notificationPreferences = UiKit.card(this);
+    boolean hasNotificationPreference = false;
+    if (!data.permissionsResolved || data.hasPermission("customer.view") || data.hasPermission("reservation.view")) {
+      notificationPreferences.addView(notificationToggle(
+          "Müşteri / Rezervasyon",
+          "Yeni talepler ve onay bekleyen rezervasyonlar",
+          NotificationEvent.CATEGORY_CUSTOMER
+      ));
+      hasNotificationPreference = true;
+    }
+    if (!data.permissionsResolved || data.hasPermission("table.view") || data.hasPermission("table_order.view")) {
+      if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
+      notificationPreferences.addView(notificationToggle(
+          "Restoran / Masa",
+          "Masa siparişi ve hesap bekleyen adisyonlar",
+          NotificationEvent.CATEGORY_RESTAURANT
+      ));
+      hasNotificationPreference = true;
+    }
+    if (!data.permissionsResolved || data.hasPermission("room.view") || data.hasPermission("daily_task.view")) {
+      if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
+      notificationPreferences.addView(notificationToggle(
+          "Oda / Günlük İş",
+          "Temizlik, bakım ve bekleyen günlük işler",
+          NotificationEvent.CATEGORY_ROOMS
+      ));
+      hasNotificationPreference = true;
+    }
+    if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
+    notificationPreferences.addView(notificationToggle(
+        "İşlem hataları",
+        "Telefondan gönderilen işlemler uygulanamadığında",
+        NotificationEvent.CATEGORY_ACTION
+    ));
+    hasNotificationPreference = true;
+    if (canViewTechnicalSettings) {
+      notificationPreferences.addView(UiKit.divider(this));
+      notificationPreferences.addView(notificationToggle(
+          "Sync bağlantısı",
+          "Canlı veri uzun süredir yenilenemediğinde",
+          NotificationEvent.CATEGORY_SYNC
+      ));
+    }
+    notificationPreferences.addView(UiKit.text(
+        this,
+        "Bu anahtarlar cihaz yetkilerini genişletmez; masaüstünde kapalı olan görev alanları bildirim üretemez.",
+        11,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+    page.addView(notificationPreferences);
+
+    if (!canViewTechnicalSettings) {
+      return UiKit.scroll(this, page);
+    }
 
     webModuleInput = null;
     syncSecretInput = null;
@@ -752,6 +878,29 @@ public final class MainActivity extends Activity {
       page.addView(actionCard(action));
     }
     return UiKit.scroll(this, page);
+  }
+
+  private View notificationToggle(String title, String detail, String category) {
+    LinearLayout row = UiKit.row(this);
+    row.setGravity(Gravity.CENTER_VERTICAL);
+    row.setPadding(0, UiKit.dp(this, 7), 0, UiKit.dp(this, 7));
+    LinearLayout copy = UiKit.column(this);
+    copy.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    copy.addView(UiKit.text(this, title, 14, UiKit.TEXT, Typeface.BOLD));
+    copy.addView(UiKit.text(this, detail, 11, UiKit.MUTED, Typeface.NORMAL));
+    row.addView(copy);
+
+    Switch toggle = new Switch(this);
+    toggle.setChecked(NotificationPreferences.isEnabled(preferences, category));
+    toggle.setContentDescription(title + " bildirimleri");
+    toggle.setOnCheckedChangeListener((button, checked) -> {
+      NotificationPreferences.setEnabled(preferences, category, checked);
+      if (localNotifications != null) {
+        localNotifications.refreshCurrentSnapshot(data);
+      }
+    });
+    row.addView(toggle, new LinearLayout.LayoutParams(-2, UiKit.dp(this, 48)));
+    return row;
   }
 
   private View screenIntro(String eyebrow, String title, String description, boolean includeRefresh) {
@@ -1640,6 +1789,8 @@ public final class MainActivity extends Activity {
     loading = true;
     connectionState = pendingToRetry.isEmpty() ? "Canlı veri çekiliyor" : "Bekleyen işlemler yeniden gönderiliyor";
     clearError();
+    final OperationData previousData = operationCache.load();
+    final OperationData fallbackData = data;
     executor.execute(() -> {
       try {
         for (ActionOutbox.PendingAction pending : pendingToRetry) {
@@ -1653,10 +1804,14 @@ public final class MainActivity extends Activity {
           OperationData cachedData = operationCache.load();
           nextData = cachedData == null ? fetched.data : cachedData;
         } else {
-          nextData = data;
+          nextData = previousData == null ? fallbackData : previousData;
           nextData.pulledAt = fetched.payload.optString("pulled_at", nextData.pulledAt);
           nextData.pendingActions = Math.max(0, fetched.payload.optInt("pending_action_count", nextData.pendingActions));
         }
+        if (!fetched.notModified) {
+          localNotifications.processSnapshot(previousData, nextData);
+        }
+        localNotifications.recordSyncSuccess();
         runOnUiThread(() -> {
           data = nextData;
           loading = false;
@@ -1667,6 +1822,7 @@ public final class MainActivity extends Activity {
           }
         });
       } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
+        localNotifications.recordSyncFailure(previousData, error.getMessage());
         runOnUiThread(() -> {
           loading = false;
           connectionState = error.getMessage();

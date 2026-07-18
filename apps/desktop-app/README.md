@@ -26,6 +26,12 @@ Masaüstü uygulamasının varsayılan web modülü
 kurulumudur. Ayarlar ekranındaki güvenlik anahtarı hosting kurulumundaki
 `config/business.json → sync_secret` değeriyle eşleşmelidir.
 
+Üst bardaki bildirim merkezi açık müşteri taleplerini, onay bekleyen rezervasyonları,
+hesap bekleyen masaları, bekleyen/geciken günlük işleri, sync hatalarını ve başarısız
+Android işlemlerini tek listede gösterir. Operasyon kaydı çözüldüğünde uyarı canlı
+listeden kalkar; başarısız Android işlem uyarısı aynı cihazın aynı kayıt üzerindeki
+işlemi daha sonra başarıyla uygulandığında kapanır.
+
 ## İlk Durum
 
 Bu iskelet şu parçaları içerir:
