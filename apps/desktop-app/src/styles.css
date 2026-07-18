@@ -4850,6 +4850,82 @@ button {
   opacity: 0.5;
 }
 
+.android-removed-devices {
+  overflow: hidden;
+  background: var(--surface-neutral);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.android-removed-devices > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px 11px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+}
+
+.android-removed-devices > summary::-webkit-details-marker {
+  display: none;
+}
+
+.android-removed-devices > summary > span {
+  flex: 1;
+}
+
+.android-removed-devices > summary > strong {
+  display: grid;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 7px;
+  color: var(--muted);
+  background: var(--field);
+  border-radius: 999px;
+  place-items: center;
+}
+
+.android-removed-devices > summary::after {
+  content: "+";
+  color: var(--muted);
+  font-size: var(--text-lg);
+}
+
+.android-removed-devices[open] > summary::after {
+  content: "−";
+}
+
+.android-removed-device-list {
+  display: grid;
+  gap: 7px;
+  padding: 0 9px 9px;
+}
+
+.android-removed-device-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(190px, auto) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  background: var(--surface-disabled);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.android-removed-device-row > span {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.android-removed-device-row > .setup-secondary {
+  min-height: 34px !important;
+  padding: 5px 9px !important;
+}
+
 /* Aşama 4: Menü, Ayarlar ve ortak koyu tema son dokunuşları */
 .status-badge {
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
@@ -6656,6 +6732,15 @@ button {
 
   .android-device-list {
     grid-template-columns: 1fr;
+  }
+
+  .android-removed-device-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .android-removed-device-row > .setup-secondary {
+    justify-self: start;
   }
 
   .pension-reservations-section,

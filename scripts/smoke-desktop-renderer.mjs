@@ -52,7 +52,7 @@ try {
           ? [...new Set([...device.permissions, "table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"])]
           : device.permissions.filter((permission) => !["table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"].includes(permission))
       }), role === "admin" ? "Telefon yönetici yapıldı." : "Telefon personel yapıldı."),
-      setAndroidDeviceActive: async (deviceId, active) => mutateDevice(deviceId, (device) => ({ ...device, isActive: active }), active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi."),
+      setAndroidDeviceActive: async (deviceId, active) => mutateDevice(deviceId, (device) => ({ ...device, isActive: active, revokedAt: active ? "" : device.revokedAt }), active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi."),
       resetAndroidDevicePermissions: async (deviceId) => mutateDevice(deviceId, (device) => device, "Telefon yetkileri rol varsayılanına döndürüldü."),
       revokeAndroidDevice: async (deviceId) => mutateDevice(deviceId, (device) => ({ ...device, isActive: false, revokedAt: new Date().toISOString() }), "Telefon kaldırıldı ve erişimi kapatıldı."),
       getAiWorkspaceHistory: async () => [],
@@ -80,6 +80,32 @@ try {
   await expect(androidDeviceSection.getByText(/Hesap kapatabilir/)).toBeVisible();
   await androidDeviceSection.getByRole("button", { name: "Personel Yap" }).click();
   await expect(androidDeviceSection.getByText("Telefon personel yapıldı.", { exact: true })).toBeVisible();
+  await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
+  await expect(androidDeviceSection.getByText("Yönetici", { exact: true })).toBeVisible();
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("android-smok…ce-001");
+    await dialog.accept();
+  });
+  await androidDeviceSection.getByRole("button", { name: "Kaldır" }).click();
+  await expect(androidDeviceSection.getByText("Telefon kaldırıldı ve erişimi kapatıldı.", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.locator(".android-device-list")).toHaveCount(0);
+  await expect(androidDeviceSection.getByText("0 cihaz", { exact: true })).toBeVisible();
+  const removedDevices = androidDeviceSection.locator(".android-removed-devices");
+  await expect(removedDevices.getByText("Kaldırılan cihazlar", { exact: true })).toBeVisible();
+  await removedDevices.locator("summary").click();
+  await expect(removedDevices.locator(".android-removed-device-row").getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
+  await expect(removedDevices.getByText("Yönetici", { exact: true })).toBeVisible();
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("android-smok…ce-001");
+    expect(dialog.message()).toContain("Yönetici rolü");
+    await dialog.accept();
+  });
+  await removedDevices.getByRole("button", { name: /Smoke Personel Telefonu.*cihazını geri yükle/ }).click();
+  await expect(androidDeviceSection.locator(".android-device-list").getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.locator(".android-device-list").getByText("Yönetici", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText(/Hesap kapatabilir/)).toBeVisible();
+  await expect(androidDeviceSection.getByText("1 cihaz", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.locator(".android-removed-devices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(page.locator(".setup-footer")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Panele Dön" })).toHaveCount(0);

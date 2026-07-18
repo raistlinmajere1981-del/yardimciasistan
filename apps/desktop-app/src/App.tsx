@@ -875,7 +875,9 @@ function App() {
   }
 
   function handleRevokeAndroidDevice(device: DesktopAndroidDevice) {
-    if (!window.yardimciDesktop || !window.confirm(`${device.deviceName || "Bu telefon"} kaldırılsın ve erişimi kapatılsın mı?`)) {
+    const shortId = compactAndroidDeviceId(device.deviceId);
+    const deviceLabel = `${device.deviceName || "Bu telefon"}${shortId ? ` (${shortId})` : ""}`;
+    if (!window.yardimciDesktop || !window.confirm(`${deviceLabel} kaldırılsın ve erişimi kapatılsın mı?`)) {
       return;
     }
     void runAndroidDeviceMutation(
@@ -2635,6 +2637,18 @@ function AndroidDevicesSection({
   onRevoke
 }: AndroidDevicesSectionProps) {
   const busy = state === "loading";
+  const availableDevices = devices.filter((device) => !device.revokedAt);
+  const removedDevices = devices.filter((device) => Boolean(device.revokedAt));
+  const restoreDevice = (device: DesktopAndroidDevice) => {
+    if (!onSetActive) return;
+    const shortId = compactAndroidDeviceId(device.deviceId);
+    const deviceName = device.deviceName || "Android Telefon";
+    const roleLabel = device.role === "admin" ? "Yönetici" : "Personel";
+    if (!window.confirm(`${deviceName} (${shortId}) ${roleLabel} rolü ve kayıtlı yetkileriyle geri yüklensin mi?`)) {
+      return;
+    }
+    onSetActive(device.deviceId, true);
+  };
   return (
     <section className="setup-section settings-android-devices-section">
       <div className="setup-section-title android-devices-heading">
@@ -2642,21 +2656,22 @@ function AndroidDevicesSection({
           <p>Telefon Yetkileri</p>
           <h2>Android Cihazlar</h2>
         </div>
-        <span>{devices.length} cihaz</span>
+        <span>{availableDevices.length} cihaz</span>
       </div>
-      <p className="setup-section-description">Rol ve işlem yetkileri yalnız bu bilgisayardan değiştirilebilir. Personel günlük sipariş alabilir; hesabı ödendi olarak kapatamaz.</p>
-      {devices.length === 0 ? (
+      <p className="setup-section-description">Rol ve işlem yetkileri yalnız bu bilgisayardan değiştirilebilir. Kaldırılan cihazlar ana listeden çıkarılır ve erişimleri kapalı kalır.</p>
+      {availableDevices.length === 0 ? (
         <div className="android-devices-empty">
           <Smartphone size={22} aria-hidden="true" />
-          <div><strong>Henüz Android cihaz görülmedi.</strong><span>Telefon web modülüne bağlandığında burada personel olarak görünür.</span></div>
+          <div>
+            <strong>{removedDevices.length > 0 ? "Etkin Android cihaz yok." : "Henüz Android cihaz görülmedi."}</strong>
+            <span>{removedDevices.length > 0 ? "Gerekirse kaldırılan cihazlardan birini geri yükleyin." : "Telefon web modülüne bağlandığında burada personel olarak görünür."}</span>
+          </div>
         </div>
       ) : (
         <div className="android-device-list">
-          {devices.map((device) => {
+          {availableDevices.map((device) => {
             const canClosePaid = device.permissions.includes("table_order.close_paid");
-            const shortId = device.deviceId.length > 22
-              ? `${device.deviceId.slice(0, 12)}…${device.deviceId.slice(-6)}`
-              : device.deviceId;
+            const shortId = compactAndroidDeviceId(device.deviceId);
             return (
               <article className={`android-device-card${device.isActive ? "" : " is-inactive"}`} key={device.deviceId}>
                 <div className="android-device-identity">
@@ -2682,16 +2697,54 @@ function AndroidDevicesSection({
                   <button className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "staff")} disabled={busy || device.role === "staff"}>Personel Yap</button>
                   <button className="setup-secondary" type="button" onClick={() => onSetActive?.(device.deviceId, !device.isActive)} disabled={busy}>{device.isActive ? "Pasifleştir" : "Aktif Et"}</button>
                   <button className="setup-secondary" type="button" onClick={() => onResetPermissions?.(device.deviceId)} disabled={busy}>Yetkileri Sıfırla</button>
-                  <button className="setup-secondary android-device-remove" type="button" onClick={() => onRevoke?.(device)} disabled={busy || Boolean(device.revokedAt)}>Kaldır</button>
+                  <button className="setup-secondary android-device-remove" type="button" onClick={() => onRevoke?.(device)} disabled={busy}>Kaldır</button>
                 </div>
               </article>
             );
           })}
         </div>
       )}
+      {removedDevices.length > 0 && (
+        <details className="android-removed-devices">
+          <summary>
+            <span>Kaldırılan cihazlar</span>
+            <strong>{removedDevices.length}</strong>
+          </summary>
+          <div className="android-removed-device-list">
+            {removedDevices.map((device) => (
+              <article className="android-removed-device-row" key={device.deviceId}>
+                <div className="android-device-identity">
+                  <span className="android-device-icon"><Smartphone size={17} aria-hidden="true" /></span>
+                  <div>
+                    <strong>{device.deviceName || "Android Telefon"}</strong>
+                    <code title={device.deviceId}>{compactAndroidDeviceId(device.deviceId)}</code>
+                  </div>
+                  <span className={`device-role role-${device.role}`}>{device.role === "admin" ? "Yönetici" : "Personel"}</span>
+                </div>
+                <span>{device.revokedAt ? `${formatDateTime(device.revokedAt)} tarihinde kaldırıldı` : "Erişimi kapalı"}</span>
+                <button
+                  aria-label={`${device.deviceName || "Android Telefon"} (${compactAndroidDeviceId(device.deviceId)}) cihazını geri yükle`}
+                  className="setup-secondary"
+                  type="button"
+                  onClick={() => restoreDevice(device)}
+                  disabled={busy || !onSetActive}
+                >
+                  Geri Yükle
+                </button>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
       <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>
     </section>
   );
+}
+
+function compactAndroidDeviceId(deviceId: string): string {
+  return deviceId.length > 22
+    ? `${deviceId.slice(0, 12)}…${deviceId.slice(-6)}`
+    : deviceId;
 }
 
 interface AiWorkspaceProps {

@@ -998,6 +998,26 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.equal(cancelResult.ok, true);
   assert.equal(database.getActiveTableOrder("table_001"), null);
   assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "available");
+
+  const adminResult = database.setAndroidDeviceRole("android-smoke-device", "admin");
+  assert.equal(adminResult.ok, true);
+  const revokedResult = database.revokeAndroidDevice("android-smoke-device");
+  assert.equal(revokedResult.ok, true);
+  const revokedDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-smoke-device");
+  assert.ok(revokedDevice?.revokedAt);
+  assert.equal(revokedDevice.isActive, false);
+  const revokedProfile = database.getAndroidPermissionSnapshot()["android-smoke-device"];
+  assert.equal(revokedProfile?.role, "admin");
+  assert.equal(revokedProfile?.is_active, false);
+  const restoredResult = database.setAndroidDeviceActive("android-smoke-device", true);
+  assert.equal(restoredResult.ok, true);
+  const restoredDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-smoke-device");
+  assert.equal(restoredDevice?.revokedAt, "");
+  assert.equal(restoredDevice?.isActive, true);
+  const restoredProfile = database.getAndroidPermissionSnapshot()["android-smoke-device"];
+  assert.equal(restoredProfile?.role, "admin");
+  assert.equal(restoredProfile?.is_active, true);
+  assert.ok(restoredProfile?.permissions.includes("android_devices.manage"));
 }
 
 function androidAction(id, actionType, payload) {
