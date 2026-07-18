@@ -8,14 +8,27 @@ kaynağı olmaya devam eder.
 
 Alt navigasyonda beş operasyon ekranı bulunur:
 
-- **Bugün:** talepler, rezervasyonlar, işler, boş oda/masa, hesap bekleyen masalar ve
-  hazır cevaplar.
-- **Müşteri:** yeni talepler, müşteriler ve cevap bekleyenler; arama, WhatsApp,
-  onay/red, cevaplandı ve rezervasyona çevirme kısayolları.
-- **Pansiyon:** rezervasyon, oda durumu ve günlük iş yönetimi.
-- **Restoran:** masa durumu, aktif adisyonlar, menüden ürün ekleme, adet/satır
-  yönetimi ve servis/hesap/kapatma akışı.
-- **Mesajlar:** hazır mesajı gösterme, kopyalama, WhatsApp uygulamasında açma ve arama.
+- **Bugün:** kompakt sayaç şeridi ile yeni talep, rezervasyon, günlük iş, hesap ve
+  kritik stok kayıtlarından oluşan tek bir öncelikli işler listesi.
+- **Müşteri:** `Yeni Talepler`, `Müşteriler` ve `Cevap Bekleyenler` segmentleri;
+  karttaki kısa iletişim aksiyonlarından sonra karar ve uzun içerik tam ekran detayda.
+- **Pansiyon:** yetkiye göre gösterilen `Rezervasyonlar`, `Odalar` ve `İşler`
+  modları. Aynı anda yalnız seçilen modun sayaçları ve listesi görünür.
+- **Restoran:** yetkiye göre gösterilen `Masalar`, `Açık Adisyon` ve `Stok` modları.
+  Masa kartları en fazla iki ana aksiyon taşır; stok düzenleme ayrıca açılan işlem
+  yüzeyindedir.
+- **Mesajlar:** `Hazır Mesajlar` ve `Cevap Bekleyenler` segmentleri. Kartlar kısa
+  önizleme gösterir, uzun mesaj tam ekran detayda açılır.
+
+Her operasyon sayfası 72 dp'lik ortak üst çubuğu kullanır: sayfa adı, rol/son senkron
+bilgisi ve sağda yenile ile ayar ikonları. Büyük ortak hero ve sayfa bazında tekrarlanan
+metrik kartları kullanılmaz. Kompakt sayaç şeritleri gerektiğinde yatay kayar; ana ekran
+içerikleri son kartı alt navigasyondan uzak tutan güvenli alt boşlukla biter.
+
+Masa siparişi tam ekran açılır; ürün arama ve kategori filtrelerinden sonra menü ile
+aktif adisyon satırları gösterilir. Servis, hesap ve yetkili cihazdaki kapatma aksiyonları
+ekranın altında en fazla iki sütunlu satırlara bölünerek sabit kalır. Stokta olmayan
+takipli ürünün ekleme aksiyonu devre dışıdır.
 
 Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
 `Ayarlar` ekranında gösterilir.
@@ -39,12 +52,13 @@ gösterilir; Firebase veya başka bir push servisi kullanılmaz.
 Aynı olay anahtarı kalıcı yerel ledger'da `first_seen_at`, `notified_at` ve `cleared_at`
 alanlarıyla tutulur. Böylece foreground ve `JobScheduler` aynı snapshot'ı görse bile
 bildirim tekrarlanmaz; talep, rezervasyon, masa veya iş çözüldüğünde aktif bildirim
-kapatılır. Bildirime dokunmak ilgili ana sekmeyi açar.
+kapatılır. Bildirime dokunmak yalnız ana sekmeyi değil ilgili yeni modu da açar; örneğin
+rezervasyon `Pansiyon / Rezervasyonlar`, oda `Pansiyon / Odalar`, günlük iş
+`Pansiyon / İşler`, hesap bekleyen masa `Restoran / Masalar` moduna gider.
 
-Yönetici cihazlarda `Ayarlar`, personel cihazlarda `Bildirimler` ekranı şu tercihleri
-gösterir: müşteri/rezervasyon, restoran/masa, oda/günlük iş ve işlem hataları. Teknik
-sync tercihi ile bağlantı ayrıntıları personelden gizlenir. Yerel tercihler cihaz
-yetkilerini hiçbir zaman genişletmez.
+Tek `Ayarlar` ekranı müşteri/rezervasyon, restoran/masa, oda/günlük iş ve işlem hatası
+bildirim tercihlerini gösterir. Teknik sync tercihi ile bağlantı ayrıntıları yetkisiz
+personelden gizlenir. Yerel tercihler cihaz yetkilerini hiçbir zaman genişletmez.
 
 Telefon kimliği normal APK güncellemelerinde uygulamanın kalıcı ayarlarında korunur.
 Bu ayar henüz yoksa kimlik, Android'in uygulama/imza/cihaz kapsamlı `ANDROID_ID`

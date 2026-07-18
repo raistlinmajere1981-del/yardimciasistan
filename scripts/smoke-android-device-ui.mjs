@@ -111,14 +111,22 @@ async function main() {
   uiTestBaseUrl = baseUrl;
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
-  await waitForUiText("2 oda içinde", 12000);
+  await waitForUiText("Öncelikli işler", 12000);
   scrollToTop();
   await delay(400);
 
   let topXml = dumpUi("top.xml");
   captureScreenshot("top.png");
-  assertContains(topXml, ["Bugün", "GÜNLÜK OPERASYON", "Pansiyon", "Restoran"]);
-  assertNotContains(topXml, ["Yeni talepler", 'text="Müşteri"', 'text="Mesajlar"', "Canlı veri çekiliyor", "Canlı veri alındı", "Veriler zaten güncel", "Son yayın:"]);
+  assertContains(topXml, ["Bugün", "Öncelikli işler", "Pansiyon", "Restoran", 'content-desc="Yenile"', 'content-desc="Ayarlar"', 'text="İş 2"', 'text="Oda 1"', 'text="Hesap 0"', 'text="Stok yok 1"']);
+  assertNotContains(topXml, ["GÜNLÜK OPERASYON", 'content-desc="Bildirimler"', 'text="Müşteri"', 'text="Mesajlar"', "Canlı veri çekiliyor", "Canlı veri alındı", "Veriler zaten güncel", "Son yayın:"]);
+  assertCounterStripFits(topXml, ["İş 2", "Oda 1", "Hesap 0", "Stok yok 1"]);
+  assertSquareTouchTarget(topXml, "Yenile");
+  assertSquareTouchTarget(topXml, "Ayarlar");
+
+  scrollToBottom();
+  await delay(350);
+  const todayBottomXml = dumpUi("today-bottom-safe.xml");
+  assertBottomNavClearance(todayBottomXml, "Stoku Aç", "Bugün", 160);
 
   const deviceId = readDeviceId();
   if (deviceIdBeforeUiReset) {
@@ -132,7 +140,7 @@ async function main() {
   assertNotContains(beforeRefreshXml, ["GÜNLÜK OPERASYON"]);
   await publishDeviceRole(baseUrl, deviceId, "staff");
   const afterRefreshXml = await waitForUiCondition(
-    (xml) => xml.includes("Personel") && !xml.includes('text="Ayarlar"') && !xml.includes('text="Yenile"'),
+    (xml) => xml.includes("Personel ·") && xml.includes('content-desc="Ayarlar"') && xml.includes('content-desc="Yenile"'),
     20000,
     "Personel yetki profili Android arayüzüne uygulanmadı."
   );
@@ -142,35 +150,35 @@ async function main() {
 
   topXml = dumpUi("staff-top.xml");
   captureScreenshot("staff-top.png");
-  assertContains(topXml, ["Personel", "Bildirimler", "Boş odalar", "Hesap bekleyen", "Pansiyon", "Restoran"]);
-  assertNotContains(topXml, ["Ayarlar", "Yenile", 'text="Müşteri"', 'text="Mesajlar"', syncSecret]);
-  tap(centerOf(findBoundsByText(topXml, "Bildirimler")));
+  assertContains(topXml, ["Personel", 'content-desc="Ayarlar"', 'content-desc="Yenile"', 'text="Oda 1"', 'text="Hesap 0"', "Pansiyon", "Restoran"]);
+  assertNotContains(topXml, ['content-desc="Bildirimler"', 'text="Müşteri"', 'text="Mesajlar"', syncSecret]);
+  tap(centerOf(findClickableBoundsByDescription(topXml, "Ayarlar")));
   await delay(400);
-  const staffNotificationsXml = dumpUi("staff-notification-preferences.xml");
-  assertContains(staffNotificationsXml, ["Bildirim tercihleri", "Restoran / Masa", "Oda / Günlük İş", "İşlem hataları"]);
-  assertNotContains(staffNotificationsXml, ["Sync bağlantısı", "Bağlantı özeti", "Güvenlik anahtarı", syncSecret]);
+  const staffSettingsXml = dumpUi("staff-settings.xml");
+  assertContains(staffSettingsXml, ["Ayarlar", "Bildirim tercihleri", "Restoran / Masa", "Oda / Günlük İş", "İşlem hataları"]);
+  assertNotContains(staffSettingsXml, ["Bildirimler", "Sync bağlantısı", "Bağlantı özeti", "Güvenlik anahtarı", syncSecret]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
 
   relaunchAppWithConnectionExtras("https://override.invalid/device-hijack", "override-secret-not-allowed");
   await waitForUiCondition(
-    (xml) => xml.includes("Personel") && !xml.includes('text="Ayarlar"'),
+    (xml) => xml.includes('text="Bugün"') && xml.includes('content-desc="Yenile"'),
     12000,
-    "Personel profili bağlantı extra denemesinden sonra korunmadı."
+    "Bağlantı extra denemesinden sonra uygulama operasyon ekranına dönemedi."
   );
   assert.notEqual(readPreferenceValue("web_module_url"), "https://override.invalid/device-hijack");
   assert.notEqual(readPreferenceValue("sync_secret"), "override-secret-not-allowed");
   await publishDeviceRole(baseUrl, deviceId, "staff");
   relaunchApp();
   await waitForUiCondition(
-    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && !xml.includes('text="Ayarlar"'),
+    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && xml.includes('content-desc="Ayarlar"'),
     12000,
     "Geçici test bağlantısı yeniden uygulanamadı."
   );
   await publishMissingDeviceProfile(baseUrl);
   relaunchApp();
   await waitForUiCondition(
-    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && !xml.includes('text="Ayarlar"'),
+    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && xml.includes('content-desc="Ayarlar"'),
     12000,
     "Daha önce çözülmüş personel profili eksik snapshot sonrasında korunmadı."
   );
@@ -179,49 +187,39 @@ async function main() {
   topXml = dumpUi("staff-after-profile-gap.xml");
   tap(centerOf(findClickableBoundsByText(topXml, "Pansiyon")));
   await delay(400);
-  let staffPensionCombinedXml = dumpUi("staff-pension.xml");
-  for (let index = 0; index < 2; index += 1) {
-    swipe(360, 1080, 360, 360, 400);
-    await delay(350);
-    staffPensionCombinedXml += dumpUi(`staff-pension-scrolled-${index}.xml`);
-  }
-  assertContains(staffPensionCombinedXml, ["Odalar", "Temizlik", "Günlük işler", "Tamamla"]);
-  assertNotContains(staffPensionCombinedXml, ["WhatsApp", "Reddet", "Rezervasyonu İptal Et"]);
+  const staffPensionRoomsXml = dumpUi("staff-pension-rooms.xml");
+  assertContains(staffPensionRoomsXml, ["Odalar", "İşler", "Balkonlu Oda", "Temizlik", "Durumu Değiştir"]);
+  assertNotContains(staffPensionRoomsXml, ["Oda 101 giriş hazırlığı", "Tamamla", "Rezervasyonlar"]);
+  tap(centerOf(findClickableBoundsByText(staffPensionRoomsXml, "İşler")));
+  await delay(400);
+  const staffPensionTasksXml = dumpUi("staff-pension-tasks.xml");
+  assertContains(staffPensionTasksXml, ["Oda 101 giriş hazırlığı", "Bahçe servis kontrolü", "Tamamla"]);
+  assertNotContains(staffPensionTasksXml, ["Balkonlu Oda", "Aile Odası"]);
 
-  const staffPensionCurrentXml = dumpUi("staff-pension-current.xml");
-  tap(centerOf(findClickableBoundsByText(staffPensionCurrentXml, "Restoran")));
+  tap(centerOf(findClickableBoundsByText(staffPensionTasksXml, "Restoran")));
   await delay(500);
 
   let staffRestaurantXml = dumpUi("staff-restaurant.xml");
-  assertContains(staffRestaurantXml, ["Stok takibi"]);
-  for (let index = 0; index < 4; index += 1) {
-    const bounds = findBoundsByTextIfPresent(staffRestaurantXml, "Salon Masası 1");
-    if (bounds && bounds.top >= 100 && bounds.bottom <= 1160) {
-      break;
-    }
-    swipe(360, 1080, 360, 380, 420);
-    await delay(400);
-    staffRestaurantXml = dumpUi("staff-restaurant-scrolled.xml");
-  }
+  assertContains(staffRestaurantXml, ["Masalar", "Açık Adisyon", "Stok", "Salon Masası 1", "Siparişi Aç"]);
+  assertNotContains(staffRestaurantXml, ["Ev Limonatası", "Aktif adisyonlar"]);
   tap(centerOf(findBoundsByText(staffRestaurantXml, "Siparişi Aç")));
   await delay(500);
-  let staffOrderXml = dumpUi("staff-table-order.xml");
-  for (let index = 0; index < 6 && !staffOrderXml.includes("Hesap Bekliyor"); index += 1) {
-    swipe(360, 1080, 360, 300, 420);
-    await delay(350);
-    staffOrderXml = dumpUi("staff-table-order-scrolled.xml");
-  }
+  const staffOrderXml = dumpUi("staff-table-order.xml");
   captureScreenshot("staff-table-order.png");
-  assertContains(staffOrderXml, ["Hesap Bekliyor"]);
+  assertContains(staffOrderXml, ["MASA SİPARİŞİ", "Açık · 2 ürün · ₺900,00", "Ürün ara", "Hazırlanıyor", "Servis Edildi", "Hesap Bekliyor"]);
   assertNotContains(staffOrderXml, ["Ödendi / Kapat"]);
+  assertOrderActionGrid(staffOrderXml, false);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
+  const staffRestaurantAfterOrderXml = dumpUi("staff-restaurant-after-order.xml");
+  tap(centerOf(findClickableBoundsByText(staffRestaurantAfterOrderXml, "Stok")));
+  await delay(400);
   let staffStockXml = "";
-  for (let index = 0; index < 12; index += 1) {
+  for (let index = 0; index < 8; index += 1) {
     const currentXml = dumpUi(`staff-stock-${index}.xml`);
     staffStockXml += currentXml;
-    if (staffStockXml.includes("Stokta olmayanlar")
-        && staffStockXml.includes("Azalanlar")
+    if (staffStockXml.includes("Stokta yok")
+        && staffStockXml.includes("Az stok")
         && staffStockXml.includes("Tüm takip edilen ürünler")
         && staffStockXml.includes("Ev Limonatası")) {
       break;
@@ -229,8 +227,8 @@ async function main() {
     swipe(360, 1080, 360, 760, 360);
     await delay(300);
   }
-  assertContains(staffStockXml, ["Stokta olmayanlar", "Azalanlar", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı", "QR menüde"]);
-  assertNotContains(staffStockXml, ["+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
+  assertContains(staffStockXml, ["Stokta yok", "Az stok", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı"]);
+  assertNotContains(staffStockXml, ["Stok Güncelle", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
 
   await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: serviceOrderPermissions });
   relaunchApp();
@@ -305,9 +303,9 @@ async function main() {
   }
   tap(centerOf(findNotificationClickBounds(notificationShadeXml, notificationClickMessage)));
   await waitForUiCondition(
-    (xml) => xml.includes("MÜŞTERİ İŞLERİ") && xml.includes(notificationClickCustomer),
+    (xml) => xml.includes('text="Müşteri"') && xml.includes("Yeni Talepler") && xml.includes(notificationClickCustomer),
     12000,
-    "Müşteri bildirimine dokununca Müşteri sekmesi açılmadı."
+    "Müşteri bildirimine dokununca Yeni Talepler modu açılmadı."
   );
 
   await publishDeviceRole(baseUrl, deviceId, "staff", {
@@ -323,25 +321,13 @@ async function main() {
   let cashierTopXml = dumpUi("cashier-top.xml");
   tap(centerOf(findClickableBoundsByText(cashierTopXml, "Restoran")));
   await delay(500);
-  let cashierRestaurantXml = dumpUi("cashier-restaurant.xml");
-  for (let index = 0; index < 4; index += 1) {
-    const bounds = findBoundsByTextIfPresent(cashierRestaurantXml, "Salon Masası 1");
-    if (bounds && bounds.top >= 100 && bounds.bottom <= 1160) {
-      break;
-    }
-    swipe(360, 1080, 360, 380, 420);
-    await delay(400);
-    cashierRestaurantXml = dumpUi("cashier-restaurant-scrolled.xml");
-  }
+  const cashierRestaurantXml = dumpUi("cashier-restaurant.xml");
+  assertContains(cashierRestaurantXml, ["Masalar", "Salon Masası 1", "Siparişi Aç"]);
   tap(centerOf(findBoundsByText(cashierRestaurantXml, "Siparişi Aç")));
   await delay(500);
-  let cashierOrderXml = dumpUi("cashier-table-order.xml");
-  for (let index = 0; index < 6 && !cashierOrderXml.includes("Ödendi / Kapat"); index += 1) {
-    swipe(360, 1080, 360, 300, 420);
-    await delay(350);
-    cashierOrderXml = dumpUi("cashier-table-order-scrolled.xml");
-  }
-  assertContains(cashierOrderXml, ["Ödendi / Kapat"]);
+  const cashierOrderXml = dumpUi("cashier-table-order.xml");
+  assertContains(cashierOrderXml, ["Açık · 2 ürün · ₺900,00", "Hazırlanıyor", "Servis Edildi", "Hesap Bekliyor", "Ödendi / Kapat"]);
+  assertOrderActionGrid(cashierOrderXml, true);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
 
   await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: customerReservationPermissions });
@@ -355,11 +341,12 @@ async function main() {
     12000,
     "Müşteri / Rezervasyon profili Android arayüzüne uygulanmadı."
   );
-  assertNotContains(customerPackageTopXml, ['text="Restoran"', "Boş odalar", "Boş masalar"]);
+  assertNotContains(customerPackageTopXml, ['text="Restoran"', "Boş oda", "Boş masa"]);
   tap(centerOf(findClickableBoundsByText(customerPackageTopXml, "Müşteri")));
   await delay(500);
   const customerPackageListXml = dumpUi("customer-package-list.xml");
-  assertContains(customerPackageListXml, ["MÜŞTERİ İŞLERİ", "Yeni Talepler", "Demo Aile"]);
+  assertContains(customerPackageListXml, ["Müşteri", "Yeni Talepler", "Cevap Bekleyenler", "Demo Aile"]);
+  assertNotContains(customerPackageListXml, ["MÜŞTERİ İŞLERİ"]);
   tap(centerOf(findBoundsByText(customerPackageListXml, "Demo Aile")));
   await delay(500);
   let customerPackageDetailXml = dumpUi("customer-package-detail.xml");
@@ -375,14 +362,15 @@ async function main() {
   const customerPackageAfterDetailXml = dumpUi("customer-package-after-detail.xml");
   tap(centerOf(findClickableBoundsByText(customerPackageAfterDetailXml, "Pansiyon")));
   await delay(500);
-  let customerPackagePensionXml = dumpUi("customer-package-pension.xml");
-  for (let index = 0; index < 2 && !customerPackagePensionXml.includes("Onayla"); index += 1) {
-    swipe(360, 1080, 360, 360, 420);
-    await delay(350);
-    customerPackagePensionXml += dumpUi(`customer-package-pension-scrolled-${index}.xml`);
-  }
-  assertContains(customerPackagePensionXml, ["Rezervasyonlar", "Onayla"]);
-  assertNotContains(customerPackagePensionXml, ["Reddet", "Rezervasyonu İptal Et", "Odalar", "Günlük işler"]);
+  const customerPackagePensionXml = dumpUi("customer-package-pension.xml");
+  assertContains(customerPackagePensionXml, ["Rezervasyonlar", "Demo Aile", "Aç"]);
+  assertNotContains(customerPackagePensionXml, ["Onayla", "Reddet", "Rezervasyonu İptal Et", "Odalar", 'text="İşler"']);
+  tap(centerOf(findBoundsByText(customerPackagePensionXml, "Demo Aile")));
+  await delay(400);
+  const customerReservationDetailXml = dumpUi("customer-package-reservation-detail.xml");
+  assertContains(customerReservationDetailXml, ["REZERVASYON DETAYI", "Onayla", "WhatsApp"]);
+  assertNotContains(customerReservationDetailXml, ["Reddet", "Rezervasyonu İptal Et"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
 
   await publishDeviceRole(baseUrl, deviceId, "staff", { isActive: false });
   relaunchApp();
@@ -398,16 +386,16 @@ async function main() {
   await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: ["settings.view"] });
   relaunchApp();
   await waitForUiCondition(
-    (xml) => xml.includes("Personel") && xml.includes('text="Ayarlar"') && xml.includes('text="Yenile"'),
+    (xml) => xml.includes("Personel") && xml.includes('content-desc="Ayarlar"') && xml.includes('content-desc="Yenile"'),
     12000,
     "Salt-okunur ayar profili Android arayüzüne uygulanmadı."
   );
   scrollToTop();
   await delay(300);
   const settingsViewerTopXml = dumpUi("settings-viewer-top.xml");
-  assertContains(settingsViewerTopXml, ["Ayarlar", "Yenile"]);
+  assertContains(settingsViewerTopXml, ['content-desc="Ayarlar"', 'content-desc="Yenile"']);
   assertNotContains(settingsViewerTopXml, ["Yeni talepler", "Boş odalar", "Müşteri", "Pansiyon", "Restoran", "Mesajlar", "Demo Aile"]);
-  tap(centerOf(findBoundsByText(settingsViewerTopXml, "Ayarlar")));
+  tap(centerOf(findClickableBoundsByDescription(settingsViewerTopXml, "Ayarlar")));
   await delay(400);
   const settingsViewerXml = dumpUi("settings-viewer.xml");
   assertContains(settingsViewerXml, [
@@ -419,7 +407,7 @@ async function main() {
   await publishDeviceRole(baseUrl, deviceId, "admin");
   relaunchApp();
   await waitForUiCondition(
-    (xml) => xml.includes("Yönetici") && xml.includes('text="Ayarlar"') && xml.includes('text="Yenile"'),
+    (xml) => xml.includes("Yönetici") && xml.includes('content-desc="Ayarlar"') && xml.includes('content-desc="Yenile"'),
     12000,
     "Yönetici yetki profili yeniden kurulum olmadan Android arayüzüne uygulanmadı."
   );
@@ -427,14 +415,31 @@ async function main() {
   await delay(300);
   topXml = dumpUi("admin-top.xml");
   captureScreenshot("admin-top.png");
-  assertContains(topXml, ["Yönetici", "Ayarlar", "Yenile", "Müşteri", "Restoran"]);
+  assertContains(topXml, ["Yönetici", 'content-desc="Ayarlar"', 'content-desc="Yenile"', "Müşteri", "Restoran"]);
   assert.equal(readPreferenceValue("device_id"), deviceId);
 
   tap(centerOf(findClickableBoundsByText(topXml, "Müşteri")));
   await delay(500);
-  const requestsXml = dumpUi("requests.xml");
+  let requestsXml = dumpUi("requests.xml");
   captureScreenshot("requests.png");
-  assertContains(requestsXml, ["MÜŞTERİ İŞLERİ", "Yeni Talepler", "Cevap Bekleyenler", "Demo Aile"]);
+  assertContains(requestsXml, ["Müşteri", "Yeni Talepler", "Cevap Bekleyenler", "Demo Aile"]);
+  assertNotContains(requestsXml, ["MÜŞTERİ İŞLERİ"]);
+
+  tap(centerOf(findClickableBoundsByText(requestsXml, "Müşteriler")));
+  await delay(400);
+  const customersXml = dumpUi("customers.xml");
+  assertContains(customersXml, ["Demo Aile", "Balkonlu oda tercih ediyor.", "Aç"]);
+  assertNodeHeightAtMost(customersXml, "Balkonlu oda tercih ediyor.", 110);
+  tap(centerOf(findBoundsByText(customersXml, "Aç")));
+  await delay(300);
+  const customerDetailXml = dumpUi("customer-detail.xml");
+  assertContains(customerDetailXml, ["MÜŞTERİ DETAYI", "Demo Aile", "Balkonlu oda tercih ediyor."]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await delay(300);
+  const customersAfterDetailXml = dumpUi("customers-after-detail.xml");
+  tap(centerOf(findClickableBoundsByText(customersAfterDetailXml, "Yeni Talepler")));
+  await delay(400);
+  requestsXml = dumpUi("requests-after-customers.xml");
 
   tap(centerOf(findBoundsByText(requestsXml, "Demo Aile")));
   await delay(500);
@@ -453,70 +458,99 @@ async function main() {
   await delay(600);
   const queuedXml = dumpUi("queued.xml");
   captureScreenshot("queued.png");
-  assertContains(queuedXml, ["MÜŞTERİ İŞLERİ", "Müşteri"]);
+  assertContains(queuedXml, ["Müşteri", "Yeni Talepler"]);
   assertNotContains(queuedXml, ["Canlı veri çekiliyor", "Canlı veri alındı", "Veriler zaten güncel", "Son yayın:"]);
 
   tap(centerOf(findClickableBoundsByText(queuedXml, "Pansiyon")));
   await delay(500);
   const pensionXml = dumpUi("pension.xml");
   captureScreenshot("pension.png");
-  assertContains(pensionXml, ["PANSİYON", "Konaklama operasyonu", "Rezervasyonlar"]);
-  swipe(360, 1080, 360, 350, 420);
+  assertContains(pensionXml, ["Pansiyon", "Rezervasyonlar", "Odalar", "İşler", "Demo Aile", 'text="Bekleyen 1"', 'text="Giriş 0"', 'text="Çıkış 0"']);
+  assertNotContains(pensionXml, ["Durumu Değiştir", "Oda 101 giriş hazırlığı", "Konaklama operasyonu"]);
+  assertCounterStripFits(pensionXml, ["Bekleyen 1", "Giriş 0", "Çıkış 0"]);
+  tap(centerOf(findClickableBoundsByText(pensionXml, "Odalar")));
+  const pensionRoomsXml = await waitForUiCondition(
+    (xml) => xml.includes("Balkonlu Oda") && xml.includes("Temizlik"),
+    5000,
+    "Pansiyon oda kartları çizilmedi."
+  );
+  assertContains(pensionRoomsXml, ["Odalar", "Balkonlu Oda", "Temizlik"]);
+  assertNotContains(pensionRoomsXml, ["Demo Aile", "Oda 101 giriş hazırlığı"]);
+  tap(centerOf(findClickableBoundsByText(pensionRoomsXml, "İşler")));
   await delay(400);
-  const pensionRoomsXml = dumpUi("pension-rooms.xml");
-  assertContains(pensionRoomsXml, ["Odalar", "Balkonlu Oda"]);
+  const pensionTasksXml = dumpUi("pension-tasks.xml");
+  assertContains(pensionTasksXml, ["İşler", "Oda 101 giriş hazırlığı", "Bahçe servis kontrolü"]);
+  assertNotContains(pensionTasksXml, ["Balkonlu Oda", "Demo Aile"]);
 
-  tap(centerOf(findClickableBoundsByText(pensionRoomsXml, "Restoran")));
+  tap(centerOf(findClickableBoundsByText(pensionTasksXml, "Restoran")));
   await delay(500);
-  let restaurantXml = dumpUi("restaurant.xml");
-  assertContains(restaurantXml, ["RESTORAN", "Servis ve masa yönetimi", "Masalar"]);
-  for (let index = 0; index < 4; index += 1) {
-    const bounds = findBoundsByTextIfPresent(restaurantXml, "Salon Masası 1");
-    if (bounds && bounds.top >= 100 && bounds.bottom <= 1160) {
-      break;
-    }
-    swipe(360, 1080, 360, 380, 420);
-    await delay(400);
-    restaurantXml = dumpUi("restaurant-scrolled.xml");
-  }
+  const restaurantXml = dumpUi("restaurant.xml");
+  assertContains(restaurantXml, ["Restoran", "Masalar", "Açık Adisyon", "Stok", "Salon Masası 1", "Siparişi Aç", 'text="Boş 1"', 'text="Dolu 1"', 'text="Hesap 0"', 'text="Açık 1"']);
+  assertNotContains(restaurantXml, ["Servis ve masa yönetimi", "Ev Limonatası"]);
+  assertCounterStripFits(restaurantXml, ["Boş 1", "Dolu 1", "Hesap 0", "Açık 1"]);
   captureScreenshot("restaurant.png");
-  assertContains(restaurantXml, ["Salon Masası 1", "Siparişi Aç"]);
   tap(centerOf(findBoundsByText(restaurantXml, "Siparişi Aç")));
   await delay(500);
   let orderXml = dumpUi("table-order.xml");
   captureScreenshot("table-order.png");
-  assertContains(orderXml, ["MASA SİPARİŞİ", "Salon Masası 1", "Serpme Kahvaltı", "Aktif adisyon satırları"]);
-
-  for (let index = 0; index < 6 && !orderXml.includes("Ödendi / Kapat"); index += 1) {
+  assertContains(orderXml, ["MASA SİPARİŞİ", "Salon Masası 1", "Açık · 2 ürün · ₺900,00", "Ürün ara", "Serpme Kahvaltı", "Hazırlanıyor", "Servis Edildi", "Hesap Bekliyor", "Ödendi / Kapat"]);
+  assertOrderActionGrid(orderXml, true);
+  for (let index = 0; index < 6 && !orderXml.includes("Aktif adisyon satırları"); index += 1) {
     swipe(360, 1080, 360, 300, 420);
     await delay(350);
     orderXml = dumpUi("admin-table-order-scrolled.xml");
   }
-  assertContains(orderXml, ["Ödendi / Kapat"]);
+  assertContains(orderXml, ["Aktif adisyon satırları", "Ödendi / Kapat"]);
 
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
+  const restaurantAfterDialog = dumpUi("restaurant-after-dialog.xml");
+  tap(centerOf(findClickableBoundsByText(restaurantAfterDialog, "Stok")));
+  await delay(400);
   let adminStockXml = "";
-  for (let index = 0; index < 12; index += 1) {
+  let stockUpdateXml = "";
+  for (let index = 0; index < 8; index += 1) {
     const currentXml = dumpUi(`admin-stock-${index}.xml`);
     adminStockXml += currentXml;
-    if (adminStockXml.includes("Stokta olmayanlar")
-        && adminStockXml.includes("Azalanlar")
+    if (!stockUpdateXml && currentXml.includes("Stok Güncelle")) {
+      stockUpdateXml = currentXml;
+    }
+    if (adminStockXml.includes("Stokta yok")
+        && adminStockXml.includes("Az stok")
         && adminStockXml.includes("Tüm takip edilen ürünler")
         && adminStockXml.includes("Serpme Kahvaltı")
-        && adminStockXml.includes("Fark Gir")) {
+        && stockUpdateXml) {
       break;
     }
     swipe(360, 1080, 360, 760, 360);
     await delay(300);
   }
-  assertContains(adminStockXml, ["Stokta olmayanlar", "Azalanlar", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
-  const restaurantAfterDialog = dumpUi("restaurant-after-dialog.xml");
-  tap(centerOf(findClickableBoundsByText(restaurantAfterDialog, "Mesajlar")));
+  assertContains(adminStockXml, ["Stokta yok", "Az stok", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı", "Stok Güncelle"]);
+  scrollToTop();
+  await delay(300);
+  const adminStockTopXml = dumpUi("admin-stock-top.xml");
+  tap(centerOf(findBoundsByText(adminStockTopXml, "Stok Güncelle")));
+  await delay(300);
+  const stockActionsXml = dumpUi("admin-stock-actions.xml");
+  assertContains(stockActionsXml, ["STOK GÜNCELLE", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await delay(300);
+  const restaurantAfterStockXml = dumpUi("restaurant-after-stock.xml");
+  tap(centerOf(findClickableBoundsByText(restaurantAfterStockXml, "Mesajlar")));
   await delay(500);
   const messagesXml = dumpUi("messages.xml");
   captureScreenshot("messages.png");
-  assertContains(messagesXml, ["MESAJLAR", "Hazır cevaplar", "Hazır mesaj"]);
+  assertContains(messagesXml, ["Mesajlar", "Hazır Mesajlar", "Cevap Bekleyenler", "Demo Aile", "Aç"]);
+  assertNotContains(messagesXml, ["MESAJLAR", "Hazır cevaplar", "Hazır mesaj"]);
+  assertNodeHeightAtMost(
+    messagesXml,
+    "Merhaba, talebinizi aldık. Oda uygunluğunu kontrol edip kısa süre içinde size dönüş yapacağız.",
+    110
+  );
+  tap(centerOf(findBoundsByText(messagesXml, "Aç")));
+  await delay(300);
+  const messageDetailXml = dumpUi("message-detail.xml");
+  assertContains(messageDetailXml, ["MESAJ DETAYI", "Demo Aile", "WhatsApp'ta Aç"]);
 
   await restoreEmbeddedConnectionAfterTest();
   console.log("android-device-ui-smoke-ok");
@@ -931,6 +965,12 @@ function scrollToTop() {
   }
 }
 
+function scrollToBottom() {
+  for (let index = 0; index < 4; index += 1) {
+    swipe(360, 1080, 360, 260, 300);
+  }
+}
+
 async function waitForUiText(text, timeoutMs) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
@@ -1131,6 +1171,22 @@ function findClickableBoundsByText(xml, text) {
   };
 }
 
+function findClickableBoundsByDescription(xml, description) {
+  const nodes = xml.match(/<node\b[^>]*>/g) ?? [];
+  const node = nodes.find((candidate) => candidate.includes(`content-desc="${escapeXmlAttribute(description)}"`)
+    && candidate.includes('clickable="true"'));
+  const match = node?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if (!match) {
+    throw new Error(`Tıklanabilir açıklamalı UI node bulunamadı: ${description}`);
+  }
+  return {
+    left: Number(match[1]),
+    top: Number(match[2]),
+    right: Number(match[3]),
+    bottom: Number(match[4])
+  };
+}
+
 function findBoundsByTextIfPresent(xml, text) {
   const nodes = xml.match(/<node\b[^>]*>/g) ?? [];
   const node = nodes.find((candidate) => candidate.includes(`text="${escapeXmlAttribute(text)}"`));
@@ -1170,6 +1226,53 @@ function assertNotContains(xml, texts) {
   if (present.length > 0) {
     throw new Error(`Android UI beklenmeyen metinleri içeriyor: ${present.join(", ")}`);
   }
+}
+
+function assertCounterStripFits(xml, labels) {
+  const bounds = labels.map((label) => findBoundsByText(xml, label));
+  const firstTop = bounds[0].top;
+  assert.ok(bounds.every((item) => Math.abs(item.top - firstTop) <= 2), "Sayaç chip'leri tek satırda değil.");
+  assert.ok(bounds.every((item) => item.left >= 20 && item.right <= 680 && item.right > item.left), "Sayaç chip satırı yatay görünüm sınırını aşıyor.");
+}
+
+function assertSquareTouchTarget(xml, description) {
+  const bounds = findClickableBoundsByDescription(xml, description);
+  const width = bounds.right - bounds.left;
+  const height = bounds.bottom - bounds.top;
+  assert.ok(width >= 84 && width <= 100, `${description} ikon genişliği 44–48dp aralığında değil: ${width}px`);
+  assert.ok(height >= 84 && height <= 100, `${description} ikon yüksekliği 44–48dp aralığında değil: ${height}px`);
+  assert.ok(Math.abs(width - height) <= 2, `${description} ikon butonu kare değil: ${width}x${height}px`);
+}
+
+function assertBottomNavClearance(xml, contentText, navText, minimumPixels) {
+  const contentBounds = findBoundsByText(xml, contentText);
+  const navBounds = findClickableBoundsByText(xml, navText);
+  const clearance = navBounds.top - contentBounds.bottom;
+  assert.ok(clearance >= minimumPixels, `Son içerik bottom nav'a fazla yakın: ${clearance}px (${contentText})`);
+}
+
+function assertOrderActionGrid(xml, includePaid) {
+  const preparing = findBoundsByText(xml, "Hazırlanıyor");
+  const served = findBoundsByText(xml, "Servis Edildi");
+  const payment = findBoundsByText(xml, "Hesap Bekliyor");
+  const actions = [preparing, served, payment];
+  let paid = null;
+  if (includePaid) {
+    paid = findBoundsByText(xml, "Ödendi / Kapat");
+    actions.push(paid);
+  }
+  assert.ok(actions.every((item) => item.left >= 20 && item.right <= 700 && item.right > item.left), "Sipariş alt aksiyonları ekran sınırını aşıyor.");
+  assert.ok(Math.abs(preparing.top - served.top) <= 2, "Hazırlanıyor ve Servis Edildi aynı üst satırda değil.");
+  assert.ok(payment.top > preparing.bottom, "Hesap Bekliyor alt aksiyon satırına taşınmadı.");
+  if (paid) {
+    assert.ok(Math.abs(payment.top - paid.top) <= 2, "Hesap Bekliyor ve Ödendi / Kapat aynı alt satırda değil.");
+  }
+}
+
+function assertNodeHeightAtMost(xml, text, maximumPixels) {
+  const bounds = findBoundsByText(xml, text);
+  const height = bounds.bottom - bounds.top;
+  assert.ok(height <= maximumPixels, `Kart önizlemesi gereğinden yüksek: ${height}px (${text})`);
 }
 
 function adb(args, options = {}) {

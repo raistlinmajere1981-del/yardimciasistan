@@ -25,7 +25,7 @@ final class NotificationEventDetector {
             "request",
             "Yeni müşteri talebi",
             request.customerName + requestSummarySuffix(request),
-            "customers",
+            "customers:new",
             firstNonEmpty(request.createdAt, request.updatedAt),
             NotificationEvent.PRIORITY_HIGH
         ));
@@ -40,7 +40,7 @@ final class NotificationEventDetector {
             "reservation",
             "Rezervasyon onay bekliyor",
             reservation.customerName + reservationSummarySuffix(reservation),
-            "pension",
+            "pension:reservations",
             reservation.updatedAt,
             NotificationEvent.PRIORITY_MEDIUM
         ));
@@ -67,7 +67,7 @@ final class NotificationEventDetector {
             "table_order",
             "Masa siparişi açıldı",
             tableName + (order.itemCount > 0 ? " · " + order.itemCount + " ürün" : " için yeni adisyon"),
-            "restaurant",
+            "restaurant:orders",
             firstNonEmpty(order.openedAt, order.updatedAt),
             NotificationEvent.PRIORITY_LOW
         ));
@@ -93,7 +93,7 @@ final class NotificationEventDetector {
           "room",
           maintenance ? "Oda bakım bekliyor" : "Oda temizlik bekliyor",
           tableName(room.name, room.number),
-          "pension",
+          "pension:rooms",
           room.updatedAt,
           NotificationEvent.PRIORITY_MEDIUM
       ));
@@ -110,7 +110,7 @@ final class NotificationEventDetector {
           "daily_task",
           overdue ? "Günlük iş gecikti" : "Günlük iş bekliyor",
           task.title + taskDueSuffix(task),
-          "today",
+          "pension:tasks",
           task.updatedAt,
           NotificationEvent.PRIORITY_MEDIUM
       ));
@@ -190,13 +190,25 @@ final class NotificationEventDetector {
   static String routeForAction(String actionType) {
     String type = actionType == null ? "" : actionType;
     if (type.startsWith("customer_")) {
-      return "customers";
+      return "customers:new";
     }
-    if (type.startsWith("reservation_") || type.startsWith("room_") || type.startsWith("daily_task_")) {
-      return "pension";
+    if (type.startsWith("reservation_")) {
+      return "pension:reservations";
+    }
+    if (type.startsWith("room_")) {
+      return "pension:rooms";
+    }
+    if (type.startsWith("daily_task_")) {
+      return "pension:tasks";
+    }
+    if (type.startsWith("menu_stock_")) {
+      return "restaurant:stock";
+    }
+    if (type.startsWith("table_order_")) {
+      return "restaurant:orders";
     }
     if (type.startsWith("table_")) {
-      return "restaurant";
+      return "restaurant:tables";
     }
     return "today";
   }
@@ -213,7 +225,7 @@ final class NotificationEventDetector {
         "payment_waiting",
         "Masa hesap bekliyor",
         message,
-        "restaurant",
+        "restaurant:tables",
         updatedAt,
         NotificationEvent.PRIORITY_HIGH
     );

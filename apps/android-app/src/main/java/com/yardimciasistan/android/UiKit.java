@@ -96,13 +96,6 @@ final class UiKit {
     return card;
   }
 
-  static LinearLayout compactCard(Context context) {
-    LinearLayout card = column(context);
-    card.setPadding(dp(context, 12), dp(context, 11), dp(context, 12), dp(context, 11));
-    card.setBackground(rounded(context, SURFACE, BORDER, 12));
-    return card;
-  }
-
   static View divider(Context context) {
     View divider = new View(context);
     divider.setBackgroundColor(BORDER);
@@ -159,6 +152,47 @@ final class UiKit {
     return button;
   }
 
+  static Button iconButton(Context context, String glyph, String description, boolean selected, View.OnClickListener listener) {
+    Button button = new Button(context);
+    button.setText(glyph);
+    button.setContentDescription(description);
+    button.setTextSize(18);
+    button.setTextColor(selected ? PRIMARY : TEXT);
+    button.setTypeface(Typeface.create("sans", Typeface.BOLD));
+    button.setAllCaps(false);
+    button.setGravity(Gravity.CENTER);
+    button.setMinWidth(dp(context, 44));
+    button.setMinimumWidth(dp(context, 44));
+    button.setMinHeight(dp(context, 44));
+    button.setMinimumHeight(dp(context, 44));
+    button.setPadding(0, 0, 0, 0);
+    button.setBackground(rounded(context, selected ? PRIMARY_DARK : SURFACE_ALT, selected ? PRIMARY : BORDER, 11));
+    button.setOnClickListener(listener);
+    return button;
+  }
+
+  static Button counterChip(Context context, String label, int value, int tone, View.OnClickListener listener) {
+    Button button = new Button(context);
+    button.setText(label + " " + value);
+    button.setTextSize(12);
+    button.setTextColor(tone);
+    button.setTypeface(Typeface.create("sans", Typeface.BOLD));
+    button.setAllCaps(false);
+    button.setSingleLine(true);
+    button.setMinWidth(0);
+    button.setMinimumWidth(0);
+    button.setGravity(Gravity.CENTER);
+    button.setMinHeight(dp(context, 34));
+    button.setMinimumHeight(dp(context, 34));
+    button.setPadding(dp(context, 10), 0, dp(context, 10), 0);
+    button.setBackground(rounded(context, withAlpha(tone, 24), withAlpha(tone, 84), 17));
+    button.setOnClickListener(listener);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(context, 36));
+    params.setMargins(0, 0, dp(context, 7), 0);
+    button.setLayoutParams(params);
+    return button;
+  }
+
   static TextView badge(Context context, String label, int tone) {
     TextView badge = text(context, label, 11, tone, Typeface.BOLD);
     badge.setGravity(Gravity.CENTER);
@@ -167,23 +201,15 @@ final class UiKit {
     return badge;
   }
 
-  static LinearLayout metric(Context context, String label, String value, String detail, int tone) {
-    LinearLayout card = compactCard(context);
-    card.addView(text(context, label, 12, MUTED, Typeface.BOLD));
-    TextView metricValue = text(context, value, 25, tone, Typeface.BOLD);
-    LinearLayout.LayoutParams valueParams = new LinearLayout.LayoutParams(-1, -2);
-    valueParams.setMargins(0, dp(context, 3), 0, dp(context, 1));
-    metricValue.setLayoutParams(valueParams);
-    card.addView(metricValue);
-    card.addView(text(context, detail, 11, MUTED, Typeface.NORMAL));
-    return card;
+  static ScrollView scroll(Context context, View content) {
+    return scroll(context, content, 24);
   }
 
-  static ScrollView scroll(Context context, View content) {
+  static ScrollView scroll(Context context, View content, int bottomPaddingDp) {
     ScrollView scroll = new ScrollView(context);
     scroll.setFillViewport(true);
     scroll.setClipToPadding(false);
-    scroll.setPadding(dp(context, 14), 0, dp(context, 14), dp(context, 24));
+    scroll.setPadding(dp(context, 14), 0, dp(context, 14), dp(context, bottomPaddingDp));
     scroll.addView(content);
     return scroll;
   }
@@ -199,12 +225,6 @@ final class UiKit {
     input.setMinHeight(dp(context, 50));
     input.setBackground(rounded(context, BG, BORDER, 11));
     return input;
-  }
-
-  static LinearLayout.LayoutParams weighted(int width, int height, float weight, Context context, int marginEnd) {
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(width, height, weight);
-    params.setMargins(0, 0, dp(context, marginEnd), 0);
-    return params;
   }
 
   static void addAction(LinearLayout row, View action, Context context) {

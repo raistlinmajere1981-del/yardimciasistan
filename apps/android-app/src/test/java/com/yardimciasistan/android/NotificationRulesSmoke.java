@@ -123,6 +123,14 @@ public final class NotificationRulesSmoke {
     NotificationEvent roomEvent = event(events, "room:room-1:cleaning");
     NotificationEvent taskEvent = event(events, "task:task-1:pending");
 
+    assertEquals("customers:new", requestEvent.route, "request notification route");
+    assertEquals("pension:reservations", reservationEvent.route, "reservation notification route");
+    assertEquals("restaurant:tables", paymentEvent.route, "payment notification route");
+    assertEquals("pension:rooms", roomEvent.route, "room notification route");
+    assertEquals("pension:tasks", taskEvent.route, "daily-task notification route");
+    assertEquals("restaurant:stock", NotificationEventDetector.routeForAction("menu_stock_set"), "stock action route");
+    assertEquals("restaurant:orders", NotificationEventDetector.routeForAction("table_order_set_served"), "order action route");
+
     data.permissions.add("customer.view");
     assertTrue(NotificationEventDetector.isAllowed(requestEvent, data, enabled), "customer.view should allow request alerts");
     assertFalse(NotificationEventDetector.isAllowed(reservationEvent, data, enabled), "reservation.view should remain independent");

@@ -105,7 +105,8 @@ if (javaTestFiles.length > 0) {
   for (const testMain of [
     "com.yardimciasistan.android.StableDeviceIdSmoke",
     "com.yardimciasistan.android.NotificationRulesSmoke",
-    "com.yardimciasistan.android.StockRulesSmoke"
+    "com.yardimciasistan.android.StockRulesSmoke",
+    "com.yardimciasistan.android.AndroidUiRulesSmoke"
   ]) {
     run("java", [
       "-classpath",
