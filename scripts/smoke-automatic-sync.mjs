@@ -84,6 +84,29 @@ try {
   }, { mode: "keep" });
   assert.equal(setupResult.ok, true);
 
+  const trackedMenuItemBefore = database.getDashboardData().menu.items.find((item) => item.is_available);
+  assert.ok(trackedMenuItemBefore);
+  const trackedMenuSave = database.saveMenuItem({
+    id: trackedMenuItemBefore.id,
+    category_id: trackedMenuItemBefore.category_id,
+    name: trackedMenuItemBefore.name,
+    description: trackedMenuItemBefore.description,
+    price: trackedMenuItemBefore.price,
+    currency: trackedMenuItemBefore.currency,
+    image_url: trackedMenuItemBefore.image_url,
+    is_available: trackedMenuItemBefore.is_available,
+    is_featured: trackedMenuItemBefore.is_featured,
+    allergens: trackedMenuItemBefore.allergens,
+    tags: trackedMenuItemBefore.tags,
+    stock_quantity: 2,
+    stock_min_quantity: 1,
+    hide_when_out_of_stock: true,
+    stock_note: "Otomatik senkron stok testi",
+    sort_order: trackedMenuItemBefore.sort_order
+  });
+  assert.equal(trackedMenuSave.ok, true);
+  const trackedMenuItemId = trackedMenuSave.savedId;
+
   const requestResponse = await postJson(`${baseUrl}/api/request.php`, {
     request_type: "pension_reservation",
     customer_name: "Otomatik Web Misafiri",
@@ -155,6 +178,8 @@ try {
   });
   assert.equal(staffDevice.permissions.includes("table_order.open"), true);
   assert.equal(staffDevice.permissions.includes("room.update_status"), true);
+  assert.equal(staffDevice.permissions.includes("menu.stock_view"), true);
+  assert.equal(staffDevice.permissions.includes("menu.stock_update"), false);
   assert.equal(staffDevice.permissions.includes("customer.view"), false);
   assert.equal(staffDevice.permissions.includes("table_order.close_paid"), false);
   const runtime = database.getSyncRuntimeStatus();
@@ -168,6 +193,7 @@ try {
   const hostedMenu = await menuResponse.json();
   assert.equal(hostedMenu.ok, true);
   assert.equal(hostedMenu.categories.length, dashboard.menu.categories.filter((category) => category.is_active).length);
+  assert.equal(hostedMenu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 2);
 
   const androidSummary = await syncApi({
     action: "android_summary",
@@ -178,6 +204,19 @@ try {
   const androidData = await androidSummary.json();
   assert.ok(androidData.requests.some((request) => request.id === requestResult.request_id));
   assert.equal(androidData.rooms.find((room) => room.id === roomBefore.id)?.status, "cleaning");
+  assert.deepEqual(
+    androidData.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId),
+    {
+      menu_item_id: trackedMenuItemId,
+      name: trackedMenuItemBefore.name,
+      category: dashboard.menu.categories.find((category) => category.id === trackedMenuItemBefore.category_id)?.name,
+      price: trackedMenuItemBefore.price,
+      stock_quantity: 2,
+      stock_min_quantity: 1,
+      hide_when_out_of_stock: true,
+      stock_status: "in_stock"
+    }
+  );
   assert.ok(androidData.server_revision > 0);
 
   const unchangedSummary = await syncApi({
@@ -226,7 +265,7 @@ try {
   assert.equal(sightingOnlyProfile.permissions.includes("table_order.close_paid"), false);
 
   const table = database.getDashboardData().tables[0];
-  const menuItem = database.getDashboardData().menu.items.find((item) => item.is_available);
+  const menuItem = database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId);
   assert.ok(table);
   assert.ok(menuItem);
 
@@ -252,9 +291,30 @@ try {
   const addCycle = await coordinator.runNow();
   assert.equal(addCycle.appliedActions, 1);
   assert.equal(addCycle.failedActions, 0);
+  assert.equal(addCycle.publishedJobs, 2);
   order = database.getActiveTableOrder(table.id);
   assert.ok(order);
   assert.equal(order.itemCount, 2);
+  assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 0);
+  const outOfStockSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
+  const outOfStockSummary = await outOfStockSummaryResponse.json();
+  assert.equal(outOfStockSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_quantity, 0);
+  assert.equal(outOfStockSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_status, "out_of_stock");
+  const outOfStockMenu = await (await fetch(`${baseUrl}/api/menu.php`)).json();
+  assert.equal(outOfStockMenu.items.some((item) => item.id === trackedMenuItemId), false);
+
+  const forbiddenStockActionId = "android_permission_stock_staff_0001";
+  await assertQueued(await enqueueAndroidAction(forbiddenStockActionId, "menu_stock_add", {
+    menu_item_id: trackedMenuItemId,
+    quantity: 1,
+    note: "Personel yetki testi"
+  }));
+  const forbiddenStockCycle = await coordinator.runNow();
+  assert.equal(forbiddenStockCycle.appliedActions, 0);
+  assert.equal(forbiddenStockCycle.failedActions, 1);
+  assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 0);
+  const forbiddenStockResult = await getAndroidAction(forbiddenStockActionId);
+  assert.match(forbiddenStockResult.error_message, /yetkisi yok/i);
 
   const paymentActionId = "android_permission_payment_0001";
   await assertQueued(await enqueueAndroidAction(paymentActionId, "table_order_set_payment_waiting", {
@@ -328,6 +388,23 @@ try {
   const adminSummary = await adminSummaryResponse.json();
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].role, "admin");
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("table_order.close_paid"), true);
+
+  const adminStockActionId = "android_permission_stock_admin_0001";
+  await assertQueued(await enqueueAndroidAction(adminStockActionId, "menu_stock_add", {
+    menu_item_id: trackedMenuItemId,
+    quantity: 5,
+    note: "Yönetici stok ekleme testi"
+  }));
+  const adminStockCycle = await coordinator.runNow();
+  assert.equal(adminStockCycle.appliedActions, 1);
+  assert.equal(adminStockCycle.failedActions, 0);
+  assert.equal(adminStockCycle.publishedJobs, 2);
+  assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 5);
+  const replenishedSummary = await (await syncApi({ action: "android_summary", device_id: "android-auto-smoke" })).json();
+  assert.equal(replenishedSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_quantity, 5);
+  assert.equal(replenishedSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_status, "in_stock");
+  const replenishedMenu = await (await fetch(`${baseUrl}/api/menu.php`)).json();
+  assert.equal(replenishedMenu.items.some((item) => item.id === trackedMenuItemId), true);
 
   const adminOrderResult = database.openTableOrder(table.id);
   assert.equal(adminOrderResult.ok, true);
@@ -486,6 +563,7 @@ function createSnapshot(databaseInstance) {
   const data = databaseInstance.getDashboardData();
   const activeCategories = data.menu.categories.filter((category) => category.is_active);
   const categoryIds = new Set(activeCategories.map((category) => category.id));
+  const categoryNames = new Map(data.menu.categories.map((category) => [category.id, category.name]));
   const activeTableOrders = databaseInstance.listTableOrders()
     .filter((order) => ["open", "preparing", "served", "payment"].includes(order.status));
   return {
@@ -538,6 +616,22 @@ function createSnapshot(databaseInstance) {
       items: data.menu.items.filter((item) => item.is_available && categoryIds.has(item.category_id)),
       updated_at: data.menu.updated_at
     },
+    trackedStockItems: data.menu.items
+      .filter((item) => item.stock_quantity !== null)
+      .map((item) => ({
+        menu_item_id: item.id,
+        name: item.name,
+        category: categoryNames.get(item.category_id) ?? "Menü",
+        price: item.price,
+        stock_quantity: item.stock_quantity,
+        stock_min_quantity: item.stock_min_quantity,
+        hide_when_out_of_stock: item.hide_when_out_of_stock,
+        stock_status: item.stock_quantity <= 0
+          ? "out_of_stock"
+          : item.stock_min_quantity !== null && item.stock_quantity <= item.stock_min_quantity
+            ? "low_stock"
+            : "in_stock"
+      })),
     table_orders: activeTableOrders.map((order) => ({
       id: order.id,
       table_id: order.tableId,

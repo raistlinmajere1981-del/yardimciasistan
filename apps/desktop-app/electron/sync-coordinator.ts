@@ -386,7 +386,7 @@ export class SyncCoordinator {
         ? await transport.publishMenu({
             sourceRevision: job.sourceRevision,
             idempotencyKey,
-            value: this.options.database.getPublishedMenu()
+            value: this.options.database.getQrMenuPublication()
           })
         : await transport.publishAndroidSnapshot({
             sourceRevision: job.sourceRevision,

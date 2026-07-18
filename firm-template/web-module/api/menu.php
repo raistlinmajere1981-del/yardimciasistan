@@ -41,6 +41,11 @@ $activeCategoryIds = array_flip(array_map(static function ($category): string {
 $items = array_values(array_filter($menu['items'] ?? [], static function ($item): bool {
     return ($item['is_available'] ?? true) === true;
 }));
+$items = array_values(array_filter($items, static function ($item): bool {
+    $stockQuantity = $item['stock_quantity'] ?? null;
+    $hideWhenOut = ($item['hide_when_out_of_stock'] ?? false) === true;
+    return !($stockQuantity !== null && is_numeric($stockQuantity) && $hideWhenOut && (float) $stockQuantity <= 0);
+}));
 $items = array_values(array_filter($items, static function ($item) use ($activeCategoryIds): bool {
     return isset($activeCategoryIds[(string) ($item['category_id'] ?? '')]);
 }));

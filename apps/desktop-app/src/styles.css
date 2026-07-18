@@ -5548,6 +5548,7 @@ button {
 .item-description-field,
 .item-form > .form-row,
 .item-form > .form-details,
+.item-form > .menu-stock-editor,
 .menu-editor-footer {
   grid-column: 1 / -1;
 }
@@ -7699,6 +7700,71 @@ button {
   .menu-live-panel {
     min-height: 680px;
   }
+}
+
+.menu-stock-badges {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: 52%;
+}
+
+.menu-stock-badges .status-badge {
+  white-space: nowrap;
+}
+
+.menu-stock-editor {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-alt) 72%, transparent);
+}
+
+.menu-stock-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.menu-stock-editor-heading > span:first-of-type {
+  max-width: calc(100% - 116px);
+  display: grid;
+  gap: 3px;
+}
+
+.menu-stock-editor-heading small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.menu-stock-summary-value {
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.menu-stock-editor-body {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.stock-stop-action {
+  border: 0;
+  padding: 3px 0;
+  background: transparent;
+  color: var(--red);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 @media (prefers-reduced-motion: reduce) {

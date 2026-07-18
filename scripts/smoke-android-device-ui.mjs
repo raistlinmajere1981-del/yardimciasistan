@@ -22,7 +22,8 @@ const serviceOrderPermissions = [
   "table_order.set_preparing",
   "table_order.set_served",
   "table_order.set_payment_waiting",
-  "menu.view"
+  "menu.view",
+  "menu.stock_view"
 ];
 const roomsTasksPermissions = [
   "room.view",
@@ -35,7 +36,8 @@ const cashierPermissions = [
   "table.view",
   "table_order.view",
   "table_order.set_payment_waiting",
-  "table_order.close_paid"
+  "table_order.close_paid",
+  "menu.stock_view"
 ];
 const customerReservationPermissions = [
   "customer.view",
@@ -74,6 +76,8 @@ const adminPermissions = [
   "table_order.cancel",
   "menu.view",
   "menu.edit",
+  "menu.stock_view",
+  "menu.stock_update",
   "settings.view",
   "settings.edit",
   "android_devices.view",
@@ -189,6 +193,7 @@ async function main() {
   await delay(500);
 
   let staffRestaurantXml = dumpUi("staff-restaurant.xml");
+  assertContains(staffRestaurantXml, ["Stok takibi"]);
   for (let index = 0; index < 4; index += 1) {
     const bounds = findBoundsByTextIfPresent(staffRestaurantXml, "Salon Masası 1");
     if (bounds && bounds.top >= 100 && bounds.bottom <= 1160) {
@@ -210,6 +215,22 @@ async function main() {
   assertContains(staffOrderXml, ["Hesap Bekliyor"]);
   assertNotContains(staffOrderXml, ["Ödendi / Kapat"]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await delay(300);
+  let staffStockXml = "";
+  for (let index = 0; index < 12; index += 1) {
+    const currentXml = dumpUi(`staff-stock-${index}.xml`);
+    staffStockXml += currentXml;
+    if (staffStockXml.includes("Stokta olmayanlar")
+        && staffStockXml.includes("Azalanlar")
+        && staffStockXml.includes("Tüm takip edilen ürünler")
+        && staffStockXml.includes("Ev Limonatası")) {
+      break;
+    }
+    swipe(360, 1080, 360, 760, 360);
+    await delay(300);
+  }
+  assertContains(staffStockXml, ["Stokta olmayanlar", "Azalanlar", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı", "QR menüde"]);
+  assertNotContains(staffStockXml, ["+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
 
   await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: serviceOrderPermissions });
   relaunchApp();
@@ -475,6 +496,21 @@ async function main() {
 
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
+  let adminStockXml = "";
+  for (let index = 0; index < 12; index += 1) {
+    const currentXml = dumpUi(`admin-stock-${index}.xml`);
+    adminStockXml += currentXml;
+    if (adminStockXml.includes("Stokta olmayanlar")
+        && adminStockXml.includes("Azalanlar")
+        && adminStockXml.includes("Tüm takip edilen ürünler")
+        && adminStockXml.includes("Serpme Kahvaltı")
+        && adminStockXml.includes("Fark Gir")) {
+      break;
+    }
+    swipe(360, 1080, 360, 760, 360);
+    await delay(300);
+  }
+  assertContains(adminStockXml, ["Stokta olmayanlar", "Azalanlar", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
   const restaurantAfterDialog = dumpUi("restaurant-after-dialog.xml");
   tap(centerOf(findClickableBoundsByText(restaurantAfterDialog, "Mesajlar")));
   await delay(500);

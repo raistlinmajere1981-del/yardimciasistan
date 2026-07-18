@@ -440,6 +440,7 @@ test("Android role presets and action permission mapping stay explicit", () => {
     "table_order.set_served",
     "table_order.set_payment_waiting",
     "menu.view",
+    "menu.stock_view",
     "room.view",
     "room.update_status",
     "daily_task.view",
@@ -455,6 +456,9 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("table_order_close_paid"), "table_order.close_paid");
   assert.equal(resolveAndroidActionPermission("table_order_cancel"), "table_order.cancel");
   assert.equal(resolveAndroidActionPermission("table_order_close", { status: "paid" }), "table_order.close_paid");
+  assert.equal(resolveAndroidActionPermission("menu_stock_add"), "menu.stock_update");
+  assert.equal(resolveAndroidActionPermission("menu_stock_set"), "menu.stock_update");
+  assert.equal(resolveAndroidActionPermission("menu_stock_adjust"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("unsupported_action"), null);
 });
 
@@ -469,7 +473,8 @@ test("Android staff permission groups produce only their documented effective pe
     "table.view",
     "table_order.view",
     "table_order.set_payment_waiting",
-    "table_order.close_paid"
+    "table_order.close_paid",
+    "menu.stock_view"
   ]);
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.customer_reservation, [
     "customer.view",
@@ -486,6 +491,8 @@ test("Android staff permission groups produce only their documented effective pe
     customer_reservation: false
   });
   assert.equal(serviceOnly.includes("table_order.open"), true);
+  assert.equal(serviceOnly.includes("menu.stock_view"), true);
+  assert.equal(serviceOnly.includes("menu.stock_update"), false);
   assert.equal(serviceOnly.includes("table_order.close_paid"), false);
   assert.equal(serviceOnly.includes("room.update_status"), false);
 
@@ -500,6 +507,18 @@ test("Android staff permission groups produce only their documented effective pe
   assert.equal(customerReservation.includes("customer.convert_to_reservation"), false);
   assert.equal(customerReservation.includes("reservation.reject"), false);
   assert.equal(customerReservation.includes("reservation.cancel"), false);
+  assert.equal(customerReservation.includes("menu.stock_view"), false);
+  assert.equal(customerReservation.includes("menu.stock_update"), false);
+
+  const roomsOnly = androidPermissionsForGroups({
+    service_orders: false,
+    cashier: false,
+    rooms_tasks: true,
+    customer_reservation: false
+  });
+  assert.equal(roomsOnly.includes("room.update_status"), true);
+  assert.equal(roomsOnly.includes("menu.stock_view"), false);
+  assert.equal(roomsOnly.includes("menu.stock_update"), false);
 });
 
 test("pushAiSettings sends the complete snake_case settings and strips the API key from its response", async () => {

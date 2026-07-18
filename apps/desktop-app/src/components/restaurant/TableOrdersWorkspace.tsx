@@ -349,6 +349,11 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
 
   async function addMenuItem(menuItemId: string) {
     const bridge = window.yardimciDesktop;
+    const menuItem = menu.items.find((item) => item.id === menuItemId);
+    if (menuItem && menuItem.stock_quantity !== null && menuItem.stock_quantity <= 0) {
+      setFeedback("Bu ürün stokta yeterli değil.");
+      return;
+    }
     if (!selectedOrderRef.current || !bridge || typeof bridge.addTableOrderItem !== "function") {
       setFeedback("Ürün eklemek için aktif bir masa adisyonu gerekli.");
       return;
@@ -671,8 +676,13 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
                       </div>
                       <div className="table-order-product-action">
                         <strong>{formatMoney(item.price, item.currency || "TRY")}</strong>
-                        <span>Mevcut</span>
-                        <button type="button" onClick={() => void addMenuItem(item.id)} disabled={!selectedOrder || Boolean(busyAction)} aria-label={`${item.name} ürününü siparişe ekle`}>
+                        <span>{formatOrderMenuStock(item.stock_quantity)}</span>
+                        <button
+                          type="button"
+                          onClick={() => void addMenuItem(item.id)}
+                          disabled={!selectedOrder || Boolean(busyAction) || (item.stock_quantity !== null && item.stock_quantity <= 0)}
+                          aria-label={`${item.name} ürününü siparişe ekle`}
+                        >
                           <Plus size={15} aria-hidden="true" /> Ekle
                         </button>
                       </div>
@@ -704,7 +714,12 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
                       <div className="table-order-quantity" aria-label={`${item.productName} adedi`}>
                         <button type="button" onClick={() => void changeItemQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1 || Boolean(busyAction)} aria-label={`${item.productName} adetini azalt`}><Minus size={14} aria-hidden="true" /></button>
                         <output>{item.quantity}</output>
-                        <button type="button" onClick={() => void changeItemQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= 999 || Boolean(busyAction)} aria-label={`${item.productName} adetini artır`}><Plus size={14} aria-hidden="true" /></button>
+                        <button
+                          type="button"
+                          onClick={() => void changeItemQuantity(item.id, item.quantity + 1)}
+                          disabled={item.quantity >= 999 || Boolean(busyAction) || isOrderItemOutOfStock(item.menuItemId, menu)}
+                          aria-label={`${item.productName} adetini artır`}
+                        ><Plus size={14} aria-hidden="true" /></button>
                       </div>
                       <input
                         className="table-order-item-note"
@@ -771,6 +786,21 @@ function formatMoney(value: number, currency: string): string {
   } catch {
     return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(value);
   }
+}
+
+function formatOrderMenuStock(quantity: number | null | undefined): string {
+  if (quantity == null) {
+    return "Stok takibi yok";
+  }
+  if (quantity <= 0) {
+    return "Stokta yok";
+  }
+  return `Stok: ${quantity}`;
+}
+
+function isOrderItemOutOfStock(menuItemId: string, menu: PublishedQrMenu): boolean {
+  const item = menu.items.find((candidate) => candidate.id === menuItemId);
+  return item?.stock_quantity !== null && item !== undefined && item.stock_quantity <= 0;
 }
 
 function formatOpenedAt(value: string): string {

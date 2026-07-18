@@ -132,7 +132,51 @@ try {
             is_featured: true,
             allergens: [],
             tags: ["test"],
+            stock_quantity: 4,
+            stock_min_quantity: 2,
+            hide_when_out_of_stock: true,
+            stock_note: "Smoke stok notu",
             sort_order: 1,
+            created_at: "2026-07-10T10:00:00+03:00",
+            updated_at: "2026-07-10T10:00:00+03:00"
+          },
+          {
+            id: "item_smoke_hidden_stock",
+            category_id: "cat_smoke",
+            name: "Gizli Stok Ürünü",
+            description: "Stok 0 ve gizleme açık.",
+            price: 2,
+            currency: "TRY",
+            image_url: "",
+            is_available: true,
+            is_featured: false,
+            allergens: [],
+            tags: [],
+            stock_quantity: 0,
+            stock_min_quantity: 1,
+            hide_when_out_of_stock: true,
+            stock_note: null,
+            sort_order: 2,
+            created_at: "2026-07-10T10:00:00+03:00",
+            updated_at: "2026-07-10T10:00:00+03:00"
+          },
+          {
+            id: "item_smoke_visible_zero",
+            category_id: "cat_smoke",
+            name: "Görünür Stok Ürünü",
+            description: "Stok 0 ama gizleme kapalı.",
+            price: 3,
+            currency: "TRY",
+            image_url: "",
+            is_available: true,
+            is_featured: false,
+            allergens: [],
+            tags: [],
+            stock_quantity: 0,
+            stock_min_quantity: 1,
+            hide_when_out_of_stock: false,
+            stock_note: null,
+            sort_order: 3,
             created_at: "2026-07-10T10:00:00+03:00",
             updated_at: "2026-07-10T10:00:00+03:00"
           }
@@ -144,7 +188,7 @@ try {
   expect(publishResponse.ok()).toBe(true);
   const publishResult = await publishResponse.json();
   expect(publishResult.ok).toBe(true);
-  expect(publishResult.item_count).toBe(1);
+  expect(publishResult.item_count).toBe(3);
 
   const changedMenuResponse = await page.request.get(`${baseUrl}/api/menu.php`, {
     headers: { "If-None-Match": initialEtag }
@@ -155,6 +199,97 @@ try {
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByRole("button", { name: "Smoke Test" })).toBeVisible();
   await expect(page.getByText("Smoke Kahvesi")).toBeVisible();
+  await expect(page.getByText("Gizli Stok Ürünü")).toHaveCount(0);
+  await expect(page.getByText("Görünür Stok Ürünü")).toBeVisible();
+  const stockMenuResponse = await page.request.get(`${baseUrl}/api/menu.php`);
+  const stockMenu = await stockMenuResponse.json();
+  expect(stockMenu.items.some((item) => item.id === "item_smoke_hidden_stock")).toBe(false);
+  expect(stockMenu.items.find((item) => item.id === "item_smoke_visible_zero")?.stock_quantity).toBe(0);
+  expect(stockMenu.items.find((item) => item.id === "item_smoke_001")).toMatchObject({
+    stock_quantity: 4,
+    stock_min_quantity: 2,
+    hide_when_out_of_stock: true,
+    stock_note: "Smoke stok notu"
+  });
+
+  const androidStockSnapshotResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    data: {
+      action: "publish_android_snapshot",
+      sync_secret: "change-this-secret",
+      snapshot: {
+        summary: {},
+        daily_tasks: [],
+        requests: [],
+        customers: [],
+        reservations: [],
+        rooms: [],
+        tables: [],
+        menu: { categories: [], items: [], updated_at: "2026-07-18T10:00:00+03:00" },
+        trackedStockItems: [
+          {
+            menu_item_id: "item_stock_snapshot_001",
+            name: "Snapshot Stok Ürünü",
+            category: "Smoke Test",
+            price: 12,
+            stock_quantity: 0,
+            stock_min_quantity: 2,
+            hide_when_out_of_stock: true,
+            stock_status: "out_of_stock"
+          }
+        ],
+        table_orders: [],
+        messages: [],
+        androidPermissions: {
+          "android-stock-web-smoke": {
+            role: "admin",
+            is_active: true,
+            permissions: ["menu.stock_view", "menu.stock_update"]
+          }
+        },
+        updated_at: "2026-07-18T10:00:00+03:00"
+      }
+    }
+  });
+  expect(androidStockSnapshotResponse.ok()).toBe(true);
+  const androidStockSummaryResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    data: {
+      action: "android_summary",
+      sync_secret: "change-this-secret",
+      device_id: "android-stock-web-smoke"
+    }
+  });
+  expect(androidStockSummaryResponse.ok()).toBe(true);
+  const androidStockSummary = await androidStockSummaryResponse.json();
+  expect(androidStockSummary.trackedStockItems).toEqual([
+    {
+      menu_item_id: "item_stock_snapshot_001",
+      name: "Snapshot Stok Ürünü",
+      category: "Smoke Test",
+      price: 12,
+      stock_quantity: 0,
+      stock_min_quantity: 2,
+      hide_when_out_of_stock: true,
+      stock_status: "out_of_stock"
+    }
+  ]);
+  expect(androidStockSummary.androidPermissions["android-stock-web-smoke"].permissions).toEqual([
+    "menu.stock_view",
+    "menu.stock_update"
+  ]);
+
+  for (const [index, actionType] of ["menu_stock_add", "menu_stock_set", "menu_stock_adjust"].entries()) {
+    const enqueueStockAction = await page.request.post(`${baseUrl}/api/sync.php`, {
+      data: {
+        action: "enqueue_android_action",
+        sync_secret: "change-this-secret",
+        action_id: `android_stock_action_${index}_0001`,
+        action_type: actionType,
+        device_id: "android-stock-web-smoke",
+        payload: { menu_item_id: "item_stock_snapshot_001", quantity: 1, quantity_change: 1, note: "Smoke" }
+      }
+    });
+    expect(enqueueStockAction.ok()).toBe(true);
+  }
 
   const chatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: {

@@ -286,7 +286,37 @@ export interface SaveMenuItemInput {
   is_featured: boolean;
   allergens: string[];
   tags: string[];
+  stock_quantity: number | null;
+  stock_min_quantity: number | null;
+  hide_when_out_of_stock: boolean;
+  stock_note: string | null;
   sort_order: number;
+}
+
+export type MenuStockMovementType =
+  | "add"
+  | "remove"
+  | "set"
+  | "adjust"
+  | "order_add"
+  | "order_update"
+  | "order_remove"
+  | "order_cancel";
+
+export type MenuStockSourceType = "desktop" | "android" | "table_order";
+
+export interface DesktopMenuStockMovement {
+  id: string;
+  menuItemId: string;
+  type: MenuStockMovementType;
+  quantityChange: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  sourceType: MenuStockSourceType;
+  sourceId: string;
+  actorDeviceId: string;
+  note: string;
+  createdAt: string;
 }
 
 export type DesktopMenuSaveResult =
@@ -598,6 +628,16 @@ export type ApplyAndroidActionResult =
 
 type AndroidActionMutationResult =
   | { ok: true; message: string }
+  | { ok: false; message: string };
+
+type MenuStockMutationResult =
+  | {
+      ok: true;
+      message: string;
+      tracked: boolean;
+      quantityBefore: number;
+      quantityAfter: number;
+    }
   | { ok: false; message: string };
 
 export class DesktopDatabase {
@@ -1571,19 +1611,45 @@ export class DesktopDatabase {
         `)
         .get(orderId, menuItemId, productName, unitPrice, currency, note) as { id?: string; quantity?: number } | undefined;
 
-      let itemId: string;
+      const itemId = existingItem?.id || createTableOrderId("table_order_item_");
       if (existingItem?.id) {
-        itemId = existingItem.id;
         const nextQuantity = Number(existingItem.quantity ?? 0) + quantity;
         if (nextQuantity > 999) {
           this.db.exec("ROLLBACK");
           return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
         }
+        const stockResult = this.mutateMenuStockInTransaction({
+          menuItemId,
+          type: "order_add",
+          quantityChange: -quantity,
+          sourceType: "table_order",
+          sourceId: orderId,
+          actorDeviceId: "",
+          note: `${productName} adisyona eklendi.`,
+          now
+        });
+        if (!stockResult.ok) {
+          this.db.exec("ROLLBACK");
+          return stockResult;
+        }
         this.db
           .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
           .run(nextQuantity, roundMoney(unitPrice * nextQuantity), now, itemId);
       } else {
-        itemId = createTableOrderId("table_order_item_");
+        const stockResult = this.mutateMenuStockInTransaction({
+          menuItemId,
+          type: "order_add",
+          quantityChange: -quantity,
+          sourceType: "table_order",
+          sourceId: orderId,
+          actorDeviceId: "",
+          note: `${productName} adisyona eklendi.`,
+          now
+        });
+        if (!stockResult.ok) {
+          this.db.exec("ROLLBACK");
+          return stockResult;
+        }
         this.db
           .prepare(`
             INSERT INTO table_order_items (
@@ -1629,7 +1695,7 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(orderId, "Ürün adisyona eklendi.");
+    return this.getTableOrderMutationResult(orderId, "Ürün adisyona eklendi.", true);
   }
 
   updateTableOrderItemQuantity(input: UpdateTableOrderItemQuantityInput): DesktopTableOrderResult {
@@ -1649,6 +1715,23 @@ export class DesktopDatabase {
         return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
       }
       orderId = String(item.order_id);
+      const previousQuantity = Number(item.quantity ?? 0);
+      if (quantity !== previousQuantity) {
+        const stockResult = this.mutateMenuStockInTransaction({
+          menuItemId: String(item.menu_item_id ?? ""),
+          type: "order_update",
+          quantityChange: previousQuantity - quantity,
+          sourceType: "table_order",
+          sourceId: orderId,
+          actorDeviceId: "",
+          note: "Adisyon ürün adedi değiştirildi.",
+          now
+        });
+        if (!stockResult.ok) {
+          this.db.exec("ROLLBACK");
+          return stockResult;
+        }
+      }
       const lineTotal = roundMoney(Number(item.unit_price ?? 0) * quantity);
       const updatedAt = nextMutationTimestamp(item.updated_at, now);
       this.db
@@ -1668,7 +1751,7 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(orderId, "Ürün adedi güncellendi.");
+    return this.getTableOrderMutationResult(orderId, "Ürün adedi güncellendi.", true);
   }
 
   updateTableOrderItemNote(input: UpdateTableOrderItemNoteInput): DesktopTableOrderResult {
@@ -1714,6 +1797,20 @@ export class DesktopDatabase {
         return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
       }
       orderId = String(item.order_id);
+      const stockResult = this.mutateMenuStockInTransaction({
+        menuItemId: String(item.menu_item_id ?? ""),
+        type: "order_remove",
+        quantityChange: Number(item.quantity ?? 0),
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: "",
+        note: "Ürün adisyondan silindi.",
+        now
+      });
+      if (!stockResult.ok) {
+        this.db.exec("ROLLBACK");
+        return stockResult;
+      }
       const updatedAt = nextMutationTimestamp(item.updated_at, now);
       this.db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(updatedAt, normalizedItemId);
       this.recalculateTableOrderTotalInTransaction(orderId, now);
@@ -1730,7 +1827,7 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(orderId, "Ürün adisyondan kaldırıldı.");
+    return this.getTableOrderMutationResult(orderId, "Ürün adisyondan kaldırıldı.", true);
   }
 
   updateTableOrderStatus(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
@@ -1809,6 +1906,13 @@ export class DesktopDatabase {
       if (!current) {
         this.db.exec("ROLLBACK");
         return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
+      }
+      if (status === "cancelled") {
+        const stockRestore = this.restoreCancelledOrderStockInTransaction(orderId, "", now);
+        if (!stockRestore.ok) {
+          this.db.exec("ROLLBACK");
+          return stockRestore;
+        }
       }
       this.recalculateTableOrderTotalInTransaction(orderId, now);
       const updateResult = this.db
@@ -2505,6 +2609,10 @@ export class DesktopDatabase {
           is_featured,
           allergens_json,
           tags_json,
+          stock_quantity,
+          stock_min_quantity,
+          hide_when_out_of_stock,
+          stock_note,
           sort_order,
           created_at,
           updated_at
@@ -2539,12 +2647,55 @@ export class DesktopDatabase {
         is_featured: Number(row.is_featured ?? 0) === 1,
         allergens: this.parseStringArray(row.allergens_json),
         tags: this.parseStringArray(row.tags_json),
+        stock_quantity: nullableNumber(row.stock_quantity),
+        stock_min_quantity: nullableNumber(row.stock_min_quantity),
+        hide_when_out_of_stock: Number(row.hide_when_out_of_stock ?? 0) === 1,
+        stock_note: nullableString(row.stock_note),
         sort_order: Number(row.sort_order ?? 0),
         created_at: String(row.created_at ?? ""),
         updated_at: String(row.updated_at ?? "")
       })),
       updated_at: updatedAt
     };
+  }
+
+  getQrMenuPublication(): PublishedQrMenu {
+    const menu = this.getPublishedMenu();
+    return {
+      ...menu,
+      items: menu.items.filter((item) => !(
+        item.stock_quantity !== null
+        && item.hide_when_out_of_stock
+        && item.stock_quantity <= 0
+      ))
+    };
+  }
+
+  getMenuStockMovements(menuItemId = ""): DesktopMenuStockMovement[] {
+    const normalizedMenuItemId = menuItemId.trim();
+    const rows = (normalizedMenuItemId
+      ? this.db.prepare(`
+          SELECT * FROM menu_stock_movements
+          WHERE menu_item_id = ?
+          ORDER BY created_at ASC, id ASC
+        `).all(normalizedMenuItemId)
+      : this.db.prepare(`
+          SELECT * FROM menu_stock_movements
+          ORDER BY created_at ASC, id ASC
+        `).all()) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      id: String(row.id ?? ""),
+      menuItemId: String(row.menu_item_id ?? ""),
+      type: String(row.type ?? "adjust") as MenuStockMovementType,
+      quantityChange: Number(row.quantity_change ?? 0),
+      quantityBefore: Number(row.quantity_before ?? 0),
+      quantityAfter: Number(row.quantity_after ?? 0),
+      sourceType: String(row.source_type ?? "desktop") as MenuStockSourceType,
+      sourceId: String(row.source_id ?? ""),
+      actorDeviceId: String(row.actor_device_id ?? ""),
+      note: String(row.note ?? ""),
+      createdAt: String(row.created_at ?? "")
+    }));
   }
 
   upsertRequests(requests: SyncedCustomerRequest[], nextCursor?: number) {
@@ -3422,6 +3573,8 @@ export class DesktopDatabase {
   saveMenuItem(input: SaveMenuItemInput): DesktopMenuSaveResult {
     const name = input.name.trim();
     const categoryId = input.category_id.trim();
+    const stockQuantity = normalizeNullableStockNumber(input.stock_quantity);
+    const stockMinQuantity = normalizeNullableStockNumber(input.stock_min_quantity);
     if (!name) {
       return {
         ok: false,
@@ -3436,63 +3589,108 @@ export class DesktopDatabase {
         message: "Ürün için kategori seçilmeli."
       };
     }
+    if (input.stock_quantity !== null && input.stock_quantity !== undefined && stockQuantity === null) {
+      return { ok: false, message: "Stok adedi 0 veya daha büyük bir sayı olmalı." };
+    }
+    if (input.stock_min_quantity !== null && input.stock_min_quantity !== undefined && stockMinQuantity === null) {
+      return { ok: false, message: "Minimum stok uyarısı 0 veya daha büyük bir sayı olmalı." };
+    }
 
     const id = input.id?.trim() || createId("item_");
     const now = new Date().toISOString();
-    const existing = this.db.prepare("SELECT created_at FROM menu_items WHERE id = ?").get(id) as { created_at?: string } | undefined;
+    const existing = this.db
+      .prepare("SELECT created_at, stock_quantity FROM menu_items WHERE id = ?")
+      .get(id) as { created_at?: string; stock_quantity?: number | null } | undefined;
     const createdAt = existing?.created_at || now;
+    const previousStockQuantity = existing ? nullableNumber(existing.stock_quantity) : null;
 
-    this.db
-      .prepare(`
-        INSERT INTO menu_items (
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(`
+          INSERT INTO menu_items (
+            id,
+            category_id,
+            name,
+            description,
+            price,
+            currency,
+            image_url,
+            is_available,
+            is_featured,
+            allergens_json,
+            tags_json,
+            stock_quantity,
+            stock_min_quantity,
+            hide_when_out_of_stock,
+            stock_note,
+            sort_order,
+            created_at,
+            updated_at,
+            sync_status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+          ON CONFLICT(id) DO UPDATE SET
+            category_id = excluded.category_id,
+            name = excluded.name,
+            description = excluded.description,
+            price = excluded.price,
+            currency = excluded.currency,
+            image_url = excluded.image_url,
+            is_available = excluded.is_available,
+            is_featured = excluded.is_featured,
+            allergens_json = excluded.allergens_json,
+            tags_json = excluded.tags_json,
+            stock_quantity = excluded.stock_quantity,
+            stock_min_quantity = excluded.stock_min_quantity,
+            hide_when_out_of_stock = excluded.hide_when_out_of_stock,
+            stock_note = excluded.stock_note,
+            sort_order = excluded.sort_order,
+            updated_at = excluded.updated_at,
+            deleted_at = '',
+            sync_status = 'pending'
+        `)
+        .run(
           id,
-          category_id,
+          categoryId,
           name,
-          description,
-          price,
-          currency,
-          image_url,
-          is_available,
-          is_featured,
-          allergens_json,
-          tags_json,
-          sort_order,
-          created_at,
-          updated_at,
-          sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-        ON CONFLICT(id) DO UPDATE SET
-          category_id = excluded.category_id,
-          name = excluded.name,
-          description = excluded.description,
-          price = excluded.price,
-          currency = excluded.currency,
-          image_url = excluded.image_url,
-          is_available = excluded.is_available,
-          is_featured = excluded.is_featured,
-          allergens_json = excluded.allergens_json,
-          tags_json = excluded.tags_json,
-          sort_order = excluded.sort_order,
-          updated_at = excluded.updated_at,
-          deleted_at = '',
-          sync_status = 'pending'
-      `)
-      .run(
-        id,
-        categoryId,
-        name,
-        input.description.trim(),
-        normalizePrice(input.price),
-        normalizeCurrency(input.currency),
-        input.image_url.trim(),
-        input.is_available ? 1 : 0,
-        input.is_featured ? 1 : 0,
-        JSON.stringify(normalizeStringArray(input.allergens)),
-        JSON.stringify(normalizeStringArray(input.tags)),
-        normalizeInteger(input.sort_order),
-        createdAt,
-        now
-      );
+          input.description.trim(),
+          normalizePrice(input.price),
+          normalizeCurrency(input.currency),
+          input.image_url.trim(),
+          input.is_available ? 1 : 0,
+          input.is_featured ? 1 : 0,
+          JSON.stringify(normalizeStringArray(input.allergens)),
+          JSON.stringify(normalizeStringArray(input.tags)),
+          stockQuantity,
+          stockMinQuantity,
+          input.hide_when_out_of_stock ? 1 : 0,
+          nullableTrimmedString(input.stock_note),
+          normalizeInteger(input.sort_order),
+          createdAt,
+          now
+        );
+
+      if (previousStockQuantity !== stockQuantity) {
+        const before = previousStockQuantity ?? 0;
+        const after = stockQuantity ?? 0;
+        this.insertMenuStockMovementInTransaction({
+          menuItemId: id,
+          type: "set",
+          quantityChange: after - before,
+          quantityBefore: before,
+          quantityAfter: after,
+          sourceType: "desktop",
+          sourceId: id,
+          actorDeviceId: "",
+          note: stockQuantity === null ? "Stok takibi bırakıldı." : "Menü ürün detayından stok ayarlandı.",
+          now
+        });
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
 
     return {
       ok: true,
@@ -4055,6 +4253,12 @@ export class DesktopDatabase {
         return this.applyAndroidTableOrderStatus(action, now);
       case "table_order_close":
         return this.applyAndroidTableOrderClose(action, now);
+      case "menu_stock_add":
+        return this.applyAndroidMenuStockAction(action, "add", now);
+      case "menu_stock_set":
+        return this.applyAndroidMenuStockAction(action, "set", now);
+      case "menu_stock_adjust":
+        return this.applyAndroidMenuStockAction(action, "adjust", now);
       default:
         return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
     }
@@ -4432,11 +4636,37 @@ export class DesktopDatabase {
       if (nextQuantity > 999) {
         return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
       }
+      const stockResult = this.mutateMenuStockInTransaction({
+        menuItemId,
+        type: "order_add",
+        quantityChange: -quantity,
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: action.device_id,
+        note: `${productName} Android siparişinden adisyona eklendi.`,
+        now
+      });
+      if (!stockResult.ok) {
+        return stockResult;
+      }
       const itemUpdatedAt = nextMutationTimestamp(existingItem.updated_at, now);
       this.db
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
         .run(nextQuantity, roundMoney(unitPrice * nextQuantity), itemUpdatedAt, itemId);
     } else {
+      const stockResult = this.mutateMenuStockInTransaction({
+        menuItemId,
+        type: "order_add",
+        quantityChange: -quantity,
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: action.device_id,
+        note: `${productName} Android siparişinden adisyona eklendi.`,
+        now
+      });
+      if (!stockResult.ok) {
+        return stockResult;
+      }
       this.db
         .prepare(`
           INSERT INTO table_order_items (
@@ -4472,6 +4702,22 @@ export class DesktopDatabase {
     }
     const updatedAt = nextMutationTimestamp(item.updated_at, now);
     const orderId = String(item.order_id ?? "");
+    const previousQuantity = Number(item.quantity ?? 0);
+    if (quantity !== previousQuantity) {
+      const stockResult = this.mutateMenuStockInTransaction({
+        menuItemId: String(item.menu_item_id ?? ""),
+        type: "order_update",
+        quantityChange: previousQuantity - quantity,
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId: action.device_id,
+        note: "Android siparişinde ürün adedi değiştirildi.",
+        now
+      });
+      if (!stockResult.ok) {
+        return stockResult;
+      }
+    }
     this.db
       .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
       .run(quantity, roundMoney(Number(item.unit_price ?? 0) * quantity), updatedAt, itemId);
@@ -4495,6 +4741,19 @@ export class DesktopDatabase {
     }
     const updatedAt = nextMutationTimestamp(item.updated_at, now);
     const orderId = String(item.order_id ?? "");
+    const stockResult = this.mutateMenuStockInTransaction({
+      menuItemId: String(item.menu_item_id ?? ""),
+      type: "order_remove",
+      quantityChange: Number(item.quantity ?? 0),
+      sourceType: "table_order",
+      sourceId: orderId,
+      actorDeviceId: action.device_id,
+      note: "Ürün Android siparişinden silindi.",
+      now
+    });
+    if (!stockResult.ok) {
+      return stockResult;
+    }
     this.db
       .prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?")
       .run(updatedAt, itemId);
@@ -4563,6 +4822,12 @@ export class DesktopDatabase {
       return versionConflict;
     }
     const updatedAt = nextMutationTimestamp(current.updated_at, now);
+    if (status === "cancelled") {
+      const stockRestore = this.restoreCancelledOrderStockInTransaction(orderId, action.device_id, now);
+      if (!stockRestore.ok) {
+        return stockRestore;
+      }
+    }
     this.recalculateTableOrderTotalInTransaction(orderId, now);
     this.db
       .prepare("UPDATE table_orders SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?")
@@ -4573,6 +4838,207 @@ export class DesktopDatabase {
       status
     }, now);
     return { ok: true, message: status === "paid" ? "Adisyon telefondan ödendi olarak kapatıldı." : "Adisyon telefondan iptal edildi." };
+  }
+
+  private applyAndroidMenuStockAction(
+    action: AndroidSyncAction,
+    mode: "add" | "set" | "adjust",
+    now: string
+  ): AndroidActionMutationResult {
+    const menuItemId = androidPayloadString(action.payload, "menu_item_id");
+    const note = androidPayloadString(action.payload, "note").slice(0, 500);
+    if (!menuItemId) {
+      return { ok: false, message: "Stoku güncellenecek menü ürünü seçilmemiş." };
+    }
+
+    let quantityChange: number | undefined;
+    let quantityAfter: number | undefined;
+    if (mode === "set") {
+      quantityAfter = normalizeNullableStockNumber(action.payload.quantity) ?? undefined;
+      if (quantityAfter === undefined) {
+        return { ok: false, message: "Yeni stok adedi 0 veya daha büyük bir sayı olmalı." };
+      }
+    } else if (mode === "add") {
+      quantityChange = normalizePositiveStockNumber(action.payload.quantity) ?? undefined;
+      if (quantityChange === undefined) {
+        return { ok: false, message: "Eklenecek stok adedi 0'dan büyük olmalı." };
+      }
+    } else {
+      quantityChange = normalizeSignedStockNumber(action.payload.quantity_change) ?? undefined;
+      if (quantityChange === undefined || quantityChange === 0) {
+        return { ok: false, message: "Stok farkı sıfırdan farklı bir sayı olmalı." };
+      }
+    }
+
+    const result = this.mutateMenuStockInTransaction({
+      menuItemId,
+      type: mode,
+      quantityChange,
+      quantityAfter,
+      allowStartTracking: mode === "set",
+      sourceType: "android",
+      sourceId: action.id,
+      actorDeviceId: action.device_id,
+      note,
+      now
+    });
+    if (!result.ok) {
+      return result;
+    }
+    this.insertAndroidActionEvent(action, "menu.stock_changed", "menu_item", menuItemId, {
+      movement_type: mode,
+      quantity_before: result.quantityBefore,
+      quantity_after: result.quantityAfter
+    }, now);
+    return { ok: true, message: "Menü ürünü stoku telefondan güncellendi." };
+  }
+
+  private mutateMenuStockInTransaction(input: {
+    menuItemId: string;
+    type: MenuStockMovementType;
+    quantityChange?: number;
+    quantityAfter?: number;
+    allowStartTracking?: boolean;
+    sourceType: MenuStockSourceType;
+    sourceId: string;
+    actorDeviceId: string;
+    note: string;
+    now: string;
+  }): MenuStockMutationResult {
+    const item = this.db
+      .prepare("SELECT stock_quantity, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
+      .get(input.menuItemId) as { stock_quantity?: number | null; updated_at?: string } | undefined;
+    if (!item) {
+      return { ok: false, message: "Menü ürünü bulunamadı." };
+    }
+
+    const storedQuantity = nullableNumber(item.stock_quantity);
+    if (storedQuantity === null && !input.allowStartTracking) {
+      if (input.sourceType === "table_order") {
+        return {
+          ok: true,
+          message: "Ürün stok takibinde değil.",
+          tracked: false,
+          quantityBefore: 0,
+          quantityAfter: 0
+        };
+      }
+      return { ok: false, message: "Bu ürün stok takibinde değil." };
+    }
+
+    const quantityBefore = storedQuantity ?? 0;
+    const requestedAfter = input.quantityAfter === undefined
+      ? quantityBefore + (input.quantityChange ?? 0)
+      : input.quantityAfter;
+    const quantityAfter = normalizeNullableStockNumber(requestedAfter);
+    if (quantityAfter === null) {
+      return {
+        ok: false,
+        message: input.actorDeviceId ? "Stokta yeterli ürün yok." : "Bu ürün stokta yeterli değil."
+      };
+    }
+
+    const updatedAt = nextMutationTimestamp(item.updated_at, input.now);
+    const update = this.db
+      .prepare(`
+        UPDATE menu_items
+        SET stock_quantity = ?, updated_at = ?, sync_status = 'pending'
+        WHERE id = ? AND deleted_at = ''
+      `)
+      .run(quantityAfter, updatedAt, input.menuItemId);
+    if (Number(update.changes) !== 1) {
+      return { ok: false, message: "Menü ürünü stoku güncellenemedi." };
+    }
+    this.insertMenuStockMovementInTransaction({
+      menuItemId: input.menuItemId,
+      type: input.type,
+      quantityChange: quantityAfter - quantityBefore,
+      quantityBefore,
+      quantityAfter,
+      sourceType: input.sourceType,
+      sourceId: input.sourceId,
+      actorDeviceId: input.actorDeviceId,
+      note: input.note,
+      now: input.now
+    });
+    return {
+      ok: true,
+      message: "Stok güncellendi.",
+      tracked: true,
+      quantityBefore,
+      quantityAfter
+    };
+  }
+
+  private restoreCancelledOrderStockInTransaction(
+    orderId: string,
+    actorDeviceId: string,
+    now: string
+  ): AndroidActionMutationResult {
+    const balances = this.db
+      .prepare(`
+        SELECT menu_item_id, COALESCE(SUM(quantity_change), 0) AS quantity_balance
+        FROM menu_stock_movements
+        WHERE source_type = 'table_order'
+          AND source_id = ?
+          AND type IN ('order_add', 'order_update', 'order_remove')
+        GROUP BY menu_item_id
+      `)
+      .all(orderId) as Array<{ menu_item_id?: string; quantity_balance?: number }>;
+    for (const balance of balances) {
+      const outstandingQuantity = normalizeStockPrecision(-Number(balance.quantity_balance ?? 0));
+      if (outstandingQuantity <= 0) {
+        continue;
+      }
+      const result = this.mutateMenuStockInTransaction({
+        menuItemId: String(balance.menu_item_id ?? ""),
+        type: "order_cancel",
+        quantityChange: outstandingQuantity,
+        sourceType: "table_order",
+        sourceId: orderId,
+        actorDeviceId,
+        note: "Adisyon iptal edildi; ayrılan stok geri eklendi.",
+        now
+      });
+      if (!result.ok) {
+        return result;
+      }
+    }
+    return { ok: true, message: "İptal edilen adisyonun stoku geri eklendi." };
+  }
+
+  private insertMenuStockMovementInTransaction(input: {
+    menuItemId: string;
+    type: MenuStockMovementType;
+    quantityChange: number;
+    quantityBefore: number;
+    quantityAfter: number;
+    sourceType: MenuStockSourceType;
+    sourceId: string;
+    actorDeviceId: string;
+    note: string;
+    now: string;
+  }) {
+    this.db
+      .prepare(`
+        INSERT INTO menu_stock_movements (
+          id, menu_item_id, type, quantity_change, quantity_before, quantity_after,
+          source_type, source_id, actor_device_id, note, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        `stock_movement_${randomUUID()}`,
+        input.menuItemId,
+        input.type,
+        normalizeStockPrecision(input.quantityChange),
+        normalizeStockPrecision(input.quantityBefore),
+        normalizeStockPrecision(input.quantityAfter),
+        input.sourceType,
+        input.sourceId || null,
+        input.actorDeviceId || null,
+        input.note || null,
+        input.now
+      );
   }
 
   private resolveAndroidActiveOrderId(payload: Record<string, unknown>): string {
@@ -4687,7 +5153,12 @@ export class DesktopDatabase {
 
     const row = this.db
       .prepare(`
-        SELECT table_order_items.order_id, table_order_items.unit_price, table_order_items.updated_at
+        SELECT
+          table_order_items.order_id,
+          table_order_items.menu_item_id,
+          table_order_items.unit_price,
+          table_order_items.quantity,
+          table_order_items.updated_at
         FROM table_order_items
         INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
         WHERE table_order_items.id = ?
@@ -5088,6 +5559,49 @@ function normalizePrice(value: number) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
+function normalizeStockPrecision(value: number): number {
+  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
+}
+
+function normalizeNullableStockNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const quantity = Number(value);
+  return Number.isFinite(quantity) && quantity >= 0
+    ? normalizeStockPrecision(quantity)
+    : null;
+}
+
+function normalizePositiveStockNumber(value: unknown): number | null {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) && quantity > 0
+    ? normalizeStockPrecision(quantity)
+    : null;
+}
+
+function normalizeSignedStockNumber(value: unknown): number | null {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? normalizeStockPrecision(quantity) : null;
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function nullableString(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value);
+}
+
+function nullableTrimmedString(value: unknown): string | null {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
 function normalizeOrderQuantity(value: number): number | null {
   const quantity = Number(value);
   return Number.isInteger(quantity) && quantity >= 1 && quantity <= 999 ? quantity : null;
@@ -5161,7 +5675,7 @@ function androidActionRelatedId(action: AndroidSyncAction): string {
   const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
     ? action.payload as Record<string, unknown>
     : {};
-  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "room_id", "task_id", "item_id"]) {
+  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "room_id", "task_id", "item_id", "menu_item_id"]) {
     const value = String(payload[key] ?? "").trim();
     if (value) {
       return value;
@@ -5185,7 +5699,7 @@ function androidActionTargetPage(actionType: string): DesktopAndroidActionFailur
   if (actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {
     return "pension";
   }
-  if (actionType.startsWith("table_")) {
+  if (actionType.startsWith("table_") || actionType.startsWith("menu_stock_")) {
     return "restaurant";
   }
   return "settings";
@@ -5209,6 +5723,9 @@ function friendlyDesktopActionFailure(value: string): string {
   }
   if (lower.includes("adisyon") && (lower.includes("kapalı") || lower.includes("kapat"))) {
     return "Adisyon kapalı olduğu için işlem yapılamadı.";
+  }
+  if (lower.includes("stok") && (lower.includes("yeterli") || lower.includes("yok"))) {
+    return "Stokta yeterli ürün yok.";
   }
   if (lower.includes("yetki") || lower.includes("izin")) {
     return "Bu cihazın bu işlem için yetkisi yok.";

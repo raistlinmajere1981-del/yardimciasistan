@@ -18,6 +18,10 @@ export interface MenuItem extends TimestampedRecord {
   is_featured: boolean;
   allergens: string[];
   tags: string[];
+  stock_quantity: number | null;
+  stock_min_quantity: number | null;
+  hide_when_out_of_stock: boolean;
+  stock_note: string | null;
   sort_order: number;
 }
 

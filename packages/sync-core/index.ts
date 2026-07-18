@@ -79,6 +79,10 @@ export interface PublishedMenuItem {
   is_featured: boolean;
   allergens: string[];
   tags: string[];
+  stock_quantity: number | null;
+  stock_min_quantity: number | null;
+  hide_when_out_of_stock: boolean;
+  stock_note: string | null;
   sort_order: number;
   created_at: ISODateTimeString;
   updated_at: ISODateTimeString;
@@ -129,6 +133,7 @@ export interface AndroidOperationsSnapshot {
   rooms: AndroidSnapshotRoom[];
   tables: AndroidSnapshotTable[];
   menu: PublishedQrMenu;
+  trackedStockItems: AndroidTrackedStockItem[];
   table_orders: AndroidSnapshotTableOrder[];
   messages: AndroidSnapshotMessage[];
   androidPermissions: Record<string, AndroidSnapshotPermissionProfile>;
@@ -166,6 +171,8 @@ export const ANDROID_PERMISSIONS = [
   "table_order.cancel",
   "menu.view",
   "menu.edit",
+  "menu.stock_view",
+  "menu.stock_update",
   "settings.view",
   "settings.edit",
   "android_devices.view",
@@ -196,13 +203,15 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
     "table_order.set_preparing",
     "table_order.set_served",
     "table_order.set_payment_waiting",
-    "menu.view"
+    "menu.view",
+    "menu.stock_view"
   ],
   cashier: [
     "table.view",
     "table_order.view",
     "table_order.set_payment_waiting",
-    "table_order.close_paid"
+    "table_order.close_paid",
+    "menu.stock_view"
   ],
   rooms_tasks: [
     "room.view",
@@ -362,6 +371,19 @@ export interface AndroidSnapshotMessage {
   updated_at: ISODateTimeString | "";
 }
 
+export type AndroidStockStatus = "out_of_stock" | "low_stock" | "in_stock";
+
+export interface AndroidTrackedStockItem {
+  menu_item_id: string;
+  name: string;
+  category: string;
+  price: number;
+  stock_quantity: number;
+  stock_min_quantity: number | null;
+  hide_when_out_of_stock: boolean;
+  stock_status: AndroidStockStatus;
+}
+
 export const ANDROID_ACTION_TYPES = [
   "customer_request_mark_answered",
   "customer_request_reopen",
@@ -386,7 +408,10 @@ export const ANDROID_ACTION_TYPES = [
   "table_order_close_paid",
   "table_order_cancel",
   "table_order_set_status",
-  "table_order_close"
+  "table_order_close",
+  "menu_stock_add",
+  "menu_stock_set",
+  "menu_stock_adjust"
 ] as const;
 
 export type AndroidActionType = typeof ANDROID_ACTION_TYPES[number];
@@ -446,7 +471,10 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   table_order_set_served: "table_order.set_served",
   table_order_set_payment_waiting: "table_order.set_payment_waiting",
   table_order_close_paid: "table_order.close_paid",
-  table_order_cancel: "table_order.cancel"
+  table_order_cancel: "table_order.cancel",
+  menu_stock_add: "menu.stock_update",
+  menu_stock_set: "menu.stock_update",
+  menu_stock_adjust: "menu.stock_update"
 };
 
 export function resolveAndroidActionPermission(

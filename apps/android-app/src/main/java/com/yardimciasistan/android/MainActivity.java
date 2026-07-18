@@ -428,6 +428,7 @@ public final class MainActivity extends Activity {
       return data.hasPermission("table.view")
           || data.hasPermission("table_order.view")
           || data.hasPermission("menu.view")
+          || data.hasPermission("menu.stock_view")
           || data.hasPermission("daily_task.view");
     }
     return false;
@@ -664,6 +665,7 @@ public final class MainActivity extends Activity {
     boolean canViewTables = data.hasPermission("table.view");
     boolean canViewOrders = data.hasPermission("table_order.view");
     boolean canViewMenu = data.hasPermission("menu.view");
+    boolean canViewStock = data.hasPermission("menu.stock_view");
     boolean canViewTasks = data.hasPermission("daily_task.view");
     ArrayList<MetricValue> metrics = new ArrayList<>();
     if (canViewTables) {
@@ -676,6 +678,9 @@ public final class MainActivity extends Activity {
     }
     if (canViewMenu) {
       metrics.add(new MetricValue("Menü ürünü", data.menuItems.size(), "Görüntülenebilir", UiKit.PRIMARY));
+    }
+    if (canViewStock) {
+      metrics.add(new MetricValue("Stok takibi", data.trackedStockItems.size(), "Takip edilen ürün", UiKit.WARNING));
     }
     if (!metrics.isEmpty()) {
       page.addView(metricGrid(metrics.toArray(new MetricValue[0])));
@@ -698,6 +703,40 @@ public final class MainActivity extends Activity {
       }
       for (OperationData.TableOrder order : data.tableOrders) {
         page.addView(activeOrderCard(order));
+      }
+    }
+
+    if (canViewStock) {
+      page.addView(UiKit.sectionTitle(this, "Stokta olmayanlar"));
+      int outOfStockCount = 0;
+      for (OperationData.TrackedStockItem item : data.trackedStockItems) {
+        if ("out_of_stock".equals(item.stockStatus)) {
+          page.addView(stockCard(item));
+          outOfStockCount += 1;
+        }
+      }
+      if (outOfStockCount == 0) {
+        page.addView(emptyCard("Stokta olmayan ürün yok", "Takip edilen ürünlerde tükenen stok bulunmuyor."));
+      }
+
+      page.addView(UiKit.sectionTitle(this, "Azalanlar"));
+      int lowStockCount = 0;
+      for (OperationData.TrackedStockItem item : data.trackedStockItems) {
+        if ("low_stock".equals(item.stockStatus)) {
+          page.addView(stockCard(item));
+          lowStockCount += 1;
+        }
+      }
+      if (lowStockCount == 0) {
+        page.addView(emptyCard("Azalan stok yok", "Minimum stok seviyesine yaklaşan ürün bulunmuyor."));
+      }
+
+      page.addView(UiKit.sectionTitle(this, "Tüm takip edilen ürünler"));
+      if (data.trackedStockItems.isEmpty()) {
+        page.addView(emptyCard("Stok takibi yapılmıyor", "Masaüstünde stok adedi girilen ürünler burada görünür."));
+      }
+      for (OperationData.TrackedStockItem item : data.trackedStockItems) {
+        page.addView(stockCard(item));
       }
     }
 
@@ -1230,6 +1269,93 @@ public final class MainActivity extends Activity {
     return card;
   }
 
+  private View stockCard(OperationData.TrackedStockItem item) {
+    LinearLayout card = UiKit.card(this);
+    LinearLayout top = UiKit.row(this);
+    LinearLayout identity = UiKit.column(this);
+    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    identity.addView(UiKit.text(this, item.name, 15, UiKit.TEXT, Typeface.BOLD));
+    identity.addView(UiKit.text(this, item.category + " · " + money(item.price, "TRY"), 12, UiKit.MUTED, Typeface.NORMAL));
+    top.addView(identity);
+    top.addView(statusBadge(formatStockStatus(item.stockStatus), stockTone(item.stockStatus)));
+    card.addView(top);
+    card.addView(UiKit.text(this,
+        "Stok: " + stockNumber(item.stockQuantity)
+            + " · Minimum: " + (item.stockMinQuantity == null ? "—" : stockNumber(item.stockMinQuantity)),
+        13, UiKit.TEXT, Typeface.BOLD));
+    card.addView(UiKit.text(this,
+        item.hideWhenOutOfStock ? "Stok bittiğinde QR menüde gizleniyor" : "QR menüde görünmeye devam ediyor",
+        12, item.hideWhenOutOfStock ? UiKit.WARNING : UiKit.MUTED, Typeface.NORMAL));
+
+    if (data.hasPermission("menu.stock_update")) {
+      LinearLayout actions = UiKit.row(this);
+      LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
+      actionParams.setMargins(0, UiKit.dp(this, 9), 0, 0);
+      actions.setLayoutParams(actionParams);
+      UiKit.addAction(actions, UiKit.outlineButton(this, "+1 Ekle", view -> sendAction(
+          "menu_stock_add",
+          payload("menu_item_id", item.menuItemId, "quantity", 1, "note", "Android hızlı stok ekleme"),
+          item.name + " stok ekleme işlemi gönderildi."
+      )), this);
+      UiKit.addAction(actions, UiKit.outlineButton(this, "Adedi Ayarla", view -> showStockMutationDialog(item, "set")), this);
+      UiKit.addAction(actions, UiKit.outlineButton(this, "Fark Gir", view -> showStockMutationDialog(item, "adjust")), this);
+      card.addView(actions);
+    }
+    return card;
+  }
+
+  private void showStockMutationDialog(OperationData.TrackedStockItem item, String mode) {
+    LinearLayout form = UiKit.column(this);
+    int horizontal = UiKit.dp(this, 20);
+    form.setPadding(horizontal, 0, horizontal, 0);
+    EditText quantity = UiKit.input(this, "set".equals(mode) ? "Yeni stok adedi" : "Stok farkı (örn. -2 veya 5)");
+    quantity.setInputType(InputType.TYPE_CLASS_NUMBER
+        | InputType.TYPE_NUMBER_FLAG_DECIMAL
+        | ("adjust".equals(mode) ? InputType.TYPE_NUMBER_FLAG_SIGNED : 0));
+    if ("set".equals(mode)) {
+      quantity.setText(stockNumber(item.stockQuantity));
+    }
+    EditText note = UiKit.input(this, "Not (isteğe bağlı)");
+    LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
+    noteParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    note.setLayoutParams(noteParams);
+    form.addView(quantity);
+    form.addView(note);
+
+    AlertDialog dialog = new AlertDialog.Builder(this)
+        .setTitle("set".equals(mode) ? "Stok adedini ayarla" : "Stok farkı gir")
+        .setView(form)
+        .setNegativeButton("Vazgeç", null)
+        .setPositiveButton("Kaydet", null)
+        .create();
+    dialog.setOnShowListener(value -> {
+      dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiKit.MUTED);
+      dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(UiKit.PRIMARY);
+      dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+        double parsed;
+        try {
+          parsed = Double.parseDouble(quantity.getText().toString().trim().replace(',', '.'));
+        } catch (NumberFormatException error) {
+          Toast.makeText(this, "Geçerli bir stok değeri girin.", Toast.LENGTH_SHORT).show();
+          return;
+        }
+        if (("set".equals(mode) && parsed < 0) || ("adjust".equals(mode) && parsed == 0)) {
+          Toast.makeText(this, "Stok değeri geçersiz.", Toast.LENGTH_SHORT).show();
+          return;
+        }
+        String actionType = "set".equals(mode) ? "menu_stock_set" : "menu_stock_adjust";
+        String quantityKey = "set".equals(mode) ? "quantity" : "quantity_change";
+        sendAction(actionType, payload(
+            "menu_item_id", item.menuItemId,
+            quantityKey, parsed,
+            "note", note.getText().toString().trim()
+        ), item.name + " stok güncellemesi gönderildi.");
+        dialog.dismiss();
+      });
+    });
+    dialog.show();
+  }
+
   private View activeOrderCard(OperationData.TableOrder order) {
     LinearLayout card = UiKit.card(this);
     LinearLayout top = UiKit.row(this);
@@ -1643,12 +1769,18 @@ public final class MainActivity extends Activity {
       details.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
       details.addView(UiKit.text(this, item.name, 14, UiKit.TEXT, Typeface.BOLD));
       details.addView(UiKit.text(this, data.categoryName(item.categoryId) + " · " + money(item.price, item.currency), 12, UiKit.MUTED, Typeface.NORMAL));
+      if (item.stockQuantity != null) {
+        details.addView(UiKit.text(this,
+            item.outOfStock() ? "Stokta yok" : "Mevcut stok: " + stockNumber(item.stockQuantity),
+            12, item.outOfStock() ? UiKit.DANGER : UiKit.INFO, Typeface.BOLD));
+      }
       row.addView(details);
       boolean canAdd = data.hasPermission("table_order.add_item")
           && (order != null || data.hasPermission("table_order.open"));
       if (canAdd) {
         Button add = UiKit.button(this, "Ekle", UiKit.PRIMARY, view -> addOrderItem(table, order, item));
         add.setLayoutParams(new LinearLayout.LayoutParams(UiKit.dp(this, 82), UiKit.dp(this, 44)));
+        add.setEnabled(!item.outOfStock());
         row.addView(add);
       }
       card.addView(row);
@@ -1685,7 +1817,10 @@ public final class MainActivity extends Activity {
         });
         minus.setEnabled(item.quantity > 1);
         UiKit.addAction(actions, minus, this);
-        UiKit.addAction(actions, UiKit.outlineButton(this, "+", view -> sendAction("table_order_update_item_quantity", payload("item_id", item.id, "quantity", item.quantity + 1, "expected_item_updated_at", item.updatedAt), "Ürün adedi artırılmak üzere gönderildi.")), this);
+        Button plus = UiKit.outlineButton(this, "+", view -> sendAction("table_order_update_item_quantity", payload("item_id", item.id, "quantity", item.quantity + 1, "expected_item_updated_at", item.updatedAt), "Ürün adedi artırılmak üzere gönderildi."));
+        OperationData.MenuItem currentMenuItem = data.menuItemById(item.menuItemId);
+        plus.setEnabled(currentMenuItem == null || !currentMenuItem.outOfStock());
+        UiKit.addAction(actions, plus, this);
       }
       if (data.hasPermission("table_order.remove_item")) {
         UiKit.addAction(actions, UiKit.dangerButton(this, "Sil", view -> confirm("Ürünü sil", item.productName + " adisyondan kaldırılsın mı?", () -> sendAction("table_order_remove_item", payload("item_id", item.id, "expected_item_updated_at", item.updatedAt), "Ürün silinmek üzere gönderildi."))), this);
@@ -1696,6 +1831,12 @@ public final class MainActivity extends Activity {
   }
 
   private void addOrderItem(OperationData.TableRecord table, OperationData.TableOrder order, OperationData.MenuItem item) {
+    if (item.outOfStock()) {
+      String message = "Stokta yeterli ürün yok";
+      showError(message);
+      Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+      return;
+    }
     if (order == null) {
       ArrayList<ActionSpec> actions = new ArrayList<>();
       ActionSpec openAction = new ActionSpec("table_order_open", payload(
@@ -2010,6 +2151,10 @@ public final class MainActivity extends Activity {
         return "table_order.close_paid";
       case "table_order_cancel":
         return "table_order.cancel";
+      case "menu_stock_add":
+      case "menu_stock_set":
+      case "menu_stock_adjust":
+        return "menu.stock_update";
       case "table_order_set_status":
         String status = actionPayload.optString("status", "");
         if ("served".equals(status)) {
@@ -2411,6 +2556,25 @@ public final class MainActivity extends Activity {
     if ("served".equals(status)) return UiKit.SUCCESS;
     if ("preparing".equals(status)) return UiKit.ACCENT;
     return UiKit.INFO;
+  }
+
+  private String formatStockStatus(String status) {
+    if ("out_of_stock".equals(status)) return "Stokta yok";
+    if ("low_stock".equals(status)) return "Az stok";
+    return "Stokta var";
+  }
+
+  private int stockTone(String status) {
+    if ("out_of_stock".equals(status)) return UiKit.DANGER;
+    if ("low_stock".equals(status)) return UiKit.WARNING;
+    return UiKit.SUCCESS;
+  }
+
+  private String stockNumber(double value) {
+    if (Math.rint(value) == value) {
+      return String.valueOf((long) value);
+    }
+    return String.format(new Locale("tr", "TR"), "%.2f", value).replaceAll("0+$", "").replaceAll("[,\\.]$", "");
   }
 
   private int actionTone(String status) {

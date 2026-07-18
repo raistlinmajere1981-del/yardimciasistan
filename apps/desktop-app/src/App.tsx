@@ -157,6 +157,10 @@ interface ItemFormState {
   is_featured: boolean;
   allergens: string;
   tags: string;
+  stock_quantity: string;
+  stock_min_quantity: string;
+  hide_when_out_of_stock: boolean;
+  stock_note: string;
   sort_order: string;
 }
 
@@ -276,6 +280,10 @@ const defaultDashboardData: DesktopDashboardData = {
         is_featured: true,
         allergens: ["gluten", "süt", "yumurta"],
         tags: ["popüler", "kahvaltı"],
+        stock_quantity: null,
+        stock_min_quantity: null,
+        hide_when_out_of_stock: false,
+        stock_note: null,
         sort_order: 10,
         created_at: "2026-07-10T10:00:00+03:00",
         updated_at: "2026-07-10T10:00:00+03:00"
@@ -292,6 +300,10 @@ const defaultDashboardData: DesktopDashboardData = {
         is_featured: false,
         allergens: ["yumurta"],
         tags: ["sıcak"],
+        stock_quantity: null,
+        stock_min_quantity: null,
+        hide_when_out_of_stock: false,
+        stock_note: null,
         sort_order: 20,
         created_at: "2026-07-10T10:00:00+03:00",
         updated_at: "2026-07-10T10:00:00+03:00"
@@ -308,6 +320,10 @@ const defaultDashboardData: DesktopDashboardData = {
         is_featured: false,
         allergens: [],
         tags: ["kahve"],
+        stock_quantity: null,
+        stock_min_quantity: null,
+        hide_when_out_of_stock: false,
+        stock_note: null,
         sort_order: 10,
         created_at: "2026-07-10T10:00:00+03:00",
         updated_at: "2026-07-10T10:00:00+03:00"
@@ -324,6 +340,10 @@ const defaultDashboardData: DesktopDashboardData = {
         is_featured: true,
         allergens: [],
         tags: ["soğuk", "ferah"],
+        stock_quantity: null,
+        stock_min_quantity: null,
+        hide_when_out_of_stock: false,
+        stock_note: null,
         sort_order: 20,
         created_at: "2026-07-10T10:00:00+03:00",
         updated_at: "2026-07-10T10:00:00+03:00"
@@ -340,6 +360,10 @@ const defaultDashboardData: DesktopDashboardData = {
         is_featured: false,
         allergens: ["gluten", "süt"],
         tags: ["hızlı"],
+        stock_quantity: null,
+        stock_min_quantity: null,
+        hide_when_out_of_stock: false,
+        stock_note: null,
         sort_order: 10,
         created_at: "2026-07-10T10:00:00+03:00",
         updated_at: "2026-07-10T10:00:00+03:00"
@@ -1030,6 +1054,10 @@ function App() {
       is_featured: itemForm.is_featured,
       allergens: splitCommaList(itemForm.allergens),
       tags: splitCommaList(itemForm.tags),
+      stock_quantity: parseNullableFormNumber(itemForm.stock_quantity),
+      stock_min_quantity: parseNullableFormNumber(itemForm.stock_min_quantity),
+      hide_when_out_of_stock: itemForm.hide_when_out_of_stock,
+      stock_note: itemForm.stock_note.trim() || null,
       sort_order: Number(itemForm.sort_order)
     });
 
@@ -2105,7 +2133,7 @@ function MenuPreviewCanvas({
   const activeCategoryIds = useMemo(() => new Set(categories.map((category) => category.id)), [categories]);
   const items = useMemo(
     () => menu.items
-      .filter((item) => item.is_available && activeCategoryIds.has(item.category_id))
+      .filter((item) => item.is_available && activeCategoryIds.has(item.category_id) && !isQrHiddenByStock(item))
       .sort(compareMenuRecords),
     [activeCategoryIds, menu.items]
   );
@@ -4545,9 +4573,15 @@ function MenuManager({
                   <strong>{item.name}</strong>
                   <small>{formatCurrency(item.price, item.currency)} · {item.is_available ? "Mevcut" : "Kapalı"}{item.is_featured ? " · Öne çıkan" : ""}</small>
                 </span>
-                {item.is_featured
-                  ? <Star className="manager-row-star" size={14} aria-hidden="true" />
-                  : <span className={item.is_available ? "dot is-on dot" : "dot"} aria-hidden="true" />}
+                <span className="menu-stock-badges">
+                  {getMenuStockBadge(item) && (
+                    <StatusBadge tone={getMenuStockBadge(item)!.tone}>{getMenuStockBadge(item)!.label}</StatusBadge>
+                  )}
+                  {isQrHiddenByStock(item) && <StatusBadge tone="neutral">QR menüde gizli</StatusBadge>}
+                  {item.is_featured
+                    ? <Star className="manager-row-star" size={14} aria-hidden="true" />
+                    : <span className={item.is_available ? "dot is-on dot" : "dot"} aria-hidden="true" />}
+                </span>
               </button>
             ))}
           </div>
@@ -4600,6 +4634,68 @@ function MenuManager({
                 Öne çıkar
               </label>
             </div>
+            <details className="menu-stock-editor" key={itemForm.id || "new-menu-item"}>
+              <summary className="menu-stock-editor-heading">
+                <span>
+                  <strong id="menu-stock-editor-title">Stok</strong>
+                  <small>Adet boşsa takip edilmez; 0 stokta yok demektir.</small>
+                </span>
+                <span className="menu-stock-summary-value">
+                  {itemForm.stock_quantity === "" ? "Takip edilmiyor" : `${itemForm.stock_quantity} adet`}
+                </span>
+              </summary>
+              <div className="menu-stock-editor-body">
+                <div className="form-row">
+                  <label>
+                    Stok adedi
+                    <input
+                      value={itemForm.stock_quantity}
+                      onChange={(event) => onItemFormChange({ ...itemForm, stock_quantity: event.target.value })}
+                      inputMode="decimal"
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="Takip edilmiyor"
+                    />
+                  </label>
+                  <label>
+                    Minimum stok uyarısı
+                    <input
+                      value={itemForm.stock_min_quantity}
+                      onChange={(event) => onItemFormChange({ ...itemForm, stock_min_quantity: event.target.value })}
+                      inputMode="decimal"
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="Örn. 5"
+                    />
+                  </label>
+                </div>
+                <label className="toggle-label">
+                  <input
+                    checked={itemForm.hide_when_out_of_stock}
+                    onChange={(event) => onItemFormChange({ ...itemForm, hide_when_out_of_stock: event.target.checked })}
+                    type="checkbox"
+                  />
+                  Stok bitince QR menüden gizle
+                </label>
+                <label>
+                  Stok notu
+                  <textarea
+                    value={itemForm.stock_note}
+                    onChange={(event) => onItemFormChange({ ...itemForm, stock_note: event.target.value })}
+                    placeholder="İsteğe bağlı kısa stok notu"
+                  />
+                </label>
+                {itemForm.stock_quantity !== "" && (
+                  <button
+                    className="stock-stop-action"
+                    type="button"
+                    onClick={() => onItemFormChange({ ...itemForm, stock_quantity: "" })}
+                  >Stok takibini bırak</button>
+                )}
+              </div>
+            </details>
             <details className="form-details item-details">
               <summary>Detaylı ayarlar</summary>
               <label>
@@ -4745,6 +4841,10 @@ function toItemForm(item: PublishedMenuItem | undefined, fallbackCategoryId: str
     is_featured: item.is_featured,
     allergens: item.allergens.join(", "),
     tags: item.tags.join(", "),
+    stock_quantity: item.stock_quantity == null ? "" : String(item.stock_quantity),
+    stock_min_quantity: item.stock_min_quantity == null ? "" : String(item.stock_min_quantity),
+    hide_when_out_of_stock: Boolean(item.hide_when_out_of_stock),
+    stock_note: item.stock_note ?? "",
     sort_order: String(item.sort_order)
   };
 }
@@ -4762,6 +4862,10 @@ function emptyItemForm(categoryId: string, sortOrder: number): ItemFormState {
     is_featured: false,
     allergens: "",
     tags: "",
+    stock_quantity: "",
+    stock_min_quantity: "",
+    hide_when_out_of_stock: false,
+    stock_note: "",
     sort_order: String(sortOrder)
   };
 }
@@ -4775,6 +4879,31 @@ function splitCommaList(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function parseNullableFormNumber(value: string): number | null {
+  if (!value.trim()) {
+    return null;
+  }
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getMenuStockBadge(item: PublishedMenuItem): { label: string; tone: StatusTone } | null {
+  if (item.stock_quantity == null) {
+    return null;
+  }
+  if (item.stock_quantity <= 0) {
+    return { label: "Stokta yok", tone: "danger" };
+  }
+  if (item.stock_min_quantity !== null && item.stock_quantity <= item.stock_min_quantity) {
+    return { label: "Az stok", tone: "wait" };
+  }
+  return { label: "Stokta var", tone: "ok" };
+}
+
+function isQrHiddenByStock(item: PublishedMenuItem): boolean {
+  return typeof item.stock_quantity === "number" && item.hide_when_out_of_stock && item.stock_quantity <= 0;
 }
 
 function buildMenuPreviewData(
@@ -4817,6 +4946,10 @@ function buildMenuPreviewData(
     is_featured: itemForm.is_featured,
     allergens: splitCommaList(itemForm.allergens),
     tags: splitCommaList(itemForm.tags),
+    stock_quantity: parseNullableFormNumber(itemForm.stock_quantity),
+    stock_min_quantity: parseNullableFormNumber(itemForm.stock_min_quantity),
+    hide_when_out_of_stock: itemForm.hide_when_out_of_stock,
+    stock_note: itemForm.stock_note.trim() || null,
     sort_order: Number.isFinite(Number(itemForm.sort_order)) ? Number(itemForm.sort_order) : 0,
     created_at: existingItem?.created_at ?? now,
     updated_at: now

@@ -20,6 +20,13 @@ const database = new DesktopDatabase({
 try {
   database.initialize();
 
+  assert.ok(database.getDashboardData().menu.items.length > 0);
+  assert.equal(
+    database.getDashboardData().menu.items.every((item) => item.stock_quantity === null),
+    true,
+    "Existing menu items must migrate with stock tracking disabled."
+  );
+
   const initialSetup = database.getSetupData();
   assert.equal(initialSetup.setupRequired, true);
   assert.equal(initialSetup.autoSyncEnabled, true);
@@ -448,6 +455,7 @@ try {
   assert.equal(itemResult.ok, true);
   assertTableOrderFlow(database, { appPath, dataDir, categoryId: categoryResult.savedId, menuItemId: itemResult.savedId });
   assertAndroidActionFlow(database, itemResult.savedId, manualRequestResult.savedId);
+  assertStockTrackingFlow(database, categoryResult.savedId);
 
   const dashboardData = database.getDashboardData();
   assert.ok(dashboardData.menu.categories.some((category) => category.id === categoryResult.savedId));
@@ -1128,13 +1136,177 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.ok(restoredProfile?.permissions.includes("android_devices.manage"));
 }
 
-function androidAction(id, actionType, payload) {
+function assertStockTrackingFlow(database, categoryId) {
+  const stockTableId = database.getDashboardData().tables.find((table) => !["table_001", "table_002"].includes(table.id))?.id;
+  assert.ok(stockTableId);
+  const baseInput = {
+    category_id: categoryId,
+    name: "Stok Smoke Ürün",
+    description: "Basit stok takibi smoke ürünü.",
+    price: 25,
+    currency: "TRY",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["stock-smoke"],
+    stock_quantity: null,
+    stock_min_quantity: null,
+    hide_when_out_of_stock: false,
+    stock_note: null,
+    sort_order: 80
+  };
+  const created = database.saveMenuItem(baseInput);
+  assert.equal(created.ok, true);
+  const itemId = created.savedId;
+  assert.equal(created.dashboardData.menu.items.find((item) => item.id === itemId)?.stock_quantity, null);
+  assert.equal(database.getMenuStockMovements(itemId).length, 0);
+
+  const zeroVisible = database.saveMenuItem({
+    ...baseInput,
+    id: itemId,
+    stock_quantity: 0,
+    stock_min_quantity: 2,
+    stock_note: "0 takip dışı değildir"
+  });
+  assert.equal(zeroVisible.ok, true);
+  assert.equal(zeroVisible.dashboardData.menu.items.find((item) => item.id === itemId)?.stock_quantity, 0);
+  assert.equal(database.getQrMenuPublication().items.some((item) => item.id === itemId), true);
+
+  const zeroHidden = database.saveMenuItem({
+    ...baseInput,
+    id: itemId,
+    stock_quantity: 0,
+    stock_min_quantity: 2,
+    hide_when_out_of_stock: true
+  });
+  assert.equal(zeroHidden.ok, true);
+  assert.equal(zeroHidden.dashboardData.menu.items.some((item) => item.id === itemId), true);
+  assert.equal(database.getQrMenuPublication().items.some((item) => item.id === itemId), false);
+
+  const stocked = database.saveMenuItem({
+    ...baseInput,
+    id: itemId,
+    stock_quantity: 5,
+    stock_min_quantity: 2,
+    hide_when_out_of_stock: true
+  });
+  assert.equal(stocked.ok, true);
+  assert.equal(database.getQrMenuPublication().items.some((item) => item.id === itemId), true);
+
+  const opened = database.openTableOrder(stockTableId);
+  assert.equal(opened.ok, true);
+  const added = database.addTableOrderItem({ orderId: opened.order.id, menuItemId: itemId, quantity: 2, note: "" });
+  assert.equal(added.ok, true);
+  assert.equal(stockQuantity(database, itemId), 3);
+  assert.equal(added.dashboardData.menu.items.find((item) => item.id === itemId)?.stock_quantity, 3);
+  const orderItemId = added.order.items[0].id;
+
+  const increased = database.updateTableOrderItemQuantity({ itemId: orderItemId, quantity: 3 });
+  assert.equal(increased.ok, true);
+  assert.equal(stockQuantity(database, itemId), 2);
+  const decreased = database.updateTableOrderItemQuantity({ itemId: orderItemId, quantity: 1 });
+  assert.equal(decreased.ok, true);
+  assert.equal(stockQuantity(database, itemId), 4);
+  const removed = database.removeTableOrderItem(orderItemId);
+  assert.equal(removed.ok, true);
+  assert.equal(stockQuantity(database, itemId), 5);
+  assert.equal(database.closeTableOrder({ orderId: opened.order.id, status: "cancelled" }).ok, true);
+  assert.equal(stockQuantity(database, itemId), 5);
+
+  const cancelOrder = database.openTableOrder(stockTableId);
+  assert.equal(cancelOrder.ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: cancelOrder.order.id, menuItemId: itemId, quantity: 3, note: "" }).ok, true);
+  assert.equal(stockQuantity(database, itemId), 2);
+  assert.equal(database.closeTableOrder({ orderId: cancelOrder.order.id, status: "cancelled" }).ok, true);
+  assert.equal(stockQuantity(database, itemId), 5);
+
+  const paidOrder = database.openTableOrder(stockTableId);
+  assert.equal(paidOrder.ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: paidOrder.order.id, menuItemId: itemId, quantity: 2, note: "" }).ok, true);
+  assert.equal(stockQuantity(database, itemId), 3);
+  assert.equal(database.closeTableOrder({ orderId: paidOrder.order.id, status: "paid" }).ok, true);
+  assert.equal(stockQuantity(database, itemId), 3, "Paid orders must not restore stock.");
+
+  const insufficientOrder = database.openTableOrder(stockTableId);
+  assert.equal(insufficientOrder.ok, true);
+  const insufficient = database.addTableOrderItem({ orderId: insufficientOrder.order.id, menuItemId: itemId, quantity: 4, note: "" });
+  assert.equal(insufficient.ok, false);
+  assert.equal(insufficient.message, "Bu ürün stokta yeterli değil.");
+  assert.equal(stockQuantity(database, itemId), 3);
+  assert.equal(database.getActiveTableOrder(stockTableId).items.length, 0);
+  assert.equal(database.closeTableOrder({ orderId: insufficientOrder.order.id, status: "cancelled" }).ok, true);
+
+  const untracked = database.saveMenuItem({ ...baseInput, name: "Takipsiz Smoke Ürün", sort_order: 90 });
+  assert.equal(untracked.ok, true);
+  const untrackedOrder = database.openTableOrder(stockTableId);
+  assert.equal(untrackedOrder.ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: untrackedOrder.order.id, menuItemId: untracked.savedId, quantity: 2, note: "" }).ok, true);
+  assert.equal(database.getMenuStockMovements(untracked.savedId).length, 0);
+  assert.equal(database.closeTableOrder({ orderId: untrackedOrder.order.id, status: "cancelled" }).ok, true);
+  assert.equal(database.getMenuStockMovements(untracked.savedId).length, 0);
+
+  const deniedManual = database.applyAndroidAction(androidAction(
+    "android_stock_denied_001",
+    "menu_stock_add",
+    { menu_item_id: itemId, quantity: 1, note: "Yetkisiz deneme" },
+    "android-stock-smoke"
+  ));
+  assert.equal(deniedManual.ok, false);
+  assert.match(deniedManual.message, /yetkisi yok/i);
+  const stockViewer = database.getAndroidDevices().find((device) => device.deviceId === "android-stock-smoke");
+  assert.equal(stockViewer?.permissions.includes("menu.stock_view"), true);
+  assert.equal(stockViewer?.permissions.includes("menu.stock_update"), false);
+  assert.equal(database.setAndroidDeviceRole("android-stock-smoke", "admin").ok, true);
+  const allowedManual = database.applyAndroidAction(androidAction(
+    "android_stock_set_001",
+    "menu_stock_set",
+    { menu_item_id: itemId, quantity: 10, note: "Sayım sonucu" },
+    "android-stock-smoke"
+  ));
+  assert.equal(allowedManual.ok, true);
+  assert.equal(stockQuantity(database, itemId), 10);
+  const allowedAdd = database.applyAndroidAction(androidAction(
+    "android_stock_add_001",
+    "menu_stock_add",
+    { menu_item_id: itemId, quantity: 2, note: "Teslimat" },
+    "android-stock-smoke"
+  ));
+  assert.equal(allowedAdd.ok, true);
+  assert.equal(stockQuantity(database, itemId), 12);
+  const allowedAdjust = database.applyAndroidAction(androidAction(
+    "android_stock_adjust_001",
+    "menu_stock_adjust",
+    { menu_item_id: itemId, quantity_change: -3, note: "Fire düzeltmesi" },
+    "android-stock-smoke"
+  ));
+  assert.equal(allowedAdjust.ok, true);
+  assert.equal(stockQuantity(database, itemId), 9);
+
+  const movementTypes = database.getMenuStockMovements(itemId).map((movement) => movement.type);
+  for (const type of ["add", "set", "adjust", "order_add", "order_update", "order_remove", "order_cancel"]) {
+    assert.equal(movementTypes.includes(type), true, `Missing stock movement type: ${type}`);
+  }
+  assert.ok(database.getMenuStockMovements(itemId).some((movement) =>
+    movement.sourceType === "android" && movement.actorDeviceId === "android-stock-smoke" && movement.note === "Sayım sonucu"
+  ));
+
+  const stopped = database.saveMenuItem({ ...baseInput, id: itemId, stock_quantity: null });
+  assert.equal(stopped.ok, true);
+  assert.equal(stockQuantity(database, itemId), null);
+}
+
+function stockQuantity(database, itemId) {
+  return database.getDashboardData().menu.items.find((item) => item.id === itemId)?.stock_quantity ?? null;
+}
+
+function androidAction(id, actionType, payload, deviceId = "android-smoke-device") {
   return {
     id,
     action_type: actionType,
     payload,
     created_at: "2026-07-17T10:00:00.000Z",
-    device_id: "android-smoke-device",
+    device_id: deviceId,
     device_name: "DB Smoke Telefonu",
     app_version: "0.1.0-smoke",
     last_seen_at: "2026-07-17T10:00:01.000Z",

@@ -339,7 +339,7 @@ function registerIpcHandlers() {
     const setup = getDatabase().getSetupData();
     const result = await pushMenu({
       ...getWebSyncConfig(setup),
-      menu: getDatabase().getPublishedMenu()
+      menu: getDatabase().getQrMenuPublication()
     });
 
     if (result.ok) {
@@ -943,6 +943,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     .filter((order) => ["open", "preparing", "served", "payment"].includes(order.status));
   const activeMenuCategories = dashboardData.menu.categories.filter((category) => category.is_active);
   const activeMenuCategoryIds = new Set(activeMenuCategories.map((category) => category.id));
+  const menuCategoryNames = new Map(dashboardData.menu.categories.map((category) => [category.id, category.name]));
   const androidMenu = {
     categories: activeMenuCategories,
     items: dashboardData.menu.items.filter((item) => item.is_available && activeMenuCategoryIds.has(item.category_id)),
@@ -1059,6 +1060,18 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
       updated_at: table.updatedAt
     })),
     menu: androidMenu,
+    trackedStockItems: dashboardData.menu.items
+      .filter((item) => item.stock_quantity !== null)
+      .map((item) => ({
+        menu_item_id: item.id,
+        name: item.name,
+        category: menuCategoryNames.get(item.category_id) ?? "Menü",
+        price: item.price,
+        stock_quantity: item.stock_quantity ?? 0,
+        stock_min_quantity: item.stock_min_quantity,
+        hide_when_out_of_stock: item.hide_when_out_of_stock,
+        stock_status: getMenuStockStatus(item.stock_quantity ?? 0, item.stock_min_quantity)
+      })),
     table_orders: activeTableOrders.map((order) => ({
       id: order.id,
       table_id: order.tableId,
@@ -1085,6 +1098,16 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     androidPermissions: getDatabase().getAndroidPermissionSnapshot(),
     updated_at: updatedAt
   };
+}
+
+function getMenuStockStatus(quantity: number, minimum: number | null): "out_of_stock" | "low_stock" | "in_stock" {
+  if (quantity <= 0) {
+    return "out_of_stock";
+  }
+  if (minimum !== null && quantity <= minimum) {
+    return "low_stock";
+  }
+  return "in_stock";
 }
 
 function formatLocalDateKey(date: Date): string {

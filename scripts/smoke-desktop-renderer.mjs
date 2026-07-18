@@ -1793,7 +1793,8 @@ function createDashboardFixture() {
           "table_order.set_preparing",
           "table_order.set_served",
           "table_order.set_payment_waiting",
-          "menu.view"
+          "menu.view",
+          "menu.stock_view"
         ],
         firstSeenAt: "2026-07-18T08:00:00+03:00",
         lastSeenAt: "2026-07-18T12:30:00+03:00",

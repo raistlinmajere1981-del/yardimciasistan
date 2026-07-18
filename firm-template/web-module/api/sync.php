@@ -246,6 +246,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'rooms' => $androidSnapshot['rooms'],
         'tables' => $androidSnapshot['tables'],
         'menu' => $androidSnapshot['menu'],
+        'trackedStockItems' => $androidSnapshot['trackedStockItems'],
         'table_orders' => $androidSnapshot['table_orders'],
         'messages' => $androidSnapshot['messages'],
         'androidPermissions' => $androidSnapshot['androidPermissions'],
@@ -809,7 +810,10 @@ function ya_sync_android_action_types(): array
         'table_order_close_paid',
         'table_order_cancel',
         'table_order_set_status',
-        'table_order_close'
+        'table_order_close',
+        'menu_stock_add',
+        'menu_stock_set',
+        'menu_stock_adjust'
     ];
 }
 
@@ -898,6 +902,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
             'items' => ya_sync_sanitize_menu_items($menu['items'] ?? [], $categoryIds, $updatedAt),
             'updated_at' => ya_sync_string($menu['updated_at'] ?? $updatedAt) ?: $updatedAt
         ],
+        'trackedStockItems' => ya_sync_sanitize_tracked_stock_items($snapshot['trackedStockItems'] ?? []),
         'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
         'messages' => ya_sync_sanitize_android_messages($snapshot['messages'] ?? []),
         'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
@@ -965,6 +970,8 @@ function ya_sync_android_permissions(): array
         'table_order.cancel',
         'menu.view',
         'menu.edit',
+        'menu.stock_view',
+        'menu.stock_update',
         'settings.view',
         'settings.edit',
         'android_devices.view',
@@ -1310,6 +1317,10 @@ function ya_sync_sanitize_menu_items(mixed $records, array $categoryIds, string 
             continue;
         }
 
+        $stockQuantity = ya_sync_nullable_nonnegative_float($record['stock_quantity'] ?? null);
+        $stockMinQuantity = ya_sync_nullable_nonnegative_float($record['stock_min_quantity'] ?? null);
+        $stockNote = ya_sync_string($record['stock_note'] ?? '');
+
         $itemsById[$id] = [
             'id' => $id,
             'category_id' => $categoryId,
@@ -1322,12 +1333,57 @@ function ya_sync_sanitize_menu_items(mixed $records, array $categoryIds, string 
             'is_featured' => ya_sync_bool($record['is_featured'] ?? false),
             'allergens' => ya_sync_string_array($record['allergens'] ?? []),
             'tags' => ya_sync_string_array($record['tags'] ?? []),
+            'stock_quantity' => $stockQuantity,
+            'stock_min_quantity' => $stockMinQuantity,
+            'hide_when_out_of_stock' => ya_sync_bool($record['hide_when_out_of_stock'] ?? false),
+            'stock_note' => $stockNote === '' ? null : $stockNote,
             'sort_order' => ya_sync_int($record['sort_order'] ?? 0, 0),
             'created_at' => ya_sync_string($record['created_at'] ?? $fallbackTimestamp) ?: $fallbackTimestamp,
             'updated_at' => ya_sync_string($record['updated_at'] ?? $fallbackTimestamp) ?: $fallbackTimestamp
         ];
     }
 
+    return array_values($itemsById);
+}
+
+function ya_sync_sanitize_tracked_stock_items(mixed $records): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+
+    $itemsById = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $menuItemId = ya_sync_string($record['menu_item_id'] ?? '');
+        $name = ya_sync_string($record['name'] ?? '');
+        $quantity = ya_sync_nullable_nonnegative_float($record['stock_quantity'] ?? null);
+        if ($menuItemId === '' || $name === '' || $quantity === null) {
+            continue;
+        }
+        $minimum = ya_sync_nullable_nonnegative_float($record['stock_min_quantity'] ?? null);
+        $status = ya_sync_string($record['stock_status'] ?? '');
+        if (!in_array($status, ['out_of_stock', 'low_stock', 'in_stock'], true)) {
+            $status = $quantity <= 0
+                ? 'out_of_stock'
+                : ($minimum !== null && $quantity <= $minimum ? 'low_stock' : 'in_stock');
+        }
+        $itemsById[$menuItemId] = [
+            'menu_item_id' => $menuItemId,
+            'name' => $name,
+            'category' => ya_sync_string($record['category'] ?? 'Menü') ?: 'Menü',
+            'price' => max(0, ya_sync_float($record['price'] ?? 0, 0)),
+            'stock_quantity' => $quantity,
+            'stock_min_quantity' => $minimum,
+            'hide_when_out_of_stock' => ya_sync_bool($record['hide_when_out_of_stock'] ?? false),
+            'stock_status' => $status
+        ];
+        if (count($itemsById) >= 500) {
+            break;
+        }
+    }
     return array_values($itemsById);
 }
 
@@ -1527,6 +1583,18 @@ function ya_sync_float(mixed $value, float $fallback): float
     }
 
     return $fallback;
+}
+
+function ya_sync_nullable_nonnegative_float(mixed $value): ?float
+{
+    if ($value === null || $value === '') {
+        return null;
+    }
+    if (!is_numeric($value)) {
+        return null;
+    }
+    $number = (float) $value;
+    return is_finite($number) && $number >= 0 ? $number : null;
 }
 
 function ya_sync_string_array(mixed $value): array
