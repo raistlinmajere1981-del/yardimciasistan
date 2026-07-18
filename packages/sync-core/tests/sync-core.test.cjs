@@ -2,8 +2,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
   ANDROID_ADMIN_PERMISSIONS,
+  ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
   ANDROID_PERMISSIONS,
+  ANDROID_PERMISSION_GROUP_PERMISSIONS,
   ANDROID_STAFF_PERMISSIONS,
+  androidPermissionsForGroups,
   acknowledgeRequests,
   createSyncEndpointUrl,
   getSyncCapabilities,
@@ -426,13 +429,6 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
 test("Android role presets and action permission mapping stay explicit", () => {
   assert.deepEqual(ANDROID_ADMIN_PERMISSIONS, ANDROID_PERMISSIONS);
   assert.deepEqual(ANDROID_STAFF_PERMISSIONS, [
-    "customer.view",
-    "reservation.view",
-    "room.view",
-    "room.update_status",
-    "daily_task.view",
-    "daily_task.complete",
-    "daily_task.reopen",
     "table.view",
     "table.update_status",
     "table_order.view",
@@ -443,7 +439,12 @@ test("Android role presets and action permission mapping stay explicit", () => {
     "table_order.set_preparing",
     "table_order.set_served",
     "table_order.set_payment_waiting",
-    "menu.view"
+    "menu.view",
+    "room.view",
+    "room.update_status",
+    "daily_task.view",
+    "daily_task.complete",
+    "daily_task.reopen"
   ]);
   assert.equal(resolveAndroidActionPermission("customer_request_mark_answered"), "customer.mark_answered");
   assert.equal(resolveAndroidActionPermission("customer_request_reopen"), "customer.respond");
@@ -455,6 +456,50 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("table_order_cancel"), "table_order.cancel");
   assert.equal(resolveAndroidActionPermission("table_order_close", { status: "paid" }), "table_order.close_paid");
   assert.equal(resolveAndroidActionPermission("unsupported_action"), null);
+});
+
+test("Android staff permission groups produce only their documented effective permissions", () => {
+  assert.deepEqual(ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS, {
+    service_orders: true,
+    cashier: false,
+    rooms_tasks: true,
+    customer_reservation: false
+  });
+  assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.cashier, [
+    "table.view",
+    "table_order.view",
+    "table_order.set_payment_waiting",
+    "table_order.close_paid"
+  ]);
+  assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.customer_reservation, [
+    "customer.view",
+    "customer.respond",
+    "customer.mark_answered",
+    "reservation.view",
+    "reservation.approve"
+  ]);
+
+  const serviceOnly = androidPermissionsForGroups({
+    service_orders: true,
+    cashier: false,
+    rooms_tasks: false,
+    customer_reservation: false
+  });
+  assert.equal(serviceOnly.includes("table_order.open"), true);
+  assert.equal(serviceOnly.includes("table_order.close_paid"), false);
+  assert.equal(serviceOnly.includes("room.update_status"), false);
+
+  const customerReservation = androidPermissionsForGroups({
+    service_orders: false,
+    cashier: false,
+    rooms_tasks: false,
+    customer_reservation: true
+  });
+  assert.equal(customerReservation.includes("reservation.approve"), true);
+  assert.equal(customerReservation.includes("customer.reject"), false);
+  assert.equal(customerReservation.includes("customer.convert_to_reservation"), false);
+  assert.equal(customerReservation.includes("reservation.reject"), false);
+  assert.equal(customerReservation.includes("reservation.cancel"), false);
 });
 
 test("pushAiSettings sends the complete snake_case settings and strips the API key from its response", async () => {

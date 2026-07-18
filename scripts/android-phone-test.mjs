@@ -10,6 +10,7 @@ const packageName = "com.yardimciasistan.android";
 const activityName = ".MainActivity";
 const syncSecret = "change-this-secret";
 const outputApk = join(repoRoot, "apps", "android-app", "build", "outputs", "apk", "debug", "yardimci-asistan-debug.apk");
+const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "r", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
 const webModuleRoot = join(repoRoot, "firm-template", "web-module");
 const requestsFile = join(webModuleRoot, "data", "requests.json");
 const syncStateFile = join(webModuleRoot, "data", "sync-state.json");
@@ -36,6 +37,7 @@ const backups = new Map(managedFiles.filter((path) => existsSync(path)).map((pat
 let phpServer = null;
 let phpOutput = "";
 let cleaned = false;
+let activeAdbSerial = "";
 
 process.once("SIGINT", () => stopAndExit(0));
 process.once("SIGTERM", () => stopAndExit(0));
@@ -185,6 +187,7 @@ function installAndLaunchWithAdb(port, primaryLanUrl) {
   }
 
   installApk(device.serial);
+  activeAdbSerial = device.serial;
   runAdb(device.serial, [
     "shell",
     "am",
@@ -196,7 +199,10 @@ function installAndLaunchWithAdb(port, primaryLanUrl) {
     deviceBaseUrl,
     "--es",
     "ya_sync_secret",
-    syncSecret
+    syncSecret,
+    "--ez",
+    "ya_allow_debug_connection_override",
+    "true"
   ]);
 
   return {
@@ -208,17 +214,40 @@ function installAndLaunchWithAdb(port, primaryLanUrl) {
 }
 
 function installApk(serial) {
-  let result = runAdb(serial, ["install", "-r", outputApk], { allowFailure: true });
+  const deviceIdBeforeUpdate = readInstalledDeviceId(serial);
+  const result = runAdb(serial, ["install", "-r", outputApk], { allowFailure: true });
   const output = `${result.stdout}${result.stderr}`;
 
   if (result.status !== 0 && output.includes("INSTALL_FAILED_UPDATE_INCOMPATIBLE")) {
-    runAdb(serial, ["uninstall", packageName], { allowFailure: true });
-    result = runAdb(serial, ["install", "-r", outputApk], { allowFailure: true });
+    throw new Error([
+      "APK mevcut uygulamayla aynı imzayı kullanmıyor; telefon verilerini korumak için uygulama kaldırılmadı.",
+      "Aynı imzalama anahtarıyla yeniden derleyin. Uygulamayı kaldırmak cihaz ayarlarını ve eski telefon kimliğini silebilir."
+    ].join("\n"));
   }
 
   if (result.status !== 0) {
     throw new Error(`APK kurulamadı.\n${result.stdout}${result.stderr}`.trim());
   }
+
+  const deviceIdAfterUpdate = readInstalledDeviceId(serial);
+  if (deviceIdBeforeUpdate && deviceIdAfterUpdate && deviceIdBeforeUpdate !== deviceIdAfterUpdate) {
+    throw new Error("APK güncellemesi sırasında telefon kimliği değişti.");
+  }
+}
+
+function readInstalledDeviceId(serial) {
+  const result = runAdb(serial, [
+    "shell",
+    "run-as",
+    packageName,
+    "cat",
+    "shared_prefs/yardimci_asistan_android.xml"
+  ], { allowFailure: true, capture: true });
+  if (result.status !== 0) {
+    return "";
+  }
+  const match = result.stdout.match(/<string name="device_id">([^<]+)<\/string>/);
+  return match ? match[1].trim() : "";
 }
 
 function getAdbDevices() {
@@ -393,6 +422,8 @@ function cleanup() {
 
   cleaned = true;
 
+  restoreEmbeddedConnection();
+
   if (phpServer && phpServer.exitCode === null) {
     phpServer.kill();
   }
@@ -405,6 +436,21 @@ function cleanup() {
       writeFileSync(path, contents);
     }
   }
+}
+
+function restoreEmbeddedConnection() {
+  if (!activeAdbSerial || !embeddedConnectionIsLocked()) {
+    return;
+  }
+  const serial = activeAdbSerial;
+  activeAdbSerial = "";
+  runAdb(serial, ["shell", "am", "force-stop", packageName], { allowFailure: true, capture: true });
+  runAdb(serial, ["shell", "am", "start", "-n", `${packageName}/${activityName}`], { allowFailure: true, capture: true });
+}
+
+function embeddedConnectionIsLocked() {
+  return existsSync(generatedConnectionDefaultsFile)
+      && readFileSync(generatedConnectionDefaultsFile, "utf8").includes("LOCK_EMBEDDED_CONNECTION = true");
 }
 
 function stopAndExit(code) {

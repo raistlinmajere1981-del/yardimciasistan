@@ -174,10 +174,15 @@ Her Android kurulumu ilk açılışta kalıcı bir cihaz kimliği üretir. Hosti
 özet isteği veya action sırasında görülen cihaz kimliği, cihaz adı ve uygulama sürümünü
 hafif bir cihaz-görülme kaydında tutar; masaüstü bu kayıtları dışarı doğru senkron
 bağlantısıyla alıp kendi `android_devices` tablosuna aktarır. Bilinmeyen cihaz ilk
-görülmede aktif `staff` profiliyle başlar. Rol, aktiflik ve gerçek yetki kaynağı yalnız
-masaüstü SQLite'tır; Android'in bildirdiği role veya yetkiye güvenilmez.
+görülmede aktif `staff` profiliyle ve Servis / Sipariş ile Oda / Günlük İşler görev
+paketleri açık olarak başlar. Personel için masaüstünde teknik izin listesi düzenlenmez;
+Servis / Sipariş, Kasa / Hesap, Oda / Günlük İşler ve Müşteri / Rezervasyon paketleri
+seçilir ve `permissions_json` bu seçimlerden yeniden üretilir. Rol, aktiflik ve gerçek
+yetki kaynağı yalnız masaüstü SQLite'tır; Android'in bildirdiği role veya yetkiye güvenilmez.
 
-Masaüstünün yayınladığı Android snapshot'ı cihaz bazlı etkili yetki haritasını da taşır.
+Yönetici cihaz görev paketlerinden bağımsız olarak desteklenen tüm Android izinlerini
+almaya devam eder. Masaüstünün yayınladığı Android snapshot'ı cihaz bazlı etkili yetki
+haritasını da taşır.
 Telefon yalnız kendi kalıcı kimliğine ait profili kullanarak yetkisiz düğmeleri gizler.
 Bir kez çözümlenen profil ayrı bir yerel kayıtta korunur; sonraki snapshot profili geçici
 olarak içermiyorsa cihaz staff varsayımına açılmaz. `*.view` izinleri ekran içindeki veri

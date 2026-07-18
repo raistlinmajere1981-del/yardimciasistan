@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
-import type { PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
+import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
   DesktopDashboardData,
   DesktopSetupData,
@@ -70,6 +70,7 @@ export interface DesktopBridge {
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
+  setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
   resetAndroidDevicePermissions: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
   revokeAndroidDevice: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
@@ -127,6 +128,7 @@ const bridge: DesktopBridge = {
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => ipcRenderer.invoke("setup:saveInitial", input),
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
+  setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => ipcRenderer.invoke("androidDevice:setPermissionGroups", deviceId, groups),
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
   resetAndroidDevicePermissions: (deviceId: string) => ipcRenderer.invoke("androidDevice:resetPermissions", deviceId),
   revokeAndroidDevice: (deviceId: string) => ipcRenderer.invoke("androidDevice:revoke", deviceId),

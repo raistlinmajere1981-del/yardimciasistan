@@ -388,6 +388,11 @@ function registerIpcHandlers() {
     return finalizeAndroidDeviceMutation(result);
   });
 
+  ipcMain.handle("androidDevice:setPermissionGroups", (_event, deviceId: unknown, groups: unknown): DesktopAndroidDeviceMutationResult => {
+    const result = getDatabase().setAndroidDevicePermissionGroups(String(deviceId ?? ""), groups);
+    return finalizeAndroidDeviceMutation(result);
+  });
+
   ipcMain.handle("androidDevice:setActive", (_event, deviceId: unknown, active: unknown): DesktopAndroidDeviceMutationResult => {
     const result = getDatabase().setAndroidDeviceActive(String(deviceId ?? ""), active === true);
     return finalizeAndroidDeviceMutation(result);

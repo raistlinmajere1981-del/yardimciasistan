@@ -5,14 +5,18 @@ import path from "node:path";
 import { createId, normalizePhone } from "@yardimci-asistan/shared";
 import {
   ANDROID_ADMIN_PERMISSIONS,
+  ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
+  ANDROID_PERMISSION_GROUP_IDS,
   ANDROID_PERMISSIONS,
   ANDROID_STAFF_PERMISSIONS,
+  androidPermissionsForGroups,
   resolveAndroidActionPermission
 } from "@yardimci-asistan/sync-core";
 import type {
   AndroidDeviceRole,
   AndroidDeviceSighting,
   AndroidPermission,
+  AndroidPermissionGroups,
   AndroidSnapshotPermissionProfile,
   AndroidSyncAction,
   PublishedQrMenu,
@@ -137,6 +141,7 @@ export interface DesktopAndroidDevice {
   appVersion: string;
   role: AndroidDeviceRole;
   isActive: boolean;
+  permissionGroups: AndroidPermissionGroups;
   permissions: AndroidPermission[];
   firstSeenAt: string;
   lastSeenAt: string;
@@ -692,6 +697,7 @@ export class DesktopDatabase {
         appVersion: String(row.app_version ?? ""),
         role,
         isActive: Number(row.is_active ?? 0) === 1 && !String(row.revoked_at ?? "").trim(),
+        permissionGroups: parseStoredAndroidPermissionGroups(row.permission_groups_json),
         permissions: effectiveAndroidPermissions(role, row.permissions_json),
         firstSeenAt: String(row.first_seen_at ?? ""),
         lastSeenAt: String(row.last_seen_at ?? ""),
@@ -720,9 +726,9 @@ export class DesktopDatabase {
     const now = new Date().toISOString();
     const statement = this.db.prepare(`
       INSERT INTO android_devices (
-        id, device_id, device_name, app_version, role, is_active, permissions_json,
+        id, device_id, device_name, app_version, role, is_active, permissions_json, permission_groups_json,
         first_seen_at, last_seen_at, created_at, updated_at, revoked_at
-      ) VALUES (?, ?, ?, ?, 'staff', 1, ?, ?, ?, ?, ?, NULL)
+      ) VALUES (?, ?, ?, ?, 'staff', 1, ?, ?, ?, ?, ?, ?, NULL)
       ON CONFLICT(device_id) DO UPDATE SET
         device_name = CASE WHEN excluded.device_name != '' THEN excluded.device_name ELSE android_devices.device_name END,
         app_version = CASE WHEN excluded.app_version != '' THEN excluded.app_version ELSE android_devices.app_version END,
@@ -754,6 +760,7 @@ export class DesktopDatabase {
           String(sighting.device_name ?? "").trim().slice(0, 160),
           String(sighting.app_version ?? "").trim().slice(0, 80),
           JSON.stringify(ANDROID_STAFF_PERMISSIONS),
+          JSON.stringify(ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS),
           firstSeenAt,
           lastSeenAt,
           firstSeenAt,
@@ -775,6 +782,16 @@ export class DesktopDatabase {
     if (!deviceId || !role) {
       return { ok: false, message: "Telefon rolü için geçerli bir cihaz ve profil seçin.", devices: this.getAndroidDevices() };
     }
+    const row = this.db
+      .prepare("SELECT permission_groups_json FROM android_devices WHERE device_id = ?")
+      .get(deviceId) as { permission_groups_json?: unknown } | undefined;
+    if (!row) {
+      return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+    }
+    const groups = parseStoredAndroidPermissionGroups(row.permission_groups_json);
+    const permissions = role === "admin"
+      ? androidPermissionsForRole("admin")
+      : androidPermissionsForGroups(groups);
     const now = new Date().toISOString();
     const result = this.db
       .prepare(`
@@ -782,9 +799,41 @@ export class DesktopDatabase {
         SET role = ?, permissions_json = ?, updated_at = ?
         WHERE device_id = ?
       `)
-      .run(role, JSON.stringify(androidPermissionsForRole(role)), now, deviceId);
+      .run(role, JSON.stringify(permissions), now, deviceId);
     return Number(result.changes) === 1
       ? { ok: true, message: role === "admin" ? "Telefon yönetici yapıldı." : "Telefon personel yapıldı.", devices: this.getAndroidDevices() }
+      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+  }
+
+  setAndroidDevicePermissionGroups(deviceIdInput: string, groupsInput: unknown): DesktopAndroidDeviceMutationResult {
+    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
+    const groups = normalizeAndroidPermissionGroupsInput(groupsInput);
+    if (!deviceId || !groups) {
+      return { ok: false, message: "Telefon görev alanları için geçerli seçimler yapın.", devices: this.getAndroidDevices() };
+    }
+    const row = this.db
+      .prepare("SELECT role FROM android_devices WHERE device_id = ?")
+      .get(deviceId) as { role?: unknown } | undefined;
+    if (!row) {
+      return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+    }
+    if (normalizeAndroidDeviceRole(row.role) === "admin") {
+      return { ok: false, message: "Yönetici cihazlarda tüm yetkiler açıktır.", devices: this.getAndroidDevices() };
+    }
+    const result = this.db
+      .prepare(`
+        UPDATE android_devices
+        SET permission_groups_json = ?, permissions_json = ?, updated_at = ?
+        WHERE device_id = ?
+      `)
+      .run(
+        JSON.stringify(groups),
+        JSON.stringify(androidPermissionsForGroups(groups)),
+        new Date().toISOString(),
+        deviceId
+      );
+    return Number(result.changes) === 1
+      ? { ok: true, message: "Telefon görev alanları güncellendi.", devices: this.getAndroidDevices() }
       : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
   }
 
@@ -815,10 +864,16 @@ export class DesktopDatabase {
       return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
     }
     const role = normalizeAndroidDeviceRole(row.role);
+    const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
     this.db
-      .prepare("UPDATE android_devices SET permissions_json = ?, updated_at = ? WHERE device_id = ?")
-      .run(JSON.stringify(androidPermissionsForRole(role)), new Date().toISOString(), deviceId);
-    return { ok: true, message: "Telefon yetkileri rol varsayılanına döndürüldü.", devices: this.getAndroidDevices() };
+      .prepare("UPDATE android_devices SET permission_groups_json = ?, permissions_json = ?, updated_at = ? WHERE device_id = ?")
+      .run(
+        JSON.stringify(groups),
+        JSON.stringify(role === "admin" ? androidPermissionsForRole("admin") : androidPermissionsForGroups(groups)),
+        new Date().toISOString(),
+        deviceId
+      );
+    return { ok: true, message: "Telefon görev alanları varsayılana döndürüldü.", devices: this.getAndroidDevices() };
   }
 
   revokeAndroidDevice(deviceIdInput: string): DesktopAndroidDeviceMutationResult {
@@ -4741,6 +4796,43 @@ function normalizeAndroidDeviceRoleInput(value: unknown): AndroidDeviceRole | nu
 
 function androidPermissionsForRole(role: AndroidDeviceRole): AndroidPermission[] {
   return [...(role === "admin" ? ANDROID_ADMIN_PERMISSIONS : ANDROID_STAFF_PERMISSIONS)];
+}
+
+function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
+  return {
+    service_orders: false,
+    cashier: false,
+    rooms_tasks: false,
+    customer_reservation: false
+  };
+}
+
+function parseStoredAndroidPermissionGroups(value: unknown): AndroidPermissionGroups {
+  try {
+    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return emptyAndroidPermissionGroups();
+    }
+    const record = parsed as Record<string, unknown>;
+    const groups = emptyAndroidPermissionGroups();
+    for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
+      groups[groupId] = record[groupId] === true;
+    }
+    return groups;
+  } catch {
+    return emptyAndroidPermissionGroups();
+  }
+}
+
+function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPermissionGroups | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (ANDROID_PERMISSION_GROUP_IDS.some((groupId) => typeof record[groupId] !== "boolean")) {
+    return null;
+  }
+  return Object.fromEntries(ANDROID_PERMISSION_GROUP_IDS.map((groupId) => [groupId, record[groupId]])) as AndroidPermissionGroups;
 }
 
 function effectiveAndroidPermissions(role: AndroidDeviceRole, value: unknown): AndroidPermission[] {

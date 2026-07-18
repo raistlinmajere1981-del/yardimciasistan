@@ -35,7 +35,13 @@ import {
   UtensilsCrossed,
   X
 } from "lucide-react";
-import type { PublishedMenuCategory, PublishedMenuItem, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import type {
+  AndroidPermissionGroupId,
+  AndroidPermissionGroups,
+  PublishedMenuCategory,
+  PublishedMenuItem,
+  SyncedCustomerRequest
+} from "@yardimci-asistan/sync-core";
 import type {
   AiWorkspaceHistoryEntry,
   AiWorkspaceMode,
@@ -72,6 +78,18 @@ import {
 type SyncState = "idle" | "loading" | "success" | "error";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "yardimci-asistan.sidebar-collapsed";
+
+const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
+  id: AndroidPermissionGroupId;
+  label: string;
+  shortLabel: string;
+  description: string;
+}> = [
+  { id: "service_orders", label: "Servis / Sipariş", shortLabel: "Servis", description: "Masa, sipariş ve servis akışı" },
+  { id: "cashier", label: "Kasa / Hesap", shortLabel: "Kasa", description: "Ödendi / Kapat işlemi" },
+  { id: "rooms_tasks", label: "Oda / Günlük İşler", shortLabel: "Oda işleri", description: "Oda durumu ve günlük işler" },
+  { id: "customer_reservation", label: "Müşteri / Rezervasyon", shortLabel: "Müşteri / Rezervasyon", description: "Talep yanıtı ve rezervasyon onayı" }
+];
 
 const defaultAutomaticSyncStatus: AutomaticSyncStatus = {
   enabled: true,
@@ -609,7 +627,7 @@ function App() {
   const [androidPublishState, setAndroidPublishState] = useState<SyncState>("idle");
   const [androidPublishMessage, setAndroidPublishMessage] = useState("Android özeti henüz yayınlanmadı.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
-  const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri masaüstünden yönetilir.");
+  const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
   const modules = useMemo(
     () => ({
       rooms: setupData.modules.rooms,
@@ -855,6 +873,18 @@ function App() {
     void runAndroidDeviceMutation(
       role === "admin" ? "Telefon yönetici yapılıyor..." : "Telefon personel yapılıyor...",
       () => window.yardimciDesktop!.setAndroidDeviceRole(deviceId, role)
+    );
+  }
+
+  function handleSetAndroidDevicePermissionGroups(deviceId: string, groups: AndroidPermissionGroups) {
+    if (!window.yardimciDesktop) {
+      setAndroidDeviceState("error");
+      setAndroidDeviceMessage("Telefon yönetimi hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+    void runAndroidDeviceMutation(
+      "Telefon görev alanları güncelleniyor...",
+      () => window.yardimciDesktop!.setAndroidDevicePermissionGroups(deviceId, groups)
     );
   }
 
@@ -1928,6 +1958,7 @@ function App() {
             onCreateBackup={handleCreateManualBackup}
             onPublishAndroid={handlePublishAndroidSnapshot}
             onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
+            onSetAndroidDevicePermissionGroups={handleSetAndroidDevicePermissionGroups}
             onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
             onResetAndroidDevicePermissions={handleResetAndroidDevicePermissions}
             onRevokeAndroidDevice={handleRevokeAndroidDevice}
@@ -2223,6 +2254,7 @@ interface SetupWizardProps {
   onCreateBackup?: () => void;
   onPublishAndroid?: () => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
+  onSetAndroidDevicePermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
   onResetAndroidDevicePermissions?: (deviceId: string) => void;
   onRevokeAndroidDevice?: (device: DesktopAndroidDevice) => void;
@@ -2244,7 +2276,7 @@ function SetupWizard({
   androidPublishState = "idle",
   androidPublishMessage = "Telefon özeti henüz yayınlanmadı.",
   androidDeviceState = "idle",
-  androidDeviceMessage = "Telefon rolleri masaüstünden yönetilir.",
+  androidDeviceMessage = "Telefon rolleri ve görev alanları masaüstünden yönetilir.",
   aiConnectionTestState,
   aiConnectionTestMessage,
   aiModelOptions,
@@ -2253,6 +2285,7 @@ function SetupWizard({
   onCreateBackup,
   onPublishAndroid,
   onSetAndroidDeviceRole,
+  onSetAndroidDevicePermissionGroups,
   onSetAndroidDeviceActive,
   onResetAndroidDevicePermissions,
   onRevokeAndroidDevice,
@@ -2449,6 +2482,7 @@ function SetupWizard({
             state={androidDeviceState}
             message={androidDeviceMessage}
             onSetRole={onSetAndroidDeviceRole}
+            onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
             onSetActive={onSetAndroidDeviceActive}
             onResetPermissions={onResetAndroidDevicePermissions}
             onRevoke={onRevokeAndroidDevice}
@@ -2622,6 +2656,7 @@ interface AndroidDevicesSectionProps {
   state: SyncState;
   message: string;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
+  onSetPermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetActive?: (deviceId: string, active: boolean) => void;
   onResetPermissions?: (deviceId: string) => void;
   onRevoke?: (device: DesktopAndroidDevice) => void;
@@ -2632,6 +2667,7 @@ function AndroidDevicesSection({
   state,
   message,
   onSetRole,
+  onSetPermissionGroups,
   onSetActive,
   onResetPermissions,
   onRevoke
@@ -2644,7 +2680,7 @@ function AndroidDevicesSection({
     const shortId = compactAndroidDeviceId(device.deviceId);
     const deviceName = device.deviceName || "Android Telefon";
     const roleLabel = device.role === "admin" ? "Yönetici" : "Personel";
-    if (!window.confirm(`${deviceName} (${shortId}) ${roleLabel} rolü ve kayıtlı yetkileriyle geri yüklensin mi?`)) {
+    if (!window.confirm(`${deviceName} (${shortId}) ${roleLabel} rolü ve kayıtlı görev alanlarıyla geri yüklensin mi?`)) {
       return;
     }
     onSetActive(device.deviceId, true);
@@ -2658,7 +2694,7 @@ function AndroidDevicesSection({
         </div>
         <span>{availableDevices.length} cihaz</span>
       </div>
-      <p className="setup-section-description">Rol ve işlem yetkileri yalnız bu bilgisayardan değiştirilebilir. Kaldırılan cihazlar ana listeden çıkarılır ve erişimleri kapalı kalır.</p>
+      <p className="setup-section-description">Rol ve görev alanları yalnız bu bilgisayardan değiştirilebilir. Kaldırılan cihazlar ana listeden çıkarılır ve erişimleri kapalı kalır.</p>
       {availableDevices.length === 0 ? (
         <div className="android-devices-empty">
           <Smartphone size={22} aria-hidden="true" />
@@ -2670,7 +2706,6 @@ function AndroidDevicesSection({
       ) : (
         <div className="android-device-list">
           {availableDevices.map((device) => {
-            const canClosePaid = device.permissions.includes("table_order.close_paid");
             const shortId = compactAndroidDeviceId(device.deviceId);
             return (
               <article className={`android-device-card${device.isActive ? "" : " is-inactive"}`} key={device.deviceId}>
@@ -2688,8 +2723,43 @@ function AndroidDevicesSection({
                 <dl className="android-device-details">
                   <div><dt>Son bağlantı</dt><dd>{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : "Henüz yok"}</dd></div>
                   <div><dt>Uygulama</dt><dd>{device.appVersion || "Sürüm bilinmiyor"}</dd></div>
-                  <div><dt>Yetkiler</dt><dd>{device.permissions.length} izin · {canClosePaid ? "Hesap kapatabilir" : "Hesap kapatamaz"}</dd></div>
+                  <div><dt>Görev özeti</dt><dd>{androidDevicePermissionSummary(device)}</dd></div>
                 </dl>
+                {device.role === "admin" ? (
+                  <div className="android-device-all-permissions">
+                    <ShieldCheck size={18} aria-hidden="true" />
+                    <div>
+                      <strong>Tüm yetkiler açık</strong>
+                      <span>Yönetici cihaz bütün görev alanlarını kullanabilir.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <fieldset className="android-device-permission-groups" disabled={busy}>
+                    <legend>Görev alanları</legend>
+                    <div className="android-device-permission-grid">
+                      {ANDROID_PERMISSION_GROUP_OPTIONS.map((group) => {
+                        const checked = Boolean(device.permissionGroups?.[group.id]);
+                        return (
+                          <label className={`android-permission-group${checked ? " is-selected" : ""}`} key={group.id}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => onSetPermissionGroups?.(
+                                device.deviceId,
+                                androidPermissionGroupsWith(device, group.id, event.target.checked)
+                              )}
+                              disabled={busy || !onSetPermissionGroups}
+                            />
+                            <span>
+                              <strong>{group.label}</strong>
+                              <small>{group.description}</small>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                )}
                 <div className="android-device-actions">
                   <button className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "admin")} disabled={busy || device.role === "admin"}>
                     <ShieldCheck size={15} aria-hidden="true" /> Yönetici Yap
@@ -2745,6 +2815,30 @@ function compactAndroidDeviceId(deviceId: string): string {
   return deviceId.length > 22
     ? `${deviceId.slice(0, 12)}…${deviceId.slice(-6)}`
     : deviceId;
+}
+
+function androidPermissionGroupsWith(
+  device: DesktopAndroidDevice,
+  changedGroupId: AndroidPermissionGroupId,
+  enabled: boolean
+): AndroidPermissionGroups {
+  return Object.fromEntries(ANDROID_PERMISSION_GROUP_OPTIONS.map((group) => [
+    group.id,
+    group.id === changedGroupId ? enabled : Boolean(device.permissionGroups?.[group.id])
+  ])) as AndroidPermissionGroups;
+}
+
+function androidDevicePermissionSummary(device: DesktopAndroidDevice): string {
+  if (!device.isActive) {
+    return "Yetkisiz / Pasif";
+  }
+  if (device.role === "admin") {
+    return "Tüm yetkiler";
+  }
+  const selected = ANDROID_PERMISSION_GROUP_OPTIONS
+    .filter((group) => device.permissionGroups?.[group.id])
+    .map((group) => group.shortLabel);
+  return selected.length > 0 ? selected.join(" + ") : "Görev alanı seçilmedi";
 }
 
 interface AiWorkspaceProps {

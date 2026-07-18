@@ -27,6 +27,17 @@ Sunucu revision'ı değişmediyse tam snapshot indirilmez. Son başarılı JSON 
 yenilemek için en az 15 dakikalık periyotta çalışır; kesin zaman Android'in pil ve ağ
 politikasına bağlıdır.
 
+Telefon kimliği normal APK güncellemelerinde uygulamanın kalıcı ayarlarında korunur.
+Bu ayar henüz yoksa kimlik, Android'in uygulama/imza/cihaz kapsamlı `ANDROID_ID`
+değerinin tek yönlü özetinden üretilir. Bu sürümle oluşturulan kararlı kimlikten sonra
+aynı paket ve aynı imzalama anahtarıyla yapılan güncelleme, veri temizleme veya yeniden
+kurulum aynı fiziksel telefon için yeni bir masaüstü kaydı oluşturmaz. Eski rastgele
+kimliğe sahip kurulum normal APK güncellemesinde mevcut kaydını korur; yalnız uygulama
+verisi ayrıca silinirse kararlı kimliğe bir kez geçer. Fabrika ayarları, Android
+kullanıcısının değişmesi ya da APK imzalama anahtarının değişmesi yeni cihaz kabul
+edilir. Dağıtım APK'larının imzalama anahtarını yedekleyin ve sonraki sürümlerde mutlaka
+aynı anahtarı kullanın.
+
 ## Veri Akışı
 
 Android SQLite'a veya PC'ye doğrudan bağlanmaz:
@@ -75,9 +86,18 @@ npm run configure:android:connection
 
 Komut `apps/android-app/connection.local.json` dosyasını `0600` izinle oluşturur.
 Dosya git tarafından yok sayılır; sonraki derlemeler URL ve anahtarı APK içine sabit
-varsayılan olarak gömer. İlk açılışta bu değerler yerel ayarlara alınır, mevcut kullanıcı
-ayarı varsa üzerine yazılmaz ve normal APK güncellemelerinde korunur. Yetkili cihazlar
-gerekirse Ayarlar ekranından farklı bir bağlantıya geçebilir.
+olarak gömer. Tasarım süresince hem URL hem anahtar gömülüyse APK `embedded connection
+locked` modunda üretilir. Bu mod her normal uygulama açılışında gömülü değerleri yeniden
+uygular; eski geliştirme adresleri ve normal APK güncellemelerinden kalan ayarlar bağlantıyı
+değiştiremez. Ayarlar ekranı bağlantının APK içinde hazır olduğunu salt okunur gösterir.
+ADB smoke testleri açıkça işaretlenmiş geçici debug bağlantısıyla çalışır ve test sonunda
+gömülü bağlantıyı geri yükler. UI testi temiz başlangıç hazırlarken uygulama önbelleğini
+ve test verilerini sıfırlar ancak kalıcı telefon kimliğini korur. Test kurucusu imza
+uyumsuzluğu görürse uygulamayı otomatik kaldırmaz; veri kaybını önlemek için hata verir.
+
+Web'e dağıtılacak son APK hazırlanırken `connection.local.json` kaldırılmalı, bağlantı
+ortam değişkenleri temizlenmeli ve APK yeniden üretilmelidir. Build çıktısında
+`android-connection-mode: editable connection` görülmeden genel dağıtım yapılmamalıdır.
 
 APK içine gömülen bir anahtar tersine mühendislikle çıkarılabilir. APK işletme dışına
 dağıtılırsa hosting anahtarını döndürün ve yeni APK yayınlayın.

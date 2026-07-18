@@ -10,14 +10,8 @@ const packageName = "com.yardimciasistan.android";
 const activityName = ".MainActivity";
 const syncSecret = "change-this-secret";
 const demoSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
-const staffPermissions = [
-  "customer.view",
-  "reservation.view",
-  "room.view",
-  "room.update_status",
-  "daily_task.view",
-  "daily_task.complete",
-  "daily_task.reopen",
+const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "r", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
+const serviceOrderPermissions = [
   "table.view",
   "table.update_status",
   "table_order.view",
@@ -30,6 +24,27 @@ const staffPermissions = [
   "table_order.set_payment_waiting",
   "menu.view"
 ];
+const roomsTasksPermissions = [
+  "room.view",
+  "room.update_status",
+  "daily_task.view",
+  "daily_task.complete",
+  "daily_task.reopen"
+];
+const cashierPermissions = [
+  "table.view",
+  "table_order.view",
+  "table_order.set_payment_waiting",
+  "table_order.close_paid"
+];
+const customerReservationPermissions = [
+  "customer.view",
+  "customer.respond",
+  "customer.mark_answered",
+  "reservation.view",
+  "reservation.approve"
+];
+const staffPermissions = [...serviceOrderPermissions, ...roomsTasksPermissions];
 const adminPermissions = [
   "customer.view",
   "customer.respond",
@@ -65,6 +80,8 @@ const adminPermissions = [
   "android_devices.manage"
 ];
 let snapshotRevision = 100;
+let uiTestBaseUrl = "";
+let deviceIdBeforeUiReset = "";
 
 const options = parseArgs(process.argv.slice(2));
 let phoneTest = null;
@@ -87,6 +104,7 @@ async function main() {
   phoneTest = startPhoneTest();
   await waitForReady(phoneTest, options.readyTimeoutMs);
   const baseUrl = getPhoneTestBaseUrl(phoneTest.output);
+  uiTestBaseUrl = baseUrl;
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
   await waitForUiText("2 oda içinde", 12000);
@@ -95,10 +113,13 @@ async function main() {
 
   let topXml = dumpUi("top.xml");
   captureScreenshot("top.png");
-  assertContains(topXml, ["Bugün", "GÜNLÜK OPERASYON", "Yeni talepler", "Pansiyon", "Restoran", "Mesajlar"]);
-  assertNotContains(topXml, ["Canlı veri çekiliyor", "Canlı veri alındı", "Veriler zaten güncel", "Son yayın:"]);
+  assertContains(topXml, ["Bugün", "GÜNLÜK OPERASYON", "Pansiyon", "Restoran"]);
+  assertNotContains(topXml, ["Yeni talepler", 'text="Müşteri"', 'text="Mesajlar"', "Canlı veri çekiliyor", "Canlı veri alındı", "Veriler zaten güncel", "Son yayın:"]);
 
   const deviceId = readDeviceId();
+  if (deviceIdBeforeUiReset) {
+    assert.equal(deviceId, deviceIdBeforeUiReset, "UI testi hazırlanırken telefon kimliği değişti.");
+  }
   for (let index = 0; index < 2; index += 1) {
     swipe(360, 1080, 360, 360, 400);
     await delay(300);
@@ -117,38 +138,35 @@ async function main() {
 
   topXml = dumpUi("staff-top.xml");
   captureScreenshot("staff-top.png");
-  assertContains(topXml, ["Personel", "Boş odalar", "Hesap bekleyen"]);
-  assertNotContains(topXml, ["Ayarlar", "Yenile", syncSecret]);
+  assertContains(topXml, ["Personel", "Boş odalar", "Hesap bekleyen", "Pansiyon", "Restoran"]);
+  assertNotContains(topXml, ["Ayarlar", "Yenile", 'text="Müşteri"', 'text="Mesajlar"', syncSecret]);
 
-  await publishMissingDeviceProfile(baseUrl);
-  relaunchApp();
-  await waitForUiCondition(
-    (xml) => xml.includes("Personel") && !xml.includes('text="Ayarlar"'),
-    12000,
-    "Daha önce çözülmüş personel profili eksik snapshot sonrasında korunmadı."
-  );
-  assert.equal(readPreferenceValue("device_id"), deviceId);
-  const originalWebModuleUrl = readPreferenceValue("web_module_url");
-  const originalSyncSecret = readPreferenceValue("sync_secret");
   relaunchAppWithConnectionExtras("https://override.invalid/device-hijack", "override-secret-not-allowed");
   await waitForUiCondition(
     (xml) => xml.includes("Personel") && !xml.includes('text="Ayarlar"'),
     12000,
     "Personel profili bağlantı extra denemesinden sonra korunmadı."
   );
-  assert.equal(readPreferenceValue("web_module_url"), originalWebModuleUrl);
-  assert.equal(readPreferenceValue("sync_secret"), originalSyncSecret);
+  assert.notEqual(readPreferenceValue("web_module_url"), "https://override.invalid/device-hijack");
+  assert.notEqual(readPreferenceValue("sync_secret"), "override-secret-not-allowed");
+  await publishDeviceRole(baseUrl, deviceId, "staff");
+  relaunchApp();
+  await waitForUiCondition(
+    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && !xml.includes('text="Ayarlar"'),
+    12000,
+    "Geçici test bağlantısı yeniden uygulanamadı."
+  );
+  await publishMissingDeviceProfile(baseUrl);
+  relaunchApp();
+  await waitForUiCondition(
+    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && !xml.includes('text="Ayarlar"'),
+    12000,
+    "Daha önce çözülmüş personel profili eksik snapshot sonrasında korunmadı."
+  );
+  assert.equal(readPreferenceValue("device_id"), deviceId);
 
   topXml = dumpUi("staff-after-profile-gap.xml");
-  tap(centerOf(findClickableBoundsByText(topXml, "Müşteri")));
-  await delay(400);
-  let staffCustomerXml = dumpUi("staff-customers.xml");
-  tap(centerOf(findClickableBoundsByText(staffCustomerXml, "Müşteriler")));
-  await delay(400);
-  staffCustomerXml = dumpUi("staff-customer-list.xml");
-  assertNotContains(staffCustomerXml, ["WhatsApp"]);
-
-  tap(centerOf(findClickableBoundsByText(staffCustomerXml, "Pansiyon")));
+  tap(centerOf(findClickableBoundsByText(topXml, "Pansiyon")));
   await delay(400);
   let staffPensionCombinedXml = dumpUi("staff-pension.xml");
   for (let index = 0; index < 2; index += 1) {
@@ -156,7 +174,8 @@ async function main() {
     await delay(350);
     staffPensionCombinedXml += dumpUi(`staff-pension-scrolled-${index}.xml`);
   }
-  assertNotContains(staffPensionCombinedXml, ["WhatsApp"]);
+  assertContains(staffPensionCombinedXml, ["Odalar", "Temizlik", "Günlük işler", "Tamamla"]);
+  assertNotContains(staffPensionCombinedXml, ["WhatsApp", "Reddet", "Rezervasyonu İptal Et"]);
 
   const staffPensionCurrentXml = dumpUi("staff-pension-current.xml");
   tap(centerOf(findClickableBoundsByText(staffPensionCurrentXml, "Restoran")));
@@ -185,6 +204,89 @@ async function main() {
   assertNotContains(staffOrderXml, ["Ödendi / Kapat"]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
 
+  await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: serviceOrderPermissions });
+  relaunchApp();
+  const serviceOnlyXml = await waitForUiCondition(
+    (xml) => xml.includes("Personel") && xml.includes('text="Restoran"') && !xml.includes('text="Pansiyon"'),
+    12000,
+    "Oda / Günlük İşler kapatıldığında pansiyon aksiyonları gizlenmedi."
+  );
+  assertNotContains(serviceOnlyXml, ['text="Pansiyon"', 'text="Müşteri"', 'text="Mesajlar"', "Boş odalar"]);
+
+  await publishDeviceRole(baseUrl, deviceId, "staff", {
+    permissions: [...new Set([...serviceOrderPermissions, ...cashierPermissions])]
+  });
+  relaunchApp();
+  await waitForUiCondition(
+    (xml) => xml.includes("Personel") && xml.includes('text="Restoran"'),
+    12000,
+    "Kasa / Hesap profili Android arayüzüne uygulanmadı."
+  );
+  scrollToTop();
+  let cashierTopXml = dumpUi("cashier-top.xml");
+  tap(centerOf(findClickableBoundsByText(cashierTopXml, "Restoran")));
+  await delay(500);
+  let cashierRestaurantXml = dumpUi("cashier-restaurant.xml");
+  for (let index = 0; index < 4; index += 1) {
+    const bounds = findBoundsByTextIfPresent(cashierRestaurantXml, "Salon Masası 1");
+    if (bounds && bounds.top >= 100 && bounds.bottom <= 1160) {
+      break;
+    }
+    swipe(360, 1080, 360, 380, 420);
+    await delay(400);
+    cashierRestaurantXml = dumpUi("cashier-restaurant-scrolled.xml");
+  }
+  tap(centerOf(findBoundsByText(cashierRestaurantXml, "Siparişi Aç")));
+  await delay(500);
+  let cashierOrderXml = dumpUi("cashier-table-order.xml");
+  for (let index = 0; index < 6 && !cashierOrderXml.includes("Ödendi / Kapat"); index += 1) {
+    swipe(360, 1080, 360, 300, 420);
+    await delay(350);
+    cashierOrderXml = dumpUi("cashier-table-order-scrolled.xml");
+  }
+  assertContains(cashierOrderXml, ["Ödendi / Kapat"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+
+  await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: customerReservationPermissions });
+  relaunchApp();
+  const customerPackageTopXml = await waitForUiCondition(
+    (xml) => xml.includes("Personel")
+      && xml.includes('text="Müşteri"')
+      && xml.includes('text="Pansiyon"')
+      && xml.includes('text="Mesajlar"')
+      && !xml.includes('text="Restoran"'),
+    12000,
+    "Müşteri / Rezervasyon profili Android arayüzüne uygulanmadı."
+  );
+  assertNotContains(customerPackageTopXml, ['text="Restoran"', "Boş odalar", "Boş masalar"]);
+  tap(centerOf(findClickableBoundsByText(customerPackageTopXml, "Müşteri")));
+  await delay(500);
+  const customerPackageListXml = dumpUi("customer-package-list.xml");
+  assertContains(customerPackageListXml, ["MÜŞTERİ İŞLERİ", "Yeni Talepler", "Demo Aile"]);
+  tap(centerOf(findBoundsByText(customerPackageListXml, "Demo Aile")));
+  await delay(500);
+  let customerPackageDetailXml = dumpUi("customer-package-detail.xml");
+  for (let index = 0; index < 4 && !customerPackageDetailXml.includes("Cevaplandı"); index += 1) {
+    swipe(360, 1080, 360, 330, 420);
+    await delay(350);
+    customerPackageDetailXml = dumpUi("customer-package-detail-scrolled.xml");
+  }
+  assertContains(customerPackageDetailXml, ["Ara", "WhatsApp", "Onayla", "Cevaplandı"]);
+  assertNotContains(customerPackageDetailXml, ["Reddet", "Rezervasyona Çevir"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await delay(300);
+  const customerPackageAfterDetailXml = dumpUi("customer-package-after-detail.xml");
+  tap(centerOf(findClickableBoundsByText(customerPackageAfterDetailXml, "Pansiyon")));
+  await delay(500);
+  let customerPackagePensionXml = dumpUi("customer-package-pension.xml");
+  for (let index = 0; index < 2 && !customerPackagePensionXml.includes("Onayla"); index += 1) {
+    swipe(360, 1080, 360, 360, 420);
+    await delay(350);
+    customerPackagePensionXml += dumpUi(`customer-package-pension-scrolled-${index}.xml`);
+  }
+  assertContains(customerPackagePensionXml, ["Rezervasyonlar", "Onayla"]);
+  assertNotContains(customerPackagePensionXml, ["Reddet", "Rezervasyonu İptal Et", "Odalar", "Günlük işler"]);
+
   await publishDeviceRole(baseUrl, deviceId, "staff", { isActive: false });
   relaunchApp();
   await waitForUiText("Cihaz Pasif", 12000);
@@ -211,7 +313,10 @@ async function main() {
   tap(centerOf(findBoundsByText(settingsViewerTopXml, "Ayarlar")));
   await delay(400);
   const settingsViewerXml = dumpUi("settings-viewer.xml");
-  assertContains(settingsViewerXml, ["Bağlantı ayarları salt okunur", "Bağlantı özeti"]);
+  assertContains(settingsViewerXml, [
+    embeddedConnectionIsLocked() ? "Bağlantı bilgileri APK içinde hazır" : "Bağlantı ayarları salt okunur",
+    "Bağlantı özeti"
+  ]);
   assertNotContains(settingsViewerXml, [syncSecret, baseUrl, "Canlı Veriyi Çek"]);
 
   await publishDeviceRole(baseUrl, deviceId, "admin");
@@ -301,6 +406,7 @@ async function main() {
   captureScreenshot("messages.png");
   assertContains(messagesXml, ["MESAJLAR", "Hazır cevaplar", "Hazır mesaj"]);
 
+  await restoreEmbeddedConnectionAfterTest();
   console.log("android-device-ui-smoke-ok");
   cleanup();
   await waitForPhoneTestExit();
@@ -308,7 +414,7 @@ async function main() {
 
 function parseArgs(args) {
   const parsed = {
-    holdMs: 150000,
+    holdMs: 300000,
     readyTimeoutMs: 45000,
     settleMs: 1800,
     noBuild: false
@@ -459,12 +565,12 @@ function swipe(x1, y1, x2, y2, durationMs) {
 }
 
 function prepareAppForUi(baseUrl) {
+  deviceIdBeforeUiReset = readPreferenceValueIfPresent("device_id");
   adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"], { allowFailure: true });
   adb(["shell", "wm", "dismiss-keyguard"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_MENU"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
-  adb(["shell", "pm", "clear", packageName]);
   adb([
     "shell",
     "am",
@@ -476,13 +582,37 @@ function prepareAppForUi(baseUrl) {
     baseUrl,
     "--es",
     "ya_sync_secret",
-    syncSecret
+    syncSecret,
+    "--ez",
+    "ya_allow_debug_connection_override",
+    "true",
+    "--ez",
+    "ya_reset_debug_app_state",
+    "true"
   ]);
 }
 
 function relaunchApp() {
+  if (!uiTestBaseUrl) {
+    throw new Error("Android UI test bağlantısı hazırlanmadı.");
+  }
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
-  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`]);
+  adb([
+    "shell",
+    "am",
+    "start",
+    "-n",
+    `${packageName}/${activityName}`,
+    "--es",
+    "ya_web_module_url",
+    uiTestBaseUrl,
+    "--es",
+    "ya_sync_secret",
+    syncSecret,
+    "--ez",
+    "ya_allow_debug_connection_override",
+    "true"
+  ]);
 }
 
 function relaunchAppWithConnectionExtras(webModuleUrl, secret) {
@@ -506,6 +636,24 @@ function readDeviceId() {
   return readPreferenceValue("device_id");
 }
 
+async function restoreEmbeddedConnectionAfterTest() {
+  if (!embeddedConnectionIsLocked()) {
+    return;
+  }
+  adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
+  adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`]);
+  await delay(800);
+  const restoredUrl = readPreferenceValue("web_module_url");
+  assert.notEqual(restoredUrl, uiTestBaseUrl);
+  assert.equal(new URL(restoredUrl).protocol, "https:");
+  adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
+}
+
+function embeddedConnectionIsLocked() {
+  return existsSync(generatedConnectionDefaultsFile)
+      && readFileSync(generatedConnectionDefaultsFile, "utf8").includes("LOCK_EMBEDDED_CONNECTION = true");
+}
+
 function readPreferenceValue(name) {
   const result = adb([
     "shell",
@@ -520,6 +668,22 @@ function readPreferenceValue(name) {
     throw new Error(`Android tercih değeri okunamadı: ${name}`);
   }
   return match[1].trim();
+}
+
+function readPreferenceValueIfPresent(name) {
+  const result = adb([
+    "shell",
+    "run-as",
+    packageName,
+    "cat",
+    "shared_prefs/yardimci_asistan_android.xml"
+  ], { capture: true, allowFailure: true });
+  if (result.status !== 0) {
+    return "";
+  }
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = result.stdout.match(new RegExp(`<string name="${escapedName}">([^<]+)<\\/string>`));
+  return match ? match[1].trim() : "";
 }
 
 async function publishDeviceRole(baseUrl, deviceId, role, options = {}) {

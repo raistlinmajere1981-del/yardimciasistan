@@ -174,26 +174,69 @@ export const ANDROID_PERMISSIONS = [
 
 export type AndroidPermission = typeof ANDROID_PERMISSIONS[number];
 
-export const ANDROID_STAFF_PERMISSIONS: readonly AndroidPermission[] = [
-  "customer.view",
-  "reservation.view",
-  "room.view",
-  "room.update_status",
-  "daily_task.view",
-  "daily_task.complete",
-  "daily_task.reopen",
-  "table.view",
-  "table.update_status",
-  "table_order.view",
-  "table_order.open",
-  "table_order.add_item",
-  "table_order.update_item",
-  "table_order.remove_item",
-  "table_order.set_preparing",
-  "table_order.set_served",
-  "table_order.set_payment_waiting",
-  "menu.view"
-];
+export const ANDROID_PERMISSION_GROUP_IDS = [
+  "service_orders",
+  "cashier",
+  "rooms_tasks",
+  "customer_reservation"
+] as const;
+
+export type AndroidPermissionGroupId = typeof ANDROID_PERMISSION_GROUP_IDS[number];
+export type AndroidPermissionGroups = Record<AndroidPermissionGroupId, boolean>;
+
+export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermissionGroupId, readonly AndroidPermission[]>> = {
+  service_orders: [
+    "table.view",
+    "table.update_status",
+    "table_order.view",
+    "table_order.open",
+    "table_order.add_item",
+    "table_order.update_item",
+    "table_order.remove_item",
+    "table_order.set_preparing",
+    "table_order.set_served",
+    "table_order.set_payment_waiting",
+    "menu.view"
+  ],
+  cashier: [
+    "table.view",
+    "table_order.view",
+    "table_order.set_payment_waiting",
+    "table_order.close_paid"
+  ],
+  rooms_tasks: [
+    "room.view",
+    "room.update_status",
+    "daily_task.view",
+    "daily_task.complete",
+    "daily_task.reopen"
+  ],
+  customer_reservation: [
+    "customer.view",
+    "customer.respond",
+    "customer.mark_answered",
+    "reservation.view",
+    "reservation.approve"
+  ]
+};
+
+export const ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS: Readonly<AndroidPermissionGroups> = {
+  service_orders: true,
+  cashier: false,
+  rooms_tasks: true,
+  customer_reservation: false
+};
+
+export function androidPermissionsForGroups(groups: AndroidPermissionGroups): AndroidPermission[] {
+  const permissions = ANDROID_PERMISSION_GROUP_IDS.flatMap((groupId) =>
+    groups[groupId] ? ANDROID_PERMISSION_GROUP_PERMISSIONS[groupId] : []
+  );
+  return [...new Set(permissions)];
+}
+
+export const ANDROID_STAFF_PERMISSIONS: readonly AndroidPermission[] = androidPermissionsForGroups({
+  ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS
+});
 
 export const ANDROID_ADMIN_PERMISSIONS: readonly AndroidPermission[] = ANDROID_PERMISSIONS;
 

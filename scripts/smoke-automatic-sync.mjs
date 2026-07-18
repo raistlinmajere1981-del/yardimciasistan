@@ -147,7 +147,15 @@ try {
   assert.equal(staffDevice.appVersion, "0.1.0-smoke");
   assert.equal(staffDevice.role, "staff");
   assert.equal(staffDevice.isActive, true);
+  assert.deepEqual(staffDevice.permissionGroups, {
+    service_orders: true,
+    cashier: false,
+    rooms_tasks: true,
+    customer_reservation: false
+  });
   assert.equal(staffDevice.permissions.includes("table_order.open"), true);
+  assert.equal(staffDevice.permissions.includes("room.update_status"), true);
+  assert.equal(staffDevice.permissions.includes("customer.view"), false);
   assert.equal(staffDevice.permissions.includes("table_order.close_paid"), false);
   const runtime = database.getSyncRuntimeStatus();
   assert.ok(runtime.requestCursor > 0);
@@ -277,15 +285,46 @@ try {
   assert.equal(forbiddenCloseResult.status, "failed");
   assert.equal(forbiddenCloseResult.error_message, "Bu cihazın hesap kapatma yetkisi yok.");
 
+  const cashierResult = database.setAndroidDevicePermissionGroups("android-auto-smoke", {
+    service_orders: true,
+    cashier: true,
+    rooms_tasks: true,
+    customer_reservation: false
+  });
+  assert.equal(cashierResult.ok, true);
+  const cashierProfilePublishCycle = await coordinator.runNow();
+  assert.equal(cashierProfilePublishCycle.ok, true, cashierProfilePublishCycle.message);
+  assert.equal(cashierProfilePublishCycle.publishedJobs, 1);
+  const cashierSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
+  const cashierSummary = await cashierSummaryResponse.json();
+  assert.equal(cashierSummary.androidPermissions["android-auto-smoke"].role, "staff");
+  assert.equal(cashierSummary.androidPermissions["android-auto-smoke"].permissions.includes("table_order.close_paid"), true);
+
+  const cashierCloseActionId = "android_permission_close_cashier_0001";
+  await assertQueued(await enqueueAndroidAction(cashierCloseActionId, "table_order_close_paid", {
+    order_id: order.id,
+    table_id: table.id,
+    expected_updated_at: order.updatedAt
+  }));
+  const cashierCloseCycle = await coordinator.runNow();
+  assert.equal(cashierCloseCycle.appliedActions, 1);
+  assert.equal(cashierCloseCycle.failedActions, 0);
+  assert.equal(database.getActiveTableOrder(table.id), null);
+
   const promoteResult = database.setAndroidDeviceRole("android-auto-smoke", "admin");
   assert.equal(promoteResult.ok, true);
-  const profilePublishCycle = await coordinator.runNow();
-  assert.equal(profilePublishCycle.ok, true, profilePublishCycle.message);
-  assert.equal(profilePublishCycle.publishedJobs, 1);
+  const adminProfilePublishCycle = await coordinator.runNow();
+  assert.equal(adminProfilePublishCycle.ok, true, adminProfilePublishCycle.message);
+  assert.equal(adminProfilePublishCycle.publishedJobs, 1);
   const adminSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
   const adminSummary = await adminSummaryResponse.json();
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].role, "admin");
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("table_order.close_paid"), true);
+
+  const adminOrderResult = database.openTableOrder(table.id);
+  assert.equal(adminOrderResult.ok, true);
+  order = database.getActiveTableOrder(table.id);
+  assert.ok(order);
 
   const adminCloseActionId = "android_permission_close_admin_0001";
   await assertQueued(await enqueueAndroidAction(adminCloseActionId, "table_order_close_paid", {

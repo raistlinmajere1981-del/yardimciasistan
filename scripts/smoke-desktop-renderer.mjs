@@ -52,8 +52,18 @@ try {
           ? [...new Set([...device.permissions, "table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"])]
           : device.permissions.filter((permission) => !["table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"].includes(permission))
       }), role === "admin" ? "Telefon yönetici yapıldı." : "Telefon personel yapıldı."),
+      setAndroidDevicePermissionGroups: async (deviceId, permissionGroups) => mutateDevice(deviceId, (device) => ({
+        ...device,
+        permissionGroups,
+        permissions: permissionGroups.cashier
+          ? [...new Set([...device.permissions, "table_order.close_paid"])]
+          : device.permissions.filter((permission) => permission !== "table_order.close_paid")
+      }), "Telefon görev alanları güncellendi."),
       setAndroidDeviceActive: async (deviceId, active) => mutateDevice(deviceId, (device) => ({ ...device, isActive: active, revokedAt: active ? "" : device.revokedAt }), active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi."),
-      resetAndroidDevicePermissions: async (deviceId) => mutateDevice(deviceId, (device) => device, "Telefon yetkileri rol varsayılanına döndürüldü."),
+      resetAndroidDevicePermissions: async (deviceId) => mutateDevice(deviceId, (device) => ({
+        ...device,
+        permissionGroups: { service_orders: true, cashier: false, rooms_tasks: true, customer_reservation: false }
+      }), "Telefon görev alanları varsayılana döndürüldü."),
       revokeAndroidDevice: async (deviceId) => mutateDevice(deviceId, (device) => ({ ...device, isActive: false, revokedAt: new Date().toISOString() }), "Telefon kaldırıldı ve erişimi kapatıldı."),
       getAiWorkspaceHistory: async () => [],
       markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
@@ -74,12 +84,24 @@ try {
   await expect(androidDeviceSection.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText(/Hesap kapatamaz/)).toBeVisible();
+  await expect(androidDeviceSection.getByText("Servis + Oda işleri", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText(/izin ·|Hesap kapatamaz|table_order\.close_paid/)).toHaveCount(0);
+  const cashierGroup = androidDeviceSection.getByRole("checkbox", { name: /Kasa \/ Hesap/ });
+  await expect(cashierGroup).not.toBeChecked();
+  await cashierGroup.check();
+  await expect(androidDeviceSection.getByText("Servis + Kasa + Oda işleri", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Telefon görev alanları güncellendi.", { exact: true })).toBeVisible();
   await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
   await expect(androidDeviceSection.getByText("Yönetici", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText(/Hesap kapatabilir/)).toBeVisible();
+  await expect(androidDeviceSection.getByText("Tüm yetkiler açık", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("checkbox")).toHaveCount(0);
   await androidDeviceSection.getByRole("button", { name: "Personel Yap" }).click();
   await expect(androidDeviceSection.getByText("Telefon personel yapıldı.", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("checkbox", { name: /Kasa \/ Hesap/ })).toBeChecked();
+  await androidDeviceSection.getByRole("button", { name: "Yetkileri Sıfırla" }).click();
+  await expect(androidDeviceSection.getByText("Telefon görev alanları varsayılana döndürüldü.", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Servis + Oda işleri", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("checkbox", { name: /Kasa \/ Hesap/ })).not.toBeChecked();
   await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
   await expect(androidDeviceSection.getByText("Yönetici", { exact: true })).toBeVisible();
   page.once("dialog", async (dialog) => {
@@ -103,7 +125,7 @@ try {
   await removedDevices.getByRole("button", { name: /Smoke Personel Telefonu.*cihazını geri yükle/ }).click();
   await expect(androidDeviceSection.locator(".android-device-list").getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-device-list").getByText("Yönetici", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText(/Hesap kapatabilir/)).toBeVisible();
+  await expect(androidDeviceSection.getByText("Tüm yetkiler açık", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("1 cihaz", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-removed-devices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
@@ -1723,9 +1745,13 @@ function createDashboardFixture() {
         appVersion: "0.1.0-smoke",
         role: "staff",
         isActive: true,
+        permissionGroups: {
+          service_orders: true,
+          cashier: false,
+          rooms_tasks: true,
+          customer_reservation: false
+        },
         permissions: [
-          "customer.view",
-          "reservation.view",
           "room.view",
           "room.update_status",
           "daily_task.view",

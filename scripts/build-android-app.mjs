@@ -26,6 +26,7 @@ const unsignedApk = join(buildDir, "intermediates", "app-unsigned.apk");
 const alignedApk = join(buildDir, "intermediates", "app-aligned.apk");
 const dexDir = join(buildDir, "intermediates", "dex");
 const classDir = join(buildDir, "intermediates", "classes");
+const testClassDir = join(buildDir, "intermediates", "test-classes");
 const generatedJavaDir = join(buildDir, "generated", "source", "r");
 const outputDir = join(buildDir, "outputs", "apk", "debug");
 const outputApk = join(outputDir, "yardimci-asistan-debug.apk");
@@ -36,6 +37,7 @@ const productionWebModuleUrl = "https://yardimciasistan.alwaysdata.net/yardimci-
 rmSync(buildDir, { recursive: true, force: true });
 mkdirSync(join(buildDir, "intermediates"), { recursive: true });
 mkdirSync(classDir, { recursive: true });
+mkdirSync(testClassDir, { recursive: true });
 mkdirSync(dexDir, { recursive: true });
 mkdirSync(generatedJavaDir, { recursive: true });
 mkdirSync(outputDir, { recursive: true });
@@ -85,6 +87,28 @@ run("javac", [
   ...javaFiles
 ]);
 
+const javaTestFiles = collectFiles(join(appDir, "src", "test", "java"), ".java");
+if (javaTestFiles.length > 0) {
+  run("javac", [
+    "-encoding",
+    "UTF-8",
+    "-source",
+    "8",
+    "-target",
+    "8",
+    "-classpath",
+    classDir,
+    "-d",
+    testClassDir,
+    ...javaTestFiles
+  ]);
+  run("java", [
+    "-classpath",
+    `${classDir}${delimiter}${testClassDir}`,
+    "com.yardimciasistan.android.StableDeviceIdSmoke"
+  ]);
+}
+
 run(d8, [
   "--lib",
   androidJar,
@@ -127,6 +151,7 @@ console.log(packageLine);
 console.log(`android-sdk: ${sdkDir}`);
 console.log(`compile-sdk: android-${platform.api} build-tools-${buildTools.version}`);
 console.log(`android-connection-defaults: ${connectionDefaults.webModuleUrl} (${connectionDefaults.syncSecret ? "sync secret embedded" : "sync secret not configured"})`);
+console.log(`android-connection-mode: ${connectionDefaults.lockEmbeddedConnection ? "embedded connection locked" : "editable connection"}`);
 
 function generateConnectionDefaults() {
   let localConfig = {};
@@ -145,6 +170,7 @@ function generateConnectionDefaults() {
   if (syncSecret && syncSecret.length < 16) {
     throw new Error("Android varsayılan sync anahtarı en az 16 karakter olmalı.");
   }
+  const lockEmbeddedConnection = Boolean(webModuleUrl && syncSecret);
 
   const packageDir = join(generatedJavaDir, "com", "yardimciasistan", "android");
   mkdirSync(packageDir, { recursive: true });
@@ -154,13 +180,14 @@ function generateConnectionDefaults() {
     "final class ConnectionDefaults {",
     `  static final String WEB_MODULE_URL = ${javaString(webModuleUrl)};`,
     `  static final String SYNC_SECRET = ${javaString(syncSecret)};`,
+    `  static final boolean LOCK_EMBEDDED_CONNECTION = ${lockEmbeddedConnection};`,
     "",
     "  private ConnectionDefaults() {}",
     "}",
     ""
   ].join("\n"), { mode: 0o600 });
 
-  return { webModuleUrl, syncSecret };
+  return { webModuleUrl, syncSecret, lockEmbeddedConnection };
 }
 
 function firstNonEmpty(...values) {

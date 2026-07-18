@@ -681,7 +681,113 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.ok(automaticallyRegisteredDevice);
   assert.equal(automaticallyRegisteredDevice.role, "staff");
   assert.equal(automaticallyRegisteredDevice.isActive, true);
+  assert.deepEqual(automaticallyRegisteredDevice.permissionGroups, {
+    service_orders: true,
+    cashier: false,
+    rooms_tasks: true,
+    customer_reservation: false
+  });
+  assert.equal(automaticallyRegisteredDevice.permissions.includes("table_order.open"), true);
+  assert.equal(automaticallyRegisteredDevice.permissions.includes("room.update_status"), true);
+  assert.equal(automaticallyRegisteredDevice.permissions.includes("table_order.close_paid"), false);
+  assert.equal(automaticallyRegisteredDevice.permissions.includes("customer.view"), false);
   assert.equal(automaticallyRegisteredDevice.permissions.includes("customer.mark_answered"), false);
+
+  const packageTestOrder = database.openTableOrder("table_002");
+  assert.equal(packageTestOrder.ok, true);
+  const deniedStaffClose = database.applyAndroidAction(androidAction("android_action_package_close_denied_001", "table_order_close_paid", {
+    order_id: packageTestOrder.order.id
+  }));
+  assert.equal(deniedStaffClose.ok, false);
+  assert.match(deniedStaffClose.message, /hesap kapatma yetkisi yok/i);
+  assert.ok(database.getActiveTableOrder("table_002"));
+
+  const cashierGroups = {
+    service_orders: true,
+    cashier: true,
+    rooms_tasks: true,
+    customer_reservation: false
+  };
+  const cashierResult = database.setAndroidDevicePermissionGroups("android-smoke-device", cashierGroups);
+  assert.equal(cashierResult.ok, true);
+  assert.equal(cashierResult.devices.find((device) => device.deviceId === "android-smoke-device")?.permissions.includes("table_order.close_paid"), true);
+  const allowedStaffClose = database.applyAndroidAction(androidAction("android_action_package_close_allowed_001", "table_order_close_paid", {
+    order_id: packageTestOrder.order.id
+  }));
+  assert.equal(allowedStaffClose.ok, true);
+  assert.equal(database.getActiveTableOrder("table_002"), null);
+
+  const serviceOnlyGroups = {
+    service_orders: true,
+    cashier: false,
+    rooms_tasks: false,
+    customer_reservation: false
+  };
+  assert.equal(database.setAndroidDevicePermissionGroups("android-smoke-device", serviceOnlyGroups).ok, true);
+  const roomBeforePackageToggle = database.getDashboardData().rooms[0];
+  assert.ok(roomBeforePackageToggle);
+  const nextRoomStatus = roomBeforePackageToggle.status === "maintenance" ? "cleaning" : "maintenance";
+  const deniedRoomUpdate = database.applyAndroidAction(androidAction("android_action_package_room_denied_001", "room_status_update", {
+    room_id: roomBeforePackageToggle.id,
+    status: nextRoomStatus,
+    expected_updated_at: roomBeforePackageToggle.updatedAt
+  }));
+  assert.equal(deniedRoomUpdate.ok, false);
+  assert.match(deniedRoomUpdate.message, /yetkisi yok/i);
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === roomBeforePackageToggle.id)?.status, roomBeforePackageToggle.status);
+
+  const defaultGroups = {
+    service_orders: true,
+    cashier: false,
+    rooms_tasks: true,
+    customer_reservation: false
+  };
+  assert.equal(database.setAndroidDevicePermissionGroups("android-smoke-device", defaultGroups).ok, true);
+  const allowedRoomUpdate = database.applyAndroidAction(androidAction("android_action_package_room_allowed_001", "room_status_update", {
+    room_id: roomBeforePackageToggle.id,
+    status: nextRoomStatus,
+    expected_updated_at: roomBeforePackageToggle.updatedAt
+  }));
+  assert.equal(allowedRoomUpdate.ok, true);
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === roomBeforePackageToggle.id)?.status, nextRoomStatus);
+  const restoreRoomAfterPackageTest = database.updateRoomStatus({
+    roomId: roomBeforePackageToggle.id,
+    status: roomBeforePackageToggle.status
+  });
+  assert.equal(restoreRoomAfterPackageTest.ok, true);
+
+  const customerReservationGroups = { ...defaultGroups, customer_reservation: true };
+  const customerReservationResult = database.setAndroidDevicePermissionGroups("android-smoke-device", customerReservationGroups);
+  assert.equal(customerReservationResult.ok, true);
+  const customerReservationDevice = customerReservationResult.devices.find((device) => device.deviceId === "android-smoke-device");
+  assert.equal(customerReservationDevice?.permissions.includes("customer.respond"), true);
+  assert.equal(customerReservationDevice?.permissions.includes("customer.mark_answered"), true);
+  assert.equal(customerReservationDevice?.permissions.includes("reservation.approve"), true);
+  assert.equal(customerReservationDevice?.permissions.includes("customer.reject"), false);
+  assert.equal(customerReservationDevice?.permissions.includes("customer.convert_to_reservation"), false);
+  assert.equal(customerReservationDevice?.permissions.includes("reservation.reject"), false);
+  assert.equal(customerReservationDevice?.permissions.includes("reservation.cancel"), false);
+  const staffAnsweredRequest = database.applyAndroidAction(androidAction("android_action_package_request_answered_001", "customer_request_mark_answered", {
+    request_id: "request_smoke_customer_001",
+    expected_updated_at: requestBeforeAnswer.updated_at
+  }));
+  assert.equal(staffAnsweredRequest.ok, true);
+  const staffReopenedRequest = database.applyAndroidAction(androidAction("android_action_package_request_reopened_001", "customer_request_reopen", {
+    request_id: "request_smoke_customer_001"
+  }));
+  assert.equal(staffReopenedRequest.ok, true);
+  const deniedCriticalCustomerAction = database.applyAndroidAction(androidAction("android_action_package_request_reject_denied_001", "customer_request_reject", {
+    request_id: "request_smoke_customer_001"
+  }));
+  assert.equal(deniedCriticalCustomerAction.ok, false);
+  assert.match(deniedCriticalCustomerAction.message, /yetkisi yok/i);
+
+  const resetGroupsResult = database.resetAndroidDevicePermissions("android-smoke-device");
+  assert.equal(resetGroupsResult.ok, true);
+  const resetDevice = resetGroupsResult.devices.find((device) => device.deviceId === "android-smoke-device");
+  assert.deepEqual(resetDevice?.permissionGroups, defaultGroups);
+  assert.equal(resetDevice?.permissions.includes("table_order.close_paid"), false);
+  assert.equal(resetDevice?.permissions.includes("customer.view"), false);
 
   const malformedPermissionDb = new DatabaseSync(database.databasePath);
   try {
@@ -710,9 +816,11 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   );
   assert.equal(database.setAndroidDeviceRole("android-smoke-device", "admin").ok, true);
 
+  const requestBeforeAdminAnswer = database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001");
+  assert.ok(requestBeforeAdminAnswer);
   const answeredRequestResult = database.applyAndroidAction(androidAction("android_action_request_answered_001", "customer_request_mark_answered", {
     request_id: "request_smoke_customer_001",
-    expected_updated_at: requestBeforeAnswer.updated_at
+    expected_updated_at: requestBeforeAdminAnswer.updated_at
   }));
   assert.equal(answeredRequestResult.ok, true);
   assert.equal(database.getDashboardData().requests.find((request) => request.id === "request_smoke_customer_001")?.status, "answered");

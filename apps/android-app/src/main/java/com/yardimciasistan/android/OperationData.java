@@ -45,8 +45,6 @@ final class OperationData {
       "android_devices.manage"
   };
   private static final String[] STAFF_PERMISSIONS = {
-      "customer.view",
-      "reservation.view",
       "room.view",
       "room.update_status",
       "daily_task.view",
@@ -212,7 +210,6 @@ final class OperationData {
       return;
     }
     if (profilePermissions == null) {
-      permissions.addAll(Arrays.asList(STAFF_PERMISSIONS));
       return;
     }
     Set<String> allowed = new HashSet<>(Arrays.asList(ALL_PERMISSIONS));

@@ -1580,7 +1580,7 @@ masaüstü action apply katmanında yapmak.
 
 ```text
 Kalıcı Android device_id, cihaz adı ve uygulama sürümü
-Masaüstü android_devices tablosu ve admin/staff presetleri
+Masaüstü android_devices tablosu, admin preset'i ve staff görev paketleri
 Ayarlar içinde Android Cihazlar listesi ve rol/aktiflik işlemleri
 Android snapshot içinde cihaz bazlı effective permissions
 Yetkisiz Android butonlarını gizleme
@@ -1595,6 +1595,15 @@ Kabul kriterleri:
 * Pasif cihazın hiçbir action'ı yerel veriye uygulanmamalı.
 * Rol Android'den değiştirilememeli; masaüstü değişikliği sonraki snapshot'ta UI'a yansımalı.
 * Action queue idempotency ve otomatik senkron davranışı korunmalı.
+
+Durum:
+
+* Tamamlandı. Personel cihaz yetkileri masaüstünde teknik izin listesi yerine Servis /
+  Sipariş, Kasa / Hesap, Oda / Günlük İşler ve Müşteri / Rezervasyon görev paketleriyle
+  yönetilir. Yeni personel cihazlar Servis / Sipariş ile Oda / Günlük İşler açık olarak
+  başlar; paket seçimleri `permissions_json` üretir. Yönetici tüm izinleri almaya, Android
+  UI etkili izinlere göre aksiyonları gizlemeye ve masaüstü action apply katmanı nihai
+  aktiflik/izin/veri durumu kontrolünü yapmaya devam eder.
 
 ---
 

@@ -74,7 +74,8 @@ Masaüstü SQLite kaydı:
   "app_version": "0.1.0",
   "role": "staff",
   "is_active": true,
-  "permissions_json": "[\"table.view\",\"table_order.open\"]",
+  "permission_groups_json": "{\"service_orders\":true,\"cashier\":false,\"rooms_tasks\":true,\"customer_reservation\":false}",
+  "permissions_json": "[\"table.view\",\"table_order.open\",\"room.view\"]",
   "first_seen_at": "2026-07-18T10:00:00+03:00",
   "last_seen_at": "2026-07-18T10:15:00+03:00",
   "created_at": "2026-07-18T10:00:00+03:00",
@@ -83,11 +84,25 @@ Masaüstü SQLite kaydı:
 }
 ```
 
-`role` yalnız `admin` veya `staff` olabilir. Bilinmeyen cihaz aktif `staff` profiliyle
-oluşturulur. Admin preset'i tüm Android izinlerini, staff preset'i günlük operasyon için
-tanımlanan sınırlı izinleri `permissions_json` alanına yazar. Cihaz pasifleştirildiğinde
-hiçbir action uygulanmaz. Android snapshot'ındaki `androidPermissions` haritası UI için
-etkili profili taşır; güvenlik kontrolü her zaman masaüstü kaydından yeniden yapılır.
+`role` yalnız `admin` veya `staff` olabilir. Bilinmeyen cihaz aktif `staff` profiliyle;
+`service_orders` ve `rooms_tasks` açık, diğer görev paketleri kapalı olarak oluşturulur.
+Personel cihazda `permission_groups_json` içindeki dört kullanıcı dostu görev alanı
+masaüstünden seçilir ve `permissions_json` her değişiklikte bu paketlerin birleşiminden
+yeniden üretilir:
+
+```text
+service_orders       → Servis / Sipariş
+cashier              → Kasa / Hesap
+rooms_tasks          → Oda / Günlük İşler
+customer_reservation → Müşteri / Rezervasyon
+```
+
+`cashier` paketi `table_order.close_paid` iznini veren tek personel paketidir.
+`customer_reservation` ilk sürümde müşteri/rezerve reddetme, rezervasyona dönüştürme ve
+rezervasyon iptal etme gibi kritik izinleri vermez. Admin profili paket seçimlerinden
+bağımsız olarak tüm Android izinlerini alır. Cihaz pasifleştirildiğinde hiçbir action
+uygulanmaz. Android snapshot'ındaki `androidPermissions` haritası UI için etkili profili
+taşır; güvenlik kontrolü her zaman masaüstü kaydından yeniden yapılır.
 `permissions_json` geçersiz veya çözümlenemez durumdaysa masaüstü boş izin kümesi kullanır
 ve action'ı reddeder; bozuk güvenlik kaydı staff preset'ine fail-open dönmez.
 

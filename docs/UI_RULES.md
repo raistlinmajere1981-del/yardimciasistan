@@ -256,6 +256,11 @@ Android uygulama masaüstünün küçük kopyası değildir.
 
 Android uygulamanın ana görevi hızlı takip ve hızlı aksiyondur.
 
+Masaüstündeki Android cihaz yönetiminde personel için teknik izin adları veya yalnız izin
+sayısı gösterilmemelidir. Bunun yerine Servis / Sipariş, Kasa / Hesap, Oda / Günlük İşler
+ve Müşteri / Rezervasyon görev alanları seçilebilir olmalıdır. Yönetici cihazda görev
+alanları yerine `Tüm yetkiler açık` bilgisi gösterilebilir.
+
 ### Android’de Olması Gerekenler
 
 * Yeni talepler

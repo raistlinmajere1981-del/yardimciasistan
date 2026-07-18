@@ -9,6 +9,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -101,6 +102,8 @@ public final class MainActivity extends Activity {
     getWindow().getDecorView().setSystemUiVisibility(0);
 
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
+    resetDebugAppStateIfRequested();
+    ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
     ConnectionSettings.ensureDefaults(preferences);
     identity = DeviceIdentity.loadOrCreate(this, preferences);
     actionOutbox = new ActionOutbox(preferences);
@@ -156,7 +159,11 @@ public final class MainActivity extends Activity {
   private void applyConnectionExtras() {
     String extraUrl = getIntent().getStringExtra("ya_web_module_url");
     String extraSecret = getIntent().getStringExtra("ya_sync_secret");
-    if (data.permissionsResolved && !data.hasPermission("settings.edit")) {
+    boolean debugOverride = isDebugConnectionOverrideRequested();
+    if (ConnectionSettings.isEmbeddedConnectionLocked() && !debugOverride) {
+      return;
+    }
+    if (data.permissionsResolved && !data.hasPermission("settings.edit") && !debugOverride) {
       return;
     }
     if (extraUrl != null && extraSecret != null
@@ -177,6 +184,21 @@ public final class MainActivity extends Activity {
           .putString(ConnectionSettings.KEY_SYNC_SECRET, extraSecret.trim())
           .apply();
     }
+  }
+
+  private boolean isDebugConnectionOverrideRequested() {
+    return isDebuggable()
+        && getIntent().getBooleanExtra("ya_allow_debug_connection_override", false);
+  }
+
+  private void resetDebugAppStateIfRequested() {
+    if (isDebuggable() && getIntent().getBooleanExtra("ya_reset_debug_app_state", false)) {
+      DeviceIdentity.clearAppStateKeepingIdentity(preferences);
+    }
+  }
+
+  private boolean isDebuggable() {
+    return (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
   }
 
   private void buildShell() {
@@ -669,7 +691,9 @@ public final class MainActivity extends Activity {
 
     webModuleInput = null;
     syncSecretInput = null;
-    boolean canEditSettings = !data.permissionsResolved || data.hasPermission("settings.edit");
+    boolean embeddedConnectionLocked = ConnectionSettings.isEmbeddedConnectionLocked();
+    boolean canEditSettings = !embeddedConnectionLocked
+        && (!data.permissionsResolved || data.hasPermission("settings.edit"));
     if (canEditSettings) {
       LinearLayout connection = UiKit.card(this);
       connection.addView(UiKit.text(this, "Web modül adresi", 12, UiKit.MUTED, Typeface.BOLD));
@@ -697,8 +721,10 @@ public final class MainActivity extends Activity {
       page.addView(connection);
     } else {
       LinearLayout readOnly = UiKit.card(this);
-      readOnly.addView(UiKit.text(this, "Bağlantı ayarları salt okunur", 14, UiKit.TEXT, Typeface.BOLD));
-      readOnly.addView(UiKit.text(this, "Web modül adresi ve güvenlik anahtarı yalnız ayar düzenleme yetkisi olan cihazlarda değiştirilebilir.", 12, UiKit.MUTED, Typeface.NORMAL));
+      readOnly.addView(UiKit.text(this, embeddedConnectionLocked ? "Bağlantı bilgileri APK içinde hazır" : "Bağlantı ayarları salt okunur", 14, UiKit.TEXT, Typeface.BOLD));
+      readOnly.addView(UiKit.text(this, embeddedConnectionLocked
+          ? "Tasarım süresince web bağlantısı bu APK'ya sabitlendi ve uygulama güncellendiğinde otomatik olarak korunur."
+          : "Web modül adresi ve güvenlik anahtarı yalnız ayar düzenleme yetkisi olan cihazlarda değiştirilebilir.", 12, UiKit.MUTED, Typeface.NORMAL));
       page.addView(readOnly);
     }
 
@@ -1010,7 +1036,8 @@ public final class MainActivity extends Activity {
     LinearLayout.LayoutParams primaryParams = new LinearLayout.LayoutParams(-1, -2);
     primaryParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
     primaryActions.setLayoutParams(primaryParams);
-    if (data.hasPermission("table_order.view")) {
+    if (data.hasPermission("table_order.view")
+        && (order != null || data.hasPermission("table_order.open"))) {
       UiKit.addAction(primaryActions, UiKit.button(this, order == null ? "Sipariş Aç" : "Siparişi Aç", UiKit.PRIMARY, view -> showTableOrder(table)), this);
     }
     if (order != null && data.hasPermission("table_order.set_payment_waiting")) {
