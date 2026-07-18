@@ -4,7 +4,7 @@ declare(strict_types=1);
 const YA_STORAGE_BASE_DIR = __DIR__ . '/..';
 const YA_STORAGE_DATA_DIR = YA_STORAGE_BASE_DIR . '/data';
 const YA_STORAGE_DATABASE_FILE = YA_STORAGE_DATA_DIR . '/yardimci-asistan.sqlite';
-const YA_STORAGE_SCHEMA_VERSION = 1;
+const YA_STORAGE_SCHEMA_VERSION = 2;
 
 /**
  * Opens and migrates the hosting-side SQLite store.
@@ -66,6 +66,8 @@ function ya_storage_capabilities(): array
             'request_cursor',
             'request_acknowledgement',
             'android_action_queue',
+            'android_device_sightings',
+            'android_device_permissions',
             'versioned_publications',
             'idempotent_publications',
             'server_revision'
@@ -287,6 +289,60 @@ function ya_storage_enqueue_android_action(array $action): array
         throw new RuntimeException('android_action_not_stored');
     }
     return ['action' => $stored, 'created' => $created];
+}
+
+function ya_storage_record_android_device(array $device): void
+{
+    $deviceId = ya_storage_string($device['device_id'] ?? '');
+    if ($deviceId === '') {
+        return;
+    }
+    $now = ya_storage_string($device['last_seen_at'] ?? '') ?: date(DATE_ATOM);
+    $statement = ya_storage_open()->prepare(<<<'SQL'
+        INSERT INTO android_device_sightings (
+          device_id, device_name, app_version, first_seen_at, last_seen_at
+        ) VALUES (
+          :device_id, :device_name, :app_version, :first_seen_at, :last_seen_at
+        )
+        ON CONFLICT(device_id) DO UPDATE SET
+          device_name = CASE
+            WHEN excluded.device_name != '' THEN excluded.device_name
+            ELSE android_device_sightings.device_name
+          END,
+          app_version = CASE
+            WHEN excluded.app_version != '' THEN excluded.app_version
+            ELSE android_device_sightings.app_version
+          END,
+          last_seen_at = excluded.last_seen_at
+    SQL);
+    $statement->execute([
+        ':device_id' => $deviceId,
+        ':device_name' => substr(ya_storage_string($device['device_name'] ?? ''), 0, 160),
+        ':app_version' => substr(ya_storage_string($device['app_version'] ?? ''), 0, 80),
+        ':first_seen_at' => ya_storage_string($device['first_seen_at'] ?? '') ?: $now,
+        ':last_seen_at' => $now
+    ]);
+}
+
+function ya_storage_get_android_device_sightings(int $limit = 500): array
+{
+    $statement = ya_storage_open()->prepare(<<<'SQL'
+        SELECT device_id, device_name, app_version, first_seen_at, last_seen_at
+        FROM android_device_sightings
+        ORDER BY last_seen_at DESC, device_id ASC
+        LIMIT :limit
+    SQL);
+    $statement->bindValue(':limit', max(1, min($limit, 1000)), PDO::PARAM_INT);
+    $statement->execute();
+    return array_map(static function (array $row): array {
+        return [
+            'device_id' => ya_storage_string($row['device_id'] ?? ''),
+            'device_name' => ya_storage_string($row['device_name'] ?? ''),
+            'app_version' => ya_storage_string($row['app_version'] ?? ''),
+            'first_seen_at' => ya_storage_string($row['first_seen_at'] ?? ''),
+            'last_seen_at' => ya_storage_string($row['last_seen_at'] ?? '')
+        ];
+    }, $statement->fetchAll());
 }
 
 function ya_storage_pull_android_actions(int $limit): array
@@ -530,6 +586,16 @@ function ya_storage_create_schema(PDO $database): void
         );
         CREATE INDEX IF NOT EXISTS idx_android_actions_pending ON android_actions(status, seq);
         CREATE INDEX IF NOT EXISTS idx_android_actions_device ON android_actions(device_id, seq DESC);
+
+        CREATE TABLE IF NOT EXISTS android_device_sightings (
+          device_id TEXT PRIMARY KEY,
+          device_name TEXT NOT NULL DEFAULT '',
+          app_version TEXT NOT NULL DEFAULT '',
+          first_seen_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_android_device_sightings_last_seen
+          ON android_device_sightings(last_seen_at DESC);
 
         CREATE TABLE IF NOT EXISTS publications (
           name TEXT PRIMARY KEY,

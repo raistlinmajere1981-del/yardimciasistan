@@ -18,6 +18,7 @@ import type {
   SaveAiWorkspaceResult,
   AiWorkspaceHistoryEntry,
   DesktopBackupResult,
+  DesktopAndroidDeviceMutationResult,
   DesktopStatusUpdateResult,
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
@@ -68,6 +69,10 @@ export interface DesktopBridge {
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
+  setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
+  setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
+  resetAndroidDevicePermissions: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
+  revokeAndroidDevice: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
   createManualRequest: (input: CreateManualRequestInput) => Promise<CreateManualRequestResult>;
   convertRequestToReservation: (requestId: string) => Promise<RequestReservationConversionResult>;
   updateRequestStatus: (input: UpdateRequestStatusInput) => Promise<DesktopStatusUpdateResult>;
@@ -121,6 +126,10 @@ const bridge: DesktopBridge = {
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => ipcRenderer.invoke("setup:saveInitial", input),
+  setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
+  setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
+  resetAndroidDevicePermissions: (deviceId: string) => ipcRenderer.invoke("androidDevice:resetPermissions", deviceId),
+  revokeAndroidDevice: (deviceId: string) => ipcRenderer.invoke("androidDevice:revoke", deviceId),
   createManualRequest: (input: CreateManualRequestInput) => ipcRenderer.invoke("request:createManual", input),
   convertRequestToReservation: (requestId: string) => ipcRenderer.invoke("request:convertToReservation", requestId),
   updateRequestStatus: (input: UpdateRequestStatusInput) => ipcRenderer.invoke("request:updateStatus", input),

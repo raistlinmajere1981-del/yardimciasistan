@@ -14,6 +14,7 @@
     "check": "npm run typecheck && npm test && npm run build && npm run e2e",
     "check:linux": "npm run doctor && npm run lint:php && npm run pack:web-module && npm run smoke:local-lab && npm run smoke:web-form-api && npm run smoke:web-module && npm run smoke:automatic-sync && npm run smoke:web-widget-branding && npm run smoke:web-widget-module && npm run smoke:demo-web-widget && npm run check && npm run smoke:android-hosting && npm run smoke:demo-flow && npm run smoke:desktop-renderer && npm run smoke:desktop-package && npm run smoke:desktop:linux",
     "build:android": "npm run build -w @yardimci-asistan/android-app",
+    "configure:android:connection": "node scripts/configure-android-connection.mjs",
     "android:control": "node scripts/android-control.mjs",
     "android:dump": "node scripts/android-control.mjs dump",
     "android:mirror": "node scripts/android-control.mjs mirror",

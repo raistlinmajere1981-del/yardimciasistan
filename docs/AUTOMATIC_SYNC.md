@@ -44,6 +44,15 @@ aynı işlemin iki kez uygulanmasını engeller:
   gelen eski revision `409` ile reddedilir.
 - Android action kimliği telefonda ağ çağrısından önce üretilir. Telefon outbox'ı,
   hosting kuyruğu ve masaüstü action receipt kaydı bu kimliği korur.
+- Android özet isteği ve action gönderimi kalıcı cihaz kimliğiyle birlikte cihaz adı ve
+  uygulama sürümünü bildirir. Hostingdeki görülme kayıtları masaüstüne taşınır; rol,
+  aktiflik ve action yetkisi yalnız masaüstü SQLite'tan belirlenir.
+- Masaüstü snapshot'ı cihaz bazlı etkili izin haritasını taşır. Android bu haritayla
+  butonları gizler; masaüstü action apply katmanı aktiflik ve gerekli izni ayrıca kontrol
+  ederek istemci UI'ını güvenlik sınırı olarak kabul etmez.
+- Android bir kez çözümlenmiş cihaz profilini ayrıca yerelde saklar. Sonraki snapshot'ta
+  profil geçici olarak eksikse aktif staff varsayımına geri dönmez; son güvenilir aktiflik
+  ve izinleri koruyarak profil kaybını fail-open hale getirmez.
 - Masaüstü outbox işi yalnız sunucu yayını kabul ettikten sonra silinir; kalıcı
   revision sayacı korunur. İş sırasında yeni yerel değişiklik gelirse daha yüksek
   revision'lı iş korunur.
@@ -62,7 +71,8 @@ yardimci-asistan/data/yardimci-asistan.sqlite
 ```
 
 SQLite; web taleplerini, Android action kuyruğunu, yayınları, idempotency receipt'lerini,
-istemci cursor'larını ve sunucu revision'ını tutar. `data/` PHP kullanıcısı tarafından
+Android cihaz görülme kayıtlarını, istemci cursor'larını ve sunucu revision'ını tutar.
+`data/` PHP kullanıcısı tarafından
 yazılabilir olmalıdır ve tarayıcıdan doğrudan erişime kapatılmalıdır.
 
 Güncel paket ilk açılışta eski `requests.json`, `android-actions.json`, `menu.json`,
@@ -79,7 +89,9 @@ curl -X POST 'https://firma.example/yardimci-asistan/api/sync.php' \
   --data '{"action":"capabilities"}'
 ```
 
-Başarılı cevapta `protocol_version: 2` ve `storage: "sqlite"` bulunmalıdır. Canlı
+Başarılı cevapta `protocol_version: 2`, `storage: "sqlite"`, `schema_version: 2` ve
+`features` içinde `android_device_sightings` ile `android_device_permissions` bulunmalıdır.
+Masaüstü Android modülü açıkken bu capability'ler eksikse senkronu başarılı saymaz. Canlı
 hostingde HTTPS kullanın; sync anahtarını URL query parametresine veya loglara yazmayın.
 
 ## Taşıma Katmanı

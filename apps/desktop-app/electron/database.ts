@@ -3,7 +3,22 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createId, normalizePhone } from "@yardimci-asistan/shared";
-import type { AndroidSyncAction, PublishedQrMenu, PushAiSettingsResult, SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import {
+  ANDROID_ADMIN_PERMISSIONS,
+  ANDROID_PERMISSIONS,
+  ANDROID_STAFF_PERMISSIONS,
+  resolveAndroidActionPermission
+} from "@yardimci-asistan/sync-core";
+import type {
+  AndroidDeviceRole,
+  AndroidDeviceSighting,
+  AndroidPermission,
+  AndroidSnapshotPermissionProfile,
+  AndroidSyncAction,
+  PublishedQrMenu,
+  PushAiSettingsResult,
+  SyncedCustomerRequest
+} from "@yardimci-asistan/sync-core";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
@@ -115,6 +130,25 @@ export interface DesktopPreparedMessage {
   updatedAt: string;
 }
 
+export interface DesktopAndroidDevice {
+  id: string;
+  deviceId: string;
+  deviceName: string;
+  appVersion: string;
+  role: AndroidDeviceRole;
+  isActive: boolean;
+  permissions: AndroidPermission[];
+  firstSeenAt: string;
+  lastSeenAt: string;
+  createdAt: string;
+  updatedAt: string;
+  revokedAt: string;
+}
+
+export type DesktopAndroidDeviceMutationResult =
+  | { ok: true; message: string; devices: DesktopAndroidDevice[] }
+  | { ok: false; message: string; devices: DesktopAndroidDevice[] };
+
 export interface DesktopDashboardData {
   databasePath: string;
   backupPath: string;
@@ -125,6 +159,7 @@ export interface DesktopDashboardData {
   reservations: DesktopReservation[];
   dailyTasks: DesktopDailyTask[];
   customers: DesktopCustomer[];
+  androidDevices: DesktopAndroidDevice[];
   menu: PublishedQrMenu;
   summary: DashboardSummary;
 }
@@ -604,6 +639,7 @@ export class DesktopDatabase {
       reservations: this.getReservations(),
       dailyTasks: this.getDailyTasks(),
       customers: this.getCustomers(),
+      androidDevices: this.getAndroidDevices(),
       summary: {
         newRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status = 'new' AND deleted_at = ''"),
         waitingRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND deleted_at = ''"),
@@ -637,6 +673,166 @@ export class DesktopDatabase {
       },
       menu: this.getPublishedMenu()
     };
+  }
+
+  getAndroidDevices(): DesktopAndroidDevice[] {
+    const rows = this.db
+      .prepare(`
+        SELECT *
+        FROM android_devices
+        ORDER BY is_active DESC, last_seen_at DESC, device_name ASC, device_id ASC
+      `)
+      .all() as Array<Record<string, unknown>>;
+    return rows.map((row) => {
+      const role = normalizeAndroidDeviceRole(row.role);
+      return {
+        id: String(row.id ?? ""),
+        deviceId: String(row.device_id ?? ""),
+        deviceName: String(row.device_name ?? ""),
+        appVersion: String(row.app_version ?? ""),
+        role,
+        isActive: Number(row.is_active ?? 0) === 1 && !String(row.revoked_at ?? "").trim(),
+        permissions: effectiveAndroidPermissions(role, row.permissions_json),
+        firstSeenAt: String(row.first_seen_at ?? ""),
+        lastSeenAt: String(row.last_seen_at ?? ""),
+        createdAt: String(row.created_at ?? ""),
+        updatedAt: String(row.updated_at ?? ""),
+        revokedAt: String(row.revoked_at ?? "")
+      };
+    });
+  }
+
+  getAndroidPermissionSnapshot(): Record<string, AndroidSnapshotPermissionProfile> {
+    return Object.fromEntries(this.getAndroidDevices().map((device) => [
+      device.deviceId,
+      {
+        role: device.role,
+        is_active: device.isActive,
+        permissions: device.permissions
+      }
+    ]));
+  }
+
+  upsertAndroidDeviceSightings(sightings: AndroidDeviceSighting[]): number {
+    if (!Array.isArray(sightings) || sightings.length === 0) {
+      return 0;
+    }
+    const now = new Date().toISOString();
+    const statement = this.db.prepare(`
+      INSERT INTO android_devices (
+        id, device_id, device_name, app_version, role, is_active, permissions_json,
+        first_seen_at, last_seen_at, created_at, updated_at, revoked_at
+      ) VALUES (?, ?, ?, ?, 'staff', 1, ?, ?, ?, ?, ?, NULL)
+      ON CONFLICT(device_id) DO UPDATE SET
+        device_name = CASE WHEN excluded.device_name != '' THEN excluded.device_name ELSE android_devices.device_name END,
+        app_version = CASE WHEN excluded.app_version != '' THEN excluded.app_version ELSE android_devices.app_version END,
+        last_seen_at = CASE
+          WHEN excluded.last_seen_at > android_devices.last_seen_at THEN excluded.last_seen_at
+          ELSE android_devices.last_seen_at
+        END,
+        updated_at = CASE
+          WHEN (excluded.device_name != '' AND excluded.device_name != android_devices.device_name)
+            OR (excluded.app_version != '' AND excluded.app_version != android_devices.app_version)
+            OR excluded.last_seen_at > android_devices.last_seen_at
+          THEN excluded.updated_at
+          ELSE android_devices.updated_at
+        END
+    `);
+    let changed = 0;
+    this.db.exec("BEGIN");
+    try {
+      for (const sighting of sightings) {
+        const deviceId = normalizeAndroidDeviceId(sighting?.device_id);
+        if (!deviceId) {
+          continue;
+        }
+        const firstSeenAt = normalizeAndroidTimestamp(sighting.first_seen_at, now);
+        const lastSeenAt = normalizeAndroidTimestamp(sighting.last_seen_at, firstSeenAt);
+        const result = statement.run(
+          createId("android_device_"),
+          deviceId,
+          String(sighting.device_name ?? "").trim().slice(0, 160),
+          String(sighting.app_version ?? "").trim().slice(0, 80),
+          JSON.stringify(ANDROID_STAFF_PERMISSIONS),
+          firstSeenAt,
+          lastSeenAt,
+          firstSeenAt,
+          now
+        );
+        changed += Number(result.changes ?? 0);
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return changed;
+  }
+
+  setAndroidDeviceRole(deviceIdInput: string, roleInput: string): DesktopAndroidDeviceMutationResult {
+    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
+    const role = normalizeAndroidDeviceRoleInput(roleInput);
+    if (!deviceId || !role) {
+      return { ok: false, message: "Telefon rolü için geçerli bir cihaz ve profil seçin.", devices: this.getAndroidDevices() };
+    }
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(`
+        UPDATE android_devices
+        SET role = ?, permissions_json = ?, updated_at = ?
+        WHERE device_id = ?
+      `)
+      .run(role, JSON.stringify(androidPermissionsForRole(role)), now, deviceId);
+    return Number(result.changes) === 1
+      ? { ok: true, message: role === "admin" ? "Telefon yönetici yapıldı." : "Telefon personel yapıldı.", devices: this.getAndroidDevices() }
+      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+  }
+
+  setAndroidDeviceActive(deviceIdInput: string, active: boolean): DesktopAndroidDeviceMutationResult {
+    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
+    if (!deviceId) {
+      return { ok: false, message: "Geçerli bir telefon seçin.", devices: this.getAndroidDevices() };
+    }
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(`
+        UPDATE android_devices
+        SET is_active = ?, revoked_at = CASE WHEN ? = 1 THEN NULL ELSE revoked_at END, updated_at = ?
+        WHERE device_id = ?
+      `)
+      .run(active ? 1 : 0, active ? 1 : 0, now, deviceId);
+    return Number(result.changes) === 1
+      ? { ok: true, message: active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi.", devices: this.getAndroidDevices() }
+      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+  }
+
+  resetAndroidDevicePermissions(deviceIdInput: string): DesktopAndroidDeviceMutationResult {
+    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
+    const row = deviceId
+      ? this.db.prepare("SELECT role FROM android_devices WHERE device_id = ?").get(deviceId) as { role?: unknown } | undefined
+      : undefined;
+    if (!deviceId || !row) {
+      return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+    }
+    const role = normalizeAndroidDeviceRole(row.role);
+    this.db
+      .prepare("UPDATE android_devices SET permissions_json = ?, updated_at = ? WHERE device_id = ?")
+      .run(JSON.stringify(androidPermissionsForRole(role)), new Date().toISOString(), deviceId);
+    return { ok: true, message: "Telefon yetkileri rol varsayılanına döndürüldü.", devices: this.getAndroidDevices() };
+  }
+
+  revokeAndroidDevice(deviceIdInput: string): DesktopAndroidDeviceMutationResult {
+    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
+    if (!deviceId) {
+      return { ok: false, message: "Geçerli bir telefon seçin.", devices: this.getAndroidDevices() };
+    }
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare("UPDATE android_devices SET is_active = 0, revoked_at = ?, updated_at = ? WHERE device_id = ?")
+      .run(now, now, deviceId);
+    return Number(result.changes) === 1
+      ? { ok: true, message: "Telefon kaldırıldı ve erişimi kapatıldı.", devices: this.getAndroidDevices() }
+      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
   }
 
   getAndroidPreparedMessages(): DesktopPreparedMessage[] {
@@ -710,6 +906,18 @@ export class DesktopDatabase {
       return { ok: false, message: "Telefon işlemi eksik veya geçersiz." };
     }
 
+    try {
+      this.upsertAndroidDeviceSightings([{
+        device_id: deviceId,
+        device_name: String(action.device_name ?? ""),
+        app_version: String(action.app_version ?? ""),
+        first_seen_at: action.created_at,
+        last_seen_at: action.last_seen_at || new Date().toISOString()
+      }]);
+    } catch {
+      return { ok: false, message: "Telefon kaydı masaüstünde hazırlanamadı." };
+    }
+
     const existingReceipt = this.db.prepare("SELECT id FROM android_action_receipts WHERE id = ?").get(actionId);
     if (existingReceipt) {
       return {
@@ -733,6 +941,13 @@ export class DesktopDatabase {
           message: "Telefon işlemi daha önce uygulanmış.",
           alreadyApplied: true
         };
+      }
+
+      const authorization = this.authorizeAndroidActionInTransaction(action);
+      if (!authorization.ok) {
+        this.db.exec("ROLLBACK");
+        transactionStarted = false;
+        return authorization;
       }
 
       const result = this.applyAndroidActionInTransaction(action, now);
@@ -3569,6 +3784,39 @@ export class DesktopDatabase {
     return customerId;
   }
 
+  private authorizeAndroidActionInTransaction(action: AndroidSyncAction): AndroidActionMutationResult {
+    const deviceId = String(action.device_id ?? "").trim();
+    const device = this.db
+      .prepare(`
+        SELECT role, is_active, permissions_json, revoked_at
+        FROM android_devices
+        WHERE device_id = ?
+        LIMIT 1
+      `)
+      .get(deviceId) as Record<string, unknown> | undefined;
+    if (!device) {
+      return { ok: false, message: "Telefon masaüstü cihaz listesine kaydedilemedi." };
+    }
+    if (Number(device.is_active ?? 0) !== 1 || String(device.revoked_at ?? "").trim()) {
+      return { ok: false, message: "Cihaz masaüstünde pasifleştirilmiş." };
+    }
+    const requiredPermission = resolveAndroidActionPermission(action.action_type, action.payload);
+    if (!requiredPermission) {
+      return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
+    }
+    const role = normalizeAndroidDeviceRole(device.role);
+    const permissions = effectiveAndroidPermissions(role, device.permissions_json);
+    if (!permissions.includes(requiredPermission)) {
+      return {
+        ok: false,
+        message: requiredPermission === "table_order.close_paid"
+          ? "Bu cihazın hesap kapatma yetkisi yok."
+          : "Bu cihazın bu işlem için yetkisi yok."
+      };
+    }
+    return { ok: true, message: "Telefon işlemi yetkilendirildi." };
+  }
+
   private applyAndroidActionInTransaction(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
     switch (action.action_type) {
       case "customer_request_mark_answered":
@@ -3605,6 +3853,16 @@ export class DesktopDatabase {
         return this.applyAndroidTableOrderItemQuantity(action, now);
       case "table_order_remove_item":
         return this.applyAndroidTableOrderRemoveItem(action, now);
+      case "table_order_set_preparing":
+        return this.applyAndroidTableOrderStatus(action, now, "preparing");
+      case "table_order_set_served":
+        return this.applyAndroidTableOrderStatus(action, now, "served");
+      case "table_order_set_payment_waiting":
+        return this.applyAndroidTableOrderStatus(action, now, "payment");
+      case "table_order_close_paid":
+        return this.applyAndroidTableOrderClose(action, now, "paid");
+      case "table_order_cancel":
+        return this.applyAndroidTableOrderClose(action, now, "cancelled");
       case "table_order_set_status":
         return this.applyAndroidTableOrderStatus(action, now);
       case "table_order_close":
@@ -4057,9 +4315,13 @@ export class DesktopDatabase {
     return { ok: true, message: "Ürün telefondan adisyondan kaldırıldı." };
   }
 
-  private applyAndroidTableOrderStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+  private applyAndroidTableOrderStatus(
+    action: AndroidSyncAction,
+    now: string,
+    forcedStatus?: "preparing" | "served" | "payment"
+  ): AndroidActionMutationResult {
     const orderId = this.resolveAndroidActiveOrderId(action.payload);
-    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["open", "preparing", "served", "payment"]);
+    const status = forcedStatus ?? normalizeStatus(androidPayloadString(action.payload, "status"), ["open", "preparing", "served", "payment"]);
     if (!orderId || !status) {
       return { ok: false, message: "Adisyon veya yeni durum bilgisi geçersiz." };
     }
@@ -4092,9 +4354,13 @@ export class DesktopDatabase {
     return { ok: true, message: "Adisyon durumu telefondan güncellendi." };
   }
 
-  private applyAndroidTableOrderClose(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+  private applyAndroidTableOrderClose(
+    action: AndroidSyncAction,
+    now: string,
+    forcedStatus?: "paid" | "cancelled"
+  ): AndroidActionMutationResult {
     const orderId = this.resolveAndroidActiveOrderId(action.payload);
-    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["paid", "cancelled"]);
+    const status = forcedStatus ?? normalizeStatus(androidPayloadString(action.payload, "status"), ["paid", "cancelled"]);
     if (!orderId || !status) {
       return { ok: false, message: "Kapatılacak adisyon veya kapanış durumu geçersiz." };
     }
@@ -4452,11 +4718,53 @@ export class DesktopDatabase {
   }
 }
 
+const ANDROID_PERMISSION_SET = new Set<string>(ANDROID_PERMISSIONS);
 const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(["openai", "openrouter", "groq", "gemini", "custom"]);
 const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
 const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_AI_TIMEOUT_SECONDS = 30;
 const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
+
+function normalizeAndroidDeviceId(value: unknown): string {
+  const deviceId = String(value ?? "").trim();
+  return /^[A-Za-z0-9._:-]{6,120}$/.test(deviceId) ? deviceId : "";
+}
+
+function normalizeAndroidDeviceRole(value: unknown): AndroidDeviceRole {
+  return String(value ?? "").trim() === "admin" ? "admin" : "staff";
+}
+
+function normalizeAndroidDeviceRoleInput(value: unknown): AndroidDeviceRole | null {
+  const role = String(value ?? "").trim();
+  return role === "admin" || role === "staff" ? role : null;
+}
+
+function androidPermissionsForRole(role: AndroidDeviceRole): AndroidPermission[] {
+  return [...(role === "admin" ? ANDROID_ADMIN_PERMISSIONS : ANDROID_STAFF_PERMISSIONS)];
+}
+
+function effectiveAndroidPermissions(role: AndroidDeviceRole, value: unknown): AndroidPermission[] {
+  if (role === "admin") {
+    return androidPermissionsForRole("admin");
+  }
+  try {
+    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return [...new Set(parsed
+      .map((permission) => String(permission).trim())
+      .filter((permission): permission is AndroidPermission => ANDROID_PERMISSION_SET.has(permission)))];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeAndroidTimestamp(value: unknown, fallback: string): string {
+  const timestamp = String(value ?? "").trim();
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : fallback;
+}
 
 function normalizeAiService(value: unknown): DesktopAiService | null {
   const service = String(value ?? "").trim().toLowerCase();

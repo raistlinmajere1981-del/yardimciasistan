@@ -124,6 +124,14 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $limit = ya_sync_int($payload['limit'] ?? $_GET['limit'] ?? 100, 100);
     $limit = max(1, min($limit, 200));
     $deviceId = ya_sync_string($payload['device_id'] ?? $_GET['device_id'] ?? '');
+    if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId)) {
+        ya_storage_record_android_device([
+            'device_id' => $deviceId,
+            'device_name' => ya_sync_string($payload['device_name'] ?? $_GET['device_name'] ?? ''),
+            'app_version' => ya_sync_string($payload['app_version'] ?? $_GET['app_version'] ?? ''),
+            'last_seen_at' => date(DATE_ATOM)
+        ]);
+    }
     $knownServerRevision = max(0, ya_sync_int($payload['known_server_revision'] ?? 0, 0));
     $serverRevision = ya_storage_server_revision();
     if ($knownServerRevision > 0 && $knownServerRevision === $serverRevision) {
@@ -240,6 +248,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'menu' => $androidSnapshot['menu'],
         'table_orders' => $androidSnapshot['table_orders'],
         'messages' => $androidSnapshot['messages'],
+        'androidPermissions' => $androidSnapshot['androidPermissions'],
         'actions' => $actions,
         'server_revision' => ya_storage_server_revision()
     ]);
@@ -374,6 +383,8 @@ function ya_sync_enqueue_android_action(array $payload): void
     $actionId = ya_sync_string($payload['action_id'] ?? $payload['id'] ?? '');
     $actionType = ya_sync_string($payload['action_type'] ?? '');
     $deviceId = ya_sync_string($payload['device_id'] ?? '');
+    $deviceName = ya_sync_string($payload['device_name'] ?? '');
+    $appVersion = ya_sync_string($payload['app_version'] ?? '');
     $actionPayload = $payload['payload'] ?? null;
 
     if (!preg_match('/^[A-Za-z0-9_-]{12,120}$/', $actionId)) {
@@ -413,6 +424,12 @@ function ya_sync_enqueue_android_action(array $payload): void
     }
 
     $now = date(DATE_ATOM);
+    ya_storage_record_android_device([
+        'device_id' => $deviceId,
+        'device_name' => $deviceName,
+        'app_version' => $appVersion,
+        'last_seen_at' => $now
+    ]);
     $stored = ya_storage_enqueue_android_action([
             'id' => $actionId,
             'action_type' => $actionType,
@@ -451,6 +468,7 @@ function ya_sync_pull_android_actions(array $payload): void
         'ok' => true,
         'message' => $actions === [] ? 'Bekleyen telefon işlemi yok.' : 'Telefon işlemleri alındı.',
         'actions' => $actions,
+        'devices' => ya_storage_get_android_device_sightings(),
         'count' => count($actions),
         'pulled_at' => $now
     ]);
@@ -785,6 +803,11 @@ function ya_sync_android_action_types(): array
         'table_order_add_item',
         'table_order_update_item_quantity',
         'table_order_remove_item',
+        'table_order_set_preparing',
+        'table_order_set_served',
+        'table_order_set_payment_waiting',
+        'table_order_close_paid',
+        'table_order_cancel',
         'table_order_set_status',
         'table_order_close'
     ];
@@ -877,7 +900,75 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         ],
         'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
         'messages' => ya_sync_sanitize_android_messages($snapshot['messages'] ?? []),
+        'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
         'updated_at' => $updatedAt
+    ];
+}
+
+function ya_sync_sanitize_android_permissions(mixed $profiles): array
+{
+    if (!is_array($profiles)) {
+        return [];
+    }
+    $allowedPermissions = ya_sync_android_permissions();
+    $result = [];
+    foreach ($profiles as $deviceId => $profile) {
+        $normalizedDeviceId = ya_sync_string($deviceId);
+        if (!preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $normalizedDeviceId) || !is_array($profile)) {
+            continue;
+        }
+        $role = ya_sync_string($profile['role'] ?? 'staff');
+        if (!in_array($role, ['admin', 'staff'], true)) {
+            $role = 'staff';
+        }
+        $permissions = array_values(array_unique(array_filter(
+            ya_sync_string_array($profile['permissions'] ?? []),
+            static fn(string $permission): bool => in_array($permission, $allowedPermissions, true)
+        )));
+        $result[$normalizedDeviceId] = [
+            'role' => $role,
+            'is_active' => ya_sync_bool($profile['is_active'] ?? false),
+            'permissions' => $permissions
+        ];
+    }
+    return $result;
+}
+
+function ya_sync_android_permissions(): array
+{
+    return [
+        'customer.view',
+        'customer.respond',
+        'customer.mark_answered',
+        'customer.reject',
+        'customer.convert_to_reservation',
+        'reservation.view',
+        'reservation.approve',
+        'reservation.reject',
+        'reservation.cancel',
+        'room.view',
+        'room.update_status',
+        'daily_task.view',
+        'daily_task.complete',
+        'daily_task.reopen',
+        'table.view',
+        'table.update_status',
+        'table_order.view',
+        'table_order.open',
+        'table_order.add_item',
+        'table_order.update_item',
+        'table_order.remove_item',
+        'table_order.set_preparing',
+        'table_order.set_served',
+        'table_order.set_payment_waiting',
+        'table_order.close_paid',
+        'table_order.cancel',
+        'menu.view',
+        'menu.edit',
+        'settings.view',
+        'settings.edit',
+        'android_devices.view',
+        'android_devices.manage'
     ];
 }
 

@@ -13,16 +13,18 @@ final class HostingSyncClient {
   private static final int CONNECT_TIMEOUT_MS = 12000;
   private static final int READ_TIMEOUT_MS = 18000;
 
-  OperationData fetchOperations(String baseUrl, String syncSecret, String deviceId) throws SyncException {
-    FetchResult result = fetchOperations(baseUrl, syncSecret, deviceId, 0L);
+  OperationData fetchOperations(String baseUrl, String syncSecret, DeviceIdentity identity) throws SyncException {
+    FetchResult result = fetchOperations(baseUrl, syncSecret, identity, 0L);
     return result.data == null ? new OperationData() : result.data;
   }
 
-  FetchResult fetchOperations(String baseUrl, String syncSecret, String deviceId, long knownServerRevision) throws SyncException {
+  FetchResult fetchOperations(String baseUrl, String syncSecret, DeviceIdentity identity, long knownServerRevision) throws SyncException {
     JSONObject payload = new JSONObject();
     try {
       payload.put("action", "android_summary");
-      payload.put("device_id", deviceId);
+      payload.put("device_id", identity.deviceId);
+      payload.put("device_name", identity.deviceName);
+      payload.put("app_version", identity.appVersion);
       payload.put("limit", 200);
       payload.put("known_server_revision", Math.max(0L, knownServerRevision));
     } catch (Exception error) {
@@ -32,13 +34,13 @@ final class HostingSyncClient {
     if (response.optBoolean("not_modified", false)) {
       return new FetchResult(true, Math.max(0L, response.optLong("server_revision", knownServerRevision)), null, response);
     }
-    return new FetchResult(false, Math.max(0L, response.optLong("server_revision", 0L)), OperationData.fromJson(response), response);
+    return new FetchResult(false, Math.max(0L, response.optLong("server_revision", 0L)), OperationData.fromJson(response, identity.deviceId), response);
   }
 
   OperationData.ActionRecord enqueueAction(
       String baseUrl,
       String syncSecret,
-      String deviceId,
+      DeviceIdentity identity,
       String actionId,
       String actionType,
       JSONObject actionPayload
@@ -48,7 +50,9 @@ final class HostingSyncClient {
       payload.put("action", "enqueue_android_action");
       payload.put("action_id", actionId);
       payload.put("action_type", actionType);
-      payload.put("device_id", deviceId);
+      payload.put("device_id", identity.deviceId);
+      payload.put("device_name", identity.deviceName);
+      payload.put("app_version", identity.appVersion);
       payload.put("payload", actionPayload);
     } catch (Exception error) {
       throw new SyncException("İşlem isteği hazırlanamadı.", error);

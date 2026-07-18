@@ -38,6 +38,7 @@ import {
   type SaveAiWorkspaceResult,
   type AiWorkspaceHistoryEntry,
   type DesktopBackupResult,
+  type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
   type UpdateRequestStatusInput,
   type UpdateRoomStatusInput,
@@ -382,6 +383,24 @@ function registerIpcHandlers() {
     return getDatabase().getSetupData();
   });
 
+  ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
+    const result = getDatabase().setAndroidDeviceRole(String(deviceId ?? ""), String(role ?? ""));
+    return finalizeAndroidDeviceMutation(result);
+  });
+
+  ipcMain.handle("androidDevice:setActive", (_event, deviceId: unknown, active: unknown): DesktopAndroidDeviceMutationResult => {
+    const result = getDatabase().setAndroidDeviceActive(String(deviceId ?? ""), active === true);
+    return finalizeAndroidDeviceMutation(result);
+  });
+
+  ipcMain.handle("androidDevice:resetPermissions", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
+    return finalizeAndroidDeviceMutation(getDatabase().resetAndroidDevicePermissions(String(deviceId ?? "")));
+  });
+
+  ipcMain.handle("androidDevice:revoke", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
+    return finalizeAndroidDeviceMutation(getDatabase().revokeAndroidDevice(String(deviceId ?? "")));
+  });
+
   ipcMain.handle("setup:saveInitial", async (_event, input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> => {
     const secretUpdate = createAiApiKeyUpdate(input);
     if (!secretUpdate.ok) {
@@ -718,6 +737,15 @@ function invalidTableOrderPayload(message: string): DesktopTableOrderResult {
   return { ok: false, message };
 }
 
+function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
+  if (result.ok) {
+    androidSnapshotPublishPending = true;
+    notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+    getSyncCoordinator().scheduleSoon();
+  }
+  return result;
+}
+
 function parseAddTableOrderItemInput(value: unknown): AddTableOrderItemInput | null {
   const record = toUnknownRecord(value);
   return record
@@ -820,6 +848,7 @@ async function processAndroidActionQueueOnce(allowPlaceholderSecret: boolean): P
     return summary;
   }
 
+  const androidDevicesChanged = getDatabase().upsertAndroidDeviceSightings(pullResult.devices ?? []);
   summary.pulled = pullResult.count;
   for (const action of pullResult.actions) {
     const applyResult = getDatabase().applyAndroidAction(action);
@@ -854,7 +883,7 @@ async function processAndroidActionQueueOnce(allowPlaceholderSecret: boolean): P
     recordCount: summary.pulled,
     message: `${summary.applied} telefon işlemi uygulandı, ${summary.failed} işlem uygulanamadı.`
   });
-  if (summary.applied > 0) {
+  if (summary.applied > 0 || androidDevicesChanged > 0) {
     notifyDesktopDashboardChanged(getDatabase().getDashboardData());
     androidSnapshotPublishPending = true;
   }
@@ -1047,6 +1076,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
       updated_at: order.updatedAt
     })),
     messages: messages.slice(0, 300),
+    androidPermissions: getDatabase().getAndroidPermissionSnapshot(),
     updated_at: updatedAt
   };
 }

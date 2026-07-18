@@ -131,7 +131,84 @@ export interface AndroidOperationsSnapshot {
   menu: PublishedQrMenu;
   table_orders: AndroidSnapshotTableOrder[];
   messages: AndroidSnapshotMessage[];
+  androidPermissions: Record<string, AndroidSnapshotPermissionProfile>;
   updated_at: ISODateTimeString | "";
+}
+
+export type AndroidDeviceRole = "admin" | "staff";
+
+export const ANDROID_PERMISSIONS = [
+  "customer.view",
+  "customer.respond",
+  "customer.mark_answered",
+  "customer.reject",
+  "customer.convert_to_reservation",
+  "reservation.view",
+  "reservation.approve",
+  "reservation.reject",
+  "reservation.cancel",
+  "room.view",
+  "room.update_status",
+  "daily_task.view",
+  "daily_task.complete",
+  "daily_task.reopen",
+  "table.view",
+  "table.update_status",
+  "table_order.view",
+  "table_order.open",
+  "table_order.add_item",
+  "table_order.update_item",
+  "table_order.remove_item",
+  "table_order.set_preparing",
+  "table_order.set_served",
+  "table_order.set_payment_waiting",
+  "table_order.close_paid",
+  "table_order.cancel",
+  "menu.view",
+  "menu.edit",
+  "settings.view",
+  "settings.edit",
+  "android_devices.view",
+  "android_devices.manage"
+] as const;
+
+export type AndroidPermission = typeof ANDROID_PERMISSIONS[number];
+
+export const ANDROID_STAFF_PERMISSIONS: readonly AndroidPermission[] = [
+  "customer.view",
+  "reservation.view",
+  "room.view",
+  "room.update_status",
+  "daily_task.view",
+  "daily_task.complete",
+  "daily_task.reopen",
+  "table.view",
+  "table.update_status",
+  "table_order.view",
+  "table_order.open",
+  "table_order.add_item",
+  "table_order.update_item",
+  "table_order.remove_item",
+  "table_order.set_preparing",
+  "table_order.set_served",
+  "table_order.set_payment_waiting",
+  "menu.view"
+];
+
+export const ANDROID_ADMIN_PERMISSIONS: readonly AndroidPermission[] = ANDROID_PERMISSIONS;
+
+export interface AndroidSnapshotPermissionProfile {
+  role: AndroidDeviceRole;
+  is_active: boolean;
+  permissions: AndroidPermission[];
+}
+
+export interface AndroidDeviceSighting {
+  device_id: string;
+  device_name: string;
+  app_version: string;
+  first_seen_at: ISODateTimeString | "";
+  last_seen_at: ISODateTimeString | "";
 }
 
 export interface AndroidSnapshotRequest {
@@ -260,6 +337,11 @@ export const ANDROID_ACTION_TYPES = [
   "table_order_add_item",
   "table_order_update_item_quantity",
   "table_order_remove_item",
+  "table_order_set_preparing",
+  "table_order_set_served",
+  "table_order_set_payment_waiting",
+  "table_order_close_paid",
+  "table_order_cancel",
   "table_order_set_status",
   "table_order_close"
 ] as const;
@@ -273,6 +355,9 @@ export interface AndroidSyncAction {
   payload: Record<string, unknown>;
   created_at: ISODateTimeString;
   device_id: string;
+  device_name?: string;
+  app_version?: string;
+  last_seen_at?: ISODateTimeString | "";
   status: AndroidActionStatus;
   error_message: string;
   processed_at?: ISODateTimeString | "";
@@ -292,8 +377,55 @@ export interface PullAndroidActionsSuccess {
   ok: true;
   message: string;
   actions: AndroidSyncAction[];
+  devices: AndroidDeviceSighting[];
   count: number;
   pulled_at: ISODateTimeString;
+}
+
+export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, AndroidPermission>> = {
+  customer_request_mark_answered: "customer.mark_answered",
+  customer_request_reopen: "customer.respond",
+  customer_request_approve: "customer.respond",
+  customer_request_reject: "customer.reject",
+  customer_request_convert_to_reservation: "customer.convert_to_reservation",
+  reservation_approve: "reservation.approve",
+  reservation_reject: "reservation.reject",
+  reservation_cancel: "reservation.cancel",
+  room_status_update: "room.update_status",
+  daily_task_complete: "daily_task.complete",
+  daily_task_reopen: "daily_task.reopen",
+  table_status_update: "table.update_status",
+  table_order_open: "table_order.open",
+  table_order_add_item: "table_order.add_item",
+  table_order_update_item_quantity: "table_order.update_item",
+  table_order_remove_item: "table_order.remove_item",
+  table_order_set_preparing: "table_order.set_preparing",
+  table_order_set_served: "table_order.set_served",
+  table_order_set_payment_waiting: "table_order.set_payment_waiting",
+  table_order_close_paid: "table_order.close_paid",
+  table_order_cancel: "table_order.cancel"
+};
+
+export function resolveAndroidActionPermission(
+  actionType: string,
+  payload: Record<string, unknown> = {}
+): AndroidPermission | null {
+  const mapped = ANDROID_ACTION_PERMISSION_MAP[actionType as AndroidActionType];
+  if (mapped) {
+    return mapped;
+  }
+  if (actionType === "table_order_set_status") {
+    const status = String(payload.status ?? "").trim();
+    if (status === "preparing") return "table_order.set_preparing";
+    if (status === "served") return "table_order.set_served";
+    if (status === "payment") return "table_order.set_payment_waiting";
+  }
+  if (actionType === "table_order_close") {
+    const status = String(payload.status ?? "").trim();
+    if (status === "paid") return "table_order.close_paid";
+    if (status === "cancelled") return "table_order.cancel";
+  }
+  return null;
 }
 
 export interface MarkAndroidActionResultSuccess {

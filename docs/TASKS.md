@@ -1568,6 +1568,36 @@ Durum:
 
 ---
 
+## TASK-0905 — Android yönetici / personel cihaz yetkilerini ekle
+
+Amaç:
+
+Tek APK kullanılırken Android cihazların rol ve işlem yetkilerini yalnız masaüstünden
+yönetmek; Android UI'ını etkili profile göre sadeleştirirken gerçek güvenlik kontrolünü
+masaüstü action apply katmanında yapmak.
+
+Özellikler:
+
+```text
+Kalıcı Android device_id, cihaz adı ve uygulama sürümü
+Masaüstü android_devices tablosu ve admin/staff presetleri
+Ayarlar içinde Android Cihazlar listesi ve rol/aktiflik işlemleri
+Android snapshot içinde cihaz bazlı effective permissions
+Yetkisiz Android butonlarını gizleme
+Her action için masaüstü aktiflik ve permission kontrolü
+```
+
+Kabul kriterleri:
+
+* Bilinmeyen cihaz ilk özet veya action temasında aktif staff olarak kaydedilmeli.
+* Staff sipariş açabilmeli, ürün ekleyebilmeli ve hesabı beklemeye alabilmeli; ödendi/kapat yapamamalı.
+* Admin cihaz desteklenen tüm Android operasyonlarını yapabilmeli.
+* Pasif cihazın hiçbir action'ı yerel veriye uygulanmamalı.
+* Rol Android'den değiştirilememeli; masaüstü değişikliği sonraki snapshot'ta UI'a yansımalı.
+* Action queue idempotency ve otomatik senkron davranışı korunmalı.
+
+---
+
 # Faz 10 — Kurulum ve Paketleme
 
 ## TASK-1001 — Firma web modülü kurulum dokümanını yaz

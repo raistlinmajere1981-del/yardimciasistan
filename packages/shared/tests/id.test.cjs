@@ -15,5 +15,6 @@ test("createId prefixes records consistently", () => {
 
 test("isSupportedIdPrefix allows documented prefixes", () => {
   assert.equal(isSupportedIdPrefix("business_"), true);
+  assert.equal(isSupportedIdPrefix("android_device_"), true);
   assert.equal(isSupportedIdPrefix("unknown_"), false);
 });

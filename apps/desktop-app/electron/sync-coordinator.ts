@@ -1,6 +1,7 @@
 import {
   PhpHostingSyncTransport,
   type AndroidOperationsSnapshot,
+  type SyncCapabilitiesSuccess,
   type SyncFailure,
   type SyncTransport
 } from "@yardimci-asistan/sync-core";
@@ -15,6 +16,15 @@ const INITIAL_SYNC_DELAY_MS = 1_500;
 const DEBOUNCE_DELAY_MS = 750;
 const MAX_PULL_PAGES = 20;
 const RETRY_DELAYS_SECONDS = [5, 15, 30, 60, 300] as const;
+const REQUIRED_ANDROID_SYNC_FEATURES = ["android_device_sightings", "android_device_permissions"] as const;
+
+export function supportsAndroidDevicePermissionSync(
+  capabilities: Pick<SyncCapabilitiesSuccess, "schema_version" | "features">
+): boolean {
+  return capabilities.schema_version >= 2
+    && Array.isArray(capabilities.features)
+    && REQUIRED_ANDROID_SYNC_FEATURES.every((feature) => capabilities.features.includes(feature));
+}
 
 export type AutomaticSyncPhase = "disabled" | "idle" | "syncing" | "success" | "offline" | "error";
 
@@ -188,6 +198,7 @@ export class SyncCoordinator {
     }
 
     const transport = new PhpHostingSyncTransport({ ...config, clientId });
+    const setup = this.options.database.getSetupData();
     this.phase = "syncing";
     this.message = "Web, masaüstü ve Android verileri eşitleniyor...";
     this.options.database.recordSyncAttempt();
@@ -195,13 +206,21 @@ export class SyncCoordinator {
 
     const counts = { ...empty };
     const errors: string[] = [];
-    const targetKey = `${config.baseUrl}\u0000${clientId}`;
+    const targetKey = `${config.baseUrl}\u0000${clientId}\u0000android:${setup.modules.android ? "1" : "0"}`;
     if (this.capabilitiesTarget !== targetKey) {
       const capabilities = await transport.getCapabilities();
-      if (!capabilities.ok || capabilities.protocol_version < 2 || capabilities.storage !== "sqlite") {
-        const message = capabilities.ok
-          ? "Web modülü otomatik senkron protokolünü desteklemiyor. Hosting paketini güncelleyin."
-          : capabilities.message;
+      const missingAndroidCapabilities = capabilities.ok
+        && setup.modules.android
+        && !supportsAndroidDevicePermissionSync(capabilities);
+      if (!capabilities.ok
+          || capabilities.protocol_version < 2
+          || capabilities.storage !== "sqlite"
+          || missingAndroidCapabilities) {
+        const message = !capabilities.ok
+          ? capabilities.message
+          : missingAndroidCapabilities
+            ? "Web modülü Android cihaz yetkilerini desteklemiyor. Hosting paketini güncelleyin."
+            : "Web modülü otomatik senkron protokolünü desteklemiyor. Hosting paketini güncelleyin.";
         this.options.database.recordAutomaticSyncFailure(message);
         this.deferPassiveRetry(runtime.consecutiveFailures);
         this.phase = classifyFailurePhase(capabilities.ok ? undefined : capabilities);
@@ -223,7 +242,7 @@ export class SyncCoordinator {
     counts.pulledActions = actionResult.pulled;
     counts.appliedActions = actionResult.applied;
     counts.failedActions = actionResult.failed;
-    dashboardChanged ||= actionResult.applied > 0;
+    dashboardChanged ||= actionResult.applied > 0 || actionResult.devicesChanged > 0;
     if (actionResult.error) {
       errors.push(actionResult.error);
     }
@@ -308,16 +327,18 @@ export class SyncCoordinator {
     pulled: number;
     applied: number;
     failed: number;
+    devicesChanged: number;
     error: string;
   }> {
     const setup = this.options.database.getSetupData();
     if (!setup.modules.android) {
-      return { pulled: 0, applied: 0, failed: 0, error: "" };
+      return { pulled: 0, applied: 0, failed: 0, devicesChanged: 0, error: "" };
     }
     const pulled = await transport.pullAndroidActions({ limit: 100 });
     if (!pulled.ok) {
-      return { pulled: 0, applied: 0, failed: 0, error: pulled.message };
+      return { pulled: 0, applied: 0, failed: 0, devicesChanged: 0, error: pulled.message };
     }
+    const devicesChanged = this.options.database.upsertAndroidDeviceSightings(pulled.devices ?? []);
     let applied = 0;
     let failed = 0;
     for (const action of pulled.actions) {
@@ -329,7 +350,7 @@ export class SyncCoordinator {
         errorMessage: local.ok ? "" : local.message
       });
       if (!completion.ok) {
-        return { pulled: pulled.count, applied, failed, error: completion.message };
+        return { pulled: pulled.count, applied, failed, devicesChanged, error: completion.message };
       }
       if (local.ok) {
         applied += 1;
@@ -344,7 +365,7 @@ export class SyncCoordinator {
       recordCount: pulled.count,
       message: `${applied} telefon işlemi uygulandı, ${failed} işlem reddedildi.`
     });
-    return { pulled: pulled.count, applied, failed, error: "" };
+    return { pulled: pulled.count, applied, failed, devicesChanged, error: "" };
   }
 
   private async publishOutbox(transport: SyncTransport): Promise<{ published: number; errors: string[] }> {

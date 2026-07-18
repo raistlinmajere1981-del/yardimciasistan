@@ -12,6 +12,7 @@ export type IdPrefix =
   | "ai_conv_"
   | "wa_msg_"
   | "notification_"
+  | "android_device_"
   | "task_"
   | "sync_"
   | "settings_"
@@ -31,6 +32,7 @@ export const ID_PREFIXES: readonly IdPrefix[] = [
   "ai_conv_",
   "wa_msg_",
   "notification_",
+  "android_device_",
   "task_",
   "sync_",
   "settings_",

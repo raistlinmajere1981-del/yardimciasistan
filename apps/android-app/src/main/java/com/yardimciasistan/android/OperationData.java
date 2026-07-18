@@ -4,9 +4,67 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 final class OperationData {
+  private static final String[] ALL_PERMISSIONS = {
+      "customer.view",
+      "customer.respond",
+      "customer.mark_answered",
+      "customer.reject",
+      "customer.convert_to_reservation",
+      "reservation.view",
+      "reservation.approve",
+      "reservation.reject",
+      "reservation.cancel",
+      "room.view",
+      "room.update_status",
+      "daily_task.view",
+      "daily_task.complete",
+      "daily_task.reopen",
+      "table.view",
+      "table.update_status",
+      "table_order.view",
+      "table_order.open",
+      "table_order.add_item",
+      "table_order.update_item",
+      "table_order.remove_item",
+      "table_order.set_preparing",
+      "table_order.set_served",
+      "table_order.set_payment_waiting",
+      "table_order.close_paid",
+      "table_order.cancel",
+      "menu.view",
+      "menu.edit",
+      "settings.view",
+      "settings.edit",
+      "android_devices.view",
+      "android_devices.manage"
+  };
+  private static final String[] STAFF_PERMISSIONS = {
+      "customer.view",
+      "reservation.view",
+      "room.view",
+      "room.update_status",
+      "daily_task.view",
+      "daily_task.complete",
+      "daily_task.reopen",
+      "table.view",
+      "table.update_status",
+      "table_order.view",
+      "table_order.open",
+      "table_order.add_item",
+      "table_order.update_item",
+      "table_order.remove_item",
+      "table_order.set_preparing",
+      "table_order.set_served",
+      "table_order.set_payment_waiting",
+      "menu.view"
+  };
+
   String businessName = "Yardımcı Asistan";
   String businessPhone = "";
   String businessWhatsapp = "";
@@ -29,6 +87,10 @@ final class OperationData {
   int preparedMessages;
   int waitingResponses;
   int customerCount;
+  String deviceRole = "staff";
+  boolean deviceActive = true;
+  boolean permissionsResolved;
+  final Set<String> permissions = new HashSet<>(Arrays.asList(STAFF_PERMISSIONS));
 
   final List<RequestRecord> requests = new ArrayList<>();
   final List<CustomerRecord> customers = new ArrayList<>();
@@ -43,6 +105,10 @@ final class OperationData {
   final List<ActionRecord> actions = new ArrayList<>();
 
   static OperationData fromJson(JSONObject root) {
+    return fromJson(root, "");
+  }
+
+  static OperationData fromJson(JSONObject root, String deviceId) {
     OperationData data = new OperationData();
     data.serverRevision = Math.max(0L, root.optLong("server_revision", 0L));
     boolean messagesIncluded = root.has("messages") && root.optJSONArray("messages") != null;
@@ -87,6 +153,8 @@ final class OperationData {
     addRecords(array(menu, "categories"), data.categories, MenuCategory::fromJson);
     addRecords(array(menu, "items"), data.menuItems, MenuItem::fromJson);
 
+    data.applyPermissionProfile(root.optJSONObject("androidPermissions"), deviceId);
+
     if (!messagesIncluded) {
       for (RequestRecord request : data.requests) {
         String readyMessage = request.readyMessage();
@@ -104,6 +172,56 @@ final class OperationData {
       }
     }
     return data;
+  }
+
+  boolean hasPermission(String permission) {
+    return deviceActive && permissions.contains(permission);
+  }
+
+  String deviceRoleLabel() {
+    if (!permissionsResolved) {
+      return "Personel (atanıyor)";
+    }
+    return "admin".equals(deviceRole) ? "Yönetici" : "Personel";
+  }
+
+  private void applyPermissionProfile(JSONObject profiles, String deviceId) {
+    String normalizedDeviceId = deviceId == null ? "" : deviceId.trim();
+    if (profiles == null || normalizedDeviceId.isEmpty()) {
+      return;
+    }
+    JSONObject profile = profiles.optJSONObject(normalizedDeviceId);
+    if (profile == null) {
+      return;
+    }
+
+    applyPermissionProfile(profile);
+  }
+
+  void applyPermissionProfile(JSONObject profile) {
+    if (profile == null) {
+      return;
+    }
+    permissionsResolved = true;
+    deviceRole = "admin".equals(value(profile, "role", "staff")) ? "admin" : "staff";
+    deviceActive = profile.optBoolean("is_active", false);
+    permissions.clear();
+    JSONArray profilePermissions = profile.optJSONArray("permissions");
+    if (profilePermissions == null && "admin".equals(deviceRole)) {
+      permissions.addAll(Arrays.asList(ALL_PERMISSIONS));
+      return;
+    }
+    if (profilePermissions == null) {
+      permissions.addAll(Arrays.asList(STAFF_PERMISSIONS));
+      return;
+    }
+    Set<String> allowed = new HashSet<>(Arrays.asList(ALL_PERMISSIONS));
+    for (int index = 0; index < profilePermissions.length(); index += 1) {
+      String permission = profilePermissions.optString(index, "").trim();
+      if (allowed.contains(permission)) {
+        permissions.add(permission);
+      }
+    }
   }
 
   TableOrder activeOrderForTable(String tableId) {

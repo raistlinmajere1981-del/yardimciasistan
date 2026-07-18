@@ -26,6 +26,12 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
   await page.addInitScript(({ setupData, dashboardData }) => {
+    let currentDashboardData = dashboardData;
+    const mutateDevice = (deviceId, mutation, message) => {
+      const devices = currentDashboardData.androidDevices.map((device) => device.deviceId === deviceId ? mutation(device) : device);
+      currentDashboardData = { ...currentDashboardData, androidDevices: devices };
+      return { ok: true, message, devices };
+    };
     window.__openedExternalUrls = [];
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
@@ -38,7 +44,17 @@ try {
         backupPath: dashboardData.backupPath,
         setup: setupData
       }),
-      getDashboardData: async () => dashboardData,
+      getDashboardData: async () => currentDashboardData,
+      setAndroidDeviceRole: async (deviceId, role) => mutateDevice(deviceId, (device) => ({
+        ...device,
+        role,
+        permissions: role === "admin"
+          ? [...new Set([...device.permissions, "table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"])]
+          : device.permissions.filter((permission) => !["table_order.close_paid", "settings.view", "settings.edit", "android_devices.view", "android_devices.manage"].includes(permission))
+      }), role === "admin" ? "Telefon yönetici yapıldı." : "Telefon personel yapıldı."),
+      setAndroidDeviceActive: async (deviceId, active) => mutateDevice(deviceId, (device) => ({ ...device, isActive: active }), active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi."),
+      resetAndroidDevicePermissions: async (deviceId) => mutateDevice(deviceId, (device) => device, "Telefon yetkileri rol varsayılanına döndürüldü."),
+      revokeAndroidDevice: async (deviceId) => mutateDevice(deviceId, (device) => ({ ...device, isActive: false, revokedAt: new Date().toISOString() }), "Telefon kaldırıldı ve erişimi kapatıldı."),
       getAiWorkspaceHistory: async () => [],
       markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
       openExternal: async (url) => {
@@ -54,6 +70,16 @@ try {
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page.getByRole("button", { name: "Ayarlar" }).click();
+  const androidDeviceSection = page.locator(".settings-android-devices-section");
+  await expect(androidDeviceSection.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText(/Hesap kapatamaz/)).toBeVisible();
+  await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
+  await expect(androidDeviceSection.getByText("Yönetici", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText(/Hesap kapatabilir/)).toBeVisible();
+  await androidDeviceSection.getByRole("button", { name: "Personel Yap" }).click();
+  await expect(androidDeviceSection.getByText("Telefon personel yapıldı.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(page.locator(".setup-footer")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Panele Dön" })).toHaveCount(0);
@@ -1228,9 +1254,10 @@ try {
     const box = section.getBoundingClientRect();
     return { x: box.x, y: box.y, width: box.width, height: box.height };
   }));
-  expect(basicSettingsBoxes).toHaveLength(4);
+  expect(basicSettingsBoxes).toHaveLength(5);
   expect(new Set(basicSettingsBoxes.map((box) => Math.round(box.x))).size).toBe(2);
-  expect(basicSettingsBoxes.every((box) => box.y + box.height <= 768)).toBe(true);
+  expect(basicSettingsBoxes.slice(0, 4).every((box) => box.y + box.height <= 768)).toBe(true);
+  await expect(compactPage.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
   await compactPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await compactPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
   await expect(compactPage.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
@@ -1662,6 +1689,41 @@ function createDashboardFixture() {
         updatedAt: "2026-07-11T10:15:00+03:00"
       }
     ],
+    androidDevices: [
+      {
+        id: "android_device_smoke_001",
+        deviceId: "android-smoke-device-001",
+        deviceName: "Smoke Personel Telefonu",
+        appVersion: "0.1.0-smoke",
+        role: "staff",
+        isActive: true,
+        permissions: [
+          "customer.view",
+          "reservation.view",
+          "room.view",
+          "room.update_status",
+          "daily_task.view",
+          "daily_task.complete",
+          "daily_task.reopen",
+          "table.view",
+          "table.update_status",
+          "table_order.view",
+          "table_order.open",
+          "table_order.add_item",
+          "table_order.update_item",
+          "table_order.remove_item",
+          "table_order.set_preparing",
+          "table_order.set_served",
+          "table_order.set_payment_waiting",
+          "menu.view"
+        ],
+        firstSeenAt: "2026-07-18T08:00:00+03:00",
+        lastSeenAt: "2026-07-18T12:30:00+03:00",
+        createdAt: "2026-07-18T08:00:00+03:00",
+        updatedAt: "2026-07-18T12:30:00+03:00",
+        revokedAt: ""
+      }
+    ],
     menu: {
       categories: [],
       items: [],
@@ -1824,6 +1886,7 @@ function createCompactUiFixture() {
     title: `${requests[index].customer_name} - ${index + 1} gece`,
     startDate: `2026-07-${18 + index}`,
     endDate: `2026-07-${20 + index}`,
+    time: index === 0 ? "00:01" : "",
     guestCount: index + 2,
     roomIds: [rooms[index].id],
     notes: "Balkon tercihi ve geç giriş notu uzun kart oluşturmadan özetlenir."

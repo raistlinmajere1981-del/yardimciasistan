@@ -671,6 +671,45 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   const requestBeforeAnswer = preparedMessageResult.dashboardData.requests.find((request) => request.id === "request_smoke_customer_001");
   assert.ok(requestBeforeAnswer);
 
+  const deniedStaffAnswer = database.applyAndroidAction(androidAction("android_action_request_staff_denied_001", "customer_request_mark_answered", {
+    request_id: "request_smoke_customer_001",
+    expected_updated_at: requestBeforeAnswer.updated_at
+  }));
+  assert.equal(deniedStaffAnswer.ok, false);
+  assert.match(deniedStaffAnswer.message, /yetkisi yok/i);
+  const automaticallyRegisteredDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-smoke-device");
+  assert.ok(automaticallyRegisteredDevice);
+  assert.equal(automaticallyRegisteredDevice.role, "staff");
+  assert.equal(automaticallyRegisteredDevice.isActive, true);
+  assert.equal(automaticallyRegisteredDevice.permissions.includes("customer.mark_answered"), false);
+
+  const malformedPermissionDb = new DatabaseSync(database.databasePath);
+  try {
+    malformedPermissionDb
+      .prepare("UPDATE android_devices SET permissions_json = ? WHERE device_id = ?")
+      .run("{bozuk-json", "android-smoke-device");
+  } finally {
+    malformedPermissionDb.close();
+  }
+  assert.deepEqual(
+    database.getAndroidDevices().find((device) => device.deviceId === "android-smoke-device")?.permissions,
+    []
+  );
+  const roomBeforeMalformedPermission = database.getDashboardData().rooms[0];
+  assert.ok(roomBeforeMalformedPermission);
+  const malformedPermissionAction = database.applyAndroidAction(androidAction("android_action_malformed_permissions_denied_001", "room_status_update", {
+    room_id: roomBeforeMalformedPermission.id,
+    status: roomBeforeMalformedPermission.status === "maintenance" ? "cleaning" : "maintenance",
+    expected_updated_at: roomBeforeMalformedPermission.updatedAt
+  }));
+  assert.equal(malformedPermissionAction.ok, false);
+  assert.match(malformedPermissionAction.message, /yetkisi yok/i);
+  assert.equal(
+    database.getDashboardData().rooms.find((room) => room.id === roomBeforeMalformedPermission.id)?.status,
+    roomBeforeMalformedPermission.status
+  );
+  assert.equal(database.setAndroidDeviceRole("android-smoke-device", "admin").ok, true);
+
   const answeredRequestResult = database.applyAndroidAction(androidAction("android_action_request_answered_001", "customer_request_mark_answered", {
     request_id: "request_smoke_customer_001",
     expected_updated_at: requestBeforeAnswer.updated_at
@@ -766,8 +805,9 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   const taskCancelResult = database.applyAndroidAction(androidAction("android_action_task_cancel_001", "daily_task_cancel", {
     task_id: "task_demo_001"
   }));
-  assert.equal(taskCancelResult.ok, true);
-  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "cancelled");
+  assert.equal(taskCancelResult.ok, false);
+  assert.match(taskCancelResult.message, /desteklenmiyor/i);
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "done");
 
   const taskReopenResult = database.applyAndroidAction(androidAction("android_action_task_reopen_001", "daily_task_reopen", {
     task_id: "task_demo_001"
@@ -967,6 +1007,9 @@ function androidAction(id, actionType, payload) {
     payload,
     created_at: "2026-07-17T10:00:00.000Z",
     device_id: "android-smoke-device",
+    device_name: "DB Smoke Telefonu",
+    app_version: "0.1.0-smoke",
+    last_seen_at: "2026-07-17T10:00:01.000Z",
     status: "pending",
     error_message: "",
     processed_at: ""

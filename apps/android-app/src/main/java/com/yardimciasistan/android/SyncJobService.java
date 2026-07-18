@@ -15,10 +15,6 @@ import java.util.concurrent.Executors;
 public final class SyncJobService extends JobService {
   private static final int JOB_ID = 0x594153;
   private static final long PERIOD_MS = 15L * 60L * 1000L;
-  private static final String PREFS_NAME = "yardimci_asistan_android";
-  private static final String KEY_WEB_MODULE_URL = "web_module_url";
-  private static final String KEY_SYNC_SECRET = "sync_secret";
-  private static final String KEY_DEVICE_ID = "device_id";
 
   private ExecutorService executor;
 
@@ -68,14 +64,14 @@ public final class SyncJobService extends JobService {
   }
 
   private void syncOnce() throws Exception {
-    SharedPreferences preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-    String baseUrl = preferences.getString(KEY_WEB_MODULE_URL, "");
-    String syncSecret = preferences.getString(KEY_SYNC_SECRET, "");
-    String deviceId = preferences.getString(KEY_DEVICE_ID, "");
+    SharedPreferences preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
+    ConnectionSettings.ensureDefaults(preferences);
+    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
+    String syncSecret = ConnectionSettings.syncSecret(preferences);
+    DeviceIdentity identity = DeviceIdentity.loadOrCreate(this, preferences);
     baseUrl = baseUrl == null ? "" : baseUrl.trim();
     syncSecret = syncSecret == null ? "" : syncSecret.trim();
-    deviceId = deviceId == null ? "" : deviceId.trim();
-    if (baseUrl.isEmpty() || syncSecret.isEmpty() || deviceId.isEmpty()) {
+    if (baseUrl.isEmpty() || syncSecret.isEmpty() || identity.deviceId.isEmpty()) {
       return;
     }
 
@@ -86,12 +82,12 @@ public final class SyncJobService extends JobService {
       if (!pending.matchesTarget(baseUrl, syncSecret)) {
         continue;
       }
-      client.enqueueAction(baseUrl, syncSecret, deviceId, pending.id, pending.type, pending.payload);
+      client.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
       outbox.remove(pending.id);
     }
 
-    OperationCache cache = new OperationCache(preferences);
-    HostingSyncClient.FetchResult fetched = client.fetchOperations(baseUrl, syncSecret, deviceId, cache.revision());
+    OperationCache cache = new OperationCache(preferences, identity.deviceId);
+    HostingSyncClient.FetchResult fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision());
     if (!fetched.notModified && fetched.data != null) {
       cache.save(fetched.payload);
     }

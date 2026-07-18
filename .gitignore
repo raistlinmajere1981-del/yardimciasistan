@@ -4,6 +4,7 @@ dist-electron/
 dist-renderer/
 apps/android-app/build/
 apps/android-app/.debug/
+apps/android-app/connection.local.json
 coverage/
 artifacts/
 test-results/

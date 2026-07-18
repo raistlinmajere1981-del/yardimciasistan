@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,8 @@ const generatedJavaDir = join(buildDir, "generated", "source", "r");
 const outputDir = join(buildDir, "outputs", "apk", "debug");
 const outputApk = join(outputDir, "yardimci-asistan-debug.apk");
 const debugKeystore = join(appDir, ".debug", "yardimci-asistan-debug.keystore");
+const connectionConfigPath = join(appDir, "connection.local.json");
+const productionWebModuleUrl = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
 
 rmSync(buildDir, { recursive: true, force: true });
 mkdirSync(join(buildDir, "intermediates"), { recursive: true });
@@ -61,6 +63,8 @@ run(aapt2, [
   "--debug-mode",
   compiledResources
 ]);
+
+const connectionDefaults = generateConnectionDefaults();
 
 const javaFiles = [
   ...collectFiles(join(appDir, "src", "main", "java"), ".java"),
@@ -122,6 +126,77 @@ console.log(`android-build-ok: ${outputApk}`);
 console.log(packageLine);
 console.log(`android-sdk: ${sdkDir}`);
 console.log(`compile-sdk: android-${platform.api} build-tools-${buildTools.version}`);
+console.log(`android-connection-defaults: ${connectionDefaults.webModuleUrl} (${connectionDefaults.syncSecret ? "sync secret embedded" : "sync secret not configured"})`);
+
+function generateConnectionDefaults() {
+  let localConfig = {};
+  if (existsSync(connectionConfigPath)) {
+    try {
+      localConfig = JSON.parse(readFileSync(connectionConfigPath, "utf8"));
+    } catch (error) {
+      throw new Error(`Android bağlantı dosyası okunamadı: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const webModuleUrl = normalizeWebModuleUrl(
+    firstNonEmpty(process.env.YARDIMCI_ASISTAN_ANDROID_WEB_MODULE_URL, localConfig.web_module_url, productionWebModuleUrl)
+  );
+  const syncSecret = firstNonEmpty(process.env.YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET, localConfig.sync_secret);
+  if (syncSecret && syncSecret.length < 16) {
+    throw new Error("Android varsayılan sync anahtarı en az 16 karakter olmalı.");
+  }
+
+  const packageDir = join(generatedJavaDir, "com", "yardimciasistan", "android");
+  mkdirSync(packageDir, { recursive: true });
+  writeFileSync(join(packageDir, "ConnectionDefaults.java"), [
+    "package com.yardimciasistan.android;",
+    "",
+    "final class ConnectionDefaults {",
+    `  static final String WEB_MODULE_URL = ${javaString(webModuleUrl)};`,
+    `  static final String SYNC_SECRET = ${javaString(syncSecret)};`,
+    "",
+    "  private ConnectionDefaults() {}",
+    "}",
+    ""
+  ].join("\n"), { mode: 0o600 });
+
+  return { webModuleUrl, syncSecret };
+}
+
+function firstNonEmpty(...values) {
+  for (const value of values) {
+    const normalized = typeof value === "string" ? value.trim() : "";
+    if (normalized) {
+      return normalized;
+    }
+  }
+  return "";
+}
+
+function normalizeWebModuleUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Android varsayılan web modül adresi geçerli bir URL olmalı.");
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("Android varsayılan web modül adresi HTTP veya HTTPS kullanmalı.");
+  }
+  url.hash = "";
+  url.search = "";
+  return url.toString().replace(/\/$/, "");
+}
+
+function javaString(value) {
+  return `"${value
+    .replaceAll("\\", "\\\\")
+    .replaceAll('"', '\\"')
+    .replace(/\r/g, "\\r")
+    .replace(/\n/g, "\\n")
+    .replace(/\t/g, "\\t")
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, (character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`)}"`;
+}
 
 function findAndroidSdk() {
   const candidates = [

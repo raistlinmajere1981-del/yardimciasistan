@@ -1,6 +1,9 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  ANDROID_ADMIN_PERMISSIONS,
+  ANDROID_PERMISSIONS,
+  ANDROID_STAFF_PERMISSIONS,
   acknowledgeRequests,
   createSyncEndpointUrl,
   getSyncCapabilities,
@@ -11,7 +14,8 @@ const {
   pushAndroidSnapshot,
   pushMenu,
   pullRequests,
-  PhpHostingSyncTransport
+  PhpHostingSyncTransport,
+  resolveAndroidActionPermission
 } = require("../dist");
 
 test("createSyncEndpointUrl creates the mini API sync endpoint", () => {
@@ -220,6 +224,13 @@ test("pullAndroidActions reads pending mobile commands", async () => {
         error_message: "",
         processed_at: ""
       }],
+      devices: [{
+        device_id: "android-device-001",
+        device_name: "Test Telefonu",
+        app_version: "0.1.0",
+        first_seen_at: "2026-07-17T09:59:00+03:00",
+        last_seen_at: "2026-07-17T10:00:01+03:00"
+      }],
       count: 1,
       pulled_at: "2026-07-17T10:00:01+03:00"
     }), { status: 200, headers: { "Content-Type": "application/json" } });
@@ -234,6 +245,7 @@ test("pullAndroidActions reads pending mobile commands", async () => {
 
   assert.equal(result.ok, true);
   assert.equal(result.actions[0].action_type, "room_status_update");
+  assert.equal(result.devices[0].device_name, "Test Telefonu");
   assert.equal(calls[0].action, "pull_android_actions");
   assert.equal(calls[0].limit, 25);
 });
@@ -390,6 +402,13 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
           updated_at: "2026-07-10T14:30:00+03:00"
         }
       ],
+      androidPermissions: {
+        "android-device-001": {
+          role: "staff",
+          is_active: true,
+          permissions: [...ANDROID_STAFF_PERMISSIONS]
+        }
+      },
       updated_at: "2026-07-10T14:30:00+03:00"
     },
     fetchImpl
@@ -400,7 +419,42 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
   assert.equal(calls[0].body.action, "publish_android_snapshot");
   assert.equal(calls[0].body.snapshot.summary.available_rooms, 4);
   assert.equal(calls[0].body.snapshot.daily_tasks[0].id, "task_001");
+  assert.equal(calls[0].body.snapshot.androidPermissions["android-device-001"].role, "staff");
   assert.equal("sync_secret" in calls[0].body, false);
+});
+
+test("Android role presets and action permission mapping stay explicit", () => {
+  assert.deepEqual(ANDROID_ADMIN_PERMISSIONS, ANDROID_PERMISSIONS);
+  assert.deepEqual(ANDROID_STAFF_PERMISSIONS, [
+    "customer.view",
+    "reservation.view",
+    "room.view",
+    "room.update_status",
+    "daily_task.view",
+    "daily_task.complete",
+    "daily_task.reopen",
+    "table.view",
+    "table.update_status",
+    "table_order.view",
+    "table_order.open",
+    "table_order.add_item",
+    "table_order.update_item",
+    "table_order.remove_item",
+    "table_order.set_preparing",
+    "table_order.set_served",
+    "table_order.set_payment_waiting",
+    "menu.view"
+  ]);
+  assert.equal(resolveAndroidActionPermission("customer_request_mark_answered"), "customer.mark_answered");
+  assert.equal(resolveAndroidActionPermission("customer_request_reopen"), "customer.respond");
+  assert.equal(resolveAndroidActionPermission("reservation_cancel"), "reservation.cancel");
+  assert.equal(resolveAndroidActionPermission("table_order_set_preparing"), "table_order.set_preparing");
+  assert.equal(resolveAndroidActionPermission("table_order_set_served"), "table_order.set_served");
+  assert.equal(resolveAndroidActionPermission("table_order_set_payment_waiting"), "table_order.set_payment_waiting");
+  assert.equal(resolveAndroidActionPermission("table_order_close_paid"), "table_order.close_paid");
+  assert.equal(resolveAndroidActionPermission("table_order_cancel"), "table_order.cancel");
+  assert.equal(resolveAndroidActionPermission("table_order_close", { status: "paid" }), "table_order.close_paid");
+  assert.equal(resolveAndroidActionPermission("unsupported_action"), null);
 });
 
 test("pushAiSettings sends the complete snake_case settings and strips the API key from its response", async () => {

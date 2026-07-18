@@ -4671,6 +4671,185 @@ button {
   gap: 8px;
 }
 
+.settings-android-devices-section {
+  display: grid;
+  gap: 10px;
+}
+
+.android-devices-heading,
+.android-device-identity,
+.android-device-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.android-devices-heading {
+  justify-content: space-between;
+}
+
+.android-devices-heading > div {
+  min-width: 0;
+}
+
+.android-devices-heading > span,
+.device-role,
+.device-state {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.android-devices-heading > span {
+  color: var(--muted);
+  background: var(--surface-neutral);
+  border: 1px solid var(--line);
+}
+
+.android-devices-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px;
+  color: var(--muted);
+  background: var(--surface-neutral);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-md);
+}
+
+.android-devices-empty > div {
+  display: grid;
+  gap: 3px;
+}
+
+.android-devices-empty strong {
+  color: var(--ink);
+}
+
+.android-device-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.android-device-card {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+  padding: 11px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.android-device-card.is-inactive {
+  background: var(--surface-disabled);
+}
+
+.android-device-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: 9px;
+  place-items: center;
+}
+
+.android-device-identity > div:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+}
+
+.android-device-identity code {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.android-device-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.device-role.role-admin {
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.device-role.role-staff {
+  color: var(--warning-ink);
+  background: var(--warning-soft);
+}
+
+.device-state.is-active {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.device-state.is-inactive {
+  color: var(--muted);
+  background: var(--surface-neutral);
+}
+
+.android-device-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.android-device-details div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.android-device-details dt {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+}
+
+.android-device-details dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.android-device-actions {
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.android-device-actions .setup-secondary {
+  min-height: 34px !important;
+  padding: 5px 8px !important;
+}
+
+.android-device-actions .android-device-remove {
+  color: var(--red);
+  background: var(--danger-soft);
+  border-color: var(--danger-line);
+}
+
+.android-device-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* Aşama 4: Menü, Ayarlar ve ortak koyu tema son dokunuşları */
 .status-badge {
   border: 1px solid color-mix(in srgb, currentColor 18%, transparent);
@@ -4712,6 +4891,11 @@ button {
 .setup-shell.is-embedded .settings-daily-section {
   grid-column: 1 / -1;
   grid-row: 3;
+}
+
+.setup-shell.is-embedded .settings-android-devices-section {
+  grid-column: 1 / -1;
+  grid-row: 4;
 }
 
 .setup-shell.is-embedded .settings-advanced-grid {
@@ -6464,9 +6648,14 @@ button {
   .setup-shell.is-embedded .settings-daily-section,
   .setup-shell.is-embedded .settings-web-section,
   .setup-shell.is-embedded .setup-ai-section,
-  .setup-shell.is-embedded .settings-storage-section {
+  .setup-shell.is-embedded .settings-storage-section,
+  .setup-shell.is-embedded .settings-android-devices-section {
     grid-column: 1;
     grid-row: auto;
+  }
+
+  .android-device-list {
+    grid-template-columns: 1fr;
   }
 
   .pension-reservations-section,

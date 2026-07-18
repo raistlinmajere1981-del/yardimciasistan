@@ -64,6 +64,24 @@ Kök dizinden APK üretmek için:
 npm run build:android
 ```
 
+Canlı bağlantı değerlerini her APK güncellemesinde yeniden girmemek için bir kez
+yerel derleme yapılandırmasını oluşturun:
+
+```bash
+YARDIMCI_ASISTAN_ANDROID_WEB_MODULE_URL="https://yardimciasistan.alwaysdata.net/yardimci-asistan" \
+YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET="üretim-sync-anahtarı" \
+npm run configure:android:connection
+```
+
+Komut `apps/android-app/connection.local.json` dosyasını `0600` izinle oluşturur.
+Dosya git tarafından yok sayılır; sonraki derlemeler URL ve anahtarı APK içine sabit
+varsayılan olarak gömer. İlk açılışta bu değerler yerel ayarlara alınır, mevcut kullanıcı
+ayarı varsa üzerine yazılmaz ve normal APK güncellemelerinde korunur. Yetkili cihazlar
+gerekirse Ayarlar ekranından farklı bir bağlantıya geçebilir.
+
+APK içine gömülen bir anahtar tersine mühendislikle çıkarılabilir. APK işletme dışına
+dağıtılırsa hosting anahtarını döndürün ve yeni APK yayınlayın.
+
 Çıktı:
 
 ```text

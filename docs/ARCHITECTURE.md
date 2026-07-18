@@ -170,6 +170,21 @@ firma hostingindeki güvenli action queue'ya yazılır; PC uygulaması kuyruğu 
 bağlantıyla çeker, işlemi yerel veriye bir kez uygular ve güncel mobil snapshot'ı yeniden
 yayınlar.
 
+Her Android kurulumu ilk açılışta kalıcı bir cihaz kimliği üretir. Hosting mini API,
+özet isteği veya action sırasında görülen cihaz kimliği, cihaz adı ve uygulama sürümünü
+hafif bir cihaz-görülme kaydında tutar; masaüstü bu kayıtları dışarı doğru senkron
+bağlantısıyla alıp kendi `android_devices` tablosuna aktarır. Bilinmeyen cihaz ilk
+görülmede aktif `staff` profiliyle başlar. Rol, aktiflik ve gerçek yetki kaynağı yalnız
+masaüstü SQLite'tır; Android'in bildirdiği role veya yetkiye güvenilmez.
+
+Masaüstünün yayınladığı Android snapshot'ı cihaz bazlı etkili yetki haritasını da taşır.
+Telefon yalnız kendi kalıcı kimliğine ait profili kullanarak yetkisiz düğmeleri gizler.
+Bir kez çözümlenen profil ayrı bir yerel kayıtta korunur; sonraki snapshot profili geçici
+olarak içermiyorsa cihaz staff varsayımına açılmaz. `*.view` izinleri ekran içindeki veri
+bölümlerini, `settings.edit` ise bağlantı alanlarını ayrı ayrı sınırlar.
+Asıl güvenlik sınırı yine masaüstündedir: action apply transaction'ı cihazın aktifliğini
+ve action türünün gerektirdiği izni kontrol etmeden yerel operasyon verisini değiştirmez.
+
 Telefon action kimliğini gönderimden önce üretir ve action'ı kalıcı yerel outbox'ta tutar.
 Belirsiz HTTP yanıtlarında aynı kimlik tekrar kullanılır. Snapshot kaynaklı değişiklikler
 beklenen `updated_at` sürümünü taşır; masaüstü daha yeni bir kayıt görürse stale işlemi

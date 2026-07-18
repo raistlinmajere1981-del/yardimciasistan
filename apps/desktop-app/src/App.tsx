@@ -40,6 +40,7 @@ import type {
   AiWorkspaceHistoryEntry,
   AiWorkspaceMode,
   CreateManualRequestInput,
+  DesktopAndroidDevice,
   DesktopDashboardData,
   DesktopSetupData,
   SaveInitialSetupInput
@@ -481,7 +482,8 @@ const defaultDashboardData: DesktopDashboardData = {
       reservationCount: 1,
       updatedAt: "2026-07-10T14:30:00+03:00"
     }
-  ]
+  ],
+  androidDevices: []
 };
 
 const defaultSetupData: DesktopSetupData = {
@@ -606,6 +608,8 @@ function App() {
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidPublishState, setAndroidPublishState] = useState<SyncState>("idle");
   const [androidPublishMessage, setAndroidPublishMessage] = useState("Android özeti henüz yayınlanmadı.");
+  const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
+  const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri masaüstünden yönetilir.");
   const modules = useMemo(
     () => ({
       rooms: setupData.modules.rooms,
@@ -823,6 +827,61 @@ function App() {
 
     setAndroidPublishState("success");
     setAndroidPublishMessage(`${result.task_count} günlük iş ile Android özeti yayınlandı.`);
+  }
+
+  async function runAndroidDeviceMutation(
+    pendingMessage: string,
+    operation: () => ReturnType<NonNullable<typeof window.yardimciDesktop>["setAndroidDeviceRole"]>
+  ) {
+    setAndroidDeviceState("loading");
+    setAndroidDeviceMessage(pendingMessage);
+    try {
+      const result = await operation();
+      setDashboardData((current) => ({ ...current, androidDevices: result.devices }));
+      setAndroidDeviceState(result.ok ? "success" : "error");
+      setAndroidDeviceMessage(result.message);
+    } catch {
+      setAndroidDeviceState("error");
+      setAndroidDeviceMessage("Telefon ayarı güncellenemedi. Uygulamayı yeniden başlatın.");
+    }
+  }
+
+  function handleSetAndroidDeviceRole(deviceId: string, role: "admin" | "staff") {
+    if (!window.yardimciDesktop) {
+      setAndroidDeviceState("error");
+      setAndroidDeviceMessage("Telefon yönetimi hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+    void runAndroidDeviceMutation(
+      role === "admin" ? "Telefon yönetici yapılıyor..." : "Telefon personel yapılıyor...",
+      () => window.yardimciDesktop!.setAndroidDeviceRole(deviceId, role)
+    );
+  }
+
+  function handleSetAndroidDeviceActive(deviceId: string, active: boolean) {
+    if (!window.yardimciDesktop) return;
+    void runAndroidDeviceMutation(
+      active ? "Telefon yeniden aktif ediliyor..." : "Telefon pasifleştiriliyor...",
+      () => window.yardimciDesktop!.setAndroidDeviceActive(deviceId, active)
+    );
+  }
+
+  function handleResetAndroidDevicePermissions(deviceId: string) {
+    if (!window.yardimciDesktop) return;
+    void runAndroidDeviceMutation(
+      "Telefon yetkileri sıfırlanıyor...",
+      () => window.yardimciDesktop!.resetAndroidDevicePermissions(deviceId)
+    );
+  }
+
+  function handleRevokeAndroidDevice(device: DesktopAndroidDevice) {
+    if (!window.yardimciDesktop || !window.confirm(`${device.deviceName || "Bu telefon"} kaldırılsın ve erişimi kapatılsın mı?`)) {
+      return;
+    }
+    void runAndroidDeviceMutation(
+      "Telefon erişimi kaldırılıyor...",
+      () => window.yardimciDesktop!.revokeAndroidDevice(device.deviceId)
+    );
   }
 
   async function openMenuPreview() {
@@ -1857,6 +1916,8 @@ function App() {
             backupMessage={backupMessage}
             androidPublishState={androidPublishState}
             androidPublishMessage={androidPublishMessage}
+            androidDeviceState={androidDeviceState}
+            androidDeviceMessage={androidDeviceMessage}
             aiConnectionTestState={aiConnectionTestState}
             aiConnectionTestMessage={aiConnectionTestMessage}
             aiModelOptions={aiModelOptions}
@@ -1864,6 +1925,10 @@ function App() {
             onTestAiConnection={handleTestAiConnection}
             onCreateBackup={handleCreateManualBackup}
             onPublishAndroid={handlePublishAndroidSnapshot}
+            onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
+            onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
+            onResetAndroidDevicePermissions={handleResetAndroidDevicePermissions}
+            onRevokeAndroidDevice={handleRevokeAndroidDevice}
             onSave={handleSaveSetup}
             onSkip={() => setActivePage("dashboard")}
             uiPreferences={uiPreferences}
@@ -2146,6 +2211,8 @@ interface SetupWizardProps {
   backupMessage?: string;
   androidPublishState?: SyncState;
   androidPublishMessage?: string;
+  androidDeviceState?: SyncState;
+  androidDeviceMessage?: string;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
   aiModelOptions: Array<{ id: string; label: string }>;
@@ -2153,6 +2220,10 @@ interface SetupWizardProps {
   onTestAiConnection: () => void;
   onCreateBackup?: () => void;
   onPublishAndroid?: () => void;
+  onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
+  onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
+  onResetAndroidDevicePermissions?: (deviceId: string) => void;
+  onRevokeAndroidDevice?: (device: DesktopAndroidDevice) => void;
   onSave: () => void;
   onSkip: () => void;
   uiPreferences: UiPreferences;
@@ -2170,6 +2241,8 @@ function SetupWizard({
   backupMessage = "Yedekleme bekliyor.",
   androidPublishState = "idle",
   androidPublishMessage = "Telefon özeti henüz yayınlanmadı.",
+  androidDeviceState = "idle",
+  androidDeviceMessage = "Telefon rolleri masaüstünden yönetilir.",
   aiConnectionTestState,
   aiConnectionTestMessage,
   aiModelOptions,
@@ -2177,6 +2250,10 @@ function SetupWizard({
   onTestAiConnection,
   onCreateBackup,
   onPublishAndroid,
+  onSetAndroidDeviceRole,
+  onSetAndroidDeviceActive,
+  onResetAndroidDevicePermissions,
+  onRevokeAndroidDevice,
   onSave,
   onSkip,
   uiPreferences,
@@ -2364,6 +2441,17 @@ function SetupWizard({
             AI cevap önerileri açık
           </label>
         </div>
+        {embedded && form.androidEnabled && (
+          <AndroidDevicesSection
+            devices={dashboardData?.androidDevices ?? []}
+            state={androidDeviceState}
+            message={androidDeviceMessage}
+            onSetRole={onSetAndroidDeviceRole}
+            onSetActive={onSetAndroidDeviceActive}
+            onResetPermissions={onResetAndroidDevicePermissions}
+            onRevoke={onRevokeAndroidDevice}
+          />
+        )}
         </div>}
 
         {settingsLevel === "advanced" && <div className="settings-section-grid settings-advanced-grid"><div className="setup-section settings-web-section">
@@ -2524,6 +2612,85 @@ function SetupWizard({
         </footer>}
       </section>
     </main>
+  );
+}
+
+interface AndroidDevicesSectionProps {
+  devices: DesktopAndroidDevice[];
+  state: SyncState;
+  message: string;
+  onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
+  onSetActive?: (deviceId: string, active: boolean) => void;
+  onResetPermissions?: (deviceId: string) => void;
+  onRevoke?: (device: DesktopAndroidDevice) => void;
+}
+
+function AndroidDevicesSection({
+  devices,
+  state,
+  message,
+  onSetRole,
+  onSetActive,
+  onResetPermissions,
+  onRevoke
+}: AndroidDevicesSectionProps) {
+  const busy = state === "loading";
+  return (
+    <section className="setup-section settings-android-devices-section">
+      <div className="setup-section-title android-devices-heading">
+        <div>
+          <p>Telefon Yetkileri</p>
+          <h2>Android Cihazlar</h2>
+        </div>
+        <span>{devices.length} cihaz</span>
+      </div>
+      <p className="setup-section-description">Rol ve işlem yetkileri yalnız bu bilgisayardan değiştirilebilir. Personel günlük sipariş alabilir; hesabı ödendi olarak kapatamaz.</p>
+      {devices.length === 0 ? (
+        <div className="android-devices-empty">
+          <Smartphone size={22} aria-hidden="true" />
+          <div><strong>Henüz Android cihaz görülmedi.</strong><span>Telefon web modülüne bağlandığında burada personel olarak görünür.</span></div>
+        </div>
+      ) : (
+        <div className="android-device-list">
+          {devices.map((device) => {
+            const canClosePaid = device.permissions.includes("table_order.close_paid");
+            const shortId = device.deviceId.length > 22
+              ? `${device.deviceId.slice(0, 12)}…${device.deviceId.slice(-6)}`
+              : device.deviceId;
+            return (
+              <article className={`android-device-card${device.isActive ? "" : " is-inactive"}`} key={device.deviceId}>
+                <div className="android-device-identity">
+                  <span className="android-device-icon"><Smartphone size={18} aria-hidden="true" /></span>
+                  <div>
+                    <strong>{device.deviceName || "Android Telefon"}</strong>
+                    <code title={device.deviceId}>{shortId}</code>
+                  </div>
+                  <div className="android-device-badges">
+                    <span className={`device-role role-${device.role}`}>{device.role === "admin" ? "Yönetici" : "Personel"}</span>
+                    <span className={`device-state${device.isActive ? " is-active" : " is-inactive"}`}>{device.isActive ? "Aktif" : "Pasif"}</span>
+                  </div>
+                </div>
+                <dl className="android-device-details">
+                  <div><dt>Son bağlantı</dt><dd>{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : "Henüz yok"}</dd></div>
+                  <div><dt>Uygulama</dt><dd>{device.appVersion || "Sürüm bilinmiyor"}</dd></div>
+                  <div><dt>Yetkiler</dt><dd>{device.permissions.length} izin · {canClosePaid ? "Hesap kapatabilir" : "Hesap kapatamaz"}</dd></div>
+                </dl>
+                <div className="android-device-actions">
+                  <button className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "admin")} disabled={busy || device.role === "admin"}>
+                    <ShieldCheck size={15} aria-hidden="true" /> Yönetici Yap
+                  </button>
+                  <button className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "staff")} disabled={busy || device.role === "staff"}>Personel Yap</button>
+                  <button className="setup-secondary" type="button" onClick={() => onSetActive?.(device.deviceId, !device.isActive)} disabled={busy}>{device.isActive ? "Pasifleştir" : "Aktif Et"}</button>
+                  <button className="setup-secondary" type="button" onClick={() => onResetPermissions?.(device.deviceId)} disabled={busy}>Yetkileri Sıfırla</button>
+                  <button className="setup-secondary android-device-remove" type="button" onClick={() => onRevoke?.(device)} disabled={busy || Boolean(device.revokedAt)}>Kaldır</button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+      <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>
+    </section>
   );
 }
 

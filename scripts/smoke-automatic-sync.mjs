@@ -9,7 +9,10 @@ import process from "node:process";
 
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
+const {
+  SyncCoordinator,
+  supportsAndroidDevicePermissionSync
+} = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
 
 const syncSecret = "automatic-sync-secret-12345";
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-automatic-sync-"));
@@ -45,6 +48,18 @@ const database = new DesktopDatabase({
 try {
   await waitForUrl(`${baseUrl}/api/menu.php`);
   database.initialize();
+  assert.equal(supportsAndroidDevicePermissionSync({
+    schema_version: 1,
+    features: ["android_device_sightings", "android_device_permissions"]
+  }), false);
+  assert.equal(supportsAndroidDevicePermissionSync({
+    schema_version: 2,
+    features: ["android_device_sightings"]
+  }), false);
+  assert.equal(supportsAndroidDevicePermissionSync({
+    schema_version: 2,
+    features: ["android_device_sightings", "android_device_permissions"]
+  }), true);
   const setupResult = database.saveInitialSetup({
     businessName: "Otomatik Senkron Smoke",
     businessType: "pension_restaurant",
@@ -92,6 +107,8 @@ try {
     action_id: actionId,
     action_type: "room_status_update",
     device_id: "android-auto-smoke",
+    device_name: "Smoke Personel Telefonu",
+    app_version: "0.1.0-smoke",
     payload: {
       room_id: roomBefore.id,
       status: "cleaning",
@@ -124,6 +141,14 @@ try {
   const dashboard = database.getDashboardData();
   assert.ok(dashboard.requests.some((request) => request.id === requestResult.request_id));
   assert.equal(dashboard.rooms.find((room) => room.id === roomBefore.id)?.status, "cleaning");
+  const staffDevice = dashboard.androidDevices.find((device) => device.deviceId === "android-auto-smoke");
+  assert.ok(staffDevice);
+  assert.equal(staffDevice.deviceName, "Smoke Personel Telefonu");
+  assert.equal(staffDevice.appVersion, "0.1.0-smoke");
+  assert.equal(staffDevice.role, "staff");
+  assert.equal(staffDevice.isActive, true);
+  assert.equal(staffDevice.permissions.includes("table_order.open"), true);
+  assert.equal(staffDevice.permissions.includes("table_order.close_paid"), false);
   const runtime = database.getSyncRuntimeStatus();
   assert.ok(runtime.requestCursor > 0);
   assert.equal(runtime.acknowledgedCursor, runtime.requestCursor);
@@ -165,11 +190,131 @@ try {
   assert.equal(duplicateAction.status, 200);
   assert.equal((await duplicateAction.json()).deduplicated, true);
 
+  const sightingOnlySummary = await syncApi({
+    action: "android_summary",
+    device_id: "android-summary-only-smoke",
+    device_name: "Yalnız Snapshot Telefonu",
+    app_version: "0.1.0-snapshot"
+  });
+  assert.equal(sightingOnlySummary.status, 200);
+
   const secondCycle = await coordinator.runNow();
   assert.equal(secondCycle.ok, true, secondCycle.message);
   assert.equal(secondCycle.pulledRequests, 0);
   assert.equal(secondCycle.pulledActions, 0);
-  assert.equal(secondCycle.publishedJobs, 0);
+  assert.equal(secondCycle.publishedJobs, 1);
+  const sightingOnlyDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-summary-only-smoke");
+  assert.ok(sightingOnlyDevice);
+  assert.equal(sightingOnlyDevice.deviceName, "Yalnız Snapshot Telefonu");
+  assert.equal(sightingOnlyDevice.role, "staff");
+  assert.equal(sightingOnlyDevice.isActive, true);
+  const sightingOnlyProfileResponse = await syncApi({
+    action: "android_summary",
+    device_id: "android-summary-only-smoke"
+  });
+  const sightingOnlyProfile = (await sightingOnlyProfileResponse.json()).androidPermissions["android-summary-only-smoke"];
+  assert.equal(sightingOnlyProfile.role, "staff");
+  assert.equal(sightingOnlyProfile.is_active, true);
+  assert.equal(sightingOnlyProfile.permissions.includes("table_order.close_paid"), false);
+
+  const table = database.getDashboardData().tables[0];
+  const menuItem = database.getDashboardData().menu.items.find((item) => item.is_available);
+  assert.ok(table);
+  assert.ok(menuItem);
+
+  const openActionId = "android_permission_open_0001";
+  await assertQueued(await enqueueAndroidAction(openActionId, "table_order_open", {
+    table_id: table.id,
+    expected_table_updated_at: table.updatedAt
+  }));
+  const openCycle = await coordinator.runNow();
+  assert.equal(openCycle.appliedActions, 1);
+  assert.equal(openCycle.failedActions, 0);
+  let order = database.getActiveTableOrder(table.id);
+  assert.ok(order);
+
+  const addActionId = "android_permission_add_0001";
+  await assertQueued(await enqueueAndroidAction(addActionId, "table_order_add_item", {
+    order_id: order.id,
+    table_id: table.id,
+    menu_item_id: menuItem.id,
+    quantity: 2,
+    expected_order_updated_at: order.updatedAt
+  }));
+  const addCycle = await coordinator.runNow();
+  assert.equal(addCycle.appliedActions, 1);
+  assert.equal(addCycle.failedActions, 0);
+  order = database.getActiveTableOrder(table.id);
+  assert.ok(order);
+  assert.equal(order.itemCount, 2);
+
+  const paymentActionId = "android_permission_payment_0001";
+  await assertQueued(await enqueueAndroidAction(paymentActionId, "table_order_set_payment_waiting", {
+    order_id: order.id,
+    table_id: table.id,
+    expected_updated_at: order.updatedAt
+  }));
+  const paymentCycle = await coordinator.runNow();
+  assert.equal(paymentCycle.appliedActions, 1);
+  assert.equal(paymentCycle.failedActions, 0);
+  order = database.getActiveTableOrder(table.id);
+  assert.ok(order);
+  assert.equal(order.status, "payment");
+
+  const forbiddenCloseActionId = "android_permission_close_staff_0001";
+  await assertQueued(await enqueueAndroidAction(forbiddenCloseActionId, "table_order_close_paid", {
+    order_id: order.id,
+    table_id: table.id,
+    expected_updated_at: order.updatedAt
+  }));
+  const forbiddenCloseCycle = await coordinator.runNow();
+  assert.equal(forbiddenCloseCycle.appliedActions, 0);
+  assert.equal(forbiddenCloseCycle.failedActions, 1);
+  order = database.getActiveTableOrder(table.id);
+  assert.ok(order);
+  assert.equal(order.status, "payment");
+  const forbiddenCloseResult = await getAndroidAction(forbiddenCloseActionId);
+  assert.equal(forbiddenCloseResult.status, "failed");
+  assert.equal(forbiddenCloseResult.error_message, "Bu cihazın hesap kapatma yetkisi yok.");
+
+  const promoteResult = database.setAndroidDeviceRole("android-auto-smoke", "admin");
+  assert.equal(promoteResult.ok, true);
+  const profilePublishCycle = await coordinator.runNow();
+  assert.equal(profilePublishCycle.ok, true, profilePublishCycle.message);
+  assert.equal(profilePublishCycle.publishedJobs, 1);
+  const adminSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
+  const adminSummary = await adminSummaryResponse.json();
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].role, "admin");
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("table_order.close_paid"), true);
+
+  const adminCloseActionId = "android_permission_close_admin_0001";
+  await assertQueued(await enqueueAndroidAction(adminCloseActionId, "table_order_close_paid", {
+    order_id: order.id,
+    table_id: table.id,
+    expected_updated_at: order.updatedAt
+  }));
+  const adminCloseCycle = await coordinator.runNow();
+  assert.equal(adminCloseCycle.appliedActions, 1);
+  assert.equal(adminCloseCycle.failedActions, 0);
+  assert.equal(database.getActiveTableOrder(table.id), null);
+  assert.equal(database.listTableOrders().find((candidate) => candidate.id === order.id)?.status, "paid");
+
+  const deactivateResult = database.setAndroidDeviceActive("android-auto-smoke", false);
+  assert.equal(deactivateResult.ok, true);
+  const roomBeforeInactiveAction = database.getDashboardData().rooms[1] ?? database.getDashboardData().rooms[0];
+  const inactiveActionId = "android_permission_inactive_0001";
+  await assertQueued(await enqueueAndroidAction(inactiveActionId, "room_status_update", {
+    room_id: roomBeforeInactiveAction.id,
+    status: roomBeforeInactiveAction.status === "maintenance" ? "cleaning" : "maintenance",
+    expected_updated_at: roomBeforeInactiveAction.updatedAt
+  }));
+  const inactiveCycle = await coordinator.runNow();
+  assert.equal(inactiveCycle.appliedActions, 0);
+  assert.equal(inactiveCycle.failedActions, 1);
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === roomBeforeInactiveAction.id)?.status, roomBeforeInactiveAction.status);
+  const inactiveAction = await getAndroidAction(inactiveActionId);
+  assert.equal(inactiveAction.status, "failed");
+  assert.equal(inactiveAction.error_message, "Cihaz masaüstünde pasifleştirilmiş.");
 
   const automaticRequestResponse = await postJson(`${baseUrl}/api/request.php`, {
     request_type: "restaurant_reservation",
@@ -264,6 +409,8 @@ function createSnapshot(databaseInstance) {
   const data = databaseInstance.getDashboardData();
   const activeCategories = data.menu.categories.filter((category) => category.is_active);
   const categoryIds = new Set(activeCategories.map((category) => category.id));
+  const activeTableOrders = databaseInstance.listTableOrders()
+    .filter((order) => ["open", "preparing", "served", "payment"].includes(order.status));
   return {
     summary: {
       pending_daily_tasks: data.summary.pendingDailyTasks,
@@ -273,7 +420,7 @@ function createSnapshot(databaseInstance) {
       available_tables: data.summary.availableTables,
       occupied_tables: data.tables.filter((table) => table.status === "occupied").length,
       bill_waiting_tables: data.tables.filter((table) => table.status === "bill_waiting").length,
-      active_table_orders: 0,
+      active_table_orders: activeTableOrders.length,
       pending_reservations: data.summary.pendingReservations,
       prepared_whatsapp_messages: 0,
       waiting_responses: data.requests.filter((request) => ["new", "seen", "waiting_owner"].includes(request.status)).length,
@@ -314,10 +461,60 @@ function createSnapshot(databaseInstance) {
       items: data.menu.items.filter((item) => item.is_available && categoryIds.has(item.category_id)),
       updated_at: data.menu.updated_at
     },
-    table_orders: [],
+    table_orders: activeTableOrders.map((order) => ({
+      id: order.id,
+      table_id: order.tableId,
+      table_name: order.tableName,
+      status: order.status,
+      opened_at: order.openedAt,
+      total: order.total,
+      item_count: order.itemCount,
+      items: order.items.map((item) => ({
+        id: item.id,
+        order_id: item.orderId,
+        menu_item_id: item.menuItemId,
+        product_name: item.productName,
+        unit_price: item.unitPrice,
+        currency: item.currency,
+        quantity: item.quantity,
+        line_total: item.lineTotal,
+        status: item.status,
+        updated_at: item.updatedAt
+      })),
+      updated_at: order.updatedAt
+    })),
     messages: [],
+    androidPermissions: databaseInstance.getAndroidPermissionSnapshot(),
     updated_at: new Date().toISOString()
   };
+}
+
+async function enqueueAndroidAction(actionId, actionType, payload) {
+  return syncApi({
+    action: "enqueue_android_action",
+    action_id: actionId,
+    action_type: actionType,
+    device_id: "android-auto-smoke",
+    device_name: "Smoke Personel Telefonu",
+    app_version: "0.1.0-smoke",
+    payload
+  });
+}
+
+async function assertQueued(response) {
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.ok, true);
+  assert.equal(result.action.status, "pending");
+}
+
+async function getAndroidAction(actionId) {
+  const response = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  const action = result.actions.find((candidate) => candidate.id === actionId);
+  assert.ok(action, `Android action result not found: ${actionId}`);
+  return action;
 }
 
 async function syncApi(payload) {
@@ -341,11 +538,13 @@ function assertCapabilitiesShape() {
     message: "Senkron özellikleri alındı.",
     protocol_version: 2,
     storage: "sqlite",
-    schema_version: 1,
+    schema_version: 2,
     features: [
       "request_cursor",
       "request_acknowledgement",
       "android_action_queue",
+      "android_device_sightings",
+      "android_device_permissions",
       "versioned_publications",
       "idempotent_publications",
       "server_revision"

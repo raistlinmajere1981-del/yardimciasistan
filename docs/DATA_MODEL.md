@@ -57,6 +57,40 @@ bağlantısına otomatik gönderilemez. Çok adımlı action payload'ları
 yalnız gönderildiğinde kontrol edilir; bu sayede eski kuyruk kayıtları geriye dönük uyumlu
 kalırken yeni kayıtlar stale snapshot üzerine yazamaz.
 
+## Android Cihaz ve Yetki Modeli
+
+Android uygulaması ilk açılışta bir kez `device_id` üretir ve uygulama verisinde kalıcı
+olarak saklar. Özet istekleri ve action kayıtları ayrıca cihaz adı ile uygulama sürümünü
+taşıyabilir. Hosting bu bilgileri yalnız masaüstüne ulaştıran bir görülme kaydı olarak
+tutar; rol ve yetki kararı hostingde verilmez.
+
+Masaüstü SQLite kaydı:
+
+```json
+{
+  "id": "android_device_001",
+  "device_id": "android-device-001",
+  "device_name": "Samsung SM-A546E",
+  "app_version": "0.1.0",
+  "role": "staff",
+  "is_active": true,
+  "permissions_json": "[\"table.view\",\"table_order.open\"]",
+  "first_seen_at": "2026-07-18T10:00:00+03:00",
+  "last_seen_at": "2026-07-18T10:15:00+03:00",
+  "created_at": "2026-07-18T10:00:00+03:00",
+  "updated_at": "2026-07-18T10:15:00+03:00",
+  "revoked_at": null
+}
+```
+
+`role` yalnız `admin` veya `staff` olabilir. Bilinmeyen cihaz aktif `staff` profiliyle
+oluşturulur. Admin preset'i tüm Android izinlerini, staff preset'i günlük operasyon için
+tanımlanan sınırlı izinleri `permissions_json` alanına yazar. Cihaz pasifleştirildiğinde
+hiçbir action uygulanmaz. Android snapshot'ındaki `androidPermissions` haritası UI için
+etkili profili taşır; güvenlik kontrolü her zaman masaüstü kaydından yeniden yapılır.
+`permissions_json` geçersiz veya çözümlenemez durumdaysa masaüstü boş izin kümesi kullanır
+ve action'ı reddeder; bozuk güvenlik kaydı staff preset'ine fail-open dönmez.
+
 ## Temel Veri Prensipleri
 
 1. Her kayıt benzersiz bir `id` alanına sahip olmalıdır.
@@ -877,6 +911,7 @@ Temel tablolar:
 sync_meta
 web_requests
 android_actions
+android_device_sightings
 publications
 publication_receipts
 sync_clients
@@ -915,6 +950,7 @@ sync_records
 sync_runtime
 sync_outbox
 sync_outbox_revisions
+android_devices
 events
 ```
 
