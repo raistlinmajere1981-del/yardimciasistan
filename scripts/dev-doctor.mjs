@@ -11,6 +11,7 @@ checkCommand("node", ["--version"], true);
 checkCommand("npm", ["--version"], true);
 checkCommand("npx", ["electron", "--version"], false);
 checkCommand("php", ["-v"], false);
+checkPhpPdoSqlite();
 checkCommand("Xvfb", ["-help"], false);
 checkCommand("xvfb-run", ["--help"], false);
 checkCommand("magick", ["-version"], false);
@@ -77,6 +78,18 @@ function checkCommand(command, args, required) {
     required,
     ok: result.status === 0,
     detail: result.status === 0 ? output : "bulunamadı veya çalışmadı"
+  });
+}
+
+function checkPhpPdoSqlite() {
+  const result = spawnSync("php", ["-r", "exit(class_exists('PDO') && in_array('sqlite', PDO::getAvailableDrivers(), true) ? 0 : 1);"], {
+    encoding: "utf8"
+  });
+  checks.push({
+    name: "PHP PDO_SQLITE",
+    required: true,
+    ok: result.status === 0,
+    detail: result.status === 0 ? "etkin" : "hosting ve yerel PHP için pdo_sqlite eklentisi gerekli"
   });
 }
 

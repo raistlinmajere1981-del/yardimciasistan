@@ -28,6 +28,7 @@ import type {
   UpdateDailyTaskStatusInput,
   MarkWhatsAppMessageSentInput
 } from "./database";
+import type { AutomaticSyncCycleResult, AutomaticSyncStatus } from "./sync-coordinator";
 
 export interface AiConnectionTestInput {
   provider: string;
@@ -61,6 +62,10 @@ export interface DesktopBridge {
   }>;
   getDashboardData: () => Promise<DesktopDashboardData>;
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
+  getSyncStatus: () => Promise<AutomaticSyncStatus>;
+  runSyncNow: () => Promise<AutomaticSyncCycleResult>;
+  setAutoSyncEnabled: (enabled: boolean) => Promise<AutomaticSyncStatus>;
+  onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
   createManualRequest: (input: CreateManualRequestInput) => Promise<CreateManualRequestResult>;
@@ -105,6 +110,14 @@ const bridge: DesktopBridge = {
     const handler = (_event: Electron.IpcRendererEvent, data: DesktopDashboardData) => listener(data);
     ipcRenderer.on("dashboard:dataChanged", handler);
     return () => ipcRenderer.removeListener("dashboard:dataChanged", handler);
+  },
+  getSyncStatus: () => ipcRenderer.invoke("sync:getStatus"),
+  runSyncNow: () => ipcRenderer.invoke("sync:runNow"),
+  setAutoSyncEnabled: (enabled: boolean) => ipcRenderer.invoke("sync:setAutoEnabled", enabled),
+  onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: AutomaticSyncStatus) => listener(status);
+    ipcRenderer.on("sync:statusChanged", handler);
+    return () => ipcRenderer.removeListener("sync:statusChanged", handler);
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => ipcRenderer.invoke("setup:saveInitial", input),

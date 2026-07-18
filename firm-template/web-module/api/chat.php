@@ -6,7 +6,8 @@ const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 const YA_AI_CONFIG_FILE = YA_BASE_DIR . '/config/ai.php';
 const YA_KNOWLEDGE_DIR = YA_BASE_DIR . '/knowledge';
 const YA_AI_CONVERSATIONS_FILE = YA_BASE_DIR . '/data/ai-conversations.json';
-const YA_REQUESTS_FILE = YA_BASE_DIR . '/data/requests.json';
+
+require_once YA_BASE_DIR . '/lib/storage.php';
 
 $businessConfig = ya_chat_load_json(YA_CONFIG_FILE, []);
 $aiConfig = is_file(YA_AI_CONFIG_FILE) ? require YA_AI_CONFIG_FILE : [];
@@ -65,7 +66,7 @@ $requestWasCreated = false;
 
 try {
     if ($requestShouldBeCreated) {
-        ya_chat_append_json_record(YA_REQUESTS_FILE, $request);
+        ya_storage_insert_request($request);
         $requestId = $request['id'];
         $requestWasCreated = true;
     }
@@ -97,9 +98,12 @@ try {
         'sync_status' => 'local_only'
     ]);
 } catch (Throwable $error) {
-    ya_chat_response(500, [
+    $storageUnavailable = $error->getMessage() === 'pdo_sqlite_missing';
+    ya_chat_response($storageUnavailable ? 503 : 500, [
         'ok' => false,
-        'message' => $requestShouldBeCreated && !$requestWasCreated ? 'AI talebi kaydedilemedi.' : 'AI konuşması kaydedilemedi.'
+        'message' => $storageUnavailable
+            ? 'Hostingde PHP SQLite desteği etkin değil. PDO_SQLITE eklentisini açıp tekrar deneyin.'
+            : ($requestShouldBeCreated && !$requestWasCreated ? 'AI talebi kaydedilemedi.' : 'AI konuşması kaydedilemedi.')
     ]);
 }
 

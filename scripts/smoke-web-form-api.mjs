@@ -1,14 +1,26 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import process from "node:process";
 
-const requestsFile = "firm-template/web-module/data/requests.json";
-const originalRequestsJson = readFileSync(requestsFile, "utf8");
+const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-web-form-"));
+const webModuleRoot = join(tempRoot, "web-module");
+cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+const requestsFile = join(webModuleRoot, "data", "requests.json");
+for (const runtimeFile of [
+  "yardimci-asistan.sqlite",
+  "yardimci-asistan.sqlite-wal",
+  "yardimci-asistan.sqlite-shm"
+]) {
+  rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
+}
+writeFileSync(requestsFile, "[]\n");
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", "firm-template/web-module"], {
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"]
 });
@@ -22,7 +34,6 @@ server.stderr.on("data", (chunk) => {
 });
 
 try {
-  writeFileSync(requestsFile, "[]\n");
   await waitForUrl(`${baseUrl}/api/menu.php`);
 
   const methodResponse = await fetch(`${baseUrl}/api/request.php`);
@@ -95,7 +106,17 @@ try {
   assert.equal(restaurantResult.ok, true);
   assert.equal(restaurantResult.whatsapp_message, "Hazır restoran mesajı");
 
-  const records = JSON.parse(readFileSync(requestsFile, "utf8"));
+  const syncResponse = await fetch(`${baseUrl}/api/sync.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-YA-Sync-Secret": "change-this-secret"
+    },
+    body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 10 })
+  });
+  assert.equal(syncResponse.status, 200);
+  const syncResult = await syncResponse.json();
+  const records = syncResult.requests;
   assert.equal(records.length, 2);
   assert.equal(records[0].request_type, "pension_reservation");
   assert.equal(records[0].customer_phone, "+905551112233");
@@ -110,8 +131,8 @@ try {
   }
   throw error;
 } finally {
-  writeFileSync(requestsFile, originalRequestsJson);
   server.kill();
+  rmSync(tempRoot, { recursive: true, force: true });
 }
 
 async function postRequest(data) {

@@ -52,13 +52,17 @@ import {
   type UpdateDailyTaskStatusInput,
   type MarkWhatsAppMessageSentInput
 } from "./database";
+import {
+  SyncCoordinator,
+  type AutomaticSyncCycleResult,
+  type AutomaticSyncStatus
+} from "./sync-coordinator";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
 const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 let desktopDatabase: DesktopDatabase | null = null;
-let androidActionPollTimer: NodeJS.Timeout | null = null;
-let androidActionInitialPollTimer: NodeJS.Timeout | null = null;
+let syncCoordinator: SyncCoordinator | null = null;
 let androidActionSyncInFlight: Promise<AndroidActionProcessSummary> | null = null;
 let androidSnapshotPublishPending = true;
 
@@ -185,9 +189,16 @@ if (!hasSingleInstanceLock) {
       userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData")
     });
     desktopDatabase.initialize();
+    syncCoordinator = new SyncCoordinator({
+      database: desktopDatabase,
+      getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
+      createAndroidSnapshot: () => createAndroidOperationsSnapshot(getDatabase().getDashboardData()),
+      onDashboardChanged: () => notifyDesktopDashboardChanged(getDatabase().getDashboardData()),
+      onStatusChanged: notifySyncStatusChanged
+    });
     registerIpcHandlers();
     createMainWindow();
-    startAndroidActionPolling();
+    syncCoordinator.start();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -211,14 +222,14 @@ function createChromeUserAgent() {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
-    stopAndroidActionPolling();
+    syncCoordinator?.stop();
     desktopDatabase?.close();
     app.quit();
   }
 });
 
 app.on("before-quit", () => {
-  stopAndroidActionPolling();
+  syncCoordinator?.stop();
 });
 
 function registerIpcHandlers() {
@@ -236,6 +247,18 @@ function registerIpcHandlers() {
       backupPath: getDatabase().backupPath,
       setup: getDatabase().getSetupData()
     };
+  });
+
+  ipcMain.handle("sync:getStatus", (): AutomaticSyncStatus => {
+    return getSyncCoordinator().getStatus();
+  });
+
+  ipcMain.handle("sync:runNow", async (): Promise<AutomaticSyncCycleResult> => {
+    return getSyncCoordinator().runNow();
+  });
+
+  ipcMain.handle("sync:setAutoEnabled", (_event, enabled: unknown): AutomaticSyncStatus => {
+    return getSyncCoordinator().setEnabled(enabled === true);
   });
 
   ipcMain.handle("sync:pullRequests", async (): Promise<PullRequestsResult> => {
@@ -374,6 +397,7 @@ function registerIpcHandlers() {
     }
 
     const aiWebSync = await publishSavedAiSettings();
+    getSyncCoordinator().restart();
     const setupData = getDatabase().getSetupData();
     const dashboardData = getDatabase().getDashboardData();
 
@@ -749,30 +773,11 @@ function getDatabase() {
   return desktopDatabase;
 }
 
-function startAndroidActionPolling() {
-  stopAndroidActionPolling();
-  const poll = () => {
-    const setup = getDatabase().getSetupData();
-    if (canUseAndroidSync(setup, false)) {
-      void processAndroidActionQueue(false);
-    }
-  };
-  androidActionInitialPollTimer = setTimeout(() => {
-    androidActionInitialPollTimer = null;
-    poll();
-  }, 1500);
-  androidActionPollTimer = setInterval(poll, 15_000);
-}
-
-function stopAndroidActionPolling() {
-  if (androidActionInitialPollTimer) {
-    clearTimeout(androidActionInitialPollTimer);
-    androidActionInitialPollTimer = null;
+function getSyncCoordinator() {
+  if (!syncCoordinator) {
+    throw new Error("Sync coordinator is not initialized.");
   }
-  if (androidActionPollTimer) {
-    clearInterval(androidActionPollTimer);
-    androidActionPollTimer = null;
-  }
+  return syncCoordinator;
 }
 
 function canUseAndroidSync(setup: DesktopSetupData, allowPlaceholderSecret: boolean) {
@@ -863,6 +868,14 @@ function notifyDesktopDashboardChanged(dashboardData: DesktopDashboardData) {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
       window.webContents.send("dashboard:dataChanged", dashboardData);
+    }
+  }
+}
+
+function notifySyncStatusChanged(status: AutomaticSyncStatus) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+      window.webContents.send("sync:statusChanged", status);
     }
   }
 }

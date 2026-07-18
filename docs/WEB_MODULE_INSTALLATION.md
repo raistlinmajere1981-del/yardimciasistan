@@ -1,6 +1,10 @@
 # Firma Web Modülü Kurulumu
 
-Bu rehber, mevcut bir web sitesine Yardımcı Asistan web modülünü eklemek içindir. Modül PHP destekli standart hostinglerde çalışır ve merkezi cloud servisine ihtiyaç duymaz.
+Bu rehber, mevcut bir web sitesine Yardımcı Asistan web modülünü eklemek içindir. Modül PHP, PDO ve `pdo_sqlite` destekli standart hostinglerde çalışır ve merkezi cloud servisine ihtiyaç duymaz.
+
+Hosting panelinde PHP SQLite eklentisinin açık olduğunu kurulumdan önce doğrulayın.
+`PDO::getAvailableDrivers()` çıktısında `sqlite` yoksa senkron endpoint'i bilinçli olarak
+`503 pdo_sqlite_missing` döndürür.
 
 ## 1. Kopyalanacak Dosyalar
 
@@ -157,22 +161,24 @@ Müşteriye açık QR menü sayfası:
 https://firma.com/yardimci-asistan/menu.html
 ```
 
-QR kod bu adrese üretilebilir. Menü verisi `api/menu.php` üzerinden okunur; PC uygulamasından yayınlanan menü `data/menu.json` dosyasına yazılır.
+QR kod bu adrese üretilebilir. Menü verisi `api/menu.php` üzerinden okunur; PC
+uygulamasındaki değişiklik kalıcı outbox üzerinden hosting SQLite'ına otomatik yayınlanır.
+Sayfa görünürken ETag ile yaklaşık 15 saniyede bir güncel yayın kontrol edilir.
 
 Android companion için PC uygulamasından yayınlanan talepler, müşteriler,
 rezervasyonlar, odalar, masalar, menü, aktif adisyonlar, günlük işler ve hazır
-mesajlar `data/android-snapshot.json` dosyasında tutulur; `api/sync.php` içindeki
-`android_summary` aksiyonuyla okunur. Telefonda yapılan işlemler
-`data/android-actions.json` kuyruğuna eklenir. PC kuyruğu periyodik çeker, her
-action kimliğini yerel veritabanına yalnız bir kez uygular, sonucu hostingde
-işaretler ve güncel snapshot'ı yeniden yayınlar. Telefonun PC'ye doğrudan ağ
-erişimi gerekmez.
+mesajlar hosting SQLite'ında sürümlü `android_snapshot` yayını olarak tutulur;
+`api/sync.php` içindeki `android_summary` aksiyonuyla okunur. Telefonda yapılan
+işlemler SQLite action kuyruğuna eklenir. PC kuyruğu açıkken yaklaşık 15 saniyede
+bir çeker, her action kimliğini yerel veritabanına yalnız bir kez uygular, sonucu
+hostingde işaretler ve güncel snapshot'ı outbox üzerinden yeniden yayınlar.
+Telefonun PC'ye doğrudan ağ erişimi gerekmez.
 
 ## 6. AI Ayarları
 
 AI varsayılan olarak kapalıdır. Kapalıyken `api/chat.php` güvenli fallback cevap döndürür. Endpoint AI sorunlarını `ai_disabled`, `configuration_incomplete`, `provider_authentication_failed`, `provider_model_or_endpoint_not_found`, `provider_rate_limited`, `provider_timeout`, `provider_connection_failed` ve `provider_unavailable` gibi güvenli hata kodlarıyla ayırır. Widget açıklamayı, varsa sağlayıcı HTTP durumunu ve yeniden deneme bilgisini gösterir; API anahtarı ve ham sağlayıcı cevabı frontend'e gönderilmez.
 
-`api/chat.php`, sohbet yanıtını üretirken konuşmayı `data/ai-conversations.json` içine kaydeder. İstek gövdesinde veya mesaj içinde talep niyeti bulunduğunda ve `customer_name` ile geçerli Türkiye cep telefonu geldiğinde ayrıca `data/requests.json` içine `source=web_ai`, `sync_status=pending` olan müşteri talebi açar. Tarih, saat ve kişi sayısı varsa kayda eklenir; eksik bilgiler işletme sahibi tarafından konuşmada tamamlanabilir.
+`api/chat.php`, sohbet yanıtını üretirken konuşmayı `data/ai-conversations.json` içine kaydeder. İstek gövdesinde veya mesaj içinde talep niyeti bulunduğunda ve `customer_name` ile geçerli Türkiye cep telefonu geldiğinde ayrıca hosting SQLite'ında `source=web_ai`, `sync_status=pending` olan müşteri talebi açar. Tarih, saat ve kişi sayısı varsa kayda eklenir; eksik bilgiler işletme sahibi tarafından konuşmada tamamlanabilir.
 
 AI anahtarı frontend dosyalarına veya `widget.js` içine yazılmamalıdır. Ana kullanım yolu masaüstü uygulamasındaki `Ayarlar → AI Bağlantısı` alanıdır:
 
@@ -223,13 +229,22 @@ api/*.php: 644
 config/*.json ve config/*.php: 644
 knowledge/*.md: 644
 data/ klasörü: 755
-data/*.json: 664
+data/yardimci-asistan.sqlite: uygulama tarafından 600
+data/*.json: yalnız konuşma ve eski veri içe aktarma dosyaları için 664
 data/ai-settings.local.php: uygulama tarafından 600
 ```
 
-Bazı paylaşımlı hostinglerde PHP'nin `data/*.json` dosyalarına yazabilmesi için `data/` klasörü `775`, JSON dosyaları `666` gerekebilir. Daha geniş izin gerekiyorsa yalnızca `data/` klasöründe kullanın; `config/` klasörünü yazılabilir yapmayın.
+Bazı paylaşımlı hostinglerde PHP'nin SQLite veritabanını, WAL/SHM yardımcı dosyalarını
+ve konuşma JSON'unu oluşturabilmesi için `data/` klasörü `775` gerekebilir. Daha geniş
+izin gerekiyorsa yalnızca `data/` klasöründe kullanın; `config/` klasörünü yazılabilir
+yapmayın. SQLite dosyasını önceden elle oluşturmanız gerekmez.
 
 Apache hostinglerde `config/`, `data/` ve `knowledge/` klasörlerinde gelen `.htaccess` dosyaları doğrudan tarayıcı erişimini kapatır. Nginx veya özel panel kullanılan hostinglerde aynı engelleme sunucu ayarından yapılmalıdır.
+
+Eski JSON tabanlı kurulum güncellendiğinde ilk API çağrısı `requests.json`,
+`android-actions.json`, `menu.json`, `android-snapshot.json` ve `sync-state.json`
+verilerini SQLite'a bir kez aktarır. Her kaynak dosyanın `.legacy-backup-v1` kopyası
+önce oluşturulur. Canlı veriyi ve menüyü kontrol edene kadar bu yedekleri saklayın.
 
 ## 8. Hızlı Test
 
@@ -240,13 +255,18 @@ https://firma.com/yardimci-asistan/menu.html
 https://firma.com/yardimci-asistan/api/menu.php
 ```
 
-Talep formunu test etmek için sitedeki Yardımcı Asistan widget'ını açın ve örnek talep gönderin. Başarılıysa:
+Senkron deposunu test etmek için güvenlik anahtarını header'da gönderin:
 
-```text
-yardimci-asistan/data/requests.json
+```bash
+curl -X POST 'https://firma.com/yardimci-asistan/api/sync.php' \
+  -H 'Content-Type: application/json' \
+  -H 'X-YA-Sync-Secret: uzun-ve-tahmin-edilemeyen-bir-anahtar' \
+  --data '{"action":"capabilities"}'
 ```
 
-dosyasında yeni kayıt oluşur.
+Başarılı yanıtta `protocol_version: 2` ve `storage: "sqlite"` görünmelidir. Ardından
+sitedeki widget'tan örnek talep gönderin; `data/yardimci-asistan.sqlite` oluşur ve
+masaüstündeki `Şimdi Eşitle` komutundan sonra talep panelde görünür.
 
 ## 9. PC Uygulamasıyla Eşleştirme
 
@@ -256,6 +276,11 @@ PC uygulamasında kullanılacak iki bilgi:
 Web modül adresi: https://firma.com/yardimci-asistan
 Sync güvenlik anahtarı: business.json içindeki sync_secret
 ```
+
+Otomatik eşitleme yeni kurulumda açıktır. Masaüstü açıkken talep ve Android kuyruğu
+yaklaşık 15 saniyede bir kontrol edilir; menü ve operasyon değişiklikleri outbox'tan
+otomatik yayınlanır. Ayar `Gelişmiş Ayarlar → Web Bağlantısı → Otomatik eşitle`
+alanından değiştirilebilir.
 
 Canlı kurulumda `sync_secret` değerini kimseyle paylaşmayın. Anahtar sızarsa `business.json` içinde değiştirip PC uygulamasında yeni değeri kullanın.
 
@@ -269,7 +294,7 @@ Widget görünmüyor:
 
 Talep kaydedilmiyor:
 
-- `data/requests.json` yazılabilir olmayabilir.
+- Hostingde `pdo_sqlite` etkin olmayabilir.
 - `data/` klasör izni hosting kullanıcısı için yetersiz olabilir.
 - `data-api-base-url` yanlış olabilir.
 
@@ -285,4 +310,4 @@ AI sohbetinden talep oluşmuyor:
 
 - `customer_name` ve Türkiye cep telefonu formatında `customer_phone` gönderildiğini kontrol edin.
 - Mesajda rezervasyon, oda, masa, kahvaltı, fiyat veya benzeri açık talep niyeti bulunmalı ya da `create_request=true` gönderilmelidir.
-- `data/requests.json` ve `data/ai-conversations.json` dosyaları hosting kullanıcısı tarafından yazılabilir olmalıdır.
+- `data/` klasörü SQLite ve `data/ai-conversations.json` için hosting kullanıcısı tarafından yazılabilir olmalıdır.

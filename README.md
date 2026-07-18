@@ -33,6 +33,7 @@ Proje iskeleti, web modülü, desktop omurgası, QR menü ve ilk AI altyapısı 
 
 - [Proje Özeti](docs/PROJECT_BRIEF.md)
 - [Sistem Mimarisi](docs/ARCHITECTURE.md)
+- [Otomatik Senkronizasyon](docs/AUTOMATIC_SYNC.md)
 - [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
 - [UI Kuralları](docs/UI_RULES.md)
 - [Veri Modeli](docs/DATA_MODEL.md)
@@ -52,6 +53,7 @@ npm install
 npm run build
 npm run doctor
 npm run smoke:web-form-api
+npm run smoke:automatic-sync
 npm run e2e
 npm test
 npm run smoke:demo-flow
@@ -84,19 +86,19 @@ Derleme ve test komutları monorepo içindeki hazır workspace paketleri üzerin
 
 ## Güncel Geliştirme Akışı
 
-Web tarafı için demo site, web widget ve firma hosting mini API şablonu hazırlanmıştır. PC uygulaması tarafında kullanılacak ilk senkron fonksiyonları `packages/sync-core` içinde yer alır.
+Web tarafı için demo site, web widget ve firma hosting mini API şablonu hazırlanmıştır. `packages/sync-core`, sağlayıcıdan bağımsız `SyncTransport` sınırını ve güncel PHP hosting adaptörünü içerir.
 
-Desktop tarafında Electron + React iskeleti, ana panel tasarımı, local SQLite açılışı, migration/seed akışı, web taleplerini local veritabanına alma yolu ve `electron-builder` tabanlı paketleme smoke kontrolü hazırdır.
+Desktop tarafında Electron + React iskeleti, local SQLite, kalıcı outbox, cursor tabanlı talep çekme, 15 saniyelik otomatik koordinatör ve `electron-builder` tabanlı paketleme smoke kontrolü hazırdır. İnternet kesildiğinde yerel işlemler devam eder; kuyruklar bağlantı geldiğinde yeniden denenir.
 
 Firma web modülünde müşteriye açık `menu.html` QR menü sayfası ve `api/menu.php` üzerinden çalışan menü okuma akışı bulunur.
 
 QR menü için PC tarafında kategori/ürün yönetim ekranı bulunur; local SQLite verisi `pushMenu()` ile firma web modülündeki `publish_menu` aksiyonuna gönderilebilir.
 
-AI tarafında `packages/ai-core` provider bağımsız prompt/knowledge/adapter katmanını sağlar. Servis, bağlantı adresi, model, gizli anahtar ve zaman aşımı masaüstü Ayarlar ekranından yönetilir; anahtar işletim sistemi güvenli saklama alanıyla şifrelenir ve renderer'a geri dönmez. Aynı ayar HTTPS + `sync_secret` ile firma web modülüne yayınlanır; `api/chat.php` son yayınlanan sunucu ayarını kullanır, AI kapalıyken güvenli fallback cevap döner. Sohbet içinde müşteri adı, geçerli cep telefonu ve talep niyeti geldiğinde web modülü `source=web_ai` talebi de `requests.json` içine kaydeder.
+AI tarafında `packages/ai-core` provider bağımsız prompt/knowledge/adapter katmanını sağlar. Servis, bağlantı adresi, model, gizli anahtar ve zaman aşımı masaüstü Ayarlar ekranından yönetilir; anahtar işletim sistemi güvenli saklama alanıyla şifrelenir ve renderer'a geri dönmez. Aynı ayar HTTPS + `sync_secret` ile firma web modülüne yayınlanır; `api/chat.php` son yayınlanan sunucu ayarını kullanır, AI kapalıyken güvenli fallback cevap döner. Sohbet içinde müşteri adı, geçerli cep telefonu ve talep niyeti geldiğinde web modülü `source=web_ai` talebi de hosting SQLite veritabanına kaydeder.
 
 WhatsApp tarafında `packages/whatsapp-bridge` Türkiye cep telefonu normalizasyonu, `wa.me` link üretimi, manuel kopyalama ve WebView/resmi API geçişleri için ortak adapter yüzeyini sağlar.
 
-Android tarafında `apps/android-app` native companion ekranını ve `hosting_limited` canlı talep akışını sağlar. Desktop ana panelindeki `Android'e Yayınla` komutu PC'deki oda/masa, günlük iş ve bekleyen onay özetini web modülüne gönderir; Android `android_summary` cevabından bu operasyon snapshot'ını okur. Debug APK, kurulu Android SDK araçlarıyla `npm run build:android` komutu üzerinden üretilebilir. `npm run smoke:android-hosting` cihazsız hosting hazırlığını doğrular; gerçek telefonda yerel test için `npm run android:phone-test` demo veriyi yükler, PHP web modülünü LAN'da açar ve adb cihazı bağlıysa uygulamayı doğru web modül adresiyle başlatır.
+Android tarafında `apps/android-app` native companion ekranını sağlar. Masaüstü operasyon snapshot'ını kalıcı outbox üzerinden otomatik yayınlar; Android açıkken yaklaşık 15 saniyede bir, arka planda işletim sisteminin izin verdiği periyotta yeniler ve son başarılı veriyi yerel cache'den gösterebilir. Debug APK, kurulu Android SDK araçlarıyla `npm run build:android` komutu üzerinden üretilebilir. `npm run smoke:android-hosting` cihazsız hosting hazırlığını doğrular; gerçek telefonda yerel test için `npm run android:phone-test` demo veriyi yükler, PHP web modülünü LAN'da açar ve adb cihazı bağlıysa uygulamayı doğru web modül adresiyle başlatır.
 
 Android ekran kontrolü için `npm run android:screenshot` ekran görüntüsünü
 `artifacts/android-control/` altına kaydeder, `npm run android:dump` UI ağacını
@@ -115,9 +117,9 @@ Web form / widget
   ↓
 firm-template/web-module/api/request.php
   ↓
-firm-template/web-module/data/requests.json
-  ↓
-PC uygulaması / sync-core pullRequests()
-  ↓
-sync.php mark_requests_synced
+Firma hostingi / PHP + SQLite
+  ↓ cursor + acknowledgement
+Masaüstü SyncCoordinator / local SQLite
+  ↓ versioned outbox
+QR menü + Android snapshot
 ```

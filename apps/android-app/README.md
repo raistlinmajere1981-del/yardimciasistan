@@ -20,6 +20,13 @@ Alt navigasyonda beş operasyon ekranı bulunur:
 Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
 `Ayarlar` ekranında gösterilir.
 
+Uygulama ön plandayken canlı özet yaklaşık 15 saniyede bir otomatik kontrol edilir.
+Sunucu revision'ı değişmediyse tam snapshot indirilmez. Son başarılı JSON özeti
+`SharedPreferences` cache'inde tutulduğu için uygulama ağ yokken de son veriyi açabilir.
+`JobScheduler`, uygulama kapalıyken bekleyen action outbox'ını göndermek ve özeti
+yenilemek için en az 15 dakikalık periyotta çalışır; kesin zaman Android'in pil ve ağ
+politikasına bağlıdır.
+
 ## Veri Akışı
 
 Android SQLite'a veya PC'ye doğrudan bağlanmaz:
@@ -90,3 +97,6 @@ npm run android:mirror
 Telefonun yerel PHP sunucusuna erişmesi için script mümkünse `adb reverse` kullanır;
 aksi halde aynı ağdaki PC adresini verir. Web modül alanına modül kökü, `/api` klasörü
 veya tam `/api/sync.php` adresi girilebilir.
+
+Canlı hostingde HTTPS kullanın. Senkron anahtarı JSON gövdesine veya URL'ye değil,
+`X-YA-Sync-Secret` header'ına gönderilir.

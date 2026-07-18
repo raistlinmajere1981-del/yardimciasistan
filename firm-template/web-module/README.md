@@ -19,13 +19,12 @@ config/
   business.json
   ai.php
 data/
-  requests.json
-  menu.json
-  android-snapshot.json
-  android-actions.json
+  yardimci-asistan.sqlite (çalışırken oluşur)
   ai-conversations.json
-  sync-state.json
   ai-settings.local.php (masaüstünden yayınlanınca oluşur)
+  *.json.legacy-backup-v1 (eski kurulum içe aktarılırsa oluşur)
+lib/
+  storage.php
 knowledge/
   firma.md
   odalar.md
@@ -42,8 +41,12 @@ Hosting kullanıcısının `data/` klasörüne yazabilmesi gerekir. Başlangıç
 config/ ve knowledge/ dosyaları: 644
 api/ dosyaları: 644
 data/ klasörü: 755 veya hosting gerektiriyorsa 775
-data/*.json dosyaları: 664 veya hosting gerektiriyorsa 666
+data/yardimci-asistan.sqlite: uygulama tarafından 600
 ```
+
+PHP'de `PDO` ve `pdo_sqlite` zorunludur. SQLite dosyası çalışma anında `0600`
+izinle oluşturulur. Eski JSON çalışma dosyaları varsa ilk açılışta yedeklenerek
+bir kez içe aktarılır; sonraki talep, action ve yayın yazımları SQLite'a gider.
 
 `config/`, `data/` ve `knowledge/` klasörlerinde Apache için doğrudan tarayıcı erişimini kapatan `.htaccess` dosyaları bulunur. Nginx kullanılan hostinglerde aynı kural sunucu panelinden eklenmelidir.
 
@@ -59,7 +62,7 @@ api/chat.php
 
 AI varsayılan olarak kapalıdır. Kapalıyken endpoint müşteriye form veya WhatsApp yönlendirmesi yapan güvenli fallback cevap döndürür ve konuşmayı `data/ai-conversations.json` içine kaydeder. Kapalı ayar, eksik yapılandırma, kimlik doğrulama, model/adres, istek sınırı, zaman aşımı, ağ ve sağlayıcı kesintileri ayrı güvenli hata kodlarıyla döner; konuşma kaydında `error_code` saklanır.
 
-Sohbet isteğinde `customer_name`, geçerli Türkiye cep telefonu `customer_phone` ve açık talep niyeti varsa endpoint ayrıca `data/requests.json` içine `source=web_ai`, `sync_status=pending` olan talep kaydı açar. Yanıtta `request_created`, `request_id` ve `request_missing_fields` alanları bulunur.
+Sohbet isteğinde `customer_name`, geçerli Türkiye cep telefonu `customer_phone` ve açık talep niyeti varsa endpoint ayrıca hosting SQLite'ında `source=web_ai`, `sync_status=pending` olan talep kaydı açar. Yanıtta `request_created`, `request_id` ve `request_missing_fields` alanları bulunur.
 
 Normal kullanımda servis, bağlantı adresi, model ve anahtar masaüstü uygulamasındaki `Ayarlar → AI Bağlantısı` alanından girilir. Kaydetme, aynı ayarı HTTPS ve `sync_secret` ile web modülüne yayınlar. Hostingde son başarıyla yayınlanan ayar PC kapalıyken de kullanılmaya devam eder. Google AI Studio seçildiğinde yeni authorization key'lerle uyumlu `x-goog-api-key` doğrulaması kullanılır.
 
@@ -91,7 +94,9 @@ config/business.json → sync_secret
 Desteklenen aksiyonlar:
 
 ```text
+capabilities
 pull_requests
+acknowledge_requests
 android_summary
 enqueue_android_action
 pull_android_actions
@@ -110,24 +115,43 @@ publish_ai_settings
 ```json
 {
   "action": "pull_requests",
-  "sync_secret": "change-this-secret",
+  "after_seq": 0,
   "limit": 50
 }
 ```
+
+Güvenlik anahtarı `X-YA-Sync-Secret` HTTP header'ında gönderilir. Eski istemcilerin
+gövdedeki anahtarı geçici olarak desteklenir; yeni entegrasyonlarda anahtarı gövdeye,
+query string'e veya loglara yazmayın.
+
+Masaüstü başarılı local transaction sonrasında cursor'u onaylar:
+
+```json
+{
+  "action": "acknowledge_requests",
+  "client_id": "desktop-uuid",
+  "through_seq": 42
+}
+```
+
+`capabilities` cevabında otomatik senkron için `protocol_version: 2` ve
+`storage: "sqlite"` bulunur. Menü ve Android snapshot yayınlarındaki revision ile
+idempotency anahtarı ağ tekrarlarında çift yazımı, eski revision ise güncel verinin
+üzerine yazılmasını engeller.
 
 Örnek `android_summary` gövdesi:
 
 ```json
 {
   "action": "android_summary",
-  "sync_secret": "change-this-secret",
   "device_id": "android-telefon-01",
+  "known_server_revision": 42,
   "limit": 10
 }
 ```
 
 Android uygulaması yerel veritabanına veya PC'ye doğrudan yazmaz. Kullanıcı işlemi
-`enqueue_android_action` ile `data/android-actions.json` kuyruğuna eklenir. Masaüstü
+`enqueue_android_action` ile hosting SQLite action kuyruğuna eklenir. Masaüstü
 uygulaması bekleyen işlemleri `pull_android_actions` ile çeker, yerel veritabanında
 aynı action kimliğini yalnız bir kez uygular ve `mark_android_action_result` ile
 `applied` ya da `failed` sonucunu yayınlar. Ardından tam operasyon snapshot'ını
@@ -138,7 +162,6 @@ yenileyerek Android ekranlarının güncel durumu çekmesini sağlar.
 ```json
 {
   "action": "enqueue_android_action",
-  "sync_secret": "change-this-secret",
   "action_id": "act_android-telefon-01_1752746400000_a1b2c3",
   "action_type": "room_status_update",
   "payload": {
@@ -159,7 +182,6 @@ anahtar operasyon ekranlarında gösterilmez.
 ```json
 {
   "action": "mark_requests_synced",
-  "sync_secret": "change-this-secret",
   "request_ids": ["request_001"]
 }
 ```
@@ -169,7 +191,6 @@ anahtar operasyon ekranlarında gösterilmez.
 ```json
 {
   "action": "update_request_status",
-  "sync_secret": "change-this-secret",
   "request_id": "request_001",
   "status": "answered"
 }
@@ -180,7 +201,9 @@ anahtar operasyon ekranlarında gösterilmez.
 ```json
 {
   "action": "publish_menu",
-  "sync_secret": "change-this-secret",
+  "client_id": "desktop-uuid",
+  "source_revision": 12,
+  "idempotency_key": "desktop-uuid:menu:12",
   "menu": {
     "categories": [],
     "items": [],
@@ -199,7 +222,10 @@ Müşteriye açık QR menü sayfası:
 menu.html
 ```
 
-Sayfa menü verisini sadece `api/menu.php` üzerinden okur. Örnek menü verisi `data/menu.json` içindedir; pasif kategoriler ve mevcut olmayan ürünler API cevabına dahil edilmez.
+Sayfa menü verisini sadece `api/menu.php` üzerinden okur. İlk örnek menü eski
+`data/menu.json` dosyasından SQLite'a aktarılır; güncel yayın SQLite'tan okunur.
+Pasif kategoriler ve mevcut olmayan ürünler API cevabına dahil edilmez. Sayfa
+görünürken ETag ile yaklaşık 15 saniyede bir güncelliği kontrol eder.
 
 Lokal smoke testi:
 

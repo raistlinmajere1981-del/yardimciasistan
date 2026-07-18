@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -18,15 +18,20 @@ const androidSnapshotFile = join(webModuleRoot, "data", "android-snapshot.json")
 const androidActionsFile = join(webModuleRoot, "data", "android-actions.json");
 const demoRequestsFile = join(repoRoot, "demo-data", "web-module-requests.json");
 const demoAndroidSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
+const runtimeFiles = [
+  "yardimci-asistan.sqlite",
+  "yardimci-asistan.sqlite-wal",
+  "yardimci-asistan.sqlite-shm",
+  "requests.json.legacy-backup-v1",
+  "menu.json.legacy-backup-v1",
+  "android-actions.json.legacy-backup-v1",
+  "android-snapshot.json.legacy-backup-v1",
+  "sync-state.json.legacy-backup-v1"
+].map((file) => join(webModuleRoot, "data", file));
 
 const options = parseArgs(process.argv.slice(2));
-const backups = new Map([
-  [requestsFile, readFileSync(requestsFile, "utf8")],
-  [syncStateFile, readFileSync(syncStateFile, "utf8")],
-  [conversationsFile, readFileSync(conversationsFile, "utf8")],
-  [androidSnapshotFile, readFileSync(androidSnapshotFile, "utf8")],
-  [androidActionsFile, readFileSync(androidActionsFile, "utf8")]
-]);
+const managedFiles = [requestsFile, syncStateFile, conversationsFile, androidSnapshotFile, androidActionsFile, ...runtimeFiles];
+const backups = new Map(managedFiles.filter((path) => existsSync(path)).map((path) => [path, readFileSync(path)]));
 
 let phpServer = null;
 let phpOutput = "";
@@ -141,6 +146,9 @@ function parseArgs(args) {
 }
 
 function seedDemoData() {
+  for (const path of runtimeFiles) {
+    rmSync(path, { force: true });
+  }
   const requests = JSON.parse(readFileSync(demoRequestsFile, "utf8"));
   const androidSnapshot = JSON.parse(readFileSync(demoAndroidSnapshotFile, "utf8"));
   writeJson(requestsFile, requests);
@@ -272,7 +280,6 @@ async function verifyAndroidSummary(baseUrl) {
     },
     body: JSON.stringify({
       action: "android_summary",
-      sync_secret: syncSecret,
       limit: 10
     })
   });
@@ -391,6 +398,9 @@ function cleanup() {
   }
 
   if (!options.keepData) {
+    for (const path of managedFiles) {
+      rmSync(path, { force: true });
+    }
     for (const [path, contents] of backups) {
       writeFileSync(path, contents);
     }

@@ -24,7 +24,7 @@ npm run smoke:demo-flow
 
 `smoke:demo-flow` komutu:
 
-- `demo-data/web-module-requests.json` içindeki örnek talepleri web modülüne yükler.
+- Web modülünün geçici bir kopyasını oluşturur ve `demo-data/web-module-requests.json` örneklerini ilk SQLite migration girdisi olarak yükler.
 - PHP web modülünü geçici portta çalıştırır.
 - `request.php` üzerinden demo sırasında yeni bir `source=web_form` talebi oluşturur.
 - Web AI sohbet endpointiyle ek bir `source=web_ai` talep oluşturur.
@@ -39,28 +39,28 @@ npm run smoke:demo-flow
 - Android için `android_summary` endpointinden sınırlı canlı özet, operasyon kartları ve günlük iş listesini alır.
 - Android'in `update_request_status` aksiyonuyla talep durumunu güncelleyebildiğini doğrular.
 - Aynı taleplerin ikinci kez çekilmediğini doğrular.
-- Test sonunda `requests.json`, `ai-conversations.json`, `android-snapshot.json` ve `sync-state.json` dosyalarını eski haline getirir.
+- Test sonunda geçici PHP/SQLite web modülünü tamamen kaldırır; kaynak template'e çalışma verisi yazmaz.
 
 Web modülü için ayrı duman testi `npm run smoke:web-module` komutudur. Bu test QR menü yayınını, AI kapalıyken güvenli sohbet cevabını ve yeterli müşteri bilgisiyle `source=web_ai` talep oluşturmayı PHP sunucusu üzerinden doğrular. Widget'ın gerçek web modülünden yüklenip `api/request.php` ve `api/chat.php` akışlarını tarayıcıda kullanması `npm run smoke:web-widget-module` ile doğrulanır.
 
 ## Manuel Demo
 
-1. Web modülünü aç:
+1. Demo verisini web modülüne yükle:
+
+```bash
+npm run demo:data:apply
+```
+
+2. Web modülünü aç:
 
 ```bash
 npm run dev:php-module
 ```
 
-2. Başka terminalde demo web sitesini API bağlantısıyla aç:
+3. Başka terminalde demo web sitesini API bağlantısıyla aç:
 
 ```bash
 VITE_YA_WEB_MODULE_URL=http://127.0.0.1:8080 npm run dev:demo-web
-```
-
-3. Demo verisini web modülüne yükle:
-
-```bash
-npm run demo:data:apply
 ```
 
 4. PC uygulamasını aç:
@@ -69,11 +69,11 @@ npm run demo:data:apply
 npm run dev:desktop
 ```
 
-5. PC uygulamasında `Web Taleplerini Çek` butonuna bas.
+5. Yaklaşık 15 saniye içinde web taleplerinin otomatik geldiğini doğrula; beklemek istemezsen `Şimdi Eşitle` düğmesine bas.
 
 6. Ana panelde `Yedek Al` ile demo öncesi yerel SQLite yedeğini oluştur.
 
-7. Ana panelde `Android'e Yayınla` ile PC'deki oda/masa/günlük iş özetini web modülüne gönder.
+7. PC'deki oda/masa/günlük iş özetinin outbox üzerinden Android'e otomatik yayınlandığını doğrula. `Android'e Yayınla` elle yeniden yayın için kullanılabilir.
 
 8. Gelen talepte `WhatsApp'tan Yaz` ile hazır cevap çalışma alanını aç.
 
@@ -81,9 +81,9 @@ npm run dev:desktop
 
 10. Aynı talepte `Rezervasyona Çevir` butonuyla talebi onaylanmış rezervasyona dönüştür.
 
-11. Android companion ekranında web modül adresini ve sync anahtarını girip
-`Canlı Veriyi Çek` butonuyla aynı demo talep listesini, operasyon kartlarını,
-günlük işleri ve hızlı arama/WhatsApp aksiyonlarını göster.
+11. Android companion ekranında web modül adresini ve sync anahtarını gir. İlk veri
+hemen, uygulama açıkken sonraki değişiklikler yaklaşık 15 saniyede otomatik gelir;
+`Canlı Veriyi Çek` elle kontrol için kullanılabilir.
 
 Gerçek telefonda bu adımı otomatik hazırlamak için:
 

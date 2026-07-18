@@ -34,6 +34,8 @@ Bu iskelet şu parçaları içerir:
 - React tabanlı ana panel.
 - Yeni talepler, bugünkü işler, oda/masa durumu, bekleyen rezervasyonlar ve WhatsApp hazır cevap kartları.
 - `packages/sync-core` üzerinden web taleplerini çekmeye hazır IPC akışı.
+- Tek `SyncCoordinator` üzerinden 15 saniyelik cursor tabanlı talep/Android action pull akışı.
+- SQLite trigger'larıyla beslenen kalıcı menü ve Android snapshot outbox'ı; idempotent sürümlü yayın ve 5–300 saniyelik artan retry.
 - SQLite için ilk migration ve demo seed SQL dosyaları.
 - Talepler, müşteriler, basit raporlar, günlük işler, odalar, masalar ve rezervasyonlar için yan menüden açılan günlük yönetim ekranları, manuel talep oluşturma formu ve local status update IPC akışları.
 - QR menü kategori/ürün yönetimi, local SQLite kaydı ve web modülüne yayınlama akışı.
@@ -42,6 +44,12 @@ Bu iskelet şu parçaları içerir:
 - İlk kurulum sihirbazı, uygulama veri klasörü altında SQLite dosyası ve ana panelden manuel `backups/` yedeği alma akışı.
 - Ayarlar ekranında masaüstü ve web için ortak AI servisi/adres/model/anahtar/zaman aşımı yönetimi, bağlantı testi ve web modülüne otomatik yayınlama. Gizli anahtar Electron `safeStorage` ile şifrelenir ve renderer'a geri okunmaz.
 - Google AI Studio seçildiğinde API anahtarı ayrıntısındaki `Copy cURL quickstart` çıktısı tek alana yapıştırılır. Uygulama adres, authorization key ve örnek modeli ayıklayıp Models API'den metin modellerini çeker; model seçimi ek istek çalıştırmadan yalnız ayar değerini günceller.
+
+Otomatik eşitleme ilk kurulumda açıktır. `Ayarlar → Gelişmiş Ayarlar → Web
+Bağlantısı` bölümünden kapatılabilir; `Şimdi Eşitle` tek çevrimi her zaman elle
+başlatabilir. İnternet yokken yerel kayıtlar çalışmaya devam eder ve bekleyen outbox
+işleri bağlantı geri geldiğinde yeniden denenir. Web modülünün `protocol_version: 2`
+ve `storage: sqlite` yeteneklerini sunması gerekir.
 
 Installer hazırlığı için:
 

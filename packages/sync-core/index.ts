@@ -9,19 +9,34 @@ export interface SyncCoreConfig {
 export interface PullRequestsOptions extends SyncCoreConfig {
   limit?: number;
   includeSynced?: boolean;
+  afterSeq?: number;
+  clientId?: string;
 }
 
 export interface MarkRequestsSyncedOptions extends SyncCoreConfig {
   requestIds: string[];
 }
 
+export interface AcknowledgeRequestsOptions extends SyncCoreConfig {
+  clientId: string;
+  throughSeq: number;
+}
+
 export interface PushMenuOptions extends SyncCoreConfig {
   menu: PublishedQrMenu;
+  clientId?: string;
+  sourceRevision?: number;
+  idempotencyKey?: string;
 }
 
 export interface PushAndroidSnapshotOptions extends SyncCoreConfig {
   snapshot: AndroidOperationsSnapshot;
+  clientId?: string;
+  sourceRevision?: number;
+  idempotencyKey?: string;
 }
+
+export interface SyncCapabilitiesOptions extends SyncCoreConfig {}
 
 export interface AiConnectionSettings {
   enabled: boolean;
@@ -39,6 +54,7 @@ export interface PushAiSettingsOptions extends SyncCoreConfig {
 
 export interface SyncedCustomerRequest extends CustomerRequest {
   synced_at?: ISODateTimeString | "";
+  sync_seq?: number;
 }
 
 export interface PublishedMenuCategory {
@@ -300,6 +316,18 @@ export interface PullRequestsSuccess {
   requests: SyncedCustomerRequest[];
   count: number;
   pulled_at: ISODateTimeString;
+  next_cursor?: number;
+  has_more?: boolean;
+  server_revision?: number;
+}
+
+export interface AcknowledgeRequestsSuccess {
+  ok: true;
+  message: string;
+  updated_count: number;
+  acknowledged_cursor: number;
+  acknowledged_at: ISODateTimeString;
+  server_revision: number;
 }
 
 export interface MarkRequestsSyncedSuccess {
@@ -318,6 +346,9 @@ export interface PushMenuSuccess {
   updated_at: ISODateTimeString;
   category_count: number;
   item_count: number;
+  source_revision?: number;
+  server_revision?: number;
+  deduplicated?: boolean;
 }
 
 export interface PushAndroidSnapshotSuccess {
@@ -326,6 +357,20 @@ export interface PushAndroidSnapshotSuccess {
   published_at: ISODateTimeString;
   updated_at: ISODateTimeString;
   task_count: number;
+  source_revision?: number;
+  server_revision?: number;
+  deduplicated?: boolean;
+}
+
+export interface SyncCapabilitiesSuccess {
+  ok: true;
+  message: string;
+  protocol_version: number;
+  storage: string;
+  schema_version: number;
+  features: string[];
+  server_time: ISODateTimeString;
+  server_revision: number;
 }
 
 export interface PushAiSettingsSuccess {
@@ -343,22 +388,71 @@ export interface PushAiSettingsSuccess {
 
 export type PullRequestsResult = PullRequestsSuccess | SyncFailure;
 export type MarkRequestsSyncedResult = MarkRequestsSyncedSuccess | SyncFailure;
+export type AcknowledgeRequestsResult = AcknowledgeRequestsSuccess | SyncFailure;
 export type PushMenuResult = PushMenuSuccess | SyncFailure;
 export type PushAndroidSnapshotResult = PushAndroidSnapshotSuccess | SyncFailure;
 export type PushAiSettingsResult = PushAiSettingsSuccess | SyncFailure;
 export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
 export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
+export type SyncCapabilitiesResult = SyncCapabilitiesSuccess | SyncFailure;
+
+export interface PullCursorInput {
+  afterSeq: number;
+  limit?: number;
+}
+
+export interface RequestAcknowledgement {
+  throughSeq: number;
+}
+
+export interface PullActionsInput {
+  limit?: number;
+}
+
+export interface ActionCompletion {
+  actionId: string;
+  status: Exclude<AndroidActionStatus, "pending">;
+  errorMessage?: string;
+}
+
+export interface VersionedPublication<T> {
+  sourceRevision: number;
+  idempotencyKey: string;
+  value: T;
+}
+
+export interface SyncTransport {
+  getCapabilities(): Promise<SyncCapabilitiesResult>;
+  pullRequests(input: PullCursorInput): Promise<PullRequestsResult>;
+  acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult>;
+  pullAndroidActions(input?: PullActionsInput): Promise<PullAndroidActionsResult>;
+  completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult>;
+  publishMenu(input: VersionedPublication<PublishedQrMenu>): Promise<PushMenuResult>;
+  publishAndroidSnapshot(input: VersionedPublication<AndroidOperationsSnapshot>): Promise<PushAndroidSnapshotResult>;
+}
+
+export interface PhpHostingSyncTransportConfig extends SyncCoreConfig {
+  clientId: string;
+}
 
 export function createSyncEndpointUrl(baseUrl: string): string {
   const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
   return `${normalizedBaseUrl}/api/sync.php`;
 }
 
+export async function getSyncCapabilities(options: SyncCapabilitiesOptions): Promise<SyncCapabilitiesResult> {
+  return syncRequest<SyncCapabilitiesSuccess>(options, {
+    action: "capabilities"
+  });
+}
+
 export async function pullRequests(options: PullRequestsOptions): Promise<PullRequestsResult> {
   return syncRequest<PullRequestsSuccess>(options, {
     action: "pull_requests",
     limit: options.limit ?? 50,
-    include_synced: options.includeSynced ?? false
+    include_synced: options.includeSynced ?? false,
+    ...(options.afterSeq === undefined ? {} : { after_seq: Math.max(0, Math.trunc(options.afterSeq)) }),
+    ...(options.clientId ? { client_id: options.clientId } : {})
   });
 }
 
@@ -369,17 +463,31 @@ export async function markRequestsSynced(options: MarkRequestsSyncedOptions): Pr
   });
 }
 
+export async function acknowledgeRequests(options: AcknowledgeRequestsOptions): Promise<AcknowledgeRequestsResult> {
+  return syncRequest<AcknowledgeRequestsSuccess>(options, {
+    action: "acknowledge_requests",
+    client_id: options.clientId,
+    through_seq: Math.max(0, Math.trunc(options.throughSeq))
+  });
+}
+
 export async function pushMenu(options: PushMenuOptions): Promise<PushMenuResult> {
   return syncRequest<PushMenuSuccess>(options, {
     action: "publish_menu",
-    menu: options.menu
+    menu: options.menu,
+    ...(options.clientId ? { client_id: options.clientId } : {}),
+    ...(options.sourceRevision === undefined ? {} : { source_revision: Math.max(0, Math.trunc(options.sourceRevision)) }),
+    ...(options.idempotencyKey ? { idempotency_key: options.idempotencyKey } : {})
   });
 }
 
 export async function pushAndroidSnapshot(options: PushAndroidSnapshotOptions): Promise<PushAndroidSnapshotResult> {
   return syncRequest<PushAndroidSnapshotSuccess>(options, {
     action: "publish_android_snapshot",
-    snapshot: options.snapshot
+    snapshot: options.snapshot,
+    ...(options.clientId ? { client_id: options.clientId } : {}),
+    ...(options.sourceRevision === undefined ? {} : { source_revision: Math.max(0, Math.trunc(options.sourceRevision)) }),
+    ...(options.idempotencyKey ? { idempotency_key: options.idempotencyKey } : {})
   });
 }
 
@@ -450,6 +558,64 @@ export async function pushAiSettings(options: PushAiSettingsOptions): Promise<Pu
   };
 }
 
+export class PhpHostingSyncTransport implements SyncTransport {
+  constructor(private readonly config: PhpHostingSyncTransportConfig) {}
+
+  getCapabilities(): Promise<SyncCapabilitiesResult> {
+    return getSyncCapabilities(this.config);
+  }
+
+  pullRequests(input: PullCursorInput): Promise<PullRequestsResult> {
+    return pullRequests({
+      ...this.config,
+      clientId: this.config.clientId,
+      afterSeq: input.afterSeq,
+      limit: input.limit
+    });
+  }
+
+  acknowledgeRequests(input: RequestAcknowledgement): Promise<AcknowledgeRequestsResult> {
+    return acknowledgeRequests({
+      ...this.config,
+      clientId: this.config.clientId,
+      throughSeq: input.throughSeq
+    });
+  }
+
+  pullAndroidActions(input: PullActionsInput = {}): Promise<PullAndroidActionsResult> {
+    return pullAndroidActions({ ...this.config, limit: input.limit });
+  }
+
+  completeAndroidAction(input: ActionCompletion): Promise<MarkAndroidActionResultResult> {
+    return markAndroidActionResult({
+      ...this.config,
+      actionId: input.actionId,
+      status: input.status,
+      errorMessage: input.errorMessage
+    });
+  }
+
+  publishMenu(input: VersionedPublication<PublishedQrMenu>): Promise<PushMenuResult> {
+    return pushMenu({
+      ...this.config,
+      clientId: this.config.clientId,
+      sourceRevision: input.sourceRevision,
+      idempotencyKey: input.idempotencyKey,
+      menu: input.value
+    });
+  }
+
+  publishAndroidSnapshot(input: VersionedPublication<AndroidOperationsSnapshot>): Promise<PushAndroidSnapshotResult> {
+    return pushAndroidSnapshot({
+      ...this.config,
+      clientId: this.config.clientId,
+      sourceRevision: input.sourceRevision,
+      idempotencyKey: input.idempotencyKey,
+      snapshot: input.value
+    });
+  }
+}
+
 async function syncRequest<SuccessResult extends { ok: true }>(
   config: SyncCoreConfig,
   body: Record<string, unknown>
@@ -475,10 +641,7 @@ async function syncRequest<SuccessResult extends { ok: true }>(
         "Content-Type": "application/json",
         "X-YA-Sync-Secret": config.syncSecret
       },
-      body: JSON.stringify({
-        ...body,
-        sync_secret: config.syncSecret
-      })
+      body: JSON.stringify(body)
     });
     const payload = await readJsonResponse(response);
 

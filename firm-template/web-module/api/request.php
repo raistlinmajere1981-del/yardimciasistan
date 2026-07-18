@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
-const YA_REQUESTS_FILE = YA_BASE_DIR . '/data/requests.json';
+
+require_once YA_BASE_DIR . '/lib/storage.php';
 
 $businessConfig = ya_load_business_config();
 ya_apply_cors($businessConfig);
@@ -74,11 +75,14 @@ $request = [
 ];
 
 try {
-    ya_append_json_record(YA_REQUESTS_FILE, $request);
+    ya_storage_insert_request($request);
 } catch (Throwable $error) {
-    ya_json_response(500, [
+    $storageUnavailable = $error->getMessage() === 'pdo_sqlite_missing';
+    ya_json_response($storageUnavailable ? 503 : 500, [
         'ok' => false,
-        'message' => 'Talep kaydedilemedi. Lütfen biraz sonra tekrar deneyin.'
+        'message' => $storageUnavailable
+            ? 'Hostingde PHP SQLite desteği etkin değil. Hosting yöneticinizden PDO_SQLITE eklentisini açmasını isteyin.'
+            : 'Talep kaydedilemedi. Lütfen biraz sonra tekrar deneyin.'
     ]);
 }
 
@@ -216,48 +220,6 @@ function ya_validate_request_payload(array $payload): array
     }
 
     return $errors;
-}
-
-function ya_append_json_record(string $path, array $record): void
-{
-    $directory = dirname($path);
-    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException('data_directory_missing');
-    }
-
-    $handle = fopen($path, 'c+');
-    if ($handle === false) {
-        throw new RuntimeException('data_file_open_failed');
-    }
-
-    try {
-        if (!flock($handle, LOCK_EX)) {
-            throw new RuntimeException('data_file_lock_failed');
-        }
-
-        rewind($handle);
-        $contents = stream_get_contents($handle);
-        $records = json_decode($contents ?: '[]', true);
-
-        if (!is_array($records)) {
-            $records = [];
-        }
-
-        $records[] = $record;
-        $json = json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-        if ($json === false) {
-            throw new RuntimeException('data_encode_failed');
-        }
-
-        ftruncate($handle, 0);
-        rewind($handle);
-        fwrite($handle, $json . PHP_EOL);
-        fflush($handle);
-        flock($handle, LOCK_UN);
-    } finally {
-        fclose($handle);
-    }
 }
 
 function ya_build_whatsapp_message(array $businessConfig, array $payload): string

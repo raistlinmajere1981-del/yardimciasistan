@@ -3,12 +3,9 @@ declare(strict_types=1);
 
 const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
-const YA_REQUESTS_FILE = YA_BASE_DIR . '/data/requests.json';
-const YA_MENU_FILE = YA_BASE_DIR . '/data/menu.json';
-const YA_ANDROID_SNAPSHOT_FILE = YA_BASE_DIR . '/data/android-snapshot.json';
-const YA_ANDROID_ACTIONS_FILE = YA_BASE_DIR . '/data/android-actions.json';
-const YA_SYNC_STATE_FILE = YA_BASE_DIR . '/data/sync-state.json';
 const YA_AI_SETTINGS_FILE = YA_BASE_DIR . '/data/ai-settings.local.php';
+
+require_once YA_BASE_DIR . '/lib/storage.php';
 
 $businessConfig = ya_sync_load_json(YA_CONFIG_FILE, []);
 ya_sync_apply_cors($businessConfig);
@@ -41,6 +38,10 @@ if (!$isAuthorized) {
 }
 
 try {
+    if ($action === 'capabilities') {
+        ya_sync_capabilities();
+    }
+
     if ($action === 'pull_requests') {
         ya_sync_pull_requests($payload);
     }
@@ -51,6 +52,10 @@ try {
 
     if ($action === 'mark_requests_synced') {
         ya_sync_mark_requests_synced($payload);
+    }
+
+    if ($action === 'acknowledge_requests') {
+        ya_sync_acknowledge_requests($payload);
     }
 
     if ($action === 'update_request_status') {
@@ -85,10 +90,32 @@ try {
         'ok' => false,
         'message' => 'Güncelleme isteği anlaşılamadı.'
     ]);
-} catch (Throwable $error) {
-    ya_sync_response(500, [
+} catch (YaStorageConflictException $error) {
+    ya_sync_response(409, [
         'ok' => false,
-        'message' => 'Güncelleme sırasında bir sorun oldu. Biraz sonra tekrar deneyin.'
+        'message' => 'Daha eski bir yayın güncel verinin üzerine yazılamaz.',
+        'error' => $error->getMessage()
+    ]);
+} catch (Throwable $error) {
+    $storageUnavailable = $error->getMessage() === 'pdo_sqlite_missing';
+    ya_sync_response($storageUnavailable ? 503 : 500, [
+        'ok' => false,
+        'message' => $storageUnavailable
+            ? 'Hostingde PHP SQLite desteği etkin değil. PDO_SQLITE eklentisini açıp tekrar deneyin.'
+            : 'Güncelleme sırasında bir sorun oldu. Biraz sonra tekrar deneyin.',
+        'error' => $storageUnavailable ? 'pdo_sqlite_missing' : 'sync_failed'
+    ]);
+}
+
+function ya_sync_capabilities(): void
+{
+    $now = date(DATE_ATOM);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Senkron özellikleri alındı.',
+        ...ya_storage_capabilities(),
+        'server_time' => $now,
+        'server_revision' => ya_storage_server_revision()
     ]);
 }
 
@@ -97,10 +124,21 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $limit = ya_sync_int($payload['limit'] ?? $_GET['limit'] ?? 100, 100);
     $limit = max(1, min($limit, 200));
     $deviceId = ya_sync_string($payload['device_id'] ?? $_GET['device_id'] ?? '');
-    $records = ya_sync_load_json(YA_REQUESTS_FILE, []);
-    if (!is_array($records)) {
-        $records = [];
+    $knownServerRevision = max(0, ya_sync_int($payload['known_server_revision'] ?? 0, 0));
+    $serverRevision = ya_storage_server_revision();
+    if ($knownServerRevision > 0 && $knownServerRevision === $serverRevision) {
+        $now = date(DATE_ATOM);
+        ya_sync_update_state(['last_android_summary_at' => $now]);
+        ya_sync_response(200, [
+            'ok' => true,
+            'message' => 'Android verisi zaten güncel.',
+            'not_modified' => true,
+            'server_revision' => $serverRevision,
+            'pulled_at' => $now,
+            'pending_action_count' => ya_sync_count_pending_android_actions($deviceId)
+        ]);
     }
+    $records = ya_storage_all_requests();
 
     $androidSnapshot = ya_sync_load_android_snapshot();
     $requestsById = [];
@@ -202,7 +240,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'menu' => $androidSnapshot['menu'],
         'table_orders' => $androidSnapshot['table_orders'],
         'messages' => $androidSnapshot['messages'],
-        'actions' => $actions
+        'actions' => $actions,
+        'server_revision' => ya_storage_server_revision()
     ]);
 }
 
@@ -211,28 +250,11 @@ function ya_sync_pull_requests(array $payload): void
     $limit = ya_sync_int($payload['limit'] ?? $_GET['limit'] ?? 50, 50);
     $limit = max(1, min($limit, 200));
     $includeSynced = ya_sync_bool($payload['include_synced'] ?? $_GET['include_synced'] ?? false);
-    $records = ya_sync_load_json(YA_REQUESTS_FILE, []);
-
-    if (!is_array($records)) {
-        $records = [];
-    }
-
-    $requests = [];
-    foreach ($records as $record) {
-        if (!is_array($record)) {
-            continue;
-        }
-
-        $syncStatus = ya_sync_string($record['sync_status'] ?? 'pending');
-        if (!$includeSynced && $syncStatus === 'synced') {
-            continue;
-        }
-
-        $requests[] = ya_sync_public_request($record);
-        if (count($requests) >= $limit) {
-            break;
-        }
-    }
+    $afterSeq = array_key_exists('after_seq', $payload)
+        ? max(0, ya_sync_int($payload['after_seq'], 0))
+        : null;
+    $pulled = ya_storage_pull_requests($limit, $includeSynced, $afterSeq);
+    $requests = array_map('ya_sync_public_request', $pulled['requests']);
 
     $now = date(DATE_ATOM);
     ya_sync_update_state([
@@ -244,7 +266,10 @@ function ya_sync_pull_requests(array $payload): void
         'message' => 'Talepler alındı.',
         'requests' => $requests,
         'count' => count($requests),
-        'pulled_at' => $now
+        'pulled_at' => $now,
+        'next_cursor' => $pulled['next_cursor'],
+        'has_more' => $pulled['has_more'],
+        'server_revision' => ya_storage_server_revision()
     ]);
 }
 
@@ -260,25 +285,7 @@ function ya_sync_mark_requests_synced(array $payload): void
 
     $requestIds = array_values(array_unique(array_map('ya_sync_string', $requestIds)));
     $now = date(DATE_ATOM);
-    $updatedCount = 0;
-
-    $records = ya_sync_edit_json_array(YA_REQUESTS_FILE, static function (array $records) use ($requestIds, $now, &$updatedCount): array {
-        foreach ($records as &$record) {
-            if (!is_array($record)) {
-                continue;
-            }
-
-            if (in_array(ya_sync_string($record['id'] ?? ''), $requestIds, true)) {
-                $record['sync_status'] = 'synced';
-                $record['synced_at'] = $now;
-                $record['updated_at'] = $now;
-                $updatedCount++;
-            }
-        }
-        unset($record);
-
-        return $records;
-    });
+    $updatedCount = ya_storage_mark_requests_synced($requestIds, $now);
 
     ya_sync_update_state([
         'last_request_mark_at' => $now
@@ -290,7 +297,30 @@ function ya_sync_mark_requests_synced(array $payload): void
         'updated_count' => $updatedCount,
         'synced_at' => $now,
         'request_ids' => $requestIds,
-        'total_records' => count($records)
+        'total_records' => count(ya_storage_all_requests())
+    ]);
+}
+
+function ya_sync_acknowledge_requests(array $payload): void
+{
+    $clientId = ya_sync_string($payload['client_id'] ?? '');
+    $throughSeq = ya_sync_int($payload['through_seq'] ?? -1, -1);
+    if (!preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $clientId) || $throughSeq < 0) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Talep onay cursor bilgisi geçersiz.'
+        ]);
+    }
+    $now = date(DATE_ATOM);
+    $updatedCount = ya_storage_acknowledge_requests($clientId, $throughSeq, $now);
+    ya_storage_update_state(['last_request_ack_at' => $now]);
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Talep cursor bilgisi onaylandı.',
+        'updated_count' => $updatedCount,
+        'acknowledged_cursor' => $throughSeq,
+        'acknowledged_at' => $now,
+        'server_revision' => ya_storage_server_revision()
     ]);
 }
 
@@ -315,25 +345,7 @@ function ya_sync_update_request_status(array $payload): void
     }
 
     $now = date(DATE_ATOM);
-    $updatedRequest = null;
-
-    $records = ya_sync_edit_json_array(YA_REQUESTS_FILE, static function (array $records) use ($requestId, $nextStatus, $now, &$updatedRequest): array {
-        foreach ($records as &$record) {
-            if (!is_array($record)) {
-                continue;
-            }
-
-            if (ya_sync_string($record['id'] ?? '') === $requestId) {
-                $record['status'] = $nextStatus;
-                $record['updated_at'] = $now;
-                $updatedRequest = ya_sync_public_request($record);
-                break;
-            }
-        }
-        unset($record);
-
-        return $records;
-    });
+    $updatedRequest = ya_storage_update_request_status($requestId, $nextStatus, $now);
 
     if ($updatedRequest === null) {
         ya_sync_response(404, [
@@ -353,7 +365,7 @@ function ya_sync_update_request_status(array $payload): void
         'request_id' => $requestId,
         'status' => $nextStatus,
         'updated_at' => $now,
-        'total_records' => count($records)
+        'total_records' => count(ya_storage_all_requests())
     ]);
 }
 
@@ -401,25 +413,7 @@ function ya_sync_enqueue_android_action(array $payload): void
     }
 
     $now = date(DATE_ATOM);
-    $created = false;
-    $storedAction = null;
-    $actions = ya_sync_edit_json_array(YA_ANDROID_ACTIONS_FILE, static function (array $actions) use (
-        $actionId,
-        $actionType,
-        $deviceId,
-        $actionPayload,
-        $now,
-        &$created,
-        &$storedAction
-    ): array {
-        foreach ($actions as $action) {
-            if (is_array($action) && ya_sync_string($action['id'] ?? '') === $actionId) {
-                $storedAction = ya_sync_public_android_action($action);
-                return $actions;
-            }
-        }
-
-        $storedAction = [
+    $stored = ya_storage_enqueue_android_action([
             'id' => $actionId,
             'action_type' => $actionType,
             'payload' => $actionPayload,
@@ -428,31 +422,13 @@ function ya_sync_enqueue_android_action(array $payload): void
             'status' => 'pending',
             'error_message' => '',
             'processed_at' => ''
-        ];
-        $actions[] = $storedAction;
-        $created = true;
-
-        // Retain every pending command and a bounded recent result history.
-        if (count($actions) > 2000) {
-            $pending = array_values(array_filter($actions, static function ($action): bool {
-                return is_array($action) && ya_sync_string($action['status'] ?? '') === 'pending';
-            }));
-            $finished = array_values(array_filter($actions, static function ($action): bool {
-                return is_array($action) && ya_sync_string($action['status'] ?? '') !== 'pending';
-            }));
-            $actions = array_merge(array_slice($finished, -1000), $pending);
-        }
-
-        return $actions;
-    });
-
-    if ($storedAction === null) {
-        throw new RuntimeException('android_action_not_stored');
-    }
+    ]);
+    $created = $stored['created'] === true;
+    $storedAction = ya_sync_public_android_action($stored['action']);
 
     ya_sync_update_state([
         'last_android_action_enqueue_at' => $now,
-        'android_action_count' => count($actions)
+        'android_action_count' => ya_storage_count_pending_android_actions()
     ]);
 
     ya_sync_response($created ? 201 : 200, [
@@ -467,21 +443,7 @@ function ya_sync_enqueue_android_action(array $payload): void
 function ya_sync_pull_android_actions(array $payload): void
 {
     $limit = max(1, min(ya_sync_int($payload['limit'] ?? 50, 50), 200));
-    $records = ya_sync_load_json(YA_ANDROID_ACTIONS_FILE, []);
-    if (!is_array($records)) {
-        $records = [];
-    }
-
-    $actions = [];
-    foreach ($records as $record) {
-        if (!is_array($record) || ya_sync_string($record['status'] ?? '') !== 'pending') {
-            continue;
-        }
-        $actions[] = ya_sync_public_android_action($record);
-        if (count($actions) >= $limit) {
-            break;
-        }
-    }
+    $actions = array_map('ya_sync_public_android_action', ya_storage_pull_android_actions($limit));
 
     $now = date(DATE_ATOM);
     ya_sync_update_state(['last_android_action_pull_at' => $now]);
@@ -514,37 +476,15 @@ function ya_sync_mark_android_action_result(array $payload): void
     }
 
     $now = date(DATE_ATOM);
-    $updatedAction = null;
-    $conflict = false;
-    ya_sync_edit_json_array(YA_ANDROID_ACTIONS_FILE, static function (array $actions) use (
-        $actionId,
-        $status,
-        $errorMessage,
-        $now,
-        &$updatedAction,
-        &$conflict
-    ): array {
-        foreach ($actions as &$action) {
-            if (!is_array($action) || ya_sync_string($action['id'] ?? '') !== $actionId) {
-                continue;
-            }
-
-            $currentStatus = ya_sync_string($action['status'] ?? 'pending') ?: 'pending';
-            if ($currentStatus !== 'pending' && $currentStatus !== $status) {
-                $conflict = true;
-                $updatedAction = ya_sync_public_android_action($action);
-                break;
-            }
-
-            $action['status'] = $status;
-            $action['error_message'] = $errorMessage;
-            $action['processed_at'] = ya_sync_string($action['processed_at'] ?? '') ?: $now;
-            $updatedAction = ya_sync_public_android_action($action);
-            break;
-        }
-        unset($action);
-        return $actions;
-    });
+    $currentAction = ya_storage_get_android_action($actionId);
+    $currentStatus = ya_sync_string($currentAction['status'] ?? '');
+    if ($currentAction !== null && $currentStatus !== 'pending' && $currentStatus !== $status) {
+        ya_sync_response(409, [
+            'ok' => false,
+            'message' => 'İşlem sonucu daha önce farklı bir durumla kaydedilmiş.'
+        ]);
+    }
+    $updatedAction = ya_storage_mark_android_action($actionId, $status, $errorMessage, $now);
 
     if ($updatedAction === null) {
         ya_sync_response(404, [
@@ -552,13 +492,6 @@ function ya_sync_mark_android_action_result(array $payload): void
             'message' => 'Telefon işlemi bulunamadı.'
         ]);
     }
-    if ($conflict) {
-        ya_sync_response(409, [
-            'ok' => false,
-            'message' => 'İşlem sonucu daha önce farklı bir durumla kaydedilmiş.'
-        ]);
-    }
-
     ya_sync_update_state(['last_android_action_result_at' => $now]);
     ya_sync_response(200, [
         'ok' => true,
@@ -591,7 +524,14 @@ function ya_sync_publish_menu(array $payload): void
         'updated_at' => $now
     ];
 
-    ya_sync_write_json(YA_MENU_FILE, $publishedMenu);
+    $publication = ya_storage_publish(
+        'menu',
+        $publishedMenu,
+        ya_sync_string($payload['client_id'] ?? 'legacy-desktop'),
+        array_key_exists('source_revision', $payload) ? ya_sync_int($payload['source_revision'], 0) : null,
+        ya_sync_string($payload['idempotency_key'] ?? ''),
+        $now
+    );
     ya_sync_update_state([
         'last_menu_publish_at' => $now
     ]);
@@ -602,7 +542,10 @@ function ya_sync_publish_menu(array $payload): void
         'published_at' => $now,
         'updated_at' => $now,
         'category_count' => count($categories),
-        'item_count' => count($items)
+        'item_count' => count($items),
+        'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'],
+        'deduplicated' => $publication['deduplicated']
     ]);
 }
 
@@ -618,7 +561,14 @@ function ya_sync_publish_android_snapshot(array $payload): void
 
     $now = date(DATE_ATOM);
     $publishedSnapshot = ya_sync_sanitize_android_snapshot($snapshot, $now);
-    ya_sync_write_json(YA_ANDROID_SNAPSHOT_FILE, $publishedSnapshot);
+    $publication = ya_storage_publish(
+        'android_snapshot',
+        $publishedSnapshot,
+        ya_sync_string($payload['client_id'] ?? 'legacy-desktop'),
+        array_key_exists('source_revision', $payload) ? ya_sync_int($payload['source_revision'], 0) : null,
+        ya_sync_string($payload['idempotency_key'] ?? ''),
+        $now
+    );
     ya_sync_update_state([
         'last_android_snapshot_at' => $now
     ]);
@@ -628,7 +578,10 @@ function ya_sync_publish_android_snapshot(array $payload): void
         'message' => 'Android özeti yayınlandı.',
         'published_at' => $now,
         'updated_at' => $publishedSnapshot['updated_at'],
-        'task_count' => count($publishedSnapshot['daily_tasks'])
+        'task_count' => count($publishedSnapshot['daily_tasks']),
+        'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'],
+        'deduplicated' => $publication['deduplicated']
     ]);
 }
 
@@ -798,6 +751,8 @@ function ya_sync_public_request(array $record): array
         'assigned_to',
         'priority',
         'sync_status',
+        'sync_seq',
+        'synced_at',
         'created_at',
         'updated_at'
     ];
@@ -859,23 +814,10 @@ function ya_sync_get_android_actions(string $deviceId, int $limit): array
     if ($deviceId === '') {
         return [];
     }
-
-    $records = ya_sync_load_json(YA_ANDROID_ACTIONS_FILE, []);
-    if (!is_array($records)) {
-        return [];
-    }
-
-    $actions = [];
-    foreach (array_reverse($records) as $record) {
-        if (!is_array($record) || ya_sync_string($record['device_id'] ?? '') !== $deviceId) {
-            continue;
-        }
-        $actions[] = ya_sync_public_android_action($record);
-        if (count($actions) >= max(1, min($limit, 100))) {
-            break;
-        }
-    }
-    return $actions;
+    return array_map(
+        'ya_sync_public_android_action',
+        ya_storage_get_android_actions($deviceId, max(1, min($limit, 100)))
+    );
 }
 
 function ya_sync_count_pending_android_actions(string $deviceId): int
@@ -884,29 +826,13 @@ function ya_sync_count_pending_android_actions(string $deviceId): int
         return 0;
     }
 
-    $records = ya_sync_load_json(YA_ANDROID_ACTIONS_FILE, []);
-    if (!is_array($records)) {
-        return 0;
-    }
-
-    $count = 0;
-    foreach ($records as $record) {
-        if (is_array($record)
-            && ya_sync_string($record['device_id'] ?? '') === $deviceId
-            && ya_sync_string($record['status'] ?? '') === 'pending') {
-            $count++;
-        }
-    }
-    return $count;
+    return ya_storage_count_pending_android_actions($deviceId);
 }
 
 function ya_sync_load_android_snapshot(): array
 {
-    $snapshot = ya_sync_load_json(YA_ANDROID_SNAPSHOT_FILE, []);
-    if (!is_array($snapshot)) {
-        $snapshot = [];
-    }
-
+    $snapshot = ya_storage_get_publication('android_snapshot', []);
+    unset($snapshot['_publication']);
     return ya_sync_sanitize_android_snapshot($snapshot, ya_sync_string($snapshot['updated_at'] ?? ''));
 }
 
@@ -1321,7 +1247,9 @@ function ya_sync_is_authorized(array $businessConfig, array $payload): bool
         return false;
     }
 
-    $providedSecret = ya_sync_string($payload['sync_secret'] ?? $_GET['sync_secret'] ?? '');
+    // Body authentication remains for one compatibility release. Query-string
+    // secrets are deliberately rejected because URLs can be logged by proxies.
+    $providedSecret = ya_sync_string($payload['sync_secret'] ?? '');
     $headerSecret = ya_sync_header('HTTP_X_YA_SYNC_SECRET');
 
     if ($providedSecret === '' && $headerSecret !== '') {
@@ -1405,63 +1333,6 @@ function ya_sync_load_json(string $path, mixed $fallback): mixed
     return $data === null ? $fallback : $data;
 }
 
-function ya_sync_edit_json_array(string $path, callable $editor): array
-{
-    $directory = dirname($path);
-    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException('data_directory_missing');
-    }
-
-    $handle = fopen($path, 'c+');
-    if ($handle === false) {
-        throw new RuntimeException('data_file_open_failed');
-    }
-
-    try {
-        if (!flock($handle, LOCK_EX)) {
-            throw new RuntimeException('data_file_lock_failed');
-        }
-
-        rewind($handle);
-        $contents = stream_get_contents($handle);
-        $records = json_decode($contents ?: '[]', true);
-        if (!is_array($records)) {
-            $records = [];
-        }
-
-        $records = $editor($records);
-        $json = json_encode($records, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if ($json === false) {
-            throw new RuntimeException('data_encode_failed');
-        }
-
-        ftruncate($handle, 0);
-        rewind($handle);
-        fwrite($handle, $json . PHP_EOL);
-        fflush($handle);
-        flock($handle, LOCK_UN);
-    } finally {
-        fclose($handle);
-    }
-
-    return $records;
-}
-
-function ya_sync_write_json(string $path, mixed $data): void
-{
-    $directory = dirname($path);
-    if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
-        throw new RuntimeException('data_directory_missing');
-    }
-
-    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($json === false) {
-        throw new RuntimeException('data_encode_failed');
-    }
-
-    file_put_contents($path, $json . PHP_EOL, LOCK_EX);
-}
-
 function ya_sync_write_php_array_atomic(string $path, array $data): void
 {
     $directory = dirname($path);
@@ -1518,21 +1389,9 @@ function ya_sync_write_php_array_atomic(string $path, array $data): void
 
 function ya_sync_update_state(array $changes): void
 {
-    $state = ya_sync_load_json(YA_SYNC_STATE_FILE, []);
-    if (!is_array($state)) {
-        $state = [];
-    }
-
-    $state = array_merge($state, $changes, [
+    ya_storage_update_state(array_merge($changes, [
         'updated_at' => date(DATE_ATOM)
-    ]);
-
-    $json = json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if ($json === false) {
-        throw new RuntimeException('state_encode_failed');
-    }
-
-    file_put_contents(YA_SYNC_STATE_FILE, $json . PHP_EOL, LOCK_EX);
+    ]));
 }
 
 function ya_sync_response(int $status, array $payload): void

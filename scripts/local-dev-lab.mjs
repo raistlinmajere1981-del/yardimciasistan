@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -13,11 +13,23 @@ const dataFiles = [
   join(webModuleRoot, "data", "requests.json"),
   join(webModuleRoot, "data", "sync-state.json"),
   join(webModuleRoot, "data", "ai-conversations.json"),
-  join(webModuleRoot, "data", "android-snapshot.json")
+  join(webModuleRoot, "data", "android-snapshot.json"),
+  join(webModuleRoot, "data", "android-actions.json")
 ];
+const runtimeFiles = [
+  "yardimci-asistan.sqlite",
+  "yardimci-asistan.sqlite-wal",
+  "yardimci-asistan.sqlite-shm",
+  "requests.json.legacy-backup-v1",
+  "menu.json.legacy-backup-v1",
+  "android-actions.json.legacy-backup-v1",
+  "android-snapshot.json.legacy-backup-v1",
+  "sync-state.json.legacy-backup-v1"
+].map((file) => join(webModuleRoot, "data", file));
 
 const options = parseArgs(process.argv.slice(2));
-const backups = new Map(dataFiles.filter((path) => existsSync(path)).map((path) => [path, readFileSync(path, "utf8")]));
+const managedFiles = [...dataFiles, ...runtimeFiles];
+const backups = new Map(managedFiles.filter((path) => existsSync(path)).map((path) => [path, readFileSync(path)]));
 const processes = [];
 let cleaned = false;
 
@@ -191,7 +203,6 @@ async function verifyAndroidSummary(baseUrl) {
     },
     body: JSON.stringify({
       action: "android_summary",
-      sync_secret: syncSecret,
       limit: 10
     })
   });
@@ -312,6 +323,9 @@ function cleanup() {
   }
 
   if (options.once && !options.keepData) {
+    for (const path of managedFiles) {
+      rmSync(path, { force: true });
+    }
     for (const [path, contents] of backups) {
       writeFileSync(path, contents);
     }

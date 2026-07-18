@@ -18,3 +18,5 @@ playwright-report/
 firm-template/web-module/config/ai.local.php
 firm-template/web-module/data/ai-settings.local.php
 firm-template/web-module/data/.ai-settings.*
+firm-template/web-module/data/yardimci-asistan.sqlite*
+firm-template/web-module/data/*.legacy-backup-v1

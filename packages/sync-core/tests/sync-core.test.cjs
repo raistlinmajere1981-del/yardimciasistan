@@ -1,14 +1,17 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
+  acknowledgeRequests,
   createSyncEndpointUrl,
+  getSyncCapabilities,
   markAndroidActionResult,
   markRequestsSynced,
   pullAndroidActions,
   pushAiSettings,
   pushAndroidSnapshot,
   pushMenu,
-  pullRequests
+  pullRequests,
+  PhpHostingSyncTransport
 } = require("../dist");
 
 test("createSyncEndpointUrl creates the mini API sync endpoint", () => {
@@ -79,7 +82,91 @@ test("pullRequests posts secret and returns request data", async () => {
   assert.equal(calls[0].headers["X-YA-Sync-Secret"], "secret");
   assert.equal(calls[0].body.action, "pull_requests");
   assert.equal(calls[0].body.limit, 25);
-  assert.equal(calls[0].body.sync_secret, "secret");
+  assert.equal("sync_secret" in calls[0].body, false);
+});
+
+test("cursor pull and acknowledgement use the v2 request protocol", async () => {
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push(body);
+    return new Response(JSON.stringify(body.action === "pull_requests" ? {
+      ok: true,
+      message: "Talepler alındı.",
+      requests: [],
+      count: 0,
+      pulled_at: "2026-07-17T20:00:00Z",
+      next_cursor: 42,
+      has_more: false,
+      server_revision: 7
+    } : {
+      ok: true,
+      message: "Talep cursor bilgisi onaylandı.",
+      updated_count: 3,
+      acknowledged_cursor: 42,
+      acknowledged_at: "2026-07-17T20:00:01Z",
+      server_revision: 8
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const pulled = await pullRequests({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    clientId: "desktop-client-001",
+    afterSeq: 12,
+    limit: 30,
+    fetchImpl
+  });
+  const acknowledged = await acknowledgeRequests({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    clientId: "desktop-client-001",
+    throughSeq: 42,
+    fetchImpl
+  });
+
+  assert.equal(pulled.ok, true);
+  assert.equal(pulled.next_cursor, 42);
+  assert.equal(acknowledged.ok, true);
+  assert.equal(calls[0].after_seq, 12);
+  assert.equal(calls[0].client_id, "desktop-client-001");
+  assert.equal(calls[1].action, "acknowledge_requests");
+  assert.equal(calls[1].through_seq, 42);
+});
+
+test("capabilities and PhpHostingSyncTransport expose a provider-neutral boundary", async () => {
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push(body);
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "Senkron özellikleri alındı.",
+      protocol_version: 2,
+      storage: "sqlite",
+      schema_version: 1,
+      features: ["request_cursor"],
+      server_time: "2026-07-17T20:00:00Z",
+      server_revision: 4
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const direct = await getSyncCapabilities({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    fetchImpl
+  });
+  const transport = new PhpHostingSyncTransport({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "secret",
+    clientId: "desktop-client-001",
+    fetchImpl
+  });
+  const throughTransport = await transport.getCapabilities();
+
+  assert.equal(direct.ok, true);
+  assert.equal(direct.protocol_version, 2);
+  assert.equal(throughTransport.ok, true);
+  assert.deepEqual(calls.map((call) => call.action), ["capabilities", "capabilities"]);
 });
 
 test("markRequestsSynced sends processed ids", async () => {
@@ -251,7 +338,7 @@ test("pushMenu sends QR menu data", async () => {
   assert.equal(result.item_count, 1);
   assert.equal(calls[0].body.action, "publish_menu");
   assert.equal(calls[0].body.menu.items[0].name, "Serpme Kahvaltı");
-  assert.equal(calls[0].body.sync_secret, "secret");
+  assert.equal("sync_secret" in calls[0].body, false);
 });
 
 test("pushAndroidSnapshot sends desktop operation summary", async () => {
@@ -313,7 +400,7 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
   assert.equal(calls[0].body.action, "publish_android_snapshot");
   assert.equal(calls[0].body.snapshot.summary.available_rooms, 4);
   assert.equal(calls[0].body.snapshot.daily_tasks[0].id, "task_001");
-  assert.equal(calls[0].body.sync_secret, "secret");
+  assert.equal("sync_secret" in calls[0].body, false);
 });
 
 test("pushAiSettings sends the complete snake_case settings and strips the API key from its response", async () => {
@@ -376,7 +463,7 @@ test("pushAiSettings sends the complete snake_case settings and strips the API k
   assert.equal(calls[0].url, "https://firma.example/yardimci-asistan/api/sync.php");
   assert.equal(calls[0].headers["X-YA-Sync-Secret"], "sync-secret");
   assert.equal(calls[0].body.action, "publish_ai_settings");
-  assert.equal(calls[0].body.sync_secret, "sync-secret");
+  assert.equal("sync_secret" in calls[0].body, false);
   assert.deepEqual(calls[0].body.ai_settings, {
     enabled: true,
     provider: "openai_compatible",

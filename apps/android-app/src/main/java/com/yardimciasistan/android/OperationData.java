@@ -12,6 +12,7 @@ final class OperationData {
   String businessWhatsapp = "";
   String pulledAt = "";
   String snapshotUpdatedAt = "";
+  long serverRevision;
   int totalRequests;
   int newRequests;
   int pendingRequests;
@@ -43,6 +44,7 @@ final class OperationData {
 
   static OperationData fromJson(JSONObject root) {
     OperationData data = new OperationData();
+    data.serverRevision = Math.max(0L, root.optLong("server_revision", 0L));
     boolean messagesIncluded = root.has("messages") && root.optJSONArray("messages") != null;
     JSONObject business = object(root, "business");
     data.businessName = value(business, "display_name", "Yardımcı Asistan");

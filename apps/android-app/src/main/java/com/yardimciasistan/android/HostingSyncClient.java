@@ -14,16 +14,25 @@ final class HostingSyncClient {
   private static final int READ_TIMEOUT_MS = 18000;
 
   OperationData fetchOperations(String baseUrl, String syncSecret, String deviceId) throws SyncException {
+    FetchResult result = fetchOperations(baseUrl, syncSecret, deviceId, 0L);
+    return result.data == null ? new OperationData() : result.data;
+  }
+
+  FetchResult fetchOperations(String baseUrl, String syncSecret, String deviceId, long knownServerRevision) throws SyncException {
     JSONObject payload = new JSONObject();
     try {
       payload.put("action", "android_summary");
-      payload.put("sync_secret", syncSecret);
       payload.put("device_id", deviceId);
       payload.put("limit", 200);
+      payload.put("known_server_revision", Math.max(0L, knownServerRevision));
     } catch (Exception error) {
       throw new SyncException("Güncelleme isteği hazırlanamadı.", error);
     }
-    return OperationData.fromJson(post(baseUrl, syncSecret, payload));
+    JSONObject response = post(baseUrl, syncSecret, payload);
+    if (response.optBoolean("not_modified", false)) {
+      return new FetchResult(true, Math.max(0L, response.optLong("server_revision", knownServerRevision)), null, response);
+    }
+    return new FetchResult(false, Math.max(0L, response.optLong("server_revision", 0L)), OperationData.fromJson(response), response);
   }
 
   OperationData.ActionRecord enqueueAction(
@@ -37,7 +46,6 @@ final class HostingSyncClient {
     JSONObject payload = new JSONObject();
     try {
       payload.put("action", "enqueue_android_action");
-      payload.put("sync_secret", syncSecret);
       payload.put("action_id", actionId);
       payload.put("action_type", actionType);
       payload.put("device_id", deviceId);
@@ -143,6 +151,20 @@ final class HostingSyncClient {
 
     SyncException(String message, Throwable cause) {
       super(message, cause);
+    }
+  }
+
+  static final class FetchResult {
+    final boolean notModified;
+    final long serverRevision;
+    final OperationData data;
+    final JSONObject payload;
+
+    FetchResult(boolean notModified, long serverRevision, OperationData data, JSONObject payload) {
+      this.notModified = notModified;
+      this.serverRevision = serverRevision;
+      this.data = data;
+      this.payload = payload;
     }
   }
 }

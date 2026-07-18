@@ -4722,6 +4722,22 @@ button {
   grid-column: 1 / -1;
 }
 
+.setup-shell.is-embedded .settings-web-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-shell.is-embedded .settings-web-title > h2 {
+  margin-right: auto;
+}
+
+.settings-auto-sync-toggle {
+  min-height: 32px;
+  margin: 0;
+  white-space: nowrap;
+}
+
 .setup-shell.is-embedded .setup-ai-section {
   grid-column: 1;
 }

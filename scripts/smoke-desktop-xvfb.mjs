@@ -15,6 +15,7 @@ if (xvfbCheck.status !== 0) {
 const electron = spawn("xvfb-run", ["-a", "npx", "electron", "apps/desktop-app", "--no-sandbox"], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"],
+  detached: true,
   env: {
     ...process.env,
     ELECTRON_ENABLE_LOGGING: "1",
@@ -24,11 +25,11 @@ const electron = spawn("xvfb-run", ["-a", "npx", "electron", "apps/desktop-app",
 
 let output = "";
 let exited = false;
+let stoppingAfterSuccessfulStart = false;
 const successTimer = setTimeout(() => {
   if (!exited) {
-    electron.kill("SIGTERM");
-    console.log("electron-started-ok: app stayed open under xvfb-run");
-    process.exit(0);
+    stoppingAfterSuccessfulStart = true;
+    stopElectronProcessGroup();
   }
 }, 8000);
 
@@ -44,15 +45,28 @@ electron.on("exit", (code, signal) => {
   exited = true;
   clearTimeout(successTimer);
 
-  if (signal === "SIGTERM") {
+  if (stoppingAfterSuccessfulStart) {
     console.log("electron-started-ok: app stopped after smoke timeout");
     process.exit(0);
   }
 
   console.error(output.trim());
   console.error(`Electron erken kapandı. code=${code ?? "null"} signal=${signal ?? "null"}`);
-  process.exit(code ?? 1);
+  process.exit(1);
 });
+
+function stopElectronProcessGroup() {
+  if (!electron.pid) {
+    electron.kill("SIGTERM");
+    return;
+  }
+
+  try {
+    process.kill(-electron.pid, "SIGTERM");
+  } catch {
+    electron.kill("SIGTERM");
+  }
+}
 
 function createSmokeDataDir() {
   const directory = join(process.cwd(), "artifacts", "desktop-smoke-data");

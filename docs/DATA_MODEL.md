@@ -863,47 +863,33 @@ sync.failed
 
 ---
 
-# 18. Hosting Mini API Veri Dosyaları
+# 18. Hosting Mini API Veri Deposu
 
-İlk sürümde firma hosting mini API basit dosya tabanlı veri kullanabilir.
-
-Önerilen yapı:
-
-```text
-data/
-  requests.json
-  menu.json
-  business.json
-  sync-state.json
-  ai-conversations.json
-```
-
-Daha sağlam kurulumlarda SQLite kullanılabilir:
+Firma hosting mini API çalışma verileri için SQLite kullanır:
 
 ```text
 data/yardimci-asistan.sqlite
 ```
 
-## requests.json Örneği
+Temel tablolar:
 
-```json
-[
-  {
-    "id": "request_001",
-    "source": "web_form",
-    "request_type": "pension_reservation",
-    "status": "new",
-    "customer_name": "Ahmet Yılmaz",
-    "customer_phone": "+905xxxxxxxxx",
-    "start_date": "2026-07-12",
-    "end_date": "2026-07-14",
-    "guest_count": 3,
-    "message": "Deniz manzaralı oda varsa bilgi almak istiyorum.",
-    "created_at": "2026-07-10T14:30:00+03:00",
-    "updated_at": "2026-07-10T14:30:00+03:00"
-  }
-]
+```text
+sync_meta
+web_requests
+android_actions
+publications
+publication_receipts
+sync_clients
 ```
+
+`web_requests.seq` talep cursor'udur. `publications` menü ve Android snapshot için
+kaynak istemci/revision ile sunucu revision'ını tutar. `publication_receipts`
+idempotency anahtarlarının sonucunu, `sync_clients` masaüstü acknowledgement cursor'unu
+tutar. Eski JSON dosyaları yalnız ilk açılıştaki migration girdisi ve
+`.legacy-backup-v1` güvenlik kopyasıdır; güncel çalışma deposu değildir.
+
+AI konuşma geçmişi `ai-conversations.json`, sunucu AI anahtarı ise doğrudan webden
+erişimi engellenmiş `ai-settings.local.php` içinde kalır.
 
 ---
 
@@ -926,6 +912,9 @@ whatsapp_messages
 notifications
 daily_tasks
 sync_records
+sync_runtime
+sync_outbox
+sync_outbox_revisions
 events
 ```
 

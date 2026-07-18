@@ -1,24 +1,26 @@
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
-import { chmodSync, existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import process from "node:process";
 
-const menuFile = "firm-template/web-module/data/menu.json";
-const conversationsFile = "firm-template/web-module/data/ai-conversations.json";
-const requestsFile = "firm-template/web-module/data/requests.json";
-const syncStateFile = "firm-template/web-module/data/sync-state.json";
-const aiSettingsFile = "firm-template/web-module/data/ai-settings.local.php";
-const originalMenuJson = readFileSync(menuFile, "utf8");
-const originalConversationsJson = readFileSync(conversationsFile, "utf8");
-const originalRequestsJson = readFileSync(requestsFile, "utf8");
-const originalSyncStateJson = readFileSync(syncStateFile, "utf8");
-const originalAiSettings = existsSync(aiSettingsFile)
-  ? {
-      contents: readFileSync(aiSettingsFile, "utf8"),
-      mode: statSync(aiSettingsFile).mode & 0o777
-    }
-  : null;
+const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-web-module-"));
+const webModuleRoot = join(tempRoot, "web-module");
+cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+const menuFile = join(webModuleRoot, "data", "menu.json");
+const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
+const requestsFile = join(webModuleRoot, "data", "requests.json");
+const aiSettingsFile = join(webModuleRoot, "data", "ai-settings.local.php");
+for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
+  rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
+}
+if (existsSync(aiSettingsFile)) {
+  unlinkSync(aiSettingsFile);
+}
+writeFileSync(conversationsFile, "[]\n");
+writeFileSync(requestsFile, "[]\n");
 const mockAiApiKey = "smoke-ai-key-do-not-log";
 const mockAiModel = "smoke-model-001";
 const mockAiRequests = [];
@@ -58,7 +60,7 @@ const mockAiPort = await listenOnRandomPort(mockAiServer);
 const mockAiBaseUrl = `http://127.0.0.1:${mockAiPort}/v1`;
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", "firm-template/web-module"], {
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"]
 });
@@ -73,11 +75,6 @@ server.stderr.on("data", (chunk) => {
 });
 
 try {
-  if (existsSync(aiSettingsFile)) {
-    unlinkSync(aiSettingsFile);
-  }
-  writeFileSync(conversationsFile, "[]\n");
-  writeFileSync(requestsFile, "[]\n");
   await waitForUrl(`${baseUrl}/api/menu.php`);
 
   browser = await chromium.launch();
@@ -95,6 +92,12 @@ try {
 
   const response = await page.request.get(`${baseUrl}/api/menu.php`);
   expect(response.ok()).toBe(true);
+  const initialEtag = response.headers().etag;
+  expect(initialEtag).toMatch(/^"ya-menu-/);
+  const cachedResponse = await page.request.get(`${baseUrl}/api/menu.php`, {
+    headers: { "If-None-Match": initialEtag }
+  });
+  expect(cachedResponse.status()).toBe(304);
   const menu = await response.json();
   expect(menu.ok).toBe(true);
   expect(menu.items.some((item) => item.id === "item_unavailable_sahlep")).toBe(false);
@@ -143,7 +146,13 @@ try {
   expect(publishResult.ok).toBe(true);
   expect(publishResult.item_count).toBe(1);
 
-  await page.goto(`${baseUrl}/menu.html`);
+  const changedMenuResponse = await page.request.get(`${baseUrl}/api/menu.php`, {
+    headers: { "If-None-Match": initialEtag }
+  });
+  expect(changedMenuResponse.status()).toBe(200);
+  expect(changedMenuResponse.headers().etag).not.toBe(initialEtag);
+
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByRole("button", { name: "Smoke Test" })).toBeVisible();
   await expect(page.getByText("Smoke Kahvesi")).toBeVisible();
 
@@ -300,7 +309,12 @@ try {
   expect(aiRequestResult.request_id).toMatch(/^request_/);
   expect(aiRequestResult.request_missing_fields).toEqual([]);
 
-  const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
+  const pullAiRequests = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": "change-this-secret" },
+    data: { action: "pull_requests", after_seq: 0, limit: 200 }
+  });
+  expect(pullAiRequests.ok()).toBe(true);
+  const requests = (await pullAiRequests.json()).requests;
   const aiRequest = requests.find((request) => request.id === aiRequestResult.request_id);
   expect(aiRequest).toBeTruthy();
   expect(aiRequest.source).toBe("web_ai");
@@ -352,17 +366,8 @@ return ${toPhpArray({
   if (browser) {
     await browser.close().catch(() => undefined);
   }
-  writeFileSync(menuFile, originalMenuJson);
-  writeFileSync(conversationsFile, originalConversationsJson);
-  writeFileSync(requestsFile, originalRequestsJson);
-  writeFileSync(syncStateFile, originalSyncStateJson);
-  if (originalAiSettings) {
-    writeFileSync(aiSettingsFile, originalAiSettings.contents);
-    chmodSync(aiSettingsFile, originalAiSettings.mode);
-  } else if (existsSync(aiSettingsFile)) {
-    unlinkSync(aiSettingsFile);
-  }
   server.kill();
+  rmSync(tempRoot, { recursive: true, force: true });
   await closeServer(mockAiServer);
 }
 

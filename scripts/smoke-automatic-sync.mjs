@@ -1,0 +1,393 @@
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import process from "node:process";
+
+const require = createRequire(import.meta.url);
+const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coordinator.js");
+
+const syncSecret = "automatic-sync-secret-12345";
+const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-automatic-sync-"));
+const webModuleRoot = join(tempRoot, "web-module");
+const desktopDataRoot = join(tempRoot, "desktop-data");
+cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+
+for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
+  rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
+}
+writeFileSync(join(webModuleRoot, "data", "requests.json"), "[]\n");
+writeFileSync(join(webModuleRoot, "data", "android-actions.json"), "[]\n");
+const businessFile = join(webModuleRoot, "config", "business.json");
+const businessConfig = JSON.parse(readFileSync(businessFile, "utf8"));
+businessConfig.sync_secret = syncSecret;
+writeFileSync(businessFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
+
+const port = await getFreePort();
+const baseUrl = `http://127.0.0.1:${port}`;
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
+  cwd: process.cwd(),
+  stdio: ["ignore", "pipe", "pipe"]
+});
+let serverOutput = "";
+server.stdout.on("data", (chunk) => { serverOutput += chunk.toString(); });
+server.stderr.on("data", (chunk) => { serverOutput += chunk.toString(); });
+
+const database = new DesktopDatabase({
+  appPath: join(process.cwd(), "apps", "desktop-app"),
+  userDataPath: desktopDataRoot
+});
+
+try {
+  await waitForUrl(`${baseUrl}/api/menu.php`);
+  database.initialize();
+  const setupResult = database.saveInitialSetup({
+    businessName: "Otomatik Senkron Smoke",
+    businessType: "pension_restaurant",
+    phone: "+905321234567",
+    whatsapp: "+905321234567",
+    email: "sync-smoke@example.test",
+    address: "Test adresi",
+    webModuleUrl: baseUrl,
+    syncSecret,
+    autoSyncEnabled: true,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "gpt-4o-mini",
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    modules: { rooms: true, tables: true, qrMenu: true, whatsapp: true, android: true },
+    initialCounts: { rooms: 2, tables: 2 }
+  }, { mode: "keep" });
+  assert.equal(setupResult.ok, true);
+
+  const requestResponse = await postJson(`${baseUrl}/api/request.php`, {
+    request_type: "pension_reservation",
+    customer_name: "Otomatik Web Misafiri",
+    customer_phone: "0555 444 33 22",
+    date_text: "20-22 Temmuz",
+    start_date: "2026-07-20",
+    end_date: "2026-07-22",
+    guest_count: 2,
+    adult_count: 2,
+    child_count: 0,
+    message: "Sessiz oda rica ediyoruz."
+  }, false);
+  assert.equal(requestResponse.status, 201);
+  const requestResult = await requestResponse.json();
+
+  const roomBefore = database.getDashboardData().rooms[0];
+  assert.ok(roomBefore);
+  const actionId = "android_auto_smoke_0001";
+  const queuedAction = await syncApi({
+    action: "enqueue_android_action",
+    action_id: actionId,
+    action_type: "room_status_update",
+    device_id: "android-auto-smoke",
+    payload: {
+      room_id: roomBefore.id,
+      status: "cleaning",
+      expected_updated_at: roomBefore.updatedAt
+    }
+  });
+  assert.equal(queuedAction.status, 201);
+
+  const statusEvents = [];
+  let dashboardChangeCount = 0;
+  const coordinator = new SyncCoordinator({
+    database,
+    getSyncConfig: () => ({ baseUrl, syncSecret }),
+    createAndroidSnapshot: () => createSnapshot(database),
+    onDashboardChanged: () => { dashboardChangeCount += 1; },
+    onStatusChanged: (status) => { statusEvents.push(status); }
+  });
+
+  const firstCycle = await coordinator.runNow();
+  assert.equal(firstCycle.ok, true, firstCycle.message);
+  assert.equal(firstCycle.pulledRequests, 1);
+  assert.equal(firstCycle.pulledActions, 1);
+  assert.equal(firstCycle.appliedActions, 1);
+  assert.equal(firstCycle.failedActions, 0);
+  assert.equal(firstCycle.publishedJobs, 2);
+  assert.ok(dashboardChangeCount >= 1);
+  assert.ok(statusEvents.some((status) => status.phase === "syncing"));
+  assert.equal(statusEvents.at(-1)?.phase, "success");
+
+  const dashboard = database.getDashboardData();
+  assert.ok(dashboard.requests.some((request) => request.id === requestResult.request_id));
+  assert.equal(dashboard.rooms.find((room) => room.id === roomBefore.id)?.status, "cleaning");
+  const runtime = database.getSyncRuntimeStatus();
+  assert.ok(runtime.requestCursor > 0);
+  assert.equal(runtime.acknowledgedCursor, runtime.requestCursor);
+  assert.equal(runtime.pendingJobs, 0);
+  assert.equal(runtime.consecutiveFailures, 0);
+
+  const menuResponse = await fetch(`${baseUrl}/api/menu.php`);
+  assert.equal(menuResponse.status, 200);
+  const hostedMenu = await menuResponse.json();
+  assert.equal(hostedMenu.ok, true);
+  assert.equal(hostedMenu.categories.length, dashboard.menu.categories.filter((category) => category.is_active).length);
+
+  const androidSummary = await syncApi({
+    action: "android_summary",
+    device_id: "android-auto-smoke",
+    limit: 200
+  });
+  assert.equal(androidSummary.status, 200);
+  const androidData = await androidSummary.json();
+  assert.ok(androidData.requests.some((request) => request.id === requestResult.request_id));
+  assert.equal(androidData.rooms.find((room) => room.id === roomBefore.id)?.status, "cleaning");
+  assert.ok(androidData.server_revision > 0);
+
+  const unchangedSummary = await syncApi({
+    action: "android_summary",
+    device_id: "android-auto-smoke",
+    known_server_revision: androidData.server_revision
+  });
+  assert.equal(unchangedSummary.status, 200);
+  assert.equal((await unchangedSummary.json()).not_modified, true);
+
+  const duplicateAction = await syncApi({
+    action: "enqueue_android_action",
+    action_id: actionId,
+    action_type: "room_status_update",
+    device_id: "android-auto-smoke",
+    payload: { room_id: roomBefore.id, status: "cleaning" }
+  });
+  assert.equal(duplicateAction.status, 200);
+  assert.equal((await duplicateAction.json()).deduplicated, true);
+
+  const secondCycle = await coordinator.runNow();
+  assert.equal(secondCycle.ok, true, secondCycle.message);
+  assert.equal(secondCycle.pulledRequests, 0);
+  assert.equal(secondCycle.pulledActions, 0);
+  assert.equal(secondCycle.publishedJobs, 0);
+
+  const automaticRequestResponse = await postJson(`${baseUrl}/api/request.php`, {
+    request_type: "restaurant_reservation",
+    customer_name: "Zamanlayıcı Misafiri",
+    customer_phone: "0555 222 11 00",
+    date_text: "Bu akşam",
+    start_date: "2026-07-17",
+    time: "20:30",
+    guest_count: 3,
+    message: "Bahçede masa rica ediyoruz."
+  }, false);
+  assert.equal(automaticRequestResponse.status, 201);
+  const automaticRequestId = (await automaticRequestResponse.json()).request_id;
+  coordinator.start();
+  await waitForCondition(
+    () => database.getDashboardData().requests.some((request) => request.id === automaticRequestId),
+    6_000,
+    "Masaüstü başlangıç zamanlayıcısı web talebini otomatik çekmedi."
+  );
+  await waitForCondition(
+    () => {
+      const automaticRuntime = database.getSyncRuntimeStatus();
+      return automaticRuntime.acknowledgedCursor === 2
+        && automaticRuntime.pendingJobs === 0
+        && automaticRuntime.consecutiveFailures === 0;
+    },
+    6_000,
+    "Masaüstü otomatik senkron döngüsünü tamamlamadı."
+  );
+  coordinator.stop();
+  assert.equal(database.getSyncRuntimeStatus().acknowledgedCursor, 2);
+
+  database.queueSyncJob("menu_publish");
+  const offlineStatuses = [];
+  const offlineCoordinator = new SyncCoordinator({
+    database,
+    getSyncConfig: () => ({ baseUrl: "http://127.0.0.1:1", syncSecret }),
+    createAndroidSnapshot: () => createSnapshot(database),
+    onDashboardChanged: () => {},
+    onStatusChanged: (status) => { offlineStatuses.push(status); }
+  });
+  offlineCoordinator.start();
+  await new Promise((resolve) => setTimeout(resolve, 3_000));
+  offlineCoordinator.stop();
+  assert.equal(offlineStatuses.filter((status) => status.phase === "syncing").length, 1);
+  assert.equal(offlineStatuses.at(-1)?.phase, "offline");
+  assert.equal(database.getSyncRuntimeStatus().consecutiveFailures, 1);
+
+  const capabilities = await syncApi({ action: "capabilities" });
+  assert.equal(capabilities.status, 200);
+  assert.deepEqual(
+    Object.assign({}, await capabilities.json(), { server_time: undefined, server_revision: undefined }),
+    assertCapabilitiesShape()
+  );
+
+  const publicationPayload = {
+    action: "publish_menu",
+    client_id: "desktop-api-smoke",
+    source_revision: 10,
+    idempotency_key: "menu-api-smoke-revision-10",
+    menu: { categories: [], items: [], updated_at: new Date().toISOString() }
+  };
+  const firstPublication = await syncApi(publicationPayload);
+  assert.equal(firstPublication.status, 200);
+  assert.equal((await firstPublication.json()).deduplicated, false);
+  const repeatedPublication = await syncApi(publicationPayload);
+  assert.equal(repeatedPublication.status, 200);
+  assert.equal((await repeatedPublication.json()).deduplicated, true);
+  const stalePublication = await syncApi({
+    ...publicationPayload,
+    source_revision: 9,
+    idempotency_key: "menu-api-smoke-revision-9"
+  });
+  assert.equal(stalePublication.status, 409);
+
+  assert.equal(readFileSync(join(webModuleRoot, "data", "requests.json"), "utf8"), "[]\n");
+  assert.equal(existsSync(join(webModuleRoot, "data", "yardimci-asistan.sqlite")), true);
+  assert.equal(existsSync(join(webModuleRoot, "data", "requests.json.legacy-backup-v1")), true);
+  console.log(`automatic-sync-ok: cursor ${database.getSyncRuntimeStatus().requestCursor}, ${firstCycle.publishedJobs} initial publications`);
+} catch (error) {
+  if (serverOutput.trim()) {
+    console.error(serverOutput.trim());
+  }
+  throw error;
+} finally {
+  database.close();
+  server.kill();
+  rmSync(tempRoot, { recursive: true, force: true });
+}
+
+function createSnapshot(databaseInstance) {
+  const data = databaseInstance.getDashboardData();
+  const activeCategories = data.menu.categories.filter((category) => category.is_active);
+  const categoryIds = new Set(activeCategories.map((category) => category.id));
+  return {
+    summary: {
+      pending_daily_tasks: data.summary.pendingDailyTasks,
+      today_tasks: data.dailyTasks.length,
+      available_rooms: data.summary.availableRooms,
+      total_rooms: data.summary.totalRooms,
+      available_tables: data.summary.availableTables,
+      occupied_tables: data.tables.filter((table) => table.status === "occupied").length,
+      bill_waiting_tables: data.tables.filter((table) => table.status === "bill_waiting").length,
+      active_table_orders: 0,
+      pending_reservations: data.summary.pendingReservations,
+      prepared_whatsapp_messages: 0,
+      waiting_responses: data.requests.filter((request) => ["new", "seen", "waiting_owner"].includes(request.status)).length,
+      active_menu_categories: activeCategories.length,
+      available_menu_items: data.menu.items.filter((item) => item.is_available).length,
+      customer_count: data.customers.length
+    },
+    daily_tasks: data.dailyTasks.map((task) => ({
+      id: task.id, title: task.title, description: task.description, task_type: task.taskType,
+      status: task.status, due_date: task.dueDate, due_time: task.dueTime,
+      related_type: task.relatedType, related_id: task.relatedId, updated_at: task.updatedAt
+    })),
+    requests: data.requests.map((request) => ({
+      id: request.id, customer_id: request.customer_id, request_type: request.request_type,
+      status: request.status, customer_name: request.customer_name, customer_phone: request.customer_phone,
+      date_text: request.date_text, start_date: request.start_date, end_date: request.end_date,
+      time: request.time, guest_count: request.guest_count, message: request.message,
+      ai_summary: request.ai_summary, ai_suggested_reply: request.ai_suggested_reply,
+      whatsapp_message: request.whatsapp_message, priority: request.priority,
+      created_at: request.created_at, updated_at: request.updated_at
+    })),
+    customers: data.customers.map((customer) => ({
+      id: customer.id, full_name: customer.fullName, phone: customer.phone, email: customer.email,
+      notes: customer.notes, tags: customer.tags, request_count: customer.requestCount,
+      reservation_count: customer.reservationCount, updated_at: customer.updatedAt
+    })),
+    reservations: [],
+    rooms: data.rooms.map((room) => ({
+      id: room.id, name: room.name, number: room.number, capacity: room.capacity,
+      status: room.status, active_reservation_title: room.activeReservationTitle, updated_at: room.updatedAt
+    })),
+    tables: data.tables.map((table) => ({
+      id: table.id, name: table.name, area: table.area, capacity: table.capacity,
+      status: table.status, active_reservation_title: table.activeReservationTitle, updated_at: table.updatedAt
+    })),
+    menu: {
+      categories: activeCategories,
+      items: data.menu.items.filter((item) => item.is_available && categoryIds.has(item.category_id)),
+      updated_at: data.menu.updated_at
+    },
+    table_orders: [],
+    messages: [],
+    updated_at: new Date().toISOString()
+  };
+}
+
+async function syncApi(payload) {
+  return postJson(`${baseUrl}/api/sync.php`, payload, true);
+}
+
+function postJson(url, payload, authenticated) {
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(authenticated ? { "X-YA-Sync-Secret": syncSecret } : {})
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+function assertCapabilitiesShape() {
+  return {
+    ok: true,
+    message: "Senkron özellikleri alındı.",
+    protocol_version: 2,
+    storage: "sqlite",
+    schema_version: 1,
+    features: [
+      "request_cursor",
+      "request_acknowledgement",
+      "android_action_queue",
+      "versioned_publications",
+      "idempotent_publications",
+      "server_revision"
+    ],
+    server_time: undefined,
+    server_revision: undefined
+  };
+}
+
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = http.createServer();
+    probe.on("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const address = probe.address();
+      const freePort = typeof address === "object" && address ? address.port : 0;
+      probe.close(() => resolve(freePort));
+    });
+  });
+}
+
+async function waitForUrl(url) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    try {
+      if ((await fetch(url)).ok) {
+        return;
+      }
+    } catch {
+      // PHP server is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`PHP server did not become ready: ${url}`);
+}
+
+async function waitForCondition(predicate, timeoutMs, message) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (predicate()) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(message);
+}

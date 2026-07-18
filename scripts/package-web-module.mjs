@@ -20,6 +20,7 @@ const requiredFiles = [
   "api/sync.php",
   "api/menu.php",
   "api/chat.php",
+  "lib/storage.php",
   "assets/yardimci-asistan-symbol.png",
   "assets/menu-breakfast.webp",
   "config/.htaccess",
@@ -117,6 +118,10 @@ function validateSource() {
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "AI ayar yayını header güvenlik anahtarını doğrulamalı.");
   assert.ok(syncEndpoint.includes("enqueue_android_action"), "api/sync.php Android action kuyruğunu içermeli.");
+  assert.ok(syncEndpoint.includes("acknowledge_requests"), "api/sync.php cursor onayını içermeli.");
+
+  const storageModule = readFileSync(join(sourceRoot, "lib", "storage.php"), "utf8");
+  assert.ok(storageModule.includes("PDO_SQLITE") || storageModule.includes("pdo_sqlite"), "SQLite depolama PDO_SQLITE gereksinimini açıklamalı.");
 
   const widget = readFileSync(join(sourceRoot, "widget.js"), "utf8");
   assert.ok(widget.includes("YardimciAsistanWidget"), "widget.js YardimciAsistanWidget globalini içermeli.");
@@ -200,6 +205,12 @@ function shouldCopySourcePath(sourcePath) {
   }
 
   if (relativePath === "config/ai.local.php" || relativePath === "data/ai-settings.local.php") {
+    return false;
+  }
+
+  if (relativePath === "data/yardimci-asistan.sqlite"
+      || relativePath.startsWith("data/yardimci-asistan.sqlite-")
+      || relativePath.endsWith(".legacy-backup-v1")) {
     return false;
   }
 

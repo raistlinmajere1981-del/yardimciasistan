@@ -44,6 +44,7 @@ import type {
   DesktopSetupData,
   SaveInitialSetupInput
 } from "../electron/database";
+import type { AutomaticSyncStatus } from "../electron/sync-coordinator";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "./app/operations";
@@ -71,6 +72,21 @@ type SyncState = "idle" | "loading" | "success" | "error";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "yardimci-asistan.sidebar-collapsed";
 
+const defaultAutomaticSyncStatus: AutomaticSyncStatus = {
+  enabled: true,
+  clientId: "",
+  requestCursor: 0,
+  acknowledgedCursor: 0,
+  lastAttemptAt: "",
+  lastSuccessAt: "",
+  lastError: "",
+  consecutiveFailures: 0,
+  pendingJobs: 0,
+  nextRetryAt: "",
+  phase: "idle",
+  message: "Otomatik senkron hazır."
+};
+
 function readSidebarCollapsedPreference() {
   try {
     return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
@@ -85,6 +101,19 @@ function saveSidebarCollapsedPreference(collapsed: boolean) {
   } catch {
     // Depolama kapalıysa menü tercihi yalnız bu oturumda geçerli kalır.
   }
+}
+
+function automaticSyncTone(status: AutomaticSyncStatus): SyncState {
+  if (status.phase === "syncing") {
+    return "loading";
+  }
+  if (status.phase === "success") {
+    return "success";
+  }
+  if (status.phase === "offline" || status.phase === "error") {
+    return "error";
+  }
+  return "idle";
 }
 
 interface CategoryFormState {
@@ -134,6 +163,7 @@ interface SetupFormState {
   address: string;
   webModuleUrl: string;
   syncSecret: string;
+  autoSyncEnabled: boolean;
   aiEnabled: boolean;
   aiProvider: string;
   aiService: string;
@@ -464,6 +494,7 @@ const defaultSetupData: DesktopSetupData = {
   address: "Sahil Yolu No: 18, Akyaka / Muğla",
   webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
   syncSecret: "change-this-secret",
+  autoSyncEnabled: true,
   aiEnabled: false,
   aiProvider: "openai_compatible",
   aiService: "openai",
@@ -535,6 +566,7 @@ function App() {
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
+  const [automaticSyncStatus, setAutomaticSyncStatus] = useState<AutomaticSyncStatus>(defaultAutomaticSyncStatus);
   const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
   const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
@@ -612,11 +644,18 @@ function App() {
       setSetupMessage(data.setup.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
     });
     void loadDashboardData();
+    void window.yardimciDesktop?.getSyncStatus?.().then(setAutomaticSyncStatus);
 
-    const unsubscribe = window.yardimciDesktop?.onDashboardDataChanged?.((nextDashboardData) => {
+    const unsubscribeDashboard = window.yardimciDesktop?.onDashboardDataChanged?.((nextDashboardData) => {
       setDashboardData(nextDashboardData);
     });
-    return () => unsubscribe?.();
+    const unsubscribeSync = window.yardimciDesktop?.onSyncStatusChanged?.((nextStatus) => {
+      setAutomaticSyncStatus(nextStatus);
+    });
+    return () => {
+      unsubscribeDashboard?.();
+      unsubscribeSync?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -704,6 +743,15 @@ function App() {
     if (!window.yardimciDesktop) {
       setSyncState("error");
       setStatusMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    if (window.yardimciDesktop.runSyncNow) {
+      const cycle = await window.yardimciDesktop.runSyncNow();
+      setAutomaticSyncStatus(cycle.status);
+      await loadDashboardData();
+      setSyncState(cycle.ok ? "success" : "error");
+      setStatusMessage(cycle.message);
       return;
     }
 
@@ -1470,6 +1518,7 @@ function App() {
       address: setupForm.address,
       webModuleUrl: setupForm.webModuleUrl,
       syncSecret: setupForm.syncSecret,
+      autoSyncEnabled: setupForm.autoSyncEnabled,
       aiEnabled: setupForm.aiEnabled,
       aiProvider: setupForm.aiProvider,
       aiService: setupForm.aiService,
@@ -1641,11 +1690,19 @@ function App() {
               </button>
             </div>
           ) : (
-            <div className={`sync-pill sync-${syncState}`}>
-              <span role="status" aria-live="polite">{statusMessage}</span>
-              <button type="button" onClick={handlePullRequests} disabled={syncState === "loading"}>
+            <div className={`sync-pill sync-${syncState === "idle" ? automaticSyncTone(automaticSyncStatus) : syncState}`}>
+              <span role="status" aria-live="polite">
+                {syncState === "idle" ? automaticSyncStatus.message : statusMessage}
+                {automaticSyncStatus.pendingJobs > 0 ? ` · ${automaticSyncStatus.pendingJobs} eşitleme bekliyor` : ""}
+              </span>
+              <button
+                type="button"
+                title={automaticSyncStatus.message}
+                onClick={handlePullRequests}
+                disabled={automaticSyncStatus.phase === "syncing" || syncState === "loading"}
+              >
                 <RefreshCw size={16} aria-hidden="true" />
-                {syncState === "loading" ? "Kontrol ediliyor" : "Talepleri Kontrol Et"}
+                {automaticSyncStatus.phase === "syncing" ? "Eşitleniyor" : "Şimdi Eşitle"}
               </button>
             </div>
           )}
@@ -2310,9 +2367,13 @@ function SetupWizard({
         </div>}
 
         {settingsLevel === "advanced" && <div className="settings-section-grid settings-advanced-grid"><div className="setup-section settings-web-section">
-          <div className="setup-section-title">
+          <div className="setup-section-title settings-web-title">
             {!embedded && <p>Web Bağlantısı</p>}
             <h2>Web Bağlantısı</h2>
+            <label className="setup-checkline settings-auto-sync-toggle">
+              <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
+              Otomatik eşitle
+            </label>
           </div>
           <div className="setup-grid two">
             <label className="setup-field">
@@ -4944,6 +5005,7 @@ function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     address: setupData.address || "",
     webModuleUrl: setupData.webModuleUrl || "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : generateSyncSecret(),
+    autoSyncEnabled: setupData.autoSyncEnabled,
     aiEnabled: setupData.aiEnabled,
     aiProvider: setupData.aiProvider || "openai_compatible",
     aiService: setupData.aiService || "openai",

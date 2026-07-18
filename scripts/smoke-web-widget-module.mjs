@@ -1,16 +1,24 @@
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import process from "node:process";
 
-const conversationsFile = "firm-template/web-module/data/ai-conversations.json";
-const requestsFile = "firm-template/web-module/data/requests.json";
-const originalConversationsJson = readFileSync(conversationsFile, "utf8");
-const originalRequestsJson = readFileSync(requestsFile, "utf8");
+const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-widget-module-"));
+const webModuleRoot = join(tempRoot, "web-module");
+cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
+const requestsFile = join(webModuleRoot, "data", "requests.json");
+for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
+  rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
+}
+writeFileSync(conversationsFile, "[]\n");
+writeFileSync(requestsFile, "[]\n");
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", "firm-template/web-module"], {
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"]
 });
@@ -25,8 +33,6 @@ server.stderr.on("data", (chunk) => {
 });
 
 try {
-  writeFileSync(conversationsFile, "[]\n");
-  writeFileSync(requestsFile, "[]\n");
   await waitForUrl(`${baseUrl}/widget.js`);
 
   browser = await chromium.launch();
@@ -69,7 +75,7 @@ try {
   expect(decodeURIComponent(openedUrl)).toContain("Masa rezervasyonu");
   expect(decodeURIComponent(openedUrl)).toContain("Widget Misafir");
 
-  const requestsAfterForm = JSON.parse(readFileSync(requestsFile, "utf8"));
+  const requestsAfterForm = await pullRequests();
   expect(requestsAfterForm).toHaveLength(1);
   expect(requestsAfterForm[0].id).toBe(requestResult.request_id);
   expect(requestsAfterForm[0].source).toBe("web_form");
@@ -100,7 +106,7 @@ try {
   expect(conversations[0].messages_json).toContain("Bu akşam 4 kişilik masa var mı?");
   expect(conversations[0].messages_json).toContain("işletme sahibi");
 
-  const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
+  const requests = await pullRequests();
   expect(requests).toHaveLength(1);
   expect(requests[0].id).toBe(requestResult.request_id);
 
@@ -114,9 +120,21 @@ try {
   if (browser) {
     await browser.close();
   }
-  writeFileSync(conversationsFile, originalConversationsJson);
-  writeFileSync(requestsFile, originalRequestsJson);
   server.kill();
+  rmSync(tempRoot, { recursive: true, force: true });
+}
+
+async function pullRequests() {
+  const response = await fetch(`${baseUrl}/api/sync.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-YA-Sync-Secret": "change-this-secret"
+    },
+    body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 20 })
+  });
+  expect(response.status).toBe(200);
+  return (await response.json()).requests;
 }
 
 async function injectWidget(page, widgetBaseUrl) {

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import process from "node:process";
 
@@ -9,6 +9,8 @@ const requestsFile = join(root, "firm-template", "web-module", "data", "requests
 const syncStateFile = join(root, "firm-template", "web-module", "data", "sync-state.json");
 const conversationsFile = join(root, "firm-template", "web-module", "data", "ai-conversations.json");
 const androidSnapshotFile = join(root, "firm-template", "web-module", "data", "android-snapshot.json");
+const androidActionsFile = join(root, "firm-template", "web-module", "data", "android-actions.json");
+const hostingDataDir = join(root, "firm-template", "web-module", "data");
 const emptyAndroidSnapshot = {
   summary: {
     pending_daily_tasks: 0,
@@ -26,6 +28,7 @@ const emptyAndroidSnapshot = {
 };
 
 if (mode === "apply") {
+  resetHostingStore();
   const requests = JSON.parse(readFileSync(fixtureFile, "utf8"));
   writeJson(requestsFile, requests);
   writeJson(syncStateFile, {
@@ -37,11 +40,14 @@ if (mode === "apply") {
     updated_at: new Date().toISOString()
   });
   writeJson(androidSnapshotFile, emptyAndroidSnapshot);
+  writeJson(androidActionsFile, []);
   console.log(`demo-data-applied: ${requests.length} web request records`);
 } else if (mode === "clear") {
+  resetHostingStore();
   writeJson(requestsFile, []);
   writeJson(conversationsFile, []);
   writeJson(androidSnapshotFile, emptyAndroidSnapshot);
+  writeJson(androidActionsFile, []);
   writeJson(syncStateFile, {
     last_request_pull_at: "",
     last_request_mark_at: "",
@@ -60,4 +66,19 @@ if (mode === "apply") {
 
 function writeJson(path, value) {
   writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function resetHostingStore() {
+  for (const file of [
+    "yardimci-asistan.sqlite",
+    "yardimci-asistan.sqlite-wal",
+    "yardimci-asistan.sqlite-shm",
+    "requests.json.legacy-backup-v1",
+    "menu.json.legacy-backup-v1",
+    "android-actions.json.legacy-backup-v1",
+    "android-snapshot.json.legacy-backup-v1",
+    "sync-state.json.legacy-backup-v1"
+  ]) {
+    rmSync(join(hostingDataDir, file), { force: true });
+  }
 }

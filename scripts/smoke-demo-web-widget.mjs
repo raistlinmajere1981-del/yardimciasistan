@@ -1,18 +1,23 @@
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 
 const repoRoot = process.cwd();
 const demoWebRoot = join(repoRoot, "apps", "demo-web");
-const businessConfigFile = "firm-template/web-module/config/business.json";
-const conversationsFile = "firm-template/web-module/data/ai-conversations.json";
-const requestsFile = "firm-template/web-module/data/requests.json";
+const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-demo-widget-"));
+const webModuleRoot = join(tempRoot, "web-module");
+cpSync(join(repoRoot, "firm-template", "web-module"), webModuleRoot, { recursive: true });
+const businessConfigFile = join(webModuleRoot, "config", "business.json");
+const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
+const requestsFile = join(webModuleRoot, "data", "requests.json");
 const originalBusinessConfigJson = readFileSync(businessConfigFile, "utf8");
-const originalConversationsJson = readFileSync(conversationsFile, "utf8");
-const originalRequestsJson = readFileSync(requestsFile, "utf8");
+for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
+  rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
+}
 const phpPort = await getFreePort();
 let demoPort = await getFreePort();
 while (demoPort === phpPort) {
@@ -29,7 +34,7 @@ try {
   writeFileSync(requestsFile, "[]\n");
   allowDemoOrigin(demoWebUrl);
 
-  const phpServer = startProcess("php", ["-S", `127.0.0.1:${phpPort}`, "-t", "firm-template/web-module"], repoRoot);
+  const phpServer = startProcess("php", ["-S", `127.0.0.1:${phpPort}`, "-t", webModuleRoot], repoRoot);
   await waitForUrl(`${webModuleUrl}/api/menu.php`, phpServer);
 
   const demoServer = startProcess("npx", ["vite", "--host", "127.0.0.1", "--port", String(demoPort), "--strictPort"], demoWebRoot, {
@@ -71,7 +76,7 @@ try {
   expect(openedUrl).toContain("https://wa.me/905316969334");
   expect(decodeURIComponent(openedUrl)).toContain("Demo Web Widget");
 
-  const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
+  const requests = await pullRequests();
   expect(requests).toHaveLength(1);
   expect(requests[0].source).toBe("web_form");
   expect(requests[0].customer_name).toBe("Demo Web Widget");
@@ -99,10 +104,8 @@ try {
   if (browser) {
     await browser.close();
   }
-  writeFileSync(businessConfigFile, originalBusinessConfigJson);
-  writeFileSync(conversationsFile, originalConversationsJson);
-  writeFileSync(requestsFile, originalRequestsJson);
   stopProcesses();
+  rmSync(tempRoot, { recursive: true, force: true });
 }
 
 function allowDemoOrigin(origin) {
@@ -110,6 +113,19 @@ function allowDemoOrigin(origin) {
   const allowedOrigins = Array.isArray(config.allowed_origins) ? config.allowed_origins : [];
   config.allowed_origins = Array.from(new Set([...allowedOrigins, origin]));
   writeFileSync(businessConfigFile, `${JSON.stringify(config, null, 2)}\n`);
+}
+
+async function pullRequests() {
+  const response = await fetch(`${webModuleUrl}/api/sync.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-YA-Sync-Secret": "change-this-secret"
+    },
+    body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 20 })
+  });
+  expect(response.status).toBe(200);
+  return (await response.json()).requests;
 }
 
 function startProcess(command, args, cwd, env = {}) {

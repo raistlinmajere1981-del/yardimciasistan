@@ -364,7 +364,8 @@
         activeCategoryId: "all",
         categories: [],
         items: [],
-        updatedAt: ""
+        updatedAt: "",
+        etag: ""
       };
 
       const formatterCache = new Map();
@@ -374,25 +375,49 @@
       const updatedAt = document.querySelector("#updated-at");
 
       loadMenu();
+      window.setInterval(() => {
+        if (document.visibilityState === "visible") {
+          loadMenu(true);
+        }
+      }, 15000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          loadMenu(true);
+        }
+      });
+      window.addEventListener("focus", () => loadMenu(true));
 
-      async function loadMenu() {
+      async function loadMenu(silent = false) {
         try {
           const response = await fetch("api/menu.php", {
             headers: {
-              Accept: "application/json"
+              Accept: "application/json",
+              ...(state.etag ? { "If-None-Match": state.etag } : {})
             }
           });
+
+          if (response.status === 304) {
+            return;
+          }
 
           if (!response.ok) {
             throw new Error("Menü şu anda okunamadı.");
           }
 
           const menu = await response.json();
+          state.etag = response.headers.get("ETag") || state.etag;
           state.categories = Array.isArray(menu.categories) ? menu.categories : [];
           state.items = Array.isArray(menu.items) ? menu.items : [];
           state.updatedAt = typeof menu.updated_at === "string" ? menu.updated_at : "";
+          if (state.activeCategoryId !== "all"
+              && !state.categories.some((category) => category.id === state.activeCategoryId)) {
+            state.activeCategoryId = "all";
+          }
           render();
         } catch (error) {
+          if (silent && state.categories.length > 0) {
+            return;
+          }
           status.textContent = error instanceof Error ? error.message : "Menü şu anda okunamadı.";
           list.replaceChildren();
         }

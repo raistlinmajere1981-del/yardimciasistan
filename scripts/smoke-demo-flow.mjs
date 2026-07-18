@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
 
@@ -16,21 +17,22 @@ const {
 } = require("../packages/sync-core/dist");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 
-const requestsFile = "firm-template/web-module/data/requests.json";
-const syncStateFile = "firm-template/web-module/data/sync-state.json";
-const androidSnapshotFile = "firm-template/web-module/data/android-snapshot.json";
-const androidActionsFile = "firm-template/web-module/data/android-actions.json";
-const conversationsFile = "firm-template/web-module/data/ai-conversations.json";
-const demoRequestsFile = "demo-data/web-module-requests.json";
-const originalRequestsJson = readFileSync(requestsFile, "utf8");
-const originalSyncStateJson = readFileSync(syncStateFile, "utf8");
-const originalAndroidSnapshotJson = readFileSync(androidSnapshotFile, "utf8");
-const originalAndroidActionsJson = readFileSync(androidActionsFile, "utf8");
-const originalConversationsJson = readFileSync(conversationsFile, "utf8");
+const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-demo-flow-"));
+const webModuleRoot = join(tempRoot, "web-module");
+cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+const requestsFile = join(webModuleRoot, "data", "requests.json");
+const syncStateFile = join(webModuleRoot, "data", "sync-state.json");
+const androidSnapshotFile = join(webModuleRoot, "data", "android-snapshot.json");
+const androidActionsFile = join(webModuleRoot, "data", "android-actions.json");
+const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
+const demoRequestsFile = join(process.cwd(), "demo-data", "web-module-requests.json");
+for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
+  rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
+}
 const demoRequests = JSON.parse(readFileSync(demoRequestsFile, "utf8"));
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", "firm-template/web-module"], {
+const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"]
 });
@@ -78,7 +80,6 @@ try {
     },
     body: JSON.stringify({
       action: "android_summary",
-      sync_secret: "change-this-secret",
       limit: 2
     })
   });
@@ -98,7 +99,6 @@ try {
     },
     body: JSON.stringify({
       action: "update_request_status",
-      sync_secret: "change-this-secret",
       request_id: "request_demo_web_003",
       status: "done"
     })
@@ -113,7 +113,6 @@ try {
     },
     body: JSON.stringify({
       action: "update_request_status",
-      sync_secret: "change-this-secret",
       request_id: "request_demo_web_003",
       status: "answered"
     })
@@ -131,7 +130,6 @@ try {
     },
     body: JSON.stringify({
       action: "android_summary",
-      sync_secret: "change-this-secret",
       limit: 3
     })
   });
@@ -277,7 +275,6 @@ try {
     },
     body: JSON.stringify({
       action: "android_summary",
-      sync_secret: "change-this-secret",
       device_id: actionDeviceId,
       limit: 3
     })
@@ -308,12 +305,8 @@ try {
   throw error;
 } finally {
   database?.close();
-  writeFileSync(requestsFile, originalRequestsJson);
-  writeFileSync(syncStateFile, originalSyncStateJson);
-  writeFileSync(androidSnapshotFile, originalAndroidSnapshotJson);
-  writeFileSync(androidActionsFile, originalAndroidActionsJson);
-  writeFileSync(conversationsFile, originalConversationsJson);
   server.kill();
+  rmSync(tempRoot, { recursive: true, force: true });
 }
 
 function writeJson(path, value) {
@@ -374,9 +367,9 @@ async function createWebFormRequest(baseUrl) {
   assert.equal(result.whatsapp_phone, "905553338800");
   assert.match(result.whatsapp_message, /Pansiyon rezervasyonu/);
 
-  const requests = JSON.parse(readFileSync(requestsFile, "utf8"));
+  const requests = await pullAllRequests(baseUrl);
   const request = requests.find((record) => record.id === result.request_id);
-  assert.ok(request, "request.php ile olusan web form talebi requests.json icinde bulunmali");
+  assert.ok(request, "request.php ile oluşan web form talebi hosting SQLite içinde bulunmalı");
   assert.equal(request.source, "web_form");
   assert.equal(request.request_type, "pension_reservation");
   assert.equal(request.customer_name, "Widget Demo Misafir");
@@ -386,6 +379,17 @@ async function createWebFormRequest(baseUrl) {
   assert.equal(request.sync_status, "pending");
 
   return result;
+}
+
+async function pullAllRequests(baseUrl) {
+  const result = await pullRequests({
+    baseUrl,
+    syncSecret: "change-this-secret",
+    afterSeq: 0,
+    limit: 100
+  });
+  assert.equal(result.ok, true);
+  return result.requests;
 }
 
 async function createWebAiRequest(baseUrl) {
@@ -565,7 +569,6 @@ async function enqueueAndroidAction(baseUrl, input) {
     },
     body: JSON.stringify({
       action: "enqueue_android_action",
-      sync_secret: "change-this-secret",
       action_id: input.id,
       action_type: input.type,
       device_id: input.deviceId,

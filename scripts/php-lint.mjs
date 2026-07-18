@@ -6,6 +6,7 @@ const phpFiles = [
   "firm-template/web-module/api/sync.php",
   "firm-template/web-module/api/menu.php",
   "firm-template/web-module/api/chat.php",
+  "firm-template/web-module/lib/storage.php",
   "firm-template/web-module/config/ai.php"
 ];
 

@@ -28,12 +28,12 @@ Zorunlu:
 ```text
 Node.js 22 veya üzeri
 npm 10 veya üzeri
+PHP CLI + PDO_SQLITE (web modülü ve senkron testleri için)
 ```
 
 Önerilen:
 
 ```text
-PHP CLI: mini API endpointlerini lokal test etmek için
 ImageMagick: görselleri WebP'ye çevirmek için
 Playwright Chromium: web ve widget ekranlarını otomatik test etmek için
 Android Studio + platform-tools: telefonda Android testleri için
@@ -114,6 +114,8 @@ http://127.0.0.1:8080/
 ```
 
 Mini API endpointleri `firm-template/web-module/api/` altında bulunur. AI anahtarları frontend dosyalarına yazılmamalıdır.
+`php -m` çıktısında `PDO` ve `pdo_sqlite` bulunmalıdır; hosting runtime deposu
+`data/yardimci-asistan.sqlite` olarak otomatik oluşturulur.
 
 ### Talep Çekme Test Mantığı
 
@@ -213,12 +215,13 @@ QR menü sayfasını PHP server ve mobil Chromium viewport ile kontrol etmek iç
 
 ```bash
 npm run smoke:web-module
+npm run smoke:automatic-sync
 npm run smoke:web-widget-branding
 npm run smoke:web-widget-module
 npm run smoke:demo-web-widget
 ```
 
-`smoke:web-module` QR menü yayınını, AI kapalı fallback'ini, yetkili `publish_ai_settings` akışını ve yayınlanan ayarla mock OpenAI uyumlu servise giden model/Authorization bilgisini birlikte kontrol eder. `smoke:web-widget-branding` widget bundle çıktısında logosuz `YA` fallback'ini, `data-logo-url`/`logoUrl` ile görsel marka kullanımını ve bilgi panelindeki AI cevap alanını mock API ile Playwright üzerinden doğrular. `smoke:web-widget-module` ise build edilmiş `firm-template/web-module/widget.js` dosyasını gerçek PHP server'dan yükler; widget rezervasyon formunun `api/request.php` üzerinden `requests.json` kaydı açtığını, WhatsApp taslak linkini hazırladığını, AI kısa soru formunun `api/chat.php` fallback cevabını gösterdiğini ve `ai-conversations.json` içine kayıt açtığını kontrol eder. `smoke:demo-web-widget` demo web sitesini `VITE_YA_WEB_MODULE_URL` ile açar ve gerçek gömülü widget'ın aynı PHP modülüne talep/AI kayıtlarını yazabildiğini doğrular.
+`smoke:web-module` QR menü yayınını, AI kapalı fallback'ini, yetkili `publish_ai_settings` akışını ve yayınlanan ayarla mock OpenAI uyumlu servise giden model/Authorization bilgisini birlikte kontrol eder. `smoke:automatic-sync` geçici PHP/SQLite hostingi ile masaüstü SQLite'ı birlikte çalıştırarak cursor/ack, Android action, kalıcı outbox, revision ve idempotency akışlarını doğrular. `smoke:web-widget-branding` widget bundle çıktısında logosuz `YA` fallback'ini, `data-logo-url`/`logoUrl` ile görsel marka kullanımını ve bilgi panelindeki AI cevap alanını mock API ile Playwright üzerinden doğrular. `smoke:web-widget-module` ise build edilmiş `firm-template/web-module/widget.js` dosyasını gerçek PHP server'dan yükler; widget rezervasyon formunun `api/request.php` üzerinden hosting SQLite'ında kayıt açtığını, WhatsApp taslak linkini hazırladığını, AI kısa soru formunun `api/chat.php` fallback cevabını gösterdiğini ve `ai-conversations.json` içine kayıt açtığını kontrol eder. `smoke:demo-web-widget` demo web sitesini `VITE_YA_WEB_MODULE_URL` ile açar ve gerçek gömülü widget'ın aynı PHP modülüne talep/AI kayıtlarını yazabildiğini doğrular.
 
 WhatsApp linkleri, manuel kopyalama ve ilerideki resmi API geçişi için ortak mantık `packages/whatsapp-bridge` içindedir. Web widget, demo web ve desktop app aynı paketi kullanır; paket testleri Türkiye cep telefonu normalizasyonunu, boş mesaj/telefon hatalarını ve WebView fallback aksiyonunu kontrol eder. Web widget `data-logo-url` ile firma veya Yardımcı Asistan marka sembolünü gösterebilir. Desktop app içinde WhatsApp sayfası WebView alanını, bağlantı durumunu ve manuel kopyalama alternatifini birlikte sunar.
 

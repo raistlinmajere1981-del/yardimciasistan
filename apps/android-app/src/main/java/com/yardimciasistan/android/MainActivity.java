@@ -14,6 +14,8 @@ import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -54,17 +56,20 @@ public final class MainActivity extends Activity {
   private static final String TAB_PENSION = "pension";
   private static final String TAB_RESTAURANT = "restaurant";
   private static final String TAB_MESSAGES = "messages";
+  private static final long FOREGROUND_SYNC_INTERVAL_MS = 15_000L;
 
   private final HostingSyncClient syncClient = new HostingSyncClient();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private SharedPreferences preferences;
   private ActionOutbox actionOutbox;
+  private OperationCache operationCache;
   private OperationData data = new OperationData();
   private String deviceId = "";
   private String activeTab = TAB_TODAY;
   private String customerFilter = "new";
   private boolean settingsOpen;
   private boolean loading;
+  private boolean foregroundActive;
   private String connectionState = "Henüz bağlanmadı";
 
   private LinearLayout root;
@@ -76,6 +81,19 @@ public final class MainActivity extends Activity {
   private Button settingsButton;
   private EditText webModuleInput;
   private EditText syncSecretInput;
+  private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
+  private final Runnable foregroundSyncRunnable = new Runnable() {
+    @Override
+    public void run() {
+      if (!foregroundActive) {
+        return;
+      }
+      if (hasConnectionSettings() && !loading) {
+        syncFromHosting(false);
+      }
+      foregroundSyncHandler.postDelayed(this, FOREGROUND_SYNC_INTERVAL_MS);
+    }
+  };
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -86,12 +104,19 @@ public final class MainActivity extends Activity {
 
     preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
     actionOutbox = new ActionOutbox(preferences);
+    operationCache = new OperationCache(preferences);
+    OperationData cachedData = operationCache.load();
+    if (cachedData != null) {
+      data = cachedData;
+      connectionState = "Son kayıtlı veri gösteriliyor";
+    }
     deviceId = preferences.getString(KEY_DEVICE_ID, "");
     if (deviceId == null || deviceId.trim().isEmpty()) {
       deviceId = "android-" + UUID.randomUUID().toString();
       preferences.edit().putString(KEY_DEVICE_ID, deviceId).apply();
     }
     applyConnectionExtras();
+    SyncJobService.schedule(this);
     buildShell();
     render();
     if (hasConnectionSettings()) {
@@ -102,7 +127,23 @@ public final class MainActivity extends Activity {
   }
 
   @Override
+  protected void onResume() {
+    super.onResume();
+    foregroundActive = true;
+    foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
+    foregroundSyncHandler.postDelayed(foregroundSyncRunnable, FOREGROUND_SYNC_INTERVAL_MS);
+  }
+
+  @Override
+  protected void onPause() {
+    foregroundActive = false;
+    foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
+    super.onPause();
+  }
+
+  @Override
   protected void onDestroy() {
+    foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
     executor.shutdownNow();
     super.onDestroy();
   }
@@ -1299,17 +1340,24 @@ public final class MainActivity extends Activity {
           syncClient.enqueueAction(baseUrl, syncSecret, deviceId, pending.id, pending.type, pending.payload);
           actionOutbox.remove(pending.id);
         }
-        OperationData nextData = syncClient.fetchOperations(baseUrl, syncSecret, deviceId);
+        HostingSyncClient.FetchResult fetched = syncClient.fetchOperations(baseUrl, syncSecret, deviceId, data.serverRevision);
+        OperationData nextData = fetched.notModified ? data : fetched.data;
+        if (!fetched.notModified && fetched.data != null) {
+          operationCache.save(fetched.payload);
+        } else if (fetched.notModified) {
+          nextData.pulledAt = fetched.payload.optString("pulled_at", nextData.pulledAt);
+          nextData.pendingActions = Math.max(0, fetched.payload.optInt("pending_action_count", nextData.pendingActions));
+        }
         runOnUiThread(() -> {
           data = nextData;
           loading = false;
           connectionState = "Bağlantı hazır";
           showBanner(nextData.pendingActions > 0
               ? "Canlı veri alındı. " + nextData.pendingActions + " işlem masaüstünü bekliyor."
-              : "Canlı veri alındı.", nextData.pendingActions > 0 ? UiKit.WARNING : UiKit.SUCCESS);
+              : (fetched.notModified ? "Veriler zaten güncel." : "Canlı veri alındı."), nextData.pendingActions > 0 ? UiKit.WARNING : UiKit.SUCCESS);
           render();
         });
-      } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException error) {
+      } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
         runOnUiThread(() -> {
           loading = false;
           connectionState = error.getMessage();

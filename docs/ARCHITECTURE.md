@@ -9,16 +9,13 @@ Sistem firma bazlı bağımsız kurulum mantığıyla çalışacaktır.
 Genel yapı:
 
 ```text
-Firma Web Sitesi / Demo Site
-        ↓
-Yardımcı Asistan Web Modülü
-        ↓
-Firmanın Hostingindeki Mini API
-        ↓
-Local PC Uygulaması
-        ↓
-Android Companion
+Firma web sitesi / demo site ─┐
+QR menü ──────────────────────┼── Firma hostingi: PHP API + SQLite
+Android companion ────────────┤              ⇅
+                              └──── Local PC uygulaması + SQLite
 ```
+
+Hosting mini API ortak değişim noktasıdır; PC ve Android birbirine doğrudan bağlanmaz.
 
 ## Ana Sistem Bileşenleri
 
@@ -92,9 +89,11 @@ Görevleri:
     business.json
     ai.php
   data/
-    requests.json
-    menu.json
-    sync-state.json
+    yardimci-asistan.sqlite (runtime)
+    ai-conversations.json
+    ai-settings.local.php (runtime)
+  lib/
+    storage.php
   knowledge/
     firma.md
     odalar.md
@@ -103,7 +102,10 @@ Görevleri:
     sik-sorulan-sorular.md
 ```
 
-İlk sürümde PHP + JSON veya PHP + SQLite kullanılabilir.
+Güncel ilk sürümde PHP `PDO_SQLITE` zorunludur. Talepler, Android action kuyruğu,
+menü/Android yayınları, cursor'lar, revision ve idempotency receipt kayıtları hosting
+SQLite'ında tutulur. Eski JSON çalışma verileri ilk açılışta yedeklenerek tek seferlik
+içe aktarılır.
 
 Ama yapı ileride Node.js veya farklı backend teknolojilerine taşınabilir şekilde tasarlanmalıdır.
 
@@ -189,6 +191,11 @@ Bu yapı hem firma sahibi dışarıdayken çalışır hem de PC'ye port açılma
 Android yalnız hızlı operasyon için gereken müşteri, rezervasyon, oda, masa, günlük iş,
 menü ve aktif adisyon verilerini görür.
 
+Android ön plandayken yaklaşık 15 saniyede bir revision kontrollü özet çeker. Son başarılı
+cevap yerel cache'de korunur. Arka planda `JobScheduler` bekleyen action'ları gönderir ve
+özeti en az 15 dakikalık sistem periyoduyla yeniler; kesin çalışma zamanı Android güç
+tasarrufu politikasına bağlıdır.
+
 ### 6. AI Adapter
 
 AI sistemi provider bağımsız olmalıdır.
@@ -266,6 +273,9 @@ PC uygulaması menüyü yönetir.
 
 Hosting mini API menüyü müşterilere sunar.
 
+Menü değişikliği masaüstü SQLite outbox'ına otomatik yazılır. QR sayfası görünürken
+ETag ile yaklaşık 15 saniyede bir yeni yayın kontrol edilir.
+
 Akış:
 
 ```text
@@ -279,6 +289,8 @@ Müşteri QR kod ile güncel menüyü görür
 ### 9. Senkronizasyon
 
 Senkronizasyon merkezi cloud üzerinden değil, firma hostingi ve local PC arasında yapılır.
+Masaüstündeki tek `SyncCoordinator`, uygulama açıkken yaklaşık 15 saniyede bir pull
+çevrimi çalıştırır ve yerel outbox değişikliklerini kısa debounce ile yayınlar.
 
 Temel senkron akışları:
 
@@ -292,6 +304,16 @@ Android İşlemi → Hosting Mini API action queue → PC Uygulaması → Androi
 PC uygulaması offline çalışabilmelidir.
 
 İnternet geldiğinde veriler senkronize edilmelidir.
+
+Web talepleri monoton cursor ile çekilir ve yalnız local SQLite transaction'ı tamamlandıktan
+sonra onaylanır. Menü ve Android snapshot yayınları istemci revision'ı ve idempotency
+anahtarı taşır. Android işlemleri aynı action kimliğiyle yeniden gönderilebilir; hosting
+kuyruğu ve masaüstü receipt kaydı ikinci uygulamayı engeller. Hatalı yayınlar kalıcı
+outbox'ta artan gecikmeyle yeniden denenir.
+
+Taşıma sözleşmesi `packages/sync-core` içindeki `SyncTransport` arayüzüdür. Bugünkü
+uygulama `PhpHostingSyncTransport` adaptörünü kullanır; ileride yönetilen cloud için aynı
+arayüzün yeni bir adaptörü eklenebilir. Ayrıntılar `docs/AUTOMATIC_SYNC.md` dosyasındadır.
 
 ## Mimari Kurallar
 
@@ -316,7 +338,7 @@ Müşteri web sitesinden bilgi talebi oluşturduğunda:
 3. Talep firmanın hostingindeki mini API’ye kaydedilir.
 4. WhatsApp hazır mesajı müşterinin cihazında açılır.
 5. Firma sahibi WhatsApp’tan mesajı alabilir.
-6. PC uygulaması açıldığında yeni talepleri hostingden çeker.
+6. PC uygulaması açıkken otomatik koordinatör yeni talepleri hostingden çeker.
 7. Talep PC uygulamasında görünür.
 8. Android companion gerekli özetleri gösterir.
 9. Firma sahibi müşteriye arama veya WhatsApp ile dönüş yapar.

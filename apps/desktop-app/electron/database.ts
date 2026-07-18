@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createId, normalizePhone } from "@yardimci-asistan/shared";
@@ -146,6 +146,7 @@ export interface DesktopSetupData {
   address: string;
   webModuleUrl: string;
   syncSecret: string;
+  autoSyncEnabled: boolean;
   aiEnabled: boolean;
   aiProvider: string;
   aiService: DesktopAiService;
@@ -177,6 +178,7 @@ export interface SaveInitialSetupInput {
   address: string;
   webModuleUrl: string;
   syncSecret: string;
+  autoSyncEnabled?: boolean;
   aiEnabled: boolean;
   aiProvider: string;
   aiService: string;
@@ -496,6 +498,31 @@ export interface RecordSyncEventInput {
   status?: number;
 }
 
+export type DesktopSyncJobType = "menu_publish" | "android_snapshot";
+
+export interface DesktopSyncJob {
+  jobKey: string;
+  jobType: DesktopSyncJobType;
+  sourceRevision: number;
+  attemptCount: number;
+  nextAttemptAt: string;
+  lastError: string;
+  updatedAt: string;
+}
+
+export interface DesktopSyncRuntimeStatus {
+  enabled: boolean;
+  clientId: string;
+  requestCursor: number;
+  acknowledgedCursor: number;
+  lastAttemptAt: string;
+  lastSuccessAt: string;
+  lastError: string;
+  consecutiveFailures: number;
+  pendingJobs: number;
+  nextRetryAt: string;
+}
+
 export type ApplyAndroidActionResult =
   | {
       ok: true;
@@ -560,6 +587,8 @@ export class DesktopDatabase {
         this.db.exec(seed.sql);
       }
     }
+
+    this.ensureSyncClientId();
   }
 
   getDashboardData(): DesktopDashboardData {
@@ -1659,6 +1688,7 @@ export class DesktopDatabase {
       address: String(business?.address ?? ""),
       webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
       syncSecret,
+      autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
       aiEnabled: Number(settings?.ai_enabled ?? 0) === 1,
       aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
       aiService: normalizeStoredAiService(settings?.ai_service),
@@ -1680,6 +1710,131 @@ export class DesktopDatabase {
         tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
       }
     };
+  }
+
+  setAutoSyncEnabled(enabled: boolean): DesktopSyncRuntimeStatus {
+    const now = new Date().toISOString();
+    this.db
+      .prepare("UPDATE settings SET auto_sync_enabled = ?, updated_at = ? WHERE deleted_at = ''")
+      .run(enabled ? 1 : 0, now);
+    return this.getSyncRuntimeStatus();
+  }
+
+  getSyncRuntimeStatus(): DesktopSyncRuntimeStatus {
+    const settings = this.db
+      .prepare("SELECT auto_sync_enabled, sync_client_id FROM settings WHERE deleted_at = '' LIMIT 1")
+      .get() as { auto_sync_enabled?: number; sync_client_id?: string } | undefined;
+    const runtime = this.db
+      .prepare("SELECT * FROM sync_runtime WHERE id = 'primary'")
+      .get() as Record<string, unknown> | undefined;
+    const pending = this.db
+      .prepare("SELECT COUNT(*) AS count, MIN(NULLIF(next_attempt_at, '')) AS next_retry_at FROM sync_outbox")
+      .get() as { count?: number; next_retry_at?: string } | undefined;
+    return {
+      enabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
+      clientId: String(settings?.sync_client_id ?? ""),
+      requestCursor: Number(runtime?.request_cursor ?? 0),
+      acknowledgedCursor: Number(runtime?.acknowledged_cursor ?? 0),
+      lastAttemptAt: String(runtime?.last_attempt_at ?? ""),
+      lastSuccessAt: String(runtime?.last_success_at ?? ""),
+      lastError: String(runtime?.last_error ?? ""),
+      consecutiveFailures: Number(runtime?.consecutive_failures ?? 0),
+      pendingJobs: Number(pending?.count ?? 0),
+      nextRetryAt: String(pending?.next_retry_at ?? "")
+    };
+  }
+
+  getPendingSyncJobs(now = new Date().toISOString()): DesktopSyncJob[] {
+    const rows = this.db
+      .prepare(`
+        SELECT job_key, job_type, source_revision, attempt_count, next_attempt_at, last_error, updated_at
+        FROM sync_outbox
+        WHERE next_attempt_at = '' OR next_attempt_at <= ?
+        ORDER BY CASE job_type WHEN 'menu_publish' THEN 0 ELSE 1 END, updated_at ASC
+      `)
+      .all(now) as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      jobKey: String(row.job_key ?? ""),
+      jobType: String(row.job_type ?? "") as DesktopSyncJobType,
+      sourceRevision: Number(row.source_revision ?? 0),
+      attemptCount: Number(row.attempt_count ?? 0),
+      nextAttemptAt: String(row.next_attempt_at ?? ""),
+      lastError: String(row.last_error ?? ""),
+      updatedAt: String(row.updated_at ?? "")
+    }));
+  }
+
+  queueSyncJob(jobType: DesktopSyncJobType, timestamp = new Date().toISOString()) {
+    const jobKey = jobType === "menu_publish" ? "menu" : "android_snapshot";
+    this.db
+      .prepare(`
+        INSERT INTO sync_outbox (
+          job_key, job_type, source_revision, attempt_count, next_attempt_at,
+          last_error, created_at, updated_at
+        ) VALUES (?, ?, 1, 0, '', '', ?, ?)
+        ON CONFLICT(job_key) DO UPDATE SET
+          source_revision = sync_outbox.source_revision + 1,
+          attempt_count = 0,
+          next_attempt_at = '',
+          last_error = '',
+          updated_at = excluded.updated_at
+      `)
+      .run(jobKey, jobType, timestamp, timestamp);
+  }
+
+  completeSyncJob(jobKey: string, sourceRevision: number) {
+    this.db
+      .prepare("DELETE FROM sync_outbox WHERE job_key = ? AND source_revision = ?")
+      .run(jobKey, sourceRevision);
+  }
+
+  failSyncJob(jobKey: string, sourceRevision: number, errorMessage: string, nextAttemptAt: string) {
+    this.db
+      .prepare(`
+        UPDATE sync_outbox
+        SET attempt_count = attempt_count + 1,
+            next_attempt_at = ?,
+            last_error = ?,
+            updated_at = ?
+        WHERE job_key = ? AND source_revision = ?
+      `)
+      .run(nextAttemptAt, errorMessage.slice(0, 1000), new Date().toISOString(), jobKey, sourceRevision);
+  }
+
+  recordSyncAttempt(timestamp = new Date().toISOString()) {
+    this.db
+      .prepare("UPDATE sync_runtime SET last_attempt_at = ?, updated_at = ? WHERE id = 'primary'")
+      .run(timestamp, timestamp);
+  }
+
+  recordAutomaticSyncSuccess(timestamp = new Date().toISOString()) {
+    this.db
+      .prepare(`
+        UPDATE sync_runtime
+        SET last_success_at = ?, last_error = '', consecutive_failures = 0, updated_at = ?
+        WHERE id = 'primary'
+      `)
+      .run(timestamp, timestamp);
+  }
+
+  recordAutomaticSyncFailure(message: string, timestamp = new Date().toISOString()) {
+    this.db
+      .prepare(`
+        UPDATE sync_runtime
+        SET last_error = ?, consecutive_failures = consecutive_failures + 1, updated_at = ?
+        WHERE id = 'primary'
+      `)
+      .run(message.slice(0, 1000), timestamp);
+  }
+
+  acknowledgeRequestCursor(cursor: number, timestamp = new Date().toISOString()) {
+    this.db
+      .prepare(`
+        UPDATE sync_runtime
+        SET acknowledged_cursor = MAX(acknowledged_cursor, ?), updated_at = ?
+        WHERE id = 'primary'
+      `)
+      .run(Math.max(0, Math.trunc(cursor)), timestamp);
   }
 
   getEncryptedAiApiKey(): string {
@@ -1903,6 +2058,7 @@ export class DesktopDatabase {
             business_id,
             web_module_url,
             sync_secret,
+            auto_sync_enabled,
             ai_enabled,
             ai_provider,
             ai_model,
@@ -1922,11 +2078,12 @@ export class DesktopDatabase {
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             business_id = excluded.business_id,
             web_module_url = excluded.web_module_url,
             sync_secret = excluded.sync_secret,
+            auto_sync_enabled = excluded.auto_sync_enabled,
             ai_enabled = excluded.ai_enabled,
             ai_provider = excluded.ai_provider,
             ai_model = excluded.ai_model,
@@ -1951,6 +2108,7 @@ export class DesktopDatabase {
           businessId,
           webModuleUrl,
           syncSecret,
+          input.autoSyncEnabled === false ? 0 : 1,
           input.aiEnabled ? 1 : 0,
           storedAiProvider,
           aiModel,
@@ -1975,6 +2133,13 @@ export class DesktopDatabase {
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
+    }
+
+    if (input.modules.qrMenu) {
+      this.queueSyncJob("menu_publish", now);
+    }
+    if (input.modules.android) {
+      this.queueSyncJob("android_snapshot", now);
     }
 
     return {
@@ -2051,8 +2216,8 @@ export class DesktopDatabase {
     };
   }
 
-  upsertRequests(requests: SyncedCustomerRequest[]) {
-    if (requests.length === 0) {
+  upsertRequests(requests: SyncedCustomerRequest[], nextCursor?: number) {
+    if (requests.length === 0 && nextCursor === undefined) {
       return;
     }
 
@@ -2133,8 +2298,18 @@ export class DesktopDatabase {
           request.priority,
           request.created_at,
           request.updated_at,
-          request.sync_status
+          "synced"
         );
+      }
+      if (nextCursor !== undefined) {
+        const now = new Date().toISOString();
+        this.db
+          .prepare(`
+            UPDATE sync_runtime
+            SET request_cursor = MAX(request_cursor, ?), updated_at = ?
+            WHERE id = 'primary'
+          `)
+          .run(Math.max(0, Math.trunc(nextCursor)), now);
       }
       this.db.exec("COMMIT");
     } catch (error) {
@@ -4245,6 +4420,19 @@ export class DesktopDatabase {
         input.now,
         input.now
       );
+  }
+
+  private ensureSyncClientId() {
+    const settings = this.db
+      .prepare("SELECT id, sync_client_id FROM settings WHERE deleted_at = '' LIMIT 1")
+      .get() as { id?: string; sync_client_id?: string } | undefined;
+    if (!settings?.id || String(settings.sync_client_id ?? "").trim()) {
+      return;
+    }
+    const clientId = `desktop-${randomUUID()}`;
+    this.db
+      .prepare("UPDATE settings SET sync_client_id = ?, updated_at = ? WHERE id = ?")
+      .run(clientId, new Date().toISOString(), settings.id);
   }
 
   private readSqlFiles(relativeDir: string) {

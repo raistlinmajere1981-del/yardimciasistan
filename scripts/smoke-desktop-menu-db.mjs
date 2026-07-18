@@ -22,6 +22,7 @@ try {
 
   const initialSetup = database.getSetupData();
   assert.equal(initialSetup.setupRequired, true);
+  assert.equal(initialSetup.autoSyncEnabled, true);
   assert.equal(initialSetup.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
   assert.equal(initialSetup.aiEnabled, false);
   assert.equal(initialSetup.aiService, "openai");
@@ -31,6 +32,38 @@ try {
   assert.equal(initialSetup.aiApiKeyConfigured, false);
   assert.equal(initialSetup.aiLastPublishedAt, "");
   assert.ok(database.backupPath.endsWith("backups"));
+
+  const initialSyncRuntime = database.getSyncRuntimeStatus();
+  assert.equal(initialSyncRuntime.enabled, true);
+  assert.match(initialSyncRuntime.clientId, /^desktop-[0-9a-f-]{36}$/);
+  assert.equal(initialSyncRuntime.pendingJobs, 2);
+  assert.deepEqual(
+    database.getPendingSyncJobs().map((job) => job.jobType).sort(),
+    ["android_snapshot", "menu_publish"]
+  );
+  database.setAutoSyncEnabled(false);
+  assert.equal(database.getSyncRuntimeStatus().enabled, false);
+  database.setAutoSyncEnabled(true);
+  const initialJobRevisions = new Map(
+    database.getPendingSyncJobs().map((job) => [job.jobKey, job.sourceRevision])
+  );
+  for (const job of database.getPendingSyncJobs()) {
+    database.completeSyncJob(job.jobKey, job.sourceRevision);
+  }
+  assert.equal(database.getSyncRuntimeStatus().pendingJobs, 0);
+
+  database.queueSyncJob("menu_publish");
+  const failedJob = database.getPendingSyncJobs().find((job) => job.jobType === "menu_publish");
+  assert.ok(failedJob);
+  assert.ok(failedJob.sourceRevision > initialJobRevisions.get(failedJob.jobKey));
+  database.failSyncJob(failedJob.jobKey, failedJob.sourceRevision, "geçici ağ hatası", "2100-01-01T00:00:00.000Z");
+  assert.equal(database.getPendingSyncJobs().some((job) => job.jobType === "menu_publish"), false);
+  database.queueSyncJob("menu_publish");
+  const retriedJob = database.getPendingSyncJobs().find((job) => job.jobType === "menu_publish");
+  assert.ok(retriedJob);
+  assert.equal(retriedJob.attemptCount, 0);
+  assert.equal(retriedJob.lastError, "");
+  database.completeSyncJob(retriedJob.jobKey, retriedJob.sourceRevision);
 
   const firstRawAiApiKey = "smoke-raw-ai-key-never-persist-001";
   const firstEncryptedAiApiKey = "safe-storage:v1:opaque-smoke-value-001";
@@ -43,6 +76,7 @@ try {
     address: "Smoke adresi",
     webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     syncSecret: "smoke-secret-12345",
+    autoSyncEnabled: true,
     aiEnabled: true,
     aiProvider: "openai_compatible",
     aiService: "openrouter",
@@ -379,7 +413,11 @@ try {
       created_at: "2026-07-11T11:00:00+03:00",
       updated_at: "2026-07-11T11:00:00+03:00"
     }
-  ]);
+  ], 42);
+  assert.equal(database.getSyncRuntimeStatus().requestCursor, 42);
+  assert.equal(database.getSyncRuntimeStatus().acknowledgedCursor, 0);
+  database.acknowledgeRequestCursor(42);
+  assert.equal(database.getSyncRuntimeStatus().acknowledgedCursor, 42);
   const customerDashboard = database.getDashboardData();
   const smokeCustomer = customerDashboard.customers.find((customer) => customer.fullName === "Smoke Yeni Misafir");
   assert.ok(smokeCustomer);

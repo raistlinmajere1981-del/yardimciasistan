@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-const YA_MENU_FILE = __DIR__ . '/../data/menu.json';
+require_once __DIR__ . '/../lib/storage.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     ya_menu_response(405, [
@@ -10,7 +10,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     ]);
 }
 
-$menu = ya_read_menu();
+try {
+    $menu = ya_read_menu();
+} catch (Throwable $error) {
+    ya_menu_response(503, [
+        'ok' => false,
+        'message' => $error->getMessage() === 'pdo_sqlite_missing'
+            ? 'QR menü için hostingde PDO_SQLITE eklentisi etkinleştirilmeli.'
+            : 'QR menü verisi şu anda okunamıyor.'
+    ]);
+}
+$publication = is_array($menu['_publication'] ?? null) ? $menu['_publication'] : [];
+unset($menu['_publication']);
+$serverRevision = (int) ($publication['server_revision'] ?? 0);
+$etag = '"ya-menu-' . $serverRevision . '"';
+header('ETag: ' . $etag);
+header('Cache-Control: no-cache, must-revalidate');
+if (trim((string) ($_SERVER['HTTP_IF_NONE_MATCH'] ?? '')) === $etag) {
+    http_response_code(304);
+    exit;
+}
 $categories = array_values(array_filter($menu['categories'] ?? [], static function ($category): bool {
     return ($category['is_active'] ?? true) === true;
 }));
@@ -31,27 +50,18 @@ ya_menu_response(200, [
     'ok' => true,
     'categories' => $categories,
     'items' => $items,
-    'updated_at' => $menu['updated_at'] ?? ''
+    'updated_at' => $menu['updated_at'] ?? '',
+    'source_revision' => (int) ($publication['source_revision'] ?? 0),
+    'server_revision' => $serverRevision
 ]);
 
 function ya_read_menu(): array
 {
-    if (!is_file(YA_MENU_FILE)) {
-        return [
-            'categories' => [],
-            'items' => [],
-            'updated_at' => ''
-        ];
-    }
-
-    $json = file_get_contents(YA_MENU_FILE);
-    $data = json_decode($json ?: '{}', true);
-
-    return is_array($data) ? $data : [
+    return ya_storage_get_publication('menu', [
         'categories' => [],
         'items' => [],
         'updated_at' => ''
-    ];
+    ]);
 }
 
 function ya_sort_records(array $records): array

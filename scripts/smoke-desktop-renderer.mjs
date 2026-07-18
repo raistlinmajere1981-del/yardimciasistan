@@ -1326,7 +1326,7 @@ try {
   });
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(pullPage.locator(".dashboard-attention-card").first().locator("strong")).toHaveText("0");
-  await pullPage.getByRole("button", { name: "Talepleri Kontrol Et" }).click();
+  await pullPage.getByRole("button", { name: "Şimdi Eşitle" }).click();
   await expect(pullPage.getByText("1 talep alındı.")).toBeVisible();
   await expect(pullPage.getByRole("heading", { name: "Web Sync Smoke" })).toBeVisible();
   await expect(pullPage.getByText("Bahçe masa için canlı web talebi.")).toBeVisible();

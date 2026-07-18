@@ -4,6 +4,30 @@ Firma hostingindeki mini API ile local PC uygulaması arasındaki veri alışver
 
 PC dışarıya port açmaz; hostingdeki mini API'ye istek atarak yeni talepleri çeker. Bağlantı sorunlarında uygulama local çalışmaya devam etmelidir.
 
+## Taşıma Sınırı
+
+Otomatik koordinatör doğrudan PHP fonksiyonlarına bağlı değildir. Sağlayıcıdan bağımsız
+`SyncTransport` sözleşmesini kullanır. Güncel adaptör:
+
+```ts
+const transport = new PhpHostingSyncTransport({
+  baseUrl: "https://firma.example/yardimci-asistan",
+  syncSecret: "uzun-gizli-anahtar",
+  clientId: "desktop-kalici-uuid"
+});
+
+await transport.getCapabilities();
+const page = await transport.pullRequests({ afterSeq: 0, limit: 100 });
+if (page.ok) {
+  // Önce local SQLite transaction'ını tamamla.
+  await transport.acknowledgeRequests({ throughSeq: page.next_cursor ?? 0 });
+}
+```
+
+Menü ve Android snapshot yayınları `sourceRevision` ile `idempotencyKey` ister.
+Bugünkü uygulama `PhpHostingSyncTransport` kullanır; yönetilen cloud için daha sonra
+aynı arayüzü uygulayan ikinci bir adaptör eklenebilir.
+
 ## İlk Fonksiyonlar
 
 ```ts
@@ -82,6 +106,9 @@ pushAiSettings({
 
 Başarısız bağlantı veya hatalı güvenlik anahtarı durumunda fonksiyonlar uygulamayı kilitlemez; `ok: false` ve kullanıcıya sade gösterilebilecek bir `message` döndürür.
 
+Tüm güncel senkron çağrıları anahtarı `X-YA-Sync-Secret` header'ında gönderir; JSON
+gövdesine veya query string'e eklemez. Canlı uzak hedefte HTTPS kullanılmalıdır.
+
 `pushMenu()` PC'deki QR menü verisini `api/sync.php` içindeki `publish_menu` aksiyonuna gönderir. Başarılı yayın sonrası müşteri menüsü `menu.html` üzerinden güncel veriyi okur.
 
 `pushAndroidSnapshot()` PC'deki local oda, masa, rezervasyon, günlük iş ve müşteri özetini `publish_android_snapshot` aksiyonuna gönderir. Android uygulama aynı veriyi `android_summary` cevabındaki `operations` ve `daily_tasks` alanlarından okur.
@@ -94,6 +121,11 @@ içerir.
 Masaüstü yerel işlemi uyguladıktan sonra `markAndroidActionResult()` ile sonucu
 `applied` veya `failed` olarak kaydeder. Masaüstündeki action receipt kaydı aynı kimliğin
 yeniden gelmesi halinde işlemin ikinci kez uygulanmasını engeller.
+
+`getSyncCapabilities()` hostingin protokol ve depolama desteğini doğrular.
+Otomatik koordinatör `protocol_version >= 2` ve `storage === "sqlite"` bekler.
+`pullRequests()` çağrısındaki `afterSeq` kalıcı cursor'u, `acknowledgeRequests()` ise
+başarılı yerel import sonrasındaki onayı temsil eder.
 
 `pushAiSettings()` masaüstünde kaydedilen AI bağlantısını `publish_ai_settings` aksiyonuna yollar. Uzak hedeflerde HTTPS zorunludur; HTTP yalnız loopback geliştirme adreslerinde kabul edilir. API anahtarı istekten sonra sonuç nesnesine veya hata mesajına geri taşınmaz.
 

@@ -257,7 +257,7 @@ Kategori örneği:
 
 `category_id`, kategorilerden birinin `id` değeriyle aynı olmalıdır.
 
-QR menü web modülündeki canlı menüden ayrı çalışır. Demo site içindeki menü satış/önizleme amaçlıdır; gerçek QR yayın akışı desktop uygulamadan `firm-template/web-module/data/menu.json` dosyasına gider.
+QR menü web modülündeki canlı menüden ayrı çalışır. Demo site içindeki menü satış/önizleme amaçlıdır; gerçek QR yayın akışı masaüstü outbox'ından web modülünün hosting SQLite'ına gider.
 
 ## 11. WhatsApp Numarası
 
