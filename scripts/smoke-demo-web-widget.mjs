@@ -58,12 +58,17 @@ try {
   });
 
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
-  await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Pansiyon & Kafe");
-  await page.locator('[data-ya-view="form"]').click();
-  await page.locator('.ya-widget-form select[name="request_type"]').selectOption("pension_reservation");
+  await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
+  await expect(page.getByRole("heading", { name: "Size nasıl yardımcı olayım?" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveAttribute("href", `${webModuleUrl}/menu.html`);
+  await expect(page.locator(".ya-widget-panel")).not.toContainText("mm/dd/yyyy");
+  const mobilePanelBox = await page.locator(".ya-widget-panel").boundingBox();
+  expect(mobilePanelBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((mobilePanelBox?.x ?? 0) + (mobilePanelBox?.width ?? 0)).toBeLessThanOrEqual(420);
+  await page.locator('[data-ya-request-type="pension_reservation"]').click();
   await page.locator('.ya-widget-form input[name="customer_name"]').fill("Demo Web Widget");
   await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 222 11 00");
-  await page.locator('.ya-widget-form input[name="date_text"]').fill("23 Temmuz");
+  await page.locator('[data-ya-date-preset="tomorrow"]').click();
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("2");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Sessiz oda için bilgi rica ederiz.");
   const requestResponsePromise = page.waitForResponse((response) => response.url() === `${webModuleUrl}/api/request.php` && response.request().method() === "POST");
@@ -85,6 +90,7 @@ try {
 
   await page.locator('[data-ya-view="home"]').click();
   await page.locator('[data-ya-view="info"]').click();
+  await expect(page.getByRole("heading", { name: "Merak ettiğiniz şeyi sorun" })).toBeVisible();
   await page.locator(".ya-widget-ai textarea").fill("Bu akşam 2 kişilik masa var mı?");
   const chatResponsePromise = page.waitForResponse((response) => response.url() === `${webModuleUrl}/api/chat.php` && response.request().method() === "POST");
   await page.locator('.ya-widget-ai button[type="submit"]').click();
@@ -98,6 +104,18 @@ try {
   expect(conversations).toHaveLength(1);
   expect(conversations[0].source).toBe("web_ai");
   expect(conversations[0].status).toBe("fallback");
+
+  await page.locator('[data-ya-view="home"]').click();
+  await page.locator('[data-ya-view="whatsapp"]').click();
+  await page.locator('[data-ya-whatsapp-topic="table"]').click();
+  await expect(page.locator("[data-ya-message-preview]")).toContainText("masa müsaitliği");
+  await page.locator('[data-ya-whatsapp-form] button[type="submit"]').click();
+  await expect(page.locator(".ya-widget-status")).toContainText("Mesajınız WhatsApp'ta hazırlandı");
+  const directMessageUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
+  expect(decodeURIComponent(directMessageUrl)).toContain("masa müsaitliği");
+
+  await page.locator('[data-ya-view="home"]').click();
+  await expect(page.getByRole("heading", { name: "Size nasıl yardımcı olayım?" })).toBeVisible();
 
   console.log(`demo-web-widget-smoke-ok: ${demoWebUrl} -> ${webModuleUrl}`);
 } finally {

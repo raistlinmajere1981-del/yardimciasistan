@@ -2,7 +2,7 @@
 
 Mevcut web sitelerine tek script ile eklenebilecek Yardımcı Asistan widget'ı burada geliştirilir.
 
-Widget; sağ altta Yardımcı Asistan butonu, açılır panel, kısa talep formu, bilgi panelinde AI soru/cevap alanı, WhatsApp hazır mesajı ve QR menü bağlantısı sunar. Mini API adresi verilirse talebi arka planda kaydetmeyi ve bilgi panelindeki kısa soruları `api/chat.php` üzerinden yanıtlamayı dener; bu denemeler başarısız olsa bile WhatsApp akışı devam eder. AI fallback yanıtları güvenli hata kodu, açıklama, sağlayıcı HTTP durumu ve yeniden deneme bilgisini gösterir; ham sağlayıcı cevabı veya API anahtarı tarayıcıya taşınmaz.
+Widget; sağ altta AI asistan başlatıcısı, hızlı aksiyon chipleri, kompakt rezervasyon/masa akışı, öneri sorulu AI bilgi alanı, akıllı WhatsApp mesaj hazırlama ve QR menü bağlantısı sunar. Tarih seçimi Bugün/Yarın/Hafta sonu seçenekleriyle veya görünür Türkçe tarih üreten native date picker ile yapılır. Mini API adresi verilirse talebi arka planda kaydetmeyi ve bilgi panelindeki kısa soruları `api/chat.php` üzerinden yanıtlamayı dener; bu denemeler başarısız olsa bile WhatsApp akışı devam eder. AI fallback yanıtları güvenli hata kodu, açıklama, sağlayıcı HTTP durumu ve yeniden deneme bilgisini gösterir; ham sağlayıcı cevabı veya API anahtarı tarayıcıya taşınmaz.
 
 ## Build
 

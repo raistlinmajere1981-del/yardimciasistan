@@ -31,6 +31,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Switch;
@@ -67,6 +68,7 @@ public final class MainActivity extends Activity {
   private final HostingSyncClient syncClient = new HostingSyncClient();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private SharedPreferences preferences;
+  private AppTheme.Mode themeMode = AppTheme.Mode.NIGHT;
   private ActionOutbox actionOutbox;
   private OperationCache operationCache;
   private LocalNotificationCenter localNotifications;
@@ -89,11 +91,13 @@ public final class MainActivity extends Activity {
   private TextView headerMeta;
   private TextView errorBanner;
   private Button refreshButton;
+  private ImageButton themeButton;
   private Button settingsButton;
   private EditText webModuleInput;
   private EditText syncSecretInput;
   private final Map<String, Integer> screenScrollPositions = new HashMap<>();
   private String renderedScreenKey = "";
+  private String currentError = "";
   private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
   private final Runnable foregroundSyncRunnable = new Runnable() {
     @Override
@@ -110,13 +114,13 @@ public final class MainActivity extends Activity {
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
-    super.onCreate(savedInstanceState);
-    getWindow().setStatusBarColor(UiKit.BG);
-    getWindow().setNavigationBarColor(UiKit.BG);
-    getWindow().getDecorView().setSystemUiVisibility(0);
-
     preferences = getSharedPreferences(ConnectionSettings.PREFS_NAME, MODE_PRIVATE);
     resetDebugAppStateIfRequested();
+    themeMode = AppTheme.load(preferences);
+    setTheme(themeStyleResource(themeMode));
+    super.onCreate(savedInstanceState);
+    UiKit.applyTheme(AppTheme.tokens(themeMode));
+    applyWindowTheme();
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
     ConnectionSettings.ensureDefaults(preferences);
     identity = DeviceIdentity.loadOrCreate(this, preferences);
@@ -304,6 +308,9 @@ public final class MainActivity extends Activity {
     refreshButton = UiKit.iconButton(this, "↻", "Yenile", false, view -> syncFromHosting(false));
     headerActions.addView(refreshButton, headerActionParams(false));
 
+    themeButton = createThemeButton(null);
+    headerActions.addView(themeButton, headerActionParams(true));
+
     settingsButton = UiKit.iconButton(this, "⚙", "Ayarlar", false, view -> {
       settingsOpen = !settingsOpen;
       render();
@@ -326,10 +333,63 @@ public final class MainActivity extends Activity {
 
     bottomNavigation = UiKit.row(this);
     bottomNavigation.setPadding(UiKit.dp(this, 5), UiKit.dp(this, 6), UiKit.dp(this, 5), UiKit.dp(this, 7));
-    bottomNavigation.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 0));
+    bottomNavigation.setBackground(UiKit.rounded(this, UiKit.BOTTOM_NAV_BACKGROUND, UiKit.BORDER, 0));
     bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, BOTTOM_NAV_HEIGHT_DP)));
     root.addView(bottomNavigation);
     setContentView(root);
+    updateErrorBanner();
+  }
+
+  private ImageButton createThemeButton(Runnable afterApplied) {
+    int icon = themeMode == AppTheme.Mode.NIGHT ? R.drawable.ic_theme_day : R.drawable.ic_theme_night;
+    return UiKit.themeIconButton(this, icon, themeMode.switchDescription, view -> {
+      switchTheme();
+      if (afterApplied != null) {
+        afterApplied.run();
+      }
+    });
+  }
+
+  private void addDetailHeaderActions(LinearLayout header, Dialog dialog, Runnable reopen) {
+    ImageButton quickTheme = createThemeButton(() -> {
+      dialog.dismiss();
+      reopen.run();
+    });
+    header.addView(quickTheme, headerActionParams(true));
+    Button close = UiKit.outlineButton(this, "Kapat", view -> dialog.dismiss());
+    LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(-2, UiKit.dp(this, 44));
+    closeParams.setMargins(UiKit.dp(this, 6), 0, 0, 0);
+    close.setLayoutParams(closeParams);
+    header.addView(close);
+  }
+
+  private void switchTheme() {
+    rememberCurrentScrollPosition();
+    AppTheme.Mode nextMode = themeMode.toggled();
+    boolean persisted = AppTheme.save(preferences, nextMode);
+    themeMode = nextMode;
+    setTheme(themeStyleResource(themeMode));
+    UiKit.applyTheme(AppTheme.tokens(themeMode));
+    applyWindowTheme();
+    buildShell();
+    render();
+    if (!persisted) {
+      Toast.makeText(this, "Tema seçimi kalıcı olarak kaydedilemedi.", Toast.LENGTH_SHORT).show();
+    }
+  }
+
+  private int themeStyleResource(AppTheme.Mode mode) {
+    return mode == AppTheme.Mode.DAY ? R.style.AppTheme_Day : R.style.AppTheme_Night;
+  }
+
+  private void applyWindowTheme() {
+    getWindow().setStatusBarColor(UiKit.BG);
+    getWindow().setNavigationBarColor(UiKit.BG);
+    getWindow().setBackgroundDrawable(new ColorDrawable(UiKit.BG));
+    int flags = themeMode == AppTheme.Mode.DAY
+        ? View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
+        : 0;
+    getWindow().getDecorView().setSystemUiVisibility(flags);
   }
 
   private LinearLayout.LayoutParams headerActionParams(boolean withMargin) {
@@ -496,7 +556,7 @@ public final class MainActivity extends Activity {
     Button button = new Button(this);
     button.setText(label);
     button.setTextSize(11);
-    button.setTextColor(selected ? UiKit.PRIMARY : UiKit.MUTED);
+    button.setTextColor(selected ? UiKit.BOTTOM_NAV_ACTIVE : UiKit.BOTTOM_NAV_INACTIVE);
     button.setTypeface(Typeface.create("sans", selected ? Typeface.BOLD : Typeface.NORMAL));
     button.setAllCaps(false);
     button.setGravity(Gravity.CENTER);
@@ -883,6 +943,10 @@ public final class MainActivity extends Activity {
   private View settingsScreen() {
     LinearLayout page = UiKit.column(this);
     boolean canViewTechnicalSettings = !data.permissionsResolved || data.hasPermission("settings.view");
+    page.addView(sectionLabel("Görünüm"));
+    LinearLayout appearance = UiKit.card(this);
+    appearance.addView(settingLine("Tema", themeMode.label, UiKit.PRIMARY));
+    page.addView(appearance);
     page.addView(sectionLabel("Bildirim tercihleri"));
     LinearLayout notificationPreferences = UiKit.card(this);
     boolean hasNotificationPreference = false;
@@ -975,7 +1039,7 @@ public final class MainActivity extends Activity {
       readOnly.addView(UiKit.text(this, embeddedConnectionLocked ? "Bağlantı bilgileri APK içinde hazır" : "Bağlantı ayarları salt okunur", 14, UiKit.TEXT, Typeface.BOLD));
       readOnly.addView(UiKit.text(this, embeddedConnectionLocked
           ? "Tasarım süresince web bağlantısı bu APK'ya sabitlendi ve uygulama güncellendiğinde otomatik olarak korunur."
-          : "Web modül adresi ve güvenlik anahtarı yalnız ayar düzenleme yetkisi olan cihazlarda değiştirilebilir.", 12, UiKit.MUTED, Typeface.NORMAL));
+          : "Web modül adresi ve güvenlik anahtarı yalnız ayar düzenleme yetkisi olan cihazlarda değiştirilebilir.", 12, UiKit.SECONDARY, Typeface.NORMAL));
       page.addView(readOnly);
     }
 
@@ -1012,10 +1076,11 @@ public final class MainActivity extends Activity {
     LinearLayout copy = UiKit.column(this);
     copy.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
     copy.addView(UiKit.text(this, title, 14, UiKit.TEXT, Typeface.BOLD));
-    copy.addView(UiKit.text(this, detail, 11, UiKit.MUTED, Typeface.NORMAL));
+    copy.addView(UiKit.text(this, detail, 11, UiKit.SECONDARY, Typeface.NORMAL));
     row.addView(copy);
 
     Switch toggle = new Switch(this);
+    UiKit.styleSwitch(toggle);
     toggle.setChecked(NotificationPreferences.isEnabled(preferences, category));
     toggle.setContentDescription(title + " bildirimleri");
     toggle.setOnCheckedChangeListener((button, checked) -> {
@@ -1042,7 +1107,7 @@ public final class MainActivity extends Activity {
       titleRow.addView(refresh);
     }
     intro.addView(titleRow);
-    intro.addView(UiKit.text(this, description, 12, UiKit.MUTED, Typeface.NORMAL));
+    intro.addView(UiKit.text(this, description, 12, UiKit.SECONDARY, Typeface.NORMAL));
     return intro;
   }
 
@@ -1093,7 +1158,7 @@ public final class MainActivity extends Activity {
   private View emptyCard(String title, String detail) {
     LinearLayout card = UiKit.card(this);
     card.addView(UiKit.text(this, title, 14, UiKit.TEXT, Typeface.BOLD));
-    card.addView(UiKit.text(this, detail, 12, UiKit.MUTED, Typeface.NORMAL));
+    card.addView(UiKit.text(this, detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
     return card;
   }
 
@@ -1495,7 +1560,7 @@ public final class MainActivity extends Activity {
     form.addView(quantity);
     form.addView(note);
 
-    AlertDialog dialog = new AlertDialog.Builder(this)
+    AlertDialog dialog = alertDialogBuilder()
         .setTitle("set".equals(mode) ? "Stok adedini ayarla" : "Stok farkı gir")
         .setView(form)
         .setNegativeButton("Vazgeç", null)
@@ -1641,9 +1706,7 @@ public final class MainActivity extends Activity {
     heading.addView(UiKit.eyebrow(this, "MÜŞTERİ DETAYI"));
     heading.addView(UiKit.title(this, customer.fullName));
     header.addView(heading);
-    Button close = UiKit.outlineButton(this, "Kapat", view -> dialog.dismiss());
-    close.setLayoutParams(new LinearLayout.LayoutParams(-2, UiKit.dp(this, 44)));
-    header.addView(close);
+    addDetailHeaderActions(header, dialog, () -> showCustomerDetail(customer));
     shell.addView(header);
 
     LinearLayout page = UiKit.column(this);
@@ -1699,9 +1762,7 @@ public final class MainActivity extends Activity {
     heading.addView(UiKit.eyebrow(this, "TALEP DETAYI"));
     heading.addView(UiKit.title(this, request.customerName));
     header.addView(heading);
-    Button close = UiKit.outlineButton(this, "Kapat", view -> dialog.dismiss());
-    close.setLayoutParams(new LinearLayout.LayoutParams(-2, UiKit.dp(this, 44)));
-    header.addView(close);
+    addDetailHeaderActions(header, dialog, () -> showRequestDetail(request));
     shell.addView(header);
 
     LinearLayout page = UiKit.column(this);
@@ -1815,9 +1876,7 @@ public final class MainActivity extends Activity {
     heading.addView(UiKit.eyebrow(this, "REZERVASYON DETAYI"));
     heading.addView(UiKit.title(this, reservation.customerName.isEmpty() ? reservation.title : reservation.customerName));
     header.addView(heading);
-    Button close = UiKit.outlineButton(this, "Kapat", view -> dialog.dismiss());
-    close.setLayoutParams(new LinearLayout.LayoutParams(-2, UiKit.dp(this, 44)));
-    header.addView(close);
+    addDetailHeaderActions(header, dialog, () -> showReservationDetail(reservation));
     shell.addView(header);
 
     LinearLayout page = UiKit.column(this);
@@ -1904,9 +1963,7 @@ public final class MainActivity extends Activity {
     heading.addView(UiKit.eyebrow(this, "MESAJ DETAYI"));
     heading.addView(UiKit.title(this, message.customerName));
     header.addView(heading);
-    Button close = UiKit.outlineButton(this, "Kapat", view -> dialog.dismiss());
-    close.setLayoutParams(new LinearLayout.LayoutParams(-2, UiKit.dp(this, 44)));
-    header.addView(close);
+    addDetailHeaderActions(header, dialog, () -> showMessageDetail(message));
     shell.addView(header);
 
     LinearLayout page = UiKit.column(this);
@@ -2003,9 +2060,7 @@ public final class MainActivity extends Activity {
         Typeface.BOLD
     ));
     header.addView(heading);
-    Button close = UiKit.outlineButton(this, "Kapat", view -> dialog.dismiss());
-    close.setLayoutParams(new LinearLayout.LayoutParams(-2, UiKit.dp(this, 44)));
-    header.addView(close);
+    addDetailHeaderActions(header, dialog, () -> showTableOrder(table));
     shell.addView(header);
 
     LinearLayout page = UiKit.column(this);
@@ -2479,15 +2534,28 @@ public final class MainActivity extends Activity {
   }
 
   private void showError(String message) {
-    errorBanner.setText(message);
-    errorBanner.setTextColor(UiKit.DANGER);
-    errorBanner.setBackground(UiKit.rounded(this, UiKit.withAlpha(UiKit.DANGER, 26), UiKit.withAlpha(UiKit.DANGER, 100), 11));
-    errorBanner.setVisibility(View.VISIBLE);
+    currentError = message == null ? "" : message;
+    updateErrorBanner();
   }
 
   private void clearError() {
-    errorBanner.setText("");
-    errorBanner.setVisibility(View.GONE);
+    currentError = "";
+    updateErrorBanner();
+  }
+
+  private void updateErrorBanner() {
+    if (errorBanner == null) {
+      return;
+    }
+    errorBanner.setText(currentError);
+    errorBanner.setTextColor(UiKit.DANGER);
+    errorBanner.setBackground(UiKit.rounded(
+        this,
+        UiKit.withAlpha(UiKit.DANGER, 26),
+        UiKit.withAlpha(UiKit.DANGER, 100),
+        11
+    ));
+    errorBanner.setVisibility(currentError.isEmpty() ? View.GONE : View.VISIBLE);
   }
 
   private int localPendingActionCount() {
@@ -2576,7 +2644,7 @@ public final class MainActivity extends Activity {
   }
 
   private void confirm(String title, String message, Runnable action) {
-    AlertDialog dialog = new AlertDialog.Builder(this)
+    AlertDialog dialog = alertDialogBuilder()
         .setTitle(title)
         .setMessage(message)
         .setNegativeButton("Vazgeç", null)
@@ -2587,6 +2655,13 @@ public final class MainActivity extends Activity {
       dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(UiKit.MUTED);
     });
     dialog.show();
+  }
+
+  private AlertDialog.Builder alertDialogBuilder() {
+    int dialogTheme = themeMode == AppTheme.Mode.DAY
+        ? android.R.style.Theme_Material_Light_Dialog_Alert
+        : android.R.style.Theme_Material_Dialog_Alert;
+    return new AlertDialog.Builder(this, dialogTheme);
   }
 
   private void configureFullDialog(Dialog dialog) {

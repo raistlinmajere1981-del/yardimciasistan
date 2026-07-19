@@ -31,9 +31,10 @@ docs/DEMO_SITE_CUSTOMIZATION.md
 
 ## Uygulama İndirmeleri
 
-Demo sitenin `Ayarlar` sayfası Windows 64 bit, Windows 32 bit ve Android APK
-indirmelerini sunar. Canlı hosting paketi doğrulanmış üç dosyayı `downloads/`
-altına kopyalar.
+Demo sitenin müşteri navigasyonunda gösterilmeyen `#settings` sayfası Windows 64
+bit, Windows 32 bit ve Android APK indirmelerini sunar. Sayfaya doğrudan
+`/#settings` adresinden veya footer'daki “Uygulamayı İndir” bağlantısından
+ulaşılır. Canlı hosting paketi doğrulanmış üç dosyayı `downloads/` altına kopyalar.
 
 Dosyalar üretilir ve ardından hosting paketi hazırlanır:
 

@@ -117,11 +117,50 @@ async function main() {
 
   let topXml = dumpUi("top.xml");
   captureScreenshot("top.png");
-  assertContains(topXml, ["Bugün", "Öncelikli işler", "Pansiyon", "Restoran", 'content-desc="Yenile"', 'content-desc="Ayarlar"', 'text="İş 2"', 'text="Oda 1"', 'text="Hesap 0"', 'text="Stok yok 1"']);
+  assertContains(topXml, ["Bugün", "Öncelikli işler", "Pansiyon", "Restoran", 'content-desc="Yenile"', 'content-desc="Gündüz moduna geç"', 'content-desc="Ayarlar"', 'text="İş 2"', 'text="Oda 1"', 'text="Hesap 0"', 'text="Stok yok 1"']);
   assertNotContains(topXml, ["GÜNLÜK OPERASYON", 'content-desc="Bildirimler"', 'text="Müşteri"', 'text="Mesajlar"', "Canlı veri çekiliyor", "Canlı veri alındı", "Veriler zaten güncel", "Son yayın:"]);
   assertCounterStripFits(topXml, ["İş 2", "Oda 1", "Hesap 0", "Stok yok 1"]);
   assertSquareTouchTarget(topXml, "Yenile");
+  assertSquareTouchTarget(topXml, "Gündüz moduna geç");
   assertSquareTouchTarget(topXml, "Ayarlar");
+  assertIconOnly(topXml, "Gündüz moduna geç");
+  assertHeaderActionOrder(topXml, "Gündüz moduna geç");
+
+  tap(centerOf(findClickableBoundsByDescription(topXml, "Gündüz moduna geç")));
+  const dayThemeXml = await waitForUiCondition(
+    (xml) => xml.includes('content-desc="Gece moduna geç"'),
+    5000,
+    "Gündüz teması anında uygulanmadı."
+  );
+  captureScreenshot("today-day-theme.png");
+  assert.equal(readPreferenceValue("app_theme_mode"), "day", "Gündüz teması kalıcı tercihe yazılmadı.");
+  assertSquareTouchTarget(dayThemeXml, "Gece moduna geç");
+  assertIconOnly(dayThemeXml, "Gece moduna geç");
+  assertHeaderActionOrder(dayThemeXml, "Gece moduna geç");
+
+  relaunchApp();
+  const persistedDayThemeXml = await waitForUiCondition(
+    (xml) => xml.includes('content-desc="Gece moduna geç"') && xml.includes('text="Bugün"'),
+    12000,
+    "Gündüz teması uygulama yeniden açıldığında korunmadı."
+  );
+  assert.equal(readPreferenceValue("app_theme_mode"), "day", "Yeniden açılışta gündüz tercihi değişti.");
+  tap(centerOf(findClickableBoundsByDescription(persistedDayThemeXml, "Gece moduna geç")));
+  await waitForUiCondition(
+    (xml) => xml.includes('content-desc="Gündüz moduna geç"'),
+    5000,
+    "Gece teması anında uygulanmadı."
+  );
+  assert.equal(readPreferenceValue("app_theme_mode"), "night", "Gece teması kalıcı tercihe yazılmadı.");
+  relaunchApp();
+  topXml = await waitForUiCondition(
+    (xml) => xml.includes('content-desc="Gündüz moduna geç"') && xml.includes('text="Bugün"'),
+    12000,
+    "Gece teması uygulama yeniden açıldığında korunmadı."
+  );
+  assert.equal(readPreferenceValue("app_theme_mode"), "night", "Yeniden açılışta gece tercihi değişti.");
+  scrollToTop();
+  await delay(350);
 
   scrollToBottom();
   await delay(350);
@@ -140,7 +179,7 @@ async function main() {
   assertNotContains(beforeRefreshXml, ["GÜNLÜK OPERASYON"]);
   await publishDeviceRole(baseUrl, deviceId, "staff");
   const afterRefreshXml = await waitForUiCondition(
-    (xml) => xml.includes("Personel ·") && xml.includes('content-desc="Ayarlar"') && xml.includes('content-desc="Yenile"'),
+    (xml) => xml.includes("Personel ·") && xml.includes('content-desc="Ayarlar"') && xml.includes('content-desc="Yenile"') && xml.includes('content-desc="Gündüz moduna geç"'),
     20000,
     "Personel yetki profili Android arayüzüne uygulanmadı."
   );
@@ -150,12 +189,12 @@ async function main() {
 
   topXml = dumpUi("staff-top.xml");
   captureScreenshot("staff-top.png");
-  assertContains(topXml, ["Personel", 'content-desc="Ayarlar"', 'content-desc="Yenile"', 'text="Oda 1"', 'text="Hesap 0"', "Pansiyon", "Restoran"]);
+  assertContains(topXml, ["Personel", 'content-desc="Ayarlar"', 'content-desc="Yenile"', 'content-desc="Gündüz moduna geç"', 'text="Oda 1"', 'text="Hesap 0"', "Pansiyon", "Restoran"]);
   assertNotContains(topXml, ['content-desc="Bildirimler"', 'text="Müşteri"', 'text="Mesajlar"', syncSecret]);
   tap(centerOf(findClickableBoundsByDescription(topXml, "Ayarlar")));
   await delay(400);
   const staffSettingsXml = dumpUi("staff-settings.xml");
-  assertContains(staffSettingsXml, ["Ayarlar", "Bildirim tercihleri", "Restoran / Masa", "Oda / Günlük İş", "İşlem hataları"]);
+  assertContains(staffSettingsXml, ["Ayarlar", "Görünüm", "Tema", "Gece Modu", 'content-desc="Gündüz moduna geç"', "Bildirim tercihleri", "Restoran / Masa", "Oda / Günlük İş", "İşlem hataları"]);
   assertNotContains(staffSettingsXml, ["Bildirimler", "Sync bağlantısı", "Bağlantı özeti", "Güvenlik anahtarı", syncSecret]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
@@ -206,7 +245,9 @@ async function main() {
   await delay(500);
   const staffOrderXml = dumpUi("staff-table-order.xml");
   captureScreenshot("staff-table-order.png");
-  assertContains(staffOrderXml, ["MASA SİPARİŞİ", "Açık · 2 ürün · ₺900,00", "Ürün ara", "Hazırlanıyor", "Servis Edildi", "Hesap Bekliyor"]);
+  assertContains(staffOrderXml, ["MASA SİPARİŞİ", 'content-desc="Gündüz moduna geç"', "Açık · 2 ürün · ₺900,00", "Ürün ara", "Hazırlanıyor", "Servis Edildi", "Hesap Bekliyor"]);
+  assertSquareTouchTarget(staffOrderXml, "Gündüz moduna geç");
+  assertIconOnly(staffOrderXml, "Gündüz moduna geç");
   assertNotContains(staffOrderXml, ["Ödendi / Kapat"]);
   assertOrderActionGrid(staffOrderXml, false);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
@@ -1242,6 +1283,24 @@ function assertSquareTouchTarget(xml, description) {
   assert.ok(width >= 84 && width <= 100, `${description} ikon genişliği 44–48dp aralığında değil: ${width}px`);
   assert.ok(height >= 84 && height <= 100, `${description} ikon yüksekliği 44–48dp aralığında değil: ${height}px`);
   assert.ok(Math.abs(width - height) <= 2, `${description} ikon butonu kare değil: ${width}x${height}px`);
+}
+
+function assertIconOnly(xml, description) {
+  const nodes = xml.match(/<node\b[^>]*>/g) ?? [];
+  const node = nodes.find((candidate) => candidate.includes(`content-desc="${escapeXmlAttribute(description)}"`)
+    && candidate.includes('clickable="true"'));
+  assert.ok(node, `${description} ikon butonu bulunamadı.`);
+  const text = node.match(/\btext="([^"]*)"/)?.[1] ?? "";
+  assert.equal(text, "", `${description} tema butonunda görünür metin var: ${text}`);
+  assert.ok(node.includes('class="android.widget.ImageButton"'), `${description} vektör ikon butonu değil.`);
+}
+
+function assertHeaderActionOrder(xml, themeDescription) {
+  const refresh = findClickableBoundsByDescription(xml, "Yenile");
+  const theme = findClickableBoundsByDescription(xml, themeDescription);
+  const settings = findClickableBoundsByDescription(xml, "Ayarlar");
+  assert.ok(refresh.right <= theme.left, "Tema butonu Yenile butonunun sağında değil.");
+  assert.ok(theme.right <= settings.left, "Tema butonu Ayarlar butonunun solunda değil.");
 }
 
 function assertBottomNavClearance(xml, contentText, navText, minimumPixels) {

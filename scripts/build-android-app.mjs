@@ -106,7 +106,8 @@ if (javaTestFiles.length > 0) {
     "com.yardimciasistan.android.StableDeviceIdSmoke",
     "com.yardimciasistan.android.NotificationRulesSmoke",
     "com.yardimciasistan.android.StockRulesSmoke",
-    "com.yardimciasistan.android.AndroidUiRulesSmoke"
+    "com.yardimciasistan.android.AndroidUiRulesSmoke",
+    "com.yardimciasistan.android.AppThemeSmoke"
   ]) {
     run("java", [
       "-classpath",

@@ -45,7 +45,7 @@ try {
 
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);
-  await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Pansiyon & Kafe");
+  await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
 
   await page.evaluate(() => {
     window.open = (url) => {
@@ -54,11 +54,10 @@ try {
     };
   });
 
-  await page.locator('[data-ya-view="form"]').click();
-  await page.locator('.ya-widget-form select[name="request_type"]').selectOption("restaurant_reservation");
+  await page.locator('[data-ya-request-type="restaurant_reservation"]').click();
   await page.locator('.ya-widget-form input[name="customer_name"]').fill("Widget Misafir");
   await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 444 33 22");
-  await page.locator('.ya-widget-form input[name="date_text"]').fill("Bu akşam");
+  await page.locator('[data-ya-date-preset="today"]').click();
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
   const requestResponsePromise = page.waitForResponse((response) => response.url() === `${baseUrl}/api/request.php` && response.request().method() === "POST");
@@ -82,7 +81,7 @@ try {
   expect(requestsAfterForm[0].request_type).toBe("restaurant_reservation");
   expect(requestsAfterForm[0].customer_name).toBe("Widget Misafir");
   expect(requestsAfterForm[0].customer_phone).toBe("+905554443322");
-  expect(requestsAfterForm[0].date_text).toBe("Bu akşam");
+  expect(requestsAfterForm[0].date_text).toMatch(/^Bugün, /);
   expect(requestsAfterForm[0].guest_count).toBe(4);
   expect(requestsAfterForm[0].message).toContain("Bahçede sakin");
   expect(requestsAfterForm[0].sync_status).toBe("pending");

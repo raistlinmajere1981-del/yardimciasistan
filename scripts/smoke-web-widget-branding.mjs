@@ -47,7 +47,7 @@ try {
       logoUrl: ""
     });
   });
-  await expect(page.locator(".ya-widget-button .ya-widget-mark-fallback")).toHaveText("YA");
+  await expect(page.locator(".ya-widget-button .ya-widget-mark-fallback")).toHaveText("AI");
 
   await page.evaluate(() => {
     window.YardimciAsistanWidget?.init({
@@ -60,7 +60,7 @@ try {
   await expect(page.locator(".ya-widget-button img.ya-widget-mark")).toHaveAttribute("src", "/assets/yardimci-asistan-symbol.png");
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", "/assets/yardimci-asistan-symbol.png");
-  await expect(page.locator(".ya-widget-header strong")).toHaveText("Logo Firma");
+  await expect(page.locator(".ya-widget-header strong")).toHaveText("Logo Firma AI Asistanı");
   await page.locator('[data-ya-view="info"]').click();
   await page.locator(".ya-widget-ai textarea").fill("Bu akşam 4 kişilik masa var mı?");
   await page.locator('.ya-widget-ai button[type="submit"]').click();

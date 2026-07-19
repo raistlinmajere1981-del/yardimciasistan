@@ -9,6 +9,7 @@ test("demo web ana akışını gösterir", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Deniz Çiçeği Pansiyon & Kafe" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /Rezervasyon Talebi Oluştur/ }).first()).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Ana menü" }).getByRole("button", { name: "Ayarlar", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Odalar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pansiyon / Odalar" })).toBeVisible();
@@ -20,10 +21,10 @@ test("demo web ana akışını gösterir", async ({ page }) => {
 });
 
 test("ayarlar sayfası Windows kurulum dosyasını sunar", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
+  await page.goto("/#settings");
 
   await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Ana menü" }).getByRole("button", { name: "Ayarlar", exact: true })).toHaveCount(0);
   await expect(page.getByText("Windows 10 / 11")).toHaveCount(2);
   await expect(page.getByText("Android 8.0+")).toBeVisible();
 
@@ -51,13 +52,15 @@ test("rezervasyon formu WhatsApp hazır mesajı açar", async ({ page, context }
   await page.goto("/");
   await page.getByRole("button", { name: /Rezervasyon Talebi Oluştur/ }).first().click();
 
-  await expect(page.getByRole("heading", { name: "Rezervasyon / Bilgi Al" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Talebinizi birlikte hazırlayalım" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Bugün:/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Yarın:/ })).toBeVisible();
 
   await page.getByLabel("Ad soyad").fill("Demo Misafir");
   await page.getByLabel("Telefon").fill("0532 123 45 67");
-  await page.getByLabel("Tarih").fill("2026-07-12");
-  await page.getByLabel("Kişi sayısı").fill("3");
-  await page.getByLabel("Not").fill("Balkonlu oda için bilgi rica ederim.");
+  await page.getByLabel("Tarih seç").fill("2030-07-12");
+  await page.getByRole("spinbutton", { name: "Kişi sayısı", exact: true }).fill("3");
+  await page.getByLabel(/Kısa not/).fill("Balkonlu oda için bilgi rica ederim.");
 
   const pagePromise = context.waitForEvent("page");
   await page.getByRole("button", { name: /WhatsApp'ta Aç/ }).click();
@@ -71,4 +74,6 @@ test("rezervasyon formu WhatsApp hazır mesajı açar", async ({ page, context }
     whatsappUrl.includes(`wa.me/${configuredWhatsAppNumber}`) || whatsappUrl.includes(`phone=${configuredWhatsAppNumber}`)
   ).toBe(true);
   expect(readableWhatsappUrl).toContain("Demo Misafir");
+  expect(readableWhatsappUrl).toContain("12 Temmuz 2030");
+  expect(readableWhatsappUrl).not.toContain("2030-07-12");
 });

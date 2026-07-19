@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { buildCustomerRequestWhatsAppMessage, createWhatsAppUrl } from "@yardimci-asistan/whatsapp-bridge";
 import {
   BedDouble,
+  CalendarDays,
   CalendarPlus,
+  Check,
   Coffee,
   Download,
   Home,
@@ -10,12 +12,16 @@ import {
   MapPin,
   Menu as MenuIcon,
   MessageCircle,
+  MessageSquareText,
+  Minus,
   MonitorDown,
   Navigation,
   Phone,
+  Plus,
   Send,
   Settings,
   ShieldCheck,
+  Sparkles,
   Smartphone,
   UtensilsCrossed,
   Users
@@ -55,9 +61,16 @@ const navItems: Array<{ key: PageKey; label: string; icon: typeof Home }> = [
   { key: "gallery", label: "Galeri", icon: Images },
   { key: "location", label: "Ulaşım", icon: MapPin },
   { key: "contact", label: "İletişim", icon: Phone },
-  { key: "request", label: "Talep Oluştur", icon: CalendarPlus },
-  { key: "settings", label: "Ayarlar", icon: Settings }
+  { key: "request", label: "Talep Oluştur", icon: CalendarPlus }
 ];
+
+const pageKeys: PageKey[] = ["home", "rooms", "restaurant", "menu", "gallery", "location", "contact", "request", "settings"];
+
+const requestTypeOptions = [
+  { value: "pension_reservation", label: "Oda rezervasyonu", icon: BedDouble },
+  { value: "restaurant_reservation", label: "Masa talebi", icon: UtensilsCrossed },
+  { value: "general_info", label: "Bilgi al", icon: MessageSquareText }
+] as const;
 
 const serviceIcons = {
   bed: BedDouble,
@@ -66,7 +79,7 @@ const serviceIcons = {
 };
 
 function App() {
-  const [activePage, setActivePage] = useState<PageKey>("home");
+  const [activePage, setActivePage] = useState<PageKey>(() => getPageFromLocation());
   const themeStyle = {
     "--primary": business.colors.primary,
     "--accent": business.colors.accent,
@@ -75,8 +88,21 @@ function App() {
 
   useDemoWidget();
 
+  useEffect(() => {
+    const syncPageFromLocation = () => {
+      setActivePage(getPageFromLocation());
+      window.scrollTo({ top: 0 });
+    };
+
+    window.addEventListener("popstate", syncPageFromLocation);
+    return () => window.removeEventListener("popstate", syncPageFromLocation);
+  }, []);
+
   function goToPage(page: PageKey) {
     setActivePage(page);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.hash = page === "home" ? "" : page;
+    window.history.pushState({ page }, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -427,6 +453,7 @@ function RequestPage() {
   const [lastMessage, setLastMessage] = useState("");
   const [submitState, setSubmitState] = useState<RequestSubmitState>("idle");
   const [submitMessage, setSubmitMessage] = useState("");
+  const selectedRequestType = requestTypeOptions.find((option) => option.value === form.requestType) ?? requestTypeOptions[0];
 
   function updateField(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -453,65 +480,240 @@ function RequestPage() {
   }
 
   return (
-    <PageShell title="Rezervasyon / Bilgi Al" text="Talebinizi kısa bilgilerle iletin; işletme müsaitlik ve detayları kontrol edip size dönüş yapsın.">
-      <form className="request-form" onSubmit={handleSubmit}>
-        <label>
-          Talep türü
-          <select value={form.requestType} onChange={(event) => updateField("requestType", event.target.value)}>
-            <option value="pension_reservation">Pansiyon rezervasyonu</option>
-            <option value="restaurant_reservation">Masa rezervasyonu</option>
-            <option value="general_info">Bilgi almak istiyorum</option>
-          </select>
-        </label>
-        <label>
-          Ad soyad
-          <input required value={form.name} onChange={(event) => updateField("name", event.target.value)} placeholder="Adınız soyadınız" />
-        </label>
-        <label>
-          Telefon
-          <input required value={form.phone} onChange={(event) => updateField("phone", event.target.value)} placeholder="05xx xxx xx xx" inputMode="tel" />
-        </label>
-        <label>
-          Tarih
-          <input required type="date" value={form.date} onChange={(event) => updateField("date", event.target.value)} />
-        </label>
-        {form.requestType === "restaurant_reservation" && (
-          <label>
-            Saat
-            <input type="time" value={form.time} onChange={(event) => updateField("time", event.target.value)} />
+    <PageShell
+      className="request-page"
+      title="Talebinizi birlikte hazırlayalım"
+      text="Birkaç kısa seçim yapın; mesajınızı WhatsApp'ta hazır açalım. Müsaitlik ve son onay işletme tarafından verilir."
+    >
+      <section className="request-workspace">
+        <form className="request-form" onSubmit={handleSubmit}>
+          <div className="request-form-heading wide-field">
+            <span className="request-form-icon" aria-hidden="true">
+              <Sparkles size={20} />
+            </span>
+            <div>
+              <p className="eyebrow">Hızlı Talep</p>
+              <h2>{selectedRequestType.label}</h2>
+            </div>
+          </div>
+
+          <fieldset className="request-choice-group wide-field">
+            <legend>Size nasıl yardımcı olalım?</legend>
+            <div className="request-type-options">
+              {requestTypeOptions.map((option) => {
+                const Icon = option.icon;
+                const isActive = form.requestType === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={isActive ? "request-type-option is-active" : "request-type-option"}
+                    aria-pressed={isActive}
+                    onClick={() => updateField("requestType", option.value)}
+                  >
+                    <Icon size={17} aria-hidden="true" />
+                    {option.label}
+                    {isActive && <Check className="request-option-check" size={15} aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <DateQuickPicker value={form.date} onChange={(value) => updateField("date", value)} />
+
+          <label className="form-field">
+            <span>Ad soyad</span>
+            <input
+              required
+              autoComplete="name"
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              placeholder="Adınız soyadınız"
+            />
           </label>
-        )}
-        <label>
-          Kişi sayısı
-          <input required min="1" type="number" value={form.guests} onChange={(event) => updateField("guests", event.target.value)} />
-        </label>
-        <label className="wide-field">
-          Not
-          <textarea value={form.note} onChange={(event) => updateField("note", event.target.value)} placeholder="Oda tercihi, çocuk sayısı veya masa notu" />
-        </label>
-        <p className="form-note">Formdaki bilgileriniz talebinize dönüş yapılması amacıyla işletmeye iletilir.</p>
-        {submitMessage && (
-          <p className={`form-status status-${submitState}`} role="status">
-            {submitMessage}
+          <label className="form-field">
+            <span>Telefon</span>
+            <input
+              required
+              value={form.phone}
+              onChange={(event) => updateField("phone", event.target.value)}
+              placeholder="05xx xxx xx xx"
+              inputMode="tel"
+              autoComplete="tel"
+            />
+          </label>
+
+          {form.requestType === "restaurant_reservation" && (
+            <label className="form-field">
+              <span>Saat <small>(isteğe bağlı)</small></span>
+              <input type="time" value={form.time} onChange={(event) => updateField("time", event.target.value)} />
+            </label>
+          )}
+
+          <GuestStepper value={form.guests} onChange={(value) => updateField("guests", value)} />
+
+          <label className="form-field wide-field">
+            <span>Kısa not <small>(isteğe bağlı)</small></span>
+            <textarea
+              rows={2}
+              value={form.note}
+              onChange={(event) => updateField("note", event.target.value)}
+              placeholder="Oda tercihi, çocuk sayısı veya masa notu"
+            />
+          </label>
+
+          <p className="form-note">
+            <ShieldCheck size={16} aria-hidden="true" />
+            Bilgileriniz yalnızca talebinize dönüş yapılması için işletmeye iletilir.
           </p>
-        )}
-        <button className="primary-button wide-button" type="submit">
-          <MessageCircle size={18} aria-hidden="true" />
-          WhatsApp'ta Aç
-        </button>
-      </form>
-      <aside className="prepared-message">
-        <h3>Hazır mesaj</h3>
-        <p>WhatsApp açıldığında mesajınız hazır olarak gelecektir. Bilgileri kontrol edip gönder tuşuna basmanız yeterlidir.</p>
-        {lastMessage && <pre>{lastMessage}</pre>}
-      </aside>
+          {submitMessage && (
+            <p className={`form-status status-${submitState}`} role="status">
+              {submitMessage}
+            </p>
+          )}
+          <button className="primary-button wide-button request-submit" type="submit">
+            <MessageCircle size={19} aria-hidden="true" />
+            WhatsApp'ta Aç
+          </button>
+        </form>
+
+        <aside className="prepared-message" aria-live="polite">
+          <div className="prepared-message-heading">
+            <span aria-hidden="true">
+              <MessageCircle size={20} />
+            </span>
+            <div>
+              <p className="eyebrow">Hazır Mesaj</p>
+              <h2>Kontrol sizde</h2>
+            </div>
+          </div>
+          {lastMessage ? (
+            <div className="message-preview-bubble">
+              <strong>WhatsApp mesajınız hazır</strong>
+              <pre>{lastMessage}</pre>
+            </div>
+          ) : (
+            <div className="message-placeholder">
+              <p>Formu tamamladığınızda WhatsApp mesajınız burada hazır görünecek.</p>
+              <ol>
+                <li>Bilgilerinizi seçin.</li>
+                <li>WhatsApp'ta açın.</li>
+                <li>Mesajı kontrol edip gönderin.</li>
+              </ol>
+            </div>
+          )}
+          <p className="prepared-message-trust">
+            <ShieldCheck size={16} aria-hidden="true" />
+            Son müsaitlik ve rezervasyon onayını işletme verir.
+          </p>
+        </aside>
+      </section>
     </PageShell>
+  );
+}
+
+type DatePreset = "today" | "tomorrow" | "weekend" | "custom";
+
+function DateQuickPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const inputId = useId();
+  const [selection, setSelection] = useState<DatePreset | "">("");
+  const today = new Date();
+  const todayIso = toLocalIsoDate(today);
+  const presets: Array<{ key: Exclude<DatePreset, "custom">; label: string; value: string }> = [
+    { key: "today", label: "Bugün", value: todayIso },
+    { key: "tomorrow", label: "Yarın", value: toLocalIsoDate(addLocalDays(today, 1)) },
+    { key: "weekend", label: "Hafta sonu", value: toLocalIsoDate(nextWeekendDate(today)) }
+  ];
+
+  function choosePreset(preset: (typeof presets)[number]) {
+    setSelection(preset.key);
+    onChange(preset.value);
+  }
+
+  return (
+    <fieldset className="request-choice-group date-choice-group wide-field">
+      <legend>Ne zaman?</legend>
+      <div className="date-quick-options">
+        {presets.map((preset) => {
+          const isActive = selection === preset.key;
+          return (
+            <button
+              key={preset.key}
+              type="button"
+              className={isActive ? "date-quick-option is-active" : "date-quick-option"}
+              aria-pressed={isActive}
+              aria-label={`${preset.label}: ${formatTurkishCalendarDate(preset.value)}`}
+              onClick={() => choosePreset(preset)}
+            >
+              {preset.label}
+            </button>
+          );
+        })}
+        <label className={selection === "custom" ? "date-quick-option custom-date-option is-active" : "date-quick-option custom-date-option"} htmlFor={inputId}>
+          <CalendarDays size={17} aria-hidden="true" />
+          <span>{selection === "custom" && value ? formatTurkishCalendarDate(value) : "Tarih seç"}</span>
+          <input
+            id={inputId}
+            className="native-date-control"
+            type="date"
+            required
+            min={todayIso}
+            value={value}
+            aria-label="Tarih seç"
+            onChange={(event) => {
+              setSelection("custom");
+              onChange(event.target.value);
+            }}
+          />
+        </label>
+      </div>
+      <p className="selected-date" aria-live="polite">
+        {value ? `Seçilen tarih: ${formatRequestDate(value)}` : "Tarih seçiminizi hızlı seçeneklerden yapabilirsiniz."}
+      </p>
+    </fieldset>
+  );
+}
+
+function GuestStepper({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const inputId = useId();
+  const parsedValue = Number(value);
+  const safeValue = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 1;
+
+  function step(amount: number) {
+    onChange(String(Math.min(30, Math.max(1, safeValue + amount))));
+  }
+
+  return (
+    <fieldset className="guest-stepper-field">
+      <legend>Kişi sayısı</legend>
+      <div className="guest-stepper">
+        <button type="button" aria-label="Kişi sayısını azalt" onClick={() => step(-1)} disabled={safeValue <= 1}>
+          <Minus size={17} aria-hidden="true" />
+        </button>
+        <input
+          id={inputId}
+          required
+          aria-label="Kişi sayısı"
+          inputMode="numeric"
+          min="1"
+          max="30"
+          type="number"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <button type="button" aria-label="Kişi sayısını artır" onClick={() => step(1)} disabled={safeValue >= 30}>
+          <Plus size={17} aria-hidden="true" />
+        </button>
+      </div>
+    </fieldset>
   );
 }
 
 function SettingsPage() {
   return (
     <PageShell
+      className="settings-page"
       title="Ayarlar"
       text="Yardımcı Asistan masaüstü uygulamasını bu bilgisayara indirip işletme ayarlarınızı yerel olarak yönetin."
     >
@@ -609,9 +811,19 @@ function SectionHeading({ title, text }: { title: string; text: string }) {
   );
 }
 
-function PageShell({ title, text, children }: { title: string; text: string; children: React.ReactNode }) {
+function PageShell({
+  title,
+  text,
+  children,
+  className = ""
+}: {
+  title: string;
+  text: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="page-shell">
+    <section className={`page-shell ${className}`.trim()}>
       <div className="page-title">
         <p className="eyebrow">{business.display_name}</p>
         <h1>{title}</h1>
@@ -661,7 +873,7 @@ function buildRequestMessage(form: {
       request_type: form.requestType,
       customer_name: form.name,
       customer_phone: form.phone,
-      date_text: form.date,
+      date_text: formatRequestDate(form.date),
       time_text: form.time,
       guest_count: form.guests,
       message: form.note
@@ -687,7 +899,7 @@ function toRequestApiPayload(
     request_type: form.requestType,
     customer_name: form.name,
     customer_phone: form.phone,
-    date_text: form.date,
+    date_text: formatRequestDate(form.date),
     start_date: form.date,
     time: form.time,
     guest_count: Number(form.guests),
@@ -746,6 +958,74 @@ async function submitRequestToMiniApi(endpoint: string, payload: Record<string, 
 
 function createWhatsAppLink(phone: string, message: string) {
   return createWhatsAppUrl(phone, message);
+}
+
+function getPageFromLocation(): PageKey {
+  const hashPage = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
+  return pageKeys.includes(hashPage as PageKey) ? (hashPage as PageKey) : "home";
+}
+
+function addLocalDays(date: Date, amount: number) {
+  const nextDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  nextDate.setDate(nextDate.getDate() + amount);
+  return nextDate;
+}
+
+function nextWeekendDate(date: Date) {
+  const day = date.getDay();
+  const daysUntilWeekend = day === 0 || day === 6 ? 0 : 6 - day;
+  return addLocalDays(date, daysUntilWeekend);
+}
+
+function toLocalIsoDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseLocalIsoDate(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatTurkishCalendarDate(value: string) {
+  const date = parseLocalIsoDate(value);
+  if (!date) {
+    return "Tarih seç";
+  }
+
+  const includeYear = date.getFullYear() !== new Date().getFullYear();
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric",
+    month: "long",
+    ...(includeYear ? { year: "numeric" as const } : {})
+  }).format(date);
+}
+
+function formatRequestDate(value: string) {
+  const date = parseLocalIsoDate(value);
+  if (!date) {
+    return value;
+  }
+
+  const calendarDate = formatTurkishCalendarDate(value);
+  const today = toLocalIsoDate(new Date());
+  const tomorrow = toLocalIsoDate(addLocalDays(new Date(), 1));
+
+  if (value === today) {
+    return `Bugün, ${calendarDate}`;
+  }
+  if (value === tomorrow) {
+    return `Yarın, ${calendarDate}`;
+  }
+
+  return calendarDate;
 }
 
 export default App;

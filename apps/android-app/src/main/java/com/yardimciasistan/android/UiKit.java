@@ -1,33 +1,96 @@
 package com.yardimciasistan.android;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 
 final class UiKit {
-  static final int BG = Color.rgb(9, 15, 27);
-  static final int SURFACE = Color.rgb(18, 28, 46);
-  static final int SURFACE_ALT = Color.rgb(24, 36, 58);
-  static final int BORDER = Color.rgb(43, 58, 82);
-  static final int TEXT = Color.rgb(248, 250, 252);
-  static final int MUTED = Color.rgb(148, 163, 184);
-  static final int PRIMARY = Color.rgb(45, 212, 191);
-  static final int PRIMARY_DARK = Color.rgb(19, 78, 74);
-  static final int ACCENT = Color.rgb(251, 146, 60);
-  static final int SUCCESS = Color.rgb(74, 222, 128);
-  static final int WARNING = Color.rgb(250, 204, 21);
-  static final int DANGER = Color.rgb(248, 113, 113);
-  static final int INFO = Color.rgb(96, 165, 250);
+  private static ThemeTokens tokens = ThemeTokens.night();
+
+  static int BG;
+  static int SURFACE;
+  static int CARD;
+  static int SURFACE_ALT;
+  static int BORDER;
+  static int TEXT;
+  static int SECONDARY;
+  static int MUTED;
+  static int PRIMARY;
+  static int PRIMARY_DARK;
+  static int ACCENT_PRESSED;
+  static int ACCENT_TEXT;
+  static int ACCENT;
+  static int ACCENT_TEXT_SECONDARY;
+  static int SUCCESS;
+  static int WARNING;
+  static int DANGER;
+  static int INFO;
+  static int DISABLED_BACKGROUND;
+  static int DISABLED_TEXT;
+  static int BOTTOM_NAV_BACKGROUND;
+  static int BOTTOM_NAV_ACTIVE;
+  static int BOTTOM_NAV_INACTIVE;
+  static int ICON_BUTTON_BACKGROUND;
+  static int ICON_BUTTON_FOREGROUND;
+  static int CHIP_BACKGROUND;
+  static int CHIP_ACTIVE_BACKGROUND;
+  static int CHIP_TEXT;
+  static int CHIP_ACTIVE_TEXT;
+  static int DANGER_BACKGROUND;
+  static int DANGER_TEXT;
+
+  static {
+    applyTheme(tokens);
+  }
 
   private UiKit() {}
+
+  static void applyTheme(ThemeTokens nextTokens) {
+    tokens = nextTokens;
+    BG = tokens.appBackground;
+    SURFACE = tokens.surface;
+    CARD = tokens.cardBackground;
+    SURFACE_ALT = tokens.elevatedCard;
+    BORDER = tokens.border;
+    TEXT = tokens.textPrimary;
+    SECONDARY = tokens.textSecondary;
+    MUTED = tokens.textMuted;
+    PRIMARY = tokens.accent;
+    PRIMARY_DARK = blend(tokens.appBackground, tokens.accent, 0.22f);
+    ACCENT_PRESSED = tokens.accentPressed;
+    ACCENT_TEXT = tokens.accentText;
+    ACCENT = tokens.secondaryAccent;
+    ACCENT_TEXT_SECONDARY = tokens.secondaryAccentText;
+    SUCCESS = tokens.success;
+    WARNING = tokens.warning;
+    DANGER = tokens.danger;
+    INFO = tokens.info;
+    DISABLED_BACKGROUND = tokens.disabledBackground;
+    DISABLED_TEXT = tokens.disabledText;
+    BOTTOM_NAV_BACKGROUND = tokens.bottomNavBackground;
+    BOTTOM_NAV_ACTIVE = tokens.bottomNavActive;
+    BOTTOM_NAV_INACTIVE = tokens.bottomNavInactive;
+    ICON_BUTTON_BACKGROUND = tokens.iconButtonBackground;
+    ICON_BUTTON_FOREGROUND = tokens.iconButtonForeground;
+    CHIP_BACKGROUND = tokens.chipBackground;
+    CHIP_ACTIVE_BACKGROUND = tokens.chipActiveBackground;
+    CHIP_TEXT = tokens.chipText;
+    CHIP_ACTIVE_TEXT = tokens.chipActiveText;
+    DANGER_BACKGROUND = tokens.dangerBackground;
+    DANGER_TEXT = tokens.dangerText;
+  }
 
   static int dp(Context context, int value) {
     return Math.round(value * context.getResources().getDisplayMetrics().density);
@@ -89,7 +152,7 @@ final class UiKit {
   static LinearLayout card(Context context) {
     LinearLayout card = column(context);
     card.setPadding(dp(context, 14), dp(context, 13), dp(context, 14), dp(context, 13));
-    card.setBackground(rounded(context, SURFACE, BORDER, 14));
+    card.setBackground(rounded(context, CARD, BORDER, 14));
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
     params.setMargins(0, 0, 0, dp(context, 9));
     card.setLayoutParams(params);
@@ -107,9 +170,13 @@ final class UiKit {
 
   static Button button(Context context, String label, int tone, View.OnClickListener listener) {
     Button button = new Button(context);
+    boolean primary = tone == PRIMARY;
+    boolean secondaryAccent = tone == ACCENT;
+    int enabledText = primary ? ACCENT_TEXT : (secondaryAccent ? ACCENT_TEXT_SECONDARY : readableTextColor(tone));
+    int pressedFill = primary ? ACCENT_PRESSED : darken(tone, 0.82f);
     button.setText(label);
     button.setTextSize(13);
-    button.setTextColor(tone == PRIMARY ? Color.rgb(4, 47, 46) : TEXT);
+    button.setTextColor(statefulText(enabledText));
     button.setTypeface(Typeface.create("sans", Typeface.BOLD));
     button.setAllCaps(false);
     button.setGravity(Gravity.CENTER);
@@ -117,20 +184,22 @@ final class UiKit {
     button.setMinimumHeight(dp(context, 44));
     button.setPadding(dp(context, 12), 0, dp(context, 12), 0);
     int fill = tone == PRIMARY ? PRIMARY : tone;
-    button.setBackground(rounded(context, fill, Color.TRANSPARENT, 11));
+    button.setBackground(statefulRounded(context, fill, Color.TRANSPARENT, pressedFill, 11));
     button.setOnClickListener(listener);
     return button;
   }
 
   static Button outlineButton(Context context, String label, View.OnClickListener listener) {
-    Button button = button(context, label, SURFACE_ALT, listener);
-    button.setBackground(rounded(context, SURFACE_ALT, BORDER, 11));
+    Button button = button(context, label, ICON_BUTTON_BACKGROUND, listener);
+    button.setTextColor(statefulText(ICON_BUTTON_FOREGROUND));
+    button.setBackground(statefulRounded(context, ICON_BUTTON_BACKGROUND, BORDER, SURFACE, 11));
     return button;
   }
 
   static Button dangerButton(Context context, String label, View.OnClickListener listener) {
-    Button button = button(context, label, Color.rgb(127, 29, 29), listener);
-    button.setBackground(rounded(context, Color.rgb(69, 24, 32), Color.rgb(127, 29, 29), 11));
+    Button button = button(context, label, DANGER_BACKGROUND, listener);
+    button.setTextColor(statefulText(DANGER_TEXT));
+    button.setBackground(statefulRounded(context, DANGER_BACKGROUND, DANGER, darken(DANGER_BACKGROUND, 0.88f), 11));
     return button;
   }
 
@@ -138,13 +207,19 @@ final class UiKit {
     Button button = new Button(context);
     button.setText(label);
     button.setTextSize(12);
-    button.setTextColor(selected ? Color.rgb(4, 47, 46) : TEXT);
+    button.setTextColor(statefulText(selected ? CHIP_ACTIVE_TEXT : CHIP_TEXT));
     button.setTypeface(Typeface.create("sans", Typeface.BOLD));
     button.setAllCaps(false);
     button.setMinHeight(dp(context, 38));
     button.setMinimumHeight(dp(context, 38));
     button.setPadding(dp(context, 13), 0, dp(context, 13), 0);
-    button.setBackground(rounded(context, selected ? PRIMARY : SURFACE_ALT, selected ? PRIMARY : BORDER, 18));
+    button.setBackground(statefulRounded(
+        context,
+        selected ? CHIP_ACTIVE_BACKGROUND : CHIP_BACKGROUND,
+        selected ? PRIMARY : BORDER,
+        selected ? ACCENT_PRESSED : SURFACE,
+        18
+    ));
     button.setOnClickListener(listener);
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(context, 40));
     params.setMargins(0, 0, dp(context, 7), 0);
@@ -157,16 +232,34 @@ final class UiKit {
     button.setText(glyph);
     button.setContentDescription(description);
     button.setTextSize(18);
-    button.setTextColor(selected ? PRIMARY : TEXT);
+    button.setTextColor(statefulText(selected ? PRIMARY : ICON_BUTTON_FOREGROUND));
     button.setTypeface(Typeface.create("sans", Typeface.BOLD));
     button.setAllCaps(false);
     button.setGravity(Gravity.CENTER);
-    button.setMinWidth(dp(context, 44));
     button.setMinimumWidth(dp(context, 44));
-    button.setMinHeight(dp(context, 44));
     button.setMinimumHeight(dp(context, 44));
     button.setPadding(0, 0, 0, 0);
-    button.setBackground(rounded(context, selected ? PRIMARY_DARK : SURFACE_ALT, selected ? PRIMARY : BORDER, 11));
+    button.setBackground(statefulRounded(
+        context,
+        selected ? PRIMARY_DARK : ICON_BUTTON_BACKGROUND,
+        selected ? PRIMARY : BORDER,
+        selected ? blend(PRIMARY_DARK, PRIMARY, 0.18f) : SURFACE,
+        11
+    ));
+    button.setOnClickListener(listener);
+    return button;
+  }
+
+  static ImageButton themeIconButton(Context context, int iconResource, String description, View.OnClickListener listener) {
+    ImageButton button = new ImageButton(context);
+    button.setImageResource(iconResource);
+    button.setImageTintList(statefulText(ICON_BUTTON_FOREGROUND));
+    button.setContentDescription(description);
+    button.setScaleType(ImageButton.ScaleType.CENTER);
+    button.setMinimumWidth(dp(context, 44));
+    button.setMinimumHeight(dp(context, 44));
+    button.setPadding(dp(context, 10), dp(context, 10), dp(context, 10), dp(context, 10));
+    button.setBackground(statefulRounded(context, ICON_BUTTON_BACKGROUND, BORDER, SURFACE, 11));
     button.setOnClickListener(listener);
     return button;
   }
@@ -185,7 +278,13 @@ final class UiKit {
     button.setMinHeight(dp(context, 34));
     button.setMinimumHeight(dp(context, 34));
     button.setPadding(dp(context, 10), 0, dp(context, 10), 0);
-    button.setBackground(rounded(context, withAlpha(tone, 24), withAlpha(tone, 84), 17));
+    button.setBackground(statefulRounded(
+        context,
+        withAlpha(tone, 24),
+        withAlpha(tone, 84),
+        withAlpha(tone, 42),
+        17
+    ));
     button.setOnClickListener(listener);
     LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(context, 36));
     params.setMargins(0, 0, dp(context, 7), 0);
@@ -218,13 +317,37 @@ final class UiKit {
     EditText input = new EditText(context);
     input.setHint(hint);
     input.setHintTextColor(MUTED);
-    input.setTextColor(TEXT);
+    input.setTextColor(statefulText(TEXT));
     input.setTextSize(15);
     input.setSingleLine(true);
     input.setPadding(dp(context, 12), 0, dp(context, 12), 0);
     input.setMinHeight(dp(context, 50));
-    input.setBackground(rounded(context, BG, BORDER, 11));
+    StateListDrawable background = new StateListDrawable();
+    background.addState(new int[] {-android.R.attr.state_enabled}, rounded(context, DISABLED_BACKGROUND, BORDER, 11));
+    background.addState(new int[] {android.R.attr.state_focused}, rounded(context, SURFACE, PRIMARY, 11));
+    background.addState(new int[] {}, rounded(context, SURFACE, BORDER, 11));
+    input.setBackground(background);
     return input;
+  }
+
+  static void styleSwitch(Switch toggle) {
+    int[][] states = {
+        new int[] {-android.R.attr.state_enabled},
+        new int[] {android.R.attr.state_checked},
+        new int[] {}
+    };
+    toggle.setThumbTintList(new ColorStateList(
+        states,
+        new int[] {DISABLED_TEXT, PRIMARY, MUTED}
+    ));
+    toggle.setTrackTintList(new ColorStateList(
+        states,
+        new int[] {
+            withAlpha(DISABLED_BACKGROUND, 180),
+            withAlpha(PRIMARY, 88),
+            withAlpha(BORDER, 150)
+        }
+    ));
   }
 
   static void addAction(LinearLayout row, View action, Context context) {
@@ -238,5 +361,59 @@ final class UiKit {
 
   static int withAlpha(int color, int alpha) {
     return Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color));
+  }
+
+  private static ColorStateList statefulText(int enabledColor) {
+    return new ColorStateList(
+        new int[][] {
+            new int[] {-android.R.attr.state_enabled},
+            new int[] {}
+        },
+        new int[] {DISABLED_TEXT, enabledColor}
+    );
+  }
+
+  private static StateListDrawable statefulRounded(
+      Context context,
+      int fill,
+      int stroke,
+      int pressedFill,
+      int radius
+  ) {
+    StateListDrawable drawable = new StateListDrawable();
+    drawable.addState(
+        new int[] {-android.R.attr.state_enabled},
+        rounded(context, DISABLED_BACKGROUND, BORDER, radius)
+    );
+    drawable.addState(
+        new int[] {android.R.attr.state_pressed},
+        rounded(context, pressedFill, stroke, radius)
+    );
+    drawable.addState(new int[] {}, rounded(context, fill, stroke, radius));
+    return drawable;
+  }
+
+  private static int blend(int base, int overlay, float overlayRatio) {
+    float ratio = Math.max(0f, Math.min(1f, overlayRatio));
+    return Color.rgb(
+        Math.round(Color.red(base) * (1f - ratio) + Color.red(overlay) * ratio),
+        Math.round(Color.green(base) * (1f - ratio) + Color.green(overlay) * ratio),
+        Math.round(Color.blue(base) * (1f - ratio) + Color.blue(overlay) * ratio)
+    );
+  }
+
+  private static int darken(int color, float ratio) {
+    return Color.rgb(
+        Math.round(Color.red(color) * ratio),
+        Math.round(Color.green(color) * ratio),
+        Math.round(Color.blue(color) * ratio)
+    );
+  }
+
+  private static int readableTextColor(int background) {
+    double luminance = 0.2126 * Color.red(background)
+        + 0.7152 * Color.green(background)
+        + 0.0722 * Color.blue(background);
+    return luminance > 150 ? ACCENT_TEXT : TEXT;
   }
 }
