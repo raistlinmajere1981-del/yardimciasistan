@@ -331,13 +331,21 @@ adb devices komutu ile cihaz görünür.
 Android debug APK üretmek için:
 
 ```bash
-npm run build:android
+npm run android:debug
 ```
 
 APK çıktısı:
 
 ```text
 apps/android-app/build/outputs/apk/debug/yardimci-asistan-debug.apk
+```
+
+USB debugging gerektirmeyen pilot release APK, Play Store AAB, signing ve sürüm
+yönetimi için `docs/ANDROID_DISTRIBUTION.md` rehberini kullanın:
+
+```bash
+npm run android:release-apk
+npm run android:release-aab
 ```
 
 Gerçek telefonda yerel canlı test için:

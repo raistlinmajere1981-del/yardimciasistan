@@ -24,7 +24,7 @@ files:
 extraMetadata:
   main: dist-electron/main.js
   name: yardimci-asistan-desktop
-  version: 0.1.0
+  version: 0.1.1
 
 win:
   icon: assets/app-icon.ico

@@ -1,8 +1,8 @@
-var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation:"Pansiyon rezervasyonu",restaurant_reservation:"Masa rezervasyonu",general_info:"Bilgi talebi"},I=/^5\d{9}$/,O="Telefon numarası Türkiye cep telefonu formatında olmalı. Örnek: 05xx xxx xx xx";function Y(e,a){const t=T(e);if(!t.ok)return{ok:!1,mode:"wa_link",code:"invalid_phone",message:t.error};const i=a.trim();if(!i)return{ok:!1,mode:"wa_link",code:"empty_message",message:"WhatsApp mesajı boş olmamalı."};const r=encodeURIComponent(i);return{ok:!0,mode:"wa_link",url:`https://wa.me/${t.whatsapp}?text=${r}`,whatsappPhone:t.whatsapp,phoneDisplay:t.display,message:i,encodedMessage:r}}function U(e,a){const t=Y(e,a);return t.ok?t.url:""}function F(e,a){const t=R[e.request_type]??"Bilgi talebi";return[`Merhaba, ${a} için talep oluşturmak istiyorum.`,`Talep türü: ${t}`,`Ad soyad: ${e.customer_name}`,`Telefon: ${e.customer_phone}`,`Tarih: ${e.date_text}`,e.time_text?`Saat: ${e.time_text}`:"",`Kişi sayısı: ${e.guest_count}`,e.message?`Not: ${e.message}`:"","Lütfen bilgileri kontrol edip gönder tuşuna basın."].filter(Boolean).join(`
-`)}function T(e){const a=A(e);return a.ok?{ok:!0,whatsapp:a.whatsapp,e164:a.e164,national:a.national,display:K(e)}:{ok:!1,error:a.error}}function A(e){const t=e.trim().replace(/[^\d+]/g,"").replace(/^00/,"+"),i=H(t);return!i||!I.test(i)?{ok:!1,error:O}:{ok:!0,e164:`+90${i}`,national:i,whatsapp:`90${i}`}}function K(e){const a=A(e);if(!a.ok)return e.trim();const t=a.national.slice(0,3),i=a.national.slice(3,6),r=a.national.slice(6,8),s=a.national.slice(8,10);return`+90 ${t} ${i} ${r} ${s}`}function H(e){return e.startsWith("+90")?e.slice(3):e.startsWith("90")&&e.length===12?e.slice(2):e.startsWith("0")&&e.length===11?e.slice(1):e.length===10?e:null}const p="yardimci-asistan-widget",q="yardimci-asistan-widget-style",_={businessName:"Yardımcı Asistan",whatsappPhone:"",apiBaseUrl:"",menuUrl:"",logoUrl:"",primaryColor:"#2F6F5E",accentColor:"#E47863"},Z=C();let d={..._},n={isOpen:!1,view:"home",requestType:"pension_reservation",status:"",aiAnswer:"",aiLoading:!1,questionDraft:"",whatsappDraft:"",whatsappTopic:""};function w(e={}){d={..._,...Z,...C(),...e},ye(d),m()}function k(){n={...n,isOpen:!0,status:""},m(),x("[data-ya-close]")}function f(){n={...n,isOpen:!1,view:"home",status:"",aiLoading:!1,aiAnswer:""},m(),x("[data-ya-open]")}function b(e,a){return U(e,a)}function M(e,a=d.businessName){return F(e,a)}function L(e){const a=T(e);return a.ok?{ok:!0,whatsapp:a.whatsapp}:{ok:!1,error:a.error}}function m(){const e=ge();e.innerHTML=n.isOpen?V():G(),ie(e)}function G(){return`
+var YardimciAsistanWidget=(function(y){"use strict";const F={pension_reservation:"Pansiyon rezervasyonu",restaurant_reservation:"Masa rezervasyonu",general_info:"Bilgi talebi"},U=/^5\d{9}$/,K="Telefon numarası Türkiye cep telefonu formatında olmalı. Örnek: 05xx xxx xx xx";function H(e,t){const a=T(e);if(!a.ok)return{ok:!1,mode:"wa_link",code:"invalid_phone",message:a.error};const i=t.trim();if(!i)return{ok:!1,mode:"wa_link",code:"empty_message",message:"WhatsApp mesajı boş olmamalı."};const r=encodeURIComponent(i);return{ok:!0,mode:"wa_link",url:`https://wa.me/${a.whatsapp}?text=${r}`,whatsappPhone:a.whatsapp,phoneDisplay:a.display,message:i,encodedMessage:r}}function Z(e,t){const a=H(e,t);return a.ok?a.url:""}function G(e,t){const a=F[e.request_type]??"Bilgi talebi";return[`Merhaba, ${t} için talep oluşturmak istiyorum.`,`Talep türü: ${a}`,`Ad soyad: ${e.customer_name}`,`Telefon: ${e.customer_phone}`,`Tarih: ${e.date_text}`,e.time_text?`Saat: ${e.time_text}`:"",`Kişi sayısı: ${e.guest_count}`,e.message?`Not: ${e.message}`:"","Lütfen bilgileri kontrol edip gönder tuşuna basın."].filter(Boolean).join(`
+`)}function T(e){const t=q(e);return t.ok?{ok:!0,whatsapp:t.whatsapp,e164:t.e164,national:t.national,display:V(e)}:{ok:!1,error:t.error}}function q(e){const a=e.trim().replace(/[^\d+]/g,"").replace(/^00/,"+"),i=J(a);return!i||!U.test(i)?{ok:!1,error:K}:{ok:!0,e164:`+90${i}`,national:i,whatsapp:`90${i}`}}function V(e){const t=q(e);if(!t.ok)return e.trim();const a=t.national.slice(0,3),i=t.national.slice(3,6),r=t.national.slice(6,8),s=t.national.slice(8,10);return`+90 ${a} ${i} ${r} ${s}`}function J(e){return e.startsWith("+90")?e.slice(3):e.startsWith("90")&&e.length===12?e.slice(2):e.startsWith("0")&&e.length===11?e.slice(1):e.length===10?e:null}const p="yardimci-asistan-widget",M="yardimci-asistan-widget-style",_={businessName:"Yardımcı Asistan",whatsappPhone:"",apiBaseUrl:"",menuUrl:"",logoUrl:"",primaryColor:"#2F6F5E",accentColor:"#E47863"},Q=C();let d={..._},n={isOpen:!1,view:"home",requestType:"pension_reservation",status:"",aiAnswer:"",aiLoading:!1,questionDraft:"",whatsappDraft:"",whatsappTopic:""},L=!1,k=0;function w(e={}){d={..._,...Q,...C(),...e},fe(d),m()}function $(){n={...n,isOpen:!0,status:""},m(),x("[data-ya-close]")}function f(){n={...n,isOpen:!1,view:"home",status:"",aiLoading:!1,aiAnswer:""},m(),x("[data-ya-open]")}function b(e,t){return Z(e,t)}function E(e,t=d.businessName){return G(e,t)}function D(e){const t=T(e);return t.ok?{ok:!0,whatsapp:t.whatsapp}:{ok:!1,error:t.error}}function m(){const e=we();e.innerHTML=n.isOpen?ee():X(),oe(e),ke(),W()}function X(){return`
     <button class="ya-widget-button" type="button" data-ya-open aria-label="Yardımcı Asistan'ı aç">
       <span class="ya-widget-launcher-avatar">
-        ${D()}
+        ${P()}
         <span class="ya-widget-online-dot" aria-hidden="true"></span>
       </span>
       <span class="ya-widget-launcher-copy">
@@ -11,16 +11,16 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
       </span>
       ${o("sparkles","ya-widget-launcher-sparkle")}
     </button>
-  `}function V(){return`
+  `}function ee(){return`
     <section class="ya-widget-panel" role="dialog" aria-labelledby="ya-widget-title">
       <header class="ya-widget-header">
         <div class="ya-widget-identity">
           <span class="ya-widget-avatar">
-            ${D()}
+            ${P()}
             <span class="ya-widget-avatar-spark" aria-hidden="true">${o("sparkles")}</span>
           </span>
           <span class="ya-widget-title-copy">
-            <strong id="ya-widget-title">${c(ue())}</strong>
+            <strong id="ya-widget-title">${c(he())}</strong>
             <small>Rezervasyon, masa ve bilgi taleplerinizi hızlıca hazırlayayım.</small>
           </span>
         </div>
@@ -29,14 +29,14 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         </button>
       </header>
       <div class="ya-widget-content">
-        ${n.view==="home"?J():""}
-        ${n.view==="form"?Q():""}
-        ${n.view==="info"?ae():""}
-        ${n.view==="whatsapp"?te():""}
+        ${n.view==="home"?te():""}
+        ${n.view==="form"?ae():""}
+        ${n.view==="info"?re():""}
+        ${n.view==="whatsapp"?se():""}
         <p class="ya-widget-status" data-ya-status role="status" ${n.status?"":"hidden"}>${c(n.status)}</p>
       </div>
     </section>
-  `}function D(){return d.logoUrl?`<img class="ya-widget-mark" src="${v(d.logoUrl)}" alt="" aria-hidden="true" />`:'<span class="ya-widget-mark ya-widget-mark-fallback">AI</span>'}function J(){return`
+  `}function P(){return d.logoUrl?`<img class="ya-widget-mark" src="${v(d.logoUrl)}" alt="" aria-hidden="true" />`:'<span class="ya-widget-mark ya-widget-mark-fallback">AI</span>'}function te(){return`
     <div class="ya-widget-home">
       <div class="ya-widget-welcome">
         <span class="ya-widget-bot-bubble" aria-hidden="true">${o("bot")}</span>
@@ -73,19 +73,19 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         <span>Bilgileriniz işletmeye iletilir, son onayı işletme yapar.</span>
       </p>
     </div>
-  `}function Q(){const e=n.requestType==="restaurant_reservation",a=e?"Masa talebi":"Rezervasyon talebi",t=e?"Masa talebinizi hazırlayalım":"Rezervasyonunuzu hazırlayalım";return`
+  `}function ae(){const e=n.requestType==="restaurant_reservation",t=e?"Masa talebi":"Rezervasyon talebi",a=e?"Masa talebinizi hazırlayalım":"Rezervasyonunuzu hazırlayalım";return`
     <div class="ya-widget-subview">
-      ${$(a,e?"table":"calendar")}
+      ${z(t,e?"table":"calendar")}
       <div class="ya-widget-subview-intro">
         <span aria-hidden="true">${o("sparkles")}</span>
         <div>
-          <h2 class="ya-widget-view-title" tabindex="-1">${t}</h2>
+          <h2 class="ya-widget-view-title" tabindex="-1">${a}</h2>
           <p>Sadece gerekli bilgileri ekleyin; mesajınız WhatsApp'ta hazır açılsın.</p>
         </div>
       </div>
       <form class="ya-widget-form" data-ya-form>
         <input type="hidden" name="request_type" value="${n.requestType}" />
-        ${X()}
+        ${ie()}
         <div class="ya-widget-field-grid">
           <label class="ya-widget-field">
             <span>Ad soyad</span>
@@ -96,7 +96,7 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
             <input name="customer_phone" required inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx" />
           </label>
         </div>
-        ${ee()}
+        ${ne()}
         <label class="ya-widget-field">
           <span>Kısa not <small>(isteğe bağlı)</small></span>
           <textarea name="message" rows="2" placeholder="Tercihiniz veya eklemek istediğiniz kısa not"></textarea>
@@ -108,23 +108,23 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         <p class="ya-widget-form-note">${o("shield")} Bilgileriniz yalnızca talebinize dönüş yapılması için kullanılır.</p>
       </form>
     </div>
-  `}function X(){const e=new Date,a=z(e),t=z(W(e,1)),i=z(fe(e));return`
+  `}function ie(){const e=new Date,t=S(e),a=S(R(e,1)),i=S($e(e));return`
     <fieldset class="ya-widget-date-group">
       <legend>Ne zaman?</legend>
       <div class="ya-widget-date-options">
-        <button type="button" data-ya-date-preset="today" data-ya-date-value="${a}" aria-pressed="false">Bugün</button>
-        <button type="button" data-ya-date-preset="tomorrow" data-ya-date-value="${t}" aria-pressed="false">Yarın</button>
+        <button type="button" data-ya-date-preset="today" data-ya-date-value="${t}" aria-pressed="false">Bugün</button>
+        <button type="button" data-ya-date-preset="tomorrow" data-ya-date-value="${a}" aria-pressed="false">Yarın</button>
         <button type="button" data-ya-date-preset="weekend" data-ya-date-value="${i}" aria-pressed="false">Hafta sonu</button>
         <label class="ya-widget-date-custom" data-ya-date-custom>
           ${o("calendar")}
           <span data-ya-custom-date-label>Tarih seç</span>
-          <input name="date_iso" type="date" min="${a}" required aria-label="Tarih seç" />
+          <input name="date_iso" type="date" min="${t}" required aria-label="Tarih seç" />
         </label>
         <input name="date_text" type="hidden" />
       </div>
       <p data-ya-selected-date aria-live="polite">Tarih seçiminizi yukarıdan yapın.</p>
     </fieldset>
-  `}function ee(){return`
+  `}function ne(){return`
     <fieldset class="ya-widget-guest-group">
       <legend>Kişi sayısı</legend>
       <div class="ya-widget-stepper">
@@ -133,9 +133,9 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         <button type="button" data-ya-guest-step="1" aria-label="Kişi sayısını artır">${o("plus")}</button>
       </div>
     </fieldset>
-  `}function ae(){const e=["Oda fiyatları","Kahvaltı saatleri","Konum","Masa var mı?","Çocuk uygun mu?"];return`
+  `}function re(){const e=["Oda fiyatları","Kahvaltı saatleri","Konum","Masa var mı?","Çocuk uygun mu?"];return`
     <div class="ya-widget-subview ya-widget-info">
-      ${$("Bilgi al","help")}
+      ${z("Bilgi al","help")}
       <div class="ya-widget-subview-intro">
         <span aria-hidden="true">${o("bot")}</span>
         <div>
@@ -144,7 +144,7 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         </div>
       </div>
       <div class="ya-widget-suggestions" role="group" aria-label="Sık sorulan sorular">
-        ${e.map(a=>`<button type="button" data-ya-question-suggestion="${v(a)}">${c(a)}</button>`).join("")}
+        ${e.map(t=>`<button type="button" data-ya-question-suggestion="${v(t)}">${c(t)}</button>`).join("")}
       </div>
       <form class="ya-widget-ai" data-ya-ai-form>
         <label class="ya-widget-field">
@@ -168,9 +168,9 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
             </div>`:""}
       <p class="ya-widget-trust ya-widget-inline-trust">${o("shield")} Kesin fiyat ve müsaitlik bilgisini işletme onaylar.</p>
     </div>
-  `}function te(){const e=[{key:"reservation",label:"Rezervasyon soracağım",message:`Merhaba, ${d.businessName} için oda müsaitliği ve rezervasyon hakkında bilgi almak istiyorum.`},{key:"table",label:"Masa soracağım",message:`Merhaba, ${d.businessName} için masa müsaitliği hakkında bilgi almak istiyorum.`},{key:"menu",label:"Menü hakkında soracağım",message:`Merhaba, ${d.businessName} menüsü hakkında bilgi almak istiyorum.`},{key:"custom",label:"Kendi mesajımı yazacağım",message:""}];return`
+  `}function se(){const e=[{key:"reservation",label:"Rezervasyon soracağım",message:`Merhaba, ${d.businessName} için oda müsaitliği ve rezervasyon hakkında bilgi almak istiyorum.`},{key:"table",label:"Masa soracağım",message:`Merhaba, ${d.businessName} için masa müsaitliği hakkında bilgi almak istiyorum.`},{key:"menu",label:"Menü hakkında soracağım",message:`Merhaba, ${d.businessName} menüsü hakkında bilgi almak istiyorum.`},{key:"custom",label:"Kendi mesajımı yazacağım",message:""}];return`
     <div class="ya-widget-subview ya-widget-whatsapp-view">
-      ${$("WhatsApp","whatsapp")}
+      ${z("WhatsApp","whatsapp")}
       <div class="ya-widget-subview-intro">
         <span aria-hidden="true">${o("whatsapp")}</span>
         <div>
@@ -179,14 +179,14 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         </div>
       </div>
       <div class="ya-widget-topic-chips" role="group" aria-label="WhatsApp mesaj konusu">
-        ${e.map(a=>`
+        ${e.map(t=>`
               <button
                 type="button"
-                data-ya-whatsapp-topic="${a.key}"
-                data-ya-whatsapp-message="${v(a.message)}"
-                aria-pressed="${n.whatsappTopic===a.key?"true":"false"}"
-                class="${n.whatsappTopic===a.key?"is-active":""}"
-              >${c(a.label)}</button>
+                data-ya-whatsapp-topic="${t.key}"
+                data-ya-whatsapp-message="${v(t.message)}"
+                aria-pressed="${n.whatsappTopic===t.key?"true":"false"}"
+                class="${n.whatsappTopic===t.key?"is-active":""}"
+              >${c(t.label)}</button>
             `).join("")}
       </div>
       <form class="ya-widget-direct-whatsapp" data-ya-whatsapp-form>
@@ -204,20 +204,21 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         </button>
       </form>
     </div>
-  `}function $(e,a){return`
+  `}function z(e,t){return`
     <div class="ya-widget-subview-nav">
       <button type="button" data-ya-view="home">${o("arrow-left")}<span>Geri</span></button>
-      <span class="ya-widget-active-flow">${o(a)} ${c(e)}</span>
+      <span class="ya-widget-active-flow">${o(t)} ${c(e)}</span>
     </div>
-  `}function ie(e){e.querySelector("[data-ya-open]")?.addEventListener("click",k),e.querySelector("[data-ya-close]")?.addEventListener("click",f),e.querySelectorAll("[data-ya-view]").forEach(a=>{a.addEventListener("click",()=>{n={...n,isOpen:!0,view:a.dataset.yaView,status:"",aiLoading:!1},m(),x(".ya-widget-view-title")})}),e.querySelectorAll("[data-ya-request-type]").forEach(a=>{a.addEventListener("click",()=>{n={...n,view:"form",requestType:a.dataset.yaRequestType,status:""},m(),x(".ya-widget-view-title")})}),ne(e),re(e),se(e),oe(e),e.querySelector("[data-ya-form]")?.addEventListener("submit",de),e.querySelector("[data-ya-ai-form]")?.addEventListener("submit",le),e.querySelector("[data-ya-whatsapp-form]")?.addEventListener("submit",ce),e.onkeydown=a=>{a.key==="Escape"&&n.isOpen&&(a.preventDefault(),f())}}function ne(e){e.querySelectorAll("[data-ya-date-preset]").forEach(a=>{a.addEventListener("click",()=>{const t=a.dataset.yaDatePreset,i=String(a.dataset.yaDateValue??"");E(e,t,i)})}),e.querySelector('input[name="date_iso"]')?.addEventListener("change",a=>{const t=a.currentTarget;E(e,"custom",t.value)})}function E(e,a,t){const i=e.querySelector('input[name="date_iso"]'),r=e.querySelector('input[name="date_text"]'),s=e.querySelector("[data-ya-date-custom]"),g=e.querySelector("[data-ya-custom-date-label]"),l=e.querySelector("[data-ya-selected-date]");if(!i||!r||!t)return;const h=xe(t,a);i.value=t,r.value=h,e.querySelectorAll("[data-ya-date-preset]").forEach(S=>{const B=S.dataset.yaDatePreset===a;S.classList.toggle("is-active",B),S.setAttribute("aria-pressed",String(B))}),s?.classList.toggle("is-active",a==="custom"),g&&(g.textContent=a==="custom"?P(t):"Tarih seç"),l&&(l.textContent=`Seçilen tarih: ${h}`)}function re(e){const a=e.querySelector('input[name="guest_count"]');if(!a)return;const t=()=>{const i=N(a.value);e.querySelectorAll("[data-ya-guest-step]").forEach(r=>{const s=Number(r.dataset.yaGuestStep??0);r.disabled=s<0&&i<=1||s>0&&i>=30})};e.querySelectorAll("[data-ya-guest-step]").forEach(i=>{i.addEventListener("click",()=>{const r=Number(i.dataset.yaGuestStep??0);a.value=String(Math.min(30,Math.max(1,N(a.value)+r))),t()})}),a.addEventListener("input",t),t()}function se(e){const a=e.querySelector(".ya-widget-ai textarea");a&&(a.addEventListener("input",()=>{n.questionDraft=a.value}),e.querySelectorAll("[data-ya-question-suggestion]").forEach(t=>{t.addEventListener("click",()=>{const i=String(t.dataset.yaQuestionSuggestion??"");a.value=i,n.questionDraft=i,e.querySelectorAll("[data-ya-question-suggestion]").forEach(r=>r.classList.remove("is-active")),t.classList.add("is-active"),a.focus()})}),e.querySelector("[data-ya-ai-whatsapp]")?.addEventListener("click",()=>{const t=a.value.trim()||"Bilgi almak istiyorum.";n.questionDraft=a.value;const i=`Merhaba, ${d.businessName} hakkında bilgi almak istiyorum. Sorum: ${t}`;window.open(b(d.whatsappPhone,i),"_blank","noopener,noreferrer"),u("Sorunuz WhatsApp mesajı olarak hazırlandı.")}))}function oe(e){const a=e.querySelector(".ya-widget-direct-whatsapp textarea"),t=e.querySelector("[data-ya-message-preview]");if(!a||!t)return;const i=()=>{n.whatsappDraft=a.value,t.textContent=a.value.trim()||"Mesajınızı yazdığınızda burada görünecek."};a.addEventListener("input",()=>{n.whatsappTopic="custom",e.querySelectorAll("[data-ya-whatsapp-topic]").forEach(r=>{const s=r.dataset.yaWhatsappTopic==="custom";r.classList.toggle("is-active",s),r.setAttribute("aria-pressed",String(s))}),i()}),e.querySelectorAll("[data-ya-whatsapp-topic]").forEach(r=>{r.addEventListener("click",()=>{const s=String(r.dataset.yaWhatsappTopic??""),g=String(r.dataset.yaWhatsappMessage??"");n.whatsappTopic=s,a.value=g,i(),e.querySelectorAll("[data-ya-whatsapp-topic]").forEach(l=>{const h=l===r;l.classList.toggle("is-active",h),l.setAttribute("aria-pressed",String(h))}),a.focus()})})}function de(e){e.preventDefault();const a=e.currentTarget,t=new FormData(a),i=String(t.get("customer_phone")??""),r=L(i);if(!r.ok){u(r.error),a.querySelector('input[name="customer_phone"]')?.focus();return}const s={request_type:String(t.get("request_type")??n.requestType),customer_name:String(t.get("customer_name")??"").trim(),customer_phone:i.trim(),date_text:String(t.get("date_text")??"").trim(),start_date:String(t.get("date_iso")??"").trim(),guest_count:Number(t.get("guest_count")??1),message:String(t.get("message")??"").trim(),source:"web_form",whatsapp_message:""};if(!s.customer_name||!s.date_text&&!s.start_date||!Number.isFinite(s.guest_count)||s.guest_count<1){u("Lütfen gerekli alanları kontrol edin.");return}s.whatsapp_message=M(s),pe(s),window.open(b(d.whatsappPhone,s.whatsapp_message),"_blank","noopener,noreferrer"),u("WhatsApp mesajı hazırlandı. Bilgileri kontrol edip gönder tuşuna basın.")}async function pe(e){if(d.apiBaseUrl)try{const a=`${d.apiBaseUrl.replace(/\/$/,"")}/api/request.php`;if(!(await fetch(a,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(e),keepalive:!0})).ok)throw new Error("request_failed")}catch{u("Talep kaydı sırasında sorun oldu. WhatsApp mesajınız yine de hazırlandı.")}}async function le(e){e.preventDefault();const a=e.currentTarget,t=new FormData(a),i=String(t.get("message")??"").trim();if(!i){u("Lütfen kısa sorunuzu yazın.");return}if(!d.apiBaseUrl){u("AI bağlantısı bu sitede etkin değil. Sorunuzu WhatsApp'tan iletebilirsiniz.");return}n={...n,questionDraft:i,status:"Yanıt hazırlanıyor.",aiLoading:!0},m();let r="";try{const s=`${d.apiBaseUrl.replace(/\/$/,"")}/api/chat.php`,g=await fetch(s,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:i})}),l=await g.json().catch(()=>null);if(!g.ok||!l?.ok||!l.answer)throw r=j(l?.error,l?.message),new Error("ai_failed");n={...n,aiAnswer:l.answer,aiLoading:!1,status:l.fallback?j(l.error):""},m()}catch{n={...n,aiLoading:!1,status:r||"AI servisine ulaşılamadı. İnternet veya sunucu bağlantısını kontrol edin. Hata kodu: widget_connection_failed."},m()}}function ce(e){e.preventDefault();const a=e.currentTarget,t=new FormData(a),i=String(t.get("message")??"").trim();if(!i){u("Lütfen bir konu seçin veya kısa mesajınızı yazın.");return}n.whatsappDraft=i,window.open(b(d.whatsappPhone,i),"_blank","noopener,noreferrer"),u("Mesajınız WhatsApp'ta hazırlandı.")}function u(e){n.status=e;const a=document.querySelector(`#${p} [data-ya-status]`);a&&(a.textContent=e,a.hidden=!e)}function j(e,a=""){const t=String(e?.message||a||"AI yanıtı alınamadı.").trim(),i=String(e?.code||"unknown_ai_error").trim(),r=Number(e?.provider_status||0),s=r>0?` (HTTP ${r})`:"",g=e?.retryable===!0?" Biraz sonra yeniden deneyebilirsiniz.":"";return`${t} Hata kodu: ${i}${s}.${g}`}function ue(){const a=(d.businessName.trim()||"Yardımcı").replace(/\s+(?:Pansiyon|Otel|Butik Otel|Restoran|Kafe)(?:\s*(?:&|\/)\s*(?:Pansiyon|Otel|Restoran|Kafe))*\s*$/i,"").trim();return`${a&&a.toLocaleLowerCase("tr-TR")!=="yardımcı asistan"?a:"Yardımcı"} AI Asistanı`}function ge(){const e=document.getElementById(p);if(e)return e;const a=document.createElement("div");return a.id=p,document.body.appendChild(a),a}function ye(e){let a=document.getElementById(q);a||(a=document.createElement("style"),a.id=q,document.head.appendChild(a)),a.textContent=me(e)}function me(e){return`
+  `}function oe(e){e.querySelector("[data-ya-open]")?.addEventListener("click",$),e.querySelector("[data-ya-close]")?.addEventListener("click",f),e.querySelectorAll("[data-ya-view]").forEach(t=>{t.addEventListener("click",()=>{n={...n,isOpen:!0,view:t.dataset.yaView,status:"",aiLoading:!1},m(),x(".ya-widget-view-title")})}),e.querySelectorAll("[data-ya-request-type]").forEach(t=>{t.addEventListener("click",()=>{n={...n,view:"form",requestType:t.dataset.yaRequestType,status:""},m(),x(".ya-widget-view-title")})}),de(e),pe(e),le(e),ce(e),e.querySelector("[data-ya-form]")?.addEventListener("submit",ue),e.querySelector("[data-ya-ai-form]")?.addEventListener("submit",ye),e.querySelector("[data-ya-whatsapp-form]")?.addEventListener("submit",me),e.onkeydown=t=>{t.key==="Escape"&&n.isOpen&&(t.preventDefault(),f())}}function de(e){e.querySelectorAll("[data-ya-date-preset]").forEach(t=>{t.addEventListener("click",()=>{const a=t.dataset.yaDatePreset,i=String(t.dataset.yaDateValue??"");j(e,a,i)})}),e.querySelector('input[name="date_iso"]')?.addEventListener("change",t=>{const a=t.currentTarget;j(e,"custom",a.value)})}function j(e,t,a){const i=e.querySelector('input[name="date_iso"]'),r=e.querySelector('input[name="date_text"]'),s=e.querySelector("[data-ya-date-custom]"),g=e.querySelector("[data-ya-custom-date-label]"),l=e.querySelector("[data-ya-selected-date]");if(!i||!r||!a)return;const h=Se(a,t);i.value=a,r.value=h,e.querySelectorAll("[data-ya-date-preset]").forEach(A=>{const Y=A.dataset.yaDatePreset===t;A.classList.toggle("is-active",Y),A.setAttribute("aria-pressed",String(Y))}),s?.classList.toggle("is-active",t==="custom"),g&&(g.textContent=t==="custom"?O(a):"Tarih seç"),l&&(l.textContent=`Seçilen tarih: ${h}`)}function pe(e){const t=e.querySelector('input[name="guest_count"]');if(!t)return;const a=()=>{const i=I(t.value);e.querySelectorAll("[data-ya-guest-step]").forEach(r=>{const s=Number(r.dataset.yaGuestStep??0);r.disabled=s<0&&i<=1||s>0&&i>=30})};e.querySelectorAll("[data-ya-guest-step]").forEach(i=>{i.addEventListener("click",()=>{const r=Number(i.dataset.yaGuestStep??0);t.value=String(Math.min(30,Math.max(1,I(t.value)+r))),a()})}),t.addEventListener("input",a),a()}function le(e){const t=e.querySelector(".ya-widget-ai textarea");t&&(t.addEventListener("input",()=>{n.questionDraft=t.value}),e.querySelectorAll("[data-ya-question-suggestion]").forEach(a=>{a.addEventListener("click",()=>{const i=String(a.dataset.yaQuestionSuggestion??"");t.value=i,n.questionDraft=i,e.querySelectorAll("[data-ya-question-suggestion]").forEach(r=>r.classList.remove("is-active")),a.classList.add("is-active"),t.focus()})}),e.querySelector("[data-ya-ai-whatsapp]")?.addEventListener("click",()=>{const a=t.value.trim()||"Bilgi almak istiyorum.";n.questionDraft=t.value;const i=`Merhaba, ${d.businessName} hakkında bilgi almak istiyorum. Sorum: ${a}`;window.open(b(d.whatsappPhone,i),"_blank","noopener,noreferrer"),u("Sorunuz WhatsApp mesajı olarak hazırlandı.")}))}function ce(e){const t=e.querySelector(".ya-widget-direct-whatsapp textarea"),a=e.querySelector("[data-ya-message-preview]");if(!t||!a)return;const i=()=>{n.whatsappDraft=t.value,a.textContent=t.value.trim()||"Mesajınızı yazdığınızda burada görünecek."};t.addEventListener("input",()=>{n.whatsappTopic="custom",e.querySelectorAll("[data-ya-whatsapp-topic]").forEach(r=>{const s=r.dataset.yaWhatsappTopic==="custom";r.classList.toggle("is-active",s),r.setAttribute("aria-pressed",String(s))}),i()}),e.querySelectorAll("[data-ya-whatsapp-topic]").forEach(r=>{r.addEventListener("click",()=>{const s=String(r.dataset.yaWhatsappTopic??""),g=String(r.dataset.yaWhatsappMessage??"");n.whatsappTopic=s,t.value=g,i(),e.querySelectorAll("[data-ya-whatsapp-topic]").forEach(l=>{const h=l===r;l.classList.toggle("is-active",h),l.setAttribute("aria-pressed",String(h))}),t.focus()})})}function ue(e){e.preventDefault();const t=e.currentTarget,a=new FormData(t),i=String(a.get("customer_phone")??""),r=D(i);if(!r.ok){u(r.error),t.querySelector('input[name="customer_phone"]')?.focus();return}const s={request_type:String(a.get("request_type")??n.requestType),customer_name:String(a.get("customer_name")??"").trim(),customer_phone:i.trim(),date_text:String(a.get("date_text")??"").trim(),start_date:String(a.get("date_iso")??"").trim(),guest_count:Number(a.get("guest_count")??1),message:String(a.get("message")??"").trim(),source:"web_form",whatsapp_message:""};if(!s.customer_name||!s.date_text&&!s.start_date||!Number.isFinite(s.guest_count)||s.guest_count<1){u("Lütfen gerekli alanları kontrol edin.");return}s.whatsapp_message=E(s),ge(s),window.open(b(d.whatsappPhone,s.whatsapp_message),"_blank","noopener,noreferrer"),u("WhatsApp mesajı hazırlandı. Bilgileri kontrol edip gönder tuşuna basın.")}async function ge(e){if(d.apiBaseUrl)try{const t=`${d.apiBaseUrl.replace(/\/$/,"")}/api/request.php`;if(!(await fetch(t,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(e),keepalive:!0})).ok)throw new Error("request_failed")}catch{u("Talep kaydı sırasında sorun oldu. WhatsApp mesajınız yine de hazırlandı.")}}async function ye(e){e.preventDefault();const t=e.currentTarget,a=new FormData(t),i=String(a.get("message")??"").trim();if(!i){u("Lütfen kısa sorunuzu yazın.");return}if(!d.apiBaseUrl){u("AI bağlantısı bu sitede etkin değil. Sorunuzu WhatsApp'tan iletebilirsiniz.");return}n={...n,questionDraft:i,status:"Yanıt hazırlanıyor.",aiLoading:!0},m();let r="";try{const s=`${d.apiBaseUrl.replace(/\/$/,"")}/api/chat.php`,g=await fetch(s,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:i})}),l=await g.json().catch(()=>null);if(!g.ok||!l?.ok||!l.answer)throw r=B(l?.error,l?.message),new Error("ai_failed");n={...n,aiAnswer:l.answer,aiLoading:!1,status:l.fallback?B(l.error):""},m()}catch{n={...n,aiLoading:!1,status:r||"AI servisine ulaşılamadı. İnternet veya sunucu bağlantısını kontrol edin. Hata kodu: widget_connection_failed."},m()}}function me(e){e.preventDefault();const t=e.currentTarget,a=new FormData(t),i=String(a.get("message")??"").trim();if(!i){u("Lütfen bir konu seçin veya kısa mesajınızı yazın.");return}n.whatsappDraft=i,window.open(b(d.whatsappPhone,i),"_blank","noopener,noreferrer"),u("Mesajınız WhatsApp'ta hazırlandı.")}function u(e){n.status=e;const t=document.querySelector(`#${p} [data-ya-status]`);t&&(t.textContent=e,t.hidden=!e)}function B(e,t=""){const a=String(e?.message||t||"AI yanıtı alınamadı.").trim(),i=String(e?.code||"unknown_ai_error").trim(),r=Number(e?.provider_status||0),s=r>0?` (HTTP ${r})`:"",g=e?.retryable===!0?" Biraz sonra yeniden deneyebilirsiniz.":"";return`${a} Hata kodu: ${i}${s}.${g}`}function he(){const t=(d.businessName.trim()||"Yardımcı").replace(/\s+(?:Pansiyon|Otel|Butik Otel|Restoran|Kafe)(?:\s*(?:&|\/)\s*(?:Pansiyon|Otel|Restoran|Kafe))*\s*$/i,"").trim();return`${t&&t.toLocaleLowerCase("tr-TR")!=="yardımcı asistan"?t:"Yardımcı"} AI Asistanı`}function we(){const e=document.getElementById(p);if(e)return e;const t=document.createElement("div");return t.id=p,document.body.appendChild(t),t}function fe(e){let t=document.getElementById(M);t||(t=document.createElement("style"),t.id=M,document.head.appendChild(t)),t.textContent=be(e)}function be(e){return`
     #${p} {
       position: fixed;
       right: 18px;
-      bottom: 18px;
+      bottom: var(--ya-widget-bottom, 18px);
       z-index: 2147483000;
       color: #172033;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.4;
+      transition: bottom 180ms ease;
     }
 
     #${p} * {
@@ -1076,4 +1077,4 @@ var YardimciAsistanWidget=(function(y){"use strict";const R={pension_reservation
         transition: none;
       }
     }
-  `}const he={sparkles:'<path d="m12 3-1.4 3.5L7 8l3.6 1.4L12 13l1.4-3.6L17 8l-3.6-1.5L12 3Z"/><path d="m5 15-.8 2-2.2.8 2.2.9L5 21l.8-2.3 2.2-.9-2.2-.8L5 15Z"/>',bot:'<rect x="5" y="7" width="14" height="11" rx="4"/><path d="M12 4v3M9 12h.01M15 12h.01M9 15h6"/>',calendar:'<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 9h16M8 13h.01M12 13h.01M16 13h.01"/>',table:'<path d="M4 10h16M6 10l-1 10M18 10l1 10M8 6h8a2 2 0 0 1 2 2v2H6V8a2 2 0 0 1 2-2Z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.9.8-.9 1.6M12 17h.01"/>',whatsapp:'<path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.4-4A8 8 0 1 1 20 11.5Z"/><path d="M9 8.7c.5 2.5 2 4 4.5 4.8l1-1"/>',menu:'<path d="M5 7h14M5 12h14M5 17h14"/>',shield:'<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',"arrow-left":'<path d="m15 18-6-6 6-6M9 12h10"/>',minus:'<path d="M5 12h14"/>',plus:'<path d="M12 5v14M5 12h14"/>',send:'<path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/>'};function o(e,a=""){return`<svg class="ya-widget-icon${a?` ${a}`:""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${he[e]}</svg>`}function C(){const a=document.currentScript?.dataset??{};return we({businessName:a.businessName,whatsappPhone:a.whatsappPhone,apiBaseUrl:a.apiBaseUrl,menuUrl:a.menuUrl,logoUrl:a.logoUrl,primaryColor:a.primaryColor,accentColor:a.accentColor})}function we(e){return Object.fromEntries(Object.entries(e).filter(([,a])=>typeof a=="string"&&a.length>0))}function x(e){window.requestAnimationFrame(()=>{document.querySelector(`#${p} ${e}`)?.focus()})}function N(e){const a=Number(e);return Number.isFinite(a)&&a>=1?Math.min(30,Math.floor(a)):1}function W(e,a){const t=new Date(e.getFullYear(),e.getMonth(),e.getDate());return t.setDate(t.getDate()+a),t}function fe(e){const a=e.getDay();return W(e,a===0||a===6?0:6-a)}function z(e){const a=e.getFullYear(),t=String(e.getMonth()+1).padStart(2,"0"),i=String(e.getDate()).padStart(2,"0");return`${a}-${t}-${i}`}function be(e){const[a,t,i]=e.split("-").map(Number);if(!a||!t||!i)return null;const r=new Date(a,t-1,i);return Number.isNaN(r.getTime())?null:r}function P(e){const a=be(e);if(!a)return"Tarih seç";const t=a.getFullYear()!==new Date().getFullYear();return new Intl.DateTimeFormat("tr-TR",{day:"numeric",month:"long",...t?{year:"numeric"}:{}}).format(a)}function xe(e,a){const t=P(e);return a==="today"?`Bugün, ${t}`:a==="tomorrow"?`Yarın, ${t}`:a==="weekend"?`Hafta sonu, ${t}`:t}function c(e){return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function v(e){return c(e).replace(/`/g,"&#096;")}return window.YardimciAsistanWidget={init:w,open:k,close:f},document.readyState==="loading"?document.addEventListener("DOMContentLoaded",()=>w(),{once:!0}):w(),y.buildWhatsAppMessage=M,y.close=f,y.createWhatsAppLink=b,y.init=w,y.normalizeTRMobilePhone=L,y.open=k,Object.defineProperty(y,Symbol.toStringTag,{value:"Module"}),y})({});
+  `}const xe={sparkles:'<path d="m12 3-1.4 3.5L7 8l3.6 1.4L12 13l1.4-3.6L17 8l-3.6-1.5L12 3Z"/><path d="m5 15-.8 2-2.2.8 2.2.9L5 21l.8-2.3 2.2-.9-2.2-.8L5 15Z"/>',bot:'<rect x="5" y="7" width="14" height="11" rx="4"/><path d="M12 4v3M9 12h.01M15 12h.01M9 15h6"/>',calendar:'<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 9h16M8 13h.01M12 13h.01M16 13h.01"/>',table:'<path d="M4 10h16M6 10l-1 10M18 10l1 10M8 6h8a2 2 0 0 1 2 2v2H6V8a2 2 0 0 1 2-2Z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.9.8-.9 1.6M12 17h.01"/>',whatsapp:'<path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.4-4A8 8 0 1 1 20 11.5Z"/><path d="M9 8.7c.5 2.5 2 4 4.5 4.8l1-1"/>',menu:'<path d="M5 7h14M5 12h14M5 17h14"/>',shield:'<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',"arrow-left":'<path d="m15 18-6-6 6-6M9 12h10"/>',minus:'<path d="M5 12h14"/>',plus:'<path d="M12 5v14M5 12h14"/>',send:'<path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/>'};function o(e,t=""){return`<svg class="ya-widget-icon${t?` ${t}`:""}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${xe[e]}</svg>`}function C(){const t=document.currentScript?.dataset??{};return ve({businessName:t.businessName,whatsappPhone:t.whatsappPhone,apiBaseUrl:t.apiBaseUrl,menuUrl:t.menuUrl,logoUrl:t.logoUrl,primaryColor:t.primaryColor,accentColor:t.accentColor})}function ve(e){return Object.fromEntries(Object.entries(e).filter(([,t])=>typeof t=="string"&&t.length>0))}function x(e){window.requestAnimationFrame(()=>{document.querySelector(`#${p} ${e}`)?.focus()})}function ke(){L||(L=!0,window.addEventListener("scroll",N,{passive:!0}),window.addEventListener("resize",N))}function N(){k||(k=window.requestAnimationFrame(()=>{k=0,W()}))}function W(){const e=document.getElementById(p);if(!e)return;const t=18;if(n.isOpen||window.innerWidth<=520){e.style.setProperty("--ya-widget-bottom",`${t}px`);return}const a=document.querySelector(".site-footer, footer");if(!a){e.style.setProperty("--ya-widget-bottom",`${t}px`);return}const i=a.getBoundingClientRect(),s=i.top>0&&i.top<window.innerHeight&&i.bottom>0?Math.min(window.innerHeight-76,Math.ceil(window.innerHeight-i.top+14)):t;e.style.setProperty("--ya-widget-bottom",`${Math.max(t,s)}px`)}function I(e){const t=Number(e);return Number.isFinite(t)&&t>=1?Math.min(30,Math.floor(t)):1}function R(e,t){const a=new Date(e.getFullYear(),e.getMonth(),e.getDate());return a.setDate(a.getDate()+t),a}function $e(e){const t=e.getDay();return R(e,t===0||t===6?0:6-t)}function S(e){const t=e.getFullYear(),a=String(e.getMonth()+1).padStart(2,"0"),i=String(e.getDate()).padStart(2,"0");return`${t}-${a}-${i}`}function ze(e){const[t,a,i]=e.split("-").map(Number);if(!t||!a||!i)return null;const r=new Date(t,a-1,i);return Number.isNaN(r.getTime())?null:r}function O(e){const t=ze(e);if(!t)return"Tarih seç";const a=t.getFullYear()!==new Date().getFullYear();return new Intl.DateTimeFormat("tr-TR",{day:"numeric",month:"long",...a?{year:"numeric"}:{}}).format(t)}function Se(e,t){const a=O(e);return t==="today"?`Bugün, ${a}`:t==="tomorrow"?`Yarın, ${a}`:t==="weekend"?`Hafta sonu, ${a}`:a}function c(e){return e.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}function v(e){return c(e).replace(/`/g,"&#096;")}return window.YardimciAsistanWidget={init:w,open:$,close:f},document.readyState==="loading"?document.addEventListener("DOMContentLoaded",()=>w(),{once:!0}):w(),y.buildWhatsAppMessage=E,y.close=f,y.createWhatsAppLink=b,y.init=w,y.normalizeTRMobilePhone=D,y.open=$,Object.defineProperty(y,Symbol.toStringTag,{value:"Module"}),y})({});

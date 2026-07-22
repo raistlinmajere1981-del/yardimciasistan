@@ -94,6 +94,8 @@ let state: WidgetState = {
   whatsappDraft: "",
   whatsappTopic: ""
 };
+let footerAvoidanceBound = false;
+let footerPositionFrame = 0;
 
 export function init(userConfig: Partial<WidgetConfig> = {}) {
   config = {
@@ -156,6 +158,8 @@ function render() {
   const root = getOrCreateRoot();
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
   bindEvents(root);
+  ensureFooterAvoidance();
+  updateFooterSafePosition();
 }
 
 function buttonTemplate() {
@@ -839,11 +843,12 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     #${ROOT_ID} {
       position: fixed;
       right: 18px;
-      bottom: 18px;
+      bottom: var(--ya-widget-bottom, 18px);
       z-index: 2147483000;
       color: #172033;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       line-height: 1.4;
+      transition: bottom 180ms ease;
     }
 
     #${ROOT_ID} * {
@@ -1749,6 +1754,53 @@ function focusWidgetElement(selector: string) {
   window.requestAnimationFrame(() => {
     document.querySelector<HTMLElement>(`#${ROOT_ID} ${selector}`)?.focus();
   });
+}
+
+function ensureFooterAvoidance() {
+  if (footerAvoidanceBound) {
+    return;
+  }
+
+  footerAvoidanceBound = true;
+  window.addEventListener("scroll", scheduleFooterPositionUpdate, { passive: true });
+  window.addEventListener("resize", scheduleFooterPositionUpdate);
+}
+
+function scheduleFooterPositionUpdate() {
+  if (footerPositionFrame) {
+    return;
+  }
+
+  footerPositionFrame = window.requestAnimationFrame(() => {
+    footerPositionFrame = 0;
+    updateFooterSafePosition();
+  });
+}
+
+function updateFooterSafePosition() {
+  const root = document.getElementById(ROOT_ID);
+  if (!root) {
+    return;
+  }
+
+  const defaultBottom = 18;
+  if (state.isOpen || window.innerWidth <= 520) {
+    root.style.setProperty("--ya-widget-bottom", `${defaultBottom}px`);
+    return;
+  }
+
+  const footer = document.querySelector<HTMLElement>(".site-footer, footer");
+  if (!footer) {
+    root.style.setProperty("--ya-widget-bottom", `${defaultBottom}px`);
+    return;
+  }
+
+  const footerBox = footer.getBoundingClientRect();
+  const footerIsVisible = footerBox.top > 0 && footerBox.top < window.innerHeight && footerBox.bottom > 0;
+  const safeBottom = footerIsVisible
+    ? Math.min(window.innerHeight - 76, Math.ceil(window.innerHeight - footerBox.top + 14))
+    : defaultBottom;
+  root.style.setProperty("--ya-widget-bottom", `${Math.max(defaultBottom, safeBottom)}px`);
 }
 
 function readGuestCount(value: string) {

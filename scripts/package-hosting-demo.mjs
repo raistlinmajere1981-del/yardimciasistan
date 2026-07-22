@@ -30,7 +30,7 @@ const desktopInstallerX86Source = resolve(
 );
 const androidApkSource = resolve(
   repoRoot,
-  String(process.env.YARDIMCI_ASISTAN_ANDROID_APK_PATH || join("apps", "android-app", "build", "outputs", "apk", "debug", "yardimci-asistan-debug.apk"))
+  String(process.env.YARDIMCI_ASISTAN_ANDROID_APK_PATH || join("apps", "android-app", "build", "outputs", "apk", "release", "yardimci-asistan-release.apk"))
 );
 const desktopInstallerPublicPath = `downloads/${desktopInstallerFileName}`;
 const desktopInstallerX86PublicPath = `downloads/${desktopInstallerX86FileName}`;
@@ -187,7 +187,7 @@ function validateWindowsInstaller(source, label, buildCommand) {
 
 function validateAndroidApk() {
   assert.ok(androidAppVersion, "Android uygulama sürümü package.json içinde tanımlı olmalı.");
-  assert.ok(existsSync(androidApkSource), `Android APK bulunamadı: ${androidApkSource}\nDosyayı \`npm run build:android\` ile üretin.`);
+  assert.ok(existsSync(androidApkSource), `Android release APK bulunamadı: ${androidApkSource}\nDosyayı \`npm run android:release-apk\` ile üretin.`);
   const apkStats = statSync(androidApkSource);
   assert.ok(apkStats.isFile(), `Android APK yolu dosya olmalı: ${androidApkSource}`);
   assert.ok(apkStats.size >= 20 * 1024, "Android APK eksik veya yarım görünüyor (20 KB altında).");

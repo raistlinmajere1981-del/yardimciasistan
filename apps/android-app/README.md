@@ -102,11 +102,23 @@ adisyon olmadan uygulanmaz.
 
 ## Komutlar
 
-Kök dizinden APK üretmek için:
+Kök dizinden geliştirme/debug APK üretmek için:
 
 ```bash
-npm run build:android
+npm run android:debug
 ```
+
+Pilot release APK ve Google Play release AAB üretmek için:
+
+```bash
+npm run android:release-apk
+npm run android:release-aab
+```
+
+Release komutları repo dışındaki kalıcı keystore için environment veya
+git-ignored Gradle properties ister. Keystore kurulumu, sürüm artırma, USB
+debugging gerektirmeyen APK kurulumu ve Play checklist'i
+[`docs/ANDROID_DISTRIBUTION.md`](../../docs/ANDROID_DISTRIBUTION.md) içindedir.
 
 Canlı bağlantı değerlerini her APK güncellemesinde yeniden girmemek için bir kez
 yerel derleme yapılandırmasını oluşturun:
@@ -135,15 +147,18 @@ ortam değişkenleri temizlenmeli ve APK yeniden üretilmelidir. Build çıktıs
 APK içine gömülen bir anahtar tersine mühendislikle çıkarılabilir. APK işletme dışına
 dağıtılırsa hosting anahtarını döndürün ve yeni APK yayınlayın.
 
-Çıktı:
+Çıktılar:
 
 ```text
 apps/android-app/build/outputs/apk/debug/yardimci-asistan-debug.apk
+apps/android-app/build/outputs/apk/release/yardimci-asistan-release.apk
+apps/android-app/build/outputs/bundle/release/yardimci-asistan-android-release.aab
 ```
 
-Bu proje Gradle kullanmadan kurulu Android SDK araçlarıyla native Java APK üretir.
-Java 8 kaynakları `javac` ile derlenir, `d8` ile dex/desugar edilir, ardından APK
-`zipalign` ve `apksigner` ile hazırlanır.
+Proje Android Gradle Plugin ile native Java APK/AAB üretir. Debug build standart
+debug anahtarıyla, release build yalnız dışarıdan sağlanan kalıcı release
+keystore ile imzalanır. Signing değerleri build loguna yazılmaz; eksikse release
+build unsigned çıktı üretmek yerine hata verir.
 
 Hosting ve demo operasyon verisiyle komut satırı smoke testi:
 

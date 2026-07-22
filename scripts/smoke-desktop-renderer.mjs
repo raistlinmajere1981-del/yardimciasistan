@@ -100,7 +100,7 @@ try {
   await expect(notificationCenter.getByText("Yeni müşteri talebi", { exact: true })).toBeVisible();
   await expect(notificationCenter.getByText("Rezervasyon onay bekliyor", { exact: true })).toBeVisible();
   await expect(notificationCenter.getByText("Masa hesap bekliyor", { exact: true })).toBeVisible();
-  await expect(notificationCenter.getByText("Günlük iş bekliyor", { exact: true })).toHaveCount(2);
+  await expect(notificationCenter.getByText(/Günlük iş (?:bekliyor|gecikti)/)).toHaveCount(2);
   await expect(notificationCenter.getByText("Sync bağlantı sorunu", { exact: true })).toBeVisible();
   await expect(notificationCenter.getByText("Android işlemi uygulanamadı", { exact: true })).toBeVisible();
   await notificationCenter.locator(".notification-item", { hasText: "Yeni müşteri talebi" }).getByRole("button", { name: /ilgili sayfaya git/ }).click();

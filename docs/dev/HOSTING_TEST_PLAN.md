@@ -26,6 +26,14 @@ anahtarını kullanır.
 
 ## Paket Üretimi
 
+Paketleyici Android indirmesi olarak debug APK değil, imzalı release APK kullanır.
+Önce kalıcı keystore yapılandırmasıyla release dosyasını üretin; ayrıntılar
+`docs/ANDROID_DISTRIBUTION.md` içindedir:
+
+```bash
+npm run android:release-apk
+```
+
 Canlı prova paketi tek komutla üretilebilir:
 
 ```bash

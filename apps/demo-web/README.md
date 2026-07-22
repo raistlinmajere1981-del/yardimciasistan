@@ -41,7 +41,7 @@ Dosyalar üretilir ve ardından hosting paketi hazırlanır:
 ```bash
 npm run pack:desktop:win
 npm run pack:desktop:win32
-npm run build:android
+npm run android:release-apk
 YARDIMCI_ASISTAN_HOSTING_ORIGIN=https://site.example \
 YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET=guclu-ve-ozel-anahtar \
 npm run pack:hosting-demo

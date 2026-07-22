@@ -1,0 +1,160 @@
+plugins {
+  id "com.android.application" version "9.3.0"
+}
+
+def versionFile = file("version.properties")
+if (!versionFile.isFile()) {
+  throw new GradleException("Android sürüm dosyası bulunamadı: ${versionFile}")
+}
+
+def androidVersion = new Properties()
+versionFile.withInputStream { androidVersion.load(it) }
+def versionCodeText = androidVersion.getProperty("VERSION_CODE", "").trim()
+def versionNameText = androidVersion.getProperty("VERSION_NAME", "").trim()
+if (!(versionCodeText ==~ /[1-9][0-9]*/)) {
+  throw new GradleException("VERSION_CODE pozitif bir tam sayı olmalı.")
+}
+if (!(versionNameText ==~ /[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?/)) {
+  throw new GradleException("VERSION_NAME SemVer biçiminde olmalı (ör. 0.1.0).")
+}
+
+def packageVersion = new groovy.json.JsonSlurper().parse(file("package.json")).version?.toString()
+if (packageVersion != versionNameText) {
+  throw new GradleException("package.json version (${packageVersion}) ile VERSION_NAME (${versionNameText}) aynı olmalı.")
+}
+
+def localKeystoreProperties = new Properties()
+def localKeystoreFile = file("keystore.properties")
+if (localKeystoreFile.isFile()) {
+  localKeystoreFile.withInputStream { localKeystoreProperties.load(it) }
+}
+
+def signingValue = { String name ->
+  def environmentValue = System.getenv(name)
+  if (environmentValue != null && !environmentValue.isEmpty()) {
+    return environmentValue
+  }
+  def localValue = localKeystoreProperties.getProperty(name)
+  if (localValue != null && !localValue.isEmpty()) {
+    return localValue
+  }
+  def gradleValue = providers.gradleProperty(name).orNull
+  return gradleValue != null && !gradleValue.isEmpty() ? gradleValue : null
+}
+
+def signingPropertyNames = [
+  path: "YA_ANDROID_KEYSTORE_PATH",
+  storePassword: "YA_ANDROID_KEYSTORE_PASSWORD",
+  alias: "YA_ANDROID_KEY_ALIAS",
+  keyPassword: "YA_ANDROID_KEY_PASSWORD"
+]
+def releaseSigning = signingPropertyNames.collectEntries { key, propertyName ->
+  [(key): signingValue(propertyName)]
+}
+def missingSigningProperties = signingPropertyNames.findAll { key, propertyName ->
+  releaseSigning[key] == null
+}.values().toList()
+def releaseSigningReady = missingSigningProperties.isEmpty()
+def generatedConnectionDirectory = layout.buildDirectory.dir("generated/source/connection")
+
+android {
+  namespace = "com.yardimciasistan.android"
+  compileSdk = 36
+
+  defaultConfig {
+    applicationId = "com.yardimciasistan.android"
+    minSdk = 26
+    targetSdk = 36
+    versionCode = versionCodeText.toInteger()
+    versionName = versionNameText
+  }
+
+  sourceSets {
+    main {
+      manifest.srcFile "AndroidManifest.xml"
+      java.srcDirs = ["src/main/java", generatedConnectionDirectory]
+      res.srcDirs = ["src/main/res"]
+    }
+  }
+
+  signingConfigs {
+    if (releaseSigningReady) {
+      create("release") {
+        storeFile = file(releaseSigning.path)
+        storePassword = releaseSigning.storePassword
+        keyAlias = releaseSigning.alias
+        keyPassword = releaseSigning.keyPassword
+      }
+    }
+  }
+
+  buildTypes {
+    debug {
+      debuggable = true
+      versionNameSuffix = "-debug"
+    }
+    release {
+      debuggable = false
+      minifyEnabled = false
+      if (releaseSigningReady) {
+        signingConfig = signingConfigs.getByName("release")
+      }
+    }
+  }
+
+  compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+  }
+
+  testOptions {
+    unitTests.returnDefaultValues = true
+  }
+}
+
+androidComponents {
+  onVariants(selector().all()) { variant ->
+    variant.outputs.each { output ->
+      output.outputFileName.set("yardimci-asistan-${variant.name}.apk")
+    }
+  }
+}
+
+dependencies {
+  testImplementation "junit:junit:4.13.2"
+}
+
+def generateConnectionDefaults = tasks.register("generateConnectionDefaults", Exec) {
+  group = "build"
+  description = "Git-ignored local connection defaults are generated without logging secrets."
+  workingDir = rootProject.projectDir
+  commandLine "node", file("../../scripts/generate-android-connection-defaults.mjs").absolutePath
+  inputs.file file("../../scripts/generate-android-connection-defaults.mjs")
+  outputs.dir generatedConnectionDirectory
+  outputs.upToDateWhen { false }
+}
+
+tasks.named("preBuild").configure {
+  dependsOn generateConnectionDefaults
+}
+
+def validateReleaseSigning = tasks.register("validateReleaseSigning") {
+  group = "verification"
+  description = "Fails release builds unless a complete external signing configuration is available."
+  doLast {
+    if (!missingSigningProperties.isEmpty()) {
+      throw new GradleException(
+        "Release signing eksik. Ayarlanması gereken adlar: ${missingSigningProperties.join(', ')}. " +
+        "Değerleri environment, ~/.gradle/gradle.properties veya git-ignored keystore.properties ile sağlayın."
+      )
+    }
+    def configuredKeystore = file(releaseSigning.path)
+    if (!configuredKeystore.isFile()) {
+      throw new GradleException("Release keystore dosyası bulunamadı: ${configuredKeystore}")
+    }
+  }
+}
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+  dependsOn validateReleaseSigning
+}

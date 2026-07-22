@@ -32,8 +32,9 @@ import type { BusinessConfig, PageKey } from "./types";
 const business = businessJson as BusinessConfig;
 type RequestSubmitState = "idle" | "saving" | "saved" | "fallback" | "error";
 const DEMO_WIDGET_SCRIPT_ID = "yardimci-asistan-demo-widget-script";
+const DEMO_WIDGET_VERSION = "20260719-footer-safe";
 const DEFAULT_WEB_MODULE_URL = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
-const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.0").trim() || "0.1.0";
+const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.1").trim() || "0.1.1";
 const DESKTOP_INSTALLER_URL =
   String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_URL ?? "").trim() ||
   `/downloads/YardimciAsistan-Setup-${DESKTOP_INSTALLER_VERSION}.exe`;
@@ -150,7 +151,7 @@ function useDemoWidget() {
 
     const script = document.createElement("script");
     script.id = DEMO_WIDGET_SCRIPT_ID;
-    script.src = `${webModuleBaseUrl}/widget.js`;
+    script.src = `${webModuleBaseUrl}/widget.js?v=${DEMO_WIDGET_VERSION}`;
     script.async = true;
     script.dataset.businessName = config.businessName;
     script.dataset.whatsappPhone = config.whatsappPhone;
