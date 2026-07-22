@@ -1458,6 +1458,9 @@ public final class MainActivity extends ComponentActivity {
     if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_STOCK)) {
       options.add(new String[] {AndroidUiRules.RESTAURANT_STOCK, "Stok"});
     }
+    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_MENU)) {
+      options.add(new String[] {AndroidUiRules.RESTAURANT_MENU, "Menü"});
+    }
     if (options.isEmpty()) {
       page.addView(permissionDeniedCard());
       return mainScreenScroll(page);
@@ -1496,7 +1499,7 @@ public final class MainActivity extends ComponentActivity {
           page.addView(activeOrderCard(order));
         }
       }
-    } else {
+    } else if (AndroidUiRules.RESTAURANT_STOCK.equals(restaurantMode)) {
       if (data.hasPermission("menu.stock_update")) {
         page.addView(stockImageImportCard());
       }
@@ -1535,6 +1538,29 @@ public final class MainActivity extends ComponentActivity {
       }
       for (OperationData.TrackedStockItem item : data.trackedStockItems) {
         page.addView(stockCard(item));
+      }
+    } else {
+      page.addView(statusStrip(new CounterValue[] {
+          new CounterValue("Kategori", data.adminCategories.size(), UiKit.INFO, ""),
+          new CounterValue("Ürün", data.adminMenuItems.size(), UiKit.ACCENT, "")
+      }));
+      page.addView(emptyCard(
+          "Yönetici silme alanı",
+          "Kategori silmek o kategoriye bağlı tüm ürünleri de siler. Her işlem ayrıca onay ister."
+      ));
+      page.addView(sectionLabel("Kategoriler"));
+      if (data.adminCategories.isEmpty()) {
+        page.addView(emptyCard("Kategori yok", "Silinebilecek menü kategorisi bulunmuyor."));
+      }
+      for (OperationData.MenuCategory category : data.adminCategories) {
+        page.addView(adminMenuCategoryCard(category));
+      }
+      page.addView(sectionLabel("Ürünler"));
+      if (data.adminMenuItems.isEmpty()) {
+        page.addView(emptyCard("Ürün yok", "Silinebilecek menü ürünü bulunmuyor."));
+      }
+      for (OperationData.MenuItem item : data.adminMenuItems) {
+        page.addView(adminMenuItemCard(item));
       }
     }
     return mainScreenScroll(page);
@@ -2069,6 +2095,79 @@ public final class MainActivity extends ComponentActivity {
     return card;
   }
 
+  private View adminMenuCategoryCard(OperationData.MenuCategory category) {
+    LinearLayout card = UiKit.card(this);
+    LinearLayout top = UiKit.row(this);
+    LinearLayout identity = UiKit.column(this);
+    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    identity.addView(UiKit.text(this, category.name, 15, UiKit.TEXT, Typeface.BOLD));
+    int productCount = 0;
+    for (OperationData.MenuItem item : data.adminMenuItems) {
+      if (category.id.equals(item.categoryId)) {
+        productCount += 1;
+      }
+    }
+    identity.addView(UiKit.text(
+        this,
+        productCount + " ürün · " + (category.active ? "Aktif" : "Pasif"),
+        12,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+    top.addView(identity);
+    top.addView(statusBadge(category.active ? "Aktif" : "Pasif", category.active ? UiKit.SUCCESS : UiKit.MUTED));
+    card.addView(top);
+
+    final int relatedProductCount = productCount;
+    Button delete = UiKit.dangerButton(this, "Kategoriyi Sil", view -> confirm(
+        "Menü kategorisini sil",
+        category.name + " ve bağlı " + relatedProductCount + " ürün kalıcı görünümden kaldırılsın mı?",
+        () -> sendAction(
+            "menu_category_delete",
+            payload("category_id", category.id, "expected_updated_at", category.updatedAt),
+            "Menü kategorisi silinmek üzere gönderildi."
+        )
+    ));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
+    params.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    delete.setLayoutParams(params);
+    card.addView(delete);
+    return card;
+  }
+
+  private View adminMenuItemCard(OperationData.MenuItem item) {
+    LinearLayout card = UiKit.card(this);
+    LinearLayout top = UiKit.row(this);
+    LinearLayout identity = UiKit.column(this);
+    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    identity.addView(UiKit.text(this, item.name, 15, UiKit.TEXT, Typeface.BOLD));
+    identity.addView(UiKit.text(
+        this,
+        data.adminCategoryName(item.categoryId) + " · " + money(item.price, item.currency),
+        12,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+    top.addView(identity);
+    top.addView(statusBadge(item.available ? "Satışta" : "Pasif", item.available ? UiKit.SUCCESS : UiKit.MUTED));
+    card.addView(top);
+
+    Button delete = UiKit.dangerButton(this, "Ürünü Sil", view -> confirm(
+        "Menü ürününü sil",
+        item.name + " menüden silinsin mi?",
+        () -> sendAction(
+            "menu_item_delete",
+            payload("menu_item_id", item.id, "expected_updated_at", item.updatedAt),
+            "Menü ürünü silinmek üzere gönderildi."
+        )
+    ));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
+    params.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    delete.setLayoutParams(params);
+    card.addView(delete);
+    return card;
+  }
+
   private View stockImageImportCard() {
     LinearLayout card = UiKit.card(this);
     card.setBackground(UiKit.rounded(this, UiKit.PRIMARY_DARK, UiKit.PRIMARY, 14));
@@ -2394,6 +2493,24 @@ public final class MainActivity extends ComponentActivity {
       page.addView(contact);
     }
 
+    if (AndroidUiRules.canDelete(data, "customer.delete")) {
+      page.addView(sectionLabel("Yönetici işlemi"));
+      Button delete = UiKit.dangerButton(this, "Müşteriyi Sil", view -> confirm(
+          "Müşteriyi sil",
+          customer.fullName + " müşteri listesinden silinsin mi? Eski talep ve rezervasyon kayıtları korunur.",
+          () -> {
+            sendAction(
+                "customer_delete",
+                payload("customer_id", customer.id, "expected_updated_at", customer.updatedAt),
+                "Müşteri silinmek üzere gönderildi."
+            );
+            dialog.dismiss();
+          }
+      ));
+      delete.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
+      page.addView(delete);
+    }
+
     ScrollView scroll = UiKit.scroll(this, page);
     scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
     shell.addView(scroll);
@@ -2506,6 +2623,24 @@ public final class MainActivity extends ComponentActivity {
         }), this);
       }
       page.addView(response);
+    }
+
+    if (AndroidUiRules.canDelete(data, "request.delete")) {
+      page.addView(sectionLabel("Yönetici işlemi"));
+      Button delete = UiKit.dangerButton(this, "Talebi Sil", view -> confirm(
+          "Talebi sil",
+          request.customerName + " talebi ve bu talebe bağlı hazır mesaj silinsin mi?",
+          () -> {
+            sendAction(
+                "customer_request_delete",
+                payload("request_id", request.id, "expected_updated_at", request.updatedAt),
+                "Talep silinmek üzere gönderildi."
+            );
+            dialog.dismiss();
+          }
+      ));
+      delete.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
+      page.addView(delete);
     }
 
     ScrollView scroll = UiKit.scroll(this, page);
@@ -2661,6 +2796,28 @@ public final class MainActivity extends ComponentActivity {
         }), this);
       }
       page.addView(followUp);
+    }
+
+    if (AndroidUiRules.canDelete(data, "message.delete")) {
+      page.addView(sectionLabel("Yönetici işlemi"));
+      Button delete = UiKit.dangerButton(this, "Mesajı Sil", view -> confirm(
+          "Hazır mesajı sil",
+          "Bu hazır mesaj silinsin mi? Talep kaydı korunur.",
+          () -> {
+            sendAction(
+                "message_delete",
+                payload(
+                    "message_id", message.id,
+                    "request_id", message.requestId,
+                    "expected_updated_at", message.updatedAt
+                ),
+                "Hazır mesaj silinmek üzere gönderildi."
+            );
+            dialog.dismiss();
+          }
+      ));
+      delete.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
+      page.addView(delete);
     }
 
     ScrollView scroll = UiKit.scroll(this, page);
@@ -3098,6 +3255,12 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
     for (ActionSpec action : actions) {
+      if (isAdminOnlyDeletionAction(action.type) && !data.isAdmin()) {
+        String message = "Silme işlemleri yalnız yönetici cihazlarda kullanılabilir.";
+        showError(message);
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        return;
+      }
       String requiredPermission = requiredPermissionForAction(action.type, action.payload);
       if (requiredPermission == null || !data.hasPermission(requiredPermission)) {
         String message = "table_order.close_paid".equals(requiredPermission)
@@ -3232,6 +3395,15 @@ public final class MainActivity extends ComponentActivity {
 
   private String requiredPermissionForAction(String actionType, JSONObject actionPayload) {
     switch (actionType) {
+      case "customer_request_delete":
+        return "request.delete";
+      case "customer_delete":
+        return "customer.delete";
+      case "menu_category_delete":
+      case "menu_item_delete":
+        return "menu.delete";
+      case "message_delete":
+        return "message.delete";
       case "customer_request_approve":
       case "customer_request_reopen":
         return "customer.respond";
@@ -3294,6 +3466,14 @@ public final class MainActivity extends ComponentActivity {
       default:
         return null;
     }
+  }
+
+  private boolean isAdminOnlyDeletionAction(String actionType) {
+    return "customer_request_delete".equals(actionType)
+        || "customer_delete".equals(actionType)
+        || "menu_category_delete".equals(actionType)
+        || "menu_item_delete".equals(actionType)
+        || "message_delete".equals(actionType);
   }
 
   private void confirm(String title, String message, Runnable action) {

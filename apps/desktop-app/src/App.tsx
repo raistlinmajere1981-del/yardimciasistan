@@ -29,6 +29,7 @@ import {
   Smartphone,
   Sparkles,
   Star,
+  Trash2,
   TrendingUp,
   UploadCloud,
   Users,
@@ -1080,6 +1081,68 @@ function App() {
     setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
   }
 
+  async function handleDeleteMenuCategory() {
+    if (!categoryForm.id || !window.yardimciDesktop) {
+      return;
+    }
+    const relatedProductCount = dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length;
+    if (!window.confirm(`“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`)) {
+      return;
+    }
+
+    setMenuEditState("loading");
+    setMenuEditMessage("Kategori ve bağlı ürünler siliniyor...");
+    const result = await window.yardimciDesktop.deleteMenuCategory(categoryForm.id);
+    if (!result.ok) {
+      setMenuEditState("error");
+      setMenuEditMessage(result.message);
+      return;
+    }
+
+    const nextCategory = [...result.dashboardData.menu.categories].sort(compareMenuRecords)[0];
+    const nextItem = [...result.dashboardData.menu.items]
+      .filter((item) => !nextCategory || item.category_id === nextCategory.id)
+      .sort(compareMenuRecords)[0];
+    setDashboardData(result.dashboardData);
+    setSelectedCategoryId(nextCategory?.id ?? "");
+    setCategoryForm(toCategoryForm(nextCategory));
+    setSelectedItemId(nextItem?.id ?? "");
+    setItemForm(toItemForm(nextItem, nextCategory?.id ?? ""));
+    setMenuEditState("success");
+    setMenuEditMessage(result.message);
+    setMenuPublishState("idle");
+    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
+  }
+
+  async function handleDeleteMenuItem() {
+    if (!itemForm.id || !window.yardimciDesktop) {
+      return;
+    }
+    if (!window.confirm(`“${itemForm.name}” ürünü menüden silinsin mi?`)) {
+      return;
+    }
+
+    setMenuEditState("loading");
+    setMenuEditMessage("Ürün siliniyor...");
+    const result = await window.yardimciDesktop.deleteMenuItem(itemForm.id);
+    if (!result.ok) {
+      setMenuEditState("error");
+      setMenuEditMessage(result.message);
+      return;
+    }
+
+    const nextItem = [...result.dashboardData.menu.items]
+      .filter((item) => !selectedCategoryId || item.category_id === selectedCategoryId)
+      .sort(compareMenuRecords)[0];
+    setDashboardData(result.dashboardData);
+    setSelectedItemId(nextItem?.id ?? "");
+    setItemForm(toItemForm(nextItem, selectedCategoryId || result.dashboardData.menu.categories[0]?.id || ""));
+    setMenuEditState("success");
+    setMenuEditMessage(result.message);
+    setMenuPublishState("idle");
+    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
+  }
+
   function openWhatsApp(request: SyncedCustomerRequest) {
     setSelectedWhatsAppRequestId(request.id);
     setActivePage("messages");
@@ -1423,6 +1486,70 @@ function App() {
     setStatusMessage(result.message);
   }
 
+  async function handleDeleteRequest(request: SyncedCustomerRequest) {
+    if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} adına kayıtlı talep ve bağlı hazır mesaj silinsin mi?`)) {
+      return;
+    }
+
+    setSyncState("loading");
+    setStatusMessage("Talep siliniyor...");
+    const result = await window.yardimciDesktop.deleteRequest(request.id);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    setDashboardData(result.dashboardData);
+    const nextRequestId = result.dashboardData.requests[0]?.id ?? "";
+    if (selectedRequestId === request.id) {
+      setSelectedRequestId(nextRequestId);
+    }
+    if (selectedWhatsAppRequestId === request.id) {
+      setSelectedWhatsAppRequestId(nextRequestId);
+    }
+    setSyncState("success");
+    setStatusMessage(result.message);
+  }
+
+  async function handleDeleteCustomer(customer: DesktopDashboardData["customers"][number]) {
+    if (!window.yardimciDesktop || !window.confirm(`${customer.fullName} müşteri listesinden silinsin mi? Eski talep ve rezervasyon kayıtları korunur.`)) {
+      return;
+    }
+
+    setSyncState("loading");
+    setStatusMessage("Müşteri siliniyor...");
+    const result = await window.yardimciDesktop.deleteCustomer(customer.id);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+  }
+
+  async function handleDeleteWhatsAppMessage(request: SyncedCustomerRequest) {
+    if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} için hazırlanmış mesaj silinsin mi? Talep kaydı korunur.`)) {
+      return;
+    }
+
+    setSyncState("loading");
+    setStatusMessage("Hazır mesaj siliniyor...");
+    const result = await window.yardimciDesktop.deleteWhatsAppMessage({ requestId: request.id });
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+  }
+
   function openRequestReservation(request: SyncedCustomerRequest) {
     const reservation = dashboardData.reservations.find((item) => item.requestId === request.id);
     if (!reservation) {
@@ -1738,6 +1865,7 @@ function App() {
           onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
           onRewrite={handleRewriteWhatsAppMessage}
           onMessageSent={handleWhatsAppMessageSent}
+          onDeleteMessage={handleDeleteWhatsAppMessage}
         />
       )}
       webMode={(onReturnToSafe) => (
@@ -1756,6 +1884,7 @@ function App() {
           onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
           onRewrite={handleRewriteWhatsAppMessage}
           onMessageSent={handleWhatsAppMessageSent}
+          onDeleteMessage={handleDeleteWhatsAppMessage}
         />
       )}
       aiTools={(
@@ -1900,6 +2029,7 @@ function App() {
                 onSuggest={handleCreateOwnerReplySuggestion}
                 onUpdateStatus={handleUpdateRequestStatus}
                 onOpenReservation={openRequestReservation}
+                onDelete={handleDeleteRequest}
               />
             )}
             customers={(
@@ -1911,6 +2041,7 @@ function App() {
                 onCall={callCustomerRecord}
                 onWhatsApp={openCustomerWhatsApp}
                 onSummarize={(requestId) => openAiTools("summary", requestId)}
+                onDelete={handleDeleteCustomer}
               />
             )}
             waiting={(
@@ -1933,6 +2064,7 @@ function App() {
                 onSuggest={handleCreateOwnerReplySuggestion}
                 onUpdateStatus={handleUpdateRequestStatus}
                 onOpenReservation={openRequestReservation}
+                onDelete={handleDeleteRequest}
               />
             )}
           />
@@ -1986,6 +2118,8 @@ function App() {
             onNewItem={startNewItem}
             onSaveCategory={handleSaveCategory}
             onSaveItem={handleSaveItem}
+            onDeleteCategory={handleDeleteMenuCategory}
+            onDeleteItem={handleDeleteMenuItem}
             onExpandPreview={openMenuPreview}
             onDashboardDataChanged={setDashboardData}
           />
@@ -3110,6 +3244,7 @@ interface WhatsAppWorkspaceProps {
   onCall?: () => void;
   onRewrite: (instructions: string) => void;
   onMessageSent: (requestId: string, message: string) => Promise<{ ok: boolean; message: string }>;
+  onDeleteMessage: (request: SyncedCustomerRequest) => void;
 }
 
 type WhatsAppWebViewElement = HTMLElement & {
@@ -3275,7 +3410,7 @@ function createWhatsAppSendScript(expectedMessage: string, expectedChatTitle: st
   })()`;
 }
 
-function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent }: WhatsAppWorkspaceProps) {
+function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent, onDeleteMessage }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
   const [sendState, setSendState] = useState<SyncState>("idle");
@@ -3548,6 +3683,10 @@ function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, s
             <Phone size={16} aria-hidden="true" />
             Müşteriyi Ara
           </ActionButton>
+          <ActionButton variant="danger" size="sm" type="button" onClick={() => selectedRequest && onDeleteMessage(selectedRequest)} disabled={!selectedRequest || !selectedMessage}>
+            <Trash2 size={16} aria-hidden="true" />
+            Mesajı Sil
+          </ActionButton>
         </div>
         {aiEnabled && (
           <div className="message-ai-actions">
@@ -3585,6 +3724,7 @@ interface RequestsWorkspaceProps {
   onSuggest: (request: SyncedCustomerRequest) => void;
   onUpdateStatus: (request: SyncedCustomerRequest, status: string) => void;
   onOpenReservation: (request: SyncedCustomerRequest) => void;
+  onDelete: (request: SyncedCustomerRequest) => void;
 }
 
 function RequestsWorkspace({
@@ -3605,7 +3745,8 @@ function RequestsWorkspace({
   onConvert,
   onSuggest,
   onUpdateStatus,
-  onOpenReservation
+  onOpenReservation,
+  onDelete
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
   const manualDrawerCloseRef = useRef<HTMLButtonElement>(null);
@@ -3751,6 +3892,10 @@ function RequestsWorkspace({
                   Rezervasyonu Aç
                 </ActionButton>
               )}
+              <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedRequest)}>
+                <Trash2 size={16} aria-hidden="true" />
+                Talebi Sil
+              </ActionButton>
             </div>
           </>
         ) : (
@@ -3989,9 +4134,10 @@ interface CustomersWorkspaceProps {
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSummarize: (requestId: string) => void;
+  onDelete: (customer: DesktopDashboardData["customers"][number]) => void;
 }
 
-function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCall, onWhatsApp, onSummarize }: CustomersWorkspaceProps) {
+function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCall, onWhatsApp, onSummarize, onDelete }: CustomersWorkspaceProps) {
   const [searchText, setSearchText] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? "");
   const filteredCustomers = useMemo(
@@ -4108,6 +4254,10 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
                   Geçmişi Özetle
                 </ActionButton>
               )}
+              <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedCustomer)}>
+                <Trash2 size={16} aria-hidden="true" />
+                Müşteriyi Sil
+              </ActionButton>
             </div>
             <div className="customer-history-grid">
               <section>
@@ -4428,6 +4578,8 @@ interface MenuManagerProps {
   onNewItem: () => void;
   onSaveCategory: () => void;
   onSaveItem: () => void;
+  onDeleteCategory: () => void;
+  onDeleteItem: () => void;
   onExpandPreview: () => void;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
@@ -4450,6 +4602,8 @@ function MenuManager({
   onNewItem,
   onSaveCategory,
   onSaveItem,
+  onDeleteCategory,
+  onDeleteItem,
   onExpandPreview,
   onDashboardDataChanged
 }: MenuManagerProps) {
@@ -4542,10 +4696,18 @@ function MenuManager({
                 />
               </label>
             </details>
-            <button className="primary-command" type="button" onClick={onSaveCategory} disabled={menuEditState === "loading"}>
-              <Save size={16} aria-hidden="true" />
-              Kategoriyi Kaydet
-            </button>
+            <div className="menu-form-actions">
+              {categoryForm.id && (
+                <ActionButton variant="danger" size="sm" type="button" onClick={onDeleteCategory} disabled={menuEditState === "loading"}>
+                  <Trash2 size={16} aria-hidden="true" />
+                  Kategoriyi Sil
+                </ActionButton>
+              )}
+              <button className="primary-command" type="button" onClick={onSaveCategory} disabled={menuEditState === "loading"}>
+                <Save size={16} aria-hidden="true" />
+                Kategoriyi Kaydet
+              </button>
+            </div>
           </div>
         </section>
 
@@ -4732,10 +4894,18 @@ function MenuManager({
             </details>
             <div className="menu-editor-footer">
               <p className={`menu-status sync-${menuEditState}`} role="status" aria-live="polite">{menuEditMessage}</p>
-              <button className="primary-command" type="button" onClick={onSaveItem} disabled={menuEditState === "loading"}>
-                <Save size={16} aria-hidden="true" />
-                Ürünü Kaydet
-              </button>
+              <div className="menu-editor-actions">
+                {itemForm.id && (
+                  <ActionButton variant="danger" size="sm" type="button" onClick={onDeleteItem} disabled={menuEditState === "loading"}>
+                    <Trash2 size={16} aria-hidden="true" />
+                    Ürünü Sil
+                  </ActionButton>
+                )}
+                <button className="primary-command" type="button" onClick={onSaveItem} disabled={menuEditState === "loading"}>
+                  <Save size={16} aria-hidden="true" />
+                  Ürünü Kaydet
+                </button>
+              </div>
             </div>
           </div>
         </section>

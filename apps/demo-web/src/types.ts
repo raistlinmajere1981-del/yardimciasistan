@@ -67,6 +67,7 @@ export interface BusinessConfig {
       description: string;
       price: number;
       currency: string;
+      image_url: string;
       is_featured: boolean;
     }>;
   };

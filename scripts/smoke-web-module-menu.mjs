@@ -84,6 +84,7 @@ try {
   await expect(page.getByRole("heading", { name: "Deniz Çiçeği Menü" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Kahvaltı" })).toBeVisible();
   await expect(page.getByText("Serpme Kahvaltı")).toBeVisible();
+  await expect(page.getByRole("img", { name: "Serpme Kahvaltı (2 Kişilik)" })).toBeVisible();
 
   await page.getByRole("button", { name: "İçecekler" }).click();
   await expect(page.getByRole("heading", { name: "İçecekler" })).toBeVisible();

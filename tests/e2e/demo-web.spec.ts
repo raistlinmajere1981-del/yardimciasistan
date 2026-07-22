@@ -9,7 +9,9 @@ test("demo web ana akışını gösterir", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Deniz Çiçeği Pansiyon & Kafe" }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /Rezervasyon Talebi Oluştur/ }).first()).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Ana menü" }).getByRole("button", { name: "Ayarlar", exact: true })).toHaveCount(0);
+  const mainNavigation = page.getByRole("navigation", { name: "Ana menü" });
+  await expect(mainNavigation.getByRole("button", { name: "Ayarlar", exact: true })).toHaveCount(0);
+  await expect(mainNavigation.getByRole("button", { name: "Talep Oluştur", exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Odalar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Pansiyon / Odalar" })).toBeVisible();
@@ -18,6 +20,23 @@ test("demo web ana akışını gösterir", async ({ page }) => {
   await page.getByRole("button", { name: "QR Menü", exact: true }).click();
   await expect(page.getByRole("heading", { name: "QR Menü" })).toBeVisible();
   await expect(page.getByText("Serpme Kahvaltı")).toBeVisible();
+  await expect(page.locator(".menu-item img").first()).toBeVisible();
+});
+
+test("oda ve restoran sayfaları doğru talep türünü açar", async ({ page }) => {
+  await page.goto("/#rooms");
+
+  await page.getByRole("button", { name: "Bu Oda İçin Talep Oluştur" }).first().click();
+  await expect(page).toHaveURL(/#request$/);
+  await expect(page.getByRole("button", { name: "Oda rezervasyonu", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Masa talebi", exact: true })).toHaveAttribute("aria-pressed", "false");
+
+  await page.getByRole("button", { name: "Restoran / Kafe", exact: true }).click();
+  await page.getByRole("button", { name: "Masa Talebi Oluştur", exact: true }).click();
+  await expect(page).toHaveURL(/#request$/);
+  await expect(page.getByRole("button", { name: "Masa talebi", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Oda rezervasyonu", exact: true })).toHaveAttribute("aria-pressed", "false");
+  await expect(page.getByLabel(/^Saat/)).toBeVisible();
 });
 
 test("kurulum sayfası bağlantı bilgilerini ve uygulama dosyalarını sunar", async ({ page }) => {

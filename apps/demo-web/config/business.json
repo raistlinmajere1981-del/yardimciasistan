@@ -37,127 +37,306 @@
   },
   "highlights": [
     {
-      "label": "8 oda",
-      "description": "Sade, temiz ve balkonlu seçenekler"
+      "label": "10 oda",
+      "description": "Bahçe katından deniz manzaralı aile odasına kadar farklı seçenekler"
     },
     {
-      "label": "Bahçe masaları",
-      "description": "Kahvaltı ve akşam servisinde sakin alan"
+      "label": "14 masa",
+      "description": "Bahçe, teras, salon ve avluda farklı oturma alanları"
     },
     {
-      "label": "WhatsApp dönüşü",
-      "description": "Talebiniz işletmeye hazır mesajla ulaşır"
+      "label": "18 ürün",
+      "description": "Ege kahvaltısı, yerel ana yemekler ve ev yapımı tatlılar"
     }
   ],
   "services": [
     {
       "title": "Konaklama",
-      "description": "Kısa tatiller ve hafta sonu kaçamakları için temiz, sakin odalar.",
+      "description": "Tek kişilik odadan bağlantılı aile odasına kadar temiz ve sakin seçenekler.",
       "icon": "bed"
     },
     {
-      "title": "Kahvaltı ve Kafe",
-      "description": "Sabah kahvaltısı, gün boyu içecekler ve hafif atıştırmalıklar.",
+      "title": "Ege Mutfağı ve Kafe",
+      "description": "Yöresel kahvaltı, zeytinyağlılar, ızgaralar ve günlük tatlılar.",
       "icon": "coffee"
     },
     {
       "title": "Masa Talebi",
-      "description": "Bahçe veya iç mekan için hızlı masa talebi oluşturma.",
+      "description": "Bahçe, teras, salon veya avlu için hızlı masa talebi oluşturma.",
       "icon": "table"
     }
   ],
   "rooms": [
     {
       "id": "room_101",
-      "name": "Balkonlu Standart Oda",
+      "name": "Bahçe Katı Standart Oda",
       "capacity": 2,
       "bed_info": "1 çift kişilik yatak",
-      "features": ["Klima", "Balkon", "Duş", "Wi-Fi"],
-      "description": "Kısa konaklamalar için ferah ve sakin oda.",
-      "price_note": "Fiyat bilgisi için işletme dönüş yapar.",
+      "features": ["Klima", "Bahçe çıkışı", "Özel banyo", "Wi-Fi"],
+      "description": "Bahçeye açılan, sakin ve serin standart oda.",
+      "price_note": "Kahvaltı dahil fiyat için işletmeye danışın.",
       "image_url": "/assets/demo-room.webp"
     },
     {
       "id": "room_102",
+      "name": "Balkonlu Standart Oda",
+      "capacity": 2,
+      "bed_info": "1 çift kişilik yatak",
+      "features": ["Klima", "Balkon", "Özel banyo", "Wi-Fi"],
+      "description": "Sabah ışığı alan özel balkonlu iki kişilik oda.",
+      "price_note": "Kahvaltı dahil fiyat için işletmeye danışın.",
+      "image_url": "/assets/demo-room.webp"
+    },
+    {
+      "id": "room_104",
+      "name": "Üç Kişilik Oda",
+      "capacity": 3,
+      "bed_info": "1 çift kişilik + 1 tek kişilik yatak",
+      "features": ["Klima", "Balkon", "Mini buzdolabı", "Wi-Fi"],
+      "description": "Üç kişilik konaklamalar için dengeli ve ferah yerleşim.",
+      "price_note": "Kahvaltı dahil fiyat için işletmeye danışın.",
+      "image_url": "/assets/demo-room.webp"
+    },
+    {
+      "id": "room_201",
+      "name": "Deniz Manzaralı Deluxe Oda",
+      "capacity": 2,
+      "bed_info": "1 büyük çift kişilik yatak",
+      "features": ["Deniz manzarası", "Geniş balkon", "Klima", "Wi-Fi"],
+      "description": "Gökova Körfezi yönüne bakan geniş balkonlu üst kat odası.",
+      "price_note": "Kahvaltı dahil fiyat için işletmeye danışın.",
+      "image_url": "/assets/demo-room.webp"
+    },
+    {
+      "id": "room_202",
       "name": "Aile Odası",
       "capacity": 4,
-      "bed_info": "1 çift kişilik yatak + 2 tek kişilik yatak",
-      "features": ["Klima", "Ek yatak", "Duş", "Mini dolap"],
-      "description": "Çocuklu aileler için daha geniş kullanım alanı.",
-      "price_note": "Müsaitlik ve fiyat onayla netleşir.",
+      "bed_info": "1 çift kişilik + 2 tek kişilik yatak",
+      "features": ["Klima", "Geniş balkon", "Mini buzdolabı", "Wi-Fi"],
+      "description": "Çocuklu aileler için geniş depolama ve oturma alanı.",
+      "price_note": "Kahvaltı dahil fiyat için işletmeye danışın.",
+      "image_url": "/assets/demo-room.webp"
+    },
+    {
+      "id": "room_204",
+      "name": "Bağlantılı Aile Odası",
+      "capacity": 5,
+      "bed_info": "1 çift kişilik + 3 tek kişilik yatak",
+      "features": ["İki oda", "Ara kapı", "İki balkon", "Wi-Fi"],
+      "description": "Kalabalık aileler için ara kapıyla birleşen iki ayrı bölüm.",
+      "price_note": "Kahvaltı dahil fiyat için işletmeye danışın.",
       "image_url": "/assets/demo-room.webp"
     }
   ],
   "tables": [
-    {
-      "name": "Bahçe Masası",
-      "capacity": 4,
-      "area": "Bahçe"
-    },
-    {
-      "name": "İç Mekan Masa",
-      "capacity": 2,
-      "area": "Salon"
-    }
+    { "name": "Bahçe 1", "capacity": 4, "area": "Bahçe" },
+    { "name": "Bahçe 2", "capacity": 4, "area": "Bahçe" },
+    { "name": "Bahçe 4", "capacity": 6, "area": "Bahçe" },
+    { "name": "Teras 1", "capacity": 2, "area": "Teras" },
+    { "name": "Teras 2", "capacity": 4, "area": "Teras" },
+    { "name": "Salon 1", "capacity": 2, "area": "Salon" },
+    { "name": "Avlu 2", "capacity": 4, "area": "Avlu" },
+    { "name": "Büyük Grup Masası", "capacity": 8, "area": "Bahçe" }
   ],
   "menu": {
     "categories": [
-      {
-        "id": "cat_breakfast",
-        "name": "Kahvaltı"
-      },
-      {
-        "id": "cat_drinks",
-        "name": "İçecekler"
-      },
-      {
-        "id": "cat_food",
-        "name": "Hafif Lezzetler"
-      }
+      { "id": "cat_breakfast", "name": "Kahvaltı" },
+      { "id": "cat_meze", "name": "Ege Başlangıçları" },
+      { "id": "cat_mains", "name": "Ana Yemekler" },
+      { "id": "cat_light", "name": "Hafif Lezzetler" },
+      { "id": "cat_dessert", "name": "Tatlılar" },
+      { "id": "cat_drinks", "name": "İçecekler" }
     ],
     "items": [
       {
-        "id": "item_001",
+        "id": "item_breakfast_001",
         "category_id": "cat_breakfast",
-        "name": "Serpme Kahvaltı",
-        "description": "Yöresel ürünler, sıcak lezzetler ve taze çay.",
-        "price": 450,
+        "name": "Serpme Kahvaltı (2 Kişilik)",
+        "description": "Ege peynirleri, zeytinler, söğüş, ev reçeli, bal-kaymak, yumurta, sıcak pişi ve sınırsız çay.",
+        "price": 1150,
         "currency": "TRY",
+        "image_url": "/assets/menu-breakfast-spread.webp",
         "is_featured": true
       },
       {
-        "id": "item_002",
-        "category_id": "cat_drinks",
-        "name": "Türk Kahvesi",
-        "description": "Yanında küçük ikramla servis edilir.",
-        "price": 90,
+        "id": "item_breakfast_002",
+        "category_id": "cat_breakfast",
+        "name": "Menemen",
+        "description": "Domates, köy biberi ve yumurta; bakır tavada sıcak servis edilir.",
+        "price": 420,
         "currency": "TRY",
+        "image_url": "/assets/menu-menemen.webp",
         "is_featured": false
       },
       {
-        "id": "item_003",
-        "category_id": "cat_food",
-        "name": "Günün Tostu",
-        "description": "Kaşar, domates ve mevsim yeşillikleriyle.",
-        "price": 180,
+        "id": "item_breakfast_003",
+        "category_id": "cat_breakfast",
+        "name": "Ege Otlu Omlet",
+        "description": "Maydanoz, dereotu, taze soğan ve keçi peyniriyle üç yumurtalı omlet.",
+        "price": 390,
         "currency": "TRY",
+        "image_url": "/assets/menu-menemen.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_meze_001",
+        "category_id": "cat_meze",
+        "name": "Ege Meze Tabağı",
+        "description": "Fava, deniz börülcesi, köz biber yoğurtlama, Girit ezmesi ve zeytin.",
+        "price": 480,
+        "currency": "TRY",
+        "image_url": "/assets/menu-aegean-meze.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_meze_002",
+        "category_id": "cat_meze",
+        "name": "Kabak Çiçeği Dolması",
+        "description": "Zeytinyağlı, dereotlu ve limonlu pirinç harcıyla günlük hazırlanır.",
+        "price": 360,
+        "currency": "TRY",
+        "image_url": "/assets/menu-stuffed-zucchini-flowers.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_meze_003",
+        "category_id": "cat_meze",
+        "name": "Girit Ezmesi",
+        "description": "Ezine peyniri, lor, ceviz, Antep fıstığı ve taze otlar.",
+        "price": 320,
+        "currency": "TRY",
+        "image_url": "/assets/menu-aegean-meze.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_main_001",
+        "category_id": "cat_mains",
+        "name": "Izgara Levrek",
+        "description": "Mevsim salatası, köz limon ve roka eşliğinde bütün levrek.",
+        "price": 950,
+        "currency": "TRY",
+        "image_url": "/assets/menu-grilled-sea-bass.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_main_002",
+        "category_id": "cat_mains",
+        "name": "Çökertme Kebabı",
+        "description": "Kibrit patates üzerinde sarımsaklı yoğurt, dana eti ve domates sosu.",
+        "price": 780,
+        "currency": "TRY",
+        "image_url": "/assets/menu-main-courses.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_main_003",
+        "category_id": "cat_mains",
+        "name": "Otlu Tavuk Şiş",
+        "description": "Ege otlarıyla marine tavuk, bulgur pilavı ve köz sebzeler.",
+        "price": 650,
+        "currency": "TRY",
+        "image_url": "/assets/menu-main-courses.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_light_001",
+        "category_id": "cat_light",
+        "name": "Izgara Hellimli Mevsim Salatası",
+        "description": "Mevsim yeşillikleri, domates, salatalık, zeytin ve narenciye sosu.",
+        "price": 490,
+        "currency": "TRY",
+        "image_url": "/assets/menu-light-bites.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_light_002",
+        "category_id": "cat_light",
+        "name": "Akyaka Kumrusu",
+        "description": "Çıtır ekmekte kaşar, domates, biber ve kekikli zeytin ezmesi.",
+        "price": 430,
+        "currency": "TRY",
+        "image_url": "/assets/menu-light-bites.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_light_003",
+        "category_id": "cat_light",
+        "name": "Köy Ekmeğinde Karışık Tost",
+        "description": "Kaşar, dana sucuk, domates ve yanında küçük mevsim salatası.",
+        "price": 380,
+        "currency": "TRY",
+        "image_url": "/assets/menu-light-bites.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_dessert_001",
+        "category_id": "cat_dessert",
+        "name": "Limonlu Cheesecake",
+        "description": "Günlük hazırlanan, ince limon kabuklu ve hafif ekşi cheesecake.",
+        "price": 320,
+        "currency": "TRY",
+        "image_url": "/assets/menu-desserts.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_dessert_002",
+        "category_id": "cat_dessert",
+        "name": "Muğla Saraylısı",
+        "description": "Cevizli ince hamur katları ve dengeli şerbetle geleneksel usulde.",
+        "price": 330,
+        "currency": "TRY",
+        "image_url": "/assets/menu-desserts.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_001",
+        "category_id": "cat_drinks",
+        "name": "Türk Kahvesi",
+        "description": "Orta kavrum kahve; yanında su ve küçük lokumla.",
+        "price": 150,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_002",
+        "category_id": "cat_drinks",
+        "name": "Ev Yapımı Naneli Limonata",
+        "description": "Taze limon, nane ve az şekerle günlük hazırlanır.",
+        "price": 220,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_drink_003",
+        "category_id": "cat_drinks",
+        "name": "Soğuk Demleme Kahve",
+        "description": "On altı saat demlenen yumuşak içimli kahve, buzla servis edilir.",
+        "price": 260,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_004",
+        "category_id": "cat_drinks",
+        "name": "Adaçayı",
+        "description": "Demlikte taze demlenir; yanında limon ve bal seçeneğiyle.",
+        "price": 160,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
         "is_featured": false
       }
     ]
   },
   "gallery": [
-    {
-      "title": "Bahçe ve giriş",
-      "image_url": "/assets/demo-hero.webp"
-    },
-    {
-      "title": "Oda örneği",
-      "image_url": "/assets/demo-room.webp"
-    },
-    {
-      "title": "Kahvaltı masası",
-      "image_url": "/assets/demo-breakfast.webp"
-    }
+    { "title": "Bahçe ve giriş", "image_url": "/assets/demo-hero.webp" },
+    { "title": "Oda örneği", "image_url": "/assets/demo-room.webp" },
+    { "title": "Serpme kahvaltı", "image_url": "/assets/menu-breakfast-spread.webp" },
+    { "title": "Ege mezeleri", "image_url": "/assets/menu-aegean-meze.webp" },
+    { "title": "Izgara levrek", "image_url": "/assets/menu-grilled-sea-bass.webp" },
+    { "title": "Ev yapımı tatlılar", "image_url": "/assets/menu-desserts.webp" }
   ],
   "social_media": {
     "instagram": "https://instagram.com/denizcicegi.example"

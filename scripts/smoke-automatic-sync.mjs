@@ -228,6 +228,24 @@ try {
   assert.equal(unchangedSummary.status, 200);
   assert.equal((await unchangedSummary.json()).not_modified, true);
 
+  const deletedHostedRequest = database.deleteRequest(requestResult.request_id);
+  assert.equal(deletedHostedRequest.ok, true);
+  assert.equal(database.getDeletedRequestIds().includes(requestResult.request_id), true);
+  const deletionPublishCycle = await coordinator.runNow();
+  assert.equal(deletionPublishCycle.ok, true, deletionPublishCycle.message);
+  assert.ok(deletionPublishCycle.publishedJobs >= 1);
+  const summaryAfterDeletion = await (await syncApi({
+    action: "android_summary",
+    device_id: "android-auto-smoke",
+    limit: 200
+  })).json();
+  assert.equal(
+    summaryAfterDeletion.requests.some((request) => request.id === requestResult.request_id),
+    false,
+    "A hosting web request deleted on desktop must not reappear in Android summary."
+  );
+  assert.equal(summaryAfterDeletion.admin_menu.categories.length, database.getDashboardData().menu.categories.length);
+
   const duplicateAction = await syncApi({
     action: "enqueue_android_action",
     action_id: actionId,
@@ -398,6 +416,32 @@ try {
   assert.equal(database.getActiveTableOrder(table.id), null);
   assert.equal(database.getDashboardData().androidActionFailures.some((failure) => failure.id === forbiddenCloseActionId), false);
 
+  const deletionTargetResult = database.createManualRequest({
+    requestType: "general_info",
+    customerName: "Android Silme Yetki Misafiri",
+    customerPhone: "+905550000222",
+    dateText: "",
+    startDate: "",
+    endDate: "",
+    time: "",
+    guestCount: 1,
+    adultCount: 1,
+    childCount: 0,
+    message: "Android silme yetki smoke talebi.",
+    priority: "normal"
+  });
+  assert.equal(deletionTargetResult.ok, true);
+  const deletionTargetId = deletionTargetResult.savedId;
+  const staffDeleteActionId = "android_request_delete_staff_0001";
+  await assertQueued(await enqueueAndroidAction(staffDeleteActionId, "customer_request_delete", {
+    request_id: deletionTargetId
+  }));
+  const staffDeleteCycle = await coordinator.runNow();
+  assert.equal(staffDeleteCycle.appliedActions, 0);
+  assert.equal(staffDeleteCycle.failedActions, 1);
+  assert.match((await getAndroidAction(staffDeleteActionId)).error_message, /yalnız yönetici/i);
+  assert.equal(database.getDashboardData().requests.some((request) => request.id === deletionTargetId), true);
+
   const promoteResult = database.setAndroidDeviceRole("android-auto-smoke", "admin");
   assert.equal(promoteResult.ok, true);
   const adminProfilePublishCycle = await coordinator.runNow();
@@ -407,6 +451,20 @@ try {
   const adminSummary = await adminSummaryResponse.json();
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].role, "admin");
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("table_order.close_paid"), true);
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("request.delete"), true);
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("customer.delete"), true);
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("menu.delete"), true);
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("message.delete"), true);
+
+  const adminDeleteActionId = "android_request_delete_admin_0001";
+  await assertQueued(await enqueueAndroidAction(adminDeleteActionId, "customer_request_delete", {
+    request_id: deletionTargetId
+  }));
+  const adminDeleteCycle = await coordinator.runNow();
+  assert.equal(adminDeleteCycle.appliedActions, 1);
+  assert.equal(adminDeleteCycle.failedActions, 0);
+  assert.equal(database.getDashboardData().requests.some((request) => request.id === deletionTargetId), false);
+  assert.equal(database.getDeletedRequestIds().includes(deletionTargetId), true);
 
   const adminStockActionId = "android_permission_stock_admin_0001";
   await assertQueued(await enqueueAndroidAction(adminStockActionId, "menu_stock_add", {
@@ -683,6 +741,8 @@ function createSnapshot(databaseInstance) {
       items: data.menu.items.filter((item) => item.is_available && categoryIds.has(item.category_id)),
       updated_at: data.menu.updated_at
     },
+    admin_menu: data.menu,
+    deleted_request_ids: databaseInstance.getDeletedRequestIds(),
     trackedStockItems: data.menu.items
       .filter((item) => item.stock_quantity !== null)
       .map((item) => ({

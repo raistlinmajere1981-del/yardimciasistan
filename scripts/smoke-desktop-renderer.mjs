@@ -339,6 +339,8 @@ try {
   await expect(page.locator(".menu-management-grid .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürünü Kaydet" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kategoriyi Sil" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ürünü Sil" })).toBeVisible();
   const liveMenuPreview = page.getByLabel("Canlı menü önizlemesi");
   await expect(liveMenuPreview).toBeVisible();
   await expect(liveMenuPreview.getByText("Yerel Serpme Kahvaltı", { exact: true })).toBeVisible();
@@ -378,6 +380,7 @@ try {
   await expect(page.locator(".whatsapp-copy-panel .detail-category-label")).toHaveText("Hazır yanıt");
   await expect(page.locator(".whatsapp-copy-panel .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mesajı Sil" })).toBeVisible();
   await expect(page.getByText("AI ile mesajı düzenle", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "AI Araçları", exact: true })).toHaveCount(0);
   await expect(page.locator(".whatsapp-webview-frame")).toHaveCount(0);
@@ -771,7 +774,8 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
-  await expect(conversionPage.locator(".request-detail-actions .action-button")).toHaveCount(3);
+  await expect(conversionPage.getByRole("button", { name: "Talebi Sil" })).toBeVisible();
+  await expect(conversionPage.locator(".request-detail-actions .action-button")).toHaveCount(4);
   await conversionPage.getByRole("button", { name: "Yeniden Aç" }).click();
   await conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" }).click();
   await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
@@ -782,6 +786,7 @@ try {
   await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
   await expect(conversionPage.getByLabel("Müşteri yönetimi")).toBeVisible();
   await expect(conversionPage.getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Müşteriyi Sil" })).toBeVisible();
   await conversionPage.getByLabel("Ara", { exact: true }).fill("Smoke");
   await expect(conversionPage.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Restoran" }).click();
@@ -1089,7 +1094,8 @@ try {
   const requestDetailHeight = await compactPage.locator(".request-detail-panel").evaluate((panel) => panel.getBoundingClientRect().height);
   expect(requestDetailHeight).toBeLessThan(420);
   await expect(compactPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
-  await expect(compactPage.locator(".request-detail-actions .action-button")).toHaveCount(3);
+  await expect(compactPage.getByRole("button", { name: "Talebi Sil" })).toBeVisible();
+  await expect(compactPage.locator(".request-detail-actions .action-button")).toHaveCount(4);
   await expect(compactPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
 

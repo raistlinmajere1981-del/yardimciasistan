@@ -248,6 +248,11 @@ Bu rezervasyonu onaylamak istiyor musunuz?
 
 Ama her küçük işlemde kullanıcıyı yoran onaylar çıkmamalıdır.
 
+Talep, müşteri, menü kategorisi/ürünü ve hazır mesaj silme düğmeleri tehlikeli işlem
+görünümünde olmalı ve her zaman hedef kaydı açıklayan ayrı bir onay istemelidir. Kategori
+onayı bağlı kaç ürünün de silineceğini, müşteri onayı ise geçmiş talep ve rezervasyonların
+korunacağını açıkça söylemelidir.
+
 ## Android Companion UI Kuralları
 
 Android uygulama sade olmalıdır.
@@ -261,6 +266,11 @@ sayısı gösterilmemelidir. Bunun yerine Servis / Sipariş, Kasa / Hesap, Oda /
 ve Müşteri / Rezervasyon görev alanları seçilebilir olmalıdır. Yönetici cihazda görev
 alanları yerine `Tüm yetkiler açık` bilgisi gösterilebilir.
 
+Android'de kayıt silme yüzeyleri yalnız aktif ve rolü çözümlenmiş yönetici cihazda
+gösterilmelidir. Personel cihazda ilgili izin yanlışlıkla görünse bile silme düğmesi veya
+Menü silme sekmesi açılmamalıdır. Yönetici menü yüzeyi yalnız kategori/ürün silmeye yarar;
+fiyat, içerik veya geniş menü düzenleme alanları içermez.
+
 ### Android’de Olması Gerekenler
 
 * Yeni talepler
@@ -271,6 +281,7 @@ alanları yerine `Tüm yetkiler açık` bilgisi gösterilebilir.
 * Ara
 * WhatsApp’tan yaz
 * Bildirimler
+* Yönetici için talep, müşteri, hazır mesaj ve menü kayıtlarını silme
 
 ### Android’de Olmaması Gerekenler
 
@@ -350,7 +361,6 @@ Widget küçük, sade ve güven veren bir şekilde görünmelidir.
 * Açılır sohbet / form penceresi
 * WhatsApp butonu
 * Rezervasyon formu
-* QR menü bağlantısı
 
 Widget açıldığında kullanıcıyı boğmamalıdır.
 

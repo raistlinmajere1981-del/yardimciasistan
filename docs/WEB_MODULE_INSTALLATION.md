@@ -131,7 +131,6 @@ Sitenin `</body>` kapanış etiketinden hemen önce ekleyin:
   data-business-name="Firma Adı"
   data-whatsapp-phone="+90 532 123 45 67"
   data-api-base-url="/yardimci-asistan"
-  data-menu-url="/yardimci-asistan/menu.html"
   data-logo-url="/yardimci-asistan/assets/yardimci-asistan-symbol.png"
   data-primary-color="#2F6F5E"
   data-accent-color="#E47863"
@@ -141,12 +140,11 @@ Sitenin `</body>` kapanış etiketinden hemen önce ekleyin:
 </script>
 ```
 
-Site farklı bir alt klasörde çalışıyorsa `src`, `data-api-base-url`, `data-menu-url` ve `data-logo-url` yollarını tam URL olarak yazabilirsiniz:
+Site farklı bir alt klasörde çalışıyorsa `src`, `data-api-base-url` ve `data-logo-url` yollarını tam URL olarak yazabilirsiniz:
 
 ```text
 https://firma.com/yardimci-asistan/widget.js
 https://firma.com/yardimci-asistan
-https://firma.com/yardimci-asistan/menu.html
 https://firma.com/yardimci-asistan/assets/yardimci-asistan-symbol.png
 ```
 

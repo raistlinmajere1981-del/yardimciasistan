@@ -19,6 +19,7 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+  seedOperationalSmokeData(database.databasePath);
 
   assert.ok(database.getDashboardData().menu.items.length > 0);
   assert.equal(
@@ -491,6 +492,15 @@ try {
   console.log(`desktop-menu-db-ok: setup ${categoryResult.savedId} ${itemResult.savedId}`);
 } finally {
   database.close();
+}
+
+function seedOperationalSmokeData(databasePath) {
+  const sqlite = new DatabaseSync(databasePath);
+  try {
+    sqlite.exec(readFileSync(join(process.cwd(), "scripts", "fixtures", "desktop-operations-smoke.sql"), "utf8"));
+  } finally {
+    sqlite.close();
+  }
 }
 
 function assertReadableSqliteBackup(backupFilePath) {

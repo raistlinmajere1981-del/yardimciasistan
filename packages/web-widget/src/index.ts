@@ -12,7 +12,6 @@ interface WidgetConfig {
   businessName: string;
   whatsappPhone: string;
   apiBaseUrl: string;
-  menuUrl: string;
   logoUrl: string;
   primaryColor: string;
   accentColor: string;
@@ -74,7 +73,6 @@ const defaultConfig: WidgetConfig = {
   businessName: "Yardımcı Asistan",
   whatsappPhone: "",
   apiBaseUrl: "",
-  menuUrl: "",
   logoUrl: "",
   primaryColor: "#2F6F5E",
   accentColor: "#E47863"
@@ -243,14 +241,6 @@ function homeTemplate() {
           ${iconTemplate("whatsapp")}
           <span>WhatsApp mesajı hazırla</span>
         </button>
-        ${
-          config.menuUrl
-            ? `<a class="ya-widget-menu-link" href="${escapeAttribute(config.menuUrl)}" target="_blank" rel="noreferrer">
-                ${iconTemplate("menu")}
-                <span>Menüyü gör</span>
-              </a>`
-            : ""
-        }
       </div>
       <p class="ya-widget-trust">
         ${iconTemplate("shield")}
@@ -1211,11 +1201,6 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       background: #f5faf5;
     }
 
-    .ya-widget-menu-link {
-      color: ${widgetConfig.primaryColor} !important;
-      border-color: rgba(47, 111, 94, 0.2) !important;
-    }
-
     .ya-widget-trust,
     .ya-widget-form-note {
       display: flex;
@@ -1717,7 +1702,6 @@ const iconPaths = {
   table: '<path d="M4 10h16M6 10l-1 10M18 10l1 10M8 6h8a2 2 0 0 1 2 2v2H6V8a2 2 0 0 1 2-2Z"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.9.8-.9 1.6M12 17h.01"/>',
   whatsapp: '<path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.4-4A8 8 0 1 1 20 11.5Z"/><path d="M9 8.7c.5 2.5 2 4 4.5 4.8l1-1"/>',
-  menu: '<path d="M5 7h14M5 12h14M5 17h14"/>',
   shield: '<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
   "arrow-left": '<path d="m15 18-6-6 6-6M9 12h10"/>',
   minus: '<path d="M5 12h14"/>',
@@ -1739,7 +1723,6 @@ function getScriptConfig(): Partial<WidgetConfig> {
     businessName: dataset.businessName,
     whatsappPhone: dataset.whatsappPhone,
     apiBaseUrl: dataset.apiBaseUrl,
-    menuUrl: dataset.menuUrl,
     logoUrl: dataset.logoUrl,
     primaryColor: dataset.primaryColor,
     accentColor: dataset.accentColor

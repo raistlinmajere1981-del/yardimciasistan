@@ -35,7 +35,7 @@ import type { BusinessConfig, PageKey } from "./types";
 const business = businessJson as BusinessConfig;
 type RequestSubmitState = "idle" | "saving" | "saved" | "fallback" | "error";
 const DEMO_WIDGET_SCRIPT_ID = "yardimci-asistan-demo-widget-script";
-const DEMO_WIDGET_VERSION = "20260719-footer-safe";
+const DEMO_WIDGET_VERSION = "20260722-menu-link-removed";
 const DEFAULT_WEB_MODULE_URL = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
 const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.1").trim() || "0.1.1";
 const DESKTOP_INSTALLER_URL =
@@ -65,8 +65,7 @@ const navItems: Array<{ key: PageKey; label: string; icon: typeof Home }> = [
   { key: "menu", label: "QR Menü", icon: MenuIcon },
   { key: "gallery", label: "Galeri", icon: Images },
   { key: "location", label: "Ulaşım", icon: MapPin },
-  { key: "contact", label: "İletişim", icon: Phone },
-  { key: "request", label: "Talep Oluştur", icon: CalendarPlus }
+  { key: "contact", label: "İletişim", icon: Phone }
 ];
 
 const pageKeys: PageKey[] = ["home", "rooms", "restaurant", "menu", "gallery", "location", "contact", "request", "settings"];
@@ -76,6 +75,8 @@ const requestTypeOptions = [
   { value: "restaurant_reservation", label: "Masa talebi", icon: UtensilsCrossed },
   { value: "general_info", label: "Bilgi al", icon: MessageSquareText }
 ] as const;
+type RequestType = (typeof requestTypeOptions)[number]["value"];
+type NavigateToPage = (page: PageKey, requestType?: RequestType) => void;
 
 const serviceIcons = {
   bed: BedDouble,
@@ -85,6 +86,7 @@ const serviceIcons = {
 
 function App() {
   const [activePage, setActivePage] = useState<PageKey>(() => getPageFromLocation());
+  const [initialRequestType, setInitialRequestType] = useState<RequestType>("pension_reservation");
   const themeStyle = {
     "--primary": business.colors.primary,
     "--accent": business.colors.accent,
@@ -103,7 +105,10 @@ function App() {
     return () => window.removeEventListener("popstate", syncPageFromLocation);
   }, []);
 
-  function goToPage(page: PageKey) {
+  function goToPage(page: PageKey, requestType?: RequestType) {
+    if (page === "request" && requestType) {
+      setInitialRequestType(requestType);
+    }
     setActivePage(page);
     const nextUrl = new URL(window.location.href);
     nextUrl.hash = page === "home" ? "" : page;
@@ -122,7 +127,7 @@ function App() {
         {activePage === "gallery" && <GalleryPage />}
         {activePage === "location" && <LocationPage />}
         {activePage === "contact" && <ContactPage onNavigate={goToPage} />}
-        {activePage === "request" && <RequestPage />}
+        {activePage === "request" && <RequestPage initialRequestType={initialRequestType} />}
         {activePage === "settings" && <SettingsPage />}
       </main>
       <Footer onNavigate={goToPage} />
@@ -141,7 +146,6 @@ function useDemoWidget() {
       businessName: business.display_name,
       whatsappPhone: business.whatsapp,
       apiBaseUrl: getWebModuleApiBaseUrl(),
-      menuUrl: `${webModuleBaseUrl}/menu.html`,
       logoUrl: `${webModuleBaseUrl}/assets/yardimci-asistan-symbol.png`,
       primaryColor: business.colors.primary,
       accentColor: business.colors.accent
@@ -160,7 +164,6 @@ function useDemoWidget() {
     script.dataset.businessName = config.businessName;
     script.dataset.whatsappPhone = config.whatsappPhone;
     script.dataset.apiBaseUrl = config.apiBaseUrl;
-    script.dataset.menuUrl = config.menuUrl;
     script.dataset.logoUrl = config.logoUrl;
     script.dataset.primaryColor = config.primaryColor;
     script.dataset.accentColor = config.accentColor;
@@ -168,7 +171,7 @@ function useDemoWidget() {
   }, []);
 }
 
-function Header({ activePage, onNavigate }: { activePage: PageKey; onNavigate: (page: PageKey) => void }) {
+function Header({ activePage, onNavigate }: { activePage: PageKey; onNavigate: NavigateToPage }) {
   const brandLogoUrl = business.logo_url || "/assets/yardimci-asistan-symbol.png";
 
   return (
@@ -201,7 +204,7 @@ function Header({ activePage, onNavigate }: { activePage: PageKey; onNavigate: (
   );
 }
 
-function HomePage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+function HomePage({ onNavigate }: { onNavigate: NavigateToPage }) {
   return (
     <>
       <section className="hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(23, 32, 51, 0.78), rgba(23, 32, 51, 0.2)), url(${business.hero.image_url})` }}>
@@ -210,7 +213,7 @@ function HomePage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
           <h1>{business.hero.title}</h1>
           <p>{business.hero.summary}</p>
           <div className="hero-actions">
-            <button className="primary-button" onClick={() => onNavigate("request")}>
+            <button className="primary-button" onClick={() => onNavigate("request", "pension_reservation")}>
               <CalendarPlus size={19} aria-hidden="true" />
               Rezervasyon Talebi Oluştur
             </button>
@@ -267,7 +270,7 @@ function HomePage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
   );
 }
 
-function RoomsPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+function RoomsPage({ onNavigate }: { onNavigate: NavigateToPage }) {
   return (
     <PageShell title="Pansiyon / Odalar" text="Müsaitlik ve fiyat bilgisi işletme tarafından kontrol edilerek paylaşılır.">
       <section className="room-grid">
@@ -290,7 +293,7 @@ function RoomsPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
                 ))}
               </div>
               <p className="note">{room.price_note}</p>
-              <button className="primary-button" onClick={() => onNavigate("request")}>
+              <button className="primary-button" onClick={() => onNavigate("request", "pension_reservation")}>
                 <CalendarPlus size={18} aria-hidden="true" />
                 Bu Oda İçin Talep Oluştur
               </button>
@@ -302,7 +305,7 @@ function RoomsPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
   );
 }
 
-function RestaurantPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+function RestaurantPage({ onNavigate }: { onNavigate: NavigateToPage }) {
   return (
     <PageShell title="Restoran / Kafe" text="Bahçe masaları, kahvaltı ve hafif lezzetler için hızlıca masa talebi oluşturabilirsiniz.">
       <section className="feature-band reverse">
@@ -319,7 +322,7 @@ function RestaurantPage({ onNavigate }: { onNavigate: (page: PageKey) => void })
             ))}
           </div>
           <div className="inline-actions">
-            <button className="primary-button" onClick={() => onNavigate("request")}>
+            <button className="primary-button" onClick={() => onNavigate("request", "restaurant_reservation")}>
               <CalendarPlus size={18} aria-hidden="true" />
               Masa Talebi Oluştur
             </button>
@@ -334,11 +337,11 @@ function RestaurantPage({ onNavigate }: { onNavigate: (page: PageKey) => void })
   );
 }
 
-function MenuPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+function MenuPage({ onNavigate }: { onNavigate: NavigateToPage }) {
   const formatter = useMemo(() => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }), []);
 
   return (
-    <PageShell title="QR Menü" text="Öne çıkan ürünler ve günlük lezzetler.">
+    <PageShell title="QR Menü" text="Ege kahvaltısından yerel ana yemeklere, günlük tatlılardan kafe içeceklerine.">
       <section className="menu-layout">
         {business.menu.categories.map((category) => {
           const items = business.menu.items.filter((item) => item.category_id === category.id);
@@ -348,11 +351,12 @@ function MenuPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
               <div className="menu-items">
                 {items.map((item) => (
                   <div className="menu-item" key={item.id}>
-                    <div>
+                    <img src={item.image_url} alt="" loading="lazy" />
+                    <div className="menu-item-copy">
                       <strong>{item.name}</strong>
                       <p>{item.description}</p>
                     </div>
-                    <span>{formatter.format(item.price)}</span>
+                    <span className="menu-item-price">{formatter.format(item.price)}</span>
                   </div>
                 ))}
               </div>
@@ -361,7 +365,7 @@ function MenuPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
         })}
       </section>
       <div className="center-actions">
-        <button className="primary-button" onClick={() => onNavigate("request")}>
+        <button className="primary-button" onClick={() => onNavigate("request", "restaurant_reservation")}>
           <CalendarPlus size={18} aria-hidden="true" />
           Masa veya Bilgi Talebi Oluştur
         </button>
@@ -407,7 +411,7 @@ function LocationPage() {
   );
 }
 
-function ContactPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+function ContactPage({ onNavigate }: { onNavigate: NavigateToPage }) {
   return (
     <PageShell title="İletişim" text="Sorularınız ve rezervasyon talepleriniz için işletmeye kolayca ulaşabilirsiniz.">
       <section className="contact-layout">
@@ -435,7 +439,7 @@ function ContactPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
           {business.working_hours.map((hour) => (
             <p key={hour}>{hour}</p>
           ))}
-          <button className="ghost-button" onClick={() => onNavigate("request")}>
+          <button className="ghost-button" onClick={() => onNavigate("request", "general_info")}>
             <Send size={18} aria-hidden="true" />
             Talep Oluştur
           </button>
@@ -445,9 +449,9 @@ function ContactPage({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
   );
 }
 
-function RequestPage() {
+function RequestPage({ initialRequestType }: { initialRequestType: RequestType }) {
   const [form, setForm] = useState({
-    requestType: "pension_reservation",
+    requestType: initialRequestType,
     name: "",
     phone: "",
     date: "",
@@ -922,7 +926,7 @@ function PageShell({
   );
 }
 
-function Footer({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
+function Footer({ onNavigate }: { onNavigate: NavigateToPage }) {
   return (
     <footer className="site-footer">
       <div>

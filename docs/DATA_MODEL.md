@@ -116,6 +116,30 @@ ve action'ı reddeder; bozuk güvenlik kaydı staff preset'ine fail-open dönmez
 6. Müşteri tarafına gereksiz işletme içi veri gönderilmemelidir.
 7. AI tarafından üretilen bilgiler kesin veri değil, öneri olarak işaretlenmelidir.
 
+## Operasyonel Silme Kuralları
+
+Masaüstü ve Android yönetici silme işlemleri fiziksel `DELETE` kullanmaz; ilgili kayıt
+`deleted_at` ile görünür veri kümesinden çıkarılır ve bir event oluşturulur.
+
+```text
+Talep silme       → talep ve bağlı hazırlanmış WhatsApp mesajları soft-delete olur.
+Müşteri silme     → müşteri soft-delete olur; talep, rezervasyon ve mesaj geçmişindeki
+                    customer_id bağı kaldırılır, geçmiş kayıtlar korunur.
+Kategori silme    → kategori ve o kategoriye bağlı tüm menü ürünleri soft-delete olur.
+Ürün silme        → yalnız seçili menü ürünü soft-delete olur.
+Hazır mesaj silme → hazırlanmış outgoing mesaj soft-delete olur; talebin
+                    ai_suggested_reply ve whatsapp_message alanları temizlenir.
+```
+
+Android'de bu işlemler yalnız aktif, profili çözülmüş `admin` cihazlara açıktır ve
+`customer.delete`, `request.delete`, `menu.delete`, `message.delete` izinleriyle birlikte
+rol kontrolü de yapılır. Personel görev paketleri bu izinleri içermez.
+
+Android snapshot iki menü görünümü taşır: operasyonlar için aktif/mevcut kayıtları içeren
+`menu`, yönetici silme ekranı için silinmemiş tüm kategori ve ürünleri içeren `admin_menu`.
+Soft-delete edilmiş talep kimlikleri `deleted_request_ids` içinde tombstone olarak taşınır;
+hosting `web_requests` birleşimi bu kimlikleri yeniden Android listesine eklemez.
+
 ---
 
 # 1. Business / Firma Modeli

@@ -1607,6 +1607,32 @@ Durum:
 
 ---
 
+## TASK-0906 — Masaüstü ve Android yönetici kayıt silme akışlarını ekle
+
+Amaç:
+
+Talep, müşteri, menü kategorisi/ürünü ve hazır mesajları masaüstünden; aynı kayıtları
+Android'de yalnız yönetici cihazdan güvenli biçimde silebilmek.
+
+Kabul kriterleri:
+
+* Tüm silmeler SQLite `deleted_at` alanıyla soft-delete olmalı ve event üretmeli.
+* Kategori silme bağlı ürünleri de silmeli.
+* Müşteri silme talep ve rezervasyon geçmişini koruyup müşteri bağlarını kaldırmalı.
+* Hazır mesaj silme talebi korurken mesaj kaydı ve talepteki hazır cevap alanlarını temizlemeli.
+* Android personel UI'ında silme yüzeyleri görünmemeli ve action apply katmanı rolü yeniden doğrulamalı.
+* Hostingdeki eski web talebi silme sonrası Android özetinde yeniden görünmemeli.
+
+Durum:
+
+* Tamamlandı. Masaüstü IPC/UI silme eylemleri, Android yönetici detay eylemleri ve silmeye
+  özel menü görünümü eklendi. Yeni action/permission sözleşmeleri masaüstü tarafından
+  fail-closed uygulanır. Android snapshot `admin_menu` ile tam silme listesini,
+  `deleted_request_ids` ile hosting birleşim tombstone'larını taşır. SQLite smoke testi,
+  Android unit/debug derlemesi ve gerçek PHP otomatik senkron smoke testi kapsamı eklendi.
+
+---
+
 # Faz 10 — Kurulum ve Paketleme
 
 ## TASK-1001 — Firma web modülü kurulum dokümanını yaz

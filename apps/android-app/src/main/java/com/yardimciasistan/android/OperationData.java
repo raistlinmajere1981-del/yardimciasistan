@@ -16,6 +16,8 @@ final class OperationData {
       "customer.mark_answered",
       "customer.reject",
       "customer.convert_to_reservation",
+      "customer.delete",
+      "request.delete",
       "reservation.view",
       "reservation.approve",
       "reservation.reject",
@@ -41,6 +43,8 @@ final class OperationData {
       "menu.edit",
       "menu.stock_view",
       "menu.stock_update",
+      "menu.delete",
+      "message.delete",
       "settings.view",
       "settings.edit",
       "android_devices.view",
@@ -101,6 +105,8 @@ final class OperationData {
   final List<TaskRecord> tasks = new ArrayList<>();
   final List<MenuCategory> categories = new ArrayList<>();
   final List<MenuItem> menuItems = new ArrayList<>();
+  final List<MenuCategory> adminCategories = new ArrayList<>();
+  final List<MenuItem> adminMenuItems = new ArrayList<>();
   final List<TrackedStockItem> trackedStockItems = new ArrayList<>();
   final Set<String> appliedStockImageHashes = new HashSet<>();
   final List<TableOrder> tableOrders = new ArrayList<>();
@@ -163,6 +169,12 @@ final class OperationData {
     JSONObject menu = object(root, "menu");
     addRecords(array(menu, "categories"), data.categories, MenuCategory::fromJson);
     addRecords(array(menu, "items"), data.menuItems, MenuItem::fromJson);
+    JSONObject adminMenu = root.optJSONObject("admin_menu");
+    if (adminMenu == null) {
+      adminMenu = menu;
+    }
+    addRecords(array(adminMenu, "categories"), data.adminCategories, MenuCategory::fromJson);
+    addRecords(array(adminMenu, "items"), data.adminMenuItems, MenuItem::fromJson);
 
     data.applyPermissionProfile(root.optJSONObject("androidPermissions"), deviceId);
 
@@ -187,6 +199,10 @@ final class OperationData {
 
   boolean hasPermission(String permission) {
     return deviceActive && permissions.contains(permission);
+  }
+
+  boolean isAdmin() {
+    return permissionsResolved && deviceActive && "admin".equals(deviceRole);
   }
 
   String deviceRoleLabel() {
@@ -254,6 +270,15 @@ final class OperationData {
 
   String categoryName(String categoryId) {
     for (MenuCategory category : categories) {
+      if (categoryId.equals(category.id)) {
+        return category.name;
+      }
+    }
+    return "Menü";
+  }
+
+  String adminCategoryName(String categoryId) {
+    for (MenuCategory category : adminCategories) {
       if (categoryId.equals(category.id)) {
         return category.name;
       }
@@ -533,11 +558,15 @@ final class OperationData {
   static final class MenuCategory {
     String id = "";
     String name = "Menü";
+    boolean active = true;
+    String updatedAt = "";
 
     static MenuCategory fromJson(JSONObject source) {
       MenuCategory record = new MenuCategory();
       record.id = value(source, "id", "");
       record.name = value(source, "name", "Menü");
+      record.active = source.optBoolean("is_active", true);
+      record.updatedAt = value(source, "updated_at", "");
       return record;
     }
   }
@@ -553,6 +582,7 @@ final class OperationData {
     Double stockQuantity;
     Double stockMinQuantity;
     boolean hideWhenOutOfStock;
+    String updatedAt = "";
 
     static MenuItem fromJson(JSONObject source) {
       MenuItem record = new MenuItem();
@@ -566,6 +596,7 @@ final class OperationData {
       record.stockQuantity = nullableDecimal(source, "stock_quantity");
       record.stockMinQuantity = nullableDecimal(source, "stock_min_quantity");
       record.hideWhenOutOfStock = source.optBoolean("hide_when_out_of_stock", false);
+      record.updatedAt = value(source, "updated_at", "");
       return record;
     }
 

@@ -46,6 +46,7 @@ try {
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
+  await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
 
   await page.evaluate(() => {
     window.open = (url) => {

@@ -190,6 +190,17 @@ bölümlerini, `settings.edit` ise bağlantı alanlarını ayrı ayrı sınırla
 Asıl güvenlik sınırı yine masaüstündedir: action apply transaction'ı cihazın aktifliğini
 ve action türünün gerektirdiği izni kontrol etmeden yerel operasyon verisini değiştirmez.
 
+Talep, müşteri, menü kategorisi/ürünü ve hazır mesaj silme action'ları Android'de ayrıca
+`admin` rolü gerektirir. İzin adı yanlışlıkla bir personel profiline eklense bile Android
+gönderim kapısı ve masaüstü apply transaction'ı işlemi reddeder. Android menü ekranı tam
+bir düzenleyici değildir; yöneticiye yalnız kategori ve ürün silme yüzeyi sunar.
+
+Silme işlemleri masaüstü SQLite'ta `deleted_at` ile soft-delete olarak uygulanır. Kategori
+silme bağlı ürünleri de siler; müşteri silme geçmiş talep ve rezervasyonları silmek yerine
+`customer_id` bağını kaldırır. Masaüstü Android snapshot'ında yöneticiye ait tam menüyü
+`admin_menu`, silinen web taleplerinin hosting kaydından yeniden birleşmesini önleyen
+kimlikleri `deleted_request_ids` alanında yayınlar.
+
 Telefon action kimliğini gönderimden önce üretir ve action'ı kalıcı yerel outbox'ta tutar.
 Belirsiz HTTP yanıtlarında aynı kimlik tekrar kullanılır. Snapshot kaynaklı değişiklikler
 beklenen `updated_at` sürümünü taşır; masaüstü daha yeni bir kayıt görürse stale işlemi

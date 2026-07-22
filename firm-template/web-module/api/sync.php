@@ -149,13 +149,14 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $records = ya_storage_all_requests();
 
     $androidSnapshot = ya_sync_load_android_snapshot();
+    $deletedRequestIds = array_fill_keys($androidSnapshot['deleted_request_ids'], true);
     $requestsById = [];
     foreach ($androidSnapshot['requests'] as $snapshotRequest) {
         if (!is_array($snapshotRequest)) {
             continue;
         }
         $requestId = ya_sync_string($snapshotRequest['id'] ?? '');
-        if ($requestId !== '') {
+        if ($requestId !== '' && !isset($deletedRequestIds[$requestId])) {
             $requestsById[$requestId] = $snapshotRequest;
         }
     }
@@ -169,7 +170,11 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         }
         $publicRequest = ya_sync_public_request($record);
         $requestId = ya_sync_string($publicRequest['id'] ?? '');
-        if ($requestId !== '' && !isset($requestsById[$requestId])) {
+        if (
+            $requestId !== ''
+            && !isset($deletedRequestIds[$requestId])
+            && !isset($requestsById[$requestId])
+        ) {
             $requestsById[$requestId] = ya_sync_sanitize_android_request($publicRequest);
         }
     }
@@ -246,6 +251,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'rooms' => $androidSnapshot['rooms'],
         'tables' => $androidSnapshot['tables'],
         'menu' => $androidSnapshot['menu'],
+        'admin_menu' => $androidSnapshot['admin_menu'],
         'trackedStockItems' => $androidSnapshot['trackedStockItems'],
         'appliedStockImageHashes' => $androidSnapshot['appliedStockImageHashes'],
         'table_orders' => $androidSnapshot['table_orders'],
@@ -793,6 +799,8 @@ function ya_sync_android_action_types(): array
         'customer_request_approve',
         'customer_request_reject',
         'customer_request_convert_to_reservation',
+        'customer_request_delete',
+        'customer_delete',
         'reservation_approve',
         'reservation_reject',
         'reservation_cancel',
@@ -815,7 +823,10 @@ function ya_sync_android_action_types(): array
         'menu_stock_add',
         'menu_stock_set',
         'menu_stock_adjust',
-        'menu_stock_image_import_apply'
+        'menu_stock_image_import_apply',
+        'menu_category_delete',
+        'menu_item_delete',
+        'message_delete'
     ];
 }
 
@@ -870,11 +881,16 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
     $summary = is_array($snapshot['summary'] ?? null) ? $snapshot['summary'] : [];
     $tasks = is_array($snapshot['daily_tasks'] ?? null) ? $snapshot['daily_tasks'] : [];
     $menu = is_array($snapshot['menu'] ?? null) ? $snapshot['menu'] : [];
+    $adminMenu = is_array($snapshot['admin_menu'] ?? null) ? $snapshot['admin_menu'] : $menu;
     $updatedAt = ya_sync_string($snapshot['updated_at'] ?? $fallbackTimestamp);
     $categories = ya_sync_sanitize_menu_categories($menu['categories'] ?? [], $updatedAt);
     $categoryIds = array_map(static function (array $category): string {
         return ya_sync_string($category['id'] ?? '');
     }, $categories);
+    $adminCategories = ya_sync_sanitize_menu_categories($adminMenu['categories'] ?? [], $updatedAt);
+    $adminCategoryIds = array_map(static function (array $category): string {
+        return ya_sync_string($category['id'] ?? '');
+    }, $adminCategories);
 
     return [
         'summary' => [
@@ -904,6 +920,12 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
             'items' => ya_sync_sanitize_menu_items($menu['items'] ?? [], $categoryIds, $updatedAt),
             'updated_at' => ya_sync_string($menu['updated_at'] ?? $updatedAt) ?: $updatedAt
         ],
+        'admin_menu' => [
+            'categories' => $adminCategories,
+            'items' => ya_sync_sanitize_menu_items($adminMenu['items'] ?? [], $adminCategoryIds, $updatedAt),
+            'updated_at' => ya_sync_string($adminMenu['updated_at'] ?? $updatedAt) ?: $updatedAt
+        ],
+        'deleted_request_ids' => ya_sync_sanitize_deleted_request_ids($snapshot['deleted_request_ids'] ?? []),
         'trackedStockItems' => ya_sync_sanitize_tracked_stock_items($snapshot['trackedStockItems'] ?? []),
         'appliedStockImageHashes' => ya_sync_sanitize_stock_image_hashes($snapshot['appliedStockImageHashes'] ?? []),
         'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
@@ -950,6 +972,8 @@ function ya_sync_android_permissions(): array
         'customer.mark_answered',
         'customer.reject',
         'customer.convert_to_reservation',
+        'customer.delete',
+        'request.delete',
         'reservation.view',
         'reservation.approve',
         'reservation.reject',
@@ -975,6 +999,8 @@ function ya_sync_android_permissions(): array
         'menu.edit',
         'menu.stock_view',
         'menu.stock_update',
+        'menu.delete',
+        'message.delete',
         'settings.view',
         'settings.edit',
         'android_devices.view',
@@ -1406,6 +1432,31 @@ function ya_sync_sanitize_stock_image_hashes(mixed $hashes): array
             break;
         }
     }
+    return array_keys($result);
+}
+
+function ya_sync_sanitize_deleted_request_ids(mixed $ids): array
+{
+    if (!is_array($ids)) {
+        return [];
+    }
+
+    $result = [];
+    foreach ($ids as $id) {
+        $normalized = ya_sync_string($id);
+        if (
+            $normalized === ''
+            || strlen($normalized) > 200
+            || preg_match('/^[A-Za-z0-9._:-]+$/', $normalized) !== 1
+        ) {
+            continue;
+        }
+        $result[$normalized] = true;
+        if (count($result) >= 5000) {
+            break;
+        }
+    }
+
     return array_keys($result);
 }
 

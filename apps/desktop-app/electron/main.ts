@@ -54,6 +54,7 @@ import {
   type UpdateReservationStatusInput,
   type UpdateDailyTaskStatusInput,
   type MarkWhatsAppMessageSentInput,
+  type DeleteWhatsAppMessageInput,
   type DesktopStockImageAnalyzeInput,
   type DesktopStockImageAnalyzeResult,
   type ApplyStockImageImportInput,
@@ -427,6 +428,14 @@ function registerIpcHandlers() {
     return getDatabase().saveMenuItem(input);
   });
 
+  ipcMain.handle("menu:deleteCategory", (_event, categoryId: unknown): DesktopStatusUpdateResult => {
+    return finalizeDesktopRecordDeletion(getDatabase().deleteMenuCategory(String(categoryId ?? "")));
+  });
+
+  ipcMain.handle("menu:deleteItem", (_event, itemId: unknown): DesktopStatusUpdateResult => {
+    return finalizeDesktopRecordDeletion(getDatabase().deleteMenuItem(String(itemId ?? "")));
+  });
+
   ipcMain.handle("stockImage:analyze", async (_event, value: unknown): Promise<DesktopStockImageAnalyzeResult> => {
     return analyzeDesktopStockImage(value);
   });
@@ -664,8 +673,20 @@ function registerIpcHandlers() {
     return getDatabase().updateRequestStatus(input);
   });
 
+  ipcMain.handle("request:delete", (_event, requestId: unknown): DesktopStatusUpdateResult => {
+    return finalizeDesktopRecordDeletion(getDatabase().deleteRequest(String(requestId ?? "")));
+  });
+
+  ipcMain.handle("customer:delete", (_event, customerId: unknown): DesktopStatusUpdateResult => {
+    return finalizeDesktopRecordDeletion(getDatabase().deleteCustomer(String(customerId ?? "")));
+  });
+
   ipcMain.handle("whatsapp:markMessageSent", (_event, input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult => {
     return getDatabase().markWhatsAppMessageSent(input);
+  });
+
+  ipcMain.handle("whatsapp:deleteMessage", (_event, input: DeleteWhatsAppMessageInput): DesktopStatusUpdateResult => {
+    return finalizeDesktopRecordDeletion(getDatabase().deleteWhatsAppMessage(input));
   });
 
   ipcMain.handle("room:updateStatus", (_event, input: UpdateRoomStatusInput): DesktopStatusUpdateResult => {
@@ -1020,6 +1041,15 @@ function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResul
   return result;
 }
 
+function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
+  if (result.ok) {
+    androidSnapshotPublishPending = true;
+    notifyDesktopDashboardChanged(result.dashboardData);
+    getSyncCoordinator().scheduleSoon();
+  }
+  return result;
+}
+
 function parseAddTableOrderItemInput(value: unknown): AddTableOrderItemInput | null {
   const record = toUnknownRecord(value);
   return record
@@ -1329,6 +1359,8 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
       updated_at: table.updatedAt
     })),
     menu: androidMenu,
+    admin_menu: dashboardData.menu,
+    deleted_request_ids: getDatabase().getDeletedRequestIds(),
     trackedStockItems: dashboardData.menu.items
       .filter((item) => item.stock_quantity !== null)
       .map((item) => ({

@@ -28,6 +28,7 @@ import type {
   UpdateReservationStatusInput,
   UpdateDailyTaskStatusInput,
   MarkWhatsAppMessageSentInput,
+  DeleteWhatsAppMessageInput,
   DesktopStockImageAnalyzeInput,
   DesktopStockImageAnalyzeResult,
   ApplyStockImageImportInput,
@@ -81,7 +82,10 @@ export interface DesktopBridge {
   createManualRequest: (input: CreateManualRequestInput) => Promise<CreateManualRequestResult>;
   convertRequestToReservation: (requestId: string) => Promise<RequestReservationConversionResult>;
   updateRequestStatus: (input: UpdateRequestStatusInput) => Promise<DesktopStatusUpdateResult>;
+  deleteRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
+  deleteCustomer: (customerId: string) => Promise<DesktopStatusUpdateResult>;
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => Promise<DesktopStatusUpdateResult>;
+  deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => Promise<DesktopStatusUpdateResult>;
   updateRoomStatus: (input: UpdateRoomStatusInput) => Promise<DesktopStatusUpdateResult>;
   updateTableStatus: (input: UpdateTableStatusInput) => Promise<DesktopStatusUpdateResult>;
   listTableOrders: () => Promise<DesktopTableOrder[]>;
@@ -109,6 +113,8 @@ export interface DesktopBridge {
   pushAiSettings: () => Promise<PushAiSettingsResult>;
   saveMenuCategory: (input: SaveMenuCategoryInput) => Promise<DesktopMenuSaveResult>;
   saveMenuItem: (input: SaveMenuItemInput) => Promise<DesktopMenuSaveResult>;
+  deleteMenuCategory: (categoryId: string) => Promise<DesktopStatusUpdateResult>;
+  deleteMenuItem: (itemId: string) => Promise<DesktopStatusUpdateResult>;
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => Promise<DesktopStockImageAnalyzeResult>;
   cancelStockImageAnalysis: (importId: string) => Promise<boolean>;
   applyStockImageImport: (input: ApplyStockImageImportInput) => Promise<DesktopStockImageApplyResult>;
@@ -142,7 +148,10 @@ const bridge: DesktopBridge = {
   createManualRequest: (input: CreateManualRequestInput) => ipcRenderer.invoke("request:createManual", input),
   convertRequestToReservation: (requestId: string) => ipcRenderer.invoke("request:convertToReservation", requestId),
   updateRequestStatus: (input: UpdateRequestStatusInput) => ipcRenderer.invoke("request:updateStatus", input),
+  deleteRequest: (requestId: string) => ipcRenderer.invoke("request:delete", requestId),
+  deleteCustomer: (customerId: string) => ipcRenderer.invoke("customer:delete", customerId),
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => ipcRenderer.invoke("whatsapp:markMessageSent", input),
+  deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => ipcRenderer.invoke("whatsapp:deleteMessage", input),
   updateRoomStatus: (input: UpdateRoomStatusInput) => ipcRenderer.invoke("room:updateStatus", input),
   updateTableStatus: (input: UpdateTableStatusInput) => ipcRenderer.invoke("table:updateStatus", input),
   listTableOrders: () => ipcRenderer.invoke("tableOrder:list"),
@@ -173,6 +182,8 @@ const bridge: DesktopBridge = {
   pushAiSettings: () => ipcRenderer.invoke("sync:pushAiSettings"),
   saveMenuCategory: (input: SaveMenuCategoryInput) => ipcRenderer.invoke("menu:saveCategory", input),
   saveMenuItem: (input: SaveMenuItemInput) => ipcRenderer.invoke("menu:saveItem", input),
+  deleteMenuCategory: (categoryId: string) => ipcRenderer.invoke("menu:deleteCategory", categoryId),
+  deleteMenuItem: (itemId: string) => ipcRenderer.invoke("menu:deleteItem", itemId),
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => ipcRenderer.invoke("stockImage:analyze", input),
   cancelStockImageAnalysis: (importId: string) => ipcRenderer.invoke("stockImage:cancel", importId),
   applyStockImageImport: (input: ApplyStockImageImportInput) => ipcRenderer.invoke("stockImage:apply", input),

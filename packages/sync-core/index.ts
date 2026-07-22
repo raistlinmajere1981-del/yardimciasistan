@@ -133,6 +133,8 @@ export interface AndroidOperationsSnapshot {
   rooms: AndroidSnapshotRoom[];
   tables: AndroidSnapshotTable[];
   menu: PublishedQrMenu;
+  admin_menu: PublishedQrMenu;
+  deleted_request_ids: string[];
   trackedStockItems: AndroidTrackedStockItem[];
   appliedStockImageHashes: string[];
   table_orders: AndroidSnapshotTableOrder[];
@@ -149,6 +151,8 @@ export const ANDROID_PERMISSIONS = [
   "customer.mark_answered",
   "customer.reject",
   "customer.convert_to_reservation",
+  "customer.delete",
+  "request.delete",
   "reservation.view",
   "reservation.approve",
   "reservation.reject",
@@ -172,10 +176,12 @@ export const ANDROID_PERMISSIONS = [
   "table_order.cancel",
   "menu.view",
   "menu.edit",
+  "menu.delete",
   "menu.stock_view",
   "menu.stock_update",
   "settings.view",
   "settings.edit",
+  "message.delete",
   "android_devices.view",
   "android_devices.manage"
 ] as const;
@@ -391,6 +397,8 @@ export const ANDROID_ACTION_TYPES = [
   "customer_request_approve",
   "customer_request_reject",
   "customer_request_convert_to_reservation",
+  "customer_request_delete",
+  "customer_delete",
   "reservation_approve",
   "reservation_reject",
   "reservation_cancel",
@@ -410,6 +418,9 @@ export const ANDROID_ACTION_TYPES = [
   "table_order_cancel",
   "table_order_set_status",
   "table_order_close",
+  "menu_category_delete",
+  "menu_item_delete",
+  "message_delete",
   "menu_stock_add",
   "menu_stock_set",
   "menu_stock_adjust",
@@ -458,6 +469,8 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   customer_request_approve: "customer.respond",
   customer_request_reject: "customer.reject",
   customer_request_convert_to_reservation: "customer.convert_to_reservation",
+  customer_request_delete: "request.delete",
+  customer_delete: "customer.delete",
   reservation_approve: "reservation.approve",
   reservation_reject: "reservation.reject",
   reservation_cancel: "reservation.cancel",
@@ -474,6 +487,9 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   table_order_set_payment_waiting: "table_order.set_payment_waiting",
   table_order_close_paid: "table_order.close_paid",
   table_order_cancel: "table_order.cancel",
+  menu_category_delete: "menu.delete",
+  menu_item_delete: "menu.delete",
+  message_delete: "message.delete",
   menu_stock_add: "menu.stock_update",
   menu_stock_set: "menu.stock_update",
   menu_stock_adjust: "menu.stock_update",

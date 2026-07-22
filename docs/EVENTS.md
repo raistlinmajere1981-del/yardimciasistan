@@ -319,6 +319,20 @@ Talep aktif listeden çıkar.
 Geçmiş kayıt olarak saklanır.
 ```
 
+## request.deleted
+
+Talep masaüstünden veya yetkili Android yönetici cihazdan silindiğinde oluşur.
+
+```json
+{
+  "customer_name": "Ahmet Yılmaz",
+  "deleted_message_count": 1
+}
+```
+
+Talep ve bağlı hazırlanmış WhatsApp mesajları `deleted_at` ile görünür veri kümesinden
+çıkarılır. Talep kimliği Android snapshot tombstone listesine eklenir.
+
 ---
 
 # 2. Reservation / Rezervasyon Eventleri
@@ -656,6 +670,21 @@ Müşteri last_contact_at alanı güncellenir.
 İlgili talep cevaplandı durumuna geçebilir.
 ```
 
+## customer.deleted
+
+Müşteri masaüstünden veya yetkili Android yönetici cihazdan silindiğinde oluşur.
+
+```json
+{
+  "full_name": "Ahmet Yılmaz",
+  "preserved_request_count": 2,
+  "preserved_reservation_count": 1
+}
+```
+
+Müşteri soft-delete edilir. Talep ve rezervasyon geçmişi korunur; müşteri kimliği bağları
+kaldırılır.
+
 ---
 
 # 6. Menu / QR Menü Eventleri
@@ -667,6 +696,19 @@ Yeni menü kategorisi eklendiğinde oluşur.
 ## menu.category_updated
 
 Menü kategorisi güncellendiğinde oluşur.
+
+## menu.category_deleted
+
+Menü kategorisi silindiğinde oluşur.
+
+```json
+{
+  "name": "Kahvaltı",
+  "deleted_item_count": 8
+}
+```
+
+Kategori ve bağlı ürünler soft-delete edilir; menü ve Android snapshot yayınları sıraya alınır.
 
 ## menu.item_created
 
@@ -691,6 +733,19 @@ Tepkiler:
 QR menü verisi güncellenir.
 Hosting mini API’ye senkronizasyon gerekebilir.
 ```
+
+## menu.item_deleted
+
+Tek bir menü ürünü silindiğinde oluşur.
+
+```json
+{
+  "name": "Serpme Kahvaltı",
+  "category_id": "cat_001"
+}
+```
+
+Ürün soft-delete edilir; kategori korunur ve yayınlar sıraya alınır.
 
 ## menu.item_availability_changed
 
@@ -960,6 +1015,20 @@ Tepkiler:
 Talep cevaplandı olarak işaretlenebilir.
 Müşteri last_contact_at güncellenir.
 ```
+
+## whatsapp.message_deleted
+
+Hazır mesaj masaüstünden veya yetkili Android yönetici cihazdan silindiğinde oluşur.
+
+```json
+{
+  "request_id": "request_001",
+  "deleted_record_count": 1
+}
+```
+
+Hazırlanmış outgoing mesaj soft-delete edilir ve talepteki hazır cevap alanları temizlenir;
+talebin kendisi korunur.
 
 ## whatsapp.webview_connected
 
@@ -1352,6 +1421,9 @@ request.created
 request.seen
 request.answered
 request.converted_to_reservation
+request.deleted
+
+customer.deleted
 
 reservation.created
 reservation.approved
@@ -1361,12 +1433,15 @@ room.status_changed
 table.status_changed
 
 menu.item_updated
+menu.item_deleted
+menu.category_deleted
 menu.published
 
 ai.summary_created
 ai.reply_suggested
 
 whatsapp.message_prepared
+whatsapp.message_deleted
 whatsapp.link_opened
 
 sync.completed

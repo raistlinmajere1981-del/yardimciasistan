@@ -405,6 +405,12 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
           updated_at: "2026-07-10T14:30:00+03:00"
         }
       ],
+      admin_menu: {
+        categories: [],
+        items: [],
+        updated_at: "2026-07-10T14:30:00+03:00"
+      },
+      deleted_request_ids: ["request_deleted_001"],
       androidPermissions: {
         "android-device-001": {
           role: "staff",
@@ -422,6 +428,8 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
   assert.equal(calls[0].body.action, "publish_android_snapshot");
   assert.equal(calls[0].body.snapshot.summary.available_rooms, 4);
   assert.equal(calls[0].body.snapshot.daily_tasks[0].id, "task_001");
+  assert.deepEqual(calls[0].body.snapshot.deleted_request_ids, ["request_deleted_001"]);
+  assert.deepEqual(calls[0].body.snapshot.admin_menu.items, []);
   assert.equal(calls[0].body.snapshot.androidPermissions["android-device-001"].role, "staff");
   assert.equal("sync_secret" in calls[0].body, false);
 });
@@ -449,6 +457,8 @@ test("Android role presets and action permission mapping stay explicit", () => {
   ]);
   assert.equal(resolveAndroidActionPermission("customer_request_mark_answered"), "customer.mark_answered");
   assert.equal(resolveAndroidActionPermission("customer_request_reopen"), "customer.respond");
+  assert.equal(resolveAndroidActionPermission("customer_request_delete"), "request.delete");
+  assert.equal(resolveAndroidActionPermission("customer_delete"), "customer.delete");
   assert.equal(resolveAndroidActionPermission("reservation_cancel"), "reservation.cancel");
   assert.equal(resolveAndroidActionPermission("table_order_set_preparing"), "table_order.set_preparing");
   assert.equal(resolveAndroidActionPermission("table_order_set_served"), "table_order.set_served");
@@ -460,6 +470,13 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("menu_stock_set"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("menu_stock_adjust"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("menu_stock_image_import_apply"), "menu.stock_update");
+  assert.equal(resolveAndroidActionPermission("menu_category_delete"), "menu.delete");
+  assert.equal(resolveAndroidActionPermission("menu_item_delete"), "menu.delete");
+  assert.equal(resolveAndroidActionPermission("message_delete"), "message.delete");
+  assert.equal(ANDROID_STAFF_PERMISSIONS.includes("customer.delete"), false);
+  assert.equal(ANDROID_STAFF_PERMISSIONS.includes("request.delete"), false);
+  assert.equal(ANDROID_STAFF_PERMISSIONS.includes("menu.delete"), false);
+  assert.equal(ANDROID_STAFF_PERMISSIONS.includes("message.delete"), false);
   assert.equal(resolveAndroidActionPermission("unsupported_action"), null);
 });
 

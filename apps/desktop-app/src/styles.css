@@ -5588,6 +5588,23 @@ button {
   font-size: var(--text-sm);
 }
 
+.menu-form-actions,
+.menu-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.menu-form-actions > *,
+.menu-editor-actions > * {
+  flex: 1 1 auto;
+}
+
+.menu-form-actions .primary-command,
+.menu-editor-actions .primary-command {
+  width: auto;
+}
+
 .menu-editor-footer {
   display: flex;
   align-items: center;
@@ -6477,6 +6494,10 @@ button {
   }
 
   .menu-editor-footer .primary-command {
+    width: 100%;
+  }
+
+  .menu-editor-actions {
     width: 100%;
   }
 }

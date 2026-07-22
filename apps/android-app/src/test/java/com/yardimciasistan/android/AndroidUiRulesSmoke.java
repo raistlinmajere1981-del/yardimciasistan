@@ -6,6 +6,7 @@ public final class AndroidUiRulesSmoke {
   public static void main(String[] args) {
     hidesUnauthorizedTabsAndModes();
     selectsTheFirstAuthorizedMode();
+    deletionsRequireResolvedActiveAdmin();
     resolvesNotificationDestinations();
     System.out.println("android-ui-rules-smoke-ok");
   }
@@ -30,6 +31,11 @@ public final class AndroidUiRulesSmoke {
     assertFalse(
         AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_STOCK),
         "menu.view alone must not expose stock"
+    );
+    data.permissions.add("menu.delete");
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_MENU),
+        "a staff role must not expose menu deletion even if the permission is present"
     );
   }
 
@@ -61,6 +67,37 @@ public final class AndroidUiRulesSmoke {
     assertTrue(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_MESSAGES), "customer.view should expose messages");
   }
 
+  private static void deletionsRequireResolvedActiveAdmin() {
+    OperationData data = restrictedData();
+    data.permissions.add("customer.delete");
+    data.permissions.add("request.delete");
+    data.permissions.add("menu.delete");
+    data.permissions.add("message.delete");
+
+    assertFalse(AndroidUiRules.canDelete(data, "customer.delete"), "staff cannot delete customers");
+    assertFalse(AndroidUiRules.canDelete(data, "request.delete"), "staff cannot delete requests");
+    assertFalse(AndroidUiRules.canDelete(data, "message.delete"), "staff cannot delete messages");
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_MENU),
+        "staff cannot open menu deletion"
+    );
+
+    data.deviceRole = "admin";
+    assertTrue(AndroidUiRules.canDelete(data, "customer.delete"), "active resolved admin can delete customers");
+    assertTrue(AndroidUiRules.canDelete(data, "request.delete"), "active resolved admin can delete requests");
+    assertTrue(AndroidUiRules.canDelete(data, "message.delete"), "active resolved admin can delete messages");
+    assertTrue(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_MENU),
+        "active resolved admin can open menu deletion"
+    );
+
+    data.permissionsResolved = false;
+    assertFalse(AndroidUiRules.canDelete(data, "menu.delete"), "an unresolved profile must fail closed");
+    data.permissionsResolved = true;
+    data.deviceActive = false;
+    assertFalse(AndroidUiRules.canDelete(data, "menu.delete"), "an inactive admin must fail closed");
+  }
+
   private static void resolvesNotificationDestinations() {
     assertDestination("customers:new", AndroidUiRules.TAB_CUSTOMERS, AndroidUiRules.CUSTOMER_NEW);
     assertDestination("pension:reservations", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_RESERVATIONS);
@@ -68,6 +105,7 @@ public final class AndroidUiRulesSmoke {
     assertDestination("restaurant:tables", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_TABLES);
     assertDestination("restaurant:orders", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_ORDERS);
     assertDestination("restaurant:stock", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_STOCK);
+    assertDestination("restaurant:menu", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_MENU);
     assertDestination("messages:waiting", AndroidUiRules.TAB_MESSAGES, AndroidUiRules.MESSAGES_WAITING);
     assertDestination("unknown", AndroidUiRules.TAB_TODAY, "");
   }

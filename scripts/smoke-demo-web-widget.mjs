@@ -60,7 +60,7 @@ try {
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
   await expect(page.getByRole("heading", { name: "Size nasıl yardımcı olayım?" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveAttribute("href", `${webModuleUrl}/menu.html`);
+  await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
   await expect(page.locator(".ya-widget-panel")).not.toContainText("mm/dd/yyyy");
   const mobilePanelBox = await page.locator(".ya-widget-panel").boundingBox();
   expect(mobilePanelBox?.x ?? -1).toBeGreaterThanOrEqual(0);

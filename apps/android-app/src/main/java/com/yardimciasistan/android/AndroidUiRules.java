@@ -20,6 +20,7 @@ final class AndroidUiRules {
   static final String RESTAURANT_TABLES = "tables";
   static final String RESTAURANT_ORDERS = "orders";
   static final String RESTAURANT_STOCK = "stock";
+  static final String RESTAURANT_MENU = "menu";
 
   static final String MESSAGES_PREPARED = "prepared";
   static final String MESSAGES_WAITING = "waiting";
@@ -82,7 +83,14 @@ final class AndroidUiRules {
     if (RESTAURANT_STOCK.equals(mode)) {
       return data.hasPermission("menu.stock_view");
     }
+    if (RESTAURANT_MENU.equals(mode)) {
+      return canDelete(data, "menu.delete");
+    }
     return false;
+  }
+
+  static boolean canDelete(OperationData data, String permission) {
+    return data != null && data.isAdmin() && data.hasPermission(permission);
   }
 
   static String firstRestaurantMode(OperationData data) {
@@ -94,6 +102,9 @@ final class AndroidUiRules {
     }
     if (canOpenRestaurantMode(data, RESTAURANT_STOCK)) {
       return RESTAURANT_STOCK;
+    }
+    if (canOpenRestaurantMode(data, RESTAURANT_MENU)) {
+      return RESTAURANT_MENU;
     }
     return null;
   }
@@ -122,7 +133,11 @@ final class AndroidUiRules {
       return new Destination(TAB_PENSION, mode);
     }
     if (TAB_RESTAURANT.equals(tab)) {
-      if (!RESTAURANT_ORDERS.equals(mode) && !RESTAURANT_STOCK.equals(mode)) {
+      if (
+          !RESTAURANT_ORDERS.equals(mode)
+          && !RESTAURANT_STOCK.equals(mode)
+          && !RESTAURANT_MENU.equals(mode)
+      ) {
         mode = RESTAURANT_TABLES;
       }
       return new Destination(TAB_RESTAURANT, mode);
