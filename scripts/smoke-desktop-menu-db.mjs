@@ -22,11 +22,10 @@ try {
   seedOperationalSmokeData(database.databasePath);
 
   assert.ok(database.getDashboardData().menu.items.length > 0);
-  assert.equal(
-    database.getDashboardData().menu.items.every((item) => item.stock_quantity === null),
-    true,
-    "Existing menu items must migrate with stock tracking disabled."
-  );
+  const initialTrackedItems = database.getDashboardData().menu.items.filter((item) => item.stock_quantity !== null);
+  assert.equal(initialTrackedItems.length, 10, "The demo menu must expose ten stock-tracked fish, meatball and drink items.");
+  assert.equal(initialTrackedItems.filter((item) => item.stock_unit === "gram").length, 2);
+  assert.equal(initialTrackedItems.find((item) => item.id === "item_main_006")?.stock_consumption_quantity, 200);
 
   const initialSetup = database.getSetupData();
   assert.equal(initialSetup.setupRequired, true);
@@ -39,6 +38,8 @@ try {
   assert.equal(initialSetup.aiTimeoutSeconds, 30);
   assert.equal(initialSetup.aiApiKeyConfigured, false);
   assert.equal(initialSetup.aiLastPublishedAt, "");
+  assert.equal(initialSetup.aiProfiles.length, 5);
+  assert.equal(initialSetup.aiProfiles.every((profile) => profile.apiKeyConfigured === false), true);
   assert.ok(database.backupPath.endsWith("backups"));
 
   const initialSyncRuntime = database.getSyncRuntimeStatus();
@@ -121,6 +122,8 @@ try {
   assert.equal(setupResult.setupData.aiApiKeyConfigured, true);
   assert.equal(setupResult.setupData.aiLastPublishedAt, "");
   assert.equal(database.getEncryptedAiApiKey(), firstEncryptedAiApiKey);
+  assert.equal(database.getEncryptedAiApiKey("openrouter"), firstEncryptedAiApiKey);
+  assert.equal(setupResult.setupData.aiProfiles.find((profile) => profile.service === "openrouter")?.model, "smoke-model-v1");
   assert.equal(setupResult.dashboardData.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
   assert.ok(setupResult.dashboardData.backupPath.endsWith("backups"));
 
@@ -139,6 +142,32 @@ try {
   assert.equal(keepResult.setupData.aiApiKeyConfigured, true);
   assert.equal(keepResult.setupData.aiLastPublishedAt, publishedAt);
   assert.equal(database.getEncryptedAiApiKey(), firstEncryptedAiApiKey);
+
+  const groqRawAiApiKey = "smoke-raw-groq-key-never-persist-001";
+  const groqEncryptedAiApiKey = "safe-storage:v1:opaque-groq-smoke-value-001";
+  const multiProfileResult = database.saveInitialSetup(
+    {
+      ...setupInput,
+      aiApiKey: "",
+      aiProfiles: [{
+        service: "groq",
+        projectName: "",
+        baseUrl: "https://api.groq.com/openai/v1",
+        model: "groq-smoke-model",
+        modelOptions: [],
+        timeoutSeconds: 25,
+        apiKey: groqRawAiApiKey,
+        clearApiKey: false
+      }]
+    },
+    { mode: "keep" },
+    { groq: { mode: "replace", encryptedValue: groqEncryptedAiApiKey } }
+  );
+  assert.equal(multiProfileResult.ok, true);
+  assert.equal(multiProfileResult.setupData.aiService, "openrouter");
+  assert.equal(multiProfileResult.setupData.aiLastPublishedAt, publishedAt);
+  assert.equal(database.getEncryptedAiApiKey("groq"), groqEncryptedAiApiKey);
+  assert.equal(multiProfileResult.setupData.aiProfiles.find((profile) => profile.service === "groq")?.model, "groq-smoke-model");
 
   const invalidAiCases = [
     [{ aiProvider: "unsupported" }, "servis sağlayıcı"],
@@ -160,6 +189,8 @@ try {
     assert.match(invalidResult.message, new RegExp(expectedMessage, "i"));
   }
 
+  const googleRawAiApiKey = "smoke-raw-google-key-never-persist-001";
+  const googleEncryptedAiApiKey = "safe-storage:v1:opaque-google-smoke-value-001";
   const missingGoogleProjectResult = database.saveInitialSetup(
     {
       ...setupInput,
@@ -167,12 +198,18 @@ try {
       aiProjectName: "",
       aiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
       aiModel: "gemini-smoke",
-      aiApiKey: ""
+      aiModelOptions: [
+        { id: "gemini-smoke", label: "Gemini Smoke" },
+        { id: "gemini-smoke-lite", label: "Gemini Smoke Lite" }
+      ],
+      aiApiKey: googleRawAiApiKey
     },
-    { mode: "keep" }
+    { mode: "replace", encryptedValue: googleEncryptedAiApiKey }
   );
   assert.equal(missingGoogleProjectResult.ok, true);
   assert.equal(missingGoogleProjectResult.setupData.aiProjectName, "");
+  assert.equal(missingGoogleProjectResult.setupData.aiApiKeyConfigured, true);
+  assert.equal(database.getEncryptedAiApiKey("gemini"), googleEncryptedAiApiKey);
 
   const invalidGoogleUrlResult = database.saveInitialSetup(
     {
@@ -203,6 +240,13 @@ try {
   assert.equal(googleSetupResult.setupData.aiService, "gemini");
   assert.equal(googleSetupResult.setupData.aiProjectName, "");
   assert.equal(googleSetupResult.setupData.aiBaseUrl, "https://generativelanguage.googleapis.com/v1beta");
+  assert.deepEqual(
+    googleSetupResult.setupData.aiProfiles.find((profile) => profile.service === "gemini")?.modelOptions,
+    [
+      { id: "gemini-smoke", label: "Gemini Smoke" },
+      { id: "gemini-smoke-lite", label: "Gemini Smoke Lite" }
+    ]
+  );
 
   const secondRawAiApiKey = "smoke-raw-ai-key-never-persist-002";
   const secondEncryptedAiApiKey = "safe-storage:v1:opaque-smoke-value-002";
@@ -220,6 +264,9 @@ try {
   assert.equal(replaceResult.setupData.aiApiKeyConfigured, true);
   assert.equal(replaceResult.setupData.aiLastPublishedAt, "");
   assert.equal(database.getEncryptedAiApiKey(), secondEncryptedAiApiKey);
+  assert.equal(database.getEncryptedAiApiKey("openrouter"), secondEncryptedAiApiKey);
+  assert.equal(database.getEncryptedAiApiKey("gemini"), googleEncryptedAiApiKey);
+  assert.equal(replaceResult.setupData.aiProfiles.find((profile) => profile.service === "gemini")?.apiKeyConfigured, true);
 
   const backupResult = database.createManualBackup();
   assert.equal(backupResult.ok, true);
@@ -230,7 +277,7 @@ try {
   assertReadableSqliteBackup(backupResult.backupFilePath);
   assertFilesDoNotContainSecrets(
     [database.databasePath, backupResult.backupFilePath],
-    [firstRawAiApiKey, secondRawAiApiKey]
+    [firstRawAiApiKey, secondRawAiApiKey, googleRawAiApiKey, groqRawAiApiKey]
   );
 
   const clearResult = database.saveInitialSetup(
@@ -246,6 +293,8 @@ try {
   assert.equal(clearResult.setupData.aiEnabled, false);
   assert.equal(clearResult.setupData.aiApiKeyConfigured, false);
   assert.equal(database.getEncryptedAiApiKey(), "");
+  assert.equal(database.getEncryptedAiApiKey("openrouter"), "");
+  assert.equal(database.getEncryptedAiApiKey("gemini"), googleEncryptedAiApiKey);
 
   const enableWithoutKeyResult = database.saveInitialSetup(
     {
@@ -1162,6 +1211,8 @@ function assertStockTrackingFlow(database, categoryId) {
     tags: ["stock-smoke"],
     stock_quantity: null,
     stock_min_quantity: null,
+    stock_unit: "piece",
+    stock_consumption_quantity: 1,
     hide_when_out_of_stock: false,
     stock_note: null,
     sort_order: 80
@@ -1301,6 +1352,28 @@ function assertStockTrackingFlow(database, categoryId) {
     movement.sourceType === "android" && movement.actorDeviceId === "android-stock-smoke" && movement.note === "Sayım sonucu"
   ));
 
+  const gramItemId = "item_main_006";
+  const gramStockBefore = stockQuantity(database, gramItemId);
+  assert.equal(gramStockBefore, 6000);
+  const gramOrder = database.openTableOrder(stockTableId);
+  assert.equal(gramOrder.ok, true);
+  const gramAdded = database.addTableOrderItem({ orderId: gramOrder.order.id, menuItemId: gramItemId, quantity: 2, note: "" });
+  assert.equal(gramAdded.ok, true);
+  assert.equal(stockQuantity(database, gramItemId), 5600, "Two portions must consume 2 × 200 grams.");
+  const gramOrderItemId = gramAdded.order.items[0].id;
+  assert.equal(database.updateTableOrderItemQuantity({ itemId: gramOrderItemId, quantity: 3 }).ok, true);
+  assert.equal(stockQuantity(database, gramItemId), 5400);
+  assert.equal(database.removeTableOrderItem(gramOrderItemId).ok, true);
+  assert.equal(stockQuantity(database, gramItemId), 6000, "Removing the line must restore the consumed grams.");
+  assert.equal(database.closeTableOrder({ orderId: gramOrder.order.id, status: "cancelled" }).ok, true);
+
+  const gramCancelOrder = database.openTableOrder(stockTableId);
+  assert.equal(gramCancelOrder.ok, true);
+  assert.equal(database.addTableOrderItem({ orderId: gramCancelOrder.order.id, menuItemId: gramItemId, quantity: 2, note: "" }).ok, true);
+  assert.equal(stockQuantity(database, gramItemId), 5600);
+  assert.equal(database.closeTableOrder({ orderId: gramCancelOrder.order.id, status: "cancelled" }).ok, true);
+  assert.equal(stockQuantity(database, gramItemId), 6000, "Cancelling the order must restore the consumed grams.");
+
   const stopped = database.saveMenuItem({ ...baseInput, id: itemId, stock_quantity: null });
   assert.equal(stopped.ok, true);
   assert.equal(stockQuantity(database, itemId), null);
@@ -1380,6 +1453,10 @@ function assertLegacyAiMigration(desktopAppPath, legacyDataDir) {
     assert.equal(migratedSetup.aiTimeoutSeconds, 30);
     assert.equal(migratedSetup.aiApiKeyConfigured, false);
     assert.equal(migratedSetup.aiLastPublishedAt, "");
+    assert.equal(migratedSetup.aiProfiles.find((profile) => profile.service === "openai")?.model, "legacy-model");
+    assert.deepEqual(migratedSetup.aiProfiles.find((profile) => profile.service === "openai")?.modelOptions, [
+      { id: "legacy-model", label: "legacy-model" }
+    ]);
     assert.equal(migratedDatabase.getEncryptedAiApiKey(), "");
   } finally {
     migratedDatabase.close();

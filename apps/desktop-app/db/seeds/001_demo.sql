@@ -93,6 +93,10 @@ INSERT OR IGNORE INTO menu_items (
   ('item_main_001', 'cat_mains', 'Izgara Levrek', 'Mevsim salatası, köz limon ve roka eşliğinde bütün levrek.', 950, 'TRY', '/assets/menu-grilled-sea-bass.webp', 1, 1, '["balık"]', '["ızgara","deniz ürünü"]', 10, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
   ('item_main_002', 'cat_mains', 'Çökertme Kebabı', 'Kibrit patates üzerinde sarımsaklı yoğurt, dana eti ve domates sosu.', 780, 'TRY', '/assets/menu-main-courses.webp', 1, 1, '["süt"]', '["Muğla mutfağı","doyurucu"]', 20, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
   ('item_main_003', 'cat_mains', 'Otlu Tavuk Şiş', 'Ege otlarıyla marine tavuk, bulgur pilavı ve köz sebzeler.', 650, 'TRY', '/assets/menu-main-courses.webp', 1, 0, '["gluten"]', '["ızgara","proteinli"]', 30, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_main_004', 'cat_mains', 'Izgara Çipura', 'Mevsim salatası, roka ve köz limon eşliğinde bütün çipura.', 980, 'TRY', '/assets/menu-grilled-sea-bass.webp', 1, 1, '["balık"]', '["ızgara","deniz ürünü","stok takipli"]', 40, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_main_005', 'cat_mains', 'Fırında Alabalık', 'Defne, limon ve mevsim sebzeleriyle fırında pişirilen bütün alabalık.', 820, 'TRY', '/assets/menu-grilled-sea-bass.webp', 1, 0, '["balık"]', '["fırın","deniz ürünü","stok takipli"]', 50, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_main_006', 'cat_mains', 'Izgara Kasap Köfte', '200 gram dana kasap köfte, köz sebze ve pilav eşliğinde.', 720, 'TRY', '/assets/menu-main-courses.webp', 1, 1, '["gluten"]', '["ızgara","köfte","stok takipli"]', 60, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_main_007', 'cat_mains', 'Kaşarlı Köfte', '200 gram dana köfte, erimiş kaşar, domates sosu ve patates eşliğinde.', 760, 'TRY', '/assets/menu-main-courses.webp', 1, 0, '["gluten","süt"]', '["ızgara","köfte","stok takipli"]', 70, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
   ('item_light_001', 'cat_light', 'Izgara Hellimli Mevsim Salatası', 'Mevsim yeşillikleri, domates, salatalık, zeytin ve narenciye sosu.', 490, 'TRY', '/assets/menu-light-bites.webp', 1, 0, '["süt"]', '["vejetaryen","hafif"]', 10, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
   ('item_light_002', 'cat_light', 'Akyaka Kumrusu', 'Çıtır ekmekte kaşar, domates, biber ve kekikli zeytin ezmesi.', 430, 'TRY', '/assets/menu-light-bites.webp', 1, 1, '["gluten","süt"]', '["vejetaryen","hızlı"]', 20, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
   ('item_light_003', 'cat_light', 'Köy Ekmeğinde Karışık Tost', 'Kaşar, dana sucuk, domates ve yanında küçük mevsim salatası.', 380, 'TRY', '/assets/menu-light-bites.webp', 1, 0, '["gluten","süt"]', '["hızlı","doyurucu"]', 30, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
@@ -101,4 +105,45 @@ INSERT OR IGNORE INTO menu_items (
   ('item_drink_001', 'cat_drinks', 'Türk Kahvesi', 'Orta kavrum kahve; yanında su ve küçük lokumla.', 150, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["sıcak","kahve"]', 10, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
   ('item_drink_002', 'cat_drinks', 'Ev Yapımı Naneli Limonata', 'Taze limon, nane ve az şekerle günlük hazırlanır.', 220, 'TRY', '/assets/menu-drinks.webp', 1, 1, '[]', '["soğuk","ev yapımı"]', 20, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
   ('item_drink_003', 'cat_drinks', 'Soğuk Demleme Kahve', 'On altı saat demlenen yumuşak içimli kahve, buzla servis edilir.', 260, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["soğuk","kahve"]', 30, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
-  ('item_drink_004', 'cat_drinks', 'Adaçayı', 'Demlikte taze demlenir; yanında limon ve bal seçeneğiyle.', 160, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["sıcak","bitki çayı"]', 40, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00');
+  ('item_drink_004', 'cat_drinks', 'Adaçayı', 'Demlikte taze demlenir; yanında limon ve bal seçeneğiyle.', 160, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["sıcak","bitki çayı"]', 40, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_drink_005', 'cat_drinks', 'Şişe Su (330 ml)', 'Soğuk servis edilen 330 ml cam şişe su.', 60, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["soğuk","şişe","stok takipli"]', 50, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_drink_006', 'cat_drinks', 'Maden Suyu (200 ml)', 'Doğal mineralli 200 ml cam şişe maden suyu.', 80, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["soğuk","şişe","stok takipli"]', 60, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_drink_007', 'cat_drinks', 'Kutu Kola (330 ml)', 'Soğuk servis edilen 330 ml kutu kola.', 120, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["soğuk","kutu","stok takipli"]', 70, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_drink_008', 'cat_drinks', 'Portakallı Gazoz (250 ml)', 'Portakal aromalı 250 ml cam şişe gazoz.', 110, 'TRY', '/assets/menu-drinks.webp', 1, 0, '[]', '["soğuk","şişe","stok takipli"]', 80, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00'),
+  ('item_drink_009', 'cat_drinks', 'Şişe Ayran (300 ml)', 'Soğuk servis edilen 300 ml şişe ayran.', 100, 'TRY', '/assets/menu-drinks.webp', 1, 0, '["süt"]', '["soğuk","şişe","stok takipli"]', 90, '2026-07-22T09:00:00+03:00', '2026-07-22T09:00:00+03:00');
+
+UPDATE menu_items
+SET stock_quantity = 12, stock_min_quantity = 4, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Bütün balık adedi üzerinden takip edilir.'
+WHERE id = 'item_main_001';
+
+UPDATE menu_items
+SET stock_quantity = 14, stock_min_quantity = 4, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Bütün balık adedi üzerinden takip edilir.'
+WHERE id = 'item_main_004';
+
+UPDATE menu_items
+SET stock_quantity = 10, stock_min_quantity = 3, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Bütün balık adedi üzerinden takip edilir.'
+WHERE id = 'item_main_005';
+
+UPDATE menu_items
+SET stock_quantity = 6000, stock_min_quantity = 1500, stock_unit = 'gram', stock_consumption_quantity = 200,
+  hide_when_out_of_stock = 1, stock_note = 'Bir porsiyonda 200 g köfte kullanılır.'
+WHERE id = 'item_main_006';
+
+UPDATE menu_items
+SET stock_quantity = 4500, stock_min_quantity = 1200, stock_unit = 'gram', stock_consumption_quantity = 200,
+  hide_when_out_of_stock = 1, stock_note = 'Bir porsiyonda 200 g köfte kullanılır.'
+WHERE id = 'item_main_007';
+
+UPDATE menu_items SET stock_quantity = 72, stock_min_quantity = 24, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Şişe adedi üzerinden takip edilir.' WHERE id = 'item_drink_005';
+UPDATE menu_items SET stock_quantity = 48, stock_min_quantity = 12, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Şişe adedi üzerinden takip edilir.' WHERE id = 'item_drink_006';
+UPDATE menu_items SET stock_quantity = 36, stock_min_quantity = 12, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Kutu adedi üzerinden takip edilir.' WHERE id = 'item_drink_007';
+UPDATE menu_items SET stock_quantity = 24, stock_min_quantity = 8, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Şişe adedi üzerinden takip edilir.' WHERE id = 'item_drink_008';
+UPDATE menu_items SET stock_quantity = 30, stock_min_quantity = 10, stock_unit = 'piece', stock_consumption_quantity = 1,
+  hide_when_out_of_stock = 1, stock_note = 'Şişe adedi üzerinden takip edilir.' WHERE id = 'item_drink_009';

@@ -16,6 +16,12 @@ export type GoogleAiStudioModelListResult =
   | { ok: true; models: GoogleAiStudioModel[] }
   | { ok: false; message: string; status?: number };
 
+export interface GoogleAiStudioVisionCheckOptions {
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  timeoutMs?: number;
+}
 
 interface GoogleModelResponse {
   models?: Array<{
@@ -161,6 +167,136 @@ export function rankGoogleAiStudioModels(models: string[]): string[] {
     });
 }
 
+export async function verifyGoogleAiStudioVisionModel(
+  options: GoogleAiStudioVisionCheckOptions,
+  fetchImpl: typeof fetch = globalThis.fetch
+): Promise<AICompletionResult> {
+  const model = options.model.trim().replace(/^models\//, "");
+  const url = createGoogleGenerateContentUrl(options.baseUrl, model);
+  if (!url || !model) {
+    return {
+      ok: false,
+      provider: "openai_compatible",
+      message: "Google AI Studio model bilgisi geçersiz.",
+      fallbackAnswer: ""
+    };
+  }
+  if (!options.apiKey.trim()) {
+    return {
+      ok: false,
+      provider: "openai_compatible",
+      message: "Google AI Studio API anahtarı gerekli.",
+      fallbackAnswer: ""
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
+  try {
+    const response = await fetchImpl(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": options.apiKey
+      },
+      body: JSON.stringify(createGoogleVisionCheckBody()),
+      redirect: "error",
+      signal: controller.signal
+    });
+    const payload = (await response.json().catch(() => null)) as GoogleGenerateContentResponse | null;
+    if (!response.ok) {
+      return {
+        ok: false,
+        provider: "openai_compatible",
+        status: response.status,
+        message: payload?.error?.message || "Google AI Studio görsel girişi kabul etmedi.",
+        fallbackAnswer: ""
+      };
+    }
+
+    const answer = (payload?.candidates?.[0]?.content?.parts ?? [])
+      .map((part) => String(part.text ?? ""))
+      .join("")
+      .trim();
+    if (!answer) {
+      return {
+        ok: false,
+        provider: "openai_compatible",
+        message: "Google AI Studio görsel kontrolüne boş yanıt verdi.",
+        fallbackAnswer: ""
+      };
+    }
+
+    return {
+      ok: true,
+      provider: "openai_compatible",
+      model,
+      answer
+    };
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "AbortError";
+    return {
+      ok: false,
+      provider: "openai_compatible",
+      message: timedOut
+        ? "Google AI Studio görsel kontrolü zaman aşımına uğradı."
+        : "Google AI Studio görsel kontrolü sırasında bağlantı sorunu oldu.",
+      error: error instanceof Error ? error.message : String(error),
+      fallbackAnswer: ""
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function createGoogleVisionCheckBody() {
+  return {
+    systemInstruction: {
+      parts: [{ text: "Bu yalnızca görsel giriş uyumluluğu kontrolüdür." }]
+    },
+    contents: [{
+      role: "user",
+      parts: [
+        { text: "Görsel girdisini aldıysan yalnız geçerli bir JSON nesnesi döndür." },
+        {
+          inlineData: {
+            mimeType: "image/png",
+            data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+          }
+        }
+      ]
+    }],
+    generationConfig: {
+      responseMimeType: "application/json"
+    }
+  };
+}
+
+export function isGoogleAiStudioVisionModel(model: Pick<GoogleAiStudioModel, "id" | "displayName" | "description">): boolean {
+  const id = model.id.trim().toLowerCase().replace(/^models\//, "");
+  if (!id.startsWith("gemini-")) {
+    return false;
+  }
+
+  const specializedModel = /(?:^|[-_.])(?:image|imagen|tts|live|audio|native-audio|embedding|robotics?|computer-use|deep-research|omni|translate|veo|lyria|aqa|vision)(?:[-_.]|$)/i;
+  if (specializedModel.test(id)
+      || /(?:^|[-_.])(?:experimental|exp|preview|latest|customtools)(?:[-_.]|$)/i.test(id)) {
+    return false;
+  }
+
+  const searchableDescription = `${model.displayName} ${model.description}`.toLowerCase();
+  if (/\b(?:deprecated|discontinued|shut down)\b/.test(searchableDescription)) {
+    return false;
+  }
+
+  if (/^gemini-(?:1(?:\.\d+)?|2(?:\.\d+)?)(?:-|$)/.test(id)
+      || /^gemini-(?:pro|ultra)(?:-|$)/.test(id)
+      || !/^gemini-3\.(?:1|5|6)-(?:flash|flash-lite)(?:-|$)/.test(id)) {
+    return false;
+  }
+
+  return true;
+}
 
 export async function listGoogleAiStudioModels(
   options: { baseUrl: string; apiKey: string; timeoutMs?: number },
@@ -200,7 +336,7 @@ export async function listGoogleAiStudioModels(
       };
     }
 
-    const models = (payload?.models ?? [])
+    const compatibleModels = (payload?.models ?? [])
       .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
       .map((model) => ({
         id: String(model.baseModelId || model.name || "").replace(/^models\//, "").trim(),
@@ -209,11 +345,18 @@ export async function listGoogleAiStudioModels(
         inputTokenLimit: normalizeTokenLimit(model.inputTokenLimit),
         outputTokenLimit: normalizeTokenLimit(model.outputTokenLimit)
       }))
-      .filter((model) => model.id)
+      .filter((model) => model.id && isGoogleAiStudioVisionModel(model));
+    const uniqueModels = new Map<string, GoogleAiStudioModel>();
+    for (const model of compatibleModels) {
+      if (!uniqueModels.has(model.id)) {
+        uniqueModels.set(model.id, model);
+      }
+    }
+    const models = [...uniqueModels.values()]
       .sort((left, right) => left.displayName.localeCompare(right.displayName, "tr"));
 
     if (models.length === 0) {
-      return { ok: false, message: "Bu API anahtarı için metin üretebilen Gemini modeli bulunamadı." };
+      return { ok: false, message: "Bu API anahtarı için görsel ve metin işleyebilen güncel Gemini modeli bulunamadı." };
     }
 
     return { ok: true, models };

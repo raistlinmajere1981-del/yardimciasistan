@@ -1290,7 +1290,7 @@ Masaüstü ve web AI işlemlerinin aynı kullanıcı tarafından yönetilen bağ
 ```text
 Servis hazır ayarı ve özel OpenAI uyumlu adres
 Model ve zaman aşımı
-Geri okunmayan güvenli API anahtarı
+Başlangıçta geri okunmayan güvenli API anahtarı
 Masaüstü bağlantı testi
 HTTPS ve sync_secret ile web'e yayınlama
 Web yayın hatasında yerel ayarı koruma
@@ -1298,7 +1298,7 @@ Web yayın hatasında yerel ayarı koruma
 
 Kabul kriterleri:
 
-* API anahtarı renderer bootstrap verisine, loglara veya web widget'a dönmemeli.
+* API anahtarı renderer bootstrap verisine, loglara veya web widget'a dönmemeli; yalnız kullanıcının açık `Göster` eyleminde masaüstü Ayarlar ekranına aktarılmalı.
 * Masaüstü AI çağrısı kaydedilmiş bağlantı bilgisini kullanmalı.
 * Web `chat.php`, hostingde son başarıyla yayınlanan aynı bağlantı bilgisini kullanmalı.
 * Canlı hostinge anahtar aktarımı HTTPS olmadan yapılmamalı; yalnız localhost geliştirme istisnası bulunmalı.
@@ -1307,7 +1307,7 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. Masaüstü Ayarlar ekranına OpenAI/OpenRouter/Groq/Gemini/özel OpenAI uyumlu servis hazır seçimleri, bağlantı adresi, model, maskeli anahtar, 5–120 saniye zaman aşımı ve bağlantı testi eklendi. API anahtarı Electron `safeStorage` ile şifrelenerek SQLite'ta opaque değer olarak tutulur ve renderer'a geri dönmez. Kaydetme `pushAiSettings()` ile ayarı HTTPS + header güvenlik anahtarı üzerinden web modülüne yollar; `sync.php` ayarı doğrudan erişime kapalı `data/ai-settings.local.php` dosyasına atomik ve `0600` izinle yazar. `chat.php` böylece masaüstüyle aynı bağlantıyı kullanır. Yerel kayıt, web yayını hata verse de korunur. Sync-core, desktop DB/renderer ve gerçek PHP + mock provider smoke testleri bu akışı doğrular.
+* Tamamlandı. Masaüstü Ayarlar ekranına OpenAI/OpenRouter/Groq/Gemini/özel OpenAI uyumlu servis hazır seçimleri, bağlantı adresi, model, maskeli anahtar, 5–120 saniye zaman aşımı ve bağlantı testi eklendi. API anahtarı Electron `safeStorage` ile şifrelenerek SQLite'ta opaque değer olarak tutulur ve renderer başlangıç verisine eklenmez; yalnız kullanıcının `Göster` eyleminde ana süreçten alınır, yeniden gizlendiğinde gösterim kopyası temizlenir. Kaydetme `pushAiSettings()` ile ayarı HTTPS + header güvenlik anahtarı üzerinden web modülüne yollar; `sync.php` ayarı doğrudan erişime kapalı `data/ai-settings.local.php` dosyasına atomik ve `0600` izinle yazar. `chat.php` böylece masaüstüyle aynı bağlantıyı kullanır. Yerel kayıt, web yayını hata verse de korunur. Sync-core, desktop DB/renderer ve gerçek PHP + mock provider smoke testleri bu akışı doğrular.
 
 ---
 

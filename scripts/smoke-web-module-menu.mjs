@@ -270,6 +270,8 @@ try {
       price: 12,
       stock_quantity: 0,
       stock_min_quantity: 2,
+      stock_unit: "piece",
+      stock_consumption_quantity: 1,
       hide_when_out_of_stock: true,
       stock_status: "out_of_stock"
     }

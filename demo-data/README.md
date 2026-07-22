@@ -8,6 +8,9 @@ amaciyla uretilmistir. `smoke:demo-flow` bu kayitlara ek olarak calisan
 `api/chat.php` endpointinden bir `source=web_ai` talebi uretir ve PC SQLite'a
 cekildigini dogrular.
 
+`fatura-ornekleri/` klasörü, `AI ile Stok Ekle` akışında kullanılabilecek iki
+yapay PNG fatura ve bunların beklenen adet/gram sonuçlarını içerir.
+
 Kullanim:
 
 ```bash

@@ -16,7 +16,8 @@ const database = new DesktopDatabase({
 try {
   database.initialize();
   const [first, second] = database.getDashboardData().menu.items;
-  assert.ok(first && second);
+  const gramItem = database.getDashboardData().menu.items.find((item) => item.id === "item_main_006");
+  assert.ok(first && second && gramItem);
   assert.equal(database.saveMenuItem(trackedInput(first, 0, true)).ok, true);
   assert.equal(database.saveMenuItem(trackedInput(second, 5, false)).ok, true);
   const firstName = first.name;
@@ -55,30 +56,53 @@ try {
         source_quantity_text: "1 KOLI",
         confidence: "medium",
         needs_review_reason: null
+      },
+      {
+        raw_text: `${gramItem.name} 3 KG`,
+        matched_menu_item_id: gramItem.id,
+        matched_menu_item_name: gramItem.name,
+        suggested_quantity: 3,
+        source_quantity_text: "3 KG",
+        confidence: "high",
+        needs_review_reason: null
+      },
+      {
+        raw_text: `${gramItem.name} 2.500 GR`,
+        matched_menu_item_id: gramItem.id,
+        matched_menu_item_name: gramItem.name,
+        suggested_quantity: 2500,
+        source_quantity_text: "2.500 GR",
+        confidence: "high",
+        needs_review_reason: null
       }
     ]
   });
   assert.ok(sanitized);
   assert.equal(sanitized.lines[0].suggested_quantity, 24);
   assert.equal(sanitized.lines[1].suggested_quantity, null);
-  assert.match(sanitized.lines[1].needs_review_reason, /Koli, paket, kg veya litre/i);
+  assert.match(sanitized.lines[1].needs_review_reason, /Koli, paket, ağırlık veya hacim/i);
+  assert.equal(sanitized.lines[2].suggested_quantity, 3000);
+  assert.equal(sanitized.lines[3].suggested_quantity, 2500);
 
+  const gramStockBeforeImport = stock(database, gramItem.id);
   const applied = database.applyStockImageImport({
     importId,
     imageHash: hash,
     lines: [
       { menu_item_id: first.id, quantity: 24, raw_text: `${firstName} 24 AD`, confidence: "high" },
-      { menu_item_id: second.id, quantity: 24, raw_text: `${secondName} 1 KOLI · kullanıcı 24 girdi`, confidence: "medium" }
+      { menu_item_id: second.id, quantity: 24, raw_text: `${secondName} 1 KOLI · kullanıcı 24 girdi`, confidence: "medium" },
+      { menu_item_id: gramItem.id, quantity: 3000, raw_text: `${gramItem.name} 3 KG`, confidence: "high" }
     ]
   });
   assert.equal(applied.ok, true);
-  assert.equal(applied.appliedLineCount, 2);
-  assert.equal(applied.totalQuantity, 48);
+  assert.equal(applied.appliedLineCount, 3);
+  assert.equal(applied.totalQuantity, 3048);
   assert.equal(stock(database, first.id), 24);
   assert.equal(stock(database, second.id), 29);
+  assert.equal(stock(database, gramItem.id), gramStockBeforeImport + 3000);
   assert.equal(database.getQrMenuPublication().items.some((item) => item.id === first.id), true, "0 → positive stock must republish a hidden item");
   const imageMovements = database.getMenuStockMovements().filter((movement) => movement.sourceId === importId);
-  assert.equal(imageMovements.length, 2);
+  assert.equal(imageMovements.length, 3);
   assert.equal(imageMovements.every((movement) => movement.type === "image_import_add"), true);
   assert.equal(imageMovements.every((movement) => movement.sourceType === "stock_image_import"), true);
   assert.equal(imageMovements.every((movement) => movement.actorSource === "desktop"), true);
@@ -172,7 +196,7 @@ try {
     assert.equal(stored.status, "applied");
     assert.ok(stored.raw_analysis_json);
     assert.ok(stored.applied_at);
-    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM stock_image_import_lines WHERE import_id = ? AND status = 'approved'").get(importId).count, 2);
+    assert.equal(sqlite.prepare("SELECT COUNT(*) AS count FROM stock_image_import_lines WHERE import_id = ? AND status = 'approved'").get(importId).count, 3);
   } finally {
     sqlite.close();
   }
@@ -197,6 +221,8 @@ function trackedInput(item, quantity, hideWhenOut) {
     tags: item.tags,
     stock_quantity: quantity,
     stock_min_quantity: 1,
+    stock_unit: item.stock_unit ?? "piece",
+    stock_consumption_quantity: item.stock_consumption_quantity ?? 1,
     hide_when_out_of_stock: hideWhenOut,
     stock_note: "Stock image smoke",
     sort_order: item.sort_order

@@ -1,5 +1,7 @@
 import type { CurrencyCode, TimestampedRecord } from "./common";
 
+export type MenuStockUnit = "piece" | "gram";
+
 export interface MenuCategory extends TimestampedRecord {
   name: string;
   description: string;
@@ -20,6 +22,8 @@ export interface MenuItem extends TimestampedRecord {
   tags: string[];
   stock_quantity: number | null;
   stock_min_quantity: number | null;
+  stock_unit: MenuStockUnit;
+  stock_consumption_quantity: number;
   hide_when_out_of_stock: boolean;
   stock_note: string | null;
   sort_order: number;

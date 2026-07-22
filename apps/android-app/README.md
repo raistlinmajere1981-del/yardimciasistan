@@ -107,8 +107,10 @@ ve geçici cache dosyaları işlem sonunda silinir.
 
 Analiz aynı hostingdeki kimlik doğrulamalı `api/stock-image-analysis.php` endpoint'ine
 gider. AI anahtarı APK'ya veya action payload'ına eklenmez. Sonuç bir öneri taslağıdır:
-ürün ve pozitif tam sayı adet kullanıcı tarafından kontrol edilip onaylanmadan stok
-değişmez. Onay, `menu_stock_image_import_apply` action'ı olarak kalıcı outbox'a yazılır;
+ürün, stok birimi ve pozitif tam sayı miktar kullanıcı tarafından kontrol edilip
+onaylanmadan stok değişmez. Adet ürünleri adet, gram ürünleri gram olarak gösterilir;
+açık kilogram miktarı analizde grama çevrilebilir. Onay,
+`menu_stock_image_import_apply` action'ı olarak kalıcı outbox'a yazılır;
 masaüstü aktif cihazı ve `menu.stock_update` iznini yeniden doğrular, tüm satırları tek
 SQLite transaction içinde uygular ve aynı import kimliğini iki kez çalıştırmaz. Aynı
 görsel hash'i yeniden seçilirse uyarı gösterilir; bu uyarıyı yalnız yönetici aşabilir.

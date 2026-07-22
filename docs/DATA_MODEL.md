@@ -531,11 +531,22 @@ QR menüde gösterilecek ürünleri temsil eder.
   "is_featured": false,
   "allergens": [],
   "tags": ["kahvaltı", "yöresel"],
+  "stock_quantity": null,
+  "stock_min_quantity": null,
+  "stock_unit": "piece",
+  "stock_consumption_quantity": 1,
+  "hide_when_out_of_stock": false,
+  "stock_note": null,
   "sort_order": 1,
   "created_at": "2026-01-01T10:00:00+03:00",
   "updated_at": "2026-01-01T10:00:00+03:00"
 }
 ```
+
+`stock_quantity = null` stok takibinin kapalı olduğunu, `0` ise takip edilen
+ürünün tükendiğini belirtir. `stock_unit` değeri `piece` veya `gram` olabilir.
+`stock_consumption_quantity`, bir menü ürünü adisyona eklendiğinde stoktan aynı
+birimde düşülecek miktardır; örneğin gram takipli bir köfte porsiyonu için `200`.
 
 ---
 
@@ -878,6 +889,24 @@ Firma kurulum ayarlarını temsil eder.
 `ai_provider` kullanılan adapter protokolünü, `ai_service` ise kullanıcıya gösterilen servis hazır ayarını temsil eder. v1 bağlantısı OpenAI uyumlu `chat/completions` protokolünü kullanır; özel servis seçildiğinde bağlantı adresi kullanıcı tarafından girilebilir.
 
 `ai_api_key_encrypted` yalnız masaüstü ana süreç tarafından çözülebilen yerel gizli değerdir. Renderer'a, bootstrap verisine, loglara veya web istemcisine gönderilmez. Hosting tarafına yalnız `sync_secret` ile yetkilendirilmiş HTTPS isteğinde aktarılır ve doğrudan web erişimine kapalı sunucu dosyasında tutulur. API cevapları anahtarın kendisini hiçbir zaman döndürmez.
+
+Masaüstünde servisler arasında geçiş yapılabilmesi için servis başına bağlantı bilgisi ayrıca `ai_service_profiles` tablosunda tutulur. `settings` tablosundaki AI alanları web modülüne yayınlanan aktif profili temsil eder.
+
+```json
+{
+  "service": "gemini",
+  "project_name": "Google AI Studio",
+  "base_url": "https://generativelanguage.googleapis.com/v1beta",
+  "model": "gemini-3.6-flash",
+  "model_options_json": "[{\"id\":\"gemini-3.6-flash\",\"label\":\"Gemini 3.6 Flash\"}]",
+  "timeout_seconds": 30,
+  "api_key_encrypted": "<opaque-encrypted-value>",
+  "created_at": "2026-07-22T10:00:00+03:00",
+  "updated_at": "2026-07-22T10:00:00+03:00"
+}
+```
+
+`api_key_encrypted` her profil için ayrı şifrelenir. Renderer yalnız anahtarın yapılandırılmış olup olmadığını görür; şifreli veya açık anahtar değeri iletilmez. `model_options_json` gizli değildir ve bağlantı testinde alınan model seçiminin ayarlar sayfasına geri dönüldüğünde yeniden kurulmasını sağlar.
 
 AI kapalıysa sistemin form, WhatsApp, talep yönetimi ve yerel işletme özellikleri çalışmaya devam eder.
 

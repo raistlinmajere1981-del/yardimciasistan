@@ -450,6 +450,10 @@ button {
   border-color: var(--line);
 }
 
+.setup-field > .setup-secret-error {
+  color: var(--red);
+}
+
 .setup-toggle-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));

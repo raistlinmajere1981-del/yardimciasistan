@@ -499,6 +499,7 @@ public final class MainActivity extends ComponentActivity {
         candidate.put("name", item.name);
         candidate.put("category", item.category);
         candidate.put("current_stock", item.stockQuantity);
+        candidate.put("stock_unit", item.stockUnit);
         candidates.put(candidate);
       } catch (Exception ignored) {
         // Snapshot values are primitives; a malformed row is omitted safely.
@@ -591,7 +592,8 @@ public final class MainActivity extends ComponentActivity {
 
     refreshSummary[0] = () -> {
       int valid = 0;
-      int total = 0;
+      int pieceTotal = 0;
+      int gramTotal = 0;
       int review = 0;
       for (StockImageReviewLine line : lines) {
         if (line.ignored) {
@@ -600,12 +602,20 @@ public final class MainActivity extends ComponentActivity {
         int quantity = line.quantity();
         if (!line.menuItemId.isEmpty() && quantity > 0) {
           valid += 1;
-          total += quantity;
+          OperationData.TrackedStockItem item = trackedStockItem(line.menuItemId);
+          if (item != null && "gram".equals(item.stockUnit)) {
+            gramTotal += quantity;
+          } else {
+            pieceTotal += quantity;
+          }
         } else {
           review += 1;
         }
       }
-      summary.setText(valid + " satır · " + total + " adet · " + review + " kontrol gerekli");
+      String totals = (pieceTotal > 0 ? pieceTotal + " adet" : "")
+          + (pieceTotal > 0 && gramTotal > 0 ? " + " : "")
+          + (gramTotal > 0 ? stockNumber(gramTotal) + " g" : "");
+      summary.setText(valid + " satır · " + (totals.isEmpty() ? "0" : totals) + " · " + review + " kontrol gerekli");
       apply.setEnabled(valid > 0 && (!duplicate || (canOverrideDuplicate && duplicateApproval.isChecked())));
     };
     duplicateApproval.setOnCheckedChangeListener((button, checked) -> refreshSummary[0].run());
@@ -670,7 +680,7 @@ public final class MainActivity extends ComponentActivity {
     int selectedIndex = 0;
     for (int index = 0; index < data.trackedStockItems.size(); index += 1) {
       OperationData.TrackedStockItem item = data.trackedStockItems.get(index);
-      labels.add(item.name + " · " + item.category);
+      labels.add(item.name + " · " + item.category + " · " + stockUnitLabel(item.stockUnit));
       if (item.menuItemId.equals(line.menuItemId)) {
         selectedIndex = index + 1;
       }
@@ -706,7 +716,7 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout.LayoutParams quantityRowParams = new LinearLayout.LayoutParams(-1, -2);
     quantityRowParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
     quantityRow.setLayoutParams(quantityRowParams);
-    EditText quantity = UiKit.input(this, "Eklenecek adet");
+    EditText quantity = UiKit.input(this, "Eklenecek miktar");
     quantity.setInputType(InputType.TYPE_CLASS_NUMBER);
     quantity.setText(line.quantityText);
     quantity.setLayoutParams(new LinearLayout.LayoutParams(0, UiKit.dp(this, 48), 1f));
@@ -2081,8 +2091,8 @@ public final class MainActivity extends ComponentActivity {
     top.addView(statusBadge(formatStockStatus(item.stockStatus), stockTone(item.stockStatus)));
     card.addView(top);
     card.addView(UiKit.text(this,
-        "Stok: " + stockNumber(item.stockQuantity)
-            + " · Minimum: " + (item.stockMinQuantity == null ? "—" : stockNumber(item.stockMinQuantity)),
+        "Stok: " + stockQuantity(item.stockQuantity, item.stockUnit)
+            + " · Minimum: " + (item.stockMinQuantity == null ? "—" : stockQuantity(item.stockMinQuantity, item.stockUnit)),
         13, UiKit.TEXT, Typeface.BOLD));
 
     if (data.hasPermission("menu.stock_update")) {
@@ -2190,7 +2200,7 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout identity = UiKit.column(this);
     identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
     identity.addView(UiKit.text(this, item.name, 15, UiKit.TEXT, Typeface.BOLD));
-    identity.addView(UiKit.text(this, item.category + " · Stok " + stockNumber(item.stockQuantity), 12, UiKit.MUTED, Typeface.NORMAL));
+    identity.addView(UiKit.text(this, item.category + " · Stok " + stockQuantity(item.stockQuantity, item.stockUnit), 12, UiKit.MUTED, Typeface.NORMAL));
     top.addView(identity);
     top.addView(statusBadge(formatStockStatus(item.stockStatus), stockTone(item.stockStatus)));
     card.addView(top);
@@ -2255,12 +2265,13 @@ public final class MainActivity extends ComponentActivity {
     sheet.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 18));
     sheet.addView(UiKit.eyebrow(this, "STOK GÜNCELLE"));
     sheet.addView(UiKit.title(this, item.name));
-    sheet.addView(UiKit.text(this, "Mevcut stok: " + stockNumber(item.stockQuantity), 13, UiKit.MUTED, Typeface.NORMAL));
+    sheet.addView(UiKit.text(this, "Mevcut stok: " + stockQuantity(item.stockQuantity, item.stockUnit), 13, UiKit.MUTED, Typeface.NORMAL));
 
-    Button add = UiKit.button(this, "+1 Ekle", UiKit.PRIMARY, view -> {
+    int quickAddQuantity = "gram".equals(item.stockUnit) ? 1000 : 1;
+    Button add = UiKit.button(this, "+" + stockQuantity(quickAddQuantity, item.stockUnit) + " Ekle", UiKit.PRIMARY, view -> {
       sendAction(
           "menu_stock_add",
-          payload("menu_item_id", item.menuItemId, "quantity", 1, "note", "Android hızlı stok ekleme"),
+          payload("menu_item_id", item.menuItemId, "quantity", quickAddQuantity, "note", "Android hızlı stok ekleme"),
           item.name + " stok ekleme işlemi gönderildi."
       );
       dialog.dismiss();
@@ -2270,7 +2281,7 @@ public final class MainActivity extends ComponentActivity {
     add.setLayoutParams(actionParams);
     sheet.addView(add);
 
-    Button set = UiKit.outlineButton(this, "Adedi Ayarla", view -> {
+    Button set = UiKit.outlineButton(this, "Miktarı Ayarla", view -> {
       dialog.dismiss();
       showStockMutationDialog(item, "set");
     });
@@ -2297,7 +2308,9 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout form = UiKit.column(this);
     int horizontal = UiKit.dp(this, 20);
     form.setPadding(horizontal, 0, horizontal, 0);
-    EditText quantity = UiKit.input(this, "set".equals(mode) ? "Yeni stok adedi" : "Stok farkı (örn. -2 veya 5)");
+    EditText quantity = UiKit.input(this, "set".equals(mode)
+        ? "Yeni stok miktarı (" + stockUnitLabel(item.stockUnit) + ")"
+        : "Stok farkı (" + stockUnitLabel(item.stockUnit) + ")");
     quantity.setInputType(InputType.TYPE_CLASS_NUMBER
         | InputType.TYPE_NUMBER_FLAG_DECIMAL
         | ("adjust".equals(mode) ? InputType.TYPE_NUMBER_FLAG_SIGNED : 0));
@@ -2312,7 +2325,7 @@ public final class MainActivity extends ComponentActivity {
     form.addView(note);
 
     AlertDialog dialog = alertDialogBuilder()
-        .setTitle("set".equals(mode) ? "Stok adedini ayarla" : "Stok farkı gir")
+        .setTitle("set".equals(mode) ? "Stok miktarını ayarla" : "Stok farkı gir")
         .setView(form)
         .setNegativeButton("Vazgeç", null)
         .setPositiveButton("Kaydet", null)
@@ -3037,7 +3050,7 @@ public final class MainActivity extends ComponentActivity {
       details.addView(UiKit.text(this, data.categoryName(item.categoryId) + " · " + money(item.price, item.currency), 12, UiKit.MUTED, Typeface.NORMAL));
       if (item.stockQuantity != null) {
         details.addView(UiKit.text(this,
-            item.outOfStock() ? "Stokta yok" : "Mevcut stok: " + stockNumber(item.stockQuantity),
+            item.outOfStock() ? "Stokta yok" : "Mevcut stok: " + stockQuantity(item.stockQuantity, item.stockUnit),
             12, item.outOfStock() ? UiKit.DANGER : UiKit.INFO, Typeface.BOLD));
       }
       row.addView(details);
@@ -3962,6 +3975,23 @@ public final class MainActivity extends ComponentActivity {
       return String.valueOf((long) value);
     }
     return String.format(new Locale("tr", "TR"), "%.2f", value).replaceAll("0+$", "").replaceAll("[,\\.]$", "");
+  }
+
+  private String stockUnitLabel(String unit) {
+    return "gram".equals(unit) ? "gram" : "adet";
+  }
+
+  private String stockQuantity(double value, String unit) {
+    return stockNumber(value) + ("gram".equals(unit) ? " g" : " adet");
+  }
+
+  private OperationData.TrackedStockItem trackedStockItem(String menuItemId) {
+    for (OperationData.TrackedStockItem item : data.trackedStockItems) {
+      if (item.menuItemId.equals(menuItemId)) {
+        return item;
+      }
+    }
+    return null;
   }
 
   private int actionTone(String status) {

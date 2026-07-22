@@ -51,6 +51,10 @@ export type AiConnectionTestResult =
   | { ok: true; message: string; model: string; models: Array<{ id: string; label: string }> }
   | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string }> };
 
+export type AiApiKeyRevealResult =
+  | { ok: true; apiKey: string }
+  | { ok: false; message: string };
+
 export interface DesktopBridge {
   setUiScale: (scale: number) => void;
   getBootstrapData: () => Promise<{
@@ -106,6 +110,7 @@ export interface DesktopBridge {
   getAiWorkspaceHistory: (limit?: number) => Promise<AiWorkspaceHistoryEntry[]>;
   saveAiWorkspaceResult: (input: SaveAiWorkspaceResultInput) => Promise<SaveAiWorkspaceResult>;
   testAiConnection: (input: AiConnectionTestInput) => Promise<AiConnectionTestResult>;
+  revealAiApiKey: (service: string) => Promise<AiApiKeyRevealResult>;
   pullRequests: () => Promise<PullRequestsResult>;
   markRequestsSynced: (requestIds: string[]) => Promise<MarkRequestsSyncedResult>;
   pushMenu: () => Promise<PushMenuResult>;
@@ -175,6 +180,7 @@ const bridge: DesktopBridge = {
   getAiWorkspaceHistory: (limit?: number) => ipcRenderer.invoke("ai:getWorkspaceHistory", limit),
   saveAiWorkspaceResult: (input: SaveAiWorkspaceResultInput) => ipcRenderer.invoke("ai:saveWorkspaceResult", input),
   testAiConnection: (input: AiConnectionTestInput) => ipcRenderer.invoke("ai:testConnection", input),
+  revealAiApiKey: (service: string) => ipcRenderer.invoke("ai:revealApiKey", service),
   pullRequests: () => ipcRenderer.invoke("sync:pullRequests"),
   markRequestsSynced: (requestIds: string[]) => ipcRenderer.invoke("sync:markRequestsSynced", requestIds),
   pushMenu: () => ipcRenderer.invoke("sync:pushMenu"),

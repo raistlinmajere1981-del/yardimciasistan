@@ -1,4 +1,4 @@
-import type { CustomerRequest, ISODateTimeString } from "@yardimci-asistan/shared";
+import type { CustomerRequest, ISODateTimeString, MenuStockUnit } from "@yardimci-asistan/shared";
 
 export interface SyncCoreConfig {
   baseUrl: string;
@@ -81,6 +81,8 @@ export interface PublishedMenuItem {
   tags: string[];
   stock_quantity: number | null;
   stock_min_quantity: number | null;
+  stock_unit: MenuStockUnit;
+  stock_consumption_quantity: number;
   hide_when_out_of_stock: boolean;
   stock_note: string | null;
   sort_order: number;
@@ -387,6 +389,8 @@ export interface AndroidTrackedStockItem {
   price: number;
   stock_quantity: number;
   stock_min_quantity: number | null;
+  stock_unit: MenuStockUnit;
+  stock_consumption_quantity: number;
   hide_when_out_of_stock: boolean;
   stock_status: AndroidStockStatus;
 }

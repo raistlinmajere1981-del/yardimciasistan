@@ -386,27 +386,16 @@ function ya_chat_post_json(string $url, array $body, array $headers, int $timeou
     }
 
     if (function_exists('curl_init')) {
-        $handle = curl_init($url);
-        curl_setopt_array($handle, [
-            CURLOPT_POST => true,
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_POSTFIELDS => $json,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => $timeoutSeconds
-        ]);
-        $bodyText = curl_exec($handle);
-        $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
-        $curlErrorNumber = curl_errno($handle);
-        $curlError = curl_error($handle);
-        curl_close($handle);
-
-        return [
-            'ok' => is_string($bodyText) && $status >= 200 && $status < 300,
-            'body' => is_string($bodyText) ? $bodyText : '',
-            'status' => $status,
-            'network_error' => $curlErrorNumber,
-            'network_message' => $curlError
-        ];
+        $result = ya_chat_curl_post_json($url, $json, $headers, $timeoutSeconds, null);
+        if (ya_chat_is_google_api_url($url)
+            && defined('CURL_IPRESOLVE_V4')
+            && ya_chat_should_retry_google_over_ipv4($result)) {
+            $ipv4Result = ya_chat_curl_post_json($url, $json, $headers, $timeoutSeconds, CURL_IPRESOLVE_V4);
+            if ($ipv4Result['ok'] || (int) $ipv4Result['status'] > 0) {
+                return $ipv4Result;
+            }
+        }
+        return $result;
     }
 
     $context = stream_context_create([
@@ -430,6 +419,67 @@ function ya_chat_post_json(string $url, array $body, array $headers, int $timeou
         'network_error' => $bodyText === false ? 1 : 0,
         'network_message' => ''
     ];
+}
+
+function ya_chat_curl_post_json(string $url, string $json, array $headers, int $timeoutSeconds, ?int $ipResolve): array
+{
+    $handle = curl_init($url);
+    if ($handle === false) {
+        return [
+            'ok' => false,
+            'body' => '',
+            'status' => 0,
+            'network_error' => 1,
+            'network_message' => 'curl_init_failed'
+        ];
+    }
+    $options = [
+        CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_POSTFIELDS => $json,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => $timeoutSeconds
+    ];
+    if ($ipResolve !== null) {
+        $options[CURLOPT_IPRESOLVE] = $ipResolve;
+    }
+    curl_setopt_array($handle, $options);
+    $bodyText = curl_exec($handle);
+    $status = (int) curl_getinfo($handle, CURLINFO_HTTP_CODE);
+    $curlErrorNumber = curl_errno($handle);
+    $curlError = curl_error($handle);
+    curl_close($handle);
+
+    return [
+        'ok' => is_string($bodyText) && $status >= 200 && $status < 300,
+        'body' => is_string($bodyText) ? $bodyText : '',
+        'status' => $status,
+        'network_error' => $curlErrorNumber,
+        'network_message' => $curlError
+    ];
+}
+
+function ya_chat_is_google_api_url(string $url): bool
+{
+    return strtolower((string) parse_url($url, PHP_URL_HOST)) === 'generativelanguage.googleapis.com';
+}
+
+function ya_chat_should_retry_google_over_ipv4(array $response): bool
+{
+    if ((int) ($response['status'] ?? 0) === 0 || (int) ($response['network_error'] ?? 0) !== 0) {
+        return true;
+    }
+    if ((int) ($response['status'] ?? 0) !== 400) {
+        return false;
+    }
+    $payload = json_decode((string) ($response['body'] ?? ''), true);
+    $error = is_array($payload) && is_array($payload['error'] ?? null) ? $payload['error'] : [];
+    $providerStatus = strtoupper(ya_chat_string($error['status'] ?? ''));
+    $providerMessage = strtolower(ya_chat_string($error['message'] ?? ''));
+    return $providerStatus === 'FAILED_PRECONDITION'
+        && (str_contains($providerMessage, 'location is not supported')
+            || str_contains($providerMessage, 'free tier is not available')
+            || str_contains($providerMessage, 'not supported in your country'));
 }
 
 function ya_chat_classify_provider_error(array $response): array

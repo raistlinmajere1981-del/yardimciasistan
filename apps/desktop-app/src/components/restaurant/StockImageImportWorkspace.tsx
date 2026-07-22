@@ -65,7 +65,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
 
   const applicableLines = reviewLines.filter((line) => !line.ignored && isValidReviewLine(line));
   const needsReviewCount = reviewLines.filter((line) => !line.ignored && !isValidReviewLine(line)).length;
-  const totalQuantity = applicableLines.reduce((sum, line) => sum + Number(line.quantity), 0);
+  const totalQuantitySummary = formatStockTotals(applicableLines, trackedItems);
 
   function resetWorkspace() {
     analysisAttemptRef.current += 1;
@@ -242,7 +242,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
       menuItemId: "",
       quantity: "",
       confidence: "low",
-      reason: "Ürün ve adet kullanıcı tarafından girilmeli.",
+      reason: "Ürün ve miktar kullanıcı tarafından girilmeli.",
       ignored: false
     }]);
   }
@@ -258,7 +258,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
       return;
     }
     if (applicableLines.length === 0) {
-      setError("Uygulanacak geçerli stok satırı bulunamadı. Ürün ve pozitif tam sayı adet girin.");
+      setError("Uygulanacak geçerli stok satırı bulunamadı. Ürün ve pozitif tam sayı miktar girin.");
       return;
     }
     setError("");
@@ -280,7 +280,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
       return;
     }
     onApplied(result.dashboardData);
-    setSuccessSummary(`${result.appliedLineCount} satırda toplam ${result.totalQuantity} adet stok eklendi.`);
+    setSuccessSummary(`${result.appliedLineCount} satırda ${totalQuantitySummary} stok eklendi.`);
     setMessage(result.message);
     setStage("success");
   }
@@ -326,13 +326,13 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
                 {message && <p className="stock-image-info" role="status">{message}</p>}
                 {duplicateWarning && <label className="stock-image-duplicate-warning"><input type="checkbox" checked={duplicateAcknowledged} onChange={(event) => setDuplicateAcknowledged(event.target.checked)} /><span><strong>Bu görsel daha önce stok girişinde kullanılmış olabilir.</strong> Yönetici olarak yine de uygulamak istediğimi onaylıyorum.</span></label>}
                 <div className="stock-image-table" role="table" aria-label="AI stok eşleştirme taslağı">
-                  <div className="stock-image-table-head" role="row"><span>Faturada okunan</span><span>Menü karşılığı</span><span>Eklenecek adet</span><span>Güven</span><span>İşlem</span></div>
-                  {reviewLines.map((line) => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}><div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div><label><span className="stock-image-mobile-label">Menü karşılığı</span><select disabled={line.ignored} value={line.menuItemId} onChange={(event) => updateLine(line.id, { menuItemId: event.target.value })}><option value="">Eşleşme yok</option>{trackedItems.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label><label><span className="stock-image-mobile-label">Eklenecek adet</span><input disabled={line.ignored} type="number" min="1" step="1" inputMode="numeric" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: event.target.value })} placeholder="Boş" /></label><span className={`stock-confidence is-${line.confidence}`}>{confidenceLabel(line.confidence)}</span><button type="button" onClick={() => updateLine(line.id, { ignored: !line.ignored })}>{line.ignored ? <><Undo2 size={15} /> Geri al</> : "Yok say"}</button></div>)}
+                  <div className="stock-image-table-head" role="row"><span>Faturada okunan</span><span>Menü karşılığı</span><span>Eklenecek miktar</span><span>Güven</span><span>İşlem</span></div>
+                  {reviewLines.map((line) => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}><div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div><label><span className="stock-image-mobile-label">Menü karşılığı</span><select disabled={line.ignored} value={line.menuItemId} onChange={(event) => updateLine(line.id, { menuItemId: event.target.value })}><option value="">Eşleşme yok</option>{trackedItems.map((item) => <option value={item.id} key={item.id}>{item.name} ({stockUnitLabel(item.stock_unit)})</option>)}</select></label><label><span className="stock-image-mobile-label">Eklenecek miktar</span><input aria-label={`Eklenecek miktar (${stockUnitLabel(trackedItems.find((item) => item.id === line.menuItemId)?.stock_unit ?? "piece")})`} disabled={line.ignored} type="number" min="1" step="1" inputMode="numeric" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: event.target.value })} placeholder="Boş" /></label><span className={`stock-confidence is-${line.confidence}`}>{confidenceLabel(line.confidence)}</span><button type="button" onClick={() => updateLine(line.id, { ignored: !line.ignored })}>{line.ignored ? <><Undo2 size={15} /> Geri al</> : "Yok say"}</button></div>)}
                   {reviewLines.length === 0 && <p className="stock-image-no-lines">Eşleşen satır bulunamadı. Manuel bir satır ekleyebilirsiniz.</p>}
                 </div>
                 <button className="stock-image-add-line" type="button" onClick={addManualLine}><Plus size={16} /> Manuel satır ekle</button>
                 {error && <p className="stock-image-error" role="alert">{error}</p>}
-                <footer className="stock-image-review-footer"><div><strong>{applicableLines.length}</strong><span>uygulanacak satır</span></div><div><strong>{totalQuantity}</strong><span>toplam adet</span></div><div><strong>{needsReviewCount}</strong><span>kontrol gerekli</span></div><button type="button" onClick={returnToImage}>Görsele dön</button><button className="primary-command" type="button" disabled={applicableLines.length === 0 || (duplicateWarning && !duplicateAcknowledged)} onClick={() => void applyImport()}>Stokları Güncelle</button></footer>
+                <footer className="stock-image-review-footer"><div><strong>{applicableLines.length}</strong><span>uygulanacak satır</span></div><div><strong>{totalQuantitySummary}</strong><span>toplam miktar</span></div><div><strong>{needsReviewCount}</strong><span>kontrol gerekli</span></div><button type="button" onClick={returnToImage}>Görsele dön</button><button className="primary-command" type="button" disabled={applicableLines.length === 0 || (duplicateWarning && !duplicateAcknowledged)} onClick={() => void applyImport()}>Stokları Güncelle</button></footer>
               </div>
             )}
             {stage === "success" && <div className="stock-image-success"><Sparkles size={42} /><h3>Stok girişi tamamlandı</h3><p>{successSummary}</p><button className="primary-command" type="button" onClick={closeWorkspace}>Kapat</button></div>}
@@ -352,6 +352,22 @@ function confidenceLabel(confidence: StockImageConfidence): string {
   if (confidence === "high") return "Yüksek";
   if (confidence === "medium") return "Orta";
   return "Düşük";
+}
+
+function stockUnitLabel(unit: "piece" | "gram"): string {
+  return unit === "gram" ? "gram" : "adet";
+}
+
+function formatStockTotals(lines: ReviewLine[], items: DesktopDashboardData["menu"]["items"]): string {
+  const totals = lines.reduce((result, line) => {
+    const unit = items.find((item) => item.id === line.menuItemId)?.stock_unit ?? "piece";
+    result[unit] += Number(line.quantity) || 0;
+    return result;
+  }, { piece: 0, gram: 0 });
+  return [
+    totals.piece > 0 ? `${totals.piece} adet` : "",
+    totals.gram > 0 ? `${new Intl.NumberFormat("tr-TR").format(totals.gram)} g` : ""
+  ].filter(Boolean).join(" + ") || "0";
 }
 
 function stopCameraStream(stream: MediaStream | null) {

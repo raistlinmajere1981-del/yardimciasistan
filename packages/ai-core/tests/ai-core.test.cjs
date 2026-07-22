@@ -8,14 +8,17 @@ const {
   createChatCompletionsUrl,
   createGoogleGenerateContentUrl,
   createGoogleModelsUrl,
+  createGoogleVisionCheckBody,
   createOwnerReplySuggestion,
   generateOwnerReplySuggestion,
   generateConfiguredChat,
   generateOpenAICompatibleChat,
   generateWebChatReply,
+  isGoogleAiStudioVisionModel,
   listGoogleAiStudioModels,
   loadKnowledgeDocuments,
-  rankGoogleAiStudioModels
+  rankGoogleAiStudioModels,
+  verifyGoogleAiStudioVisionModel
 } = require("../dist");
 
 test("loadKnowledgeDocuments reads known markdown files with limits", () => {
@@ -186,9 +189,9 @@ test("listGoogleAiStudioModels returns only generateContent models without expos
       return new Response(JSON.stringify({
         models: [
           {
-            name: "models/gemini-flash",
-            baseModelId: "gemini-flash",
-            displayName: "Gemini Flash",
+            name: "models/gemini-3.5-flash",
+            baseModelId: "gemini-3.5-flash",
+            displayName: "Gemini 3.5 Flash",
             supportedGenerationMethods: ["generateContent"],
             inputTokenLimit: 1000
           },
@@ -202,10 +205,114 @@ test("listGoogleAiStudioModels returns only generateContent models without expos
   );
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.models.map((model) => model.id), ["gemini-flash"]);
+  assert.deepEqual(result.models.map((model) => model.id), ["gemini-3.5-flash"]);
   assert.equal(calls[0].url, "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000");
   assert.equal(calls[0].headers["x-goog-api-key"], "google-secret");
   assert.equal(calls[0].url.includes("google-secret"), false);
+});
+
+test("listGoogleAiStudioModels keeps only current general-purpose multimodal Gemini models and removes duplicates", async () => {
+  const result = await listGoogleAiStudioModels(
+    {
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      apiKey: "google-secret"
+    },
+    async () => new Response(JSON.stringify({
+      models: [
+        {
+          name: "models/gemini-3.6-flash-001",
+          baseModelId: "gemini-3.6-flash",
+          displayName: "Gemini 3.6 Flash",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-3.6-flash-002",
+          baseModelId: "gemini-3.6-flash",
+          displayName: "Gemini 3.6 Flash duplicate",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-3.1-pro-preview",
+          displayName: "Gemini 3.1 Pro Preview",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-3.5-flash-lite",
+          displayName: "Gemini 3.5 Flash-Lite",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-2.5-flash",
+          displayName: "Gemini 2.5 Flash",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-flash-latest",
+          displayName: "Gemini Flash Latest",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-3.1-flash-image",
+          displayName: "Gemini image generator",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-3.1-flash-tts-preview",
+          displayName: "Gemini TTS",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-2.0-flash",
+          displayName: "Gemini 2.0 Flash Shut down",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemma-3-27b-it",
+          displayName: "Gemma 3",
+          supportedGenerationMethods: ["generateContent"]
+        },
+        {
+          name: "models/gemini-embedding-2",
+          displayName: "Gemini Embedding 2",
+          supportedGenerationMethods: ["embedContent"]
+        }
+      ]
+    }), { status: 200, headers: { "Content-Type": "application/json" } })
+  );
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.models.map((model) => model.id), ["gemini-3.5-flash-lite", "gemini-3.6-flash"]);
+  assert.equal(isGoogleAiStudioVisionModel({ id: "gemini-2.5-flash", displayName: "Gemini 2.5 Flash", description: "" }), false);
+  assert.equal(isGoogleAiStudioVisionModel({ id: "gemini-flash-latest", displayName: "Gemini Flash Latest", description: "" }), false);
+  assert.equal(isGoogleAiStudioVisionModel({ id: "gemini-3.1-pro-preview", displayName: "Gemini 3.1 Pro Preview", description: "" }), false);
+  assert.equal(isGoogleAiStudioVisionModel({ id: "gemini-2.5-flash-image", displayName: "Nano Banana", description: "" }), false);
+});
+
+test("verifyGoogleAiStudioVisionModel sends an inline image and JSON response configuration", async () => {
+  const calls = [];
+  const result = await verifyGoogleAiStudioVisionModel(
+    {
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "gemini-3.6-flash",
+      apiKey: "google-secret"
+    },
+    async (url, init) => {
+      calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: "{\"vision\":true}" }] } }]
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.model, "gemini-3.6-flash");
+  assert.equal(calls[0].url, "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent");
+  assert.equal(calls[0].headers["x-goog-api-key"], "google-secret");
+  assert.equal(calls[0].body.contents[0].parts[1].inlineData.mimeType, "image/png");
+  assert.match(calls[0].body.contents[0].parts[1].inlineData.data, /^[A-Za-z0-9+/]+=*$/);
+  assert.equal(calls[0].body.generationConfig.responseMimeType, "application/json");
+  assert.equal("temperature" in calls[0].body.generationConfig, false);
+  assert.deepEqual(calls[0].body, createGoogleVisionCheckBody());
 });
 
 test("createGoogleModelsUrl accepts the configured OpenAI-compatible Gemini endpoint", () => {

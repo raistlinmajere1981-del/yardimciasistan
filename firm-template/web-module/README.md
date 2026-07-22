@@ -105,9 +105,20 @@ post_max_size = 12M
 Endpoint mevcut `config/ai.php` yapılandırmasını kullanır; bu dosya masaüstünden
 yayınlanan `data/ai-settings.local.php` ayarını da yükler. OpenAI/OpenRouter uyumlu
 vision modelleri ve Gemini yolu desteklenir. Seçili model/hizmet görsel kabul etmiyorsa
-`Mevcut AI hizmeti görsel analizini desteklemiyor.` cevabı döner. Koli, paket, kg veya
-litre gibi belirsiz birimlerden adet tahmini yapılmaz ve AI'nın izinli liste dışında
-ürettiği ürün kimlikleri temizlenir.
+ayar ekranından görsel destekli bir model seçilmesini isteyen yönlendirici bir cevap
+döner. Gemini'de genel amaçlı güncel modeller kullanılır; görsel üretim, TTS, Live,
+embedding ve kapanmış model aileleri stok analizi için kabul edilmez. Stok birimi adet
+olan ürünlerde koli, paket, ağırlık veya hacim bilgisi tahminle adede çevrilmez. Gram
+takipli ürünlerde açık `GR` miktarı korunur, açık `KG` miktarı güvenli biçimde 1000 ile
+çarpılarak grama dönüştürülür. AI'nın izinli liste dışında ürettiği ürün kimlikleri
+temizlenir.
+
+Fatura/fiş çıkarımı için düşük gecikmeli `gemini-3.5-flash-lite` uygundur. Google kotası
+model ve proje bazında uygulanır; seçili model HTTP 429 döndürürse bağlantı kontrolü
+listedeki sonraki kararlı görsel modele geçebilir. Yeni Gemini sürümleriyle uyumluluk için
+kullanımdan kaldırılan sampling parametreleri gönderilmez. Hosting IPv6 çıkışı Google
+tarafından desteklenmeyen konum olarak sınıflandırılırsa yalnız bu özel hata için istek
+IPv4 üzerinden bir kez güvenli biçimde yeniden denenir.
 
 Yüklenen görsel yalnız istek süresince PHP geçici dosyasında bulunur ve başarı/hata
 sonucundan sonra silinir. Görsel, base64 içeriği ve ham sağlayıcı cevabı uygulama

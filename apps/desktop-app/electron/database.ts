@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   createId,
   normalizePhone,
+  type MenuStockUnit,
   type StockImageAnalysis,
   type StockImageAnalysisLine,
   type StockImageApplyLine,
@@ -192,6 +193,33 @@ export interface DesktopDashboardData {
 
 export type DesktopAiService = "openai" | "openrouter" | "groq" | "gemini" | "custom";
 
+export interface DesktopAiModelOption {
+  id: string;
+  label: string;
+}
+
+export interface DesktopAiServiceProfile {
+  service: DesktopAiService;
+  projectName: string;
+  baseUrl: string;
+  model: string;
+  modelOptions: DesktopAiModelOption[];
+  timeoutSeconds: number;
+  apiKeyConfigured: boolean;
+  updatedAt: string;
+}
+
+export interface SaveAiServiceProfileInput {
+  service: string;
+  projectName: string;
+  baseUrl: string;
+  model: string;
+  modelOptions?: DesktopAiModelOption[];
+  timeoutSeconds: number;
+  apiKey: string;
+  clearApiKey: boolean;
+}
+
 export interface AiApiKeyWrite {
   mode: "keep" | "replace" | "clear";
   encryptedValue?: string;
@@ -217,6 +245,7 @@ export interface DesktopSetupData {
   aiTimeoutSeconds: number;
   aiApiKeyConfigured: boolean;
   aiLastPublishedAt: string;
+  aiProfiles: DesktopAiServiceProfile[];
   modules: {
     rooms: boolean;
     tables: boolean;
@@ -245,10 +274,12 @@ export interface SaveInitialSetupInput {
   aiService: string;
   aiProjectName: string;
   aiModel: string;
+  aiModelOptions?: DesktopAiModelOption[];
   aiBaseUrl: string;
   aiTimeoutSeconds: number;
   aiApiKey: string;
   clearAiApiKey: boolean;
+  aiProfiles?: SaveAiServiceProfileInput[];
   modules: {
     rooms: boolean;
     tables: boolean;
@@ -297,6 +328,8 @@ export interface SaveMenuItemInput {
   tags: string[];
   stock_quantity: number | null;
   stock_min_quantity: number | null;
+  stock_unit: MenuStockUnit;
+  stock_consumption_quantity: number;
   hide_when_out_of_stock: boolean;
   stock_note: string | null;
   sort_order: number;
@@ -2229,6 +2262,9 @@ export class DesktopDatabase {
     const modules = this.parseModulesJson(String(business?.modules_json ?? "{}"));
     const syncSecret = String(settings?.sync_secret ?? "");
     const businessName = String(business?.display_name ?? "");
+    const aiService = normalizeStoredAiService(settings?.ai_service);
+    const aiProfiles = this.getAiServiceProfiles();
+    const activeAiProfile = aiProfiles.find((profile) => profile.service === aiService);
     const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
     const setupRequired =
       !setupCompleted ||
@@ -2249,13 +2285,14 @@ export class DesktopDatabase {
       autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
       aiEnabled: Number(settings?.ai_enabled ?? 0) === 1,
       aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
-      aiService: normalizeStoredAiService(settings?.ai_service),
-      aiProjectName: String(settings?.ai_project_name ?? ""),
-      aiModel: String(settings?.ai_model ?? ""),
-      aiBaseUrl: normalizeStoredAiBaseUrl(settings?.ai_base_url),
-      aiTimeoutSeconds: normalizeStoredAiTimeout(settings?.ai_timeout_seconds),
-      aiApiKeyConfigured: Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
+      aiService,
+      aiProjectName: activeAiProfile?.projectName ?? String(settings?.ai_project_name ?? ""),
+      aiModel: activeAiProfile?.model ?? String(settings?.ai_model ?? ""),
+      aiBaseUrl: activeAiProfile?.baseUrl || normalizeStoredAiBaseUrl(settings?.ai_base_url),
+      aiTimeoutSeconds: activeAiProfile?.timeoutSeconds ?? normalizeStoredAiTimeout(settings?.ai_timeout_seconds),
+      aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
       aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
+      aiProfiles,
       modules: {
         rooms: modules.rooms,
         tables: modules.tables,
@@ -2268,6 +2305,42 @@ export class DesktopDatabase {
         tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
       }
     };
+  }
+
+  getAiServiceProfiles(): DesktopAiServiceProfile[] {
+    const settings = this.db
+      .prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1")
+      .get() as Record<string, unknown> | undefined;
+    const activeService = normalizeStoredAiService(settings?.ai_service);
+    const rows = this.db
+      .prepare("SELECT * FROM ai_service_profiles ORDER BY service")
+      .all() as Array<Record<string, unknown>>;
+    const rowsByService = new Map<DesktopAiService, Record<string, unknown>>();
+
+    for (const row of rows) {
+      const service = normalizeAiService(row.service);
+      if (service) {
+        rowsByService.set(service, row);
+      }
+    }
+
+    return AI_SERVICE_IDS.map((service) => {
+      const row = rowsByService.get(service);
+      const useLegacyActiveSettings = !row && service === activeService;
+      const model = String(row?.model ?? (useLegacyActiveSettings ? settings?.ai_model : "") ?? "").trim();
+      const baseUrl = normalizeAiBaseUrl(row?.base_url ?? (useLegacyActiveSettings ? settings?.ai_base_url : ""))
+        || AI_SERVICE_DEFAULT_BASE_URLS[service];
+      return {
+        service,
+        projectName: String(row?.project_name ?? (useLegacyActiveSettings ? settings?.ai_project_name : "") ?? "").trim(),
+        baseUrl,
+        model,
+        modelOptions: normalizeAiModelOptions(row?.model_options_json, model),
+        timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? (useLegacyActiveSettings ? settings?.ai_timeout_seconds : DEFAULT_AI_TIMEOUT_SECONDS)),
+        apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? (useLegacyActiveSettings ? settings?.ai_api_key_encrypted : "") ?? "").trim()),
+        updatedAt: normalizeStoredTimestamp(row?.updated_at ?? (useLegacyActiveSettings ? settings?.updated_at : ""))
+      };
+    });
   }
 
   setAutoSyncEnabled(enabled: boolean): DesktopSyncRuntimeStatus {
@@ -2395,12 +2468,26 @@ export class DesktopDatabase {
       .run(Math.max(0, Math.trunc(cursor)), timestamp);
   }
 
-  getEncryptedAiApiKey(): string {
+  getEncryptedAiApiKey(service?: DesktopAiService | string): string {
     const settings = this.db
-      .prepare("SELECT ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as { ai_api_key_encrypted?: string } | undefined;
+      .prepare("SELECT ai_service, ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1")
+      .get() as { ai_service?: string; ai_api_key_encrypted?: string } | undefined;
+    const requestedService = service === undefined ? normalizeStoredAiService(settings?.ai_service) : normalizeAiService(service);
 
-    return String(settings?.ai_api_key_encrypted ?? "").trim();
+    if (!requestedService) {
+      return "";
+    }
+
+    const profile = this.db
+      .prepare("SELECT api_key_encrypted FROM ai_service_profiles WHERE service = ? LIMIT 1")
+      .get(requestedService) as { api_key_encrypted?: string } | undefined;
+    if (profile) {
+      return String(profile.api_key_encrypted ?? "").trim();
+    }
+
+    return normalizeStoredAiService(settings?.ai_service) === requestedService
+      ? String(settings?.ai_api_key_encrypted ?? "").trim()
+      : "";
   }
 
   markAiSettingsPublished(timestamp: string): DesktopSetupData {
@@ -2425,7 +2512,11 @@ export class DesktopDatabase {
     return this.getSetupData();
   }
 
-  saveInitialSetup(input: SaveInitialSetupInput, aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" }): DesktopSetupSaveResult {
+  saveInitialSetup(
+    input: SaveInitialSetupInput,
+    aiApiKeyWrite: AiApiKeyWrite = { mode: "keep" },
+    aiProfileApiKeyWrites: Partial<Record<DesktopAiService, AiApiKeyWrite>> = {}
+  ): DesktopSetupSaveResult {
     const businessName = input.businessName.trim();
     const syncSecret = input.syncSecret.trim();
     const webModuleUrl = normalizeUrl(input.webModuleUrl);
@@ -2437,7 +2528,15 @@ export class DesktopDatabase {
     const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
     const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
     const existingSettings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
-    const existingEncryptedAiApiKey = String(existingSettings?.ai_api_key_encrypted ?? "").trim();
+    const profileService = aiService ?? normalizeStoredAiService(existingSettings?.ai_service);
+    const existingAiProfile = this.db
+      .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
+      .get(profileService) as Record<string, unknown> | undefined;
+    const existingEncryptedAiApiKey = String(
+      existingAiProfile?.api_key_encrypted
+        ?? (normalizeStoredAiService(existingSettings?.ai_service) === profileService ? existingSettings?.ai_api_key_encrypted : "")
+        ?? ""
+    ).trim();
     const aiApiKeyResolution = resolveEncryptedAiApiKey({
       rawKeyProvided: rawAiApiKeyProvided,
       clearRequested: Boolean(input.clearAiApiKey),
@@ -2533,6 +2632,77 @@ export class DesktopDatabase {
       };
     }
 
+    const additionalAiProfiles: Array<{
+      service: DesktopAiService;
+      projectName: string;
+      baseUrl: string;
+      model: string;
+      modelOptions: DesktopAiModelOption[];
+      timeoutSeconds: number;
+      encryptedApiKey: string;
+      createdAt: string;
+    }> = [];
+    const seenProfileServices = new Set<DesktopAiService>();
+    for (const profileInput of Array.isArray(input.aiProfiles) ? input.aiProfiles : []) {
+      const service = normalizeAiService(profileInput?.service);
+      if (!service) {
+        return { ok: false, message: "Kaydedilecek AI servis profillerinden biri geçersiz." };
+      }
+      if (seenProfileServices.has(service)) {
+        return { ok: false, message: "Aynı AI servis profili birden fazla kez gönderilemez." };
+      }
+      seenProfileServices.add(service);
+      if (service === profileService) {
+        continue;
+      }
+
+      const existingProfile = this.db
+        .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
+        .get(service) as Record<string, unknown> | undefined;
+      const projectName = String(profileInput.projectName ?? "").trim();
+      const model = String(profileInput.model ?? "").trim();
+      const normalizedBaseUrl = normalizeAiBaseUrl(profileInput.baseUrl);
+      const baseUrl = normalizedBaseUrl || AI_SERVICE_DEFAULT_BASE_URLS[service];
+      const timeoutSeconds = normalizeAiTimeout(profileInput.timeoutSeconds);
+      const rawKeyProvided = Boolean(String(profileInput.apiKey ?? "").trim());
+      const keyResolution = resolveEncryptedAiApiKey({
+        rawKeyProvided,
+        clearRequested: Boolean(profileInput.clearApiKey),
+        write: aiProfileApiKeyWrites[service] ?? { mode: "keep" },
+        existingEncryptedValue: String(existingProfile?.api_key_encrypted ?? "").trim()
+      });
+
+      if (!keyResolution.ok) {
+        return keyResolution;
+      }
+      if (projectName.length > 120 || /[\x00-\x1F\x7F]/.test(projectName)) {
+        return { ok: false, message: `${getAiServiceDisplayName(service)} profil adı geçersiz.` };
+      }
+      if (!timeoutSeconds) {
+        return { ok: false, message: `${getAiServiceDisplayName(service)} zaman aşımı 5 ile 120 saniye arasında olmalı.` };
+      }
+      if (service === "gemini" && baseUrl !== GOOGLE_AI_STUDIO_BASE_URL) {
+        return { ok: false, message: "Google AI Studio profili için resmi Gemini bağlantı adresi kullanılmalı." };
+      }
+      if (!baseUrl && (model || keyResolution.encryptedValue)) {
+        return { ok: false, message: `${getAiServiceDisplayName(service)} bağlantı adresi gerekli.` };
+      }
+
+      additionalAiProfiles.push({
+        service,
+        projectName,
+        baseUrl,
+        model,
+        modelOptions: normalizeAiModelOptions(
+          profileInput.modelOptions === undefined ? existingProfile?.model_options_json : profileInput.modelOptions,
+          model
+        ),
+        timeoutSeconds,
+        encryptedApiKey: keyResolution.encryptedValue,
+        createdAt: String(existingProfile?.created_at ?? "")
+      });
+    }
+
     const now = new Date().toISOString();
     const existingBusiness = this.db.prepare("SELECT id, created_at FROM business WHERE deleted_at = '' LIMIT 1").get() as { id?: string; created_at?: string } | undefined;
     const businessId = existingBusiness?.id || createId("business_");
@@ -2544,6 +2714,10 @@ export class DesktopDatabase {
     const storedAiBaseUrl = aiBaseUrl || DEFAULT_AI_BASE_URL;
     const storedAiTimeoutSeconds = aiTimeoutSeconds ?? DEFAULT_AI_TIMEOUT_SECONDS;
     const storedEncryptedAiApiKey = aiApiKeyResolution.encryptedValue;
+    const storedAiModelOptions = normalizeAiModelOptions(
+      input.aiModelOptions === undefined ? existingAiProfile?.model_options_json : input.aiModelOptions,
+      aiModel
+    );
     const aiSettingsChanged =
       !existingSettings ||
       Number(existingSettings.ai_enabled ?? 0) !== (input.aiEnabled ? 1 : 0) ||
@@ -2685,6 +2859,75 @@ export class DesktopDatabase {
           now
         );
 
+      this.db
+        .prepare(`
+          INSERT INTO ai_service_profiles (
+            service,
+            project_name,
+            base_url,
+            model,
+            model_options_json,
+            timeout_seconds,
+            api_key_encrypted,
+            created_at,
+            updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(service) DO UPDATE SET
+            project_name = excluded.project_name,
+            base_url = excluded.base_url,
+            model = excluded.model,
+            model_options_json = excluded.model_options_json,
+            timeout_seconds = excluded.timeout_seconds,
+            api_key_encrypted = excluded.api_key_encrypted,
+            updated_at = excluded.updated_at
+        `)
+        .run(
+          storedAiService,
+          aiProjectName,
+          storedAiBaseUrl,
+          aiModel,
+          JSON.stringify(storedAiModelOptions),
+          storedAiTimeoutSeconds,
+          storedEncryptedAiApiKey,
+          String(existingAiProfile?.created_at ?? "") || now,
+          now
+        );
+
+      const saveAiProfile = this.db.prepare(`
+        INSERT INTO ai_service_profiles (
+          service,
+          project_name,
+          base_url,
+          model,
+          model_options_json,
+          timeout_seconds,
+          api_key_encrypted,
+          created_at,
+          updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(service) DO UPDATE SET
+          project_name = excluded.project_name,
+          base_url = excluded.base_url,
+          model = excluded.model,
+          model_options_json = excluded.model_options_json,
+          timeout_seconds = excluded.timeout_seconds,
+          api_key_encrypted = excluded.api_key_encrypted,
+          updated_at = excluded.updated_at
+      `);
+      for (const profile of additionalAiProfiles) {
+        saveAiProfile.run(
+          profile.service,
+          profile.projectName,
+          profile.baseUrl,
+          profile.model,
+          JSON.stringify(profile.modelOptions),
+          profile.timeoutSeconds,
+          profile.encryptedApiKey,
+          profile.createdAt || now,
+          now
+        );
+      }
+
       this.ensureInitialRooms(normalizeInteger(input.initialCounts.rooms), now);
       this.ensureInitialTables(normalizeInteger(input.initialCounts.tables), now);
       this.db.exec("COMMIT");
@@ -2734,6 +2977,8 @@ export class DesktopDatabase {
           tags_json,
           stock_quantity,
           stock_min_quantity,
+          stock_unit,
+          stock_consumption_quantity,
           hide_when_out_of_stock,
           stock_note,
           sort_order,
@@ -2772,6 +3017,8 @@ export class DesktopDatabase {
         tags: this.parseStringArray(row.tags_json),
         stock_quantity: nullableNumber(row.stock_quantity),
         stock_min_quantity: nullableNumber(row.stock_min_quantity),
+        stock_unit: normalizeMenuStockUnit(row.stock_unit),
+        stock_consumption_quantity: normalizePositiveStockNumber(row.stock_consumption_quantity) ?? 1,
         hide_when_out_of_stock: Number(row.hide_when_out_of_stock ?? 0) === 1,
         stock_note: nullableString(row.stock_note),
         sort_order: Number(row.sort_order ?? 0),
@@ -2797,7 +3044,7 @@ export class DesktopDatabase {
       items: menu.items.filter((item) => !(
         item.stock_quantity !== null
         && item.hide_when_out_of_stock
-        && item.stock_quantity <= 0
+        && item.stock_quantity < item.stock_consumption_quantity
       ))
     };
   }
@@ -2833,7 +3080,8 @@ export class DesktopDatabase {
   getTrackedStockCandidates(): StockImageMenuCandidate[] {
     const rows = this.db
       .prepare(`
-        SELECT menu_items.id, menu_items.name, menu_items.stock_quantity, menu_categories.name AS category
+        SELECT menu_items.id, menu_items.name, menu_items.stock_quantity, menu_items.stock_unit,
+          menu_categories.name AS category
         FROM menu_items
         INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
         WHERE menu_items.deleted_at = ''
@@ -2846,7 +3094,8 @@ export class DesktopDatabase {
       id: String(row.id ?? ""),
       name: String(row.name ?? ""),
       category: String(row.category ?? "Menü"),
-      current_stock: Number(row.stock_quantity ?? 0)
+      current_stock: Number(row.stock_quantity ?? 0),
+      stock_unit: normalizeMenuStockUnit(row.stock_unit)
     }));
   }
 
@@ -3884,6 +4133,8 @@ export class DesktopDatabase {
     const categoryId = input.category_id.trim();
     const stockQuantity = normalizeNullableStockNumber(input.stock_quantity);
     const stockMinQuantity = normalizeNullableStockNumber(input.stock_min_quantity);
+    const stockUnit = normalizeMenuStockUnit(input.stock_unit);
+    const stockConsumptionQuantity = normalizePositiveStockNumber(input.stock_consumption_quantity) ?? 1;
     if (!name) {
       return {
         ok: false,
@@ -3899,7 +4150,7 @@ export class DesktopDatabase {
       };
     }
     if (input.stock_quantity !== null && input.stock_quantity !== undefined && stockQuantity === null) {
-      return { ok: false, message: "Stok adedi 0 veya daha büyük bir sayı olmalı." };
+      return { ok: false, message: "Stok miktarı 0 veya daha büyük bir sayı olmalı." };
     }
     if (input.stock_min_quantity !== null && input.stock_min_quantity !== undefined && stockMinQuantity === null) {
       return { ok: false, message: "Minimum stok uyarısı 0 veya daha büyük bir sayı olmalı." };
@@ -3931,13 +4182,15 @@ export class DesktopDatabase {
             tags_json,
             stock_quantity,
             stock_min_quantity,
+            stock_unit,
+            stock_consumption_quantity,
             hide_when_out_of_stock,
             stock_note,
             sort_order,
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
           ON CONFLICT(id) DO UPDATE SET
             category_id = excluded.category_id,
             name = excluded.name,
@@ -3951,6 +4204,8 @@ export class DesktopDatabase {
             tags_json = excluded.tags_json,
             stock_quantity = excluded.stock_quantity,
             stock_min_quantity = excluded.stock_min_quantity,
+            stock_unit = excluded.stock_unit,
+            stock_consumption_quantity = excluded.stock_consumption_quantity,
             hide_when_out_of_stock = excluded.hide_when_out_of_stock,
             stock_note = excluded.stock_note,
             sort_order = excluded.sort_order,
@@ -3972,6 +4227,8 @@ export class DesktopDatabase {
           JSON.stringify(normalizeStringArray(input.tags)),
           stockQuantity,
           stockMinQuantity,
+          stockUnit,
+          stockConsumptionQuantity,
           input.hide_when_out_of_stock ? 1 : 0,
           nullableTrimmedString(input.stock_note),
           normalizeInteger(input.sort_order),
@@ -5691,8 +5948,12 @@ export class DesktopDatabase {
     now: string;
   }): MenuStockMutationResult {
     const item = this.db
-      .prepare("SELECT stock_quantity, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
-      .get(input.menuItemId) as { stock_quantity?: number | null; updated_at?: string } | undefined;
+      .prepare("SELECT stock_quantity, stock_consumption_quantity, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
+      .get(input.menuItemId) as {
+        stock_quantity?: number | null;
+        stock_consumption_quantity?: number;
+        updated_at?: string;
+      } | undefined;
     if (!item) {
       return { ok: false, message: "Menü ürünü bulunamadı." };
     }
@@ -5712,8 +5973,14 @@ export class DesktopDatabase {
     }
 
     const quantityBefore = storedQuantity ?? 0;
+    const stockConsumptionQuantity = normalizePositiveStockNumber(item.stock_consumption_quantity) ?? 1;
+    const quantityChange = input.quantityChange === undefined
+      ? undefined
+      : ["order_add", "order_update", "order_remove"].includes(input.type)
+        ? normalizeStockPrecision(input.quantityChange * stockConsumptionQuantity)
+        : input.quantityChange;
     const requestedAfter = input.quantityAfter === undefined
-      ? quantityBefore + (input.quantityChange ?? 0)
+      ? quantityBefore + (quantityChange ?? 0)
       : input.quantityAfter;
     const quantityAfter = normalizeNullableStockNumber(requestedAfter);
     if (quantityAfter === null) {
@@ -6173,10 +6440,25 @@ const ANDROID_ADMIN_ONLY_DELETION_ACTIONS = new Set<string>([
   "menu_item_delete",
   "message_delete"
 ]);
-const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(["openai", "openrouter", "groq", "gemini", "custom"]);
+const AI_SERVICE_IDS: DesktopAiService[] = ["openai", "openrouter", "groq", "gemini", "custom"];
+const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(AI_SERVICE_IDS);
 const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
 const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 const DEFAULT_AI_TIMEOUT_SECONDS = 30;
+const AI_SERVICE_DEFAULT_BASE_URLS: Record<DesktopAiService, string> = {
+  openai: DEFAULT_AI_BASE_URL,
+  openrouter: "https://openrouter.ai/api/v1",
+  groq: "https://api.groq.com/openai/v1",
+  gemini: GOOGLE_AI_STUDIO_BASE_URL,
+  custom: ""
+};
+const AI_SERVICE_DISPLAY_NAMES: Record<DesktopAiService, string> = {
+  openai: "OpenAI",
+  openrouter: "OpenRouter",
+  groq: "Groq",
+  gemini: "Google AI Studio",
+  custom: "Özel AI servisi"
+};
 const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
 
 function isAndroidAdminOnlyDeletion(actionType: unknown): boolean {
@@ -6268,6 +6550,50 @@ function normalizeAiService(value: unknown): DesktopAiService | null {
 
 function normalizeStoredAiService(value: unknown): DesktopAiService {
   return normalizeAiService(value) ?? "openai";
+}
+
+function getAiServiceDisplayName(service: DesktopAiService): string {
+  return AI_SERVICE_DISPLAY_NAMES[service];
+}
+
+function normalizeAiModelOptions(value: unknown, selectedModel = ""): DesktopAiModelOption[] {
+  let candidates: unknown = value;
+  if (!Array.isArray(candidates)) {
+    try {
+      candidates = JSON.parse(String(value ?? "[]"));
+    } catch {
+      candidates = [];
+    }
+  }
+
+  const options: DesktopAiModelOption[] = [];
+  const seen = new Set<string>();
+  for (const candidate of Array.isArray(candidates) ? candidates : []) {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      continue;
+    }
+    const record = candidate as Record<string, unknown>;
+    const id = String(record.id ?? "").trim();
+    const rawLabel = String(record.label ?? "").trim();
+    if (!id || id.length > 200 || /[\x00-\x1F\x7F]/.test(id) || seen.has(id)) {
+      continue;
+    }
+    const label = rawLabel && rawLabel.length <= 300 && !/[\x00-\x1F\x7F]/.test(rawLabel) ? rawLabel : id;
+    seen.add(id);
+    options.push({ id, label });
+    if (options.length >= 100) {
+      break;
+    }
+  }
+
+  const normalizedSelectedModel = String(selectedModel ?? "").trim();
+  if (normalizedSelectedModel && !seen.has(normalizedSelectedModel)) {
+    if (options.length >= 100) {
+      options.pop();
+    }
+    options.push({ id: normalizedSelectedModel, label: normalizedSelectedModel });
+  }
+  return options;
 }
 
 function normalizeAiBaseUrl(value: unknown): string {
@@ -6379,6 +6705,10 @@ function normalizePositiveStockNumber(value: unknown): number | null {
     : null;
 }
 
+function normalizeMenuStockUnit(value: unknown): MenuStockUnit {
+  return value === "gram" ? "gram" : "piece";
+}
+
 function normalizeSignedStockNumber(value: unknown): number | null {
   const quantity = Number(value);
   return Number.isFinite(quantity) ? normalizeStockPrecision(quantity) : null;
@@ -6468,21 +6798,28 @@ function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates: Stock
     const integerQuantity = Number.isInteger(rawQuantity) && rawQuantity > 0 && rawQuantity <= 100_000
       ? rawQuantity
       : null;
-    const ambiguousQuantity = hasAmbiguousStockUnit(sourceQuantityText || rawText);
+    const quantityText = sourceQuantityText || rawText;
+    const gramQuantity = candidate?.stock_unit === "gram" ? parseGramQuantity(quantityText) : null;
+    const ambiguousQuantity = hasAmbiguousStockUnit(quantityText, candidate?.stock_unit ?? "piece");
+    const suggestedQuantity = candidate?.stock_unit === "gram" ? gramQuantity : integerQuantity;
     let reason = normalizeStockImageText(line.needs_review_reason, 500);
     if (requestedId && !candidate) {
       reason = reason || "Önerilen ürün mevcut stok takipli menü listesinde değil.";
     }
     if (ambiguousQuantity) {
-      reason = "Koli, paket, kg veya litre bilgisi açık bir adede dönüştürülemedi.";
-    } else if (integerQuantity === null) {
-      reason = reason || "Açık adet bilgisi bulunamadı.";
+      reason = candidate?.stock_unit === "gram"
+        ? "Miktar gram veya kilogram olarak açıkça okunamadı."
+        : "Koli, paket, ağırlık veya hacim bilgisi açık bir adede dönüştürülemedi.";
+    } else if (suggestedQuantity === null) {
+      reason = reason || (candidate?.stock_unit === "gram"
+        ? "Açık gram veya kilogram bilgisi bulunamadı."
+        : "Açık adet bilgisi bulunamadı.");
     }
     lines.push({
       raw_text: rawText,
       matched_menu_item_id: candidate?.id ?? null,
       matched_menu_item_name: candidate?.name ?? null,
-      suggested_quantity: ambiguousQuantity ? null : integerQuantity,
+      suggested_quantity: ambiguousQuantity ? null : suggestedQuantity,
       source_quantity_text: sourceQuantityText,
       confidence: normalizeStockImageConfidence(line.confidence),
       needs_review_reason: reason
@@ -6499,12 +6836,36 @@ function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates: Stock
   };
 }
 
-function hasAmbiguousStockUnit(value: string): boolean {
+function hasAmbiguousStockUnit(value: string, stockUnit: MenuStockUnit): boolean {
   const normalized = value.toLocaleLowerCase("tr-TR")
     .replace(/ı/g, "i")
     .replace(/\b\d+\s*['’]?\s*(?:li|lı|lu|lü|lik|lık|luk|lük)\s+paket\b/giu, "")
     .replace(/\s+/g, " ");
-  return /\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|lt|litre)\b/iu.test(normalized);
+  if (stockUnit === "gram") {
+    return /\b(?:koli|paket|lt|litre|adet|ad|tane)\b/iu.test(normalized) || parseGramQuantity(normalized) === null;
+  }
+  return /\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|gr|gram|lt|litre)\b/iu.test(normalized);
+}
+
+function parseGramQuantity(value: string): number | null {
+  const normalized = value.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
+  const match = normalized.match(/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g)\b/iu);
+  if (!match) {
+    return null;
+  }
+  const quantity = parseTurkishDocumentNumber(match[1]);
+  const grams = ["kg", "kilogram", "kilo"].includes(match[2]) ? quantity * 1000 : quantity;
+  return Number.isInteger(grams) && grams > 0 && grams <= 100_000 ? grams : null;
+}
+
+function parseTurkishDocumentNumber(value: string): number {
+  const text = value.trim();
+  const normalized = text.includes(",")
+    ? text.replace(/\./g, "").replace(",", ".")
+    : /^\d{1,3}(?:\.\d{3})+$/.test(text)
+      ? text.replace(/\./g, "")
+      : text;
+  return Number(normalized);
 }
 
 function normalizeStockImageApplyLines(value: unknown): StockImageApplyLine[] | null {

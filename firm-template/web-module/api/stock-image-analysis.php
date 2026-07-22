@@ -112,7 +112,8 @@ try {
                         $responsePayload = [
                             'ok' => false,
                             'code' => ya_stock_image_string($result['code'] ?? 'analysis_failed'),
-                            'message' => ya_stock_image_string($result['message'] ?? 'Görsel analiz edilemedi.')
+                            'message' => ya_stock_image_string($result['message'] ?? 'Görsel analiz edilemedi.'),
+                            'provider_status' => max(0, (int) ($result['provider_status'] ?? 0))
                         ];
                     } else {
                         $analysis = ya_stock_image_sanitize_analysis($result['analysis'] ?? [], $menuItems);
@@ -168,7 +169,8 @@ function ya_stock_endpoint_authoritative_android_candidates(array $provided): ar
             'id' => $record['menu_item_id'] ?? '',
             'name' => $record['name'] ?? '',
             'category' => $record['category'] ?? 'Menü',
-            'current_stock' => $record['stock_quantity'] ?? null
+            'current_stock' => $record['stock_quantity'] ?? null,
+            'stock_unit' => $record['stock_unit'] ?? 'piece'
         ];
     }, is_array($snapshot['trackedStockItems'] ?? null) ? $snapshot['trackedStockItems'] : []));
     $providedIds = array_fill_keys(array_map(static fn(array $item): string => ya_stock_image_string($item['id'] ?? ''), $provided), true);

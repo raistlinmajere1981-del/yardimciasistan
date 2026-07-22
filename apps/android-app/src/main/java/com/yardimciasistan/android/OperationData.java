@@ -340,6 +340,11 @@ final class OperationData {
     return Math.max(0, source.optDouble(key, 0));
   }
 
+  static double positiveDecimal(JSONObject source, String key, double fallback) {
+    double value = source.optDouble(key, fallback);
+    return Double.isFinite(value) && value > 0 ? value : fallback;
+  }
+
   static Double nullableDecimal(JSONObject source, String key) {
     if (!source.has(key) || source.isNull(key)) {
       return null;
@@ -581,6 +586,8 @@ final class OperationData {
     boolean available = true;
     Double stockQuantity;
     Double stockMinQuantity;
+    String stockUnit = "piece";
+    double stockConsumptionQuantity = 1;
     boolean hideWhenOutOfStock;
     String updatedAt = "";
 
@@ -595,13 +602,15 @@ final class OperationData {
       record.available = source.optBoolean("is_available", true);
       record.stockQuantity = nullableDecimal(source, "stock_quantity");
       record.stockMinQuantity = nullableDecimal(source, "stock_min_quantity");
+      record.stockUnit = "gram".equals(value(source, "stock_unit", "piece")) ? "gram" : "piece";
+      record.stockConsumptionQuantity = positiveDecimal(source, "stock_consumption_quantity", 1);
       record.hideWhenOutOfStock = source.optBoolean("hide_when_out_of_stock", false);
       record.updatedAt = value(source, "updated_at", "");
       return record;
     }
 
     boolean outOfStock() {
-      return stockQuantity != null && stockQuantity <= 0;
+      return stockQuantity != null && stockQuantity < stockConsumptionQuantity;
     }
   }
 
@@ -612,6 +621,8 @@ final class OperationData {
     double price;
     double stockQuantity;
     Double stockMinQuantity;
+    String stockUnit = "piece";
+    double stockConsumptionQuantity = 1;
     boolean hideWhenOutOfStock;
     String stockStatus = "in_stock";
 
@@ -623,6 +634,8 @@ final class OperationData {
       record.price = decimal(source, "price");
       record.stockQuantity = decimal(source, "stock_quantity");
       record.stockMinQuantity = nullableDecimal(source, "stock_min_quantity");
+      record.stockUnit = "gram".equals(value(source, "stock_unit", "piece")) ? "gram" : "piece";
+      record.stockConsumptionQuantity = positiveDecimal(source, "stock_consumption_quantity", 1);
       record.hideWhenOutOfStock = source.optBoolean("hide_when_out_of_stock", false);
       record.stockStatus = value(source, "stock_status", record.derivedStatus());
       if (!"out_of_stock".equals(record.stockStatus)
@@ -634,7 +647,7 @@ final class OperationData {
     }
 
     String derivedStatus() {
-      if (stockQuantity <= 0) {
+      if (stockQuantity < stockConsumptionQuantity) {
         return "out_of_stock";
       }
       if (stockMinQuantity != null && stockQuantity <= stockMinQuantity) {

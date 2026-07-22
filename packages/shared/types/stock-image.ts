@@ -1,3 +1,5 @@
+import type { MenuStockUnit } from "./menu";
+
 export type StockImageImportSource = "desktop" | "android";
 export type StockImageConfidence = "high" | "medium" | "low";
 
@@ -6,6 +8,7 @@ export interface StockImageMenuCandidate {
   name: string;
   category: string;
   current_stock: number;
+  stock_unit: MenuStockUnit;
 }
 
 export interface StockImageDocumentAnalysis {

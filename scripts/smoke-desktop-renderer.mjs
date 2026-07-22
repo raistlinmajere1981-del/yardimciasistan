@@ -99,6 +99,15 @@ try {
                 source_quantity_text: "1 koli",
                 confidence: "low",
                 needs_review_reason: "Koli adede çevrilemedi."
+              },
+              {
+                raw_text: "Kaşarlı Köfte 3 KG",
+                matched_menu_item_id: "item_gram_preview",
+                matched_menu_item_name: "Kaşarlı Köfte",
+                suggested_quantity: 3000,
+                source_quantity_text: "3 KG",
+                confidence: "high",
+                needs_review_reason: null
               }
             ]
           }
@@ -308,10 +317,12 @@ try {
     mimeType: "image/png",
     buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
   });
-  await expect(stockImageDialog.getByAltText("Seçilen fatura veya fiş önizlemesi")).toBeVisible();
+  const stockImagePreview = stockImageDialog.getByAltText("Seçilen fatura veya fiş önizlemesi");
+  await expect(stockImagePreview).toBeVisible();
+  await expect.poll(() => stockImagePreview.evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
   await stockImageDialog.getByRole("button", { name: "Analiz Et" }).click();
   await expect(stockImageDialog.getByText("Smoke Tedarikçi", { exact: true })).toBeVisible();
-  await expect(stockImageDialog.locator(".stock-image-row")).toHaveCount(2);
+  await expect(stockImageDialog.locator(".stock-image-row")).toHaveCount(3);
   await expect(stockImageDialog.getByRole("button", { name: "Stokları Güncelle" })).toBeDisabled();
   await stockImageDialog.locator(".stock-image-row").nth(1).getByRole("button", { name: "Yok say" }).click();
   await stockImageDialog.getByRole("button", { name: "Manuel satır ekle" }).click();
@@ -323,13 +334,14 @@ try {
   await page.screenshot({ path: "artifacts/screenshots/desktop-stock-image-review.png", fullPage: true });
   await stockImageDialog.getByRole("button", { name: "Stokları Güncelle" }).click();
   await expect(stockImageDialog.getByRole("heading", { name: "Stok girişi tamamlandı" })).toBeVisible();
-  await expect(stockImageDialog.getByText("2 satırda toplam 16 adet stok eklendi.", { exact: true })).toBeVisible();
+  await expect(stockImageDialog.getByText("3 satırda 16 adet + 3.000 g stok eklendi.", { exact: true })).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__stockImageAnalysisCalls.at(-1)?.mimeType)).toBe("image/jpeg");
   await expect.poll(() => page.evaluate(() => window.__stockImageApplyCalls.at(-1))).toMatchObject({
     imageHash: "a".repeat(64),
     duplicateWarningAcknowledged: true,
     lines: [
       { menu_item_id: "item_local_preview", quantity: 12 },
+      { menu_item_id: "item_gram_preview", quantity: 3000 },
       { menu_item_id: "item_local_preview", quantity: 4 }
     ]
   });
@@ -1551,6 +1563,9 @@ try {
   const setupPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await setupPage.addInitScript(({ setupData, dashboardData }) => {
     window.__aiConnectionTestCount = 0;
+    const storedAiApiKeys = {
+      openai: "sk-openai-stored-smoke"
+    };
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -1567,47 +1582,73 @@ try {
       }),
       getDashboardData: async () => dashboardData,
       getSetupData: async () => setupData,
-      saveInitialSetup: async (input) => ({
-        ok: true,
-        message: "Ayarlar kaydedildi ve AI bağlantısı web sitesinde güncellendi.",
-        setupData: {
-          ...setupData,
-          setupRequired: false,
-          businessName: input.businessName,
-          businessType: input.businessType,
-          phone: input.phone,
-          whatsapp: input.whatsapp,
-          email: input.email,
-          address: input.address,
-          webModuleUrl: input.webModuleUrl,
-          syncSecret: input.syncSecret,
-          aiEnabled: input.aiEnabled,
-          aiProvider: input.aiProvider,
-          aiService: input.aiService,
-          aiBaseUrl: input.aiBaseUrl,
-          aiModel: input.aiModel,
-          aiTimeoutSeconds: input.aiTimeoutSeconds,
-          aiApiKeyConfigured: Boolean(input.aiApiKey) || setupData.aiApiKeyConfigured,
-          aiLastPublishedAt: "2026-07-12T10:00:00.000Z",
-          modules: input.modules,
-          initialCounts: input.initialCounts
-        },
-        dashboardData: {
-          ...dashboardData,
-          webModuleUrl: input.webModuleUrl
-        },
-        aiWebSync: {
-          ok: true,
-          message: "AI ayarları web modülüne uygulandı.",
-          published_at: "2026-07-12T10:00:00.000Z"
+      saveInitialSetup: async (input) => {
+        for (const profile of input.aiProfiles || []) {
+          if (profile.clearApiKey) {
+            delete storedAiApiKeys[profile.service];
+          } else if (profile.apiKey) {
+            storedAiApiKeys[profile.service] = profile.apiKey;
+          }
         }
-      }),
+        const savedProfiles = (input.aiProfiles || []).map((profile) => ({
+          service: profile.service,
+          projectName: profile.projectName,
+          baseUrl: profile.baseUrl,
+          model: profile.model,
+          modelOptions: profile.modelOptions || [],
+          timeoutSeconds: profile.timeoutSeconds,
+          apiKeyConfigured: Boolean(profile.apiKey)
+            || Boolean(setupData.aiProfiles?.find((saved) => saved.service === profile.service)?.apiKeyConfigured)
+            || (profile.service === setupData.aiService && setupData.aiApiKeyConfigured),
+          updatedAt: "2026-07-12T10:00:00.000Z"
+        }));
+        return {
+          ok: true,
+          message: "Ayarlar kaydedildi ve AI bağlantısı web sitesinde güncellendi.",
+          setupData: {
+            ...setupData,
+            setupRequired: false,
+            businessName: input.businessName,
+            businessType: input.businessType,
+            phone: input.phone,
+            whatsapp: input.whatsapp,
+            email: input.email,
+            address: input.address,
+            webModuleUrl: input.webModuleUrl,
+            syncSecret: input.syncSecret,
+            aiEnabled: input.aiEnabled,
+            aiProvider: input.aiProvider,
+            aiService: input.aiService,
+            aiProjectName: input.aiProjectName,
+            aiBaseUrl: input.aiBaseUrl,
+            aiModel: input.aiModel,
+            aiTimeoutSeconds: input.aiTimeoutSeconds,
+            aiApiKeyConfigured: Boolean(input.aiApiKey) || setupData.aiApiKeyConfigured,
+            aiLastPublishedAt: "2026-07-12T10:00:00.000Z",
+            aiProfiles: savedProfiles,
+            modules: input.modules,
+            initialCounts: input.initialCounts
+          },
+          dashboardData: {
+            ...dashboardData,
+            webModuleUrl: input.webModuleUrl
+          },
+          aiWebSync: {
+            ok: true,
+            message: "AI ayarları web modülüne uygulandı.",
+            published_at: "2026-07-12T10:00:00.000Z"
+          }
+        };
+      },
+      revealAiApiKey: async (service) => storedAiApiKeys[service]
+        ? { ok: true, apiKey: storedAiApiKeys[service] }
+        : { ok: false, message: "Bu sağlayıcı için kayıtlı bir API anahtarı bulunamadı." },
       testAiConnection: async (input) => {
         window.__aiConnectionTestCount += 1;
         if (input.service === "gemini") {
           return {
             ok: true,
-            message: "Google AI Studio bağlantısı doğrulandı; 2 kullanılabilir Gemini modeli bulundu.",
+            message: "Google AI Studio bağlantısında gemini-3.5-flash modeliyle görsel girişi doğrulandı; 2 uygun Gemini modeli bulundu. Kullanmak için ayarları kaydedin.",
             model: "gemini-3.5-flash",
             models: [
               { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash" },
@@ -1655,27 +1696,61 @@ try {
   await expect(setupPage.getByRole("heading", { name: "İşletme panelini kullanıma hazırlayın." })).toBeVisible();
   await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Deniz Çiçeği Pansiyon & Kafe");
   await setupPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
-  await expect(setupPage.getByText("Anahtar bu cihazda güvenli biçimde kayıtlı.")).toBeVisible();
+  const storedOpenAiKeyInput = setupPage.getByLabel("AI güvenlik anahtarı");
+  await expect(storedOpenAiKeyInput).toHaveValue("********************");
+  await expect(setupPage.getByText("Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilirsiniz.")).toBeVisible();
+  await setupPage.getByRole("button", { name: "Göster" }).click();
+  await expect(storedOpenAiKeyInput).toHaveValue("sk-openai-stored-smoke");
+  await setupPage.getByRole("button", { name: "Gizle" }).click();
+  await expect(storedOpenAiKeyInput).toHaveValue("********************");
   await setupPage.getByLabel("Servis sağlayıcı").selectOption("openrouter");
   await expect(setupPage.getByLabel("Bağlantı adresi")).toHaveValue("https://openrouter.ai/api/v1");
   await setupPage.getByLabel("Model adı").fill("smoke/provider-model");
+  await setupPage.getByLabel("AI güvenlik anahtarı").fill("openrouter-smoke-secret");
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
   await expect(setupPage.getByText("OpenRouter bağlantısı çalışıyor.")).toBeVisible();
   await setupPage.getByLabel("Servis sağlayıcı").selectOption("gemini");
   await setupPage.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
-  await expect(setupPage.getByText(/2 kullanılabilir Gemini modeli bulundu/)).toBeVisible();
+  await expect(setupPage.getByText(/görsel girişi doğrulandı; 2 uygun Gemini modeli bulundu/)).toBeVisible();
+  await expect(setupPage.getByText("2 görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.")).toBeVisible();
   await expect(setupPage.getByLabel("Model adı")).toHaveValue("gemini-3.5-flash");
   expect(await setupPage.evaluate(() => window.__aiConnectionTestCount)).toBe(2);
   await setupPage.getByLabel("Model adı").selectOption("gemini-3.1-flash-lite");
   await setupPage.waitForTimeout(100);
   expect(await setupPage.evaluate(() => window.__aiConnectionTestCount)).toBe(2);
+  await setupPage.getByLabel("Servis sağlayıcı").selectOption("openrouter");
+  await expect(setupPage.getByLabel("Model adı")).toHaveValue("smoke/provider-model");
+  await expect(setupPage.getByLabel("AI güvenlik anahtarı")).toHaveValue("openrouter-smoke-secret");
+  await setupPage.getByLabel("Servis sağlayıcı").selectOption("gemini");
+  await expect(setupPage.getByLabel("Model adı")).toHaveValue("gemini-3.1-flash-lite");
+  await expect(setupPage.getByText("2 görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.")).toBeVisible();
   await setupPage.screenshot({ path: "artifacts/screenshots/desktop-setup-wizard.png", fullPage: true });
   await setupPage.getByLabel("Web eşitleme adresi").fill("https://yardimciasistan.alwaysdata.net/yardimci-asistan");
   await setupPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
   await setupPage.getByLabel("Firma adı").fill("Smoke Pansiyon");
   await setupPage.getByRole("button", { name: "Kurulumu Kaydet" }).click();
   await expect(setupPage.getByRole("heading", { name: "Bugün ne var?" })).toBeVisible();
+  await setupPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
+  await setupPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
+  await expect(setupPage.getByLabel("Servis sağlayıcı")).toHaveValue("gemini");
+  await expect(setupPage.getByLabel("Model adı")).toHaveValue("gemini-3.1-flash-lite");
+  await expect(setupPage.getByText("2 görsel ve metin modeli bu sağlayıcı altında kayıtlı.")).toBeVisible();
+  const storedGeminiKeyInput = setupPage.getByLabel("Google AI Studio cURL bağlantısı");
+  await expect(storedGeminiKeyInput).toHaveValue("********************");
+  await expect(setupPage.getByText("Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz.")).toBeVisible();
+  await setupPage.getByRole("button", { name: "Göster" }).click();
+  await expect(storedGeminiKeyInput).toHaveValue("AQ.smoke-key");
+  await setupPage.getByRole("button", { name: "Gizle" }).click();
+  await expect(storedGeminiKeyInput).toHaveValue("********************");
+  await setupPage.getByLabel("Servis sağlayıcı").selectOption("openrouter");
+  await expect(setupPage.getByLabel("Model adı")).toHaveValue("smoke/provider-model");
+  const storedOpenRouterKeyInput = setupPage.getByLabel("AI güvenlik anahtarı");
+  await expect(storedOpenRouterKeyInput).toHaveValue("********************");
+  await setupPage.getByRole("button", { name: "Göster" }).click();
+  await expect(storedOpenRouterKeyInput).toHaveValue("openrouter-smoke-secret");
+  await setupPage.getByRole("button", { name: "Gizle" }).click();
+  await expect(storedOpenRouterKeyInput).toHaveValue("********************");
 
   await browser.close();
   console.log(`desktop-renderer-ok: ${baseUrl}`);
@@ -2026,9 +2101,33 @@ function createDashboardConversionFixture() {
           tags: ["yerel", "yeni"],
           stock_quantity: 5,
           stock_min_quantity: 2,
+          stock_unit: "piece",
+          stock_consumption_quantity: 1,
           hide_when_out_of_stock: false,
           stock_note: "Smoke stok takibi",
           sort_order: 10,
+          created_at: "2026-07-16T10:00:00+03:00",
+          updated_at: "2026-07-16T10:30:00+03:00"
+        },
+        {
+          id: "item_gram_preview",
+          category_id: "category_local_preview",
+          name: "Kaşarlı Köfte",
+          description: "200 gramlık porsiyon, stok gram üzerinden izlenir.",
+          price: 760,
+          currency: "TRY",
+          image_url: "",
+          is_available: true,
+          is_featured: false,
+          allergens: ["süt"],
+          tags: ["köfte", "gram"],
+          stock_quantity: 6000,
+          stock_min_quantity: 1200,
+          stock_unit: "gram",
+          stock_consumption_quantity: 200,
+          hide_when_out_of_stock: true,
+          stock_note: "Bir porsiyonda 200 g kullanılır.",
+          sort_order: 20,
           created_at: "2026-07-16T10:00:00+03:00",
           updated_at: "2026-07-16T10:30:00+03:00"
         },
@@ -2046,9 +2145,11 @@ function createDashboardConversionFixture() {
           tags: [],
           stock_quantity: null,
           stock_min_quantity: null,
+          stock_unit: "piece",
+          stock_consumption_quantity: 1,
           hide_when_out_of_stock: false,
           stock_note: "",
-          sort_order: 20,
+          sort_order: 30,
           created_at: "2026-07-16T10:00:00+03:00",
           updated_at: "2026-07-16T10:30:00+03:00"
         }
@@ -2060,7 +2161,7 @@ function createDashboardConversionFixture() {
       newRequests: 1,
       waitingRequests: 1,
       activeMenuCategories: 1,
-      availableMenuItems: 1
+      availableMenuItems: 2
     }
   };
 }

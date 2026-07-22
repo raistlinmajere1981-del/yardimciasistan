@@ -43,8 +43,11 @@ $items = array_values(array_filter($menu['items'] ?? [], static function ($item)
 }));
 $items = array_values(array_filter($items, static function ($item): bool {
     $stockQuantity = $item['stock_quantity'] ?? null;
+    $stockConsumptionQuantity = is_numeric($item['stock_consumption_quantity'] ?? null)
+        ? max(0.000001, (float) $item['stock_consumption_quantity'])
+        : 1.0;
     $hideWhenOut = ($item['hide_when_out_of_stock'] ?? false) === true;
-    return !($stockQuantity !== null && is_numeric($stockQuantity) && $hideWhenOut && (float) $stockQuantity <= 0);
+    return !($stockQuantity !== null && is_numeric($stockQuantity) && $hideWhenOut && (float) $stockQuantity < $stockConsumptionQuantity);
 }));
 $items = array_values(array_filter($items, static function ($item) use ($activeCategoryIds): bool {
     return isset($activeCategoryIds[(string) ($item['category_id'] ?? '')]);

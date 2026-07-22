@@ -350,7 +350,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
   async function addMenuItem(menuItemId: string) {
     const bridge = window.yardimciDesktop;
     const menuItem = menu.items.find((item) => item.id === menuItemId);
-    if (menuItem && menuItem.stock_quantity !== null && menuItem.stock_quantity <= 0) {
+    if (menuItem && menuItem.stock_quantity !== null && menuItem.stock_quantity < menuStockConsumption(menuItem.stock_consumption_quantity)) {
       setFeedback("Bu ürün stokta yeterli değil.");
       return;
     }
@@ -676,11 +676,11 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
                       </div>
                       <div className="table-order-product-action">
                         <strong>{formatMoney(item.price, item.currency || "TRY")}</strong>
-                        <span>{formatOrderMenuStock(item.stock_quantity)}</span>
+                        <span>{formatOrderMenuStock(item.stock_quantity, item.stock_unit)}</span>
                         <button
                           type="button"
                           onClick={() => void addMenuItem(item.id)}
-                          disabled={!selectedOrder || Boolean(busyAction) || (item.stock_quantity !== null && item.stock_quantity <= 0)}
+                          disabled={!selectedOrder || Boolean(busyAction) || (item.stock_quantity !== null && item.stock_quantity < menuStockConsumption(item.stock_consumption_quantity))}
                           aria-label={`${item.name} ürününü siparişe ekle`}
                         >
                           <Plus size={15} aria-hidden="true" /> Ekle
@@ -788,19 +788,23 @@ function formatMoney(value: number, currency: string): string {
   }
 }
 
-function formatOrderMenuStock(quantity: number | null | undefined): string {
+function formatOrderMenuStock(quantity: number | null | undefined, unit: "piece" | "gram"): string {
   if (quantity == null) {
     return "Stok takibi yok";
   }
   if (quantity <= 0) {
     return "Stokta yok";
   }
-  return `Stok: ${quantity}`;
+  return `Stok: ${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 }).format(quantity)} ${unit === "gram" ? "g" : "adet"}`;
 }
 
 function isOrderItemOutOfStock(menuItemId: string, menu: PublishedQrMenu): boolean {
   const item = menu.items.find((candidate) => candidate.id === menuItemId);
-  return item?.stock_quantity !== null && item !== undefined && item.stock_quantity <= 0;
+  return item?.stock_quantity !== null && item !== undefined && item.stock_quantity < menuStockConsumption(item.stock_consumption_quantity);
+}
+
+function menuStockConsumption(value: number | undefined): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 1;
 }
 
 function formatOpenedAt(value: string): string {

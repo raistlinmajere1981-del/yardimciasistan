@@ -17,6 +17,10 @@ Deniz Çiçeği menüsü Ege mutfağına odaklanır. Kahvaltı her gün 08:30–
 ## Ana Yemekler
 
 - Izgara Levrek
+- Izgara Çipura
+- Fırında Alabalık
+- Izgara Kasap Köfte (200 gram)
+- Kaşarlı Köfte (200 gram)
 - Çökertme Kebabı
 - Otlu Tavuk Şiş
 
@@ -34,5 +38,12 @@ Deniz Çiçeği menüsü Ege mutfağına odaklanır. Kahvaltı her gün 08:30–
 - Ev Yapımı Naneli Limonata
 - Soğuk Demleme Kahve
 - Adaçayı
+- Şişe Su (330 ml)
+- Maden Suyu (200 ml)
+- Kutu Kola (330 ml)
+- Portakallı Gazoz (250 ml)
+- Şişe Ayran (300 ml)
+
+Balıklar ve ambalajlı içecekler stokta adet, köfteler gram üzerinden takip edilir.
 
 Güncel fiyat, alerjen ve ürün durumu her zaman QR menü verisinden kontrol edilmelidir.

@@ -254,7 +254,7 @@ AI Provider
 
 PC uygulaması da AI istekleri için aynı adapter mantığını kullanır.
 
-AI bağlantı ayarlarının ana yönetim yeri PC uygulamasındaki Ayarlar ekranıdır. Kullanıcı servis seçimi, OpenAI uyumlu bağlantı adresi, model, API anahtarı ve zaman aşımı bilgisini burada yönetir. API anahtarı renderer'a geri okunmaz; yalnız Electron ana sürecinde çözülerek masaüstü AI çağrısında veya yetkili senkron isteğinde kullanılır.
+AI bağlantı ayarlarının ana yönetim yeri PC uygulamasındaki Ayarlar ekranıdır. Kullanıcı servis seçimi, OpenAI uyumlu bağlantı adresi, model, API anahtarı ve zaman aşımı bilgisini burada yönetir. Her servis ayrı bir yerel profil olarak tutulur; servisler arasında geçiş bağlantı taslağını, seçili modeli veya daha önce alınmış model listesini sıfırlamaz. Yalnız seçilen profil aktif ayar olarak web modülüne yayınlanır. API anahtarı renderer başlangıç verisine eklenmez; Electron ana sürecinde çözülerek masaüstü AI çağrısında, yetkili senkron isteğinde veya kullanıcının Ayarlar ekranındaki açık `Göster` eyleminde kullanılır. Kullanıcı anahtarı yeniden gizlediğinde renderer'daki gösterim kopyası temizlenir.
 
 Web tarafında aynı bağlantının kullanım akışı:
 

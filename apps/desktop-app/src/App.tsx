@@ -48,6 +48,8 @@ import type {
   AiWorkspaceMode,
   CreateManualRequestInput,
   DesktopAndroidDevice,
+  DesktopAiModelOption,
+  DesktopAiService,
   DesktopDashboardData,
   DesktopSetupData,
   SaveInitialSetupInput
@@ -82,6 +84,7 @@ import {
 type SyncState = "idle" | "loading" | "success" | "error";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "yardimci-asistan.sidebar-collapsed";
+const STORED_AI_API_KEY_MASK = "*".repeat(20);
 
 const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   id: AndroidPermissionGroupId;
@@ -161,6 +164,8 @@ interface ItemFormState {
   tags: string;
   stock_quantity: string;
   stock_min_quantity: string;
+  stock_unit: "piece" | "gram";
+  stock_consumption_quantity: string;
   hide_when_out_of_stock: boolean;
   stock_note: string;
   sort_order: string;
@@ -198,9 +203,12 @@ interface SetupFormState {
   aiGoogleCurl: string;
   aiBaseUrl: string;
   aiModel: string;
+  aiModelOptions: DesktopAiModelOption[];
   aiApiKey: string;
+  aiStoredApiKeyConfigured: boolean;
   clearAiApiKey: boolean;
   aiTimeoutSeconds: string;
+  aiServiceDrafts: Partial<Record<DesktopAiService, AiServiceFormDraft>>;
   roomsEnabled: boolean;
   tablesEnabled: boolean;
   qrMenuEnabled: boolean;
@@ -208,6 +216,18 @@ interface SetupFormState {
   androidEnabled: boolean;
   roomCount: string;
   tableCount: string;
+}
+
+interface AiServiceFormDraft {
+  projectName: string;
+  googleCurl: string;
+  baseUrl: string;
+  model: string;
+  modelOptions: DesktopAiModelOption[];
+  apiKey: string;
+  storedApiKeyConfigured: boolean;
+  clearApiKey: boolean;
+  timeoutSeconds: string;
 }
 
 interface ManualRequestFormState {
@@ -284,6 +304,8 @@ const defaultDashboardData: DesktopDashboardData = {
         tags: ["popüler", "kahvaltı"],
         stock_quantity: null,
         stock_min_quantity: null,
+        stock_unit: "piece",
+        stock_consumption_quantity: 1,
         hide_when_out_of_stock: false,
         stock_note: null,
         sort_order: 10,
@@ -304,6 +326,8 @@ const defaultDashboardData: DesktopDashboardData = {
         tags: ["sıcak"],
         stock_quantity: null,
         stock_min_quantity: null,
+        stock_unit: "piece",
+        stock_consumption_quantity: 1,
         hide_when_out_of_stock: false,
         stock_note: null,
         sort_order: 20,
@@ -324,6 +348,8 @@ const defaultDashboardData: DesktopDashboardData = {
         tags: ["kahve"],
         stock_quantity: null,
         stock_min_quantity: null,
+        stock_unit: "piece",
+        stock_consumption_quantity: 1,
         hide_when_out_of_stock: false,
         stock_note: null,
         sort_order: 10,
@@ -344,6 +370,8 @@ const defaultDashboardData: DesktopDashboardData = {
         tags: ["soğuk", "ferah"],
         stock_quantity: null,
         stock_min_quantity: null,
+        stock_unit: "piece",
+        stock_consumption_quantity: 1,
         hide_when_out_of_stock: false,
         stock_note: null,
         sort_order: 20,
@@ -364,6 +392,8 @@ const defaultDashboardData: DesktopDashboardData = {
         tags: ["hızlı"],
         stock_quantity: null,
         stock_min_quantity: null,
+        stock_unit: "piece",
+        stock_consumption_quantity: 1,
         hide_when_out_of_stock: false,
         stock_note: null,
         sort_order: 10,
@@ -554,6 +584,7 @@ const defaultSetupData: DesktopSetupData = {
   aiTimeoutSeconds: 30,
   aiApiKeyConfigured: false,
   aiLastPublishedAt: "",
+  aiProfiles: [],
   modules: {
     rooms: false,
     tables: false,
@@ -638,7 +669,6 @@ function App() {
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
   const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
-  const [aiModelOptions, setAiModelOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [convertingRequestId, setConvertingRequestId] = useState("");
   const [suggestingRequestId, setSuggestingRequestId] = useState("");
   const [aiState, setAiState] = useState<SyncState>("idle");
@@ -735,8 +765,13 @@ function App() {
   }, [activePage, setupData.aiEnabled, setupData.modules.whatsapp]);
 
   useEffect(() => {
-    setAiModelOptions([]);
-  }, [setupForm.aiService, setupForm.aiApiKey]);
+    setAiConnectionTestState("idle");
+    setAiConnectionTestMessage(
+      setupForm.aiStoredApiKeyConfigured
+        ? "Bu sağlayıcının kayıtlı bağlantısı kullanılabilir."
+        : "Bağlantı henüz denenmedi."
+    );
+  }, [setupForm.aiService]);
 
   useEffect(() => {
     if (aiWorkspaceRequestId && dashboardData.requests.some((request) => request.id === aiWorkspaceRequestId)) {
@@ -1058,6 +1093,8 @@ function App() {
       tags: splitCommaList(itemForm.tags),
       stock_quantity: parseNullableFormNumber(itemForm.stock_quantity),
       stock_min_quantity: parseNullableFormNumber(itemForm.stock_min_quantity),
+      stock_unit: itemForm.stock_unit,
+      stock_consumption_quantity: parsePositiveFormNumber(itemForm.stock_consumption_quantity, 1),
       hide_when_out_of_stock: itemForm.hide_when_out_of_stock,
       stock_note: itemForm.stock_note.trim() || null,
       sort_order: Number(itemForm.sort_order)
@@ -1745,22 +1782,26 @@ function App() {
       baseUrl,
       model,
       apiKey,
-      useStoredApiKey: !setupForm.clearAiApiKey && apiKey.trim() === "",
+      useStoredApiKey: !setupForm.clearAiApiKey && setupForm.aiStoredApiKeyConfigured && apiKey.trim() === "",
       timeoutSeconds: Number(setupForm.aiTimeoutSeconds)
     });
 
     setAiConnectionTestState(result.ok ? "success" : "error");
     setAiConnectionTestMessage(result.message);
     if (result.ok) {
-      setAiModelOptions(result.models);
-      if (result.model !== setupForm.aiModel) {
-        setSetupForm((current) => ({ ...current, aiModel: result.model }));
-      }
+      setSetupSaveState("idle");
+      setSetupMessage("AI bağlantısı hazır. Ayarları kaydedin.");
+      setSetupForm((current) => ({
+        ...current,
+        aiModel: result.model,
+        aiModelOptions: result.models
+      }));
     } else if (setupForm.aiService === "gemini") {
-      setAiModelOptions(result.models ?? []);
-      if (result.model) {
-        setSetupForm((current) => ({ ...current, aiModel: result.model || current.aiModel }));
-      }
+      setSetupForm((current) => ({
+        ...current,
+        aiModel: result.model || current.aiModel,
+        aiModelOptions: result.models ?? current.aiModelOptions
+      }));
     }
   }
 
@@ -1790,8 +1831,10 @@ function App() {
       aiProjectName: setupForm.aiProjectName,
       aiBaseUrl: setupForm.aiBaseUrl,
       aiModel: setupForm.aiModel,
+      aiModelOptions: setupForm.aiModelOptions,
       aiApiKey: setupForm.aiApiKey,
       clearAiApiKey: setupForm.clearAiApiKey,
+      aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
       modules: {
         rooms: setupForm.roomsEnabled,
@@ -1833,7 +1876,6 @@ function App() {
         message={setupMessage}
         aiConnectionTestState={aiConnectionTestState}
         aiConnectionTestMessage={aiConnectionTestMessage}
-        aiModelOptions={aiModelOptions}
         onFormChange={setSetupForm}
         onTestAiConnection={handleTestAiConnection}
         onSave={handleSaveSetup}
@@ -2139,7 +2181,6 @@ function App() {
             androidDeviceMessage={androidDeviceMessage}
             aiConnectionTestState={aiConnectionTestState}
             aiConnectionTestMessage={aiConnectionTestMessage}
-            aiModelOptions={aiModelOptions}
             onFormChange={setSetupForm}
             onTestAiConnection={handleTestAiConnection}
             onCreateBackup={handleCreateManualBackup}
@@ -2435,7 +2476,6 @@ interface SetupWizardProps {
   androidDeviceMessage?: string;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
-  aiModelOptions: Array<{ id: string; label: string }>;
   onFormChange: (form: SetupFormState) => void;
   onTestAiConnection: () => void;
   onCreateBackup?: () => void;
@@ -2466,7 +2506,6 @@ function SetupWizard({
   androidDeviceMessage = "Telefon rolleri ve görev alanları masaüstünden yönetilir.",
   aiConnectionTestState,
   aiConnectionTestMessage,
-  aiModelOptions,
   onFormChange,
   onTestAiConnection,
   onCreateBackup,
@@ -2483,25 +2522,131 @@ function SetupWizard({
 }: SetupWizardProps) {
   const [showAiApiKey, setShowAiApiKey] = useState(false);
   const [showGoogleCurl, setShowGoogleCurl] = useState(false);
+  const [revealedAiApiKey, setRevealedAiApiKey] = useState("");
+  const [aiApiKeyRevealState, setAiApiKeyRevealState] = useState<"idle" | "loading" | "error">("idle");
+  const [aiApiKeyRevealMessage, setAiApiKeyRevealMessage] = useState("");
+  const selectedAiServiceRef = useRef(form.aiService);
   const [settingsLevel, setSettingsLevel] = useState<"basic" | "advanced">("basic");
+
+  useEffect(() => {
+    selectedAiServiceRef.current = form.aiService;
+    setShowAiApiKey(false);
+    setShowGoogleCurl(false);
+    setRevealedAiApiKey("");
+    setAiApiKeyRevealState("idle");
+    setAiApiKeyRevealMessage("");
+  }, [form.aiService, form.clearAiApiKey]);
+
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
   };
 
+  const googleUsesStoredApiKey = form.aiStoredApiKeyConfigured && !form.clearAiApiKey && !form.aiGoogleCurl && !form.aiApiKey;
+  const genericUsesStoredApiKey = form.aiStoredApiKeyConfigured && !form.clearAiApiKey && !form.aiApiKey;
+  const googleSecretValue = form.aiGoogleCurl
+    || form.aiApiKey
+    || (googleUsesStoredApiKey ? (showGoogleCurl ? revealedAiApiKey : STORED_AI_API_KEY_MASK) : "");
+  const genericSecretValue = form.aiApiKey
+    || (genericUsesStoredApiKey ? (showAiApiKey ? revealedAiApiKey : STORED_AI_API_KEY_MASK) : "");
+
+  const toggleAiApiKeyVisibility = async (field: "google" | "generic") => {
+    const isVisible = field === "google" ? showGoogleCurl : showAiApiKey;
+    const setVisible = field === "google" ? setShowGoogleCurl : setShowAiApiKey;
+    if (isVisible) {
+      setVisible(false);
+      setRevealedAiApiKey("");
+      setAiApiKeyRevealState("idle");
+      setAiApiKeyRevealMessage("");
+      return;
+    }
+
+    const pendingValue = field === "google" ? form.aiGoogleCurl || form.aiApiKey : form.aiApiKey;
+    if (pendingValue || !form.aiStoredApiKeyConfigured) {
+      setVisible(true);
+      return;
+    }
+
+    const requestedService = form.aiService;
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.revealAiApiKey) {
+      setAiApiKeyRevealState("error");
+      setAiApiKeyRevealMessage("API anahtarı gösterilemiyor. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    setAiApiKeyRevealState("loading");
+    setAiApiKeyRevealMessage("");
+    const result = await bridge.revealAiApiKey(requestedService);
+    if (selectedAiServiceRef.current !== requestedService) {
+      return;
+    }
+    if (!result.ok) {
+      setAiApiKeyRevealState("error");
+      setAiApiKeyRevealMessage(result.message);
+      return;
+    }
+
+    setRevealedAiApiKey(result.apiKey);
+    setVisible(true);
+    setAiApiKeyRevealState("idle");
+  };
+
+  const replaceGoogleSecret = (value: string) => {
+    let nextValue = value;
+    if (googleUsesStoredApiKey && !showGoogleCurl && nextValue.startsWith(STORED_AI_API_KEY_MASK)) {
+      nextValue = nextValue.slice(STORED_AI_API_KEY_MASK.length);
+    }
+
+    setRevealedAiApiKey("");
+    setAiApiKeyRevealState("idle");
+    setAiApiKeyRevealMessage("");
+    if (form.aiApiKey && !form.aiGoogleCurl) {
+      onFormChange({ ...form, aiApiKey: nextValue });
+      return;
+    }
+    if (googleUsesStoredApiKey && showGoogleCurl) {
+      onFormChange({ ...form, aiApiKey: nextValue, aiGoogleCurl: "" });
+      return;
+    }
+    onFormChange({ ...form, aiGoogleCurl: nextValue, aiApiKey: "" });
+  };
+
+  const replaceGenericSecret = (value: string) => {
+    const nextValue = genericUsesStoredApiKey && !showAiApiKey && value.startsWith(STORED_AI_API_KEY_MASK)
+      ? value.slice(STORED_AI_API_KEY_MASK.length)
+      : value;
+    setRevealedAiApiKey("");
+    setAiApiKeyRevealState("idle");
+    setAiApiKeyRevealMessage("");
+    update("aiApiKey", nextValue);
+  };
+
   const updateAiService = (service: string) => {
-    const preset = aiServicePresets.find((item) => item.id === service);
+    const normalizedService = aiServicePresets.some((item) => item.id === service) ? service as DesktopAiService : "openai";
+    const currentDraft = toAiServiceFormDraft(form);
+    const targetDraft = form.aiServiceDrafts[normalizedService] ?? createDefaultAiServiceDraft(normalizedService);
     onFormChange({
       ...form,
-      aiService: service,
-      aiBaseUrl: preset?.baseUrl || form.aiBaseUrl,
-      aiGoogleCurl: "",
-      aiModel: service === form.aiService ? form.aiModel : ""
+      aiService: normalizedService,
+      aiProjectName: targetDraft.projectName,
+      aiGoogleCurl: targetDraft.googleCurl,
+      aiBaseUrl: targetDraft.baseUrl,
+      aiModel: targetDraft.model,
+      aiModelOptions: targetDraft.modelOptions,
+      aiApiKey: targetDraft.apiKey,
+      aiStoredApiKeyConfigured: targetDraft.storedApiKeyConfigured,
+      clearAiApiKey: targetDraft.clearApiKey,
+      aiTimeoutSeconds: targetDraft.timeoutSeconds,
+      aiServiceDrafts: {
+        ...form.aiServiceDrafts,
+        [form.aiService]: currentDraft
+      }
     });
   };
 
   const renderAiConnectionActions = (inline: boolean) => (
     <div className={`setup-ai-actions${inline ? " is-inline" : ""} sync-${aiConnectionTestState}`}>
-      <button className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !setupData.aiApiKeyConfigured)}>
+      <button className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
         <RefreshCw size={16} aria-hidden="true" />
         {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
       </button>
@@ -2708,7 +2853,9 @@ function SetupWizard({
               Servis sağlayıcı
               <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
                 {aiServicePresets.map((preset) => (
-                  <option value={preset.id} key={preset.id}>{preset.label}</option>
+                  <option value={preset.id} key={preset.id}>
+                    {preset.label}{isAiServiceProfileStored(form, preset.id) ? " · kayıtlı" : ""}
+                  </option>
                 ))}
               </select>
             </label>
@@ -2726,19 +2873,23 @@ function SetupWizard({
                   <div className="setup-secret-input">
                     <input
                       aria-label="Google AI Studio cURL bağlantısı"
-                      value={form.aiGoogleCurl}
-                      onChange={(event) => update("aiGoogleCurl", event.target.value)}
-                      type={showGoogleCurl ? "text" : "password"}
-                      placeholder={setupData.aiApiKeyConfigured ? "Kayıtlı bağlantıyı kullanmak için boş bırakabilirsiniz" : "Copy cURL quickstart çıktısını buraya yapıştırın"}
+                      value={googleSecretValue}
+                      onChange={(event) => replaceGoogleSecret(event.target.value)}
+                      onFocus={(event) => {
+                        if (googleUsesStoredApiKey) event.currentTarget.select();
+                      }}
+                      type={showGoogleCurl || googleUsesStoredApiKey ? "text" : "password"}
+                      placeholder={form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantıyı değiştirmek için yeni cURL yapıştırın" : "Copy cURL quickstart çıktısını buraya yapıştırın"}
                       disabled={!form.aiEnabled || form.clearAiApiKey}
                       autoComplete="off"
                       spellCheck={false}
                     />
-                    <button type="button" onClick={() => setShowGoogleCurl((current) => !current)} disabled={!form.aiEnabled || form.clearAiApiKey}>
-                      {showGoogleCurl ? "Gizle" : "Göster"}
+                    <button type="button" onClick={() => void toggleAiApiKeyVisibility("google")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showGoogleCurl}>
+                      {aiApiKeyRevealState === "loading" ? "Açılıyor" : showGoogleCurl ? "Gizle" : "Göster"}
                     </button>
                   </div>
-                  <small>Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır.</small>
+                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz." : "Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır."}</small>
+                  {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
                 </div>
                 {renderAiConnectionActions(true)}
               </>
@@ -2750,9 +2901,9 @@ function SetupWizard({
             )}
             <label>
               Model adı
-              {form.aiService === "gemini" && aiModelOptions.length > 0 ? (
+              {form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
                 <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
-                  {aiModelOptions.map((model) => (
+                  {form.aiModelOptions.map((model) => (
                     <option value={model.id} key={model.id}>{model.label}</option>
                   ))}
                 </select>
@@ -2760,7 +2911,11 @@ function SetupWizard({
                 <input value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} placeholder={form.aiService === "gemini" ? "Bağlantı kontrolünden sonra listelenir" : "Serviste görünen model adı"} disabled={!form.aiEnabled || form.aiService === "gemini"} spellCheck={false} />
               )}
               {form.aiService === "gemini" && (
-                <small>{aiModelOptions.length > 0 ? `${aiModelOptions.length} model servisten alındı.` : "Bağlantıyı Dene ile kullanılabilir modeller otomatik alınır."}</small>
+                <small>{form.aiModelOptions.length > 0
+                  ? form.aiStoredApiKeyConfigured
+                    ? `${form.aiModelOptions.length} görsel ve metin modeli bu sağlayıcı altında kayıtlı.`
+                    : `${form.aiModelOptions.length} görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.`
+                  : "Bağlantıyı Dene ile görsel destekli, güncel modeller otomatik alınır."}</small>
               )}
             </label>
             <label>
@@ -2772,21 +2927,25 @@ function SetupWizard({
               <div className="setup-secret-input">
                 <input
                   aria-label="AI güvenlik anahtarı"
-                  value={form.aiApiKey}
-                  onChange={(event) => update("aiApiKey", event.target.value)}
-                  type={showAiApiKey ? "text" : "password"}
-                  placeholder={setupData.aiApiKeyConfigured ? "Yeni anahtar girmezseniz kayıtlı anahtar korunur" : "Servis erişim anahtarını girin"}
+                  value={genericSecretValue}
+                  onChange={(event) => replaceGenericSecret(event.target.value)}
+                  onFocus={(event) => {
+                    if (genericUsesStoredApiKey) event.currentTarget.select();
+                  }}
+                  type={showAiApiKey || genericUsesStoredApiKey ? "text" : "password"}
+                  placeholder={form.aiStoredApiKeyConfigured ? "Yeni anahtar girmezseniz bu sağlayıcının kayıtlı anahtarı korunur" : "Servis erişim anahtarını girin"}
                   disabled={!form.aiEnabled || form.clearAiApiKey}
                   autoComplete="new-password"
                   spellCheck={false}
                 />
-                <button type="button" onClick={() => setShowAiApiKey((current) => !current)} disabled={!form.aiEnabled || form.clearAiApiKey}>
-                  {showAiApiKey ? "Gizle" : "Göster"}
+                <button type="button" onClick={() => void toggleAiApiKeyVisibility("generic")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showAiApiKey}>
+                  {aiApiKeyRevealState === "loading" ? "Açılıyor" : showAiApiKey ? "Gizle" : "Göster"}
                 </button>
               </div>
-              <small>{setupData.aiApiKeyConfigured ? "Anahtar bu cihazda güvenli biçimde kayıtlı." : "Anahtar henüz kayıtlı değil."}</small>
+              <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
+              {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
             </div>}
-            {setupData.aiApiKeyConfigured && (
+            {form.aiStoredApiKeyConfigured && (
               <label className="setup-checkline setup-grid-wide setup-danger-checkline">
                 <input
                   checked={form.clearAiApiKey}
@@ -2797,7 +2956,7 @@ function SetupWizard({
                   })}
                   type="checkbox"
                 />
-                Kayıtlı erişim anahtarını sil ve AI yardımcıyı kapat
+                Bu sağlayıcının kayıtlı anahtarını sil ve AI yardımcıyı kapat
               </label>
             )}
           </div>
@@ -4805,16 +4964,16 @@ function MenuManager({
               <summary className="menu-stock-editor-heading">
                 <span>
                   <strong id="menu-stock-editor-title">Stok</strong>
-                  <small>Adet boşsa takip edilmez; 0 stokta yok demektir.</small>
+                  <small>Miktar boşsa takip edilmez; 0 stokta yok demektir.</small>
                 </span>
                 <span className="menu-stock-summary-value">
-                  {itemForm.stock_quantity === "" ? "Takip edilmiyor" : `${itemForm.stock_quantity} adet`}
+                  {itemForm.stock_quantity === "" ? "Takip edilmiyor" : formatStockQuantity(Number(itemForm.stock_quantity), itemForm.stock_unit)}
                 </span>
               </summary>
               <div className="menu-stock-editor-body">
                 <div className="form-row">
                   <label>
-                    Stok adedi
+                    Stok miktarı
                     <input
                       value={itemForm.stock_quantity}
                       onChange={(event) => onItemFormChange({ ...itemForm, stock_quantity: event.target.value })}
@@ -4826,7 +4985,22 @@ function MenuManager({
                     />
                   </label>
                   <label>
-                    Minimum stok uyarısı
+                    Stok birimi
+                    <select
+                      value={itemForm.stock_unit}
+                      onChange={(event) => onItemFormChange({
+                        ...itemForm,
+                        stock_unit: event.target.value === "gram" ? "gram" : "piece"
+                      })}
+                    >
+                      <option value="piece">Adet</option>
+                      <option value="gram">Gram</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="form-row">
+                  <label>
+                    Minimum stok uyarısı ({stockUnitShortLabel(itemForm.stock_unit)})
                     <input
                       value={itemForm.stock_min_quantity}
                       onChange={(event) => onItemFormChange({ ...itemForm, stock_min_quantity: event.target.value })}
@@ -4835,6 +5009,18 @@ function MenuManager({
                       min="0"
                       step="any"
                       placeholder="Örn. 5"
+                    />
+                  </label>
+                  <label>
+                    Bir satışta düşülecek ({stockUnitShortLabel(itemForm.stock_unit)})
+                    <input
+                      value={itemForm.stock_consumption_quantity}
+                      onChange={(event) => onItemFormChange({ ...itemForm, stock_consumption_quantity: event.target.value })}
+                      inputMode="decimal"
+                      type="number"
+                      min="0.001"
+                      step="any"
+                      placeholder="Örn. 1"
                     />
                   </label>
                 </div>
@@ -5018,6 +5204,8 @@ function toItemForm(item: PublishedMenuItem | undefined, fallbackCategoryId: str
     tags: item.tags.join(", "),
     stock_quantity: item.stock_quantity == null ? "" : String(item.stock_quantity),
     stock_min_quantity: item.stock_min_quantity == null ? "" : String(item.stock_min_quantity),
+    stock_unit: item.stock_unit === "gram" ? "gram" : "piece",
+    stock_consumption_quantity: String(item.stock_consumption_quantity > 0 ? item.stock_consumption_quantity : 1),
     hide_when_out_of_stock: Boolean(item.hide_when_out_of_stock),
     stock_note: item.stock_note ?? "",
     sort_order: String(item.sort_order)
@@ -5039,6 +5227,8 @@ function emptyItemForm(categoryId: string, sortOrder: number): ItemFormState {
     tags: "",
     stock_quantity: "",
     stock_min_quantity: "",
+    stock_unit: "piece",
+    stock_consumption_quantity: "1",
     hide_when_out_of_stock: false,
     stock_note: "",
     sort_order: String(sortOrder)
@@ -5064,21 +5254,37 @@ function parseNullableFormNumber(value: string): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
+function parsePositiveFormNumber(value: string, fallback: number): number {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : fallback;
+}
+
 function getMenuStockBadge(item: PublishedMenuItem): { label: string; tone: StatusTone } | null {
   if (item.stock_quantity == null) {
     return null;
   }
-  if (item.stock_quantity <= 0) {
+  if (item.stock_quantity < (item.stock_consumption_quantity > 0 ? item.stock_consumption_quantity : 1)) {
     return { label: "Stokta yok", tone: "danger" };
   }
   if (item.stock_min_quantity !== null && item.stock_quantity <= item.stock_min_quantity) {
-    return { label: "Az stok", tone: "wait" };
+    return { label: `Az stok · ${formatStockQuantity(item.stock_quantity, item.stock_unit)}`, tone: "wait" };
   }
-  return { label: "Stokta var", tone: "ok" };
+  return { label: formatStockQuantity(item.stock_quantity, item.stock_unit), tone: "ok" };
+}
+
+function formatStockQuantity(quantity: number, unit: "piece" | "gram"): string {
+  const value = Number.isFinite(quantity) ? new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 }).format(quantity) : "0";
+  return `${value} ${stockUnitShortLabel(unit)}`;
+}
+
+function stockUnitShortLabel(unit: "piece" | "gram"): string {
+  return unit === "gram" ? "g" : "adet";
 }
 
 function isQrHiddenByStock(item: PublishedMenuItem): boolean {
-  return typeof item.stock_quantity === "number" && item.hide_when_out_of_stock && item.stock_quantity <= 0;
+  return typeof item.stock_quantity === "number"
+    && item.hide_when_out_of_stock
+    && item.stock_quantity < (item.stock_consumption_quantity > 0 ? item.stock_consumption_quantity : 1);
 }
 
 function buildMenuPreviewData(
@@ -5123,6 +5329,8 @@ function buildMenuPreviewData(
     tags: splitCommaList(itemForm.tags),
     stock_quantity: parseNullableFormNumber(itemForm.stock_quantity),
     stock_min_quantity: parseNullableFormNumber(itemForm.stock_min_quantity),
+    stock_unit: itemForm.stock_unit,
+    stock_consumption_quantity: parsePositiveFormNumber(itemForm.stock_consumption_quantity, 1),
     hide_when_out_of_stock: itemForm.hide_when_out_of_stock,
     stock_note: itemForm.stock_note.trim() || null,
     sort_order: Number.isFinite(Number(itemForm.sort_order)) ? Number(itemForm.sort_order) : 0,
@@ -5641,6 +5849,9 @@ function formatCurrency(value: number, currency: string) {
 }
 
 function toSetupForm(setupData: DesktopSetupData): SetupFormState {
+  const service = aiServicePresets.some((preset) => preset.id === setupData.aiService) ? setupData.aiService : "openai";
+  const aiServiceDrafts = createAiServiceFormDrafts(setupData);
+  const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
   return {
     businessName: setupData.businessName || "Deniz Çiçeği Pansiyon & Kafe",
     businessType: setupData.businessType || "pension_restaurant",
@@ -5653,14 +5864,17 @@ function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     autoSyncEnabled: setupData.autoSyncEnabled,
     aiEnabled: setupData.aiEnabled,
     aiProvider: setupData.aiProvider || "openai_compatible",
-    aiService: setupData.aiService || "openai",
-    aiProjectName: setupData.aiProjectName || "",
-    aiGoogleCurl: "",
-    aiBaseUrl: setupData.aiBaseUrl || "https://api.openai.com/v1",
-    aiModel: setupData.aiModel,
-    aiApiKey: "",
-    clearAiApiKey: false,
-    aiTimeoutSeconds: String(setupData.aiTimeoutSeconds || 30),
+    aiService: service,
+    aiProjectName: activeAiDraft.projectName,
+    aiGoogleCurl: activeAiDraft.googleCurl,
+    aiBaseUrl: activeAiDraft.baseUrl,
+    aiModel: activeAiDraft.model,
+    aiModelOptions: activeAiDraft.modelOptions,
+    aiApiKey: activeAiDraft.apiKey,
+    aiStoredApiKeyConfigured: activeAiDraft.storedApiKeyConfigured,
+    clearAiApiKey: activeAiDraft.clearApiKey,
+    aiTimeoutSeconds: activeAiDraft.timeoutSeconds,
+    aiServiceDrafts,
     roomsEnabled: setupData.modules.rooms,
     tablesEnabled: setupData.modules.tables,
     qrMenuEnabled: setupData.modules.qrMenu,
@@ -5669,6 +5883,81 @@ function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
     tableCount: String(Math.max(0, setupData.initialCounts.tables || 2))
   };
+}
+
+function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {
+  const profiles = Array.isArray(setupData.aiProfiles) ? setupData.aiProfiles : [];
+  return Object.fromEntries(aiServicePresets.map((preset) => {
+    const profile = profiles.find((candidate) => candidate.service === preset.id);
+    const isActiveLegacyProfile = setupData.aiService === preset.id;
+    const draft = createDefaultAiServiceDraft(preset.id);
+    return [preset.id, {
+      ...draft,
+      projectName: profile?.projectName ?? (isActiveLegacyProfile ? setupData.aiProjectName : ""),
+      baseUrl: profile?.baseUrl || (isActiveLegacyProfile ? setupData.aiBaseUrl : preset.baseUrl) || "",
+      model: profile?.model ?? (isActiveLegacyProfile ? setupData.aiModel : ""),
+      modelOptions: profile?.modelOptions ?? (
+        isActiveLegacyProfile && setupData.aiModel
+          ? [{ id: setupData.aiModel, label: setupData.aiModel }]
+          : []
+      ),
+      timeoutSeconds: String(profile?.timeoutSeconds ?? (isActiveLegacyProfile ? setupData.aiTimeoutSeconds : 30) ?? 30),
+      storedApiKeyConfigured: profile?.apiKeyConfigured ?? (isActiveLegacyProfile && setupData.aiApiKeyConfigured)
+    } satisfies AiServiceFormDraft];
+  })) as Partial<Record<DesktopAiService, AiServiceFormDraft>>;
+}
+
+function createDefaultAiServiceDraft(service: DesktopAiService): AiServiceFormDraft {
+  const preset = aiServicePresets.find((candidate) => candidate.id === service);
+  return {
+    projectName: service === "gemini" ? "Google AI Studio" : "",
+    googleCurl: "",
+    baseUrl: preset?.baseUrl ?? "",
+    model: "",
+    modelOptions: [],
+    apiKey: "",
+    storedApiKeyConfigured: false,
+    clearApiKey: false,
+    timeoutSeconds: "30"
+  };
+}
+
+function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
+  return {
+    projectName: form.aiProjectName,
+    googleCurl: form.aiGoogleCurl,
+    baseUrl: form.aiBaseUrl,
+    model: form.aiModel,
+    modelOptions: form.aiModelOptions,
+    apiKey: form.aiApiKey,
+    storedApiKeyConfigured: form.aiStoredApiKeyConfigured,
+    clearApiKey: form.clearAiApiKey,
+    timeoutSeconds: form.aiTimeoutSeconds
+  };
+}
+
+function isAiServiceProfileStored(form: SetupFormState, service: DesktopAiService): boolean {
+  return service === form.aiService
+    ? form.aiStoredApiKeyConfigured
+    : Boolean(form.aiServiceDrafts[service]?.storedApiKeyConfigured);
+}
+
+function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInitialSetupInput["aiProfiles"]> {
+  return aiServicePresets.map((preset) => {
+    const draft = preset.id === form.aiService
+      ? toAiServiceFormDraft(form)
+      : form.aiServiceDrafts[preset.id] ?? createDefaultAiServiceDraft(preset.id);
+    return {
+      service: preset.id,
+      projectName: draft.projectName,
+      baseUrl: draft.baseUrl,
+      model: draft.model,
+      modelOptions: draft.modelOptions,
+      timeoutSeconds: Number(draft.timeoutSeconds),
+      apiKey: draft.apiKey,
+      clearApiKey: draft.clearApiKey
+    };
+  });
 }
 
 function formatDateTime(value: string) {

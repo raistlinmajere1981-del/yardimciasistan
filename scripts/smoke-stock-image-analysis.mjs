@@ -22,54 +22,68 @@ writeFileSync(businessPath, `${JSON.stringify(business, null, 2)}\n`);
 
 const providerPort = await freePort();
 const providerRequests = [];
+const providerRequestUrls = [];
 const provider = http.createServer(async (request, response) => {
   let body = "";
   for await (const chunk of request) body += chunk;
-  providerRequests.push(JSON.parse(body));
-  response.writeHead(200, { "Content-Type": "application/json" });
-  response.end(JSON.stringify({
-    choices: [{
-      message: {
-        content: JSON.stringify({
-          document: {
-            supplier_name: "Smoke Tedarik",
-            invoice_number: "INV-42",
-            invoice_date: "2026-07-22",
-            document_confidence: "high"
-          },
-          lines: [
-            {
-              raw_text: "COCA COLA 330 ML 24 AD",
-              matched_menu_item_id: "item-cola",
-              matched_menu_item_name: "Provider adını değiştiremez",
-              suggested_quantity: 24,
-              source_quantity_text: "24 AD",
-              confidence: "high",
-              needs_review_reason: null
-            },
-            {
-              raw_text: "MADEN SUYU 1 KOLI",
-              matched_menu_item_id: "item-soda",
-              matched_menu_item_name: "Soda",
-              suggested_quantity: 999,
-              source_quantity_text: "1 KOLI",
-              confidence: "medium",
-              needs_review_reason: null
-            },
-            {
-              raw_text: "NAKLİYE BEDELİ 2",
-              matched_menu_item_id: "invented-item",
-              matched_menu_item_name: "İcat edilen ürün",
-              suggested_quantity: 2,
-              source_quantity_text: "2",
-              confidence: "low",
-              needs_review_reason: null
-            }
-          ]
-        })
+  const parsedBody = JSON.parse(body);
+  providerRequests.push(parsedBody);
+  providerRequestUrls.push(request.url);
+  if (parsedBody.model === "text-only-smoke") {
+    response.writeHead(400, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "This model does not support image input." } }));
+    return;
+  }
+  const analysis = {
+    document: {
+      supplier_name: "Smoke Tedarik",
+      invoice_number: "INV-42",
+      invoice_date: "2026-07-22",
+      document_confidence: "high"
+    },
+    lines: [
+      {
+        raw_text: "COCA COLA 330 ML 24 AD",
+        matched_menu_item_id: "item-cola",
+        matched_menu_item_name: "Provider adını değiştiremez",
+        suggested_quantity: 24,
+        source_quantity_text: "24 AD",
+        confidence: "high",
+        needs_review_reason: null
+      },
+      {
+        raw_text: "MADEN SUYU 1 KOLI",
+        matched_menu_item_id: "item-soda",
+        matched_menu_item_name: "Soda",
+        suggested_quantity: 999,
+        source_quantity_text: "1 KOLI",
+        confidence: "medium",
+        needs_review_reason: null
+      },
+      {
+        raw_text: "NAKLİYE BEDELİ 2",
+        matched_menu_item_id: "invented-item",
+        matched_menu_item_name: "İcat edilen ürün",
+        suggested_quantity: 2,
+        source_quantity_text: "2",
+        confidence: "low",
+        needs_review_reason: null
+      },
+      {
+        raw_text: "KAŞARLI KÖFTE 3 KG",
+        matched_menu_item_id: "item-meatball",
+        matched_menu_item_name: "Kaşarlı Köfte",
+        suggested_quantity: 3,
+        source_quantity_text: "3 KG",
+        confidence: "high",
+        needs_review_reason: null
       }
-    }]
-  }));
+    ]
+  };
+  response.writeHead(200, { "Content-Type": "application/json" });
+  response.end(JSON.stringify(request.url?.includes(":generateContent")
+    ? { candidates: [{ content: { parts: [{ text: JSON.stringify(analysis) }] } }] }
+    : { choices: [{ message: { content: JSON.stringify(analysis) } }] }));
 });
 await listen(provider, providerPort);
 
@@ -91,8 +105,9 @@ const baseUrl = `http://127.0.0.1:${phpPort}`;
 try {
   await waitForUrl(`${baseUrl}/api/stock-image-analysis.php`);
   const candidates = [
-    { id: "item-cola", name: "Kola", category: "İçecekler", current_stock: 10 },
-    { id: "item-soda", name: "Soda", category: "İçecekler", current_stock: 5 }
+    { id: "item-cola", name: "Kola", category: "İçecekler", current_stock: 10, stock_unit: "piece" },
+    { id: "item-soda", name: "Soda", category: "İçecekler", current_stock: 5, stock_unit: "piece" },
+    { id: "item-meatball", name: "Kaşarlı Köfte", category: "Ana Yemekler", current_stock: 4500, stock_unit: "gram" }
   ];
   const pngBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
@@ -134,6 +149,8 @@ try {
           price: 10,
           stock_quantity: item.current_stock,
           stock_min_quantity: 1,
+          stock_unit: item.stock_unit,
+          stock_consumption_quantity: item.stock_unit === "gram" ? 200 : 1,
           hide_when_out_of_stock: false,
           stock_status: "in_stock"
         })),
@@ -153,7 +170,7 @@ try {
   const androidValid = await analyze({
     bytes: pngBytes,
     mime: "image/png",
-    candidates: [...candidates, { id: "client-only-item", name: "İstemci ürünü", category: "Sahte", current_stock: 9 }],
+    candidates: [...candidates, { id: "client-only-item", name: "İstemci ürünü", category: "Sahte", current_stock: 9, stock_unit: "piece" }],
     source: "android",
     deviceId: "android-stock-smoke"
   });
@@ -181,10 +198,33 @@ try {
   });
   assert.equal(payload.analysis.lines[1].matched_menu_item_id, "item-soda");
   assert.equal(payload.analysis.lines[1].suggested_quantity, null, "Koli must never be guessed into units");
-  assert.match(payload.analysis.lines[1].needs_review_reason, /Koli, paket, kg veya litre/i);
+  assert.match(payload.analysis.lines[1].needs_review_reason, /Koli, paket, ağırlık veya hacim/i);
   assert.equal(payload.analysis.lines[2].matched_menu_item_id, null, "Ids outside the candidate allowlist must be removed");
   assert.equal(payload.analysis.lines[2].matched_menu_item_name, null);
+  assert.equal(payload.analysis.lines[3].matched_menu_item_id, "item-meatball");
+  assert.equal(payload.analysis.lines[3].suggested_quantity, 3000, "Kilograms must be normalized to grams for gram-tracked products");
+  assert.equal(providerRequests.at(-1).messages[1].content.find((part) => part.type === "text")?.text.includes('"stock_unit":"gram"'), true);
   assert.ok(providerRequests.at(-1).messages[1].content.some((part) => part.type === "image_url"));
+
+  writeAiConfig("gemini", "gemini-3.6-flash");
+  const geminiValid = await analyze({ bytes: pngBytes, mime: "image/png", candidates });
+  assert.equal(geminiValid.status, 200);
+  assert.match(providerRequestUrls.at(-1), /\/v1\/models\/gemini-3\.6-flash:generateContent$/);
+  assert.equal(providerRequests.at(-1).contents[0].parts[1].inlineData.mimeType, "image/png");
+  assert.equal(providerRequests.at(-1).generationConfig.responseMimeType, "application/json");
+
+  writeAiConfig("gemini", "gemini-3.1-flash-image");
+  const specializedGemini = await analyze({ bytes: pngBytes, mime: "image/png", candidates });
+  assert.equal(specializedGemini.status, 422);
+  assert.equal((await specializedGemini.json()).code, "vision_not_supported");
+
+  writeAiConfig("openai", "text-only-smoke");
+  const rejectedVision = await analyze({ bytes: pngBytes, mime: "image/png", candidates });
+  assert.equal(rejectedVision.status, 502);
+  const rejectedPayload = await rejectedVision.json();
+  assert.equal(rejectedPayload.code, "provider_vision_not_supported");
+  assert.equal(rejectedPayload.provider_status, 400);
+  assert.match(rejectedPayload.message, /görsel destekli bir model/i);
 
   writeAiConfig("custom");
   const unsupportedProvider = await analyze({ bytes: pngBytes, mime: "image/png", candidates });
@@ -193,7 +233,7 @@ try {
 
   await waitFor(() => readdirSync(uploadRoot).length === 0, 2_000);
   assert.deepEqual(readdirSync(uploadRoot), [], "Temporary multipart files must be removed after success and failure");
-  console.log("stock-image-analysis-smoke-ok: auth, mime, size, cleanup, allowlist and ambiguity rules verified");
+  console.log("stock-image-analysis-smoke-ok: Gemini vision, provider guidance, auth, mime, cleanup, allowlist and piece/gram rules verified");
 } catch (error) {
   if (phpOutput.trim()) console.error(phpOutput.trim());
   throw error;
@@ -203,13 +243,13 @@ try {
   rmSync(tempRoot, { recursive: true, force: true });
 }
 
-function writeAiConfig(service) {
+function writeAiConfig(service, model = "gpt-4o-mini") {
   writeFileSync(aiLocalPath, `<?php\ndeclare(strict_types=1);\nreturn ${phpExport({
     enabled: true,
     provider: "openai_compatible",
     service,
     base_url: `http://127.0.0.1:${providerPort}/v1`,
-    model: "gpt-4o-mini",
+    model,
     api_key: "mock-provider-key",
     timeout_seconds: 15
   })};\n`);

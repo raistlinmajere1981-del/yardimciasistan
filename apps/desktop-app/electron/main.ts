@@ -1,7 +1,13 @@
 import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from "electron";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { generateConfiguredChat, generateOwnerReplySuggestion, listGoogleAiStudioModels, rankGoogleAiStudioModels } from "@yardimci-asistan/ai-core";
+import {
+  generateConfiguredChat,
+  generateOwnerReplySuggestion,
+  listGoogleAiStudioModels,
+  rankGoogleAiStudioModels,
+  verifyGoogleAiStudioVisionModel
+} from "@yardimci-asistan/ai-core";
 import type { AIProviderName } from "@yardimci-asistan/ai-core";
 import type { StockImageAnalysis, StockImageApplyLine } from "@yardimci-asistan/shared";
 import {
@@ -24,8 +30,10 @@ import type {
 import {
   DesktopDatabase,
   type DesktopDashboardData,
+  type DesktopAiService,
   type DesktopSetupData,
   type DesktopSetupSaveResult,
+  type SaveAiServiceProfileInput,
   type SaveInitialSetupInput,
   type SaveMenuCategoryInput,
   type SaveMenuItemInput,
@@ -114,6 +122,10 @@ interface AiConnectionTestInput {
 type AiConnectionTestResult =
   | { ok: true; message: string; model: string; models: Array<{ id: string; label: string }> }
   | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string }> };
+
+type AiApiKeyRevealResult =
+  | { ok: true; apiKey: string }
+  | { ok: false; message: string };
 
 interface DesktopBootstrapData {
   appName: string;
@@ -469,6 +481,31 @@ function registerIpcHandlers() {
     return getDatabase().getSetupData();
   });
 
+  ipcMain.handle("ai:revealApiKey", (_event, serviceValue: unknown): AiApiKeyRevealResult => {
+    const service = String(serviceValue ?? "").trim().toLowerCase() as DesktopAiService;
+    if (!["openai", "openrouter", "groq", "gemini", "custom"].includes(service)) {
+      return { ok: false, message: "API anahtarı için geçerli bir servis sağlayıcı seçin." };
+    }
+
+    const encryptedValue = getDatabase().getEncryptedAiApiKey(service);
+    if (!encryptedValue) {
+      return { ok: false, message: "Bu sağlayıcı için kayıtlı bir API anahtarı bulunamadı." };
+    }
+    if (!encryptedValue.startsWith("safe-storage:v1:") || !safeStorage.isEncryptionAvailable()) {
+      return { ok: false, message: "Kayıtlı API anahtarı bu cihazda çözülemiyor." };
+    }
+
+    try {
+      const payload = encryptedValue.slice("safe-storage:v1:".length);
+      const apiKey = safeStorage.decryptString(Buffer.from(payload, "base64")).trim();
+      return apiKey
+        ? { ok: true, apiKey }
+        : { ok: false, message: "Kayıtlı API anahtarı boş." };
+    } catch {
+      return { ok: false, message: "Kayıtlı API anahtarı çözülemedi." };
+    }
+  });
+
   ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
     const result = getDatabase().setAndroidDeviceRole(String(deviceId ?? ""), String(role ?? ""));
     return finalizeAndroidDeviceMutation(result);
@@ -497,11 +534,16 @@ function registerIpcHandlers() {
     if (!secretUpdate.ok) {
       return secretUpdate;
     }
+    const profileSecretUpdates = createAiProfileApiKeyUpdates(input);
+    if (!profileSecretUpdates.ok) {
+      return profileSecretUpdates;
+    }
 
     const localResult = getDatabase().saveInitialSetup({
       ...input,
-      aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : ""
-    }, secretUpdate.update);
+      aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
+      aiProfiles: profileSecretUpdates.profiles
+    }, secretUpdate.update, profileSecretUpdates.updates);
     if (!localResult.ok) {
       return localResult;
     }
@@ -567,7 +609,7 @@ function registerIpcHandlers() {
       };
     }
 
-    const apiKey = String(input?.apiKey ?? "").trim() || (input?.useStoredApiKey ? getEffectiveAiApiKey() : "");
+    const apiKey = String(input?.apiKey ?? "").trim() || (input?.useStoredApiKey ? getEffectiveAiApiKey(service) : "");
     const timeoutSeconds = normalizeAiTimeoutSeconds(timeoutCandidate);
 
     if (service === "gemini") {
@@ -599,9 +641,11 @@ function registerIpcHandlers() {
     const rankedGoogleModels = service === "gemini"
       ? rankGoogleAiStudioModels(models.map((item) => item.id))
       : [];
-    const modelCandidates = model
-      ? [model]
-      : rankedGoogleModels.slice(0, 6);
+    const modelCandidates = service === "gemini"
+      ? [...new Set([model, ...rankedGoogleModels].filter(Boolean))].slice(0, 6)
+      : model
+        ? [model]
+        : [];
     if (modelCandidates.length === 0) {
       return {
         ok: false,
@@ -613,26 +657,33 @@ function registerIpcHandlers() {
     const attemptedModels: string[] = [];
     for (const candidate of modelCandidates) {
       attemptedModels.push(candidate);
-      result = await generateConfiguredChat({
-        enabled: true,
-        provider: "openai_compatible",
-        service,
-        baseUrl,
-        model: candidate,
-        apiKey,
-        authMode: service === "gemini" ? "google_api_key" : "bearer",
-        timeoutMs: timeoutSeconds * 1000,
-        messages: [
-          {
-            role: "system",
-            content: "Bu bir bağlantı kontrolüdür. Türkçe ve tek kısa cümleyle bağlantının çalıştığını belirt."
-          },
-          {
-            role: "user",
-            content: "Bağlantı kontrolü"
-          }
-        ]
-      });
+      result = service === "gemini"
+        ? await verifyGoogleAiStudioVisionModel({
+            baseUrl,
+            model: candidate,
+            apiKey,
+            timeoutMs: timeoutSeconds * 1000
+          })
+        : await generateConfiguredChat({
+            enabled: true,
+            provider: "openai_compatible",
+            service,
+            baseUrl,
+            model: candidate,
+            apiKey,
+            authMode: "bearer",
+            timeoutMs: timeoutSeconds * 1000,
+            messages: [
+              {
+                role: "system",
+                content: "Bu bir bağlantı kontrolüdür. Türkçe ve tek kısa cümleyle bağlantının çalıştığını belirt."
+              },
+              {
+                role: "user",
+                content: "Bağlantı kontrolü"
+              }
+            ]
+          });
       if (result.ok) {
         model = candidate;
         break;
@@ -654,7 +705,7 @@ function registerIpcHandlers() {
     return {
       ok: true,
       message: service === "gemini"
-        ? `${projectName || "Google AI Studio"} bağlantısı ${model} modeliyle doğrulandı; ${models.length} kullanılabilir Gemini modeli bulundu.`
+        ? `${projectName || "Google AI Studio"} bağlantısında ${model} modeliyle görsel girişi doğrulandı; ${models.length} uygun Gemini modeli bulundu. Kullanmak için ayarları kaydedin.`
         : `${getAiServiceLabel(service)} bağlantısı çalışıyor.`,
       model: result.model || model,
       models
@@ -1370,8 +1421,10 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
         price: item.price,
         stock_quantity: item.stock_quantity ?? 0,
         stock_min_quantity: item.stock_min_quantity,
+        stock_unit: item.stock_unit,
+        stock_consumption_quantity: item.stock_consumption_quantity,
         hide_when_out_of_stock: item.hide_when_out_of_stock,
-        stock_status: getMenuStockStatus(item.stock_quantity ?? 0, item.stock_min_quantity)
+        stock_status: getMenuStockStatus(item.stock_quantity ?? 0, item.stock_min_quantity, item.stock_consumption_quantity)
       })),
     appliedStockImageHashes: getDatabase().getAppliedStockImageHashes(100),
     table_orders: activeTableOrders.map((order) => ({
@@ -1402,8 +1455,8 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
   };
 }
 
-function getMenuStockStatus(quantity: number, minimum: number | null): "out_of_stock" | "low_stock" | "in_stock" {
-  if (quantity <= 0) {
+function getMenuStockStatus(quantity: number, minimum: number | null, consumptionQuantity = 1): "out_of_stock" | "low_stock" | "in_stock" {
+  if (quantity < consumptionQuantity) {
     return "out_of_stock";
   }
   if (minimum !== null && quantity <= minimum) {
@@ -1434,7 +1487,7 @@ function createDesktopAiConfig(setup: DesktopSetupData) {
     service: setup.aiService,
     baseUrl: useLegacyEnvironment ? process.env.YARDIMCI_ASISTAN_AI_BASE_URL || setup.aiBaseUrl : setup.aiBaseUrl,
     model: useLegacyEnvironment ? process.env.YARDIMCI_ASISTAN_AI_MODEL || setup.aiModel : setup.aiModel,
-    apiKey: getEffectiveAiApiKey(),
+    apiKey: getEffectiveAiApiKey(setup.aiService),
     authMode: setup.aiService === "gemini" ? "google_api_key" as const : "bearer" as const,
     timeoutMs: timeoutSeconds * 1000
   };
@@ -1647,7 +1700,7 @@ async function publishSavedAiSettings(): Promise<PushAiSettingsResult> {
       service: setup.aiService || "custom",
       baseUrl: setup.aiBaseUrl,
       model: setup.aiModel,
-      apiKey: setup.aiEnabled ? getEffectiveAiApiKey() : "",
+      apiKey: setup.aiEnabled ? getEffectiveAiApiKey(setup.aiService) : "",
       timeoutSeconds: normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds)
     }
   });
@@ -1703,14 +1756,54 @@ function createAiApiKeyUpdate(input: SaveInitialSetupInput): { ok: true; update:
     };
   }
 
-  if (input.clearAiApiKey) {
+  return createEncryptedAiApiKeyUpdate(input.aiApiKey, input.clearAiApiKey);
+}
+
+function createAiProfileApiKeyUpdates(input: SaveInitialSetupInput):
+  | {
+      ok: true;
+      profiles: SaveAiServiceProfileInput[];
+      updates: Partial<Record<DesktopAiService, AiApiKeyUpdate>>;
+    }
+  | { ok: false; message: string } {
+  const profiles = Array.isArray(input.aiProfiles) ? input.aiProfiles : [];
+  const supportedServices = new Set<DesktopAiService>(["openai", "openrouter", "groq", "gemini", "custom"]);
+  const updates: Partial<Record<DesktopAiService, AiApiKeyUpdate>> = {};
+  const sanitizedProfiles: SaveAiServiceProfileInput[] = [];
+
+  for (const profile of profiles) {
+    const service = String(profile?.service ?? "").trim().toLowerCase() as DesktopAiService;
+    if (!supportedServices.has(service)) {
+      return { ok: false, message: "Kaydedilecek AI servis profillerinden biri geçersiz." };
+    }
+
+    const apiKey = String(profile.apiKey ?? "").trim();
+    if (service !== input.aiService) {
+      const update = createEncryptedAiApiKeyUpdate(apiKey, Boolean(profile.clearApiKey));
+      if (!update.ok) {
+        return update;
+      }
+      updates[service] = update.update;
+    }
+    sanitizedProfiles.push({
+      ...profile,
+      service,
+      apiKey: apiKey ? "__encrypted_in_main_process__" : ""
+    });
+  }
+
+  return { ok: true, profiles: sanitizedProfiles, updates };
+}
+
+function createEncryptedAiApiKeyUpdate(apiKeyValue: unknown, clearRequested: boolean): { ok: true; update: AiApiKeyUpdate } | { ok: false; message: string } {
+  if (clearRequested) {
     return {
       ok: true,
       update: { mode: "clear" }
     };
   }
 
-  const apiKey = String(input.aiApiKey ?? "").trim();
+  const apiKey = String(apiKeyValue ?? "").trim();
   if (!apiKey) {
     return {
       ok: true,
@@ -1742,8 +1835,8 @@ function createAiApiKeyUpdate(input: SaveInitialSetupInput): { ok: true; update:
   }
 }
 
-function getEffectiveAiApiKey() {
-  const encryptedValue = getDatabase().getEncryptedAiApiKey();
+function getEffectiveAiApiKey(service?: string) {
+  const encryptedValue = getDatabase().getEncryptedAiApiKey(service);
   if (encryptedValue.startsWith("safe-storage:v1:")) {
     if (!safeStorage.isEncryptionAvailable()) {
       return "";
@@ -1789,7 +1882,7 @@ function isGoogleAiStudioUrl(value: string) {
 function shouldTryNextGoogleModel(result: { status?: number; message: string }) {
   return result.status === 404
     || result.status === 429
-    || (result.status === 400 && /model|not found|support/i.test(result.message));
+    || (result.status === 400 && /model|not found|support|image|vision|multimodal|mime/i.test(result.message));
 }
 
 function formatAiConnectionFailure(

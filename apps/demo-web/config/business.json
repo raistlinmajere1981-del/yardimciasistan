@@ -239,6 +239,46 @@
         "is_featured": false
       },
       {
+        "id": "item_main_004",
+        "category_id": "cat_mains",
+        "name": "Izgara Çipura",
+        "description": "Mevsim salatası, roka ve köz limon eşliğinde bütün çipura.",
+        "price": 980,
+        "currency": "TRY",
+        "image_url": "/assets/menu-grilled-sea-bass.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_main_005",
+        "category_id": "cat_mains",
+        "name": "Fırında Alabalık",
+        "description": "Defne, limon ve mevsim sebzeleriyle fırında pişirilen bütün alabalık.",
+        "price": 820,
+        "currency": "TRY",
+        "image_url": "/assets/menu-grilled-sea-bass.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_main_006",
+        "category_id": "cat_mains",
+        "name": "Izgara Kasap Köfte",
+        "description": "200 gram dana kasap köfte, köz sebze ve pilav eşliğinde.",
+        "price": 720,
+        "currency": "TRY",
+        "image_url": "/assets/menu-main-courses.webp",
+        "is_featured": true
+      },
+      {
+        "id": "item_main_007",
+        "category_id": "cat_mains",
+        "name": "Kaşarlı Köfte",
+        "description": "200 gram dana köfte, erimiş kaşar, domates sosu ve patates eşliğinde.",
+        "price": 760,
+        "currency": "TRY",
+        "image_url": "/assets/menu-main-courses.webp",
+        "is_featured": false
+      },
+      {
         "id": "item_light_001",
         "category_id": "cat_light",
         "name": "Izgara Hellimli Mevsim Salatası",
@@ -324,6 +364,56 @@
         "name": "Adaçayı",
         "description": "Demlikte taze demlenir; yanında limon ve bal seçeneğiyle.",
         "price": 160,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_005",
+        "category_id": "cat_drinks",
+        "name": "Şişe Su (330 ml)",
+        "description": "Soğuk servis edilen 330 ml cam şişe su.",
+        "price": 60,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_006",
+        "category_id": "cat_drinks",
+        "name": "Maden Suyu (200 ml)",
+        "description": "Doğal mineralli 200 ml cam şişe maden suyu.",
+        "price": 80,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_007",
+        "category_id": "cat_drinks",
+        "name": "Kutu Kola (330 ml)",
+        "description": "Soğuk servis edilen 330 ml kutu kola.",
+        "price": 120,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_008",
+        "category_id": "cat_drinks",
+        "name": "Portakallı Gazoz (250 ml)",
+        "description": "Portakal aromalı 250 ml cam şişe gazoz.",
+        "price": 110,
+        "currency": "TRY",
+        "image_url": "/assets/menu-drinks.webp",
+        "is_featured": false
+      },
+      {
+        "id": "item_drink_009",
+        "category_id": "cat_drinks",
+        "name": "Şişe Ayran (300 ml)",
+        "description": "Soğuk servis edilen 300 ml şişe ayran.",
+        "price": 100,
         "currency": "TRY",
         "image_url": "/assets/menu-drinks.webp",
         "is_featured": false

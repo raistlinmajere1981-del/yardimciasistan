@@ -100,6 +100,8 @@ try {
     tags: trackedMenuItemBefore.tags,
     stock_quantity: 2,
     stock_min_quantity: 1,
+    stock_unit: trackedMenuItemBefore.stock_unit,
+    stock_consumption_quantity: trackedMenuItemBefore.stock_consumption_quantity,
     hide_when_out_of_stock: true,
     stock_note: "Otomatik senkron stok testi",
     sort_order: trackedMenuItemBefore.sort_order
@@ -213,6 +215,8 @@ try {
       price: trackedMenuItemBefore.price,
       stock_quantity: 2,
       stock_min_quantity: 1,
+      stock_unit: trackedMenuItemBefore.stock_unit,
+      stock_consumption_quantity: trackedMenuItemBefore.stock_consumption_quantity,
       hide_when_out_of_stock: true,
       stock_status: "in_stock"
     }
@@ -752,8 +756,10 @@ function createSnapshot(databaseInstance) {
         price: item.price,
         stock_quantity: item.stock_quantity,
         stock_min_quantity: item.stock_min_quantity,
+        stock_unit: item.stock_unit,
+        stock_consumption_quantity: item.stock_consumption_quantity,
         hide_when_out_of_stock: item.hide_when_out_of_stock,
-        stock_status: item.stock_quantity <= 0
+        stock_status: item.stock_quantity < item.stock_consumption_quantity
           ? "out_of_stock"
           : item.stock_min_quantity !== null && item.stock_quantity <= item.stock_min_quantity
             ? "low_stock"

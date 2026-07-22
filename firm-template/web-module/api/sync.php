@@ -1348,6 +1348,8 @@ function ya_sync_sanitize_menu_items(mixed $records, array $categoryIds, string 
 
         $stockQuantity = ya_sync_nullable_nonnegative_float($record['stock_quantity'] ?? null);
         $stockMinQuantity = ya_sync_nullable_nonnegative_float($record['stock_min_quantity'] ?? null);
+        $stockUnit = ya_sync_stock_unit($record['stock_unit'] ?? 'piece');
+        $stockConsumptionQuantity = ya_sync_positive_float($record['stock_consumption_quantity'] ?? 1, 1);
         $stockNote = ya_sync_string($record['stock_note'] ?? '');
 
         $itemsById[$id] = [
@@ -1364,6 +1366,8 @@ function ya_sync_sanitize_menu_items(mixed $records, array $categoryIds, string 
             'tags' => ya_sync_string_array($record['tags'] ?? []),
             'stock_quantity' => $stockQuantity,
             'stock_min_quantity' => $stockMinQuantity,
+            'stock_unit' => $stockUnit,
+            'stock_consumption_quantity' => $stockConsumptionQuantity,
             'hide_when_out_of_stock' => ya_sync_bool($record['hide_when_out_of_stock'] ?? false),
             'stock_note' => $stockNote === '' ? null : $stockNote,
             'sort_order' => ya_sync_int($record['sort_order'] ?? 0, 0),
@@ -1393,9 +1397,10 @@ function ya_sync_sanitize_tracked_stock_items(mixed $records): array
             continue;
         }
         $minimum = ya_sync_nullable_nonnegative_float($record['stock_min_quantity'] ?? null);
+        $consumption = ya_sync_positive_float($record['stock_consumption_quantity'] ?? 1, 1);
         $status = ya_sync_string($record['stock_status'] ?? '');
         if (!in_array($status, ['out_of_stock', 'low_stock', 'in_stock'], true)) {
-            $status = $quantity <= 0
+            $status = $quantity < $consumption
                 ? 'out_of_stock'
                 : ($minimum !== null && $quantity <= $minimum ? 'low_stock' : 'in_stock');
         }
@@ -1406,6 +1411,8 @@ function ya_sync_sanitize_tracked_stock_items(mixed $records): array
             'price' => max(0, ya_sync_float($record['price'] ?? 0, 0)),
             'stock_quantity' => $quantity,
             'stock_min_quantity' => $minimum,
+            'stock_unit' => ya_sync_stock_unit($record['stock_unit'] ?? 'piece'),
+            'stock_consumption_quantity' => $consumption,
             'hide_when_out_of_stock' => ya_sync_bool($record['hide_when_out_of_stock'] ?? false),
             'stock_status' => $status
         ];
@@ -1668,6 +1675,20 @@ function ya_sync_nullable_nonnegative_float(mixed $value): ?float
     }
     $number = (float) $value;
     return is_finite($number) && $number >= 0 ? $number : null;
+}
+
+function ya_sync_positive_float(mixed $value, float $fallback): float
+{
+    if (!is_numeric($value)) {
+        return $fallback;
+    }
+    $number = (float) $value;
+    return is_finite($number) && $number > 0 ? $number : $fallback;
+}
+
+function ya_sync_stock_unit(mixed $value): string
+{
+    return ya_sync_string($value) === 'gram' ? 'gram' : 'piece';
 }
 
 function ya_sync_string_array(mixed $value): array

@@ -22,6 +22,15 @@ public final class StockRulesSmoke {
     stocked.id = "stocked";
     stocked.stockQuantity = 100d;
     assertFalse(stocked.outOfStock(), "positive stock should be orderable");
+
+    OperationData.MenuItem gramPortion = new OperationData.MenuItem();
+    gramPortion.id = "gram-portion";
+    gramPortion.stockUnit = "gram";
+    gramPortion.stockConsumptionQuantity = 200d;
+    gramPortion.stockQuantity = 199d;
+    assertTrue(gramPortion.outOfStock(), "stock below one 200 gram portion must not be orderable");
+    gramPortion.stockQuantity = 200d;
+    assertFalse(gramPortion.outOfStock(), "exactly one gram-based portion should be orderable");
     data.menuItems.add(zero);
     assertSame(zero, data.menuItemById("zero"), "order screen lookup should resolve stock-aware menu items");
 
