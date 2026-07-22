@@ -10,6 +10,8 @@ const packageName = "com.yardimciasistan.android";
 const activityName = ".MainActivity";
 const syncSecret = "change-this-secret";
 const demoSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
+const stockGalleryFixture = join(repoRoot, "firm-template", "web-module", "assets", "yardimci-asistan-symbol.png");
+const stockGalleryDeviceFile = "/sdcard/Download/yardimci-stock-image-smoke.png";
 const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "r", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
 const serviceOrderPermissions = [
   "table.view",
@@ -104,6 +106,7 @@ try {
 async function main() {
   ensureArtifactDir();
   ensureAdbDevice();
+  prepareStockGalleryFixture();
 
   phoneTest = startPhoneTest();
   await waitForReady(phoneTest, options.readyTimeoutMs);
@@ -112,6 +115,14 @@ async function main() {
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
   await waitForUiText("Öncelikli işler", 12000);
+  if (options.stockImageOnly) {
+    await runStockImageOnly(baseUrl);
+    await restoreEmbeddedConnectionAfterTest();
+    console.log("android-stock-image-device-ui-smoke-ok");
+    cleanup();
+    await waitForPhoneTestExit();
+    return;
+  }
   scrollToTop();
   await delay(400);
 
@@ -230,8 +241,12 @@ async function main() {
   assertContains(staffPensionRoomsXml, ["Odalar", "İşler", "Balkonlu Oda", "Temizlik", "Durumu Değiştir"]);
   assertNotContains(staffPensionRoomsXml, ["Oda 101 giriş hazırlığı", "Tamamla", "Rezervasyonlar"]);
   tap(centerOf(findClickableBoundsByText(staffPensionRoomsXml, "İşler")));
-  await delay(400);
-  const staffPensionTasksXml = dumpUi("staff-pension-tasks.xml");
+  const staffPensionTasksXml = await waitForUiCondition(
+    (xml) => xml.includes("Oda 101 giriş hazırlığı") && xml.includes("Bahçe servis kontrolü"),
+    5000,
+    "Personel günlük iş modu açılmadı."
+  );
+  writeFileSync(join(artifactDir, "staff-pension-tasks.xml"), staffPensionTasksXml);
   assertContains(staffPensionTasksXml, ["Oda 101 giriş hazırlığı", "Bahçe servis kontrolü", "Tamamla"]);
   assertNotContains(staffPensionTasksXml, ["Balkonlu Oda", "Aile Odası"]);
 
@@ -269,7 +284,7 @@ async function main() {
     await delay(300);
   }
   assertContains(staffStockXml, ["Stokta yok", "Az stok", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı"]);
-  assertNotContains(staffStockXml, ["Stok Güncelle", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
+  assertNotContains(staffStockXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç", "Stok Güncelle", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
 
   await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: serviceOrderPermissions });
   relaunchApp();
@@ -311,12 +326,12 @@ async function main() {
     notificationCustomerName,
     "new"
   );
-  await waitForCachedSnapshotText(repeatedNotificationSnapshotAt, 20000);
+  await waitForCachedSnapshotText(repeatedNotificationSnapshotAt, 45000);
   await waitForNotificationText(notificationCustomerName, 12000);
   assert.equal(countOccurrences(readPreferenceValue("notification_event_ledger_v1"), notificationEventKey), 1, "Aynı snapshot bildirimi ledger'da çoğalttı.");
 
   await publishNotificationRequest(baseUrl, deviceId, customerReservationPermissions, notificationRequestId, notificationCustomerName, "answered");
-  await waitForNotificationAbsence(notificationCustomerName, 20000);
+  await waitForNotificationAbsence(notificationCustomerName, 45000);
 
   const notificationClickRequestId = "request_android_notification_click_smoke_001";
   const notificationClickCustomer = "Tıklama Smoke Misafiri";
@@ -328,7 +343,7 @@ async function main() {
     notificationClickCustomer,
     "new"
   );
-  await waitForCachedSnapshotText(notificationClickSnapshotAt, 20000);
+  await waitForCachedSnapshotText(notificationClickSnapshotAt, 45000);
   await waitForNotificationText(notificationClickCustomer, 12000);
   adb(["shell", "cmd", "statusbar", "expand-notifications"]);
   await delay(800);
@@ -518,8 +533,12 @@ async function main() {
   assertContains(pensionRoomsXml, ["Odalar", "Balkonlu Oda", "Temizlik"]);
   assertNotContains(pensionRoomsXml, ["Demo Aile", "Oda 101 giriş hazırlığı"]);
   tap(centerOf(findClickableBoundsByText(pensionRoomsXml, "İşler")));
-  await delay(400);
-  const pensionTasksXml = dumpUi("pension-tasks.xml");
+  const pensionTasksXml = await waitForUiCondition(
+    (xml) => xml.includes("Oda 101 giriş hazırlığı") && xml.includes("Bahçe servis kontrolü"),
+    5000,
+    "Yönetici günlük iş modu açılmadı."
+  );
+  writeFileSync(join(artifactDir, "pension-tasks.xml"), pensionTasksXml);
   assertContains(pensionTasksXml, ["İşler", "Oda 101 giriş hazırlığı", "Bahçe servis kontrolü"]);
   assertNotContains(pensionTasksXml, ["Balkonlu Oda", "Demo Aile"]);
 
@@ -560,17 +579,32 @@ async function main() {
         && adminStockXml.includes("Az stok")
         && adminStockXml.includes("Tüm takip edilen ürünler")
         && adminStockXml.includes("Serpme Kahvaltı")
+        && adminStockXml.includes("AI DESTEKLİ STOK GİRİŞİ")
         && stockUpdateXml) {
       break;
     }
     swipe(360, 1080, 360, 760, 360);
     await delay(300);
   }
-  assertContains(adminStockXml, ["Stokta yok", "Az stok", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı", "Stok Güncelle"]);
+  assertContains(adminStockXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç", "Stokta yok", "Az stok", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı", "Stok Güncelle"]);
   scrollToTop();
   await delay(300);
   const adminStockTopXml = dumpUi("admin-stock-top.xml");
-  tap(centerOf(findBoundsByText(adminStockTopXml, "Stok Güncelle")));
+  assertContains(adminStockTopXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç", "Stoklar siz onaylamadan değişmez"]);
+  captureScreenshot("admin-stock-image-import.png");
+  await exerciseStockImageSources(adminStockTopXml);
+  let stockUpdateAfterSourcesXml = "";
+  for (let index = 0; index < 8; index += 1) {
+    const currentXml = dumpUi(`admin-stock-update-after-sources-${index}.xml`);
+    if (currentXml.includes("Stok Güncelle")) {
+      stockUpdateAfterSourcesXml = currentXml;
+      break;
+    }
+    swipe(360, 1080, 360, 760, 360);
+    await delay(300);
+  }
+  assertContains(stockUpdateAfterSourcesXml, ["Stok Güncelle"]);
+  tap(centerOf(findBoundsByText(stockUpdateAfterSourcesXml, "Stok Güncelle")));
   await delay(300);
   const stockActionsXml = dumpUi("admin-stock-actions.xml");
   assertContains(stockActionsXml, ["STOK GÜNCELLE", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
@@ -601,16 +635,19 @@ async function main() {
 
 function parseArgs(args) {
   const parsed = {
-    holdMs: 300000,
+    holdMs: 600000,
     readyTimeoutMs: 45000,
     settleMs: 1800,
-    noBuild: false
+    noBuild: false,
+    stockImageOnly: false
   };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (arg === "--no-build") {
       parsed.noBuild = true;
+    } else if (arg === "--stock-image-only") {
+      parsed.stockImageOnly = true;
     } else if (arg.startsWith("--hold-ms=")) {
       parsed.holdMs = Number(arg.slice("--hold-ms=".length));
     } else if (arg === "--hold-ms") {
@@ -631,8 +668,8 @@ function parseArgs(args) {
     readyTimeoutMs: parsed.readyTimeoutMs,
     settleMs: parsed.settleMs
   })) {
-    if (!Number.isInteger(value) || value < 0 || value > 300000) {
-      throw new Error(`${name} 0-300000 ms arasında sayısal olmalı.`);
+    if (!Number.isInteger(value) || value < 0 || value > 900000) {
+      throw new Error(`${name} 0-900000 ms arasında sayısal olmalı.`);
     }
   }
 
@@ -641,6 +678,31 @@ function parseArgs(args) {
   }
 
   return parsed;
+}
+
+async function runStockImageOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  await publishDeviceRole(baseUrl, deviceId, "admin");
+  relaunchApp();
+  const topXml = await waitForUiCondition(
+    (xml) => xml.includes("Yönetici") && xml.includes('text="Restoran"'),
+    12000,
+    "Odaklı stok görseli testi için yönetici profili uygulanmadı."
+  );
+  tap(centerOf(findClickableBoundsByText(topXml, "Restoran")));
+  const restaurantXml = await waitForUiCondition(
+    (xml) => xml.includes("Masalar") && xml.includes("Açık Adisyon") && xml.includes('text="Stok"'),
+    8000,
+    "Odaklı stok görseli testi restoran ekranını açamadı."
+  );
+  tap(centerOf(findClickableBoundsByText(restaurantXml, "Stok")));
+  const stockXml = await waitForUiCondition(
+    (xml) => xml.includes("AI DESTEKLİ STOK GİRİŞİ") && xml.includes("Kamera ile çek") && xml.includes("Galeriden seç"),
+    8000,
+    "Odaklı stok görseli kartı açılmadı."
+  );
+  captureScreenshot("admin-stock-image-import.png");
+  await exerciseStockImageSources(stockXml);
 }
 
 function startPhoneTest() {
@@ -755,6 +817,8 @@ function prepareAppForUi(baseUrl) {
   deviceIdBeforeUiReset = readPreferenceValueIfPresent("device_id");
   adb(["shell", "input", "keyevent", "KEYCODE_WAKEUP"], { allowFailure: true });
   adb(["shell", "wm", "dismiss-keyguard"], { allowFailure: true });
+  adb(["shell", "am", "force-stop", "com.android.documentsui"], { allowFailure: true });
+  prepareSystemCameraForUiTest();
   adb(["shell", "input", "keyevent", "KEYCODE_MENU"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
@@ -777,6 +841,124 @@ function prepareAppForUi(baseUrl) {
     "ya_reset_debug_app_state",
     "true"
   ]);
+}
+
+function prepareSystemCameraForUiTest() {
+  const cameraPackage = "net.sourceforge.opencamera";
+  const installed = adb(["shell", "pm", "path", cameraPackage], { capture: true, allowFailure: true });
+  if (installed.status !== 0 || !installed.stdout.includes("package:")) {
+    return;
+  }
+  adb(["shell", "am", "start", "-W", "-n", `${cameraPackage}/.MainActivity`], { allowFailure: true });
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
+}
+
+function prepareStockGalleryFixture() {
+  if (!existsSync(stockGalleryFixture)) {
+    throw new Error(`Android galeri smoke görseli bulunamadı: ${stockGalleryFixture}`);
+  }
+  adb(["shell", "mkdir", "-p", "/sdcard/Download"]);
+  adb(["push", stockGalleryFixture, stockGalleryDeviceFile]);
+  adb([
+    "shell", "am", "broadcast",
+    "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+    "-d", "file:///sdcard/Download/yardimci-stock-image-smoke.png"
+  ], { allowFailure: true });
+}
+
+async function exerciseStockImageSources(stockXml) {
+  tap(centerOf(findBoundsByText(stockXml, "Galeriden seç")));
+  await waitForFocusedPackage("com.android.documentsui", 8000, "Sistem görsel seçicisi açılmadı.");
+  let pickerXml = dumpUi("stock-image-gallery-recent.xml");
+  if (!pickerXml.includes("yardimci-stock-image-smoke")) {
+    tap(centerOf(findClickableBoundsByDescription(pickerXml, "Show roots")));
+    const rootsXml = await waitForUiCondition(
+      (xml) => xml.includes('text="Downloads"'),
+      5000,
+      "Sistem dosya seçicisinde Downloads kökü bulunamadı."
+    );
+    tap(centerOf(findBoundsByText(rootsXml, "Downloads")));
+    pickerXml = await waitForUiCondition(
+      (xml) => xml.includes("yardimci-stock-image-smoke"),
+      8000,
+      "Galeri smoke görseli Downloads klasöründe bulunamadı."
+    );
+  }
+  captureScreenshot("stock-image-gallery-picker.png");
+  const fixtureBounds = findBoundsByTextIfPresent(pickerXml, "yardimci-stock-image-smoke.png")
+      ?? findBoundsByTextIfPresent(pickerXml, "yardimci-stock-image-smoke")
+      ?? findBoundsByContentDescriptionPrefix(pickerXml, "yardimci-stock-image-smoke.png");
+  if (!fixtureBounds) {
+    throw new Error("Galeri smoke görseli tıklanabilir bir dosya olarak bulunamadı.");
+  }
+  tap(centerOf(fixtureBounds));
+  const previewXml = await waitForUiCondition(
+    (xml) => xml.includes("Görseli kontrol et") && xml.includes("Görsel hazır") && xml.includes("Analiz Et"),
+    15000,
+    "Galeriden seçilen görsel güvenli önizlemeye hazırlanamadı."
+  );
+  assertContains(previewXml, ["AI DESTEKLİ STOK GİRİŞİ", "Görseli kontrol et", "90° döndür", "Yeniden çek", "Başka görsel seç", "Analiz Et", "kalıcı saklanmaz"]);
+  captureScreenshot("stock-image-gallery-preview.png");
+  tap(centerOf(findBoundsByText(previewXml, "90° döndür")));
+  tap(centerOf(findBoundsByText(previewXml, "Analiz Et")));
+  const disabledAiXml = await waitForUiCondition(
+    (xml) => xml.includes("AI görsel analizi işletme ayarlarında kapalı."),
+    20000,
+    "Fiziksel cihazdaki görsel analiz hata geri bildirimi alınamadı."
+  );
+  assertContains(disabledAiXml, ["AI görsel analizi işletme ayarlarında kapalı.", "Analiz Et"]);
+  captureScreenshot("stock-image-analysis-disabled-feedback.png");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  const returnedStockXml = await waitForUiCondition(
+    (xml) => xml.includes("AI DESTEKLİ STOK GİRİŞİ") && xml.includes("Kamera ile çek"),
+    8000,
+    "Görsel önizlemesinden stok ekranına dönülemedi."
+  );
+
+  tap(centerOf(findBoundsByText(returnedStockXml, "Kamera ile çek")));
+  await waitForFocusedPackage("net.sourceforge.opencamera", 10000, "Sistem kamera uygulaması açılamadı.");
+  await delay(1000);
+  const cameraXml = dumpUi("stock-image-system-camera.xml");
+  assertContains(cameraXml, ["net.sourceforge.opencamera:id/take_photo", 'content-desc="Take Photo"']);
+  tap(centerOf(findBoundsByResourceId(cameraXml, "net.sourceforge.opencamera:id/take_photo")));
+  const cameraPreviewXml = await waitForUiCondition(
+    (xml) => xml.includes("Görseli kontrol et") && xml.includes("Görsel hazır") && xml.includes("Analiz Et"),
+    20000,
+    "Sistem kamerasıyla çekilen görsel güvenli önizlemeye dönmedi."
+  );
+  assertContains(cameraPreviewXml, ["Yeniden çek", "Başka görsel seç", "90° döndür", "kalıcı saklanmaz"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiCondition(
+    (xml) => xml.includes("AI DESTEKLİ STOK GİRİŞİ") && xml.includes("Galeriden seç"),
+    10000,
+    "Sistem kamerasından stok ekranına dönülemedi."
+  );
+  const remainingCameraFiles = adb(
+    ["shell", "run-as", packageName, "find", "cache/stock-images", "-type", "f"],
+    { capture: true, allowFailure: true }
+  );
+  assert.equal(
+    remainingCameraFiles.stdout.trim(),
+    "",
+    "İptal edilen kamera çekiminin güvenli geçici dosyası silinmedi."
+  );
+}
+
+async function waitForFocusedPackage(packageName, timeoutMs, message) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (focusedPackage() === packageName) {
+      return;
+    }
+    await delay(300);
+  }
+  throw new Error(`${message} Odak: ${focusedPackage() || "bilinmiyor"}`);
+}
+
+function focusedPackage() {
+  const result = adb(["shell", "dumpsys", "activity", "activities"], { capture: true, allowFailure: true });
+  const match = result.stdout?.match(/(?:topResumedActivity|ResumedActivity|mResumedActivity):?[^\n]*\su\d+\s+([^/\s}]+)/);
+  return match?.[1] ?? "";
 }
 
 function relaunchApp() {
@@ -829,8 +1011,12 @@ async function restoreEmbeddedConnectionAfterTest() {
   }
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
   adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`]);
-  await delay(800);
-  const restoredUrl = readPreferenceValue("web_module_url");
+  const startedAt = Date.now();
+  let restoredUrl = readPreferenceValue("web_module_url");
+  while (restoredUrl === uiTestBaseUrl && Date.now() - startedAt < 8000) {
+    await delay(250);
+    restoredUrl = readPreferenceValue("web_module_url");
+  }
   assert.notEqual(restoredUrl, uiTestBaseUrl);
   assert.equal(new URL(restoredUrl).protocol, "https:");
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
@@ -1073,6 +1259,14 @@ function findBoundsByText(xml, text) {
   return bounds;
 }
 
+function findBoundsByResourceId(xml, resourceId) {
+  const node = flattenUiNodes(parseUiNodes(xml)).find((candidate) => candidate.resourceId === resourceId);
+  if (!node?.bounds) {
+    throw new Error(`UI resource node bulunamadı: ${resourceId}`);
+  }
+  return node.bounds;
+}
+
 function findNotificationGroupExpandBounds(xml, text) {
   const target = findUiNodeByText(xml, text);
   if (!target) {
@@ -1248,6 +1442,22 @@ function findBoundsByTextIfPresent(xml, text) {
   };
 }
 
+function findBoundsByContentDescriptionPrefix(xml, prefix) {
+  const nodes = xml.match(/<node\b[^>]*>/g) ?? [];
+  const escapedPrefix = escapeXmlAttribute(prefix);
+  const node = nodes.find((candidate) => candidate.includes(`content-desc="${escapedPrefix}`));
+  const match = node?.match(/bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  if (!match) {
+    return null;
+  }
+  return {
+    left: Number(match[1]),
+    top: Number(match[2]),
+    right: Number(match[3]),
+    bottom: Number(match[4])
+  };
+}
+
 function centerOf(bounds) {
   return {
     x: Math.trunc((bounds.left + bounds.right) / 2),
@@ -1374,6 +1584,11 @@ function formatOutput(result) {
 }
 
 function cleanup() {
+  adb(["shell", "rm", "-f", stockGalleryDeviceFile], { allowFailure: true });
+  adb(["shell", "am", "force-stop", "com.android.documentsui"], { allowFailure: true });
+  if (focusedPackage() === "net.sourceforge.opencamera") {
+    adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
+  }
   if (phoneTest && phoneTest.exitCode === null) {
     phoneTest.kill();
   }

@@ -33,6 +33,8 @@ try {
       return { ok: true, message, devices };
     };
     window.__openedExternalUrls = [];
+    window.__stockImageAnalysisCalls = [];
+    window.__stockImageApplyCalls = [];
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -59,6 +61,74 @@ try {
         phase: "offline",
         message: "Smoke sync bağlantısına ulaşılamadı."
       }),
+      analyzeStockImage: async (input) => {
+        window.__stockImageAnalysisCalls.push({
+          importId: input.importId,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          byteLength: input.bytes.byteLength
+        });
+        return {
+          ok: true,
+          message: "Görsel analiz edildi. Stoklar değişmeden önce satırları kontrol edin.",
+          importId: input.importId,
+          imageHash: "a".repeat(64),
+          duplicateWarning: true,
+          analysis: {
+            document: {
+              supplier_name: "Smoke Tedarikçi",
+              invoice_number: "FTR-2026-42",
+              invoice_date: "2026-07-22",
+              document_confidence: "high"
+            },
+            lines: [
+              {
+                raw_text: "12 adet Yerel Serpme Kahvaltı",
+                matched_menu_item_id: "item_local_preview",
+                matched_menu_item_name: "Yerel Serpme Kahvaltı",
+                suggested_quantity: 12,
+                source_quantity_text: "12 adet",
+                confidence: "high",
+                needs_review_reason: null
+              },
+              {
+                raw_text: "1 koli bilinmeyen ürün",
+                matched_menu_item_id: null,
+                matched_menu_item_name: null,
+                suggested_quantity: null,
+                source_quantity_text: "1 koli",
+                confidence: "low",
+                needs_review_reason: "Koli adede çevrilemedi."
+              }
+            ]
+          }
+        };
+      },
+      cancelStockImageAnalysis: async () => true,
+      applyStockImageImport: async (input) => {
+        window.__stockImageApplyCalls.push(input);
+        const additions = new Map();
+        for (const line of input.lines) {
+          additions.set(line.menu_item_id, (additions.get(line.menu_item_id) || 0) + line.quantity);
+        }
+        currentDashboardData = {
+          ...currentDashboardData,
+          menu: {
+            ...currentDashboardData.menu,
+            items: currentDashboardData.menu.items.map((item) => additions.has(item.id)
+              ? { ...item, stock_quantity: item.stock_quantity + additions.get(item.id) }
+              : item)
+          }
+        };
+        return {
+          ok: true,
+          message: "2 stok satırı güncellendi.",
+          importId: input.importId,
+          appliedLineCount: input.lines.length,
+          totalQuantity: input.lines.reduce((total, line) => total + line.quantity, 0),
+          dashboardData: currentDashboardData
+        };
+      },
       setAndroidDeviceRole: async (deviceId, role) => mutateDevice(deviceId, (device) => ({
         ...device,
         role,
@@ -226,6 +296,45 @@ try {
   await expect(page.getByRole("heading", { name: "Kategoriler", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ürünler", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ürün Detayı", exact: true })).toBeVisible();
+  const stockImageTrigger = page.getByRole("button", { name: "AI ile Stok Ekle", exact: true });
+  await expect(stockImageTrigger).toBeVisible();
+  await stockImageTrigger.click();
+  const stockImageDialog = page.getByRole("dialog", { name: "AI ile Stok Ekle" });
+  await expect(stockImageDialog).toBeVisible();
+  await expect(stockImageDialog.getByText(/uygulama görseli kalıcı saklamaz/)).toBeVisible();
+  await expect(stockImageDialog.getByRole("button", { name: "Analiz Et" })).toBeDisabled();
+  await stockImageDialog.locator(".stock-image-file-input").setInputFiles({
+    name: "smoke-fatura.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+  });
+  await expect(stockImageDialog.getByAltText("Seçilen fatura veya fiş önizlemesi")).toBeVisible();
+  await stockImageDialog.getByRole("button", { name: "Analiz Et" }).click();
+  await expect(stockImageDialog.getByText("Smoke Tedarikçi", { exact: true })).toBeVisible();
+  await expect(stockImageDialog.locator(".stock-image-row")).toHaveCount(2);
+  await expect(stockImageDialog.getByRole("button", { name: "Stokları Güncelle" })).toBeDisabled();
+  await stockImageDialog.locator(".stock-image-row").nth(1).getByRole("button", { name: "Yok say" }).click();
+  await stockImageDialog.getByRole("button", { name: "Manuel satır ekle" }).click();
+  const manualStockLine = stockImageDialog.locator(".stock-image-row").last();
+  await manualStockLine.locator("select").selectOption("item_local_preview");
+  await manualStockLine.locator("input[type='number']").fill("4");
+  await stockImageDialog.getByRole("checkbox").check();
+  await expect(stockImageDialog.getByRole("button", { name: "Stokları Güncelle" })).toBeEnabled();
+  await page.screenshot({ path: "artifacts/screenshots/desktop-stock-image-review.png", fullPage: true });
+  await stockImageDialog.getByRole("button", { name: "Stokları Güncelle" }).click();
+  await expect(stockImageDialog.getByRole("heading", { name: "Stok girişi tamamlandı" })).toBeVisible();
+  await expect(stockImageDialog.getByText("2 satırda toplam 16 adet stok eklendi.", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__stockImageAnalysisCalls.at(-1)?.mimeType)).toBe("image/jpeg");
+  await expect.poll(() => page.evaluate(() => window.__stockImageApplyCalls.at(-1))).toMatchObject({
+    imageHash: "a".repeat(64),
+    duplicateWarningAcknowledged: true,
+    lines: [
+      { menu_item_id: "item_local_preview", quantity: 12 },
+      { menu_item_id: "item_local_preview", quantity: 4 }
+    ]
+  });
+  await stockImageDialog.getByRole("button", { name: "Kapat", exact: true }).click();
+  await expect(stockImageDialog).toHaveCount(0);
   await expect(page.locator(".menu-list-panel .panel-heading .status-badge")).toHaveText([/\d+ kayıt/, /\d+ kayıt/]);
   await expect(page.locator(".menu-management-grid .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
@@ -1909,6 +2018,10 @@ function createDashboardConversionFixture() {
           is_featured: true,
           allergens: ["süt"],
           tags: ["yerel", "yeni"],
+          stock_quantity: 5,
+          stock_min_quantity: 2,
+          hide_when_out_of_stock: false,
+          stock_note: "Smoke stok takibi",
           sort_order: 10,
           created_at: "2026-07-16T10:00:00+03:00",
           updated_at: "2026-07-16T10:30:00+03:00"
@@ -1925,6 +2038,10 @@ function createDashboardConversionFixture() {
           is_featured: false,
           allergens: [],
           tags: [],
+          stock_quantity: null,
+          stock_min_quantity: null,
+          hide_when_out_of_stock: false,
+          stock_note: "",
           sort_order: 20,
           created_at: "2026-07-16T10:00:00+03:00",
           updated_at: "2026-07-16T10:30:00+03:00"

@@ -8,6 +8,7 @@ export * from "./types/notification";
 export * from "./types/request";
 export * from "./types/reservation";
 export * from "./types/room";
+export * from "./types/stock-image";
 export * from "./types/sync";
 export * from "./types/table";
 export * from "./types/whatsapp";

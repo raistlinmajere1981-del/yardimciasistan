@@ -36,6 +36,17 @@ public final class StockRulesSmoke {
 
     data.permissions.add("menu.stock_update");
     assertTrue(data.hasPermission("menu.stock_update"), "explicit update permission should enable manual stock actions");
+
+    assertEquals(
+        "https://example.test/module/api/stock-image-analysis.php",
+        HostingSyncClient.toStockImageAnalysisEndpoint("https://example.test/module/"),
+        "module root should resolve the stock image endpoint"
+    );
+    assertEquals(
+        "https://example.test/module/api/stock-image-analysis.php",
+        HostingSyncClient.toStockImageAnalysisEndpoint("https://example.test/module/api/sync.php"),
+        "sync endpoint should resolve its sibling stock image endpoint"
+    );
     System.out.println("stock-rules-smoke-ok");
   }
 

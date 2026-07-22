@@ -1,17 +1,18 @@
 package com.yardimciasistan.android;
 
 import android.Manifest;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -28,18 +29,29 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.widget.Button;
+import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.Spinner;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.ComponentActivity;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.core.content.FileProvider;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.net.URLEncoder;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
@@ -49,10 +61,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends ComponentActivity {
   private static final String TAB_TODAY = AndroidUiRules.TAB_TODAY;
   private static final String TAB_CUSTOMERS = AndroidUiRules.TAB_CUSTOMERS;
   private static final String TAB_PENSION = AndroidUiRules.TAB_PENSION;
@@ -98,6 +111,10 @@ public final class MainActivity extends Activity {
   private final Map<String, Integer> screenScrollPositions = new HashMap<>();
   private String renderedScreenKey = "";
   private String currentError = "";
+  private ActivityResultLauncher<Uri> stockCameraLauncher;
+  private ActivityResultLauncher<String[]> stockGalleryLauncher;
+  private Uri pendingStockCameraUri;
+  private File pendingStockCameraFile;
   private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
   private final Runnable foregroundSyncRunnable = new Runnable() {
     @Override
@@ -119,6 +136,7 @@ public final class MainActivity extends Activity {
     themeMode = AppTheme.load(preferences);
     setTheme(themeStyleResource(themeMode));
     super.onCreate(savedInstanceState);
+    registerStockImageLaunchers();
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
@@ -164,6 +182,7 @@ public final class MainActivity extends Activity {
   protected void onDestroy() {
     foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
     executor.shutdownNow();
+    deletePendingStockCameraFile();
     super.onDestroy();
   }
 
@@ -181,6 +200,620 @@ public final class MainActivity extends Activity {
     if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE && localNotifications != null) {
       localNotifications.refreshCurrentSnapshot(data);
     }
+  }
+
+  private void registerStockImageLaunchers() {
+    stockCameraLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture() {
+      @Override
+      public Intent createIntent(Context context, Uri input) {
+        Intent intent = super.createIntent(context, input);
+        PackageManager packageManager = context.getPackageManager();
+        if (intent.resolveActivity(packageManager) != null) {
+          return intent;
+        }
+
+        // Android 11+ may restrict an implicit capture intent to preinstalled
+        // camera apps. Some privacy-focused ROMs ship without one even though
+        // the user has installed a compatible camera. Keep TakePicture's URI
+        // grants, but explicitly select the first visible, enabled handler.
+        for (ApplicationInfo application : packageManager.getInstalledApplications(PackageManager.MATCH_ALL)) {
+          Intent packageIntent = new Intent(intent).setPackage(application.packageName);
+          List<ResolveInfo> handlers = packageManager.queryIntentActivities(
+              packageIntent,
+              PackageManager.MATCH_DEFAULT_ONLY
+          );
+          if (handlers.isEmpty()) {
+            continue;
+          }
+          ResolveInfo handler = handlers.get(0);
+          if (handler.activityInfo == null || !handler.activityInfo.enabled || !handler.activityInfo.exported) {
+            continue;
+          }
+          intent.setComponent(new ComponentName(handler.activityInfo.packageName, handler.activityInfo.name));
+          return intent;
+        }
+        return intent;
+      }
+    }, success -> {
+      Uri resultUri = pendingStockCameraUri;
+      if (Boolean.TRUE.equals(success) && resultUri != null) {
+        showStockImagePreviewDialog(resultUri);
+      } else {
+        deletePendingStockCameraFile();
+        Toast.makeText(this, "Fotoğraf çekimi tamamlanmadı.", Toast.LENGTH_SHORT).show();
+      }
+      pendingStockCameraUri = null;
+    });
+    stockGalleryLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+      if (uri == null) {
+        return;
+      }
+      try {
+        getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+      } catch (SecurityException ignored) {
+        // The picker grant remains valid for the immediate analysis flow.
+      }
+      showStockImagePreviewDialog(uri);
+    });
+  }
+
+  private void launchStockCamera() {
+    if (!data.hasPermission("menu.stock_update")) {
+      showError("Bu cihazın stok güncelleme yetkisi yok.");
+      return;
+    }
+    try {
+      deletePendingStockCameraFile();
+      File directory = new File(getCacheDir(), "stock-images");
+      if ((!directory.isDirectory() && !directory.mkdirs()) || !directory.isDirectory()) {
+        throw new IllegalStateException("cache_missing");
+      }
+      pendingStockCameraFile = File.createTempFile("camera-", ".jpg", directory);
+      pendingStockCameraUri = FileProvider.getUriForFile(
+          this,
+          getPackageName() + ".fileprovider",
+          pendingStockCameraFile
+      );
+      stockCameraLauncher.launch(pendingStockCameraUri);
+    } catch (ActivityNotFoundException error) {
+      deletePendingStockCameraFile();
+      showError("Sistem kamera uygulaması bulunamadı. Galeriden görsel seçebilirsiniz.");
+    } catch (Exception error) {
+      deletePendingStockCameraFile();
+      showError("Kamera için güvenli geçici dosya hazırlanamadı.");
+    }
+  }
+
+  private void launchStockGallery() {
+    if (!data.hasPermission("menu.stock_update")) {
+      showError("Bu cihazın stok güncelleme yetkisi yok.");
+      return;
+    }
+    try {
+      stockGalleryLauncher.launch(new String[] {"image/jpeg", "image/png", "image/webp"});
+    } catch (ActivityNotFoundException error) {
+      showError("Sistem fotoğraf seçicisi açılamadı.");
+    }
+  }
+
+  private void deletePendingStockCameraFile() {
+    if (pendingStockCameraFile != null && pendingStockCameraFile.isFile()) {
+      pendingStockCameraFile.delete();
+    }
+    pendingStockCameraFile = null;
+  }
+
+  private void showStockImagePreviewDialog(Uri sourceUri) {
+    Dialog dialog = new Dialog(this);
+    dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+    LinearLayout root = UiKit.column(this);
+    root.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 16));
+    root.setBackgroundColor(UiKit.BG);
+
+    LinearLayout header = UiKit.row(this);
+    LinearLayout heading = UiKit.column(this);
+    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    heading.addView(UiKit.eyebrow(this, "AI DESTEKLİ STOK GİRİŞİ"));
+    heading.addView(UiKit.title(this, "Görseli kontrol et"));
+    header.addView(heading);
+    Button close = UiKit.iconButton(this, "×", "Görsel ekranını kapat", false, view -> dialog.dismiss());
+    header.addView(close, new LinearLayout.LayoutParams(UiKit.dp(this, 44), UiKit.dp(this, 44)));
+    root.addView(header);
+
+    TextView status = UiKit.text(this, "Görsel hazırlanıyor…", 13, UiKit.MUTED, Typeface.BOLD);
+    LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+    statusParams.setMargins(0, UiKit.dp(this, 8), 0, UiKit.dp(this, 8));
+    status.setLayoutParams(statusParams);
+    root.addView(status);
+
+    ImageView preview = new ImageView(this);
+    preview.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+    preview.setAdjustViewBounds(true);
+    preview.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 14));
+    preview.setContentDescription("Seçilen fatura veya fiş önizlemesi");
+    LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(-1, 0, 1f);
+    previewParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+    preview.setLayoutParams(previewParams);
+    root.addView(preview);
+
+    final StockImageFile.PreparedImage[] prepared = {null};
+    final int[] rotation = {0};
+    final boolean[] analyzing = {false};
+
+    LinearLayout imageActions = UiKit.row(this);
+    Button retake = UiKit.outlineButton(this, "Yeniden çek", view -> {
+      dialog.dismiss();
+      launchStockCamera();
+    });
+    Button reselect = UiKit.outlineButton(this, "Başka görsel seç", view -> {
+      dialog.dismiss();
+      launchStockGallery();
+    });
+    Button rotate = UiKit.outlineButton(this, "90° döndür", view -> {
+      rotation[0] = (rotation[0] + 90) % 360;
+      preview.setRotation(rotation[0]);
+    });
+    retake.setEnabled(false);
+    reselect.setEnabled(false);
+    rotate.setEnabled(false);
+    UiKit.addAction(imageActions, retake, this);
+    UiKit.addAction(imageActions, reselect, this);
+    UiKit.addAction(imageActions, rotate, this);
+    root.addView(imageActions);
+
+    TextView privacy = UiKit.text(this,
+        "Görsel analiz için işletmenin yapılandırdığı AI sağlayıcısına gönderilir; uygulamada kalıcı saklanmaz.",
+        11,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    );
+    LinearLayout.LayoutParams privacyParams = new LinearLayout.LayoutParams(-1, -2);
+    privacyParams.setMargins(0, UiKit.dp(this, 9), 0, UiKit.dp(this, 9));
+    privacy.setLayoutParams(privacyParams);
+    root.addView(privacy);
+
+    final Button[] analyze = {null};
+    analyze[0] = UiKit.button(this, "Analiz Et", UiKit.PRIMARY, view -> {
+      if (prepared[0] == null || analyzing[0]) {
+        return;
+      }
+      String baseUrl = ConnectionSettings.webModuleUrl(preferences);
+      String syncSecret = ConnectionSettings.syncSecret(preferences);
+      if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
+        status.setText("Görsel analizi için bağlantı ayarlarını tamamlayın.");
+        status.setTextColor(UiKit.DANGER);
+        return;
+      }
+      JSONArray candidates = stockImageCandidatesJson();
+      if (candidates.length() == 0) {
+        status.setText("Stok takip edilen menü ürünü bulunamadı.");
+        status.setTextColor(UiKit.DANGER);
+        return;
+      }
+      analyzing[0] = true;
+      dialog.setCancelable(false);
+      close.setEnabled(false);
+      analyze[0].setEnabled(false);
+      retake.setEnabled(false);
+      reselect.setEnabled(false);
+      rotate.setEnabled(false);
+      status.setText("Görsel analiz ediliyor; stoklar henüz değişmiyor…");
+      status.setTextColor(UiKit.INFO);
+      String importId = "stock_import_android_" + UUID.randomUUID().toString().replace("-", "");
+      StockImageFile.PreparedImage baseImage = prepared[0];
+      executor.execute(() -> {
+        StockImageFile.PreparedImage upload = null;
+        try {
+          upload = StockImageFile.rotatedCopy(this, baseImage, rotation[0]);
+          HostingSyncClient.StockImageAnalysisResult result = syncClient.analyzeStockImage(
+              baseUrl,
+              syncSecret,
+              identity,
+              importId,
+              upload,
+              candidates
+          );
+          boolean duplicate = data.appliedStockImageHashes.contains(result.imageHash);
+          runOnUiThread(() -> {
+            if (!dialog.isShowing()) {
+              return;
+            }
+            dialog.dismiss();
+            showStockImageReviewDialog(result, duplicate);
+          });
+        } catch (HostingSyncClient.SyncException | StockImageFile.StockImageException error) {
+          runOnUiThread(() -> {
+            if (!dialog.isShowing()) {
+              return;
+            }
+            analyzing[0] = false;
+            dialog.setCancelable(true);
+            close.setEnabled(true);
+            analyze[0].setEnabled(true);
+            retake.setEnabled(true);
+            reselect.setEnabled(true);
+            rotate.setEnabled(true);
+            status.setText(error.getMessage());
+            status.setTextColor(UiKit.DANGER);
+          });
+        } finally {
+          if (upload != null && upload != baseImage) {
+            upload.release();
+          }
+        }
+      });
+    });
+    analyze[0].setEnabled(false);
+    root.addView(analyze[0], new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48)));
+
+    dialog.setOnDismissListener(value -> {
+      if (prepared[0] != null) {
+        preview.setImageDrawable(null);
+        prepared[0].release();
+        prepared[0] = null;
+      }
+    });
+    dialog.setContentView(root);
+    dialog.show();
+    configureFullDialog(dialog);
+
+    executor.execute(() -> {
+      try {
+        StockImageFile.PreparedImage ready = StockImageFile.prepare(this, sourceUri);
+        deletePendingStockCameraFile();
+        runOnUiThread(() -> {
+          if (!dialog.isShowing()) {
+            ready.release();
+            return;
+          }
+          prepared[0] = ready;
+          preview.setImageBitmap(ready.preview);
+          status.setText("Görsel hazır. Gerekirse döndürüp analizi başlatın.");
+          status.setTextColor(UiKit.SUCCESS);
+          analyze[0].setEnabled(true);
+          retake.setEnabled(true);
+          reselect.setEnabled(true);
+          rotate.setEnabled(true);
+        });
+      } catch (StockImageFile.StockImageException error) {
+        deletePendingStockCameraFile();
+        runOnUiThread(() -> {
+          if (!dialog.isShowing()) {
+            return;
+          }
+          status.setText(error.getMessage());
+          status.setTextColor(UiKit.DANGER);
+          retake.setEnabled(true);
+          reselect.setEnabled(true);
+        });
+      }
+    });
+  }
+
+  private JSONArray stockImageCandidatesJson() {
+    JSONArray candidates = new JSONArray();
+    for (OperationData.TrackedStockItem item : data.trackedStockItems) {
+      try {
+        JSONObject candidate = new JSONObject();
+        candidate.put("id", item.menuItemId);
+        candidate.put("name", item.name);
+        candidate.put("category", item.category);
+        candidate.put("current_stock", item.stockQuantity);
+        candidates.put(candidate);
+      } catch (Exception ignored) {
+        // Snapshot values are primitives; a malformed row is omitted safely.
+      }
+    }
+    return candidates;
+  }
+
+  private void showStockImageReviewDialog(HostingSyncClient.StockImageAnalysisResult result, boolean duplicate) {
+    List<StockImageReviewLine> lines = parseStockImageReviewLines(result.analysis);
+    Dialog dialog = new Dialog(this);
+    dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+    LinearLayout root = UiKit.column(this);
+    root.setBackgroundColor(UiKit.BG);
+
+    LinearLayout header = UiKit.row(this);
+    header.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 12), UiKit.dp(this, 12), UiKit.dp(this, 8));
+    LinearLayout heading = UiKit.column(this);
+    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    heading.addView(UiKit.eyebrow(this, "EŞLEŞMELERİ KONTROL ET"));
+    heading.addView(UiKit.title(this, "Stok taslağı"));
+    header.addView(heading);
+    header.addView(UiKit.iconButton(this, "×", "Stok taslağını kapat", false, view -> dialog.dismiss()),
+        new LinearLayout.LayoutParams(UiKit.dp(this, 44), UiKit.dp(this, 44)));
+    root.addView(header);
+
+    LinearLayout content = UiKit.column(this);
+    JSONObject document = result.analysis.optJSONObject("document");
+    LinearLayout documentCard = UiKit.card(this);
+    documentCard.addView(UiKit.text(this, "Belge bilgisi", 15, UiKit.TEXT, Typeface.BOLD));
+    documentCard.addView(UiKit.text(this,
+        "Tedarikçi: " + stockImageDocumentValue(document, "supplier_name")
+            + "\nBelge no: " + stockImageDocumentValue(document, "invoice_number")
+            + " · Tarih: " + stockImageDocumentValue(document, "invoice_date"),
+        12,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+    content.addView(documentCard);
+
+    TextView analysisMessage = UiKit.text(this, result.message, 12, UiKit.INFO, Typeface.BOLD);
+    LinearLayout.LayoutParams analysisMessageParams = new LinearLayout.LayoutParams(-1, -2);
+    analysisMessageParams.setMargins(0, 0, 0, UiKit.dp(this, 9));
+    analysisMessage.setLayoutParams(analysisMessageParams);
+    content.addView(analysisMessage);
+
+    CheckBox duplicateApproval = new CheckBox(this);
+    duplicateApproval.setTextColor(UiKit.WARNING);
+    duplicateApproval.setTextSize(12);
+    duplicateApproval.setVisibility(duplicate ? View.VISIBLE : View.GONE);
+    boolean canOverrideDuplicate = "admin".equals(data.deviceRole);
+    if (duplicate) {
+      duplicateApproval.setText(canOverrideDuplicate
+          ? "Bu görsel daha önce kullanılmış olabilir. Yönetici olarak yine de uygulamak istiyorum."
+          : "Bu görsel daha önce kullanılmış olabilir. Yeniden uygulamak için yönetici gerekir.");
+      duplicateApproval.setEnabled(canOverrideDuplicate);
+      LinearLayout.LayoutParams duplicateParams = new LinearLayout.LayoutParams(-1, -2);
+      duplicateParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+      duplicateApproval.setLayoutParams(duplicateParams);
+      content.addView(duplicateApproval);
+    }
+
+    content.addView(UiKit.sectionTitle(this, "Okunan satırlar"));
+    TextView summary = UiKit.text(this, "", 13, UiKit.TEXT, Typeface.BOLD);
+    Button apply = UiKit.button(this, "Stokları Güncelle", UiKit.PRIMARY, view -> {});
+    final Runnable[] refreshSummary = {null};
+    if (lines.isEmpty()) {
+      content.addView(emptyCard("Eşleşen satır bulunamadı", "Görseli yeniden deneyin veya mevcut manuel stok güncelleme düğmelerini kullanın."));
+    }
+    for (StockImageReviewLine line : lines) {
+      content.addView(stockImageReviewCard(line, refreshSummary));
+    }
+
+    ScrollView scroll = UiKit.scroll(this, content, 18);
+    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
+    root.addView(scroll);
+
+    LinearLayout bottom = UiKit.column(this);
+    bottom.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 10), UiKit.dp(this, 16), UiKit.dp(this, 14));
+    bottom.setBackground(UiKit.rounded(this, UiKit.SURFACE_ALT, UiKit.BORDER, 0));
+    bottom.addView(summary);
+    LinearLayout bottomActions = UiKit.row(this);
+    LinearLayout.LayoutParams bottomActionsParams = new LinearLayout.LayoutParams(-1, -2);
+    bottomActionsParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    bottomActions.setLayoutParams(bottomActionsParams);
+    UiKit.addAction(bottomActions, UiKit.outlineButton(this, "Vazgeç", view -> dialog.dismiss()), this);
+    UiKit.addAction(bottomActions, apply, this);
+    bottom.addView(bottomActions);
+    root.addView(bottom);
+
+    refreshSummary[0] = () -> {
+      int valid = 0;
+      int total = 0;
+      int review = 0;
+      for (StockImageReviewLine line : lines) {
+        if (line.ignored) {
+          continue;
+        }
+        int quantity = line.quantity();
+        if (!line.menuItemId.isEmpty() && quantity > 0) {
+          valid += 1;
+          total += quantity;
+        } else {
+          review += 1;
+        }
+      }
+      summary.setText(valid + " satır · " + total + " adet · " + review + " kontrol gerekli");
+      apply.setEnabled(valid > 0 && (!duplicate || (canOverrideDuplicate && duplicateApproval.isChecked())));
+    };
+    duplicateApproval.setOnCheckedChangeListener((button, checked) -> refreshSummary[0].run());
+    apply.setOnClickListener(view -> {
+      JSONArray approvedLines = new JSONArray();
+      for (StockImageReviewLine line : lines) {
+        int quantity = line.quantity();
+        if (line.ignored || line.menuItemId.isEmpty() || quantity <= 0) {
+          continue;
+        }
+        try {
+          JSONObject approved = new JSONObject();
+          approved.put("menu_item_id", line.menuItemId);
+          approved.put("quantity", quantity);
+          approved.put("raw_text", line.rawText);
+          approved.put("confidence", line.confidence);
+          approvedLines.put(approved);
+        } catch (Exception ignored) {
+          // Primitive review values are safe; an unencodable row is not applied.
+        }
+      }
+      if (approvedLines.length() == 0) {
+        Toast.makeText(this, "Miktarlar kontrol edilmeli.", Toast.LENGTH_SHORT).show();
+        return;
+      }
+      JSONObject actionPayload = payload(
+          "import_id", result.importId,
+          "image_hash", result.imageHash,
+          "duplicate_warning_acknowledged", duplicate && duplicateApproval.isChecked(),
+          "lines", approvedLines
+      );
+      dialog.dismiss();
+      sendAction(
+          "menu_stock_image_import_apply",
+          actionPayload,
+          "Onaylanan stok girişi action queue üzerinden masaüstüne gönderildi."
+      );
+    });
+    refreshSummary[0].run();
+
+    dialog.setContentView(root);
+    dialog.show();
+    configureFullDialog(dialog);
+  }
+
+  private View stockImageReviewCard(StockImageReviewLine line, Runnable[] refreshSummary) {
+    LinearLayout card = UiKit.card(this);
+    TextView raw = UiKit.text(this, line.rawText, 14, UiKit.TEXT, Typeface.BOLD);
+    card.addView(raw);
+    if (!line.reason.isEmpty()) {
+      TextView reason = UiKit.text(this, line.reason, 11, UiKit.WARNING, Typeface.NORMAL);
+      LinearLayout.LayoutParams reasonParams = new LinearLayout.LayoutParams(-1, -2);
+      reasonParams.setMargins(0, UiKit.dp(this, 3), 0, UiKit.dp(this, 7));
+      reason.setLayoutParams(reasonParams);
+      card.addView(reason);
+    }
+
+    TextView itemLabel = UiKit.text(this, "Menü karşılığı", 11, UiKit.MUTED, Typeface.BOLD);
+    card.addView(itemLabel);
+    ArrayList<String> labels = new ArrayList<>();
+    labels.add("Eşleşme yok");
+    int selectedIndex = 0;
+    for (int index = 0; index < data.trackedStockItems.size(); index += 1) {
+      OperationData.TrackedStockItem item = data.trackedStockItems.get(index);
+      labels.add(item.name + " · " + item.category);
+      if (item.menuItemId.equals(line.menuItemId)) {
+        selectedIndex = index + 1;
+      }
+    }
+    Spinner itemSelect = new Spinner(this);
+    ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, labels);
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    itemSelect.setAdapter(adapter);
+    itemSelect.setSelection(selectedIndex);
+    itemSelect.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 10));
+    itemSelect.setPadding(UiKit.dp(this, 8), 0, UiKit.dp(this, 8), 0);
+    itemSelect.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48)));
+    itemSelect.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+      @Override
+      public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+        line.menuItemId = position <= 0 ? "" : data.trackedStockItems.get(position - 1).menuItemId;
+        if (refreshSummary[0] != null) {
+          refreshSummary[0].run();
+        }
+      }
+
+      @Override
+      public void onNothingSelected(android.widget.AdapterView<?> parent) {
+        line.menuItemId = "";
+        if (refreshSummary[0] != null) {
+          refreshSummary[0].run();
+        }
+      }
+    });
+    card.addView(itemSelect);
+
+    LinearLayout quantityRow = UiKit.row(this);
+    LinearLayout.LayoutParams quantityRowParams = new LinearLayout.LayoutParams(-1, -2);
+    quantityRowParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    quantityRow.setLayoutParams(quantityRowParams);
+    EditText quantity = UiKit.input(this, "Eklenecek adet");
+    quantity.setInputType(InputType.TYPE_CLASS_NUMBER);
+    quantity.setText(line.quantityText);
+    quantity.setLayoutParams(new LinearLayout.LayoutParams(0, UiKit.dp(this, 48), 1f));
+    quantity.addTextChangedListener(new TextWatcher() {
+      @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+      @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
+        line.quantityText = value == null ? "" : value.toString();
+        if (refreshSummary[0] != null) {
+          refreshSummary[0].run();
+        }
+      }
+      @Override public void afterTextChanged(Editable value) {}
+    });
+    quantityRow.addView(quantity);
+    TextView confidence = statusBadge(stockImageConfidenceLabel(line.confidence), stockImageConfidenceTone(line.confidence));
+    LinearLayout.LayoutParams confidenceParams = new LinearLayout.LayoutParams(-2, -2);
+    confidenceParams.setMargins(UiKit.dp(this, 8), 0, 0, 0);
+    confidence.setLayoutParams(confidenceParams);
+    quantityRow.addView(confidence);
+    card.addView(quantityRow);
+
+    Button remove = UiKit.outlineButton(this, "Kaldır", view -> {
+      line.ignored = !line.ignored;
+      itemSelect.setEnabled(!line.ignored);
+      quantity.setEnabled(!line.ignored);
+      raw.setAlpha(line.ignored ? 0.5f : 1f);
+      ((Button) view).setText(line.ignored ? "Geri al" : "Kaldır");
+      if (refreshSummary[0] != null) {
+        refreshSummary[0].run();
+      }
+    });
+    LinearLayout.LayoutParams removeParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 42));
+    removeParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    remove.setLayoutParams(removeParams);
+    card.addView(remove);
+    return card;
+  }
+
+  private List<StockImageReviewLine> parseStockImageReviewLines(JSONObject analysis) {
+    ArrayList<StockImageReviewLine> lines = new ArrayList<>();
+    JSONArray sourceLines = analysis.optJSONArray("lines");
+    if (sourceLines == null) {
+      return lines;
+    }
+    for (int index = 0; index < sourceLines.length() && lines.size() < 200; index += 1) {
+      JSONObject source = sourceLines.optJSONObject(index);
+      if (source == null) {
+        continue;
+      }
+      String rawText = source.optString("raw_text", "").trim();
+      if (rawText.isEmpty()) {
+        continue;
+      }
+      String menuItemId = source.optString("matched_menu_item_id", "").trim();
+      if (!isTrackedStockItem(menuItemId)) {
+        menuItemId = "";
+      }
+      String quantity = "";
+      Object suggested = source.opt("suggested_quantity");
+      if (suggested instanceof Number) {
+        double value = ((Number) suggested).doubleValue();
+        if (value == Math.rint(value) && value > 0 && value <= 100000) {
+          quantity = String.valueOf((int) value);
+        }
+      }
+      String confidence = source.optString("confidence", "low");
+      if (!"high".equals(confidence) && !"medium".equals(confidence)) {
+        confidence = "low";
+      }
+      lines.add(new StockImageReviewLine(
+          rawText,
+          menuItemId,
+          quantity,
+          confidence,
+          source.optString("needs_review_reason", "").trim()
+      ));
+    }
+    return lines;
+  }
+
+  private boolean isTrackedStockItem(String menuItemId) {
+    for (OperationData.TrackedStockItem item : data.trackedStockItems) {
+      if (item.menuItemId.equals(menuItemId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private String stockImageDocumentValue(JSONObject document, String field) {
+    if (document == null) {
+      return "Okunamadı";
+    }
+    String value = document.optString(field, "").trim();
+    return value.isEmpty() ? "Okunamadı" : value;
+  }
+
+  private String stockImageConfidenceLabel(String confidence) {
+    if ("high".equals(confidence)) return "Yüksek";
+    if ("medium".equals(confidence)) return "Orta";
+    return "Düşük";
+  }
+
+  private int stockImageConfidenceTone(String confidence) {
+    if ("high".equals(confidence)) return UiKit.SUCCESS;
+    if ("medium".equals(confidence)) return UiKit.WARNING;
+    return UiKit.DANGER;
   }
 
   @Override
@@ -864,6 +1497,9 @@ public final class MainActivity extends Activity {
         }
       }
     } else {
+      if (data.hasPermission("menu.stock_update")) {
+        page.addView(stockImageImportCard());
+      }
       page.addView(statusStrip(new CounterValue[] {
           new CounterValue("Stok yok", countStockByStatus("out_of_stock"), UiKit.DANGER, ""),
           new CounterValue("Az stok", countStockByStatus("low_stock"), UiKit.WARNING, ""),
@@ -1430,6 +2066,22 @@ public final class MainActivity extends Activity {
       update.setLayoutParams(params);
       card.addView(update);
     }
+    return card;
+  }
+
+  private View stockImageImportCard() {
+    LinearLayout card = UiKit.card(this);
+    card.setBackground(UiKit.rounded(this, UiKit.PRIMARY_DARK, UiKit.PRIMARY, 14));
+    card.addView(UiKit.eyebrow(this, "AI DESTEKLİ STOK GİRİŞİ"));
+    card.addView(UiKit.text(this, "Fatura veya fiş görselini kontrol edilebilir bir stok taslağına dönüştürün.", 13, UiKit.TEXT, Typeface.BOLD));
+    card.addView(UiKit.text(this, "Stoklar siz onaylamadan değişmez. Görsel analiz için yapılandırılmış AI hizmetine gönderilir ve kalıcı saklanmaz.", 12, UiKit.MUTED, Typeface.NORMAL));
+    LinearLayout actions = UiKit.row(this);
+    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
+    actionParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
+    actions.setLayoutParams(actionParams);
+    UiKit.addAction(actions, UiKit.button(this, "Kamera ile çek", UiKit.PRIMARY, view -> launchStockCamera()), this);
+    UiKit.addAction(actions, UiKit.outlineButton(this, "Galeriden seç", view -> launchStockGallery()), this);
+    card.addView(actions);
     return card;
   }
 
@@ -2624,6 +3276,7 @@ public final class MainActivity extends Activity {
       case "menu_stock_add":
       case "menu_stock_set":
       case "menu_stock_adjust":
+      case "menu_stock_image_import_apply":
         return "menu.stock_update";
       case "table_order_set_status":
         String status = actionPayload.optString("status", "");
@@ -3180,6 +3833,38 @@ public final class MainActivity extends Activity {
       this.id = ActionOutbox.createActionId();
       this.type = type;
       this.payload = payload;
+    }
+  }
+
+  private static final class StockImageReviewLine {
+    final String rawText;
+    String menuItemId;
+    String quantityText;
+    final String confidence;
+    final String reason;
+    boolean ignored;
+
+    StockImageReviewLine(
+        String rawText,
+        String menuItemId,
+        String quantityText,
+        String confidence,
+        String reason
+    ) {
+      this.rawText = rawText;
+      this.menuItemId = menuItemId;
+      this.quantityText = quantityText;
+      this.confidence = confidence;
+      this.reason = reason;
+    }
+
+    int quantity() {
+      try {
+        int value = Integer.parseInt(quantityText.trim());
+        return value > 0 && value <= 100000 ? value : 0;
+      } catch (Exception ignored) {
+        return 0;
+      }
     }
   }
 }

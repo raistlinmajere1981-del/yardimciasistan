@@ -45,6 +45,7 @@ Bu iskelet şu parçaları içerir:
 - SQLite için ilk migration ve demo seed SQL dosyaları.
 - Talepler, müşteriler, basit raporlar, günlük işler, odalar, masalar ve rezervasyonlar için yan menüden açılan günlük yönetim ekranları, manuel talep oluşturma formu ve local status update IPC akışları.
 - QR menü kategori/ürün yönetimi, local SQLite kaydı ve web modülüne yayınlama akışı.
+- Menü ekranında webcam veya JPG/PNG/WebP dosyasından çalışan `AI ile Stok Ekle` akışı. Görsel döndürülüp analiz edildikten sonra yalnız stok takibi açık ürünler için öneri taslağı gösterilir; kullanıcı satırları düzenlemeden ve açıkça onaylamadan stok değişmez. Uygulama görseli kalıcı saklamaz, yalnız SHA-256 özeti ve onay/audit kayıtlarını tutar.
 - WhatsApp WebView çalışma ekranı, müşteri numarasına gitme ve manuel hazır mesaj kopyalama akışı.
 - AI Yardımcı çalışma alanında seçili talep için düzenlenebilir cevap taslağı ve özet, günlük operasyon değerlendirmesi, ek talimat, yerel çalışma geçmişi, talebe kaydetme ve WhatsApp'a hazırlama akışları.
 - İlk kurulum sihirbazı, uygulama veri klasörü altında SQLite dosyası ve ana panelden manuel `backups/` yedeği alma akışı.

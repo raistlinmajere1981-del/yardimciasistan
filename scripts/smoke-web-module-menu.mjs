@@ -237,6 +237,7 @@ try {
             stock_status: "out_of_stock"
           }
         ],
+        appliedStockImageHashes: ["A".repeat(64), "invalid-hash", "a".repeat(64)],
         table_orders: [],
         messages: [],
         androidPermissions: {
@@ -272,12 +273,13 @@ try {
       stock_status: "out_of_stock"
     }
   ]);
+  expect(androidStockSummary.appliedStockImageHashes).toEqual(["a".repeat(64)]);
   expect(androidStockSummary.androidPermissions["android-stock-web-smoke"].permissions).toEqual([
     "menu.stock_view",
     "menu.stock_update"
   ]);
 
-  for (const [index, actionType] of ["menu_stock_add", "menu_stock_set", "menu_stock_adjust"].entries()) {
+  for (const [index, actionType] of ["menu_stock_add", "menu_stock_set", "menu_stock_adjust", "menu_stock_image_import_apply"].entries()) {
     const enqueueStockAction = await page.request.post(`${baseUrl}/api/sync.php`, {
       data: {
         action: "enqueue_android_action",
@@ -285,7 +287,13 @@ try {
         action_id: `android_stock_action_${index}_0001`,
         action_type: actionType,
         device_id: "android-stock-web-smoke",
-        payload: { menu_item_id: "item_stock_snapshot_001", quantity: 1, quantity_change: 1, note: "Smoke" }
+        payload: actionType === "menu_stock_image_import_apply"
+          ? {
+              import_id: "stock_import_web_queue_0001",
+              image_hash: "b".repeat(64),
+              lines: [{ menu_item_id: "item_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
+            }
+          : { menu_item_id: "item_stock_snapshot_001", quantity: 1, quantity_change: 1, note: "Smoke" }
       }
     });
     expect(enqueueStockAction.ok()).toBe(true);

@@ -1,14 +1,18 @@
 package com.yardimciasistan.android;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+
 final class HostingSyncClient {
   private static final int CONNECT_TIMEOUT_MS = 12000;
   private static final int READ_TIMEOUT_MS = 18000;
@@ -64,6 +68,96 @@ final class HostingSyncClient {
       throw new SyncException("İşlem gönderildi ancak bekleme kaydı alınamadı.");
     }
     return OperationData.ActionRecord.fromJson(action);
+  }
+
+  StockImageAnalysisResult analyzeStockImage(
+      String baseUrl,
+      String syncSecret,
+      DeviceIdentity identity,
+      String importId,
+      StockImageFile.PreparedImage image,
+      JSONArray menuItems
+  ) throws SyncException {
+    HttpURLConnection connection = null;
+    String boundary = "----YardimciAsistanStockImage" + System.currentTimeMillis();
+    try {
+      URL endpoint = new URL(toStockImageAnalysisEndpoint(baseUrl));
+      connection = (HttpURLConnection) endpoint.openConnection();
+      connection.setRequestMethod("POST");
+      connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+      connection.setReadTimeout(90_000);
+      connection.setDoOutput(true);
+      connection.setChunkedStreamingMode(16 * 1024);
+      connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+      connection.setRequestProperty("Accept", "application/json");
+      connection.setRequestProperty("X-YA-Sync-Secret", syncSecret);
+
+      try (DataOutputStream output = new DataOutputStream(connection.getOutputStream())) {
+        writeMultipartField(output, boundary, "source", "android");
+        writeMultipartField(output, boundary, "device_id", identity.deviceId);
+        writeMultipartField(output, boundary, "import_id", importId);
+        writeMultipartField(output, boundary, "image_hash", image.imageHash);
+        writeMultipartField(output, boundary, "menu_items", menuItems.toString());
+        output.writeBytes("--" + boundary + "\r\n");
+        output.writeBytes("Content-Disposition: form-data; name=\"image\"; filename=\"stock-document.jpg\"\r\n");
+        output.writeBytes("Content-Type: " + image.mimeType + "\r\n\r\n");
+        byte[] buffer = new byte[16 * 1024];
+        try (FileInputStream input = new FileInputStream(image.file)) {
+          int read;
+          while ((read = input.read(buffer)) != -1) {
+            output.write(buffer, 0, read);
+          }
+        }
+        output.writeBytes("\r\n--" + boundary + "--\r\n");
+        output.flush();
+      }
+
+      int status = connection.getResponseCode();
+      InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+      String responseText = readAll(stream);
+      JSONObject response;
+      try {
+        response = new JSONObject(responseText);
+      } catch (Exception error) {
+        throw new SyncException(status == 404
+            ? "Web modülü görsel analizini desteklemiyor. Hosting paketini güncelleyin."
+            : "Görsel analiz hizmeti geçerli bir yanıt vermedi.", error);
+      }
+      if (status == 401) {
+        throw new SyncException("Güvenlik anahtarı hatalı. Ayarlar ekranından kontrol edin.");
+      }
+      if (status == 403) {
+        throw new SyncException("Bu cihazın stok güncelleme yetkisi yok.");
+      }
+      if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
+        String message = response.optString("message", "").trim();
+        throw new SyncException(message.isEmpty() ? "Görsel analiz edilemedi." : message);
+      }
+      JSONObject analysis = response.optJSONObject("analysis");
+      String responseImportId = response.optString("import_id", "").trim();
+      String responseHash = response.optString("image_hash", "").trim().toLowerCase(java.util.Locale.US);
+      if (analysis == null || !importId.equals(responseImportId) || !image.imageHash.equals(responseHash)) {
+        throw new SyncException("Görsel analiz cevabı doğrulanamadı.");
+      }
+      return new StockImageAnalysisResult(
+          responseImportId,
+          responseHash,
+          response.optString("message", "Görsel analiz edildi."),
+          analysis
+      );
+    } catch (SyncException error) {
+      throw error;
+    } catch (java.net.SocketTimeoutException error) {
+      throw new SyncException("AI görsel analizi zaman aşımına uğradı.", error);
+    } catch (java.net.UnknownHostException error) {
+      throw new SyncException("Görsel analiz hizmetine ulaşılamadı. İnternet bağlantısını kontrol edin.", error);
+    } catch (Exception error) {
+      throw new SyncException("Görsel analiz hizmetine bağlanılamadı.", error);
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
   }
 
   private JSONObject post(String baseUrl, String syncSecret, JSONObject payload) throws SyncException {
@@ -134,6 +228,22 @@ final class HostingSyncClient {
     return normalized + "/api/sync.php";
   }
 
+  static String toStockImageAnalysisEndpoint(String baseUrl) {
+    String normalized = baseUrl == null ? "" : baseUrl.trim();
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    normalized = normalized.replaceFirst("/(?:api/)?sync\\.php$", "");
+    return normalized + "/api/stock-image-analysis.php";
+  }
+
+  private static void writeMultipartField(DataOutputStream output, String boundary, String name, String value) throws Exception {
+    output.writeBytes("--" + boundary + "\r\n");
+    output.writeBytes("Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n");
+    output.write(value.getBytes(StandardCharsets.UTF_8));
+    output.writeBytes("\r\n");
+  }
+
   private static String readAll(InputStream stream) throws Exception {
     if (stream == null) {
       return "";
@@ -169,6 +279,20 @@ final class HostingSyncClient {
       this.serverRevision = serverRevision;
       this.data = data;
       this.payload = payload;
+    }
+  }
+
+  static final class StockImageAnalysisResult {
+    final String importId;
+    final String imageHash;
+    final String message;
+    final JSONObject analysis;
+
+    StockImageAnalysisResult(String importId, String imageHash, String message, JSONObject analysis) {
+      this.importId = importId;
+      this.imageHash = imageHash;
+      this.message = message;
+      this.analysis = analysis;
     }
   }
 }

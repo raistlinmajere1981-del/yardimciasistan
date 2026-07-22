@@ -102,6 +102,7 @@ final class OperationData {
   final List<MenuCategory> categories = new ArrayList<>();
   final List<MenuItem> menuItems = new ArrayList<>();
   final List<TrackedStockItem> trackedStockItems = new ArrayList<>();
+  final Set<String> appliedStockImageHashes = new HashSet<>();
   final List<TableOrder> tableOrders = new ArrayList<>();
   final List<MessageRecord> messages = new ArrayList<>();
   final List<ActionRecord> actions = new ArrayList<>();
@@ -149,6 +150,13 @@ final class OperationData {
     addRecords(array(root, "daily_tasks"), data.tasks, TaskRecord::fromJson);
     addRecords(array(root, "table_orders"), data.tableOrders, TableOrder::fromJson);
     addRecords(array(root, "trackedStockItems"), data.trackedStockItems, TrackedStockItem::fromJson);
+    JSONArray appliedHashes = array(root, "appliedStockImageHashes");
+    for (int index = 0; index < appliedHashes.length(); index += 1) {
+      String hash = appliedHashes.optString(index, "").trim().toLowerCase(java.util.Locale.US);
+      if (hash.matches("[a-f0-9]{64}")) {
+        data.appliedStockImageHashes.add(hash);
+      }
+    }
     addRecords(array(root, "messages"), data.messages, MessageRecord::fromJson);
     addRecords(array(root, "actions"), data.actions, ActionRecord::fromJson);
 

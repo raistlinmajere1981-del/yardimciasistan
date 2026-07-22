@@ -1,7 +1,9 @@
 import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from "electron";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { generateConfiguredChat, generateOwnerReplySuggestion, listGoogleAiStudioModels, rankGoogleAiStudioModels } from "@yardimci-asistan/ai-core";
 import type { AIProviderName } from "@yardimci-asistan/ai-core";
+import type { StockImageAnalysis, StockImageApplyLine } from "@yardimci-asistan/shared";
 import {
   markAndroidActionResult,
   markRequestsSynced,
@@ -51,7 +53,11 @@ import {
   type UpdateTableOrderStatusInput,
   type UpdateReservationStatusInput,
   type UpdateDailyTaskStatusInput,
-  type MarkWhatsAppMessageSentInput
+  type MarkWhatsAppMessageSentInput,
+  type DesktopStockImageAnalyzeInput,
+  type DesktopStockImageAnalyzeResult,
+  type ApplyStockImageImportInput,
+  type DesktopStockImageApplyResult
 } from "./database";
 import {
   SyncCoordinator,
@@ -66,6 +72,8 @@ let desktopDatabase: DesktopDatabase | null = null;
 let syncCoordinator: SyncCoordinator | null = null;
 let androidActionSyncInFlight: Promise<AndroidActionProcessSummary> | null = null;
 let androidSnapshotPublishPending = true;
+const stockImageAnalysisControllers = new Map<string, AbortController>();
+const STOCK_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 interface AndroidActionProcessSummary {
   pulled: number;
@@ -184,6 +192,7 @@ if (!hasSingleInstanceLock) {
 
   void app.whenReady().then(() => {
     session.fromPartition(WHATSAPP_WEB_PARTITION).setUserAgent(createChromeUserAgent(), "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7");
+    configureDesktopMediaPermissions();
 
     desktopDatabase = new DesktopDatabase({
       appPath: app.getAppPath(),
@@ -207,6 +216,45 @@ if (!hasSingleInstanceLock) {
       }
     });
   });
+}
+
+function configureDesktopMediaPermissions() {
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, _origin) => {
+    const trustedRenderer = webContents?.getType() === "window"
+      && isTrustedDesktopRendererUrl(webContents.getURL());
+    return Boolean(trustedRenderer && (permission === "media" || permission === "clipboard-sanitized-write"));
+  });
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const mediaTypes = "mediaTypes" in details ? details.mediaTypes : undefined;
+    const trustedRenderer = webContents.getType() === "window"
+      && isTrustedDesktopRendererUrl(webContents.getURL());
+    if (trustedRenderer && permission === "clipboard-sanitized-write") {
+      callback(true);
+      return;
+    }
+    callback(
+      trustedRenderer
+      && permission === "media"
+      && Array.isArray(mediaTypes)
+      && mediaTypes.includes("video")
+      && !mediaTypes.includes("audio")
+    );
+  });
+}
+
+function isTrustedDesktopRendererUrl(value: string): boolean {
+  try {
+    const candidate = new URL(value);
+    if (candidate.protocol === "file:") {
+      return true;
+    }
+    if (!isDev || !process.env.VITE_DEV_SERVER_URL) {
+      return false;
+    }
+    return candidate.origin === new URL(process.env.VITE_DEV_SERVER_URL).origin;
+  } catch {
+    return false;
+  }
 }
 
 function createChromeUserAgent() {
@@ -377,6 +425,35 @@ function registerIpcHandlers() {
 
   ipcMain.handle("menu:saveItem", (_event, input: SaveMenuItemInput): DesktopMenuSaveResult => {
     return getDatabase().saveMenuItem(input);
+  });
+
+  ipcMain.handle("stockImage:analyze", async (_event, value: unknown): Promise<DesktopStockImageAnalyzeResult> => {
+    return analyzeDesktopStockImage(value);
+  });
+
+  ipcMain.handle("stockImage:cancel", (_event, importIdValue: unknown): boolean => {
+    const importId = normalizeStockImageImportId(String(importIdValue ?? ""));
+    if (!importId) {
+      return false;
+    }
+    const controller = stockImageAnalysisControllers.get(importId);
+    controller?.abort();
+    getDatabase().failStockImageImport(importId, "Kullanıcı analizi iptal etti.", true);
+    return Boolean(controller);
+  });
+
+  ipcMain.handle("stockImage:apply", (_event, value: unknown): DesktopStockImageApplyResult => {
+    const input = parseStockImageApplyInput(value);
+    if (!input) {
+      return { ok: false, message: "Görsel stok taslağı geçersiz." };
+    }
+    const result = getDatabase().applyStockImageImport(input);
+    if (result.ok) {
+      notifyDesktopDashboardChanged(result.dashboardData);
+      androidSnapshotPublishPending = true;
+      getSyncCoordinator().scheduleSoon();
+    }
+    return result;
   });
 
   ipcMain.handle("setup:getData", (): DesktopSetupData => {
@@ -742,6 +819,198 @@ function invalidTableOrderPayload(message: string): DesktopTableOrderResult {
   return { ok: false, message };
 }
 
+async function analyzeDesktopStockImage(value: unknown): Promise<DesktopStockImageAnalyzeResult> {
+  const input = parseDesktopStockImageAnalyzeInput(value);
+  if (!input) {
+    return { ok: false, code: "invalid_image", message: "Görsel okunamadı." };
+  }
+  if (input.bytes.byteLength > STOCK_IMAGE_MAX_BYTES) {
+    return { ok: false, code: "image_too_large", message: "Görsel çok büyük." };
+  }
+  const bytes = new Uint8Array(input.bytes);
+  const detectedMime = detectStockImageMime(bytes);
+  if (!detectedMime || detectedMime !== input.mimeType) {
+    return { ok: false, code: "unsupported_image_type", message: "Desteklenmeyen dosya türü." };
+  }
+  const menuItems = getDatabase().getTrackedStockCandidates();
+  if (menuItems.length === 0) {
+    return { ok: false, code: "no_tracked_items", message: "Stok takip edilen menü ürünü bulunamadı." };
+  }
+  if (stockImageAnalysisControllers.has(input.importId)) {
+    return { ok: false, code: "analysis_in_progress", message: "Bu görsel zaten analiz ediliyor." };
+  }
+  const imageHash = createHash("sha256").update(bytes).digest("hex");
+  const created = getDatabase().createStockImageImport({
+    importId: input.importId,
+    source: "desktop",
+    imageHash,
+    originalFilename: input.fileName
+  });
+  if (!created.ok) {
+    return { ok: false, code: "import_conflict", message: created.message };
+  }
+
+  const setup = getDatabase().getSetupData();
+  const endpoint = createStockImageAnalysisUrl(setup.webModuleUrl);
+  if (!endpoint || !setup.syncSecret.trim()) {
+    getDatabase().failStockImageImport(input.importId, "Web modülü bağlantısı eksik.");
+    return { ok: false, code: "connection_incomplete", message: "Görsel analizi için web modülü bağlantısını ayarlayın." };
+  }
+  const controller = new AbortController();
+  stockImageAnalysisControllers.set(input.importId, controller);
+  const timeout = setTimeout(() => controller.abort(), Math.max(30_000, setup.aiTimeoutSeconds * 1000 + 10_000));
+  try {
+    const form = new FormData();
+    form.append("source", "desktop");
+    form.append("import_id", input.importId);
+    form.append("image_hash", imageHash);
+    form.append("menu_items", JSON.stringify(menuItems));
+    form.append("image", new Blob([input.bytes], { type: input.mimeType }), input.fileName);
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "X-YA-Sync-Secret": setup.syncSecret
+      },
+      body: form,
+      redirect: "error",
+      signal: controller.signal
+    });
+    const payload = toUnknownRecord(await response.json().catch(() => null));
+    if (!response.ok || payload?.ok !== true) {
+      const message = stockImageEndpointErrorMessage(response.status, payload);
+      getDatabase().failStockImageImport(input.importId, message);
+      return {
+        ok: false,
+        code: typeof payload?.code === "string" ? payload.code : "analysis_failed",
+        message
+      };
+    }
+    if (String(payload.import_id ?? "") !== input.importId || String(payload.image_hash ?? "").toLowerCase() !== imageHash) {
+      getDatabase().failStockImageImport(input.importId, "Görsel analiz cevabı doğrulanamadı.");
+      return { ok: false, code: "invalid_analysis_response", message: "Görsel analiz cevabı doğrulanamadı." };
+    }
+    const analysisValue = payload.analysis;
+    if (!analysisValue || typeof analysisValue !== "object" || Array.isArray(analysisValue)) {
+      getDatabase().failStockImageImport(input.importId, "Görsel analiz cevabı geçersiz.");
+      return { ok: false, code: "invalid_analysis_response", message: "Görsel analiz cevabı geçersiz." };
+    }
+    const analysis = getDatabase().completeStockImageAnalysis(input.importId, analysisValue as StockImageAnalysis);
+    if (!analysis) {
+      return { ok: false, code: "draft_unavailable", message: "Görsel stok taslağı kaydedilemedi." };
+    }
+    return {
+      ok: true,
+      message: typeof payload.message === "string" && payload.message.trim()
+        ? payload.message.trim()
+        : "Görsel analiz edildi. Satırları kontrol edin.",
+      importId: input.importId,
+      imageHash,
+      duplicateWarning: created.duplicateWarning,
+      analysis
+    };
+  } catch (error) {
+    const cancelled = controller.signal.aborted;
+    const message = cancelled
+      ? "Görsel analizi iptal edildi."
+      : "Görsel analiz hizmetine ulaşılamadı.";
+    getDatabase().failStockImageImport(input.importId, message, cancelled);
+    return {
+      ok: false,
+      code: cancelled ? "analysis_cancelled" : "analysis_connection_failed",
+      message
+    };
+  } finally {
+    clearTimeout(timeout);
+    stockImageAnalysisControllers.delete(input.importId);
+  }
+}
+
+function parseDesktopStockImageAnalyzeInput(value: unknown): DesktopStockImageAnalyzeInput | null {
+  const record = toUnknownRecord(value);
+  const importId = normalizeStockImageImportId(record?.importId);
+  const fileName = typeof record?.fileName === "string" ? record.fileName.trim().slice(0, 255) : "";
+  const mimeType = typeof record?.mimeType === "string" ? record.mimeType.trim().toLowerCase() : "";
+  const bytes = record?.bytes;
+  if (!importId || !fileName || !["image/jpeg", "image/png", "image/webp"].includes(mimeType) || !(bytes instanceof ArrayBuffer)) {
+    return null;
+  }
+  return { importId, fileName, mimeType, bytes };
+}
+
+function parseStockImageApplyInput(value: unknown): ApplyStockImageImportInput | null {
+  const record = toUnknownRecord(value);
+  const importId = normalizeStockImageImportId(record?.importId);
+  const imageHash = typeof record?.imageHash === "string" ? record.imageHash.trim().toLowerCase() : "";
+  if (!importId || !/^[a-f0-9]{64}$/.test(imageHash) || !Array.isArray(record?.lines)) {
+    return null;
+  }
+  return {
+    importId,
+    imageHash,
+    duplicateWarningAcknowledged: record.duplicateWarningAcknowledged === true,
+    lines: record.lines as StockImageApplyLine[]
+  };
+}
+
+function normalizeStockImageImportId(value: unknown): string {
+  const importId = String(value ?? "").trim();
+  return /^[A-Za-z0-9._:-]{8,160}$/.test(importId) ? importId : "";
+}
+
+function detectStockImageMime(bytes: Uint8Array): "image/jpeg" | "image/png" | "image/webp" | null {
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (bytes.length >= 8
+      && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+      && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a) {
+    return "image/png";
+  }
+  if (bytes.length >= 12
+      && String.fromCharCode(...bytes.slice(0, 4)) === "RIFF"
+      && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP") {
+    return "image/webp";
+  }
+  return null;
+}
+
+function createStockImageAnalysisUrl(baseUrl: string): string {
+  try {
+    const parsed = new URL(baseUrl.trim());
+    if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) {
+      return "";
+    }
+    parsed.search = "";
+    parsed.hash = "";
+    parsed.pathname = parsed.pathname
+      .replace(/\/(?:api\/)?sync\.php\/?$/i, "")
+      .replace(/\/+$/, "") + "/api/stock-image-analysis.php";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
+function stockImageEndpointErrorMessage(status: number, payload: Record<string, unknown> | null): string {
+  const provided = typeof payload?.message === "string" ? payload.message.trim() : "";
+  if (provided) {
+    return provided.slice(0, 500);
+  }
+  if (status === 401 || status === 403) {
+    return "Görsel analizi için yetki alınamadı.";
+  }
+  if (status === 413) {
+    return "Görsel çok büyük.";
+  }
+  if (status === 415) {
+    return "Desteklenmeyen dosya türü.";
+  }
+  if (status === 404) {
+    return "Web modülü görsel analizini desteklemiyor. Hosting paketini güncelleyin.";
+  }
+  return "Görsel analiz edilemedi.";
+}
+
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
   if (result.ok) {
     androidSnapshotPublishPending = true;
@@ -1072,6 +1341,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
         hide_when_out_of_stock: item.hide_when_out_of_stock,
         stock_status: getMenuStockStatus(item.stock_quantity ?? 0, item.stock_min_quantity)
       })),
+    appliedStockImageHashes: getDatabase().getAppliedStockImageHashes(100),
     table_orders: activeTableOrders.map((order) => ({
       id: order.id,
       table_id: order.tableId,

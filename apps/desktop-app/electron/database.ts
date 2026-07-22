@@ -2,7 +2,16 @@ import { DatabaseSync } from "node:sqlite";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { createId, normalizePhone } from "@yardimci-asistan/shared";
+import {
+  createId,
+  normalizePhone,
+  type StockImageAnalysis,
+  type StockImageAnalysisLine,
+  type StockImageApplyLine,
+  type StockImageConfidence,
+  type StockImageImportSource,
+  type StockImageMenuCandidate
+} from "@yardimci-asistan/shared";
 import {
   ANDROID_ADMIN_PERMISSIONS,
   ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
@@ -298,12 +307,13 @@ export type MenuStockMovementType =
   | "remove"
   | "set"
   | "adjust"
+  | "image_import_add"
   | "order_add"
   | "order_update"
   | "order_remove"
   | "order_cancel";
 
-export type MenuStockSourceType = "desktop" | "android" | "table_order";
+export type MenuStockSourceType = "desktop" | "android" | "table_order" | "stock_image_import";
 
 export interface DesktopMenuStockMovement {
   id: string;
@@ -314,6 +324,7 @@ export interface DesktopMenuStockMovement {
   quantityAfter: number;
   sourceType: MenuStockSourceType;
   sourceId: string;
+  actorSource: StockImageImportSource;
   actorDeviceId: string;
   note: string;
   createdAt: string;
@@ -324,6 +335,57 @@ export type DesktopMenuSaveResult =
       ok: true;
       message: string;
       savedId: string;
+      dashboardData: DesktopDashboardData;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export interface CreateStockImageImportInput {
+  importId: string;
+  source: StockImageImportSource;
+  deviceId?: string;
+  imageHash: string;
+  originalFilename?: string;
+}
+
+export interface ApplyStockImageImportInput {
+  importId: string;
+  imageHash: string;
+  duplicateWarningAcknowledged?: boolean;
+  lines: StockImageApplyLine[];
+}
+
+export interface DesktopStockImageAnalyzeInput {
+  importId: string;
+  fileName: string;
+  mimeType: string;
+  bytes: ArrayBuffer;
+}
+
+export type DesktopStockImageAnalyzeResult =
+  | {
+      ok: true;
+      message: string;
+      importId: string;
+      imageHash: string;
+      duplicateWarning: boolean;
+      analysis: StockImageAnalysis;
+    }
+  | {
+      ok: false;
+      message: string;
+      code?: string;
+    };
+
+export type DesktopStockImageApplyResult =
+  | {
+      ok: true;
+      message: string;
+      importId: string;
+      appliedLineCount: number;
+      totalQuantity: number;
       dashboardData: DesktopDashboardData;
     }
   | {
@@ -2692,10 +2754,188 @@ export class DesktopDatabase {
       quantityAfter: Number(row.quantity_after ?? 0),
       sourceType: String(row.source_type ?? "desktop") as MenuStockSourceType,
       sourceId: String(row.source_id ?? ""),
+      actorSource: String(row.actor_source ?? (row.actor_device_id ? "android" : "desktop")) as StockImageImportSource,
       actorDeviceId: String(row.actor_device_id ?? ""),
       note: String(row.note ?? ""),
       createdAt: String(row.created_at ?? "")
     }));
+  }
+
+  getTrackedStockCandidates(): StockImageMenuCandidate[] {
+    const rows = this.db
+      .prepare(`
+        SELECT menu_items.id, menu_items.name, menu_items.stock_quantity, menu_categories.name AS category
+        FROM menu_items
+        INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
+        WHERE menu_items.deleted_at = ''
+          AND menu_categories.deleted_at = ''
+          AND menu_items.stock_quantity IS NOT NULL
+        ORDER BY menu_categories.sort_order ASC, menu_items.sort_order ASC, menu_items.name ASC
+      `)
+      .all() as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      category: String(row.category ?? "Menü"),
+      current_stock: Number(row.stock_quantity ?? 0)
+    }));
+  }
+
+  getAppliedStockImageHashes(limit = 100): string[] {
+    const normalizedLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
+    const rows = this.db
+      .prepare(`
+        SELECT image_hash
+        FROM stock_image_imports
+        WHERE status = 'applied'
+        ORDER BY applied_at DESC, created_at DESC
+        LIMIT ?
+      `)
+      .all(normalizedLimit) as Array<{ image_hash?: string }>;
+    return [...new Set(rows.map((row) => String(row.image_hash ?? "").toLowerCase()).filter(isSha256Hex))];
+  }
+
+  createStockImageImport(input: CreateStockImageImportInput): { ok: true; duplicateWarning: boolean } | { ok: false; message: string } {
+    const importId = normalizeStockImageImportId(input.importId);
+    const imageHash = String(input.imageHash ?? "").trim().toLowerCase();
+    const source = input.source === "android" ? "android" : input.source === "desktop" ? "desktop" : null;
+    if (!importId || !isSha256Hex(imageHash) || !source) {
+      return { ok: false, message: "Görsel içe aktarma kimliği veya özeti geçersiz." };
+    }
+    if (this.db.prepare("SELECT id FROM stock_image_imports WHERE import_id = ?").get(importId)) {
+      return { ok: false, message: "Bu içe aktarma daha önce başlatılmış." };
+    }
+    const duplicateWarning = Boolean(this.db
+      .prepare("SELECT id FROM stock_image_imports WHERE image_hash = ? AND status = 'applied' LIMIT 1")
+      .get(imageHash));
+    const now = new Date().toISOString();
+    this.db
+      .prepare(`
+        INSERT INTO stock_image_imports (
+          id, import_id, source, device_id, image_hash, original_filename, status,
+          supplier_name, invoice_number, invoice_date, raw_analysis_json, error_message,
+          created_at, applied_at
+        ) VALUES (?, ?, ?, ?, ?, ?, 'analyzing', NULL, NULL, NULL, NULL, NULL, ?, NULL)
+      `)
+      .run(
+        `stock_image_import_record_${randomUUID()}`,
+        importId,
+        source,
+        nullableTrimmedString(input.deviceId)?.slice(0, 120) ?? null,
+        imageHash,
+        nullableTrimmedString(input.originalFilename)?.slice(0, 255) ?? null,
+        now
+      );
+    return { ok: true, duplicateWarning };
+  }
+
+  completeStockImageAnalysis(importIdValue: string, analysis: StockImageAnalysis): StockImageAnalysis | null {
+    const importId = normalizeStockImageImportId(importIdValue);
+    if (!importId) {
+      return null;
+    }
+    const existing = this.db
+      .prepare("SELECT status FROM stock_image_imports WHERE import_id = ?")
+      .get(importId) as { status?: string } | undefined;
+    if (!existing || !["analyzing", "review"].includes(String(existing.status ?? ""))) {
+      return null;
+    }
+    const sanitized = sanitizeStockImageAnalysis(analysis, this.getTrackedStockCandidates());
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.prepare("DELETE FROM stock_image_import_lines WHERE import_id = ?").run(importId);
+      const insertLine = this.db.prepare(`
+        INSERT INTO stock_image_import_lines (
+          id, import_id, raw_text, matched_menu_item_id, suggested_quantity,
+          approved_quantity, source_quantity_text, confidence, status, note, created_at
+        ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
+      `);
+      for (const line of sanitized.lines) {
+        const needsReview = line.matched_menu_item_id === null
+          || line.suggested_quantity === null
+          || line.confidence === "low"
+          || Boolean(line.needs_review_reason);
+        insertLine.run(
+          `stock_image_import_line_${randomUUID()}`,
+          importId,
+          line.raw_text,
+          line.matched_menu_item_id,
+          line.suggested_quantity,
+          line.source_quantity_text,
+          line.confidence,
+          needsReview ? "needs_review" : "proposed",
+          line.needs_review_reason,
+          now
+        );
+      }
+      this.db
+        .prepare(`
+          UPDATE stock_image_imports
+          SET status = 'review', supplier_name = ?, invoice_number = ?, invoice_date = ?,
+              raw_analysis_json = ?, error_message = NULL
+          WHERE import_id = ? AND status IN ('analyzing', 'review')
+        `)
+        .run(
+          sanitized.document.supplier_name,
+          sanitized.document.invoice_number,
+          sanitized.document.invoice_date,
+          JSON.stringify(sanitized),
+          importId
+        );
+      this.db.exec("COMMIT");
+      return sanitized;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  failStockImageImport(importIdValue: string, message: string, cancelled = false): void {
+    const importId = normalizeStockImageImportId(importIdValue);
+    if (!importId) {
+      return;
+    }
+    this.db
+      .prepare(`
+        UPDATE stock_image_imports
+        SET status = ?, error_message = ?
+        WHERE import_id = ? AND status != 'applied'
+      `)
+      .run(cancelled ? "cancelled" : "failed", String(message ?? "").trim().slice(0, 1000) || null, importId);
+  }
+
+  applyStockImageImport(input: ApplyStockImageImportInput): DesktopStockImageApplyResult {
+    const importId = normalizeStockImageImportId(input.importId);
+    const imageHash = String(input.imageHash ?? "").trim().toLowerCase();
+    if (!importId || !isSha256Hex(imageHash)) {
+      return { ok: false, message: "Görsel stok taslağı geçersiz." };
+    }
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = this.applyStockImageImportInTransaction({
+        importId,
+        imageHash,
+        lines: input.lines,
+        source: "desktop",
+        actorDeviceId: "",
+        duplicateWarningAcknowledged: input.duplicateWarningAcknowledged === true,
+        canOverrideDuplicate: true,
+        now: new Date().toISOString()
+      });
+      if (!result.ok) {
+        this.db.exec("ROLLBACK");
+        return result;
+      }
+      this.db.exec("COMMIT");
+      return {
+        ...result,
+        dashboardData: this.getDashboardData()
+      };
+    } catch {
+      this.db.exec("ROLLBACK");
+      return { ok: false, message: "Stoklar tek işlem içinde güncellenemedi." };
+    }
   }
 
   upsertRequests(requests: SyncedCustomerRequest[], nextCursor?: number) {
@@ -4259,6 +4499,8 @@ export class DesktopDatabase {
         return this.applyAndroidMenuStockAction(action, "set", now);
       case "menu_stock_adjust":
         return this.applyAndroidMenuStockAction(action, "adjust", now);
+      case "menu_stock_image_import_apply":
+        return this.applyAndroidStockImageImport(action, now);
       default:
         return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
     }
@@ -4893,6 +5135,178 @@ export class DesktopDatabase {
     return { ok: true, message: "Menü ürünü stoku telefondan güncellendi." };
   }
 
+  private applyAndroidStockImageImport(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const importId = normalizeStockImageImportId(androidPayloadString(action.payload, "import_id"));
+    const imageHash = androidPayloadString(action.payload, "image_hash").toLowerCase();
+    const lines = normalizeStockImageApplyLines(action.payload.lines);
+    if (!importId || !isSha256Hex(imageHash) || !lines) {
+      return { ok: false, message: "Görsel stok taslağı eksik veya geçersiz." };
+    }
+    const existing = this.db
+      .prepare("SELECT status FROM stock_image_imports WHERE import_id = ?")
+      .get(importId) as { status?: string } | undefined;
+    if (existing) {
+      return {
+        ok: false,
+        message: existing.status === "applied"
+          ? "Bu içe aktarma daha önce uygulanmış."
+          : "Bu içe aktarma kimliği daha önce kullanılmış."
+      };
+    }
+    const created = this.createStockImageImport({
+      importId,
+      source: "android",
+      deviceId: action.device_id,
+      imageHash
+    });
+    if (!created.ok) {
+      return created;
+    }
+    this.db
+      .prepare("UPDATE stock_image_imports SET status = 'review', raw_analysis_json = ? WHERE import_id = ?")
+      .run(JSON.stringify({ lines }), importId);
+    const device = this.db
+      .prepare("SELECT role FROM android_devices WHERE device_id = ? LIMIT 1")
+      .get(action.device_id) as { role?: string } | undefined;
+    const result = this.applyStockImageImportInTransaction({
+      importId,
+      imageHash,
+      lines,
+      source: "android",
+      actorDeviceId: action.device_id,
+      duplicateWarningAcknowledged: action.payload.duplicate_warning_acknowledged === true,
+      canOverrideDuplicate: normalizeAndroidDeviceRole(device?.role) === "admin",
+      now
+    });
+    if (!result.ok) {
+      return result;
+    }
+    this.insertAndroidActionEvent(action, "menu.stock_image_import_applied", "stock_image_import", importId, {
+      image_hash: imageHash,
+      applied_line_count: result.appliedLineCount,
+      total_quantity: result.totalQuantity
+    }, now);
+    return { ok: true, message: "Görsel stok girişi telefondan uygulandı." };
+  }
+
+  private applyStockImageImportInTransaction(input: {
+    importId: string;
+    imageHash: string;
+    lines: StockImageApplyLine[];
+    source: StockImageImportSource;
+    actorDeviceId: string;
+    duplicateWarningAcknowledged: boolean;
+    canOverrideDuplicate: boolean;
+    now: string;
+  }): { ok: true; message: string; importId: string; appliedLineCount: number; totalQuantity: number } | { ok: false; message: string } {
+    const record = this.db
+      .prepare("SELECT source, device_id, image_hash, status FROM stock_image_imports WHERE import_id = ? LIMIT 1")
+      .get(input.importId) as Record<string, unknown> | undefined;
+    if (!record || String(record.image_hash ?? "").toLowerCase() !== input.imageHash || String(record.source ?? "") !== input.source) {
+      return { ok: false, message: "Görsel stok taslağı bulunamadı veya değiştirilmiş." };
+    }
+    if (String(record.status ?? "") === "applied") {
+      return { ok: false, message: "Bu içe aktarma daha önce uygulanmış." };
+    }
+    if (!["analyzing", "review"].includes(String(record.status ?? ""))) {
+      return { ok: false, message: "Bu görsel stok taslağı artık uygulanamaz." };
+    }
+    const lines = normalizeStockImageApplyLines(input.lines);
+    if (!lines || lines.length === 0) {
+      return { ok: false, message: "Uygulanacak geçerli stok satırı bulunamadı." };
+    }
+    const duplicate = this.db
+      .prepare(`
+        SELECT import_id
+        FROM stock_image_imports
+        WHERE image_hash = ? AND status = 'applied' AND import_id != ?
+        LIMIT 1
+      `)
+      .get(input.imageHash, input.importId);
+    if (duplicate && !input.duplicateWarningAcknowledged) {
+      return { ok: false, message: "Bu görsel daha önce stok girişinde kullanılmış olabilir." };
+    }
+    if (duplicate && !input.canOverrideDuplicate) {
+      return { ok: false, message: "Bu görseli yeniden uygulamak için yönetici yetkisi gerekli." };
+    }
+
+    const candidates = new Map(this.getTrackedStockCandidates().map((candidate) => [candidate.id, candidate]));
+    for (const line of lines) {
+      if (!candidates.has(line.menu_item_id)) {
+        return { ok: false, message: "Satırlardan biri artık mevcut veya stok takipli bir menü ürünü değil." };
+      }
+    }
+
+    this.db
+      .prepare("UPDATE stock_image_import_lines SET status = 'ignored', approved_quantity = NULL WHERE import_id = ?")
+      .run(input.importId);
+    const insertApprovedLine = this.db.prepare(`
+      INSERT INTO stock_image_import_lines (
+        id, import_id, raw_text, matched_menu_item_id, suggested_quantity,
+        approved_quantity, source_quantity_text, confidence, status, note, created_at
+      ) VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, 'approved', NULL, ?)
+    `);
+    let totalQuantity = 0;
+    for (const line of lines) {
+      insertApprovedLine.run(
+        `stock_image_import_line_${randomUUID()}`,
+        input.importId,
+        line.raw_text.slice(0, 1000),
+        line.menu_item_id,
+        line.quantity,
+        line.confidence,
+        input.now
+      );
+      const result = this.mutateMenuStockInTransaction({
+        menuItemId: line.menu_item_id,
+        type: "image_import_add",
+        quantityChange: line.quantity,
+        sourceType: "stock_image_import",
+        sourceId: input.importId,
+        actorSource: input.source,
+        actorDeviceId: input.actorDeviceId,
+        note: line.raw_text.slice(0, 500),
+        now: input.now
+      });
+      if (!result.ok) {
+        return result;
+      }
+      totalQuantity += line.quantity;
+    }
+    const update = this.db
+      .prepare(`
+        UPDATE stock_image_imports
+        SET status = 'applied', applied_at = ?, error_message = NULL
+        WHERE import_id = ? AND status IN ('analyzing', 'review')
+      `)
+      .run(input.now, input.importId);
+    if (Number(update.changes) !== 1) {
+      return { ok: false, message: "Görsel stok taslağı uygulanmış olarak kaydedilemedi." };
+    }
+    this.insertEvent({
+      type: "stock.image_import_applied",
+      actorType: input.source,
+      actorId: input.actorDeviceId,
+      entityType: "stock_image_import",
+      entityId: input.importId,
+      payload: {
+        source: input.source,
+        line_count: lines.length,
+        total_quantity: totalQuantity
+      },
+      now: input.now
+    });
+    this.queueSyncJob("menu_publish", input.now);
+    this.queueSyncJob("android_snapshot", input.now);
+    return {
+      ok: true,
+      message: `${lines.length} stok satırı güncellendi.`,
+      importId: input.importId,
+      appliedLineCount: lines.length,
+      totalQuantity
+    };
+  }
+
   private mutateMenuStockInTransaction(input: {
     menuItemId: string;
     type: MenuStockMovementType;
@@ -4901,6 +5315,7 @@ export class DesktopDatabase {
     allowStartTracking?: boolean;
     sourceType: MenuStockSourceType;
     sourceId: string;
+    actorSource?: StockImageImportSource;
     actorDeviceId: string;
     note: string;
     now: string;
@@ -4957,6 +5372,7 @@ export class DesktopDatabase {
       quantityAfter,
       sourceType: input.sourceType,
       sourceId: input.sourceId,
+      actorSource: input.actorSource,
       actorDeviceId: input.actorDeviceId,
       note: input.note,
       now: input.now
@@ -5015,6 +5431,7 @@ export class DesktopDatabase {
     quantityAfter: number;
     sourceType: MenuStockSourceType;
     sourceId: string;
+    actorSource?: StockImageImportSource;
     actorDeviceId: string;
     note: string;
     now: string;
@@ -5023,8 +5440,8 @@ export class DesktopDatabase {
       .prepare(`
         INSERT INTO menu_stock_movements (
           id, menu_item_id, type, quantity_change, quantity_before, quantity_after,
-          source_type, source_id, actor_device_id, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          source_type, source_id, actor_source, actor_device_id, note, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       .run(
         `stock_movement_${randomUUID()}`,
@@ -5035,6 +5452,7 @@ export class DesktopDatabase {
         normalizeStockPrecision(input.quantityAfter),
         input.sourceType,
         input.sourceId || null,
+        input.actorSource ?? (input.actorDeviceId ? "android" : "desktop"),
         input.actorDeviceId || null,
         input.note || null,
         input.now
@@ -5620,6 +6038,118 @@ function createAndroidEntityId(prefix: "reservation_" | "table_order_" | "table_
 
 function androidPayloadString(payload: Record<string, unknown>, field: string): string {
   return typeof payload[field] === "string" ? payload[field].trim() : "";
+}
+
+function normalizeStockImageImportId(value: unknown): string {
+  const importId = String(value ?? "").trim();
+  return /^[A-Za-z0-9._:-]{8,160}$/.test(importId) ? importId : "";
+}
+
+function isSha256Hex(value: string): boolean {
+  return /^[a-f0-9]{64}$/.test(value);
+}
+
+function normalizeStockImageConfidence(value: unknown): StockImageConfidence {
+  return value === "high" || value === "medium" || value === "low" ? value : "low";
+}
+
+function normalizeStockImageText(value: unknown, limit: number): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const text = value.trim().slice(0, limit);
+  return text || null;
+}
+
+function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates: StockImageMenuCandidate[]): StockImageAnalysis {
+  const source = value && typeof value === "object" && !Array.isArray(value)
+    ? value as unknown as Record<string, unknown>
+    : {};
+  const documentSource = source.document && typeof source.document === "object" && !Array.isArray(source.document)
+    ? source.document as Record<string, unknown>
+    : {};
+  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+  const sourceLines = Array.isArray(source.lines) ? source.lines.slice(0, 200) : [];
+  const lines: StockImageAnalysisLine[] = [];
+  for (const rawLine of sourceLines) {
+    if (!rawLine || typeof rawLine !== "object" || Array.isArray(rawLine)) {
+      continue;
+    }
+    const line = rawLine as Record<string, unknown>;
+    const rawText = normalizeStockImageText(line.raw_text, 1000);
+    if (!rawText) {
+      continue;
+    }
+    const requestedId = normalizeStockImageText(line.matched_menu_item_id, 160);
+    const candidate = requestedId ? candidateById.get(requestedId) : undefined;
+    const sourceQuantityText = normalizeStockImageText(line.source_quantity_text, 200);
+    const rawQuantity = Number(line.suggested_quantity);
+    const integerQuantity = Number.isInteger(rawQuantity) && rawQuantity > 0 && rawQuantity <= 100_000
+      ? rawQuantity
+      : null;
+    const ambiguousQuantity = hasAmbiguousStockUnit(sourceQuantityText || rawText);
+    let reason = normalizeStockImageText(line.needs_review_reason, 500);
+    if (requestedId && !candidate) {
+      reason = reason || "Önerilen ürün mevcut stok takipli menü listesinde değil.";
+    }
+    if (ambiguousQuantity) {
+      reason = "Koli, paket, kg veya litre bilgisi açık bir adede dönüştürülemedi.";
+    } else if (integerQuantity === null) {
+      reason = reason || "Açık adet bilgisi bulunamadı.";
+    }
+    lines.push({
+      raw_text: rawText,
+      matched_menu_item_id: candidate?.id ?? null,
+      matched_menu_item_name: candidate?.name ?? null,
+      suggested_quantity: ambiguousQuantity ? null : integerQuantity,
+      source_quantity_text: sourceQuantityText,
+      confidence: normalizeStockImageConfidence(line.confidence),
+      needs_review_reason: reason
+    });
+  }
+  return {
+    document: {
+      supplier_name: normalizeStockImageText(documentSource.supplier_name, 255),
+      invoice_number: normalizeStockImageText(documentSource.invoice_number, 120),
+      invoice_date: normalizeStockImageText(documentSource.invoice_date, 40),
+      document_confidence: normalizeStockImageConfidence(documentSource.document_confidence)
+    },
+    lines
+  };
+}
+
+function hasAmbiguousStockUnit(value: string): boolean {
+  const normalized = value.toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/\b\d+\s*['’]?\s*(?:li|lı|lu|lü|lik|lık|luk|lük)\s+paket\b/giu, "")
+    .replace(/\s+/g, " ");
+  return /\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|lt|litre)\b/iu.test(normalized);
+}
+
+function normalizeStockImageApplyLines(value: unknown): StockImageApplyLine[] | null {
+  if (!Array.isArray(value) || value.length > 200) {
+    return null;
+  }
+  const lines: StockImageApplyLine[] = [];
+  for (const rawLine of value) {
+    if (!rawLine || typeof rawLine !== "object" || Array.isArray(rawLine)) {
+      return null;
+    }
+    const line = rawLine as Record<string, unknown>;
+    const menuItemId = normalizeStockImageText(line.menu_item_id, 160);
+    const rawText = normalizeStockImageText(line.raw_text, 1000);
+    const quantity = Number(line.quantity);
+    if (!menuItemId || !rawText || !Number.isInteger(quantity) || quantity <= 0 || quantity > 100_000) {
+      return null;
+    }
+    lines.push({
+      menu_item_id: menuItemId,
+      quantity,
+      raw_text: rawText,
+      confidence: normalizeStockImageConfidence(line.confidence)
+    });
+  }
+  return lines;
 }
 
 function getAndroidVersionConflict(

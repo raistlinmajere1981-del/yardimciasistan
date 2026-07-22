@@ -60,6 +60,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { PageHeader } from "./components/layout/PageHeader";
 import { Sidebar } from "./components/layout/Sidebar";
 import { NotificationCenter } from "./components/notifications/NotificationCenter";
+import { StockImageImportWorkspace } from "./components/restaurant/StockImageImportWorkspace";
 import { ActionButton } from "./components/ui/ActionButton";
 import { CompactList } from "./components/ui/CompactList";
 import { CompactListButton, CompactListItem } from "./components/ui/CompactListItem";
@@ -1986,6 +1987,7 @@ function App() {
             onSaveCategory={handleSaveCategory}
             onSaveItem={handleSaveItem}
             onExpandPreview={openMenuPreview}
+            onDashboardDataChanged={setDashboardData}
           />
         ) : activePage === "messages" ? null : (
           <SetupWizard
@@ -4427,6 +4429,7 @@ interface MenuManagerProps {
   onSaveCategory: () => void;
   onSaveItem: () => void;
   onExpandPreview: () => void;
+  onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
 
 function MenuManager({
@@ -4447,7 +4450,8 @@ function MenuManager({
   onNewItem,
   onSaveCategory,
   onSaveItem,
-  onExpandPreview
+  onExpandPreview,
+  onDashboardDataChanged
 }: MenuManagerProps) {
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [previewCategoryId, setPreviewCategoryId] = useState(selectedCategoryId || "all");
@@ -4552,6 +4556,7 @@ function MenuManager({
               <span>{selectedCategoryName}</span>
             </div>
             <div className="menu-heading-actions">
+              <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
               <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
               <button className="icon-command" type="button" onClick={onNewItem} aria-label="Ürün ekle" title="Ürün ekle">
                 <Plus size={18} aria-hidden="true" />

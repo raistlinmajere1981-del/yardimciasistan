@@ -31,10 +31,13 @@ docs/DEMO_SITE_CUSTOMIZATION.md
 
 ## Uygulama İndirmeleri
 
-Demo sitenin müşteri navigasyonunda gösterilmeyen `#settings` sayfası Windows 64
-bit, Windows 32 bit ve Android APK indirmelerini sunar. Sayfaya doğrudan
-`/#settings` adresinden veya footer'daki “Uygulamayı İndir” bağlantısından
-ulaşılır. Canlı hosting paketi doğrulanmış üç dosyayı `downloads/` altına kopyalar.
+Demo sitenin müşteri navigasyonunda gösterilmeyen `#settings` sayfası ortak web
+modülü adresini, demo `sync_secret` değerini, kurulum adımlarını ve Windows 64 bit,
+Windows 32 bit ile Android APK indirmelerini sunar. Sayfaya doğrudan `/#settings`
+adresinden veya footer'daki “Kurulum” bağlantısından ulaşılır. Canlı hosting paketi
+doğrulanmış üç dosyayı `downloads/` altına kopyalar ve paketleme sırasında verilen
+`YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET` değerini yalnız bu demo sayfası için build'e
+aktarır.
 
 Dosyalar üretilir ve ardından hosting paketi hazırlanır:
 
@@ -61,5 +64,6 @@ VITE_YA_DESKTOP_INSTALLER_X86_URL=https://indir.example/YardimciAsistan-Setup-x8
 VITE_YA_DESKTOP_INSTALLER_VERSION=0.1.0 \
 VITE_YA_ANDROID_APK_URL=https://indir.example/YardimciAsistan-Android.apk \
 VITE_YA_ANDROID_APP_VERSION=0.1.0 \
+VITE_YA_SYNC_SECRET=demo-ortak-sync-anahtari \
 npm run build -w @yardimci-asistan/demo-web
 ```

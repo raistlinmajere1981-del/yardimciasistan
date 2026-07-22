@@ -66,7 +66,8 @@ run("npm", ["run", "build", "-w", "@yardimci-asistan/demo-web"], {
   VITE_YA_DESKTOP_INSTALLER_X86_URL: desktopInstallerX86Url,
   VITE_YA_DESKTOP_INSTALLER_VERSION: desktopInstallerVersion,
   VITE_YA_ANDROID_APK_URL: androidApkUrl,
-  VITE_YA_ANDROID_APP_VERSION: androidAppVersion
+  VITE_YA_ANDROID_APP_VERSION: androidAppVersion,
+  VITE_YA_SYNC_SECRET: syncSecret
 });
 
 assert.ok(existsSync(demoDistRoot), `Demo web build çıktısı bulunamadı: ${demoDistRoot}`);
@@ -153,6 +154,10 @@ function validatePackage(files) {
     return bundle.includes(desktopInstallerX86Url) && bundle.includes(androidApkUrl);
   });
   assert.ok(bundleHasAdditionalDownloads, "Demo site build çıktısı Windows 32 bit ve Android indirme URL'lerini içermeli.");
+  const bundleHasDemoSyncSecret = jsFiles.some((file) => {
+    return readText(join(publicHtmlRoot, file)).includes(syncSecret);
+  });
+  assert.ok(bundleHasDemoSyncSecret, "Demo site build çıktısı ortak demo sync anahtarını içermeli.");
 
   const business = JSON.parse(readText(join(publicHtmlRoot, `${webModulePrefix}/config/business.json`)));
   assert.notEqual(business.sync_secret, "change-this-secret", "Hosting demo paketi varsayılan sync secret içeremez.");

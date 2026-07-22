@@ -459,6 +459,7 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("menu_stock_add"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("menu_stock_set"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("menu_stock_adjust"), "menu.stock_update");
+  assert.equal(resolveAndroidActionPermission("menu_stock_image_import_apply"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("unsupported_action"), null);
 });
 

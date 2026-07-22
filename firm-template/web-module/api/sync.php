@@ -247,6 +247,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'tables' => $androidSnapshot['tables'],
         'menu' => $androidSnapshot['menu'],
         'trackedStockItems' => $androidSnapshot['trackedStockItems'],
+        'appliedStockImageHashes' => $androidSnapshot['appliedStockImageHashes'],
         'table_orders' => $androidSnapshot['table_orders'],
         'messages' => $androidSnapshot['messages'],
         'androidPermissions' => $androidSnapshot['androidPermissions'],
@@ -813,7 +814,8 @@ function ya_sync_android_action_types(): array
         'table_order_close',
         'menu_stock_add',
         'menu_stock_set',
-        'menu_stock_adjust'
+        'menu_stock_adjust',
+        'menu_stock_image_import_apply'
     ];
 }
 
@@ -903,6 +905,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
             'updated_at' => ya_sync_string($menu['updated_at'] ?? $updatedAt) ?: $updatedAt
         ],
         'trackedStockItems' => ya_sync_sanitize_tracked_stock_items($snapshot['trackedStockItems'] ?? []),
+        'appliedStockImageHashes' => ya_sync_sanitize_stock_image_hashes($snapshot['appliedStockImageHashes'] ?? []),
         'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
         'messages' => ya_sync_sanitize_android_messages($snapshot['messages'] ?? []),
         'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
@@ -1385,6 +1388,25 @@ function ya_sync_sanitize_tracked_stock_items(mixed $records): array
         }
     }
     return array_values($itemsById);
+}
+
+function ya_sync_sanitize_stock_image_hashes(mixed $hashes): array
+{
+    if (!is_array($hashes)) {
+        return [];
+    }
+    $result = [];
+    foreach ($hashes as $hash) {
+        $normalized = strtolower(ya_sync_string($hash));
+        if (preg_match('/^[a-f0-9]{64}$/', $normalized) !== 1) {
+            continue;
+        }
+        $result[$normalized] = true;
+        if (count($result) >= 500) {
+            break;
+        }
+    }
+    return array_keys($result);
 }
 
 function ya_sync_is_authorized(array $businessConfig, array $payload): bool

@@ -20,11 +20,15 @@ test("demo web ana akışını gösterir", async ({ page }) => {
   await expect(page.getByText("Serpme Kahvaltı")).toBeVisible();
 });
 
-test("ayarlar sayfası Windows kurulum dosyasını sunar", async ({ page }) => {
+test("kurulum sayfası bağlantı bilgilerini ve uygulama dosyalarını sunar", async ({ page }) => {
   await page.goto("/#settings");
 
-  await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kurulum", exact: true })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "Ana menü" }).getByRole("button", { name: "Ayarlar", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Ortak kurulum bilgileri" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Yardımcı Asistan nasıl kurulur?" })).toBeVisible();
+  await expect(page.getByLabel("Yardımcı Asistan kurulum yolu")).toHaveValue("https://yardimciasistan.alwaysdata.net/yardimci-asistan");
+  await expect(page.getByLabel("Web güvenlik anahtarı")).toHaveValue("Canlı demo paketi oluşturulurken eklenir");
   await expect(page.getByText("Windows 10 / 11")).toHaveCount(2);
   await expect(page.getByText("Android 8.0+")).toBeVisible();
 
@@ -39,6 +43,14 @@ test("ayarlar sayfası Windows kurulum dosyasını sunar", async ({ page }) => {
   const androidDownloadLink = page.getByRole("link", { name: "Android APK İndir" });
   await expect(androidDownloadLink).toHaveAttribute("href", /\/downloads\/YardimciAsistan-Android-\d+\.\d+\.\d+\.apk$/);
   await expect(androidDownloadLink).toHaveAttribute("download", "");
+});
+
+test("footer kurulum sayfasını açar", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Kurulum", exact: true }).click();
+  await expect(page).toHaveURL(/#settings$/);
+  await expect(page.getByRole("heading", { name: "Kurulum", exact: true })).toBeVisible();
 });
 
 test("rezervasyon formu WhatsApp hazır mesajı açar", async ({ page, context }) => {

@@ -96,6 +96,23 @@ Değiştirilebilir kayıtların payload'ı snapshot'taki `updated_at` değerini 
 taşır. Kayıt masaüstünde bu sırada değişmişse işlem uygulanmaz ve kullanıcıdan canlı veriyi
 yenilemesi istenir.
 
+### Görselden stok girişi
+
+`Restoran → Stok` ekranındaki `AI ile Stok Ekle` kartı yalnız `menu.stock_update`
+yetkisi olan aktif cihazlarda görünür. Kamera sistem kamera uygulaması ve güvenli
+`FileProvider` URI'siyle, galeri ise sistem Photo Picker/OpenDocument akışıyla açılır;
+uygulama geniş kamera veya depolama izni istemez. JPG, PNG ve WebP içerikleri gerçek
+dosya imzasıyla doğrulanır, EXIF yönü düzeltilir, en uzun kenar 2400 px ile sınırlandırılır
+ve geçici cache dosyaları işlem sonunda silinir.
+
+Analiz aynı hostingdeki kimlik doğrulamalı `api/stock-image-analysis.php` endpoint'ine
+gider. AI anahtarı APK'ya veya action payload'ına eklenmez. Sonuç bir öneri taslağıdır:
+ürün ve pozitif tam sayı adet kullanıcı tarafından kontrol edilip onaylanmadan stok
+değişmez. Onay, `menu_stock_image_import_apply` action'ı olarak kalıcı outbox'a yazılır;
+masaüstü aktif cihazı ve `menu.stock_update` iznini yeniden doğrular, tüm satırları tek
+SQLite transaction içinde uygular ve aynı import kimliğini iki kez çalıştırmaz. Aynı
+görsel hash'i yeniden seçilirse uyarı gösterilir; bu uyarıyı yalnız yönetici aşabilir.
+
 Yeni masa için `adisyon aç + ürün ekle` iki bağlı action olarak saklanır. Ürün action'ı,
 adisyon açma action'ının masaüstü receipt kaydı ve o action kimliğinden türetilen aktif
 adisyon olmadan uygulanmaz.
@@ -159,6 +176,13 @@ Proje Android Gradle Plugin ile native Java APK/AAB üretir. Debug build standar
 debug anahtarıyla, release build yalnız dışarıdan sağlanan kalıcı release
 keystore ile imzalanır. Signing değerleri build loguna yazılmaz; eksikse release
 build unsigned çıktı üretmek yerine hata verir.
+
+Fiziksel geliştirme cihazında aynı uygulama verisini ve telefon kimliğini koruyarak
+debug APK güncellemek için isteğe bağlı
+`apps/android-app/.debug/yardimci-asistan-debug.keystore` kullanılabilir. Dosya Git
+tarafından yok sayılır; varsa debug build otomatik olarak bu kararlı geliştirme
+anahtarıyla, yoksa Android'in standart kullanıcı debug anahtarıyla imzalanır. Bu dosyayı
+paylaşmayın veya commit etmeyin.
 
 Hosting ve demo operasyon verisiyle komut satırı smoke testi:
 

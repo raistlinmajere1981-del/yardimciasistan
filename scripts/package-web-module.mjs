@@ -20,7 +20,9 @@ const requiredFiles = [
   "api/sync.php",
   "api/menu.php",
   "api/chat.php",
+  "api/stock-image-analysis.php",
   "lib/storage.php",
+  "lib/stock-image-analysis.php",
   "assets/yardimci-asistan-symbol.png",
   "assets/menu-breakfast.webp",
   "config/.htaccess",
@@ -119,6 +121,15 @@ function validateSource() {
   assert.ok(syncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "AI ayar yayını header güvenlik anahtarını doğrulamalı.");
   assert.ok(syncEndpoint.includes("enqueue_android_action"), "api/sync.php Android action kuyruğunu içermeli.");
   assert.ok(syncEndpoint.includes("acknowledge_requests"), "api/sync.php cursor onayını içermeli.");
+
+  const stockImageEndpoint = readFileSync(join(sourceRoot, "api", "stock-image-analysis.php"), "utf8");
+  assert.ok(stockImageEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "Stok görseli endpoint'i header güvenlik anahtarını doğrulamalı.");
+  assert.ok(stockImageEndpoint.includes("YA_STOCK_IMAGE_MAX_BYTES"), "Stok görseli endpoint'i yükleme boyutu sınırı uygulamalı.");
+  assert.ok(stockImageEndpoint.includes("unlink($temporaryPath)"), "Stok görseli endpoint'i geçici yüklemeyi silmeli.");
+
+  const stockImageAnalyzer = readFileSync(join(sourceRoot, "lib", "stock-image-analysis.php"), "utf8");
+  assert.ok(stockImageAnalyzer.includes("interface YaVisionStockAnalyzer"), "Stok görseli analizi sağlayıcıdan bağımsız sözleşme sunmalı.");
+  assert.ok(stockImageAnalyzer.includes("Koli, paket, kg"), "Stok görseli analizi belirsiz birim korumasını içermeli.");
 
   const storageModule = readFileSync(join(sourceRoot, "lib", "storage.php"), "utf8");
   assert.ok(storageModule.includes("PDO_SQLITE") || storageModule.includes("pdo_sqlite"), "SQLite depolama PDO_SQLITE gereksinimini açıklamalı.");

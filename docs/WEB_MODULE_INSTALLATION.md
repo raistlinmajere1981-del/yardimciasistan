@@ -6,6 +6,14 @@ Hosting panelinde PHP SQLite eklentisinin açık olduğunu kurulumdan önce doğ
 `PDO::getAvailableDrivers()` çıktısında `sqlite` yoksa senkron endpoint'i bilinçli olarak
 `503 pdo_sqlite_missing` döndürür.
 
+Fatura/fiş görselinden stok taslağı kullanılacaksa PHP yükleme sınırını da kontrol edin.
+Uygulama görsel başına 10 MB sınır uygular; multipart ek yükü için önerilen alt sınırlar:
+
+```ini
+upload_max_filesize = 10M
+post_max_size = 12M
+```
+
 ## 1. Kopyalanacak Dosyalar
 
 Hosting panelinde sitenin herkese açık klasörünü bulun. Bu klasör çoğu hostingde `public_html`, `www` veya site alan adıyla aynı isimde olur.
@@ -196,6 +204,13 @@ yardimci-asistan/data/ai-settings.local.php
 ```
 
 Dosya `0600` izinle oluşturulur, API anahtarı hiçbir sync cevabında dönmez ve paketleme sırasında deploy arşivine alınmaz. `data/` klasörü PHP tarafından yazılabilir olmalıdır.
+
+Masaüstü ve Android'deki `AI ile Stok Ekle` akışı aynı ayarı
+`api/stock-image-analysis.php` üzerinden kullanır. Endpoint `X-YA-Sync-Secret`
+header'ını, Android cihaz profilini ve `menu.stock_update` iznini doğrular. Yüklenen
+JPG/PNG/WebP yalnız istek boyunca PHP geçici alanında tutulur; sonuçtan sonra silinir.
+Seçili servis veya model görsel girişini desteklemiyorsa kullanıcıya yapılandırmayı
+değiştirmesi gerektiğini belirten güvenli hata döner.
 
 Eski kurulumlar ve geliştirme ortamı için ortam değişkenleri fallback olarak desteklenir:
 

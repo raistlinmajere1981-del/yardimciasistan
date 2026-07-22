@@ -13,6 +13,7 @@ assets/
 api/
   request.php
   chat.php
+  stock-image-analysis.php
   menu.php
   sync.php
 config/
@@ -25,6 +26,7 @@ data/
   *.json.legacy-backup-v1 (eski kurulum içe aktarılırsa oluşur)
 lib/
   storage.php
+  stock-image-analysis.php
 knowledge/
   firma.md
   odalar.md
@@ -76,6 +78,47 @@ YARDIMCI_ASISTAN_AI_API_KEY=...
 ```
 
 Knowledge dosyaları `knowledge/*.md` altından okunur. AI promptu kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı vermeyecek şekilde sınırlandırılır.
+
+## Stok Görseli Analiz Endpoint'i
+
+Masaüstü ve Android stok girişleri aynı sunucu tarafı endpoint'i kullanır:
+
+```text
+api/stock-image-analysis.php
+```
+
+Endpoint yalnız `POST multipart/form-data` ve doğru `X-YA-Sync-Secret` header'ını
+kabul eder. Android isteklerinde yayınlanmış cihaz profilinin aktif olması ve
+`menu.stock_update` iznini içermesi ayrıca zorunludur. Aday listesi yalnız stok takibi
+açık menü ürünlerinden oluşur; Android'in gönderdiği adaylar sunucudaki güncel snapshot
+ile kesiştirilir. AI anahtarı masaüstü renderer'ına, Android'e veya HTTP cevabına çıkmaz.
+
+JPG, PNG ve WebP desteklenir. Gerçek MIME ve görüntü yapısı sunucuda doğrulanır; uygulama
+sınırı 10 MB'dir. Hosting PHP ayarlarında multipart ek yükü için en az şu değerleri
+kullanın:
+
+```ini
+upload_max_filesize = 10M
+post_max_size = 12M
+```
+
+Endpoint mevcut `config/ai.php` yapılandırmasını kullanır; bu dosya masaüstünden
+yayınlanan `data/ai-settings.local.php` ayarını da yükler. OpenAI/OpenRouter uyumlu
+vision modelleri ve Gemini yolu desteklenir. Seçili model/hizmet görsel kabul etmiyorsa
+`Mevcut AI hizmeti görsel analizini desteklemiyor.` cevabı döner. Koli, paket, kg veya
+litre gibi belirsiz birimlerden adet tahmini yapılmaz ve AI'nın izinli liste dışında
+ürettiği ürün kimlikleri temizlenir.
+
+Yüklenen görsel yalnız istek süresince PHP geçici dosyasında bulunur ve başarı/hata
+sonucundan sonra silinir. Görsel, base64 içeriği ve ham sağlayıcı cevabı uygulama
+loglarına yazılmaz. Endpoint yalnız yapılandırılmış AI sağlayıcısına analiz amacıyla
+görsel gönderir.
+
+Odaklı güvenlik ve sözleşme smoke testi:
+
+```bash
+npm run smoke:stock-image-analysis
+```
 
 ## Sync Endpoint
 

@@ -6,9 +6,12 @@ import {
   CalendarPlus,
   Check,
   Coffee,
+  Copy,
   Download,
   Home,
   Images,
+  KeyRound,
+  Link2,
   MapPin,
   Menu as MenuIcon,
   MessageCircle,
@@ -45,6 +48,7 @@ const ANDROID_APP_VERSION = String(import.meta.env.VITE_YA_ANDROID_APP_VERSION ?
 const ANDROID_APK_URL =
   String(import.meta.env.VITE_YA_ANDROID_APK_URL ?? "").trim() ||
   `/downloads/YardimciAsistan-Android-${ANDROID_APP_VERSION}.apk`;
+const DEMO_SYNC_SECRET = String(import.meta.env.VITE_YA_SYNC_SECRET ?? "").trim();
 
 declare global {
   interface Window {
@@ -712,12 +716,95 @@ function GuestStepper({ value, onChange }: { value: string; onChange: (value: st
 }
 
 function SettingsPage() {
+  const [copyStatus, setCopyStatus] = useState("");
+  const webModuleUrl = getWebModuleBaseUrl();
+  const displayedSyncSecret = DEMO_SYNC_SECRET || "Canlı demo paketi oluşturulurken eklenir";
+
+  async function copyConnectionValue(label: string, value: string) {
+    if (!value || (label === "Güvenlik anahtarı" && !DEMO_SYNC_SECRET)) {
+      setCopyStatus("Demo güvenlik anahtarı bu yerel build'e eklenmemiş.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyStatus(`${label} kopyalandı.`);
+    } catch {
+      setCopyStatus("Tarayıcı kopyalamaya izin vermedi; alanı seçerek elle kopyalayabilirsiniz.");
+    }
+  }
+
   return (
     <PageShell
       className="settings-page"
-      title="Ayarlar"
-      text="Yardımcı Asistan masaüstü uygulamasını bu bilgisayara indirip işletme ayarlarınızı yerel olarak yönetin."
+      title="Kurulum"
+      text="Yardımcı Asistan uygulamalarını indirin ve masaüstü bağlantısını aşağıdaki hazır demo bilgileriyle tamamlayın."
     >
+      <section className="connection-setup-card" aria-labelledby="connection-setup-title">
+        <div className="connection-setup-heading">
+          <div className="connection-setup-icon" aria-hidden="true">
+            <KeyRound size={29} />
+          </div>
+          <div>
+            <p className="eyebrow">Demo Bağlantısı</p>
+            <h2 id="connection-setup-title">Ortak kurulum bilgileri</h2>
+            <p>Masaüstü uygulamasındaki Web Bağlantısı alanına bu iki değeri girin. Android demo APK aynı bağlantıyla hazır gelir.</p>
+          </div>
+        </div>
+
+        <div className="connection-fields">
+          <label className="connection-field">
+            <span><Link2 size={16} aria-hidden="true" /> Yardımcı Asistan kurulum yolu</span>
+            <div className="connection-field-control">
+              <input aria-label="Yardımcı Asistan kurulum yolu" readOnly spellCheck={false} value={webModuleUrl} />
+              <button type="button" onClick={() => void copyConnectionValue("Kurulum yolu", webModuleUrl)}>
+                <Copy size={16} aria-hidden="true" />
+                Kopyala
+              </button>
+            </div>
+            <small>Masaüstünde: Ayarlar → Gelişmiş Ayarlar → Web Bağlantısı → Web eşitleme adresi</small>
+          </label>
+
+          <label className="connection-field">
+            <span><KeyRound size={16} aria-hidden="true" /> Web güvenlik anahtarı</span>
+            <div className="connection-field-control">
+              <input aria-label="Web güvenlik anahtarı" readOnly spellCheck={false} value={displayedSyncSecret} />
+              <button
+                type="button"
+                disabled={!DEMO_SYNC_SECRET}
+                onClick={() => void copyConnectionValue("Güvenlik anahtarı", displayedSyncSecret)}
+              >
+                <Copy size={16} aria-hidden="true" />
+                Kopyala
+              </button>
+            </div>
+            <small>Masaüstü, Android ve web modülünün kullandığı ortak demo anahtarı</small>
+          </label>
+        </div>
+        <p className="connection-copy-status" role="status" aria-live="polite">{copyStatus}</p>
+      </section>
+
+      <section className="installation-steps" aria-labelledby="installation-steps-title">
+        <div className="installation-steps-heading">
+          <p className="eyebrow">Adım Adım</p>
+          <h2 id="installation-steps-title">Yardımcı Asistan nasıl kurulur?</h2>
+        </div>
+        <ol>
+          <li>
+            <span>1</span>
+            <div><strong>Windows uygulamasını indirin</strong><p>Bilgisayarınıza uygun 64 bit veya 32 bit kurulum dosyasını aşağıdan çalıştırın.</p></div>
+          </li>
+          <li>
+            <span>2</span>
+            <div><strong>Demo bağlantısını kaydedin</strong><p>İlk açılışta yukarıdaki kurulum yolunu ve güvenlik anahtarını Web Bağlantısı alanlarına yapıştırın.</p></div>
+          </li>
+          <li>
+            <span>3</span>
+            <div><strong>Android uygulamasını kurun</strong><p>APK dosyasını telefona yükleyin. Demo bağlantısı uygulamanın içinde hazır olduğundan ayrıca anahtar girmeniz gerekmez.</p></div>
+          </li>
+        </ol>
+      </section>
+
       <section className="desktop-download-card" aria-labelledby="desktop-download-title">
         <div className="download-icon" aria-hidden="true">
           <MonitorDown size={34} />
@@ -845,7 +932,7 @@ function Footer({ onNavigate }: { onNavigate: (page: PageKey) => void }) {
       <div className="footer-actions">
         <button className="ghost-button" onClick={() => onNavigate("settings")}>
           <Download size={17} aria-hidden="true" />
-          Uygulamayı İndir
+          Kurulum
         </button>
         <button className="ghost-button" onClick={() => onNavigate("location")}>
           <MapPin size={17} aria-hidden="true" />

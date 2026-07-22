@@ -27,7 +27,11 @@ import type {
   DesktopTableOrderResult,
   UpdateReservationStatusInput,
   UpdateDailyTaskStatusInput,
-  MarkWhatsAppMessageSentInput
+  MarkWhatsAppMessageSentInput,
+  DesktopStockImageAnalyzeInput,
+  DesktopStockImageAnalyzeResult,
+  ApplyStockImageImportInput,
+  DesktopStockImageApplyResult
 } from "./database";
 import type { AutomaticSyncCycleResult, AutomaticSyncStatus } from "./sync-coordinator";
 
@@ -105,6 +109,9 @@ export interface DesktopBridge {
   pushAiSettings: () => Promise<PushAiSettingsResult>;
   saveMenuCategory: (input: SaveMenuCategoryInput) => Promise<DesktopMenuSaveResult>;
   saveMenuItem: (input: SaveMenuItemInput) => Promise<DesktopMenuSaveResult>;
+  analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => Promise<DesktopStockImageAnalyzeResult>;
+  cancelStockImageAnalysis: (importId: string) => Promise<boolean>;
+  applyStockImageImport: (input: ApplyStockImageImportInput) => Promise<DesktopStockImageApplyResult>;
   openExternal: (url: string) => Promise<boolean>;
 }
 
@@ -166,6 +173,9 @@ const bridge: DesktopBridge = {
   pushAiSettings: () => ipcRenderer.invoke("sync:pushAiSettings"),
   saveMenuCategory: (input: SaveMenuCategoryInput) => ipcRenderer.invoke("menu:saveCategory", input),
   saveMenuItem: (input: SaveMenuItemInput) => ipcRenderer.invoke("menu:saveItem", input),
+  analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => ipcRenderer.invoke("stockImage:analyze", input),
+  cancelStockImageAnalysis: (importId: string) => ipcRenderer.invoke("stockImage:cancel", importId),
+  applyStockImageImport: (input: ApplyStockImageImportInput) => ipcRenderer.invoke("stockImage:apply", input),
   openExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url)
 };
 

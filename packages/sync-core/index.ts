@@ -134,6 +134,7 @@ export interface AndroidOperationsSnapshot {
   tables: AndroidSnapshotTable[];
   menu: PublishedQrMenu;
   trackedStockItems: AndroidTrackedStockItem[];
+  appliedStockImageHashes: string[];
   table_orders: AndroidSnapshotTableOrder[];
   messages: AndroidSnapshotMessage[];
   androidPermissions: Record<string, AndroidSnapshotPermissionProfile>;
@@ -411,7 +412,8 @@ export const ANDROID_ACTION_TYPES = [
   "table_order_close",
   "menu_stock_add",
   "menu_stock_set",
-  "menu_stock_adjust"
+  "menu_stock_adjust",
+  "menu_stock_image_import_apply"
 ] as const;
 
 export type AndroidActionType = typeof ANDROID_ACTION_TYPES[number];
@@ -474,7 +476,8 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   table_order_cancel: "table_order.cancel",
   menu_stock_add: "menu.stock_update",
   menu_stock_set: "menu.stock_update",
-  menu_stock_adjust: "menu.stock_update"
+  menu_stock_adjust: "menu.stock_update",
+  menu_stock_image_import_apply: "menu.stock_update"
 };
 
 export function resolveAndroidActionPermission(

@@ -217,6 +217,7 @@ try {
       stock_status: "in_stock"
     }
   );
+  assert.deepEqual(androidData.appliedStockImageHashes, []);
   assert.ok(androidData.server_revision > 0);
 
   const unchangedSummary = await syncApi({
@@ -316,6 +317,24 @@ try {
   const forbiddenStockResult = await getAndroidAction(forbiddenStockActionId);
   assert.match(forbiddenStockResult.error_message, /yetkisi yok/i);
 
+  const forbiddenImageImportActionId = "android_permission_stock_image_staff_0001";
+  await assertQueued(await enqueueAndroidAction(forbiddenImageImportActionId, "menu_stock_image_import_apply", {
+    import_id: "stock_import_staff_queue_0001",
+    image_hash: "b".repeat(64),
+    duplicate_warning_acknowledged: false,
+    lines: [{
+      menu_item_id: trackedMenuItemId,
+      quantity: 2,
+      raw_text: "2 adet personel yetki testi",
+      confidence: "high"
+    }]
+  }));
+  const forbiddenImageImportCycle = await coordinator.runNow();
+  assert.equal(forbiddenImageImportCycle.appliedActions, 0);
+  assert.equal(forbiddenImageImportCycle.failedActions, 1);
+  assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 0);
+  assert.match((await getAndroidAction(forbiddenImageImportActionId)).error_message, /yetkisi yok/i);
+
   const paymentActionId = "android_permission_payment_0001";
   await assertQueued(await enqueueAndroidAction(paymentActionId, "table_order_set_payment_waiting", {
     order_id: order.id,
@@ -405,6 +424,54 @@ try {
   assert.equal(replenishedSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_status, "in_stock");
   const replenishedMenu = await (await fetch(`${baseUrl}/api/menu.php`)).json();
   assert.equal(replenishedMenu.items.some((item) => item.id === trackedMenuItemId), true);
+
+  const imageImportHash = "a".repeat(64);
+  const imageImportActionId = "android_stock_image_admin_0001";
+  await assertQueued(await enqueueAndroidAction(imageImportActionId, "menu_stock_image_import_apply", {
+    import_id: "stock_import_admin_queue_0001",
+    image_hash: imageImportHash,
+    duplicate_warning_acknowledged: false,
+    lines: [{
+      menu_item_id: trackedMenuItemId,
+      quantity: 3,
+      raw_text: "3 adet yönetici görsel stok testi",
+      confidence: "high"
+    }]
+  }));
+  const imageImportCycle = await coordinator.runNow();
+  assert.equal(imageImportCycle.appliedActions, 1);
+  assert.equal(imageImportCycle.failedActions, 0);
+  assert.equal(imageImportCycle.publishedJobs, 2);
+  assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 8);
+  const imageImportSummary = await (await syncApi({ action: "android_summary", device_id: "android-auto-smoke" })).json();
+  assert.equal(imageImportSummary.appliedStockImageHashes.includes(imageImportHash), true);
+  assert.equal(imageImportSummary.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId)?.stock_quantity, 8);
+
+  const invalidImageImportActionId = "android_stock_image_atomic_0001";
+  await assertQueued(await enqueueAndroidAction(invalidImageImportActionId, "menu_stock_image_import_apply", {
+    import_id: "stock_import_admin_atomic_0001",
+    image_hash: "c".repeat(64),
+    duplicate_warning_acknowledged: false,
+    lines: [
+      {
+        menu_item_id: trackedMenuItemId,
+        quantity: 4,
+        raw_text: "4 adet geçerli satır",
+        confidence: "high"
+      },
+      {
+        menu_item_id: "invented_untracked_menu_item",
+        quantity: 1,
+        raw_text: "1 adet geçersiz satır",
+        confidence: "low"
+      }
+    ]
+  }));
+  const invalidImageImportCycle = await coordinator.runNow();
+  assert.equal(invalidImageImportCycle.appliedActions, 0);
+  assert.equal(invalidImageImportCycle.failedActions, 1);
+  assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 8);
+  assert.match((await getAndroidAction(invalidImageImportActionId)).error_message, /stok takipli/i);
 
   const adminOrderResult = database.openTableOrder(table.id);
   assert.equal(adminOrderResult.ok, true);
@@ -632,6 +699,7 @@ function createSnapshot(databaseInstance) {
             ? "low_stock"
             : "in_stock"
       })),
+    appliedStockImageHashes: databaseInstance.getAppliedStockImageHashes(100),
     table_orders: activeTableOrders.map((order) => ({
       id: order.id,
       table_id: order.tableId,

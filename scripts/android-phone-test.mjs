@@ -140,8 +140,8 @@ function parseArgs(args) {
     throw new Error("Port 1-65535 arasında sayısal olmalı.");
   }
 
-  if (!Number.isInteger(parsed.holdMs) || parsed.holdMs < 0 || parsed.holdMs > 300000) {
-    throw new Error("Bekleme süresi 0-300000 ms arasında sayısal olmalı.");
+  if (!Number.isInteger(parsed.holdMs) || parsed.holdMs < 0 || parsed.holdMs > 900000) {
+    throw new Error("Bekleme süresi 0-900000 ms arasında sayısal olmalı.");
   }
 
   return parsed;

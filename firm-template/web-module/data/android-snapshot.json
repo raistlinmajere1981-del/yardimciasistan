@@ -302,6 +302,7 @@
       "stock_status": "out_of_stock"
     }
   ],
+  "appliedStockImageHashes": [],
   "table_orders": [
     {
       "id": "table_order_android_demo_001",

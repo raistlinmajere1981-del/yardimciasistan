@@ -55,6 +55,7 @@ def missingSigningProperties = signingPropertyNames.findAll { key, propertyName 
   releaseSigning[key] == null
 }.values().toList()
 def releaseSigningReady = missingSigningProperties.isEmpty()
+def stableDebugKeystore = file(".debug/yardimci-asistan-debug.keystore")
 def generatedConnectionDirectory = layout.buildDirectory.dir("generated/source/connection")
 
 android {
@@ -78,6 +79,14 @@ android {
   }
 
   signingConfigs {
+    if (stableDebugKeystore.isFile()) {
+      create("stableDebug") {
+        storeFile = stableDebugKeystore
+        storePassword = "android"
+        keyAlias = "androiddebugkey"
+        keyPassword = "android"
+      }
+    }
     if (releaseSigningReady) {
       create("release") {
         storeFile = file(releaseSigning.path)
@@ -92,6 +101,9 @@ android {
     debug {
       debuggable = true
       versionNameSuffix = "-debug"
+      if (stableDebugKeystore.isFile()) {
+        signingConfig = signingConfigs.getByName("stableDebug")
+      }
     }
     release {
       debuggable = false
@@ -121,6 +133,9 @@ androidComponents {
 }
 
 dependencies {
+  implementation "androidx.activity:activity:1.10.1"
+  implementation "androidx.core:core:1.16.0"
+  implementation "androidx.exifinterface:exifinterface:1.4.1"
   testImplementation "junit:junit:4.13.2"
 }
 
