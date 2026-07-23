@@ -7,7 +7,6 @@ import {
   WHATSAPP_WEB_HOME_URL
 } from "@yardimci-asistan/whatsapp-bridge";
 import {
-  BarChart3,
   Bell,
   BedDouble,
   CalendarCheck,
@@ -16,6 +15,7 @@ import {
   Copy,
   Eye,
   ExternalLink,
+  LockKeyhole,
   Maximize2,
   MessageCircle,
   Monitor,
@@ -30,7 +30,6 @@ import {
   Sparkles,
   Star,
   Trash2,
-  TrendingUp,
   UploadCloud,
   Users,
   UtensilsCrossed,
@@ -55,6 +54,7 @@ import type {
   SaveInitialSetupInput
 } from "../electron/database";
 import type { AutomaticSyncStatus } from "../electron/sync-coordinator";
+import type { AppLockActionResult, AppLockStatus } from "../electron/app-lock";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
@@ -63,6 +63,8 @@ import { AppShell } from "./components/layout/AppShell";
 import { PageHeader } from "./components/layout/PageHeader";
 import { Sidebar } from "./components/layout/Sidebar";
 import { NotificationCenter } from "./components/notifications/NotificationCenter";
+import { AppLockScreen } from "./components/security/AppLockScreen";
+import { PasswordSettings } from "./components/security/PasswordSettings";
 import { StockImageImportWorkspace } from "./components/restaurant/StockImageImportWorkspace";
 import { ActionButton } from "./components/ui/ActionButton";
 import { CompactList } from "./components/ui/CompactList";
@@ -72,6 +74,7 @@ import { CustomerWorkPage } from "./pages/CustomerWorkPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { PensionPage } from "./pages/PensionPage";
+import { ReportsPage } from "./pages/ReportsPage";
 import { RestaurantPage } from "./pages/RestaurantPage";
 import {
   applyUiPreferences,
@@ -82,6 +85,7 @@ import {
 } from "./ui-preferences";
 
 type SyncState = "idle" | "loading" | "success" | "error";
+type AppAccessPhase = "checking" | "locked" | "unlocking" | "unlocked";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "yardimci-asistan.sidebar-collapsed";
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
@@ -169,21 +173,6 @@ interface ItemFormState {
   hide_when_out_of_stock: boolean;
   stock_note: string;
   sort_order: string;
-}
-
-interface ReportMetric {
-  title: string;
-  value: string;
-  detail: string;
-  tone: "info" | "ok" | "wait" | "neutral";
-  icon: typeof Bell;
-}
-
-interface ReportBreakdownItem {
-  label: string;
-  value: number;
-  percent: number;
-  detail: string;
 }
 
 interface SetupFormState {
@@ -566,6 +555,7 @@ const defaultDashboardData: DesktopDashboardData = {
 
 const defaultSetupData: DesktopSetupData = {
   setupRequired: false,
+  appPasswordConfigured: false,
   businessName: "Deniz Çiçeği Pansiyon & Kafe",
   businessType: "pension_restaurant",
   phone: "+905321234567",
@@ -641,6 +631,13 @@ const aiServicePresets = [
 
 function App() {
   const contentRef = useRef<HTMLElement>(null);
+  const appDataInitializedRef = useRef(false);
+  const [appAccessPhase, setAppAccessPhase] = useState<AppAccessPhase>("checking");
+  const [appLockStatus, setAppLockStatus] = useState<AppLockStatus>({
+    locked: false,
+    passwordConfigured: false,
+    notificationCount: 0
+  });
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
@@ -710,7 +707,42 @@ function App() {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
+    let active = true;
+    const bridge = window.yardimciDesktop;
+    if (!bridge || typeof bridge.getAppLockStatus !== "function") {
+      setAppAccessPhase("unlocked");
+      return () => {
+        active = false;
+      };
+    }
+
+    void bridge.getAppLockStatus()
+      .then((status) => {
+        if (!active) return;
+        setAppLockStatus(status);
+        setAppAccessPhase(status.locked ? "locked" : "unlocked");
+      })
+      .catch(() => {
+        if (!active) return;
+        setAppLockStatus({
+          locked: true,
+          passwordConfigured: true,
+          notificationCount: 0
+        });
+        setAppAccessPhase("locked");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (appAccessPhase !== "unlocked") {
+      return;
+    }
+
     void window.yardimciDesktop?.getBootstrapData().then((data) => {
+      const firstApplicationLoad = !appDataInitializedRef.current;
       setDashboardData((current) => ({
         ...current,
         databasePath: data.databasePath,
@@ -720,9 +752,10 @@ function App() {
       setSetupData(data.setup);
       setSetupForm(toSetupForm(data.setup));
       setSetupMode(data.setup.setupRequired);
-      if (!data.setup.setupRequired) {
+      if (!data.setup.setupRequired && firstApplicationLoad) {
         setActivePage("dashboard");
       }
+      appDataInitializedRef.current = true;
       setSetupMessage(data.setup.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
     });
     void loadDashboardData();
@@ -738,7 +771,7 @@ function App() {
       unsubscribeDashboard?.();
       unsubscribeSync?.();
     };
-  }, []);
+  }, [appAccessPhase]);
 
   useEffect(() => {
     if (activePage !== "messages" || !messagesAiOpen || !window.yardimciDesktop) {
@@ -825,6 +858,100 @@ function App() {
       setSelectedItemId(nextItem?.id ?? "");
       setItemForm(toItemForm(nextItem, nextDashboardData.menu.categories[0]?.id ?? ""));
     }
+  }
+
+  async function handleLockApp() {
+    setMenuPreviewOpen(false);
+    const bridge = window.yardimciDesktop;
+    let result: AppLockActionResult;
+    try {
+      result = bridge && typeof bridge.lockApp === "function"
+        ? await bridge.lockApp()
+        : {
+            ok: true,
+            message: "Uygulama kilitlendi.",
+            status: {
+              locked: true,
+              passwordConfigured: setupData.appPasswordConfigured,
+              notificationCount: desktopNotifications.length
+            }
+          };
+    } catch {
+      return;
+    }
+
+    if (!result.ok) {
+      return;
+    }
+    setAppLockStatus({
+      ...result.status,
+      notificationCount: Math.max(result.status.notificationCount, desktopNotifications.length)
+    });
+    setAppAccessPhase("locked");
+  }
+
+  async function handleUnlockApp(password: string): Promise<AppLockActionResult> {
+    const bridge = window.yardimciDesktop;
+    let result: AppLockActionResult;
+    try {
+      result = bridge && typeof bridge.unlockApp === "function"
+        ? await bridge.unlockApp(password)
+        : {
+            ok: true,
+            message: "Kilit açıldı.",
+            status: {
+              locked: false,
+              passwordConfigured: appLockStatus.passwordConfigured,
+              notificationCount: appLockStatus.notificationCount
+            }
+          };
+    } catch {
+      result = {
+        ok: false,
+        message: "Kilit açılamadı. Uygulamayı yeniden başlatıp tekrar deneyin.",
+        status: appLockStatus
+      };
+    }
+
+    setAppLockStatus(result.status);
+    if (result.ok) {
+      setAppAccessPhase("unlocking");
+      window.setTimeout(() => setAppAccessPhase("unlocked"), 170);
+    }
+    return result;
+  }
+
+  async function handleResetAppPassword(webSecurityKey: string): Promise<AppLockActionResult> {
+    const bridge = window.yardimciDesktop;
+    let result: AppLockActionResult;
+    try {
+      result = bridge && typeof bridge.resetAppPassword === "function"
+        ? await bridge.resetAppPassword(webSecurityKey)
+        : {
+            ok: false,
+            message: "Şifre sıfırlama hazır değil. Uygulamayı yeniden başlatın.",
+            status: appLockStatus
+          };
+    } catch {
+      result = {
+        ok: false,
+        message: "Şifre sıfırlanamadı. Uygulamayı yeniden başlatıp tekrar deneyin.",
+        status: appLockStatus
+      };
+    }
+
+    setAppLockStatus(result.status);
+    if (result.ok) {
+      setSetupData((current) => ({ ...current, appPasswordConfigured: false }));
+      setAppAccessPhase("unlocking");
+      window.setTimeout(() => setAppAccessPhase("unlocked"), 170);
+    }
+    return result;
+  }
+
+  function handleAppPasswordConfiguredChange(configured: boolean) {
+    setSetupData((current) => ({ ...current, appPasswordConfigured: configured }));
+    setAppLockStatus((current) => ({ ...current, passwordConfigured: configured }));
   }
 
   async function handlePullRequests() {
@@ -1867,6 +1994,18 @@ function App() {
     }
   }
 
+  if (appAccessPhase !== "unlocked") {
+    return (
+      <AppLockScreen
+        phase={appAccessPhase}
+        passwordConfigured={appLockStatus.passwordConfigured}
+        notificationCount={appLockStatus.notificationCount}
+        onUnlock={handleUnlockApp}
+        onResetPassword={handleResetAppPassword}
+      />
+    );
+  }
+
   if (setupMode) {
     return (
       <SetupWizard
@@ -2018,6 +2157,15 @@ function App() {
             </div>
               )}
               <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />
+              <button
+                className="app-lock-trigger"
+                type="button"
+                aria-label="Uygulamayı kilitle"
+                title="Ekranı kilitle"
+                onClick={() => void handleLockApp()}
+              >
+                <LockKeyhole size={18} aria-hidden="true" />
+              </button>
             </div>
           )}
         />
@@ -2165,6 +2313,8 @@ function App() {
             onExpandPreview={openMenuPreview}
             onDashboardDataChanged={setDashboardData}
           />
+        ) : activePage === "reports" ? (
+          <ReportsPage aiEnabled={setupData.aiEnabled} />
         ) : activePage === "messages" ? null : (
           <SetupWizard
             embedded
@@ -2192,6 +2342,7 @@ function App() {
             onRevokeAndroidDevice={handleRevokeAndroidDevice}
             onSave={handleSaveSetup}
             onSkip={() => setActivePage("dashboard")}
+            onAppPasswordConfiguredChange={handleAppPasswordConfiguredChange}
             uiPreferences={uiPreferences}
             onUiPreferencesChange={setUiPreferences}
           />
@@ -2485,6 +2636,7 @@ interface SetupWizardProps {
   onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
   onResetAndroidDevicePermissions?: (deviceId: string) => void;
   onRevokeAndroidDevice?: (device: DesktopAndroidDevice) => void;
+  onAppPasswordConfiguredChange?: (configured: boolean) => void;
   onSave: () => void;
   onSkip: () => void;
   uiPreferences: UiPreferences;
@@ -2515,6 +2667,7 @@ function SetupWizard({
   onSetAndroidDeviceActive,
   onResetAndroidDevicePermissions,
   onRevokeAndroidDevice,
+  onAppPasswordConfiguredChange,
   onSave,
   onSkip,
   uiPreferences,
@@ -2808,6 +2961,12 @@ function SetupWizard({
             AI cevap önerileri açık
           </label>
         </div>
+        {embedded && (
+          <PasswordSettings
+            configured={setupData.appPasswordConfigured}
+            onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
+          />
+        )}
         {embedded && form.androidEnabled && (
           <AndroidDevicesSection
             devices={dashboardData?.androidDevices ?? []}
@@ -4167,124 +4326,6 @@ function RequestsWorkspace({
   );
 }
 
-interface ReportsWorkspaceProps {
-  dashboardData: DesktopDashboardData;
-}
-
-function ReportsWorkspace({ dashboardData }: ReportsWorkspaceProps) {
-  const report = useMemo(() => buildReportModel(dashboardData), [dashboardData]);
-
-  return (
-    <section className="reports-workspace" aria-label="Basit raporlar">
-      <section className="report-metric-grid" aria-label="Rapor özeti">
-        {report.metrics.map((metric) => {
-          const Icon = metric.icon;
-          return (
-            <article className={`report-metric-card tone-${metric.tone}`} key={metric.title}>
-              <span className="metric-icon">
-                <Icon size={20} aria-hidden="true" />
-              </span>
-              <div>
-                <span>{metric.title}</span>
-                <strong>{metric.value}</strong>
-                <p>{metric.detail}</p>
-              </div>
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="report-grid" aria-label="Rapor detayları">
-        <ReportBreakdownPanel eyebrow="Müşteri Talepleri" title="Talep Durumları" items={report.requestStatus} emptyLabel="Henüz talep kaydı yok." />
-        <ReportBreakdownPanel eyebrow="Rezervasyon" title="Onay Durumu" items={report.reservationStatus} emptyLabel="Henüz rezervasyon yok." />
-        <ReportBreakdownPanel eyebrow="Kaynaklar" title="Oda Durumu" items={report.roomStatus} emptyLabel="Oda kaydı yok." />
-        <ReportBreakdownPanel eyebrow="Servis" title="Masa Durumu" items={report.tableStatus} emptyLabel="Masa kaydı yok." />
-
-        <section className="panel report-panel report-focus-panel">
-          <div className="panel-heading compact">
-            <div>
-              <p>Bugünkü Odak</p>
-              <h2>Kritik İşler</h2>
-            </div>
-          </div>
-          <div className="report-focus-list">
-            {report.focusItems.map((item) => (
-              <article className={`report-focus-item tone-${item.tone}`} key={item.title}>
-                <span>{item.value}</span>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.detail}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="panel report-panel report-summary-panel">
-          <div className="panel-heading compact">
-            <div>
-              <p>İşletme Özeti</p>
-              <h2>Kayıt Dağılımı</h2>
-            </div>
-          </div>
-          <dl className="info-list detail-info-grid">
-            <div>
-              <dt>Müşteri</dt>
-              <dd>{dashboardData.customers.length} kayıt</dd>
-            </div>
-            <div>
-              <dt>Tekrarlayan müşteri</dt>
-              <dd>{report.repeatCustomerCount} kayıt</dd>
-            </div>
-            <div>
-              <dt>Menü</dt>
-              <dd>{dashboardData.summary.availableMenuItems} ürün yayında</dd>
-            </div>
-            <div>
-              <dt>Günlük iş</dt>
-              <dd>{report.completedTaskCount}/{dashboardData.dailyTasks.length} tamamlandı</dd>
-            </div>
-          </dl>
-        </section>
-      </section>
-    </section>
-  );
-}
-
-function ReportBreakdownPanel({ eyebrow, title, items, emptyLabel }: { eyebrow: string; title: string; items: ReportBreakdownItem[]; emptyLabel: string }) {
-  return (
-    <section className="panel report-panel">
-      <div className="panel-heading compact">
-        <div>
-          <p>{eyebrow}</p>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      {items.length === 0 ? (
-        <div className="empty-state compact-empty">
-          <BarChart3 size={24} aria-hidden="true" />
-          <strong>Kayıt yok.</strong>
-          <p>{emptyLabel}</p>
-        </div>
-      ) : (
-        <div className="report-bar-list">
-          {items.map((item) => (
-            <article className="report-bar-row" key={item.label}>
-              <div>
-                <strong>{item.label}</strong>
-                <span>{item.detail}</span>
-              </div>
-              <div className="report-bar-track" aria-hidden="true">
-                <span className="report-bar-fill" style={{ width: `${item.percent}%` }} />
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 interface CustomersWorkspaceProps {
   customers: DesktopDashboardData["customers"];
   requests: SyncedCustomerRequest[];
@@ -5344,166 +5385,6 @@ function buildMenuPreviewData(
     : menu.items;
 
   return { ...menu, categories, items };
-}
-
-function buildReportModel(dashboardData: DesktopDashboardData) {
-  const requestCount = dashboardData.requests.length;
-  const reservationCount = dashboardData.reservations.length;
-  const roomCount = dashboardData.rooms.length;
-  const tableCount = dashboardData.tables.length;
-  const taskCount = dashboardData.dailyTasks.length;
-  const convertedRequestCount = dashboardData.requests.filter((request) => request.status === "converted_to_reservation").length;
-  const answeredRequestCount = dashboardData.requests.filter((request) => request.status === "answered" || request.status === "converted_to_reservation").length;
-  const pendingRequestCount = dashboardData.requests.filter((request) => ["new", "seen", "waiting_owner"].includes(request.status)).length;
-  const approvedReservationCount = dashboardData.reservations.filter((reservation) => reservation.status === "approved" || reservation.status === "completed").length;
-  const pendingReservationCount = dashboardData.reservations.filter((reservation) => reservation.status === "pending").length;
-  const busyRoomCount = dashboardData.rooms.filter((room) => ["reserved", "occupied"].includes(room.status)).length;
-  const busyTableCount = dashboardData.tables.filter((table) => ["reserved", "occupied", "bill_waiting"].includes(table.status)).length;
-  const completedTaskCount = dashboardData.dailyTasks.filter((task) => task.status === "done").length;
-  const pendingTaskCount = dashboardData.dailyTasks.filter((task) => task.status === "pending").length;
-  const repeatCustomerCount = dashboardData.customers.filter((customer) => customer.requestCount + customer.reservationCount > 1).length;
-
-  const metrics: ReportMetric[] = [
-    {
-      title: "Talep dönüşümü",
-      value: formatPercent(convertedRequestCount, requestCount),
-      detail: `${convertedRequestCount}/${requestCount} talep rezervasyona çevrildi`,
-      tone: convertedRequestCount > 0 ? "ok" : pendingRequestCount > 0 ? "wait" : "neutral",
-      icon: TrendingUp
-    },
-    {
-      title: "Yanıt bekleyen",
-      value: String(pendingRequestCount),
-      detail: `${answeredRequestCount} talep cevaplandı veya rezervasyona döndü`,
-      tone: pendingRequestCount > 0 ? "wait" : "ok",
-      icon: MessageCircle
-    },
-    {
-      title: "Rezervasyon onayı",
-      value: formatPercent(approvedReservationCount, reservationCount),
-      detail: `${pendingReservationCount} kayıt işletme onayı bekliyor`,
-      tone: pendingReservationCount > 0 ? "wait" : "ok",
-      icon: CalendarCheck
-    },
-    {
-      title: "Oda kullanımı",
-      value: formatPercent(busyRoomCount, roomCount),
-      detail: `${dashboardData.summary.availableRooms}/${dashboardData.summary.totalRooms} oda boş`,
-      tone: busyRoomCount > 0 ? "info" : "neutral",
-      icon: BedDouble
-    },
-    {
-      title: "Masa doluluğu",
-      value: formatPercent(busyTableCount, tableCount),
-      detail: `${dashboardData.summary.availableTables}/${tableCount} masa boş`,
-      tone: busyTableCount > 0 ? "info" : "neutral",
-      icon: UtensilsCrossed
-    },
-    {
-      title: "Günlük iş tamamlama",
-      value: formatPercent(completedTaskCount, taskCount),
-      detail: `${pendingTaskCount} iş bekliyor`,
-      tone: pendingTaskCount > 0 ? "wait" : "ok",
-      icon: CheckCircle2
-    }
-  ];
-
-  return {
-    metrics,
-    requestStatus: buildBreakdown(
-      [
-        ["new", formatRequestStatus("new")],
-        ["answered", formatRequestStatus("answered")],
-        ["converted_to_reservation", formatRequestStatus("converted_to_reservation")],
-        ["rejected", formatRequestStatus("rejected")],
-        ["waiting_owner", formatRequestStatus("waiting_owner")],
-        ["waiting_customer", formatRequestStatus("waiting_customer")]
-      ],
-      (status) => dashboardData.requests.filter((request) => request.status === status).length,
-      requestCount
-    ),
-    reservationStatus: buildBreakdown(
-      [
-        ["pending", formatReservationStatus("pending")],
-        ["approved", formatReservationStatus("approved")],
-        ["completed", formatReservationStatus("completed")],
-        ["rejected", formatReservationStatus("rejected")],
-        ["cancelled", formatReservationStatus("cancelled")]
-      ],
-      (status) => dashboardData.reservations.filter((reservation) => reservation.status === status).length,
-      reservationCount
-    ),
-    roomStatus: buildBreakdown(
-      [
-        ["available", formatRoomStatus("available")],
-        ["reserved", formatRoomStatus("reserved")],
-        ["occupied", formatRoomStatus("occupied")],
-        ["cleaning", formatRoomStatus("cleaning")],
-        ["maintenance", formatRoomStatus("maintenance")]
-      ],
-      (status) => dashboardData.rooms.filter((room) => room.status === status).length,
-      roomCount
-    ),
-    tableStatus: buildBreakdown(
-      [
-        ["available", formatTableStatus("available")],
-        ["reserved", formatTableStatus("reserved")],
-        ["occupied", formatTableStatus("occupied")],
-        ["bill_waiting", formatTableStatus("bill_waiting")],
-        ["cleaning", formatTableStatus("cleaning")]
-      ],
-      (status) => dashboardData.tables.filter((table) => table.status === status).length,
-      tableCount
-    ),
-    focusItems: [
-      {
-        title: "Yanıt bekleyen talepler",
-        value: pendingRequestCount,
-        detail: pendingRequestCount > 0 ? "Müşteriye dönüş bekleyen kayıt var." : "Talep kutusu sakin.",
-        tone: pendingRequestCount > 0 ? "wait" : "ok"
-      },
-      {
-        title: "Onay bekleyen rezervasyonlar",
-        value: pendingReservationCount,
-        detail: pendingReservationCount > 0 ? "Onay veya ret kararı bekliyor." : "Bekleyen rezervasyon yok.",
-        tone: pendingReservationCount > 0 ? "wait" : "ok"
-      },
-      {
-        title: "Bekleyen günlük işler",
-        value: pendingTaskCount,
-        detail: pendingTaskCount > 0 ? "Operasyon listesinde açık iş var." : "Günlük iş listesi temiz.",
-        tone: pendingTaskCount > 0 ? "wait" : "ok"
-      }
-    ],
-    completedTaskCount,
-    repeatCustomerCount
-  };
-}
-
-function buildBreakdown(entries: Array<[string, string]>, countByKey: (key: string) => number, total: number): ReportBreakdownItem[] {
-  return entries
-    .map(([key, label]) => {
-      const value = countByKey(key);
-      return {
-        label,
-        value,
-        percent: calculatePercent(value, total),
-        detail: `${value} kayıt · ${formatPercent(value, total)}`
-      };
-    })
-    .filter((item) => item.value > 0);
-}
-
-function calculatePercent(value: number, total: number) {
-  if (total <= 0) {
-    return 0;
-  }
-
-  return Math.round((value / total) * 100);
-}
-
-function formatPercent(value: number, total: number) {
-  return `${calculatePercent(value, total)}%`;
 }
 
 function formatRequestType(value: string) {

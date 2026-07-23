@@ -66,13 +66,31 @@ import {
   type DesktopStockImageAnalyzeInput,
   type DesktopStockImageAnalyzeResult,
   type ApplyStockImageImportInput,
-  type DesktopStockImageApplyResult
+  type DesktopStockImageApplyResult,
+  type DesktopReportQueryResult,
+  type GenerateDesktopReportAiInput,
+  type GenerateDesktopReportAiResult
 } from "./database";
+import {
+  buildReportAiMessages,
+  buildReportAiPayload,
+  reportHasEnoughData,
+  sanitizeReportAiAnswer
+} from "./report-ai";
 import {
   SyncCoordinator,
   type AutomaticSyncCycleResult,
   type AutomaticSyncStatus
 } from "./sync-coordinator";
+import {
+  createAppPasswordVerifier,
+  secureTextEqual,
+  validateAppPassword,
+  verifyAppPassword,
+  type AppLockActionResult,
+  type AppLockStatus,
+  type UpdateAppPasswordInput
+} from "./app-lock";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";
@@ -81,8 +99,13 @@ let desktopDatabase: DesktopDatabase | null = null;
 let syncCoordinator: SyncCoordinator | null = null;
 let androidActionSyncInFlight: Promise<AndroidActionProcessSummary> | null = null;
 let androidSnapshotPublishPending = true;
+let appSessionLocked = false;
+let appLockFailureCount = 0;
+let appLockBlockedUntil = 0;
 const stockImageAnalysisControllers = new Map<string, AbortController>();
 const STOCK_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const APP_LOCK_FAILURE_LIMIT = 5;
+const APP_LOCK_RETRY_DELAY_MS = 30_000;
 
 interface AndroidActionProcessSummary {
   pulled: number;
@@ -212,6 +235,7 @@ if (!hasSingleInstanceLock) {
       userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData")
     });
     desktopDatabase.initialize();
+    appSessionLocked = Boolean(desktopDatabase.getAppLockPasswordVerifier());
     syncCoordinator = new SyncCoordinator({
       database: desktopDatabase,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
@@ -295,7 +319,10 @@ app.on("before-quit", () => {
 });
 
 function registerIpcHandlers() {
+  registerAppLockIpcHandlers();
+
   ipcMain.handle("app:getBootstrapData", (): DesktopBootstrapData => {
+    assertAppSessionUnlocked();
     return {
       appName: "Yardımcı Asistan",
       version: app.getVersion(),
@@ -314,6 +341,25 @@ function registerIpcHandlers() {
   ipcMain.handle("sync:getStatus", (): AutomaticSyncStatus => {
     return getSyncCoordinator().getStatus();
   });
+
+  ipcMain.handle("report:getData", (_event, input: GenerateDesktopReportAiInput["range"]): DesktopReportQueryResult => {
+    assertAppSessionUnlocked();
+    try {
+      return { ok: true, data: getDatabase().getReportData(input) };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Rapor verileri hazırlanamadı."
+      };
+    }
+  });
+
+  ipcMain.handle(
+    "report:generateAiComment",
+    async (_event, input: GenerateDesktopReportAiInput): Promise<GenerateDesktopReportAiResult> => {
+      return generateDesktopReportAiComment(input);
+    }
+  );
 
   ipcMain.handle("sync:runNow", async (): Promise<AutomaticSyncCycleResult> => {
     return getSyncCoordinator().runNow();
@@ -478,10 +524,12 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("setup:getData", (): DesktopSetupData => {
+    assertAppSessionUnlocked();
     return getDatabase().getSetupData();
   });
 
   ipcMain.handle("ai:revealApiKey", (_event, serviceValue: unknown): AiApiKeyRevealResult => {
+    assertAppSessionUnlocked();
     const service = String(serviceValue ?? "").trim().toLowerCase() as DesktopAiService;
     if (!["openai", "openrouter", "groq", "gemini", "custom"].includes(service)) {
       return { ok: false, message: "API anahtarı için geçerli bir servis sağlayıcı seçin." };
@@ -530,6 +578,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("setup:saveInitial", async (_event, input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> => {
+    assertAppSessionUnlocked();
     const secretUpdate = createAiApiKeyUpdate(input);
     if (!secretUpdate.ok) {
       return secretUpdate;
@@ -883,8 +932,164 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("dashboard:getData", (): DesktopDashboardData => {
+    assertAppSessionUnlocked();
     return getDatabase().getDashboardData();
   });
+}
+
+function registerAppLockIpcHandlers() {
+  ipcMain.handle("appLock:getStatus", (): AppLockStatus => getAppLockStatus());
+
+  ipcMain.handle("appLock:lock", (): AppLockActionResult => {
+    appSessionLocked = true;
+    return {
+      ok: true,
+      message: "Uygulama kilitlendi.",
+      status: getAppLockStatus()
+    };
+  });
+
+  ipcMain.handle("appLock:unlock", async (_event, passwordValue: unknown): Promise<AppLockActionResult> => {
+    const retryAfterSeconds = getAppLockRetryAfterSeconds();
+    if (retryAfterSeconds > 0) {
+      return appLockFailureResult(
+        `Çok fazla deneme yapıldı. ${retryAfterSeconds} saniye sonra tekrar deneyin.`,
+        retryAfterSeconds
+      );
+    }
+
+    const verifier = getDatabase().getAppLockPasswordVerifier();
+    if (!verifier) {
+      resetAppLockFailures();
+      appSessionLocked = false;
+      return {
+        ok: true,
+        message: "Kilit açıldı.",
+        status: getAppLockStatus()
+      };
+    }
+
+    const password = typeof passwordValue === "string" ? passwordValue : "";
+    if (!await verifyAppPassword(password, verifier)) {
+      const nextRetryAfterSeconds = recordAppLockFailure();
+      return appLockFailureResult(
+        nextRetryAfterSeconds > 0
+          ? `Şifre doğru değil. ${nextRetryAfterSeconds} saniye sonra tekrar deneyin.`
+          : "Şifre doğru değil.",
+        nextRetryAfterSeconds
+      );
+    }
+
+    resetAppLockFailures();
+    appSessionLocked = false;
+    return {
+      ok: true,
+      message: "Kilit açıldı.",
+      status: getAppLockStatus()
+    };
+  });
+
+  ipcMain.handle(
+    "appLock:updatePassword",
+    async (_event, inputValue: unknown): Promise<AppLockActionResult> => {
+      if (appSessionLocked) {
+        return appLockFailureResult("Şifreyi değiştirmek için önce uygulama kilidini açın.");
+      }
+
+      const input = toAppPasswordUpdateInput(inputValue);
+      if (!input) {
+        return appLockFailureResult("Şifre bilgileri okunamadı.");
+      }
+
+      const retryAfterSeconds = getAppLockRetryAfterSeconds();
+      if (retryAfterSeconds > 0) {
+        return appLockFailureResult(
+          `Çok fazla deneme yapıldı. ${retryAfterSeconds} saniye sonra tekrar deneyin.`,
+          retryAfterSeconds
+        );
+      }
+
+      const currentVerifier = getDatabase().getAppLockPasswordVerifier();
+      if (currentVerifier && !await verifyAppPassword(input.currentPassword, currentVerifier)) {
+        const nextRetryAfterSeconds = recordAppLockFailure();
+        return appLockFailureResult(
+          nextRetryAfterSeconds > 0
+            ? `Mevcut şifre doğru değil. ${nextRetryAfterSeconds} saniye sonra tekrar deneyin.`
+            : "Mevcut şifre doğru değil.",
+          nextRetryAfterSeconds
+        );
+      }
+
+      if (!input.newPassword) {
+        getDatabase().setAppLockPasswordVerifier("");
+        resetAppLockFailures();
+        return {
+          ok: true,
+          message: "Uygulama açılış şifresi kaldırıldı.",
+          status: getAppLockStatus()
+        };
+      }
+
+      const validationMessage = validateAppPassword(input.newPassword);
+      if (validationMessage) {
+        return appLockFailureResult(validationMessage);
+      }
+
+      try {
+        const verifier = await createAppPasswordVerifier(input.newPassword);
+        getDatabase().setAppLockPasswordVerifier(verifier);
+        resetAppLockFailures();
+        return {
+          ok: true,
+          message: currentVerifier
+            ? "Uygulama açılış şifresi değiştirildi."
+            : "Uygulama açılış şifresi belirlendi.",
+          status: getAppLockStatus()
+        };
+      } catch {
+        return appLockFailureResult("Uygulama şifresi güvenli biçimde kaydedilemedi.");
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "appLock:resetWithWebSecurityKey",
+    (_event, webSecurityKeyValue: unknown): AppLockActionResult => {
+      const retryAfterSeconds = getAppLockRetryAfterSeconds();
+      if (retryAfterSeconds > 0) {
+        return appLockFailureResult(
+          `Çok fazla deneme yapıldı. ${retryAfterSeconds} saniye sonra tekrar deneyin.`,
+          retryAfterSeconds
+        );
+      }
+
+      const suppliedKey = typeof webSecurityKeyValue === "string" ? webSecurityKeyValue.trim() : "";
+      const expectedKey = getWebSyncConfig(getDatabase().getSetupData()).syncSecret.trim();
+      if (
+        !suppliedKey
+        || suppliedKey.length > 4096
+        || !expectedKey
+        || !secureTextEqual(suppliedKey, expectedKey)
+      ) {
+        const nextRetryAfterSeconds = recordAppLockFailure();
+        return appLockFailureResult(
+          nextRetryAfterSeconds > 0
+            ? `Web güvenlik anahtarı doğru değil. ${nextRetryAfterSeconds} saniye sonra tekrar deneyin.`
+            : "Web güvenlik anahtarı doğru değil.",
+          nextRetryAfterSeconds
+        );
+      }
+
+      getDatabase().setAppLockPasswordVerifier("");
+      resetAppLockFailures();
+      appSessionLocked = false;
+      return {
+        ok: true,
+        message: "Uygulama şifresi sıfırlandı ve kilit açıldı.",
+        status: getAppLockStatus()
+      };
+    }
+  );
 }
 
 function invalidTableOrderPayload(message: string): DesktopTableOrderResult {
@@ -1154,6 +1359,66 @@ function getDatabase() {
   }
 
   return desktopDatabase;
+}
+
+function getAppLockStatus(): AppLockStatus {
+  const syncStatus = syncCoordinator?.getStatus();
+  const syncProblemCount = syncStatus?.enabled && syncStatus.consecutiveFailures > 0 && syncStatus.lastError ? 1 : 0;
+  return {
+    locked: appSessionLocked,
+    passwordConfigured: Boolean(getDatabase().getAppLockPasswordVerifier()),
+    notificationCount: getDatabase().getAppLockNotificationCount() + syncProblemCount
+  };
+}
+
+function appLockFailureResult(message: string, retryAfterSeconds = 0): AppLockActionResult {
+  return {
+    ok: false,
+    message,
+    status: getAppLockStatus(),
+    ...(retryAfterSeconds > 0 ? { retryAfterSeconds } : {})
+  };
+}
+
+function toAppPasswordUpdateInput(value: unknown): UpdateAppPasswordInput | null {
+  const record = toUnknownRecord(value);
+  if (!record) {
+    return null;
+  }
+  return {
+    currentPassword: typeof record.currentPassword === "string" ? record.currentPassword : "",
+    newPassword: typeof record.newPassword === "string" ? record.newPassword : ""
+  };
+}
+
+function getAppLockRetryAfterSeconds(): number {
+  if (appLockBlockedUntil <= Date.now()) {
+    appLockBlockedUntil = 0;
+    return 0;
+  }
+  return Math.max(1, Math.ceil((appLockBlockedUntil - Date.now()) / 1000));
+}
+
+function recordAppLockFailure(): number {
+  appLockFailureCount += 1;
+  if (appLockFailureCount < APP_LOCK_FAILURE_LIMIT) {
+    return 0;
+  }
+
+  appLockFailureCount = 0;
+  appLockBlockedUntil = Date.now() + APP_LOCK_RETRY_DELAY_MS;
+  return getAppLockRetryAfterSeconds();
+}
+
+function resetAppLockFailures() {
+  appLockFailureCount = 0;
+  appLockBlockedUntil = 0;
+}
+
+function assertAppSessionUnlocked() {
+  if (appSessionLocked) {
+    throw new Error("Uygulama kilitli. Devam etmek için kilidi açın.");
+  }
 }
 
 function getSyncCoordinator() {
@@ -1451,6 +1716,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     })),
     messages: messages.slice(0, 300),
     androidPermissions: getDatabase().getAndroidPermissionSnapshot(),
+    reports: getDatabase().getAndroidReportPresets(today),
     updated_at: updatedAt
   };
 }
@@ -1491,6 +1757,48 @@ function createDesktopAiConfig(setup: DesktopSetupData) {
     authMode: setup.aiService === "gemini" ? "google_api_key" as const : "bearer" as const,
     timeoutMs: timeoutSeconds * 1000
   };
+}
+
+async function generateDesktopReportAiComment(
+  input: GenerateDesktopReportAiInput
+): Promise<GenerateDesktopReportAiResult> {
+  const mode = input?.mode;
+  if (!["summary", "attention", "sales", "recommendations"].includes(mode)) {
+    return { ok: false, message: "Geçerli bir AI yorum türü seçin." };
+  }
+
+  const setup = getDatabase().getSetupData();
+  const config = createDesktopAiConfig(setup);
+  if (!config.enabled || config.provider === "disabled") {
+    return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
+  }
+
+  let report;
+  try {
+    report = getDatabase().getReportData(input.range);
+  } catch {
+    return { ok: false, message: "Rapor verileri hazırlanamadı." };
+  }
+  const payload = buildReportAiPayload(report);
+  if (!reportHasEnoughData(payload)) {
+    return { ok: true, content: "Bu dönem için yeterli veri yok." };
+  }
+
+  try {
+    const completion = await generateConfiguredChat({
+      ...config,
+      messages: buildReportAiMessages(mode, payload, setup.businessName || "İşletme")
+    });
+    if (!completion.ok) {
+      return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
+    }
+    const sanitized = sanitizeReportAiAnswer(completion.answer, payload, mode);
+    return sanitized.ok
+      ? sanitized
+      : { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
+  } catch {
+    return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
+  }
 }
 
 async function generateAiWorkspaceEntry(input: GenerateAiWorkspaceInput): Promise<GenerateAiWorkspaceResult> {

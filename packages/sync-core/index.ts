@@ -113,6 +113,57 @@ export interface AndroidOperationsSummary {
   customer_count: number;
 }
 
+export type AndroidReportPresetKey = "today" | "yesterday" | "last7" | "last30";
+
+export interface AndroidReportTopItem {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
+export interface AndroidReportAttentionItem {
+  kind: string;
+  title: string;
+  detail: string;
+}
+
+export interface AndroidReportSnapshot {
+  period: {
+    key: AndroidReportPresetKey;
+    label: string;
+    start: string;
+    end: string;
+  };
+  summary: {
+    restaurant_revenue: number;
+    closed_orders: number;
+    average_order: number;
+    approved_reservations: number;
+    new_requests: number;
+    attention_count: number;
+  };
+  restaurant: {
+    sold_item_count: number;
+    cancelled_orders: number;
+    top_items: AndroidReportTopItem[];
+    daily_revenue: Array<{
+      date: string;
+      revenue: number;
+      closed_orders: number;
+    }>;
+  };
+  attention: {
+    pending_requests: number;
+    pending_reservations: number;
+    payment_waiting_tables: number;
+    overdue_tasks: number;
+    incomplete_tasks: number;
+    out_of_stock_items: number;
+    low_stock_items: number;
+    items: AndroidReportAttentionItem[];
+  };
+}
+
 export interface AndroidSnapshotTask {
   id: string;
   title: string;
@@ -142,6 +193,7 @@ export interface AndroidOperationsSnapshot {
   table_orders: AndroidSnapshotTableOrder[];
   messages: AndroidSnapshotMessage[];
   androidPermissions: Record<string, AndroidSnapshotPermissionProfile>;
+  reports: Record<AndroidReportPresetKey, AndroidReportSnapshot>;
   updated_at: ISODateTimeString | "";
 }
 

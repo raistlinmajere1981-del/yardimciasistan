@@ -23,6 +23,8 @@ import {
   resolveAndroidActionPermission
 } from "@yardimci-asistan/sync-core";
 import type {
+  AndroidReportPresetKey,
+  AndroidReportSnapshot,
   AndroidDeviceRole,
   AndroidDeviceSighting,
   AndroidPermission,
@@ -191,6 +193,136 @@ export interface DesktopDashboardData {
   summary: DashboardSummary;
 }
 
+export type DesktopReportPreset = "today" | "yesterday" | "last7" | "last30" | "custom";
+
+export interface DesktopReportRangeInput {
+  preset: DesktopReportPreset;
+  label: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface DesktopReportPeriod {
+  preset: DesktopReportPreset;
+  label: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface DesktopReportTopItem {
+  name: string;
+  quantity: number;
+  revenue: number;
+}
+
+export interface DesktopReportDailyRevenue {
+  date: string;
+  revenue: number;
+  closedOrders: number;
+}
+
+export interface DesktopReportStockConsumption {
+  menuItemId: string;
+  name: string;
+  quantity: number;
+  unit: MenuStockUnit;
+}
+
+export interface DesktopReportStockMovement {
+  id: string;
+  menuItemId: string;
+  itemName: string;
+  type: MenuStockMovementType;
+  quantityChange: number;
+  quantityAfter: number;
+  unit: MenuStockUnit;
+  sourceType: MenuStockSourceType;
+  sourceLabel: string;
+  note: string;
+  createdAt: string;
+}
+
+export type DesktopReportAttentionKind =
+  | "pending_request"
+  | "pending_reservation"
+  | "payment_waiting"
+  | "overdue_task"
+  | "open_task"
+  | "out_of_stock"
+  | "low_stock";
+
+export interface DesktopReportAttentionItem {
+  kind: DesktopReportAttentionKind;
+  title: string;
+  detail: string;
+}
+
+export interface DesktopReportData {
+  period: DesktopReportPeriod;
+  generatedAt: string;
+  summary: {
+    restaurantRevenue: number;
+    closedOrders: number;
+    averageOrder: number;
+    approvedReservations: number;
+    newRequests: number;
+    pendingTasks: number;
+  };
+  restaurant: {
+    revenue: number;
+    closedOrders: number;
+    averageOrder: number;
+    soldItemCount: number;
+    cancelledOrders: number;
+    dailyRevenue: DesktopReportDailyRevenue[];
+    topItems: DesktopReportTopItem[];
+  };
+  pensionAndRequests: {
+    incomingReservations: number;
+    approvedReservations: number;
+    pendingReservations: number;
+    cancelledOrRejectedReservations: number;
+    accommodationNights: number;
+    newRequests: number;
+    answeredRequests: number;
+    waitingRequests: number;
+  };
+  stock: {
+    topConsumed: DesktopReportStockConsumption[];
+    manualMovementCount: number;
+    imageMovementCount: number;
+    manualMovements: DesktopReportStockMovement[];
+    imageMovements: DesktopReportStockMovement[];
+    recentMovements: DesktopReportStockMovement[];
+  };
+  attention: {
+    pendingRequests: number;
+    pendingReservations: number;
+    paymentWaitingTables: number;
+    overdueTasks: number;
+    incompleteTasks: number;
+    outOfStockItems: number;
+    lowStockItems: number;
+    totalCount: number;
+    items: DesktopReportAttentionItem[];
+  };
+}
+
+export type DesktopReportQueryResult =
+  | { ok: true; data: DesktopReportData }
+  | { ok: false; message: string };
+
+export type DesktopReportAiMode = "summary" | "attention" | "sales" | "recommendations";
+
+export interface GenerateDesktopReportAiInput {
+  mode: DesktopReportAiMode;
+  range: DesktopReportRangeInput;
+}
+
+export type GenerateDesktopReportAiResult =
+  | { ok: true; content: string }
+  | { ok: false; message: string };
+
 export type DesktopAiService = "openai" | "openrouter" | "groq" | "gemini" | "custom";
 
 export interface DesktopAiModelOption {
@@ -227,6 +359,7 @@ export interface AiApiKeyWrite {
 
 export interface DesktopSetupData {
   setupRequired: boolean;
+  appPasswordConfigured: boolean;
   businessName: string;
   businessType: string;
   phone: string;
@@ -842,6 +975,292 @@ export class DesktopDatabase {
       },
       menu: this.getPublishedMenu()
     };
+  }
+
+  getReportData(input: DesktopReportRangeInput): DesktopReportData {
+    const period = normalizeDesktopReportRange(input);
+    const { startDate, endDate } = period;
+    const generatedAt = new Date().toISOString();
+
+    const paidSummary = this.db
+      .prepare(`
+        SELECT
+          COUNT(*) AS closed_orders,
+          COALESCE(ROUND(SUM(total), 2), 0) AS revenue
+        FROM table_orders
+        WHERE status = 'paid'
+          AND closed_at != ''
+          AND date(closed_at, 'localtime') BETWEEN ? AND ?
+      `)
+      .get(startDate, endDate) as { closed_orders?: number; revenue?: number } | undefined;
+    const closedOrders = Math.max(0, Number(paidSummary?.closed_orders ?? 0));
+    const restaurantRevenue = roundMoney(Number(paidSummary?.revenue ?? 0));
+    const averageOrder = closedOrders > 0 ? roundMoney(restaurantRevenue / closedOrders) : 0;
+
+    const soldItemRow = this.db
+      .prepare(`
+        SELECT COALESCE(SUM(table_order_items.quantity), 0) AS sold_item_count
+        FROM table_order_items
+        INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
+        WHERE table_orders.status = 'paid'
+          AND table_orders.closed_at != ''
+          AND date(table_orders.closed_at, 'localtime') BETWEEN ? AND ?
+          AND table_order_items.status != 'cancelled'
+      `)
+      .get(startDate, endDate) as { sold_item_count?: number } | undefined;
+    const soldItemCount = Math.max(0, Number(soldItemRow?.sold_item_count ?? 0));
+    const cancelledOrders = this.getScalarCount(
+      `
+        SELECT COUNT(*) AS count
+        FROM table_orders
+        WHERE status = 'cancelled'
+          AND closed_at != ''
+          AND date(closed_at, 'localtime') BETWEEN ? AND ?
+      `,
+      startDate,
+      endDate
+    );
+
+    const topItems = (this.db
+      .prepare(`
+        SELECT
+          table_order_items.product_name AS name,
+          COALESCE(SUM(table_order_items.quantity), 0) AS quantity,
+          COALESCE(ROUND(SUM(table_order_items.line_total), 2), 0) AS revenue
+        FROM table_order_items
+        INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
+        WHERE table_orders.status = 'paid'
+          AND table_orders.closed_at != ''
+          AND date(table_orders.closed_at, 'localtime') BETWEEN ? AND ?
+          AND table_order_items.status != 'cancelled'
+        GROUP BY table_order_items.product_name
+        ORDER BY quantity DESC, revenue DESC, name COLLATE NOCASE ASC
+        LIMIT 5
+      `)
+      .all(startDate, endDate) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        name: String(row.name ?? "Ürün"),
+        quantity: Math.max(0, Number(row.quantity ?? 0)),
+        revenue: roundMoney(Number(row.revenue ?? 0))
+      }));
+
+    const dailyRows = this.db
+      .prepare(`
+        SELECT
+          date(closed_at, 'localtime') AS report_date,
+          COUNT(*) AS closed_orders,
+          COALESCE(ROUND(SUM(total), 2), 0) AS revenue
+        FROM table_orders
+        WHERE status = 'paid'
+          AND closed_at != ''
+          AND date(closed_at, 'localtime') BETWEEN ? AND ?
+        GROUP BY report_date
+        ORDER BY report_date ASC
+      `)
+      .all(startDate, endDate) as Array<Record<string, unknown>>;
+    const dailyByDate = new Map(dailyRows.map((row) => [
+      String(row.report_date ?? ""),
+      {
+        revenue: roundMoney(Number(row.revenue ?? 0)),
+        closedOrders: Math.max(0, Number(row.closed_orders ?? 0))
+      }
+    ]));
+    const dailyRevenue = enumerateIsoDateRange(startDate, endDate).map((date) => ({
+      date,
+      revenue: dailyByDate.get(date)?.revenue ?? 0,
+      closedOrders: dailyByDate.get(date)?.closedOrders ?? 0
+    }));
+
+    const reservationSummary = this.db
+      .prepare(`
+        SELECT
+          COUNT(*) AS incoming,
+          COALESCE(SUM(CASE WHEN status IN ('approved', 'completed') THEN 1 ELSE 0 END), 0) AS approved,
+          COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pending,
+          COALESCE(SUM(CASE WHEN status IN ('cancelled', 'rejected') THEN 1 ELSE 0 END), 0) AS cancelled_or_rejected,
+          COALESCE(SUM(
+            CASE
+              WHEN reservation_type = 'room'
+                AND status IN ('approved', 'completed')
+                AND date(end_date) > date(start_date)
+              THEN CAST(julianday(date(end_date)) - julianday(date(start_date)) AS INTEGER)
+              ELSE 0
+            END
+          ), 0) AS accommodation_nights
+        FROM reservations
+        WHERE deleted_at = ''
+          AND date(created_at, 'localtime') BETWEEN ? AND ?
+      `)
+      .get(startDate, endDate) as Record<string, unknown> | undefined;
+
+    const requestSummary = this.db
+      .prepare(`
+        SELECT
+          COUNT(*) AS incoming,
+          COALESCE(SUM(
+            CASE WHEN status IN ('answered', 'converted_to_reservation', 'waiting_customer') THEN 1 ELSE 0 END
+          ), 0) AS answered,
+          COALESCE(SUM(
+            CASE WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') THEN 1 ELSE 0 END
+          ), 0) AS waiting
+        FROM requests
+        WHERE deleted_at = ''
+          AND date(created_at, 'localtime') BETWEEN ? AND ?
+      `)
+      .get(startDate, endDate) as Record<string, unknown> | undefined;
+
+    const pendingTasks = this.getScalarCount(
+      `
+        SELECT COUNT(*) AS count
+        FROM daily_tasks
+        WHERE deleted_at = ''
+          AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+          AND (
+            (due_date != '' AND date(due_date) BETWEEN ? AND ?)
+            OR (due_date = '' AND date(created_at, 'localtime') BETWEEN ? AND ?)
+          )
+      `,
+      startDate,
+      endDate,
+      startDate,
+      endDate
+    );
+
+    const topConsumed = (this.db
+      .prepare(`
+        SELECT
+          menu_items.id AS menu_item_id,
+          menu_items.name AS name,
+          menu_items.stock_unit AS unit,
+          COALESCE(ROUND(SUM(
+            CASE WHEN menu_stock_movements.quantity_change < 0
+              THEN -menu_stock_movements.quantity_change
+              ELSE 0
+            END
+          ), 3), 0) AS consumed
+        FROM menu_stock_movements
+        INNER JOIN menu_items ON menu_items.id = menu_stock_movements.menu_item_id
+        WHERE menu_items.deleted_at = ''
+          AND date(menu_stock_movements.created_at, 'localtime') BETWEEN ? AND ?
+        GROUP BY menu_items.id, menu_items.name, menu_items.stock_unit
+        HAVING consumed > 0
+        ORDER BY consumed DESC, name COLLATE NOCASE ASC
+        LIMIT 5
+      `)
+      .all(startDate, endDate) as Array<Record<string, unknown>>)
+      .map((row) => ({
+        menuItemId: String(row.menu_item_id ?? ""),
+        name: String(row.name ?? "Ürün"),
+        quantity: normalizeStockPrecision(Number(row.consumed ?? 0)),
+        unit: normalizeMenuStockUnit(row.unit)
+      }));
+
+    const manualMovementCount = this.getScalarCount(
+      `
+        SELECT COUNT(*) AS count
+        FROM menu_stock_movements
+        WHERE source_type IN ('desktop', 'android')
+          AND date(created_at, 'localtime') BETWEEN ? AND ?
+      `,
+      startDate,
+      endDate
+    );
+    const imageMovementCount = this.getScalarCount(
+      `
+        SELECT COUNT(*) AS count
+        FROM menu_stock_movements
+        WHERE source_type = 'stock_image_import'
+          AND date(created_at, 'localtime') BETWEEN ? AND ?
+      `,
+      startDate,
+      endDate
+    );
+    const manualMovements = this.getReportStockMovements(startDate, endDate, "manual");
+    const imageMovements = this.getReportStockMovements(startDate, endDate, "image");
+    const recentMovements = this.getReportStockMovements(startDate, endDate, "all");
+    const attention = this.getReportAttention();
+    const approvedReservations = Math.max(0, Number(reservationSummary?.approved ?? 0));
+    const newRequests = Math.max(0, Number(requestSummary?.incoming ?? 0));
+
+    return {
+      period,
+      generatedAt,
+      summary: {
+        restaurantRevenue,
+        closedOrders,
+        averageOrder,
+        approvedReservations,
+        newRequests,
+        pendingTasks
+      },
+      restaurant: {
+        revenue: restaurantRevenue,
+        closedOrders,
+        averageOrder,
+        soldItemCount,
+        cancelledOrders,
+        dailyRevenue,
+        topItems
+      },
+      pensionAndRequests: {
+        incomingReservations: Math.max(0, Number(reservationSummary?.incoming ?? 0)),
+        approvedReservations,
+        pendingReservations: Math.max(0, Number(reservationSummary?.pending ?? 0)),
+        cancelledOrRejectedReservations: Math.max(0, Number(reservationSummary?.cancelled_or_rejected ?? 0)),
+        accommodationNights: Math.max(0, Number(reservationSummary?.accommodation_nights ?? 0)),
+        newRequests,
+        answeredRequests: Math.max(0, Number(requestSummary?.answered ?? 0)),
+        waitingRequests: Math.max(0, Number(requestSummary?.waiting ?? 0))
+      },
+      stock: {
+        topConsumed,
+        manualMovementCount,
+        imageMovementCount,
+        manualMovements,
+        imageMovements,
+        recentMovements
+      },
+      attention
+    };
+  }
+
+  getAndroidReportPresets(referenceDateInput = ""): Record<AndroidReportPresetKey, AndroidReportSnapshot> {
+    const referenceDate = isIsoDate(referenceDateInput) ? referenceDateInput : formatLocalIsoDate(new Date());
+    const ranges: Array<[AndroidReportPresetKey, DesktopReportRangeInput]> = [
+      ["today", { preset: "today", label: "Bugün", startDate: referenceDate, endDate: referenceDate }],
+      [
+        "yesterday",
+        {
+          preset: "yesterday",
+          label: "Dün",
+          startDate: shiftIsoDate(referenceDate, -1),
+          endDate: shiftIsoDate(referenceDate, -1)
+        }
+      ],
+      [
+        "last7",
+        {
+          preset: "last7",
+          label: "Son 7 Gün",
+          startDate: shiftIsoDate(referenceDate, -6),
+          endDate: referenceDate
+        }
+      ],
+      [
+        "last30",
+        {
+          preset: "last30",
+          label: "Son 30 Gün",
+          startDate: shiftIsoDate(referenceDate, -29),
+          endDate: referenceDate
+        }
+      ]
+    ];
+
+    return Object.fromEntries(ranges.map(([key, range]) => {
+      const report = this.getReportData(range);
+      return [key, toAndroidReportSnapshot(key, report)];
+    })) as Record<AndroidReportPresetKey, AndroidReportSnapshot>;
   }
 
   getAndroidDevices(): DesktopAndroidDevice[] {
@@ -2274,6 +2693,7 @@ export class DesktopDatabase {
 
     return {
       setupRequired,
+      appPasswordConfigured: Boolean(String(settings?.app_password_verifier ?? "").trim()),
       businessName,
       businessType: String(business?.business_type ?? "pension_restaurant"),
       phone: String(business?.phone ?? ""),
@@ -2305,6 +2725,63 @@ export class DesktopDatabase {
         tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
       }
     };
+  }
+
+  getAppLockPasswordVerifier(): string {
+    const settings = this.db
+      .prepare("SELECT app_password_verifier FROM settings WHERE deleted_at = '' LIMIT 1")
+      .get() as { app_password_verifier?: string } | undefined;
+    return String(settings?.app_password_verifier ?? "").trim();
+  }
+
+  setAppLockPasswordVerifier(verifier: string): void {
+    const normalizedVerifier = verifier.trim();
+    if (normalizedVerifier.length > 1024 || /[\x00-\x1F\x7F]/.test(normalizedVerifier)) {
+      throw new Error("Uygulama şifre kaydı geçersiz.");
+    }
+
+    const now = new Date().toISOString();
+    const result = this.db
+      .prepare(`
+        UPDATE settings
+        SET app_password_verifier = ?,
+            app_password_updated_at = ?,
+            updated_at = ?
+        WHERE deleted_at = ''
+      `)
+      .run(normalizedVerifier, now, now);
+    if (Number(result.changes) === 0) {
+      throw new Error("Uygulama şifresinin kaydedileceği ayar bulunamadı.");
+    }
+  }
+
+  getAppLockNotificationCount(): number {
+    const row = this.db
+      .prepare(`
+        SELECT
+          (
+            (SELECT COUNT(*) FROM requests WHERE status = 'new' AND deleted_at = '')
+            + (SELECT COUNT(*) FROM reservations WHERE status = 'pending' AND deleted_at = '')
+            + (SELECT COUNT(*) FROM daily_tasks WHERE status = 'pending' AND deleted_at = '')
+            + (
+              SELECT COUNT(DISTINCT tables.id)
+              FROM tables
+              LEFT JOIN table_orders
+                ON table_orders.table_id = tables.id
+                AND table_orders.status = 'payment'
+              WHERE tables.deleted_at = ''
+                AND tables.is_active = 1
+                AND (tables.status = 'bill_waiting' OR table_orders.id IS NOT NULL)
+            )
+            + (
+              SELECT COUNT(*)
+              FROM events
+              WHERE type = 'android.action_failed' AND deleted_at = ''
+            )
+          ) AS count
+      `)
+      .get() as { count?: number } | undefined;
+    return Math.max(0, Number(row?.count ?? 0));
   }
 
   getAiServiceProfiles(): DesktopAiServiceProfile[] {
@@ -4585,12 +5062,231 @@ export class DesktopDatabase {
     };
   }
 
+  private getReportStockMovements(
+    startDate: string,
+    endDate: string,
+    mode: "manual" | "image" | "all"
+  ): DesktopReportStockMovement[] {
+    const sourceClause = mode === "manual"
+      ? "AND menu_stock_movements.source_type IN ('desktop', 'android')"
+      : mode === "image"
+        ? "AND menu_stock_movements.source_type = 'stock_image_import'"
+        : "";
+    const limit = mode === "all" ? 8 : 6;
+    const rows = this.db
+      .prepare(`
+        SELECT
+          menu_stock_movements.*,
+          menu_items.name AS item_name,
+          menu_items.stock_unit AS stock_unit
+        FROM menu_stock_movements
+        INNER JOIN menu_items ON menu_items.id = menu_stock_movements.menu_item_id
+        WHERE date(menu_stock_movements.created_at, 'localtime') BETWEEN ? AND ?
+          ${sourceClause}
+        ORDER BY menu_stock_movements.created_at DESC, menu_stock_movements.id DESC
+        LIMIT ${limit}
+      `)
+      .all(startDate, endDate) as Array<Record<string, unknown>>;
+
+    return rows.map((row) => {
+      const sourceType = String(row.source_type ?? "desktop") as MenuStockSourceType;
+      return {
+        id: String(row.id ?? ""),
+        menuItemId: String(row.menu_item_id ?? ""),
+        itemName: String(row.item_name ?? "Ürün"),
+        type: String(row.type ?? "adjust") as MenuStockMovementType,
+        quantityChange: normalizeStockPrecision(Number(row.quantity_change ?? 0)),
+        quantityAfter: normalizeStockPrecision(Number(row.quantity_after ?? 0)),
+        unit: normalizeMenuStockUnit(row.stock_unit),
+        sourceType,
+        sourceLabel: reportStockSourceLabel(sourceType),
+        note: String(row.note ?? ""),
+        createdAt: String(row.created_at ?? "")
+      };
+    });
+  }
+
+  private getReportAttention(): DesktopReportData["attention"] {
+    const today = formatLocalIsoDate(new Date());
+    const pendingRequests = this.getScalarCount(`
+      SELECT COUNT(*) AS count
+      FROM requests
+      WHERE deleted_at = ''
+        AND status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress')
+    `);
+    const pendingReservations = this.getScalarCount(`
+      SELECT COUNT(*) AS count
+      FROM reservations
+      WHERE deleted_at = ''
+        AND status = 'pending'
+    `);
+    const paymentWaitingRows = this.db
+      .prepare(`
+        SELECT DISTINCT tables.id, tables.name
+        FROM tables
+        LEFT JOIN table_orders
+          ON table_orders.table_id = tables.id
+          AND table_orders.status = 'payment'
+        WHERE tables.deleted_at = ''
+          AND tables.is_active = 1
+          AND (tables.status = 'bill_waiting' OR table_orders.id IS NOT NULL)
+        ORDER BY tables.sort_order ASC, tables.name COLLATE NOCASE ASC
+      `)
+      .all() as Array<Record<string, unknown>>;
+    const paymentWaitingTables = paymentWaitingRows.length;
+    const incompleteTasks = this.getScalarCount(`
+      SELECT COUNT(*) AS count
+      FROM daily_tasks
+      WHERE deleted_at = ''
+        AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+    `);
+    const overdueTasks = this.getScalarCount(
+      `
+        SELECT COUNT(*) AS count
+        FROM daily_tasks
+        WHERE deleted_at = ''
+          AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+          AND due_date != ''
+          AND date(due_date) < ?
+      `,
+      today
+    );
+    const openTaskRows = this.db
+      .prepare(`
+        SELECT title, due_date
+        FROM daily_tasks
+        WHERE deleted_at = ''
+          AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+        ORDER BY
+          CASE WHEN due_date != '' AND date(due_date) < ? THEN 0 ELSE 1 END,
+          CASE WHEN due_date = '' THEN 1 ELSE 0 END,
+          due_date ASC,
+          created_at ASC
+        LIMIT 3
+      `)
+      .all(today) as Array<Record<string, unknown>>;
+    const stockRows = this.db
+      .prepare(`
+        SELECT
+          name,
+          stock_quantity,
+          stock_min_quantity,
+          stock_consumption_quantity,
+          stock_unit
+        FROM menu_items
+        WHERE deleted_at = ''
+          AND stock_quantity IS NOT NULL
+        ORDER BY name COLLATE NOCASE ASC
+      `)
+      .all() as Array<Record<string, unknown>>;
+    const outOfStockRows = stockRows.filter((row) =>
+      Number(row.stock_quantity ?? 0) < (normalizePositiveStockNumber(row.stock_consumption_quantity) ?? 1)
+    );
+    const lowStockRows = stockRows.filter((row) => {
+      const quantity = Number(row.stock_quantity ?? 0);
+      const consumption = normalizePositiveStockNumber(row.stock_consumption_quantity) ?? 1;
+      const minimum = nullableNumber(row.stock_min_quantity);
+      return quantity >= consumption && minimum !== null && quantity <= minimum;
+    });
+    const outOfStockItems = outOfStockRows.length;
+    const lowStockItems = lowStockRows.length;
+    const items: DesktopReportAttentionItem[] = [];
+
+    if (pendingRequests > 0) {
+      items.push({
+        kind: "pending_request",
+        title: `${pendingRequests} müşteri talebi cevap bekliyor`,
+        detail: "Yanıt bekleyen talepleri öncelik sırasıyla sonuçlandırın."
+      });
+    }
+    if (pendingReservations > 0) {
+      items.push({
+        kind: "pending_reservation",
+        title: `${pendingReservations} rezervasyon onay bekliyor`,
+        detail: "Bekleyen rezervasyonları onaylayın veya reddedin."
+      });
+    }
+    if (paymentWaitingTables > 0) {
+      const tableNames = paymentWaitingRows.slice(0, 3).map((row) => String(row.name ?? "Masa")).join(", ");
+      items.push({
+        kind: "payment_waiting",
+        title: `${paymentWaitingTables} masa hesap bekliyor`,
+        detail: tableNames
+      });
+    }
+    if (overdueTasks > 0) {
+      const titles = openTaskRows
+        .filter((row) => String(row.due_date ?? "") && String(row.due_date ?? "") < today)
+        .map((row) => String(row.title ?? "Günlük iş"))
+        .join(", ");
+      items.push({
+        kind: "overdue_task",
+        title: `${overdueTasks} günlük iş gecikti`,
+        detail: titles || "Geciken günlük işleri kontrol edin."
+      });
+    }
+    const remainingOpenTasks = Math.max(0, incompleteTasks - overdueTasks);
+    if (remainingOpenTasks > 0) {
+      items.push({
+        kind: "open_task",
+        title: `${remainingOpenTasks} günlük iş tamamlanmadı`,
+        detail: "Açık günlük işleri planlanan sırayla tamamlayın."
+      });
+    }
+    for (const row of outOfStockRows.slice(0, 4)) {
+      items.push({
+        kind: "out_of_stock",
+        title: `${String(row.name ?? "Ürün")} stokta yok`,
+        detail: "Satış için gereken en az birim stok bulunmuyor."
+      });
+    }
+    if (outOfStockRows.length > 4) {
+      items.push({
+        kind: "out_of_stock",
+        title: `${outOfStockRows.length - 4} ürün daha stokta yok`,
+        detail: "Stok listesindeki diğer tükenen ürünleri kontrol edin."
+      });
+    }
+    for (const row of lowStockRows.slice(0, 4)) {
+      const unit = normalizeMenuStockUnit(row.stock_unit);
+      items.push({
+        kind: "low_stock",
+        title: `${String(row.name ?? "Ürün")} minimum stok seviyesinde`,
+        detail: `${formatReportStockQuantity(Number(row.stock_quantity ?? 0), unit)} kaldı.`
+      });
+    }
+    if (lowStockRows.length > 4) {
+      items.push({
+        kind: "low_stock",
+        title: `${lowStockRows.length - 4} ürün daha minimum stok seviyesinde`,
+        detail: "Stok listesindeki diğer azalan ürünleri kontrol edin."
+      });
+    }
+
+    return {
+      pendingRequests,
+      pendingReservations,
+      paymentWaitingTables,
+      overdueTasks,
+      incompleteTasks,
+      outOfStockItems,
+      lowStockItems,
+      totalCount: pendingRequests
+        + pendingReservations
+        + paymentWaitingTables
+        + incompleteTasks
+        + outOfStockItems
+        + lowStockItems,
+      items
+    };
+  }
+
   private getCount(table: string): number {
     return this.getScalarCount(`SELECT COUNT(*) as count FROM ${table}`);
   }
 
-  private getScalarCount(sql: string): number {
-    const row = this.db.prepare(sql).get() as { count?: number } | undefined;
+  private getScalarCount(sql: string, ...params: Array<string | number | null>): number {
+    const row = this.db.prepare(sql).get(...params) as { count?: number } | undefined;
     return Number(row?.count ?? 0);
   }
 
@@ -7139,4 +7835,127 @@ function buildReservationNotes(request: Record<string, unknown>) {
   const parts = [message, summary ? `AI özet: ${summary}` : ""].filter(Boolean);
 
   return parts.join("\n");
+}
+
+function normalizeDesktopReportRange(input: DesktopReportRangeInput): DesktopReportPeriod {
+  const preset = String(input?.preset ?? "") as DesktopReportPreset;
+  const supportedPresets = new Set<DesktopReportPreset>(["today", "yesterday", "last7", "last30", "custom"]);
+  const startDate = String(input?.startDate ?? "").trim();
+  const endDate = String(input?.endDate ?? "").trim();
+  if (!supportedPresets.has(preset) || !isIsoDate(startDate) || !isIsoDate(endDate)) {
+    throw new Error("Rapor için geçerli bir tarih aralığı seçin.");
+  }
+  const dayCount = isoDateDifference(startDate, endDate);
+  if (dayCount < 0) {
+    throw new Error("Rapor başlangıç tarihi bitiş tarihinden sonra olamaz.");
+  }
+  if (dayCount > 3659) {
+    throw new Error("Rapor tarih aralığı en fazla 10 yıl olabilir.");
+  }
+  const label = String(input?.label ?? "").trim().replace(/\s+/g, " ").slice(0, 80)
+    || (startDate === endDate ? startDate : `${startDate} – ${endDate}`);
+  return { preset, label, startDate, endDate };
+}
+
+function isIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year
+    && parsed.getUTCMonth() === month - 1
+    && parsed.getUTCDate() === day;
+}
+
+function isoDateDifference(startDate: string, endDate: string): number {
+  const start = Date.parse(`${startDate}T00:00:00.000Z`);
+  const end = Date.parse(`${endDate}T00:00:00.000Z`);
+  return Math.round((end - start) / 86_400_000);
+}
+
+function enumerateIsoDateRange(startDate: string, endDate: string): string[] {
+  const dayCount = isoDateDifference(startDate, endDate);
+  return Array.from({ length: dayCount + 1 }, (_value, index) => shiftIsoDate(startDate, index));
+}
+
+function shiftIsoDate(value: string, days: number): string {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatLocalIsoDate(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function reportStockSourceLabel(sourceType: MenuStockSourceType): string {
+  if (sourceType === "android") {
+    return "Android manuel";
+  }
+  if (sourceType === "stock_image_import") {
+    return "Görsel / fatura";
+  }
+  if (sourceType === "table_order") {
+    return "Adisyon";
+  }
+  return "Masaüstü manuel";
+}
+
+function formatReportStockQuantity(value: number, unit: MenuStockUnit): string {
+  const amount = normalizeStockPrecision(value).toLocaleString("tr-TR", { maximumFractionDigits: 3 });
+  return unit === "gram" ? `${amount} g` : `${amount} adet`;
+}
+
+function toAndroidReportSnapshot(
+  key: AndroidReportPresetKey,
+  report: DesktopReportData
+): AndroidReportSnapshot {
+  return {
+    period: {
+      key,
+      label: report.period.label,
+      start: report.period.startDate,
+      end: report.period.endDate
+    },
+    summary: {
+      restaurant_revenue: report.summary.restaurantRevenue,
+      closed_orders: report.summary.closedOrders,
+      average_order: report.summary.averageOrder,
+      approved_reservations: report.summary.approvedReservations,
+      new_requests: report.summary.newRequests,
+      attention_count: report.attention.totalCount
+    },
+    restaurant: {
+      sold_item_count: report.restaurant.soldItemCount,
+      cancelled_orders: report.restaurant.cancelledOrders,
+      top_items: report.restaurant.topItems.slice(0, 3).map((item) => ({
+        name: item.name,
+        quantity: item.quantity,
+        revenue: item.revenue
+      })),
+      daily_revenue: report.restaurant.dailyRevenue.map((day) => ({
+        date: day.date,
+        revenue: day.revenue,
+        closed_orders: day.closedOrders
+      }))
+    },
+    attention: {
+      pending_requests: report.attention.pendingRequests,
+      pending_reservations: report.attention.pendingReservations,
+      payment_waiting_tables: report.attention.paymentWaitingTables,
+      overdue_tasks: report.attention.overdueTasks,
+      incomplete_tasks: report.attention.incompleteTasks,
+      out_of_stock_items: report.attention.outOfStockItems,
+      low_stock_items: report.attention.lowStockItems,
+      items: report.attention.items.map((item) => ({
+        kind: item.kind,
+        title: item.title,
+        detail: item.detail
+      }))
+    }
+  };
 }

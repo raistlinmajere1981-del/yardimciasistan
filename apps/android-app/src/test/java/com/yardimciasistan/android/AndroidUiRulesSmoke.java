@@ -7,7 +7,10 @@ public final class AndroidUiRulesSmoke {
     hidesUnauthorizedTabsAndModes();
     selectsTheFirstAuthorizedMode();
     deletionsRequireResolvedActiveAdmin();
+    reportsRequireResolvedActiveAdmin();
+    validatesReportDatePresets();
     resolvesNotificationDestinations();
+    resolvesReportAiEndpoint();
     System.out.println("android-ui-rules-smoke-ok");
   }
 
@@ -98,6 +101,42 @@ public final class AndroidUiRulesSmoke {
     assertFalse(AndroidUiRules.canDelete(data, "menu.delete"), "an inactive admin must fail closed");
   }
 
+  private static void reportsRequireResolvedActiveAdmin() {
+    OperationData data = restrictedData();
+    OperationData.ReportSnapshot report = new OperationData.ReportSnapshot();
+    report.label = "Son 7 Gün";
+    data.reports.put("last7", report);
+
+    assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_REPORTS), "staff must not open reports");
+    data.deviceRole = "admin";
+    assertTrue(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_REPORTS), "active resolved admin can open reports");
+    assertEquals(report, data.report("last7"), "report accessor should return the selected compact snapshot");
+
+    data.permissionsResolved = false;
+    assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_REPORTS), "unresolved admin must fail closed");
+    data.permissionsResolved = true;
+    data.deviceActive = false;
+    assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_REPORTS), "inactive admin must fail closed");
+  }
+
+  private static void validatesReportDatePresets() {
+    for (String preset : new String[] {
+        AndroidUiRules.REPORT_TODAY,
+        AndroidUiRules.REPORT_YESTERDAY,
+        AndroidUiRules.REPORT_LAST_7,
+        AndroidUiRules.REPORT_LAST_30
+    }) {
+      assertTrue(AndroidUiRules.isReportPreset(preset), preset + " must remain selectable");
+      assertEquals(preset, AndroidUiRules.normalizeReportPreset(preset), preset + " must not change");
+    }
+    assertFalse(AndroidUiRules.isReportPreset("custom"), "custom Android range is intentionally deferred");
+    assertEquals(
+        AndroidUiRules.REPORT_LAST_7,
+        AndroidUiRules.normalizeReportPreset("unknown"),
+        "invalid report range must safely fall back"
+    );
+  }
+
   private static void resolvesNotificationDestinations() {
     assertDestination("customers:new", AndroidUiRules.TAB_CUSTOMERS, AndroidUiRules.CUSTOMER_NEW);
     assertDestination("pension:reservations", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_RESERVATIONS);
@@ -107,7 +146,21 @@ public final class AndroidUiRulesSmoke {
     assertDestination("restaurant:stock", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_STOCK);
     assertDestination("restaurant:menu", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_MENU);
     assertDestination("messages:waiting", AndroidUiRules.TAB_MESSAGES, AndroidUiRules.MESSAGES_WAITING);
+    assertDestination("reports", AndroidUiRules.TAB_REPORTS, "");
     assertDestination("unknown", AndroidUiRules.TAB_TODAY, "");
+  }
+
+  private static void resolvesReportAiEndpoint() {
+    assertEquals(
+        "https://firma.example/yardimci-asistan/api/chat.php",
+        HostingSyncClient.toChatEndpoint("https://firma.example/yardimci-asistan"),
+        "module root report AI endpoint"
+    );
+    assertEquals(
+        "https://firma.example/yardimci-asistan/api/chat.php",
+        HostingSyncClient.toChatEndpoint("https://firma.example/yardimci-asistan/api/sync.php"),
+        "sync endpoint report AI endpoint"
+    );
   }
 
   private static OperationData restrictedData() {

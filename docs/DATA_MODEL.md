@@ -867,6 +867,8 @@ Firma kurulum ayarlarını temsil eder.
   "business_id": "business_001",
   "web_module_url": "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
   "sync_secret": "change-this-secret",
+  "app_password_verifier": "<salted-scrypt-verifier>",
+  "app_password_updated_at": "2026-07-23T10:00:00+03:00",
   "ai_enabled": true,
   "ai_provider": "openai_compatible",
   "ai_service": "openrouter",
@@ -887,6 +889,12 @@ Firma kurulum ayarlarını temsil eder.
 ```
 
 `ai_provider` kullanılan adapter protokolünü, `ai_service` ise kullanıcıya gösterilen servis hazır ayarını temsil eder. v1 bağlantısı OpenAI uyumlu `chat/completions` protokolünü kullanır; özel servis seçildiğinde bağlantı adresi kullanıcı tarafından girilebilir.
+
+`app_password_verifier` isteğe bağlı masaüstü açılış şifresinin tuzlu `scrypt`
+doğrulayıcısıdır; açık şifre SQLite'a, renderer başlangıç verisine veya loglara yazılmaz.
+Alan boşsa açılış şifresi kapalıdır. Şifre etkin olduğunda gerçek panel verileri kilit
+açılmadan renderer'a yüklenmez. Unutulan şifre yalnız kayıtlı web güvenlik anahtarı ana
+süreçte doğrulandıktan sonra kaldırılabilir.
 
 `ai_api_key_encrypted` yalnız masaüstü ana süreç tarafından çözülebilen yerel gizli değerdir. Renderer'a, bootstrap verisine, loglara veya web istemcisine gönderilmez. Hosting tarafına yalnız `sync_secret` ile yetkilendirilmiş HTTPS isteğinde aktarılır ve doğrudan web erişimine kapalı sunucu dosyasında tutulur. API cevapları anahtarın kendisini hiçbir zaman döndürmez.
 

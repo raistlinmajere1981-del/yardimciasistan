@@ -32,9 +32,18 @@ import type {
   DesktopStockImageAnalyzeInput,
   DesktopStockImageAnalyzeResult,
   ApplyStockImageImportInput,
-  DesktopStockImageApplyResult
+  DesktopStockImageApplyResult,
+  DesktopReportRangeInput,
+  DesktopReportQueryResult,
+  GenerateDesktopReportAiInput,
+  GenerateDesktopReportAiResult
 } from "./database";
 import type { AutomaticSyncCycleResult, AutomaticSyncStatus } from "./sync-coordinator";
+import type {
+  AppLockActionResult,
+  AppLockStatus,
+  UpdateAppPasswordInput
+} from "./app-lock";
 
 export interface AiConnectionTestInput {
   provider: string;
@@ -57,6 +66,11 @@ export type AiApiKeyRevealResult =
 
 export interface DesktopBridge {
   setUiScale: (scale: number) => void;
+  getAppLockStatus: () => Promise<AppLockStatus>;
+  lockApp: () => Promise<AppLockActionResult>;
+  unlockApp: (password: string) => Promise<AppLockActionResult>;
+  updateAppPassword: (input: UpdateAppPasswordInput) => Promise<AppLockActionResult>;
+  resetAppPassword: (webSecurityKey: string) => Promise<AppLockActionResult>;
   getBootstrapData: () => Promise<{
     appName: string;
     version: string;
@@ -71,6 +85,8 @@ export interface DesktopBridge {
     setup: DesktopSetupData;
   }>;
   getDashboardData: () => Promise<DesktopDashboardData>;
+  getReportData: (input: DesktopReportRangeInput) => Promise<DesktopReportQueryResult>;
+  generateReportAiComment: (input: GenerateDesktopReportAiInput) => Promise<GenerateDesktopReportAiResult>;
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
   getSyncStatus: () => Promise<AutomaticSyncStatus>;
   runSyncNow: () => Promise<AutomaticSyncCycleResult>;
@@ -128,8 +144,15 @@ export interface DesktopBridge {
 
 const bridge: DesktopBridge = {
   setUiScale: (scale: number) => webFrame.setZoomFactor(scale),
+  getAppLockStatus: () => ipcRenderer.invoke("appLock:getStatus"),
+  lockApp: () => ipcRenderer.invoke("appLock:lock"),
+  unlockApp: (password: string) => ipcRenderer.invoke("appLock:unlock", password),
+  updateAppPassword: (input: UpdateAppPasswordInput) => ipcRenderer.invoke("appLock:updatePassword", input),
+  resetAppPassword: (webSecurityKey: string) => ipcRenderer.invoke("appLock:resetWithWebSecurityKey", webSecurityKey),
   getBootstrapData: () => ipcRenderer.invoke("app:getBootstrapData"),
   getDashboardData: () => ipcRenderer.invoke("dashboard:getData"),
+  getReportData: (input: DesktopReportRangeInput) => ipcRenderer.invoke("report:getData", input),
+  generateReportAiComment: (input: GenerateDesktopReportAiInput) => ipcRenderer.invoke("report:generateAiComment", input),
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: DesktopDashboardData) => listener(data);
     ipcRenderer.on("dashboard:dataChanged", handler);

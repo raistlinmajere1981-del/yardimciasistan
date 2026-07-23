@@ -220,6 +220,11 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $now = date(DATE_ATOM);
     $actions = ya_sync_get_android_actions($deviceId, 40);
     $pendingActionCount = ya_sync_count_pending_android_actions($deviceId);
+    $permissionProfile = is_array($androidSnapshot['androidPermissions'][$deviceId] ?? null)
+        ? $androidSnapshot['androidPermissions'][$deviceId]
+        : [];
+    $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin'
+        && ya_sync_bool($permissionProfile['is_active'] ?? false);
     ya_sync_update_state([
         'last_android_summary_at' => $now
     ]);
@@ -257,6 +262,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'table_orders' => $androidSnapshot['table_orders'],
         'messages' => $androidSnapshot['messages'],
         'androidPermissions' => $androidSnapshot['androidPermissions'],
+        'reports' => $reportsAllowed ? $androidSnapshot['reports'] : [],
         'actions' => $actions,
         'server_revision' => ya_storage_server_revision()
     ]);
@@ -931,6 +937,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
         'messages' => ya_sync_sanitize_android_messages($snapshot['messages'] ?? []),
         'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
+        'reports' => ya_sync_sanitize_android_reports($snapshot['reports'] ?? []),
         'updated_at' => $updatedAt
     ];
 }
@@ -959,6 +966,111 @@ function ya_sync_sanitize_android_permissions(mixed $profiles): array
             'role' => $role,
             'is_active' => ya_sync_bool($profile['is_active'] ?? false),
             'permissions' => $permissions
+        ];
+    }
+    return $result;
+}
+
+function ya_sync_sanitize_android_reports(mixed $reports): array
+{
+    if (!is_array($reports)) {
+        return [];
+    }
+    $result = [];
+    foreach (['today', 'yesterday', 'last7', 'last30'] as $key) {
+        $report = $reports[$key] ?? null;
+        if (!is_array($report)) {
+            continue;
+        }
+        $period = is_array($report['period'] ?? null) ? $report['period'] : [];
+        $start = ya_sync_string($period['start'] ?? '');
+        $end = ya_sync_string($period['end'] ?? '');
+        if (
+            preg_match('/^\d{4}-\d{2}-\d{2}$/', $start) !== 1
+            || preg_match('/^\d{4}-\d{2}-\d{2}$/', $end) !== 1
+            || $start > $end
+        ) {
+            continue;
+        }
+        $summary = is_array($report['summary'] ?? null) ? $report['summary'] : [];
+        $restaurant = is_array($report['restaurant'] ?? null) ? $report['restaurant'] : [];
+        $attention = is_array($report['attention'] ?? null) ? $report['attention'] : [];
+        $topItems = [];
+        foreach (array_slice(is_array($restaurant['top_items'] ?? null) ? $restaurant['top_items'] : [], 0, 3) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $name = mb_substr(ya_sync_string($item['name'] ?? ''), 0, 180);
+            if ($name === '') {
+                continue;
+            }
+            $topItems[] = [
+                'name' => $name,
+                'quantity' => max(0, ya_sync_float($item['quantity'] ?? 0, 0)),
+                'revenue' => max(0, ya_sync_float($item['revenue'] ?? 0, 0))
+            ];
+        }
+        $dailyRevenue = [];
+        foreach (array_slice(is_array($restaurant['daily_revenue'] ?? null) ? $restaurant['daily_revenue'] : [], 0, 31) as $day) {
+            if (!is_array($day)) {
+                continue;
+            }
+            $date = ya_sync_string($day['date'] ?? '');
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+                continue;
+            }
+            $dailyRevenue[] = [
+                'date' => $date,
+                'revenue' => max(0, ya_sync_float($day['revenue'] ?? 0, 0)),
+                'closed_orders' => max(0, ya_sync_int($day['closed_orders'] ?? 0, 0))
+            ];
+        }
+        $attentionItems = [];
+        foreach (array_slice(is_array($attention['items'] ?? null) ? $attention['items'] : [], 0, 20) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $title = mb_substr(ya_sync_string($item['title'] ?? ''), 0, 220);
+            if ($title === '') {
+                continue;
+            }
+            $attentionItems[] = [
+                'kind' => mb_substr(ya_sync_string($item['kind'] ?? ''), 0, 80),
+                'title' => $title,
+                'detail' => mb_substr(ya_sync_string($item['detail'] ?? ''), 0, 320)
+            ];
+        }
+        $result[$key] = [
+            'period' => [
+                'key' => $key,
+                'label' => mb_substr(ya_sync_string($period['label'] ?? ''), 0, 80),
+                'start' => $start,
+                'end' => $end
+            ],
+            'summary' => [
+                'restaurant_revenue' => max(0, ya_sync_float($summary['restaurant_revenue'] ?? 0, 0)),
+                'closed_orders' => max(0, ya_sync_int($summary['closed_orders'] ?? 0, 0)),
+                'average_order' => max(0, ya_sync_float($summary['average_order'] ?? 0, 0)),
+                'approved_reservations' => max(0, ya_sync_int($summary['approved_reservations'] ?? 0, 0)),
+                'new_requests' => max(0, ya_sync_int($summary['new_requests'] ?? 0, 0)),
+                'attention_count' => max(0, ya_sync_int($summary['attention_count'] ?? 0, 0))
+            ],
+            'restaurant' => [
+                'sold_item_count' => max(0, ya_sync_int($restaurant['sold_item_count'] ?? 0, 0)),
+                'cancelled_orders' => max(0, ya_sync_int($restaurant['cancelled_orders'] ?? 0, 0)),
+                'top_items' => $topItems,
+                'daily_revenue' => $dailyRevenue
+            ],
+            'attention' => [
+                'pending_requests' => max(0, ya_sync_int($attention['pending_requests'] ?? 0, 0)),
+                'pending_reservations' => max(0, ya_sync_int($attention['pending_reservations'] ?? 0, 0)),
+                'payment_waiting_tables' => max(0, ya_sync_int($attention['payment_waiting_tables'] ?? 0, 0)),
+                'overdue_tasks' => max(0, ya_sync_int($attention['overdue_tasks'] ?? 0, 0)),
+                'incomplete_tasks' => max(0, ya_sync_int($attention['incomplete_tasks'] ?? 0, 0)),
+                'out_of_stock_items' => max(0, ya_sync_int($attention['out_of_stock_items'] ?? 0, 0)),
+                'low_stock_items' => max(0, ya_sync_int($attention['low_stock_items'] ?? 0, 0)),
+                'items' => $attentionItems
+            ]
         ];
     }
     return $result;

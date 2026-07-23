@@ -115,6 +115,14 @@ async function main() {
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
   await waitForUiText("Öncelikli işler", 12000);
+  if (options.reportsOnly) {
+    await runReportsOnly(baseUrl);
+    await restoreEmbeddedConnectionAfterTest();
+    console.log("android-reports-device-ui-smoke-ok");
+    cleanup();
+    await waitForPhoneTestExit();
+    return;
+  }
   if (options.stockImageOnly) {
     await runStockImageOnly(baseUrl);
     await restoreEmbeddedConnectionAfterTest();
@@ -206,9 +214,21 @@ async function main() {
   await delay(400);
   const staffSettingsXml = dumpUi("staff-settings.xml");
   assertContains(staffSettingsXml, ["Ayarlar", "Görünüm", "Tema", "Gece Modu", 'content-desc="Gündüz moduna geç"', "Bildirim tercihleri", "Restoran / Masa", "Oda / Günlük İş", "İşlem hataları"]);
-  assertNotContains(staffSettingsXml, ["Bildirimler", "Sync bağlantısı", "Bağlantı özeti", "Güvenlik anahtarı", syncSecret]);
+  assertNotContains(staffSettingsXml, ["Bildirimler", "Sync bağlantısı", "Bağlantı özeti", "Güvenlik anahtarı", "İşletme raporları", "Raporları Aç", syncSecret]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
+  adb([
+    "shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", "reports"
+  ]);
+  const deniedReportRouteXml = await waitForUiCondition(
+    (xml) => xml.includes("Bu cihazın raporlara erişim yetkisi yok.")
+      && xml.includes('text="Bugün"')
+      && !xml.includes('text="Raporlar"'),
+    8000,
+    "Personel rapor deep link denemesi fail-closed reddedilmedi."
+  );
+  writeFileSync(join(artifactDir, "staff-report-route-denied.xml"), deniedReportRouteXml);
 
   relaunchAppWithConnectionExtras("https://override.invalid/device-hijack", "override-secret-not-allowed");
   await waitForUiCondition(
@@ -474,6 +494,105 @@ async function main() {
   assertContains(topXml, ["Yönetici", 'content-desc="Ayarlar"', 'content-desc="Yenile"', "Müşteri", "Restoran"]);
   assert.equal(readPreferenceValue("device_id"), deviceId);
 
+  tap(centerOf(findClickableBoundsByDescription(topXml, "Ayarlar")));
+  const adminSettingsXml = await waitForUiCondition(
+    (xml) => xml.includes("İşletme raporları") && xml.includes("Raporları Aç"),
+    5000,
+    "Yönetici Ayarlar ekranında Raporlar aksiyonu görünmedi."
+  );
+  assertContains(adminSettingsXml, ["Yönetici", "İşletme raporları", "Raporları Aç"]);
+  tap(centerOf(findClickableBoundsByText(adminSettingsXml, "Raporları Aç")));
+  let reportsXml = await waitForUiCondition(
+    (xml) => xml.includes('text="Raporlar"')
+      && xml.includes("YÖNETİCİ RAPORU")
+      && xml.includes("Genel özet")
+      && xml.includes("₺6.400,00"),
+    8000,
+    "Yönetici Raporlar ekranı Son 7 Gün özetiyle açılmadı."
+  );
+  assertContains(reportsXml, [
+    "Bugün", "Dün", "Son 7 Gün", "Son 30 Gün",
+    "Restoran cirosu", "Kapanan hesap", "Ortalama hesap",
+    "Onaylanan rezervasyon", "Yeni talep", "Dikkat gerektiren"
+  ]);
+  assertNotContains(reportsXml, ['text="Müşteri"', 'text="Pansiyon"', 'text="Mesajlar"']);
+  captureScreenshot("admin-reports-night.png");
+
+  tap(centerOf(findClickableBoundsByText(reportsXml, "Dün")));
+  reportsXml = await waitForUiCondition(
+    (xml) => xml.includes("₺900,00") && xml.includes('text="Dönem"'),
+    5000,
+    "Dün rapor filtresi veriyi güncellemedi."
+  );
+  tap(centerOf(findClickableBoundsByText(reportsXml, "Bugün")));
+  reportsXml = await waitForUiCondition(
+    (xml) => xml.includes("₺1.600,00"),
+    5000,
+    "Bugün rapor filtresi veriyi güncellemedi."
+  );
+  tap(centerOf(findClickableBoundsByText(reportsXml, "Son 30 Gün")));
+  reportsXml = await waitForUiCondition(
+    (xml) => xml.includes("₺18.200,00"),
+    5000,
+    "Son 30 Gün rapor filtresi veriyi güncellemedi."
+  );
+  tap(centerOf(findClickableBoundsByText(reportsXml, "Son 7 Gün")));
+  reportsXml = await waitForUiCondition(
+    (xml) => xml.includes("₺6.400,00"),
+    5000,
+    "Son 7 Gün rapor filtresi veriyi güncellemedi."
+  );
+
+  tap(centerOf(findClickableBoundsByDescription(reportsXml, "Gündüz moduna geç")));
+  reportsXml = await waitForUiCondition(
+    (xml) => xml.includes('content-desc="Gece moduna geç"') && xml.includes('text="Raporlar"'),
+    5000,
+    "Rapor ekranı gündüz temasına geçmedi."
+  );
+  captureScreenshot("admin-reports-day.png");
+  tap(centerOf(findClickableBoundsByDescription(reportsXml, "Gece moduna geç")));
+  await waitForUiCondition(
+    (xml) => xml.includes('content-desc="Gündüz moduna geç"') && xml.includes('text="Raporlar"'),
+    5000,
+    "Rapor ekranı gece temasına dönemedi."
+  );
+
+  let reportBottomXml = "";
+  for (let index = 0; index < 14; index += 1) {
+    reportBottomXml = dumpUi(`admin-reports-bottom-${index}.xml`);
+    if (reportBottomXml.includes("Bu dönemi özetle")
+        && reportBottomXml.includes("Dikkat edilmesi gerekenler")
+        && reportBottomXml.includes("Satışları yorumla")
+        && reportBottomXml.includes("3 kısa öneri ver")) {
+      break;
+    }
+    swipe(360, 1080, 360, 300, 420);
+    await delay(300);
+  }
+  assertContains(reportBottomXml, [
+    "AI yorumu (isteğe bağlı)",
+    "Bu dönemi özetle",
+    "Dikkat edilmesi gerekenler",
+    "Satışları yorumla",
+    "3 kısa öneri ver"
+  ]);
+  tap(centerOf(findClickableBoundsByText(reportBottomXml, "Bu dönemi özetle")));
+  const reportAiUnavailableXml = await waitForUiCondition(
+    (xml) => xml.includes("Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı."),
+    15000,
+    "AI kapalıyken rapor ekranı beklenen kullanıcı mesajını göstermedi."
+  );
+  captureScreenshot("admin-reports-ai-unavailable.png");
+  assertContains(reportAiUnavailableXml, ["Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı."]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiText("İşletme raporları", 5000);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  topXml = await waitForUiCondition(
+    (xml) => xml.includes('text="Bugün"') && xml.includes('text="Müşteri"') && xml.includes("Yönetici"),
+    5000,
+    "Rapor ekranından operasyon ekranına dönülemedi."
+  );
+
   tap(centerOf(findClickableBoundsByText(topXml, "Müşteri")));
   await delay(500);
   let requestsXml = dumpUi("requests.xml");
@@ -639,7 +758,8 @@ function parseArgs(args) {
     readyTimeoutMs: 45000,
     settleMs: 1800,
     noBuild: false,
-    stockImageOnly: false
+    stockImageOnly: false,
+    reportsOnly: false
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -648,6 +768,8 @@ function parseArgs(args) {
       parsed.noBuild = true;
     } else if (arg === "--stock-image-only") {
       parsed.stockImageOnly = true;
+    } else if (arg === "--reports-only") {
+      parsed.reportsOnly = true;
     } else if (arg.startsWith("--hold-ms=")) {
       parsed.holdMs = Number(arg.slice("--hold-ms=".length));
     } else if (arg === "--hold-ms") {
@@ -676,8 +798,144 @@ function parseArgs(args) {
   if (parsed.holdMs < 8000) {
     throw new Error("--hold-ms Android UI smoke için en az 8000 olmalı.");
   }
+  if (parsed.stockImageOnly && parsed.reportsOnly) {
+    throw new Error("--stock-image-only ve --reports-only birlikte kullanılamaz.");
+  }
 
   return parsed;
+}
+
+async function runReportsOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  await publishDeviceRole(baseUrl, deviceId, "staff");
+  relaunchApp();
+  let xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Personel")
+      && candidate.includes('content-desc="Ayarlar"')
+      && candidate.includes('text="Bugün"'),
+    12000,
+    "Odaklı rapor testi için personel profili uygulanmadı."
+  );
+  tap(centerOf(findClickableBoundsByDescription(xml, "Ayarlar")));
+  const staffSettings = await waitForUiCondition(
+    (candidate) => candidate.includes('text="Ayarlar"') && candidate.includes("Bildirim tercihleri"),
+    5000,
+    "Personel Ayarlar ekranı açılmadı."
+  );
+  assertNotContains(staffSettings, ["İşletme raporları", "Raporları Aç"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  adb([
+    "shell", "am", "start", "-n", `${packageName}/${activityName}`,
+    "--es", "ya_notification_route", "reports"
+  ]);
+  const deniedRoute = await waitForUiCondition(
+    (candidate) => candidate.includes("Bu cihazın raporlara erişim yetkisi yok.")
+      && candidate.includes('text="Bugün"')
+      && !candidate.includes('text="Raporlar"'),
+    8000,
+    "Personel odaklı rapor deep link testi reddedilmedi."
+  );
+  writeFileSync(join(artifactDir, "reports-only-staff-denied.xml"), deniedRoute);
+
+  await publishDeviceRole(baseUrl, deviceId, "admin");
+  relaunchApp();
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Yönetici")
+      && candidate.includes('content-desc="Ayarlar"')
+      && candidate.includes('text="Bugün"'),
+    12000,
+    "Odaklı rapor testi için yönetici profili uygulanmadı."
+  );
+  tap(centerOf(findClickableBoundsByDescription(xml, "Ayarlar")));
+  const adminSettings = await waitForUiCondition(
+    (candidate) => candidate.includes("İşletme raporları") && candidate.includes("Raporları Aç"),
+    5000,
+    "Odaklı rapor testinde yönetici aksiyonu görünmedi."
+  );
+  tap(centerOf(findClickableBoundsByText(adminSettings, "Raporları Aç")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes('text="Raporlar"')
+      && candidate.includes("YÖNETİCİ RAPORU")
+      && candidate.includes("₺6.400,00"),
+    8000,
+    "Odaklı rapor ekranı Son 7 Gün özetiyle açılmadı."
+  );
+  assertContains(xml, [
+    "Bugün", "Dün", "Son 7 Gün", "Son 30 Gün",
+    "Restoran cirosu", "Kapanan hesap", "Ortalama hesap",
+    "Onaylanan rezervasyon", "Yeni talep", "Dikkat gerektiren"
+  ]);
+  assertNotContains(xml, ['text="Müşteri"', 'text="Pansiyon"', 'text="Mesajlar"']);
+
+  tap(centerOf(findClickableBoundsByText(xml, "Dün")));
+  xml = await waitForUiCondition((candidate) => candidate.includes("₺900,00"), 5000, "Dün filtresi çalışmadı.");
+  tap(centerOf(findClickableBoundsByText(xml, "Bugün")));
+  xml = await waitForUiCondition((candidate) => candidate.includes("₺1.600,00"), 5000, "Bugün filtresi çalışmadı.");
+  tap(centerOf(findClickableBoundsByText(xml, "Son 30 Gün")));
+  xml = await waitForUiCondition((candidate) => candidate.includes("₺18.200,00"), 5000, "Son 30 Gün filtresi çalışmadı.");
+  tap(centerOf(findClickableBoundsByText(xml, "Son 7 Gün")));
+  xml = await waitForUiCondition((candidate) => candidate.includes("₺6.400,00"), 5000, "Son 7 Gün filtresi çalışmadı.");
+
+  if (xml.includes('content-desc="Gece moduna geç"')) {
+    tap(centerOf(findClickableBoundsByDescription(xml, "Gece moduna geç")));
+    xml = await waitForUiCondition(
+      (candidate) => candidate.includes('content-desc="Gündüz moduna geç"') && candidate.includes('text="Raporlar"'),
+      5000,
+      "Odaklı rapor testi gece temasına dönemedi."
+    );
+  }
+  captureScreenshot("reports-only-admin-night.png");
+  tap(centerOf(findClickableBoundsByDescription(xml, "Gündüz moduna geç")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes('content-desc="Gece moduna geç"') && candidate.includes('text="Raporlar"'),
+    5000,
+    "Odaklı rapor testi gündüz temasına geçmedi."
+  );
+  captureScreenshot("reports-only-admin-day.png");
+  tap(centerOf(findClickableBoundsByDescription(xml, "Gece moduna geç")));
+  await waitForUiCondition(
+    (candidate) => candidate.includes('content-desc="Gündüz moduna geç"') && candidate.includes('text="Raporlar"'),
+    5000,
+    "Odaklı rapor testi gece temasına dönemedi."
+  );
+
+  let reportBottom = "";
+  for (let index = 0; index < 14; index += 1) {
+    reportBottom = dumpUi(`reports-only-bottom-${index}.xml`);
+    if (reportBottom.includes("Bu dönemi özetle")
+        && reportBottom.includes("Dikkat edilmesi gerekenler")
+        && reportBottom.includes("Satışları yorumla")
+        && reportBottom.includes("3 kısa öneri ver")) {
+      break;
+    }
+    swipe(360, 1080, 360, 300, 420);
+    await delay(300);
+  }
+  assertContains(reportBottom, [
+    "AI yorumu (isteğe bağlı)",
+    "Bu dönemi özetle",
+    "Dikkat edilmesi gerekenler",
+    "Satışları yorumla",
+    "3 kısa öneri ver"
+  ]);
+  tap(centerOf(findClickableBoundsByText(reportBottom, "Bu dönemi özetle")));
+  const unavailable = await waitForUiCondition(
+    (candidate) => candidate.includes("Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı."),
+    15000,
+    "Odaklı rapor testinde AI kapalı mesajı görünmedi."
+  );
+  assertContains(unavailable, ["Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı."]);
+  captureScreenshot("reports-only-admin-ai-unavailable.png");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiText("İşletme raporları", 5000);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiCondition(
+    (candidate) => candidate.includes('text="Bugün"')
+      && candidate.includes("Yönetici")
+      && candidate.includes('text="Müşteri"'),
+    5000,
+    "Odaklı rapor testinde AndroidX geri akışı operasyon ekranına dönmedi."
+  );
 }
 
 async function runStockImageOnly(baseUrl) {
@@ -1112,7 +1370,110 @@ async function publishNotificationRequest(baseUrl, deviceId, permissions, reques
 async function publishDeviceProfiles(baseUrl, profiles, label) {
   const snapshot = JSON.parse(readFileSync(demoSnapshotFile, "utf8"));
   snapshot.androidPermissions = profiles;
+  snapshot.reports = createReportFixtures();
   await publishSnapshot(baseUrl, snapshot, label);
+}
+
+function createReportFixtures() {
+  const today = localDateKey(new Date());
+  const attention = {
+    pending_requests: 2,
+    pending_reservations: 1,
+    payment_waiting_tables: 1,
+    overdue_tasks: 1,
+    incomplete_tasks: 2,
+    out_of_stock_items: 1,
+    low_stock_items: 0,
+    items: [
+      {
+        kind: "pending_request",
+        title: "2 müşteri talebi cevap bekliyor",
+        detail: "Yanıt bekleyen talepleri öncelik sırasıyla sonuçlandırın."
+      },
+      {
+        kind: "out_of_stock",
+        title: "Ev Limonatası stokta yok",
+        detail: "Satış için gereken stok bulunmuyor."
+      }
+    ]
+  };
+  return {
+    today: createReportFixture("today", "Bugün", today, today, 1600, 2, 800, 1, 2, attention),
+    yesterday: createReportFixture(
+      "yesterday",
+      "Dün",
+      shiftLocalDate(today, -1),
+      shiftLocalDate(today, -1),
+      900,
+      1,
+      900,
+      0,
+      1,
+      attention
+    ),
+    last7: createReportFixture(
+      "last7",
+      "Son 7 Gün",
+      shiftLocalDate(today, -6),
+      today,
+      6400,
+      8,
+      800,
+      2,
+      6,
+      attention
+    ),
+    last30: createReportFixture(
+      "last30",
+      "Son 30 Gün",
+      shiftLocalDate(today, -29),
+      today,
+      18200,
+      28,
+      650,
+      7,
+      18,
+      attention
+    )
+  };
+}
+
+function createReportFixture(key, label, start, end, revenue, closedOrders, averageOrder, approvedReservations, newRequests, attention) {
+  return {
+    period: { key, label, start, end },
+    summary: {
+      restaurant_revenue: revenue,
+      closed_orders: closedOrders,
+      average_order: averageOrder,
+      approved_reservations: approvedReservations,
+      new_requests: newRequests,
+      attention_count: 7
+    },
+    restaurant: {
+      sold_item_count: key === "last30" ? 72 : key === "last7" ? 24 : 7,
+      cancelled_orders: key === "today" ? 1 : 0,
+      top_items: [
+        { name: "Türk Kahvesi", quantity: 8, revenue: 720 },
+        { name: "Ev Limonatası", quantity: 6, revenue: 720 },
+        { name: "Serpme Kahvaltı", quantity: 4, revenue: 1800 }
+      ],
+      daily_revenue: [{ date: end, revenue, closed_orders: closedOrders }]
+    },
+    attention
+  };
+}
+
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function shiftLocalDate(value, days) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + days);
+  return localDateKey(date);
 }
 
 async function publishSnapshot(baseUrl, snapshot, label) {

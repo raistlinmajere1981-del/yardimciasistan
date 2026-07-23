@@ -1037,6 +1037,33 @@ Durum:
 
 ---
 
+## TASK-0512 — Masaüstü uygulama şifresi ve ekran kilidini ekle
+
+Amaç:
+
+İsteğe bağlı uygulama şifresiyle açılış ve ekran gizliliği sağlamak; unutulan şifrenin
+web güvenlik anahtarıyla güvenli biçimde sıfırlanabilmesini sağlamak.
+
+Kabul kriterleri:
+
+* Şifre işlemleri Ayarlar > Temel Ayarlar bölümünden yönetilmeli ve şifre zorunlu olmamalı.
+* Şifre belirlenmişse gerçek panel verileri yüklenmeden önce açılış kilidi gösterilmeli.
+* Üst barda bildirim ikonunun yanında ekran kilidi bulunmalı.
+* Kilit katmanı uygulama içeriğini tamamen kapatmalı; logo, bildirim sayısı ve kilit açma eylemini göstermeli.
+* Şifre açıkken kilit yalnız doğru şifreyle açılmalı.
+* Şifre unutulduğunda web güvenlik anahtarı ana süreçte doğrulanarak şifre kaldırılmalı.
+* Açma ve kapama geçişleri düşük maliyetli olmalı ve azaltılmış hareket tercihini desteklemeli.
+
+Durum:
+
+* Tamamlandı. Masaüstüne tuzlu `scrypt` doğrulayıcısı, açılış veri kapısı, üst bar kilidi,
+  tam ekran gizlilik katmanı, bildirim sayısı, şifreli/şifresiz açma akışı ve web güvenlik
+  anahtarıyla sıfırlama eklendi. Şifre düz metin olarak saklanmaz; hatalı denemeler kısa
+  süreli sınırlandırılır. Temel Ayarlar kartı şifre belirleme, değiştirme, kaldırma ve
+  sıfırlama işlemlerini içerir.
+
+---
+
 # Faz 6 — Sync Core
 
 ## TASK-0601 — Sync core paketini oluştur

@@ -25,7 +25,7 @@ try {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
-  await page.addInitScript(({ setupData, dashboardData }) => {
+  await page.addInitScript(({ setupData, dashboardData, reportData }) => {
     let currentDashboardData = dashboardData;
     const mutateDevice = (deviceId, mutation, message) => {
       const devices = currentDashboardData.androidDevices.map((device) => device.deviceId === deviceId ? mutation(device) : device);
@@ -35,6 +35,8 @@ try {
     window.__openedExternalUrls = [];
     window.__stockImageAnalysisCalls = [];
     window.__stockImageApplyCalls = [];
+    window.__reportRanges = [];
+    window.__reportAiCalls = [];
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -47,6 +49,28 @@ try {
         setup: setupData
       }),
       getDashboardData: async () => currentDashboardData,
+      getReportData: async (range) => {
+        window.__reportRanges.push(range);
+        return {
+          ok: true,
+          data: {
+            ...reportData,
+            period: {
+              preset: range.preset,
+              label: range.label,
+              startDate: range.startDate,
+              endDate: range.endDate
+            }
+          }
+        };
+      },
+      generateReportAiComment: async (input) => {
+        window.__reportAiCalls.push(input);
+        return {
+          ok: true,
+          content: "Seçilen dönemde 8 adisyon kapatıldı ve restoran cirosu ₺6.400 oldu."
+        };
+      },
       getSyncStatus: async () => ({
         enabled: true,
         clientId: "desktop-smoke",
@@ -167,7 +191,8 @@ try {
     };
   }, {
     setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345", aiApiKeyConfigured: false },
-    dashboardData: createDashboardConversionFixture()
+    dashboardData: createDashboardConversionFixture(),
+    reportData: createReportFixture()
   });
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
@@ -294,11 +319,43 @@ try {
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
   await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.locator(".nav-item")).toHaveCount(7);
+  await expect(page.locator(".nav-item")).toHaveCount(8);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
   await expect(page.getByText("Web eşitleme adresi")).toHaveCount(0);
   await expect(page.getByText("Yerel kayıt dosyası")).toHaveCount(0);
   await expect(page.getByText("Yedek klasörü")).toHaveCount(0);
+  await page.getByRole("button", { name: "Raporlar", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Genel İşletme Özeti", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Restoran Satışları", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pansiyon ve Talepler", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Stok Hareketleri", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI İşletme Yorumu", exact: true })).toBeVisible();
+  await expect(page.locator(".daily-revenue-chart")).toHaveCount(1);
+  await expect(page.getByText(/6\.400,00/).first()).toBeVisible();
+  await page.getByRole("button", { name: "Dün", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__reportRanges.at(-1)?.preset)).toBe("yesterday");
+  await page.getByRole("button", { name: "Tarih Aralığı", exact: true }).click();
+  await expect(page.getByLabel("Başlangıç tarihi")).toBeVisible();
+  await expect(page.getByLabel("Bitiş tarihi")).toBeVisible();
+  await page.getByLabel("Başlangıç tarihi").fill("2026-07-12");
+  await page.getByLabel("Bitiş tarihi").fill("2026-07-19");
+  await expect(page.getByText("12 Temmuz 2026", { exact: true })).toBeVisible();
+  await expect(page.getByText("19 Temmuz 2026", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__reportRanges.at(-1))).toMatchObject({
+    preset: "custom",
+    startDate: "2026-07-12",
+    endDate: "2026-07-19"
+  });
+  await page.getByRole("button", { name: "Dönemi Özetle", exact: true }).click();
+  await expect(page.getByText("Seçilen dönemde 8 adisyon kapatıldı ve restoran cirosu ₺6.400 oldu.", { exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.__reportAiCalls.at(-1)?.mode)).toBe("summary");
+  await page.getByRole("button", { name: "Son 7 Gün", exact: true }).click();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await page.screenshot({ path: "artifacts/screenshots/desktop-reports-dark-1366x768.png" });
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Menü", exact: true })).toBeVisible();
   await expect(page.locator(".page-header-copy > p")).toHaveText("Kategori ve ürünleri düzenleyip web menüsünü yayınlayın.");
@@ -1445,7 +1502,7 @@ try {
   await expect(compactPage.getByRole("tab", { name: "Güvenli Mod" })).toHaveAttribute("aria-selected", "true");
 
   await compactPage.reload({ waitUntil: "domcontentloaded" });
-  await expect(compactPage.locator(".nav-item")).toHaveCount(7);
+  await expect(compactPage.locator(".nav-item")).toHaveCount(8);
   await compactPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Ayarlar", exact: true })).toHaveAttribute("aria-current", "page");
   expect(await compactPage.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
@@ -1455,9 +1512,10 @@ try {
     const box = section.getBoundingClientRect();
     return { x: box.x, y: box.y, width: box.width, height: box.height };
   }));
-  expect(basicSettingsBoxes).toHaveLength(5);
+  expect(basicSettingsBoxes).toHaveLength(6);
   expect(new Set(basicSettingsBoxes.map((box) => Math.round(box.x))).size).toBe(2);
-  expect(basicSettingsBoxes.slice(0, 4).every((box) => box.y + box.height <= 768)).toBe(true);
+  expect(basicSettingsBoxes.slice(0, 5).every((box) => box.y + box.height <= 768)).toBe(true);
+  await expect(compactPage.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
   await compactPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await compactPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
@@ -1798,9 +1856,113 @@ function delay(ms) {
   });
 }
 
+function createReportFixture() {
+  return {
+    period: {
+      preset: "last7",
+      label: "Son 7 Gün",
+      startDate: "2026-07-13",
+      endDate: "2026-07-19"
+    },
+    generatedAt: "2026-07-19T12:00:00+03:00",
+    summary: {
+      restaurantRevenue: 6400,
+      closedOrders: 8,
+      averageOrder: 800,
+      approvedReservations: 2,
+      newRequests: 6,
+      pendingTasks: 1
+    },
+    restaurant: {
+      revenue: 6400,
+      closedOrders: 8,
+      averageOrder: 800,
+      soldItemCount: 24,
+      cancelledOrders: 1,
+      dailyRevenue: [
+        { date: "2026-07-13", revenue: 500, closedOrders: 1 },
+        { date: "2026-07-14", revenue: 900, closedOrders: 1 },
+        { date: "2026-07-15", revenue: 0, closedOrders: 0 },
+        { date: "2026-07-16", revenue: 1200, closedOrders: 2 },
+        { date: "2026-07-17", revenue: 800, closedOrders: 1 },
+        { date: "2026-07-18", revenue: 1400, closedOrders: 2 },
+        { date: "2026-07-19", revenue: 1600, closedOrders: 1 }
+      ],
+      topItems: [
+        { name: "Türk Kahvesi", quantity: 8, revenue: 1200 },
+        { name: "Ev Yapımı Limonata", quantity: 6, revenue: 1320 },
+        { name: "Serpme Kahvaltı", quantity: 4, revenue: 2300 }
+      ]
+    },
+    pensionAndRequests: {
+      incomingReservations: 4,
+      approvedReservations: 2,
+      pendingReservations: 1,
+      cancelledOrRejectedReservations: 1,
+      accommodationNights: 5,
+      newRequests: 6,
+      answeredRequests: 3,
+      waitingRequests: 3
+    },
+    stock: {
+      topConsumed: [
+        { menuItemId: "item_coffee", name: "Türk Kahvesi", quantity: 8, unit: "piece" }
+      ],
+      manualMovementCount: 2,
+      imageMovementCount: 1,
+      manualMovements: [
+        {
+          id: "movement_manual",
+          menuItemId: "item_coffee",
+          itemName: "Türk Kahvesi",
+          type: "add",
+          quantityChange: 10,
+          quantityAfter: 18,
+          unit: "piece",
+          sourceType: "desktop",
+          sourceLabel: "Masaüstü manuel",
+          note: "Sayım",
+          createdAt: "2026-07-19T10:00:00+03:00"
+        }
+      ],
+      imageMovements: [
+        {
+          id: "movement_image",
+          menuItemId: "item_lemonade",
+          itemName: "Ev Yapımı Limonata",
+          type: "image_import_add",
+          quantityChange: 12,
+          quantityAfter: 12,
+          unit: "piece",
+          sourceType: "stock_image_import",
+          sourceLabel: "Görsel / fatura",
+          note: "Fatura",
+          createdAt: "2026-07-18T10:00:00+03:00"
+        }
+      ],
+      recentMovements: []
+    },
+    attention: {
+      pendingRequests: 3,
+      pendingReservations: 1,
+      paymentWaitingTables: 1,
+      overdueTasks: 1,
+      incompleteTasks: 1,
+      outOfStockItems: 1,
+      lowStockItems: 1,
+      totalCount: 8,
+      items: [
+        { kind: "pending_request", title: "3 müşteri talebi cevap bekliyor", detail: "Yanıt sırasını kontrol edin." },
+        { kind: "out_of_stock", title: "Türk Kahvesi stokta yok", detail: "Stok girişini kontrol edin." }
+      ]
+    }
+  };
+}
+
 function createSetupFixture() {
   return {
     setupRequired: true,
+    appPasswordConfigured: false,
     businessName: "Deniz Çiçeği Pansiyon & Kafe",
     businessType: "pension_restaurant",
     phone: "+905321234567",

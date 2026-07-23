@@ -5,8 +5,10 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 final class OperationData {
@@ -112,6 +114,7 @@ final class OperationData {
   final List<TableOrder> tableOrders = new ArrayList<>();
   final List<MessageRecord> messages = new ArrayList<>();
   final List<ActionRecord> actions = new ArrayList<>();
+  final Map<String, ReportSnapshot> reports = new HashMap<>();
 
   static OperationData fromJson(JSONObject root) {
     return fromJson(root, "");
@@ -165,6 +168,18 @@ final class OperationData {
     }
     addRecords(array(root, "messages"), data.messages, MessageRecord::fromJson);
     addRecords(array(root, "actions"), data.actions, ActionRecord::fromJson);
+    JSONObject reports = root.optJSONObject("reports");
+    if (reports != null) {
+      for (String preset : new String[] {"today", "yesterday", "last7", "last30"}) {
+        JSONObject report = reports.optJSONObject(preset);
+        if (report != null) {
+          ReportSnapshot parsed = ReportSnapshot.fromJson(report);
+          if (!parsed.startDate.isEmpty() && !parsed.endDate.isEmpty()) {
+            data.reports.put(preset, parsed);
+          }
+        }
+      }
+    }
 
     JSONObject menu = object(root, "menu");
     addRecords(array(menu, "categories"), data.categories, MenuCategory::fromJson);
@@ -302,6 +317,10 @@ final class OperationData {
       }
     }
     return null;
+  }
+
+  ReportSnapshot report(String preset) {
+    return reports.get(preset == null ? "" : preset);
   }
 
   interface JsonParser<T> {
@@ -754,6 +773,107 @@ final class OperationData {
       record.createdAt = value(source, "created_at", "");
       record.processedAt = value(source, "processed_at", "");
       return record;
+    }
+  }
+
+  static final class ReportSnapshot {
+    String preset = "";
+    String label = "";
+    String startDate = "";
+    String endDate = "";
+    double restaurantRevenue;
+    int closedOrders;
+    double averageOrder;
+    int approvedReservations;
+    int newRequests;
+    int attentionCount;
+    int soldItemCount;
+    int cancelledOrders;
+    int pendingRequests;
+    int pendingReservations;
+    int paymentWaitingTables;
+    int overdueTasks;
+    int incompleteTasks;
+    int outOfStockItems;
+    int lowStockItems;
+    final List<ReportTopItem> topItems = new ArrayList<>();
+    final List<ReportDay> dailyRevenue = new ArrayList<>();
+    final List<ReportAttentionItem> attentionItems = new ArrayList<>();
+
+    static ReportSnapshot fromJson(JSONObject source) {
+      ReportSnapshot report = new ReportSnapshot();
+      JSONObject period = object(source, "period");
+      report.preset = value(period, "key", "");
+      report.label = value(period, "label", "");
+      report.startDate = value(period, "start", "");
+      report.endDate = value(period, "end", "");
+
+      JSONObject summary = object(source, "summary");
+      report.restaurantRevenue = decimal(summary, "restaurant_revenue");
+      report.closedOrders = number(summary, "closed_orders");
+      report.averageOrder = decimal(summary, "average_order");
+      report.approvedReservations = number(summary, "approved_reservations");
+      report.newRequests = number(summary, "new_requests");
+      report.attentionCount = number(summary, "attention_count");
+
+      JSONObject restaurant = object(source, "restaurant");
+      report.soldItemCount = number(restaurant, "sold_item_count");
+      report.cancelledOrders = number(restaurant, "cancelled_orders");
+      addRecords(array(restaurant, "top_items"), report.topItems, ReportTopItem::fromJson);
+      addRecords(array(restaurant, "daily_revenue"), report.dailyRevenue, ReportDay::fromJson);
+
+      JSONObject attention = object(source, "attention");
+      report.pendingRequests = number(attention, "pending_requests");
+      report.pendingReservations = number(attention, "pending_reservations");
+      report.paymentWaitingTables = number(attention, "payment_waiting_tables");
+      report.overdueTasks = number(attention, "overdue_tasks");
+      report.incompleteTasks = number(attention, "incomplete_tasks");
+      report.outOfStockItems = number(attention, "out_of_stock_items");
+      report.lowStockItems = number(attention, "low_stock_items");
+      addRecords(array(attention, "items"), report.attentionItems, ReportAttentionItem::fromJson);
+      return report;
+    }
+  }
+
+  static final class ReportTopItem {
+    String name = "Ürün";
+    double quantity;
+    double revenue;
+
+    static ReportTopItem fromJson(JSONObject source) {
+      ReportTopItem item = new ReportTopItem();
+      item.name = value(source, "name", "Ürün");
+      item.quantity = decimal(source, "quantity");
+      item.revenue = decimal(source, "revenue");
+      return item;
+    }
+  }
+
+  static final class ReportDay {
+    String date = "";
+    double revenue;
+    int closedOrders;
+
+    static ReportDay fromJson(JSONObject source) {
+      ReportDay day = new ReportDay();
+      day.date = value(source, "date", "");
+      day.revenue = decimal(source, "revenue");
+      day.closedOrders = number(source, "closed_orders");
+      return day;
+    }
+  }
+
+  static final class ReportAttentionItem {
+    String kind = "";
+    String title = "";
+    String detail = "";
+
+    static ReportAttentionItem fromJson(JSONObject source) {
+      ReportAttentionItem item = new ReportAttentionItem();
+      item.kind = value(source, "kind", "");
+      item.title = value(source, "title", "");
+      item.detail = value(source, "detail", "");
+      return item;
     }
   }
 }

@@ -13,6 +13,7 @@ import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
@@ -44,6 +45,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.ComponentActivity;
+import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.FileProvider;
@@ -71,9 +73,14 @@ public final class MainActivity extends ComponentActivity {
   private static final String TAB_PENSION = AndroidUiRules.TAB_PENSION;
   private static final String TAB_RESTAURANT = AndroidUiRules.TAB_RESTAURANT;
   private static final String TAB_MESSAGES = AndroidUiRules.TAB_MESSAGES;
+  private static final String TAB_REPORTS = AndroidUiRules.TAB_REPORTS;
   private static final long FOREGROUND_SYNC_INTERVAL_MS = 15_000L;
   private static final int BOTTOM_NAV_HEIGHT_DP = 70;
   private static final int MAIN_CONTENT_BOTTOM_PADDING_DP = BOTTOM_NAV_HEIGHT_DP + 24;
+  private static final int LANDSCAPE_CONTENT_BOTTOM_PADDING_DP = 18;
+  private static final int LANDSCAPE_SIDE_NAV_WIDTH_DP = 112;
+  private static final int PORTRAIT_HEADER_HEIGHT_DP = 72;
+  private static final int LANDSCAPE_HEADER_HEIGHT_DP = 60;
   private static final int HEADER_ACTION_SIZE_DP = 44;
   private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 0x5941;
   private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
@@ -92,6 +99,11 @@ public final class MainActivity extends ComponentActivity {
   private String pensionMode = AndroidUiRules.PENSION_RESERVATIONS;
   private String restaurantMode = AndroidUiRules.RESTAURANT_TABLES;
   private String messageMode = AndroidUiRules.MESSAGES_PREPARED;
+  private String reportPreset = AndroidUiRules.REPORT_LAST_7;
+  private String reportAiAnswer = "";
+  private String reportAiMessage = "";
+  private boolean reportAiLoading;
+  private int reportAiRequestVersion;
   private boolean settingsOpen;
   private boolean loading;
   private boolean foregroundActive;
@@ -108,6 +120,7 @@ public final class MainActivity extends ComponentActivity {
   private Button settingsButton;
   private EditText webModuleInput;
   private EditText syncSecretInput;
+  private boolean landscapeLayout;
   private final Map<String, Integer> screenScrollPositions = new HashMap<>();
   private String renderedScreenKey = "";
   private String currentError = "";
@@ -136,6 +149,24 @@ public final class MainActivity extends ComponentActivity {
     themeMode = AppTheme.load(preferences);
     setTheme(themeStyleResource(themeMode));
     super.onCreate(savedInstanceState);
+    getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+      @Override
+      public void handleOnBackPressed() {
+        if (settingsOpen) {
+          settingsOpen = false;
+          render();
+          return;
+        }
+        if (TAB_REPORTS.equals(activeTab)) {
+          activeTab = TAB_TODAY;
+          settingsOpen = true;
+          render();
+          return;
+        }
+        setEnabled(false);
+        getOnBackPressedDispatcher().onBackPressed();
+      }
+    });
     registerStockImageLaunchers();
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
@@ -176,6 +207,18 @@ public final class MainActivity extends ComponentActivity {
     foregroundActive = false;
     foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
     super.onPause();
+  }
+
+  @Override
+  public void onConfigurationChanged(Configuration newConfig) {
+    String webModuleDraft = webModuleInput == null ? null : webModuleInput.getText().toString();
+    String syncSecretDraft = syncSecretInput == null ? null : syncSecretInput.getText().toString();
+    rememberCurrentScrollPosition();
+    super.onConfigurationChanged(newConfig);
+    buildShell();
+    render();
+    restoreSettingsDraft(webModuleInput, webModuleDraft);
+    restoreSettingsDraft(syncSecretInput, syncSecretDraft);
   }
 
   @Override
@@ -826,16 +869,6 @@ public final class MainActivity extends ComponentActivity {
     return UiKit.DANGER;
   }
 
-  @Override
-  public void onBackPressed() {
-    if (settingsOpen) {
-      settingsOpen = false;
-      render();
-      return;
-    }
-    super.onBackPressed();
-  }
-
   private void applyConnectionExtras() {
     String extraUrl = getIntent().getStringExtra("ya_web_module_url");
     String extraSecret = getIntent().getStringExtra("ya_sync_secret");
@@ -901,6 +934,11 @@ public final class MainActivity extends ComponentActivity {
   private void openRoute(String route) {
     AndroidUiRules.Destination destination = AndroidUiRules.resolveDestination(route);
     settingsOpen = false;
+    if (TAB_REPORTS.equals(destination.tab) && !canOpenTab(TAB_REPORTS)) {
+      activeTab = TAB_TODAY;
+      showError("Bu cihazın raporlara erişim yetkisi yok.");
+      return;
+    }
     if (TAB_CUSTOMERS.equals(destination.tab)) {
       customerFilter = destination.mode;
     } else if (TAB_PENSION.equals(destination.tab)) {
@@ -930,13 +968,24 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void buildShell() {
+    landscapeLayout = getResources().getConfiguration().orientation
+        == Configuration.ORIENTATION_LANDSCAPE;
     root = UiKit.column(this);
     root.setBackgroundColor(UiKit.BG);
 
     LinearLayout header = UiKit.row(this);
-    header.setPadding(UiKit.dp(this, 14), UiKit.dp(this, 8), UiKit.dp(this, 10), UiKit.dp(this, 8));
+    int headerVerticalPadding = landscapeLayout ? 4 : 8;
+    header.setPadding(
+        UiKit.dp(this, 14),
+        UiKit.dp(this, headerVerticalPadding),
+        UiKit.dp(this, 10),
+        UiKit.dp(this, headerVerticalPadding)
+    );
     header.setBackgroundColor(UiKit.BG);
-    header.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 72)));
+    header.setLayoutParams(new LinearLayout.LayoutParams(
+        -1,
+        UiKit.dp(this, landscapeLayout ? LANDSCAPE_HEADER_HEIGHT_DP : PORTRAIT_HEADER_HEIGHT_DP)
+    ));
 
     LinearLayout titleGroup = UiKit.column(this);
     titleGroup.setGravity(Gravity.CENTER_VERTICAL);
@@ -971,16 +1020,50 @@ public final class MainActivity extends ComponentActivity {
     root.addView(errorBanner);
 
     content = new FrameLayout(this);
-    content.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
-    root.addView(content);
-
-    bottomNavigation = UiKit.row(this);
-    bottomNavigation.setPadding(UiKit.dp(this, 5), UiKit.dp(this, 6), UiKit.dp(this, 5), UiKit.dp(this, 7));
+    bottomNavigation = landscapeLayout ? UiKit.column(this) : UiKit.row(this);
     bottomNavigation.setBackground(UiKit.rounded(this, UiKit.BOTTOM_NAV_BACKGROUND, UiKit.BORDER, 0));
-    bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, BOTTOM_NAV_HEIGHT_DP)));
-    root.addView(bottomNavigation);
+    if (landscapeLayout) {
+      LinearLayout body = UiKit.row(this);
+      body.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
+      bottomNavigation.setPadding(
+          UiKit.dp(this, 6),
+          UiKit.dp(this, 5),
+          UiKit.dp(this, 6),
+          UiKit.dp(this, 5)
+      );
+      bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(
+          UiKit.dp(this, LANDSCAPE_SIDE_NAV_WIDTH_DP),
+          -1
+      ));
+      content.setLayoutParams(new LinearLayout.LayoutParams(0, -1, 1f));
+      body.addView(bottomNavigation);
+      body.addView(content);
+      root.addView(body);
+    } else {
+      content.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
+      root.addView(content);
+      bottomNavigation.setPadding(
+          UiKit.dp(this, 5),
+          UiKit.dp(this, 6),
+          UiKit.dp(this, 5),
+          UiKit.dp(this, 7)
+      );
+      bottomNavigation.setLayoutParams(new LinearLayout.LayoutParams(
+          -1,
+          UiKit.dp(this, BOTTOM_NAV_HEIGHT_DP)
+      ));
+      root.addView(bottomNavigation);
+    }
     setContentView(root);
     updateErrorBanner();
+  }
+
+  private void restoreSettingsDraft(EditText input, String draft) {
+    if (input == null || draft == null) {
+      return;
+    }
+    input.setText(draft);
+    input.setSelection(draft.length());
   }
 
   private ImageButton createThemeButton(Runnable afterApplied) {
@@ -1073,7 +1156,9 @@ public final class MainActivity extends ComponentActivity {
     refreshButton.setContentDescription(loading ? "Yenileniyor" : "Yenile");
     settingsButton.setVisibility(canOpenSettings ? View.VISIBLE : View.GONE);
     styleHeaderAction(settingsButton, settingsOpen);
-    bottomNavigation.setVisibility(settingsOpen || inactiveDevice ? View.GONE : View.VISIBLE);
+    bottomNavigation.setVisibility(
+        settingsOpen || inactiveDevice || TAB_REPORTS.equals(activeTab) ? View.GONE : View.VISIBLE
+    );
     renderBottomNavigation();
     content.removeAllViews();
     View screen;
@@ -1095,6 +1180,9 @@ public final class MainActivity extends ComponentActivity {
     } else if (TAB_MESSAGES.equals(activeTab)) {
       headerTitle.setText("Mesajlar");
       screen = messagesScreen();
+    } else if (TAB_REPORTS.equals(activeTab)) {
+      headerTitle.setText("Raporlar");
+      screen = reportsScreen();
     } else {
       headerTitle.setText("Bugün");
       screen = todayScreen();
@@ -1143,6 +1231,9 @@ public final class MainActivity extends ComponentActivity {
     }
     if (TAB_MESSAGES.equals(activeTab)) {
       return TAB_MESSAGES + ":" + messageMode;
+    }
+    if (TAB_REPORTS.equals(activeTab)) {
+      return TAB_REPORTS + ":" + reportPreset;
     }
     return activeTab;
   }
@@ -1204,13 +1295,19 @@ public final class MainActivity extends ComponentActivity {
     button.setAllCaps(false);
     button.setGravity(Gravity.CENTER);
     button.setPadding(1, 0, 1, 0);
+    button.setMinWidth(0);
+    button.setMinimumWidth(0);
+    button.setMinHeight(0);
+    button.setMinimumHeight(0);
     button.setBackground(UiKit.rounded(this, selected ? UiKit.SURFACE_ALT : Color.TRANSPARENT, Color.TRANSPARENT, 11));
     button.setOnClickListener(view -> {
       activeTab = tab;
       settingsOpen = false;
       render();
     });
-    button.setLayoutParams(new LinearLayout.LayoutParams(0, -1, 1f));
+    button.setLayoutParams(landscapeLayout
+        ? new LinearLayout.LayoutParams(-1, 0, 1f)
+        : new LinearLayout.LayoutParams(0, -1, 1f));
     bottomNavigation.addView(button);
   }
 
@@ -1612,6 +1709,229 @@ public final class MainActivity extends ComponentActivity {
     return mainScreenScroll(page);
   }
 
+  private View reportsScreen() {
+    LinearLayout page = UiKit.column(this);
+    if (!data.isAdmin()) {
+      page.addView(emptyCard(
+          "Bu cihazın raporlara erişim yetkisi yok",
+          "Raporlar yalnız masaüstünde aktif yönetici olarak atanmış telefonlarda açılır."
+      ));
+      return UiKit.scroll(this, page);
+    }
+
+    page.addView(screenIntro(
+        "YÖNETİCİ RAPORU",
+        "İşletmenin kısa görünümü",
+        "Tutarlar ve adetler masaüstündeki SQLite verisinden hazırlanır. AI yalnız bu hazır özeti açıklar.",
+        true
+    ));
+    page.addView(filterBar(new String[][] {
+        {AndroidUiRules.REPORT_TODAY, "Bugün"},
+        {AndroidUiRules.REPORT_YESTERDAY, "Dün"},
+        {AndroidUiRules.REPORT_LAST_7, "Son 7 Gün"},
+        {AndroidUiRules.REPORT_LAST_30, "Son 30 Gün"}
+    }, reportPreset, value -> {
+      reportPreset = AndroidUiRules.normalizeReportPreset(value);
+      reportAiRequestVersion += 1;
+      reportAiLoading = false;
+      reportAiAnswer = "";
+      reportAiMessage = "";
+      render();
+    }));
+
+    OperationData.ReportSnapshot report = data.report(reportPreset);
+    if (report == null) {
+      page.addView(emptyCard(
+          "Rapor verisi henüz hazır değil",
+          "Masaüstünde otomatik senkronu çalıştırın, ardından bu ekrandaki Yenile düğmesine dokunun."
+      ));
+      return UiKit.scroll(this, page);
+    }
+
+    LinearLayout period = UiKit.card(this);
+    period.addView(settingLine("Dönem", report.label.isEmpty() ? reportPresetLabel(reportPreset) : report.label, UiKit.PRIMARY));
+    period.addView(UiKit.divider(this));
+    period.addView(settingLine("Tarih", formatReportPeriod(report.startDate, report.endDate), UiKit.TEXT));
+    page.addView(period);
+
+    page.addView(sectionLabel("Genel özet"));
+    LinearLayout summary = UiKit.card(this);
+    addReportMetric(summary, "Restoran cirosu", money(report.restaurantRevenue, "TRY"), UiKit.SUCCESS);
+    addReportMetric(summary, "Kapanan hesap", String.valueOf(report.closedOrders), UiKit.INFO);
+    addReportMetric(summary, "Ortalama hesap", money(report.averageOrder, "TRY"), UiKit.ACCENT);
+    addReportMetric(summary, "Onaylanan rezervasyon", String.valueOf(report.approvedReservations), UiKit.PRIMARY);
+    addReportMetric(summary, "Yeni talep", String.valueOf(report.newRequests), UiKit.WARNING);
+    addReportMetric(summary, "Dikkat gerektiren", String.valueOf(report.attentionCount), report.attentionCount > 0 ? UiKit.DANGER : UiKit.SUCCESS);
+    page.addView(summary);
+
+    page.addView(sectionLabel("Restoran"));
+    LinearLayout restaurant = UiKit.card(this);
+    addReportMetric(restaurant, "Satılan ürün", String.valueOf(report.soldItemCount), UiKit.INFO);
+    addReportMetric(restaurant, "İptal edilen hesap", String.valueOf(report.cancelledOrders), report.cancelledOrders > 0 ? UiKit.WARNING : UiKit.SUCCESS);
+    page.addView(restaurant);
+
+    page.addView(sectionLabel("En çok satılan 3 ürün"));
+    if (report.topItems.isEmpty()) {
+      page.addView(emptyCard("Satış satırı yok", "Seçili dönemde kapanmış hesaplara bağlı ürün satışı bulunmuyor."));
+    } else {
+      int rank = 1;
+      for (OperationData.ReportTopItem item : report.topItems) {
+        page.addView(reportTopItemCard(item, rank));
+        rank += 1;
+      }
+    }
+
+    page.addView(sectionLabel("Şu an dikkat gerektirenler"));
+    LinearLayout attentionSummary = UiKit.card(this);
+    addReportMetric(attentionSummary, "Bekleyen müşteri talebi", String.valueOf(report.pendingRequests), UiKit.WARNING);
+    addReportMetric(attentionSummary, "Bekleyen rezervasyon", String.valueOf(report.pendingReservations), UiKit.WARNING);
+    addReportMetric(attentionSummary, "Hesap bekleyen masa", String.valueOf(report.paymentWaitingTables), UiKit.DANGER);
+    addReportMetric(attentionSummary, "Geciken / tamamlanmayan iş", report.overdueTasks + " / " + report.incompleteTasks, UiKit.ACCENT);
+    addReportMetric(attentionSummary, "Tükenen / az stok", report.outOfStockItems + " / " + report.lowStockItems, UiKit.DANGER);
+    page.addView(attentionSummary);
+    if (report.attentionItems.isEmpty()) {
+      page.addView(emptyCard("Acil başlık yok", "Şu anda ayrıca listelenecek dikkat başlığı bulunmuyor."));
+    } else {
+      for (OperationData.ReportAttentionItem item : report.attentionItems) {
+        page.addView(reportAttentionCard(item));
+      }
+    }
+
+    page.addView(sectionLabel("AI yorumu (isteğe bağlı)"));
+    page.addView(UiKit.text(
+        this,
+        "AI yeni hesap yapmaz; yalnız yukarıdaki hazır JSON özetini kısa ve sade biçimde açıklar.",
+        12,
+        UiKit.SECONDARY,
+        Typeface.NORMAL
+    ));
+    page.addView(reportAiButton("Bu dönemi özetle", "summary"));
+    page.addView(reportAiButton("Dikkat edilmesi gerekenler", "attention"));
+    page.addView(reportAiButton("Satışları yorumla", "sales"));
+    page.addView(reportAiButton("3 kısa öneri ver", "recommendations"));
+    if (reportAiLoading) {
+      page.addView(emptyCard("AI yorumu hazırlanıyor", "Hazır rapor güvenli sunucu bağlantısı üzerinden yorumlanıyor."));
+    } else if (!reportAiAnswer.isEmpty()) {
+      LinearLayout answer = UiKit.card(this);
+      answer.setBackground(UiKit.rounded(this, UiKit.PRIMARY_DARK, UiKit.PRIMARY, 14));
+      answer.addView(UiKit.text(this, reportAiAnswer, 13, UiKit.TEXT, Typeface.NORMAL));
+      page.addView(answer);
+    } else if (!reportAiMessage.isEmpty()) {
+      LinearLayout message = UiKit.card(this);
+      message.addView(UiKit.text(this, reportAiMessage, 13, UiKit.WARNING, Typeface.BOLD));
+      page.addView(message);
+    }
+    return UiKit.scroll(this, page);
+  }
+
+  private void addReportMetric(LinearLayout card, String label, String value, int tone) {
+    if (card.getChildCount() > 0) {
+      card.addView(UiKit.divider(this));
+    }
+    card.addView(settingLine(label, value, tone));
+  }
+
+  private View reportTopItemCard(OperationData.ReportTopItem item, int rank) {
+    LinearLayout card = UiKit.card(this);
+    LinearLayout top = UiKit.row(this);
+    TextView name = UiKit.text(this, rank + ". " + item.name, 14, UiKit.TEXT, Typeface.BOLD);
+    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    top.addView(name);
+    top.addView(statusBadge(money(item.revenue, "TRY"), UiKit.SUCCESS));
+    card.addView(top);
+    card.addView(UiKit.text(
+        this,
+        "Satılan miktar: " + stockNumber(item.quantity),
+        12,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+    return card;
+  }
+
+  private View reportAttentionCard(OperationData.ReportAttentionItem item) {
+    LinearLayout card = UiKit.card(this);
+    card.addView(UiKit.text(this, item.title, 14, UiKit.TEXT, Typeface.BOLD));
+    if (!item.detail.isEmpty()) {
+      card.addView(UiKit.text(this, item.detail, 12, UiKit.SECONDARY, Typeface.NORMAL));
+    }
+    return card;
+  }
+
+  private View reportAiButton(String label, String mode) {
+    Button button = UiKit.outlineButton(this, label, view -> requestReportAi(mode));
+    button.setEnabled(!reportAiLoading);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+    params.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    button.setLayoutParams(params);
+    return button;
+  }
+
+  private void requestReportAi(String mode) {
+    if (!data.isAdmin()) {
+      reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.";
+      showError(reportAiMessage);
+      render();
+      return;
+    }
+    if (data.report(reportPreset) == null) {
+      reportAiMessage = "Rapor verisi henüz hazır değil. Masaüstünde senkronu yenileyin.";
+      render();
+      return;
+    }
+    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
+    String syncSecret = ConnectionSettings.syncSecret(preferences);
+    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
+      reportAiMessage = "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.";
+      render();
+      return;
+    }
+
+    final String requestedPreset = reportPreset;
+    final int requestVersion = ++reportAiRequestVersion;
+    reportAiLoading = true;
+    reportAiAnswer = "";
+    reportAiMessage = "";
+    render();
+    executor.execute(() -> {
+      try {
+        String answer = syncClient.generateReportComment(
+            baseUrl,
+            syncSecret,
+            identity,
+            mode,
+            requestedPreset
+        );
+        runOnUiThread(() -> {
+          if (requestVersion != reportAiRequestVersion || !requestedPreset.equals(reportPreset)) {
+            return;
+          }
+          reportAiLoading = false;
+          if (!data.isAdmin()) {
+            reportAiAnswer = "";
+            reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.";
+          } else {
+            reportAiAnswer = answer;
+            reportAiMessage = "";
+          }
+          render();
+        });
+      } catch (HostingSyncClient.SyncException error) {
+        runOnUiThread(() -> {
+          if (requestVersion != reportAiRequestVersion || !requestedPreset.equals(reportPreset)) {
+            return;
+          }
+          reportAiLoading = false;
+          reportAiAnswer = "";
+          reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.".equals(error.getMessage())
+              ? error.getMessage()
+              : "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.";
+          render();
+        });
+      }
+    });
+  }
+
   private View settingsScreen() {
     LinearLayout page = UiKit.column(this);
     boolean canViewTechnicalSettings = !data.permissionsResolved || data.hasPermission("settings.view");
@@ -1619,6 +1939,29 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout appearance = UiKit.card(this);
     appearance.addView(settingLine("Tema", themeMode.label, UiKit.PRIMARY));
     page.addView(appearance);
+    if (data.isAdmin()) {
+      page.addView(sectionLabel("Yönetici"));
+      LinearLayout reports = UiKit.card(this);
+      reports.addView(UiKit.text(this, "İşletme raporları", 15, UiKit.TEXT, Typeface.BOLD));
+      reports.addView(UiKit.text(
+          this,
+          "Restoran satışlarını, talepleri ve güncel dikkat listesini kısa dönemlerle izleyin.",
+          12,
+          UiKit.SECONDARY,
+          Typeface.NORMAL
+      ));
+      Button openReports = UiKit.button(this, "Raporları Aç", UiKit.PRIMARY, view -> {
+        settingsOpen = false;
+        activeTab = TAB_REPORTS;
+        clearError();
+        render();
+      });
+      LinearLayout.LayoutParams reportButtonParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+      reportButtonParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
+      openReports.setLayoutParams(reportButtonParams);
+      reports.addView(openReports);
+      page.addView(reports);
+    }
     page.addView(sectionLabel("Bildirim tercihleri"));
     LinearLayout notificationPreferences = UiKit.card(this);
     boolean hasNotificationPreference = false;
@@ -1804,7 +2147,11 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private ScrollView mainScreenScroll(View page) {
-    return UiKit.scroll(this, page, MAIN_CONTENT_BOTTOM_PADDING_DP);
+    return UiKit.scroll(
+        this,
+        page,
+        landscapeLayout ? LANDSCAPE_CONTENT_BOTTOM_PADDING_DP : MAIN_CONTENT_BOTTOM_PADDING_DP
+    );
   }
 
   private View sectionLabel(String value) {
@@ -3734,6 +4081,38 @@ public final class MainActivity extends ComponentActivity {
       return start;
     }
     return start + " → " + end;
+  }
+
+  private String reportPresetLabel(String preset) {
+    if ("today".equals(preset)) return "Bugün";
+    if ("yesterday".equals(preset)) return "Dün";
+    if ("last30".equals(preset)) return "Son 30 Gün";
+    return "Son 7 Gün";
+  }
+
+  private String formatReportPeriod(String start, String end) {
+    String formattedStart = formatReportDate(start);
+    String formattedEnd = formatReportDate(end);
+    if (formattedStart.equals(formattedEnd)) {
+      return formattedStart;
+    }
+    return formattedStart + " – " + formattedEnd;
+  }
+
+  private String formatReportDate(String value) {
+    if (value == null || !value.matches("\\d{4}-\\d{2}-\\d{2}")) {
+      return value == null ? "" : value;
+    }
+    try {
+      SimpleDateFormat source = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
+      source.setLenient(false);
+      Date date = source.parse(value);
+      return date == null
+          ? value
+          : new SimpleDateFormat("d MMM yyyy", new Locale("tr", "TR")).format(date);
+    } catch (Exception ignored) {
+      return value;
+    }
   }
 
   private String joinNonEmpty(String separator, String... values) {

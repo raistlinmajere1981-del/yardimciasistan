@@ -30,6 +30,31 @@ const businessConfig = JSON.parse(readFileSync(businessFile, "utf8"));
 businessConfig.sync_secret = syncSecret;
 writeFileSync(businessFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
 
+const aiPort = await getFreePort();
+let mockAiAnswer = "Hazır rapor özeti güvenli biçimde yorumlandı.";
+const mockAiRequests = [];
+const aiServer = http.createServer((request, response) => {
+  let body = "";
+  request.setEncoding("utf8");
+  request.on("data", (chunk) => { body += chunk; });
+  request.on("end", () => {
+    mockAiRequests.push({
+      authorization: String(request.headers.authorization ?? ""),
+      body: JSON.parse(body || "{}")
+    });
+    response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    response.end(JSON.stringify({
+      choices: [{ message: { content: mockAiAnswer } }]
+    }));
+  });
+});
+await new Promise((resolve, reject) => {
+  aiServer.once("error", reject);
+  aiServer.listen(aiPort, "127.0.0.1", resolve);
+});
+const aiSettingsFile = join(webModuleRoot, "data", "ai-settings.local.php");
+writeFileSync(aiSettingsFile, "<?php\nreturn ['enabled' => false];\n");
+
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
@@ -206,6 +231,14 @@ try {
   const androidData = await androidSummary.json();
   assert.ok(androidData.requests.some((request) => request.id === requestResult.request_id));
   assert.equal(androidData.rooms.find((room) => room.id === roomBefore.id)?.status, "cleaning");
+  assert.deepEqual(androidData.reports, [], "Staff devices must not receive report aggregates.");
+  const staffReportAi = await postJson(`${baseUrl}/api/chat.php`, {
+    report_mode: "summary",
+    report_preset: "last7",
+    device_id: "android-auto-smoke"
+  }, true);
+  assert.equal(staffReportAi.status, 403, "Staff report AI access must fail closed.");
+  assert.equal((await staffReportAi.json()).message, "Bu cihazın raporlara erişim yetkisi yok.");
   assert.deepEqual(
     androidData.trackedStockItems.find((item) => item.menu_item_id === trackedMenuItemId),
     {
@@ -459,6 +492,67 @@ try {
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("customer.delete"), true);
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("menu.delete"), true);
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("message.delete"), true);
+  assert.deepEqual(
+    Object.keys(adminSummary.reports).sort(),
+    ["last30", "last7", "today", "yesterday"],
+    "Admin devices receive only the four compact report presets."
+  );
+
+  const disabledAdminReportAi = await postJson(`${baseUrl}/api/chat.php`, {
+    report_mode: "summary",
+    report_preset: "last7",
+    device_id: "android-auto-smoke"
+  }, true);
+  assert.equal(disabledAdminReportAi.status, 503);
+  assert.equal(
+    (await disabledAdminReportAi.json()).message,
+    "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı."
+  );
+
+  writeFileSync(aiSettingsFile, `<?php
+return [
+  'enabled' => true,
+  'provider' => 'openai_compatible',
+  'service' => 'custom',
+  'base_url' => 'http://127.0.0.1:${aiPort}/v1',
+  'model' => 'report-smoke-model',
+  'api_key' => 'server-only-report-smoke-key',
+  'timeout_seconds' => 5
+];
+`);
+  const localizedRevenue = new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(adminSummary.reports.last7.summary.restaurant_revenue);
+  mockAiAnswer = `Restoran cirosu ₺${localizedRevenue}.`;
+  const adminReportAi = await postJson(`${baseUrl}/api/chat.php`, {
+    report_mode: "summary",
+    report_preset: "last7",
+    device_id: "android-auto-smoke",
+    report: { summary: { restaurant_revenue: 987654 } }
+  }, true);
+  assert.equal(adminReportAi.status, 200);
+  assert.equal((await adminReportAi.json()).answer, mockAiAnswer);
+  const providerRequest = mockAiRequests.at(-1);
+  assert.ok(providerRequest);
+  assert.equal(providerRequest.authorization, "Bearer server-only-report-smoke-key");
+  const providerReport = JSON.parse(providerRequest.body.messages.at(-1).content);
+  assert.deepEqual(providerReport, adminSummary.reports.last7, "The server must ignore client-supplied report numbers.");
+  assert.equal(JSON.stringify(providerReport).includes("Otomatik Web Misafiri"), false);
+  assert.equal(JSON.stringify(providerReport).includes("0555 444 33 22"), false);
+
+  mockAiAnswer = "Raporda 987654 kayıt var.";
+  const fabricatedAdminReportAi = await postJson(`${baseUrl}/api/chat.php`, {
+    report_mode: "summary",
+    report_preset: "last7",
+    device_id: "android-auto-smoke"
+  }, true);
+  assert.equal(fabricatedAdminReportAi.status, 502);
+  assert.equal(
+    (await fabricatedAdminReportAi.json()).message,
+    "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı."
+  );
+  mockAiAnswer = "Hazır rapor özeti güvenli biçimde yorumlandı.";
 
   const adminDeleteActionId = "android_request_delete_admin_0001";
   await assertQueued(await enqueueAndroidAction(adminDeleteActionId, "customer_request_delete", {
@@ -685,6 +779,7 @@ try {
 } finally {
   database.close();
   server.kill();
+  aiServer.close();
   rmSync(tempRoot, { recursive: true, force: true });
 }
 
@@ -790,6 +885,7 @@ function createSnapshot(databaseInstance) {
     })),
     messages: [],
     androidPermissions: databaseInstance.getAndroidPermissionSnapshot(),
+    reports: databaseInstance.getAndroidReportPresets(),
     updated_at: new Date().toISOString()
   };
 }

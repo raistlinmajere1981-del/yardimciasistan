@@ -38,6 +38,9 @@ if (!$payloadResult['ok']) {
 }
 
 $payload = $payloadResult['data'];
+if (array_key_exists('report_mode', $payload)) {
+    ya_chat_generate_android_report($businessConfig, $aiConfig, $payload);
+}
 $message = ya_chat_string($payload['message'] ?? '');
 
 if ($message === '') {
@@ -122,6 +125,271 @@ ya_chat_response(200, [
         return $document['id'];
     }, $knowledgeDocuments)
 ]);
+
+function ya_chat_generate_android_report(array $businessConfig, array $aiConfig, array $payload): void
+{
+    $configuredSecret = ya_chat_string($businessConfig['sync_secret'] ?? '');
+    $providedSecret = ya_chat_string($_SERVER['HTTP_X_YA_SYNC_SECRET'] ?? '');
+    if ($configuredSecret === '' || $providedSecret === '' || !hash_equals($configuredSecret, $providedSecret)) {
+        ya_chat_response(401, [
+            'ok' => false,
+            'message' => 'AI rapor yorumu izni alınamadı. Güvenlik anahtarını kontrol edin.'
+        ]);
+    }
+
+    $deviceId = ya_chat_string($payload['device_id'] ?? '');
+    if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId) !== 1) {
+        ya_chat_response(422, ['ok' => false, 'message' => 'Telefon kimliği geçersiz.']);
+    }
+    $snapshot = ya_storage_get_publication('android_snapshot', []);
+    unset($snapshot['_publication']);
+    $profile = is_array($snapshot['androidPermissions'][$deviceId] ?? null)
+        ? $snapshot['androidPermissions'][$deviceId]
+        : [];
+    if (($profile['role'] ?? 'staff') !== 'admin' || !ya_chat_bool($profile['is_active'] ?? false)) {
+        ya_chat_response(403, [
+            'ok' => false,
+            'message' => 'Bu cihazın raporlara erişim yetkisi yok.'
+        ]);
+    }
+
+    $mode = ya_chat_string($payload['report_mode'] ?? '');
+    $preset = ya_chat_string($payload['report_preset'] ?? '');
+    $modeInstructions = [
+        'summary' => 'Seçilen dönemin genel durumunu 3–5 kısa cümle veya maddeyle özetle.',
+        'attention' => 'Dikkat gerektirenleri müşteri talepleri, rezervasyonlar, hesap bekleyen masalar, işler ve stok sırasıyla önceliklendir.',
+        'sales' => 'Yalnız restoran cirosunu, ortalama hesabı, en çok satılan ürünleri ve günlük değişimleri yorumla.',
+        'recommendations' => 'Mevcut verilere dayanan en fazla 3 kısa ve uygulanabilir işletme önerisi ver.'
+    ];
+    if (!isset($modeInstructions[$mode]) || !in_array($preset, ['today', 'yesterday', 'last7', 'last30'], true)) {
+        ya_chat_response(422, ['ok' => false, 'message' => 'AI rapor yorumu seçimi geçersiz.']);
+    }
+    $report = is_array($snapshot['reports'][$preset] ?? null) ? $snapshot['reports'][$preset] : [];
+    if ($report === []) {
+        ya_chat_response(409, [
+            'ok' => false,
+            'message' => 'Rapor verisi henüz hazır değil. Masaüstünde senkronu yenileyin.'
+        ]);
+    }
+
+    if (!ya_chat_bool($aiConfig['enabled'] ?? false)
+        || ya_chat_string($aiConfig['provider'] ?? '') !== 'openai_compatible') {
+        ya_chat_response(503, [
+            'ok' => false,
+            'message' => 'Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.'
+        ]);
+    }
+    $baseUrl = ya_chat_string($aiConfig['base_url'] ?? '');
+    $model = ya_chat_string($aiConfig['model'] ?? '');
+    $apiKey = ya_chat_string($aiConfig['api_key'] ?? '');
+    $service = ya_chat_string($aiConfig['service'] ?? 'custom');
+    if ($baseUrl === '' || $model === '' || $apiKey === '') {
+        ya_chat_response(503, [
+            'ok' => false,
+            'message' => 'Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.'
+        ]);
+    }
+
+    if (!ya_chat_report_has_data($report)) {
+        ya_chat_response(200, [
+            'ok' => true,
+            'answer' => 'Bu dönem için yeterli veri yok.',
+            'fallback' => false,
+            'provider' => 'local_validation',
+            'model' => ''
+        ]);
+    }
+    $systemPrompt = implode("\n", [
+        'İşletme sahibine kısa bir rapor yorumu yaz.',
+        $modeInstructions[$mode],
+        'Yalnız kullanıcı mesajındaki hesaplanmış JSON verisini kullan.',
+        'Hiçbir metrik hesaplama, oran çıkarma veya tahmin yapma.',
+        'JSON içinde bulunmayan hiçbir sayı, tarih, tutar ya da adet yazma.',
+        'Sayısal bilgileri yalnız rakamla yaz; sayı kelimeleri kullanma.',
+        'Veri yoksa aynen “Bu dönem için yeterli veri yok.” yaz.',
+        'Türkçe, sade ve doğrudan yaz; başlık veya tablo ekleme.',
+        'Numaralı liste kullanma; gerekiyorsa tire işaretli en fazla 5 madde yaz.',
+        'Muhasebe, vergi, yatırım, kâr-zarar veya finansal tahmin tavsiyesi verme.'
+    ]);
+    $reportJson = json_encode($report, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($reportJson)) {
+        ya_chat_response(500, [
+            'ok' => false,
+            'message' => 'Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.'
+        ]);
+    }
+    $chatOptions = [
+        'base_url' => $baseUrl,
+        'model' => $model,
+        'api_key' => $apiKey,
+        'timeout_seconds' => ya_chat_int($aiConfig['timeout_seconds'] ?? 15, 15),
+        'messages' => [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $reportJson]
+        ]
+    ];
+    $result = $service === 'gemini'
+        ? ya_chat_call_google_ai_studio($chatOptions)
+        : ya_chat_call_openai_compatible($chatOptions);
+    if (!($result['ok'] ?? false)) {
+        ya_chat_response(503, [
+            'ok' => false,
+            'message' => 'Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.'
+        ]);
+    }
+    $answer = ya_chat_sanitize_report_answer(
+        ya_chat_string($result['answer'] ?? ''),
+        $report,
+        $mode === 'recommendations' ? 3 : 5
+    );
+    if ($answer === '') {
+        ya_chat_response(502, [
+            'ok' => false,
+            'message' => 'Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.'
+        ]);
+    }
+    ya_chat_response(200, [
+        'ok' => true,
+        'answer' => $answer,
+        'fallback' => false,
+        'provider' => 'openai_compatible',
+        'model' => $model
+    ]);
+}
+
+function ya_chat_report_has_data(array $report): bool
+{
+    $summary = is_array($report['summary'] ?? null) ? $report['summary'] : [];
+    foreach ($summary as $value) {
+        if (is_numeric($value) && (float) $value > 0) {
+            return true;
+        }
+    }
+    $restaurant = is_array($report['restaurant'] ?? null) ? $report['restaurant'] : [];
+    $attention = is_array($report['attention'] ?? null) ? $report['attention'] : [];
+    return (is_array($restaurant['top_items'] ?? null) && $restaurant['top_items'] !== [])
+        || (is_array($attention['items'] ?? null) && $attention['items'] !== []);
+}
+
+function ya_chat_sanitize_report_answer(string $answer, array $report, int $maxLines): string
+{
+    $answer = trim((string) preg_replace('/^\s*\d+[.)]\s+/mu', '- ', str_replace(["\r\n", "\r"], "\n", $answer)));
+    if ($answer === '') {
+        return '';
+    }
+    $allowed = ['decimals' => [], 'integers' => []];
+    ya_chat_collect_report_numbers($report, $allowed);
+    preg_match_all('/[-+]?\d+(?:[.,]\d+)*/u', $answer, $matches);
+    foreach ($matches[0] ?? [] as $token) {
+        if (!ya_chat_report_number_allowed((string) $token, $allowed)) {
+            return '';
+        }
+    }
+    $lines = array_values(array_filter(array_map('trim', explode("\n", $answer)), static fn(string $line): bool => $line !== ''));
+    if (count($lines) > 1) {
+        return mb_substr(implode("\n", array_slice($lines, 0, $maxLines)), 0, 2400);
+    }
+    $sentences = preg_split('/(?<=[.!?])\s+/u', $answer) ?: [$answer];
+    return mb_substr(implode(' ', array_slice($sentences, 0, $maxLines)), 0, 2400);
+}
+
+function ya_chat_collect_report_numbers(mixed $value, array &$allowed): void
+{
+    if (is_int($value) || is_float($value)) {
+        $canonical = ya_chat_report_decimal((float) $value);
+        $allowed['decimals'][$canonical] = true;
+        if ((float) (int) $value === (float) $value) {
+            $allowed['integers'][(string) abs((int) $value)] = true;
+        }
+        return;
+    }
+    if (is_string($value)) {
+        preg_match_all('/\d+(?:[.,]\d+)*/u', $value, $matches);
+        foreach ($matches[0] ?? [] as $token) {
+            $normalized = ya_chat_report_decimal_token((string) $token);
+            if ($normalized !== null) {
+                $allowed['decimals'][$normalized] = true;
+            }
+            if (preg_match('/^\d+$/', (string) $token) === 1) {
+                $allowed['integers'][ltrim((string) $token, '0') ?: '0'] = true;
+            }
+        }
+        return;
+    }
+    if (is_array($value)) {
+        foreach ($value as $nested) {
+            ya_chat_collect_report_numbers($nested, $allowed);
+        }
+    }
+}
+
+function ya_chat_report_number_allowed(string $token, array $allowed): bool
+{
+    foreach (ya_chat_report_number_candidates($token) as $candidate) {
+        if (isset($allowed['decimals'][$candidate])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function ya_chat_report_number_candidates(string $value): array
+{
+    $token = trim($value);
+    $sign = str_starts_with($token, '-') ? -1 : 1;
+    $unsigned = preg_replace('/^[+-]/', '', $token) ?: '';
+    $candidates = [];
+    $add = static function (string $normalized) use (&$candidates, $sign): void {
+        if (!is_numeric($normalized)) {
+            return;
+        }
+        $candidate = ya_chat_report_decimal((float) $normalized * $sign);
+        $candidates[$candidate] = true;
+    };
+
+    if (preg_match('/^\d+$/', $unsigned) === 1) {
+        $add($unsigned);
+        return array_keys($candidates);
+    }
+    if (preg_match('/^\d{1,3}([.,])\d{3}(?:\1\d{3})*$/', $unsigned) === 1) {
+        $add((string) preg_replace('/[.,]/', '', $unsigned));
+    }
+
+    $lastDot = strrpos($unsigned, '.');
+    $lastComma = strrpos($unsigned, ',');
+    if ($lastDot !== false && $lastComma !== false) {
+        $decimalSeparator = $lastDot > $lastComma ? '.' : ',';
+        $groupingSeparator = $decimalSeparator === '.' ? ',' : '.';
+        $decimalIndex = strrpos($unsigned, $decimalSeparator);
+        $integerPart = substr($unsigned, 0, (int) $decimalIndex);
+        $fractionPart = substr($unsigned, (int) $decimalIndex + 1);
+        $groupPattern = $groupingSeparator === '.'
+            ? '/^\d{1,3}(?:\.\d{3})*$/'
+            : '/^\d{1,3}(?:,\d{3})*$/';
+        if (preg_match($groupPattern, $integerPart) === 1 && preg_match('/^\d+$/', $fractionPart) === 1) {
+            $add(str_replace($groupingSeparator, '', $integerPart) . '.' . $fractionPart);
+        }
+    } else {
+        $normalized = ya_chat_report_decimal_token($unsigned);
+        if ($normalized !== null) {
+            $add($normalized);
+        }
+    }
+    return array_keys($candidates);
+}
+
+function ya_chat_report_decimal_token(string $value): ?string
+{
+    if (preg_match('/^\d+(?:[.,]\d+)?$/', $value) !== 1) {
+        return null;
+    }
+    return ya_chat_report_decimal((float) str_replace(',', '.', $value));
+}
+
+function ya_chat_report_decimal(float $value): string
+{
+    return rtrim(rtrim(number_format(round($value, 3), 3, '.', ''), '0'), '.') ?: '0';
+}
 
 function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $payload, string $message, array $knowledgeDocuments): array
 {

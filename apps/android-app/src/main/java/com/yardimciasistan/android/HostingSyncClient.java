@@ -70,6 +70,45 @@ final class HostingSyncClient {
     return OperationData.ActionRecord.fromJson(action);
   }
 
+  String generateReportComment(
+      String baseUrl,
+      String syncSecret,
+      DeviceIdentity identity,
+      String reportMode,
+      String reportPreset
+  ) throws SyncException {
+    if (!"summary".equals(reportMode)
+        && !"attention".equals(reportMode)
+        && !"sales".equals(reportMode)
+        && !"recommendations".equals(reportMode)) {
+      throw new SyncException("AI rapor yorumu seçimi geçersiz.");
+    }
+    if (!AndroidUiRules.isReportPreset(reportPreset)) {
+      throw new SyncException("AI rapor dönemi geçersiz.");
+    }
+
+    JSONObject payload = new JSONObject();
+    try {
+      payload.put("report_mode", reportMode);
+      payload.put("report_preset", reportPreset);
+      payload.put("device_id", identity.deviceId);
+    } catch (Exception error) {
+      throw new SyncException("AI rapor yorumu isteği hazırlanamadı.", error);
+    }
+    JSONObject response = postJson(
+        toChatEndpoint(baseUrl),
+        syncSecret,
+        payload,
+        60_000,
+        "Web modülü AI rapor yorumunu desteklemiyor. Hosting paketini güncelleyin."
+    );
+    String answer = response.optString("answer", "").trim();
+    if (answer.isEmpty()) {
+      throw new SyncException("Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı.");
+    }
+    return answer;
+  }
+
   StockImageAnalysisResult analyzeStockImage(
       String baseUrl,
       String syncSecret,
@@ -161,13 +200,29 @@ final class HostingSyncClient {
   }
 
   private JSONObject post(String baseUrl, String syncSecret, JSONObject payload) throws SyncException {
+    return postJson(
+        toSyncEndpoint(baseUrl),
+        syncSecret,
+        payload,
+        READ_TIMEOUT_MS,
+        "Web modülü güncel değil. Hosting paketini güncelleyip tekrar deneyin."
+    );
+  }
+
+  private JSONObject postJson(
+      String endpointUrl,
+      String syncSecret,
+      JSONObject payload,
+      int readTimeoutMs,
+      String notFoundMessage
+  ) throws SyncException {
     HttpURLConnection connection = null;
     try {
-      URL endpoint = new URL(toSyncEndpoint(baseUrl));
+      URL endpoint = new URL(endpointUrl);
       connection = (HttpURLConnection) endpoint.openConnection();
       connection.setRequestMethod("POST");
       connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-      connection.setReadTimeout(READ_TIMEOUT_MS);
+      connection.setReadTimeout(readTimeoutMs);
       connection.setDoOutput(true);
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
       connection.setRequestProperty("Accept", "application/json");
@@ -186,9 +241,7 @@ final class HostingSyncClient {
       try {
         response = new JSONObject(responseText);
       } catch (Exception error) {
-        throw new SyncException(status == 404
-            ? "Web modülü güncel değil. Hosting paketini güncelleyip tekrar deneyin."
-            : "Web modülü geçerli bir yanıt vermedi.", error);
+        throw new SyncException(status == 404 ? notFoundMessage : "Web modülü geçerli bir yanıt vermedi.", error);
       }
 
       if (status == 401) {
@@ -235,6 +288,21 @@ final class HostingSyncClient {
     }
     normalized = normalized.replaceFirst("/(?:api/)?sync\\.php$", "");
     return normalized + "/api/stock-image-analysis.php";
+  }
+
+  static String toChatEndpoint(String baseUrl) {
+    String normalized = baseUrl == null ? "" : baseUrl.trim();
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    if (normalized.endsWith("/api/chat.php") || normalized.endsWith("/chat.php")) {
+      return normalized;
+    }
+    normalized = normalized.replaceFirst("/(?:api/)?sync\\.php$", "");
+    if (normalized.endsWith("/api")) {
+      return normalized + "/chat.php";
+    }
+    return normalized + "/api/chat.php";
   }
 
   private static void writeMultipartField(DataOutputStream output, String boundary, String name, String value) throws Exception {

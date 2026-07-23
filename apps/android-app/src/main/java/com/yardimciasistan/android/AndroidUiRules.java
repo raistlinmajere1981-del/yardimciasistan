@@ -8,6 +8,7 @@ final class AndroidUiRules {
   static final String TAB_PENSION = "pension";
   static final String TAB_RESTAURANT = "restaurant";
   static final String TAB_MESSAGES = "messages";
+  static final String TAB_REPORTS = "reports";
 
   static final String CUSTOMER_NEW = "new";
   static final String CUSTOMER_LIST = "customers";
@@ -25,6 +26,11 @@ final class AndroidUiRules {
   static final String MESSAGES_PREPARED = "prepared";
   static final String MESSAGES_WAITING = "waiting";
 
+  static final String REPORT_TODAY = "today";
+  static final String REPORT_YESTERDAY = "yesterday";
+  static final String REPORT_LAST_7 = "last7";
+  static final String REPORT_LAST_30 = "last30";
+
   private AndroidUiRules() {}
 
   static boolean canOpenTab(OperationData data, String tab) {
@@ -39,6 +45,9 @@ final class AndroidUiRules {
     }
     if (TAB_RESTAURANT.equals(tab)) {
       return firstRestaurantMode(data) != null;
+    }
+    if (TAB_REPORTS.equals(tab)) {
+      return data != null && data.isAdmin();
     }
     return false;
   }
@@ -93,6 +102,17 @@ final class AndroidUiRules {
     return data != null && data.isAdmin() && data.hasPermission(permission);
   }
 
+  static boolean isReportPreset(String preset) {
+    return REPORT_TODAY.equals(preset)
+        || REPORT_YESTERDAY.equals(preset)
+        || REPORT_LAST_7.equals(preset)
+        || REPORT_LAST_30.equals(preset);
+  }
+
+  static String normalizeReportPreset(String preset) {
+    return isReportPreset(preset) ? preset : REPORT_LAST_7;
+  }
+
   static String firstRestaurantMode(OperationData data) {
     if (canOpenRestaurantMode(data, RESTAURANT_TABLES)) {
       return RESTAURANT_TABLES;
@@ -145,6 +165,9 @@ final class AndroidUiRules {
     if (TAB_MESSAGES.equals(tab)) {
       mode = MESSAGES_WAITING.equals(mode) ? MESSAGES_WAITING : MESSAGES_PREPARED;
       return new Destination(TAB_MESSAGES, mode);
+    }
+    if (TAB_REPORTS.equals(tab)) {
+      return new Destination(TAB_REPORTS, "");
     }
     return new Destination(TAB_TODAY, "");
   }

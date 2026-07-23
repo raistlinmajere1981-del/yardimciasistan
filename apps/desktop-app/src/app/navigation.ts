@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BedDouble,
   Home,
   Menu as MenuIcon,
@@ -10,7 +11,7 @@ import {
 } from "lucide-react";
 import type { DesktopSetupData } from "../../electron/database";
 
-export type DesktopPage = "dashboard" | "customerWork" | "pension" | "restaurant" | "menu" | "messages" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "pension" | "restaurant" | "menu" | "messages" | "reports" | "settings";
 
 export interface NavigationItem {
   id: DesktopPage;
@@ -42,6 +43,7 @@ export function buildNavigation(setup: DesktopSetupData): NavigationItem[] {
     items.push({ id: "messages", label: "Mesajlar", icon: MessageCircle });
   }
 
+  items.push({ id: "reports", label: "Raporlar", icon: BarChart3 });
   items.push({ id: "settings", label: "Ayarlar", icon: Settings });
   return items;
 }
@@ -54,6 +56,7 @@ export function getPageMeta(page: DesktopPage) {
     restaurant: { eyebrow: "Servis", title: "Restoran", description: "Masa durumlarını ve servis işlerini takip edin." },
     menu: { eyebrow: "İçerik", title: "Menü", description: "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın." },
     messages: { eyebrow: "Mesaj merkezi", title: "Mesajlar", description: "Hazır yanıtları ve WhatsApp görüşmelerini yönetin." },
+    reports: { eyebrow: "İşletme yönetimi", title: "Raporlar", description: "Dönem sonuçlarını ve anlık dikkat gerekenleri sade biçimde izleyin." },
     settings: { eyebrow: "Yapılandırma", title: "Ayarlar", description: "İşletme, görünüm ve bağlantı tercihlerini düzenleyin." }
   };
 
