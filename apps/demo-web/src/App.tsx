@@ -18,6 +18,7 @@ import {
   MessageSquareText,
   Minus,
   MonitorDown,
+  MonitorSmartphone,
   Navigation,
   Phone,
   Plus,
@@ -30,6 +31,7 @@ import {
   Users
 } from "lucide-react";
 import businessJson from "../config/business.json";
+import ProductGuidePage from "./pages/ProductGuidePage";
 import type { BusinessConfig, PageKey } from "./types";
 
 const business = businessJson as BusinessConfig;
@@ -37,18 +39,24 @@ type RequestSubmitState = "idle" | "saving" | "saved" | "fallback" | "error";
 const DEMO_WIDGET_SCRIPT_ID = "yardimci-asistan-demo-widget-script";
 const DEMO_WIDGET_VERSION = "20260722-menu-link-removed";
 const DEFAULT_WEB_MODULE_URL = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
-const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.1").trim() || "0.1.1";
+const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.2").trim() || "0.1.2";
 const DESKTOP_INSTALLER_URL =
   String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_URL ?? "").trim() ||
   `/downloads/YardimciAsistan-Setup-${DESKTOP_INSTALLER_VERSION}.exe`;
 const DESKTOP_INSTALLER_X86_URL =
   String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_X86_URL ?? "").trim() ||
   `/downloads/YardimciAsistan-Setup-${DESKTOP_INSTALLER_VERSION}-x86.exe`;
-const ANDROID_APP_VERSION = String(import.meta.env.VITE_YA_ANDROID_APP_VERSION ?? "0.1.0").trim() || "0.1.0";
+const ANDROID_APP_VERSION = String(import.meta.env.VITE_YA_ANDROID_APP_VERSION ?? "0.1.1").trim() || "0.1.1";
 const ANDROID_APK_URL =
   String(import.meta.env.VITE_YA_ANDROID_APK_URL ?? "").trim() ||
   `/downloads/YardimciAsistan-Android-${ANDROID_APP_VERSION}.apk`;
 const DEMO_SYNC_SECRET = String(import.meta.env.VITE_YA_SYNC_SECRET ?? "").trim();
+const DEFAULT_DOCUMENT_TITLE = "Yardımcı Asistan Demo Web";
+const DEFAULT_META_DESCRIPTION =
+  "Yardımcı Asistan demo web sitesi: pansiyon, restoran ve kafe işletmeleri için sıcak ve sade müşteri vitrini.";
+const PRODUCT_DOCUMENT_TITLE = "Yardımcı Asistan | Tanıtım ve Hızlı Kullanım";
+const PRODUCT_META_DESCRIPTION =
+  "Pansiyon, restoran ve kafeler için masaüstü, web ve Android destekli Yardımcı Asistan sistemini ve temel kullanım akışlarını inceleyin.";
 
 declare global {
   interface Window {
@@ -64,11 +72,23 @@ const navItems: Array<{ key: PageKey; label: string; icon: typeof Home }> = [
   { key: "restaurant", label: "Restoran / Kafe", icon: Coffee },
   { key: "menu", label: "QR Menü", icon: MenuIcon },
   { key: "gallery", label: "Galeri", icon: Images },
+  { key: "product", label: "Uygulama", icon: MonitorSmartphone },
   { key: "location", label: "Ulaşım", icon: MapPin },
   { key: "contact", label: "İletişim", icon: Phone }
 ];
 
-const pageKeys: PageKey[] = ["home", "rooms", "restaurant", "menu", "gallery", "location", "contact", "request", "settings"];
+const pageKeys: PageKey[] = [
+  "home",
+  "rooms",
+  "restaurant",
+  "menu",
+  "gallery",
+  "product",
+  "location",
+  "contact",
+  "request",
+  "settings"
+];
 
 const requestTypeOptions = [
   { value: "pension_reservation", label: "Oda rezervasyonu", icon: BedDouble },
@@ -94,6 +114,14 @@ function App() {
   } as CSSProperties;
 
   useDemoWidget();
+
+  useEffect(() => {
+    const isProductPage = activePage === "product";
+    document.title = isProductPage ? PRODUCT_DOCUMENT_TITLE : DEFAULT_DOCUMENT_TITLE;
+    document
+      .querySelector<HTMLMetaElement>('meta[name="description"]')
+      ?.setAttribute("content", isProductPage ? PRODUCT_META_DESCRIPTION : DEFAULT_META_DESCRIPTION);
+  }, [activePage]);
 
   useEffect(() => {
     const syncPageFromLocation = () => {
@@ -125,6 +153,7 @@ function App() {
         {activePage === "restaurant" && <RestaurantPage onNavigate={goToPage} />}
         {activePage === "menu" && <MenuPage onNavigate={goToPage} />}
         {activePage === "gallery" && <GalleryPage />}
+        {activePage === "product" && <ProductGuidePage onNavigate={goToPage} />}
         {activePage === "location" && <LocationPage />}
         {activePage === "contact" && <ContactPage onNavigate={goToPage} />}
         {activePage === "request" && <RequestPage initialRequestType={initialRequestType} />}
@@ -934,6 +963,10 @@ function Footer({ onNavigate }: { onNavigate: NavigateToPage }) {
         <p>{business.address}</p>
       </div>
       <div className="footer-actions">
+        <button className="ghost-button" onClick={() => onNavigate("product")}>
+          <MonitorSmartphone size={17} aria-hidden="true" />
+          Yardımcı Asistan’ı Tanıyın
+        </button>
         <button className="ghost-button" onClick={() => onNavigate("settings")}>
           <Download size={17} aria-hidden="true" />
           Kurulum

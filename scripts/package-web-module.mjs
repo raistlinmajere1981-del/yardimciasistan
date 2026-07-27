@@ -129,7 +129,11 @@ function validateSource() {
 
   const stockImageAnalyzer = readFileSync(join(sourceRoot, "lib", "stock-image-analysis.php"), "utf8");
   assert.ok(stockImageAnalyzer.includes("interface YaVisionStockAnalyzer"), "Stok görseli analizi sağlayıcıdan bağımsız sözleşme sunmalı.");
-  assert.ok(stockImageAnalyzer.includes("Koli, paket, kg"), "Stok görseli analizi belirsiz birim korumasını içermeli.");
+  assert.ok(
+    stockImageAnalyzer.includes("function ya_stock_image_has_ambiguous_unit")
+      && stockImageAnalyzer.includes("koli, paket, kg"),
+    "Stok görseli analizi belirsiz birim korumasını içermeli."
+  );
 
   const storageModule = readFileSync(join(sourceRoot, "lib", "storage.php"), "utf8");
   assert.ok(storageModule.includes("PDO_SQLITE") || storageModule.includes("pdo_sqlite"), "SQLite depolama PDO_SQLITE gereksinimini açıklamalı.");

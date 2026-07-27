@@ -23,6 +23,92 @@ test("demo web ana akışını gösterir", async ({ page }) => {
   await expect(page.locator(".menu-item img").first()).toBeVisible();
 });
 
+test("ürün tanıtım sayfası platformları ve kısa rehberi gösterir", async ({ page }) => {
+  await page.goto("/#product");
+
+  await expect(page).toHaveURL(/#product$/);
+  await expect(page).toHaveTitle("Yardımcı Asistan | Tanıtım ve Hızlı Kullanım");
+  await expect(
+    page.getByRole("heading", {
+      name: "İşletmenizin web, masaüstü ve mobil işlerini tek akışta yönetin."
+    })
+  ).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Ana menü" }).getByRole("button", { name: "Uygulama" })).toHaveAttribute(
+    "aria-current",
+    "page"
+  );
+  await expect(page.locator(".product-platform-card")).toHaveCount(3);
+  await expect(page.locator(".product-feature-card")).toHaveCount(6);
+  await expect(page.locator(".product-flow > li")).toHaveCount(4);
+  await expect(page.locator(".product-accordion-item")).toHaveCount(4);
+  await expect(page.locator("body")).not.toContainText(/sync secret|api key/i);
+
+  const requestGuide = page.getByRole("button", { name: "Web talebini rezervasyona dönüştürme" });
+  const orderGuide = page.getByRole("button", { name: "Masada sipariş ve hesap yönetimi" });
+  await expect(requestGuide).toHaveAttribute("aria-expanded", "true");
+  await expect(orderGuide).toHaveAttribute("aria-expanded", "false");
+  await orderGuide.click();
+  await expect(orderGuide).toHaveAttribute("aria-expanded", "true");
+  await expect(requestGuide).toHaveAttribute("aria-expanded", "false");
+
+  const restaurantScreenshot = page
+    .getByRole("button", { name: "Masaüstünde masa, sipariş ve hesap takibi görselini büyüt" })
+    .first();
+  await restaurantScreenshot.click();
+  await expect(page.getByRole("dialog", { name: "Ekran görüntüsü önizlemesi" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Ekran görüntüsü önizlemesi" })).toBeHidden();
+  await expect(restaurantScreenshot).toBeFocused();
+
+  await page.getByRole("button", { name: "Demo talebi oluştur", exact: true }).click();
+  await expect(page).toHaveURL(/#request$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/#product$/);
+
+  await page.getByRole("button", { name: "QR menüyü incele", exact: true }).click();
+  await expect(page).toHaveURL(/#menu$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/#product$/);
+
+  await page.getByRole("button", { name: "İletişime geç", exact: true }).click();
+  await expect(page).toHaveURL(/#contact$/);
+});
+
+test("ürün sayfası navigasyonu geri ve ileri geçmişiyle çalışır", async ({ page }) => {
+  await page.goto("/");
+
+  const mainNavigation = page.getByRole("navigation", { name: "Ana menü" });
+  await mainNavigation.getByRole("button", { name: "Uygulama", exact: true }).click();
+  await expect(page).toHaveURL(/#product$/);
+  await mainNavigation.getByRole("button", { name: "QR Menü", exact: true }).click();
+  await expect(page).toHaveURL(/#menu$/);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/#product$/);
+  await expect(page.getByRole("heading", { name: "Üç parça, tek çalışma düzeni" })).toBeVisible();
+  await page.goForward();
+  await expect(page).toHaveURL(/#menu$/);
+  await expect(page.getByRole("heading", { name: "QR Menü", exact: true })).toBeVisible();
+});
+
+test("ürün sayfası dar ekranlarda taşmaz ve eksik görsele yer ayırır", async ({ page }) => {
+  await page.route("**/assets/product-guide/**", (route) => route.abort());
+
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 320, height: 720 }
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/#product");
+    await expect(page.locator(".product-screenshot-placeholder").first()).toContainText("Ekran görüntüsü hazırlanıyor");
+    const widths = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth
+    }));
+    expect(widths.scroll).toBeLessThanOrEqual(widths.client);
+  }
+});
+
 test("oda ve restoran sayfaları doğru talep türünü açar", async ({ page }) => {
   await page.goto("/#rooms");
 

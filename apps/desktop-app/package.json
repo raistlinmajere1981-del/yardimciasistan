@@ -1,6 +1,6 @@
 {
   "name": "@yardimci-asistan/desktop-app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Yardımcı Asistan local-first masaüstü yönetim uygulaması.",
   "author": "Yardımcı Asistan",

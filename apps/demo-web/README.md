@@ -61,9 +61,9 @@ verilebilir:
 ```bash
 VITE_YA_DESKTOP_INSTALLER_URL=https://indir.example/YardimciAsistan-Setup.exe \
 VITE_YA_DESKTOP_INSTALLER_X86_URL=https://indir.example/YardimciAsistan-Setup-x86.exe \
-VITE_YA_DESKTOP_INSTALLER_VERSION=0.1.0 \
+VITE_YA_DESKTOP_INSTALLER_VERSION=0.1.2 \
 VITE_YA_ANDROID_APK_URL=https://indir.example/YardimciAsistan-Android.apk \
-VITE_YA_ANDROID_APP_VERSION=0.1.0 \
+VITE_YA_ANDROID_APP_VERSION=0.1.1 \
 VITE_YA_SYNC_SECRET=demo-ortak-sync-anahtari \
 npm run build -w @yardimci-asistan/demo-web
 ```
