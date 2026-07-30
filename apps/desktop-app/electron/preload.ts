@@ -33,6 +33,12 @@ import type {
   DesktopStockImageAnalyzeResult,
   ApplyStockImageImportInput,
   DesktopStockImageApplyResult,
+  SaveCustomerInput,
+  AssignCustomerRoomInput,
+  UpdateCustomerRoomStayStatusInput,
+  DesktopCustomerMutationResult,
+  DesktopIdentityImageAnalyzeInput,
+  DesktopIdentityImageAnalyzeResult,
   DesktopReportRangeInput,
   DesktopReportQueryResult,
   GenerateDesktopReportAiInput,
@@ -104,6 +110,10 @@ export interface DesktopBridge {
   updateRequestStatus: (input: UpdateRequestStatusInput) => Promise<DesktopStatusUpdateResult>;
   deleteRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
   deleteCustomer: (customerId: string) => Promise<DesktopStatusUpdateResult>;
+  saveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  assignCustomerToRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
+  updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => Promise<DesktopCustomerMutationResult>;
+  analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => Promise<DesktopIdentityImageAnalyzeResult>;
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => Promise<DesktopStatusUpdateResult>;
   deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => Promise<DesktopStatusUpdateResult>;
   updateRoomStatus: (input: UpdateRoomStatusInput) => Promise<DesktopStatusUpdateResult>;
@@ -178,6 +188,10 @@ const bridge: DesktopBridge = {
   updateRequestStatus: (input: UpdateRequestStatusInput) => ipcRenderer.invoke("request:updateStatus", input),
   deleteRequest: (requestId: string) => ipcRenderer.invoke("request:delete", requestId),
   deleteCustomer: (customerId: string) => ipcRenderer.invoke("customer:delete", customerId),
+  saveCustomer: (input: SaveCustomerInput) => ipcRenderer.invoke("customer:save", input),
+  assignCustomerToRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),
+  updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => ipcRenderer.invoke("customer:updateRoomStayStatus", input),
+  analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => ipcRenderer.invoke("customer:analyzeIdentityImage", input),
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => ipcRenderer.invoke("whatsapp:markMessageSent", input),
   deleteWhatsAppMessage: (input: DeleteWhatsAppMessageInput) => ipcRenderer.invoke("whatsapp:deleteMessage", input),
   updateRoomStatus: (input: UpdateRoomStatusInput) => ipcRenderer.invoke("room:updateStatus", input),

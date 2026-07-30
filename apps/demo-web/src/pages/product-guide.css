@@ -360,17 +360,17 @@
   border-radius: 9px;
   font-size: 0.72rem;
   font-weight: 800;
-  opacity: 0;
-  transform: translateY(3px);
+  opacity: 1;
+  transform: translateY(0);
   transition:
-    opacity 180ms ease,
+    background 180ms ease,
     transform 180ms ease;
 }
 
 .product-screenshot:hover .product-screenshot-action,
 .product-screenshot:focus-visible .product-screenshot-action {
-  opacity: 1;
-  transform: translateY(0);
+  background: var(--primary);
+  transform: translateY(-1px);
 }
 
 .product-screenshot-placeholder {
@@ -654,11 +654,6 @@
   color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.55;
-}
-
-.product-local-band .product-lock-note {
-  color: var(--ink);
-  font-weight: 700;
 }
 
 .product-cta {

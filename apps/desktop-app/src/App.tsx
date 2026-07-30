@@ -13,12 +13,14 @@ import {
   CheckCircle2,
   ClipboardList,
   Copy,
+  CreditCard,
   Eye,
   ExternalLink,
   LockKeyhole,
   Maximize2,
   MessageCircle,
   Monitor,
+  Pencil,
   Phone,
   Plus,
   RefreshCw,
@@ -50,7 +52,11 @@ import type {
   DesktopAiModelOption,
   DesktopAiService,
   DesktopDashboardData,
+  DesktopCustomerMutationResult,
+  DesktopIdentityImageAnalyzeResult,
   DesktopSetupData,
+  SaveCustomerInput,
+  AssignCustomerRoomInput,
   SaveInitialSetupInput
 } from "../electron/database";
 import type { AutomaticSyncStatus } from "../electron/sync-coordinator";
@@ -175,6 +181,13 @@ interface ItemFormState {
   sort_order: string;
 }
 
+interface TableCategoryFormState {
+  key: string;
+  sourceName: string;
+  name: string;
+  tableCount: string;
+}
+
 interface SetupFormState {
   businessName: string;
   businessType: string;
@@ -204,7 +217,7 @@ interface SetupFormState {
   whatsappEnabled: boolean;
   androidEnabled: boolean;
   roomCount: string;
-  tableCount: string;
+  tableCategories: TableCategoryFormState[];
 }
 
 interface AiServiceFormDraft {
@@ -230,6 +243,37 @@ interface ManualRequestFormState {
   guestCount: string;
   message: string;
   priority: string;
+}
+
+interface CustomerFormState {
+  id: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  notes: string;
+  tags: string;
+  identityType: string;
+  identityNumber: string;
+  nationality: string;
+  birthDate: string;
+  gender: string;
+  documentSerialNumber: string;
+  documentExpiryDate: string;
+  birthPlace: string;
+  motherName: string;
+  fatherName: string;
+  issuingAuthority: string;
+  address: string;
+}
+
+interface RoomAssignmentFormState {
+  customerId: string;
+  roomId: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guestCount: string;
+  notes: string;
+  status: "planned" | "checked_in";
 }
 
 const defaultDashboardData: DesktopDashboardData = {
@@ -543,11 +587,25 @@ const defaultDashboardData: DesktopDashboardData = {
       notes: "Balkonlu oda sordu.",
       tags: ["pansiyon", "demo"],
       lastContactAt: "",
+      identityType: "",
+      identityNumber: "",
+      nationality: "",
+      birthDate: "",
+      gender: "",
+      documentSerialNumber: "",
+      documentExpiryDate: "",
+      birthPlace: "",
+      motherName: "",
+      fatherName: "",
+      issuingAuthority: "",
+      address: "",
       requestCount: 1,
       reservationCount: 1,
+      stayCount: 0,
       updatedAt: "2026-07-10T14:30:00+03:00"
     }
   ],
+  customerRoomStays: [],
   androidDevices: [],
   paymentWaitingTableOrders: [],
   androidActionFailures: []
@@ -585,7 +643,11 @@ const defaultSetupData: DesktopSetupData = {
   initialCounts: {
     rooms: 0,
     tables: 0
-  }
+  },
+  tableCategories: [
+    { name: "Bahçe", tableCount: 1 },
+    { name: "Salon", tableCount: 1 }
+  ]
 };
 
 const initialCategoryForm = toCategoryForm(defaultDashboardData.menu.categories[0]);
@@ -1695,6 +1757,93 @@ function App() {
     setStatusMessage(result.message);
   }
 
+  async function handleSaveCustomer(input: SaveCustomerInput): Promise<DesktopCustomerMutationResult> {
+    if (!window.yardimciDesktop) {
+      const result = { ok: false as const, message: "Müşteri kartı kaydedilemedi. Uygulamayı yeniden başlatın." };
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+    setSyncState("loading");
+    setStatusMessage(input.id ? "Müşteri kartı güncelleniyor..." : "Müşteri kartı oluşturuluyor...");
+    const result = await window.yardimciDesktop.saveCustomer(input);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
+  }
+
+  async function handleAssignCustomerToRoom(input: AssignCustomerRoomInput): Promise<DesktopCustomerMutationResult> {
+    if (!window.yardimciDesktop) {
+      const result = { ok: false as const, message: "Oda ataması kaydedilemedi. Uygulamayı yeniden başlatın." };
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+    setSyncState("loading");
+    setStatusMessage("Müşteri oda kaydı oluşturuluyor...");
+    const result = await window.yardimciDesktop.assignCustomerToRoom(input);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
+  }
+
+  async function handleUpdateCustomerRoomStayStatus(
+    stayId: string,
+    status: "planned" | "checked_in" | "checked_out" | "cancelled"
+  ): Promise<DesktopCustomerMutationResult> {
+    if (!window.yardimciDesktop) {
+      const result = { ok: false as const, message: "Konaklama kaydı güncellenemedi. Uygulamayı yeniden başlatın." };
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+    setSyncState("loading");
+    setStatusMessage("Konaklama durumu güncelleniyor...");
+    const result = await window.yardimciDesktop.updateCustomerRoomStayStatus({ stayId, status });
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
+  }
+
+  async function handleAnalyzeIdentityImage(file: File): Promise<DesktopIdentityImageAnalyzeResult> {
+    if (!window.yardimciDesktop) {
+      return { ok: false, message: "Kimlik görseli analizi kullanılamıyor." };
+    }
+    setSyncState("loading");
+    setStatusMessage("Kimlik görseli AI ile okunuyor...");
+    let result: DesktopIdentityImageAnalyzeResult;
+    try {
+      result = await window.yardimciDesktop.analyzeIdentityImage({
+        fileName: file.name,
+        mimeType: file.type,
+        bytes: await file.arrayBuffer()
+      });
+    } catch {
+      result = { ok: false, code: "image_unreadable", message: "Kimlik görseli okunamadı." };
+    }
+    setSyncState(result.ok ? "success" : "error");
+    setStatusMessage(result.message);
+    return result;
+  }
+
   async function handleDeleteWhatsAppMessage(request: SyncedCustomerRequest) {
     if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} için hazırlanmış mesaj silinsin mi? Talep kaydı korunur.`)) {
       return;
@@ -1972,8 +2121,13 @@ function App() {
       },
       initialCounts: {
         rooms: Number(setupForm.roomCount),
-        tables: Number(setupForm.tableCount)
-      }
+        tables: setupForm.tableCategories.reduce((total, category) => total + Number(category.tableCount || 0), 0)
+      },
+      tableCategories: setupForm.tableCategories.map((category) => ({
+        sourceName: category.sourceName,
+        name: category.name,
+        tableCount: Number(category.tableCount)
+      }))
     };
     const result = await window.yardimciDesktop.saveInitialSetup(input);
 
@@ -2227,10 +2381,16 @@ function App() {
                 customers={dashboardData.customers}
                 requests={dashboardData.requests}
                 reservations={dashboardData.reservations}
+                rooms={dashboardData.rooms}
+                stays={dashboardData.customerRoomStays}
                 aiEnabled={setupData.aiEnabled}
                 onCall={callCustomerRecord}
                 onWhatsApp={openCustomerWhatsApp}
                 onSummarize={(requestId) => openAiTools("summary", requestId)}
+                onSave={handleSaveCustomer}
+                onAnalyzeIdentity={handleAnalyzeIdentityImage}
+                onAssignRoom={handleAssignCustomerToRoom}
+                onUpdateStayStatus={handleUpdateCustomerRoomStayStatus}
                 onDelete={handleDeleteCustomer}
               />
             )}
@@ -2269,7 +2429,23 @@ function App() {
                 onOpenWhatsApp={openReservationWhatsApp}
               />
             )}
-            rooms={<RoomsWorkspace rooms={dashboardData.rooms} reservations={dashboardData.reservations} onUpdateStatus={handleUpdateRoomStatus} />}
+            rooms={(
+              <RoomsWorkspace
+                rooms={dashboardData.rooms}
+                reservations={dashboardData.reservations}
+                customers={dashboardData.customers}
+                stays={dashboardData.customerRoomStays}
+                onUpdateStatus={handleUpdateRoomStatus}
+                onAssignRoom={handleAssignCustomerToRoom}
+                onUpdateStayStatus={handleUpdateCustomerRoomStayStatus}
+              />
+            )}
+            stays={(
+              <CustomerRoomStaysWorkspace
+                stays={dashboardData.customerRoomStays}
+                onUpdateStatus={handleUpdateCustomerRoomStayStatus}
+              />
+            )}
             tasks={(
               <DailyTasksWorkspace
                 tasks={dashboardData.dailyTasks.filter((task) => isAccommodationTask(task, dashboardData.reservations))}
@@ -2694,6 +2870,33 @@ function SetupWizard({
     onFormChange({ ...form, [key]: value });
   };
 
+  const updateTableCategory = (key: string, field: "name" | "tableCount", value: string) => {
+    update("tableCategories", form.tableCategories.map((category) =>
+      category.key === key ? { ...category, [field]: value } : category
+    ));
+  };
+
+  const addTableCategory = () => {
+    update("tableCategories", [
+      ...form.tableCategories,
+      {
+        key: nextTableCategoryFormKey(),
+        sourceName: "",
+        name: "",
+        tableCount: "1"
+      }
+    ]);
+  };
+
+  const removeTableCategory = (key: string) => {
+    update("tableCategories", form.tableCategories.filter((category) => category.key !== key));
+  };
+
+  const tableCountTotal = form.tableCategories.reduce((total, category) => {
+    const count = Number(category.tableCount);
+    return total + (Number.isFinite(count) && count > 0 ? count : 0);
+  }, 0);
+
   const googleUsesStoredApiKey = form.aiStoredApiKeyConfigured && !form.clearAiApiKey && !form.aiGoogleCurl && !form.aiApiKey;
   const genericUsesStoredApiKey = form.aiStoredApiKeyConfigured && !form.clearAiApiKey && !form.aiApiKey;
   const googleSecretValue = form.aiGoogleCurl
@@ -2946,15 +3149,70 @@ function SetupWizard({
             {!embedded && <p>Kapasite ve Yardımcı</p>}
             <h2>Günlük Kullanım</h2>
           </div>
-          <div className="setup-count-row">
+          <div className="setup-count-row settings-room-count">
             <label>
               Oda sayısı
-              <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" />
+              <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" min="0" step="1" type="number" />
             </label>
-            <label>
-              Masa sayısı
-              <input value={form.tableCount} onChange={(event) => update("tableCount", event.target.value)} inputMode="numeric" />
-            </label>
+          </div>
+          <div className="table-category-editor">
+            <div className="table-category-heading">
+              <div>
+                <strong>Masa kategorileri</strong>
+                <small>Restoran alanlarını adlandırın ve her alandaki masa sayısını belirleyin.</small>
+              </div>
+              <span>{tableCountTotal} masa</span>
+            </div>
+            {form.tableCategories.length === 0 ? (
+              <div className="table-category-empty">
+                <span>Henüz masa kategorisi yok.</span>
+                <small>Masa kullanacaksanız ilk kategoriyi ekleyin.</small>
+              </div>
+            ) : (
+              <div className="table-category-list">
+                {form.tableCategories.map((category, index) => (
+                  <div className="table-category-row" key={category.key}>
+                    <label>
+                      <span>Kategori adı</span>
+                      <input
+                        value={category.name}
+                        onChange={(event) => updateTableCategory(category.key, "name", event.target.value)}
+                        placeholder={index === 0 ? "Örn. Salon" : "Örn. Bahçe"}
+                        maxLength={50}
+                      />
+                    </label>
+                    <label className="table-category-count">
+                      <span>Masa</span>
+                      <input
+                        value={category.tableCount}
+                        onChange={(event) => updateTableCategory(category.key, "tableCount", event.target.value)}
+                        inputMode="numeric"
+                        min="1"
+                        max="200"
+                        step="1"
+                        type="number"
+                      />
+                    </label>
+                    <button
+                      className="table-category-remove"
+                      type="button"
+                      onClick={() => removeTableCategory(category.key)}
+                      aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
+                      title="Kategoriyi kaldır"
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="table-category-add" type="button" onClick={addTableCategory}>
+              <Plus size={15} aria-hidden="true" />
+              Kategori Ekle
+            </button>
+            <small className="table-category-note">
+              Adedi azalttığınızda kullanılmayan masalar arşivlenir; aktif adisyon veya rezervasyona bağlı masalar korunur.
+            </small>
           </div>
           <label className="setup-checkline settings-ai-toggle">
             <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
@@ -4330,30 +4588,64 @@ interface CustomersWorkspaceProps {
   customers: DesktopDashboardData["customers"];
   requests: SyncedCustomerRequest[];
   reservations: DesktopDashboardData["reservations"];
+  rooms: DesktopDashboardData["rooms"];
+  stays: DesktopDashboardData["customerRoomStays"];
   aiEnabled: boolean;
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSummarize: (requestId: string) => void;
+  onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
+  onAssignRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
+  onUpdateStayStatus: (
+    stayId: string,
+    status: "planned" | "checked_in" | "checked_out" | "cancelled"
+  ) => Promise<DesktopCustomerMutationResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => void;
 }
 
-function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCall, onWhatsApp, onSummarize, onDelete }: CustomersWorkspaceProps) {
+function CustomersWorkspace({
+  customers,
+  requests,
+  reservations,
+  rooms,
+  stays,
+  aiEnabled,
+  onCall,
+  onWhatsApp,
+  onSummarize,
+  onSave,
+  onAnalyzeIdentity,
+  onAssignRoom,
+  onUpdateStayStatus,
+  onDelete
+}: CustomersWorkspaceProps) {
   const [searchText, setSearchText] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? "");
+  const [customerEditorOpen, setCustomerEditorOpen] = useState(false);
+  const [customerBeingEdited, setCustomerBeingEdited] = useState<DesktopDashboardData["customers"][number] | null>(null);
+  const [assignmentCustomerId, setAssignmentCustomerId] = useState("");
   const filteredCustomers = useMemo(
     () =>
       customers.filter((customer) => {
-        const haystack = `${customer.fullName} ${customer.phone} ${customer.email} ${customer.tags.join(" ")}`.toLowerCase();
+        const customerStays = stays
+          .filter((stay) => stay.customerId === customer.id)
+          .map((stay) => `${stay.roomName} ${stay.roomNumber}`)
+          .join(" ");
+        const haystack = `${customer.fullName} ${customer.phone} ${customer.email} ${customer.identityNumber} ${customer.tags.join(" ")} ${customerStays}`.toLowerCase();
         return haystack.includes(searchText.trim().toLowerCase());
       }),
-    [customers, searchText]
+    [customers, searchText, stays]
   );
-  const selectedCustomer = filteredCustomers.find((customer) => customer.id === selectedCustomerId) ?? filteredCustomers[0] ?? customers[0];
+  const selectedCustomer = filteredCustomers.find((customer) => customer.id === selectedCustomerId) ?? filteredCustomers[0] ?? null;
   const selectedRequests = selectedCustomer
     ? requests.filter((request) => request.customer_id === selectedCustomer.id || request.customer_phone === selectedCustomer.phone)
     : [];
   const selectedReservations = selectedCustomer
     ? reservations.filter((reservation) => reservation.customerId === selectedCustomer.id || reservation.customerPhone === selectedCustomer.phone)
+    : [];
+  const selectedStays = selectedCustomer
+    ? stays.filter((stay) => stay.customerId === selectedCustomer.id)
     : [];
 
   useEffect(() => {
@@ -4370,10 +4662,21 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
             <p>Müşteriler</p>
             <h2>{customers.length} kayıt</h2>
           </div>
+          <ActionButton
+            size="sm"
+            type="button"
+            onClick={() => {
+              setCustomerBeingEdited(null);
+              setCustomerEditorOpen(true);
+            }}
+          >
+            <Plus size={15} aria-hidden="true" />
+            Yeni Müşteri
+          </ActionButton>
         </div>
         <label className="customer-search">
           <span>Ara</span>
-          <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Ad, telefon veya etiket" />
+          <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Ad, telefon, kimlik, etiket veya oda" />
         </label>
         <CompactList className="manager-list operation-compact-list operations-list">
           {filteredCustomers.length === 0 ? (
@@ -4408,7 +4711,21 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
                 <span className="detail-category-label">{formatCustomerSource(selectedCustomer.source)}</span>
                 <h2>{selectedCustomer.fullName}</h2>
               </div>
-              <StatusBadge tone="info">{selectedCustomer.requestCount} talep</StatusBadge>
+              <div className="customer-heading-actions">
+                <StatusBadge tone="info">{selectedCustomer.stayCount} konaklama</StatusBadge>
+                <ActionButton
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  onClick={() => {
+                    setCustomerBeingEdited(selectedCustomer);
+                    setCustomerEditorOpen(true);
+                  }}
+                >
+                  <Pencil size={14} aria-hidden="true" />
+                  Düzenle
+                </ActionButton>
+              </div>
             </div>
             <dl className="info-list detail-info-grid compact-detail-meta">
               <div>
@@ -4427,7 +4744,41 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
                 <dt>Rezervasyon</dt>
                 <dd>{selectedCustomer.reservationCount} kayıt</dd>
               </div>
+              <div>
+                <dt>Kimlik türü</dt>
+                <dd>{formatIdentityType(selectedCustomer.identityType)}</dd>
+              </div>
+              <div>
+                <dt>Kimlik no</dt>
+                <dd>{selectedCustomer.identityNumber || "-"}</dd>
+              </div>
+              <div>
+                <dt>Doğum tarihi</dt>
+                <dd>{formatDateForDisplay(selectedCustomer.birthDate) || "-"}</dd>
+              </div>
+              <div>
+                <dt>Uyruk</dt>
+                <dd>{selectedCustomer.nationality || "-"}</dd>
+              </div>
             </dl>
+            {hasCustomerIdentityDetails(selectedCustomer) && (
+              <details className="customer-identity-details">
+                <summary>
+                  <CreditCard size={16} aria-hidden="true" />
+                  Kimlik kartı alanları
+                </summary>
+                <dl className="info-list detail-info-grid compact-detail-meta">
+                  <div><dt>Cinsiyet</dt><dd>{formatCustomerGender(selectedCustomer.gender)}</dd></div>
+                  <div><dt>Seri / belge no</dt><dd>{selectedCustomer.documentSerialNumber || "-"}</dd></div>
+                  <div><dt>Son geçerlilik</dt><dd>{formatDateForDisplay(selectedCustomer.documentExpiryDate) || "-"}</dd></div>
+                  <div><dt>Doğum yeri</dt><dd>{selectedCustomer.birthPlace || "-"}</dd></div>
+                  <div><dt>Anne adı</dt><dd>{selectedCustomer.motherName || "-"}</dd></div>
+                  <div><dt>Baba adı</dt><dd>{selectedCustomer.fatherName || "-"}</dd></div>
+                  <div><dt>Veren makam</dt><dd>{selectedCustomer.issuingAuthority || "-"}</dd></div>
+                  <div className="identity-address"><dt>Adres</dt><dd>{selectedCustomer.address || "-"}</dd></div>
+                </dl>
+              </details>
+            )}
             <div className="compact-detail-copy customer-detail-note">
               <span>Not</span>
               <p className="detail-scroll-copy">{selectedCustomer.notes || "Müşteri notu yok."}</p>
@@ -4454,6 +4805,15 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
                   Geçmişi Özetle
                 </ActionButton>
               )}
+              <ActionButton
+                size="sm"
+                type="button"
+                onClick={() => setAssignmentCustomerId(selectedCustomer.id)}
+                disabled={rooms.length === 0}
+              >
+                <BedDouble size={16} aria-hidden="true" />
+                Odaya Ata
+              </ActionButton>
               <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedCustomer)}>
                 <Trash2 size={16} aria-hidden="true" />
                 Müşteriyi Sil
@@ -4487,6 +4847,21 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
                   ))
                 )}
               </section>
+              <section className="customer-stay-history">
+                <h3>Oda / Konaklama Geçmişi</h3>
+                {selectedStays.length === 0 ? (
+                  <p>Oda kaydı yok.</p>
+                ) : (
+                  selectedStays.map((stay) => (
+                    <article key={stay.id}>
+                      <strong>{stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}</strong>
+                      <span>{formatCustomerRoomStayStatus(stay.status)} · {formatStayDateRange(stay)}</span>
+                      {stay.notes && <p>{stay.notes}</p>}
+                      <CustomerRoomStayActions stay={stay} onUpdateStatus={onUpdateStayStatus} />
+                    </article>
+                  ))
+                )}
+              </section>
             </div>
           </>
         ) : (
@@ -4497,7 +4872,349 @@ function CustomersWorkspace({ customers, requests, reservations, aiEnabled, onCa
           </div>
         )}
       </section>
+
+      <CustomerEditorDrawer
+        open={customerEditorOpen}
+        customer={customerBeingEdited}
+        aiEnabled={aiEnabled}
+        onClose={() => setCustomerEditorOpen(false)}
+        onSave={async (input) => {
+          const result = await onSave(input);
+          if (result.ok) {
+            setSelectedCustomerId(result.savedId);
+            setCustomerEditorOpen(false);
+          }
+          return result;
+        }}
+        onAnalyzeIdentity={onAnalyzeIdentity}
+      />
+      <RoomAssignmentDrawer
+        open={Boolean(assignmentCustomerId)}
+        customers={customers}
+        rooms={rooms}
+        initialCustomerId={assignmentCustomerId}
+        initialRoomId=""
+        onClose={() => setAssignmentCustomerId("")}
+        onAssign={async (input) => {
+          const result = await onAssignRoom(input);
+          if (result.ok) {
+            setAssignmentCustomerId("");
+          }
+          return result;
+        }}
+      />
     </section>
+  );
+}
+
+interface CustomerEditorDrawerProps {
+  open: boolean;
+  customer: DesktopDashboardData["customers"][number] | null;
+  aiEnabled: boolean;
+  onClose: () => void;
+  onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
+}
+
+function CustomerEditorDrawer({
+  open,
+  customer,
+  aiEnabled,
+  onClose,
+  onSave,
+  onAnalyzeIdentity
+}: CustomerEditorDrawerProps) {
+  const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
+  const [state, setState] = useState<SyncState>("idle");
+  const [message, setMessage] = useState("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
+  const identityFileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setForm(toCustomerForm(customer));
+      setState("idle");
+      setMessage("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
+    }
+  }, [customer, open]);
+
+  if (!open) {
+    return null;
+  }
+
+  const update = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const analyzeIdentity = async (file: File | undefined) => {
+    if (!file) {
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setState("error");
+      setMessage("JPG, PNG veya WebP biçiminde bir kimlik görseli seçin.");
+      if (identityFileRef.current) identityFileRef.current.value = "";
+      return;
+    }
+    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
+      setState("error");
+      setMessage("Kimlik görseli boş olamaz ve en fazla 10 MB olabilir.");
+      if (identityFileRef.current) identityFileRef.current.value = "";
+      return;
+    }
+    setState("loading");
+    setMessage("Kimlik görseli AI ile okunuyor...");
+    let result: DesktopIdentityImageAnalyzeResult;
+    try {
+      result = await onAnalyzeIdentity(file);
+    } catch {
+      result = { ok: false, message: "Kimlik görseli okunamadı." };
+    }
+    if (identityFileRef.current) {
+      identityFileRef.current.value = "";
+    }
+    if (!result.ok) {
+      setState("error");
+      setMessage(result.message);
+      return;
+    }
+    const fields = result.analysis.fields;
+    setForm((current) => ({
+      ...current,
+      fullName: fields.full_name || current.fullName,
+      identityType: fields.identity_type || current.identityType,
+      identityNumber: fields.identity_number || current.identityNumber,
+      nationality: fields.nationality || current.nationality,
+      birthDate: fields.birth_date || current.birthDate,
+      gender: fields.gender || current.gender,
+      documentSerialNumber: fields.document_serial_number || current.documentSerialNumber,
+      documentExpiryDate: fields.document_expiry_date || current.documentExpiryDate,
+      birthPlace: fields.birth_place || current.birthPlace,
+      motherName: fields.mother_name || current.motherName,
+      fatherName: fields.father_name || current.fatherName,
+      issuingAuthority: fields.issuing_authority || current.issuingAuthority,
+      address: fields.address || current.address
+    }));
+    setState("success");
+    setMessage(
+      result.analysis.warnings.length > 0
+        ? `${result.message} Kontrol: ${result.analysis.warnings.join(" ")}`
+        : result.message
+    );
+  };
+
+  return (
+    <div className="manual-request-backdrop customer-editor-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <aside className="manual-request-drawer customer-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title">
+        <header className="manual-request-drawer-header">
+          <div className="manual-request-heading">
+            <p>Müşteri kartı</p>
+            <h2 id="customer-editor-title">{customer ? "Müşteri bilgilerini düzenle" : "Yeni müşteri ekle"}</h2>
+          </div>
+          <button className="drawer-close-button" type="button" aria-label="Müşteri formunu kapat" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+        <form className="manager-form manual-request-form customer-editor-form" onSubmit={async (event) => {
+          event.preventDefault();
+          setState("loading");
+          setMessage("Müşteri kartı kaydediliyor...");
+          const result = await onSave(customerFormToInput(form));
+          setState(result.ok ? "success" : "error");
+          setMessage(result.message);
+        }}>
+          <section className="customer-form-section">
+            <div className="customer-form-section-heading">
+              <div><strong>Temel bilgiler</strong><small>İletişim ve kart görünümü</small></div>
+            </div>
+            <div className="manual-request-core-grid">
+              <label>Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
+              <label>Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="05xx xxx xx xx" /></label>
+              <label>E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
+              <label>Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="pansiyon, düzenli müşteri" /></label>
+              <label className="manual-request-note-field">Not<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+            </div>
+          </section>
+          <section className="customer-form-section identity-form-section">
+            <div className="customer-form-section-heading">
+              <div><strong>Kimlik kartı bilgileri</strong><small>Görsel yalnız analiz edilir; kimlik fotoğrafı saklanmaz.</small></div>
+              <div className="identity-image-action">
+                <input
+                  ref={identityFileRef}
+                  hidden
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => void analyzeIdentity(event.target.files?.[0])}
+                />
+                <ActionButton
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  disabled={!aiEnabled || state === "loading"}
+                  onClick={() => identityFileRef.current?.click()}
+                >
+                  <Sparkles size={15} aria-hidden="true" />
+                  {state === "loading" ? "Okunuyor" : "Kimlikten AI ile Doldur"}
+                </ActionButton>
+              </div>
+            </div>
+            {!aiEnabled && <p className="identity-ai-note">Kimlik görseli analizi için Ayarlar bölümünden AI bağlantısını etkinleştirin.</p>}
+            <div className="manual-request-core-grid identity-form-grid">
+              <label>Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
+                <option value="">Seçilmedi</option>
+                <option value="tc_identity_card">T.C. Kimlik Kartı</option>
+                <option value="passport">Pasaport</option>
+                <option value="other">Diğer</option>
+              </select></label>
+              <label>Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
+              <label>Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
+              <label>Doğum tarihi<input lang="tr" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
+              <label>Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
+                <option value="">Seçilmedi</option>
+                <option value="female">Kadın</option>
+                <option value="male">Erkek</option>
+                <option value="unspecified">Belirtilmemiş</option>
+              </select></label>
+              <label>Seri / belge no<input value={form.documentSerialNumber} onChange={(event) => update("documentSerialNumber", event.target.value)} /></label>
+              <label>Son geçerlilik<input lang="tr" type="date" value={form.documentExpiryDate} onChange={(event) => update("documentExpiryDate", event.target.value)} /></label>
+              <label>Doğum yeri<input value={form.birthPlace} onChange={(event) => update("birthPlace", event.target.value)} /></label>
+              <label>Anne adı<input value={form.motherName} onChange={(event) => update("motherName", event.target.value)} /></label>
+              <label>Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
+              <label>Veren makam<input value={form.issuingAuthority} onChange={(event) => update("issuingAuthority", event.target.value)} /></label>
+              <label className="manual-request-note-field">Adres<textarea value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
+            </div>
+          </section>
+          <div className="manual-request-drawer-footer">
+            <p className={`menu-status sync-${state}`} role="status">{message}</p>
+            <div>
+              <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>
+              <ActionButton type="submit" disabled={state === "loading"}>
+                <Save size={16} aria-hidden="true" />
+                {state === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}
+              </ActionButton>
+            </div>
+          </div>
+        </form>
+      </aside>
+    </div>
+  );
+}
+
+interface RoomAssignmentDrawerProps {
+  open: boolean;
+  customers: DesktopDashboardData["customers"];
+  rooms: DesktopDashboardData["rooms"];
+  initialCustomerId: string;
+  initialRoomId: string;
+  onClose: () => void;
+  onAssign: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
+}
+
+function RoomAssignmentDrawer({
+  open,
+  customers,
+  rooms,
+  initialCustomerId,
+  initialRoomId,
+  onClose,
+  onAssign
+}: RoomAssignmentDrawerProps) {
+  const [form, setForm] = useState<RoomAssignmentFormState>(() => defaultRoomAssignmentForm(initialCustomerId, initialRoomId));
+  const [state, setState] = useState<SyncState>("idle");
+  const [message, setMessage] = useState("Atama, müşteri ve oda geçmişinde birlikte arşivlenir.");
+
+  useEffect(() => {
+    if (open) {
+      setForm(defaultRoomAssignmentForm(initialCustomerId || customers[0]?.id || "", initialRoomId || rooms[0]?.id || ""));
+      setState("idle");
+      setMessage("Atama, müşteri ve oda geçmişinde birlikte arşivlenir.");
+    }
+  }, [customers, initialCustomerId, initialRoomId, open, rooms]);
+
+  if (!open) return null;
+
+  return (
+    <div className="manual-request-backdrop room-assignment-backdrop" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
+      <aside className="manual-request-drawer room-assignment-drawer" role="dialog" aria-modal="true" aria-labelledby="room-assignment-title">
+        <header className="manual-request-drawer-header">
+          <div className="manual-request-heading"><p>Müşteri · Oda</p><h2 id="room-assignment-title">Odaya müşteri ata</h2></div>
+          <button className="drawer-close-button" type="button" aria-label="Oda atama formunu kapat" onClick={onClose}><X size={18} aria-hidden="true" /></button>
+        </header>
+        <form className="manager-form manual-request-form" onSubmit={async (event) => {
+          event.preventDefault();
+          setState("loading");
+          setMessage("Oda ataması kaydediliyor...");
+          const result = await onAssign({
+            customerId: form.customerId,
+            roomId: form.roomId,
+            checkInDate: form.checkInDate,
+            checkOutDate: form.checkOutDate,
+            guestCount: Number(form.guestCount),
+            notes: form.notes,
+            status: form.status
+          });
+          setState(result.ok ? "success" : "error");
+          setMessage(result.message);
+        }}>
+          <div className="manual-request-core-grid">
+            <label>Müşteri<select required value={form.customerId} onChange={(event) => setForm({ ...form, customerId: event.target.value })}>
+              <option value="">Müşteri seçin</option>
+              {customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.fullName}{customer.phone ? ` · ${customer.phone}` : ""}</option>)}
+            </select></label>
+            <label>Oda<select required value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })}>
+              <option value="">Oda seçin</option>
+              {rooms.filter((room) => room.isActive).map((room) => (
+                <option value={room.id} key={room.id}>
+                  {room.number ? `Oda ${room.number} · ` : ""}{room.name} · {room.capacity} kişi · {formatRoomStatus(room.status)}
+                </option>
+              ))}
+            </select></label>
+            <label>Giriş tarihi<input required lang="tr" type="date" value={form.checkInDate} onChange={(event) => setForm({ ...form, checkInDate: event.target.value })} /></label>
+            <label>Çıkış tarihi<input lang="tr" type="date" value={form.checkOutDate} onChange={(event) => setForm({ ...form, checkOutDate: event.target.value })} /></label>
+            <label>Kişi sayısı<input min="1" max="50" type="number" value={form.guestCount} onChange={(event) => setForm({ ...form, guestCount: event.target.value })} /></label>
+            <label>Başlangıç durumu<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RoomAssignmentFormState["status"] })}>
+              <option value="planned">Planlandı / Rezerve</option>
+              <option value="checked_in">Giriş yaptı / Dolu</option>
+            </select></label>
+            <label className="manual-request-note-field">Konaklama notu<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+          </div>
+          <div className="manual-request-drawer-footer">
+            <p className={`menu-status sync-${state}`} role="status">{message}</p>
+            <div>
+              <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>
+              <ActionButton type="submit" disabled={state === "loading" || customers.length === 0 || rooms.length === 0}>
+                <BedDouble size={16} aria-hidden="true" />
+                {state === "loading" ? "Kaydediliyor" : "Odaya Ata"}
+              </ActionButton>
+            </div>
+          </div>
+        </form>
+      </aside>
+    </div>
+  );
+}
+
+function CustomerRoomStayActions({
+  stay,
+  onUpdateStatus
+}: {
+  stay: DesktopDashboardData["customerRoomStays"][number];
+  onUpdateStatus: (
+    stayId: string,
+    status: "planned" | "checked_in" | "checked_out" | "cancelled"
+  ) => Promise<DesktopCustomerMutationResult>;
+}) {
+  if (stay.status === "checked_out") return null;
+  return (
+    <div className="stay-inline-actions">
+      {stay.status === "planned" && <ActionButton size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "checked_in")}>Giriş Yap</ActionButton>}
+      {stay.status === "checked_in" && <ActionButton size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "checked_out")}>Çıkış Yap</ActionButton>}
+      {stay.status === "cancelled" && <ActionButton variant="secondary" size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "planned")}>Yeniden Planla</ActionButton>}
+      {["planned", "checked_in"].includes(stay.status) && <ActionButton variant="danger" size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "cancelled")}>İptal</ActionButton>}
+    </div>
   );
 }
 
@@ -4723,39 +5440,141 @@ function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhat
 interface RoomsWorkspaceProps {
   rooms: DesktopDashboardData["rooms"];
   reservations: DesktopDashboardData["reservations"];
+  customers: DesktopDashboardData["customers"];
+  stays: DesktopDashboardData["customerRoomStays"];
   onUpdateStatus: (roomId: string, status: string) => void;
+  onAssignRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
+  onUpdateStayStatus: (
+    stayId: string,
+    status: "planned" | "checked_in" | "checked_out" | "cancelled"
+  ) => Promise<DesktopCustomerMutationResult>;
 }
 
-function RoomsWorkspace({ rooms, reservations, onUpdateStatus }: RoomsWorkspaceProps) {
+function RoomsWorkspace({
+  rooms,
+  reservations,
+  customers,
+  stays,
+  onUpdateStatus,
+  onAssignRoom,
+  onUpdateStayStatus
+}: RoomsWorkspaceProps) {
+  const [assignmentRoomId, setAssignmentRoomId] = useState("");
   return (
-    <section className="operations-grid compact-resource-grid" aria-label="Oda yönetimi">
-      {rooms.length === 0 && (
-        <div className="panel empty-state"><BedDouble size={28} aria-hidden="true" /><strong>Oda kaydı yok.</strong><p>Oda sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
-      )}
-      {rooms.map((room) => {
-        const displayInfo = getRoomDisplayInfo(room, reservations);
-        return <article className="compact-card resource-compact-card" key={room.id}>
-          <div className="resource-card-heading">
-            <div>
-              <h2>{room.number ? `Oda ${room.number} — ${room.name}` : room.name}</h2>
+    <>
+      <section className="operations-grid compact-resource-grid" aria-label="Oda yönetimi">
+        {rooms.length === 0 && (
+          <div className="panel empty-state"><BedDouble size={28} aria-hidden="true" /><strong>Oda kaydı yok.</strong><p>Oda sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
+        )}
+        {rooms.map((room) => {
+          const displayInfo = getRoomDisplayInfo(room, reservations);
+          const activeStay = stays.find((stay) => stay.roomId === room.id && ["planned", "checked_in"].includes(stay.status));
+          return <article className="compact-card resource-compact-card" key={room.id}>
+            <div className="resource-card-heading">
+              <div>
+                <h2>{room.number ? `Oda ${room.number} — ${room.name}` : room.name}</h2>
+              </div>
+              <StatusBadge tone={getResourceStatusTone(displayInfo.status)}>{formatRoomStatus(displayInfo.status)}</StatusBadge>
             </div>
-            <StatusBadge tone={getResourceStatusTone(displayInfo.status)}>{formatRoomStatus(displayInfo.status)}</StatusBadge>
-          </div>
-          <div className="compact-meta-row">
-            <span>{room.capacity} kişi</span>
-            <span>{room.floor || "Kat bilgisi yok"}</span>
-            <span>{room.bedInfo || "Yatak bilgisi yok"}</span>
-          </div>
-          <p className="compact-reservation-line line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
-          {(room.description || room.features.length > 0) && <p className="resource-description line-clamp-1">{room.description || room.features.join(", ")}</p>}
-          <div className="status-button-row compact-status-actions" aria-label={`${room.name} durumunu değiştir`}>
-            <button className={displayInfo.status === "available" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "available"} onClick={() => onUpdateStatus(room.id, "available")}>Boş</button>
-            <button className={displayInfo.status === "occupied" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "occupied"} onClick={() => onUpdateStatus(room.id, "occupied")}>Dolu</button>
-            <button className={displayInfo.status === "cleaning" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "cleaning"} onClick={() => onUpdateStatus(room.id, "cleaning")}>Temizlik</button>
-            <button className={displayInfo.status === "maintenance" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "maintenance"} onClick={() => onUpdateStatus(room.id, "maintenance")}>Bakım</button>
-          </div>
-        </article>
-      })}
+            <div className="compact-meta-row">
+              <span>{room.capacity} kişi</span>
+              <span>{room.floor || "Kat bilgisi yok"}</span>
+              <span>{room.bedInfo || "Yatak bilgisi yok"}</span>
+            </div>
+            {activeStay ? (
+              <div className="room-customer-assignment">
+                <strong>{activeStay.customerName}</strong>
+                <span>{formatCustomerRoomStayStatus(activeStay.status)} · {formatStayDateRange(activeStay)}</span>
+                <CustomerRoomStayActions stay={activeStay} onUpdateStatus={onUpdateStayStatus} />
+              </div>
+            ) : (
+              <p className="compact-reservation-line line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
+            )}
+            {(room.description || room.features.length > 0) && <p className="resource-description line-clamp-1">{room.description || room.features.join(", ")}</p>}
+            {!activeStay && (
+              <ActionButton
+                size="sm"
+                type="button"
+                onClick={() => setAssignmentRoomId(room.id)}
+                disabled={customers.length === 0 || ["cleaning", "maintenance", "out_of_service"].includes(displayInfo.status)}
+              >
+                <Users size={15} aria-hidden="true" />
+                Müşteri Ata
+              </ActionButton>
+            )}
+            <div className="status-button-row compact-status-actions" aria-label={`${room.name} durumunu değiştir`}>
+              <button disabled={Boolean(activeStay)} className={displayInfo.status === "available" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "available"} onClick={() => onUpdateStatus(room.id, "available")}>Boş</button>
+              <button disabled={Boolean(activeStay)} className={displayInfo.status === "occupied" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "occupied"} onClick={() => onUpdateStatus(room.id, "occupied")}>Dolu</button>
+              <button disabled={Boolean(activeStay)} className={displayInfo.status === "cleaning" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "cleaning"} onClick={() => onUpdateStatus(room.id, "cleaning")}>Temizlik</button>
+              <button disabled={Boolean(activeStay)} className={displayInfo.status === "maintenance" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "maintenance"} onClick={() => onUpdateStatus(room.id, "maintenance")}>Bakım</button>
+            </div>
+          </article>;
+        })}
+      </section>
+      <RoomAssignmentDrawer
+        open={Boolean(assignmentRoomId)}
+        customers={customers}
+        rooms={rooms}
+        initialCustomerId=""
+        initialRoomId={assignmentRoomId}
+        onClose={() => setAssignmentRoomId("")}
+        onAssign={async (input) => {
+          const result = await onAssignRoom(input);
+          if (result.ok) setAssignmentRoomId("");
+          return result;
+        }}
+      />
+    </>
+  );
+}
+
+function CustomerRoomStaysWorkspace({
+  stays,
+  onUpdateStatus
+}: {
+  stays: DesktopDashboardData["customerRoomStays"];
+  onUpdateStatus: (
+    stayId: string,
+    status: "planned" | "checked_in" | "checked_out" | "cancelled"
+  ) => Promise<DesktopCustomerMutationResult>;
+}) {
+  const [filter, setFilter] = useState("active");
+  const visible = stays.filter((stay) =>
+    filter === "all"
+      || (filter === "active" && ["planned", "checked_in"].includes(stay.status))
+      || stay.status === filter
+  );
+  return (
+    <section className="customer-room-stays-workspace" aria-label="Konaklama arşivi">
+      <div className="reservation-toolbar">
+        <div className="operation-filter-summary">
+          <StatusBadge tone="info">{stays.filter((stay) => stay.status === "checked_in").length} içeride</StatusBadge>
+          <StatusBadge tone="wait">{stays.filter((stay) => stay.status === "planned").length} planlı</StatusBadge>
+        </div>
+        <label>Durum<select value={filter} onChange={(event) => setFilter(event.target.value)}>
+          <option value="active">Aktif kayıtlar</option>
+          <option value="checked_in">Giriş yaptı</option>
+          <option value="planned">Planlandı</option>
+          <option value="checked_out">Çıkış yaptı</option>
+          <option value="cancelled">İptal</option>
+          <option value="all">Tüm arşiv</option>
+        </select></label>
+      </div>
+      <div className="compact-record-list customer-stay-list">
+        {visible.length === 0 ? (
+          <div className="empty-state compact-empty"><BedDouble size={24} aria-hidden="true" /><strong>Konaklama kaydı yok.</strong><p>Oda kartından veya müşteri kartından atama yapabilirsiniz.</p></div>
+        ) : visible.map((stay) => (
+          <CompactListItem
+            className="operation-record-row customer-stay-row"
+            key={stay.id}
+            leading={<StatusBadge tone={getCustomerRoomStayTone(stay.status)}>{formatCustomerRoomStayStatus(stay.status)}</StatusBadge>}
+            title={`${stay.customerName} · ${stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}`}
+            meta={<><span>{formatStayDateRange(stay)}</span><span>{stay.guestCount} kişi</span></>}
+            description={stay.notes || "Konaklama notu yok."}
+            actions={<CustomerRoomStayActions stay={stay} onUpdateStatus={onUpdateStatus} />}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -5476,6 +6295,125 @@ function formatCustomerSource(value: string) {
   return labels[value] ?? "Müşteri";
 }
 
+function toCustomerForm(customer: DesktopDashboardData["customers"][number] | null): CustomerFormState {
+  return {
+    id: customer?.id ?? "",
+    fullName: customer?.fullName ?? "",
+    phone: customer?.phone ?? "",
+    email: customer?.email ?? "",
+    notes: customer?.notes ?? "",
+    tags: customer?.tags.join(", ") ?? "",
+    identityType: customer?.identityType ?? "",
+    identityNumber: customer?.identityNumber ?? "",
+    nationality: customer?.nationality ?? "",
+    birthDate: customer?.birthDate ?? "",
+    gender: customer?.gender ?? "",
+    documentSerialNumber: customer?.documentSerialNumber ?? "",
+    documentExpiryDate: customer?.documentExpiryDate ?? "",
+    birthPlace: customer?.birthPlace ?? "",
+    motherName: customer?.motherName ?? "",
+    fatherName: customer?.fatherName ?? "",
+    issuingAuthority: customer?.issuingAuthority ?? "",
+    address: customer?.address ?? ""
+  };
+}
+
+function customerFormToInput(form: CustomerFormState): SaveCustomerInput {
+  return {
+    ...(form.id ? { id: form.id } : {}),
+    fullName: form.fullName,
+    phone: form.phone,
+    email: form.email,
+    notes: form.notes,
+    tags: form.tags.split(/[,;\n]/).map((tag) => tag.trim()).filter(Boolean),
+    identityType: form.identityType,
+    identityNumber: form.identityNumber,
+    nationality: form.nationality,
+    birthDate: form.birthDate,
+    gender: form.gender,
+    documentSerialNumber: form.documentSerialNumber,
+    documentExpiryDate: form.documentExpiryDate,
+    birthPlace: form.birthPlace,
+    motherName: form.motherName,
+    fatherName: form.fatherName,
+    issuingAuthority: form.issuingAuthority,
+    address: form.address
+  };
+}
+
+function defaultRoomAssignmentForm(customerId: string, roomId: string): RoomAssignmentFormState {
+  const today = localIsoDate(new Date());
+  const tomorrow = new Date(`${today}T12:00:00`);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return {
+    customerId,
+    roomId,
+    checkInDate: today,
+    checkOutDate: localIsoDate(tomorrow),
+    guestCount: "1",
+    notes: "",
+    status: "planned"
+  };
+}
+
+function localIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatIdentityType(value: string): string {
+  if (value === "tc_identity_card") return "T.C. Kimlik Kartı";
+  if (value === "passport") return "Pasaport";
+  if (value === "other") return "Diğer belge";
+  return "-";
+}
+
+function formatCustomerGender(value: string): string {
+  if (value === "female") return "Kadın";
+  if (value === "male") return "Erkek";
+  if (value === "unspecified") return "Belirtilmemiş";
+  return "-";
+}
+
+function hasCustomerIdentityDetails(customer: DesktopDashboardData["customers"][number]): boolean {
+  return Boolean(
+    customer.identityNumber
+    || customer.nationality
+    || customer.birthDate
+    || customer.gender
+    || customer.documentSerialNumber
+    || customer.documentExpiryDate
+    || customer.birthPlace
+    || customer.motherName
+    || customer.fatherName
+    || customer.issuingAuthority
+    || customer.address
+  );
+}
+
+function formatCustomerRoomStayStatus(value: string): string {
+  if (value === "planned") return "Planlandı";
+  if (value === "checked_in") return "Giriş yaptı";
+  if (value === "checked_out") return "Çıkış yaptı";
+  if (value === "cancelled") return "İptal";
+  return value || "Bilinmiyor";
+}
+
+function getCustomerRoomStayTone(value: string): StatusTone {
+  if (value === "checked_in") return "ok";
+  if (value === "planned") return "wait";
+  if (value === "cancelled") return "danger";
+  return "neutral";
+}
+
+function formatStayDateRange(stay: DesktopDashboardData["customerRoomStays"][number]): string {
+  const start = formatDateForDisplay(stay.checkInDate) || stay.checkInDate || "-";
+  const end = formatDateForDisplay(stay.checkOutDate) || stay.checkOutDate;
+  return end ? `${start} – ${end}` : `${start} – açık`;
+}
+
 function formatReservationType(value: string) {
   const labels: Record<string, string> = {
     room: "Pansiyon",
@@ -5762,8 +6700,37 @@ function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     whatsappEnabled: setupData.modules.whatsapp,
     androidEnabled: setupData.modules.android,
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
-    tableCount: String(Math.max(0, setupData.initialCounts.tables || 2))
+    tableCategories: toTableCategoryForm(setupData)
   };
+}
+
+let tableCategoryFormSequence = 0;
+
+function nextTableCategoryFormKey() {
+  tableCategoryFormSequence += 1;
+  return `table-category-${tableCategoryFormSequence}`;
+}
+
+function toTableCategoryForm(setupData: DesktopSetupData): TableCategoryFormState[] {
+  const savedCategories = Array.isArray(setupData.tableCategories) ? setupData.tableCategories : [];
+  if (savedCategories.length > 0) {
+    return savedCategories.map((category) => ({
+      key: nextTableCategoryFormKey(),
+      sourceName: category.name,
+      name: category.name,
+      tableCount: String(Math.max(1, category.tableCount))
+    }));
+  }
+
+  const legacyTableCount = Math.max(0, Number(setupData.initialCounts?.tables ?? 0));
+  return legacyTableCount > 0
+    ? [{
+        key: nextTableCategoryFormKey(),
+        sourceName: "Genel",
+        name: "Genel",
+        tableCount: String(legacyTableCount)
+      }]
+    : [];
 }
 
 function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {

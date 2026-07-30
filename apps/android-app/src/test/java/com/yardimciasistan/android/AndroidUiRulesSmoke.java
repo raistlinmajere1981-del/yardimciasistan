@@ -66,8 +66,24 @@ public final class AndroidUiRulesSmoke {
 
     data.permissions.clear();
     data.permissions.add("customer.view");
-    assertTrue(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_CUSTOMERS), "customer.view should expose customers");
+    assertTrue(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_CUSTOMERS), "customer.view should preserve request handling");
+    assertFalse(AndroidUiRules.canManageCustomers(data), "customer cards and creation must stay admin-only");
     assertTrue(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_MESSAGES), "customer.view should expose messages");
+    data.permissions.add("customer.manage");
+    assertFalse(AndroidUiRules.canManageCustomers(data), "customer.manage must not elevate staff");
+    data.deviceRole = "admin";
+    assertTrue(AndroidUiRules.canManageCustomers(data), "active admin with customer.manage can manage customers");
+
+    data.permissions.add("room.assign_customer");
+    assertTrue(
+        AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_STAYS),
+        "admin customer and room permissions should expose the stay archive"
+    );
+    data.deviceRole = "staff";
+    assertFalse(
+        AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_STAYS),
+        "staff must never open the customer stay archive"
+    );
   }
 
   private static void deletionsRequireResolvedActiveAdmin() {
@@ -140,6 +156,7 @@ public final class AndroidUiRulesSmoke {
   private static void resolvesNotificationDestinations() {
     assertDestination("customers:new", AndroidUiRules.TAB_CUSTOMERS, AndroidUiRules.CUSTOMER_NEW);
     assertDestination("pension:reservations", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_RESERVATIONS);
+    assertDestination("pension:stays", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_STAYS);
     assertDestination("pension/tasks", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_TASKS);
     assertDestination("restaurant:tables", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_TABLES);
     assertDestination("restaurant:orders", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_ORDERS);

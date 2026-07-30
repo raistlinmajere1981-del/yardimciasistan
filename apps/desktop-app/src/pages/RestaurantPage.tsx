@@ -87,7 +87,7 @@ export function RestaurantPage({ data, tasks, onDashboardDataChanged, onUpdateTa
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Servis</span>
             <h2 id="restaurant-tables-title">Masa Durumu</h2>
-            <p>Salon ve bahçe masalarının güncel durumu</p>
+            <p>Tanımladığınız kategorilerdeki masaların güncel durumu</p>
           </header>
           <div className="operation-panel-content">
             <TableOrdersWorkspace

@@ -5,6 +5,9 @@ import path from "node:path";
 import {
   createId,
   normalizePhone,
+  type CustomerGender,
+  type CustomerIdentityType,
+  type IdentityImageAnalysis,
   type MenuStockUnit,
   type StockImageAnalysis,
   type StockImageAnalysisLine,
@@ -86,6 +89,17 @@ export interface DesktopTable {
   updatedAt: string;
 }
 
+export interface DesktopTableCategory {
+  name: string;
+  tableCount: number;
+}
+
+export interface SaveTableCategoryInput {
+  sourceName?: string;
+  name: string;
+  tableCount: number;
+}
+
 export interface DesktopReservation {
   id: string;
   requestId: string;
@@ -131,8 +145,42 @@ export interface DesktopCustomer {
   notes: string;
   tags: string[];
   lastContactAt: string;
+  identityType: CustomerIdentityType;
+  identityNumber: string;
+  nationality: string;
+  birthDate: string;
+  gender: CustomerGender;
+  documentSerialNumber: string;
+  documentExpiryDate: string;
+  birthPlace: string;
+  motherName: string;
+  fatherName: string;
+  issuingAuthority: string;
+  address: string;
   requestCount: number;
   reservationCount: number;
+  stayCount: number;
+  updatedAt: string;
+}
+
+export interface DesktopCustomerRoomStay {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  roomId: string;
+  roomName: string;
+  roomNumber: string;
+  reservationId: string;
+  status: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guestCount: number;
+  notes: string;
+  source: string;
+  checkedInAt: string;
+  checkedOutAt: string;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -186,6 +234,7 @@ export interface DesktopDashboardData {
   reservations: DesktopReservation[];
   dailyTasks: DesktopDailyTask[];
   customers: DesktopCustomer[];
+  customerRoomStays: DesktopCustomerRoomStay[];
   androidDevices: DesktopAndroidDevice[];
   paymentWaitingTableOrders: DesktopPaymentWaitingTableOrder[];
   androidActionFailures: DesktopAndroidActionFailure[];
@@ -390,6 +439,7 @@ export interface DesktopSetupData {
     rooms: number;
     tables: number;
   };
+  tableCategories: DesktopTableCategory[];
 }
 
 export interface SaveInitialSetupInput {
@@ -424,6 +474,7 @@ export interface SaveInitialSetupInput {
     rooms: number;
     tables: number;
   };
+  tableCategories?: SaveTableCategoryInput[];
 }
 
 export type DesktopSetupSaveResult =
@@ -557,6 +608,72 @@ export type DesktopStockImageApplyResult =
   | {
       ok: false;
       message: string;
+    };
+
+export interface SaveCustomerInput {
+  id?: string;
+  fullName: string;
+  phone: string;
+  email: string;
+  notes: string;
+  tags: string[];
+  identityType: string;
+  identityNumber: string;
+  nationality: string;
+  birthDate: string;
+  gender: string;
+  documentSerialNumber: string;
+  documentExpiryDate: string;
+  birthPlace: string;
+  motherName: string;
+  fatherName: string;
+  issuingAuthority: string;
+  address: string;
+}
+
+export interface AssignCustomerRoomInput {
+  customerId: string;
+  roomId: string;
+  checkInDate: string;
+  checkOutDate: string;
+  guestCount: number;
+  notes: string;
+  status: "planned" | "checked_in";
+}
+
+export interface UpdateCustomerRoomStayStatusInput {
+  stayId: string;
+  status: "planned" | "checked_in" | "checked_out" | "cancelled";
+}
+
+export type DesktopCustomerMutationResult =
+  | {
+      ok: true;
+      message: string;
+      savedId: string;
+      dashboardData: DesktopDashboardData;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export interface DesktopIdentityImageAnalyzeInput {
+  fileName: string;
+  mimeType: string;
+  bytes: ArrayBuffer;
+}
+
+export type DesktopIdentityImageAnalyzeResult =
+  | {
+      ok: true;
+      message: string;
+      analysis: IdentityImageAnalysis;
+    }
+  | {
+      ok: false;
+      message: string;
+      code?: string;
     };
 
 export type RequestReservationConversionResult =
@@ -939,6 +1056,7 @@ export class DesktopDatabase {
       reservations: this.getReservations(),
       dailyTasks: this.getDailyTasks(),
       customers: this.getCustomers(),
+      customerRoomStays: this.getCustomerRoomStays(),
       androidDevices: this.getAndroidDevices(),
       paymentWaitingTableOrders: this.listPaymentWaitingTableOrders(),
       androidActionFailures: this.getAndroidActionFailures(),
@@ -1736,6 +1854,329 @@ export class DesktopDatabase {
     );
   }
 
+  saveCustomer(input: SaveCustomerInput): DesktopCustomerMutationResult {
+    const normalized = normalizeCustomerInput(input);
+    if (!normalized.ok) {
+      return normalized;
+    }
+
+    const requestedId = String(input?.id ?? "").trim();
+    const existing = requestedId
+      ? this.db.prepare("SELECT id, source, created_at FROM customers WHERE id = ? AND deleted_at = ''").get(requestedId) as Record<string, unknown> | undefined
+      : undefined;
+    if (requestedId && !existing) {
+      return { ok: false, message: "Düzenlenecek müşteri bulunamadı." };
+    }
+
+    const duplicateIdentity = normalized.customer.identityNumber
+      ? this.db
+          .prepare("SELECT id FROM customers WHERE identity_number = ? AND id != ? AND deleted_at = '' LIMIT 1")
+          .get(normalized.customer.identityNumber, requestedId)
+      : undefined;
+    if (duplicateIdentity) {
+      return { ok: false, message: "Bu kimlik numarası başka bir müşteri kartında kayıtlı." };
+    }
+    const duplicatePhone = normalized.customer.phone
+      ? this.db
+          .prepare("SELECT id FROM customers WHERE phone = ? AND id != ? AND deleted_at = '' LIMIT 1")
+          .get(normalized.customer.phone, requestedId)
+      : undefined;
+    if (duplicatePhone) {
+      return { ok: false, message: "Bu telefon numarasıyla kayıtlı bir müşteri zaten var." };
+    }
+
+    const id = requestedId || createId("customer_");
+    const now = new Date().toISOString();
+    const source = String(existing?.source ?? "manual") || "manual";
+    const createdAt = String(existing?.created_at ?? now) || now;
+    const customer = normalized.customer;
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(`
+          INSERT INTO customers (
+            id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+            identity_type, identity_number, nationality, birth_date, gender,
+            document_serial_number, document_expiry_date, birth_place, mother_name,
+            father_name, issuing_authority, address, created_at, updated_at,
+            deleted_at, sync_status
+          ) VALUES (
+            ?, ?, ?, ?, ?, ?, ?, '',
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, ?,
+            '', 'local_only'
+          )
+          ON CONFLICT(id) DO UPDATE SET
+            full_name = excluded.full_name,
+            phone = excluded.phone,
+            email = excluded.email,
+            notes = excluded.notes,
+            tags_json = excluded.tags_json,
+            identity_type = excluded.identity_type,
+            identity_number = excluded.identity_number,
+            nationality = excluded.nationality,
+            birth_date = excluded.birth_date,
+            gender = excluded.gender,
+            document_serial_number = excluded.document_serial_number,
+            document_expiry_date = excluded.document_expiry_date,
+            birth_place = excluded.birth_place,
+            mother_name = excluded.mother_name,
+            father_name = excluded.father_name,
+            issuing_authority = excluded.issuing_authority,
+            address = excluded.address,
+            updated_at = excluded.updated_at,
+            deleted_at = '',
+            sync_status = 'local_only'
+        `)
+        .run(
+          id,
+          customer.fullName,
+          customer.phone,
+          customer.email,
+          source,
+          customer.notes,
+          JSON.stringify(customer.tags),
+          customer.identityType,
+          customer.identityNumber,
+          customer.nationality,
+          customer.birthDate,
+          customer.gender,
+          customer.documentSerialNumber,
+          customer.documentExpiryDate,
+          customer.birthPlace,
+          customer.motherName,
+          customer.fatherName,
+          customer.issuingAuthority,
+          customer.address,
+          createdAt,
+          now
+        );
+      this.insertEvent({
+        type: requestedId ? "customer.updated" : "customer.created",
+        entityType: "customer",
+        entityId: id,
+        payload: {
+          source: requestedId ? "desktop_edit" : "desktop_manual",
+          identity_type: customer.identityType,
+          has_identity_number: Boolean(customer.identityNumber)
+        },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      return { ok: false, message: "Müşteri kartı kaydedilemedi. Kimlik ve iletişim alanlarını kontrol edin." };
+    }
+
+    return {
+      ok: true,
+      message: requestedId ? "Müşteri kartı güncellendi." : "Müşteri kartı oluşturuldu.",
+      savedId: id,
+      dashboardData: this.getDashboardData()
+    };
+  }
+
+  assignCustomerToRoom(input: AssignCustomerRoomInput): DesktopCustomerMutationResult {
+    const customerId = String(input?.customerId ?? "").trim();
+    const roomId = String(input?.roomId ?? "").trim();
+    const checkInDate = normalizeDateInput(String(input?.checkInDate ?? ""));
+    const checkOutDate = normalizeDateInput(String(input?.checkOutDate ?? ""));
+    const guestCount = normalizeInteger(Number(input?.guestCount));
+    const status = input?.status === "checked_in" ? "checked_in" : input?.status === "planned" ? "planned" : "";
+    const notes = normalizeLimitedText(input?.notes, 2000);
+    if (!customerId || !roomId || !checkInDate || !status) {
+      return { ok: false, message: "Müşteri, oda, giriş tarihi ve konaklama durumu seçilmeli." };
+    }
+    if (checkOutDate && checkOutDate < checkInDate) {
+      return { ok: false, message: "Çıkış tarihi giriş tarihinden önce olamaz." };
+    }
+    if (guestCount < 1 || guestCount > 50) {
+      return { ok: false, message: "Konaklayan kişi sayısı 1 ile 50 arasında olmalı." };
+    }
+
+    const customer = this.db
+      .prepare("SELECT full_name FROM customers WHERE id = ? AND deleted_at = ''")
+      .get(customerId) as { full_name?: string } | undefined;
+    const room = this.db
+      .prepare("SELECT name, number, capacity, status, is_active FROM rooms WHERE id = ? AND deleted_at = ''")
+      .get(roomId) as Record<string, unknown> | undefined;
+    if (!customer) {
+      return { ok: false, message: "Odaya atanacak müşteri bulunamadı." };
+    }
+    if (!room || Number(room.is_active ?? 0) !== 1) {
+      return { ok: false, message: "Atama yapılacak aktif oda bulunamadı." };
+    }
+    if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
+      return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
+    }
+    if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
+      return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
+    }
+    if (this.hasOverlappingCustomerRoomStay(roomId, checkInDate, checkOutDate)) {
+      return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
+    }
+    const reservationConflict = this.findConflictingRoomReservation(roomId, customerId, checkInDate, checkOutDate);
+    if (reservationConflict) {
+      return { ok: false, message: `Oda bu tarihlerde ${reservationConflict} rezervasyonuna bağlı.` };
+    }
+
+    const id = createId("stay_");
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(`
+          INSERT INTO customer_room_stays (
+            id, customer_id, room_id, reservation_id, status, check_in_date,
+            check_out_date, guest_count, notes, source, checked_in_at,
+            checked_out_at, created_at, updated_at, deleted_at, sync_status
+          ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, 'manual', ?, '', ?, ?, '', 'local_only')
+        `)
+        .run(
+          id,
+          customerId,
+          roomId,
+          status,
+          checkInDate,
+          checkOutDate,
+          guestCount,
+          notes,
+          status === "checked_in" ? now : "",
+          now,
+          now
+        );
+      this.db
+        .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+        .run(status === "checked_in" ? "occupied" : "reserved", now, roomId);
+      this.insertEvent({
+        type: "customer.room_assigned",
+        entityType: "customer_room_stay",
+        entityId: id,
+        payload: {
+          customer_id: customerId,
+          room_id: roomId,
+          status,
+          check_in_date: checkInDate,
+          check_out_date: checkOutDate
+        },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch {
+      this.db.exec("ROLLBACK");
+      return { ok: false, message: "Müşteri oda kaydı oluşturulamadı." };
+    }
+
+    const roomLabel = String(room.number ?? "").trim() || String(room.name ?? "").trim();
+    return {
+      ok: true,
+      message: `${String(customer.full_name ?? "Müşteri")} ${roomLabel ? `· ${roomLabel}` : ""} oda kaydına eklendi.`,
+      savedId: id,
+      dashboardData: this.getDashboardData()
+    };
+  }
+
+  updateCustomerRoomStayStatus(input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult {
+    const stayId = String(input?.stayId ?? "").trim();
+    const status = normalizeStatus(String(input?.status ?? ""), ["planned", "checked_in", "checked_out", "cancelled"]);
+    if (!stayId || !status) {
+      return { ok: false, message: "Konaklama kaydı ve yeni durum seçilmeli." };
+    }
+    const stay = this.db
+      .prepare(`
+        SELECT customer_room_stays.*, customers.full_name, rooms.name AS room_name
+        FROM customer_room_stays
+        JOIN customers ON customers.id = customer_room_stays.customer_id
+        JOIN rooms ON rooms.id = customer_room_stays.room_id
+        WHERE customer_room_stays.id = ? AND customer_room_stays.deleted_at = ''
+      `)
+      .get(stayId) as Record<string, unknown> | undefined;
+    if (!stay) {
+      return { ok: false, message: "Konaklama kaydı bulunamadı." };
+    }
+    const previousStatus = String(stay.status ?? "");
+    if (previousStatus === status) {
+      return {
+        ok: true,
+        message: "Konaklama kaydı zaten seçilen durumda.",
+        savedId: stayId,
+        dashboardData: this.getDashboardData()
+      };
+    }
+    const allowedTransitions: Record<string, string[]> = {
+      planned: ["checked_in", "cancelled"],
+      checked_in: ["checked_out", "cancelled"],
+      cancelled: ["planned"],
+      checked_out: []
+    };
+    if (!(allowedTransitions[previousStatus] ?? []).includes(status)) {
+      return { ok: false, message: "Bu konaklama kaydı seçilen duruma geçirilemez." };
+    }
+    if (
+      ["planned", "checked_in"].includes(status)
+      && this.hasOverlappingCustomerRoomStay(
+        String(stay.room_id ?? ""),
+        String(stay.check_in_date ?? ""),
+        String(stay.check_out_date ?? ""),
+        stayId
+      )
+    ) {
+      return { ok: false, message: "Odanın aynı tarihlerde başka bir aktif müşteri kaydı var." };
+    }
+
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(`
+          UPDATE customer_room_stays
+          SET status = ?,
+              checked_in_at = CASE WHEN ? = 'checked_in' THEN ? ELSE checked_in_at END,
+              checked_out_at = CASE WHEN ? = 'checked_out' THEN ? ELSE checked_out_at END,
+              updated_at = ?,
+              sync_status = 'local_only'
+          WHERE id = ?
+        `)
+        .run(status, status, now, status, now, now, stayId);
+      this.refreshRoomStatusFromStays(
+        String(stay.room_id ?? ""),
+        now,
+        status === "checked_out"
+      );
+      this.insertEvent({
+        type: "customer.room_stay_status_changed",
+        entityType: "customer_room_stay",
+        entityId: stayId,
+        payload: {
+          customer_id: String(stay.customer_id ?? ""),
+          room_id: String(stay.room_id ?? ""),
+          previous_status: previousStatus,
+          status
+        },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch {
+      this.db.exec("ROLLBACK");
+      return { ok: false, message: "Konaklama durumu güncellenemedi." };
+    }
+
+    return {
+      ok: true,
+      message: status === "checked_in"
+        ? "Müşteri odaya giriş yaptı."
+        : status === "checked_out"
+          ? "Müşteri çıkışı tamamlandı; oda temizlik durumuna alındı."
+          : status === "cancelled"
+            ? "Oda ataması iptal edildi."
+            : "Oda ataması yeniden planlandı.",
+      savedId: stayId,
+      dashboardData: this.getDashboardData()
+    };
+  }
+
   deleteMenuCategory(categoryIdInput: string): DesktopStatusUpdateResult {
     const categoryId = categoryIdInput.trim();
     if (!categoryId) {
@@ -1868,6 +2309,28 @@ export class DesktopDatabase {
       return {
         ok: false,
         message: "Oda bulunamadı."
+      };
+    }
+    const activeStay = this.db
+      .prepare(`
+        SELECT status
+        FROM customer_room_stays
+        WHERE room_id = ?
+          AND status IN ('checked_in', 'planned')
+          AND deleted_at = ''
+        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END
+        LIMIT 1
+      `)
+      .get(roomId) as { status?: string } | undefined;
+    const expectedStatus = activeStay?.status === "checked_in"
+      ? "occupied"
+      : activeStay?.status === "planned"
+        ? "reserved"
+        : "";
+    if (expectedStatus && status !== expectedStatus) {
+      return {
+        ok: false,
+        message: "Odanın aktif müşteri kaydı var. Durumu konaklama kartındaki giriş, çıkış veya iptal işlemiyle değiştirin."
       };
     }
 
@@ -2612,6 +3075,10 @@ export class DesktopDatabase {
         }
       }
 
+      for (const roomId of roomIds) {
+        this.enforceActiveStayRoomStatus(roomId, now);
+      }
+
       this.insertEvent({
         type: "reservation.status_changed",
         entityType: "reservation",
@@ -2723,7 +3190,8 @@ export class DesktopDatabase {
       initialCounts: {
         rooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''"),
         tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
-      }
+      },
+      tableCategories: this.getTableCategories()
     };
   }
 
@@ -3003,6 +3471,7 @@ export class DesktopDatabase {
     const aiModel = input.aiModel.trim();
     const aiBaseUrl = normalizeAiBaseUrl(input.aiBaseUrl);
     const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
+    const tableCategoryResolution = normalizeTableCategoryInputs(input.tableCategories);
     const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
     const existingSettings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
     const profileService = aiService ?? normalizeStoredAiService(existingSettings?.ai_service);
@@ -3025,6 +3494,20 @@ export class DesktopDatabase {
       return {
         ok: false,
         message: "Firma adı gerekli."
+      };
+    }
+
+    if (!tableCategoryResolution.ok) {
+      return tableCategoryResolution;
+    }
+
+    if (
+      tableCategoryResolution.categories
+      && this.getProtectedTableIds().size > tableCategoryResolution.categories.reduce((total, category) => total + category.tableCount, 0)
+    ) {
+      return {
+        ok: false,
+        message: "Aktif adisyon veya rezervasyona bağlı masalar nedeniyle toplam masa sayısı bu kadar azaltılamaz."
       };
     }
 
@@ -3406,7 +3889,11 @@ export class DesktopDatabase {
       }
 
       this.ensureInitialRooms(normalizeInteger(input.initialCounts.rooms), now);
-      this.ensureInitialTables(normalizeInteger(input.initialCounts.tables), now);
+      if (tableCategoryResolution.categories) {
+        this.reconcileTableCategories(tableCategoryResolution.categories, now);
+      } else {
+        this.ensureInitialTables(normalizeInteger(input.initialCounts.tables), now);
+      }
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
@@ -4798,18 +5285,32 @@ export class DesktopDatabase {
           customers.notes,
           customers.tags_json,
           customers.last_contact_at,
+          customers.identity_type,
+          customers.identity_number,
+          customers.nationality,
+          customers.birth_date,
+          customers.gender,
+          customers.document_serial_number,
+          customers.document_expiry_date,
+          customers.birth_place,
+          customers.mother_name,
+          customers.father_name,
+          customers.issuing_authority,
+          customers.address,
           customers.updated_at,
           COUNT(DISTINCT requests.id) AS request_count,
-          COUNT(DISTINCT reservations.id) AS reservation_count
+          COUNT(DISTINCT reservations.id) AS reservation_count,
+          COUNT(DISTINCT customer_room_stays.id) AS stay_count
         FROM customers
         LEFT JOIN requests ON requests.customer_id = customers.id AND requests.deleted_at = ''
         LEFT JOIN reservations ON reservations.customer_id = customers.id AND reservations.deleted_at = ''
+        LEFT JOIN customer_room_stays ON customer_room_stays.customer_id = customers.id AND customer_room_stays.deleted_at = ''
         WHERE customers.deleted_at = ''
         GROUP BY customers.id
         ORDER BY
           COALESCE(NULLIF(customers.last_contact_at, ''), customers.updated_at) DESC,
           customers.full_name ASC
-        LIMIT 100
+        LIMIT 500
       `)
       .all() as Array<Record<string, unknown>>;
 
@@ -4822,10 +5323,188 @@ export class DesktopDatabase {
       notes: String(row.notes ?? ""),
       tags: this.parseStringArray(row.tags_json),
       lastContactAt: String(row.last_contact_at ?? ""),
+      identityType: normalizeCustomerIdentityType(row.identity_type),
+      identityNumber: String(row.identity_number ?? ""),
+      nationality: String(row.nationality ?? ""),
+      birthDate: String(row.birth_date ?? ""),
+      gender: normalizeCustomerGender(row.gender),
+      documentSerialNumber: String(row.document_serial_number ?? ""),
+      documentExpiryDate: String(row.document_expiry_date ?? ""),
+      birthPlace: String(row.birth_place ?? ""),
+      motherName: String(row.mother_name ?? ""),
+      fatherName: String(row.father_name ?? ""),
+      issuingAuthority: String(row.issuing_authority ?? ""),
+      address: String(row.address ?? ""),
       requestCount: Number(row.request_count ?? 0),
       reservationCount: Number(row.reservation_count ?? 0),
+      stayCount: Number(row.stay_count ?? 0),
       updatedAt: String(row.updated_at ?? "")
     }));
+  }
+
+  private getCustomerRoomStays(): DesktopCustomerRoomStay[] {
+    const rows = this.db
+      .prepare(`
+        SELECT
+          customer_room_stays.id,
+          customer_room_stays.customer_id,
+          customers.full_name AS customer_name,
+          customers.phone AS customer_phone,
+          customer_room_stays.room_id,
+          rooms.name AS room_name,
+          rooms.number AS room_number,
+          customer_room_stays.reservation_id,
+          customer_room_stays.status,
+          customer_room_stays.check_in_date,
+          customer_room_stays.check_out_date,
+          customer_room_stays.guest_count,
+          customer_room_stays.notes,
+          customer_room_stays.source,
+          customer_room_stays.checked_in_at,
+          customer_room_stays.checked_out_at,
+          customer_room_stays.created_at,
+          customer_room_stays.updated_at
+        FROM customer_room_stays
+        JOIN customers ON customers.id = customer_room_stays.customer_id
+        JOIN rooms ON rooms.id = customer_room_stays.room_id
+        WHERE customer_room_stays.deleted_at = ''
+        ORDER BY
+          CASE customer_room_stays.status
+            WHEN 'checked_in' THEN 0
+            WHEN 'planned' THEN 1
+            WHEN 'checked_out' THEN 2
+            ELSE 3
+          END,
+          customer_room_stays.check_in_date DESC,
+          customer_room_stays.created_at DESC
+        LIMIT 500
+      `)
+      .all() as Array<Record<string, unknown>>;
+
+    return rows.map((row) => ({
+      id: String(row.id ?? ""),
+      customerId: String(row.customer_id ?? ""),
+      customerName: String(row.customer_name ?? ""),
+      customerPhone: String(row.customer_phone ?? ""),
+      roomId: String(row.room_id ?? ""),
+      roomName: String(row.room_name ?? ""),
+      roomNumber: String(row.room_number ?? ""),
+      reservationId: String(row.reservation_id ?? ""),
+      status: String(row.status ?? "planned"),
+      checkInDate: String(row.check_in_date ?? ""),
+      checkOutDate: String(row.check_out_date ?? ""),
+      guestCount: Number(row.guest_count ?? 1),
+      notes: String(row.notes ?? ""),
+      source: String(row.source ?? "manual"),
+      checkedInAt: String(row.checked_in_at ?? ""),
+      checkedOutAt: String(row.checked_out_at ?? ""),
+      createdAt: String(row.created_at ?? ""),
+      updatedAt: String(row.updated_at ?? "")
+    }));
+  }
+
+  private hasOverlappingCustomerRoomStay(
+    roomId: string,
+    checkInDate: string,
+    checkOutDate: string,
+    excludedStayId = ""
+  ): boolean {
+    const rows = this.db
+      .prepare(`
+        SELECT id, check_in_date, check_out_date
+        FROM customer_room_stays
+        WHERE room_id = ?
+          AND id != ?
+          AND status IN ('planned', 'checked_in')
+          AND deleted_at = ''
+      `)
+      .all(roomId, excludedStayId) as Array<Record<string, unknown>>;
+    const candidateEnd = checkOutDate || "9999-12-31";
+    return rows.some((row) => {
+      const existingStart = String(row.check_in_date ?? "");
+      const existingEnd = String(row.check_out_date ?? "") || "9999-12-31";
+      return existingStart < candidateEnd && checkInDate < existingEnd;
+    });
+  }
+
+  private findConflictingRoomReservation(
+    roomId: string,
+    customerId: string,
+    checkInDate: string,
+    checkOutDate: string
+  ): string {
+    const candidateEnd = checkOutDate || "9999-12-31";
+    for (const reservation of this.getReservations()) {
+      if (
+        reservation.customerId === customerId
+        || !reservation.roomIds.includes(roomId)
+        || !["pending", "approved"].includes(reservation.status)
+      ) {
+        continue;
+      }
+      const reservationStart = reservation.startDate;
+      const reservationEnd = reservation.endDate || "9999-12-31";
+      if (reservationStart < candidateEnd && checkInDate < reservationEnd) {
+        return reservation.customerName || reservation.title || "başka bir müşteri";
+      }
+    }
+    return "";
+  }
+
+  private refreshRoomStatusFromStays(roomId: string, now: string, checkoutToCleaning: boolean) {
+    const active = this.db
+      .prepare(`
+        SELECT status
+        FROM customer_room_stays
+        WHERE room_id = ?
+          AND status IN ('checked_in', 'planned')
+          AND deleted_at = ''
+        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END, check_in_date ASC
+        LIMIT 1
+      `)
+      .get(roomId) as { status?: string } | undefined;
+    const room = this.db
+      .prepare("SELECT status FROM rooms WHERE id = ? AND deleted_at = ''")
+      .get(roomId) as { status?: string } | undefined;
+    if (!room) {
+      return;
+    }
+    const currentStatus = String(room.status ?? "");
+    let nextStatus = currentStatus;
+    if (active?.status === "checked_in") {
+      nextStatus = "occupied";
+    } else if (active?.status === "planned") {
+      nextStatus = "reserved";
+    } else if (checkoutToCleaning) {
+      nextStatus = "cleaning";
+    } else if (["occupied", "reserved"].includes(currentStatus)) {
+      nextStatus = "available";
+    }
+    if (nextStatus !== currentStatus) {
+      this.db
+        .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+        .run(nextStatus, now, roomId);
+    }
+  }
+
+  private enforceActiveStayRoomStatus(roomId: string, now: string) {
+    const active = this.db
+      .prepare(`
+        SELECT status
+        FROM customer_room_stays
+        WHERE room_id = ?
+          AND status IN ('checked_in', 'planned')
+          AND deleted_at = ''
+        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END, check_in_date ASC
+        LIMIT 1
+      `)
+      .get(roomId) as { status?: string } | undefined;
+    if (!active) {
+      return;
+    }
+    this.db
+      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+      .run(active.status === "checked_in" ? "occupied" : "reserved", now, roomId);
   }
 
   private getRooms(): DesktopRoom[] {
@@ -4888,7 +5567,7 @@ export class DesktopDatabase {
           updated_at
         FROM tables
         WHERE deleted_at = ''
-        ORDER BY area ASC, sort_order ASC, name ASC
+        ORDER BY sort_order ASC, area ASC, name ASC
       `)
       .all() as Array<Record<string, unknown>>;
 
@@ -4906,6 +5585,31 @@ export class DesktopDatabase {
       sortOrder: Number(row.sort_order ?? 0),
       updatedAt: String(row.updated_at ?? "")
     }));
+  }
+
+  private getTableCategories(): DesktopTableCategory[] {
+    const rows = this.db
+      .prepare(`
+        SELECT area, sort_order
+        FROM tables
+        WHERE deleted_at = ''
+        ORDER BY sort_order ASC, name ASC
+      `)
+      .all() as Array<Record<string, unknown>>;
+    const categories = new Map<string, DesktopTableCategory>();
+
+    for (const row of rows) {
+      const name = normalizeTableCategoryName(row.area);
+      const key = tableCategoryKey(name);
+      const existing = categories.get(key);
+      if (existing) {
+        existing.tableCount += 1;
+      } else {
+        categories.set(key, { name, tableCount: 1 });
+      }
+    }
+
+    return [...categories.values()];
   }
 
   private getReservations(): DesktopReservation[] {
@@ -5376,6 +6080,210 @@ export class DesktopDatabase {
     }
   }
 
+  private getProtectedTableIds(): Set<string> {
+    const protectedIds = new Set<string>();
+    const activeOrders = this.db
+      .prepare(`
+        SELECT table_id
+        FROM table_orders
+        WHERE status IN ('open', 'preparing', 'served', 'payment')
+      `)
+      .all() as Array<{ table_id?: string }>;
+    for (const order of activeOrders) {
+      const tableId = String(order.table_id ?? "").trim();
+      if (tableId) {
+        protectedIds.add(tableId);
+      }
+    }
+
+    const activeReservations = this.db
+      .prepare(`
+        SELECT table_ids_json
+        FROM reservations
+        WHERE deleted_at = ''
+          AND status IN ('pending', 'approved')
+      `)
+      .all() as Array<{ table_ids_json?: string }>;
+    for (const reservation of activeReservations) {
+      for (const tableId of this.parseStringArray(reservation.table_ids_json)) {
+        protectedIds.add(tableId);
+      }
+    }
+
+    const unavailableTables = this.db
+      .prepare(`
+        SELECT id
+        FROM tables
+        WHERE deleted_at = ''
+          AND (
+            status != 'available'
+            OR current_customer_id != ''
+            OR current_reservation_id != ''
+          )
+      `)
+      .all() as Array<{ id?: string }>;
+    for (const table of unavailableTables) {
+      const tableId = String(table.id ?? "").trim();
+      if (tableId) {
+        protectedIds.add(tableId);
+      }
+    }
+
+    const currentTableIds = new Set(
+      (this.db.prepare("SELECT id FROM tables WHERE deleted_at = ''").all() as Array<{ id?: string }>)
+        .map((table) => String(table.id ?? "").trim())
+        .filter(Boolean)
+    );
+    return new Set([...protectedIds].filter((tableId) => currentTableIds.has(tableId)));
+  }
+
+  private reconcileTableCategories(categories: NormalizedTableCategoryInput[], now: string) {
+    const tables = this.db
+      .prepare(`
+        SELECT id, name, area, capacity, status, is_active, sort_order
+        FROM tables
+        WHERE deleted_at = ''
+        ORDER BY sort_order ASC, name ASC
+      `)
+      .all() as Array<Record<string, unknown>>;
+    const protectedIds = this.getProtectedTableIds();
+    const remaining = [...tables];
+    const assignments = categories.map((category) => ({
+      category,
+      tables: [] as Array<Record<string, unknown>>
+    }));
+
+    const takeFromRemaining = (
+      assignment: (typeof assignments)[number],
+      predicate: (table: Record<string, unknown>) => boolean
+    ) => {
+      for (let index = 0; index < remaining.length && assignment.tables.length < assignment.category.tableCount;) {
+        if (predicate(remaining[index])) {
+          assignment.tables.push(remaining.splice(index, 1)[0]);
+        } else {
+          index += 1;
+        }
+      }
+    };
+
+    // Önce kendi kategorisindeki korumalı masaları yerinde tut.
+    for (const assignment of assignments) {
+      const sourceKey = assignment.category.sourceKey || assignment.category.nameKey;
+      takeFromRemaining(assignment, (table) =>
+        protectedIds.has(String(table.id ?? ""))
+        && tableCategoryKey(normalizeTableCategoryName(table.area)) === sourceKey
+      );
+    }
+
+    // Kaldırılan veya küçültülen kategorilerdeki aktif masalara mutlaka yeni bir yer ayır.
+    const assignFromPool = (protectedOnly: boolean) => {
+      for (const assignment of assignments) {
+        while (assignment.tables.length < assignment.category.tableCount) {
+          const candidateIndex = remaining.findIndex((table) =>
+            protectedIds.has(String(table.id ?? "")) === protectedOnly
+          );
+          if (candidateIndex < 0) {
+            break;
+          }
+          assignment.tables.push(remaining.splice(candidateIndex, 1)[0]);
+        }
+      }
+    };
+
+    assignFromPool(true);
+
+    // Korumalı masalar yerleştirildikten sonra mevcut kategori eşleşmelerini koru.
+    for (const assignment of assignments) {
+      const sourceKey = assignment.category.sourceKey || assignment.category.nameKey;
+      takeFromRemaining(assignment, (table) =>
+        !protectedIds.has(String(table.id ?? ""))
+        && tableCategoryKey(normalizeTableCategoryName(table.area)) === sourceKey
+      );
+    }
+
+    assignFromPool(false);
+    for (const assignment of assignments) {
+      assignment.tables.sort((left, right) =>
+        Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0)
+        || String(left.name ?? "").localeCompare(String(right.name ?? ""), "tr")
+      );
+    }
+
+    const updateTable = this.db.prepare(`
+      UPDATE tables
+      SET name = ?,
+          area = ?,
+          is_active = 1,
+          sort_order = ?,
+          updated_at = ?,
+          deleted_at = '',
+          sync_status = 'local_only'
+      WHERE id = ?
+    `);
+    const insertTable = this.db.prepare(`
+      INSERT INTO tables (
+        id,
+        name,
+        area,
+        capacity,
+        status,
+        notes,
+        is_active,
+        sort_order,
+        created_at,
+        updated_at,
+        sync_status
+      ) VALUES (?, ?, ?, 4, 'available', '', 1, ?, ?, ?, 'local_only')
+    `);
+    let sortOrder = 1;
+
+    for (const assignment of assignments) {
+      for (let index = 0; index < assignment.category.tableCount; index += 1) {
+        const table = assignment.tables[index];
+        const position = index + 1;
+        if (table) {
+          const nextName = reconcileTableName(table.name, table.area, assignment.category.name, position);
+          if (
+            nextName !== String(table.name ?? "")
+            || assignment.category.name !== String(table.area ?? "")
+            || sortOrder !== Number(table.sort_order ?? 0)
+            || Number(table.is_active ?? 0) !== 1
+          ) {
+            updateTable.run(
+              nextName,
+              assignment.category.name,
+              sortOrder,
+              now,
+              String(table.id ?? "")
+            );
+          }
+        } else {
+          insertTable.run(
+            createId("table_"),
+            `${assignment.category.name} ${position}`,
+            assignment.category.name,
+            sortOrder,
+            now,
+            now
+          );
+        }
+        sortOrder += 1;
+      }
+    }
+
+    const archiveTable = this.db.prepare(`
+      UPDATE tables
+      SET is_active = 0,
+          deleted_at = ?,
+          updated_at = ?,
+          sync_status = 'local_only'
+      WHERE id = ?
+    `);
+    for (const table of remaining) {
+      archiveTable.run(now, now, String(table.id ?? ""));
+    }
+  }
+
   private ensureCustomerForRequest(request: Record<string, unknown>, now: string) {
     const requestCustomerId = String(request.customer_id ?? "").trim();
     if (requestCustomerId) {
@@ -5453,8 +6361,8 @@ export class DesktopDatabase {
       return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
     }
     const role = normalizeAndroidDeviceRole(device.role);
-    if (isAndroidAdminOnlyDeletion(action.action_type) && role !== "admin") {
-      return { ok: false, message: "Kayıt silme işlemleri yalnız yönetici cihazlarda kullanılabilir." };
+    if (isAndroidAdminOnlyAction(action.action_type) && role !== "admin") {
+      return { ok: false, message: "Müşteri yönetimi ve kayıt silme işlemleri yalnız yönetici cihazlarda kullanılabilir." };
     }
     const permissions = effectiveAndroidPermissions(role, device.permissions_json);
     if (!permissions.includes(requiredPermission)) {
@@ -5464,6 +6372,12 @@ export class DesktopDatabase {
           ? "Bu cihazın hesap kapatma yetkisi yok."
           : "Bu cihazın bu işlem için yetkisi yok."
       };
+    }
+    if (
+      ["customer_room_assign", "customer_room_stay_status"].includes(action.action_type)
+      && !permissions.includes("customer.manage")
+    ) {
+      return { ok: false, message: "Bu cihazın müşteri yönetimi yetkisi yok." };
     }
     return { ok: true, message: "Telefon işlemi yetkilendirildi." };
   }
@@ -5482,8 +6396,16 @@ export class DesktopDatabase {
         return this.applyAndroidRequestConversion(action, now);
       case "customer_request_delete":
         return this.deleteRequestInTransaction(androidPayloadString(action.payload, "request_id"), now, action);
+      case "customer_create":
+        return this.applyAndroidCustomerSave(action, now, false);
+      case "customer_update":
+        return this.applyAndroidCustomerSave(action, now, true);
       case "customer_delete":
         return this.deleteCustomerInTransaction(androidPayloadString(action.payload, "customer_id"), now, action);
+      case "customer_room_assign":
+        return this.applyAndroidCustomerRoomAssignment(action, now);
+      case "customer_room_stay_status":
+        return this.applyAndroidCustomerRoomStayStatus(action, now);
       case "reservation_approve":
         return this.applyAndroidReservationStatus(action, "approved", now);
       case "reservation_reject":
@@ -5634,6 +6556,23 @@ export class DesktopDatabase {
       .get(customerId) as { full_name?: string; updated_at?: string } | undefined;
     if (!customer) {
       return { ok: false, message: "Müşteri masaüstü kayıtlarında bulunamadı." };
+    }
+    const activeStay = this.db
+      .prepare(`
+        SELECT customer_room_stays.id, rooms.name AS room_name
+        FROM customer_room_stays
+        JOIN rooms ON rooms.id = customer_room_stays.room_id
+        WHERE customer_room_stays.customer_id = ?
+          AND customer_room_stays.status IN ('planned', 'checked_in')
+          AND customer_room_stays.deleted_at = ''
+        LIMIT 1
+      `)
+      .get(customerId) as { id?: string; room_name?: string } | undefined;
+    if (activeStay) {
+      return {
+        ok: false,
+        message: `${String(activeStay.room_name ?? "Oda")} için aktif konaklama kaydı var. Önce çıkış veya iptal işlemini tamamlayın.`
+      };
     }
     const versionConflict = androidAction
       ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", customer.updated_at, "Müşteri")
@@ -5942,6 +6881,283 @@ export class DesktopDatabase {
     };
   }
 
+  private applyAndroidCustomerSave(
+    action: AndroidSyncAction,
+    now: string,
+    updating: boolean
+  ): AndroidActionMutationResult {
+    const customerId = updating
+      ? androidPayloadString(action.payload, "customer_id")
+      : createAndroidEntityId("customer_", action.id);
+    const existing = updating
+      ? this.db.prepare("SELECT id, source, created_at, updated_at FROM customers WHERE id = ? AND deleted_at = ''").get(customerId) as Record<string, unknown> | undefined
+      : undefined;
+    if (updating && !existing) {
+      return { ok: false, message: "Güncellenecek müşteri masaüstü kayıtlarında bulunamadı." };
+    }
+    const versionConflict = updating
+      ? getAndroidVersionConflict(action.payload, "expected_updated_at", existing?.updated_at, "Müşteri")
+      : null;
+    if (versionConflict) {
+      return versionConflict;
+    }
+
+    const normalized = normalizeCustomerInput({
+      id: customerId,
+      fullName: androidPayloadString(action.payload, "full_name"),
+      phone: androidPayloadString(action.payload, "phone"),
+      email: androidPayloadString(action.payload, "email"),
+      notes: androidPayloadString(action.payload, "notes"),
+      tags: androidPayloadStringArray(action.payload, "tags"),
+      identityType: androidPayloadString(action.payload, "identity_type"),
+      identityNumber: androidPayloadString(action.payload, "identity_number"),
+      nationality: androidPayloadString(action.payload, "nationality"),
+      birthDate: androidPayloadString(action.payload, "birth_date"),
+      gender: androidPayloadString(action.payload, "gender"),
+      documentSerialNumber: androidPayloadString(action.payload, "document_serial_number"),
+      documentExpiryDate: androidPayloadString(action.payload, "document_expiry_date"),
+      birthPlace: androidPayloadString(action.payload, "birth_place"),
+      motherName: androidPayloadString(action.payload, "mother_name"),
+      fatherName: androidPayloadString(action.payload, "father_name"),
+      issuingAuthority: androidPayloadString(action.payload, "issuing_authority"),
+      address: androidPayloadString(action.payload, "address")
+    });
+    if (!normalized.ok) {
+      return normalized;
+    }
+    const customer = normalized.customer;
+    const duplicateIdentity = customer.identityNumber
+      ? this.db
+          .prepare("SELECT id FROM customers WHERE identity_number = ? AND id != ? AND deleted_at = '' LIMIT 1")
+          .get(customer.identityNumber, customerId)
+      : undefined;
+    if (duplicateIdentity) {
+      return { ok: false, message: "Bu kimlik numarası başka bir müşteri kartında kayıtlı." };
+    }
+    const duplicatePhone = customer.phone
+      ? this.db
+          .prepare("SELECT id FROM customers WHERE phone = ? AND id != ? AND deleted_at = '' LIMIT 1")
+          .get(customer.phone, customerId)
+      : undefined;
+    if (duplicatePhone) {
+      return { ok: false, message: "Bu telefon numarasıyla kayıtlı bir müşteri zaten var." };
+    }
+
+    const updatedAt = nextMutationTimestamp(existing?.updated_at, now);
+    this.db
+      .prepare(`
+        INSERT INTO customers (
+          id, full_name, phone, email, source, notes, tags_json, last_contact_at,
+          identity_type, identity_number, nationality, birth_date, gender,
+          document_serial_number, document_expiry_date, birth_place, mother_name,
+          father_name, issuing_authority, address, created_at, updated_at,
+          deleted_at, sync_status
+        ) VALUES (
+          ?, ?, ?, ?, 'android', ?, ?, '',
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?,
+          '', 'local_only'
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          full_name = excluded.full_name,
+          phone = excluded.phone,
+          email = excluded.email,
+          notes = excluded.notes,
+          tags_json = excluded.tags_json,
+          identity_type = excluded.identity_type,
+          identity_number = excluded.identity_number,
+          nationality = excluded.nationality,
+          birth_date = excluded.birth_date,
+          gender = excluded.gender,
+          document_serial_number = excluded.document_serial_number,
+          document_expiry_date = excluded.document_expiry_date,
+          birth_place = excluded.birth_place,
+          mother_name = excluded.mother_name,
+          father_name = excluded.father_name,
+          issuing_authority = excluded.issuing_authority,
+          address = excluded.address,
+          updated_at = excluded.updated_at,
+          deleted_at = '',
+          sync_status = 'local_only'
+      `)
+      .run(
+        customerId,
+        customer.fullName,
+        customer.phone,
+        customer.email,
+        customer.notes,
+        JSON.stringify(customer.tags),
+        customer.identityType,
+        customer.identityNumber,
+        customer.nationality,
+        customer.birthDate,
+        customer.gender,
+        customer.documentSerialNumber,
+        customer.documentExpiryDate,
+        customer.birthPlace,
+        customer.motherName,
+        customer.fatherName,
+        customer.issuingAuthority,
+        customer.address,
+        String(existing?.created_at ?? updatedAt) || updatedAt,
+        updatedAt
+      );
+    this.insertAndroidActionEvent(
+      action,
+      updating ? "customer.updated" : "customer.created",
+      "customer",
+      customerId,
+      {
+        source: "android",
+        identity_type: customer.identityType,
+        has_identity_number: Boolean(customer.identityNumber)
+      },
+      now
+    );
+    return {
+      ok: true,
+      message: updating ? "Müşteri kartı telefondan güncellendi." : "Müşteri kartı telefondan oluşturuldu."
+    };
+  }
+
+  private applyAndroidCustomerRoomAssignment(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const customerId = androidPayloadString(action.payload, "customer_id");
+    const roomId = androidPayloadString(action.payload, "room_id");
+    const checkInDate = normalizeDateInput(androidPayloadString(action.payload, "check_in_date"));
+    const checkOutDate = normalizeDateInput(androidPayloadString(action.payload, "check_out_date"));
+    const guestCount = normalizeInteger(Number(action.payload.guest_count ?? 1));
+    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["planned", "checked_in"]);
+    const notes = normalizeLimitedText(action.payload.notes, 2000);
+    if (!customerId || !roomId || !checkInDate || !status) {
+      return { ok: false, message: "Müşteri, oda, giriş tarihi ve konaklama durumu seçilmeli." };
+    }
+    if (checkOutDate && checkOutDate < checkInDate) {
+      return { ok: false, message: "Çıkış tarihi giriş tarihinden önce olamaz." };
+    }
+    if (guestCount < 1 || guestCount > 50) {
+      return { ok: false, message: "Konaklayan kişi sayısı 1 ile 50 arasında olmalı." };
+    }
+    const customer = this.db
+      .prepare("SELECT full_name FROM customers WHERE id = ? AND deleted_at = ''")
+      .get(customerId) as { full_name?: string } | undefined;
+    const room = this.db
+      .prepare("SELECT name, capacity, status, is_active FROM rooms WHERE id = ? AND deleted_at = ''")
+      .get(roomId) as Record<string, unknown> | undefined;
+    if (!customer || !room || Number(room.is_active ?? 0) !== 1) {
+      return { ok: false, message: "Müşteri veya aktif oda masaüstü kayıtlarında bulunamadı." };
+    }
+    if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
+      return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
+    }
+    if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
+      return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
+    }
+    if (this.hasOverlappingCustomerRoomStay(roomId, checkInDate, checkOutDate)) {
+      return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
+    }
+    const reservationConflict = this.findConflictingRoomReservation(roomId, customerId, checkInDate, checkOutDate);
+    if (reservationConflict) {
+      return { ok: false, message: `Oda bu tarihlerde ${reservationConflict} rezervasyonuna bağlı.` };
+    }
+
+    const stayId = createAndroidEntityId("stay_", action.id);
+    this.db
+      .prepare(`
+        INSERT INTO customer_room_stays (
+          id, customer_id, room_id, reservation_id, status, check_in_date,
+          check_out_date, guest_count, notes, source, checked_in_at,
+          checked_out_at, created_at, updated_at, deleted_at, sync_status
+        ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, 'android', ?, '', ?, ?, '', 'local_only')
+      `)
+      .run(
+        stayId,
+        customerId,
+        roomId,
+        status,
+        checkInDate,
+        checkOutDate,
+        guestCount,
+        notes,
+        status === "checked_in" ? now : "",
+        now,
+        now
+      );
+    this.db
+      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+      .run(status === "checked_in" ? "occupied" : "reserved", now, roomId);
+    this.insertAndroidActionEvent(action, "customer.room_assigned", "customer_room_stay", stayId, {
+      customer_id: customerId,
+      room_id: roomId,
+      status,
+      check_in_date: checkInDate,
+      check_out_date: checkOutDate
+    }, now);
+    return { ok: true, message: "Müşteri telefondan odaya atandı." };
+  }
+
+  private applyAndroidCustomerRoomStayStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
+    const stayId = androidPayloadString(action.payload, "stay_id");
+    const status = normalizeStatus(
+      androidPayloadString(action.payload, "status"),
+      ["planned", "checked_in", "checked_out", "cancelled"]
+    );
+    if (!stayId || !status) {
+      return { ok: false, message: "Konaklama kaydı ve yeni durum seçilmeli." };
+    }
+    const stay = this.db
+      .prepare("SELECT * FROM customer_room_stays WHERE id = ? AND deleted_at = ''")
+      .get(stayId) as Record<string, unknown> | undefined;
+    if (!stay) {
+      return { ok: false, message: "Konaklama kaydı masaüstünde bulunamadı." };
+    }
+    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", stay.updated_at, "Konaklama");
+    if (versionConflict) {
+      return versionConflict;
+    }
+    const previousStatus = String(stay.status ?? "");
+    const allowedTransitions: Record<string, string[]> = {
+      planned: ["checked_in", "cancelled"],
+      checked_in: ["checked_out", "cancelled"],
+      cancelled: ["planned"],
+      checked_out: []
+    };
+    if (!(allowedTransitions[previousStatus] ?? []).includes(status)) {
+      return { ok: false, message: "Bu konaklama kaydı seçilen duruma geçirilemez." };
+    }
+    if (
+      ["planned", "checked_in"].includes(status)
+      && this.hasOverlappingCustomerRoomStay(
+        String(stay.room_id ?? ""),
+        String(stay.check_in_date ?? ""),
+        String(stay.check_out_date ?? ""),
+        stayId
+      )
+    ) {
+      return { ok: false, message: "Odanın aynı tarihlerde başka bir aktif müşteri kaydı var." };
+    }
+    const updatedAt = nextMutationTimestamp(stay.updated_at, now);
+    this.db
+      .prepare(`
+        UPDATE customer_room_stays
+        SET status = ?,
+            checked_in_at = CASE WHEN ? = 'checked_in' THEN ? ELSE checked_in_at END,
+            checked_out_at = CASE WHEN ? = 'checked_out' THEN ? ELSE checked_out_at END,
+            updated_at = ?,
+            sync_status = 'local_only'
+        WHERE id = ?
+      `)
+      .run(status, status, updatedAt, status, updatedAt, updatedAt, stayId);
+    this.refreshRoomStatusFromStays(String(stay.room_id ?? ""), updatedAt, status === "checked_out");
+    this.insertAndroidActionEvent(action, "customer.room_stay_status_changed", "customer_room_stay", stayId, {
+      customer_id: String(stay.customer_id ?? ""),
+      room_id: String(stay.room_id ?? ""),
+      previous_status: previousStatus,
+      status
+    }, now);
+    return { ok: true, message: "Konaklama durumu telefondan güncellendi." };
+  }
+
   private applyAndroidReservationStatus(action: AndroidSyncAction, status: "approved" | "rejected" | "cancelled", now: string): AndroidActionMutationResult {
     const reservationId = androidPayloadString(action.payload, "reservation_id");
     if (!reservationId) {
@@ -5995,6 +7211,9 @@ export class DesktopDatabase {
           .run(updatedAt, tableId, reservationId);
       }
     }
+    for (const roomId of roomIds) {
+      this.enforceActiveStayRoomStatus(roomId, updatedAt);
+    }
     this.insertAndroidActionEvent(action, "reservation.status_changed", "reservation", reservationId, {
       previous_status: String(reservation.status ?? ""),
       status,
@@ -6019,6 +7238,28 @@ export class DesktopDatabase {
     const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", room.updated_at, "Oda");
     if (versionConflict) {
       return versionConflict;
+    }
+    const activeStay = this.db
+      .prepare(`
+        SELECT status
+        FROM customer_room_stays
+        WHERE room_id = ?
+          AND status IN ('checked_in', 'planned')
+          AND deleted_at = ''
+        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END
+        LIMIT 1
+      `)
+      .get(roomId) as { status?: string } | undefined;
+    const expectedStatus = activeStay?.status === "checked_in"
+      ? "occupied"
+      : activeStay?.status === "planned"
+        ? "reserved"
+        : "";
+    if (expectedStatus && status !== expectedStatus) {
+      return {
+        ok: false,
+        message: "Odanın aktif müşteri kaydı var. Durumu konaklama kartından değiştirin."
+      };
     }
     const updatedAt = nextMutationTimestamp(room.updated_at, now);
     this.db
@@ -7128,10 +8369,112 @@ export class DesktopDatabase {
   }
 }
 
+interface NormalizedTableCategoryInput {
+  sourceName: string;
+  sourceKey: string;
+  name: string;
+  nameKey: string;
+  tableCount: number;
+}
+
+function normalizeTableCategoryInputs(
+  input: SaveTableCategoryInput[] | undefined
+):
+  | { ok: true; categories: NormalizedTableCategoryInput[] | undefined }
+  | { ok: false; message: string } {
+  if (input === undefined) {
+    return { ok: true, categories: undefined };
+  }
+  if (!Array.isArray(input)) {
+    return { ok: false, message: "Masa kategorileri geçerli bir liste olmalı." };
+  }
+  if (input.length > 30) {
+    return { ok: false, message: "En fazla 30 masa kategorisi tanımlanabilir." };
+  }
+
+  const categories: NormalizedTableCategoryInput[] = [];
+  const categoryNames = new Set<string>();
+  const sourceNames = new Set<string>();
+  let totalTableCount = 0;
+
+  for (const item of input) {
+    const name = normalizeTableCategoryLabel(item?.name);
+    const sourceName = normalizeTableCategoryLabel(item?.sourceName);
+    const tableCount = Number(item?.tableCount);
+    if (!name) {
+      return { ok: false, message: "Her masa kategorisinin bir adı olmalı." };
+    }
+    if (name.length > 50 || /[\x00-\x1F\x7F]/.test(name)) {
+      return { ok: false, message: `"${name.slice(0, 30)}" masa kategorisi adı geçersiz.` };
+    }
+    if (!Number.isInteger(tableCount) || tableCount < 1 || tableCount > 200) {
+      return { ok: false, message: `"${name}" kategorisindeki masa sayısı 1 ile 200 arasında olmalı.` };
+    }
+
+    const nameKey = tableCategoryKey(name);
+    const sourceKey = sourceName ? tableCategoryKey(sourceName) : "";
+    if (categoryNames.has(nameKey)) {
+      return { ok: false, message: `"${name}" masa kategorisi birden fazla kez kullanılamaz.` };
+    }
+    if (sourceKey && sourceNames.has(sourceKey)) {
+      return { ok: false, message: "Aynı mevcut masa kategorisi birden fazla satırda düzenlenemez." };
+    }
+
+    categoryNames.add(nameKey);
+    if (sourceKey) {
+      sourceNames.add(sourceKey);
+    }
+    totalTableCount += tableCount;
+    categories.push({ sourceName, sourceKey, name, nameKey, tableCount });
+  }
+
+  if (totalTableCount > 500) {
+    return { ok: false, message: "Toplam masa sayısı 500'ü aşamaz." };
+  }
+
+  return { ok: true, categories };
+}
+
+function normalizeTableCategoryLabel(value: unknown): string {
+  return String(value ?? "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeTableCategoryName(value: unknown): string {
+  return normalizeTableCategoryLabel(value) || "Genel";
+}
+
+function tableCategoryKey(value: string): string {
+  return value.toLocaleLowerCase("tr-TR");
+}
+
+function reconcileTableName(currentNameValue: unknown, currentAreaValue: unknown, nextArea: string, position: number): string {
+  const currentName = normalizeTableCategoryLabel(currentNameValue);
+  if (!currentName) {
+    return `${nextArea} ${position}`;
+  }
+
+  const currentArea = normalizeTableCategoryName(currentAreaValue);
+  const numberedName = /^(.*\S)\s+(\d+)$/.exec(currentName);
+  if (!numberedName) {
+    return currentName;
+  }
+
+  const prefixKey = tableCategoryKey(normalizeTableCategoryLabel(numberedName[1]));
+  const currentAreaKey = tableCategoryKey(currentArea);
+  const isGenericTableName = currentAreaKey === tableCategoryKey("Genel") && prefixKey === tableCategoryKey("Masa");
+  return prefixKey === currentAreaKey || isGenericTableName
+    ? `${nextArea} ${position}`
+    : currentName;
+}
+
 const ANDROID_PERMISSION_SET = new Set<string>(ANDROID_PERMISSIONS);
-const ANDROID_ADMIN_ONLY_DELETION_ACTIONS = new Set<string>([
+const ANDROID_ADMIN_ONLY_ACTIONS = new Set<string>([
   "customer_request_delete",
+  "customer_create",
+  "customer_update",
   "customer_delete",
+  "customer_room_assign",
+  "customer_room_stay_status",
   "menu_category_delete",
   "menu_item_delete",
   "message_delete"
@@ -7157,8 +8500,8 @@ const AI_SERVICE_DISPLAY_NAMES: Record<DesktopAiService, string> = {
 };
 const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
 
-function isAndroidAdminOnlyDeletion(actionType: unknown): boolean {
-  return ANDROID_ADMIN_ONLY_DELETION_ACTIONS.has(String(actionType ?? "").trim());
+function isAndroidAdminOnlyAction(actionType: unknown): boolean {
+  return ANDROID_ADMIN_ONLY_ACTIONS.has(String(actionType ?? "").trim());
 }
 
 function normalizeAndroidDeviceId(value: unknown): string {
@@ -7376,6 +8719,135 @@ function normalizeInteger(value: number) {
   return Number.isFinite(value) ? Math.trunc(value) : 0;
 }
 
+interface NormalizedCustomerInput {
+  fullName: string;
+  phone: string;
+  email: string;
+  notes: string;
+  tags: string[];
+  identityType: CustomerIdentityType;
+  identityNumber: string;
+  nationality: string;
+  birthDate: string;
+  gender: CustomerGender;
+  documentSerialNumber: string;
+  documentExpiryDate: string;
+  birthPlace: string;
+  motherName: string;
+  fatherName: string;
+  issuingAuthority: string;
+  address: string;
+}
+
+function normalizeCustomerInput(
+  input: SaveCustomerInput
+): { ok: true; customer: NormalizedCustomerInput } | { ok: false; message: string } {
+  const fullName = normalizeCustomerSingleLine(input?.fullName, 160);
+  if (fullName.length < 2) {
+    return { ok: false, message: "Müşteri adı en az 2 karakter olmalı." };
+  }
+
+  const rawPhone = String(input?.phone ?? "").trim();
+  const phoneResult = rawPhone ? normalizePhone(rawPhone) : null;
+  if (phoneResult && !phoneResult.ok) {
+    return { ok: false, message: phoneResult.error };
+  }
+
+  const email = normalizeCustomerSingleLine(input?.email, 254).toLowerCase();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, message: "E-posta adresi geçerli biçimde olmalı." };
+  }
+
+  const identityType = normalizeCustomerIdentityType(input?.identityType);
+  const identityNumber = normalizeIdentityNumber(input?.identityNumber, identityType);
+  if (identityNumber === null) {
+    return {
+      ok: false,
+      message: identityType === "tc_identity_card"
+        ? "T.C. kimlik numarası 11 haneli ve doğrulanabilir olmalı."
+        : "Kimlik veya pasaport numarası geçersiz."
+    };
+  }
+
+  const birthDate = normalizeOptionalIsoDate(input?.birthDate);
+  const documentExpiryDate = normalizeOptionalIsoDate(input?.documentExpiryDate);
+  if (birthDate === null || documentExpiryDate === null) {
+    return { ok: false, message: "Kimlik tarihleri geçerli gün/ay/yıl biçiminde olmalı." };
+  }
+
+  const tags = [...new Set(
+    (Array.isArray(input?.tags) ? input.tags : [])
+      .map((tag) => normalizeCustomerSingleLine(tag, 40))
+      .filter(Boolean)
+  )].slice(0, 20);
+
+  return {
+    ok: true,
+    customer: {
+      fullName,
+      phone: phoneResult?.ok ? phoneResult.e164 : "",
+      email,
+      notes: normalizeLimitedText(input?.notes, 4000),
+      tags,
+      identityType,
+      identityNumber,
+      nationality: normalizeCustomerSingleLine(input?.nationality, 80),
+      birthDate,
+      gender: normalizeCustomerGender(input?.gender),
+      documentSerialNumber: normalizeCustomerSingleLine(input?.documentSerialNumber, 80).toUpperCase(),
+      documentExpiryDate,
+      birthPlace: normalizeCustomerSingleLine(input?.birthPlace, 160),
+      motherName: normalizeCustomerSingleLine(input?.motherName, 160),
+      fatherName: normalizeCustomerSingleLine(input?.fatherName, 160),
+      issuingAuthority: normalizeCustomerSingleLine(input?.issuingAuthority, 160),
+      address: normalizeLimitedText(input?.address, 2000)
+    }
+  };
+}
+
+function normalizeCustomerIdentityType(value: unknown): CustomerIdentityType {
+  return value === "tc_identity_card" || value === "passport" || value === "other" ? value : "";
+}
+
+function normalizeCustomerGender(value: unknown): CustomerGender {
+  return value === "female" || value === "male" || value === "unspecified" ? value : "";
+}
+
+function normalizeIdentityNumber(value: unknown, identityType: CustomerIdentityType): string | null {
+  const normalized = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "");
+  if (!normalized) {
+    return "";
+  }
+  if (identityType === "tc_identity_card") {
+    return isValidTurkishIdentityNumber(normalized) ? normalized : null;
+  }
+  return /^[A-Z0-9]{4,32}$/.test(normalized) ? normalized : null;
+}
+
+function isValidTurkishIdentityNumber(value: string): boolean {
+  if (!/^[1-9]\d{10}$/.test(value)) {
+    return false;
+  }
+  const digits = [...value].map(Number);
+  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8];
+  const evenSum = digits[1] + digits[3] + digits[5] + digits[7];
+  return ((oddSum * 7 - evenSum) % 10 + 10) % 10 === digits[9]
+    && digits.slice(0, 10).reduce((total, digit) => total + digit, 0) % 10 === digits[10];
+}
+
+function normalizeOptionalIsoDate(value: unknown): string | null {
+  const normalized = String(value ?? "").trim();
+  return !normalized ? "" : isIsoDate(normalized) ? normalized : null;
+}
+
+function normalizeCustomerSingleLine(value: unknown, limit: number): string {
+  return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, limit);
+}
+
+function normalizeLimitedText(value: unknown, limit: number): string {
+  return String(value ?? "").trim().slice(0, limit);
+}
+
 function normalizePrice(value: number) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
@@ -7438,13 +8910,27 @@ function createTableOrderId(prefix: "table_order_" | "table_order_item_"): strin
   return `${prefix}${timestamp}_${randomPart}`;
 }
 
-function createAndroidEntityId(prefix: "reservation_" | "table_order_" | "table_order_item_", actionId: string): string {
+function createAndroidEntityId(
+  prefix: "customer_" | "reservation_" | "stay_" | "table_order_" | "table_order_item_",
+  actionId: string
+): string {
   const digest = createHash("sha256").update(actionId).digest("hex").slice(0, 48);
   return `${prefix}android_${digest}`;
 }
 
 function androidPayloadString(payload: Record<string, unknown>, field: string): string {
   return typeof payload[field] === "string" ? payload[field].trim() : "";
+}
+
+function androidPayloadStringArray(payload: Record<string, unknown>, field: string): string[] {
+  const value = payload[field];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeStockImageImportId(value: unknown): string {

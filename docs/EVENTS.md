@@ -110,6 +110,7 @@ Değerler:
 request
 reservation
 customer
+customer_room_stay
 room
 table
 menu
@@ -639,6 +640,40 @@ Payload:
   "changed_fields": ["phone", "notes"]
 }
 ```
+
+## customer.room_assigned
+
+Müşteri kartı masaüstünden veya yetkili Android yönetici cihazdan doğrudan bir
+odaya atandığında oluşur.
+
+```json
+{
+  "customer_id": "customer_001",
+  "room_id": "room_001",
+  "status": "planned",
+  "check_in_date": "2026-08-01",
+  "check_out_date": "2026-08-03"
+}
+```
+
+Event varlığı `customer_room_stay` kaydıdır. Müşteri ve oda ilişkisi talep veya
+rezervasyon silinse bile konaklama arşivinde korunur.
+
+## customer.room_stay_status_changed
+
+Planlanan konaklama giriş yaptı, çıkış yaptı, iptal veya yeniden planlandı
+durumlarından birine geçtiğinde oluşur.
+
+```json
+{
+  "customer_id": "customer_001",
+  "room_id": "room_001",
+  "previous_status": "checked_in",
+  "status": "checked_out"
+}
+```
+
+Girişte oda dolu, planlamada rezerve; çıkışta ise temizlik durumuna geçirilir.
 
 ## customer.contacted
 

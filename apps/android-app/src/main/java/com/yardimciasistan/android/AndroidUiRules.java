@@ -16,6 +16,7 @@ final class AndroidUiRules {
 
   static final String PENSION_RESERVATIONS = "reservations";
   static final String PENSION_ROOMS = "rooms";
+  static final String PENSION_STAYS = "stays";
   static final String PENSION_TASKS = "tasks";
 
   static final String RESTAURANT_TABLES = "tables";
@@ -37,7 +38,13 @@ final class AndroidUiRules {
     if (TAB_TODAY.equals(tab)) {
       return true;
     }
-    if (TAB_CUSTOMERS.equals(tab) || TAB_MESSAGES.equals(tab)) {
+    if (TAB_CUSTOMERS.equals(tab)) {
+      return data != null && (
+          data.hasPermission("customer.view")
+          || canManageCustomers(data)
+      );
+    }
+    if (TAB_MESSAGES.equals(tab)) {
       return data.hasPermission("customer.view");
     }
     if (TAB_PENSION.equals(tab)) {
@@ -59,6 +66,11 @@ final class AndroidUiRules {
     if (PENSION_ROOMS.equals(mode)) {
       return data.hasPermission("room.view");
     }
+    if (PENSION_STAYS.equals(mode)) {
+      return data.isAdmin()
+          && data.hasPermission("customer.manage")
+          && data.hasPermission("room.assign_customer");
+    }
     if (PENSION_TASKS.equals(mode)) {
       return data.hasPermission("daily_task.view");
     }
@@ -71,6 +83,9 @@ final class AndroidUiRules {
     }
     if (canOpenPensionMode(data, PENSION_ROOMS)) {
       return PENSION_ROOMS;
+    }
+    if (canOpenPensionMode(data, PENSION_STAYS)) {
+      return PENSION_STAYS;
     }
     if (canOpenPensionMode(data, PENSION_TASKS)) {
       return PENSION_TASKS;
@@ -100,6 +115,10 @@ final class AndroidUiRules {
 
   static boolean canDelete(OperationData data, String permission) {
     return data != null && data.isAdmin() && data.hasPermission(permission);
+  }
+
+  static boolean canManageCustomers(OperationData data) {
+    return data != null && data.isAdmin() && data.hasPermission("customer.manage");
   }
 
   static boolean isReportPreset(String preset) {
@@ -147,7 +166,7 @@ final class AndroidUiRules {
       return new Destination(TAB_CUSTOMERS, mode);
     }
     if (TAB_PENSION.equals(tab)) {
-      if (!PENSION_ROOMS.equals(mode) && !PENSION_TASKS.equals(mode)) {
+      if (!PENSION_ROOMS.equals(mode) && !PENSION_STAYS.equals(mode) && !PENSION_TASKS.equals(mode)) {
         mode = PENSION_RESERVATIONS;
       }
       return new Destination(TAB_PENSION, mode);

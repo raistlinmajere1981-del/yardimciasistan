@@ -14,6 +14,7 @@ api/
   request.php
   chat.php
   stock-image-analysis.php
+  identity-image-analysis.php
   menu.php
   sync.php
 config/
@@ -27,6 +28,7 @@ data/
 lib/
   storage.php
   stock-image-analysis.php
+  identity-image-analysis.php
 knowledge/
   firma.md
   odalar.md
@@ -126,6 +128,30 @@ loglarına yazılmaz. Endpoint yalnız yapılandırılmış AI sağlayıcısına
 görsel gönderir.
 
 Odaklı güvenlik ve sözleşme smoke testi:
+
+```bash
+npm run smoke:stock-image-analysis
+```
+
+## Kimlik Görseli Analiz Endpoint'i
+
+Masaüstü ve yönetici Android uygulamasındaki müşteri kartı formu şu endpoint'i
+kullanır:
+
+```text
+api/identity-image-analysis.php
+```
+
+Endpoint stok görseli akışıyla aynı güvenli AI ayarını, `X-YA-Sync-Secret` doğrulamasını
+ve 10 MB JPG/PNG/WebP sınırını kullanır. Android isteği için cihazın yayınlanmış profili
+aktif `admin` olmalı ve `customer.manage` iznini içermelidir. Sonuç yalnız
+yapılandırılmış kimlik alanları ve kullanıcıya gösterilecek uyarılardır.
+
+Kimlik görseli müşteri kaydına, hosting SQLite'ına, Android snapshot'ına veya loglara
+yazılmaz. Multipart geçici dosyası başarı ve hata sonunda silinir; OpenAI uyumlu
+sağlayıcılara yapılan istekte sağlayıcı tarafı kalıcı saklama kapatılır. AI sonucu
+doğrudan kaydedilmez, müşteri formuna öneri olarak aktarılır ve kullanıcı kontrol eder.
+Stok ve kimlik görseli sözleşmeleri birlikte şu testte doğrulanır:
 
 ```bash
 npm run smoke:stock-image-analysis

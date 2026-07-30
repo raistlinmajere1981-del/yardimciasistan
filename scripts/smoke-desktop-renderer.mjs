@@ -210,6 +210,18 @@ try {
   await notificationCenter.locator(".notification-item", { hasText: "Yeni müşteri talebi" }).getByRole("button", { name: /ilgili sayfaya git/ }).click();
   await expect(page.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Ayarlar" }).click();
+  const tableCategoryEditor = page.locator(".table-category-editor");
+  await expect(tableCategoryEditor.getByText("Masa kategorileri", { exact: true })).toBeVisible();
+  await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
+  await expect(tableCategoryEditor.locator(".table-category-heading > span")).toHaveText("2 masa");
+  await expect(tableCategoryEditor.locator(".table-category-row").nth(0).getByRole("textbox")).toHaveValue("Bahçe");
+  await expect(tableCategoryEditor.locator(".table-category-row").nth(1).getByRole("textbox")).toHaveValue("Salon");
+  await tableCategoryEditor.getByRole("button", { name: "Kategori Ekle" }).click();
+  await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(3);
+  await tableCategoryEditor.locator(".table-category-row").nth(2).getByRole("textbox").fill("Teras");
+  await expect(tableCategoryEditor.locator(".table-category-heading > span")).toHaveText("3 masa");
+  await tableCategoryEditor.getByRole("button", { name: "Teras satırını kaldır" }).click();
+  await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
   const androidDeviceSection = page.locator(".settings-android-devices-section");
   await expect(androidDeviceSection.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
@@ -568,6 +580,7 @@ try {
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await conversionPage.addInitScript(({ setupData, dashboardData }) => {
     let currentDashboardData = dashboardData;
+    window.__identityAnalysisCalls = [];
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -631,8 +644,21 @@ try {
               notes: input.message,
               tags: ["manuel", "talep"],
               lastContactAt: "2026-07-11T10:20:00+03:00",
+              identityType: "",
+              identityNumber: "",
+              nationality: "",
+              birthDate: "",
+              gender: "",
+              documentSerialNumber: "",
+              documentExpiryDate: "",
+              birthPlace: "",
+              motherName: "",
+              fatherName: "",
+              issuingAuthority: "",
+              address: "",
               requestCount: 1,
               reservationCount: 0,
+              stayCount: 0,
               updatedAt: "2026-07-11T10:20:00+03:00"
             }
           ]
@@ -641,6 +667,155 @@ try {
           ok: true,
           message: "Manuel talep kaydedildi.",
           savedId,
+          dashboardData: currentDashboardData
+        };
+      },
+      analyzeIdentityImage: async (input) => {
+        window.__identityAnalysisCalls.push({
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          byteLength: input.bytes.byteLength
+        });
+        return {
+          ok: true,
+          message: "Kimlik bilgileri okundu. Kaydetmeden önce kontrol edin.",
+          analysis: {
+            document_type: "passport",
+            document_side: "front",
+            confidence: "high",
+            fields: {
+              full_name: "Kimlik Smoke",
+              identity_type: "passport",
+              identity_number: "U12345678",
+              nationality: "Türkiye",
+              birth_date: "1991-04-23",
+              gender: "female",
+              document_serial_number: "PASS-7788",
+              document_expiry_date: "2031-04-23",
+              birth_place: "Muğla",
+              mother_name: "",
+              father_name: "",
+              issuing_authority: "Türkiye Cumhuriyeti",
+              address: ""
+            },
+            warnings: []
+          }
+        };
+      },
+      saveCustomer: async (input) => {
+        const savedId = input.id || "customer_manual_card_smoke_001";
+        const now = "2026-07-28T12:00:00+03:00";
+        const previous = currentDashboardData.customers.find((customer) => customer.id === savedId);
+        const savedCustomer = {
+          id: savedId,
+          fullName: input.fullName,
+          phone: input.phone,
+          email: input.email,
+          source: previous?.source || "manual",
+          notes: input.notes,
+          tags: input.tags,
+          lastContactAt: previous?.lastContactAt || now,
+          identityType: input.identityType,
+          identityNumber: input.identityNumber,
+          nationality: input.nationality,
+          birthDate: input.birthDate,
+          gender: input.gender,
+          documentSerialNumber: input.documentSerialNumber,
+          documentExpiryDate: input.documentExpiryDate,
+          birthPlace: input.birthPlace,
+          motherName: input.motherName,
+          fatherName: input.fatherName,
+          issuingAuthority: input.issuingAuthority,
+          address: input.address,
+          requestCount: previous?.requestCount || 0,
+          reservationCount: previous?.reservationCount || 0,
+          stayCount: previous?.stayCount || 0,
+          updatedAt: now
+        };
+        currentDashboardData = {
+          ...currentDashboardData,
+          customers: previous
+            ? currentDashboardData.customers.map((customer) => customer.id === savedId ? savedCustomer : customer)
+            : [savedCustomer, ...currentDashboardData.customers]
+        };
+        return {
+          ok: true,
+          message: previous ? "Müşteri kartı güncellendi." : "Müşteri kartı oluşturuldu.",
+          savedId,
+          dashboardData: currentDashboardData
+        };
+      },
+      assignCustomerToRoom: async (input) => {
+        const savedId = "customer_room_stay_smoke_001";
+        const customer = currentDashboardData.customers.find((item) => item.id === input.customerId);
+        const room = currentDashboardData.rooms.find((item) => item.id === input.roomId);
+        const now = "2026-07-28T12:10:00+03:00";
+        const stay = {
+          id: savedId,
+          customerId: customer.id,
+          customerName: customer.fullName,
+          customerPhone: customer.phone,
+          roomId: room.id,
+          roomName: room.name,
+          roomNumber: room.number,
+          reservationId: "",
+          status: input.status,
+          checkInDate: input.checkInDate,
+          checkOutDate: input.checkOutDate,
+          guestCount: input.guestCount,
+          notes: input.notes,
+          source: "desktop_manual",
+          checkedInAt: input.status === "checked_in" ? now : "",
+          checkedOutAt: "",
+          createdAt: now,
+          updatedAt: now
+        };
+        currentDashboardData = {
+          ...currentDashboardData,
+          customerRoomStays: [stay, ...currentDashboardData.customerRoomStays],
+          customers: currentDashboardData.customers.map((item) => item.id === customer.id
+            ? { ...item, stayCount: item.stayCount + 1, updatedAt: now }
+            : item),
+          rooms: currentDashboardData.rooms.map((item) => item.id === room.id
+            ? { ...item, status: input.status === "checked_in" ? "occupied" : "reserved", updatedAt: now }
+            : item)
+        };
+        return {
+          ok: true,
+          message: "Müşteri oda kaydı oluşturuldu.",
+          savedId,
+          dashboardData: currentDashboardData
+        };
+      },
+      updateCustomerRoomStayStatus: async ({ stayId, status }) => {
+        const stay = currentDashboardData.customerRoomStays.find((item) => item.id === stayId);
+        const now = "2026-07-28T12:20:00+03:00";
+        const roomStatus = status === "checked_in"
+          ? "occupied"
+          : status === "planned"
+            ? "reserved"
+            : status === "checked_out"
+              ? "cleaning"
+              : "available";
+        currentDashboardData = {
+          ...currentDashboardData,
+          customerRoomStays: currentDashboardData.customerRoomStays.map((item) => item.id === stayId
+            ? {
+                ...item,
+                status,
+                checkedInAt: status === "checked_in" ? (item.checkedInAt || now) : item.checkedInAt,
+                checkedOutAt: status === "checked_out" ? now : "",
+                updatedAt: now
+              }
+            : item),
+          rooms: currentDashboardData.rooms.map((room) => room.id === stay.roomId
+            ? { ...room, status: roomStatus, updatedAt: now }
+            : room)
+        };
+        return {
+          ok: true,
+          message: "Konaklama durumu güncellendi.",
+          savedId: stayId,
           dashboardData: currentDashboardData
         };
       },
@@ -900,6 +1075,46 @@ try {
   await expect(conversionPage.getByText("Rezervasyon durumu güncellendi.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Filtreyi Temizle" }).click();
   await expect(conversionPage.getByRole("button", { name: "WhatsApp", exact: true }).first()).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
+  await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
+  await conversionPage.getByRole("button", { name: "Yeni Müşteri" }).click();
+  const customerEditor = conversionPage.getByRole("dialog", { name: "Yeni müşteri ekle" });
+  await expect(customerEditor).toBeVisible();
+  await customerEditor.locator('input[type="file"]').setInputFiles({
+    name: "smoke-identity.png",
+    mimeType: "image/png",
+    buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+  });
+  await expect(customerEditor.getByLabel("Ad soyad")).toHaveValue("Kimlik Smoke");
+  await expect(customerEditor.getByLabel("Kimlik / pasaport no")).toHaveValue("U12345678");
+  await expect(customerEditor.getByLabel("Doğum tarihi")).toHaveValue("1991-04-23");
+  await customerEditor.getByLabel("Telefon").fill("+905551112244");
+  await customerEditor.getByLabel("Not", { exact: true }).fill("Resepsiyondan manuel oluşturulan müşteri kartı.");
+  await customerEditor.getByRole("button", { name: "Müşteri Kartını Kaydet" }).click();
+  await expect(customerEditor).toHaveCount(0);
+  await expect(conversionPage.getByRole("heading", { name: "Kimlik Smoke" })).toBeVisible();
+  await expect(conversionPage.getByText("U12345678", { exact: true })).toBeVisible();
+  await expect.poll(() => conversionPage.evaluate(() => window.__identityAnalysisCalls.length)).toBe(1);
+
+  await conversionPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
+  const assignableRoomCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Aile Odası" });
+  await assignableRoomCard.getByRole("button", { name: "Müşteri Ata" }).click();
+  const assignmentDrawer = conversionPage.getByRole("dialog", { name: "Odaya müşteri ata" });
+  await assignmentDrawer.getByLabel("Müşteri").selectOption("customer_manual_card_smoke_001");
+  await assignmentDrawer.getByLabel("Giriş tarihi").fill("2026-08-01");
+  await assignmentDrawer.getByLabel("Çıkış tarihi").fill("2026-08-03");
+  await assignmentDrawer.getByLabel("Kişi sayısı").fill("2");
+  await assignmentDrawer.getByLabel("Konaklama notu").fill("Manuel resepsiyon ataması.");
+  await assignmentDrawer.getByRole("button", { name: "Odaya Ata" }).click();
+  await expect(assignmentDrawer).toHaveCount(0);
+  const staysWorkspace = conversionPage.getByLabel("Konaklama arşivi");
+  await expect(staysWorkspace.getByText("Kimlik Smoke · Oda 102")).toBeVisible();
+  await staysWorkspace.getByRole("button", { name: "Giriş Yap" }).click();
+  await expect(staysWorkspace.locator(".status-badge", { hasText: "Giriş yaptı" })).toBeVisible();
+  await staysWorkspace.getByRole("button", { name: "Çıkış Yap" }).click();
+  await staysWorkspace.getByLabel("Durum").selectOption("all");
+  await expect(staysWorkspace.locator(".status-badge", { hasText: "Çıkış yaptı" })).toBeVisible();
+  await expect(assignableRoomCard.locator(".status-badge")).toHaveText("Temizlik");
 
   const compactPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   await compactPage.addInitScript(({ setupData, dashboardData }) => {
@@ -1204,7 +1419,7 @@ try {
   await expect(reservationRows.first().getByRole("button", { name: "İptal Et" })).toBeVisible();
   await reservationRows.first().locator("summary").click();
   const roomCardHeights = await compactPage.locator(".resource-compact-card").evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
-  expect(roomCardHeights.every((height) => height >= 92 && height <= 120)).toBe(true);
+  expect(roomCardHeights.every((height) => height >= 140 && height <= 155)).toBe(true);
   const compactRoomCards = compactPage.getByLabel("Oda yönetimi").locator(".resource-compact-card");
   await expect(compactRoomCards.first().locator(".compact-status-actions .is-active")).toHaveCount(0);
   await expect(compactRoomCards.first().getByRole("button", { name: "Boş", exact: true })).toHaveAttribute("aria-pressed", "false");
@@ -1218,10 +1433,11 @@ try {
   expect(pensionTaskHeights.every((height) => height >= 56 && height <= 76)).toBe(true);
   const firstPensionTask = await pensionTaskRows.first().boundingBox();
   expect(firstPensionTask).not.toBeNull();
-  const [pensionSummaryBox, reservationsPanelBox, roomsPanelBox, pensionTasksPanelBox, reservationFiltersBox, roomGridBox, pensionTaskFiltersBox] = await Promise.all([
+  const [pensionSummaryBox, reservationsPanelBox, roomsPanelBox, pensionStaysPanelBox, pensionTasksPanelBox, reservationFiltersBox, roomGridBox, pensionTaskFiltersBox] = await Promise.all([
     compactPage.locator(".pension-summary-panel").boundingBox(),
     compactPage.locator(".pension-reservations-section").boundingBox(),
     compactPage.locator(".pension-rooms-section").boundingBox(),
+    compactPage.locator(".pension-stays-section").boundingBox(),
     compactPage.locator(".pension-tasks-section").boundingBox(),
     compactPage.locator(".pension-reservations-section .reservation-filters").boundingBox(),
     compactPage.locator(".pension-rooms-section .compact-resource-grid").boundingBox(),
@@ -1230,6 +1446,7 @@ try {
   expect(pensionSummaryBox).not.toBeNull();
   expect(reservationsPanelBox).not.toBeNull();
   expect(roomsPanelBox).not.toBeNull();
+  expect(pensionStaysPanelBox).not.toBeNull();
   expect(pensionTasksPanelBox).not.toBeNull();
   expect(reservationFiltersBox).not.toBeNull();
   expect(roomGridBox).not.toBeNull();
@@ -1237,7 +1454,10 @@ try {
   expect(Math.abs(reservationsPanelBox.y - roomsPanelBox.y)).toBeLessThanOrEqual(1);
   expect(reservationsPanelBox.width).toBeGreaterThan(roomsPanelBox.width);
   expect(roomsPanelBox.x).toBeGreaterThan(reservationsPanelBox.x + reservationsPanelBox.width);
-  expect(pensionTasksPanelBox.y).toBeGreaterThanOrEqual(reservationsPanelBox.y + reservationsPanelBox.height + 10);
+  expect(pensionStaysPanelBox.y).toBeGreaterThanOrEqual(reservationsPanelBox.y + reservationsPanelBox.height + 10);
+  expect(Math.abs(pensionStaysPanelBox.x - reservationsPanelBox.x)).toBeLessThanOrEqual(1);
+  expect(pensionStaysPanelBox.width).toBeGreaterThan(reservationsPanelBox.width);
+  expect(pensionTasksPanelBox.y).toBeGreaterThanOrEqual(pensionStaysPanelBox.y + pensionStaysPanelBox.height + 10);
   expect(Math.abs(pensionTasksPanelBox.x - reservationsPanelBox.x)).toBeLessThanOrEqual(1);
   expect(pensionTasksPanelBox.width).toBeGreaterThan(reservationsPanelBox.width);
   expect(reservationFiltersBox.x).toBeGreaterThanOrEqual(reservationsPanelBox.x);
@@ -1246,7 +1466,7 @@ try {
   expect(roomGridBox.x + roomGridBox.width).toBeLessThanOrEqual(roomsPanelBox.x + roomsPanelBox.width);
   expect(pensionTaskFiltersBox.x).toBeGreaterThanOrEqual(pensionTasksPanelBox.x);
   expect(pensionTaskFiltersBox.x + pensionTaskFiltersBox.width).toBeLessThanOrEqual(pensionTasksPanelBox.x + pensionTasksPanelBox.width);
-  expect(pensionTasksPanelBox.y).toBeLessThan(768);
+  expect(pensionStaysPanelBox.y).toBeLessThan(768);
   expect(await compactPage.locator(".pension-reservations-section").evaluate((panel) => getComputedStyle(panel).borderTopWidth)).toBe("1px");
   await compactPage.waitForTimeout(50);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-pension-1366x768.png" });
@@ -1276,9 +1496,16 @@ try {
   expect(new Set(compactTableBoxes.map((box) => Math.round(box.x))).size).toBe(2);
   expect(compactTableBoxes.every((box) => box.y + box.height <= 768)).toBe(true);
   await expect(compactTableCards.first().locator(".compact-status-actions button")).toHaveCount(4);
-  for (const [index, label] of ["Boş", "Dolu", "Rezerve", "Hesap"].entries()) {
-    await expect(compactTableCards.nth(index).getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-pressed", "true");
-    await expect(compactTableCards.nth(index).locator(".compact-status-actions .is-active")).toHaveCount(1);
+  await expect(compactPage.locator(".table-area-heading h3")).toHaveText(["Bahçe", "Salon"]);
+  for (const [tableName, label] of [
+    ["Bahçe Masası 1", "Boş"],
+    ["Salon Masası 2", "Dolu"],
+    ["Bahçe Masası 3", "Rezerve"],
+    ["Salon Masası 4", "Hesap"]
+  ]) {
+    const tableCard = compactTableCards.filter({ hasText: tableName });
+    await expect(tableCard.getByRole("button", { name: label, exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect(tableCard.locator(".compact-status-actions .is-active")).toHaveCount(1);
   }
   await expect(compactPage.locator(".task-record-row").first().locator(".compact-action-bar > button")).toHaveCount(1);
   await compactPage.locator(".task-record-row").first().locator("summary").click();
@@ -1288,7 +1515,7 @@ try {
     compactPage.locator(".restaurant-summary-panel").boundingBox(),
     compactPage.locator(".restaurant-tables-section").boundingBox(),
     compactPage.locator(".restaurant-tasks-section").boundingBox(),
-    compactPage.locator(".restaurant-tables-section .compact-resource-grid").boundingBox(),
+    compactPage.locator(".restaurant-tables-section .table-area-list").boundingBox(),
     compactPage.locator(".restaurant-tasks-section .task-filters").boundingBox()
   ]);
   expect(restaurantSummaryBox).not.toBeNull();
@@ -1309,9 +1536,10 @@ try {
   await expect(compactPage.getByRole("heading", { name: "Servis İşleri" })).toBeVisible();
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-restaurant-1366x768.png" });
 
-  const firstOrderCard = compactPage.getByLabel("Masa yönetimi").locator(".table-compact-card").nth(0);
-  const secondOrderCard = compactPage.getByLabel("Masa yönetimi").locator(".table-compact-card").nth(1);
-  const reservedOrderCard = compactPage.getByLabel("Masa yönetimi").locator(".table-compact-card").nth(2);
+  const tableManagement = compactPage.getByLabel("Masa yönetimi");
+  const firstOrderCard = tableManagement.locator(".table-compact-card").filter({ hasText: "Bahçe Masası 1" });
+  const secondOrderCard = tableManagement.locator(".table-compact-card").filter({ hasText: "Salon Masası 2" });
+  const reservedOrderCard = tableManagement.locator(".table-compact-card").filter({ hasText: "Bahçe Masası 3" });
   await firstOrderCard.getByRole("button", { name: "Sipariş Aç", exact: true }).click();
   const firstOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Bahçe Masası 1" });
   await expect(firstOrderDrawer).toBeVisible();
@@ -1514,7 +1742,7 @@ try {
   }));
   expect(basicSettingsBoxes).toHaveLength(6);
   expect(new Set(basicSettingsBoxes.map((box) => Math.round(box.x))).size).toBe(2);
-  expect(basicSettingsBoxes.slice(0, 5).every((box) => box.y + box.height <= 768)).toBe(true);
+  expect(basicSettingsBoxes.slice(0, 5).every((box) => box.y < 768)).toBe(true);
   await expect(compactPage.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
   await compactPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
@@ -1990,7 +2218,11 @@ function createSetupFixture() {
     initialCounts: {
       rooms: 2,
       tables: 2
-    }
+    },
+    tableCategories: [
+      { name: "Bahçe", tableCount: 1 },
+      { name: "Salon", tableCount: 1 }
+    ]
   };
 }
 
@@ -2110,11 +2342,25 @@ function createDashboardFixture() {
         notes: "Balkonlu oda için bilgi almak istiyor.",
         tags: ["smoke", "pansiyon"],
         lastContactAt: "2026-07-11T10:15:00+03:00",
+        identityType: "",
+        identityNumber: "",
+        nationality: "",
+        birthDate: "",
+        gender: "",
+        documentSerialNumber: "",
+        documentExpiryDate: "",
+        birthPlace: "",
+        motherName: "",
+        fatherName: "",
+        issuingAuthority: "",
+        address: "",
         requestCount: 1,
         reservationCount: 1,
+        stayCount: 0,
         updatedAt: "2026-07-11T10:15:00+03:00"
       }
     ],
+    customerRoomStays: [],
     androidDevices: [
       {
         id: "android_device_smoke_001",

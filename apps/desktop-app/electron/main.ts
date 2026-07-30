@@ -9,7 +9,7 @@ import {
   verifyGoogleAiStudioVisionModel
 } from "@yardimci-asistan/ai-core";
 import type { AIProviderName } from "@yardimci-asistan/ai-core";
-import type { StockImageAnalysis, StockImageApplyLine } from "@yardimci-asistan/shared";
+import type { IdentityImageAnalysis, StockImageAnalysis, StockImageApplyLine } from "@yardimci-asistan/shared";
 import {
   markAndroidActionResult,
   markRequestsSynced,
@@ -67,6 +67,12 @@ import {
   type DesktopStockImageAnalyzeResult,
   type ApplyStockImageImportInput,
   type DesktopStockImageApplyResult,
+  type SaveCustomerInput,
+  type AssignCustomerRoomInput,
+  type UpdateCustomerRoomStayStatusInput,
+  type DesktopCustomerMutationResult,
+  type DesktopIdentityImageAnalyzeInput,
+  type DesktopIdentityImageAnalyzeResult,
   type DesktopReportQueryResult,
   type GenerateDesktopReportAiInput,
   type GenerateDesktopReportAiResult
@@ -781,6 +787,26 @@ function registerIpcHandlers() {
     return finalizeDesktopRecordDeletion(getDatabase().deleteCustomer(String(customerId ?? "")));
   });
 
+  ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
+    return finalizeDesktopCustomerMutation(getDatabase().saveCustomer(input));
+  });
+
+  ipcMain.handle("customer:assignRoom", (_event, input: AssignCustomerRoomInput): DesktopCustomerMutationResult => {
+    return finalizeDesktopCustomerMutation(getDatabase().assignCustomerToRoom(input));
+  });
+
+  ipcMain.handle(
+    "customer:updateRoomStayStatus",
+    (_event, input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult => {
+      return finalizeDesktopCustomerMutation(getDatabase().updateCustomerRoomStayStatus(input));
+    }
+  );
+
+  ipcMain.handle(
+    "customer:analyzeIdentityImage",
+    async (_event, value: unknown): Promise<DesktopIdentityImageAnalyzeResult> => analyzeDesktopIdentityImage(value)
+  );
+
   ipcMain.handle("whatsapp:markMessageSent", (_event, input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult => {
     return getDatabase().markWhatsAppMessageSent(input);
   });
@@ -1202,6 +1228,90 @@ async function analyzeDesktopStockImage(value: unknown): Promise<DesktopStockIma
   }
 }
 
+async function analyzeDesktopIdentityImage(value: unknown): Promise<DesktopIdentityImageAnalyzeResult> {
+  const input = parseDesktopIdentityImageAnalyzeInput(value);
+  if (!input) {
+    return { ok: false, code: "invalid_image", message: "Kimlik görseli okunamadı." };
+  }
+  if (input.bytes.byteLength > STOCK_IMAGE_MAX_BYTES) {
+    return { ok: false, code: "image_too_large", message: "Kimlik görseli çok büyük." };
+  }
+  const bytes = new Uint8Array(input.bytes);
+  const detectedMime = detectStockImageMime(bytes);
+  if (!detectedMime || detectedMime !== input.mimeType) {
+    return { ok: false, code: "unsupported_image_type", message: "Desteklenmeyen kimlik görseli türü." };
+  }
+
+  const setup = getDatabase().getSetupData();
+  const endpoint = createIdentityImageAnalysisUrl(setup.webModuleUrl);
+  if (!endpoint || !setup.syncSecret.trim()) {
+    return {
+      ok: false,
+      code: "connection_incomplete",
+      message: "Kimlik analizi için web modülü bağlantısını ayarlayın."
+    };
+  }
+
+  const imageHash = createHash("sha256").update(bytes).digest("hex");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(30_000, setup.aiTimeoutSeconds * 1000 + 10_000));
+  try {
+    const form = new FormData();
+    form.append("source", "desktop");
+    form.append("image_hash", imageHash);
+    form.append("image", new Blob([input.bytes], { type: input.mimeType }), input.fileName);
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "X-YA-Sync-Secret": setup.syncSecret
+      },
+      body: form,
+      redirect: "error",
+      signal: controller.signal
+    });
+    const payload = toUnknownRecord(await response.json().catch(() => null));
+    if (!response.ok || payload?.ok !== true) {
+      return {
+        ok: false,
+        code: typeof payload?.code === "string" ? payload.code : "analysis_failed",
+        message: identityImageEndpointErrorMessage(response.status, payload)
+      };
+    }
+    if (String(payload.image_hash ?? "").toLowerCase() !== imageHash) {
+      return {
+        ok: false,
+        code: "invalid_analysis_response",
+        message: "Kimlik analiz cevabı güvenli biçimde doğrulanamadı."
+      };
+    }
+    const analysis = sanitizeIdentityImageAnalysis(payload.analysis);
+    if (!analysis) {
+      return {
+        ok: false,
+        code: "invalid_analysis_response",
+        message: "Kimlik analiz cevabı geçersiz."
+      };
+    }
+    return {
+      ok: true,
+      message: typeof payload.message === "string" && payload.message.trim()
+        ? payload.message.trim().slice(0, 500)
+        : "Kimlik alanları okundu. Kaydetmeden önce bilgileri kontrol edin.",
+      analysis
+    };
+  } catch {
+    return {
+      ok: false,
+      code: controller.signal.aborted ? "analysis_timeout" : "analysis_connection_failed",
+      message: controller.signal.aborted
+        ? "Kimlik görseli analizi zaman aşımına uğradı."
+        : "Kimlik görseli analiz hizmetine ulaşılamadı."
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function parseDesktopStockImageAnalyzeInput(value: unknown): DesktopStockImageAnalyzeInput | null {
   const record = toUnknownRecord(value);
   const importId = normalizeStockImageImportId(record?.importId);
@@ -1212,6 +1322,75 @@ function parseDesktopStockImageAnalyzeInput(value: unknown): DesktopStockImageAn
     return null;
   }
   return { importId, fileName, mimeType, bytes };
+}
+
+function parseDesktopIdentityImageAnalyzeInput(value: unknown): DesktopIdentityImageAnalyzeInput | null {
+  const record = toUnknownRecord(value);
+  const fileName = typeof record?.fileName === "string" ? record.fileName.trim().slice(0, 255) : "";
+  const mimeType = typeof record?.mimeType === "string" ? record.mimeType.trim().toLowerCase() : "";
+  const bytes = record?.bytes;
+  if (!fileName || !["image/jpeg", "image/png", "image/webp"].includes(mimeType) || !(bytes instanceof ArrayBuffer)) {
+    return null;
+  }
+  return { fileName, mimeType, bytes };
+}
+
+function sanitizeIdentityImageAnalysis(value: unknown): IdentityImageAnalysis | null {
+  const source = toUnknownRecord(value);
+  const fields = toUnknownRecord(source?.fields);
+  if (!source || !fields) {
+    return null;
+  }
+  const identityType = normalizeIdentityAnalysisType(fields.identity_type ?? source.document_type);
+  const gender = fields.gender === "female" || fields.gender === "male" || fields.gender === "unspecified"
+    ? fields.gender
+    : "";
+  const documentSide = source.document_side === "front" || source.document_side === "back"
+    ? source.document_side
+    : "unknown";
+  const confidence = source.confidence === "high" || source.confidence === "medium" ? source.confidence : "low";
+  const text = (field: string, limit: number) =>
+    typeof fields[field] === "string" ? fields[field].trim().slice(0, limit) : "";
+  const warnings = Array.isArray(source.warnings)
+    ? source.warnings
+        .filter((warning): warning is string => typeof warning === "string")
+        .map((warning) => warning.trim().slice(0, 300))
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
+  return {
+    document_type: identityType,
+    document_side: documentSide,
+    confidence,
+    fields: {
+      full_name: text("full_name", 160),
+      identity_type: identityType,
+      identity_number: text("identity_number", 32).toUpperCase().replace(/[\s-]+/g, ""),
+      nationality: text("nationality", 80),
+      birth_date: normalizeIdentityAnalysisDate(text("birth_date", 20)),
+      gender,
+      document_serial_number: text("document_serial_number", 80).toUpperCase(),
+      document_expiry_date: normalizeIdentityAnalysisDate(text("document_expiry_date", 20)),
+      birth_place: text("birth_place", 160),
+      mother_name: text("mother_name", 160),
+      father_name: text("father_name", 160),
+      issuing_authority: text("issuing_authority", 160),
+      address: text("address", 2000)
+    },
+    warnings
+  };
+}
+
+function normalizeIdentityAnalysisType(value: unknown): IdentityImageAnalysis["document_type"] {
+  return value === "tc_identity_card" || value === "passport" || value === "other" ? value : "";
+}
+
+function normalizeIdentityAnalysisDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "";
+  }
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? "" : value;
 }
 
 function parseStockImageApplyInput(value: unknown): ApplyStockImageImportInput | null {
@@ -1268,6 +1447,23 @@ function createStockImageAnalysisUrl(baseUrl: string): string {
   }
 }
 
+function createIdentityImageAnalysisUrl(baseUrl: string): string {
+  try {
+    const parsed = new URL(baseUrl.trim());
+    if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) {
+      return "";
+    }
+    parsed.search = "";
+    parsed.hash = "";
+    parsed.pathname = parsed.pathname
+      .replace(/\/(?:api\/)?sync\.php\/?$/i, "")
+      .replace(/\/+$/, "") + "/api/identity-image-analysis.php";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
 function stockImageEndpointErrorMessage(status: number, payload: Record<string, unknown> | null): string {
   const provided = typeof payload?.message === "string" ? payload.message.trim() : "";
   if (provided) {
@@ -1288,6 +1484,26 @@ function stockImageEndpointErrorMessage(status: number, payload: Record<string, 
   return "Görsel analiz edilemedi.";
 }
 
+function identityImageEndpointErrorMessage(status: number, payload: Record<string, unknown> | null): string {
+  const provided = typeof payload?.message === "string" ? payload.message.trim() : "";
+  if (provided) {
+    return provided.slice(0, 500);
+  }
+  if (status === 401 || status === 403) {
+    return "Kimlik görseli analizi için yetki alınamadı.";
+  }
+  if (status === 413) {
+    return "Kimlik görseli çok büyük.";
+  }
+  if (status === 415) {
+    return "Desteklenmeyen kimlik görseli türü.";
+  }
+  if (status === 404) {
+    return "Web modülü kimlik görseli analizini desteklemiyor. Hosting paketini güncelleyin.";
+  }
+  return "Kimlik görseli analiz edilemedi.";
+}
+
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
   if (result.ok) {
     androidSnapshotPublishPending = true;
@@ -1298,6 +1514,15 @@ function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResul
 }
 
 function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
+  if (result.ok) {
+    androidSnapshotPublishPending = true;
+    notifyDesktopDashboardChanged(result.dashboardData);
+    getSyncCoordinator().scheduleSoon();
+  }
+  return result;
+}
+
+function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult): DesktopCustomerMutationResult {
   if (result.ok) {
     androidSnapshotPublishPending = true;
     notifyDesktopDashboardChanged(result.dashboardData);
@@ -1633,9 +1858,42 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
       email: customer.email,
       notes: customer.notes,
       tags: customer.tags,
+      identity_type: customer.identityType,
+      identity_number: customer.identityNumber,
+      nationality: customer.nationality,
+      birth_date: customer.birthDate,
+      gender: customer.gender,
+      document_serial_number: customer.documentSerialNumber,
+      document_expiry_date: customer.documentExpiryDate,
+      birth_place: customer.birthPlace,
+      mother_name: customer.motherName,
+      father_name: customer.fatherName,
+      issuing_authority: customer.issuingAuthority,
+      address: customer.address,
       request_count: customer.requestCount,
       reservation_count: customer.reservationCount,
+      stay_count: customer.stayCount,
       updated_at: customer.updatedAt
+    })),
+    customer_room_stays: dashboardData.customerRoomStays.slice(0, 500).map((stay) => ({
+      id: stay.id,
+      customer_id: stay.customerId,
+      customer_name: stay.customerName,
+      customer_phone: stay.customerPhone,
+      room_id: stay.roomId,
+      room_name: stay.roomName,
+      room_number: stay.roomNumber,
+      reservation_id: stay.reservationId,
+      status: stay.status,
+      check_in_date: stay.checkInDate,
+      check_out_date: stay.checkOutDate,
+      guest_count: stay.guestCount,
+      notes: stay.notes,
+      source: stay.source,
+      checked_in_at: stay.checkedInAt,
+      checked_out_at: stay.checkedOutAt,
+      created_at: stay.createdAt,
+      updated_at: stay.updatedAt
     })),
     reservations: dashboardData.reservations.slice(0, 300).map((reservation) => ({
       id: reservation.id,

@@ -199,6 +199,89 @@ final class HostingSyncClient {
     }
   }
 
+  IdentityImageAnalysisResult analyzeIdentityImage(
+      String baseUrl,
+      String syncSecret,
+      DeviceIdentity identity,
+      StockImageFile.PreparedImage image
+  ) throws SyncException {
+    HttpURLConnection connection = null;
+    String boundary = "----YardimciAsistanIdentityImage" + System.currentTimeMillis();
+    try {
+      URL endpoint = new URL(toIdentityImageAnalysisEndpoint(baseUrl));
+      connection = (HttpURLConnection) endpoint.openConnection();
+      connection.setRequestMethod("POST");
+      connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+      connection.setReadTimeout(90_000);
+      connection.setDoOutput(true);
+      connection.setChunkedStreamingMode(16 * 1024);
+      connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+      connection.setRequestProperty("Accept", "application/json");
+      connection.setRequestProperty("X-YA-Sync-Secret", syncSecret);
+
+      try (DataOutputStream output = new DataOutputStream(connection.getOutputStream())) {
+        writeMultipartField(output, boundary, "source", "android");
+        writeMultipartField(output, boundary, "device_id", identity.deviceId);
+        writeMultipartField(output, boundary, "image_hash", image.imageHash);
+        output.writeBytes("--" + boundary + "\r\n");
+        output.writeBytes("Content-Disposition: form-data; name=\"image\"; filename=\"identity-document.jpg\"\r\n");
+        output.writeBytes("Content-Type: " + image.mimeType + "\r\n\r\n");
+        byte[] buffer = new byte[16 * 1024];
+        try (FileInputStream input = new FileInputStream(image.file)) {
+          int read;
+          while ((read = input.read(buffer)) != -1) {
+            output.write(buffer, 0, read);
+          }
+        }
+        output.writeBytes("\r\n--" + boundary + "--\r\n");
+        output.flush();
+      }
+
+      int status = connection.getResponseCode();
+      InputStream stream = status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream();
+      String responseText = readAll(stream);
+      JSONObject response;
+      try {
+        response = new JSONObject(responseText);
+      } catch (Exception error) {
+        throw new SyncException(status == 404
+            ? "Web modülü kimlik görseli analizini desteklemiyor. Hosting paketini güncelleyin."
+            : "Kimlik görseli analiz hizmeti geçerli bir yanıt vermedi.", error);
+      }
+      if (status == 401) {
+        throw new SyncException("Güvenlik anahtarı hatalı. Ayarlar ekranından kontrol edin.");
+      }
+      if (status == 403) {
+        throw new SyncException("Kimlik görseli analizi yalnız aktif yönetici cihazlarda kullanılabilir.");
+      }
+      if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
+        String message = response.optString("message", "").trim();
+        throw new SyncException(message.isEmpty() ? "Kimlik görseli analiz edilemedi." : message);
+      }
+      JSONObject analysis = response.optJSONObject("analysis");
+      String responseHash = response.optString("image_hash", "").trim().toLowerCase(java.util.Locale.US);
+      if (analysis == null || !image.imageHash.equals(responseHash)) {
+        throw new SyncException("Kimlik görseli analiz cevabı doğrulanamadı.");
+      }
+      return new IdentityImageAnalysisResult(
+          response.optString("message", "Kimlik alanları okundu. Bilgileri kontrol edin."),
+          analysis
+      );
+    } catch (SyncException error) {
+      throw error;
+    } catch (java.net.SocketTimeoutException error) {
+      throw new SyncException("Kimlik görseli analizi zaman aşımına uğradı.", error);
+    } catch (java.net.UnknownHostException error) {
+      throw new SyncException("Kimlik görseli analiz hizmetine ulaşılamadı. İnternet bağlantısını kontrol edin.", error);
+    } catch (Exception error) {
+      throw new SyncException("Kimlik görseli analiz hizmetine bağlanılamadı.", error);
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
+  }
+
   private JSONObject post(String baseUrl, String syncSecret, JSONObject payload) throws SyncException {
     return postJson(
         toSyncEndpoint(baseUrl),
@@ -290,6 +373,15 @@ final class HostingSyncClient {
     return normalized + "/api/stock-image-analysis.php";
   }
 
+  static String toIdentityImageAnalysisEndpoint(String baseUrl) {
+    String normalized = baseUrl == null ? "" : baseUrl.trim();
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    normalized = normalized.replaceFirst("/(?:api/)?sync\\.php$", "");
+    return normalized + "/api/identity-image-analysis.php";
+  }
+
   static String toChatEndpoint(String baseUrl) {
     String normalized = baseUrl == null ? "" : baseUrl.trim();
     while (normalized.endsWith("/")) {
@@ -359,6 +451,16 @@ final class HostingSyncClient {
     StockImageAnalysisResult(String importId, String imageHash, String message, JSONObject analysis) {
       this.importId = importId;
       this.imageHash = imageHash;
+      this.message = message;
+      this.analysis = analysis;
+    }
+  }
+
+  static final class IdentityImageAnalysisResult {
+    final String message;
+    final JSONObject analysis;
+
+    IdentityImageAnalysisResult(String message, JSONObject analysis) {
       this.message = message;
       this.analysis = analysis;
     }

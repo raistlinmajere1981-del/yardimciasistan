@@ -225,6 +225,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         : [];
     $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin'
         && ya_sync_bool($permissionProfile['is_active'] ?? false);
+    $customerManagementAllowed = $reportsAllowed
+        && in_array('customer.manage', is_array($permissionProfile['permissions'] ?? null) ? $permissionProfile['permissions'] : [], true);
     ya_sync_update_state([
         'last_android_summary_at' => $now
     ]);
@@ -251,7 +253,8 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'operations' => $androidSnapshot['summary'],
         'daily_tasks' => $androidSnapshot['daily_tasks'],
         'requests' => $visibleRequests,
-        'customers' => $androidSnapshot['customers'],
+        'customers' => $customerManagementAllowed ? $androidSnapshot['customers'] : [],
+        'customer_room_stays' => $customerManagementAllowed ? $androidSnapshot['customer_room_stays'] : [],
         'reservations' => $androidSnapshot['reservations'],
         'rooms' => $androidSnapshot['rooms'],
         'tables' => $androidSnapshot['tables'],
@@ -427,6 +430,30 @@ function ya_sync_enqueue_android_action(array $payload): void
             'ok' => false,
             'message' => 'İşlem bilgileri eksik.'
         ]);
+    }
+
+    $managementPermission = ya_sync_android_management_action_permission($actionType);
+    if ($managementPermission !== '') {
+        $snapshot = ya_sync_load_android_snapshot();
+        $profile = is_array($snapshot['androidPermissions'][$deviceId] ?? null)
+            ? $snapshot['androidPermissions'][$deviceId]
+            : [];
+        $permissions = is_array($profile['permissions'] ?? null) ? $profile['permissions'] : [];
+        if (
+            !ya_sync_bool($profile['is_active'] ?? false)
+            || ya_sync_string($profile['role'] ?? '') !== 'admin'
+            || !in_array($managementPermission, $permissions, true)
+            || (
+                in_array($actionType, ['customer_room_assign', 'customer_room_stay_status'], true)
+                && !in_array('customer.manage', $permissions, true)
+            )
+        ) {
+            ya_sync_response(403, [
+                'ok' => false,
+                'code' => 'customer_management_permission_denied',
+                'message' => 'Müşteri ve konaklama yönetimi yalnız yetkili yönetici cihazlarda kullanılabilir.'
+            ]);
+        }
     }
 
     $encodedPayload = json_encode($actionPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -806,7 +833,11 @@ function ya_sync_android_action_types(): array
         'customer_request_reject',
         'customer_request_convert_to_reservation',
         'customer_request_delete',
+        'customer_create',
+        'customer_update',
         'customer_delete',
+        'customer_room_assign',
+        'customer_room_stay_status',
         'reservation_approve',
         'reservation_reject',
         'reservation_cancel',
@@ -834,6 +865,17 @@ function ya_sync_android_action_types(): array
         'menu_item_delete',
         'message_delete'
     ];
+}
+
+function ya_sync_android_management_action_permission(string $actionType): string
+{
+    if (in_array($actionType, ['customer_create', 'customer_update', 'customer_delete'], true)) {
+        return $actionType === 'customer_delete' ? 'customer.delete' : 'customer.manage';
+    }
+    if (in_array($actionType, ['customer_room_assign', 'customer_room_stay_status'], true)) {
+        return 'room.assign_customer';
+    }
+    return '';
 }
 
 function ya_sync_public_android_action(array $record): array
@@ -918,6 +960,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'daily_tasks' => ya_sync_sanitize_android_tasks($tasks),
         'requests' => ya_sync_sanitize_android_requests($snapshot['requests'] ?? []),
         'customers' => ya_sync_sanitize_android_customers($snapshot['customers'] ?? []),
+        'customer_room_stays' => ya_sync_sanitize_android_customer_room_stays($snapshot['customer_room_stays'] ?? []),
         'reservations' => ya_sync_sanitize_android_reservations($snapshot['reservations'] ?? []),
         'rooms' => ya_sync_sanitize_android_rooms($snapshot['rooms'] ?? []),
         'tables' => ya_sync_sanitize_android_tables($snapshot['tables'] ?? []),
@@ -1080,6 +1123,7 @@ function ya_sync_android_permissions(): array
 {
     return [
         'customer.view',
+        'customer.manage',
         'customer.respond',
         'customer.mark_answered',
         'customer.reject',
@@ -1092,6 +1136,7 @@ function ya_sync_android_permissions(): array
         'reservation.cancel',
         'room.view',
         'room.update_status',
+        'room.assign_customer',
         'daily_task.view',
         'daily_task.complete',
         'daily_task.reopen',
@@ -1224,15 +1269,98 @@ function ya_sync_sanitize_android_customers(mixed $records): array
             'email' => ya_sync_string($record['email'] ?? ''),
             'notes' => ya_sync_string($record['notes'] ?? ''),
             'tags' => ya_sync_string_array($record['tags'] ?? []),
+            'identity_type' => ya_sync_customer_identity_type($record['identity_type'] ?? ''),
+            'identity_number' => mb_substr(ya_sync_string($record['identity_number'] ?? ''), 0, 32),
+            'nationality' => mb_substr(ya_sync_string($record['nationality'] ?? ''), 0, 80),
+            'birth_date' => ya_sync_iso_date_or_empty($record['birth_date'] ?? ''),
+            'gender' => ya_sync_customer_gender($record['gender'] ?? ''),
+            'document_serial_number' => mb_substr(ya_sync_string($record['document_serial_number'] ?? ''), 0, 80),
+            'document_expiry_date' => ya_sync_iso_date_or_empty($record['document_expiry_date'] ?? ''),
+            'birth_place' => mb_substr(ya_sync_string($record['birth_place'] ?? ''), 0, 160),
+            'mother_name' => mb_substr(ya_sync_string($record['mother_name'] ?? ''), 0, 160),
+            'father_name' => mb_substr(ya_sync_string($record['father_name'] ?? ''), 0, 160),
+            'issuing_authority' => mb_substr(ya_sync_string($record['issuing_authority'] ?? ''), 0, 160),
+            'address' => mb_substr(ya_sync_string($record['address'] ?? ''), 0, 2000),
             'request_count' => max(0, ya_sync_int($record['request_count'] ?? 0, 0)),
             'reservation_count' => max(0, ya_sync_int($record['reservation_count'] ?? 0, 0)),
+            'stay_count' => max(0, ya_sync_int($record['stay_count'] ?? 0, 0)),
             'updated_at' => ya_sync_string($record['updated_at'] ?? '')
         ];
-        if (count($result) >= 300) {
+        if (count($result) >= 500) {
             break;
         }
     }
     return array_values($result);
+}
+
+function ya_sync_sanitize_android_customer_room_stays(mixed $records): array
+{
+    if (!is_array($records)) {
+        return [];
+    }
+    $result = [];
+    foreach ($records as $record) {
+        if (!is_array($record)) {
+            continue;
+        }
+        $id = ya_sync_string($record['id'] ?? '');
+        $customerId = ya_sync_string($record['customer_id'] ?? '');
+        $roomId = ya_sync_string($record['room_id'] ?? '');
+        $status = ya_sync_string($record['status'] ?? '');
+        if (
+            $id === ''
+            || $customerId === ''
+            || $roomId === ''
+            || !in_array($status, ['planned', 'checked_in', 'checked_out', 'cancelled'], true)
+        ) {
+            continue;
+        }
+        $result[$id] = [
+            'id' => $id,
+            'customer_id' => $customerId,
+            'customer_name' => mb_substr(ya_sync_string($record['customer_name'] ?? ''), 0, 160),
+            'customer_phone' => mb_substr(ya_sync_string($record['customer_phone'] ?? ''), 0, 40),
+            'room_id' => $roomId,
+            'room_name' => mb_substr(ya_sync_string($record['room_name'] ?? ''), 0, 160),
+            'room_number' => mb_substr(ya_sync_string($record['room_number'] ?? ''), 0, 40),
+            'reservation_id' => ya_sync_string($record['reservation_id'] ?? ''),
+            'status' => $status,
+            'check_in_date' => ya_sync_iso_date_or_empty($record['check_in_date'] ?? ''),
+            'check_out_date' => ya_sync_iso_date_or_empty($record['check_out_date'] ?? ''),
+            'guest_count' => max(1, min(50, ya_sync_int($record['guest_count'] ?? 1, 1))),
+            'notes' => mb_substr(ya_sync_string($record['notes'] ?? ''), 0, 2000),
+            'source' => mb_substr(ya_sync_string($record['source'] ?? 'manual'), 0, 80),
+            'checked_in_at' => ya_sync_string($record['checked_in_at'] ?? ''),
+            'checked_out_at' => ya_sync_string($record['checked_out_at'] ?? ''),
+            'created_at' => ya_sync_string($record['created_at'] ?? ''),
+            'updated_at' => ya_sync_string($record['updated_at'] ?? '')
+        ];
+        if (count($result) >= 500) {
+            break;
+        }
+    }
+    return array_values($result);
+}
+
+function ya_sync_customer_identity_type(mixed $value): string
+{
+    $type = ya_sync_string($value);
+    return in_array($type, ['tc_identity_card', 'passport', 'other'], true) ? $type : '';
+}
+
+function ya_sync_customer_gender(mixed $value): string
+{
+    $gender = ya_sync_string($value);
+    return in_array($gender, ['female', 'male', 'unspecified'], true) ? $gender : '';
+}
+
+function ya_sync_iso_date_or_empty(mixed $value): string
+{
+    $date = ya_sync_string($value);
+    if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $matches) !== 1) {
+        return '';
+    }
+    return checkdate((int) $matches[2], (int) $matches[3], (int) $matches[1]) ? $date : '';
 }
 
 function ya_sync_sanitize_android_reservations(mixed $records): array

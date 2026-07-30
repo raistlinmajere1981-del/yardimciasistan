@@ -405,6 +405,50 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
           updated_at: "2026-07-10T14:30:00+03:00"
         }
       ],
+      customers: [{
+        id: "customer_001",
+        full_name: "Kimlik Testi",
+        phone: "+905550001001",
+        email: "",
+        notes: "",
+        tags: [],
+        identity_type: "tc_identity_card",
+        identity_number: "10000000146",
+        nationality: "T.C.",
+        birth_date: "1990-05-12",
+        gender: "female",
+        document_serial_number: "A12B34567",
+        document_expiry_date: "2030-05-12",
+        birth_place: "İstanbul",
+        mother_name: "",
+        father_name: "",
+        issuing_authority: "",
+        address: "",
+        request_count: 0,
+        reservation_count: 0,
+        stay_count: 1,
+        updated_at: "2026-07-10T14:30:00+03:00"
+      }],
+      customer_room_stays: [{
+        id: "stay_001",
+        customer_id: "customer_001",
+        customer_name: "Kimlik Testi",
+        customer_phone: "+905550001001",
+        room_id: "room_001",
+        room_name: "Oda 1",
+        room_number: "101",
+        reservation_id: "",
+        status: "planned",
+        check_in_date: "2026-07-12",
+        check_out_date: "2026-07-14",
+        guest_count: 1,
+        notes: "",
+        source: "manual",
+        checked_in_at: "",
+        checked_out_at: "",
+        created_at: "2026-07-10T14:30:00+03:00",
+        updated_at: "2026-07-10T14:30:00+03:00"
+      }],
       admin_menu: {
         categories: [],
         items: [],
@@ -429,6 +473,8 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
   assert.equal(calls[0].body.snapshot.summary.available_rooms, 4);
   assert.equal(calls[0].body.snapshot.daily_tasks[0].id, "task_001");
   assert.deepEqual(calls[0].body.snapshot.deleted_request_ids, ["request_deleted_001"]);
+  assert.equal(calls[0].body.snapshot.customers[0].identity_number, "10000000146");
+  assert.equal(calls[0].body.snapshot.customer_room_stays[0].id, "stay_001");
   assert.deepEqual(calls[0].body.snapshot.admin_menu.items, []);
   assert.equal(calls[0].body.snapshot.androidPermissions["android-device-001"].role, "staff");
   assert.equal("sync_secret" in calls[0].body, false);
@@ -458,7 +504,11 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("customer_request_mark_answered"), "customer.mark_answered");
   assert.equal(resolveAndroidActionPermission("customer_request_reopen"), "customer.respond");
   assert.equal(resolveAndroidActionPermission("customer_request_delete"), "request.delete");
+  assert.equal(resolveAndroidActionPermission("customer_create"), "customer.manage");
+  assert.equal(resolveAndroidActionPermission("customer_update"), "customer.manage");
   assert.equal(resolveAndroidActionPermission("customer_delete"), "customer.delete");
+  assert.equal(resolveAndroidActionPermission("customer_room_assign"), "room.assign_customer");
+  assert.equal(resolveAndroidActionPermission("customer_room_stay_status"), "room.assign_customer");
   assert.equal(resolveAndroidActionPermission("reservation_cancel"), "reservation.cancel");
   assert.equal(resolveAndroidActionPermission("table_order_set_preparing"), "table_order.set_preparing");
   assert.equal(resolveAndroidActionPermission("table_order_set_served"), "table_order.set_served");
@@ -474,6 +524,8 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("menu_item_delete"), "menu.delete");
   assert.equal(resolveAndroidActionPermission("message_delete"), "message.delete");
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("customer.delete"), false);
+  assert.equal(ANDROID_STAFF_PERMISSIONS.includes("customer.manage"), false);
+  assert.equal(ANDROID_STAFF_PERMISSIONS.includes("room.assign_customer"), false);
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("request.delete"), false);
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("menu.delete"), false);
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("message.delete"), false);

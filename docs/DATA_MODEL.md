@@ -249,6 +249,18 @@ Müşteri kaydı web formundan, AI sohbetinden, WhatsApp destek ekranından veya
   "notes": "Deniz manzaralı oda sordu.",
   "tags": ["pansiyon", "yaz sezonu"],
   "last_contact_at": "2026-07-10T14:30:00+03:00",
+  "identity_type": "tc_identity_card",
+  "identity_number": "10000000146",
+  "nationality": "T.C.",
+  "birth_date": "1990-05-12",
+  "gender": "female",
+  "document_serial_number": "A12B34567",
+  "document_expiry_date": "2030-05-12",
+  "birth_place": "İstanbul",
+  "mother_name": "",
+  "father_name": "",
+  "issuing_authority": "",
+  "address": "",
   "created_at": "2026-07-10T14:30:00+03:00",
   "updated_at": "2026-07-10T14:30:00+03:00"
 }
@@ -264,6 +276,12 @@ manual
 phone
 android
 ```
+
+Kimlik alanları isteğe bağlıdır. `identity_type`; `tc_identity_card`, `passport`,
+`other` veya boş, `gender`; `female`, `male`, `unspecified` veya boş olabilir.
+Kimlik görseli yalnız OCR/AI alan önerisi için geçici olarak işlenir; görsel SQLite'a,
+Android snapshot'ına veya müşteri kartına kaydedilmez. Önerilen alanlar kullanıcı
+kontrolünden sonra kaydedilir.
 
 ---
 
@@ -417,6 +435,39 @@ refunded
 
 ---
 
+# 5A. Customer Room Stay / Müşteri-Oda Konaklama Modeli
+
+Rezervasyondan bağımsız veya rezervasyona bağlı gerçek müşteri-oda ilişkisini ve
+konaklama arşivini temsil eder. Rezervasyon niyeti, bu kayıt ise planlanan/gerçekleşen
+oda kullanım yaşam döngüsüdür.
+
+```json
+{
+  "id": "stay_001",
+  "customer_id": "customer_001",
+  "room_id": "room_001",
+  "reservation_id": "",
+  "status": "checked_in",
+  "check_in_date": "2026-07-12",
+  "check_out_date": "2026-07-14",
+  "guest_count": 2,
+  "notes": "Sessiz oda tercih ediyor.",
+  "source": "manual",
+  "checked_in_at": "2026-07-12T14:00:00+03:00",
+  "checked_out_at": "",
+  "created_at": "2026-07-10T14:35:00+03:00",
+  "updated_at": "2026-07-12T14:00:00+03:00"
+}
+```
+
+`status` değerleri `planned`, `checked_in`, `checked_out` ve `cancelled` olur.
+Aynı odada tarihleri çakışan iki aktif (`planned`/`checked_in`) kayıt oluşturulamaz.
+Oda kapasitesi aşılmaz. Çıkışta ilişki silinmez; durum ve zaman damgalarıyla arşivde
+kalır. Aktif ilişki varken müşteri kartı silinemez veya oda durumu ilişkiyle çelişecek
+biçimde elle değiştirilemez.
+
+---
+
 # 6. Room / Oda Modeli
 
 Pansiyon veya konaklama işletmeleri için oda bilgisini temsil eder.
@@ -458,6 +509,12 @@ out_of_service
 # 7. Table / Masa Modeli
 
 Restoran ve kafe işletmeleri için masa bilgisini temsil eder.
+
+`area` alanı kullanıcı tarafından Ayarlar ekranında tanımlanan masa kategorisinin adıdır
+(örneğin `Salon`, `Bahçe`, `Teras`). Ayrı bir kategori tablosu tutulmaz; masaüstü
+uygulaması mevcut `tables.area` değerlerini kategori/adet özeti olarak okur. Kategori adı
+veya adedi değiştiğinde masalar yerel SQLite üzerinde yeniden dağıtılır. Aktif adisyon,
+rezervasyon ya da kullanım durumuna bağlı masalar toplam azaltılırken arşivlenmez.
 
 ## Alanlar
 
@@ -1012,6 +1069,7 @@ PC uygulaması için başlangıç SQLite tabloları:
 business
 settings
 customers
+customer_room_stays
 requests
 reservations
 rooms
@@ -1067,13 +1125,16 @@ sync_status
 
 # 21. Kişisel Veri Notu
 
-Müşteri adı, telefon numarası, notları ve rezervasyon bilgileri kişisel veri sayılabilir.
+Müşteri adı, telefon numarası, kimlik alanları, notları ve rezervasyon bilgileri kişisel
+veri sayılabilir. Kimlik bilgileri daha yüksek hassasiyetle ele alınmalıdır.
 
 Bu nedenle:
 
 * Gereksiz veri toplanmamalıdır.
 * Veriler açıkça işletme amacıyla kullanılmalıdır.
 * Müşteri notlarında hassas bilgiler tutulmamalıdır.
+* Kimlik görseli kalıcı saklanmamalı; yalnız alan çıkarımı süresince işlenmelidir.
+* Android'de müşteri kartları ve kimlik alanları yalnız aktif yönetici profiline yayınlanmalıdır.
 * Yedekler güvenli saklanmalıdır.
 * Web formunda kısa bilgilendirme metni gösterilmelidir.
 
@@ -1094,6 +1155,7 @@ business
 settings
 requests
 customers
+customer_room_stays
 rooms
 tables
 reservations

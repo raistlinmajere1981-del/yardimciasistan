@@ -885,7 +885,11 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. Desktop `Masalar` ekranı masa kartları, alan/kapasite bilgisi, rezervasyon bağlantısı ve `Boş`, `Dolu`, `Rezerve`, `Hesap` hızlı durum aksiyonlarını içerir. Durum değişikliği SQLite'a yazılır ve `table.status_changed` event kaydı oluşturur; dashboard özetindeki uygun masa sayısı aynı SQLite durumunu kullanır.
+* Tamamlandı. Desktop `Masalar` ekranı masa kartları, kullanıcı tanımlı alan
+  kategorileri, kapasite ve rezervasyon bağlantısı ile `Boş`, `Dolu`, `Rezerve`, `Hesap`
+  hızlı durum aksiyonlarını içerir. Kartlar kategori başlıkları altında gruplanır. Durum
+  değişikliği SQLite'a yazılır ve `table.status_changed` event kaydı oluşturur; dashboard
+  özetindeki uygun masa sayısı aynı SQLite durumunu kullanır.
 
 ---
 
@@ -1774,7 +1778,13 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. Desktop uygulamada firma bilgileri, sektör tipi, modüller, WhatsApp, web modül adresi, sync anahtarı, opsiyonel AI ve ilk oda/masa sayısı için kurulum sihirbazı bulunur; Ayarlar menüsünden yeniden açılabilir.
+* Tamamlandı. Desktop uygulamada firma bilgileri, sektör tipi, modüller, WhatsApp, web
+  modül adresi, sync anahtarı, opsiyonel AI, ilk oda sayısı ve kullanıcı tanımlı
+  `kategori adı + masa adedi` satırları için kurulum sihirbazı bulunur; Ayarlar menüsünden
+  yeniden açılabilir. Kategori değişiklikleri aktif adisyon ve rezervasyonlara bağlı
+  masaları koruyarak yerel SQLite kayıtlarına uygulanır.
+  `npm run smoke:table-categories` kategori yeniden adlandırma, adet azaltma/artırma,
+  yinelenen ad doğrulaması ve aktif adisyon korumasını doğrular.
 
 ---
 
@@ -1919,6 +1929,34 @@ WhatsApp çalışmazsa sistem devam ediyor mu?
 Durum:
 
 * Tamamlandı. `packages/whatsapp-bridge` testleri WhatsApp link üretimi, mesaj encode, Türkiye telefon formatı, manual copy, WebView hedefi ve resmi API/fallback yüzeyini doğrular. Demo web e2e ve desktop renderer smoke hazır mesaj/manuel kopyalama akışlarını kapsar.
+
+---
+
+## TASK-1205 — Manuel müşteri kartı ve müşteri-oda konaklama yönetimi
+
+Kapsam:
+
+```text
+Masaüstü ve yönetici Android'de manuel müşteri oluşturma/düzenleme
+Kimlik kartı ve pasaport alanları
+Geçici kimlik görselinden AI alan önerisi
+Müşteriyi doğrudan odaya atama
+Planlı → giriş → çıkış / iptal yaşam döngüsü
+Kalıcı müşteri-oda konaklama arşivi
+Çakışma, oda kapasitesi ve rol/yetki korumaları
+```
+
+Durum:
+
+* Tamamlandı. `021_customer_room_management.sql` kimlik alanlarını ve
+  `customer_room_stays` arşivini ekler; masaüstü müşteri kartları ve pansiyon ekranı
+  manuel kayıt, atama ve durum yönetimini sunar. Kimlik görseli
+  `api/identity-image-analysis.php` üzerinden geçici işlenir ve kullanıcı kontrolünden
+  sonra alanlara aktarılır. Android müşteri kartı, kimlik OCR'ı ve konaklama arşivi
+  yalnız aktif `admin` + `customer.manage` profiline açılır; oda ataması ayrıca
+  `room.assign_customer` ister. `npm run smoke:customer-room-management`,
+  `npm run smoke:stock-image-analysis` ve Android smoke testi veri yaşam döngüsü,
+  görsel gizliliği, kapasite/çakışma ve personel erişim engelini doğrular.
 
 ---
 

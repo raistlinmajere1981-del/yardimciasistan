@@ -53,6 +53,24 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
     return activeOrders;
   }, [orders]);
 
+  const tableGroups = useMemo(() => {
+    const groups = new Map<string, {
+      name: string;
+      tables: DesktopDashboardData["tables"];
+    }>();
+    for (const table of tables) {
+      const name = table.area.trim() || "Genel";
+      const key = name.toLocaleLowerCase("tr-TR");
+      const group = groups.get(key);
+      if (group) {
+        group.tables.push(table);
+      } else {
+        groups.set(key, { name, tables: [table] });
+      }
+    }
+    return [...groups.values()];
+  }, [tables]);
+
   const activeCategories = useMemo(
     () => menu.categories.filter((category) => category.is_active).sort(compareMenuRecords),
     [menu.categories]
@@ -551,76 +569,88 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
     }
   }
 
+  function renderTableCard(table: DesktopDashboardData["tables"][number]) {
+    const activeOrder = activeOrdersByTable.get(table.id);
+    const activeStatusAction = getTableStatusAction(table.status);
+    const tableStatusLabel = formatTableStatus(table.status);
+    const orderBadge = activeOrder ? getOrderBadge(activeOrder.status) : null;
+    return (
+      <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
+        <div className="resource-card-heading">
+          <div><h2>{table.name}</h2></div>
+          <StatusBadge tone={getResourceStatusTone(table.status)}>
+            {tableStatusLabel}
+          </StatusBadge>
+        </div>
+        {activeOrder && orderBadge && (
+          <div className="table-order-state-summary">
+            <span>Masa: <strong>{tableStatusLabel}</strong></span>
+            <span aria-hidden="true">·</span>
+            <span>Adisyon: <strong className={`is-${orderBadge.tone}`}>{orderBadge.label}</strong></span>
+          </div>
+        )}
+        <div className="compact-meta-row table-order-summary">
+          {activeOrder ? (
+            <>
+              <span>{activeOrder.itemCount} ürün</span>
+              <strong>{formatMoney(activeOrder.total, getOrderCurrency(activeOrder))}</strong>
+            </>
+          ) : (
+            <>
+              <span>{table.area || "Genel"}</span>
+              <span>{table.capacity} kişi</span>
+              <span>{table.activeReservationTitle || "Rezervasyon yok"}</span>
+            </>
+          )}
+        </div>
+        <div className={`table-card-actions${activeOrder ? " has-active-order" : ""}`}>
+          <button className="table-order-open-button" type="button" onClick={() => void openOrderDrawer(table)} disabled={Boolean(busyAction)}>
+            <ReceiptText size={13} aria-hidden="true" />
+            {activeOrder ? "Siparişi Aç" : "Sipariş Aç"}
+          </button>
+          {activeOrder ? (
+            <div className="active-table-order-actions" aria-label={`${table.name} aktif adisyon işlemleri`}>
+              <button
+                type="button"
+                onClick={() => void runCardOrderAction(activeOrder, "payment")}
+                disabled={activeOrder.status === "payment" || Boolean(busyAction)}
+              >Hesap Bekliyor</button>
+              <button className="is-close" type="button" onClick={() => void runCardOrderAction(activeOrder, "paid")} disabled={Boolean(busyAction)}>Ödendi / Kapat</button>
+            </div>
+          ) : (
+            <div className="status-button-row compact-status-actions" aria-label={`${table.name} durumunu değiştir`}>
+              <button className={activeStatusAction === "available" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "available"} onClick={() => onUpdateStatus(table.id, "available")}>Boş</button>
+              <button className={activeStatusAction === "occupied" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "occupied"} onClick={() => onUpdateStatus(table.id, "occupied")}>Dolu</button>
+              <button className={activeStatusAction === "reserved" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "reserved"} onClick={() => onUpdateStatus(table.id, "reserved")}>Rezerve</button>
+              <button className={activeStatusAction === "bill_waiting" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "bill_waiting"} onClick={() => onUpdateStatus(table.id, "bill_waiting")}>Hesap</button>
+            </div>
+          )}
+        </div>
+      </article>
+    );
+  }
+
   return (
     <>
-      <section className="operations-grid compact-resource-grid" aria-label="Masa yönetimi">
+      <section className="table-area-list" aria-label="Masa yönetimi">
         {tables.length === 0 && (
           <div className="panel empty-state">
             <UtensilsCrossed size={28} aria-hidden="true" />
             <strong>Masa kaydı yok.</strong>
-            <p>Masa sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p>
+            <p>Masa kategorilerini Temel Ayarlar bölümünden belirleyebilirsiniz.</p>
           </div>
         )}
-        {tables.map((table) => {
-          const activeOrder = activeOrdersByTable.get(table.id);
-          const activeStatusAction = getTableStatusAction(table.status);
-          const tableStatusLabel = formatTableStatus(table.status);
-          const orderBadge = activeOrder ? getOrderBadge(activeOrder.status) : null;
-          return (
-            <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
-              <div className="resource-card-heading">
-                <div><h2>{table.name}</h2></div>
-                <StatusBadge tone={getResourceStatusTone(table.status)}>
-                  {tableStatusLabel}
-                </StatusBadge>
-              </div>
-              {activeOrder && orderBadge && (
-                <div className="table-order-state-summary">
-                  <span>Masa: <strong>{tableStatusLabel}</strong></span>
-                  <span aria-hidden="true">·</span>
-                  <span>Adisyon: <strong className={`is-${orderBadge.tone}`}>{orderBadge.label}</strong></span>
-                </div>
-              )}
-              <div className="compact-meta-row table-order-summary">
-                {activeOrder ? (
-                  <>
-                    <span>{activeOrder.itemCount} ürün</span>
-                    <strong>{formatMoney(activeOrder.total, getOrderCurrency(activeOrder))}</strong>
-                  </>
-                ) : (
-                  <>
-                    <span>{table.area || "Genel"}</span>
-                    <span>{table.capacity} kişi</span>
-                    <span>{table.activeReservationTitle || "Rezervasyon yok"}</span>
-                  </>
-                )}
-              </div>
-              <div className={`table-card-actions${activeOrder ? " has-active-order" : ""}`}>
-                <button className="table-order-open-button" type="button" onClick={() => void openOrderDrawer(table)} disabled={Boolean(busyAction)}>
-                  <ReceiptText size={13} aria-hidden="true" />
-                  {activeOrder ? "Siparişi Aç" : "Sipariş Aç"}
-                </button>
-                {activeOrder ? (
-                  <div className="active-table-order-actions" aria-label={`${table.name} aktif adisyon işlemleri`}>
-                    <button
-                      type="button"
-                      onClick={() => void runCardOrderAction(activeOrder, "payment")}
-                      disabled={activeOrder.status === "payment" || Boolean(busyAction)}
-                    >Hesap Bekliyor</button>
-                    <button className="is-close" type="button" onClick={() => void runCardOrderAction(activeOrder, "paid")} disabled={Boolean(busyAction)}>Ödendi / Kapat</button>
-                  </div>
-                ) : (
-                  <div className="status-button-row compact-status-actions" aria-label={`${table.name} durumunu değiştir`}>
-                    <button className={activeStatusAction === "available" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "available"} onClick={() => onUpdateStatus(table.id, "available")}>Boş</button>
-                    <button className={activeStatusAction === "occupied" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "occupied"} onClick={() => onUpdateStatus(table.id, "occupied")}>Dolu</button>
-                    <button className={activeStatusAction === "reserved" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "reserved"} onClick={() => onUpdateStatus(table.id, "reserved")}>Rezerve</button>
-                    <button className={activeStatusAction === "bill_waiting" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "bill_waiting"} onClick={() => onUpdateStatus(table.id, "bill_waiting")}>Hesap</button>
-                  </div>
-                )}
-              </div>
-            </article>
-          );
-        })}
+        {tableGroups.map((group) => (
+          <section className="table-area-group" key={group.name}>
+            <header className="table-area-heading">
+              <h3>{group.name}</h3>
+              <span>{group.tables.length} masa</span>
+            </header>
+            <div className="operations-grid compact-resource-grid">
+              {group.tables.map(renderTableCard)}
+            </div>
+          </section>
+        ))}
       </section>
       <span className="table-order-live-feedback" role="status" aria-live="polite">{cardFeedback}</span>
 

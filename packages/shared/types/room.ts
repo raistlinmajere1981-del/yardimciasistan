@@ -15,3 +15,19 @@ export interface Room extends TimestampedRecord, SoftDeletableRecord {
   is_active: boolean;
   sort_order: number;
 }
+
+export type CustomerRoomStayStatus = "planned" | "checked_in" | "checked_out" | "cancelled";
+
+export interface CustomerRoomStay extends TimestampedRecord, SoftDeletableRecord {
+  customer_id: string;
+  room_id: string;
+  reservation_id: string;
+  status: CustomerRoomStayStatus;
+  check_in_date: string;
+  check_out_date: string;
+  guest_count: number;
+  notes: string;
+  source: string;
+  checked_in_at: string;
+  checked_out_at: string;
+}

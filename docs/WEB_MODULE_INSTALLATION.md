@@ -210,6 +210,12 @@ JPG/PNG/WebP yalnız istek boyunca PHP geçici alanında tutulur; sonuçtan sonr
 Seçili servis veya model görsel girişini desteklemiyorsa kullanıcıya yapılandırmayı
 değiştirmesi gerektiğini belirten güvenli hata döner.
 
+Müşteri kartındaki `Kimlik Görselinden AI ile Doldur` akışı aynı ayarı
+`api/identity-image-analysis.php` üzerinden kullanır. Android tarafında yalnız aktif
+yönetici cihaz ve `customer.manage` izni kabul edilir. Kimlik görseli yalnız istek
+süresince geçici dosyada tutulur, analiz sonunda silinir ve müşteri kartına görsel olarak
+kaydedilmez. Okunan alanlar kullanıcı onayından önce düzenlenebilir.
+
 Eski kurulumlar ve geliştirme ortamı için ortam değişkenleri fallback olarak desteklenir:
 
 ```bash

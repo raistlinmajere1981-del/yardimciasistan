@@ -34,6 +34,35 @@ const provider = http.createServer(async (request, response) => {
     response.end(JSON.stringify({ error: { message: "This model does not support image input." } }));
     return;
   }
+  const requestText = JSON.stringify(parsedBody);
+  if (requestText.includes("identity_type") && requestText.includes("kimlik")) {
+    const identityAnalysis = {
+      document_type: "tc_identity_card",
+      document_side: "front",
+      confidence: "high",
+      fields: {
+        full_name: "Ayşe Kimlik Testi",
+        identity_type: "tc_identity_card",
+        identity_number: "10000000146",
+        nationality: "T.C.",
+        birth_date: "12.05.1990",
+        gender: "female",
+        document_serial_number: "a12b34567",
+        document_expiry_date: "2030-05-12",
+        birth_place: "İstanbul",
+        mother_name: "Fatma",
+        father_name: "Mehmet",
+        issuing_authority: "T.C. İçişleri Bakanlığı",
+        address: "Kimlik smoke adresi"
+      },
+      warnings: ["Kaydetmeden önce kullanıcı kontrolü gerekir."]
+    };
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify(request.url?.includes(":generateContent")
+      ? { candidates: [{ content: { parts: [{ text: JSON.stringify(identityAnalysis) }] } }] }
+      : { choices: [{ message: { content: JSON.stringify(identityAnalysis) } }] }));
+    return;
+  }
   const analysis = {
     document: {
       supplier_name: "Smoke Tedarik",
@@ -141,6 +170,7 @@ try {
       client_id: "stock-image-smoke",
       snapshot: {
         summary: {}, daily_tasks: [], requests: [], customers: [], reservations: [], rooms: [], tables: [],
+        customer_room_stays: [],
         menu: { categories: [], items: [], updated_at: "2026-07-22T12:00:00+03:00" },
         trackedStockItems: candidates.map((item) => ({
           menu_item_id: item.id,
@@ -159,7 +189,12 @@ try {
           "android-stock-smoke": {
             role: "admin",
             is_active: true,
-            permissions: ["menu.stock_view", "menu.stock_update"]
+            permissions: ["menu.stock_view", "menu.stock_update", "customer.manage"]
+          },
+          "android-identity-staff": {
+            role: "staff",
+            is_active: true,
+            permissions: ["customer.manage"]
           }
         },
         updated_at: "2026-07-22T12:00:00+03:00"
@@ -206,6 +241,50 @@ try {
   assert.equal(providerRequests.at(-1).messages[1].content.find((part) => part.type === "text")?.text.includes('"stock_unit":"gram"'), true);
   assert.ok(providerRequests.at(-1).messages[1].content.some((part) => part.type === "image_url"));
 
+  const identityMissingAuth = await analyzeIdentity({ bytes: pngBytes, mime: "image/png", includeAuth: false });
+  assert.equal(identityMissingAuth.status, 401);
+  assert.equal((await identityMissingAuth.json()).code, "unauthorized");
+
+  const identityStaff = await analyzeIdentity({
+    bytes: pngBytes,
+    mime: "image/png",
+    source: "android",
+    deviceId: "android-identity-staff"
+  });
+  assert.equal(identityStaff.status, 403);
+  assert.equal((await identityStaff.json()).code, "customer_management_permission_denied");
+
+  const identityHashMismatch = await analyzeIdentity({
+    bytes: pngBytes,
+    mime: "image/png",
+    imageHash: "e".repeat(64)
+  });
+  assert.equal(identityHashMismatch.status, 422);
+  assert.equal((await identityHashMismatch.json()).code, "image_hash_mismatch");
+
+  const identityDesktop = await analyzeIdentity({ bytes: pngBytes, mime: "image/png" });
+  assert.equal(identityDesktop.status, 200);
+  const identityPayload = await identityDesktop.json();
+  assert.equal(identityPayload.ok, true);
+  assert.equal(identityPayload.image_hash, createHash("sha256").update(pngBytes).digest("hex"));
+  assert.equal(identityPayload.analysis.document_type, "tc_identity_card");
+  assert.equal(identityPayload.analysis.fields.full_name, "Ayşe Kimlik Testi");
+  assert.equal(identityPayload.analysis.fields.identity_number, "10000000146");
+  assert.equal(identityPayload.analysis.fields.birth_date, "1990-05-12");
+  assert.equal(identityPayload.analysis.fields.document_serial_number, "A12B34567");
+  assert.deepEqual(identityPayload.analysis.warnings, ["Kaydetmeden önce kullanıcı kontrolü gerekir."]);
+  assert.equal(providerRequests.at(-1).store, false, "Identity provider requests must opt out of provider-side storage");
+  assert.ok(providerRequests.at(-1).messages[1].content.some((part) => part.type === "image_url"));
+
+  const identityAndroid = await analyzeIdentity({
+    bytes: pngBytes,
+    mime: "image/png",
+    source: "android",
+    deviceId: "android-stock-smoke"
+  });
+  assert.equal(identityAndroid.status, 200);
+  assert.equal((await identityAndroid.json()).analysis.fields.identity_number, "10000000146");
+
   writeAiConfig("gemini", "gemini-3.6-flash");
   const geminiValid = await analyze({ bytes: pngBytes, mime: "image/png", candidates });
   assert.equal(geminiValid.status, 200);
@@ -233,7 +312,7 @@ try {
 
   await waitFor(() => readdirSync(uploadRoot).length === 0, 2_000);
   assert.deepEqual(readdirSync(uploadRoot), [], "Temporary multipart files must be removed after success and failure");
-  console.log("stock-image-analysis-smoke-ok: Gemini vision, provider guidance, auth, mime, cleanup, allowlist and piece/gram rules verified");
+  console.log("stock-and-identity-image-analysis-smoke-ok: identity privacy/admin auth plus Gemini vision, provider guidance, mime, cleanup, allowlist and piece/gram rules verified");
 } catch (error) {
   if (phpOutput.trim()) console.error(phpOutput.trim());
   throw error;
@@ -269,6 +348,26 @@ async function analyze({ bytes, mime, candidates, includeAuth = true, source = "
   form.append("menu_items", JSON.stringify(candidates));
   form.append("image", new Blob([bytes], { type: mime }), "document.bin");
   return fetch(`${baseUrl}/api/stock-image-analysis.php`, {
+    method: "POST",
+    headers: includeAuth ? { "X-YA-Sync-Secret": secret } : {},
+    body: form
+  });
+}
+
+async function analyzeIdentity({
+  bytes,
+  mime,
+  includeAuth = true,
+  source = "desktop",
+  deviceId = "",
+  imageHash = ""
+}) {
+  const form = new FormData();
+  form.append("source", source);
+  form.append("device_id", deviceId);
+  form.append("image_hash", imageHash || createHash("sha256").update(bytes).digest("hex"));
+  form.append("image", new Blob([bytes], { type: mime }), "identity-document.bin");
+  return fetch(`${baseUrl}/api/identity-image-analysis.php`, {
     method: "POST",
     headers: includeAuth ? { "X-YA-Sync-Secret": secret } : {},
     body: form

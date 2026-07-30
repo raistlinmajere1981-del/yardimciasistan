@@ -4,6 +4,7 @@ export type IdPrefix =
   | "customer_"
   | "request_"
   | "reservation_"
+  | "stay_"
   | "room_"
   | "table_"
   | "cat_"
@@ -24,6 +25,7 @@ export const ID_PREFIXES: readonly IdPrefix[] = [
   "customer_",
   "request_",
   "reservation_",
+  "stay_",
   "room_",
   "table_",
   "cat_",

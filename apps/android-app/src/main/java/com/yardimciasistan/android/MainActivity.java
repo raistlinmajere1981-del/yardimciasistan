@@ -126,8 +126,13 @@ public final class MainActivity extends ComponentActivity {
   private String currentError = "";
   private ActivityResultLauncher<Uri> stockCameraLauncher;
   private ActivityResultLauncher<String[]> stockGalleryLauncher;
+  private ActivityResultLauncher<Uri> identityCameraLauncher;
+  private ActivityResultLauncher<String[]> identityGalleryLauncher;
   private Uri pendingStockCameraUri;
   private File pendingStockCameraFile;
+  private Uri pendingIdentityCameraUri;
+  private File pendingIdentityCameraFile;
+  private CustomerFormSession activeCustomerFormSession;
   private final Handler foregroundSyncHandler = new Handler(Looper.getMainLooper());
   private final Runnable foregroundSyncRunnable = new Runnable() {
     @Override
@@ -168,6 +173,7 @@ public final class MainActivity extends ComponentActivity {
       }
     });
     registerStockImageLaunchers();
+    registerIdentityImageLaunchers();
     UiKit.applyTheme(AppTheme.tokens(themeMode));
     applyWindowTheme();
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
@@ -226,6 +232,7 @@ public final class MainActivity extends ComponentActivity {
     foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
     executor.shutdownNow();
     deletePendingStockCameraFile();
+    deletePendingIdentityCameraFile();
     super.onDestroy();
   }
 
@@ -344,6 +351,177 @@ public final class MainActivity extends ComponentActivity {
       pendingStockCameraFile.delete();
     }
     pendingStockCameraFile = null;
+  }
+
+  private void registerIdentityImageLaunchers() {
+    identityCameraLauncher = registerForActivityResult(new ActivityResultContracts.TakePicture(), success -> {
+      Uri resultUri = pendingIdentityCameraUri;
+      if (Boolean.TRUE.equals(success) && resultUri != null) {
+        analyzeIdentityImage(resultUri);
+      } else {
+        deletePendingIdentityCameraFile();
+        Toast.makeText(this, "Kimlik fotoğrafı çekimi tamamlanmadı.", Toast.LENGTH_SHORT).show();
+      }
+      pendingIdentityCameraUri = null;
+    });
+    identityGalleryLauncher = registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+      if (uri == null) {
+        return;
+      }
+      // Kimlik görseli yalnız bu analiz sırasında okunur; kalıcı URI izni tutulmaz.
+      analyzeIdentityImage(uri);
+    });
+  }
+
+  private void showIdentityImageSourceDialog() {
+    if (!data.isAdmin() || !data.hasPermission("customer.manage")) {
+      showError("Kimlik görseli analizi yalnız yönetici cihazlarda kullanılabilir.");
+      return;
+    }
+    new AlertDialog.Builder(this)
+        .setTitle("Kimlik görselinden doldur")
+        .setMessage("Kimliğin ön veya arka yüzünü çekebilir ya da galeriden seçebilirsiniz. Görsel kalıcı saklanmaz.")
+        .setNegativeButton("Vazgeç", null)
+        .setNeutralButton("Galeriden Seç", (dialog, which) -> launchIdentityGallery())
+        .setPositiveButton("Fotoğraf Çek", (dialog, which) -> launchIdentityCamera())
+        .show();
+  }
+
+  private void launchIdentityCamera() {
+    if (activeCustomerFormSession == null) {
+      return;
+    }
+    try {
+      deletePendingIdentityCameraFile();
+      File directory = new File(getCacheDir(), "stock-images");
+      if ((!directory.isDirectory() && !directory.mkdirs()) || !directory.isDirectory()) {
+        throw new IllegalStateException("cache_missing");
+      }
+      pendingIdentityCameraFile = File.createTempFile("identity-camera-", ".jpg", directory);
+      pendingIdentityCameraUri = FileProvider.getUriForFile(
+          this,
+          getPackageName() + ".fileprovider",
+          pendingIdentityCameraFile
+      );
+      identityCameraLauncher.launch(pendingIdentityCameraUri);
+    } catch (ActivityNotFoundException error) {
+      deletePendingIdentityCameraFile();
+      showError("Sistem kamera uygulaması bulunamadı. Galeriden görsel seçebilirsiniz.");
+    } catch (Exception error) {
+      deletePendingIdentityCameraFile();
+      showError("Kimlik kamerası için güvenli geçici dosya hazırlanamadı.");
+    }
+  }
+
+  private void launchIdentityGallery() {
+    if (activeCustomerFormSession == null) {
+      return;
+    }
+    try {
+      identityGalleryLauncher.launch(new String[] {"image/jpeg", "image/png", "image/webp"});
+    } catch (ActivityNotFoundException error) {
+      showError("Sistem fotoğraf seçicisi açılamadı.");
+    }
+  }
+
+  private void deletePendingIdentityCameraFile() {
+    if (pendingIdentityCameraFile != null && pendingIdentityCameraFile.isFile()) {
+      pendingIdentityCameraFile.delete();
+    }
+    pendingIdentityCameraFile = null;
+  }
+
+  private void analyzeIdentityImage(Uri sourceUri) {
+    CustomerFormSession session = activeCustomerFormSession;
+    if (session == null || !session.dialog.isShowing()) {
+      deletePendingIdentityCameraFile();
+      return;
+    }
+    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
+    String syncSecret = ConnectionSettings.syncSecret(preferences);
+    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
+      deletePendingIdentityCameraFile();
+      session.setStatus("Kimlik analizi için bağlantı ayarlarını tamamlayın.", UiKit.DANGER);
+      return;
+    }
+    session.setLoading(true);
+    session.setStatus("Kimlik görseli hazırlanıyor ve AI ile okunuyor…", UiKit.INFO);
+    executor.execute(() -> {
+      StockImageFile.PreparedImage prepared = null;
+      try {
+        prepared = StockImageFile.prepare(this, sourceUri);
+        deletePendingIdentityCameraFile();
+        HostingSyncClient.IdentityImageAnalysisResult result = syncClient.analyzeIdentityImage(
+            baseUrl,
+            syncSecret,
+            identity,
+            prepared
+        );
+        runOnUiThread(() -> {
+          CustomerFormSession current = activeCustomerFormSession;
+          if (current != session || !session.dialog.isShowing()) {
+            return;
+          }
+          applyIdentityAnalysisToCustomerForm(session, result.analysis);
+          session.setLoading(false);
+          session.setStatus(result.message, UiKit.SUCCESS);
+          Toast.makeText(this, "Okunan alanları kaydetmeden önce kontrol edin.", Toast.LENGTH_LONG).show();
+        });
+      } catch (HostingSyncClient.SyncException | StockImageFile.StockImageException error) {
+        runOnUiThread(() -> {
+          if (activeCustomerFormSession != session || !session.dialog.isShowing()) {
+            return;
+          }
+          session.setLoading(false);
+          session.setStatus(error.getMessage(), UiKit.DANGER);
+        });
+      } finally {
+        deletePendingIdentityCameraFile();
+        if (prepared != null) {
+          prepared.release();
+        }
+      }
+    });
+  }
+
+  private void applyIdentityAnalysisToCustomerForm(CustomerFormSession session, JSONObject analysis) {
+    JSONObject fields = analysis.optJSONObject("fields");
+    if (fields == null) {
+      return;
+    }
+    fillIfPresent(session.fullName, fields.optString("full_name", ""));
+    fillIfPresent(session.identityNumber, fields.optString("identity_number", ""));
+    fillIfPresent(session.nationality, fields.optString("nationality", ""));
+    fillIfPresent(session.birthDate, fields.optString("birth_date", ""));
+    fillIfPresent(session.documentSerialNumber, fields.optString("document_serial_number", ""));
+    fillIfPresent(session.documentExpiryDate, fields.optString("document_expiry_date", ""));
+    fillIfPresent(session.birthPlace, fields.optString("birth_place", ""));
+    fillIfPresent(session.motherName, fields.optString("mother_name", ""));
+    fillIfPresent(session.fatherName, fields.optString("father_name", ""));
+    fillIfPresent(session.issuingAuthority, fields.optString("issuing_authority", ""));
+    fillIfPresent(session.address, fields.optString("address", ""));
+    selectSpinnerValue(session.identityType, fields.optString("identity_type", ""));
+    selectSpinnerValue(session.gender, fields.optString("gender", ""));
+  }
+
+  private void fillIfPresent(EditText field, String value) {
+    String normalized = value == null ? "" : value.trim();
+    if (!normalized.isEmpty()) {
+      field.setText(normalized);
+    }
+  }
+
+  private void selectSpinnerValue(Spinner spinner, String value) {
+    if (value == null || value.trim().isEmpty() || spinner.getAdapter() == null) {
+      return;
+    }
+    for (int index = 0; index < spinner.getAdapter().getCount(); index += 1) {
+      Object item = spinner.getAdapter().getItem(index);
+      if (item instanceof ChoiceItem && value.equals(((ChoiceItem) item).value)) {
+        spinner.setSelection(index);
+        return;
+      }
+    }
   }
 
   private void showStockImagePreviewDialog(Uri sourceUri) {
@@ -1447,15 +1625,34 @@ public final class MainActivity extends ComponentActivity {
 
   private View customerScreen() {
     LinearLayout page = UiKit.column(this);
-    if (!data.hasPermission("customer.view")) {
+    boolean canManageCustomers = AndroidUiRules.canManageCustomers(data);
+    boolean canViewRequests = data.hasPermission("customer.view");
+    if (!canManageCustomers && !canViewRequests) {
       page.addView(permissionDeniedCard());
       return mainScreenScroll(page);
     }
-    page.addView(filterBar(new String[][] {
-        {AndroidUiRules.CUSTOMER_NEW, "Yeni Talepler"},
-        {AndroidUiRules.CUSTOMER_LIST, "Müşteriler"},
-        {AndroidUiRules.CUSTOMER_WAITING, "Cevap Bekleyenler"}
-    }, customerFilter, value -> {
+    if (canManageCustomers) {
+      Button createCustomer = UiKit.button(this, "+ Yeni Müşteri", UiKit.PRIMARY, view -> showCustomerForm(null));
+      LinearLayout.LayoutParams createCustomerParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+      createCustomerParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+      createCustomer.setLayoutParams(createCustomerParams);
+      page.addView(createCustomer);
+    }
+    ArrayList<String[]> customerOptions = new ArrayList<>();
+    if (canViewRequests) {
+      customerOptions.add(new String[] {AndroidUiRules.CUSTOMER_NEW, "Yeni Talepler"});
+    }
+    if (canManageCustomers) {
+      customerOptions.add(new String[] {AndroidUiRules.CUSTOMER_LIST, "Müşteriler"});
+    }
+    if (canViewRequests) {
+      customerOptions.add(new String[] {AndroidUiRules.CUSTOMER_WAITING, "Cevap Bekleyenler"});
+    }
+    if ((!canManageCustomers && AndroidUiRules.CUSTOMER_LIST.equals(customerFilter))
+        || (!canViewRequests && !AndroidUiRules.CUSTOMER_LIST.equals(customerFilter))) {
+      customerFilter = canManageCustomers ? AndroidUiRules.CUSTOMER_LIST : AndroidUiRules.CUSTOMER_NEW;
+    }
+    page.addView(filterBar(customerOptions.toArray(new String[0][]), customerFilter, value -> {
       customerFilter = value;
       render();
     }));
@@ -1493,6 +1690,9 @@ public final class MainActivity extends ComponentActivity {
     }
     if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_ROOMS)) {
       options.add(new String[] {AndroidUiRules.PENSION_ROOMS, "Odalar"});
+    }
+    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_STAYS)) {
+      options.add(new String[] {AndroidUiRules.PENSION_STAYS, "Konaklamalar"});
     }
     if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_TASKS)) {
       options.add(new String[] {AndroidUiRules.PENSION_TASKS, "İşler"});
@@ -1535,6 +1735,25 @@ public final class MainActivity extends ComponentActivity {
       }
       for (OperationData.RoomRecord room : data.rooms) {
         page.addView(roomCard(room));
+      }
+    } else if (AndroidUiRules.PENSION_STAYS.equals(pensionMode)) {
+      Button assign = UiKit.button(this, "+ Müşteriyi Odaya Ata", UiKit.PRIMARY, view -> showRoomAssignmentDialog(null, null));
+      LinearLayout.LayoutParams assignParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+      assignParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+      assign.setLayoutParams(assignParams);
+      assign.setEnabled(!data.customers.isEmpty() && !data.rooms.isEmpty());
+      page.addView(assign);
+      page.addView(statusStrip(new CounterValue[] {
+          new CounterValue("Planlı", countCustomerRoomStays("planned"), UiKit.WARNING, ""),
+          new CounterValue("Konaklıyor", countCustomerRoomStays("checked_in"), UiKit.INFO, ""),
+          new CounterValue("Tamamlandı", countCustomerRoomStays("checked_out"), UiKit.SUCCESS, ""),
+          new CounterValue("İptal", countCustomerRoomStays("cancelled"), UiKit.MUTED, "")
+      }));
+      if (data.customerRoomStays.isEmpty()) {
+        page.addView(emptyCard("Konaklama arşivi boş", "Müşteri-oda atamaları oluşturulduğunda burada saklanır."));
+      }
+      for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
+        page.addView(customerRoomStayCard(stay));
       }
     } else {
       page.addView(statusStrip(new CounterValue[] {
@@ -2266,9 +2485,31 @@ public final class MainActivity extends ComponentActivity {
   private View customerCard(OperationData.CustomerRecord customer) {
     LinearLayout card = UiKit.card(this);
     card.setOnClickListener(view -> showCustomerDetail(customer));
-    card.addView(UiKit.text(this, customer.fullName, 16, UiKit.TEXT, Typeface.BOLD));
-    String counts = customer.requestCount + " talep · " + customer.reservationCount + " rezervasyon";
+    LinearLayout top = UiKit.row(this);
+    TextView name = UiKit.text(this, customer.fullName, 16, UiKit.TEXT, Typeface.BOLD);
+    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    top.addView(name);
+    OperationData.CustomerRoomStayRecord activeStay = activeStayForCustomer(customer.id);
+    if (activeStay != null) {
+      top.addView(statusBadge("Konaklıyor", UiKit.INFO));
+    }
+    card.addView(top);
+    String counts = customer.requestCount + " talep · " + customer.reservationCount + " rezervasyon · "
+        + customer.stayCount + " konaklama";
     card.addView(UiKit.text(this, counts, 12, UiKit.MUTED, Typeface.NORMAL));
+    String identitySummary = customerIdentitySummary(customer);
+    if (!identitySummary.isEmpty()) {
+      card.addView(UiKit.text(this, identitySummary, 12, UiKit.SECONDARY, Typeface.BOLD));
+    }
+    if (activeStay != null) {
+      card.addView(UiKit.text(
+          this,
+          "Aktif oda: " + activeStay.roomName + " · " + joinDateRange(activeStay.checkInDate, activeStay.checkOutDate),
+          12,
+          UiKit.INFO,
+          Typeface.BOLD
+      ));
+    }
     if (!customer.notes.isEmpty()) {
       TextView note = UiKit.text(this, ellipsize(customer.notes, 130), 13, UiKit.TEXT, Typeface.NORMAL);
       note.setMaxLines(3);
@@ -2324,6 +2565,7 @@ public final class MainActivity extends ComponentActivity {
 
   private View roomCard(OperationData.RoomRecord room) {
     LinearLayout card = UiKit.card(this);
+    OperationData.CustomerRoomStayRecord activeStay = data.activeStayForRoom(room.id);
     LinearLayout top = UiKit.row(this);
     LinearLayout name = UiKit.column(this);
     name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
@@ -2332,15 +2574,67 @@ public final class MainActivity extends ComponentActivity {
     top.addView(name);
     top.addView(statusBadge(formatRoomStatus(room.status), resourceTone(room.status)));
     card.addView(top);
-    if (!room.activeReservation.isEmpty()) {
+    if (activeStay != null) {
+      String staySummary = activeStay.customerName + " · " + joinDateRange(activeStay.checkInDate, activeStay.checkOutDate);
+      card.addView(UiKit.text(this, staySummary, 12, UiKit.INFO, Typeface.BOLD));
+    } else if (!room.activeReservation.isEmpty()) {
       card.addView(UiKit.text(this, room.activeReservation, 12, UiKit.INFO, Typeface.BOLD));
     }
-    if (data.hasPermission("room.update_status")) {
+    if (canManageCustomerRoomStays()) {
+      Button assignment = UiKit.button(
+          this,
+          activeStay == null ? "Müşteri Ata" : "Konaklamayı Yönet",
+          UiKit.PRIMARY,
+          view -> {
+            if (activeStay == null) {
+              showRoomAssignmentDialog(null, room);
+            } else {
+              showCustomerRoomStayActions(activeStay);
+            }
+          }
+      );
+      LinearLayout.LayoutParams assignmentParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
+      assignmentParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
+      assignment.setLayoutParams(assignmentParams);
+      assignment.setEnabled(activeStay != null || !data.customers.isEmpty());
+      card.addView(assignment);
+    }
+    if (data.hasPermission("room.update_status") && activeStay == null) {
       Button status = UiKit.outlineButton(this, "Durumu Değiştir", view -> showRoomStatusDialog(room));
       LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
       params.setMargins(0, UiKit.dp(this, 8), 0, 0);
       status.setLayoutParams(params);
       card.addView(status);
+    }
+    return card;
+  }
+
+  private View customerRoomStayCard(OperationData.CustomerRoomStayRecord stay) {
+    LinearLayout card = UiKit.card(this);
+    LinearLayout top = UiKit.row(this);
+    LinearLayout identity = UiKit.column(this);
+    identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    identity.addView(UiKit.text(this, stay.customerName, 15, UiKit.TEXT, Typeface.BOLD));
+    identity.addView(UiKit.text(this, stay.roomName + (stay.roomNumber.isEmpty() ? "" : " · " + stay.roomNumber), 12, UiKit.MUTED, Typeface.NORMAL));
+    top.addView(identity);
+    top.addView(statusBadge(formatCustomerRoomStayStatus(stay.status), customerRoomStayTone(stay.status)));
+    card.addView(top);
+    card.addView(UiKit.text(
+        this,
+        joinDateRange(stay.checkInDate, stay.checkOutDate) + " · " + stay.guestCount + " kişi",
+        12,
+        UiKit.SECONDARY,
+        Typeface.NORMAL
+    ));
+    if (!stay.notes.isEmpty()) {
+      card.addView(UiKit.text(this, ellipsize(stay.notes, 140), 12, UiKit.MUTED, Typeface.NORMAL));
+    }
+    if (canManageCustomerRoomStays() && canTransitionCustomerRoomStay(stay)) {
+      Button manage = UiKit.outlineButton(this, "Durumu Yönet", view -> showCustomerRoomStayActions(stay));
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 44));
+      params.setMargins(0, UiKit.dp(this, 8), 0, 0);
+      manage.setLayoutParams(params);
+      card.addView(manage);
     }
     return card;
   }
@@ -2822,7 +3116,11 @@ public final class MainActivity extends ComponentActivity {
 
     LinearLayout page = UiKit.column(this);
     LinearLayout summary = UiKit.card(this);
-    summary.addView(detailLine("Kayıtlar", customer.requestCount + " talep · " + customer.reservationCount + " rezervasyon"));
+    summary.addView(detailLine(
+        "Kayıtlar",
+        customer.requestCount + " talep · " + customer.reservationCount + " rezervasyon · "
+            + customer.stayCount + " konaklama"
+    ));
     if (!customer.phone.isEmpty()) {
       summary.addView(UiKit.divider(this));
       summary.addView(detailLine("Telefon", customer.phone));
@@ -2836,6 +3134,24 @@ public final class MainActivity extends ComponentActivity {
       summary.addView(detailLine("Etiketler", String.join(", ", customer.tags)));
     }
     page.addView(summary);
+
+    if (hasCustomerIdentityDetails(customer)) {
+      page.addView(sectionLabel("Kimlik bilgileri"));
+      LinearLayout identityDetails = UiKit.card(this);
+      addOptionalDetail(identityDetails, "Belge", formatIdentityType(customer.identityType));
+      addOptionalDetail(identityDetails, "Kimlik / pasaport no", customer.identityNumber);
+      addOptionalDetail(identityDetails, "Seri no", customer.documentSerialNumber);
+      addOptionalDetail(identityDetails, "Uyruk", customer.nationality);
+      addOptionalDetail(identityDetails, "Doğum tarihi", customer.birthDate);
+      addOptionalDetail(identityDetails, "Doğum yeri", customer.birthPlace);
+      addOptionalDetail(identityDetails, "Cinsiyet", formatCustomerGender(customer.gender));
+      addOptionalDetail(identityDetails, "Anne adı", customer.motherName);
+      addOptionalDetail(identityDetails, "Baba adı", customer.fatherName);
+      addOptionalDetail(identityDetails, "Son geçerlilik", customer.documentExpiryDate);
+      addOptionalDetail(identityDetails, "Düzenleyen makam", customer.issuingAuthority);
+      addOptionalDetail(identityDetails, "Adres", customer.address);
+      page.addView(identityDetails);
+    }
 
     if (!customer.notes.isEmpty()) {
       page.addView(sectionLabel("Notlar"));
@@ -2851,6 +3167,38 @@ public final class MainActivity extends ComponentActivity {
         UiKit.addAction(contact, UiKit.button(this, "WhatsApp", UiKit.PRIMARY, view -> openWhatsApp(customer.phone, "")), this);
       }
       page.addView(contact);
+    }
+
+    if (AndroidUiRules.canManageCustomers(data)) {
+      page.addView(sectionLabel("Müşteri işlemleri"));
+      LinearLayout customerActions = UiKit.row(this);
+      UiKit.addAction(
+          customerActions,
+          UiKit.outlineButton(this, "Kartı Düzenle", view -> {
+            dialog.dismiss();
+            showCustomerForm(customer);
+          }),
+          this
+      );
+      if (canManageCustomerRoomStays()) {
+        UiKit.addAction(
+            customerActions,
+            UiKit.button(this, "Odaya Ata", UiKit.PRIMARY, view -> {
+              dialog.dismiss();
+              showRoomAssignmentDialog(customer, null);
+            }),
+            this
+        );
+      }
+      page.addView(customerActions);
+    }
+
+    List<OperationData.CustomerRoomStayRecord> customerStays = data.staysForCustomer(customer.id);
+    if (!customerStays.isEmpty()) {
+      page.addView(sectionLabel("Konaklama arşivi"));
+      for (OperationData.CustomerRoomStayRecord stay : customerStays) {
+        page.addView(customerRoomStayCard(stay));
+      }
     }
 
     if (AndroidUiRules.canDelete(data, "customer.delete")) {
@@ -2877,6 +3225,401 @@ public final class MainActivity extends ComponentActivity {
     dialog.setContentView(shell);
     dialog.show();
     configureFullDialog(dialog);
+  }
+
+  private void showCustomerForm(OperationData.CustomerRecord existing) {
+    if (!data.isAdmin() || !data.hasPermission("customer.manage")) {
+      showError("Müşteri kartları yalnız yönetici cihazlarda düzenlenebilir.");
+      return;
+    }
+
+    Dialog dialog = new Dialog(this);
+    LinearLayout shell = UiKit.column(this);
+    shell.setBackgroundColor(UiKit.BG);
+    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
+
+    LinearLayout header = UiKit.row(this);
+    LinearLayout heading = UiKit.column(this);
+    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    heading.addView(UiKit.eyebrow(this, existing == null ? "YENİ MÜŞTERİ" : "MÜŞTERİ KARTI"));
+    heading.addView(UiKit.title(this, existing == null ? "Müşteri oluştur" : existing.fullName));
+    header.addView(heading);
+    Button close = UiKit.iconButton(this, "×", "Müşteri formunu kapat", false, view -> dialog.dismiss());
+    header.addView(close, new LinearLayout.LayoutParams(UiKit.dp(this, 44), UiKit.dp(this, 44)));
+    shell.addView(header);
+
+    LinearLayout form = UiKit.column(this);
+    form.addView(UiKit.text(
+        this,
+        "Kimlik görseli yalnız alanları önermek için işlenir; görsel müşteri kartında saklanmaz.",
+        12,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+
+    CustomerFormSession session = new CustomerFormSession(dialog);
+    session.fullName = addCustomerFormInput(form, "Ad soyad *", "Örn. Ayşe Yılmaz", value(existing, "fullName"), false);
+    session.fullName.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
+    session.phone = addCustomerFormInput(form, "Telefon", "05xx xxx xx xx", value(existing, "phone"), false);
+    session.phone.setInputType(InputType.TYPE_CLASS_PHONE);
+    session.email = addCustomerFormInput(form, "E-posta", "ornek@eposta.com", value(existing, "email"), false);
+    session.email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+    session.tags = addCustomerFormInput(form, "Etiketler", "VIP, kurumsal, düzenli misafir", existing == null ? "" : String.join(", ", existing.tags), false);
+    session.notes = addCustomerFormInput(form, "Müşteri notları", "Tercihler ve işletme notları", value(existing, "notes"), true);
+
+    form.addView(sectionLabel("Kimlik kartı / pasaport"));
+    session.identityType = addChoiceSpinner(
+        form,
+        "Belge türü",
+        new ChoiceItem[] {
+            new ChoiceItem("", "Belirtilmedi"),
+            new ChoiceItem("tc_identity_card", "T.C. kimlik kartı"),
+            new ChoiceItem("passport", "Pasaport"),
+            new ChoiceItem("other", "Diğer kimlik belgesi")
+        },
+        value(existing, "identityType")
+    );
+    session.identityNumber = addCustomerFormInput(form, "Kimlik / pasaport no", "Belge numarası", value(existing, "identityNumber"), false);
+    session.nationality = addCustomerFormInput(form, "Uyruk", "Örn. T.C.", value(existing, "nationality"), false);
+    session.birthDate = addCustomerFormInput(form, "Doğum tarihi", "YYYY-AA-GG", value(existing, "birthDate"), false);
+    session.gender = addChoiceSpinner(
+        form,
+        "Cinsiyet",
+        new ChoiceItem[] {
+            new ChoiceItem("", "Belirtilmedi"),
+            new ChoiceItem("female", "Kadın"),
+            new ChoiceItem("male", "Erkek"),
+            new ChoiceItem("unspecified", "Belirtmek istemiyor")
+        },
+        value(existing, "gender")
+    );
+    session.documentSerialNumber = addCustomerFormInput(form, "Belge seri no", "Seri numarası", value(existing, "documentSerialNumber"), false);
+    session.documentExpiryDate = addCustomerFormInput(form, "Son geçerlilik tarihi", "YYYY-AA-GG", value(existing, "documentExpiryDate"), false);
+    session.birthPlace = addCustomerFormInput(form, "Doğum yeri", "Şehir / ülke", value(existing, "birthPlace"), false);
+    session.motherName = addCustomerFormInput(form, "Anne adı", "Kimlikte yer alıyorsa", value(existing, "motherName"), false);
+    session.fatherName = addCustomerFormInput(form, "Baba adı", "Kimlikte yer alıyorsa", value(existing, "fatherName"), false);
+    session.issuingAuthority = addCustomerFormInput(form, "Düzenleyen makam", "Belgeyi düzenleyen makam", value(existing, "issuingAuthority"), false);
+    session.address = addCustomerFormInput(form, "Adres", "Kimlikte yer alıyorsa", value(existing, "address"), true);
+
+    session.imageButton = UiKit.outlineButton(this, "Kimlik Görselinden AI ile Doldur", view -> showIdentityImageSourceDialog());
+    LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48));
+    imageParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
+    session.imageButton.setLayoutParams(imageParams);
+    form.addView(session.imageButton);
+
+    session.status = UiKit.text(this, "", 12, UiKit.MUTED, Typeface.BOLD);
+    LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+    statusParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
+    session.status.setLayoutParams(statusParams);
+    session.status.setVisibility(View.GONE);
+    form.addView(session.status);
+
+    session.saveButton = UiKit.button(this, existing == null ? "Müşteriyi Oluştur" : "Değişiklikleri Kaydet", UiKit.PRIMARY, view -> {
+      String fullName = textValue(session.fullName);
+      if (fullName.length() < 2) {
+        session.setStatus("Müşteri adı en az 2 karakter olmalı.", UiKit.DANGER);
+        session.fullName.requestFocus();
+        return;
+      }
+      JSONArray tags = parseCustomerTags(textValue(session.tags));
+      JSONObject actionPayload = payload(
+          "full_name", fullName,
+          "phone", textValue(session.phone),
+          "email", textValue(session.email),
+          "notes", textValue(session.notes),
+          "tags", tags,
+          "identity_type", selectedChoiceValue(session.identityType),
+          "identity_number", textValue(session.identityNumber),
+          "nationality", textValue(session.nationality),
+          "birth_date", textValue(session.birthDate),
+          "gender", selectedChoiceValue(session.gender),
+          "document_serial_number", textValue(session.documentSerialNumber),
+          "document_expiry_date", textValue(session.documentExpiryDate),
+          "birth_place", textValue(session.birthPlace),
+          "mother_name", textValue(session.motherName),
+          "father_name", textValue(session.fatherName),
+          "issuing_authority", textValue(session.issuingAuthority),
+          "address", textValue(session.address)
+      );
+      if (existing != null) {
+        try {
+          actionPayload.put("customer_id", existing.id);
+          actionPayload.put("expected_updated_at", existing.updatedAt);
+        } catch (Exception ignored) {
+          session.setStatus("Müşteri güncelleme isteği hazırlanamadı.", UiKit.DANGER);
+          return;
+        }
+      }
+      dialog.dismiss();
+      sendAction(
+          existing == null ? "customer_create" : "customer_update",
+          actionPayload,
+          existing == null ? "Müşteri kartı oluşturulmak üzere gönderildi." : "Müşteri kartı güncellenmek üzere gönderildi."
+      );
+    });
+    LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
+    saveParams.setMargins(0, UiKit.dp(this, 12), 0, UiKit.dp(this, 20));
+    session.saveButton.setLayoutParams(saveParams);
+    form.addView(session.saveButton);
+
+    ScrollView scroll = UiKit.scroll(this, form);
+    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
+    shell.addView(scroll);
+    dialog.setContentView(shell);
+    dialog.setOnDismissListener(value -> {
+      if (activeCustomerFormSession == session) {
+        activeCustomerFormSession = null;
+      }
+      deletePendingIdentityCameraFile();
+      pendingIdentityCameraUri = null;
+    });
+    activeCustomerFormSession = session;
+    dialog.show();
+    configureFullDialog(dialog);
+  }
+
+  private EditText addCustomerFormInput(
+      LinearLayout form,
+      String label,
+      String hint,
+      String initialValue,
+      boolean multiline
+  ) {
+    TextView fieldLabel = UiKit.text(this, label, 11, UiKit.MUTED, Typeface.BOLD);
+    LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+    labelParams.setMargins(0, UiKit.dp(this, 10), 0, UiKit.dp(this, 4));
+    fieldLabel.setLayoutParams(labelParams);
+    form.addView(fieldLabel);
+    EditText input = UiKit.input(this, hint);
+    if (multiline) {
+      input.setSingleLine(false);
+      input.setMinLines(3);
+      input.setGravity(Gravity.TOP);
+      input.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 10), UiKit.dp(this, 12), UiKit.dp(this, 10));
+      input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+    }
+    input.setText(initialValue == null ? "" : initialValue);
+    input.setLayoutParams(new LinearLayout.LayoutParams(-1, multiline ? UiKit.dp(this, 94) : UiKit.dp(this, 50)));
+    form.addView(input);
+    return input;
+  }
+
+  private Spinner addChoiceSpinner(
+      LinearLayout form,
+      String label,
+      ChoiceItem[] choices,
+      String selectedValue
+  ) {
+    TextView fieldLabel = UiKit.text(this, label, 11, UiKit.MUTED, Typeface.BOLD);
+    LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(-1, -2);
+    labelParams.setMargins(0, UiKit.dp(this, 10), 0, UiKit.dp(this, 4));
+    fieldLabel.setLayoutParams(labelParams);
+    form.addView(fieldLabel);
+    Spinner spinner = new Spinner(this);
+    ArrayAdapter<ChoiceItem> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, choices);
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spinner.setAdapter(adapter);
+    spinner.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 11));
+    spinner.setPadding(UiKit.dp(this, 8), 0, UiKit.dp(this, 8), 0);
+    spinner.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50)));
+    selectSpinnerValue(spinner, selectedValue);
+    form.addView(spinner);
+    return spinner;
+  }
+
+  private void showRoomAssignmentDialog(
+      OperationData.CustomerRecord preferredCustomer,
+      OperationData.RoomRecord preferredRoom
+  ) {
+    if (!canManageCustomerRoomStays()) {
+      showError("Müşteri-oda ataması yalnız yetkili yönetici cihazlarda kullanılabilir.");
+      return;
+    }
+    if (data.customers.isEmpty() || data.rooms.isEmpty()) {
+      showError(data.customers.isEmpty()
+          ? "Odaya atamak için önce bir müşteri kartı oluşturun."
+          : "Atama yapılabilecek oda kaydı bulunamadı.");
+      return;
+    }
+
+    Dialog dialog = new Dialog(this);
+    LinearLayout shell = UiKit.column(this);
+    shell.setBackgroundColor(UiKit.BG);
+    shell.setPadding(UiKit.dp(this, 16), UiKit.dp(this, 14), UiKit.dp(this, 16), UiKit.dp(this, 20));
+    LinearLayout header = UiKit.row(this);
+    LinearLayout heading = UiKit.column(this);
+    heading.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    heading.addView(UiKit.eyebrow(this, "MÜŞTERİ · ODA"));
+    heading.addView(UiKit.title(this, "Konaklama oluştur"));
+    header.addView(heading);
+    Button close = UiKit.iconButton(this, "×", "Oda atama formunu kapat", false, view -> dialog.dismiss());
+    header.addView(close, new LinearLayout.LayoutParams(UiKit.dp(this, 44), UiKit.dp(this, 44)));
+    shell.addView(header);
+
+    LinearLayout form = UiKit.column(this);
+    ChoiceItem[] customerChoices = new ChoiceItem[data.customers.size()];
+    for (int index = 0; index < data.customers.size(); index += 1) {
+      OperationData.CustomerRecord customer = data.customers.get(index);
+      customerChoices[index] = new ChoiceItem(
+          customer.id,
+          customer.fullName + (customer.phone.isEmpty() ? "" : " · " + customer.phone)
+      );
+    }
+    ChoiceItem[] roomChoices = new ChoiceItem[data.rooms.size()];
+    for (int index = 0; index < data.rooms.size(); index += 1) {
+      OperationData.RoomRecord room = data.rooms.get(index);
+      OperationData.CustomerRoomStayRecord activeStay = data.activeStayForRoom(room.id);
+      roomChoices[index] = new ChoiceItem(
+          room.id,
+          room.name + (room.number.isEmpty() ? "" : " · " + room.number)
+              + " · " + formatRoomStatus(room.status)
+              + (activeStay == null ? "" : " · " + activeStay.customerName)
+      );
+    }
+    Spinner customer = addChoiceSpinner(
+        form,
+        "Müşteri *",
+        customerChoices,
+        preferredCustomer == null ? customerChoices[0].value : preferredCustomer.id
+    );
+    Spinner room = addChoiceSpinner(
+        form,
+        "Oda *",
+        roomChoices,
+        preferredRoom == null ? roomChoices[0].value : preferredRoom.id
+    );
+    String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
+    EditText checkInDate = addCustomerFormInput(form, "Giriş tarihi *", "YYYY-AA-GG", today, false);
+    EditText checkOutDate = addCustomerFormInput(form, "Çıkış tarihi", "YYYY-AA-GG", "", false);
+    EditText guestCount = addCustomerFormInput(form, "Kişi sayısı *", "1", "1", false);
+    guestCount.setInputType(InputType.TYPE_CLASS_NUMBER);
+    Spinner status = addChoiceSpinner(
+        form,
+        "Başlangıç durumu",
+        new ChoiceItem[] {
+            new ChoiceItem("planned", "Planlı / rezerve"),
+            new ChoiceItem("checked_in", "Giriş yapıldı")
+        },
+        "planned"
+    );
+    EditText notes = addCustomerFormInput(form, "Konaklama notu", "Odaya özel notlar", "", true);
+    TextView statusMessage = UiKit.text(this, "", 12, UiKit.DANGER, Typeface.BOLD);
+    statusMessage.setVisibility(View.GONE);
+    form.addView(statusMessage);
+
+    Button save = UiKit.button(this, "Müşteriyi Odaya Ata", UiKit.PRIMARY, view -> {
+      String start = textValue(checkInDate);
+      String end = textValue(checkOutDate);
+      int guests;
+      try {
+        guests = Integer.parseInt(textValue(guestCount));
+      } catch (Exception ignored) {
+        guests = 0;
+      }
+      if (!isIsoDate(start) || (!end.isEmpty() && !isIsoDate(end))) {
+        statusMessage.setText("Tarihleri YYYY-AA-GG biçiminde girin.");
+        statusMessage.setVisibility(View.VISIBLE);
+        return;
+      }
+      if (!end.isEmpty() && end.compareTo(start) < 0) {
+        statusMessage.setText("Çıkış tarihi giriş tarihinden önce olamaz.");
+        statusMessage.setVisibility(View.VISIBLE);
+        return;
+      }
+      if (guests < 1 || guests > 50) {
+        statusMessage.setText("Kişi sayısı 1 ile 50 arasında olmalı.");
+        statusMessage.setVisibility(View.VISIBLE);
+        return;
+      }
+      dialog.dismiss();
+      sendAction(
+          "customer_room_assign",
+          payload(
+              "customer_id", selectedChoiceValue(customer),
+              "room_id", selectedChoiceValue(room),
+              "check_in_date", start,
+              "check_out_date", end,
+              "guest_count", guests,
+              "status", selectedChoiceValue(status),
+              "notes", textValue(notes)
+          ),
+          "Müşteri-oda ataması gönderildi."
+      );
+    });
+    LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 50));
+    saveParams.setMargins(0, UiKit.dp(this, 12), 0, UiKit.dp(this, 20));
+    save.setLayoutParams(saveParams);
+    form.addView(save);
+
+    ScrollView scroll = UiKit.scroll(this, form);
+    scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, 0, 1f));
+    shell.addView(scroll);
+    dialog.setContentView(shell);
+    dialog.show();
+    configureFullDialog(dialog);
+  }
+
+  private void showCustomerRoomStayActions(OperationData.CustomerRoomStayRecord stay) {
+    if (!canManageCustomerRoomStays() || !canTransitionCustomerRoomStay(stay)) {
+      Toast.makeText(this, "Bu konaklama kaydında kullanılabilir durum işlemi yok.", Toast.LENGTH_SHORT).show();
+      return;
+    }
+    Dialog dialog = new Dialog(this);
+    LinearLayout sheet = UiKit.column(this);
+    sheet.setPadding(UiKit.dp(this, 18), UiKit.dp(this, 16), UiKit.dp(this, 18), UiKit.dp(this, 18));
+    sheet.setBackground(UiKit.rounded(this, UiKit.SURFACE, UiKit.BORDER, 18));
+    sheet.addView(UiKit.eyebrow(this, "KONAKLAMA DURUMU"));
+    sheet.addView(UiKit.title(this, stay.customerName + " · " + stay.roomName));
+    sheet.addView(UiKit.text(
+        this,
+        joinDateRange(stay.checkInDate, stay.checkOutDate) + " · " + formatCustomerRoomStayStatus(stay.status),
+        13,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+
+    if ("planned".equals(stay.status)) {
+      addStayStatusAction(sheet, dialog, stay, "Girişi Tamamla", "checked_in", UiKit.PRIMARY);
+      addStayStatusAction(sheet, dialog, stay, "Planı İptal Et", "cancelled", UiKit.DANGER_BACKGROUND);
+    } else if ("checked_in".equals(stay.status)) {
+      addStayStatusAction(sheet, dialog, stay, "Çıkışı Tamamla", "checked_out", UiKit.PRIMARY);
+      addStayStatusAction(sheet, dialog, stay, "Konaklamayı İptal Et", "cancelled", UiKit.DANGER_BACKGROUND);
+    } else if ("cancelled".equals(stay.status)) {
+      addStayStatusAction(sheet, dialog, stay, "Yeniden Planla", "planned", UiKit.PRIMARY);
+    }
+    dialog.setContentView(sheet);
+    dialog.show();
+    configureBottomDialog(dialog);
+  }
+
+  private void addStayStatusAction(
+      LinearLayout sheet,
+      Dialog dialog,
+      OperationData.CustomerRoomStayRecord stay,
+      String label,
+      String nextStatus,
+      int tone
+  ) {
+    Button action = "cancelled".equals(nextStatus)
+        ? UiKit.dangerButton(this, label, view -> submitCustomerRoomStayStatus(dialog, stay, nextStatus))
+        : UiKit.button(this, label, tone, view -> submitCustomerRoomStayStatus(dialog, stay, nextStatus));
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+    params.setMargins(0, UiKit.dp(this, 9), 0, 0);
+    action.setLayoutParams(params);
+    sheet.addView(action);
+  }
+
+  private void submitCustomerRoomStayStatus(
+      Dialog dialog,
+      OperationData.CustomerRoomStayRecord stay,
+      String nextStatus
+  ) {
+    dialog.dismiss();
+    sendAction(
+        "customer_room_stay_status",
+        payload("stay_id", stay.id, "status", nextStatus, "expected_updated_at", stay.updatedAt),
+        "Konaklama durumu güncellenmek üzere gönderildi."
+    );
   }
 
   private void showRequestDetail(OperationData.RequestRecord request) {
@@ -3615,8 +4358,8 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
     for (ActionSpec action : actions) {
-      if (isAdminOnlyDeletionAction(action.type) && !data.isAdmin()) {
-        String message = "Silme işlemleri yalnız yönetici cihazlarda kullanılabilir.";
+      if (isAdminOnlyAction(action.type) && !data.isAdmin()) {
+        String message = "Bu işlem yalnız yönetici cihazlarda kullanılabilir.";
         showError(message);
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         return;
@@ -3755,6 +4498,12 @@ public final class MainActivity extends ComponentActivity {
 
   private String requiredPermissionForAction(String actionType, JSONObject actionPayload) {
     switch (actionType) {
+      case "customer_create":
+      case "customer_update":
+        return "customer.manage";
+      case "customer_room_assign":
+      case "customer_room_stay_status":
+        return "room.assign_customer";
       case "customer_request_delete":
         return "request.delete";
       case "customer_delete":
@@ -3828,9 +4577,13 @@ public final class MainActivity extends ComponentActivity {
     }
   }
 
-  private boolean isAdminOnlyDeletionAction(String actionType) {
+  private boolean isAdminOnlyAction(String actionType) {
     return "customer_request_delete".equals(actionType)
         || "customer_delete".equals(actionType)
+        || "customer_create".equals(actionType)
+        || "customer_update".equals(actionType)
+        || "customer_room_assign".equals(actionType)
+        || "customer_room_stay_status".equals(actionType)
         || "menu_category_delete".equals(actionType)
         || "menu_item_delete".equals(actionType)
         || "message_delete".equals(actionType);
@@ -3968,6 +4721,16 @@ public final class MainActivity extends ComponentActivity {
     int count = 0;
     for (OperationData.RoomRecord room : data.rooms) {
       if (status.equals(room.status)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private int countCustomerRoomStays(String status) {
+    int count = 0;
+    for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
+      if (status.equals(stay.status)) {
         count += 1;
       }
     }
@@ -4129,6 +4892,124 @@ public final class MainActivity extends ComponentActivity {
     return result.toString();
   }
 
+  private boolean canManageCustomerRoomStays() {
+    return data.isAdmin()
+        && data.hasPermission("customer.manage")
+        && data.hasPermission("room.assign_customer");
+  }
+
+  private boolean canTransitionCustomerRoomStay(OperationData.CustomerRoomStayRecord stay) {
+    return stay != null && (
+        "planned".equals(stay.status)
+        || "checked_in".equals(stay.status)
+        || "cancelled".equals(stay.status)
+    );
+  }
+
+  private OperationData.CustomerRoomStayRecord activeStayForCustomer(String customerId) {
+    for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
+      if (customerId.equals(stay.customerId) && stay.isActive()) {
+        return stay;
+      }
+    }
+    return null;
+  }
+
+  private boolean hasCustomerIdentityDetails(OperationData.CustomerRecord customer) {
+    return !customerIdentitySummary(customer).isEmpty()
+        || !customer.nationality.isEmpty()
+        || !customer.birthDate.isEmpty()
+        || !customer.gender.isEmpty()
+        || !customer.documentExpiryDate.isEmpty()
+        || !customer.birthPlace.isEmpty()
+        || !customer.motherName.isEmpty()
+        || !customer.fatherName.isEmpty()
+        || !customer.issuingAuthority.isEmpty()
+        || !customer.address.isEmpty();
+  }
+
+  private String customerIdentitySummary(OperationData.CustomerRecord customer) {
+    return joinNonEmpty(
+        " · ",
+        formatIdentityType(customer.identityType),
+        customer.identityNumber,
+        customer.documentSerialNumber
+    );
+  }
+
+  private void addOptionalDetail(LinearLayout card, String label, String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return;
+    }
+    if (card.getChildCount() > 0) {
+      card.addView(UiKit.divider(this));
+    }
+    card.addView(detailLine(label, value.trim()));
+  }
+
+  private String value(OperationData.CustomerRecord customer, String field) {
+    if (customer == null) {
+      return "";
+    }
+    switch (field) {
+      case "fullName": return customer.fullName;
+      case "phone": return customer.phone;
+      case "email": return customer.email;
+      case "notes": return customer.notes;
+      case "identityType": return customer.identityType;
+      case "identityNumber": return customer.identityNumber;
+      case "nationality": return customer.nationality;
+      case "birthDate": return customer.birthDate;
+      case "gender": return customer.gender;
+      case "documentSerialNumber": return customer.documentSerialNumber;
+      case "documentExpiryDate": return customer.documentExpiryDate;
+      case "birthPlace": return customer.birthPlace;
+      case "motherName": return customer.motherName;
+      case "fatherName": return customer.fatherName;
+      case "issuingAuthority": return customer.issuingAuthority;
+      case "address": return customer.address;
+      default: return "";
+    }
+  }
+
+  private String textValue(EditText input) {
+    return input == null ? "" : input.getText().toString().trim();
+  }
+
+  private String selectedChoiceValue(Spinner spinner) {
+    Object selected = spinner == null ? null : spinner.getSelectedItem();
+    return selected instanceof ChoiceItem ? ((ChoiceItem) selected).value : "";
+  }
+
+  private JSONArray parseCustomerTags(String source) {
+    JSONArray result = new JSONArray();
+    if (source == null || source.trim().isEmpty()) {
+      return result;
+    }
+    java.util.HashSet<String> seen = new java.util.HashSet<>();
+    for (String raw : source.split("[,;\\n]")) {
+      String tag = raw.trim();
+      String key = tag.toLowerCase(new Locale("tr", "TR"));
+      if (!tag.isEmpty() && tag.length() <= 40 && seen.add(key) && result.length() < 20) {
+        result.put(tag);
+      }
+    }
+    return result;
+  }
+
+  private boolean isIsoDate(String value) {
+    if (value == null || !value.matches("\\d{4}-\\d{2}-\\d{2}")) {
+      return false;
+    }
+    try {
+      SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT);
+      format.setLenient(false);
+      return format.parse(value) != null;
+    } catch (Exception ignored) {
+      return false;
+    }
+  }
+
   private String namesForRooms(List<String> roomIds) {
     ArrayList<String> names = new ArrayList<>();
     for (String roomId : roomIds) {
@@ -4258,6 +5139,28 @@ public final class MainActivity extends ComponentActivity {
     return value;
   }
 
+  private String formatCustomerRoomStayStatus(String value) {
+    if ("planned".equals(value)) return "Planlı";
+    if ("checked_in".equals(value)) return "Konaklıyor";
+    if ("checked_out".equals(value)) return "Çıkış yapıldı";
+    if ("cancelled".equals(value)) return "İptal";
+    return value == null ? "" : value;
+  }
+
+  private String formatIdentityType(String value) {
+    if ("tc_identity_card".equals(value)) return "T.C. kimlik kartı";
+    if ("passport".equals(value)) return "Pasaport";
+    if ("other".equals(value)) return "Diğer kimlik belgesi";
+    return "";
+  }
+
+  private String formatCustomerGender(String value) {
+    if ("female".equals(value)) return "Kadın";
+    if ("male".equals(value)) return "Erkek";
+    if ("unspecified".equals(value)) return "Belirtilmedi";
+    return "";
+  }
+
   private String formatTableStatus(String value) {
     if ("available".equals(value)) return "Boş";
     if ("occupied".equals(value)) return "Dolu";
@@ -4292,6 +5195,10 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private String formatActionType(String value) {
+    if ("customer_create".equals(value)) return "Müşteri oluşturma";
+    if ("customer_update".equals(value)) return "Müşteri güncelleme";
+    if ("customer_room_assign".equals(value)) return "Müşteri-oda ataması";
+    if ("customer_room_stay_status".equals(value)) return "Konaklama durumu";
     if (value.startsWith("customer_request")) return "Müşteri talebi";
     if (value.startsWith("reservation")) return "Rezervasyon";
     if (value.startsWith("room")) return "Oda durumu";
@@ -4321,6 +5228,14 @@ public final class MainActivity extends ComponentActivity {
     if ("occupied".equals(status)) return UiKit.INFO;
     if ("reserved".equals(status) || "bill_waiting".equals(status)) return UiKit.WARNING;
     if ("maintenance".equals(status)) return UiKit.DANGER;
+    return UiKit.MUTED;
+  }
+
+  private int customerRoomStayTone(String status) {
+    if ("planned".equals(status)) return UiKit.WARNING;
+    if ("checked_in".equals(status)) return UiKit.INFO;
+    if ("checked_out".equals(status)) return UiKit.SUCCESS;
+    if ("cancelled".equals(status)) return UiKit.MUTED;
     return UiKit.MUTED;
   }
 
@@ -4422,6 +5337,68 @@ public final class MainActivity extends ComponentActivity {
       this.id = ActionOutbox.createActionId();
       this.type = type;
       this.payload = payload;
+    }
+  }
+
+  private static final class ChoiceItem {
+    final String value;
+    final String label;
+
+    ChoiceItem(String value, String label) {
+      this.value = value == null ? "" : value;
+      this.label = label == null ? "" : label;
+    }
+
+    @Override
+    public String toString() {
+      return label;
+    }
+  }
+
+  private static final class CustomerFormSession {
+    final Dialog dialog;
+    EditText fullName;
+    EditText phone;
+    EditText email;
+    EditText tags;
+    EditText notes;
+    Spinner identityType;
+    EditText identityNumber;
+    EditText nationality;
+    EditText birthDate;
+    Spinner gender;
+    EditText documentSerialNumber;
+    EditText documentExpiryDate;
+    EditText birthPlace;
+    EditText motherName;
+    EditText fatherName;
+    EditText issuingAuthority;
+    EditText address;
+    TextView status;
+    Button imageButton;
+    Button saveButton;
+
+    CustomerFormSession(Dialog dialog) {
+      this.dialog = dialog;
+    }
+
+    void setLoading(boolean loading) {
+      if (imageButton != null) {
+        imageButton.setEnabled(!loading);
+        imageButton.setText(loading ? "Kimlik okunuyor…" : "Kimlik Görselinden AI ile Doldur");
+      }
+      if (saveButton != null) {
+        saveButton.setEnabled(!loading);
+      }
+    }
+
+    void setStatus(String message, int tone) {
+      if (status == null) {
+        return;
+      }
+      status.setText(message == null ? "" : message);
+      status.setTextColor(tone);
+      status.setVisibility(message == null || message.trim().isEmpty() ? View.GONE : View.VISIBLE);
     }
   }
 

@@ -8,6 +8,7 @@ interface PensionPageProps {
   data: DesktopDashboardData;
   reservations: ReactNode;
   rooms: ReactNode;
+  stays: ReactNode;
   tasks: ReactNode;
 }
 
@@ -17,7 +18,7 @@ function localDateKey() {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-export function PensionPage({ data, reservations, rooms, tasks }: PensionPageProps) {
+export function PensionPage({ data, reservations, rooms, stays, tasks }: PensionPageProps) {
   const today = localDateKey();
   const activeReservations = data.reservations.filter((reservation) => !["rejected", "cancelled", "completed"].includes(reservation.status));
   const metrics: MetricCardProps[] = [
@@ -56,6 +57,14 @@ export function PensionPage({ data, reservations, rooms, tasks }: PensionPagePro
           </header>
           <div className="operation-panel-content">{rooms}</div>
         </aside>
+        <section className="operation-group-panel pension-stays-section" aria-labelledby="pension-stays-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Müşteri · Oda</span>
+            <h2 id="pension-stays-title">Konaklama Arşivi</h2>
+            <p>Planlanan, devam eden ve tamamlanan oda ilişkileri</p>
+          </header>
+          <div className="operation-panel-content">{stays}</div>
+        </section>
         <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Günlük İşler</span>

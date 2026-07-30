@@ -182,6 +182,7 @@ export interface AndroidOperationsSnapshot {
   daily_tasks: AndroidSnapshotTask[];
   requests: AndroidSnapshotRequest[];
   customers: AndroidSnapshotCustomer[];
+  customer_room_stays: AndroidSnapshotCustomerRoomStay[];
   reservations: AndroidSnapshotReservation[];
   rooms: AndroidSnapshotRoom[];
   tables: AndroidSnapshotTable[];
@@ -201,6 +202,7 @@ export type AndroidDeviceRole = "admin" | "staff";
 
 export const ANDROID_PERMISSIONS = [
   "customer.view",
+  "customer.manage",
   "customer.respond",
   "customer.mark_answered",
   "customer.reject",
@@ -213,6 +215,7 @@ export const ANDROID_PERMISSIONS = [
   "reservation.cancel",
   "room.view",
   "room.update_status",
+  "room.assign_customer",
   "daily_task.view",
   "daily_task.complete",
   "daily_task.reopen",
@@ -352,8 +355,42 @@ export interface AndroidSnapshotCustomer {
   email: string;
   notes: string;
   tags: string[];
+  identity_type: string;
+  identity_number: string;
+  nationality: string;
+  birth_date: string;
+  gender: string;
+  document_serial_number: string;
+  document_expiry_date: string;
+  birth_place: string;
+  mother_name: string;
+  father_name: string;
+  issuing_authority: string;
+  address: string;
   request_count: number;
   reservation_count: number;
+  stay_count: number;
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidSnapshotCustomerRoomStay {
+  id: string;
+  customer_id: string;
+  customer_name: string;
+  customer_phone: string;
+  room_id: string;
+  room_name: string;
+  room_number: string;
+  reservation_id: string;
+  status: string;
+  check_in_date: string;
+  check_out_date: string;
+  guest_count: number;
+  notes: string;
+  source: string;
+  checked_in_at: ISODateTimeString | "";
+  checked_out_at: ISODateTimeString | "";
+  created_at: ISODateTimeString | "";
   updated_at: ISODateTimeString | "";
 }
 
@@ -454,7 +491,11 @@ export const ANDROID_ACTION_TYPES = [
   "customer_request_reject",
   "customer_request_convert_to_reservation",
   "customer_request_delete",
+  "customer_create",
+  "customer_update",
   "customer_delete",
+  "customer_room_assign",
+  "customer_room_stay_status",
   "reservation_approve",
   "reservation_reject",
   "reservation_cancel",
@@ -526,7 +567,11 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   customer_request_reject: "customer.reject",
   customer_request_convert_to_reservation: "customer.convert_to_reservation",
   customer_request_delete: "request.delete",
+  customer_create: "customer.manage",
+  customer_update: "customer.manage",
   customer_delete: "customer.delete",
+  customer_room_assign: "room.assign_customer",
+  customer_room_stay_status: "room.assign_customer",
   reservation_approve: "reservation.approve",
   reservation_reject: "reservation.reject",
   reservation_cancel: "reservation.cancel",

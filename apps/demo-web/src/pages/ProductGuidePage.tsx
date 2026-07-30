@@ -94,6 +94,14 @@ const screenshots = {
     height: 768,
     kind: "desktop"
   },
+  desktopRequests: {
+    src: "/assets/product-guide/desktop-requests.webp",
+    alt: "Yardımcı Asistan masaüstü uygulamasında yeni müşteri talepleri ve seçili rezervasyon talebi",
+    caption: "Masaüstünde web taleplerini inceleme ve rezervasyona hazırlama",
+    width: 1366,
+    height: 768,
+    kind: "desktop"
+  },
   androidRestaurant: {
     src: "/assets/product-guide/android-restaurant.webp",
     alt: "Yardımcı Asistan Android uygulamasında restoran masaları ve sipariş işlemleri",
@@ -242,7 +250,7 @@ const guideItems: GuideItem[] = [
       "“Rezervasyona Dönüştür” işlemini seçin.",
       "Oda ve tarih bilgilerini kontrol ederek kaydedin."
     ],
-    screenshots: [screenshots.webAssistant]
+    screenshots: [screenshots.desktopRequests]
   },
   {
     id: "order",
@@ -540,18 +548,13 @@ export default function ProductGuidePage({ onNavigate }: ProductGuidePageProps) 
           <p className="eyebrow">Yerel Öncelikli</p>
           <h2 id="product-local-title">İşletmenin kontrolünde çalışan yapı</h2>
           <p>
-            Masaüstü uygulaması temel işletme verilerini yerel olarak saklar. Web sitesi ve Android
-            uygulaması işletmenin kendi web modülü üzerinden masaüstüyle iletişim kurar. İnternet
-            kesildiğinde masaüstündeki yerel işlemler kullanılmaya devam edebilir; bekleyen çevrimiçi
-            işlemler bağlantı geri geldiğinde yeniden eşitlenir.
+            Temel işletme verileri masaüstünde yerel olarak saklanır. Web ve Android, işletmenin kendi
+            web modülü üzerinden güncellenir; internet kesildiğinde masaüstündeki yerel işler kullanılmaya
+            devam eder.
           </p>
           <p>
-            AI özellikleri isteğe bağlıdır; AI kullanılamadığında temel rezervasyon, sipariş, stok ve
-            müşteri işlemleri çalışmaya devam eder.
-          </p>
-          <p className="product-lock-note">
-            Masaüstünde, uygulama içeriğini günlük kullanımda görünmez hale getiren ekran kilidi
-            kullanılabilir.
+            Bağlantı geri geldiğinde bekleyen işlemler yeniden eşitlenir. AI isteğe bağlıdır; kullanılamadığında
+            rezervasyon, sipariş, stok ve müşteri işlemleri devam eder.
           </p>
         </div>
       </section>
@@ -661,6 +664,7 @@ function ProductScreenshot({
       style={{ aspectRatio: `${screenshot.width} / ${screenshot.height}` }}
       onClick={(event) => onOpen(screenshot, event.currentTarget)}
       aria-label={`${screenshot.caption} görselini büyüt`}
+      title="Görseli büyüt"
     >
       <img
         src={screenshot.src}

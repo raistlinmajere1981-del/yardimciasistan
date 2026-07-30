@@ -54,6 +54,8 @@ npm run build
 npm run doctor
 npm run smoke:web-form-api
 npm run smoke:automatic-sync
+npm run smoke:customer-room-management
+npm run smoke:stock-image-analysis
 npm run e2e
 npm test
 npm run smoke:demo-flow
@@ -90,6 +92,12 @@ Web tarafı için demo site, web widget ve firma hosting mini API şablonu hazı
 
 Desktop tarafında Electron + React iskeleti, local SQLite, kalıcı outbox, cursor tabanlı talep çekme, 15 saniyelik otomatik koordinatör ve `electron-builder` tabanlı paketleme smoke kontrolü hazırdır. İnternet kesildiğinde yerel işlemler devam eder; kuyruklar bağlantı geldiğinde yeniden denenir.
 
+Müşteri kartları talep beklemeden masaüstünden veya yönetici Android uygulamasından
+oluşturulabilir. Kartta iletişim, not/etiket ve kimlik belgesi alanları bulunur; kimlik
+görseli kalıcı saklanmadan AI ile okunup kullanıcı kontrolü için forma aktarılabilir.
+Pansiyon tarafındaki `customer_room_stays` yaşam döngüsü müşteriyi odaya doğrudan
+atamayı, giriş/çıkış/iptal durumlarını ve silinmeyen konaklama arşivini yönetir.
+
 Firma web modülünde müşteriye açık `menu.html` QR menü sayfası ve `api/menu.php` üzerinden çalışan menü okuma akışı bulunur.
 
 QR menü için PC tarafında kategori/ürün yönetim ekranı bulunur; local SQLite verisi `pushMenu()` ile firma web modülündeki `publish_menu` aksiyonuna gönderilebilir.
@@ -99,6 +107,10 @@ AI tarafında `packages/ai-core` provider bağımsız prompt/knowledge/adapter k
 WhatsApp tarafında `packages/whatsapp-bridge` Türkiye cep telefonu normalizasyonu, `wa.me` link üretimi, manuel kopyalama ve WebView/resmi API geçişleri için ortak adapter yüzeyini sağlar.
 
 Android tarafında `apps/android-app` native companion ekranını sağlar. Masaüstü operasyon snapshot'ını kalıcı outbox üzerinden otomatik yayınlar; Android açıkken yaklaşık 15 saniyede bir, arka planda işletim sisteminin izin verdiği periyotta yeniler ve son başarılı veriyi yerel cache'den gösterebilir. Android Gradle Plugin hattı `npm run android:debug`, `npm run android:release-apk` ve `npm run android:release-aab` komutlarıyla debug APK, imzalı pilot APK ve Play Store AAB üretir; signing ve kurulum ayrıntıları `docs/ANDROID_DISTRIBUTION.md` içindedir. `npm run smoke:android-hosting` cihazsız hosting hazırlığını doğrular; gerçek telefonda yerel test için `npm run android:phone-test` demo veriyi yükler, PHP web modülünü LAN'da açar ve adb cihazı bağlıysa uygulamayı doğru web modül adresiyle başlatır.
+
+Android müşteri kartı, kimlik alanları, kimlik görseli analizi ve konaklama arşivi
+yalnız masaüstünde aktif yönetici olarak atanmış cihazlarda görünür; personel snapshot'ına
+bu kişisel veri listeleri eklenmez.
 
 Android ekran kontrolü için `npm run android:screenshot` ekran görüntüsünü
 `artifacts/android-control/` altına kaydeder, `npm run android:dump` UI ağacını

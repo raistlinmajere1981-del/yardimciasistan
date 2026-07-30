@@ -231,7 +231,56 @@ try {
   const androidData = await androidSummary.json();
   assert.ok(androidData.requests.some((request) => request.id === requestResult.request_id));
   assert.equal(androidData.rooms.find((room) => room.id === roomBefore.id)?.status, "cleaning");
+  assert.deepEqual(androidData.customers, [], "Staff devices must not receive customer cards or identity fields.");
+  assert.deepEqual(androidData.customer_room_stays, [], "Staff devices must not receive the customer-room archive.");
   assert.deepEqual(androidData.reports, [], "Staff devices must not receive report aggregates.");
+  const staffCustomerCreateResponse = await enqueueAndroidAction(
+    "android_customer_create_staff_hosting_0001",
+    "customer_create",
+    {
+      full_name: "Personel Oluşturamaz",
+      phone: "+905550000224",
+      email: "",
+      notes: "",
+      tags: [],
+      identity_type: "",
+      identity_number: "",
+      nationality: "",
+      birth_date: "",
+      gender: "",
+      document_serial_number: "",
+      document_expiry_date: "",
+      birth_place: "",
+      mother_name: "",
+      father_name: "",
+      issuing_authority: "",
+      address: ""
+    }
+  );
+  assert.equal(staffCustomerCreateResponse.status, 403);
+  assert.equal((await staffCustomerCreateResponse.json()).code, "customer_management_permission_denied");
+  const staffCustomerDeleteResponse = await enqueueAndroidAction(
+    "android_customer_delete_staff_hosting_0001",
+    "customer_delete",
+    { customer_id: "customer_staff_must_not_delete" }
+  );
+  assert.equal(staffCustomerDeleteResponse.status, 403);
+  assert.equal((await staffCustomerDeleteResponse.json()).code, "customer_management_permission_denied");
+  const staffRoomAssignmentResponse = await enqueueAndroidAction(
+    "android_room_assign_staff_hosting_0001",
+    "customer_room_assign",
+    {
+      customer_id: "customer_staff_must_not_assign",
+      room_id: "room_staff_must_not_assign",
+      check_in_date: "2037-07-10",
+      check_out_date: "2037-07-12",
+      guest_count: 1,
+      status: "planned",
+      notes: ""
+    }
+  );
+  assert.equal(staffRoomAssignmentResponse.status, 403);
+  assert.equal((await staffRoomAssignmentResponse.json()).code, "customer_management_permission_denied");
   const staffReportAi = await postJson(`${baseUrl}/api/chat.php`, {
     report_mode: "summary",
     report_preset: "last7",
@@ -479,6 +528,41 @@ try {
   assert.match((await getAndroidAction(staffDeleteActionId)).error_message, /yalnız yönetici/i);
   assert.equal(database.getDashboardData().requests.some((request) => request.id === deletionTargetId), true);
 
+  const managedCustomerResult = database.saveCustomer({
+    fullName: "Android Gizlilik Müşterisi",
+    phone: "+905550000223",
+    email: "android-gizlilik@example.test",
+    notes: "Yalnız yönetici snapshot testi",
+    tags: ["android", "gizlilik"],
+    identityType: "passport",
+    identityNumber: "PAUTO12345",
+    nationality: "T.C.",
+    birthDate: "1991-06-15",
+    gender: "female",
+    documentSerialNumber: "AUTO12345",
+    documentExpiryDate: "2031-06-15",
+    birthPlace: "İzmir",
+    motherName: "",
+    fatherName: "",
+    issuingAuthority: "",
+    address: ""
+  });
+  assert.equal(managedCustomerResult.ok, true, managedCustomerResult.message);
+  const managedRoom = database.getDashboardData().rooms.find(
+    (room) => room.id !== roomBefore.id && room.isActive && room.status === "available"
+  );
+  assert.ok(managedRoom);
+  const managedStayResult = database.assignCustomerToRoom({
+    customerId: managedCustomerResult.savedId,
+    roomId: managedRoom.id,
+    checkInDate: "2037-07-10",
+    checkOutDate: "2037-07-12",
+    guestCount: 1,
+    notes: "Yönetici snapshot konaklaması",
+    status: "planned"
+  });
+  assert.equal(managedStayResult.ok, true, managedStayResult.message);
+
   const promoteResult = database.setAndroidDeviceRole("android-auto-smoke", "admin");
   assert.equal(promoteResult.ok, true);
   const adminProfilePublishCycle = await coordinator.runNow();
@@ -490,8 +574,45 @@ try {
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("table_order.close_paid"), true);
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("request.delete"), true);
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("customer.delete"), true);
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("customer.manage"), true);
+  assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("room.assign_customer"), true);
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("menu.delete"), true);
   assert.equal(adminSummary.androidPermissions["android-auto-smoke"].permissions.includes("message.delete"), true);
+  const managedCustomerSnapshot = adminSummary.customers.find((customer) => customer.id === managedCustomerResult.savedId);
+  assert.ok(managedCustomerSnapshot);
+  assert.equal(managedCustomerSnapshot.identity_number, "PAUTO12345");
+  assert.equal(managedCustomerSnapshot.document_serial_number, "AUTO12345");
+  const managedStaySnapshot = adminSummary.customer_room_stays.find((stay) => stay.id === managedStayResult.savedId);
+  assert.ok(managedStaySnapshot);
+  assert.equal(managedStaySnapshot.customer_id, managedCustomerResult.savedId);
+  assert.equal(managedStaySnapshot.room_id, managedRoom.id);
+  const adminCustomerCreateActionId = "android_customer_create_admin_hosting_0001";
+  await assertQueued(await enqueueAndroidAction(adminCustomerCreateActionId, "customer_create", {
+    full_name: "Android Hosting Yönetici",
+    phone: "+905550000225",
+    email: "",
+    notes: "Hosting action smoke",
+    tags: ["android"],
+    identity_type: "passport",
+    identity_number: "PHOST12345",
+    nationality: "T.C.",
+    birth_date: "",
+    gender: "",
+    document_serial_number: "",
+    document_expiry_date: "",
+    birth_place: "",
+    mother_name: "",
+    father_name: "",
+    issuing_authority: "",
+    address: ""
+  }));
+  const adminCustomerCreateCycle = await coordinator.runNow();
+  assert.equal(adminCustomerCreateCycle.appliedActions, 1);
+  assert.equal(adminCustomerCreateCycle.failedActions, 0);
+  assert.equal(
+    database.getDashboardData().customers.some((customer) => customer.identityNumber === "PHOST12345"),
+    true
+  );
   assert.deepEqual(
     Object.keys(adminSummary.reports).sort(),
     ["last30", "last7", "today", "yesterday"],
@@ -824,7 +945,23 @@ function createSnapshot(databaseInstance) {
     customers: data.customers.map((customer) => ({
       id: customer.id, full_name: customer.fullName, phone: customer.phone, email: customer.email,
       notes: customer.notes, tags: customer.tags, request_count: customer.requestCount,
-      reservation_count: customer.reservationCount, updated_at: customer.updatedAt
+      identity_type: customer.identityType, identity_number: customer.identityNumber,
+      nationality: customer.nationality, birth_date: customer.birthDate, gender: customer.gender,
+      document_serial_number: customer.documentSerialNumber,
+      document_expiry_date: customer.documentExpiryDate, birth_place: customer.birthPlace,
+      mother_name: customer.motherName, father_name: customer.fatherName,
+      issuing_authority: customer.issuingAuthority, address: customer.address,
+      reservation_count: customer.reservationCount, stay_count: customer.stayCount,
+      updated_at: customer.updatedAt
+    })),
+    customer_room_stays: data.customerRoomStays.map((stay) => ({
+      id: stay.id, customer_id: stay.customerId, customer_name: stay.customerName,
+      customer_phone: stay.customerPhone, room_id: stay.roomId, room_name: stay.roomName,
+      room_number: stay.roomNumber, reservation_id: stay.reservationId, status: stay.status,
+      check_in_date: stay.checkInDate, check_out_date: stay.checkOutDate,
+      guest_count: stay.guestCount, notes: stay.notes, source: stay.source,
+      checked_in_at: stay.checkedInAt, checked_out_at: stay.checkedOutAt,
+      created_at: stay.createdAt, updated_at: stay.updatedAt
     })),
     reservations: [],
     rooms: data.rooms.map((room) => ({

@@ -47,6 +47,11 @@ test("ürün tanıtım sayfası platformları ve kısa rehberi gösterir", async
   const orderGuide = page.getByRole("button", { name: "Masada sipariş ve hesap yönetimi" });
   await expect(requestGuide).toHaveAttribute("aria-expanded", "true");
   await expect(orderGuide).toHaveAttribute("aria-expanded", "false");
+  const requestScreenshot = page.getByRole("button", {
+    name: "Masaüstünde web taleplerini inceleme ve rezervasyona hazırlama görselini büyüt"
+  });
+  await expect(requestScreenshot).toBeVisible();
+  await expect(requestScreenshot.locator(".product-screenshot-action")).toBeVisible();
   await orderGuide.click();
   await expect(orderGuide).toHaveAttribute("aria-expanded", "true");
   await expect(requestGuide).toHaveAttribute("aria-expanded", "false");

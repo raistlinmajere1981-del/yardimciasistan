@@ -14,6 +14,7 @@ import java.util.Set;
 final class OperationData {
   private static final String[] ALL_PERMISSIONS = {
       "customer.view",
+      "customer.manage",
       "customer.respond",
       "customer.mark_answered",
       "customer.reject",
@@ -26,6 +27,7 @@ final class OperationData {
       "reservation.cancel",
       "room.view",
       "room.update_status",
+      "room.assign_customer",
       "daily_task.view",
       "daily_task.complete",
       "daily_task.reopen",
@@ -101,6 +103,7 @@ final class OperationData {
 
   final List<RequestRecord> requests = new ArrayList<>();
   final List<CustomerRecord> customers = new ArrayList<>();
+  final List<CustomerRoomStayRecord> customerRoomStays = new ArrayList<>();
   final List<ReservationRecord> reservations = new ArrayList<>();
   final List<RoomRecord> rooms = new ArrayList<>();
   final List<TableRecord> tables = new ArrayList<>();
@@ -153,6 +156,7 @@ final class OperationData {
 
     addRecords(array(root, "requests"), data.requests, RequestRecord::fromJson);
     addRecords(array(root, "customers"), data.customers, CustomerRecord::fromJson);
+    addRecords(array(root, "customer_room_stays"), data.customerRoomStays, CustomerRoomStayRecord::fromJson);
     addRecords(array(root, "reservations"), data.reservations, ReservationRecord::fromJson);
     addRecords(array(root, "rooms"), data.rooms, RoomRecord::fromJson);
     addRecords(array(root, "tables"), data.tables, TableRecord::fromJson);
@@ -281,6 +285,34 @@ final class OperationData {
       }
     }
     return null;
+  }
+
+  CustomerRecord customerById(String customerId) {
+    for (CustomerRecord customer : customers) {
+      if (customerId.equals(customer.id)) {
+        return customer;
+      }
+    }
+    return null;
+  }
+
+  CustomerRoomStayRecord activeStayForRoom(String roomId) {
+    for (CustomerRoomStayRecord stay : customerRoomStays) {
+      if (roomId.equals(stay.roomId) && stay.isActive()) {
+        return stay;
+      }
+    }
+    return null;
+  }
+
+  List<CustomerRoomStayRecord> staysForCustomer(String customerId) {
+    ArrayList<CustomerRoomStayRecord> result = new ArrayList<>();
+    for (CustomerRoomStayRecord stay : customerRoomStays) {
+      if (customerId.equals(stay.customerId)) {
+        result.add(stay);
+      }
+    }
+    return result;
   }
 
   String categoryName(String categoryId) {
@@ -446,8 +478,21 @@ final class OperationData {
     String email = "";
     String notes = "";
     List<String> tags = new ArrayList<>();
+    String identityType = "";
+    String identityNumber = "";
+    String nationality = "";
+    String birthDate = "";
+    String gender = "";
+    String documentSerialNumber = "";
+    String documentExpiryDate = "";
+    String birthPlace = "";
+    String motherName = "";
+    String fatherName = "";
+    String issuingAuthority = "";
+    String address = "";
     int requestCount;
     int reservationCount;
+    int stayCount;
     String updatedAt = "";
 
     static CustomerRecord fromJson(JSONObject source) {
@@ -458,10 +503,71 @@ final class OperationData {
       record.email = value(source, "email", "");
       record.notes = value(source, "notes", "");
       record.tags = strings(source, "tags");
+      record.identityType = value(source, "identity_type", "");
+      record.identityNumber = value(source, "identity_number", "");
+      record.nationality = value(source, "nationality", "");
+      record.birthDate = value(source, "birth_date", "");
+      record.gender = value(source, "gender", "");
+      record.documentSerialNumber = value(source, "document_serial_number", "");
+      record.documentExpiryDate = value(source, "document_expiry_date", "");
+      record.birthPlace = value(source, "birth_place", "");
+      record.motherName = value(source, "mother_name", "");
+      record.fatherName = value(source, "father_name", "");
+      record.issuingAuthority = value(source, "issuing_authority", "");
+      record.address = value(source, "address", "");
       record.requestCount = number(source, "request_count");
       record.reservationCount = number(source, "reservation_count");
+      record.stayCount = number(source, "stay_count");
       record.updatedAt = value(source, "updated_at", "");
       return record;
+    }
+  }
+
+  static final class CustomerRoomStayRecord {
+    String id = "";
+    String customerId = "";
+    String customerName = "Misafir";
+    String customerPhone = "";
+    String roomId = "";
+    String roomName = "Oda";
+    String roomNumber = "";
+    String reservationId = "";
+    String status = "planned";
+    String checkInDate = "";
+    String checkOutDate = "";
+    int guestCount = 1;
+    String notes = "";
+    String source = "";
+    String checkedInAt = "";
+    String checkedOutAt = "";
+    String createdAt = "";
+    String updatedAt = "";
+
+    static CustomerRoomStayRecord fromJson(JSONObject source) {
+      CustomerRoomStayRecord record = new CustomerRoomStayRecord();
+      record.id = value(source, "id", "");
+      record.customerId = value(source, "customer_id", "");
+      record.customerName = value(source, "customer_name", "Misafir");
+      record.customerPhone = value(source, "customer_phone", "");
+      record.roomId = value(source, "room_id", "");
+      record.roomName = value(source, "room_name", "Oda");
+      record.roomNumber = value(source, "room_number", "");
+      record.reservationId = value(source, "reservation_id", "");
+      record.status = value(source, "status", "planned");
+      record.checkInDate = value(source, "check_in_date", "");
+      record.checkOutDate = value(source, "check_out_date", "");
+      record.guestCount = Math.max(1, number(source, "guest_count"));
+      record.notes = value(source, "notes", "");
+      record.source = value(source, "source", "");
+      record.checkedInAt = value(source, "checked_in_at", "");
+      record.checkedOutAt = value(source, "checked_out_at", "");
+      record.createdAt = value(source, "created_at", "");
+      record.updatedAt = value(source, "updated_at", "");
+      return record;
+    }
+
+    boolean isActive() {
+      return "planned".equals(status) || "checked_in".equals(status);
     }
   }
 
