@@ -1,11 +1,12 @@
-import { useEffect, useState } from "react";
-import { Banknote, BedDouble, CreditCard, Landmark, Minus, Plus, Trash2, WalletCards } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Banknote, BedDouble, CreditCard, Landmark, Minus, Plus, Trash2, WalletCards, X } from "lucide-react";
 import type {
   DesktopFinanceData,
   DesktopFinanceEntry,
   FinanceDirection,
   FinancePaymentMethod
 } from "../../../electron/finance";
+import type { DesktopRoomFolioData } from "../../../electron/room-folio";
 import { MetricCard } from "../ui/MetricCard";
 import { Panel } from "../ui/Panel";
 
@@ -20,7 +21,25 @@ const EMPTY_DATA: DesktopFinanceData = {
   pensionBalances: []
 };
 
+const EMPTY_ROOM_DATA: DesktopRoomFolioData = {
+  generatedAt: "",
+  rooms: [],
+  activeStays: [],
+  folios: [],
+  menuCategories: [],
+  menuItems: []
+};
+
 type CategoryOption = readonly [value: string, label: string];
+
+type OutstandingRow = {
+  id: string;
+  customerName: string;
+  context: string;
+  status: string;
+  dateText: string;
+  remainingMinor: number;
+};
 
 const EXPENSE_CATEGORIES: readonly CategoryOption[] = [
   ["stock", "Market / Stok"],
@@ -40,6 +59,7 @@ const INCOME_CATEGORIES: readonly CategoryOption[] = [
 
 export function FinanceWorkspace() {
   const [data, setData] = useState<DesktopFinanceData>(EMPTY_DATA);
+  const [roomData, setRoomData] = useState<DesktopRoomFolioData>(EMPTY_ROOM_DATA);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [entryMode, setEntryMode] = useState<FinanceDirection | null>(null);
@@ -47,7 +67,9 @@ export function FinanceWorkspace() {
   const [entryCategory, setEntryCategory] = useState("other_expense");
   const [entryPaymentMethod, setEntryPaymentMethod] = useState<FinancePaymentMethod>("cash");
   const [entryDescription, setEntryDescription] = useState("");
+  const [entryDate, setEntryDate] = useState(todayDateInput());
   const [saving, setSaving] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<DesktopFinanceEntry | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -57,14 +79,75 @@ export function FinanceWorkspace() {
       setMessage("Kasa bilgileri masaüstü uygulamasında kullanılabilir.");
       return () => { active = false; };
     }
-    void bridge.getFinanceData(50)
-      .then((next) => { if (active) setData(next); })
+
+    const roomPromise = bridge.getRoomFolioData
+      ? bridge.getRoomFolioData().catch(() => EMPTY_ROOM_DATA)
+      : Promise.resolve(EMPTY_ROOM_DATA);
+
+    void Promise.all([bridge.getFinanceData(100), roomPromise])
+      .then(([nextFinance, nextRooms]) => {
+        if (!active) return;
+        setData(nextFinance);
+        setRoomData(nextRooms);
+      })
       .catch(() => { if (active) setMessage("Kasa bilgileri hazırlanamadı."); })
       .finally(() => { if (active) setLoading(false); });
+
     return () => { active = false; };
   }, []);
 
   const categoryOptions: readonly CategoryOption[] = entryMode === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+
+  const outstandingRows = useMemo(() => {
+    const rows: OutstandingRow[] = [];
+    const folioReservationIds = new Set<string>();
+
+    for (const folio of roomData.folios) {
+      if (folio.reservationId) folioReservationIds.add(folio.reservationId);
+      if (folio.remainingMinor <= 0 || !["open", "closed"].includes(folio.status)) continue;
+      rows.push({
+        id: `folio:${folio.id}`,
+        customerName: folio.customerName || "Misafir",
+        context: folio.roomName || "Oda hesabı",
+        status: folio.status === "open" ? "Açık oda hesabı" : "Çıkış yaptı · alacak",
+        dateText: folio.plannedCheckOutDate ? `Çıkış ${formatDate(folio.plannedCheckOutDate)}` : "",
+        remainingMinor: folio.remainingMinor
+      });
+    }
+
+    for (const balance of data.pensionBalances) {
+      if (balance.remainingMinor <= 0 || folioReservationIds.has(balance.reservationId)) continue;
+      rows.push({
+        id: `legacy:${balance.reservationId}`,
+        customerName: balance.customerName || balance.title || "Konaklama",
+        context: balance.title || "Eski pansiyon kaydı",
+        status: "Eski rezervasyon kaydı",
+        dateText: balance.endDate ? `Bitiş ${formatDate(balance.endDate)}` : "",
+        remainingMinor: balance.remainingMinor
+      });
+    }
+
+    rows.sort((a, b) => {
+      const aOpen = a.status === "Açık oda hesabı" ? 0 : 1;
+      const bOpen = b.status === "Açık oda hesabı" ? 0 : 1;
+      return aOpen - bOpen || b.remainingMinor - a.remainingMinor;
+    });
+
+    const visibleTotal = rows.reduce((sum, item) => sum + item.remainingMinor, 0);
+    const unlistedMinor = Math.max(0, data.outstandingPensionMinor - visibleTotal);
+    if (unlistedMinor > 0) {
+      rows.push({
+        id: "older-outstanding",
+        customerName: "Diğer eski alacaklar",
+        context: "Arşivlenmiş oda hesapları",
+        status: "Geçmiş kayıt",
+        dateText: "",
+        remainingMinor: unlistedMinor
+      });
+    }
+
+    return rows;
+  }, [data.outstandingPensionMinor, data.pensionBalances, roomData.folios]);
 
   function openEntry(mode: FinanceDirection) {
     setEntryMode(mode);
@@ -72,7 +155,18 @@ export function FinanceWorkspace() {
     setEntryDescription("");
     setEntryCategory(mode === "income" ? "other_income" : "other_expense");
     setEntryPaymentMethod("cash");
+    setEntryDate(todayDateInput());
     setMessage("");
+  }
+
+  async function refreshRoomData() {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.getRoomFolioData) return;
+    try {
+      setRoomData(await bridge.getRoomFolioData());
+    } catch {
+      // Kasa hareketi kaydedilmişse oda özeti yenilenemese de işlemi geri çevirmeyiz.
+    }
   }
 
   async function saveEntry() {
@@ -83,6 +177,12 @@ export function FinanceWorkspace() {
       setMessage("Geçerli bir tutar girin.");
       return;
     }
+    const occurredAt = dateInputToTimestamp(entryDate);
+    if (!occurredAt) {
+      setMessage("Tarihi GG.AA.YYYY biçiminde girin.");
+      return;
+    }
+
     setSaving(true);
     try {
       const result = await bridge.saveManualFinanceEntry({
@@ -90,12 +190,14 @@ export function FinanceWorkspace() {
         amountMinor,
         paymentMethod: entryPaymentMethod,
         category: entryCategory,
-        description: entryDescription
+        description: entryDescription,
+        occurredAt
       });
       setMessage(result.message);
       if (result.ok) {
         setData(result.data);
         setEntryMode(null);
+        await refreshRoomData();
       }
     } catch {
       setMessage("Kasa hareketi kaydedilemedi.");
@@ -104,15 +206,15 @@ export function FinanceWorkspace() {
     }
   }
 
-  async function deleteEntry(entry: DesktopFinanceEntry) {
-    if (entry.sourceType !== "manual" || !window.yardimciDesktop?.deleteManualFinanceEntry) return;
-    const accepted = window.confirm(`${entry.description || categoryLabel(entry.category)} kaydını kasadan kaldırmak istiyor musunuz?`);
-    if (!accepted) return;
+  async function confirmDeleteEntry() {
+    const entry = pendingDelete;
+    if (!entry || entry.sourceType !== "manual" || !window.yardimciDesktop?.deleteManualFinanceEntry) return;
     setSaving(true);
     try {
       const result = await window.yardimciDesktop.deleteManualFinanceEntry(entry.id);
       setMessage(result.message);
       if (result.ok) setData(result.data);
+      setPendingDelete(null);
     } catch {
       setMessage("Kasa hareketi kaldırılamadı.");
     } finally {
@@ -126,7 +228,7 @@ export function FinanceWorkspace() {
         <div>
           <p className="panel-eyebrow">Günlük kasa</p>
           <h2 id="finance-title">Kasa</h2>
-          <p>Gelen, çıkan ve bekleyen alacakları tek yerde takip edin.</p>
+          <p>Bugünün para hareketlerini ve bekleyen alacakları tek bakışta görün.</p>
         </div>
         <div className="finance-primary-actions">
           <button className="finance-income-button" type="button" onClick={() => openEntry("income")}>
@@ -145,13 +247,33 @@ export function FinanceWorkspace() {
         <MetricCard compact title="Bekleyen Alacak" value={minorMoney(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "wait" : "ok"} icon={Landmark} />
       </div>
 
-      <Panel className="finance-room-guidance" padding="compact">
-        <BedDouble size={19} aria-hidden="true" />
-        <div>
-          <strong>Oda ödemeleri Pansiyon sayfasından alınır.</strong>
-          <p>Konaklama, restoran ürünleri, ek ücretler ve tahsilatlar “Oda Adisyonu” içinde yönetilir; alınan para buraya otomatik gelir.</p>
-        </div>
-      </Panel>
+      {outstandingRows.length > 0 && (
+        <Panel className="finance-outstanding-panel" padding="compact">
+          <div className="finance-section-heading">
+            <div>
+              <h3>Bekleyen Alacaklar</h3>
+              <p>Kimin ne kadar borcu kaldığını burada görün; tahsilatı oda adisyonundan yapın.</p>
+            </div>
+            <strong>{minorMoney(data.outstandingPensionMinor)}</strong>
+          </div>
+          <div className="finance-outstanding-list">
+            {outstandingRows.map((item) => (
+              <article key={item.id}>
+                <div>
+                  <strong>{item.customerName}</strong>
+                  <span>{item.context}{item.dateText ? ` · ${item.dateText}` : ""}</span>
+                </div>
+                <span className="finance-outstanding-status">{item.status}</span>
+                <b>{minorMoney(item.remainingMinor)}</b>
+              </article>
+            ))}
+          </div>
+          <div className="finance-room-note">
+            <BedDouble size={17} aria-hidden="true" />
+            <span>Oda tahsilatları <strong>Pansiyon → Oda Adisyonu</strong> içinden alınır; para kasaya otomatik işlenir.</span>
+          </div>
+        </Panel>
+      )}
 
       {entryMode && (
         <Panel className="finance-entry-panel" padding="compact">
@@ -162,7 +284,7 @@ export function FinanceWorkspace() {
             </div>
             <button type="button" onClick={() => setEntryMode(null)}>Vazgeç</button>
           </div>
-          <div className="finance-entry-form">
+          <div className="finance-entry-form finance-entry-form-v2">
             <label>
               Tutar
               <input inputMode="decimal" value={entryAmount} onChange={(event) => setEntryAmount(event.target.value)} placeholder="0,00" autoFocus />
@@ -177,9 +299,19 @@ export function FinanceWorkspace() {
               Ödeme şekli
               <PaymentMethodSelect value={entryPaymentMethod} onChange={setEntryPaymentMethod} />
             </label>
+            <label>
+              İşlem tarihi
+              <input
+                inputMode="numeric"
+                value={entryDate}
+                onChange={(event) => setEntryDate(autoFormatDateInput(event.target.value))}
+                placeholder="GG.AA.YYYY"
+                maxLength={10}
+              />
+            </label>
             <label className="finance-description-field">
               Açıklama
-              <input value={entryDescription} onChange={(event) => setEntryDescription(event.target.value)} placeholder="Kısa açıklama" maxLength={160} />
+              <input value={entryDescription} onChange={(event) => setEntryDescription(event.target.value)} placeholder="Örn. mutfak alışverişi" maxLength={160} />
             </label>
             <button className="finance-save-button" type="button" onClick={() => void saveEntry()} disabled={saving}>
               {saving ? "Kaydediliyor…" : "Kaydet"}
@@ -190,25 +322,25 @@ export function FinanceWorkspace() {
 
       <Panel className="finance-recent-panel">
         <div className="finance-section-heading">
-          <div><h3>Son Hareketler</h3><p>Restoran, oda tahsilatı ve manuel kayıtlar</p></div>
+          <div><h3>Son Hareketler</h3><p>Restoran, oda tahsilatı ve elle eklenen kayıtlar</p></div>
           {loading && <span>Yükleniyor…</span>}
         </div>
         {data.recentEntries.length === 0 ? (
           <p className="finance-empty">Henüz kasa hareketi yok.</p>
         ) : (
-          <div className="finance-entry-list">
+          <div className="finance-entry-list finance-entry-list-v2">
             {data.recentEntries.map((entry) => (
               <article key={entry.id}>
                 <span className={`finance-direction-icon is-${entry.direction}`}>{entry.direction === "income" ? "+" : "−"}</span>
                 <div>
                   <strong>{entry.description || categoryLabel(entry.category)}</strong>
-                  <span>{entrySourceLabel(entry)} · {formatDateTime(entry.occurredAt)}</span>
+                  <span>{entrySourceLabel(entry)} · {paymentMethodLabel(entry.paymentMethod)} · {formatDateTime(entry.occurredAt)}</span>
                 </div>
                 <b className={entry.direction === "income" ? "is-income" : "is-expense"}>
                   {entry.direction === "income" ? "+" : "−"}{minorMoney(entry.amountMinor)}
                 </b>
                 {entry.sourceType === "manual" && (
-                  <button className="finance-delete-entry" type="button" aria-label="Kasa hareketini kaldır" onClick={() => void deleteEntry(entry)} disabled={saving}>
+                  <button className="finance-delete-entry" type="button" aria-label="Kasa hareketini kaldır" onClick={() => setPendingDelete(entry)} disabled={saving}>
                     <Trash2 size={15} aria-hidden="true" />
                   </button>
                 )}
@@ -219,6 +351,22 @@ export function FinanceWorkspace() {
       </Panel>
 
       {message && <p className="finance-feedback" role="status">{message}</p>}
+
+      {pendingDelete && (
+        <div className="finance-confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setPendingDelete(null); }}>
+          <section className="finance-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="finance-delete-title">
+            <button className="finance-confirm-close" type="button" aria-label="Kapat" disabled={saving} onClick={() => setPendingDelete(null)}><X size={18} /></button>
+            <p className="panel-eyebrow">Kasa kaydı</p>
+            <h3 id="finance-delete-title">Bu hareket kaldırılsın mı?</h3>
+            <p><strong>{pendingDelete.description || categoryLabel(pendingDelete.category)}</strong> · {minorMoney(pendingDelete.amountMinor)}</p>
+            <span>Yalnız elle eklenen kasa kayıtları bu şekilde kaldırılabilir.</span>
+            <div className="finance-confirm-actions">
+              <button type="button" disabled={saving} onClick={() => setPendingDelete(null)}>Vazgeç</button>
+              <button className="is-danger" type="button" disabled={saving} onClick={() => void confirmDeleteEntry()}>{saving ? "Kaldırılıyor…" : "Kaydı Kaldır"}</button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }
@@ -254,11 +402,26 @@ function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(parsed);
 }
 
+function formatDate(value: string): string {
+  if (!value) return "—";
+  const parsed = new Date(`${value}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", year: "numeric" }).format(parsed);
+}
+
 function entrySourceLabel(entry: DesktopFinanceEntry): string {
   if (entry.sourceType === "restaurant_order") return "Restoran";
   if (entry.sourceType === "room_folio_payment") return "Oda tahsilatı";
   if (entry.sourceType === "pension_payment") return "Eski pansiyon kaydı";
   return categoryLabel(entry.category);
+}
+
+function paymentMethodLabel(method: FinancePaymentMethod): string {
+  if (method === "cash") return "Nakit";
+  if (method === "card") return "Kart";
+  if (method === "bank") return "Banka / Havale";
+  if (method === "other") return "Diğer";
+  return "Belirtilmedi";
 }
 
 function categoryLabel(category: string): string {
@@ -275,4 +438,27 @@ function categoryLabel(category: string): string {
     other_expense: "Diğer gider"
   };
   return labels[category] ?? "Kasa hareketi";
+}
+
+function todayDateInput(): string {
+  const now = new Date();
+  return `${String(now.getDate()).padStart(2, "0")}.${String(now.getMonth() + 1).padStart(2, "0")}.${now.getFullYear()}`;
+}
+
+function autoFormatDateInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+function dateInputToTimestamp(value: string): string {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value.trim());
+  if (!match) return "";
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return "";
+  return date.toISOString();
 }
