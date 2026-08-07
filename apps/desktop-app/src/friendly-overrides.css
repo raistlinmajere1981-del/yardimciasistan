@@ -1,0 +1,133 @@
+/*
+ * Yardımcı Asistan — sade kullanım katmanı
+ *
+ * Bu dosya mevcut tasarım sistemini bozmadan özellikle günlük işletme
+ * kullanımında görünen kontrol yoğunluğunu azaltır. Gelişmiş işlemler veri
+ * modelinde ve sipariş çalışma alanında korunur; masa kartlarında yalnızca
+ * o anda gerekli ana işlem öne çıkarılır.
+ */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="light"] body {
+  background: #f4f1e9;
+}
+
+/* Günlük kullanımda kartların tıklama alanlarını daha rahat hale getir. */
+.restaurant-page .table-compact-card {
+  min-height: 112px;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.restaurant-page .resource-card-heading h2 {
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.restaurant-page .table-order-summary {
+  min-height: 24px;
+  gap: 8px;
+}
+
+/*
+ * Masa kartı bir durum düzenleme formu değildir. Normal akışta masa durumunu
+ * sipariş/rezervasyon belirler. Manuel durum kontrolleri veri modelinde kalır,
+ * fakat günlük ekranda kullanıcıya aynı anda gösterilmez.
+ */
+.restaurant-page .table-card-actions .compact-status-actions,
+.restaurant-page .table-card-actions .active-table-order-actions {
+  display: none !important;
+}
+
+.restaurant-page .table-card-actions {
+  display: block;
+}
+
+.restaurant-page .table-order-open-button {
+  width: 100%;
+  min-height: 40px;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+/* Tekrarlanan küçük bölüm etiketleri yerine başlıkları öne çıkar. */
+.restaurant-page .operation-panel-eyebrow {
+  display: none;
+}
+
+.restaurant-page .operation-panel-heading h2 {
+  margin-top: 0;
+}
+
+/* Sipariş penceresinde küçük işletme için gerekli temel akışı öne çıkar. */
+.restaurant-page .table-order-footer-action-group.is-save {
+  display: none !important;
+}
+
+.restaurant-page .table-order-footer-action-group.is-flow > button:nth-child(1),
+.restaurant-page .table-order-footer-action-group.is-flow > button:nth-child(2) {
+  display: none !important;
+}
+
+.restaurant-page .table-order-footer-actions {
+  gap: 10px;
+}
+
+.restaurant-page .table-order-footer-action-group.is-flow,
+.restaurant-page .table-order-footer-action-group.is-close {
+  gap: 8px;
+}
+
+.restaurant-page .table-order-footer-actions .action-button {
+  min-height: 40px;
+}
+
+/* Ürün ekleme ve adisyon tarafında küçük hedefleri büyüt. */
+.restaurant-page .table-order-product-action button,
+.restaurant-page .table-order-quantity button,
+.restaurant-page .table-order-remove-item {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+.restaurant-page .table-order-category-tabs button {
+  min-height: 36px;
+  padding-inline: 14px;
+}
+
+/* Masa grupları arasında daha belirgin fakat sakin bir görsel ayrım. */
+.restaurant-page .table-area-group + .table-area-group {
+  margin-top: 18px;
+}
+
+.restaurant-page .table-area-heading {
+  margin-bottom: 10px;
+}
+
+/* Dar ekranlarda sipariş çalışma alanı rahat okunabilsin. */
+@media (max-width: 1100px) {
+  .restaurant-page .operations-grid.compact-resource-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .restaurant-page .operations-grid.compact-resource-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .restaurant-page .table-order-footer-actions,
+  .restaurant-page .table-order-footer-action-group.is-flow,
+  .restaurant-page .table-order-footer-action-group.is-close {
+    width: 100%;
+  }
+
+  .restaurant-page .table-order-footer-actions .action-button {
+    flex: 1 1 auto;
+  }
+}
