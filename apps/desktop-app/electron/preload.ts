@@ -44,6 +44,13 @@ import type {
   GenerateDesktopReportAiInput,
   GenerateDesktopReportAiResult
 } from "./database";
+import type {
+  AddPensionPaymentInput,
+  DesktopFinanceData,
+  DesktopFinanceMutationResult,
+  SaveManualFinanceEntryInput,
+  SetReservationAgreedTotalInput
+} from "./finance";
 import type { AutomaticSyncCycleResult, AutomaticSyncStatus } from "./sync-coordinator";
 import type {
   AppLockActionResult,
@@ -93,6 +100,11 @@ export interface DesktopBridge {
   getDashboardData: () => Promise<DesktopDashboardData>;
   getReportData: (input: DesktopReportRangeInput) => Promise<DesktopReportQueryResult>;
   generateReportAiComment: (input: GenerateDesktopReportAiInput) => Promise<GenerateDesktopReportAiResult>;
+  getFinanceData: (limit?: number) => Promise<DesktopFinanceData>;
+  saveManualFinanceEntry: (input: SaveManualFinanceEntryInput) => Promise<DesktopFinanceMutationResult>;
+  deleteManualFinanceEntry: (entryId: string) => Promise<DesktopFinanceMutationResult>;
+  setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => Promise<DesktopFinanceMutationResult>;
+  addPensionPayment: (input: AddPensionPaymentInput) => Promise<DesktopFinanceMutationResult>;
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
   getSyncStatus: () => Promise<AutomaticSyncStatus>;
   runSyncNow: () => Promise<AutomaticSyncCycleResult>;
@@ -163,6 +175,11 @@ const bridge: DesktopBridge = {
   getDashboardData: () => ipcRenderer.invoke("dashboard:getData"),
   getReportData: (input: DesktopReportRangeInput) => ipcRenderer.invoke("report:getData", input),
   generateReportAiComment: (input: GenerateDesktopReportAiInput) => ipcRenderer.invoke("report:generateAiComment", input),
+  getFinanceData: (limit?: number) => ipcRenderer.invoke("finance:getData", limit),
+  saveManualFinanceEntry: (input: SaveManualFinanceEntryInput) => ipcRenderer.invoke("finance:saveManualEntry", input),
+  deleteManualFinanceEntry: (entryId: string) => ipcRenderer.invoke("finance:deleteManualEntry", entryId),
+  setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => ipcRenderer.invoke("finance:setReservationTotal", input),
+  addPensionPayment: (input: AddPensionPaymentInput) => ipcRenderer.invoke("finance:addPensionPayment", input),
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: DesktopDashboardData) => listener(data);
     ipcRenderer.on("dashboard:dataChanged", handler);
