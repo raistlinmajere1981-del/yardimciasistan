@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, BedDouble, CalendarDays, Minus, Plus, ReceiptText, Trash2, Users, X } from "lucide-react";
+import { Banknote, BedDouble, CalendarDays, CheckCircle2, Minus, Plus, ReceiptText, Trash2, Users, X } from "lucide-react";
 import type {
   DesktopRoomFolio,
   DesktopRoomFolioData,
@@ -24,6 +24,11 @@ interface RoomFolioWorkspaceProps {
   refreshKey: string;
 }
 
+type ConfirmationAction =
+  | { kind: "checkout" }
+  | { kind: "void-payment"; paymentId: string; amountMinor: number }
+  | null;
+
 export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
   const [data, setData] = useState<DesktopRoomFolioData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,7 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<RoomFolioPaymentMethod>("cash");
   const [showPayment, setShowPayment] = useState(false);
+  const [confirmationAction, setConfirmationAction] = useState<ConfirmationAction>(null);
 
   useEffect(() => {
     let active = true;
@@ -81,14 +87,15 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
 
   function syncFolioDrafts(folio: DesktopRoomFolio) {
     setGuestDraft(String(folio.guestCount));
-    setCheckInDraft(folio.checkInDate);
-    setCheckOutDraft(folio.plannedCheckOutDate);
+    setCheckInDraft(isoToTurkishDateDraft(folio.checkInDate));
+    setCheckOutDraft(isoToTurkishDateDraft(folio.plannedCheckOutDate));
     setNightlyDraft(minorToInput(folio.nightlyPriceMinor));
     setManualLodging(folio.lodgingManualOverride);
     setLodgingTotalDraft(minorToInput(folio.lodgingTotalMinor));
     setPaymentAmount(minorToInput(folio.remainingMinor));
     setPaymentMethod("cash");
     setShowPayment(false);
+    setConfirmationAction(null);
     setManualLabel("");
     setManualAmount("");
     setMenuSearch("");
@@ -162,6 +169,16 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
     const nightlyPriceMinor = parseMoneyToMinor(nightlyDraft);
     const lodgingTotalMinor = parseMoneyToMinor(lodgingTotalDraft);
     const guestCount = Math.max(1, Math.min(50, Math.trunc(Number(guestDraft) || 1)));
+    const checkInDate = parseTurkishDateDraft(checkInDraft);
+    const checkOutDate = checkOutDraft.trim() ? parseTurkishDateDraft(checkOutDraft) : "";
+    if (!checkInDate || (checkOutDraft.trim() && !checkOutDate)) {
+      setMessage("Tarihleri GG.AA.YYYY biçiminde ve geçerli bir tarih olarak girin.");
+      return;
+    }
+    if (checkOutDate && checkOutDate < checkInDate) {
+      setMessage("Çıkış tarihi giriş tarihinden önce olamaz.");
+      return;
+    }
     if (nightlyPriceMinor < 0 || (manualLodging && lodgingTotalMinor < 0)) {
       setMessage("Konaklama tutarlarını kontrol edin.");
       return;
@@ -169,8 +186,8 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
     await applyMutation(bridge.updateRoomFolioDetails({
       folioId: selectedFolio.id,
       guestCount,
-      checkInDate: checkInDraft,
-      plannedCheckOutDate: checkOutDraft,
+      checkInDate,
+      plannedCheckOutDate: checkOutDate,
       nightlyPriceMinor,
       lodgingTotalMinor: manualLodging ? lodgingTotalMinor : undefined,
       lodgingManualOverride: manualLodging
@@ -180,6 +197,16 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
   async function addMenuItem(menuItemId: string) {
     const bridge = window.yardimciDesktop;
     if (!selectedFolio || !bridge?.addRoomFolioMenuItem) return;
+    const existingItem = selectedFolio.items.find(
+      (item) => item.kind === "menu" && item.menuItemId === menuItemId && !item.note.trim()
+    );
+    if (existingItem && bridge.updateRoomFolioItemQuantity) {
+      await applyMutation(
+        bridge.updateRoomFolioItemQuantity({ itemId: existingItem.id, quantity: existingItem.quantity + 1 }),
+        selectedFolio.id
+      );
+      return;
+    }
     await applyMutation(bridge.addRoomFolioMenuItem({ folioId: selectedFolio.id, menuItemId, quantity: 1 }), selectedFolio.id);
   }
 
@@ -236,26 +263,32 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
     if (result?.ok) setShowPayment(false);
   }
 
-  async function voidPayment(paymentId: string) {
-    const bridge = window.yardimciDesktop;
-    if (!selectedFolio || !bridge?.voidRoomFolioPayment) return;
-    if (!window.confirm("Bu tahsilat kaydını geri almak istiyor musunuz?")) return;
-    await applyMutation(bridge.voidRoomFolioPayment(paymentId), selectedFolio.id);
+  function requestVoidPayment(paymentId: string, amountMinor: number) {
+    setConfirmationAction({ kind: "void-payment", paymentId, amountMinor });
   }
 
-  async function checkout() {
+  function requestCheckout() {
+    if (!selectedFolio) return;
+    setConfirmationAction({ kind: "checkout" });
+  }
+
+  async function confirmAction() {
     const bridge = window.yardimciDesktop;
-    if (!selectedFolio || !bridge?.checkoutRoomFolio) return;
-    let allowOutstanding = false;
-    if (selectedFolio.remainingMinor > 0) {
-      allowOutstanding = window.confirm(
-        `${minorMoney(selectedFolio.remainingMinor)} kalan ödeme var. Kalanı alacak olarak bırakarak çıkış yapılsın mı?`
-      );
-      if (!allowOutstanding) return;
-    } else if (!window.confirm("Misafirin çıkışını tamamlayıp oda adisyonunu kapatmak istiyor musunuz?")) {
+    if (!selectedFolio || !confirmationAction) return;
+    if (confirmationAction.kind === "void-payment") {
+      if (!bridge?.voidRoomFolioPayment) return;
+      const paymentId = confirmationAction.paymentId;
+      setConfirmationAction(null);
+      await applyMutation(bridge.voidRoomFolioPayment(paymentId), selectedFolio.id);
       return;
     }
-    const result = await applyMutation(bridge.checkoutRoomFolio({ folioId: selectedFolio.id, allowOutstanding }), selectedFolio.id);
+    if (!bridge?.checkoutRoomFolio) return;
+    const allowOutstanding = selectedFolio.remainingMinor > 0;
+    setConfirmationAction(null);
+    const result = await applyMutation(
+      bridge.checkoutRoomFolio({ folioId: selectedFolio.id, allowOutstanding }),
+      selectedFolio.id
+    );
     if (result?.ok) setSelectedFolioId("");
   }
 
@@ -337,16 +370,20 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
                 <div className="room-folio-subheading"><h3>Konaklama</h3><span>{selectedFolio.nights} gece</span></div>
                 <div className="room-folio-details-grid">
                   <label><Users size={15} /> Kişi sayısı<input type="number" min={1} max={50} value={guestDraft} onChange={(e) => setGuestDraft(e.target.value)} /></label>
-                  <label><CalendarDays size={15} /> Giriş<input type="date" value={checkInDraft} onChange={(e) => setCheckInDraft(e.target.value)} /></label>
-                  <label><CalendarDays size={15} /> Çıkış<input type="date" min={checkInDraft || undefined} value={checkOutDraft} onChange={(e) => setCheckOutDraft(e.target.value)} /></label>
+                  <label><CalendarDays size={15} /> Giriş<input type="text" inputMode="numeric" maxLength={10} placeholder="GG.AA.YYYY" value={checkInDraft} onChange={(e) => setCheckInDraft(normalizeTurkishDateDraft(e.target.value))} /></label>
+                  <label><CalendarDays size={15} /> Çıkış<input type="text" inputMode="numeric" maxLength={10} placeholder="GG.AA.YYYY" value={checkOutDraft} onChange={(e) => setCheckOutDraft(normalizeTurkishDateDraft(e.target.value))} /></label>
                   <label>Gecelik fiyat<input inputMode="decimal" value={nightlyDraft} onChange={(e) => setNightlyDraft(e.target.value)} /></label>
                 </div>
-                <label className="room-folio-manual-total-toggle">
-                  <input type="checkbox" checked={manualLodging} onChange={(e) => setManualLodging(e.target.checked)} />
-                  Konaklama toplamını elle belirle
-                </label>
-                {manualLodging && <label className="room-folio-total-input">Konaklama toplamı<input inputMode="decimal" value={lodgingTotalDraft} onChange={(e) => setLodgingTotalDraft(e.target.value)} /></label>}
-                <button className="room-folio-secondary-button" type="button" disabled={saving} onClick={() => void saveFolioDetails()}>Konaklama Bilgilerini Kaydet</button>
+                <div className="room-folio-details-actions">
+                  <div>
+                    <label className="room-folio-manual-total-toggle">
+                      <input type="checkbox" checked={manualLodging} onChange={(e) => setManualLodging(e.target.checked)} />
+                      Konaklama toplamını elle belirle
+                    </label>
+                    {manualLodging && <label className="room-folio-total-input">Konaklama toplamı<input inputMode="decimal" value={lodgingTotalDraft} onChange={(e) => setLodgingTotalDraft(e.target.value)} /></label>}
+                  </div>
+                  <button className="room-folio-secondary-button" type="button" disabled={saving} onClick={() => void saveFolioDetails()}>Bilgileri Kaydet</button>
+                </div>
               </section>
 
               <div className="room-folio-account-layout">
@@ -406,7 +443,7 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
                     <div className="room-folio-payment-history">
                       <strong>Tahsilatlar</strong>
                       {selectedFolio.payments.map((payment) => (
-                        <div key={payment.id}><span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.source === "legacy" ? " · Kapora" : ""}</span><b>{minorMoney(payment.amountMinor)}</b>{payment.source === "direct" && <button type="button" disabled={saving} onClick={() => void voidPayment(payment.id)} aria-label="Tahsilatı geri al"><Trash2 size={13} /></button>}</div>
+                        <div key={payment.id}><span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.source === "legacy" ? " · Kapora" : ""}</span><b>{minorMoney(payment.amountMinor)}</b>{payment.source === "direct" && <button type="button" disabled={saving} onClick={() => requestVoidPayment(payment.id, payment.amountMinor)} aria-label="Tahsilatı geri al"><Trash2 size={13} /></button>}</div>
                       ))}
                     </div>
                   )}
@@ -420,8 +457,13 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
                       <button type="button" disabled={saving} onClick={() => void addPayment()}>Ödemeyi Kaydet</button>
                       <button className="is-secondary" type="button" onClick={() => setShowPayment(false)}>Vazgeç</button>
                     </div>
+                  ) : selectedFolio.remainingMinor > 0 ? (
+                    <button className="room-folio-payment-button" type="button" disabled={saving} onClick={() => { setPaymentAmount(minorToInput(selectedFolio.remainingMinor)); setShowPayment(true); }}><Banknote size={16} /> Ödeme Al</button>
                   ) : (
-                    <button className="room-folio-payment-button" type="button" disabled={saving || selectedFolio.remainingMinor <= 0} onClick={() => { setPaymentAmount(minorToInput(selectedFolio.remainingMinor)); setShowPayment(true); }}><Banknote size={16} /> Ödeme Al</button>
+                    <div className="room-folio-payment-complete" role="status">
+                      <CheckCircle2 size={18} aria-hidden="true" />
+                      <div><strong>Ödeme tamamlandı</strong><span>Oda hesabının tamamı tahsil edildi.</span></div>
+                    </div>
                   )}
                 </section>
               </div>
@@ -429,8 +471,48 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
 
             <footer className="room-folio-drawer-footer">
               <span>{selectedFolio.remainingMinor > 0 ? `${minorMoney(selectedFolio.remainingMinor)} ödeme bekliyor` : "Hesap tamamlandı"}</span>
-              <button className="room-folio-checkout-button" type="button" disabled={saving} onClick={() => void checkout()}>Çıkış Yap</button>
+              <button className="room-folio-checkout-button" type="button" disabled={saving} onClick={requestCheckout}>Çıkış Yap</button>
             </footer>
+
+            {confirmationAction && (
+              <div className="room-folio-confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmationAction(null); }}>
+                <section className="room-folio-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="room-folio-confirm-title">
+                  {confirmationAction.kind === "checkout" ? (
+                    <>
+                      <div className="room-folio-confirm-copy">
+                        <p className="panel-eyebrow">Çıkış işlemi</p>
+                        <h3 id="room-folio-confirm-title">
+                          {selectedFolio.remainingMinor > 0 ? `${minorMoney(selectedFolio.remainingMinor)} ödeme kaldı` : "Çıkışı tamamla"}
+                        </h3>
+                        <p>
+                          {selectedFolio.remainingMinor > 0
+                            ? "Bu tutar müşterinin kalan alacağı olarak korunacak ve oda boşaltılacak."
+                            : "Misafirin çıkışı tamamlanacak ve oda adisyonu kapatılacak."}
+                        </p>
+                      </div>
+                      <div className="room-folio-confirm-actions">
+                        <button className="is-secondary" type="button" onClick={() => setConfirmationAction(null)}>Vazgeç</button>
+                        <button className={selectedFolio.remainingMinor > 0 ? "is-warning" : "is-primary"} type="button" disabled={saving} onClick={() => void confirmAction()}>
+                          {selectedFolio.remainingMinor > 0 ? "Alacak Bırak ve Çıkış Yap" : "Çıkışı Tamamla"}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="room-folio-confirm-copy">
+                        <p className="panel-eyebrow">Tahsilat düzeltme</p>
+                        <h3 id="room-folio-confirm-title">{minorMoney(confirmationAction.amountMinor)} tahsilatı geri alınsın mı?</h3>
+                        <p>Bu ödeme oda hesabından ve kasa kayıtlarından geri alınacak.</p>
+                      </div>
+                      <div className="room-folio-confirm-actions">
+                        <button className="is-secondary" type="button" onClick={() => setConfirmationAction(null)}>Vazgeç</button>
+                        <button className="is-warning" type="button" disabled={saving} onClick={() => void confirmAction()}>Tahsilatı Geri Al</button>
+                      </div>
+                    </>
+                  )}
+                </section>
+              </div>
+            )}
           </section>
         </div>
       )}
@@ -469,6 +551,31 @@ function minorToInput(value: number): string {
 
 function minorMoney(value: number): string {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(value / 100);
+}
+
+function normalizeTurkishDateDraft(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
+}
+
+function isoToTurkishDateDraft(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value || "";
+  return `${match[3]}.${match[2]}.${match[1]}`;
+}
+
+function parseTurkishDateDraft(value: string): string {
+  const match = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value.trim());
+  if (!match) return "";
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  if (year < 2000 || year > 2200 || month < 1 || month > 12 || day < 1 || day > 31) return "";
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 function formatDateRange(start: string, end: string): string {
