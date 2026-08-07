@@ -21,7 +21,9 @@ const EMPTY_DATA: DesktopFinanceData = {
   pensionBalances: []
 };
 
-const EXPENSE_CATEGORIES = [
+type CategoryOption = readonly [value: string, label: string];
+
+const EXPENSE_CATEGORIES: readonly CategoryOption[] = [
   ["stock", "Market / Stok"],
   ["utilities", "Elektrik - Su"],
   ["staff", "Personel"],
@@ -29,13 +31,13 @@ const EXPENSE_CATEGORIES = [
   ["transport", "Yakıt - Ulaşım"],
   ["official", "Vergi / Resmi"],
   ["other_expense", "Diğer"]
-] as const;
+];
 
-const INCOME_CATEGORIES = [
+const INCOME_CATEGORIES: readonly CategoryOption[] = [
   ["other_income", "Diğer gelir"],
   ["pension", "Pansiyon"],
   ["restaurant", "Restoran"]
-] as const;
+];
 
 export function FinanceWorkspace() {
   const [data, setData] = useState<DesktopFinanceData>(EMPTY_DATA);
@@ -81,6 +83,7 @@ export function FinanceWorkspace() {
     () => data.pensionBalances.filter((balance) => balance.agreedTotalMinor === 0 || balance.remainingMinor > 0),
     [data.pensionBalances]
   );
+  const categoryOptions: readonly CategoryOption[] = entryMode === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   function openEntry(mode: FinanceDirection) {
     setEntryMode(mode);
@@ -122,6 +125,8 @@ export function FinanceWorkspace() {
 
   async function deleteEntry(entry: DesktopFinanceEntry) {
     if (entry.sourceType !== "manual" || !window.yardimciDesktop?.deleteManualFinanceEntry) return;
+    const accepted = window.confirm(`${entry.description || categoryLabel(entry.category)} kaydını kasadan kaldırmak istiyor musunuz?`);
+    if (!accepted) return;
     setSaving(true);
     try {
       const result = await window.yardimciDesktop.deleteManualFinanceEntry(entry.id);
@@ -141,6 +146,10 @@ export function FinanceWorkspace() {
     const amountMinor = parseMoneyToMinor(draft);
     if (amountMinor < 0) {
       setMessage("Konaklama bedeli geçersiz.");
+      return;
+    }
+    if (amountMinor > 0 && amountMinor < balance.paidTotalMinor) {
+      setMessage("Konaklama bedeli daha önce alınan toplam ödemeden düşük olamaz.");
       return;
     }
     setSaving(true);
@@ -175,6 +184,10 @@ export function FinanceWorkspace() {
     const amountMinor = parseMoneyToMinor(paymentAmount);
     if (amountMinor <= 0) {
       setMessage("Geçerli bir ödeme tutarı girin.");
+      return;
+    }
+    if (amountMinor > balance.remainingMinor) {
+      setMessage("Ödeme tutarı kalan alacaktan büyük olamaz.");
       return;
     }
     setSaving(true);
@@ -239,7 +252,7 @@ export function FinanceWorkspace() {
             <label>
               Tür
               <select value={entryCategory} onChange={(event) => setEntryCategory(event.target.value)}>
-                {(entryMode === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(([value, label]) => (
+                {categoryOptions.map(([value, label]) => (
                   <option value={value} key={value}>{label}</option>
                 ))}
               </select>
@@ -387,8 +400,16 @@ function PaymentMethodSelect({ value, onChange }: { value: FinancePaymentMethod;
 }
 
 function parseMoneyToMinor(value: string): number {
-  const normalized = value.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
-  if (!normalized) return 0;
+  const compact = value.trim().replace(/\s/g, "");
+  if (!compact) return 0;
+
+  let normalized = compact;
+  if (compact.includes(",")) {
+    normalized = compact.replace(/\./g, "").replace(",", ".");
+  } else if ((compact.match(/\./g) ?? []).length > 1) {
+    normalized = compact.replace(/\./g, "");
+  }
+
   const amount = Number(normalized);
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : -1;
 }
