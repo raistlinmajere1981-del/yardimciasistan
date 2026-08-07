@@ -128,9 +128,13 @@ export class DesktopFinanceService {
         WHERE reservations.deleted_at = ''
           AND reservations.reservation_type = 'room'
           AND reservations.status NOT IN ('cancelled', 'rejected', 'no_show')
-          AND totals.agreed_total_minor > 0
+          AND (totals.agreed_total_minor > 0 OR reservations.status IN ('pending', 'approved'))
         ORDER BY
-          CASE WHEN totals.remaining_minor > 0 THEN 0 ELSE 1 END,
+          CASE
+            WHEN totals.agreed_total_minor <= 0 THEN 0
+            WHEN totals.remaining_minor > 0 THEN 1
+            ELSE 2
+          END,
           reservations.start_date ASC,
           reservations.created_at DESC
         LIMIT 100
