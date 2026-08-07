@@ -128,10 +128,74 @@ BEGIN
     AND source_id = NEW.id;
 END;
 
+-- Pansiyon ödeme durumu kullanıcı seçimi değil, toplam ve tahsilattan türetilir.
+CREATE TRIGGER IF NOT EXISTS trg_pension_payment_status_insert
+AFTER INSERT ON pension_payments
+BEGIN
+  UPDATE reservations
+  SET payment_status = CASE
+    WHEN agreed_total_minor <= 0 THEN 'not_required'
+    WHEN COALESCE((
+      SELECT SUM(amount_minor)
+      FROM pension_payments
+      WHERE reservation_id = NEW.reservation_id AND deleted_at = ''
+    ), 0) <= 0 THEN 'unpaid'
+    WHEN COALESCE((
+      SELECT SUM(amount_minor)
+      FROM pension_payments
+      WHERE reservation_id = NEW.reservation_id AND deleted_at = ''
+    ), 0) < agreed_total_minor THEN 'partial'
+    ELSE 'paid'
+  END
+  WHERE id = NEW.reservation_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_pension_payment_status_update
+AFTER UPDATE ON pension_payments
+BEGIN
+  UPDATE reservations
+  SET payment_status = CASE
+    WHEN agreed_total_minor <= 0 THEN 'not_required'
+    WHEN COALESCE((
+      SELECT SUM(amount_minor)
+      FROM pension_payments
+      WHERE reservation_id = NEW.reservation_id AND deleted_at = ''
+    ), 0) <= 0 THEN 'unpaid'
+    WHEN COALESCE((
+      SELECT SUM(amount_minor)
+      FROM pension_payments
+      WHERE reservation_id = NEW.reservation_id AND deleted_at = ''
+    ), 0) < agreed_total_minor THEN 'partial'
+    ELSE 'paid'
+  END
+  WHERE id = NEW.reservation_id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_reservation_total_payment_status
+AFTER UPDATE OF agreed_total_minor ON reservations
+BEGIN
+  UPDATE reservations
+  SET payment_status = CASE
+    WHEN NEW.agreed_total_minor <= 0 THEN 'not_required'
+    WHEN COALESCE((
+      SELECT SUM(amount_minor)
+      FROM pension_payments
+      WHERE reservation_id = NEW.id AND deleted_at = ''
+    ), 0) <= 0 THEN 'unpaid'
+    WHEN COALESCE((
+      SELECT SUM(amount_minor)
+      FROM pension_payments
+      WHERE reservation_id = NEW.id AND deleted_at = ''
+    ), 0) < NEW.agreed_total_minor THEN 'partial'
+    ELSE 'paid'
+  END
+  WHERE id = NEW.id;
+END;
+
 -- Restoran adisyonu ödendiğinde kullanıcı tekrar gelir girmek zorunda kalmaz.
 CREATE TRIGGER IF NOT EXISTS trg_paid_table_order_finance_insert
 AFTER INSERT ON table_orders
-WHEN NEW.status = 'paid'
+WHEN NEW.status = 'paid' AND NEW.total > 0
 BEGIN
   INSERT OR IGNORE INTO finance_entries (
     id,
@@ -151,7 +215,7 @@ BEGIN
   ) VALUES (
     'finance_restaurant_' || NEW.id,
     'income',
-    MAX(1, CAST(ROUND(NEW.total * 100) AS INTEGER)),
+    CAST(ROUND(NEW.total * 100) AS INTEGER),
     COALESCE((SELECT currency FROM table_order_items WHERE order_id = NEW.id LIMIT 1), 'TRY'),
     'unspecified',
     'restaurant',
@@ -168,7 +232,7 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS trg_paid_table_order_finance_update
 AFTER UPDATE OF status, total, closed_at, note, updated_at ON table_orders
-WHEN NEW.status = 'paid'
+WHEN NEW.status = 'paid' AND NEW.total > 0
 BEGIN
   INSERT INTO finance_entries (
     id,
@@ -188,7 +252,7 @@ BEGIN
   ) VALUES (
     'finance_restaurant_' || NEW.id,
     'income',
-    MAX(1, CAST(ROUND(NEW.total * 100) AS INTEGER)),
+    CAST(ROUND(NEW.total * 100) AS INTEGER),
     COALESCE((SELECT currency FROM table_order_items WHERE order_id = NEW.id LIMIT 1), 'TRY'),
     'unspecified',
     'restaurant',
@@ -208,6 +272,16 @@ BEGIN
     note = excluded.note,
     updated_at = excluded.updated_at,
     deleted_at = '';
+END;
+
+-- Ödenmiş bir adisyon daha sonra sıfıra çekilirse kasa kaydı görünür toplamdan çıkar.
+CREATE TRIGGER IF NOT EXISTS trg_zero_paid_table_order_finance_update
+AFTER UPDATE OF status, total, updated_at ON table_orders
+WHEN NEW.status = 'paid' AND NEW.total <= 0
+BEGIN
+  UPDATE finance_entries
+  SET deleted_at = NEW.updated_at, updated_at = NEW.updated_at
+  WHERE source_type = 'restaurant_order' AND source_id = NEW.id;
 END;
 
 -- Mevcut ödenmiş adisyonları ilk migration sırasında kasaya taşı.
@@ -230,7 +304,7 @@ INSERT OR IGNORE INTO finance_entries (
 SELECT
   'finance_restaurant_' || table_orders.id,
   'income',
-  MAX(1, CAST(ROUND(table_orders.total * 100) AS INTEGER)),
+  CAST(ROUND(table_orders.total * 100) AS INTEGER),
   COALESCE((SELECT currency FROM table_order_items WHERE table_order_items.order_id = table_orders.id LIMIT 1), 'TRY'),
   'unspecified',
   'restaurant',
@@ -243,7 +317,7 @@ SELECT
   table_orders.updated_at,
   'local_only'
 FROM table_orders
-WHERE table_orders.status = 'paid';
+WHERE table_orders.status = 'paid' AND table_orders.total > 0;
 
 CREATE VIEW IF NOT EXISTS pension_payment_totals AS
 SELECT
