@@ -91,13 +91,33 @@ export class DesktopFinanceService {
           AND date(occurred_at, 'localtime') = date('now', 'localtime')
       `).get() as { income_minor?: number; expense_minor?: number } | undefined;
 
+      // Yeni modelde pansiyon alacağı oda adisyonuna aittir. Henüz oda adisyonuna
+      // aktarılmamış eski rezervasyon kayıtları da veri kaybı olmaması için eklenir.
       const outstanding = db.prepare(`
-        SELECT COALESCE(SUM(totals.remaining_minor), 0) AS outstanding_minor
-        FROM pension_payment_totals AS totals
-        JOIN reservations ON reservations.id = totals.reservation_id
-        WHERE reservations.deleted_at = ''
-          AND reservations.reservation_type = 'room'
-          AND reservations.status NOT IN ('cancelled', 'rejected', 'no_show')
+        SELECT
+          COALESCE((
+            SELECT SUM(totals.remaining_minor)
+            FROM room_folio_totals AS totals
+            JOIN room_folios AS folios ON folios.id = totals.folio_id
+            WHERE folios.deleted_at = ''
+              AND folios.status IN ('open', 'closed')
+              AND totals.remaining_minor > 0
+          ), 0)
+          +
+          COALESCE((
+            SELECT SUM(legacy.remaining_minor)
+            FROM pension_payment_totals AS legacy
+            JOIN reservations ON reservations.id = legacy.reservation_id
+            WHERE reservations.deleted_at = ''
+              AND reservations.reservation_type = 'room'
+              AND reservations.status NOT IN ('cancelled', 'rejected', 'no_show')
+              AND legacy.remaining_minor > 0
+              AND NOT EXISTS (
+                SELECT 1
+                FROM room_folios AS folios
+                WHERE folios.reservation_id = reservations.id AND folios.deleted_at = ''
+              )
+          ), 0) AS outstanding_minor
       `).get() as { outstanding_minor?: number } | undefined;
 
       const recentRows = db.prepare(`
@@ -110,6 +130,8 @@ export class DesktopFinanceService {
         LIMIT ?
       `).all(safeLimit) as Array<Record<string, unknown>>;
 
+      // Eski rezervasyon bazlı kayıtlar yalnız geriye dönük uyumluluk içindir.
+      // Güncel tahsilat arayüzü Pansiyon > Oda Adisyonu içindedir.
       const pensionRows = db.prepare(`
         SELECT
           reservations.id AS reservation_id,
@@ -195,20 +217,14 @@ export class DesktopFinanceService {
 
   deleteManualEntry(entryIdValue: string): DesktopFinanceMutationResult {
     const entryId = cleanText(entryIdValue, 180);
-    if (!entryId) {
-      return { ok: false, message: "Silinecek kasa hareketi bulunamadı." };
-    }
+    if (!entryId) return { ok: false, message: "Silinecek kasa hareketi bulunamadı." };
 
     const db = this.openDatabase();
     try {
       const row = db.prepare(`
-        SELECT source_type, deleted_at
-        FROM finance_entries
-        WHERE id = ?
+        SELECT source_type, deleted_at FROM finance_entries WHERE id = ?
       `).get(entryId) as { source_type?: string; deleted_at?: string } | undefined;
-      if (!row || row.deleted_at) {
-        return { ok: false, message: "Kasa hareketi bulunamadı." };
-      }
+      if (!row || row.deleted_at) return { ok: false, message: "Kasa hareketi bulunamadı." };
       if (row.source_type !== "manual") {
         return { ok: false, message: "Otomatik oluşan hareketi kaynak işlem üzerinden düzeltin." };
       }
@@ -221,6 +237,7 @@ export class DesktopFinanceService {
     return { ok: true, message: "Kasa hareketi kaldırıldı.", data: this.getData() };
   }
 
+  // Geriye dönük uyumluluk: yeni kullanıcı akışı bu metodu doğrudan kullanmaz.
   setReservationAgreedTotal(input: SetReservationAgreedTotalInput): DesktopFinanceMutationResult {
     const reservationId = cleanText(input?.reservationId, 180);
     const amountMinor = normalizeNonNegativeAmount(input?.amountMinor);
@@ -232,9 +249,7 @@ export class DesktopFinanceService {
     const db = this.openDatabase();
     try {
       const reservation = db.prepare(`
-        SELECT reservation_type, status
-        FROM reservations
-        WHERE id = ? AND deleted_at = ''
+        SELECT reservation_type, status FROM reservations WHERE id = ? AND deleted_at = ''
       `).get(reservationId) as { reservation_type?: string; status?: string } | undefined;
       if (!reservation || reservation.reservation_type !== "room") {
         return { ok: false, message: "Pansiyon rezervasyonu bulunamadı." };
@@ -244,9 +259,7 @@ export class DesktopFinanceService {
       }
       const now = new Date().toISOString();
       db.prepare(`
-        UPDATE reservations
-        SET agreed_total_minor = ?, currency = ?, updated_at = ?
-        WHERE id = ?
+        UPDATE reservations SET agreed_total_minor = ?, currency = ?, updated_at = ? WHERE id = ?
       `).run(amountMinor, currency, now, reservationId);
     } finally {
       db.close();
@@ -255,6 +268,7 @@ export class DesktopFinanceService {
     return { ok: true, message: "Konaklama bedeli güncellendi.", data: this.getData() };
   }
 
+  // Geriye dönük uyumluluk: yeni tahsilatlar room_folio_payments üzerinden alınır.
   addPensionPayment(input: AddPensionPaymentInput): DesktopFinanceMutationResult {
     const reservationId = cleanText(input?.reservationId, 180);
     const amountMinor = normalizePositiveAmount(input?.amountMinor);
@@ -293,15 +307,9 @@ export class DesktopFinanceService {
       }
       const agreedTotal = nonNegativeInteger(balance.agreed_total_minor);
       const remaining = nonNegativeInteger(balance.remaining_minor);
-      if (agreedTotal <= 0) {
-        return { ok: false, message: "Ödeme almadan önce konaklama bedelini girin." };
-      }
-      if (remaining <= 0) {
-        return { ok: false, message: "Bu konaklamanın ödemesi tamamlanmış." };
-      }
-      if (amountMinor > remaining) {
-        return { ok: false, message: "Ödeme tutarı kalan alacaktan büyük olamaz." };
-      }
+      if (agreedTotal <= 0) return { ok: false, message: "Ödeme almadan önce konaklama bedelini girin." };
+      if (remaining <= 0) return { ok: false, message: "Bu konaklamanın ödemesi tamamlanmış." };
+      if (amountMinor > remaining) return { ok: false, message: "Ödeme tutarı kalan alacaktan büyük olamaz." };
 
       const now = new Date().toISOString();
       db.prepare(`
@@ -377,25 +385,19 @@ function normalizePaymentMethod(value: unknown): FinancePaymentMethod {
 function normalizeCategory(direction: FinanceDirection, value: unknown): string {
   const candidate = String(value ?? "").trim();
   const allowed = direction === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  if (allowed.has(candidate)) {
-    return candidate;
-  }
+  if (allowed.has(candidate)) return candidate;
   return direction === "income" ? "other_income" : "other_expense";
 }
 
 function normalizePositiveAmount(value: unknown): number | null {
   const amount = Number(value);
-  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 999_999_999_999) {
-    return null;
-  }
+  if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 999_999_999_999) return null;
   return amount;
 }
 
 function normalizeNonNegativeAmount(value: unknown): number | null {
   const amount = Number(value);
-  if (!Number.isSafeInteger(amount) || amount < 0 || amount > 999_999_999_999) {
-    return null;
-  }
+  if (!Number.isSafeInteger(amount) || amount < 0 || amount > 999_999_999_999) return null;
   return amount;
 }
 
