@@ -15,6 +15,15 @@
   background: #f4f1e9;
 }
 
+/* Yapılacak servis işi yoksa masalar ekranın tamamını kullansın. */
+.restaurant-page .restaurant-layout.is-tables-only {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.restaurant-page .restaurant-layout.is-tables-only .restaurant-tables-section {
+  grid-column: 1 / -1;
+}
+
 /* Günlük kullanımda kartların tıklama alanlarını daha rahat hale getir. */
 .restaurant-page .table-compact-card {
   min-height: 112px;
