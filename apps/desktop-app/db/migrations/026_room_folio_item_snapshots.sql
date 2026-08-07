@@ -2,6 +2,8 @@
 -- Menü kaydı sonradan silinebildiği için menu_item_id tarihsel bir referanstır;
 -- manuel ücret/indirimlerde ise boş olabilir. Bu nedenle menu_items FK bağı kaldırılır.
 
+DROP VIEW IF EXISTS room_folio_totals;
+
 ALTER TABLE room_folio_items RENAME TO room_folio_items_with_menu_fk;
 
 CREATE TABLE room_folio_items (
@@ -34,3 +36,35 @@ DROP TABLE room_folio_items_with_menu_fk;
 
 CREATE INDEX IF NOT EXISTS idx_room_folio_items_folio
   ON room_folio_items(folio_id, created_at) WHERE deleted_at = '';
+
+CREATE VIEW room_folio_totals AS
+SELECT
+  base.folio_id,
+  base.lodging_total_minor,
+  base.extras_total_minor,
+  MAX(base.raw_charge_total_minor, 0) AS charge_total_minor,
+  base.paid_total_minor,
+  MAX(MAX(base.raw_charge_total_minor, 0) - base.paid_total_minor, 0) AS remaining_minor,
+  MAX(base.paid_total_minor - MAX(base.raw_charge_total_minor, 0), 0) AS credit_minor
+FROM (
+  SELECT
+    folios.id AS folio_id,
+    folios.lodging_total_minor,
+    COALESCE(items.extras_total_minor, 0) AS extras_total_minor,
+    folios.lodging_total_minor + COALESCE(items.extras_total_minor, 0) AS raw_charge_total_minor,
+    COALESCE(payments.paid_total_minor, 0) AS paid_total_minor
+  FROM room_folios AS folios
+  LEFT JOIN (
+    SELECT folio_id, SUM(line_total_minor) AS extras_total_minor
+    FROM room_folio_items
+    WHERE deleted_at = ''
+    GROUP BY folio_id
+  ) AS items ON items.folio_id = folios.id
+  LEFT JOIN (
+    SELECT folio_id, SUM(amount_minor) AS paid_total_minor
+    FROM room_folio_payments
+    WHERE deleted_at = ''
+    GROUP BY folio_id
+  ) AS payments ON payments.folio_id = folios.id
+  WHERE folios.deleted_at = ''
+) AS base;
