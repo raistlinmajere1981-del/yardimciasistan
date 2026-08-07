@@ -109,6 +109,38 @@ function verifyFinanceFoundation(databasePath) {
       "Updating a paid order must not duplicate its automatic income entry."
     );
 
+    const cancelledAt = new Date(Date.now() + 1500).toISOString();
+    sqlite.prepare(`
+      UPDATE table_orders
+      SET status = 'cancelled', updated_at = ?
+      WHERE id = ?
+    `).run(cancelledAt, "finance_smoke_order");
+    assert.equal(
+      sqlite.prepare(`
+        SELECT deleted_at
+        FROM finance_entries
+        WHERE source_type = 'restaurant_order' AND source_id = ?
+      `).get("finance_smoke_order").deleted_at,
+      cancelledAt,
+      "Moving a paid order away from paid must remove it from visible cash totals."
+    );
+
+    const repaidAt = new Date(Date.now() + 1750).toISOString();
+    sqlite.prepare(`
+      UPDATE table_orders
+      SET status = 'paid', closed_at = ?, updated_at = ?
+      WHERE id = ?
+    `).run(repaidAt, repaidAt, "finance_smoke_order");
+    assert.equal(
+      sqlite.prepare(`
+        SELECT deleted_at
+        FROM finance_entries
+        WHERE source_type = 'restaurant_order' AND source_id = ?
+      `).get("finance_smoke_order").deleted_at,
+      "",
+      "Returning the order to paid must reactivate the same finance entry."
+    );
+
     sqlite.prepare(`
       INSERT INTO reservations (
         id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
