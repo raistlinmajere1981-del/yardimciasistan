@@ -1,0 +1,38 @@
+name: Desktop Finance Check
+
+on:
+  pull_request:
+    paths:
+      - "apps/desktop-app/**"
+      - "scripts/smoke-finance-*.mjs"
+      - "package.json"
+      - ".github/workflows/desktop-finance-check.yml"
+  push:
+    branches:
+      - main
+      - feature/kasa-ekrani
+    paths:
+      - "apps/desktop-app/**"
+      - "scripts/smoke-finance-*.mjs"
+      - "package.json"
+      - ".github/workflows/desktop-finance-check.yml"
+
+jobs:
+  desktop-finance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v4
+
+      - name: Node.js kur
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Kasa derleme ve smoke testleri
+        run: npm run smoke:finance
