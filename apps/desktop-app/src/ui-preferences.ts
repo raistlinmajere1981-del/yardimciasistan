@@ -9,7 +9,7 @@ export const UI_SCALE_OPTIONS = [0.8, 0.9, 1, 1.1, 1.2] as const;
 
 const UI_PREFERENCES_STORAGE_KEY = "yardimci-asistan.ui-preferences";
 const DEFAULT_UI_PREFERENCES: UiPreferences = {
-  theme: "dark",
+  theme: "light",
   scale: 1
 };
 
