@@ -5,6 +5,7 @@ import App from "./App";
 import "./styles.css";
 import "./friendly-overrides.css";
 import "./room-folio.css";
+import "./room-folio-ux.css";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
 applyUiPreferences(readUiPreferences());
