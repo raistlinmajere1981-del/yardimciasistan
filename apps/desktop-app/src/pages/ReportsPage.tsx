@@ -18,6 +18,7 @@ import type {
   DesktopReportRangeInput,
   DesktopReportStockMovement
 } from "../../electron/database";
+import { FinanceWorkspace } from "../components/finance/FinanceWorkspace";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Panel } from "../components/ui/Panel";
 
@@ -139,7 +140,13 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
   const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
 
   return (
-    <section className="reports-page" aria-label="İşletme raporları">
+    <section className="reports-page" aria-label="Kasa ve işletme raporları">
+      <FinanceWorkspace />
+
+      <div className="reports-detail-divider">
+        <div><span>Detaylı raporlar</span><strong>Geçmiş dönemleri inceleyin</strong></div>
+      </div>
+
       <Panel className="report-filter-panel" padding="compact">
         <div className="report-filter-heading">
           <div>
@@ -264,7 +271,7 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
           <section className="report-table-card" aria-labelledby="top-items-title">
             <div className="report-subheading">
               <h3 id="top-items-title">En çok satılan 5 ürün</h3>
-              <span>Sipariş satırı snapshot verisi</span>
+              <span>Sipariş satırı kayıtları</span>
             </div>
             {report.restaurant.topItems.length === 0 ? (
               <ReportEmpty message="Bu dönemde satılan ürün yok." />
@@ -291,7 +298,7 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
       <Panel className="report-section-panel">
         <div className="report-section-title">
           <div>
-            <p>Gelir tahmini içermez</p>
+            <p>Konaklama ve müşteri hareketleri</p>
             <h2>Pansiyon ve Talepler</h2>
           </div>
         </div>
