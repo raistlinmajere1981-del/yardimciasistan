@@ -5,15 +5,18 @@ on:
     paths:
       - "apps/desktop-app/**"
       - "scripts/smoke-finance-*.mjs"
+      - "scripts/smoke-room-folio-*.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
   push:
     branches:
       - main
       - feature/kasa-ekrani
+      - feature/oda-adisyonu-code5
     paths:
       - "apps/desktop-app/**"
       - "scripts/smoke-finance-*.mjs"
+      - "scripts/smoke-room-folio-*.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
 
@@ -45,6 +48,9 @@ jobs:
 
       - name: Finans servis smoke
         run: node scripts/smoke-finance-service.mjs
+
+      - name: Oda adisyonu servis smoke
+        run: node scripts/smoke-room-folio-service.mjs
 
       - name: Electron başlatma smoke
         run: node scripts/smoke-desktop-xvfb.mjs
