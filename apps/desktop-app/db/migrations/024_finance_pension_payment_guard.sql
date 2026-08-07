@@ -21,3 +21,19 @@ BEGIN
       THEN RAISE(ABORT, 'payment_exceeds_remaining')
   END;
 END;
+
+-- Daha önce alınmış para varsa anlaşılmış konaklama bedeli bu toplamın altına
+-- düşürülemez. Böylece kullanıcı yanlışlıkla negatif kalan / fazla tahsilat
+-- durumu oluşturamaz.
+CREATE TRIGGER IF NOT EXISTS trg_reservation_total_paid_guard
+BEFORE UPDATE OF agreed_total_minor ON reservations
+BEGIN
+  SELECT CASE
+    WHEN NEW.agreed_total_minor < COALESCE((
+      SELECT SUM(amount_minor)
+      FROM pension_payments
+      WHERE reservation_id = NEW.id AND deleted_at = ''
+    ), 0)
+      THEN RAISE(ABORT, 'reservation_total_below_paid')
+  END;
+END;
