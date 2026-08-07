@@ -2,6 +2,9 @@
 -- Menü kaydı sonradan silinebildiği için menu_item_id tarihsel bir referanstır;
 -- manuel ücret/indirimlerde ise boş olabilir. Bu nedenle menu_items FK bağı kaldırılır.
 
+-- Guard trigger toplam görünümüne bağlıdır. Tabloyu yeniden kurarken görünümü
+-- geçici olarak kaldırabilmek için önce trigger'ı kaldır, en sonda yeniden oluştur.
+DROP TRIGGER IF EXISTS trg_room_folio_payment_remaining_guard;
 DROP VIEW IF EXISTS room_folio_totals;
 
 ALTER TABLE room_folio_items RENAME TO room_folio_items_with_menu_fk;
@@ -68,3 +71,15 @@ FROM (
   ) AS payments ON payments.folio_id = folios.id
   WHERE folios.deleted_at = ''
 ) AS base;
+
+CREATE TRIGGER IF NOT EXISTS trg_room_folio_payment_remaining_guard
+BEFORE INSERT ON room_folio_payments
+WHEN NEW.deleted_at = '' AND NEW.source = 'direct'
+BEGIN
+  SELECT CASE
+    WHEN COALESCE((SELECT charge_total_minor FROM room_folio_totals WHERE folio_id = NEW.folio_id), 0) <= 0
+      THEN RAISE(ABORT, 'room_folio_total_required')
+    WHEN NEW.amount_minor > COALESCE((SELECT remaining_minor FROM room_folio_totals WHERE folio_id = NEW.folio_id), 0)
+      THEN RAISE(ABORT, 'room_folio_payment_exceeds_remaining')
+  END;
+END;
