@@ -51,6 +51,17 @@ import type {
   SaveManualFinanceEntryInput,
   SetReservationAgreedTotalInput
 } from "./finance";
+import type {
+  AddRoomFolioManualItemInput,
+  AddRoomFolioMenuItemInput,
+  AddRoomFolioPaymentInput,
+  CheckoutRoomFolioInput,
+  DesktopRoomFolioData,
+  DesktopRoomFolioMutationResult,
+  SetRoomNightlyPriceInput,
+  UpdateRoomFolioDetailsInput,
+  UpdateRoomFolioItemQuantityInput
+} from "./room-folio";
 import type { AutomaticSyncCycleResult, AutomaticSyncStatus } from "./sync-coordinator";
 import type {
   AppLockActionResult,
@@ -88,10 +99,7 @@ export interface DesktopBridge {
     appName: string;
     version: string;
     platform: string;
-    syncSettings: {
-      webModuleUrl: string;
-      hasSyncSecret: boolean;
-    };
+    syncSettings: { webModuleUrl: string; hasSyncSecret: boolean };
     databasePath: string;
     userDataPath: string;
     backupPath: string;
@@ -105,6 +113,17 @@ export interface DesktopBridge {
   deleteManualFinanceEntry: (entryId: string) => Promise<DesktopFinanceMutationResult>;
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => Promise<DesktopFinanceMutationResult>;
   addPensionPayment: (input: AddPensionPaymentInput) => Promise<DesktopFinanceMutationResult>;
+  getRoomFolioData: () => Promise<DesktopRoomFolioData>;
+  setRoomNightlyPrice: (input: SetRoomNightlyPriceInput) => Promise<DesktopRoomFolioMutationResult>;
+  openRoomFolio: (stayId: string) => Promise<DesktopRoomFolioMutationResult>;
+  updateRoomFolioDetails: (input: UpdateRoomFolioDetailsInput) => Promise<DesktopRoomFolioMutationResult>;
+  addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => Promise<DesktopRoomFolioMutationResult>;
+  updateRoomFolioItemQuantity: (input: UpdateRoomFolioItemQuantityInput) => Promise<DesktopRoomFolioMutationResult>;
+  addRoomFolioManualItem: (input: AddRoomFolioManualItemInput) => Promise<DesktopRoomFolioMutationResult>;
+  removeRoomFolioItem: (itemId: string) => Promise<DesktopRoomFolioMutationResult>;
+  addRoomFolioPayment: (input: AddRoomFolioPaymentInput) => Promise<DesktopRoomFolioMutationResult>;
+  voidRoomFolioPayment: (paymentId: string) => Promise<DesktopRoomFolioMutationResult>;
+  checkoutRoomFolio: (input: CheckoutRoomFolioInput) => Promise<DesktopRoomFolioMutationResult>;
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
   getSyncStatus: () => Promise<AutomaticSyncStatus>;
   runSyncNow: () => Promise<AutomaticSyncCycleResult>;
@@ -166,9 +185,7 @@ export interface DesktopBridge {
 
 async function invokeWhenUnlocked<T>(channel: string, ...args: unknown[]): Promise<T> {
   const status = await ipcRenderer.invoke("appLock:getStatus") as AppLockStatus;
-  if (status.locked) {
-    throw new Error("Uygulama kilitli. Devam etmek için kilidi açın.");
-  }
+  if (status.locked) throw new Error("Uygulama kilitli. Devam etmek için kilidi açın.");
   return ipcRenderer.invoke(channel, ...args) as Promise<T>;
 }
 
@@ -188,6 +205,17 @@ const bridge: DesktopBridge = {
   deleteManualFinanceEntry: (entryId: string) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:deleteManualEntry", entryId),
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:setReservationTotal", input),
   addPensionPayment: (input: AddPensionPaymentInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:addPensionPayment", input),
+  getRoomFolioData: () => invokeWhenUnlocked<DesktopRoomFolioData>("roomFolio:getData"),
+  setRoomNightlyPrice: (input: SetRoomNightlyPriceInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:setRoomNightlyPrice", input),
+  openRoomFolio: (stayId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:open", stayId),
+  updateRoomFolioDetails: (input: UpdateRoomFolioDetailsInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:updateDetails", input),
+  addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addMenuItem", input),
+  updateRoomFolioItemQuantity: (input: UpdateRoomFolioItemQuantityInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:updateItemQuantity", input),
+  addRoomFolioManualItem: (input: AddRoomFolioManualItemInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addManualItem", input),
+  removeRoomFolioItem: (itemId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:removeItem", itemId),
+  addRoomFolioPayment: (input: AddRoomFolioPaymentInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addPayment", input),
+  voidRoomFolioPayment: (paymentId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:voidPayment", paymentId),
+  checkoutRoomFolio: (input: CheckoutRoomFolioInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:checkout", input),
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: DesktopDashboardData) => listener(data);
     ipcRenderer.on("dashboard:dataChanged", handler);
@@ -224,12 +252,9 @@ const bridge: DesktopBridge = {
   listTableOrders: () => ipcRenderer.invoke("tableOrder:list"),
   getActiveTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:getActive", tableId),
   openTableOrder: (tableId: string) => ipcRenderer.invoke("tableOrder:open", tableId),
-  addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) =>
-    ipcRenderer.invoke("tableOrder:addItem", { orderId, menuItemId, quantity, note }),
-  updateTableOrderItemQuantity: (itemId: string, quantity: number) =>
-    ipcRenderer.invoke("tableOrder:updateItemQuantity", { itemId, quantity }),
-  updateTableOrderItemNote: (itemId: string, note: string) =>
-    ipcRenderer.invoke("tableOrder:updateItemNote", { itemId, note }),
+  addTableOrderItem: (orderId: string, menuItemId: string, quantity: number, note: string) => ipcRenderer.invoke("tableOrder:addItem", { orderId, menuItemId, quantity, note }),
+  updateTableOrderItemQuantity: (itemId: string, quantity: number) => ipcRenderer.invoke("tableOrder:updateItemQuantity", { itemId, quantity }),
+  updateTableOrderItemNote: (itemId: string, note: string) => ipcRenderer.invoke("tableOrder:updateItemNote", { itemId, note }),
   removeTableOrderItem: (itemId: string) => ipcRenderer.invoke("tableOrder:removeItem", itemId),
   updateTableOrderStatus: (orderId: string, status: string) => ipcRenderer.invoke("tableOrder:updateStatus", { orderId, status }),
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => ipcRenderer.invoke("tableOrder:close", { orderId, status }),

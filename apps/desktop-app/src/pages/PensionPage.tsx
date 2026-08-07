@@ -2,6 +2,7 @@ import { CalendarCheck, LogIn, LogOut, BedDouble } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DesktopDashboardData } from "../../electron/database";
 import { getRoomDisplayInfo } from "../app/operations";
+import { RoomFolioWorkspace } from "../components/pension/RoomFolioWorkspace";
 import { MetricCard, type MetricCardProps } from "../components/ui/MetricCard";
 
 interface PensionPageProps {
@@ -27,6 +28,10 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
     { title: "Onay bekleyen", value: String(data.reservations.filter((reservation) => reservation.status === "pending").length), tone: "wait", icon: CalendarCheck, compact: true },
     { title: "Boş odalar", value: String(data.rooms.filter((room) => getRoomDisplayInfo(room, data.reservations).status === "available").length), tone: "ok", icon: BedDouble, compact: true }
   ];
+  const roomFolioRefreshKey = [
+    ...data.customerRoomStays.map((stay) => `${stay.id}:${stay.status}:${stay.updatedAt}`),
+    ...data.rooms.map((room) => `${room.id}:${room.status}:${room.updatedAt}`)
+  ].join("|");
 
   return (
     <section className="combined-page pension-page" aria-label="Pansiyon yönetimi">
@@ -40,6 +45,9 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
           {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
         </div>
       </section>
+
+      <RoomFolioWorkspace refreshKey={roomFolioRefreshKey} />
+
       <div className="pension-layout">
         <section className="operation-group-panel pension-reservations-section" aria-labelledby="pension-reservations-title">
           <header className="operation-panel-heading">

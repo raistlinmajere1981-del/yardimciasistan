@@ -1,0 +1,556 @@
+.room-folio-workspace {
+  display: grid;
+  gap: 14px;
+}
+
+.room-folio-overview-panel,
+.room-price-panel,
+.room-folio-stays-section {
+  min-width: 0;
+}
+
+.room-folio-title-row,
+.room-folio-section-heading,
+.room-folio-subheading,
+.room-folio-stay-heading,
+.room-folio-drawer-header,
+.room-folio-drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.room-folio-title-row h2,
+.room-folio-section-heading h3,
+.room-folio-subheading h3,
+.room-folio-drawer-header h2 {
+  margin: 0;
+}
+
+.room-folio-title-row p,
+.room-folio-section-heading p,
+.room-folio-drawer-header span,
+.room-price-help {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.room-folio-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.room-price-panel details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style-position: inside;
+}
+
+.room-price-help {
+  font-size: var(--text-sm);
+}
+
+.room-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.room-price-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--field);
+}
+
+.room-price-card > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.room-price-card small {
+  color: var(--muted);
+}
+
+.room-price-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.room-price-editor input {
+  width: 100px;
+}
+
+.room-price-editor button,
+.room-folio-stay-card > button,
+.room-folio-secondary-button,
+.room-folio-payment-button,
+.room-folio-checkout-button,
+.room-folio-manual-item-form button,
+.room-folio-payment-form button,
+.room-folio-menu-list button {
+  min-height: 38px;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.room-folio-section-heading {
+  margin: 2px 2px 10px;
+}
+
+.room-folio-section-heading > span,
+.room-folio-subheading > span {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.room-folio-stay-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.room-folio-stay-card {
+  display: grid;
+  gap: 10px;
+}
+
+.room-folio-stay-card.is-occupied {
+  border-color: var(--primary-line);
+}
+
+.room-folio-stay-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.room-folio-stay-heading span,
+.room-folio-stay-meta,
+.room-folio-stay-price {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.room-folio-stay-heading > b {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: var(--text-xs);
+}
+
+.room-folio-stay-meta,
+.room-folio-stay-money {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.room-folio-stay-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.room-folio-stay-money {
+  padding: 8px 0;
+  border-block: 1px solid var(--line);
+}
+
+.room-folio-stay-money span {
+  display: grid;
+  gap: 2px;
+  min-width: 88px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.room-folio-stay-money strong {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.room-folio-empty,
+.room-folio-message {
+  margin: 0;
+}
+
+.room-folio-message {
+  padding: 9px 12px;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--ink);
+}
+
+.room-folio-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(0, 0, 0, 0.52);
+}
+
+.room-folio-drawer {
+  width: min(1120px, calc(100vw - 110px));
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--bg);
+  border-left: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-xl);
+}
+
+.room-folio-drawer-header,
+.room-folio-drawer-footer {
+  padding: 14px 16px;
+  background: var(--surface-2);
+}
+
+.room-folio-drawer-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.room-folio-drawer-footer {
+  border-top: 1px solid var(--line);
+}
+
+.room-folio-close,
+.room-folio-line-remove,
+.room-folio-quantity button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.room-folio-drawer-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+}
+
+.room-folio-details-card,
+.room-folio-menu-panel,
+.room-folio-account-panel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.room-folio-details-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.room-folio-details-grid label,
+.room-folio-total-input {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.room-folio-details-grid label svg {
+  display: none;
+}
+
+.room-folio-details-grid input,
+.room-folio-total-input input,
+.room-folio-menu-search,
+.room-folio-manual-item-form input,
+.room-folio-manual-item-form select,
+.room-folio-payment-form input,
+.room-folio-payment-form select {
+  min-height: 38px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  color: var(--ink);
+  padding: 0 9px;
+}
+
+.room-folio-manual-total-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.room-folio-total-input {
+  max-width: 220px;
+  margin-bottom: 10px;
+}
+
+.room-folio-secondary-button {
+  padding-inline: 12px;
+}
+
+.room-folio-account-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(420px, 1.2fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.room-folio-menu-panel,
+.room-folio-account-panel {
+  min-height: 0;
+}
+
+.room-folio-menu-search {
+  width: 100%;
+  margin-top: 9px;
+  box-sizing: border-box;
+}
+
+.room-folio-category-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 0;
+}
+
+.room-folio-category-tabs button {
+  min-height: 32px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  color: var(--muted);
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.room-folio-category-tabs button.is-active {
+  border-color: var(--primary-line);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.room-folio-menu-list,
+.room-folio-line-list {
+  display: grid;
+  gap: 6px;
+  max-height: 370px;
+  overflow: auto;
+}
+
+.room-folio-menu-list article,
+.room-folio-line-list article {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+}
+
+.room-folio-menu-list article > div:first-child,
+.room-folio-line-list article > div:first-child {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.room-folio-menu-list article > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-folio-menu-list span,
+.room-folio-line-list span {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.room-folio-menu-list button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline: 9px;
+}
+
+.room-folio-line-list article.is-lodging {
+  border-color: var(--primary-line);
+}
+
+.room-folio-line-list article.is-discount > b {
+  color: var(--status-green);
+}
+
+.room-folio-quantity {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.room-folio-quantity span {
+  min-width: 22px;
+  text-align: center;
+  color: var(--ink);
+}
+
+.room-folio-manual-item-form {
+  display: grid;
+  grid-template-columns: 110px minmax(120px, 1fr) 100px auto;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.room-folio-manual-item-form button,
+.room-folio-payment-form button {
+  padding-inline: 10px;
+}
+
+.room-folio-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.room-folio-totals > span {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.room-folio-totals strong {
+  color: var(--ink);
+  font-size: var(--text-lg);
+}
+
+.room-folio-totals .is-waiting {
+  border-color: var(--warning-line);
+  background: var(--warning-soft);
+}
+
+.room-folio-totals .is-paid {
+  border-color: var(--primary-line);
+  background: var(--primary-soft);
+}
+
+.room-folio-payment-history {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.room-folio-payment-history > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-folio-payment-history > div span {
+  flex: 1;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.room-folio-payment-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 120px auto auto;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.room-folio-payment-form .is-secondary {
+  border-color: var(--line);
+  background: var(--field);
+  color: var(--ink);
+}
+
+.room-folio-payment-button {
+  width: 100%;
+  margin-top: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.room-folio-checkout-button {
+  min-width: 140px;
+  padding-inline: 18px;
+  background: var(--primary-solid);
+  color: white;
+}
+
+.room-folio-workspace button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1100px) {
+  .room-folio-account-layout,
+  .room-price-grid,
+  .room-folio-stay-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .room-folio-details-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .room-folio-summary-grid,
+  .room-folio-totals,
+  .room-folio-details-grid,
+  .room-folio-manual-item-form,
+  .room-folio-payment-form {
+    grid-template-columns: 1fr;
+  }
+
+  .room-folio-drawer {
+    width: 100%;
+  }
+
+  .room-price-card,
+  .room-folio-title-row,
+  .room-folio-section-heading,
+  .room-folio-drawer-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-price-editor input {
+    flex: 1;
+    width: auto;
+  }
+}
