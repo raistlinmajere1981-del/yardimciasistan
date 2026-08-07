@@ -34,8 +34,8 @@ jobs:
       - name: Bağımlılıkları kur
         run: npm ci
 
-      - name: Sync paketini derle
-        run: npm run build -w @yardimci-asistan/sync-core
+      - name: Ortak paketleri derle
+        run: npm run build:packages
 
       - name: Masaüstünü derle
         run: npm run build -w @yardimci-asistan/desktop-app
