@@ -1,0 +1,142 @@
+.room-folio-details-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.room-folio-details-actions > div {
+  min-width: 0;
+  flex: 1;
+}
+
+.room-folio-details-actions .room-folio-manual-total-toggle {
+  margin: 0;
+}
+
+.room-folio-details-actions .room-folio-total-input {
+  margin: 8px 0 0;
+}
+
+.room-folio-details-actions .room-folio-secondary-button {
+  flex: 0 0 auto;
+  min-width: 138px;
+}
+
+.room-folio-payment-complete {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.room-folio-payment-complete > div {
+  display: grid;
+  gap: 2px;
+}
+
+.room-folio-payment-complete strong {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.room-folio-payment-complete span {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.room-folio-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.room-folio-confirm-dialog {
+  width: min(480px, calc(100vw - 40px));
+  padding: 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-xl);
+}
+
+.room-folio-confirm-copy h3,
+.room-folio-confirm-copy p {
+  margin: 0;
+}
+
+.room-folio-confirm-copy h3 {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: var(--text-xl);
+}
+
+.room-folio-confirm-copy > p:last-child {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.room-folio-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.room-folio-confirm-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--field);
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.room-folio-confirm-actions button.is-primary {
+  border-color: var(--primary-line);
+  background: var(--primary-solid);
+  color: white;
+}
+
+.room-folio-confirm-actions button.is-warning {
+  border-color: var(--warning-line);
+  background: var(--warning-soft);
+  color: var(--ink);
+}
+
+.room-folio-confirm-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .room-folio-details-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-folio-details-actions .room-folio-secondary-button {
+    width: 100%;
+  }
+
+  .room-folio-confirm-actions {
+    flex-direction: column-reverse;
+  }
+
+  .room-folio-confirm-actions button {
+    width: 100%;
+  }
+}
