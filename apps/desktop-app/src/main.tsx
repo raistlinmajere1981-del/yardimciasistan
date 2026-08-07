@@ -4,6 +4,7 @@ import "@fontsource-variable/ibm-plex-sans/wght.css";
 import App from "./App";
 import "./styles.css";
 import "./friendly-overrides.css";
+import "./room-folio.css";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
 applyUiPreferences(readUiPreferences());
