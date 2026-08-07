@@ -133,6 +133,8 @@ Kullanıcı aynı tutarı ayrıca `Gelir Ekle` ekranından girmek zorunda değil
 
 İlk finans migration'ı kurulurken daha önce ödenmiş ve tutarı sıfırdan büyük adisyonlar da kasa tablosuna bir kez taşınır.
 
+Ödenmiş bir adisyon yeniden açılır veya iptal durumuna alınırsa bağlı otomatik kasa hareketi görünür toplamdan çıkarılır. Adisyon tekrar ödenirse aynı kaynak kaydı yeniden etkinleştirilir; ikinci gelir oluşturulmaz.
+
 ## Pansiyon fiyat modeli
 
 `reservations` kaydına iki işlenebilir alan eklenir:
@@ -153,7 +155,7 @@ price_currency
 
 alanları bulunur.
 
-Standart oda fiyatı zorunlu değildir. Rezervasyondaki anlaşılmış toplam her zaman düzenlenebilir olmalıdır.
+Standart oda fiyatı zorunlu değildir. Rezervasyondaki anlaşılmış toplam her zaman düzenlenebilir olmalıdır. Daha önce ödeme alınmışsa toplam bedel ödenmiş tutarın altına düşürülemez.
 
 ## pension_payments
 
@@ -190,6 +192,8 @@ sync_status
 
 Her aktif pansiyon ödemesi `finance_entries` içinde otomatik `income / pension` hareketi oluşturur.
 
+Bir ödeme kalan alacaktan büyük olamaz. Bu kural hem kullanıcı/servis katmanında hem de SQLite trigger ile korunur.
+
 ## Ödeme durumu
 
 `payment_status` kullanıcı tarafından elle yönetilecek ana alan değildir.
@@ -200,7 +204,7 @@ Sistem şu kurala göre otomatik türetir:
 anlaşılmış toplam yok              -> not_required
 anlaşılmış toplam var, ödeme yok    -> unpaid
 kısmi ödeme var                     -> partial
-toplam kadar veya daha fazla ödeme  -> paid
+toplam kadar ödeme                  -> paid
 ```
 
 `refunded` ileride iade yaşam döngüsü eklendiğinde kullanılabilir.
@@ -230,9 +234,11 @@ Kalan              3.000 ₺
 [ Ödeme Al ]
 ```
 
-## Kasa ekranı hedefi
+## Kasa ekranı
 
-İlk kullanıcı ekranı şu kadar sade olmalıdır:
+Masaüstünde mevcut `reports` rotası kullanıcıya **Kasa** adıyla gösterilir. Böylece yeni bir karmaşık menü eklemek yerine günlük para takibi aynı bölümün üst kısmında, detaylı dönem raporları ise altında tutulur.
+
+İlk görünüm:
 
 ```text
 Bugün Gelen
@@ -242,10 +248,10 @@ Bekleyen Alacak
 
 [ + Gelir Ekle ]   [ - Gider Ekle ]
 
-Son Hareketler
+Pansiyon Ödemeleri | Son Hareketler
 ```
 
-Gelişmiş muhasebe tabloları veya grafikler ana ekranda gösterilmez.
+Pansiyon rezervasyonunda henüz tutar girilmediyse Kasa ekranı kullanıcıdan yalnız `Konaklama bedeli` ister. Tutar girildikten sonra Toplam / Ödenen / Kalan özeti ve `Ödeme Al` işlemi açılır.
 
 ## Gider girişi
 
@@ -256,7 +262,6 @@ Tutar
 Tür
 Ödeme şekli
 Açıklama
-Tarih
 ```
 
 Hazır türler:
@@ -271,13 +276,15 @@ Vergi / Resmi
 Diğer
 ```
 
+Manuel hareketler yanlış girildiğinde soft-delete ile kaldırılabilir. Restoran veya pansiyondan otomatik oluşan gelirler Kasa ekranından doğrudan silinmez; kaynak işlem düzeltilir.
+
 ## Rapor ilişkisi
 
 Mevcut restoran satış raporu ürün/adisyon analizi için `table_orders` ve `table_order_items` verisini kullanmaya devam eder.
 
-Genel işletme para özeti ise `finance_entries` üzerinden hesaplanmalıdır.
+Günlük para özeti `finance_entries` üzerinden hesaplanır. Böylece restoran otomatik satışları, pansiyon tahsilatları ve manuel gelir/gider tek kasa görünümünde birleşir.
 
-Hedef özet:
+Hedef dönem özeti:
 
 ```text
 Toplam tahsilat
@@ -289,14 +296,19 @@ Kasa farkı
 Bekleyen pansiyon alacağı
 ```
 
+## Test yaklaşımı
+
+Finans akışı iki seviyede korunur:
+
+- `smoke-finance-db.mjs`: migration, trigger, restoran otomatik geliri ve pansiyon ödeme tablosunu doğrular.
+- `smoke-finance-service.mjs`: masaüstü Kasa servisinin manuel gelir/gider, tutar belirleme, kısmi/tam ödeme ve fazla ödeme engeli davranışını doğrular.
+
 ## Sonraki geliştirme adımları
 
-1. Desktop `Kasa` sayfası ve menü bağlantısı.
-2. Manuel gelir / gider CRUD servisleri.
-3. Pansiyon rezervasyon kartına anlaşılmış tutar ve `Ödeme Al` akışı.
-4. Rapor ekranının `finance_entries` verisine bağlanması.
-5. Aylık CSV / Excel dışa aktarımı.
-6. Fatura / stok görsel analizinden sonra isteğe bağlı gider oluşturma.
+1. Kasa verilerini dönem bazlı genel rapor toplamlarına bağlamak.
+2. Aylık CSV / Excel dışa aktarımı.
+3. Fatura / stok görsel analizinden sonra isteğe bağlı gider oluşturma.
+4. Gerekirse Android yönetici uygulamasına yalnız özet kasa görünümü eklemek.
 
 ## Resmi muhasebe sınırı
 
