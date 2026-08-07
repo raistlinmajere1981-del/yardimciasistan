@@ -45,3 +45,6 @@ jobs:
 
       - name: Finans servis smoke
         run: node scripts/smoke-finance-service.mjs
+
+      - name: Electron başlatma smoke
+        run: node scripts/smoke-desktop-xvfb.mjs
