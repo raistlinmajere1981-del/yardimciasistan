@@ -81,7 +81,7 @@ function verifyFinanceFoundation(databasePath) {
     `).get("finance_smoke_order");
 
     assert.deepEqual(
-      restaurantEntry,
+      { ...restaurantEntry },
       {
         direction: "income",
         amount_minor: 25050,
@@ -141,7 +141,7 @@ function verifyFinanceFoundation(databasePath) {
       FROM finance_entries
       WHERE source_type = 'pension_payment' AND source_id = ?
     `).get("finance_smoke_payment_1");
-    assert.deepEqual(firstPensionEntry, {
+    assert.deepEqual({ ...firstPensionEntry }, {
       direction: "income",
       amount_minor: 100000,
       payment_method: "cash",
@@ -166,7 +166,7 @@ function verifyFinanceFoundation(databasePath) {
       FROM pension_payment_totals
       WHERE reservation_id = ?
     `).get("finance_smoke_reservation");
-    assert.deepEqual(paidTotals, {
+    assert.deepEqual({ ...paidTotals }, {
       agreed_total_minor: 450000,
       paid_total_minor: 450000,
       remaining_minor: 0,
@@ -201,7 +201,7 @@ function verifyFinanceFoundation(databasePath) {
       FROM pension_payment_totals
       WHERE reservation_id = ?
     `).get("finance_smoke_reservation");
-    assert.deepEqual(partialTotals, {
+    assert.deepEqual({ ...partialTotals }, {
       paid_total_minor: 100000,
       remaining_minor: 350000
     });
