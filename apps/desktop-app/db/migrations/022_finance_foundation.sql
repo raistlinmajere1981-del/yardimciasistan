@@ -115,20 +115,59 @@ END;
 CREATE TRIGGER IF NOT EXISTS trg_pension_payment_finance_update
 AFTER UPDATE ON pension_payments
 BEGIN
-  UPDATE finance_entries
-  SET
-    amount_minor = NEW.amount_minor,
-    currency = NEW.currency,
-    payment_method = NEW.payment_method,
-    occurred_at = NEW.paid_at,
-    note = NEW.note,
-    updated_at = NEW.updated_at,
-    deleted_at = NEW.deleted_at
-  WHERE source_type = 'pension_payment'
-    AND source_id = NEW.id;
+  INSERT INTO finance_entries (
+    id,
+    direction,
+    amount_minor,
+    currency,
+    payment_method,
+    category,
+    description,
+    occurred_at,
+    source_type,
+    source_id,
+    note,
+    created_at,
+    updated_at,
+    deleted_at,
+    sync_status
+  ) VALUES (
+    'finance_pension_' || NEW.id,
+    'income',
+    NEW.amount_minor,
+    NEW.currency,
+    NEW.payment_method,
+    'pension',
+    'Pansiyon ödemesi',
+    NEW.paid_at,
+    'pension_payment',
+    NEW.id,
+    NEW.note,
+    NEW.created_at,
+    NEW.updated_at,
+    NEW.deleted_at,
+    'local_only'
+  )
+  ON CONFLICT(source_type, source_id) WHERE source_id != '' DO UPDATE SET
+    amount_minor = excluded.amount_minor,
+    currency = excluded.currency,
+    payment_method = excluded.payment_method,
+    occurred_at = excluded.occurred_at,
+    note = excluded.note,
+    updated_at = excluded.updated_at,
+    deleted_at = excluded.deleted_at;
 END;
 
 -- Pansiyon ödeme durumu kullanıcı seçimi değil, toplam ve tahsilattan türetilir.
+CREATE TRIGGER IF NOT EXISTS trg_reservation_insert_payment_status
+AFTER INSERT ON reservations
+WHEN NEW.agreed_total_minor > 0
+BEGIN
+  UPDATE reservations
+  SET payment_status = 'unpaid'
+  WHERE id = NEW.id;
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_pension_payment_status_insert
 AFTER INSERT ON pension_payments
 BEGIN
