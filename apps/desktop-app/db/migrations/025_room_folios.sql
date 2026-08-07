@@ -7,8 +7,7 @@ CREATE TABLE IF NOT EXISTS room_folios (
   room_id TEXT NOT NULL,
   customer_id TEXT NOT NULL,
   reservation_id TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'open'
-    CHECK (status IN ('open', 'closed', 'cancelled')),
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed', 'cancelled')),
   guest_count INTEGER NOT NULL DEFAULT 1 CHECK (guest_count BETWEEN 1 AND 50),
   check_in_date TEXT NOT NULL,
   planned_check_out_date TEXT NOT NULL DEFAULT '',
@@ -29,22 +28,17 @@ CREATE TABLE IF NOT EXISTS room_folios (
 );
 
 CREATE INDEX IF NOT EXISTS idx_room_folios_room_status
-  ON room_folios(room_id, status, opened_at DESC)
-  WHERE deleted_at = '';
-
+  ON room_folios(room_id, status, opened_at DESC) WHERE deleted_at = '';
 CREATE INDEX IF NOT EXISTS idx_room_folios_customer
-  ON room_folios(customer_id, opened_at DESC)
-  WHERE deleted_at = '';
-
+  ON room_folios(customer_id, opened_at DESC) WHERE deleted_at = '';
 CREATE INDEX IF NOT EXISTS idx_room_folios_reservation
-  ON room_folios(reservation_id)
-  WHERE reservation_id != '' AND deleted_at = '';
+  ON room_folios(reservation_id) WHERE reservation_id != '' AND deleted_at = '';
 
 CREATE TABLE IF NOT EXISTS room_folio_items (
   id TEXT PRIMARY KEY,
   folio_id TEXT NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('menu', 'manual_charge', 'discount')),
-  menu_item_id TEXT NOT NULL DEFAULT '',
+  menu_item_id TEXT NULL,
   label TEXT NOT NULL,
   unit_price_minor INTEGER NOT NULL DEFAULT 0 CHECK (unit_price_minor >= 0),
   quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 1000),
@@ -59,8 +53,7 @@ CREATE TABLE IF NOT EXISTS room_folio_items (
 );
 
 CREATE INDEX IF NOT EXISTS idx_room_folio_items_folio
-  ON room_folio_items(folio_id, created_at)
-  WHERE deleted_at = '';
+  ON room_folio_items(folio_id, created_at) WHERE deleted_at = '';
 
 CREATE TABLE IF NOT EXISTS room_folio_payments (
   id TEXT PRIMARY KEY,
@@ -71,8 +64,7 @@ CREATE TABLE IF NOT EXISTS room_folio_payments (
     CHECK (payment_method IN ('cash', 'card', 'bank', 'other', 'unspecified')),
   paid_at TEXT NOT NULL,
   note TEXT NOT NULL DEFAULT '',
-  source TEXT NOT NULL DEFAULT 'direct'
-    CHECK (source IN ('direct', 'legacy')),
+  source TEXT NOT NULL DEFAULT 'direct' CHECK (source IN ('direct', 'legacy')),
   source_payment_id TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -82,124 +74,41 @@ CREATE TABLE IF NOT EXISTS room_folio_payments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_room_folio_payments_folio
-  ON room_folio_payments(folio_id, paid_at DESC)
-  WHERE deleted_at = '';
-
+  ON room_folio_payments(folio_id, paid_at DESC) WHERE deleted_at = '';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_room_folio_payments_legacy_source
-  ON room_folio_payments(source_payment_id)
-  WHERE source_payment_id != '';
+  ON room_folio_payments(source_payment_id) WHERE source_payment_id != '';
 
 CREATE VIEW IF NOT EXISTS room_folio_totals AS
 SELECT
-  folios.id AS folio_id,
-  folios.lodging_total_minor AS lodging_total_minor,
-  COALESCE((
-    SELECT SUM(items.line_total_minor)
-    FROM room_folio_items AS items
-    WHERE items.folio_id = folios.id AND items.deleted_at = ''
-  ), 0) AS extras_total_minor,
-  CASE
-    WHEN folios.lodging_total_minor + COALESCE((
-      SELECT SUM(items.line_total_minor)
-      FROM room_folio_items AS items
-      WHERE items.folio_id = folios.id AND items.deleted_at = ''
-    ), 0) > 0
-    THEN folios.lodging_total_minor + COALESCE((
-      SELECT SUM(items.line_total_minor)
-      FROM room_folio_items AS items
-      WHERE items.folio_id = folios.id AND items.deleted_at = ''
-    ), 0)
-    ELSE 0
-  END AS charge_total_minor,
-  COALESCE((
-    SELECT SUM(payments.amount_minor)
-    FROM room_folio_payments AS payments
-    WHERE payments.folio_id = folios.id AND payments.deleted_at = ''
-  ), 0) AS paid_total_minor,
-  CASE
-    WHEN (
-      CASE
-        WHEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0) > 0
-        THEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0)
-        ELSE 0
-      END
-    ) - COALESCE((
-      SELECT SUM(payments.amount_minor)
-      FROM room_folio_payments AS payments
-      WHERE payments.folio_id = folios.id AND payments.deleted_at = ''
-    ), 0) > 0
-    THEN (
-      CASE
-        WHEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0) > 0
-        THEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0)
-        ELSE 0
-      END
-    ) - COALESCE((
-      SELECT SUM(payments.amount_minor)
-      FROM room_folio_payments AS payments
-      WHERE payments.folio_id = folios.id AND payments.deleted_at = ''
-    ), 0)
-    ELSE 0
-  END AS remaining_minor,
-  CASE
-    WHEN COALESCE((
-      SELECT SUM(payments.amount_minor)
-      FROM room_folio_payments AS payments
-      WHERE payments.folio_id = folios.id AND payments.deleted_at = ''
-    ), 0) - (
-      CASE
-        WHEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0) > 0
-        THEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0)
-        ELSE 0
-      END
-    ) > 0
-    THEN COALESCE((
-      SELECT SUM(payments.amount_minor)
-      FROM room_folio_payments AS payments
-      WHERE payments.folio_id = folios.id AND payments.deleted_at = ''
-    ), 0) - (
-      CASE
-        WHEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0) > 0
-        THEN folios.lodging_total_minor + COALESCE((
-          SELECT SUM(items.line_total_minor)
-          FROM room_folio_items AS items
-          WHERE items.folio_id = folios.id AND items.deleted_at = ''
-        ), 0)
-        ELSE 0
-      END
-    )
-    ELSE 0
-  END AS credit_minor
-FROM room_folios AS folios
-WHERE folios.deleted_at = '';
+  base.folio_id,
+  base.lodging_total_minor,
+  base.extras_total_minor,
+  MAX(base.raw_charge_total_minor, 0) AS charge_total_minor,
+  base.paid_total_minor,
+  MAX(MAX(base.raw_charge_total_minor, 0) - base.paid_total_minor, 0) AS remaining_minor,
+  MAX(base.paid_total_minor - MAX(base.raw_charge_total_minor, 0), 0) AS credit_minor
+FROM (
+  SELECT
+    folios.id AS folio_id,
+    folios.lodging_total_minor,
+    COALESCE(items.extras_total_minor, 0) AS extras_total_minor,
+    folios.lodging_total_minor + COALESCE(items.extras_total_minor, 0) AS raw_charge_total_minor,
+    COALESCE(payments.paid_total_minor, 0) AS paid_total_minor
+  FROM room_folios AS folios
+  LEFT JOIN (
+    SELECT folio_id, SUM(line_total_minor) AS extras_total_minor
+    FROM room_folio_items
+    WHERE deleted_at = ''
+    GROUP BY folio_id
+  ) AS items ON items.folio_id = folios.id
+  LEFT JOIN (
+    SELECT folio_id, SUM(amount_minor) AS paid_total_minor
+    FROM room_folio_payments
+    WHERE deleted_at = ''
+    GROUP BY folio_id
+  ) AS payments ON payments.folio_id = folios.id
+  WHERE folios.deleted_at = ''
+) AS base;
 
 -- Oda tahsilatı yalnız gerçekten para alındığında kasaya gelir olarak düşer.
 CREATE TRIGGER IF NOT EXISTS trg_room_folio_payment_finance_insert
@@ -248,7 +157,7 @@ BEGIN
     deleted_at = excluded.deleted_at;
 END;
 
--- Servis katmanındaki kontrolün yanında, fazla tahsilatı DB seviyesinde de engelle.
+-- Fazla tahsilatı servis katmanının yanında DB seviyesinde de engelle.
 CREATE TRIGGER IF NOT EXISTS trg_room_folio_payment_remaining_guard
 BEFORE INSERT ON room_folio_payments
 WHEN NEW.deleted_at = '' AND NEW.source = 'direct'
@@ -261,7 +170,7 @@ BEGIN
   END;
 END;
 
--- Oda adisyonundaki değişiklikler Android operasyon özetini yeniden yayınlasın.
+-- Oda adisyonundaki temel durum değişiklikleri Android operasyon özetini yeniden yayınlasın.
 CREATE TRIGGER IF NOT EXISTS trg_sync_room_folios_insert
 AFTER INSERT ON room_folios
 BEGIN
