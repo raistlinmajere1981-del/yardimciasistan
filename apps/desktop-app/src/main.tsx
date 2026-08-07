@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "@fontsource-variable/ibm-plex-sans/wght.css";
 import App from "./App";
 import "./styles.css";
+import "./friendly-overrides.css";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
 applyUiPreferences(readUiPreferences());
