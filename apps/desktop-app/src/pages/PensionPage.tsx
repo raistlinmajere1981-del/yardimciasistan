@@ -1,9 +1,9 @@
-import { BedDouble, CalendarCheck, ChevronDown, LogIn, LogOut } from "lucide-react";
+import { BedDouble, CalendarCheck, ChevronDown, ClipboardCheck, LogIn, LogOut } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DesktopDashboardData } from "../../electron/database";
-import { getRoomDisplayInfo } from "../app/operations";
+import { getRoomDisplayInfo, isAccommodationTask } from "../app/operations";
 import { RoomFolioWorkspace } from "../components/pension/RoomFolioWorkspace";
-import { MetricCard, type MetricCardProps } from "../components/ui/MetricCard";
 
 interface PensionPageProps {
   data: DesktopDashboardData;
@@ -11,6 +11,13 @@ interface PensionPageProps {
   rooms: ReactNode;
   stays: ReactNode;
   tasks: ReactNode;
+}
+
+interface PensionQuickStat {
+  label: string;
+  value: number;
+  icon: LucideIcon;
+  tone: "info" | "wait" | "ok" | "neutral";
 }
 
 function localDateKey() {
@@ -22,11 +29,34 @@ function localDateKey() {
 export function PensionPage({ data, reservations, rooms, stays, tasks }: PensionPageProps) {
   const today = localDateKey();
   const activeReservations = data.reservations.filter((reservation) => !["rejected", "cancelled", "completed"].includes(reservation.status));
-  const metrics: MetricCardProps[] = [
-    { title: "Bugünkü girişler", value: String(activeReservations.filter((reservation) => reservation.startDate === today).length), tone: "info", icon: LogIn, compact: true },
-    { title: "Bugünkü çıkışlar", value: String(activeReservations.filter((reservation) => reservation.endDate === today).length), tone: "neutral", icon: LogOut, compact: true },
-    { title: "Onay bekleyen", value: String(data.reservations.filter((reservation) => reservation.status === "pending").length), tone: "wait", icon: CalendarCheck, compact: true },
-    { title: "Boş odalar", value: String(data.rooms.filter((room) => getRoomDisplayInfo(room, data.reservations).status === "available").length), tone: "ok", icon: BedDouble, compact: true }
+  const pendingAccommodationTasks = data.dailyTasks.filter(
+    (task) => task.status !== "completed" && isAccommodationTask(task, data.reservations)
+  );
+  const quickStats: PensionQuickStat[] = [
+    {
+      label: "Bugün giriş",
+      value: activeReservations.filter((reservation) => reservation.startDate === today).length,
+      icon: LogIn,
+      tone: "info"
+    },
+    {
+      label: "Bugün çıkış",
+      value: activeReservations.filter((reservation) => reservation.endDate === today).length,
+      icon: LogOut,
+      tone: "neutral"
+    },
+    {
+      label: "Onay bekleyen",
+      value: data.reservations.filter((reservation) => reservation.status === "pending").length,
+      icon: CalendarCheck,
+      tone: "wait"
+    },
+    {
+      label: "Boş oda",
+      value: data.rooms.filter((room) => getRoomDisplayInfo(room, data.reservations).status === "available").length,
+      icon: BedDouble,
+      tone: "ok"
+    }
   ];
   const roomFolioRefreshKey = [
     ...data.customerRoomStays.map((stay) => `${stay.id}:${stay.status}:${stay.updatedAt}`),
@@ -35,14 +65,22 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
 
   return (
     <section className="combined-page pension-page" aria-label="Pansiyon yönetimi">
-      <section className="operation-group-panel operation-summary-panel pension-summary-panel" aria-labelledby="pension-summary-title">
-        <header className="operation-panel-heading">
-          <span className="operation-panel-eyebrow">Konaklama</span>
-          <h2 id="pension-summary-title">Bugünkü Konaklama Özeti</h2>
-          <p>Giriş, çıkış, onay ve oda uygunluğuna hızlı bakış</p>
-        </header>
-        <div className="operation-summary-grid">
-          {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
+      <section className="pension-today-strip" aria-labelledby="pension-summary-title">
+        <div className="pension-today-copy">
+          <span className="operation-panel-eyebrow">Bugün</span>
+          <h2 id="pension-summary-title">Konaklama durumu</h2>
+        </div>
+        <div className="pension-today-stats">
+          {quickStats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <div className={`pension-today-stat tone-${stat.tone}`} key={stat.label}>
+                <Icon size={17} aria-hidden="true" />
+                <span>{stat.label}</span>
+                <strong>{stat.value}</strong>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -65,14 +103,24 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
           </header>
           <div className="operation-panel-content">{rooms}</div>
         </aside>
-        <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Günlük İşler</span>
-            <h2 id="pension-tasks-title">Günlük Konaklama İşleri</h2>
-            <p>Giriş, çıkış, temizlik ve bakım görevleri</p>
-          </header>
-          <div className="operation-panel-content">{tasks}</div>
-        </section>
+        {pendingAccommodationTasks.length > 0 ? (
+          <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
+            <header className="operation-panel-heading">
+              <span className="operation-panel-eyebrow">Günlük İşler</span>
+              <h2 id="pension-tasks-title">Günlük Konaklama İşleri</h2>
+              <p>Giriş, çıkış, temizlik ve bakım görevleri</p>
+            </header>
+            <div className="operation-panel-content">{tasks}</div>
+          </section>
+        ) : (
+          <section className="pension-empty-tasks" aria-label="Günlük konaklama işleri">
+            <ClipboardCheck size={18} aria-hidden="true" />
+            <div>
+              <strong>Bugün yapılacak konaklama işi yok.</strong>
+              <span>Yeni giriş, çıkış, temizlik veya bakım işi oluşursa burada görünür.</span>
+            </div>
+          </section>
+        )}
       </div>
 
       <details className="pension-archive-details">
