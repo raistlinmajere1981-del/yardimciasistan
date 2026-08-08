@@ -21,12 +21,12 @@ export function CustomerWorkPage({ requests, customers, waiting }: CustomerWorkP
         ariaLabel="Müşteri işleri bölümleri"
         onChange={setActiveTab}
         options={[
-          { id: "requests", label: "Yeni Talepler" },
+          { id: "requests", label: "Talepler" },
           { id: "customers", label: "Müşteriler" },
-          { id: "waiting", label: "Cevap Bekleyenler" }
+          { id: "waiting", label: "Yanıt Bekleyen" }
         ]}
       />
-      {content}
+      <div className={`customer-work-content is-${activeTab}`}>{content}</div>
     </section>
   );
 }
