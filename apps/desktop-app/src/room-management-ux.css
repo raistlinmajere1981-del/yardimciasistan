@@ -1,0 +1,214 @@
+/* Pansiyon fiyat yönetimi Ayarlar sayfasına taşındı. */
+.room-price-panel {
+  display: none !important;
+}
+
+/* Gömülü Ayarlar ekranında eski tek başına oda sayısı alanı yerine Oda Yönetimi kullanılır. */
+.setup-shell.is-embedded .settings-daily-section .settings-room-count {
+  display: none !important;
+}
+
+.room-management-settings {
+  grid-column: 1 / -1;
+}
+
+.room-management-heading {
+  align-items: flex-start;
+}
+
+.room-management-heading > div > p {
+  margin: 0 0 3px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.room-management-heading > div > h2 {
+  margin: 0;
+}
+
+.room-management-save-state {
+  min-height: 18px;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.room-management-save-state.is-success {
+  color: var(--accent);
+}
+
+.room-management-save-state.is-error {
+  color: var(--danger);
+}
+
+.room-management-count-row {
+  display: flex;
+  margin-top: 12px;
+}
+
+.room-management-count-row label {
+  display: grid;
+  gap: 5px;
+  width: min(240px, 100%);
+}
+
+.room-management-count-row label > span,
+.room-management-row label > span {
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.room-management-count-row small {
+  color: var(--ink-muted);
+  line-height: 1.35;
+}
+
+.room-management-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.room-management-row {
+  display: grid;
+  grid-template-columns: minmax(150px, .75fr) minmax(230px, 1.5fr) minmax(180px, .8fr);
+  gap: 10px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  background: var(--surface-subtle);
+}
+
+.room-management-identity {
+  display: grid;
+  gap: 2px;
+  align-self: center;
+}
+
+.room-management-identity strong {
+  font-size: 13px;
+}
+
+.room-management-identity small {
+  color: var(--ink-muted);
+  font-size: 11px;
+}
+
+.room-management-row label {
+  display: grid;
+  gap: 5px;
+}
+
+.room-management-row input,
+.room-management-count-input {
+  min-height: 34px;
+}
+
+.room-management-price-wrap {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px;
+  align-items: center;
+}
+
+.room-management-price-wrap > span {
+  color: var(--ink-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.room-management-loading {
+  padding: 14px;
+  border: 1px dashed var(--line-soft);
+  border-radius: 9px;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.room-management-loading.is-error {
+  color: var(--danger);
+}
+
+.room-management-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.room-management-footer > span {
+  max-width: 720px;
+  color: var(--ink-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.room-management-save {
+  flex: 0 0 auto;
+}
+
+/* Drawer üstündeki X simgeleri yerine açık bir Kapat eylemi kullanılır. */
+.room-folio-close,
+.drawer-close-button {
+  width: auto !important;
+  min-width: 68px;
+  padding-inline: 12px !important;
+  font-size: 12px !important;
+  font-weight: 700;
+}
+
+.room-folio-close svg,
+.drawer-close-button svg {
+  display: none;
+}
+
+.room-folio-close::after,
+.drawer-close-button::after {
+  content: "Kapat";
+}
+
+/* Oda çıkışı, pencere kapatma işleminden açıkça ayrılır. */
+.room-folio-checkout-button {
+  font-size: 0 !important;
+}
+
+.room-folio-checkout-button::after {
+  content: "Konaklamayı Bitir";
+  font-size: 13px;
+  font-weight: 750;
+}
+
+/* Masa adisyonunda da kapanış işleminin adisyonu kapattığı açıkça yazılır. */
+.table-order-footer-action-group.is-close > button:first-child {
+  font-size: 0 !important;
+}
+
+.table-order-footer-action-group.is-close > button:first-child::after {
+  content: "Ödendi / Adisyonu Kapat";
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 980px) {
+  .room-management-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .room-management-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-management-save {
+    width: 100%;
+  }
+}
