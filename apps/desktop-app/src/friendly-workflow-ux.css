@@ -101,6 +101,154 @@
   margin: 0 12px 12px;
 }
 
+/* Pansiyon günlük görünümünde önce yapılacak işi, sonra ayrıntıyı göster. */
+.pension-today-strip {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 3.2fr);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-1);
+}
+
+.pension-today-copy {
+  min-width: 0;
+}
+
+.pension-today-copy h2 {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: var(--text-lg);
+}
+
+.pension-today-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.pension-today-stat {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.pension-today-stat svg {
+  color: var(--muted);
+}
+
+.pension-today-stat span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pension-today-stat strong {
+  color: var(--ink);
+  font-size: var(--text-md);
+}
+
+.pension-today-stat.tone-ok svg,
+.pension-today-stat.tone-ok strong {
+  color: var(--green);
+}
+
+.pension-today-stat.tone-wait svg,
+.pension-today-stat.tone-wait strong {
+  color: var(--yellow);
+}
+
+.pension-today-stat.tone-info svg,
+.pension-today-stat.tone-info strong {
+  color: var(--blue);
+}
+
+.pension-page .room-folio-overview-panel {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.pension-page .room-folio-title-row {
+  margin-bottom: 8px;
+}
+
+.pension-page .room-folio-title-row h2 {
+  font-size: var(--text-xl);
+}
+
+.pension-page .room-folio-title-row > div > p:last-child {
+  margin-top: 2px;
+  font-size: var(--text-sm);
+}
+
+.pension-page .room-folio-summary-grid {
+  gap: 7px;
+}
+
+.pension-page .room-folio-summary-grid .metric-card {
+  min-height: 56px;
+  padding: 8px 10px;
+}
+
+.pension-page .room-folio-summary-grid .metric-card p {
+  margin-top: 0;
+}
+
+.pension-empty-tasks {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: var(--surface-1);
+}
+
+.pension-empty-tasks svg {
+  flex: 0 0 auto;
+  color: var(--green);
+}
+
+.pension-empty-tasks div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pension-empty-tasks strong {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.pension-empty-tasks span {
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 1080px) {
+  .pension-today-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .pension-today-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
   .pension-archive-details > summary {
     align-items: flex-start;
@@ -108,5 +256,9 @@
 
   .pension-archive-summary-copy small {
     max-width: 34rem;
+  }
+
+  .pension-today-stats {
+    grid-template-columns: 1fr;
   }
 }
