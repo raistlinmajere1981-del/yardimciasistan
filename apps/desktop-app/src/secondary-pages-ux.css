@@ -1,0 +1,119 @@
+/*
+ * İkincil çalışma ekranları — küçük işletme günlük kullanım katmanı.
+ * Veri ve iş kuralları değişmez; aynı anda gösterilen yönetim ayrıntıları azaltılır.
+ */
+
+/* -------------------------------------------------------------------------- */
+/* Menü: düzenleme işi önde, müşteri önizlemesi yalnız istenince açılır.       */
+/* -------------------------------------------------------------------------- */
+
+.menu-manager .menu-management-grid {
+  grid-template-columns: minmax(220px, 0.72fr) minmax(280px, 0.9fr) minmax(420px, 1.38fr);
+  gap: 10px;
+}
+
+/* Sayfa başlığında zaten “Önizle” eylemi var. Aynı önizlemeyi sürekli açık
+ * tutmak fiyat/ürün düzenleme ekranını gereksiz yere büyütüyordu. */
+.menu-manager .menu-live-panel {
+  display: none !important;
+}
+
+.menu-manager .menu-list-panel,
+.menu-manager .item-editor-panel {
+  min-width: 0;
+}
+
+.menu-manager .panel-heading.compact {
+  min-height: 38px;
+  padding-bottom: 7px;
+}
+
+.menu-manager .manager-list {
+  max-height: min(310px, calc(100vh - 330px));
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.menu-manager .product-list {
+  max-height: min(520px, calc(100vh - 225px));
+}
+
+.menu-manager .manager-row {
+  min-height: 42px;
+  padding-block: 7px;
+}
+
+.menu-manager .category-panel .manager-form {
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.menu-manager .category-panel .manager-form textarea {
+  min-height: 58px;
+  max-height: 88px;
+}
+
+.menu-manager .item-editor-panel .manager-form {
+  gap: 9px;
+}
+
+.menu-manager .item-editor-panel textarea {
+  min-height: 64px;
+}
+
+.menu-manager .menu-form-actions,
+.menu-manager .menu-editor-actions {
+  gap: 6px;
+}
+
+.menu-manager .menu-form-actions .action-button.is-danger,
+.menu-manager .menu-editor-actions .action-button.is-danger {
+  opacity: 0.78;
+}
+
+.menu-manager .menu-form-actions .action-button.is-danger:hover,
+.menu-manager .menu-editor-actions .action-button.is-danger:hover,
+.menu-manager .menu-form-actions .action-button.is-danger:focus-visible,
+.menu-manager .menu-editor-actions .action-button.is-danger:focus-visible {
+  opacity: 1;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Mesajlar: teknik “mod” dilini geri plana alıp seçimin amacını açıklayın.   */
+/* -------------------------------------------------------------------------- */
+
+.messages-page .message-mode-intro {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.messages-page .message-mode-intro strong {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.messages-page .message-mode-switch > button {
+  min-height: 34px;
+  padding-inline: 12px;
+}
+
+@media (max-width: 1200px) {
+  .menu-manager .menu-management-grid {
+    grid-template-columns: minmax(220px, 0.75fr) minmax(0, 1.25fr);
+  }
+
+  .menu-manager .item-editor-panel {
+    grid-column: 1 / -1;
+  }
+
+  .menu-manager .manager-list,
+  .menu-manager .product-list {
+    max-height: 300px;
+  }
+}
