@@ -1,82 +1,79 @@
-/* Ana ekran: günlük iş akışını tek bakışta gösteren daha sakin görünüm. */
-.dashboard-daily-strip {
+/* Ana ekran: günlük kullanıcıya yalnız karar vermesi gereken bilgiyi öne çıkar. */
+.dashboard-page .dashboard-briefing {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) repeat(3, minmax(150px, 0.75fr));
+  grid-template-columns: minmax(260px, 1.15fr) minmax(0, 2.85fr);
   gap: 8px;
   align-items: stretch;
   margin-bottom: 12px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface-1);
 }
 
-.dashboard-daily-heading {
+.dashboard-page .dashboard-day-card {
   display: flex;
   min-width: 0;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
-  padding: 4px 8px;
+  gap: 3px;
+  min-height: 60px;
+  padding: 9px 12px;
+  border-radius: 11px;
 }
 
-.dashboard-daily-heading span {
-  color: var(--primary);
+.dashboard-page .dashboard-day-card .dashboard-date {
+  margin: 0;
   font-size: var(--text-xs);
-  font-weight: var(--weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
-.dashboard-daily-heading strong {
-  color: var(--ink);
+.dashboard-page .dashboard-day-card h2 {
+  margin: 0;
   font-size: var(--text-lg);
   line-height: 1.2;
 }
 
-.dashboard-daily-heading small {
-  color: var(--muted);
-  font-size: var(--text-xs);
+/* Açıklama cümlesi günlük ekranda başlıkla aynı şeyi tekrar etmesin. */
+.dashboard-page .dashboard-day-card > p:last-child {
+  display: none;
 }
 
-.dashboard-daily-stat {
+.dashboard-page .dashboard-attention-grid {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dashboard-page .dashboard-attention-card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  min-height: 48px;
-  padding: 7px 9px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--surface-2);
+  min-height: 60px;
+  padding: 8px 10px;
+  border-radius: 11px;
 }
 
-.dashboard-daily-stat > span:first-child {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  color: var(--primary);
-  background: var(--primary-bg);
+.dashboard-page .dashboard-attention-icon {
+  width: 32px;
+  height: 32px;
 }
 
-.dashboard-daily-stat span:nth-child(2) {
+.dashboard-page .dashboard-attention-card > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dashboard-page .dashboard-attention-card strong {
+  flex: 0 0 auto;
+  font-size: var(--text-lg);
+}
+
+.dashboard-page .dashboard-attention-card span:last-child {
   overflow: hidden;
   color: var(--muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  text-align: right;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dashboard-daily-stat strong {
-  color: var(--ink);
-  font-size: var(--text-lg);
-  white-space: nowrap;
-}
-
-.dashboard-daily-stat.is-clear strong {
-  color: var(--status-green);
 }
 
 .dashboard-page .dashboard-workspace {
@@ -91,22 +88,28 @@
   min-height: 92px;
 }
 
-@media (max-width: 1120px) {
-  .dashboard-daily-strip {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
+/* Sağdaki durum kutuları ana yapılacaklar listesinden daha baskın görünmesin. */
+.dashboard-page .dashboard-side .panel {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
 
-  .dashboard-daily-heading {
-    grid-column: 1 / -1;
+@media (max-width: 1120px) {
+  .dashboard-page .dashboard-briefing {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
-  .dashboard-daily-strip {
+  .dashboard-page .dashboard-attention-grid {
     grid-template-columns: 1fr;
   }
 
-  .dashboard-daily-heading {
-    grid-column: auto;
+  .dashboard-page .dashboard-attention-card > div {
+    justify-content: flex-start;
+  }
+
+  .dashboard-page .dashboard-attention-card span:last-child {
+    text-align: left;
   }
 }
