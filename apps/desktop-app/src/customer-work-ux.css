@@ -1,0 +1,105 @@
+/* Müşteri işleri: günlük akışta yalnız gerekli ayrıntıları öne çıkar. */
+
+.customer-work-page {
+  display: grid;
+  gap: 10px;
+}
+
+.customer-work-tabs {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.customer-work-content {
+  min-width: 0;
+}
+
+.customer-work-page .operations-workspace {
+  gap: 10px;
+}
+
+.customer-work-page .operations-list-panel,
+.customer-work-page .operations-detail-panel {
+  border-radius: 12px;
+}
+
+.customer-work-page .operations-list-panel {
+  align-self: start;
+}
+
+.customer-work-page .compact-detail-meta {
+  gap: 0;
+}
+
+.customer-work-page .compact-detail-copy {
+  margin-top: 8px;
+}
+
+.customer-work-page .request-detail-actions,
+.customer-work-page .customer-detail-actions {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* Silme günlük ana işlem değildir; görünür kalsın ama görsel ağırlığı düşük olsun. */
+.customer-work-page .request-detail-actions > button:last-child,
+.customer-work-page .customer-detail-actions > button:last-child {
+  margin-left: auto;
+  opacity: 0.72;
+}
+
+.customer-work-page .request-detail-actions > button:last-child:hover,
+.customer-work-page .customer-detail-actions > button:last-child:hover,
+.customer-work-page .request-detail-actions > button:last-child:focus-visible,
+.customer-work-page .customer-detail-actions > button:last-child:focus-visible {
+  opacity: 1;
+}
+
+.customer-work-page .customer-history-grid {
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.customer-work-page .customer-history-grid > section {
+  min-height: 0;
+}
+
+/* Yanıt bekleyen kayıt yoksa iki büyük boş panel yerine tek sakin durum göster. */
+.customer-work-content.is-waiting .requests-workspace:has(.operations-list-panel .compact-empty) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.customer-work-content.is-waiting .requests-workspace:has(.operations-list-panel .compact-empty) .operations-list-panel {
+  display: none;
+}
+
+.customer-work-content.is-waiting .requests-workspace:has(.operations-list-panel .compact-empty) .operations-detail-panel {
+  min-height: 0;
+  padding: 18px;
+}
+
+.customer-work-content.is-waiting .requests-workspace:has(.operations-list-panel .compact-empty) .operations-detail-panel .empty-state {
+  min-height: 96px;
+  padding: 14px;
+}
+
+.customer-work-content.is-waiting .requests-workspace:has(.operations-list-panel .compact-empty) .operations-detail-panel .empty-state strong::after {
+  content: " Şu anda müşteriden dönüş bekleyen bir kayıt yok.";
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.customer-work-content.is-waiting .requests-workspace:has(.operations-list-panel .compact-empty) .operations-detail-panel .empty-state p {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .customer-work-tabs {
+    width: 100%;
+  }
+
+  .customer-work-page .request-detail-actions > button:last-child,
+  .customer-work-page .customer-detail-actions > button:last-child {
+    margin-left: 0;
+  }
+}
