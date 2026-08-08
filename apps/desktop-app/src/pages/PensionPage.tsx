@@ -1,4 +1,4 @@
-import { CalendarCheck, LogIn, LogOut, BedDouble } from "lucide-react";
+import { BedDouble, CalendarCheck, ChevronDown, LogIn, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DesktopDashboardData } from "../../electron/database";
 import { getRoomDisplayInfo } from "../app/operations";
@@ -48,7 +48,7 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
 
       <RoomFolioWorkspace refreshKey={roomFolioRefreshKey} />
 
-      <div className="pension-layout">
+      <div className="pension-layout pension-primary-layout">
         <section className="operation-group-panel pension-reservations-section" aria-labelledby="pension-reservations-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Konaklama</span>
@@ -65,14 +65,6 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
           </header>
           <div className="operation-panel-content">{rooms}</div>
         </aside>
-        <section className="operation-group-panel pension-stays-section" aria-labelledby="pension-stays-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Müşteri · Oda</span>
-            <h2 id="pension-stays-title">Konaklama Arşivi</h2>
-            <p>Planlanan, devam eden ve tamamlanan oda ilişkileri</p>
-          </header>
-          <div className="operation-panel-content">{stays}</div>
-        </section>
         <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Günlük İşler</span>
@@ -82,6 +74,25 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
           <div className="operation-panel-content">{tasks}</div>
         </section>
       </div>
+
+      <details className="pension-archive-details">
+        <summary>
+          <span className="pension-archive-summary-copy">
+            <span className="operation-panel-eyebrow">Geçmiş kayıtlar</span>
+            <strong>Konaklama Geçmişini Göster</strong>
+            <small>Planlanan, devam eden ve tamamlanan eski oda kayıtları</small>
+          </span>
+          <span className="pension-archive-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
+        </summary>
+        <section className="operation-group-panel pension-stays-section" aria-labelledby="pension-stays-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Müşteri · Oda</span>
+            <h2 id="pension-stays-title">Konaklama Arşivi</h2>
+            <p>Planlanan, devam eden ve tamamlanan oda ilişkileri</p>
+          </header>
+          <div className="operation-panel-content">{stays}</div>
+        </section>
+      </details>
     </section>
   );
 }
