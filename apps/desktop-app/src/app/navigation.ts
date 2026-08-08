@@ -56,7 +56,7 @@ export function getPageMeta(page: DesktopPage) {
     restaurant: { eyebrow: "Servis", title: "Restoran", description: "Masa durumlarını ve servis işlerini takip edin." },
     menu: { eyebrow: "İçerik", title: "Menü", description: "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın." },
     messages: { eyebrow: "Mesaj merkezi", title: "Mesajlar", description: "Hazır yanıtları ve WhatsApp görüşmelerini yönetin." },
-    reports: { eyebrow: "Günlük para takibi", title: "Kasa ve Raporlar", description: "Para giriş çıkışını, pansiyon alacaklarını ve dönem sonuçlarını takip edin." },
+    reports: { eyebrow: "Günlük para takibi", title: "Kasa", description: "Bugünün para giriş çıkışını ve bekleyen alacakları takip edin." },
     settings: { eyebrow: "Yapılandırma", title: "Ayarlar", description: "İşletme, görünüm ve bağlantı tercihlerini düzenleyin." }
   };
 
