@@ -13,6 +13,7 @@ import "./dashboard-simple-ux.css";
 import "./customer-work-ux.css";
 import "./room-card-ux.css";
 import "./room-management-ux.css";
+import "./secondary-pages-ux.css";
 import { installCashPageUx } from "./cash-page-ux";
 import { installCustomerWorkEnhancements } from "./customer-work-enhancements";
 import { installRoomCardUx } from "./room-card-ux";
