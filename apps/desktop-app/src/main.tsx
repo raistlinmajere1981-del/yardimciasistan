@@ -9,6 +9,7 @@ import "./room-folio-ux.css";
 import "./finance-ux.css";
 import "./cash-page-ux.css";
 import "./friendly-workflow-ux.css";
+import "./dashboard-simple-ux.css";
 import { installCashPageUx } from "./cash-page-ux";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
