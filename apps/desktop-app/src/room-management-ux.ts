@@ -38,21 +38,20 @@ function ensureRoomManagementPanel() {
         <p>Pansiyon</p>
         <h2>Oda Yönetimi</h2>
       </div>
-      <span class="room-management-save-state" role="status"></span>
+      <div class="room-management-toolbar">
+        <label class="room-management-count-control">
+          <span>Oda sayısı</span>
+          <input class="room-management-count-input" inputmode="numeric" min="0" step="1" type="number" />
+        </label>
+        <span class="room-management-save-state" role="status"></span>
+      </div>
     </div>
-    <p class="setup-section-description">Oda sayısını, oda adlarını ve yeni konaklamalarda kullanılacak gecelik fiyatları tek yerden yönetin.</p>
-    <div class="room-management-count-row">
-      <label>
-        <span>Oda sayısı</span>
-        <input class="room-management-count-input" inputmode="numeric" min="0" step="1" type="number" />
-        <small>Oda sayısı değişikliği üstteki “Ayarları Kaydet” düğmesiyle uygulanır.</small>
-      </label>
-    </div>
+    <p class="setup-section-description">Oda adlarını ve yeni konaklamalarda kullanılacak gecelik fiyatları tek yerden yönetin.</p>
     <div class="room-management-list" aria-label="Oda adı ve fiyatları">
       <div class="room-management-loading">Odalar hazırlanıyor…</div>
     </div>
     <div class="room-management-footer">
-      <span>Fiyat değişikliği açık oda adisyonlarını etkilemez; yalnız yeni açılan konaklamalarda başlangıç fiyatı olur.</span>
+      <span>Oda sayısı değişikliği üstteki “Ayarları Kaydet” düğmesiyle uygulanır. Fiyat değişikliği açık oda adisyonlarını etkilemez.</span>
       <button class="setup-primary room-management-save" type="button">Oda Bilgilerini Kaydet</button>
     </div>
   `;
@@ -121,7 +120,10 @@ function renderRoomRows(panel: HTMLElement, rooms: RoomDraftData[]) {
     return;
   }
 
-  list.replaceChildren(...rooms.map((room) => createRoomRow(room)));
+  const header = document.createElement("div");
+  header.className = "room-management-list-head";
+  header.innerHTML = "<span>Oda</span><span>Oda adı</span><span>Gecelik fiyat</span>";
+  list.replaceChildren(header, ...rooms.map((room) => createRoomRow(room)));
 }
 
 function createRoomRow(room: RoomDraftData) {
@@ -133,21 +135,15 @@ function createRoomRow(room: RoomDraftData) {
   identity.className = "room-management-identity";
   const number = document.createElement("strong");
   number.textContent = room.number ? `Oda ${room.number}` : "Oda";
-  const hint = document.createElement("small");
-  hint.textContent = "Oda adı ve gecelik fiyat";
-  identity.append(number, hint);
+  identity.append(number);
 
-  const nameLabel = document.createElement("label");
-  nameLabel.innerHTML = "<span>Oda adı</span>";
   const nameInput = document.createElement("input");
   nameInput.className = "room-management-name";
   nameInput.value = room.name;
   nameInput.maxLength = 120;
   nameInput.placeholder = "Örn. Bahçe Katı Standart Oda";
-  nameLabel.append(nameInput);
+  nameInput.setAttribute("aria-label", `${number.textContent} adı`);
 
-  const priceLabel = document.createElement("label");
-  priceLabel.innerHTML = "<span>Gecelik fiyat</span>";
   const priceWrap = document.createElement("div");
   priceWrap.className = "room-management-price-wrap";
   const priceInput = document.createElement("input");
@@ -155,12 +151,12 @@ function createRoomRow(room: RoomDraftData) {
   priceInput.inputMode = "decimal";
   priceInput.value = minorToInput(room.nightlyPriceMinor);
   priceInput.placeholder = "0,00";
+  priceInput.setAttribute("aria-label", `${number.textContent} gecelik fiyatı`);
   const currency = document.createElement("span");
   currency.textContent = "₺ / gece";
   priceWrap.append(priceInput, currency);
-  priceLabel.append(priceWrap);
 
-  row.append(identity, nameLabel, priceLabel);
+  row.append(identity, nameInput, priceWrap);
   return row;
 }
 
