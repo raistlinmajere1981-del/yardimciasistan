@@ -11,6 +11,7 @@ import {
   type UpdateRoomFolioDetailsInput,
   type UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
+import { saveRoomProfile } from "./room-profile";
 
 export function registerRoomFolioIpcHandlers(options: {
   databasePath: () => string;
@@ -23,8 +24,22 @@ export function registerRoomFolioIpcHandlers(options: {
     return service().getData();
   });
 
-  ipcMain.handle("roomFolio:setRoomNightlyPrice", (_event, input: SetRoomNightlyPriceInput): DesktopRoomFolioMutationResult => {
+  ipcMain.handle("roomFolio:setRoomNightlyPrice", (_event, input: SetRoomNightlyPriceInput & { name?: string }): DesktopRoomFolioMutationResult => {
     options.assertUnlocked();
+
+    if (typeof input?.name === "string") {
+      const result = saveRoomProfile(options.databasePath(), {
+        roomId: input.roomId,
+        name: input.name,
+        amountMinor: input.amountMinor,
+        currency: input.currency
+      });
+      if (!result.ok) {
+        return result;
+      }
+      return { ok: true, message: result.message, data: service().getData() };
+    }
+
     return service().setRoomNightlyPrice(input);
   });
 
