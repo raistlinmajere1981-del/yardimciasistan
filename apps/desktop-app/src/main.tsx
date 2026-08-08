@@ -11,13 +11,16 @@ import "./cash-page-ux.css";
 import "./friendly-workflow-ux.css";
 import "./dashboard-simple-ux.css";
 import "./customer-work-ux.css";
+import "./room-card-ux.css";
 import { installCashPageUx } from "./cash-page-ux";
 import { installCustomerWorkEnhancements } from "./customer-work-enhancements";
+import { installRoomCardUx } from "./room-card-ux";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
 applyUiPreferences(readUiPreferences());
 installCashPageUx();
 installCustomerWorkEnhancements();
+installRoomCardUx();
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
