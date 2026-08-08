@@ -1,63 +1,67 @@
-/* Oda kartları: günlük kullanımda tek ana işlem, durum değişiklikleri gerektiğinde açılır. */
+/* Oda kartları: React DOM'una dokunmadan ikincil durum işlemlerini geri planda tutar. */
 
-.compact-resource-grid .resource-compact-card .room-primary-action {
+.compact-resource-grid .resource-compact-card {
+  position: relative;
+}
+
+.compact-resource-grid .resource-compact-card > button {
   margin-top: 8px;
 }
 
-.compact-resource-grid .resource-compact-card .room-status-details {
-  margin-top: 6px;
-  border-top: 1px solid var(--line-soft);
-  padding-top: 5px;
+.compact-resource-grid .resource-compact-card .compact-status-actions {
+  max-height: 0;
+  margin-top: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: max-height 140ms ease, opacity 120ms ease, transform 120ms ease, margin-top 120ms ease;
 }
 
-.compact-resource-grid .resource-compact-card .room-status-details[hidden] {
+.compact-resource-grid .resource-compact-card .compact-status-actions:not(:has(button:not(:disabled))) {
   display: none;
 }
 
-.compact-resource-grid .resource-compact-card .room-status-details > summary {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 5px;
+.compact-resource-grid .resource-compact-card:has(.compact-status-actions button:not(:disabled))::after {
+  content: "•••  Durumu değiştir";
+  display: block;
   width: fit-content;
-  margin-left: auto;
-  list-style: none;
-  cursor: pointer;
+  margin: 6px 0 0 auto;
   color: var(--ink-muted);
   font-size: 11px;
   font-weight: 650;
-  user-select: none;
+  letter-spacing: 0.01em;
 }
 
-.compact-resource-grid .resource-compact-card .room-status-details > summary::-webkit-details-marker {
+.compact-resource-grid .resource-compact-card:hover::after,
+.compact-resource-grid .resource-compact-card:focus-within::after {
   display: none;
 }
 
-.compact-resource-grid .resource-compact-card .room-status-details > summary::before {
-  content: "•••";
-  letter-spacing: 1px;
-  color: var(--accent);
-  font-size: 10px;
+.compact-resource-grid .resource-compact-card:hover .compact-status-actions,
+.compact-resource-grid .resource-compact-card:focus-within .compact-status-actions {
+  max-height: 42px;
+  margin-top: 6px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
-.compact-resource-grid .resource-compact-card .room-status-details[open] > summary {
-  color: var(--ink);
-  margin-bottom: 6px;
-}
-
-.compact-resource-grid .resource-compact-card .room-status-details .compact-status-actions {
-  margin: 0;
-  gap: 4px;
-}
-
-.compact-resource-grid .resource-compact-card .room-status-details .compact-status-actions button {
+.compact-resource-grid .resource-compact-card .compact-status-actions button {
   min-height: 28px;
   font-size: 11px;
 }
 
 @media (max-width: 900px) {
-  .compact-resource-grid .resource-compact-card .room-status-details > summary {
-    min-height: 30px;
-    align-items: center;
+  .compact-resource-grid .resource-compact-card .compact-status-actions {
+    max-height: none;
+    margin-top: 6px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+
+  .compact-resource-grid .resource-compact-card:has(.compact-status-actions button:not(:disabled))::after {
+    display: none;
   }
 }
