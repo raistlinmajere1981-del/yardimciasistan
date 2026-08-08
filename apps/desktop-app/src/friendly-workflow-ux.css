@@ -1,0 +1,112 @@
+.page-header-action .sync-pill button {
+  width: 36px;
+  min-width: 36px;
+  height: 32px;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  font-size: 0;
+  white-space: nowrap;
+}
+
+.page-header-action .sync-pill button svg {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.pension-primary-layout .pension-tasks-section {
+  grid-column: 1 / -1;
+}
+
+.pension-archive-details {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.pension-archive-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 64px;
+  padding: 12px 16px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.pension-archive-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pension-archive-details > summary:hover {
+  background: var(--surface-2);
+}
+
+.pension-archive-details > summary:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
+.pension-archive-summary-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pension-archive-summary-copy strong {
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.pension-archive-summary-copy small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.pension-archive-summary-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.pension-archive-summary-action svg {
+  transition: transform 150ms ease;
+}
+
+.pension-archive-details[open] .pension-archive-summary-action svg {
+  transform: rotate(180deg);
+}
+
+.pension-archive-details[open] .pension-archive-summary-action {
+  font-size: 0;
+}
+
+.pension-archive-details[open] .pension-archive-summary-action::before {
+  content: "Kapat";
+  font-size: var(--text-sm);
+}
+
+.pension-archive-details .pension-stays-section {
+  margin: 0 12px 12px;
+}
+
+@media (max-width: 760px) {
+  .pension-archive-details > summary {
+    align-items: flex-start;
+  }
+
+  .pension-archive-summary-copy small {
+    max-width: 34rem;
+  }
+}
