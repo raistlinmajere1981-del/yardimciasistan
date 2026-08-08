@@ -1,0 +1,63 @@
+/* Oda kartları: günlük kullanımda tek ana işlem, durum değişiklikleri gerektiğinde açılır. */
+
+.compact-resource-grid .resource-compact-card .room-primary-action {
+  margin-top: 8px;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details {
+  margin-top: 6px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 5px;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details[hidden] {
+  display: none;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  width: fit-content;
+  margin-left: auto;
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink-muted);
+  font-size: 11px;
+  font-weight: 650;
+  user-select: none;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details > summary::before {
+  content: "•••";
+  letter-spacing: 1px;
+  color: var(--accent);
+  font-size: 10px;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details[open] > summary {
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details .compact-status-actions {
+  margin: 0;
+  gap: 4px;
+}
+
+.compact-resource-grid .resource-compact-card .room-status-details .compact-status-actions button {
+  min-height: 28px;
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .compact-resource-grid .resource-compact-card .room-status-details > summary {
+    min-height: 30px;
+    align-items: center;
+  }
+}
