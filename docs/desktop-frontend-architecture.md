@@ -79,3 +79,4 @@ Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. 
 - Tarayıcı önizleme/fallback `defaultDashboardData` ve `defaultSetupData` verileri `app/bootstrap-defaults.ts` altında tutulur; `App.tsx` statik örnek veri taşımak yerine yalnız uygulama koordinasyonuna odaklanır.
 - Uygulama çalışma zamanı/senkron UI yardımcıları `app/runtime-state.ts`, rezervasyon WhatsApp metin üretimi `app/reservation-messaging.ts`, masa durum yardımcıları ise `app/operations.ts` altında tutulur; `App.tsx` saf yardımcı fonksiyon taşımaz.
 - Uygulama kilidi state/bridge akışı `app/use-app-lock.ts` hook'unda tutulur; `App.tsx` yalnız kilitlenirken açık menü önizlemesini kapatma gibi üst seviye koordinasyonu yapar.
+- Dashboard verisi, bootstrap yükleme, otomatik senkron abonelikleri ve manuel web talebi çekme akışı `app/use-desktop-sync.ts` controller hook'unda tutulur; `App.tsx` kurulum, menü seçimi ve ortak durum mesajı koordinasyonunu sağlar.
