@@ -81,3 +81,15 @@ export function formatReservationDate(reservation: DesktopDashboardData["reserva
   const date = endDate ? `${startDate} - ${endDate}` : startDate;
   return [date, reservation.time].filter(Boolean).join(" · ") || "-";
 }
+
+export function formatDateTime(value: string) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("tr-TR", {
+    dateStyle: "short",
+    timeStyle: "short"
+  }).format(new Date(timestamp));
+}
