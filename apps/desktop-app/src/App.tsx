@@ -71,6 +71,20 @@ import {
   toSetupForm,
   type SetupFormState
 } from "./app/setup-model";
+import {
+  customerFormToInput,
+  defaultRoomAssignmentForm,
+  formatCustomerGender,
+  formatCustomerLastContactDate,
+  formatCustomerRoomStayStatus,
+  formatCustomerSource,
+  formatIdentityType,
+  formatStayDateRange,
+  hasCustomerIdentityDetails,
+  toCustomerForm,
+  type CustomerFormState,
+  type RoomAssignmentFormState
+} from "./app/customer-model";
 import { AppShell } from "./components/layout/AppShell";
 import { PageHeader } from "./components/layout/PageHeader";
 import { Sidebar } from "./components/layout/Sidebar";
@@ -185,37 +199,6 @@ interface ManualRequestFormState {
   guestCount: string;
   message: string;
   priority: string;
-}
-
-interface CustomerFormState {
-  id: string;
-  fullName: string;
-  phone: string;
-  email: string;
-  notes: string;
-  tags: string;
-  identityType: string;
-  identityNumber: string;
-  nationality: string;
-  birthDate: string;
-  gender: string;
-  documentSerialNumber: string;
-  documentExpiryDate: string;
-  birthPlace: string;
-  motherName: string;
-  fatherName: string;
-  issuingAuthority: string;
-  address: string;
-}
-
-interface RoomAssignmentFormState {
-  customerId: string;
-  roomId: string;
-  checkInDate: string;
-  checkOutDate: string;
-  guestCount: string;
-  notes: string;
-  status: "planned" | "checked_in";
 }
 
 const defaultDashboardData: DesktopDashboardData = {
@@ -5335,136 +5318,11 @@ function isRequestWaitingForReply(status: string) {
   return ["new", "seen", "waiting_owner", "pending", "in_progress"].includes(status);
 }
 
-function formatCustomerSource(value: string) {
-  const labels: Record<string, string> = {
-    web_form: "Web form",
-    web_ai: "Web AI",
-    whatsapp: "WhatsApp",
-    manual: "Manuel",
-    phone: "Telefon",
-    android: "Android"
-  };
-
-  return labels[value] ?? "Müşteri";
-}
-
-function toCustomerForm(customer: DesktopDashboardData["customers"][number] | null): CustomerFormState {
-  return {
-    id: customer?.id ?? "",
-    fullName: customer?.fullName ?? "",
-    phone: customer?.phone ?? "",
-    email: customer?.email ?? "",
-    notes: customer?.notes ?? "",
-    tags: customer?.tags.join(", ") ?? "",
-    identityType: customer?.identityType ?? "",
-    identityNumber: customer?.identityNumber ?? "",
-    nationality: customer?.nationality ?? "",
-    birthDate: customer?.birthDate ?? "",
-    gender: customer?.gender ?? "",
-    documentSerialNumber: customer?.documentSerialNumber ?? "",
-    documentExpiryDate: customer?.documentExpiryDate ?? "",
-    birthPlace: customer?.birthPlace ?? "",
-    motherName: customer?.motherName ?? "",
-    fatherName: customer?.fatherName ?? "",
-    issuingAuthority: customer?.issuingAuthority ?? "",
-    address: customer?.address ?? ""
-  };
-}
-
-function customerFormToInput(form: CustomerFormState): SaveCustomerInput {
-  return {
-    ...(form.id ? { id: form.id } : {}),
-    fullName: form.fullName,
-    phone: form.phone,
-    email: form.email,
-    notes: form.notes,
-    tags: form.tags.split(/[,;\n]/).map((tag) => tag.trim()).filter(Boolean),
-    identityType: form.identityType,
-    identityNumber: form.identityNumber,
-    nationality: form.nationality,
-    birthDate: form.birthDate,
-    gender: form.gender,
-    documentSerialNumber: form.documentSerialNumber,
-    documentExpiryDate: form.documentExpiryDate,
-    birthPlace: form.birthPlace,
-    motherName: form.motherName,
-    fatherName: form.fatherName,
-    issuingAuthority: form.issuingAuthority,
-    address: form.address
-  };
-}
-
-function defaultRoomAssignmentForm(customerId: string, roomId: string): RoomAssignmentFormState {
-  const today = localIsoDate(new Date());
-  const tomorrow = new Date(`${today}T12:00:00`);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  return {
-    customerId,
-    roomId,
-    checkInDate: today,
-    checkOutDate: localIsoDate(tomorrow),
-    guestCount: "1",
-    notes: "",
-    status: "planned"
-  };
-}
-
-function localIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function formatIdentityType(value: string): string {
-  if (value === "tc_identity_card") return "T.C. Kimlik Kartı";
-  if (value === "passport") return "Pasaport";
-  if (value === "other") return "Diğer belge";
-  return "-";
-}
-
-function formatCustomerGender(value: string): string {
-  if (value === "female") return "Kadın";
-  if (value === "male") return "Erkek";
-  if (value === "unspecified") return "Belirtilmemiş";
-  return "-";
-}
-
-function hasCustomerIdentityDetails(customer: DesktopDashboardData["customers"][number]): boolean {
-  return Boolean(
-    customer.identityNumber
-    || customer.nationality
-    || customer.birthDate
-    || customer.gender
-    || customer.documentSerialNumber
-    || customer.documentExpiryDate
-    || customer.birthPlace
-    || customer.motherName
-    || customer.fatherName
-    || customer.issuingAuthority
-    || customer.address
-  );
-}
-
-function formatCustomerRoomStayStatus(value: string): string {
-  if (value === "planned") return "Planlandı";
-  if (value === "checked_in") return "Giriş yaptı";
-  if (value === "checked_out") return "Çıkış yaptı";
-  if (value === "cancelled") return "İptal";
-  return value || "Bilinmiyor";
-}
-
 function getCustomerRoomStayTone(value: string): StatusTone {
   if (value === "checked_in") return "ok";
   if (value === "planned") return "wait";
   if (value === "cancelled") return "danger";
   return "neutral";
-}
-
-function formatStayDateRange(stay: DesktopDashboardData["customerRoomStays"][number]): string {
-  const start = formatDateForDisplay(stay.checkInDate) || stay.checkInDate || "-";
-  const end = formatDateForDisplay(stay.checkOutDate) || stay.checkOutDate;
-  return end ? `${start} – ${end}` : `${start} – açık`;
 }
 
 function formatReservationType(value: string) {
@@ -5689,23 +5547,6 @@ function buildReservationWhatsAppMessage(
     `${dateText} tarihli ${typeText} talebiniz için sizinle iletişime geçiyoruz.`,
     "Detayları işletme sahibi kontrol edip size net bilgi verecektir."
   ].join(" ");
-}
-
-function formatCustomerLastContactDate(value: string) {
-  if (!value) {
-    return "-";
-  }
-  const timestamp = Date.parse(value);
-  if (!Number.isFinite(timestamp)) {
-    return value;
-  }
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  }).format(new Date(timestamp));
 }
 
 function formatDateTime(value: string) {
