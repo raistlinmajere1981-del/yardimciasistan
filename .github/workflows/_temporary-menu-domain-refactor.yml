@@ -1,0 +1,30 @@
+name: Temporary Menu Domain Refactor
+
+on:
+  push:
+    branches:
+      - feature/app-menu-domain-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Menü domain ve önizlemeyi ayır
+        run: python3 scripts/refactor-menu-domain.py
+      - name: Geçici codemodu temizle ve kaydet
+        run: |
+          rm -f scripts/refactor-menu-domain.py
+          rm -f .github/workflows/_temporary-menu-domain-refactor.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Menü domain ve önizleme bileşenlerini App.tsx dışına taşı"
+          git push
