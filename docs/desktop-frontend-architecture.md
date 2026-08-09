@@ -80,3 +80,4 @@ Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. 
 - Uygulama çalışma zamanı/senkron UI yardımcıları `app/runtime-state.ts`, rezervasyon WhatsApp metin üretimi `app/reservation-messaging.ts`, masa durum yardımcıları ise `app/operations.ts` altında tutulur; `App.tsx` saf yardımcı fonksiyon taşımaz.
 - Uygulama kilidi state/bridge akışı `app/use-app-lock.ts` hook'unda tutulur; `App.tsx` yalnız kilitlenirken açık menü önizlemesini kapatma gibi üst seviye koordinasyonu yapar.
 - Dashboard verisi, bootstrap yükleme, otomatik senkron abonelikleri ve manuel web talebi çekme akışı `app/use-desktop-sync.ts` controller hook'unda tutulur; `App.tsx` kurulum, menü seçimi ve ortak durum mesajı koordinasyonunu sağlar.
+- Menü seçimleri, taslak form state'leri, kaydet/sil/yayınla ve yerel önizleme lifecycle'ı `app/use-menu-controller.ts` controller hook'unda tutulur; `App.tsx` yalnız MenuManager ve preview bileşenlerini bağlar.
