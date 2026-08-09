@@ -64,6 +64,7 @@ Tamamlanan geçişler:
 - `App.tsx` içinde kalmış menü sıralama/önizleme yardımcı tekrarları temizlendi; menü domain yardımcıları tek kaynağa bağlandı.
 - `SetupFormState`, masa kategori form modeli, AI servis taslakları/presetleri ve ayar dönüşüm yardımcıları `app/setup-model.ts` altına taşındı.
 - `SetupWizard`, Android cihaz yetki kartları ve Ayarlar sunum akışı `components/settings/SetupWizard.tsx` altına taşındı; `App.tsx` ayar verisi/bridge koordinasyonuna indirildi.
+- Mesajlar ekranındaki `AiWorkspace`, `WhatsAppWorkspace` ve WhatsApp Web doğrulama/gönderim sunumu `components/messages/MessageWorkspaces.tsx` altına taşındı; `App.tsx` mesaj state/bridge koordinasyonunda kaldı.
 - Müşteri form tipleri, müşteri kayıt dönüşümleri, kimlik alanı yardımcıları ve konaklama sunum yardımcıları `app/customer-model.ts` altına taşındı.
 - `CustomersWorkspace`, `CustomerEditorDrawer`, `RoomAssignmentDrawer` ve `CustomerRoomStayActions` `components/customers` altına taşındı.
 - Talep/rezervasyon/oda/tarih ortak gösterim yardımcıları `app/record-formatters.ts` altında toplandı.
