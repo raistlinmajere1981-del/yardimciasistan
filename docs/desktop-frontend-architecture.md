@@ -75,3 +75,4 @@ Tamamlanan geçişler:
 
 Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. Her paket en az mevcut `Desktop Finance Check` hattındaki masaüstü build, finans smoke testleri, oda adisyonu testi ve gerçek Electron başlatma kontrolünden geçmelidir.
 - `RequestsWorkspace` ve manuel talep drawer’ı `components/customers/RequestsWorkspace.tsx` altına taşındı; talep durum tonu ve bekleyen-talep görünüm yardımcıları aynı modülden paylaşılır.
+- `DailyTasksWorkspace`, `ReservationsWorkspace`, `RoomsWorkspace` ve `CustomerRoomStaysWorkspace` `components/operations/OperationWorkspaces.tsx` altına taşındı; App yalnız operasyon state/bridge koordinasyonunu yürütür.
