@@ -1,6 +1,5 @@
 import { installCustomerWorkEnhancements } from "./customer-work-enhancements";
 import { installMenuEditorUx } from "./menu-editor-ux";
-import { installRoomManagementUx } from "./room-management-ux";
 
 type Cleanup = () => void;
 
@@ -14,8 +13,7 @@ type Cleanup = () => void;
 export function installDesktopUxEnhancements(): Cleanup {
   const cleanups: Cleanup[] = [
     installCustomerWorkEnhancements(),
-    installMenuEditorUx(),
-    installRoomManagementUx()
+    installMenuEditorUx()
   ];
 
   return () => {

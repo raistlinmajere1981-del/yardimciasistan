@@ -72,6 +72,7 @@ import { NotificationCenter } from "./components/notifications/NotificationCente
 import { AppLockScreen } from "./components/security/AppLockScreen";
 import { PasswordSettings } from "./components/security/PasswordSettings";
 import { StockImageImportWorkspace } from "./components/restaurant/StockImageImportWorkspace";
+import { RoomManagementSection } from "./components/settings/RoomManagementSection";
 import { ActionButton } from "./components/ui/ActionButton";
 import { CompactList } from "./components/ui/CompactList";
 import { CompactListButton, CompactListItem } from "./components/ui/CompactListItem";
@@ -3219,6 +3220,13 @@ function SetupWizard({
             AI cevap önerileri açık
           </label>
         </div>
+        {embedded && (
+          <RoomManagementSection
+            roomCount={form.roomCount}
+            dashboardRoomCount={dashboardData?.rooms.length ?? 0}
+            onRoomCountChange={(value) => update("roomCount", value)}
+          />
+        )}
         {embedded && (
           <PasswordSettings
             configured={setupData.appPasswordConfigured}
