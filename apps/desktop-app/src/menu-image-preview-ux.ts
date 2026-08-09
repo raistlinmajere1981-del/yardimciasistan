@@ -1,5 +1,5 @@
 const ITEM_DETAILS_SELECTOR = ".menu-manager details.item-details";
-const IMAGE_LABEL_SELECTOR = `${ITEM_DETAILS_SELECTOR} label.menu-image-picker-label`;
+const IMAGE_LABEL_SELECTOR = `${ITEM_DETAILS_SELECTOR} label`;
 const PREVIEW_CLASS = "menu-image-inline-preview";
 
 let installed = false;
@@ -20,13 +20,13 @@ export function installMenuImagePreviewUx() {
 
   document.addEventListener("input", (event) => {
     const input = event.target;
-    if (!(input instanceof HTMLInputElement) || input.dataset.yaMenuImagePicker !== "true") return;
+    if (!(input instanceof HTMLInputElement) || !isMenuImageInput(input)) return;
     syncPreviewForInput(input);
   }, true);
 
   document.addEventListener("change", (event) => {
     const input = event.target;
-    if (!(input instanceof HTMLInputElement) || input.dataset.yaMenuImagePicker !== "true") return;
+    if (!(input instanceof HTMLInputElement) || !isMenuImageInput(input)) return;
     syncPreviewForInput(input);
   }, true);
 
@@ -37,8 +37,9 @@ export function installMenuImagePreviewUx() {
 
 function enhanceImagePreviews() {
   document.querySelectorAll<HTMLLabelElement>(IMAGE_LABEL_SELECTOR).forEach((label) => {
+    if (!label.textContent?.includes("Görsel yolu")) return;
     const details = label.closest<HTMLDetailsElement>(ITEM_DETAILS_SELECTOR);
-    const input = label.querySelector<HTMLInputElement>('input[data-ya-menu-image-picker="true"]');
+    const input = label.querySelector<HTMLInputElement>("input");
     if (!details || !input) return;
 
     details.classList.add("has-menu-image-preview");
@@ -86,6 +87,11 @@ function createPreview() {
   frame.append(image, empty);
   figure.append(frame, caption);
   return figure;
+}
+
+function isMenuImageInput(input: HTMLInputElement) {
+  const label = input.closest("label");
+  return Boolean(label?.textContent?.includes("Görsel yolu") && input.closest(ITEM_DETAILS_SELECTOR));
 }
 
 function syncPreviewForInput(input: HTMLInputElement) {
