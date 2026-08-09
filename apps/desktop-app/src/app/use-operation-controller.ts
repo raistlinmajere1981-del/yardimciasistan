@@ -1,0 +1,110 @@
+import type { Dispatch, SetStateAction } from "react";
+import type { DesktopDashboardData } from "../../electron/database";
+import type { SyncState } from "./runtime-state";
+
+interface UseOperationControllerOptions {
+  setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>;
+  setSyncState: Dispatch<SetStateAction<SyncState>>;
+  setStatusMessage: Dispatch<SetStateAction<string>>;
+}
+
+export function useOperationController({
+  setDashboardData,
+  setSyncState,
+  setStatusMessage
+}: UseOperationControllerOptions) {
+  async function handleUpdateRoomStatus(roomId: string, status: string) {
+    setSyncState("loading");
+    setStatusMessage("Oda durumu güncelleniyor...");
+
+    if (!window.yardimciDesktop) {
+      setSyncState("error");
+      setStatusMessage("Oda durumu güncellenemedi. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    const result = await window.yardimciDesktop.updateRoomStatus({ roomId, status });
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+  }
+
+  async function handleUpdateTableStatus(tableId: string, status: string) {
+    setSyncState("loading");
+    setStatusMessage("Masa durumu güncelleniyor...");
+
+    if (!window.yardimciDesktop) {
+      setSyncState("error");
+      setStatusMessage("Masa durumu güncellenemedi. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    const result = await window.yardimciDesktop.updateTableStatus({ tableId, status });
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+  }
+
+  async function handleUpdateReservationStatus(reservationId: string, status: string) {
+    setSyncState("loading");
+    setStatusMessage("Rezervasyon durumu güncelleniyor...");
+
+    if (!window.yardimciDesktop) {
+      setSyncState("error");
+      setStatusMessage("Rezervasyon durumu güncellenemedi. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    const result = await window.yardimciDesktop.updateReservationStatus({ reservationId, status });
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+  }
+
+  async function handleUpdateDailyTaskStatus(taskId: string, status: string) {
+    setSyncState("loading");
+    setStatusMessage("Günlük iş durumu güncelleniyor...");
+
+    if (!window.yardimciDesktop) {
+      setSyncState("error");
+      setStatusMessage("Günlük iş güncellenemedi. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    const result = await window.yardimciDesktop.updateDailyTaskStatus({ taskId, status });
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+  }
+
+  return {
+    handleUpdateRoomStatus,
+    handleUpdateTableStatus,
+    handleUpdateReservationStatus,
+    handleUpdateDailyTaskStatus
+  };
+}

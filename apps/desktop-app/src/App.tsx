@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  buildOwnerReplyWhatsAppMessage,
-  createWhatsAppUrl,
-  createWhatsAppWebUrl
-} from "@yardimci-asistan/whatsapp-bridge";
-import {
   Bell,
   BedDouble,
   CalendarCheck,
@@ -31,21 +26,8 @@ import {
   UtensilsCrossed,
   X
 } from "lucide-react";
-import type {
-  AndroidPermissionGroups,
-  SyncedCustomerRequest
-} from "@yardimci-asistan/sync-core";
-import type {
-  AiWorkspaceHistoryEntry,
-  AiWorkspaceMode,
-  CreateManualRequestInput,
-  DesktopAndroidDevice,
-  DesktopDashboardData,
-  DesktopCustomerMutationResult,
-  DesktopIdentityImageAnalyzeResult,
-  SaveCustomerInput,
-  AssignCustomerRoomInput,
-} from "../electron/database";
+import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import type { DesktopDashboardData } from "../electron/database";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
 import { defaultDashboardData } from "./app/bootstrap-defaults";
 import {
@@ -58,9 +40,12 @@ import { useAppLock } from "./app/use-app-lock";
 import { useDesktopSync } from "./app/use-desktop-sync";
 import { useMenuController } from "./app/use-menu-controller";
 import { useSetupController } from "./app/use-setup-controller";
+import { useMessagingController } from "./app/use-messaging-controller";
+import { useCustomerController } from "./app/use-customer-controller";
+import { useOperationController } from "./app/use-operation-controller";
+import { useDeviceController } from "./app/use-device-controller";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
 import { getRoomDisplayInfo, getTableStatusAction, formatTableStatus, isAccommodationTask, isRestaurantTask } from "./app/operations";
-import { buildReservationWhatsAppMessage } from "./app/reservation-messaging";
 import {
   formatDateForDisplay,
   formatDateTime,
@@ -76,7 +61,7 @@ import {
   formatStayDateRange
 } from "./app/customer-model";
 import { CustomersWorkspace } from "./components/customers/CustomersWorkspace";
-import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply, type ManualRequestFormState } from "./components/customers/RequestsWorkspace";
+import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply } from "./components/customers/RequestsWorkspace";
 import { CustomerRoomStaysWorkspace, DailyTasksWorkspace, ReservationsWorkspace, RoomsWorkspace, formatTaskDue } from "./components/operations/OperationWorkspaces";
 import { AppShell } from "./components/layout/AppShell";
 import { PageHeader } from "./components/layout/PageHeader";
@@ -86,7 +71,7 @@ import { AiWorkspace, WhatsAppWorkspace } from "./components/messages/MessageWor
 import { MenuManager } from "./components/menu/MenuManager";
 import { LocalMenuPreview } from "./components/menu/MenuPreview";
 import { AppLockScreen } from "./components/security/AppLockScreen";
-import { SetupWizard, compactAndroidDeviceId } from "./components/settings/SetupWizard";
+import { SetupWizard } from "./components/settings/SetupWizard";
 import { ActionButton } from "./components/ui/ActionButton";
 import { CompactList } from "./components/ui/CompactList";
 import { CompactListButton, CompactListItem } from "./components/ui/CompactListItem";
@@ -104,19 +89,6 @@ import {
   type UiPreferences
 } from "./ui-preferences";
 
-const initialManualRequestForm: ManualRequestFormState = {
-  requestType: "general_info",
-  customerName: "",
-  customerPhone: "",
-  dateText: "",
-  startDate: "",
-  endDate: "",
-  time: "",
-  guestCount: "1",
-  message: "",
-  priority: "normal"
-};
-
 function App() {
   const contentRef = useRef<HTMLElement>(null);
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
@@ -124,30 +96,6 @@ function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
-  const [manualRequestForm, setManualRequestForm] = useState<ManualRequestFormState>(initialManualRequestForm);
-  const [manualRequestState, setManualRequestState] = useState<SyncState>("idle");
-  const [manualRequestMessage, setManualRequestMessage] = useState("Telefonla veya yüz yüze gelen talebi kaydedin.");
-  const [selectedRequestId, setSelectedRequestId] = useState(defaultDashboardData.requests[0]?.id ?? "");
-  const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestId] = useState(defaultDashboardData.requests[0]?.id ?? "");
-  const [convertingRequestId, setConvertingRequestId] = useState("");
-  const [suggestingRequestId, setSuggestingRequestId] = useState("");
-  const [aiState, setAiState] = useState<SyncState>("idle");
-  const [aiMessage, setAiMessage] = useState("AI cevap taslağı hazır.");
-  const [aiWorkspaceMode, setAiWorkspaceMode] = useState<AiWorkspaceMode>("reply");
-  const [aiWorkspaceRequestId, setAiWorkspaceRequestId] = useState(defaultDashboardData.requests[0]?.id ?? "");
-  const [aiWorkspaceInstructions, setAiWorkspaceInstructions] = useState("");
-  const [aiWorkspaceEntry, setAiWorkspaceEntry] = useState<AiWorkspaceHistoryEntry | null>(null);
-  const [aiWorkspaceContent, setAiWorkspaceContent] = useState("");
-  const [aiWorkspaceHistory, setAiWorkspaceHistory] = useState<AiWorkspaceHistoryEntry[]>([]);
-  const [aiWorkspaceState, setAiWorkspaceState] = useState<SyncState>("idle");
-  const [aiWorkspaceMessage, setAiWorkspaceMessage] = useState("Bir araç seçip AI sonucunu hazırlayın.");
-  const [messagesAiOpen, setMessagesAiOpen] = useState(false);
-  const [backupState, setBackupState] = useState<SyncState>("idle");
-  const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
-  const [androidPublishState, setAndroidPublishState] = useState<SyncState>("idle");
-  const [androidPublishMessage, setAndroidPublishMessage] = useState("Android özeti henüz yayınlanmadı.");
-  const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
-  const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
   const {
     setupData,
     setupForm,
@@ -214,6 +162,101 @@ function App() {
     deleteCategory: handleDeleteMenuCategory,
     deleteItem: handleDeleteMenuItem
   } = useMenuController({ dashboardData, setDashboardData, loadDashboardData });
+  const {
+    selectedWhatsAppRequestId,
+    setSelectedWhatsAppRequestId,
+    selectedWhatsAppRequest,
+    selectedWhatsAppMessage,
+    selectedWhatsAppUrl,
+    suggestingRequestId,
+    aiState,
+    aiMessage,
+    aiWorkspaceMode,
+    aiWorkspaceRequestId,
+    aiWorkspaceInstructions,
+    setAiWorkspaceInstructions,
+    aiWorkspaceEntry,
+    aiWorkspaceContent,
+    setAiWorkspaceContent,
+    aiWorkspaceHistory,
+    aiWorkspaceState,
+    aiWorkspaceMessage,
+    messagesAiOpen,
+    openWhatsApp,
+    callCustomer,
+    callCustomerRecord,
+    openCustomerWhatsApp,
+    openReservationWhatsApp,
+    openSelectedWhatsAppExternal,
+    handleWhatsAppMessageSent,
+    handleDeleteWhatsAppMessage,
+    handleCreateOwnerReplySuggestion,
+    handleGenerateAiWorkspace,
+    handleSaveAiWorkspace,
+    handleCopyAiWorkspace,
+    handlePrepareAiWorkspaceWhatsApp,
+    openAiTools,
+    handleRewriteWhatsAppMessage,
+    selectAiWorkspaceHistoryEntry,
+    changeAiWorkspaceMode,
+    changeAiWorkspaceRequest
+  } = useMessagingController({
+    dashboardData,
+    setDashboardData,
+    setSyncState,
+    setStatusMessage,
+    messagesActive: activePage === "messages",
+    aiEnabled: setupData.aiEnabled,
+    whatsappEnabled: setupData.modules.whatsapp,
+    onOpenMessages: () => setActivePage("messages")
+  });
+  const {
+    manualRequestForm,
+    setManualRequestForm,
+    manualRequestState,
+    manualRequestMessage,
+    selectedRequestId,
+    setSelectedRequestId,
+    selectedRequest,
+    convertingRequestId,
+    handleCreateManualRequest,
+    handleConvertRequestToReservation,
+    handleUpdateRequestStatus,
+    handleDeleteRequest,
+    handleDeleteCustomer,
+    handleSaveCustomer,
+    handleAssignCustomerToRoom,
+    handleUpdateCustomerRoomStayStatus,
+    handleAnalyzeIdentityImage
+  } = useCustomerController({
+    dashboardData,
+    setDashboardData,
+    setSyncState,
+    setStatusMessage,
+    selectedWhatsAppRequestId,
+    setSelectedWhatsAppRequestId
+  });
+  const {
+    handleUpdateRoomStatus,
+    handleUpdateTableStatus,
+    handleUpdateReservationStatus,
+    handleUpdateDailyTaskStatus
+  } = useOperationController({ setDashboardData, setSyncState, setStatusMessage });
+  const {
+    backupState,
+    backupMessage,
+    androidPublishState,
+    androidPublishMessage,
+    androidDeviceState,
+    androidDeviceMessage,
+    handlePublishAndroidSnapshot,
+    handleSetAndroidDeviceRole,
+    handleSetAndroidDevicePermissionGroups,
+    handleSetAndroidDeviceActive,
+    handleResetAndroidDevicePermissions,
+    handleRevokeAndroidDevice,
+    handleCreateManualBackup
+  } = useDeviceController({ setDashboardData });
   const modules = useMemo(
     () => ({
       rooms: setupData.modules.rooms,
@@ -236,13 +279,6 @@ function App() {
   }, [sidebarCollapsed]);
 
   useEffect(() => {
-    if (activePage !== "messages" || !messagesAiOpen || !window.yardimciDesktop) {
-      return;
-    }
-    void window.yardimciDesktop.getAiWorkspaceHistory(16).then(setAiWorkspaceHistory);
-  }, [activePage, messagesAiOpen]);
-
-  useEffect(() => {
     contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
     window.scrollTo(0, 0);
   }, [activePage]);
@@ -253,35 +289,6 @@ function App() {
     }
   }, [activePage, navigationItems]);
 
-  useEffect(() => {
-    if (activePage === "messages" && setupData.aiEnabled && !setupData.modules.whatsapp) {
-      setMessagesAiOpen(true);
-    }
-  }, [activePage, setupData.aiEnabled, setupData.modules.whatsapp]);
-
-  useEffect(() => {
-    if (aiWorkspaceRequestId && dashboardData.requests.some((request) => request.id === aiWorkspaceRequestId)) {
-      return;
-    }
-    setAiWorkspaceRequestId(dashboardData.requests[0]?.id ?? "");
-  }, [aiWorkspaceRequestId, dashboardData.requests]);
-
-  const selectedWhatsAppRequest = useMemo(
-    () => dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId) ?? dashboardData.requests[0],
-    [dashboardData.requests, selectedWhatsAppRequestId]
-  );
-  const selectedRequest = useMemo(
-    () => dashboardData.requests.find((request) => request.id === selectedRequestId) ?? dashboardData.requests[0],
-    [dashboardData.requests, selectedRequestId]
-  );
-  const selectedWhatsAppMessage = useMemo(
-    () => (selectedWhatsAppRequest ? buildOwnerReplyWhatsAppMessage(selectedWhatsAppRequest.ai_suggested_reply || selectedWhatsAppRequest.whatsapp_message) : ""),
-    [selectedWhatsAppRequest]
-  );
-  const selectedWhatsAppUrl = useMemo(
-    () => (selectedWhatsAppRequest ? createWhatsAppWebUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage) : ""),
-    [selectedWhatsAppMessage, selectedWhatsAppRequest]
-  );
   const pageMeta = getPageMeta(activePage);
   const desktopNotifications = useMemo(
     () => buildDesktopNotifications(dashboardData, automaticSyncStatus),
@@ -290,116 +297,6 @@ function App() {
   function handleLockApp() {
     closeMenuPreview();
     void lockApp();
-  }
-
-  async function handleWhatsAppMessageSent(requestId: string, message: string) {
-    if (!window.yardimciDesktop) {
-      return {
-        ok: false as const,
-        message: "Gönderim kaydı hazır değil. Uygulamayı yeniden başlatın."
-      };
-    }
-
-    const result = await window.yardimciDesktop.markWhatsAppMessageSent({ requestId, message });
-    if (result.ok) {
-      setDashboardData(result.dashboardData);
-    }
-    return result;
-  }
-
-  async function handlePublishAndroidSnapshot() {
-    setAndroidPublishState("loading");
-    setAndroidPublishMessage("Android özeti web modülüne gönderiliyor...");
-
-    if (!window.yardimciDesktop) {
-      setAndroidPublishState("error");
-      setAndroidPublishMessage("Telefon özeti yayınlanamadı. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.pushAndroidSnapshot();
-    if (!result.ok) {
-      setAndroidPublishState("error");
-      setAndroidPublishMessage(result.message);
-      return;
-    }
-
-    setAndroidPublishState("success");
-    setAndroidPublishMessage(`${result.task_count} günlük iş ile Android özeti yayınlandı.`);
-  }
-
-  async function runAndroidDeviceMutation(
-    pendingMessage: string,
-    operation: () => ReturnType<NonNullable<typeof window.yardimciDesktop>["setAndroidDeviceRole"]>
-  ) {
-    setAndroidDeviceState("loading");
-    setAndroidDeviceMessage(pendingMessage);
-    try {
-      const result = await operation();
-      setDashboardData((current) => ({ ...current, androidDevices: result.devices }));
-      setAndroidDeviceState(result.ok ? "success" : "error");
-      setAndroidDeviceMessage(result.message);
-    } catch {
-      setAndroidDeviceState("error");
-      setAndroidDeviceMessage("Telefon ayarı güncellenemedi. Uygulamayı yeniden başlatın.");
-    }
-  }
-
-  function handleSetAndroidDeviceRole(deviceId: string, role: "admin" | "staff") {
-    if (!window.yardimciDesktop) {
-      setAndroidDeviceState("error");
-      setAndroidDeviceMessage("Telefon yönetimi hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    void runAndroidDeviceMutation(
-      role === "admin" ? "Telefon yönetici yapılıyor..." : "Telefon personel yapılıyor...",
-      () => window.yardimciDesktop!.setAndroidDeviceRole(deviceId, role)
-    );
-  }
-
-  function handleSetAndroidDevicePermissionGroups(deviceId: string, groups: AndroidPermissionGroups) {
-    if (!window.yardimciDesktop) {
-      setAndroidDeviceState("error");
-      setAndroidDeviceMessage("Telefon yönetimi hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    void runAndroidDeviceMutation(
-      "Telefon görev alanları güncelleniyor...",
-      () => window.yardimciDesktop!.setAndroidDevicePermissionGroups(deviceId, groups)
-    );
-  }
-
-  function handleSetAndroidDeviceActive(deviceId: string, active: boolean) {
-    if (!window.yardimciDesktop) return;
-    void runAndroidDeviceMutation(
-      active ? "Telefon yeniden aktif ediliyor..." : "Telefon pasifleştiriliyor...",
-      () => window.yardimciDesktop!.setAndroidDeviceActive(deviceId, active)
-    );
-  }
-
-  function handleResetAndroidDevicePermissions(deviceId: string) {
-    if (!window.yardimciDesktop) return;
-    void runAndroidDeviceMutation(
-      "Telefon yetkileri sıfırlanıyor...",
-      () => window.yardimciDesktop!.resetAndroidDevicePermissions(deviceId)
-    );
-  }
-
-  function handleRevokeAndroidDevice(device: DesktopAndroidDevice) {
-    const shortId = compactAndroidDeviceId(device.deviceId);
-    const deviceLabel = `${device.deviceName || "Bu telefon"}${shortId ? ` (${shortId})` : ""}`;
-    if (!window.yardimciDesktop || !window.confirm(`${deviceLabel} kaldırılsın ve erişimi kapatılsın mı?`)) {
-      return;
-    }
-    void runAndroidDeviceMutation(
-      "Telefon erişimi kaldırılıyor...",
-      () => window.yardimciDesktop!.revokeAndroidDevice(device.deviceId)
-    );
-  }
-
-  function openWhatsApp(request: SyncedCustomerRequest) {
-    setSelectedWhatsAppRequestId(request.id);
-    setActivePage("messages");
   }
 
   function openDashboardReply(request: SyncedCustomerRequest) {
@@ -412,483 +309,6 @@ function App() {
       return;
     }
     openDashboardCustomerWork(request);
-  }
-
-  function callCustomer(request: SyncedCustomerRequest) {
-    void window.yardimciDesktop?.openExternal(`tel:${request.customer_phone}`);
-  }
-
-  function callCustomerRecord(customer: DesktopDashboardData["customers"][number]) {
-    void window.yardimciDesktop?.openExternal(`tel:${customer.phone}`);
-  }
-
-  async function handleCreateManualRequest() {
-    setManualRequestState("loading");
-    setManualRequestMessage("Manuel talep kaydediliyor...");
-
-    if (!window.yardimciDesktop) {
-      setManualRequestState("error");
-      setManualRequestMessage("Talep kaydı hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const input: CreateManualRequestInput = {
-      requestType: manualRequestForm.requestType,
-      customerName: manualRequestForm.customerName,
-      customerPhone: manualRequestForm.customerPhone,
-      dateText: manualRequestForm.dateText,
-      startDate: manualRequestForm.startDate,
-      endDate: manualRequestForm.endDate,
-      time: manualRequestForm.time,
-      guestCount: Number(manualRequestForm.guestCount),
-      adultCount: 0,
-      childCount: 0,
-      message: manualRequestForm.message,
-      priority: manualRequestForm.priority
-    };
-
-    const result = await window.yardimciDesktop.createManualRequest(input);
-    if (!result.ok) {
-      setManualRequestState("error");
-      setManualRequestMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSelectedRequestId(result.savedId);
-    setSelectedWhatsAppRequestId(result.savedId);
-    setManualRequestForm({
-      ...initialManualRequestForm,
-      requestType: manualRequestForm.requestType,
-      priority: manualRequestForm.priority
-    });
-    setManualRequestState("success");
-    setManualRequestMessage(result.message);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  function openCustomerWhatsApp(customer: DesktopDashboardData["customers"][number]) {
-    if (!customer.phone) {
-      setStatusMessage("WhatsApp bağlantısı için müşteri telefonu gerekiyor.");
-      return;
-    }
-
-    const message = `Merhaba ${customer.fullName || "Misafir"}, Yardımcı Asistan üzerinden sizinle iletişime geçiyoruz.`;
-    void window.yardimciDesktop?.openExternal(createWhatsAppUrl(customer.phone, message));
-  }
-
-  async function handleConvertRequestToReservation(request: SyncedCustomerRequest) {
-    setConvertingRequestId(request.id);
-    setSyncState("loading");
-    setStatusMessage(`${request.customer_name} için rezervasyon hazırlanıyor...`);
-
-    if (!window.yardimciDesktop) {
-      setConvertingRequestId("");
-      setSyncState("error");
-      setStatusMessage("Rezervasyon işlemi hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.convertRequestToReservation(request.id);
-    setConvertingRequestId("");
-
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  async function handleCreateOwnerReplySuggestion(request: SyncedCustomerRequest) {
-    setSuggestingRequestId(request.id);
-    setAiState("loading");
-    setAiMessage(`${request.customer_name} için cevap taslağı hazırlanıyor...`);
-
-    if (!window.yardimciDesktop) {
-      setSuggestingRequestId("");
-      setAiState("error");
-      setAiMessage("AI cevabı alınamadı. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.createOwnerReplySuggestion(request.id);
-    setSuggestingRequestId("");
-
-    if (!result.ok) {
-      setAiState("error");
-      setAiMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSelectedWhatsAppRequestId(request.id);
-    setAiState("success");
-    setAiMessage(result.missingFields.length > 0 ? `${result.message} Eksik: ${result.missingFields.join(", ")}.` : result.message);
-  }
-
-  async function handleGenerateAiWorkspace() {
-    if (!window.yardimciDesktop) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("AI araçları hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-    setAiWorkspaceState("loading");
-    setAiWorkspaceMessage("AI sonucu hazırlanıyor...");
-    const result = await window.yardimciDesktop.generateAiWorkspace({
-      mode: aiWorkspaceMode,
-      requestId: aiWorkspaceMode === "daily" ? "" : aiWorkspaceRequestId,
-      instructions: aiWorkspaceInstructions
-    });
-    if (!result.ok) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage(result.message);
-      return;
-    }
-    setAiWorkspaceEntry(result.entry);
-    setAiWorkspaceContent(result.entry.content);
-    setAiWorkspaceHistory((current) => [result.entry, ...current.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
-    setAiWorkspaceState("success");
-    setAiWorkspaceMessage(result.message);
-  }
-
-  async function persistAiWorkspaceResult() {
-    if (!window.yardimciDesktop || !aiWorkspaceEntry) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("Önce bir AI sonucu hazırlayın.");
-      return false;
-    }
-    const result = await window.yardimciDesktop.saveAiWorkspaceResult({
-      mode: aiWorkspaceEntry.mode,
-      requestId: aiWorkspaceEntry.requestId,
-      content: aiWorkspaceContent,
-      summary: aiWorkspaceEntry.summary,
-      missingFields: aiWorkspaceEntry.missingFields
-    });
-    if (!result.ok) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage(result.message);
-      return false;
-    }
-    setDashboardData(result.dashboardData);
-    setAiWorkspaceState("success");
-    setAiWorkspaceMessage(result.message);
-    return true;
-  }
-
-  async function handleSaveAiWorkspace() {
-    await persistAiWorkspaceResult();
-  }
-
-  async function handleCopyAiWorkspace() {
-    if (!aiWorkspaceContent.trim()) {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("Kopyalanacak bir AI sonucu yok.");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(aiWorkspaceContent);
-      setAiWorkspaceState("success");
-      setAiWorkspaceMessage("AI sonucu panoya kopyalandı.");
-    } catch {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("Panoya kopyalama başarısız oldu.");
-    }
-  }
-
-  async function handlePrepareAiWorkspaceWhatsApp() {
-    if (!aiWorkspaceEntry || aiWorkspaceEntry.mode !== "reply") {
-      setAiWorkspaceState("error");
-      setAiWorkspaceMessage("WhatsApp için cevap taslağı türünde bir sonuç hazırlayın.");
-      return;
-    }
-    if (await persistAiWorkspaceResult()) {
-      setSelectedWhatsAppRequestId(aiWorkspaceEntry.requestId);
-      setActivePage("messages");
-    }
-  }
-
-  function openAiTools(mode: AiWorkspaceMode, requestId = "", instructions = "") {
-    setAiWorkspaceMode(mode);
-    if (requestId) {
-      setAiWorkspaceRequestId(requestId);
-    }
-    setAiWorkspaceInstructions(instructions);
-    setAiWorkspaceEntry(null);
-    setAiWorkspaceContent("");
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("AI sonucunu hazırlamak için düğmeye basın.");
-    setMessagesAiOpen(true);
-    setActivePage("messages");
-  }
-
-  async function handleRewriteWhatsAppMessage(instructions: string) {
-    if (!selectedWhatsAppRequest || !window.yardimciDesktop) {
-      setAiState("error");
-      setAiMessage("Mesajı yenilemek için bir müşteri talebi seçin.");
-      return;
-    }
-
-    setAiState("loading");
-    setAiMessage("Mesaj yeniden hazırlanıyor...");
-    const result = await window.yardimciDesktop.generateAiWorkspace({
-      mode: "reply",
-      requestId: selectedWhatsAppRequest.id,
-      instructions
-    });
-    if (!result.ok) {
-      setAiState("error");
-      setAiMessage("AI cevabı alınamadı. Biraz sonra tekrar deneyin.");
-      return;
-    }
-
-    const saveResult = await window.yardimciDesktop.saveAiWorkspaceResult({
-      mode: result.entry.mode,
-      requestId: result.entry.requestId,
-      content: result.entry.content,
-      summary: result.entry.summary,
-      missingFields: result.entry.missingFields
-    });
-    if (!saveResult.ok) {
-      setAiState("error");
-      setAiMessage(saveResult.message);
-      return;
-    }
-
-    setDashboardData(saveResult.dashboardData);
-    setAiWorkspaceMode("reply");
-    setAiWorkspaceRequestId(selectedWhatsAppRequest.id);
-    setAiWorkspaceInstructions(instructions);
-    setAiWorkspaceEntry(result.entry);
-    setAiWorkspaceContent(result.entry.content);
-    setAiWorkspaceHistory((current) => [result.entry, ...current.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
-    setAiState("success");
-    setAiMessage("Hazır mesaj yenilendi. Göndermeden önce kontrol edin.");
-  }
-
-  function selectAiWorkspaceHistoryEntry(entry: AiWorkspaceHistoryEntry) {
-    setAiWorkspaceMode(entry.mode);
-    setAiWorkspaceRequestId(entry.requestId);
-    setAiWorkspaceInstructions(entry.instructions);
-    setAiWorkspaceEntry(entry);
-    setAiWorkspaceContent(entry.content);
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("Geçmiş sonuç açıldı; düzenleyip yeniden kullanabilirsiniz.");
-  }
-
-  function changeAiWorkspaceMode(mode: AiWorkspaceMode) {
-    setAiWorkspaceMode(mode);
-    setAiWorkspaceEntry(null);
-    setAiWorkspaceContent("");
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("Yeni çalışma türü seçildi; sonucu hazırlayın.");
-  }
-
-  function changeAiWorkspaceRequest(requestId: string) {
-    setAiWorkspaceRequestId(requestId);
-    setAiWorkspaceEntry(null);
-    setAiWorkspaceContent("");
-    setAiWorkspaceState("idle");
-    setAiWorkspaceMessage("Talep seçildi; AI sonucunu hazırlayın.");
-  }
-
-  async function handleCreateManualBackup() {
-    setBackupState("loading");
-    setBackupMessage("Yerel kayıtların yedeği oluşturuluyor...");
-
-    if (!window.yardimciDesktop) {
-      setBackupState("error");
-      setBackupMessage("Yedekleme hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.createManualBackup();
-    if (!result.ok) {
-      setBackupState("error");
-      setBackupMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setBackupState("success");
-    setBackupMessage(`${result.message} ${result.backupFileName}`);
-  }
-
-  async function handleUpdateRequestStatus(request: SyncedCustomerRequest, status: string) {
-    setSyncState("loading");
-    setStatusMessage(`${request.customer_name} için talep durumu güncelleniyor...`);
-
-    if (!window.yardimciDesktop) {
-      setSyncState("error");
-      setStatusMessage("Talep durumu güncellenemedi. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.updateRequestStatus({ requestId: request.id, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  async function handleDeleteRequest(request: SyncedCustomerRequest) {
-    if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} adına kayıtlı talep ve bağlı hazır mesaj silinsin mi?`)) {
-      return;
-    }
-
-    setSyncState("loading");
-    setStatusMessage("Talep siliniyor...");
-    const result = await window.yardimciDesktop.deleteRequest(request.id);
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    const nextRequestId = result.dashboardData.requests[0]?.id ?? "";
-    if (selectedRequestId === request.id) {
-      setSelectedRequestId(nextRequestId);
-    }
-    if (selectedWhatsAppRequestId === request.id) {
-      setSelectedWhatsAppRequestId(nextRequestId);
-    }
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  async function handleDeleteCustomer(customer: DesktopDashboardData["customers"][number]) {
-    if (!window.yardimciDesktop || !window.confirm(`${customer.fullName} müşteri listesinden silinsin mi? Eski talep ve rezervasyon kayıtları korunur.`)) {
-      return;
-    }
-
-    setSyncState("loading");
-    setStatusMessage("Müşteri siliniyor...");
-    const result = await window.yardimciDesktop.deleteCustomer(customer.id);
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  async function handleSaveCustomer(input: SaveCustomerInput): Promise<DesktopCustomerMutationResult> {
-    if (!window.yardimciDesktop) {
-      const result = { ok: false as const, message: "Müşteri kartı kaydedilemedi. Uygulamayı yeniden başlatın." };
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setSyncState("loading");
-    setStatusMessage(input.id ? "Müşteri kartı güncelleniyor..." : "Müşteri kartı oluşturuluyor...");
-    const result = await window.yardimciDesktop.saveCustomer(input);
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-    return result;
-  }
-
-  async function handleAssignCustomerToRoom(input: AssignCustomerRoomInput): Promise<DesktopCustomerMutationResult> {
-    if (!window.yardimciDesktop) {
-      const result = { ok: false as const, message: "Oda ataması kaydedilemedi. Uygulamayı yeniden başlatın." };
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setSyncState("loading");
-    setStatusMessage("Müşteri oda kaydı oluşturuluyor...");
-    const result = await window.yardimciDesktop.assignCustomerToRoom(input);
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-    return result;
-  }
-
-  async function handleUpdateCustomerRoomStayStatus(
-    stayId: string,
-    status: "planned" | "checked_in" | "checked_out" | "cancelled"
-  ): Promise<DesktopCustomerMutationResult> {
-    if (!window.yardimciDesktop) {
-      const result = { ok: false as const, message: "Konaklama kaydı güncellenemedi. Uygulamayı yeniden başlatın." };
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setSyncState("loading");
-    setStatusMessage("Konaklama durumu güncelleniyor...");
-    const result = await window.yardimciDesktop.updateCustomerRoomStayStatus({ stayId, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-    return result;
-  }
-
-  async function handleAnalyzeIdentityImage(file: File): Promise<DesktopIdentityImageAnalyzeResult> {
-    if (!window.yardimciDesktop) {
-      return { ok: false, message: "Kimlik görseli analizi kullanılamıyor." };
-    }
-    setSyncState("loading");
-    setStatusMessage("Kimlik görseli AI ile okunuyor...");
-    let result: DesktopIdentityImageAnalyzeResult;
-    try {
-      result = await window.yardimciDesktop.analyzeIdentityImage({
-        fileName: file.name,
-        mimeType: file.type,
-        bytes: await file.arrayBuffer()
-      });
-    } catch {
-      result = { ok: false, code: "image_unreadable", message: "Kimlik görseli okunamadı." };
-    }
-    setSyncState(result.ok ? "success" : "error");
-    setStatusMessage(result.message);
-    return result;
-  }
-
-  async function handleDeleteWhatsAppMessage(request: SyncedCustomerRequest) {
-    if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} için hazırlanmış mesaj silinsin mi? Talep kaydı korunur.`)) {
-      return;
-    }
-
-    setSyncState("loading");
-    setStatusMessage("Hazır mesaj siliniyor...");
-    const result = await window.yardimciDesktop.deleteWhatsAppMessage({ requestId: request.id });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
   }
 
   function openRequestReservation(request: SyncedCustomerRequest) {
@@ -935,113 +355,6 @@ function App() {
     }
     setSyncState("error");
     setStatusMessage("Bu rezervasyonun bağlı müşteri talebi bulunamadı.");
-  }
-
-  async function handleUpdateRoomStatus(roomId: string, status: string) {
-    setSyncState("loading");
-    setStatusMessage("Oda durumu güncelleniyor...");
-
-    if (!window.yardimciDesktop) {
-      setSyncState("error");
-      setStatusMessage("Oda durumu güncellenemedi. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.updateRoomStatus({ roomId, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  async function handleUpdateTableStatus(tableId: string, status: string) {
-    setSyncState("loading");
-    setStatusMessage("Masa durumu güncelleniyor...");
-
-    if (!window.yardimciDesktop) {
-      setSyncState("error");
-      setStatusMessage("Masa durumu güncellenemedi. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.updateTableStatus({ tableId, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  async function handleUpdateReservationStatus(reservationId: string, status: string) {
-    setSyncState("loading");
-    setStatusMessage("Rezervasyon durumu güncelleniyor...");
-
-    if (!window.yardimciDesktop) {
-      setSyncState("error");
-      setStatusMessage("Rezervasyon durumu güncellenemedi. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.updateReservationStatus({ reservationId, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  async function handleUpdateDailyTaskStatus(taskId: string, status: string) {
-    setSyncState("loading");
-    setStatusMessage("Günlük iş durumu güncelleniyor...");
-
-    if (!window.yardimciDesktop) {
-      setSyncState("error");
-      setStatusMessage("Günlük iş güncellenemedi. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.updateDailyTaskStatus({ taskId, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
-  function openReservationWhatsApp(reservation: DesktopDashboardData["reservations"][number]) {
-    if (!reservation.customerPhone) {
-      setStatusMessage("WhatsApp bağlantısı için rezervasyonda müşteri telefonu gerekiyor.");
-      return;
-    }
-
-    const message = buildReservationWhatsAppMessage(reservation, dashboardData.rooms, dashboardData.tables);
-    void window.yardimciDesktop?.openExternal(createWhatsAppUrl(reservation.customerPhone, message));
-  }
-
-  function openSelectedWhatsAppExternal() {
-    if (!selectedWhatsAppUrl) {
-      setStatusMessage("WhatsApp bağlantısı için geçerli müşteri telefonu ve mesaj gerekiyor.");
-      return;
-    }
-
-    void window.yardimciDesktop?.openExternal(selectedWhatsAppUrl);
   }
 
   async function handleSaveSetup() {
