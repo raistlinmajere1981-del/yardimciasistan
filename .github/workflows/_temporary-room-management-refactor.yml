@@ -1,0 +1,51 @@
+name: Temporary Room Management Refactor
+
+on:
+  push:
+    branches:
+      - feature/oda-yonetimi-react-refaktor
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/oda-yonetimi-react-refaktor
+          fetch-depth: 0
+      - name: App.tsx içine Oda Yönetimi React bileşenini bağla
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('apps/desktop-app/src/App.tsx')
+          text = path.read_text()
+
+          import_marker = 'import { StockImageImportWorkspace } from "./components/restaurant/StockImageImportWorkspace";\n'
+          import_line = 'import { RoomManagementSection } from "./components/settings/RoomManagementSection";\n'
+          if import_line not in text:
+              if import_marker not in text:
+                  raise SystemExit('Import marker bulunamadı')
+              text = text.replace(import_marker, import_marker + import_line, 1)
+
+          panel_marker = '        {embedded && (\n          <PasswordSettings\n'
+          panel_block = '''        {embedded && (\n          <RoomManagementSection\n            roomCount={form.roomCount}\n            dashboardRoomCount={dashboardData?.rooms.length ?? 0}\n            onRoomCountChange={(value) => update("roomCount", value)}\n          />\n        )}\n'''
+          if panel_block not in text:
+              if panel_marker not in text:
+                  raise SystemExit('Panel marker bulunamadı')
+              text = text.replace(panel_marker, panel_block + panel_marker, 1)
+
+          path.write_text(text)
+          PY
+      - name: Geçici workflow dosyasını kaldır
+        run: rm .github/workflows/_temporary-room-management-refactor.yml
+      - name: Değişiklikleri branch'e yaz
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/desktop-app/src/App.tsx .github/workflows/_temporary-room-management-refactor.yml
+          git commit -m "Oda yönetimini Ayarlar React ağacına bağla"
+          git push origin HEAD:feature/oda-yonetimi-react-refaktor
