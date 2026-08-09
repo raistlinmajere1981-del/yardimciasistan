@@ -216,12 +216,13 @@ async function saveRoomProfiles(panel: HTMLElement) {
 
   try {
     for (const draft of drafts) {
-      const result = await bridge.setRoomNightlyPrice({
+      const input = {
         roomId: draft.roomId,
         amountMinor: draft.amountMinor,
         currency: "TRY",
         name: draft.name
-      });
+      };
+      const result = await bridge.setRoomNightlyPrice(input);
       if (!result.ok) throw new Error(result.message);
     }
 
