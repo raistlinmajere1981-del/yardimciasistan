@@ -20,9 +20,15 @@ Müşteri kartındaki `Son temas` bilgisi de artık `CustomersWorkspace` sunumun
 
 ## Menü alanı
 
-Menü form tipleri, taslak oluşturma ve ortak saf menü yardımcıları `components/menu/menu-model.ts` altında tutulur. `MenuManager` ve müşteri görünümü aynı tip/yardımcıları kullanır; yeni menü iş kuralları tekrar `App.tsx` içine eklenmemelidir.
+Menü form tipleri, taslak oluşturma ve ortak saf menü yardımcıları `components/menu/menu-model.ts` altında tutulur. `MenuManager`, `MenuPreview` ve `App.tsx` aynı ortak yardımcıları kullanır; yeni menü iş kuralları tekrar `App.tsx` içine eklenmemelidir.
 
 Yerel müşteri önizlemesi `components/menu/MenuPreview.tsx` içindedir. `App.tsx` yalnız önizleme overlay'ini açıp kapatır ve gerekli veriyi bileşene geçirir.
+
+## Ayarlar ve AI alanı
+
+Kurulum formunun veri modeli `app/setup-model.ts` altında tutulur. `SetupFormState`, masa kategori taslağı, AI servis profilleri, servis presetleri, form dönüşümleri ve kayıt için hazırlanan AI profil verisi burada tek kaynaktır.
+
+`App.tsx` ayar ekranının React koordinasyonunu sürdürür; ancak servis seçimi, varsayılan profil üretimi, kayıtlı profil kontrolü, oda/masa başlangıç formu ve senkron gizli anahtar üretimi gibi saf dönüşüm kuralları `setup-model.ts` dışında tekrar tanımlanmamalıdır.
 
 ## Stil katmanları
 
@@ -34,8 +40,8 @@ Yerel müşteri önizlemesi `components/menu/MenuPreview.tsx` içindedir. `App.t
 
 Kademeli ayrıştırma için güncel sıra:
 
-1. `SetupFormState`, AI servis taslakları ve ayar dönüştürme yardımcılarını `src/app` altındaki ayar modülüne ayır.
-2. Müşteri form tipleri ve saf müşteri dönüştürme/biçimlendirme yardımcılarını ayrı alana taşı.
+1. Müşteri form tipleri ve saf müşteri dönüştürme/biçimlendirme yardımcılarını ayrı alana taşı.
+2. Ayarlar ekranının büyük React sunum bloklarını `components/settings` altına ayır.
 3. Büyük workspace bileşenlerini iş alanlarına göre `components` / `pages` altına taşımaya devam et.
 
 Tamamlanan geçişler:
@@ -47,6 +53,8 @@ Tamamlanan geçişler:
 - Menü görsel seçimi/dönüştürme/önizleme ve sürekli açık detay alanları React event/state akışına taşındı; `menu-editor-ux.ts` kaldırıldı.
 - Menü form tipleri ve ortak saf menü yardımcıları `menu-model.ts` altında toplandı.
 - `LocalMenuPreview` / `MenuPreviewCanvas` / `MenuPreviewItem` bileşenleri `MenuPreview.tsx` içine taşındı.
+- `App.tsx` içinde kalmış menü sıralama/önizleme yardımcı tekrarları temizlendi; menü domain yardımcıları tek kaynağa bağlandı.
+- `SetupFormState`, masa kategori form modeli, AI servis taslakları/presetleri ve ayar dönüşüm yardımcıları `app/setup-model.ts` altına taşındı.
 - Müşteri `Son temas` tarih biçimi `CustomersWorkspace` React sunumuna taşındı; `customer-work-enhancements.ts` kaldırıldı.
 - Son geçici giriş noktası olan `desktop-ux.ts` kaldırıldı.
 
