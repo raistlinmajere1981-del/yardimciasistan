@@ -34,7 +34,9 @@ Kurulum formunun veri modeli `app/setup-model.ts` altında tutulur. `SetupFormSt
 
 Müşteri kartı ve oda atama formunun veri modeli `app/customer-model.ts` altında tutulur. `CustomerFormState`, `RoomAssignmentFormState`, müşteri kartı ↔ kayıt payload dönüşümü, kimlik alanı sunum yardımcıları, müşteri kaynağı etiketi ve konaklama tarih/durum biçimlendirmeleri burada tek kaynaktır.
 
-`CustomersWorkspace`, `CustomerEditorDrawer` ve `RoomAssignmentDrawer` şimdilik `App.tsx` içinde React sunumu olarak kalır; ancak müşteri form verisi veya kimlik biçimlendirme kuralları yeniden `App.tsx` içine eklenmemelidir. Sonraki ayrıştırmada bu büyük React blokları `components/customers` altına taşınabilir.
+`CustomersWorkspace`, `CustomerEditorDrawer`, `RoomAssignmentDrawer` ve ortak konaklama durum işlemleri `components/customers/CustomersWorkspace.tsx` altında React bileşenleri olarak tutulur. `App.tsx` bu alanlarda yalnız veri/bridge işlemlerini ve sayfa koordinasyonunu sağlar.
+
+Müşteri, talep, rezervasyon, oda ve tarih gösteriminde birden fazla ekranın kullandığı saf metin biçimlendiricileri `app/record-formatters.ts` altında paylaşılır. Yeni ortak gösterim kuralları tekrar büyük ekran bileşenlerine kopyalanmamalıdır.
 
 ## Stil katmanları
 
@@ -46,8 +48,8 @@ Müşteri kartı ve oda atama formunun veri modeli `app/customer-model.ts` altı
 
 Kademeli ayrıştırma için güncel sıra:
 
-1. `CustomersWorkspace`, `CustomerEditorDrawer` ve `RoomAssignmentDrawer` React bloklarını `components/customers` altına taşı.
-2. Ayarlar ekranının büyük React sunum bloklarını `components/settings` altına ayır.
+1. Ayarlar ekranının büyük React sunum bloklarını `components/settings` altına ayır.
+2. Oda / konaklama workspace bloklarını kendi bileşenlerine taşı.
 3. Kalan büyük workspace bileşenlerini iş alanlarına göre `components` / `pages` altına taşımaya devam et.
 
 Tamamlanan geçişler:
@@ -62,6 +64,8 @@ Tamamlanan geçişler:
 - `App.tsx` içinde kalmış menü sıralama/önizleme yardımcı tekrarları temizlendi; menü domain yardımcıları tek kaynağa bağlandı.
 - `SetupFormState`, masa kategori form modeli, AI servis taslakları/presetleri ve ayar dönüşüm yardımcıları `app/setup-model.ts` altına taşındı.
 - Müşteri form tipleri, müşteri kayıt dönüşümleri, kimlik alanı yardımcıları ve konaklama sunum yardımcıları `app/customer-model.ts` altına taşındı.
+- `CustomersWorkspace`, `CustomerEditorDrawer`, `RoomAssignmentDrawer` ve `CustomerRoomStayActions` `components/customers` altına taşındı.
+- Talep/rezervasyon/oda/tarih ortak gösterim yardımcıları `app/record-formatters.ts` altında toplandı.
 - Müşteri `Son temas` tarih biçimi müşteri modelindeki ortak yardımcıdan üretilir; ham zaman damgası yalnız `title` bilgisinde korunur.
 - Son geçici giriş noktası olan `desktop-ux.ts` kaldırıldı.
 
