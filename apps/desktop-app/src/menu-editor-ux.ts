@@ -1,19 +1,38 @@
 const ALWAYS_OPEN_DETAILS_SELECTOR = ".menu-manager details.category-details, .menu-manager details.item-details";
-const IMAGE_LABEL_SELECTOR = ".menu-manager details.item-details label";
+const ITEM_DETAILS_SELECTOR = ".menu-manager details.item-details";
+const IMAGE_LABEL_SELECTOR = `${ITEM_DETAILS_SELECTOR} label`;
+const PREVIEW_CLASS = "menu-image-inline-preview";
 const MAX_SOURCE_IMAGE_BYTES = 15 * 1024 * 1024;
 const TARGET_IMAGE_BYTES = 420 * 1024;
 const MAX_OUTPUT_IMAGE_BYTES = 700 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-let installed = false;
+type Cleanup = () => void;
 
-export function installMenuEditorUx() {
-  if (installed || typeof document === "undefined") return;
-  installed = true;
+let installedCleanup: Cleanup | null = null;
+let scanScheduled = false;
+let scanFrame = 0;
 
-  const scan = () => {
-    keepDetailSectionsOpen();
-    enhanceImagePicker();
+/**
+ * Menü editörünün React'e henüz taşınmamış uyumluluk davranışlarını tek gözlemci
+ * ve tek event yaşam döngüsü altında toplar. Bu katman kademeli refaktör sırasında
+ * geçicidir; yeni menü davranışları doğrudan React bileşeninde uygulanmalıdır.
+ */
+export function installMenuEditorUx(): Cleanup {
+  if (installedCleanup) return installedCleanup;
+  if (typeof document === "undefined") return () => undefined;
+
+  const controller = new AbortController();
+  const { signal } = controller;
+
+  const scheduleScan = () => {
+    if (scanScheduled) return;
+    scanScheduled = true;
+    scanFrame = window.requestAnimationFrame(() => {
+      scanScheduled = false;
+      scanFrame = 0;
+      scanMenuEditor(signal);
+    });
   };
 
   document.addEventListener("click", (event) => {
@@ -28,19 +47,49 @@ export function installMenuEditorUx() {
     }
 
     if (target.closest(".menu-manager .manager-row")) {
-      window.setTimeout(scan, 0);
+      scheduleScan();
     }
-  }, true);
+  }, { capture: true, signal });
 
   document.addEventListener("toggle", (event) => {
     const details = event.target;
     if (!(details instanceof HTMLDetailsElement) || !details.matches(ALWAYS_OPEN_DETAILS_SELECTOR)) return;
     if (!details.open) details.open = true;
-  }, true);
+  }, { capture: true, signal });
 
-  const observer = new MutationObserver(scan);
+  document.addEventListener("input", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !isMenuImageInput(input)) return;
+    syncPreviewForInput(input);
+  }, { capture: true, signal });
+
+  document.addEventListener("change", (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) || !isMenuImageInput(input)) return;
+    syncPreviewForInput(input);
+  }, { capture: true, signal });
+
+  const observer = new MutationObserver(scheduleScan);
   observer.observe(document.body, { childList: true, subtree: true });
-  scan();
+  scheduleScan();
+
+  const cleanup = () => {
+    controller.abort();
+    observer.disconnect();
+    if (scanFrame) window.cancelAnimationFrame(scanFrame);
+    scanFrame = 0;
+    scanScheduled = false;
+    installedCleanup = null;
+  };
+
+  installedCleanup = cleanup;
+  return cleanup;
+}
+
+function scanMenuEditor(signal: AbortSignal) {
+  keepDetailSectionsOpen();
+  enhanceImagePicker(signal);
+  enhanceImagePreviews();
 }
 
 function keepDetailSectionsOpen() {
@@ -50,9 +99,9 @@ function keepDetailSectionsOpen() {
   });
 }
 
-function enhanceImagePicker() {
+function enhanceImagePicker(signal: AbortSignal) {
   document.querySelectorAll<HTMLLabelElement>(IMAGE_LABEL_SELECTOR).forEach((label) => {
-    if (!label.textContent?.includes("Görsel yolu")) return;
+    if (!isImageLabel(label)) return;
     const input = label.querySelector<HTMLInputElement>("input");
     if (!input) return;
 
@@ -69,7 +118,7 @@ function enhanceImagePicker() {
     input.addEventListener("click", (event) => {
       event.preventDefault();
       void chooseMenuImage(input, label);
-    });
+    }, { signal });
 
     input.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -82,9 +131,119 @@ function enhanceImagePicker() {
         applyReactInputValue(input, "");
         input.dataset.yaMenuImageValue = "";
         label.dataset.menuImageLabel = "Görsel seçilmedi";
+        syncPreviewForInput(input);
       }
-    });
+    }, { signal });
   });
+}
+
+function enhanceImagePreviews() {
+  document.querySelectorAll<HTMLLabelElement>(IMAGE_LABEL_SELECTOR).forEach((label) => {
+    if (!isImageLabel(label)) return;
+    const details = label.closest<HTMLDetailsElement>(ITEM_DETAILS_SELECTOR);
+    const input = label.querySelector<HTMLInputElement>("input");
+    if (!details || !input) return;
+
+    details.classList.add("has-menu-image-preview");
+    let preview = details.querySelector<HTMLElement>(`:scope > .${PREVIEW_CLASS}`);
+    if (!preview) {
+      preview = createPreview();
+      details.append(preview);
+    }
+    syncPreview(input, preview);
+  });
+}
+
+function createPreview() {
+  const figure = document.createElement("figure");
+  figure.className = PREVIEW_CLASS;
+  figure.setAttribute("aria-label", "Mevcut ürün görseli önizlemesi");
+
+  const frame = document.createElement("div");
+  frame.className = "menu-image-preview-frame";
+
+  const image = document.createElement("img");
+  image.alt = "Mevcut ürün görseli";
+  image.hidden = true;
+  image.addEventListener("load", () => {
+    image.hidden = false;
+    const empty = frame.querySelector<HTMLElement>(".menu-image-preview-empty");
+    if (empty) empty.hidden = true;
+  });
+  image.addEventListener("error", () => {
+    image.hidden = true;
+    const empty = frame.querySelector<HTMLElement>(".menu-image-preview-empty");
+    if (empty) {
+      empty.hidden = false;
+      empty.textContent = "Önizleme yok";
+    }
+  });
+
+  const empty = document.createElement("span");
+  empty.className = "menu-image-preview-empty";
+  empty.textContent = "Görsel yok";
+
+  const caption = document.createElement("figcaption");
+  caption.textContent = "Mevcut görsel";
+
+  frame.append(image, empty);
+  figure.append(frame, caption);
+  return figure;
+}
+
+function isImageLabel(label: HTMLLabelElement) {
+  return label.textContent?.includes("Görsel yolu") === true;
+}
+
+function isMenuImageInput(input: HTMLInputElement) {
+  const label = input.closest<HTMLLabelElement>("label");
+  return Boolean(label && isImageLabel(label) && input.closest(ITEM_DETAILS_SELECTOR));
+}
+
+function syncPreviewForInput(input: HTMLInputElement) {
+  const details = input.closest<HTMLDetailsElement>(ITEM_DETAILS_SELECTOR);
+  const preview = details?.querySelector<HTMLElement>(`:scope > .${PREVIEW_CLASS}`);
+  if (preview) syncPreview(input, preview);
+}
+
+function syncPreview(input: HTMLInputElement, preview: HTMLElement) {
+  const image = preview.querySelector<HTMLImageElement>("img");
+  const empty = preview.querySelector<HTMLElement>(".menu-image-preview-empty");
+  if (!image || !empty) return;
+
+  const value = input.value.trim();
+  if (!value) {
+    image.removeAttribute("src");
+    image.hidden = true;
+    empty.hidden = false;
+    empty.textContent = "Görsel yok";
+    return;
+  }
+
+  const source = resolvePreviewSource(value);
+  if (!source) {
+    image.removeAttribute("src");
+    image.hidden = true;
+    empty.hidden = false;
+    empty.textContent = "Önizleme yok";
+    return;
+  }
+
+  if (image.getAttribute("src") === source || image.src === source) return;
+  empty.hidden = false;
+  empty.textContent = "Yükleniyor…";
+  image.hidden = true;
+  image.src = source;
+}
+
+function resolvePreviewSource(value: string) {
+  if (/^(data:image\/|blob:|https?:\/\/)/i.test(value)) return value;
+
+  try {
+    return new URL(value, window.location.href).toString();
+  } catch {
+    return "";
+  }
 }
 
 function syncImagePickerLabel(input: HTMLInputElement, label: HTMLLabelElement) {
@@ -118,6 +277,7 @@ async function chooseMenuImage(input: HTMLInputElement, label: HTMLLabelElement)
       input.dataset.yaMenuImageValue = dataUrl;
       label.dataset.menuImageLabel = file.name;
       clearInputError(input);
+      syncPreviewForInput(input);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Görsel hazırlanamadı.";
       showInputError(input, message);
