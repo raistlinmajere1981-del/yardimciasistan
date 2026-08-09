@@ -1,0 +1,34 @@
+name: Temporary Customer Date Refactor
+
+on:
+  push:
+    branches:
+      - feature/musteri-tarih-react-refaktor
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v5
+        with:
+          ref: feature/musteri-tarih-react-refaktor
+          fetch-depth: 0
+      - name: Son temas tarihini React sunumuna taşı
+        run: python .github/scripts/refactor-customer-date.py
+      - name: Geçici codemodu temizle ve kaydet
+        run: |
+          rm .github/scripts/refactor-customer-date.py
+          rm .github/workflows/_temporary-customer-date-refactor.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Müşteri son temas tarihini React içinde biçimlendir"
+          git push origin HEAD:feature/musteri-tarih-react-refaktor
