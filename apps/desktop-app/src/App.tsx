@@ -33,8 +33,6 @@ import {
 } from "lucide-react";
 import type {
   AndroidPermissionGroups,
-  PublishedMenuCategory,
-  PublishedMenuItem,
   SyncedCustomerRequest
 } from "@yardimci-asistan/sync-core";
 import type {
@@ -61,6 +59,7 @@ import {
 } from "./app/runtime-state";
 import { useAppLock } from "./app/use-app-lock";
 import { useDesktopSync } from "./app/use-desktop-sync";
+import { useMenuController } from "./app/use-menu-controller";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
 import { getRoomDisplayInfo, getTableStatusAction, formatTableStatus, isAccommodationTask, isRestaurantTask } from "./app/operations";
 import { buildReservationWhatsAppMessage } from "./app/reservation-messaging";
@@ -93,20 +92,6 @@ import { NotificationCenter } from "./components/notifications/NotificationCente
 import { AiWorkspace, WhatsAppWorkspace } from "./components/messages/MessageWorkspaces";
 import { MenuManager } from "./components/menu/MenuManager";
 import { LocalMenuPreview } from "./components/menu/MenuPreview";
-import {
-  toCategoryForm,
-  emptyCategoryForm,
-  toItemForm,
-  emptyItemForm,
-  nextSortOrder,
-  splitCommaList,
-  parseNullableFormNumber,
-  parsePositiveFormNumber,
-  buildMenuPreviewData,
-  compareMenuRecords,
-  type CategoryFormState,
-  type ItemFormState
-} from "./components/menu/menu-model";
 import { AppLockScreen } from "./components/security/AppLockScreen";
 import { SetupWizard, compactAndroidDeviceId } from "./components/settings/SetupWizard";
 import { ActionButton } from "./components/ui/ActionButton";
@@ -126,8 +111,6 @@ import {
   type UiPreferences
 } from "./ui-preferences";
 
-const initialCategoryForm = toCategoryForm(defaultDashboardData.menu.categories[0]);
-const initialItemForm = toItemForm(defaultDashboardData.menu.items[0], initialCategoryForm.id);
 const initialManualRequestForm: ManualRequestFormState = {
   requestType: "general_info",
   customerName: "",
@@ -148,15 +131,6 @@ function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
-  const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
-  const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
-  const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
-  const [menuEditMessage, setMenuEditMessage] = useState("Düzenleme bekliyor.");
-  const [menuPreviewOpen, setMenuPreviewOpen] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(initialCategoryForm.id);
-  const [selectedItemId, setSelectedItemId] = useState(initialItemForm.id);
-  const [categoryForm, setCategoryForm] = useState<CategoryFormState>(initialCategoryForm);
-  const [itemForm, setItemForm] = useState<ItemFormState>(initialItemForm);
   const [manualRequestForm, setManualRequestForm] = useState<ManualRequestFormState>(initialManualRequestForm);
   const [manualRequestState, setManualRequestState] = useState<SyncState>("idle");
   const [manualRequestMessage, setManualRequestMessage] = useState("Telefonla veya yüz yüze gelen talebi kaydedin.");
@@ -221,20 +195,32 @@ function App() {
       }
       setSetupMessage(nextSetupData.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
     },
-    onDashboardLoaded: (nextDashboardData) => {
-      if (selectedCategoryId && !nextDashboardData.menu.categories.some((category) => category.id === selectedCategoryId)) {
-        const nextCategory = nextDashboardData.menu.categories[0];
-        setSelectedCategoryId(nextCategory?.id ?? "");
-        setCategoryForm(toCategoryForm(nextCategory));
-      }
-
-      if (selectedItemId && !nextDashboardData.menu.items.some((item) => item.id === selectedItemId)) {
-        const nextItem = nextDashboardData.menu.items[0];
-        setSelectedItemId(nextItem?.id ?? "");
-        setItemForm(toItemForm(nextItem, nextDashboardData.menu.categories[0]?.id ?? ""));
-      }
-    }
   });
+  const {
+    menuPublishState,
+    menuStatusMessage,
+    menuEditState,
+    menuEditMessage,
+    menuPreviewOpen,
+    menuPreviewData,
+    selectedCategoryId,
+    selectedItemId,
+    categoryForm,
+    itemForm,
+    setCategoryForm,
+    setItemForm,
+    publishMenu: handlePublishMenu,
+    openMenuPreview,
+    closeMenuPreview,
+    selectCategory,
+    selectItem,
+    startNewCategory,
+    startNewItem,
+    saveCategory: handleSaveCategory,
+    saveItem: handleSaveItem,
+    deleteCategory: handleDeleteMenuCategory,
+    deleteItem: handleDeleteMenuItem
+  } = useMenuController({ dashboardData, setDashboardData, loadDashboardData });
   const modules = useMemo(
     () => ({
       rooms: setupData.modules.rooms,
@@ -317,13 +303,8 @@ function App() {
     () => buildDesktopNotifications(dashboardData, automaticSyncStatus),
     [automaticSyncStatus, dashboardData]
   );
-  const menuPreviewData = useMemo(
-    () => buildMenuPreviewData(dashboardData.menu, categoryForm, itemForm),
-    [categoryForm, dashboardData.menu, itemForm]
-  );
-
   function handleLockApp() {
-    setMenuPreviewOpen(false);
+    closeMenuPreview();
     void lockApp();
   }
 
@@ -340,28 +321,6 @@ function App() {
       setDashboardData(result.dashboardData);
     }
     return result;
-  }
-
-  async function handlePublishMenu() {
-    setMenuPublishState("loading");
-    setMenuStatusMessage("Menü webde güncelleniyor...");
-
-    if (!window.yardimciDesktop) {
-      setMenuPublishState("error");
-      setMenuStatusMessage("Menü yayınlanamadı. Bağlantıyı kontrol edin.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.pushMenu();
-    if (!result.ok) {
-      setMenuPublishState("error");
-      setMenuStatusMessage("Menü yayınlanamadı. Bağlantıyı kontrol edin.");
-      return;
-    }
-
-    await loadDashboardData();
-    setMenuPublishState("success");
-    setMenuStatusMessage("Menü webde güncellendi.");
   }
 
   async function handlePublishAndroidSnapshot() {
@@ -452,201 +411,6 @@ function App() {
       "Telefon erişimi kaldırılıyor...",
       () => window.yardimciDesktop!.revokeAndroidDevice(device.deviceId)
     );
-  }
-
-  async function openMenuPreview() {
-    if (window.yardimciDesktop) {
-      try {
-        const currentDashboardData = await window.yardimciDesktop.getDashboardData();
-        setDashboardData(currentDashboardData);
-      } catch {
-        // Bellekteki son yerel veriyle önizlemeyi açmaya devam et.
-      }
-    }
-
-    setMenuPreviewOpen(true);
-  }
-
-  function selectCategory(category: PublishedMenuCategory) {
-    setSelectedCategoryId(category.id);
-    setCategoryForm(toCategoryForm(category));
-    const firstCategoryItem = dashboardData.menu.items
-      .filter((item) => item.category_id === category.id)
-      .sort(compareMenuRecords)[0];
-    setSelectedItemId(firstCategoryItem?.id ?? "");
-    setItemForm(toItemForm(firstCategoryItem, category.id));
-  }
-
-  function selectItem(item: PublishedMenuItem) {
-    setSelectedItemId(item.id);
-    setItemForm(toItemForm(item, dashboardData.menu.categories[0]?.id ?? ""));
-  }
-
-  function startNewCategory() {
-    setSelectedCategoryId("");
-    setCategoryForm(emptyCategoryForm(nextSortOrder(dashboardData.menu.categories)));
-    setSelectedItemId("");
-    setItemForm(emptyItemForm("", nextSortOrder(dashboardData.menu.items)));
-    setMenuEditState("idle");
-    setMenuEditMessage("Yeni kategori.");
-  }
-
-  function startNewItem() {
-    const categoryId = selectedCategoryId || dashboardData.menu.categories[0]?.id || "";
-    setSelectedItemId("");
-    setItemForm(emptyItemForm(categoryId, nextSortOrder(dashboardData.menu.items)));
-    setMenuEditState("idle");
-    setMenuEditMessage("Yeni ürün.");
-  }
-
-  async function handleSaveCategory() {
-    setMenuEditState("loading");
-    setMenuEditMessage("Kategori kaydediliyor...");
-
-    if (!window.yardimciDesktop) {
-      setMenuEditState("error");
-      setMenuEditMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.saveMenuCategory({
-      id: categoryForm.id || undefined,
-      name: categoryForm.name,
-      description: categoryForm.description,
-      is_active: categoryForm.is_active,
-      sort_order: Number(categoryForm.sort_order)
-    });
-
-    if (!result.ok) {
-      setMenuEditState("error");
-      setMenuEditMessage(result.message);
-      return;
-    }
-
-    const savedCategory = result.dashboardData.menu.categories.find((category) => category.id === result.savedId);
-    setDashboardData(result.dashboardData);
-    setSelectedCategoryId(result.savedId);
-    if (savedCategory) {
-      setCategoryForm(toCategoryForm(savedCategory));
-    }
-    if (!itemForm.category_id) {
-      setItemForm((current) => ({ ...current, category_id: result.savedId }));
-    }
-    setMenuEditState("success");
-    setMenuEditMessage(result.message);
-    setMenuPublishState("idle");
-    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
-  }
-
-  async function handleSaveItem() {
-    setMenuEditState("loading");
-    setMenuEditMessage("Ürün kaydediliyor...");
-
-    if (!window.yardimciDesktop) {
-      setMenuEditState("error");
-      setMenuEditMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.saveMenuItem({
-      id: itemForm.id || undefined,
-      category_id: itemForm.category_id,
-      name: itemForm.name,
-      description: itemForm.description,
-      price: Number(itemForm.price),
-      currency: itemForm.currency,
-      image_url: itemForm.image_url,
-      is_available: itemForm.is_available,
-      is_featured: itemForm.is_featured,
-      allergens: splitCommaList(itemForm.allergens),
-      tags: splitCommaList(itemForm.tags),
-      stock_quantity: parseNullableFormNumber(itemForm.stock_quantity),
-      stock_min_quantity: parseNullableFormNumber(itemForm.stock_min_quantity),
-      stock_unit: itemForm.stock_unit,
-      stock_consumption_quantity: parsePositiveFormNumber(itemForm.stock_consumption_quantity, 1),
-      hide_when_out_of_stock: itemForm.hide_when_out_of_stock,
-      stock_note: itemForm.stock_note.trim() || null,
-      sort_order: Number(itemForm.sort_order)
-    });
-
-    if (!result.ok) {
-      setMenuEditState("error");
-      setMenuEditMessage(result.message);
-      return;
-    }
-
-    const savedItem = result.dashboardData.menu.items.find((item) => item.id === result.savedId);
-    setDashboardData(result.dashboardData);
-    setSelectedItemId(result.savedId);
-    if (savedItem) {
-      setItemForm(toItemForm(savedItem, result.dashboardData.menu.categories[0]?.id ?? ""));
-    }
-    setMenuEditState("success");
-    setMenuEditMessage(result.message);
-    setMenuPublishState("idle");
-    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
-  }
-
-  async function handleDeleteMenuCategory() {
-    if (!categoryForm.id || !window.yardimciDesktop) {
-      return;
-    }
-    const relatedProductCount = dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length;
-    if (!window.confirm(`“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`)) {
-      return;
-    }
-
-    setMenuEditState("loading");
-    setMenuEditMessage("Kategori ve bağlı ürünler siliniyor...");
-    const result = await window.yardimciDesktop.deleteMenuCategory(categoryForm.id);
-    if (!result.ok) {
-      setMenuEditState("error");
-      setMenuEditMessage(result.message);
-      return;
-    }
-
-    const nextCategory = [...result.dashboardData.menu.categories].sort(compareMenuRecords)[0];
-    const nextItem = [...result.dashboardData.menu.items]
-      .filter((item) => !nextCategory || item.category_id === nextCategory.id)
-      .sort(compareMenuRecords)[0];
-    setDashboardData(result.dashboardData);
-    setSelectedCategoryId(nextCategory?.id ?? "");
-    setCategoryForm(toCategoryForm(nextCategory));
-    setSelectedItemId(nextItem?.id ?? "");
-    setItemForm(toItemForm(nextItem, nextCategory?.id ?? ""));
-    setMenuEditState("success");
-    setMenuEditMessage(result.message);
-    setMenuPublishState("idle");
-    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
-  }
-
-  async function handleDeleteMenuItem() {
-    if (!itemForm.id || !window.yardimciDesktop) {
-      return;
-    }
-    if (!window.confirm(`“${itemForm.name}” ürünü menüden silinsin mi?`)) {
-      return;
-    }
-
-    setMenuEditState("loading");
-    setMenuEditMessage("Ürün siliniyor...");
-    const result = await window.yardimciDesktop.deleteMenuItem(itemForm.id);
-    if (!result.ok) {
-      setMenuEditState("error");
-      setMenuEditMessage(result.message);
-      return;
-    }
-
-    const nextItem = [...result.dashboardData.menu.items]
-      .filter((item) => !selectedCategoryId || item.category_id === selectedCategoryId)
-      .sort(compareMenuRecords)[0];
-    setDashboardData(result.dashboardData);
-    setSelectedItemId(nextItem?.id ?? "");
-    setItemForm(toItemForm(nextItem, selectedCategoryId || result.dashboardData.menu.categories[0]?.id || ""));
-    setMenuEditState("success");
-    setMenuEditMessage(result.message);
-    setMenuPublishState("idle");
-    setMenuStatusMessage("Menüde yayınlanmamış değişiklik var.");
   }
 
   function openWhatsApp(request: SyncedCustomerRequest) {
@@ -1611,7 +1375,7 @@ function App() {
           menu={menuPreviewData}
           setupData={setupData}
           webModuleUrl={dashboardData.webModuleUrl}
-          onClose={() => setMenuPreviewOpen(false)}
+          onClose={closeMenuPreview}
         />
       ) : undefined}
     >
