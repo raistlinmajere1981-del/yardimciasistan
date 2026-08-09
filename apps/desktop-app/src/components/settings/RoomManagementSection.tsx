@@ -84,12 +84,13 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
     setMessage("Kaydediliyor…");
     try {
       for (const room of rooms) {
-        const result = await bridge.setRoomNightlyPrice({
+        const input = {
           roomId: room.id,
           amountMinor: parseMoneyToMinor(room.price),
           currency: "TRY",
           name: room.name.trim()
-        });
+        } as Parameters<typeof bridge.setRoomNightlyPrice>[0] & { name: string };
+        const result = await bridge.setRoomNightlyPrice(input);
         if (!result.ok) throw new Error(result.message);
       }
       const fresh = await bridge.getRoomFolioData();
