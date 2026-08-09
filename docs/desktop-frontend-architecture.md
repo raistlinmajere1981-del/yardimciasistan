@@ -77,3 +77,4 @@ Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. 
 - `RequestsWorkspace` ve manuel talep drawer’ı `components/customers/RequestsWorkspace.tsx` altına taşındı; talep durum tonu ve bekleyen-talep görünüm yardımcıları aynı modülden paylaşılır.
 - `DailyTasksWorkspace`, `ReservationsWorkspace`, `RoomsWorkspace` ve `CustomerRoomStaysWorkspace` `components/operations/OperationWorkspaces.tsx` altına taşındı; App yalnız operasyon state/bridge koordinasyonunu yürütür.
 - Tarayıcı önizleme/fallback `defaultDashboardData` ve `defaultSetupData` verileri `app/bootstrap-defaults.ts` altında tutulur; `App.tsx` statik örnek veri taşımak yerine yalnız uygulama koordinasyonuna odaklanır.
+- Uygulama çalışma zamanı/senkron UI yardımcıları `app/runtime-state.ts`, rezervasyon WhatsApp metin üretimi `app/reservation-messaging.ts`, masa durum yardımcıları ise `app/operations.ts` altında tutulur; `App.tsx` saf yardımcı fonksiyon taşımaz.
