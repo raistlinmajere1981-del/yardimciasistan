@@ -1,4 +1,3 @@
-import { installCashPageUx } from "./cash-page-ux";
 import { installCustomerWorkEnhancements } from "./customer-work-enhancements";
 import { installMenuEditorUx } from "./menu-editor-ux";
 import { installRoomManagementUx } from "./room-management-ux";
@@ -14,7 +13,6 @@ type Cleanup = () => void;
  */
 export function installDesktopUxEnhancements(): Cleanup {
   const cleanups: Cleanup[] = [
-    installCashPageUx(),
     installCustomerWorkEnhancements(),
     installMenuEditorUx(),
     installRoomManagementUx()

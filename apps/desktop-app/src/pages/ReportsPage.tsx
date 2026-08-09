@@ -51,6 +51,7 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
   const [aiMode, setAiMode] = useState<DesktopReportAiMode | "">("");
   const [aiContent, setAiContent] = useState("");
   const [aiMessage, setAiMessage] = useState("Bir yorum türü seçtiğinizde AI yalnız hazırlanmış rapor sonucunu kullanır.");
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -116,6 +117,14 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
     });
   }
 
+  function toggleDetails(toggle: HTMLButtonElement) {
+    const nextOpen = !detailsOpen;
+    setDetailsOpen(nextOpen);
+    if (nextOpen) {
+      window.requestAnimationFrame(() => toggle.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }
+  }
+
   async function generateAiComment(mode: DesktopReportAiMode) {
     setAiMode(mode);
     setAiContent("");
@@ -140,12 +149,21 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
   const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
 
   return (
-    <section className="reports-page" aria-label="Kasa ve işletme raporları">
+    <section className={`reports-page${detailsOpen ? "" : " reports-details-collapsed"}`} aria-label="Kasa ve işletme raporları">
       <FinanceWorkspace />
 
-      <div className="reports-detail-divider">
-        <div><span>Detaylı raporlar</span><strong>Geçmiş dönemleri inceleyin</strong></div>
-      </div>
+      <button
+        className="reports-detail-divider cash-details-toggle"
+        type="button"
+        aria-expanded={detailsOpen}
+        aria-label={detailsOpen ? "Detaylı raporları gizle" : "Geçmiş ve detaylı raporları aç"}
+        onClick={(event) => toggleDetails(event.currentTarget)}
+      >
+        <div>
+          <span>Detaylı raporlar</span>
+          <strong>{detailsOpen ? "Detaylı Raporları Gizle" : "Geçmiş ve Detaylı Raporları Aç"}</strong>
+        </div>
+      </button>
 
       <Panel className="report-filter-panel" padding="compact">
         <div className="report-filter-heading">
