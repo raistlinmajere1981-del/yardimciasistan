@@ -1,22 +1,27 @@
-/* Menü ürün görseli: ayar alanını kompakt tutup mevcut görseli yanında gösterir. */
+/* Menü ürün görseli: ayarlar solda kalır, mevcut görsel sağda aynı blok içinde görünür. */
 .menu-manager details.item-details.has-menu-image-preview {
-  grid-template-columns: minmax(0, 1fr) 146px;
-  column-gap: 12px;
-  row-gap: 8px;
-  align-items: start;
+  position: relative;
+  display: block;
+  min-height: 154px;
+  padding-right: 176px;
 }
 
 .menu-manager details.item-details.has-menu-image-preview > label,
 .menu-manager details.item-details.has-menu-image-preview > .form-row {
-  grid-column: 1;
   min-width: 0;
+  width: 100%;
 }
 
+.menu-manager details.item-details.has-menu-image-preview > .form-row {
+  margin-top: 8px;
+}
+
+/* Önizleme normal belge akışına katılmaz; böylece formu aşağı doğru uzatmaz. */
 .menu-manager .menu-image-inline-preview {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: stretch;
-  min-width: 0;
+  position: absolute;
+  top: 9px;
+  right: 0;
+  width: 160px;
   margin: 0;
   padding: 0;
 }
@@ -66,18 +71,37 @@
   text-align: center;
 }
 
-/* Dosya seç düğmesi, odak çerçevesinden biraz içeride dursun. */
+/* Dosya seç alanı tek bir kontrol gibi dursun. Odak çerçevesi input sınırlarının
+ * içinde çizilir; alttaki Sıra / Para birimi satırına taşmaz. */
+.menu-manager .menu-image-picker-label {
+  position: relative;
+  display: block;
+  padding-bottom: 4px;
+}
+
 .menu-manager .menu-image-picker-label input[data-ya-menu-image-picker="true"] {
+  width: 100%;
+  min-height: 34px;
   padding-right: 108px;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.menu-manager .menu-image-picker-label input[data-ya-menu-image-picker="true"]:focus,
+.menu-manager .menu-image-picker-label input[data-ya-menu-image-picker="true"]:focus-visible {
+  border-color: var(--border-focus) !important;
+  outline: none !important;
+  box-shadow: inset 0 0 0 1px var(--border-focus) !important;
 }
 
 .menu-manager .menu-image-picker-label::before {
   right: 114px;
+  bottom: 13px;
 }
 
 .menu-manager .menu-image-picker-label::after {
   right: 7px;
-  bottom: 6px;
+  bottom: 10px;
   min-height: 24px;
   padding: 0 9px;
 }
@@ -87,8 +111,28 @@
   box-shadow: none;
 }
 
+/* Orta boy pencerede de önizleme sağda kalır, sadece biraz küçülür. */
 @media (max-width: 1240px) {
   .menu-manager details.item-details.has-menu-image-preview {
-    grid-template-columns: minmax(0, 1fr) 126px;
+    min-height: 142px;
+    padding-right: 150px;
+  }
+
+  .menu-manager .menu-image-inline-preview {
+    width: 138px;
+  }
+}
+
+/* Çok dar pencere/ölçeklerde alanları sıkıştırmak yerine güvenli şekilde alta geç. */
+@media (max-width: 980px) {
+  .menu-manager details.item-details.has-menu-image-preview {
+    min-height: 0;
+    padding-right: 0;
+  }
+
+  .menu-manager .menu-image-inline-preview {
+    position: static;
+    width: min(180px, 100%);
+    margin-top: 10px;
   }
 }
