@@ -51,7 +51,6 @@ import type {
   SaveInitialSetupInput
 } from "../electron/database";
 import type { AutomaticSyncStatus } from "../electron/sync-coordinator";
-import type { AppLockActionResult, AppLockStatus } from "../electron/app-lock";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
 import { defaultDashboardData, defaultSetupData } from "./app/bootstrap-defaults";
@@ -60,9 +59,9 @@ import {
   defaultAutomaticSyncStatus,
   readSidebarCollapsedPreference,
   saveSidebarCollapsedPreference,
-  type AppAccessPhase,
   type SyncState
 } from "./app/runtime-state";
+import { useAppLock } from "./app/use-app-lock";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
 import { getRoomDisplayInfo, getTableStatusAction, formatTableStatus, isAccommodationTask, isRestaurantTask } from "./app/operations";
 import { buildReservationWhatsAppMessage } from "./app/reservation-messaging";
@@ -146,12 +145,6 @@ const initialManualRequestForm: ManualRequestFormState = {
 function App() {
   const contentRef = useRef<HTMLElement>(null);
   const appDataInitializedRef = useRef(false);
-  const [appAccessPhase, setAppAccessPhase] = useState<AppAccessPhase>("checking");
-  const [appLockStatus, setAppLockStatus] = useState<AppLockStatus>({
-    locked: false,
-    passwordConfigured: false,
-    notificationCount: 0
-  });
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
@@ -199,6 +192,20 @@ function App() {
   const [androidPublishMessage, setAndroidPublishMessage] = useState("Android özeti henüz yayınlanmadı.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
   const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
+  const {
+    phase: appAccessPhase,
+    status: appLockStatus,
+    lockApp,
+    unlockApp,
+    resetAppPassword,
+    setPasswordConfigured: handleAppPasswordConfiguredChange
+  } = useAppLock({
+    passwordConfigured: setupData.appPasswordConfigured,
+    getNotificationCount: () => buildDesktopNotifications(dashboardData, automaticSyncStatus).length,
+    onPasswordConfiguredChange: (configured) => {
+      setSetupData((current) => ({ ...current, appPasswordConfigured: configured }));
+    }
+  });
   const modules = useMemo(
     () => ({
       rooms: setupData.modules.rooms,
@@ -219,36 +226,6 @@ function App() {
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
   }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    let active = true;
-    const bridge = window.yardimciDesktop;
-    if (!bridge || typeof bridge.getAppLockStatus !== "function") {
-      setAppAccessPhase("unlocked");
-      return () => {
-        active = false;
-      };
-    }
-
-    void bridge.getAppLockStatus()
-      .then((status) => {
-        if (!active) return;
-        setAppLockStatus(status);
-        setAppAccessPhase(status.locked ? "locked" : "unlocked");
-      })
-      .catch(() => {
-        if (!active) return;
-        setAppLockStatus({
-          locked: true,
-          passwordConfigured: true,
-          notificationCount: 0
-        });
-        setAppAccessPhase("locked");
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (appAccessPhase !== "unlocked") {
@@ -374,98 +351,9 @@ function App() {
     }
   }
 
-  async function handleLockApp() {
+  function handleLockApp() {
     setMenuPreviewOpen(false);
-    const bridge = window.yardimciDesktop;
-    let result: AppLockActionResult;
-    try {
-      result = bridge && typeof bridge.lockApp === "function"
-        ? await bridge.lockApp()
-        : {
-            ok: true,
-            message: "Uygulama kilitlendi.",
-            status: {
-              locked: true,
-              passwordConfigured: setupData.appPasswordConfigured,
-              notificationCount: desktopNotifications.length
-            }
-          };
-    } catch {
-      return;
-    }
-
-    if (!result.ok) {
-      return;
-    }
-    setAppLockStatus({
-      ...result.status,
-      notificationCount: Math.max(result.status.notificationCount, desktopNotifications.length)
-    });
-    setAppAccessPhase("locked");
-  }
-
-  async function handleUnlockApp(password: string): Promise<AppLockActionResult> {
-    const bridge = window.yardimciDesktop;
-    let result: AppLockActionResult;
-    try {
-      result = bridge && typeof bridge.unlockApp === "function"
-        ? await bridge.unlockApp(password)
-        : {
-            ok: true,
-            message: "Kilit açıldı.",
-            status: {
-              locked: false,
-              passwordConfigured: appLockStatus.passwordConfigured,
-              notificationCount: appLockStatus.notificationCount
-            }
-          };
-    } catch {
-      result = {
-        ok: false,
-        message: "Kilit açılamadı. Uygulamayı yeniden başlatıp tekrar deneyin.",
-        status: appLockStatus
-      };
-    }
-
-    setAppLockStatus(result.status);
-    if (result.ok) {
-      setAppAccessPhase("unlocking");
-      window.setTimeout(() => setAppAccessPhase("unlocked"), 170);
-    }
-    return result;
-  }
-
-  async function handleResetAppPassword(webSecurityKey: string): Promise<AppLockActionResult> {
-    const bridge = window.yardimciDesktop;
-    let result: AppLockActionResult;
-    try {
-      result = bridge && typeof bridge.resetAppPassword === "function"
-        ? await bridge.resetAppPassword(webSecurityKey)
-        : {
-            ok: false,
-            message: "Şifre sıfırlama hazır değil. Uygulamayı yeniden başlatın.",
-            status: appLockStatus
-          };
-    } catch {
-      result = {
-        ok: false,
-        message: "Şifre sıfırlanamadı. Uygulamayı yeniden başlatıp tekrar deneyin.",
-        status: appLockStatus
-      };
-    }
-
-    setAppLockStatus(result.status);
-    if (result.ok) {
-      setSetupData((current) => ({ ...current, appPasswordConfigured: false }));
-      setAppAccessPhase("unlocking");
-      window.setTimeout(() => setAppAccessPhase("unlocked"), 170);
-    }
-    return result;
-  }
-
-  function handleAppPasswordConfiguredChange(configured: boolean) {
-    setSetupData((current) => ({ ...current, appPasswordConfigured: configured }));
-    setAppLockStatus((current) => ({ ...current, passwordConfigured: configured }));
+    void lockApp();
   }
 
   async function handlePullRequests() {
@@ -1606,8 +1494,8 @@ function App() {
         phase={appAccessPhase}
         passwordConfigured={appLockStatus.passwordConfigured}
         notificationCount={appLockStatus.notificationCount}
-        onUnlock={handleUnlockApp}
-        onResetPassword={handleResetAppPassword}
+        onUnlock={unlockApp}
+        onResetPassword={resetAppPassword}
       />
     );
   }
