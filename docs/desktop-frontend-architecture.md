@@ -20,9 +20,10 @@ Mevcut geçici katmanlar:
 
 - `customer-work-enhancements.ts`: Eski müşteri son-temas tarihinin kullanıcı dostu gösterimi.
 - `menu-editor-ux.ts`: Menü detaylarının sürekli açık tutulması, görsel dosya seçimi/dönüştürme ve görsel önizleme uyumluluğu.
-- `room-management-ux.ts`: Oda yönetiminin Ayarlar ekranına geçici entegrasyonu.
 
 Kasa detay raporlarının aç/kapa durumu ve alacak satırlarındaki tarih metinleri artık doğrudan `ReportsPage` / `FinanceWorkspace` React sunumunda yönetilir. Eski `cash-page-ux.ts` uyumluluk katmanı kaldırılmıştır.
+
+Oda Yönetimi de artık `RoomManagementSection` React bileşeni olarak doğrudan Setup/Ayarlar ağacında çalışır. Oda sayısı `SetupFormState` üzerinden, oda adı ve fiyat kayıtları ise masaüstü bridge üzerinden React state ile yönetilir; eski `room-management-ux.ts` kaldırılmıştır.
 
 Bu işlevler ilgili React bileşenlerine taşındıkça kalan geçici dosyalar da tek tek kaldırılmalıdır.
 
@@ -36,16 +37,18 @@ Bu işlevler ilgili React bileşenlerine taşındıkça kalan geçici dosyalar d
 
 Kademeli ayrıştırma için güncel sıra:
 
-1. Oda Yönetimi panelini Setup/Ayarlar React ağacına taşı ve `room-management-ux.ts` dosyasını kaldır.
-2. Menü yönetimini ayrı React bileşenine taşı ve `menu-editor-ux.ts` uyumluluk katmanını kaldır.
-3. Müşteri tarih biçimlendirmesini veri sunum katmanına taşı ve `customer-work-enhancements.ts` dosyasını kaldır.
-4. Büyük form tiplerini ve saf yardımcı fonksiyonları `src/app` altındaki alan modüllerine ayır.
+1. Menü yönetimini ayrı React bileşenine taşı ve `menu-editor-ux.ts` uyumluluk katmanını kaldır.
+2. Müşteri tarih biçimlendirmesini veri sunum katmanına taşı ve `customer-work-enhancements.ts` dosyasını kaldır.
+3. Büyük form tiplerini ve saf yardımcı fonksiyonları `src/app` altındaki alan modüllerine ayır.
 
-Tamamlanan geçiş:
+Tamamlanan geçişler:
 
 - Kasa detay aç/kapa durumu `ReportsPage` state'ine taşındı.
 - Açık / kapanmış oda alacağı tarih metinleri `FinanceWorkspace` içinde oluşturuluyor.
 - `cash-page-ux.ts` kaldırıldı.
+- Oda Yönetimi `RoomManagementSection` ile Setup/Ayarlar React ağacına taşındı.
+- Oda sayısı, oda adı ve gecelik fiyat akışı React state üzerinden yönetiliyor.
+- `room-management-ux.ts` kaldırıldı.
 
 ## Kontrol
 
