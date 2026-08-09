@@ -15,7 +15,6 @@ import "./room-card-ux.css";
 import "./room-management-ux.css";
 import "./secondary-pages-ux.css";
 import "./menu-image-preview-ux.css";
-import { installDesktopUxEnhancements } from "./desktop-ux";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
 applyUiPreferences(readUiPreferences());
@@ -27,11 +26,8 @@ root.render(
   </StrictMode>
 );
 
-const cleanupDesktopUx = installDesktopUxEnhancements();
-
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
-    cleanupDesktopUx();
     root.unmount();
   });
 }

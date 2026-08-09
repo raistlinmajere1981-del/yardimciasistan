@@ -4,27 +4,19 @@ Bu belge, Yardımcı Asistan masaüstü arayüzünde yapılan kullanıcı dostu 
 
 ## Ana kural
 
-Yeni bir ekran davranışı mümkün olduğunca React bileşeninin içinde uygulanmalıdır. React tarafından oluşturulan DOM ağacını sonradan `innerHTML`, `append`, `replaceChildren` veya benzeri yöntemlerle değiştirmek yalnız geçiş dönemi uyumluluk kodunda kabul edilir.
+Yeni bir ekran davranışı mümkün olduğunca React bileşeninin içinde uygulanmalıdır. React tarafından oluşturulan DOM ağacını sonradan `innerHTML`, `append`, `replaceChildren` veya benzeri yöntemlerle değiştiren bir uyumluluk katmanı artık bulunmamaktadır ve yeni özelliklerde yeniden oluşturulmamalıdır.
 
-## Geçici UX uyumluluk katmanı
+## React dışı UX katmanı
 
-`src/desktop-ux.ts`, React dışındaki mevcut UX iyileştirmelerinin tek giriş noktasıdır. Bu katmandaki her kurulum:
+Geçiş döneminde kullanılan `src/desktop-ux.ts` ve ona bağlı `MutationObserver` tabanlı yardımcı dosyalar kaldırılmıştır. Kasa, Oda Yönetimi, Menü ve müşteri son-temas sunumu artık doğrudan React state/props/event akışıyla çalışır.
 
-- tekrar çağrıldığında ikinci bir observer/listener oluşturmamalı,
-- bir cleanup fonksiyonu döndürmeli,
-- `MutationObserver` kullanıyorsa işi `requestAnimationFrame` ile birleştirmeli,
-- tüm belgeyi gereksiz yere sürekli taramamalı,
-- uygulama iş/veri kurallarını değiştirmemelidir.
+Kasa detay raporlarının aç/kapa durumu ve alacak satırlarındaki tarih metinleri doğrudan `ReportsPage` / `FinanceWorkspace` React sunumunda yönetilir.
 
-Mevcut geçici katman:
+Oda Yönetimi `RoomManagementSection` React bileşeni olarak doğrudan Setup/Ayarlar ağacında çalışır. Oda sayısı `SetupFormState` üzerinden, oda adı ve fiyat kayıtları ise masaüstü bridge üzerinden React state ile yönetilir.
 
-- `customer-work-enhancements.ts`: Eski müşteri son-temas tarihinin kullanıcı dostu gösterimi.
+Menü yönetimi `components/menu/MenuManager.tsx` içinde doğrudan React tarafından yönetilir. Sürekli açık kategori/ürün ayarları, görsel dosya seçimi, WebP dönüştürme ve mevcut görsel önizlemesi React state/event akışındadır.
 
-Kasa detay raporlarının aç/kapa durumu ve alacak satırlarındaki tarih metinleri artık doğrudan `ReportsPage` / `FinanceWorkspace` React sunumunda yönetilir. Eski `cash-page-ux.ts` uyumluluk katmanı kaldırılmıştır.
-
-Oda Yönetimi de artık `RoomManagementSection` React bileşeni olarak doğrudan Setup/Ayarlar ağacında çalışır. Oda sayısı `SetupFormState` üzerinden, oda adı ve fiyat kayıtları ise masaüstü bridge üzerinden React state ile yönetilir; eski `room-management-ux.ts` kaldırılmıştır.
-
-Menü yönetimi artık `components/menu/MenuManager.tsx` içinde doğrudan React tarafından yönetilir. Sürekli açık kategori/ürün ayarları, görsel dosya seçimi, WebP dönüştürme ve mevcut görsel önizlemesi React state/event akışına taşındı; `menu-editor-ux.ts` kaldırıldı.
+Müşteri kartındaki `Son temas` bilgisi de artık `CustomersWorkspace` sunumunda Türkçe tarih/saat biçimine dönüştürülür; ham zaman damgası yalnız `title` bilgisinde korunur.
 
 ## Stil katmanları
 
@@ -36,21 +28,19 @@ Menü yönetimi artık `components/menu/MenuManager.tsx` içinde doğrudan React
 
 Kademeli ayrıştırma için güncel sıra:
 
-1. Müşteri tarih biçimlendirmesini veri sunum katmanına taşı ve `customer-work-enhancements.ts` dosyasını kaldır.
-2. Menü form tiplerini ve saf yardımcı fonksiyonlarını ortak menü modülüne ayır.
+1. Menü form tiplerini ve saf yardımcı fonksiyonlarını ortak menü modülüne ayır.
+2. `LocalMenuPreview` / `MenuPreviewCanvas` bileşenlerini `App.tsx` dışına taşı.
 3. Büyük form tiplerini ve diğer saf yardımcı fonksiyonları `src/app` altındaki alan modüllerine ayır.
 
 Tamamlanan geçişler:
 
-- Kasa detay aç/kapa durumu `ReportsPage` state'ine taşındı.
+- Kasa detay aç/kapa durumu `ReportsPage` state'ine taşındı; `cash-page-ux.ts` kaldırıldı.
 - Açık / kapanmış oda alacağı tarih metinleri `FinanceWorkspace` içinde oluşturuluyor.
-- `cash-page-ux.ts` kaldırıldı.
-- Oda Yönetimi `RoomManagementSection` ile Setup/Ayarlar React ağacına taşındı.
-- Oda sayısı, oda adı ve gecelik fiyat akışı React state üzerinden yönetiliyor.
-- `room-management-ux.ts` kaldırıldı.
+- Oda Yönetimi `RoomManagementSection` ile Setup/Ayarlar React ağacına taşındı; `room-management-ux.ts` kaldırıldı.
 - Menü yöneticisi `App.tsx` içinden ayrı `MenuManager` bileşenine taşındı.
-- Menü görsel seçimi/dönüştürme/önizleme ve sürekli açık detay alanları React event/state akışına taşındı.
-- `menu-editor-ux.ts` kaldırıldı.
+- Menü görsel seçimi/dönüştürme/önizleme ve sürekli açık detay alanları React event/state akışına taşındı; `menu-editor-ux.ts` kaldırıldı.
+- Müşteri `Son temas` tarih biçimi `CustomersWorkspace` React sunumuna taşındı; `customer-work-enhancements.ts` kaldırıldı.
+- Son geçici giriş noktası olan `desktop-ux.ts` kaldırıldı.
 
 ## Kontrol
 

@@ -4743,7 +4743,7 @@ function CustomersWorkspace({
               </div>
               <div>
                 <dt>Son temas</dt>
-                <dd>{selectedCustomer.lastContactAt || selectedCustomer.updatedAt || "-"}</dd>
+                <dd title={selectedCustomer.lastContactAt || selectedCustomer.updatedAt || undefined}>{formatCustomerLastContactDate(selectedCustomer.lastContactAt || selectedCustomer.updatedAt)}</dd>
               </div>
               <div>
                 <dt>Rezervasyon</dt>
@@ -6369,6 +6369,23 @@ function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInit
       clearApiKey: draft.clearApiKey
     };
   });
+}
+
+function formatCustomerLastContactDate(value: string) {
+  if (!value) {
+    return "-";
+  }
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(timestamp));
 }
 
 function formatDateTime(value: string) {
