@@ -98,3 +98,23 @@ export function isAccommodationTask(task: DesktopDailyTask, reservations: Deskto
   }
   return task.relatedType === "reservation";
 }
+
+export function formatTableStatus(value: string) {
+  const labels: Record<string, string> = {
+    available: "Boş",
+    reserved: "Rezerve",
+    occupied: "Dolu",
+    bill_waiting: "Hesap bekliyor",
+    waiting_bill: "Hesap bekliyor",
+    checkout: "Hesap bekliyor",
+    payment: "Hesap bekliyor",
+    cleaning: "Temizlik"
+  };
+  return labels[value] ?? "Boş";
+}
+
+export function getTableStatusAction(value: string) {
+  if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) return "bill_waiting";
+  return ["available", "occupied", "reserved"].includes(value) ? value : "";
+}
+

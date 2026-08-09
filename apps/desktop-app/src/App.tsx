@@ -55,8 +55,17 @@ import type { AppLockActionResult, AppLockStatus } from "../electron/app-lock";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
 import { defaultDashboardData, defaultSetupData } from "./app/bootstrap-defaults";
+import {
+  automaticSyncTone,
+  defaultAutomaticSyncStatus,
+  readSidebarCollapsedPreference,
+  saveSidebarCollapsedPreference,
+  type AppAccessPhase,
+  type SyncState
+} from "./app/runtime-state";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
-import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "./app/operations";
+import { getRoomDisplayInfo, getTableStatusAction, formatTableStatus, isAccommodationTask, isRestaurantTask } from "./app/operations";
+import { buildReservationWhatsAppMessage } from "./app/reservation-messaging";
 import {
   formatDateForDisplay,
   formatDateTime,
@@ -118,54 +127,6 @@ import {
   saveUiPreferences,
   type UiPreferences
 } from "./ui-preferences";
-
-type SyncState = "idle" | "loading" | "success" | "error";
-type AppAccessPhase = "checking" | "locked" | "unlocking" | "unlocked";
-
-const SIDEBAR_COLLAPSED_STORAGE_KEY = "yardimci-asistan.sidebar-collapsed";
-const defaultAutomaticSyncStatus: AutomaticSyncStatus = {
-  enabled: true,
-  clientId: "",
-  requestCursor: 0,
-  acknowledgedCursor: 0,
-  lastAttemptAt: "",
-  lastSuccessAt: "",
-  lastError: "",
-  consecutiveFailures: 0,
-  pendingJobs: 0,
-  nextRetryAt: "",
-  phase: "idle",
-  message: "Otomatik senkron hazır."
-};
-
-function readSidebarCollapsedPreference() {
-  try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function saveSidebarCollapsedPreference(collapsed: boolean) {
-  try {
-    window.localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(collapsed));
-  } catch {
-    // Depolama kapalıysa menü tercihi yalnız bu oturumda geçerli kalır.
-  }
-}
-
-function automaticSyncTone(status: AutomaticSyncStatus): SyncState {
-  if (status.phase === "syncing") {
-    return "loading";
-  }
-  if (status.phase === "success") {
-    return "success";
-  }
-  if (status.phase === "offline" || status.phase === "error") {
-    return "error";
-  }
-  return "idle";
-}
 
 const initialCategoryForm = toCategoryForm(defaultDashboardData.menu.categories[0]);
 const initialItemForm = toItemForm(defaultDashboardData.menu.items[0], initialCategoryForm.id);
@@ -2023,97 +1984,5 @@ function App() {
 
 
 
-function formatReservationType(value: string) {
-  const labels: Record<string, string> = {
-    room: "Pansiyon",
-    table: "Masa",
-    breakfast: "Kahvaltı",
-    mixed: "Karma"
-  };
-
-  return labels[value] ?? "Rezervasyon";
-}
-
-
-
-
-
-function formatTableStatus(value: string) {
-  const labels: Record<string, string> = {
-    available: "Boş",
-    reserved: "Rezerve",
-    occupied: "Dolu",
-    bill_waiting: "Hesap bekliyor",
-    waiting_bill: "Hesap bekliyor",
-    checkout: "Hesap bekliyor",
-    payment: "Hesap bekliyor",
-    cleaning: "Temizlik"
-  };
-
-  return labels[value] ?? "Boş";
-}
-
-function getTableStatusAction(value: string) {
-  if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) {
-    return "bill_waiting";
-  }
-  return ["available", "occupied", "reserved"].includes(value) ? value : "";
-}
-
-
-
-
-function formatResourceLinks(
-  reservation: DesktopDashboardData["reservations"][number],
-  rooms: DesktopDashboardData["rooms"],
-  tables: DesktopDashboardData["tables"]
-) {
-  const roomNames = reservation.roomIds.map((roomId) => rooms.find((room) => room.id === roomId)?.name).filter(Boolean);
-  const tableNames = reservation.tableIds.map((tableId) => tables.find((table) => table.id === tableId)?.name).filter(Boolean);
-  const roomText = roomNames.length > 0 ? `Oda: ${roomNames.join(", ")}` : reservation.roomIds.length > 0 ? "Oda atandı" : "";
-  const tableText = tableNames.length > 0 ? `Masa: ${tableNames.join(", ")}` : reservation.tableIds.length > 0 ? "Masa atandı" : "";
-  return [roomText, tableText].filter(Boolean).join(" · ") || "Yer bilgisi daha sonra paylaşılacak";
-}
-
-function buildReservationWhatsAppMessage(
-  reservation: DesktopDashboardData["reservations"][number],
-  rooms: DesktopDashboardData["rooms"],
-  tables: DesktopDashboardData["tables"]
-) {
-  const greeting = `Merhaba ${reservation.customerName || "Misafir"},`;
-  const dateText = formatReservationDate(reservation);
-  const typeText = formatReservationType(reservation.reservationType).toLowerCase();
-
-  if (reservation.status === "approved") {
-    return [
-      greeting,
-      `${dateText} tarihli ${typeText} rezervasyonunuz işletme tarafından onaylandı.`,
-      formatResourceLinks(reservation, rooms, tables),
-      "Geliş saatiniz veya özel notunuz varsa bize yazabilirsiniz."
-    ].join(" ");
-  }
-
-  if (reservation.status === "rejected") {
-    return [
-      greeting,
-      `${dateText} tarihli ${typeText} talebinize mevcut uygunluk nedeniyle olumlu dönüş yapamıyoruz.`,
-      "Uygun başka tarih veya seçenek için tekrar yardımcı olabiliriz."
-    ].join(" ");
-  }
-
-  if (reservation.status === "cancelled") {
-    return [
-      greeting,
-      `${dateText} tarihli ${typeText} rezervasyonunuz iptal olarak güncellendi.`,
-      "Yeni bir tarih düşünürseniz bize yazabilirsiniz."
-    ].join(" ");
-  }
-
-  return [
-    greeting,
-    `${dateText} tarihli ${typeText} talebiniz için sizinle iletişime geçiyoruz.`,
-    "Detayları işletme sahibi kontrol edip size net bilgi verecektir."
-  ].join(" ");
-}
 
 export default App;
