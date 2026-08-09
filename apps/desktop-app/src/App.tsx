@@ -50,18 +50,17 @@ import type {
   AssignCustomerRoomInput,
   SaveInitialSetupInput
 } from "../electron/database";
-import type { AutomaticSyncStatus } from "../electron/sync-coordinator";
 import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
 import { defaultDashboardData, defaultSetupData } from "./app/bootstrap-defaults";
 import {
   automaticSyncTone,
-  defaultAutomaticSyncStatus,
   readSidebarCollapsedPreference,
   saveSidebarCollapsedPreference,
   type SyncState
 } from "./app/runtime-state";
 import { useAppLock } from "./app/use-app-lock";
+import { useDesktopSync } from "./app/use-desktop-sync";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
 import { getRoomDisplayInfo, getTableStatusAction, formatTableStatus, isAccommodationTask, isRestaurantTask } from "./app/operations";
 import { buildReservationWhatsAppMessage } from "./app/reservation-messaging";
@@ -144,14 +143,11 @@ const initialManualRequestForm: ManualRequestFormState = {
 
 function App() {
   const contentRef = useRef<HTMLElement>(null);
-  const appDataInitializedRef = useRef(false);
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
-  const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
-  const [automaticSyncStatus, setAutomaticSyncStatus] = useState<AutomaticSyncStatus>(defaultAutomaticSyncStatus);
   const [menuPublishState, setMenuPublishState] = useState<SyncState>("idle");
   const [menuStatusMessage, setMenuStatusMessage] = useState("Menü yayına hazır.");
   const [menuEditState, setMenuEditState] = useState<SyncState>("idle");
@@ -206,6 +202,39 @@ function App() {
       setSetupData((current) => ({ ...current, appPasswordConfigured: configured }));
     }
   });
+  const {
+    dashboardData,
+    setDashboardData,
+    automaticSyncStatus,
+    loadDashboardData,
+    pullRequests: handlePullRequests
+  } = useDesktopSync({
+    accessPhase: appAccessPhase,
+    setSyncState,
+    setStatusMessage,
+    onBootstrapSetup: (nextSetupData, firstApplicationLoad) => {
+      setSetupData(nextSetupData);
+      setSetupForm(toSetupForm(nextSetupData));
+      setSetupMode(nextSetupData.setupRequired);
+      if (!nextSetupData.setupRequired && firstApplicationLoad) {
+        setActivePage("dashboard");
+      }
+      setSetupMessage(nextSetupData.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
+    },
+    onDashboardLoaded: (nextDashboardData) => {
+      if (selectedCategoryId && !nextDashboardData.menu.categories.some((category) => category.id === selectedCategoryId)) {
+        const nextCategory = nextDashboardData.menu.categories[0];
+        setSelectedCategoryId(nextCategory?.id ?? "");
+        setCategoryForm(toCategoryForm(nextCategory));
+      }
+
+      if (selectedItemId && !nextDashboardData.menu.items.some((item) => item.id === selectedItemId)) {
+        const nextItem = nextDashboardData.menu.items[0];
+        setSelectedItemId(nextItem?.id ?? "");
+        setItemForm(toItemForm(nextItem, nextDashboardData.menu.categories[0]?.id ?? ""));
+      }
+    }
+  });
   const modules = useMemo(
     () => ({
       rooms: setupData.modules.rooms,
@@ -226,43 +255,6 @@ function App() {
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
   }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    if (appAccessPhase !== "unlocked") {
-      return;
-    }
-
-    void window.yardimciDesktop?.getBootstrapData().then((data) => {
-      const firstApplicationLoad = !appDataInitializedRef.current;
-      setDashboardData((current) => ({
-        ...current,
-        databasePath: data.databasePath,
-        backupPath: data.backupPath,
-        webModuleUrl: data.syncSettings.webModuleUrl
-      }));
-      setSetupData(data.setup);
-      setSetupForm(toSetupForm(data.setup));
-      setSetupMode(data.setup.setupRequired);
-      if (!data.setup.setupRequired && firstApplicationLoad) {
-        setActivePage("dashboard");
-      }
-      appDataInitializedRef.current = true;
-      setSetupMessage(data.setup.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
-    });
-    void loadDashboardData();
-    void window.yardimciDesktop?.getSyncStatus?.().then(setAutomaticSyncStatus);
-
-    const unsubscribeDashboard = window.yardimciDesktop?.onDashboardDataChanged?.((nextDashboardData) => {
-      setDashboardData(nextDashboardData);
-    });
-    const unsubscribeSync = window.yardimciDesktop?.onSyncStatusChanged?.((nextStatus) => {
-      setAutomaticSyncStatus(nextStatus);
-    });
-    return () => {
-      unsubscribeDashboard?.();
-      unsubscribeSync?.();
-    };
-  }, [appAccessPhase]);
 
   useEffect(() => {
     if (activePage !== "messages" || !messagesAiOpen || !window.yardimciDesktop) {
@@ -330,61 +322,9 @@ function App() {
     [categoryForm, dashboardData.menu, itemForm]
   );
 
-  async function loadDashboardData() {
-    if (!window.yardimciDesktop) {
-      return;
-    }
-
-    const nextDashboardData = await window.yardimciDesktop.getDashboardData();
-    setDashboardData(nextDashboardData);
-
-    if (selectedCategoryId && !nextDashboardData.menu.categories.some((category) => category.id === selectedCategoryId)) {
-      const nextCategory = nextDashboardData.menu.categories[0];
-      setSelectedCategoryId(nextCategory?.id ?? "");
-      setCategoryForm(toCategoryForm(nextCategory));
-    }
-
-    if (selectedItemId && !nextDashboardData.menu.items.some((item) => item.id === selectedItemId)) {
-      const nextItem = nextDashboardData.menu.items[0];
-      setSelectedItemId(nextItem?.id ?? "");
-      setItemForm(toItemForm(nextItem, nextDashboardData.menu.categories[0]?.id ?? ""));
-    }
-  }
-
   function handleLockApp() {
     setMenuPreviewOpen(false);
     void lockApp();
-  }
-
-  async function handlePullRequests() {
-    setSyncState("loading");
-    setStatusMessage("Web talepleri kontrol ediliyor...");
-
-    if (!window.yardimciDesktop) {
-      setSyncState("error");
-      setStatusMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    if (window.yardimciDesktop.runSyncNow) {
-      const cycle = await window.yardimciDesktop.runSyncNow();
-      setAutomaticSyncStatus(cycle.status);
-      await loadDashboardData();
-      setSyncState(cycle.ok ? "success" : "error");
-      setStatusMessage(cycle.message);
-      return;
-    }
-
-    const result = await window.yardimciDesktop.pullRequests();
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    await loadDashboardData();
-    setSyncState("success");
-    setStatusMessage(result.count > 0 ? `${result.count} talep alındı.` : "Yeni talep bulunmuyor.");
   }
 
   async function handleWhatsAppMessageSent(requestId: string, message: string) {
