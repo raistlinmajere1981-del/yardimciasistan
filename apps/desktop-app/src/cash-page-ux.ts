@@ -1,15 +1,22 @@
 const COLLAPSED_CLASS = "reports-details-collapsed";
 const TOGGLE_CLASS = "cash-details-toggle";
 
-let installed = false;
-let enhanceScheduled = false;
+type Cleanup = () => void;
 
-export function installCashPageUx() {
-  if (installed || typeof document === "undefined") return;
-  installed = true;
+let installedCleanup: Cleanup | null = null;
+let enhanceScheduled = false;
+let enhanceFrame = 0;
+
+export function installCashPageUx(): Cleanup {
+  if (installedCleanup) return installedCleanup;
+  if (typeof document === "undefined") return () => undefined;
+
+  const controller = new AbortController();
+  const { signal } = controller;
 
   const enhance = () => {
     enhanceScheduled = false;
+    enhanceFrame = 0;
 
     document.querySelectorAll<HTMLElement>(".reports-page").forEach((page) => {
       if (page.dataset.cashDetailsReady !== "true") {
@@ -51,14 +58,14 @@ export function installCashPageUx() {
   const scheduleEnhance = () => {
     if (enhanceScheduled) return;
     enhanceScheduled = true;
-    window.requestAnimationFrame(enhance);
+    enhanceFrame = window.requestAnimationFrame(enhance);
   };
 
   document.addEventListener("click", (event) => {
     const target = event.target instanceof Element ? event.target.closest<HTMLElement>(`.${TOGGLE_CLASS}`) : null;
     if (!target) return;
     toggleReportDetails(target);
-  });
+  }, { signal });
 
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -66,11 +73,23 @@ export function installCashPageUx() {
     if (!target) return;
     event.preventDefault();
     toggleReportDetails(target);
-  });
+  }, { signal });
 
   const observer = new MutationObserver(scheduleEnhance);
   observer.observe(document.body, { childList: true, subtree: true });
   scheduleEnhance();
+
+  const cleanup = () => {
+    controller.abort();
+    observer.disconnect();
+    if (enhanceFrame) window.cancelAnimationFrame(enhanceFrame);
+    enhanceFrame = 0;
+    enhanceScheduled = false;
+    installedCleanup = null;
+  };
+
+  installedCleanup = cleanup;
+  return cleanup;
 }
 
 function toggleReportDetails(toggle: HTMLElement) {

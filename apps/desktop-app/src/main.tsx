@@ -15,24 +15,23 @@ import "./room-card-ux.css";
 import "./room-management-ux.css";
 import "./secondary-pages-ux.css";
 import "./menu-image-preview-ux.css";
-import { installCashPageUx } from "./cash-page-ux";
-import { installCustomerWorkEnhancements } from "./customer-work-enhancements";
-import { installMenuEditorUx } from "./menu-editor-ux";
-import { installMenuImagePreviewUx } from "./menu-image-preview-ux";
-import { installRoomCardUx } from "./room-card-ux";
-import { installRoomManagementUx } from "./room-management-ux";
+import { installDesktopUxEnhancements } from "./desktop-ux";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
 applyUiPreferences(readUiPreferences());
-installCashPageUx();
-installCustomerWorkEnhancements();
-installMenuEditorUx();
-installMenuImagePreviewUx();
-installRoomCardUx();
-installRoomManagementUx();
 
-createRoot(document.getElementById("root") as HTMLElement).render(
+const root = createRoot(document.getElementById("root") as HTMLElement);
+root.render(
   <StrictMode>
     <App />
   </StrictMode>
 );
+
+const cleanupDesktopUx = installDesktopUxEnhancements();
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    cleanupDesktopUx();
+    root.unmount();
+  });
+}

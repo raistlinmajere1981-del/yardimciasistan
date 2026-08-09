@@ -8,11 +8,41 @@ interface RoomDraftData {
   nightlyPriceMinor: number;
 }
 
-export function installRoomManagementUx() {
-  const observer = new MutationObserver(() => ensureRoomManagementPanel());
+type Cleanup = () => void;
+
+let installedCleanup: Cleanup | null = null;
+let ensureScheduled = false;
+let ensureFrame = 0;
+
+export function installRoomManagementUx(): Cleanup {
+  if (installedCleanup) return installedCleanup;
+  if (typeof document === "undefined") return () => undefined;
+
+  const scheduleEnsure = () => {
+    if (ensureScheduled) return;
+    ensureScheduled = true;
+    ensureFrame = window.requestAnimationFrame(() => {
+      ensureScheduled = false;
+      ensureFrame = 0;
+      ensureRoomManagementPanel();
+    });
+  };
+
+  const observer = new MutationObserver(scheduleEnsure);
   observer.observe(document.body, { childList: true, subtree: true });
-  ensureRoomManagementPanel();
-  return () => observer.disconnect();
+  scheduleEnsure();
+
+  const cleanup = () => {
+    observer.disconnect();
+    if (ensureFrame) window.cancelAnimationFrame(ensureFrame);
+    ensureFrame = 0;
+    ensureScheduled = false;
+    document.querySelector(PANEL_SELECTOR)?.remove();
+    installedCleanup = null;
+  };
+
+  installedCleanup = cleanup;
+  return cleanup;
 }
 
 function ensureRoomManagementPanel() {
