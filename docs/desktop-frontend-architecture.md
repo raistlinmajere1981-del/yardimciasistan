@@ -18,6 +18,12 @@ Menü yönetimi `components/menu/MenuManager.tsx` içinde doğrudan React taraf�
 
 Müşteri kartındaki `Son temas` bilgisi de artık `CustomersWorkspace` sunumunda Türkçe tarih/saat biçimine dönüştürülür; ham zaman damgası yalnız `title` bilgisinde korunur.
 
+## Menü alanı
+
+Menü form tipleri, taslak oluşturma ve ortak saf menü yardımcıları `components/menu/menu-model.ts` altında tutulur. `MenuManager` ve müşteri görünümü aynı tip/yardımcıları kullanır; yeni menü iş kuralları tekrar `App.tsx` içine eklenmemelidir.
+
+Yerel müşteri önizlemesi `components/menu/MenuPreview.tsx` içindedir. `App.tsx` yalnız önizleme overlay'ini açıp kapatır ve gerekli veriyi bileşene geçirir.
+
 ## Stil katmanları
 
 `styles.css` eski ana stil dosyasıdır. Sonradan eklenen `*-ux.css` dosyaları işlev veya ekran alanına göre ayrılmıştır. Yeni stiller mümkün olduğunca ilgili bileşenin/alanın mevcut UX dosyasına eklenmeli; aynı seçiciyi farklı dosyalarda tekrar override eden yeni zincirler oluşturulmamalıdır.
@@ -28,9 +34,9 @@ Müşteri kartındaki `Son temas` bilgisi de artık `CustomersWorkspace` sunumun
 
 Kademeli ayrıştırma için güncel sıra:
 
-1. Menü form tiplerini ve saf yardımcı fonksiyonlarını ortak menü modülüne ayır.
-2. `LocalMenuPreview` / `MenuPreviewCanvas` bileşenlerini `App.tsx` dışına taşı.
-3. Büyük form tiplerini ve diğer saf yardımcı fonksiyonları `src/app` altındaki alan modüllerine ayır.
+1. `SetupFormState`, AI servis taslakları ve ayar dönüştürme yardımcılarını `src/app` altındaki ayar modülüne ayır.
+2. Müşteri form tipleri ve saf müşteri dönüştürme/biçimlendirme yardımcılarını ayrı alana taşı.
+3. Büyük workspace bileşenlerini iş alanlarına göre `components` / `pages` altına taşımaya devam et.
 
 Tamamlanan geçişler:
 
@@ -39,6 +45,8 @@ Tamamlanan geçişler:
 - Oda Yönetimi `RoomManagementSection` ile Setup/Ayarlar React ağacına taşındı; `room-management-ux.ts` kaldırıldı.
 - Menü yöneticisi `App.tsx` içinden ayrı `MenuManager` bileşenine taşındı.
 - Menü görsel seçimi/dönüştürme/önizleme ve sürekli açık detay alanları React event/state akışına taşındı; `menu-editor-ux.ts` kaldırıldı.
+- Menü form tipleri ve ortak saf menü yardımcıları `menu-model.ts` altında toplandı.
+- `LocalMenuPreview` / `MenuPreviewCanvas` / `MenuPreviewItem` bileşenleri `MenuPreview.tsx` içine taşındı.
 - Müşteri `Son temas` tarih biçimi `CustomersWorkspace` React sunumuna taşındı; `customer-work-enhancements.ts` kaldırıldı.
 - Son geçici giriş noktası olan `desktop-ux.ts` kaldırıldı.
 

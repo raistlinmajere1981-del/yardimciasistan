@@ -1,48 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
-import type { DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
+import type { DesktopDashboardData } from "../../../electron/database";
 import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
+import {
+  compareMenuRecords,
+  findMenuCategoryName,
+  formatCurrency,
+  formatStockQuantity,
+  getMenuStockBadge,
+  isQrHiddenByStock,
+  resolveMenuPreviewImageUrl,
+  stockUnitShortLabel,
+  type CategoryFormState,
+  type ItemFormState
+} from "./menu-model";
 import { ActionButton } from "../ui/ActionButton";
-import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
+import { StatusBadge } from "../ui/StatusBadge";
 
 type SyncState = "idle" | "loading" | "success" | "error";
-
-interface CategoryFormState {
-  id: string;
-  name: string;
-  description: string;
-  is_active: boolean;
-  sort_order: string;
-}
-
-interface ItemFormState {
-  id: string;
-  category_id: string;
-  name: string;
-  description: string;
-  price: string;
-  currency: string;
-  image_url: string;
-  is_available: boolean;
-  is_featured: boolean;
-  allergens: string;
-  tags: string;
-  stock_quantity: string;
-  stock_min_quantity: string;
-  stock_unit: "piece" | "gram";
-  stock_consumption_quantity: string;
-  hide_when_out_of_stock: boolean;
-  stock_note: string;
-  sort_order: string;
-}
 
 interface MenuManagerProps {
   dashboardData: DesktopDashboardData;
   categoryForm: CategoryFormState;
   itemForm: ItemFormState;
-  previewMenu: DesktopDashboardData["menu"];
-  setupData: DesktopSetupData;
   selectedCategoryId: string;
   selectedItemId: string;
   menuEditState: SyncState;
@@ -57,7 +38,6 @@ interface MenuManagerProps {
   onSaveItem: () => void;
   onDeleteCategory: () => void;
   onDeleteItem: () => void;
-  onExpandPreview: () => void;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
 
@@ -443,55 +423,6 @@ export function MenuManager({
       </div>
     </section>
   );
-}
-
-function findMenuCategoryName(categoryId: string, categories: DesktopDashboardData["menu"]["categories"]) {
-  return categories.find((category) => category.id === categoryId)?.name ?? "Kategori yok";
-}
-
-function compareMenuRecords(left: { sort_order: number; name: string }, right: { sort_order: number; name: string }) {
-  return left.sort_order - right.sort_order || left.name.localeCompare(right.name, "tr");
-}
-
-function formatCurrency(value: number, currency: string) {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
-}
-
-function getMenuStockBadge(item: PublishedMenuItem): { label: string; tone: StatusTone } | null {
-  if (item.stock_quantity == null) return null;
-  if (item.stock_quantity < (item.stock_consumption_quantity > 0 ? item.stock_consumption_quantity : 1)) {
-    return { label: "Stokta yok", tone: "danger" };
-  }
-  if (item.stock_min_quantity !== null && item.stock_quantity <= item.stock_min_quantity) {
-    return { label: `Az stok · ${formatStockQuantity(item.stock_quantity, item.stock_unit)}`, tone: "wait" };
-  }
-  return { label: formatStockQuantity(item.stock_quantity, item.stock_unit), tone: "ok" };
-}
-
-function formatStockQuantity(quantity: number, unit: "piece" | "gram"): string {
-  const value = Number.isFinite(quantity) ? new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 3 }).format(quantity) : "0";
-  return `${value} ${stockUnitShortLabel(unit)}`;
-}
-
-function stockUnitShortLabel(unit: "piece" | "gram"): string {
-  return unit === "gram" ? "g" : "adet";
-}
-
-function isQrHiddenByStock(item: PublishedMenuItem): boolean {
-  return typeof item.stock_quantity === "number"
-    && item.hide_when_out_of_stock
-    && item.stock_quantity < (item.stock_consumption_quantity > 0 ? item.stock_consumption_quantity : 1);
-}
-
-function resolveMenuPreviewImageUrl(imageUrl: string, webModuleUrl: string) {
-  const normalizedImageUrl = imageUrl.trim();
-  if (!normalizedImageUrl) return "";
-  if (/^(data:image\/|blob:|https?:\/\/)/i.test(normalizedImageUrl)) return normalizedImageUrl;
-  try {
-    return new URL(normalizedImageUrl, `${webModuleUrl.replace(/\/+$/, "")}/`).toString();
-  } catch {
-    return normalizedImageUrl;
-  }
 }
 
 function describeImageValue(value: string) {
