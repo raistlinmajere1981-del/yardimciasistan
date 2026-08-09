@@ -87,6 +87,7 @@ import {
   parseNullableFormNumber,
   parsePositiveFormNumber,
   buildMenuPreviewData,
+  compareMenuRecords,
   type CategoryFormState,
   type ItemFormState
 } from "./components/menu/menu-model";
@@ -5688,35 +5689,6 @@ function buildReservationWhatsAppMessage(
     `${dateText} tarihli ${typeText} talebiniz için sizinle iletişime geçiyoruz.`,
     "Detayları işletme sahibi kontrol edip size net bilgi verecektir."
   ].join(" ");
-}
-
-function findMenuCategoryName(categoryId: string, categories: DesktopDashboardData["menu"]["categories"]) {
-  return categories.find((category) => category.id === categoryId)?.name ?? "Kategori yok";
-}
-
-function compareMenuRecords(left: { sort_order: number; name: string }, right: { sort_order: number; name: string }) {
-  return left.sort_order - right.sort_order || left.name.localeCompare(right.name, "tr");
-}
-
-function resolveMenuPreviewImageUrl(imageUrl: string, webModuleUrl: string) {
-  const normalizedImageUrl = imageUrl.trim();
-  if (!normalizedImageUrl) {
-    return "";
-  }
-
-  try {
-    return new URL(normalizedImageUrl, `${webModuleUrl.replace(/\/+$/, "")}/`).toString();
-  } catch {
-    return normalizedImageUrl;
-  }
-}
-
-function formatCurrency(value: number, currency: string) {
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0
-  }).format(value);
 }
 
 function formatCustomerLastContactDate(value: string) {
