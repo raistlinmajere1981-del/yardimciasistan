@@ -43,14 +43,11 @@ import type {
   DesktopDashboardData,
   DesktopCustomerMutationResult,
   DesktopIdentityImageAnalyzeResult,
-  DesktopSetupData,
   SaveCustomerInput,
   AssignCustomerRoomInput,
-  SaveInitialSetupInput
 } from "../electron/database";
-import { parseGoogleAiStudioCurl } from "./google-ai-studio";
 import { buildNavigation, getPageMeta, type DesktopPage } from "./app/navigation";
-import { defaultDashboardData, defaultSetupData } from "./app/bootstrap-defaults";
+import { defaultDashboardData } from "./app/bootstrap-defaults";
 import {
   automaticSyncTone,
   readSidebarCollapsedPreference,
@@ -60,6 +57,7 @@ import {
 import { useAppLock } from "./app/use-app-lock";
 import { useDesktopSync } from "./app/use-desktop-sync";
 import { useMenuController } from "./app/use-menu-controller";
+import { useSetupController } from "./app/use-setup-controller";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "./app/notifications";
 import { getRoomDisplayInfo, getTableStatusAction, formatTableStatus, isAccommodationTask, isRestaurantTask } from "./app/operations";
 import { buildReservationWhatsAppMessage } from "./app/reservation-messaging";
@@ -72,11 +70,6 @@ import {
   formatReservationStatus,
   formatRoomStatus,
 } from "./app/record-formatters";
-import {
-  createSaveAiServiceProfiles,
-  toSetupForm,
-  type SetupFormState
-} from "./app/setup-model";
 import {
   formatCustomerRoomStayStatus,
   formatCustomerSource,
@@ -136,13 +129,6 @@ function App() {
   const [manualRequestMessage, setManualRequestMessage] = useState("Telefonla veya yüz yüze gelen talebi kaydedin.");
   const [selectedRequestId, setSelectedRequestId] = useState(defaultDashboardData.requests[0]?.id ?? "");
   const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestId] = useState(defaultDashboardData.requests[0]?.id ?? "");
-  const [setupData, setSetupData] = useState<DesktopSetupData>(defaultSetupData);
-  const [setupForm, setSetupForm] = useState<SetupFormState>(() => toSetupForm(defaultSetupData));
-  const [setupMode, setSetupMode] = useState(false);
-  const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
-  const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
-  const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
-  const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
   const [convertingRequestId, setConvertingRequestId] = useState("");
   const [suggestingRequestId, setSuggestingRequestId] = useState("");
   const [aiState, setAiState] = useState<SyncState>("idle");
@@ -163,6 +149,23 @@ function App() {
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
   const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
   const {
+    setupData,
+    setupForm,
+    setSetupForm,
+    setupMode,
+    setSetupMode,
+    setupSaveState,
+    setupMessage,
+    aiConnectionTestState,
+    aiConnectionTestMessage,
+    applyBootstrapSetup,
+    testAiConnection: handleTestAiConnection,
+    saveSetup,
+    setPasswordConfigured: updateSetupPasswordConfigured
+  } = useSetupController({
+    onInitialSetupReady: () => setActivePage("dashboard")
+  });
+  const {
     phase: appAccessPhase,
     status: appLockStatus,
     lockApp,
@@ -172,9 +175,7 @@ function App() {
   } = useAppLock({
     passwordConfigured: setupData.appPasswordConfigured,
     getNotificationCount: () => buildDesktopNotifications(dashboardData, automaticSyncStatus).length,
-    onPasswordConfiguredChange: (configured) => {
-      setSetupData((current) => ({ ...current, appPasswordConfigured: configured }));
-    }
+    onPasswordConfiguredChange: updateSetupPasswordConfigured
   });
   const {
     dashboardData,
@@ -186,15 +187,7 @@ function App() {
     accessPhase: appAccessPhase,
     setSyncState,
     setStatusMessage,
-    onBootstrapSetup: (nextSetupData, firstApplicationLoad) => {
-      setSetupData(nextSetupData);
-      setSetupForm(toSetupForm(nextSetupData));
-      setSetupMode(nextSetupData.setupRequired);
-      if (!nextSetupData.setupRequired && firstApplicationLoad) {
-        setActivePage("dashboard");
-      }
-      setSetupMessage(nextSetupData.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
-    },
+    onBootstrapSetup: applyBootstrapSetup,
   });
   const {
     menuPublishState,
@@ -265,15 +258,6 @@ function App() {
       setMessagesAiOpen(true);
     }
   }, [activePage, setupData.aiEnabled, setupData.modules.whatsapp]);
-
-  useEffect(() => {
-    setAiConnectionTestState("idle");
-    setAiConnectionTestMessage(
-      setupForm.aiStoredApiKeyConfigured
-        ? "Bu sağlayıcının kayıtlı bağlantısı kullanılabilir."
-        : "Bağlantı henüz denenmedi."
-    );
-  }, [setupForm.aiService]);
 
   useEffect(() => {
     if (aiWorkspaceRequestId && dashboardData.requests.some((request) => request.id === aiWorkspaceRequestId)) {
@@ -1060,136 +1044,8 @@ function App() {
     void window.yardimciDesktop?.openExternal(selectedWhatsAppUrl);
   }
 
-  async function handleTestAiConnection() {
-    setAiConnectionTestState("loading");
-    setAiConnectionTestMessage("AI servisine bağlanılıyor...");
-
-    if (!window.yardimciDesktop) {
-      setAiConnectionTestState("error");
-      setAiConnectionTestMessage("Bağlantı kontrolü hazır değil. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    let baseUrl = setupForm.aiBaseUrl;
-    let model = setupForm.aiModel;
-    let apiKey = setupForm.clearAiApiKey ? "" : setupForm.aiApiKey;
-    if (setupForm.aiService === "gemini" && setupForm.aiGoogleCurl.trim()) {
-      const parsed = parseGoogleAiStudioCurl(setupForm.aiGoogleCurl);
-      if (!parsed.ok) {
-        setAiConnectionTestState("error");
-        setAiConnectionTestMessage(parsed.message);
-        return;
-      }
-
-      baseUrl = parsed.baseUrl;
-      model = "";
-      apiKey = parsed.apiKey;
-      setSetupForm((current) => ({
-        ...current,
-        aiProjectName: current.aiProjectName || "Google AI Studio",
-        aiGoogleCurl: "",
-        aiBaseUrl: parsed.baseUrl,
-        aiModel: "",
-        aiApiKey: parsed.apiKey,
-        clearAiApiKey: false
-      }));
-    }
-
-    const result = await window.yardimciDesktop.testAiConnection({
-      provider: setupForm.aiProvider,
-      service: setupForm.aiService,
-      projectName: setupForm.aiProjectName,
-      baseUrl,
-      model,
-      apiKey,
-      useStoredApiKey: !setupForm.clearAiApiKey && setupForm.aiStoredApiKeyConfigured && apiKey.trim() === "",
-      timeoutSeconds: Number(setupForm.aiTimeoutSeconds)
-    });
-
-    setAiConnectionTestState(result.ok ? "success" : "error");
-    setAiConnectionTestMessage(result.message);
-    if (result.ok) {
-      setSetupSaveState("idle");
-      setSetupMessage("AI bağlantısı hazır. Ayarları kaydedin.");
-      setSetupForm((current) => ({
-        ...current,
-        aiModel: result.model,
-        aiModelOptions: result.models
-      }));
-    } else if (setupForm.aiService === "gemini") {
-      setSetupForm((current) => ({
-        ...current,
-        aiModel: result.model || current.aiModel,
-        aiModelOptions: result.models ?? current.aiModelOptions
-      }));
-    }
-  }
-
   async function handleSaveSetup() {
-    setSetupSaveState("loading");
-    setSetupMessage("Kurulum ayarları kaydediliyor...");
-
-    if (!window.yardimciDesktop) {
-      setSetupSaveState("error");
-      setSetupMessage("Ayarlar kaydedilemedi. Masaüstü uygulamasını yeniden başlatın.");
-      return;
-    }
-
-    const input: SaveInitialSetupInput = {
-      businessName: setupForm.businessName,
-      businessType: setupForm.businessType,
-      phone: setupForm.phone,
-      whatsapp: setupForm.whatsapp,
-      email: setupForm.email,
-      address: setupForm.address,
-      webModuleUrl: setupForm.webModuleUrl,
-      syncSecret: setupForm.syncSecret,
-      autoSyncEnabled: setupForm.autoSyncEnabled,
-      aiEnabled: setupForm.aiEnabled,
-      aiProvider: setupForm.aiProvider,
-      aiService: setupForm.aiService,
-      aiProjectName: setupForm.aiProjectName,
-      aiBaseUrl: setupForm.aiBaseUrl,
-      aiModel: setupForm.aiModel,
-      aiModelOptions: setupForm.aiModelOptions,
-      aiApiKey: setupForm.aiApiKey,
-      clearAiApiKey: setupForm.clearAiApiKey,
-      aiProfiles: createSaveAiServiceProfiles(setupForm),
-      aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
-      modules: {
-        rooms: setupForm.roomsEnabled,
-        tables: setupForm.tablesEnabled,
-        qrMenu: setupForm.qrMenuEnabled,
-        whatsapp: setupForm.whatsappEnabled,
-        android: setupForm.androidEnabled
-      },
-      initialCounts: {
-        rooms: Number(setupForm.roomCount),
-        tables: setupForm.tableCategories.reduce((total, category) => total + Number(category.tableCount || 0), 0)
-      },
-      tableCategories: setupForm.tableCategories.map((category) => ({
-        sourceName: category.sourceName,
-        name: category.name,
-        tableCount: Number(category.tableCount)
-      }))
-    };
-    const result = await window.yardimciDesktop.saveInitialSetup(input);
-
-    if (!result.ok) {
-      setSetupSaveState("error");
-      setSetupMessage(result.message);
-      return;
-    }
-
-    setSetupData(result.setupData);
-    setDashboardData(result.dashboardData);
-    setSetupForm(toSetupForm(result.setupData));
-    const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
-    setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
-    setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
-    if (!aiConnectionCouldNotBePublished) {
-      setSetupMode(false);
-    }
+    await saveSetup(setDashboardData);
   }
 
   if (appAccessPhase !== "unlocked") {
