@@ -105,12 +105,13 @@ export function FinanceWorkspace() {
     for (const folio of roomData.folios) {
       if (folio.reservationId) folioReservationIds.add(folio.reservationId);
       if (folio.remainingMinor <= 0 || !["open", "closed"].includes(folio.status)) continue;
+      const isOpen = folio.status === "open";
       rows.push({
         id: `folio:${folio.id}`,
         customerName: folio.customerName || "Misafir",
         context: folio.roomName || "Oda hesabı",
-        status: folio.status === "open" ? "Açık oda hesabı" : "Çıkış yaptı · alacak",
-        dateText: folio.plannedCheckOutDate ? `Çıkış ${formatDate(folio.plannedCheckOutDate)}` : "",
+        status: isOpen ? "Açık oda hesabı" : "Çıkış yaptı · alacak",
+        dateText: isOpen && folio.plannedCheckOutDate ? `Planlanan çıkış ${formatDate(folio.plannedCheckOutDate)}` : "",
         remainingMinor: folio.remainingMinor
       });
     }
