@@ -30,6 +30,12 @@ Kurulum formunun veri modeli `app/setup-model.ts` altında tutulur. `SetupFormSt
 
 `App.tsx` ayar ekranının React koordinasyonunu sürdürür; ancak servis seçimi, varsayılan profil üretimi, kayıtlı profil kontrolü, oda/masa başlangıç formu ve senkron gizli anahtar üretimi gibi saf dönüşüm kuralları `setup-model.ts` dışında tekrar tanımlanmamalıdır.
 
+## Müşteri alanı
+
+Müşteri kartı ve oda atama formunun veri modeli `app/customer-model.ts` altında tutulur. `CustomerFormState`, `RoomAssignmentFormState`, müşteri kartı ↔ kayıt payload dönüşümü, kimlik alanı sunum yardımcıları, müşteri kaynağı etiketi ve konaklama tarih/durum biçimlendirmeleri burada tek kaynaktır.
+
+`CustomersWorkspace`, `CustomerEditorDrawer` ve `RoomAssignmentDrawer` şimdilik `App.tsx` içinde React sunumu olarak kalır; ancak müşteri form verisi veya kimlik biçimlendirme kuralları yeniden `App.tsx` içine eklenmemelidir. Sonraki ayrıştırmada bu büyük React blokları `components/customers` altına taşınabilir.
+
 ## Stil katmanları
 
 `styles.css` eski ana stil dosyasıdır. Sonradan eklenen `*-ux.css` dosyaları işlev veya ekran alanına göre ayrılmıştır. Yeni stiller mümkün olduğunca ilgili bileşenin/alanın mevcut UX dosyasına eklenmeli; aynı seçiciyi farklı dosyalarda tekrar override eden yeni zincirler oluşturulmamalıdır.
@@ -40,9 +46,9 @@ Kurulum formunun veri modeli `app/setup-model.ts` altında tutulur. `SetupFormSt
 
 Kademeli ayrıştırma için güncel sıra:
 
-1. Müşteri form tipleri ve saf müşteri dönüştürme/biçimlendirme yardımcılarını ayrı alana taşı.
+1. `CustomersWorkspace`, `CustomerEditorDrawer` ve `RoomAssignmentDrawer` React bloklarını `components/customers` altına taşı.
 2. Ayarlar ekranının büyük React sunum bloklarını `components/settings` altına ayır.
-3. Büyük workspace bileşenlerini iş alanlarına göre `components` / `pages` altına taşımaya devam et.
+3. Kalan büyük workspace bileşenlerini iş alanlarına göre `components` / `pages` altına taşımaya devam et.
 
 Tamamlanan geçişler:
 
@@ -55,7 +61,8 @@ Tamamlanan geçişler:
 - `LocalMenuPreview` / `MenuPreviewCanvas` / `MenuPreviewItem` bileşenleri `MenuPreview.tsx` içine taşındı.
 - `App.tsx` içinde kalmış menü sıralama/önizleme yardımcı tekrarları temizlendi; menü domain yardımcıları tek kaynağa bağlandı.
 - `SetupFormState`, masa kategori form modeli, AI servis taslakları/presetleri ve ayar dönüşüm yardımcıları `app/setup-model.ts` altına taşındı.
-- Müşteri `Son temas` tarih biçimi `CustomersWorkspace` React sunumuna taşındı; `customer-work-enhancements.ts` kaldırıldı.
+- Müşteri form tipleri, müşteri kayıt dönüşümleri, kimlik alanı yardımcıları ve konaklama sunum yardımcıları `app/customer-model.ts` altına taşındı.
+- Müşteri `Son temas` tarih biçimi müşteri modelindeki ortak yardımcıdan üretilir; ham zaman damgası yalnız `title` bilgisinde korunur.
 - Son geçici giriş noktası olan `desktop-ux.ts` kaldırıldı.
 
 ## Kontrol
