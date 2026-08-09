@@ -129,6 +129,14 @@ export function parsePositiveFormNumber(value: string, fallback: number): number
   return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
+export function findMenuCategoryName(categoryId: string, categories: DesktopDashboardData["menu"]["categories"]) {
+  return categories.find((category) => category.id === categoryId)?.name ?? "Kategori yok";
+}
+
+export function compareMenuRecords(left: { sort_order: number; name: string }, right: { sort_order: number; name: string }) {
+  return left.sort_order - right.sort_order || left.name.localeCompare(right.name, "tr");
+}
+
 export function getMenuStockBadge(item: PublishedMenuItem): { label: string; tone: StatusTone } | null {
   if (item.stock_quantity == null) {
     return null;
@@ -155,6 +163,29 @@ export function isQrHiddenByStock(item: PublishedMenuItem): boolean {
   return typeof item.stock_quantity === "number"
     && item.hide_when_out_of_stock
     && item.stock_quantity < (item.stock_consumption_quantity > 0 ? item.stock_consumption_quantity : 1);
+}
+
+export function resolveMenuPreviewImageUrl(imageUrl: string, webModuleUrl: string) {
+  const normalizedImageUrl = imageUrl.trim();
+  if (!normalizedImageUrl) {
+    return "";
+  }
+  if (/^(data:image\/|blob:|https?:\/\/)/i.test(normalizedImageUrl)) {
+    return normalizedImageUrl;
+  }
+  try {
+    return new URL(normalizedImageUrl, `${webModuleUrl.replace(/\/+$/, "")}/`).toString();
+  } catch {
+    return normalizedImageUrl;
+  }
+}
+
+export function formatCurrency(value: number, currency: string) {
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0
+  }).format(value);
 }
 
 export function buildMenuPreviewData(
