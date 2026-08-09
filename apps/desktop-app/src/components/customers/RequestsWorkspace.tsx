@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import { formatCustomerSource } from "../../app/customer-model";
+import type { ManualRequestFormState } from "../../app/request-model";
 import {
   formatDateForDisplay,
   formatRequestStatus,
@@ -28,19 +29,6 @@ import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 type RequestActionMode = "open" | "answered" | "rejected" | "converted" | "closed";
-
-export interface ManualRequestFormState {
-  requestType: string;
-  customerName: string;
-  customerPhone: string;
-  dateText: string;
-  startDate: string;
-  endDate: string;
-  time: string;
-  guestCount: string;
-  message: string;
-  priority: string;
-}
 
 const manualRequestTypeOptions = [
   "general_info",

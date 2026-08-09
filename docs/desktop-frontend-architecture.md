@@ -82,3 +82,5 @@ Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. 
 - Dashboard verisi, bootstrap yükleme, otomatik senkron abonelikleri ve manuel web talebi çekme akışı `app/use-desktop-sync.ts` controller hook'unda tutulur; `App.tsx` kurulum, menü seçimi ve ortak durum mesajı koordinasyonunu sağlar.
 - Menü seçimleri, taslak form state'leri, kaydet/sil/yayınla ve yerel önizleme lifecycle'ı `app/use-menu-controller.ts` controller hook'unda tutulur; `App.tsx` yalnız MenuManager ve preview bileşenlerini bağlar.
 - Kurulum/Ayarlar form state’i, AI bağlantı testi ve ayar kaydetme bridge akışı `app/use-setup-controller.ts` içinde tutulur; `App.tsx` yalnız bootstrap, dashboard ve ekran koordinasyonunu bağlar.
+
+- Mesaj/AI, müşteri-talep, oda/rezervasyon/günlük iş mutation'ları ve Android/yedek akışları ayrı controller hook'larında tutulur; `App.tsx` bu domainleri yalnız sayfa ve ortak durum koordinasyonu için bağlar.
