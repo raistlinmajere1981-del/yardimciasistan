@@ -16,16 +16,15 @@ Yeni bir ekran davranışı mümkün olduğunca React bileşeninin içinde uygul
 - tüm belgeyi gereksiz yere sürekli taramamalı,
 - uygulama iş/veri kurallarını değiştirmemelidir.
 
-Mevcut geçici katmanlar:
+Mevcut geçici katman:
 
 - `customer-work-enhancements.ts`: Eski müşteri son-temas tarihinin kullanıcı dostu gösterimi.
-- `menu-editor-ux.ts`: Menü detaylarının sürekli açık tutulması, görsel dosya seçimi/dönüştürme ve görsel önizleme uyumluluğu.
 
 Kasa detay raporlarının aç/kapa durumu ve alacak satırlarındaki tarih metinleri artık doğrudan `ReportsPage` / `FinanceWorkspace` React sunumunda yönetilir. Eski `cash-page-ux.ts` uyumluluk katmanı kaldırılmıştır.
 
 Oda Yönetimi de artık `RoomManagementSection` React bileşeni olarak doğrudan Setup/Ayarlar ağacında çalışır. Oda sayısı `SetupFormState` üzerinden, oda adı ve fiyat kayıtları ise masaüstü bridge üzerinden React state ile yönetilir; eski `room-management-ux.ts` kaldırılmıştır.
 
-Bu işlevler ilgili React bileşenlerine taşındıkça kalan geçici dosyalar da tek tek kaldırılmalıdır.
+Menü yönetimi artık `components/menu/MenuManager.tsx` içinde doğrudan React tarafından yönetilir. Sürekli açık kategori/ürün ayarları, görsel dosya seçimi, WebP dönüştürme ve mevcut görsel önizlemesi React state/event akışına taşındı; `menu-editor-ux.ts` kaldırıldı.
 
 ## Stil katmanları
 
@@ -37,9 +36,9 @@ Bu işlevler ilgili React bileşenlerine taşındıkça kalan geçici dosyalar d
 
 Kademeli ayrıştırma için güncel sıra:
 
-1. Menü yönetimini ayrı React bileşenine taşı ve `menu-editor-ux.ts` uyumluluk katmanını kaldır.
-2. Müşteri tarih biçimlendirmesini veri sunum katmanına taşı ve `customer-work-enhancements.ts` dosyasını kaldır.
-3. Büyük form tiplerini ve saf yardımcı fonksiyonları `src/app` altındaki alan modüllerine ayır.
+1. Müşteri tarih biçimlendirmesini veri sunum katmanına taşı ve `customer-work-enhancements.ts` dosyasını kaldır.
+2. Menü form tiplerini ve saf yardımcı fonksiyonlarını ortak menü modülüne ayır.
+3. Büyük form tiplerini ve diğer saf yardımcı fonksiyonları `src/app` altındaki alan modüllerine ayır.
 
 Tamamlanan geçişler:
 
@@ -49,6 +48,9 @@ Tamamlanan geçişler:
 - Oda Yönetimi `RoomManagementSection` ile Setup/Ayarlar React ağacına taşındı.
 - Oda sayısı, oda adı ve gecelik fiyat akışı React state üzerinden yönetiliyor.
 - `room-management-ux.ts` kaldırıldı.
+- Menü yöneticisi `App.tsx` içinden ayrı `MenuManager` bileşenine taşındı.
+- Menü görsel seçimi/dönüştürme/önizleme ve sürekli açık detay alanları React event/state akışına taşındı.
+- `menu-editor-ux.ts` kaldırıldı.
 
 ## Kontrol
 
