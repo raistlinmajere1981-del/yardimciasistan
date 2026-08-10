@@ -12,6 +12,7 @@ Aşağıdaki ana zincir çalışır durumdadır:
 - Masaüstünde talep, müşteri, rezervasyon, oda, masa ve günlük iş yönetimi
 - Pansiyon ve restoran için manuel günlük iş / not oluşturma, düzenleme, tamamlama ve silme
 - Masaüstünden kayıtlı müşteri için doğrudan pansiyon rezervasyonu oluşturma
+- Aktif pansiyon rezervasyonunda oda atama/değiştirme ve manuel rezervasyon ayrıntılarını düzenleme
 - Günlük ve haftalık sade operasyon takvimi
 - QR menü, stok, masa adisyonu, oda folyosu ve basit ön muhasebe
 - AI cevap/özet/rapor araçları
@@ -51,9 +52,20 @@ Pansiyon rezervasyon takibinde `Yeni Rezervasyon` ile talep açma zorunluluğu o
 - Giriş ve çıkış tarihleri ile kişi sayısı girilir.
 - Oda hemen seçilebilir veya daha sonra atanabilir.
 - Not eklenebilir.
-- Oda seçilmişse bakım durumu, kapasite ve tarih çakışması sunucu/DB katmanında doğrulanır.
+- Oda seçilmişse bakım durumu, kapasite, aktif konaklama ve tarih çakışması DB katmanında doğrulanır.
 - Başarılı kayıt mevcut rezervasyon listesine, dashboard verisine ve operasyon akışına katılır.
 - Manuel kayıt `reservation.created` olayı üretir.
+
+### Rezervasyon düzenleme ve oda değişikliği
+
+Aktif pansiyon rezervasyonlarındaki `Düzenle / Oda Ata` işlemi aynı sade paneli yeniden kullanır.
+
+- Manuel rezervasyonlarda giriş/çıkış tarihi, kişi sayısı, oda ve not güncellenebilir.
+- Web talebinden oluşan rezervasyonlarda müşteri, tarih ve kişi bilgisi talep kaydıyla bağlı tutulur; oda ve not değiştirilebilir.
+- Oda atama veya oda değiştirmede kapasite, bakım durumu, aktif konaklama ve rezervasyon tarih çakışması yeniden doğrulanır.
+- Önceki oda artık başka aktif rezervasyon/konaklama tarafından kullanılmıyorsa otomatik olarak serbest bırakılır.
+- Aktif konaklamaya dönüştürülmüş rezervasyonlar bu formdan değiştirilmez; konaklama akışı korunur.
+- Güncellemeler `reservation.updated` olayı üretir.
 
 ### Operasyon takvimi
 
@@ -70,9 +82,9 @@ Sol menüdeki `Takvim` sayfası pansiyon ve restoran operasyonlarını aynı tar
 
 ## Sıradaki Ürün Öncelikleri
 
-### 1. Rezervasyon kullanım akışını iyileştirme
+### 1. Hızlı müşteri oluşturma
 
-Doğrudan rezervasyon ve takvim akışları sahada doğrulandıktan sonra ihtiyaç görülürse manuel rezervasyon düzenleme, hızlı müşteri oluşturma veya oda değiştirme gibi küçük kullanım kolaylıkları eklenebilir.
+Doğrudan rezervasyon sırasında müşterinin kayıtlı olmaması hâlinde kullanıcıyı başka ekrana göndermeden temel ad/telefon bilgisiyle müşteri oluşturup rezervasyona devam ettirecek sade akış değerlendirilebilir.
 
 ### 2. Canlı bağlantı sağlamlaştırma
 
@@ -84,4 +96,4 @@ Temel günlük operasyon zinciri tamamlandıktan sonra Pansiyon, Restoran, Takvi
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler ve doğrudan rezervasyon oluşturma v1 ürün paketindedir. Sade operasyon takvimi de ürün omurgasına eklenmiştir; sonraki geliştirmelerde saha geri bildirimi ve canlı bağlantı doğrulaması önceliklidir.
+Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, doğrudan rezervasyon, rezervasyon düzenleme/oda değişikliği ve sade operasyon takvimi v1 ürün omurgasındadır. Sonraki geliştirmelerde hızlı müşteri oluşturma ve saha geri bildirimi önceliklidir.

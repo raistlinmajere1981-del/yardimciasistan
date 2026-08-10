@@ -31,6 +31,20 @@ try {
     sqlite.close();
   }
 
+  const initialDashboard = database.getDashboardData();
+  const usableRooms = initialDashboard.rooms.filter((room) => {
+    if (!room.isActive || room.status !== "available") return false;
+    const activeReservation = initialDashboard.reservations.some(
+      (reservation) => ["pending", "approved"].includes(reservation.status) && reservation.roomIds.includes(room.id)
+    );
+    const activeStay = initialDashboard.customerRoomStays.some(
+      (stay) => ["planned", "checked_in"].includes(stay.status) && stay.roomId === room.id
+    );
+    return !activeReservation && !activeStay;
+  });
+  assert.ok(usableRooms.length >= 2, "Smoke test requires at least two usable rooms");
+  const [firstRoom, secondRoom] = usableRooms;
+
   const created = database.saveManualReservation({
     customerId: "manual_reservation_customer",
     startDate: "2035-09-01",
@@ -49,6 +63,51 @@ try {
   assert.equal(reservation.guestCount, 2);
   assert.equal(reservation.notes, "Telefonla alınan test rezervasyonu.");
 
+  const assigned = database.saveManualReservation({
+    reservationId: reservation.id,
+    customerId: "manual_reservation_customer",
+    roomId: firstRoom.id,
+    startDate: "2035-09-02",
+    endDate: "2035-09-05",
+    guestCount: 2,
+    notes: "Tarih ve oda güncellendi."
+  });
+  assert.equal(assigned.ok, true, assigned.message);
+  const assignedReservation = assigned.dashboardData.reservations.find((item) => item.id === reservation.id);
+  assert.ok(assignedReservation, "Updated reservation must remain in dashboard data");
+  assert.deepEqual(assignedReservation.roomIds, [firstRoom.id]);
+  assert.equal(assignedReservation.startDate, "2035-09-02");
+  assert.equal(assignedReservation.endDate, "2035-09-05");
+  assert.equal(assignedReservation.notes, "Tarih ve oda güncellendi.");
+  assert.equal(assigned.dashboardData.rooms.find((room) => room.id === firstRoom.id)?.status, "reserved");
+
+  const conflicting = database.saveManualReservation({
+    customerId: "manual_reservation_customer",
+    roomId: firstRoom.id,
+    startDate: "2035-09-03",
+    endDate: "2035-09-04",
+    guestCount: 1,
+    notes: "Çakışma testi"
+  });
+  assert.equal(conflicting.ok, false, "Overlapping reservation must be rejected");
+
+  const moved = database.saveManualReservation({
+    reservationId: reservation.id,
+    customerId: "manual_reservation_customer",
+    roomId: secondRoom.id,
+    startDate: "2035-09-02",
+    endDate: "2035-09-05",
+    guestCount: 2,
+    notes: "Oda değiştirildi."
+  });
+  assert.equal(moved.ok, true, moved.message);
+  const movedReservation = moved.dashboardData.reservations.find((item) => item.id === reservation.id);
+  assert.ok(movedReservation, "Moved reservation must remain in dashboard data");
+  assert.deepEqual(movedReservation.roomIds, [secondRoom.id]);
+  assert.equal(movedReservation.guestCount, 2);
+  assert.equal(moved.dashboardData.rooms.find((room) => room.id === secondRoom.id)?.status, "reserved");
+  assert.equal(moved.dashboardData.rooms.find((room) => room.id === firstRoom.id)?.status, "available");
+
   const invalidRange = database.saveManualReservation({
     customerId: "manual_reservation_customer",
     startDate: "2035-09-03",
@@ -60,20 +119,25 @@ try {
 
   const verify = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
-    const row = verify.prepare("SELECT request_id, status, reservation_type FROM reservations WHERE id = ?").get(reservation.id);
+    const row = verify.prepare("SELECT request_id, status, reservation_type, room_ids_json FROM reservations WHERE id = ?").get(reservation.id);
     assert.equal(row.request_id, `manual:${reservation.id}`);
     assert.equal(row.status, "approved");
     assert.equal(row.reservation_type, "room");
-    const eventCount = Number(
+    assert.deepEqual(JSON.parse(String(row.room_ids_json)), [secondRoom.id]);
+    const createdEventCount = Number(
       verify.prepare("SELECT COUNT(*) AS count FROM events WHERE type = 'reservation.created' AND entity_id = ?").get(reservation.id)?.count ?? 0
     );
-    assert.ok(eventCount >= 1, "reservation.created event missing");
+    const updatedEventCount = Number(
+      verify.prepare("SELECT COUNT(*) AS count FROM events WHERE type = 'reservation.updated' AND entity_id = ?").get(reservation.id)?.count ?? 0
+    );
+    assert.ok(createdEventCount >= 1, "reservation.created event missing");
+    assert.ok(updatedEventCount >= 2, "reservation.updated events missing");
     assert.equal(String(verify.prepare("PRAGMA integrity_check").get().integrity_check), "ok");
   } finally {
     verify.close();
   }
 
-  console.log("manual-reservation-smoke-ok: direct create, dashboard mapping, validation and event verified");
+  console.log("manual-reservation-smoke-ok: create, edit, room assign/change, overlap validation and events verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });
