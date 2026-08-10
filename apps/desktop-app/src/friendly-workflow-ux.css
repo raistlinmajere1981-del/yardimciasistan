@@ -262,3 +262,66 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Rezervasyon paneli: listede olmayan müşteriyi akıştan çıkmadan ekle. */
+.reservation-quick-customer-entry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reservation-quick-customer-success {
+  color: var(--green);
+  font-size: var(--text-xs);
+}
+
+.reservation-quick-customer {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  background: var(--surface-1);
+}
+
+.reservation-quick-customer-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reservation-quick-customer-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.reservation-quick-customer-heading strong {
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.reservation-quick-customer-heading small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.reservation-quick-customer-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reservation-quick-customer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+@media (max-width: 760px) {
+  .reservation-quick-customer-fields {
+    grid-template-columns: 1fr;
+  }
+}

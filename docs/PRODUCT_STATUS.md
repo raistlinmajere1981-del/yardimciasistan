@@ -11,7 +11,7 @@ Aşağıdaki ana zincir çalışır durumdadır:
 - Web formu ve Web AI üzerinden müşteri talebi oluşturma
 - Masaüstünde talep, müşteri, rezervasyon, oda, masa ve günlük iş yönetimi
 - Pansiyon ve restoran için manuel günlük iş / not oluşturma, düzenleme, tamamlama ve silme
-- Masaüstünden kayıtlı müşteri için doğrudan pansiyon rezervasyonu oluşturma
+- Masaüstünden doğrudan pansiyon rezervasyonu oluşturma; yeni müşteriyi rezervasyon panelinden hızlıca ekleme
 - Aktif pansiyon rezervasyonunda oda atama/değiştirme ve manuel rezervasyon ayrıntılarını düzenleme
 - Günlük ve haftalık sade operasyon takvimi
 - QR menü, stok, masa adisyonu, oda folyosu ve basit ön muhasebe
@@ -82,9 +82,9 @@ Sol menüdeki `Takvim` sayfası pansiyon ve restoran operasyonlarını aynı tar
 
 ## Sıradaki Ürün Öncelikleri
 
-### 1. Hızlı müşteri oluşturma
+### 1. Rezervasyon kullanım akışı
 
-Doğrudan rezervasyon sırasında müşterinin kayıtlı olmaması hâlinde kullanıcıyı başka ekrana göndermeden temel ad/telefon bilgisiyle müşteri oluşturup rezervasyona devam ettirecek sade akış değerlendirilebilir.
+Rezervasyon düzenleme, oda atama/değiştirme ve rezervasyon panelinden hızlı müşteri oluşturma akışları v1 kapsamına alınmıştır. Yeni rezervasyonda listede olmayan müşteri ad-soyad ve telefonla hızlıca oluşturulur ve aynı formda otomatik seçilir.
 
 ### 2. Canlı bağlantı sağlamlaştırma
 
@@ -96,4 +96,4 @@ Temel günlük operasyon zinciri tamamlandıktan sonra Pansiyon, Restoran, Takvi
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, doğrudan rezervasyon, rezervasyon düzenleme/oda değişikliği ve sade operasyon takvimi v1 ürün omurgasındadır. Sonraki geliştirmelerde hızlı müşteri oluşturma ve saha geri bildirimi önceliklidir.
+Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, doğrudan rezervasyon, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve sade operasyon takvimi v1 ürün omurgasındadır. Sonraki geliştirmelerde saha kullanılabilirliği ve canlı bağlantı doğrulaması önceliklidir.
