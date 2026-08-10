@@ -80,6 +80,17 @@ Sol menüdeki `Takvim` sayfası pansiyon ve restoran operasyonlarını aynı tar
 - İptal veya reddedilmiş rezervasyonlar ile arşivlenmiş/iptal edilmiş işler takvim kalabalığını artırmaz.
 - Haftalık özet giriş, çıkış, restoran rezervasyonu ve bekleyen iş sayılarını gösterir.
 
+### Pansiyon saha sadeleştirmesi
+
+Pansiyon ekranının ilk saha kullanılabilirlik turu tamamlanmıştır.
+
+- Ekran açılışında önce bugünün özeti, rezervasyonlar, oda durumu ve günlük işler görünür.
+- Oda hesabı ve tahsilat kaldırılmadan `Oda Hesabı ve Tahsilat` başlığı altında gerektiğinde açılan ikincil bölüme taşınmıştır.
+- Konaklama geçmişi ayrı açılır arşiv bölümü olarak korunur.
+- Oda kartlarındaki sürekli görünen `Boş / Dolu / Temizlik / Bakım` düğmeleri tek `Durum` seçimine indirilmiştir.
+- Aktif konaklama sırasında oda durumunun elle değiştirilmesini engelleyen mevcut koruma devam eder.
+- Bu düzenlemeler veri modeli, oda adisyonu, tahsilat ve rezervasyon iş kurallarını değiştirmez.
+
 ## Sıradaki Ürün Öncelikleri
 
 ### 1. Rezervasyon kullanım akışı
@@ -92,8 +103,8 @@ Gerçek hosting üzerinde web yayın/senkron davranışı bilgisayar başında l
 
 ### 3. Son saha kullanılabilirlik turu
 
-Temel günlük operasyon zinciri tamamlandıktan sonra Pansiyon, Restoran, Takvim, Müşteri İşleri ve Kasa ekranları gerçek kullanım sırasıyla tekrar gözden geçirilip gereksiz adım veya metinler temizlenebilir.
+Pansiyon ekranının ilk sadeleştirme turu tamamlandı. Sıradaki turda Restoran, Müşteri İşleri ve Kasa ekranları gerçek kullanım sırasıyla tekrar gözden geçirilerek nadir kullanılan seçenekler geri plana alınacak; günlük ana işlemler mümkün olduğunca tek adımda görünür tutulacaktır.
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, doğrudan rezervasyon, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve sade operasyon takvimi v1 ürün omurgasındadır. Sonraki geliştirmelerde saha kullanılabilirliği ve canlı bağlantı doğrulaması önceliklidir.
+Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, doğrudan rezervasyon, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve sade operasyon takvimi v1 ürün omurgasındadır. Pansiyon ekranındaki ilk saha sadeleştirmesi tamamlanmıştır. Sonraki geliştirmelerde Restoran/Müşteri İşleri/Kasa kullanılabilirlik turu ile gerçek hosting ve hedef Windows bilgisayardaki canlı bağlantı doğrulaması önceliklidir.
