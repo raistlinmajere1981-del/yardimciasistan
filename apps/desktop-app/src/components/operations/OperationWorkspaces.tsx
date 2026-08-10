@@ -15,6 +15,7 @@ import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
   DesktopStatusUpdateResult,
+  SaveCustomerInput,
   SaveDailyTaskInput,
   SaveManualReservationInput
 } from "../../../electron/database";
@@ -248,6 +249,7 @@ interface ReservationsWorkspaceProps {
   reservations: DesktopDashboardData["reservations"];
   rooms: DesktopDashboardData["rooms"];
   customers: DesktopDashboardData["customers"];
+  onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onSaveManual: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
   onUpdateStatus: (reservationId: string, status: string) => void;
   onOpenWhatsApp: (reservation: DesktopDashboardData["reservations"][number]) => void;
@@ -257,6 +259,7 @@ export function ReservationsWorkspace({
   reservations,
   rooms,
   customers,
+  onSaveCustomer,
   onSaveManual,
   onUpdateStatus,
   onOpenWhatsApp
@@ -416,6 +419,7 @@ export function ReservationsWorkspace({
           setEditingReservation(null);
         }}
         onSave={onSaveManual}
+        onSaveCustomer={onSaveCustomer}
       />
     </section>
   );

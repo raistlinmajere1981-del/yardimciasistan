@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, Save, X } from "lucide-react";
 import type {
+  DesktopCustomerMutationResult,
   DesktopDashboardData,
   DesktopStatusUpdateResult,
+  SaveCustomerInput,
   SaveManualReservationInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { QuickCustomerCreator } from "./QuickCustomerCreator";
 
 type EditorState = "idle" | "loading" | "error";
 type Reservation = DesktopDashboardData["reservations"][number];
@@ -17,6 +20,7 @@ interface ManualReservationEditorProps {
   reservation?: Reservation | null;
   onClose: () => void;
   onSave: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
+  onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
 }
 
 interface ManualReservationFormState {
@@ -66,7 +70,8 @@ export function ManualReservationEditor({
   rooms,
   reservation = null,
   onClose,
-  onSave
+  onSave,
+  onSaveCustomer
 }: ManualReservationEditorProps) {
   const [form, setForm] = useState<ManualReservationFormState>(() => createInitialForm(customers, reservation));
   const [state, setState] = useState<EditorState>("idle");
@@ -147,7 +152,7 @@ export function ManualReservationEditor({
                 onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}
               >
                 {customers.length === 0 ? (
-                  <option value="">Önce müşteri kaydı ekleyin</option>
+                  <option value="">Henüz müşteri kaydı yok</option>
                 ) : (
                   customers.map((customer) => (
                     <option value={customer.id} key={customer.id}>
@@ -161,9 +166,19 @@ export function ManualReservationEditor({
                   ? "Rezervasyonun müşteri kaydı değiştirilmez."
                   : selectedCustomer
                     ? "Kayıtlı müşteri seçildi."
-                    : "Yeni müşteri gerekiyorsa önce Müşteri İşleri bölümünden ekleyin."}
+                    : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}
               </small>
             </label>
+
+            {!isEditing && (
+              <div className="manual-request-note-field">
+                <QuickCustomerCreator
+                  disabled={state === "loading"}
+                  onSave={onSaveCustomer}
+                  onCreated={(customerId) => setForm((current) => ({ ...current, customerId }))}
+                />
+              </div>
+            )}
 
             <label>
               Giriş tarihi
@@ -237,7 +252,7 @@ export function ManualReservationEditor({
             </p>
           )}
           {customers.length === 0 && !isEditing && (
-            <p className="form-status sync-error">Rezervasyon açmak için önce bir müşteri kaydı oluşturun.</p>
+            <p className="form-status">Müşteri listeniz boş. Yeni Müşteri Ekle ile ilk kaydı oluşturabilirsiniz.</p>
           )}
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
 

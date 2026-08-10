@@ -409,6 +409,7 @@ export function DesktopWorkspaceRouter({
               reservations={dashboardData.reservations}
               rooms={dashboardData.rooms}
               customers={dashboardData.customers}
+              onSaveCustomer={handleSaveCustomer}
               onSaveManual={handleSaveManualReservation}
               onUpdateStatus={handleUpdateReservationStatus}
               onOpenWhatsApp={openReservationWhatsApp}

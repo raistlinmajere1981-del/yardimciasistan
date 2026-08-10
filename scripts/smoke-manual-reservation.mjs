@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -15,21 +15,49 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
-  const now = new Date().toISOString();
-  const sqlite = new DatabaseSync(database.databasePath);
-  try {
-    sqlite.prepare(`
-      INSERT INTO customers (
-        id, full_name, phone, email, source, notes, tags_json, last_contact_at,
-        identity_type, identity_number, nationality, birth_date, gender,
-        document_serial_number, document_expiry_date, birth_place, mother_name,
-        father_name, issuing_authority, address, created_at, updated_at,
-        deleted_at, sync_status
-      ) VALUES (?, ?, ?, '', 'manual', '', '[]', ?, '', '', '', '', '', '', '', '', '', '', '', '', ?, ?, '', 'local_only')
-    `).run("manual_reservation_customer", "Rezervasyon Test Müşterisi", "+905551112233", now, now, now);
-  } finally {
-    sqlite.close();
-  }
+  const quickCustomer = database.saveCustomer({
+    fullName: "Hızlı Rezervasyon Müşterisi",
+    phone: "+905551112233",
+    email: "",
+    notes: "",
+    tags: [],
+    identityType: "",
+    identityNumber: "",
+    nationality: "",
+    birthDate: "",
+    gender: "",
+    documentSerialNumber: "",
+    documentExpiryDate: "",
+    birthPlace: "",
+    motherName: "",
+    fatherName: "",
+    issuingAuthority: "",
+    address: ""
+  });
+  assert.equal(quickCustomer.ok, true, quickCustomer.message);
+  const customerId = quickCustomer.savedId;
+  assert.ok(customerId, "Quick customer must return savedId");
+  assert.equal(
+    quickCustomer.dashboardData.customers.find((customer) => customer.id === customerId)?.fullName,
+    "Hızlı Rezervasyon Müşterisi"
+  );
+
+  const quickCreatorSource = readFileSync(
+    join(process.cwd(), "apps", "desktop-app", "src", "components", "operations", "QuickCustomerCreator.tsx"),
+    "utf8"
+  );
+  const reservationEditorSource = readFileSync(
+    join(process.cwd(), "apps", "desktop-app", "src", "components", "operations", "ManualReservationEditor.tsx"),
+    "utf8"
+  );
+  const routerSource = readFileSync(
+    join(process.cwd(), "apps", "desktop-app", "src", "components", "app", "DesktopWorkspaceRouter.tsx"),
+    "utf8"
+  );
+  assert.match(quickCreatorSource, /Yeni Müşteri Ekle/);
+  assert.match(quickCreatorSource, /Kaydet ve Seç/);
+  assert.match(reservationEditorSource, /onSaveCustomer/);
+  assert.match(routerSource, /onSaveCustomer=\{handleSaveCustomer\}/);
 
   const initialDashboard = database.getDashboardData();
   const usableRooms = initialDashboard.rooms.filter((room) => {
@@ -46,7 +74,7 @@ try {
   const [firstRoom, secondRoom] = usableRooms;
 
   const created = database.saveManualReservation({
-    customerId: "manual_reservation_customer",
+    customerId: customerId,
     startDate: "2035-09-01",
     endDate: "2035-09-03",
     guestCount: 2,
@@ -54,7 +82,7 @@ try {
   });
   assert.equal(created.ok, true, created.message);
   const reservation = created.dashboardData.reservations.find(
-    (item) => item.customerId === "manual_reservation_customer" && item.startDate === "2035-09-01"
+    (item) => item.customerId === customerId && item.startDate === "2035-09-01"
   );
   assert.ok(reservation, "Manual reservation must appear in dashboard data");
   assert.match(reservation.requestId, /^manual:/);
@@ -65,7 +93,7 @@ try {
 
   const assigned = database.saveManualReservation({
     reservationId: reservation.id,
-    customerId: "manual_reservation_customer",
+    customerId: customerId,
     roomId: firstRoom.id,
     startDate: "2035-09-02",
     endDate: "2035-09-05",
@@ -82,7 +110,7 @@ try {
   assert.equal(assigned.dashboardData.rooms.find((room) => room.id === firstRoom.id)?.status, "reserved");
 
   const conflicting = database.saveManualReservation({
-    customerId: "manual_reservation_customer",
+    customerId: customerId,
     roomId: firstRoom.id,
     startDate: "2035-09-03",
     endDate: "2035-09-04",
@@ -93,7 +121,7 @@ try {
 
   const moved = database.saveManualReservation({
     reservationId: reservation.id,
-    customerId: "manual_reservation_customer",
+    customerId: customerId,
     roomId: secondRoom.id,
     startDate: "2035-09-02",
     endDate: "2035-09-05",
@@ -109,7 +137,7 @@ try {
   assert.equal(moved.dashboardData.rooms.find((room) => room.id === firstRoom.id)?.status, "available");
 
   const invalidRange = database.saveManualReservation({
-    customerId: "manual_reservation_customer",
+    customerId: customerId,
     startDate: "2035-09-03",
     endDate: "2035-09-03",
     guestCount: 1,
@@ -137,7 +165,7 @@ try {
     verify.close();
   }
 
-  console.log("manual-reservation-smoke-ok: create, edit, room assign/change, overlap validation and events verified");
+  console.log("manual-reservation-smoke-ok: quick customer, create, edit, room assign/change, overlap validation and events verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });
