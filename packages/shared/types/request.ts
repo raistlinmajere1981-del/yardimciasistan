@@ -1,4 +1,4 @@
-import type { ISODateString, ISODateTimeString, Priority, RecordSource, SyncStatus, TimeString, TimestampedRecord } from "./common";
+import type { ISODateString, Priority, RecordSource, SyncStatus, TimeString, TimestampedRecord } from "./common";
 
 export type RequestType =
   | "general_info"

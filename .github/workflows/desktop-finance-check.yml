@@ -4,8 +4,10 @@ on:
   pull_request:
     paths:
       - "apps/desktop-app/**"
+      - "packages/shared/types/request.ts"
       - "scripts/smoke-finance-*.mjs"
       - "scripts/smoke-room-folio-*.mjs"
+      - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
   push:
@@ -15,8 +17,10 @@ on:
       - feature/oda-adisyonu-code5
     paths:
       - "apps/desktop-app/**"
+      - "packages/shared/types/request.ts"
       - "scripts/smoke-finance-*.mjs"
       - "scripts/smoke-room-folio-*.mjs"
+      - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
 
@@ -39,6 +43,12 @@ jobs:
 
       - name: Ortak paketleri derle
         run: npm run build:packages
+
+      - name: Masaüstü strict typecheck
+        run: npm run typecheck:strict -w @yardimci-asistan/desktop-app
+
+      - name: Frontend mimari smoke
+        run: node scripts/smoke-desktop-frontend-architecture.mjs
 
       - name: Masaüstünü derle
         run: npm run build -w @yardimci-asistan/desktop-app
