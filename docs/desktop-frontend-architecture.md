@@ -84,3 +84,4 @@ Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. 
 - Kurulum/Ayarlar form state’i, AI bağlantı testi ve ayar kaydetme bridge akışı `app/use-setup-controller.ts` içinde tutulur; `App.tsx` yalnız bootstrap, dashboard ve ekran koordinasyonunu bağlar.
 
 - Mesaj/AI, müşteri-talep, oda/rezervasyon/günlük iş mutation'ları ve Android/yedek akışları ayrı controller hook'larında tutulur; `App.tsx` bu domainleri yalnız sayfa ve ortak durum koordinasyonu için bağlar.
+- Uygulama shell/header/sidebar, kilit/ilk kurulum görünümü ve sayfa router kompozisyonu `components/app/DesktopAppView.tsx` altında tutulur; `App.tsx` controller hooklarını başlatıp ortak sayfa/senkron state bağlantılarını kuran ince giriş noktasıdır.
