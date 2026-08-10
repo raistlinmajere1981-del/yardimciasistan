@@ -102,20 +102,49 @@ Pansiyon ekranının ilk saha kullanılabilirlik turu tamamlanmıştır.
 - Aktif konaklama sırasında oda durumunun elle değiştirilmesini engelleyen mevcut koruma devam eder.
 - Bu düzenlemeler veri modeli, oda adisyonu, tahsilat ve rezervasyon iş kurallarını değiştirmez.
 
+### Restoran saha sadeleştirmesi
+
+Restoran ekranının ilk saha kullanılabilirlik turu tamamlanmıştır.
+
+- Masa kartlarındaki sürekli durum düğmeleri tek `Durum` seçimine indirilmiştir.
+- Ürün ekleme, adet değiştirme ve ürün kaldırma işlemlerinin zaten otomatik kaydedildiği arayüzde netleştirilmiş; gereksiz `Siparişi Kaydet` adımı kaldırılmıştır.
+- `Hazırlanıyor / Servis Edildi / Hesap Bekliyor` işlemleri tek `Sipariş durumu` seçimine indirilmiştir.
+- `Ödendi / Kapat` ana kapanış işlemi görünür tutulmuş, nadir ve riskli adisyon iptali `Diğer` altına alınmıştır.
+- Doğrudan restoran rezervasyonu büyük bir panel olarak Masalar'ın önünde durmaz; bugün, onay bekleyen ve aktif rezervasyon sayısını gösteren kompakt özetten açılır.
+- Masa adisyonu, stok, rezervasyon ve müşteri iş kuralları korunur.
+
+### Müşteri İşleri saha sadeleştirmesi
+
+Talep detayındaki günlük karar akışı sadeleştirilmiştir.
+
+- Arama, WhatsApp, isteğe bağlı AI cevap hazırlama ve rezervasyona çevirme/açma ana işlemler olarak görünür kalır.
+- `Cevaplandı İşaretle`, `Reddet`, `Yeniden Aç` ve `Talebi Sil` işlemleri `Diğer işlemler` altında toplanmıştır.
+- Talep durumu, müşteri iletişimi ve rezervasyona dönüştürme iş kuralları değiştirilmemiştir.
+
+### Kasa saha sadeleştirmesi
+
+Basit ön muhasebe ekranındaki günlük kayıt akışı kısaltılmıştır.
+
+- Gelir/gider kaydında ilk bakışta tutar, tür ve açıklama alanları görünür.
+- Ödeme şekli varsayılan olarak `Nakit`, işlem tarihi `bugün` gelir; farklı değer gerekiyorsa `Ödeme şekli ve tarih` bölümü açılır.
+- Son hareketler ilk açılışta son 12 kayıtla sınırlıdır; daha eski kayıtlar isteğe bağlı açılır.
+- Bekleyen oda alacakları, oda adisyonundan tahsilat yönlendirmesi, manuel kayıt silme onayı ve detaylı raporlar korunur.
+- Finans hesaplama ve tahsilat servislerinde iş kuralı değişikliği yapılmamıştır.
+
 ## Sıradaki Ürün Öncelikleri
 
-### 1. Rezervasyon kullanım akışı
-
-Pansiyon rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve doğrudan restoran masa rezervasyonu akışları v1 kapsamına alınmıştır. Yeni rezervasyonda listede olmayan müşteri ad-soyad ve telefonla hızlıca oluşturulur ve aynı formda otomatik seçilir.
-
-### 2. Canlı bağlantı sağlamlaştırma
+### 1. Canlı bağlantı sağlamlaştırma
 
 Gerçek hosting üzerinde web yayın/senkron davranışı bilgisayar başında log ve ağ yanıtları izlenerek ayrıca ele alınacaktır. Bu çalışma ürün fonksiyonlarından bağımsız tutulacaktır.
 
-### 3. Son saha kullanılabilirlik turu
+### 2. Windows son saha doğrulaması
 
-Pansiyon ekranının ilk sadeleştirme turu tamamlandı. Sıradaki turda Restoran, Müşteri İşleri ve Kasa ekranları gerçek kullanım sırasıyla tekrar gözden geçirilerek nadir kullanılan seçenekler geri plana alınacak; günlük ana işlemler mümkün olduğunca tek adımda görünür tutulacaktır.
+Hedef Windows bilgisayarda kurulum, uygulama açılışı, kullanıcı veri klasörü, yerel yedek, WhatsApp WebView ve masaüstü-hosting bağlantısı uçtan uca doğrulanmalıdır.
+
+### 3. İkincil ekranlar ve son tutarlılık turu
+
+Pansiyon, Restoran, Müşteri İşleri ve Kasa ana günlük ekranlarının ilk saha turu tamamlandı. Menü, Ayarlar, Mesajlar ve rapor ayrıntıları günlük kullanım sırasında sorun oluşturduğu görülürse aynı prensiple sadeleştirilecektir; v1 için yeni özellik eklemekten önce gerçek kullanım geri bildirimi tercih edilecektir.
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve sade operasyon takvimi v1 ürün omurgasındadır. Pansiyon ekranındaki ilk saha sadeleştirmesi tamamlanmıştır. Sonraki geliştirmelerde Restoran/Müşteri İşleri/Kasa kullanılabilirlik turu ile gerçek hosting ve hedef Windows bilgisayardaki canlı bağlantı doğrulaması önceliklidir.
+Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma, sade operasyon takvimi ve temel ön muhasebe v1 ürün omurgasındadır. Pansiyon, Restoran, Müşteri İşleri ve Kasa ana ekranlarının ilk saha kullanılabilirlik turu tamamlanmıştır. Sonraki ana geliştirme odağı gerçek hosting bağlantısı ile hedef Windows bilgisayardaki uçtan uca saha doğrulamasıdır.
