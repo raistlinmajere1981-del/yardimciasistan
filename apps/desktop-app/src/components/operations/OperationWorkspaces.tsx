@@ -457,6 +457,7 @@ export function RoomsWorkspace({
         {rooms.map((room) => {
           const displayInfo = getRoomDisplayInfo(room, reservations);
           const activeStay = stays.find((stay) => stay.roomId === room.id && ["planned", "checked_in"].includes(stay.status));
+          const knownRoomStatuses = ["available", "occupied", "cleaning", "maintenance"];
           return <article className="compact-card resource-compact-card" key={room.id}>
             <div className="resource-card-heading">
               <div>
@@ -479,22 +480,35 @@ export function RoomsWorkspace({
               <p className="compact-reservation-line line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
             )}
             {(room.description || room.features.length > 0) && <p className="resource-description line-clamp-1">{room.description || room.features.join(", ")}</p>}
-            {!activeStay && (
-              <ActionButton
-                size="sm"
-                type="button"
-                onClick={() => setAssignmentRoomId(room.id)}
-                disabled={customers.length === 0 || ["cleaning", "maintenance", "out_of_service"].includes(displayInfo.status)}
-              >
-                <Users size={15} aria-hidden="true" />
-                Müşteri Ata
-              </ActionButton>
-            )}
-            <div className="status-button-row compact-status-actions" aria-label={`${room.name} durumunu değiştir`}>
-              <button disabled={Boolean(activeStay)} className={displayInfo.status === "available" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "available"} onClick={() => onUpdateStatus(room.id, "available")}>Boş</button>
-              <button disabled={Boolean(activeStay)} className={displayInfo.status === "occupied" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "occupied"} onClick={() => onUpdateStatus(room.id, "occupied")}>Dolu</button>
-              <button disabled={Boolean(activeStay)} className={displayInfo.status === "cleaning" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "cleaning"} onClick={() => onUpdateStatus(room.id, "cleaning")}>Temizlik</button>
-              <button disabled={Boolean(activeStay)} className={displayInfo.status === "maintenance" ? "is-active" : undefined} type="button" aria-pressed={displayInfo.status === "maintenance"} onClick={() => onUpdateStatus(room.id, "maintenance")}>Bakım</button>
+            <div className="room-card-actions">
+              {!activeStay && (
+                <ActionButton
+                  size="sm"
+                  type="button"
+                  onClick={() => setAssignmentRoomId(room.id)}
+                  disabled={customers.length === 0 || ["cleaning", "maintenance", "out_of_service"].includes(displayInfo.status)}
+                >
+                  <Users size={15} aria-hidden="true" />
+                  Müşteri Ata
+                </ActionButton>
+              )}
+              <label className="room-status-select">
+                <span>Durum</span>
+                <select
+                  aria-label={`${room.name} durumunu değiştir`}
+                  value={displayInfo.status}
+                  disabled={Boolean(activeStay)}
+                  onChange={(event) => onUpdateStatus(room.id, event.target.value)}
+                >
+                  {!knownRoomStatuses.includes(displayInfo.status) && (
+                    <option value={displayInfo.status}>{formatRoomStatus(displayInfo.status)}</option>
+                  )}
+                  <option value="available">Boş</option>
+                  <option value="occupied">Dolu</option>
+                  <option value="cleaning">Temizlik</option>
+                  <option value="maintenance">Bakım</option>
+                </select>
+              </label>
             </div>
           </article>;
         })}
