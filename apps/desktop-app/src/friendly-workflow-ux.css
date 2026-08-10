@@ -476,3 +476,99 @@
     width: 180px;
   }
 }
+
+/* Yeni restoran rezervasyon işlevini servis masasının önüne büyük panel olarak koyma. */
+.restaurant-reservation-details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-1);
+  overflow: hidden;
+}
+
+.restaurant-reservation-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 58px;
+  padding: 10px 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.restaurant-reservation-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.restaurant-reservation-details > summary:hover,
+.restaurant-reservation-details > summary:focus-visible {
+  background: var(--surface-2);
+}
+
+.restaurant-reservation-details.has-pending > summary {
+  border-left: 3px solid var(--yellow);
+}
+
+.restaurant-reservation-summary-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.restaurant-reservation-summary-copy strong {
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+}
+
+.restaurant-reservation-summary-copy small {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.restaurant-reservation-details.has-pending .restaurant-reservation-summary-copy small {
+  color: var(--yellow);
+}
+
+.restaurant-reservation-summary-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  color: var(--primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.restaurant-reservation-summary-action svg {
+  transition: transform 150ms ease;
+}
+
+.restaurant-reservation-details[open] .restaurant-reservation-summary-action svg {
+  transform: rotate(180deg);
+}
+
+.restaurant-reservation-details[open] .restaurant-reservation-summary-action {
+  font-size: 0;
+}
+
+.restaurant-reservation-details[open] .restaurant-reservation-summary-action::before {
+  content: "Kapat";
+  font-size: var(--text-sm);
+}
+
+.restaurant-reservation-details .restaurant-reservations-section {
+  margin: 0 10px 10px;
+}
+
+@media (max-width: 760px) {
+  .restaurant-reservation-details > summary {
+    align-items: flex-start;
+  }
+
+  .restaurant-reservation-summary-copy small {
+    white-space: normal;
+  }
+}
