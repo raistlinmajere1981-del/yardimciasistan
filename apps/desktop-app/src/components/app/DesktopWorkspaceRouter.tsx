@@ -104,7 +104,6 @@ export function DesktopWorkspaceRouter({
     deleteItem: handleDeleteMenuItem
   } = menuController;
   const {
-    selectedWhatsAppRequestId,
     setSelectedWhatsAppRequestId,
     selectedWhatsAppRequest,
     selectedWhatsAppMessage,

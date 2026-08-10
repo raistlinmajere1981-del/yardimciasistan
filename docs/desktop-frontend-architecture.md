@@ -86,3 +86,11 @@ Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. 
 - Mesaj/AI, müşteri-talep, oda/rezervasyon/günlük iş mutation'ları ve Android/yedek akışları ayrı controller hook'larında tutulur; `App.tsx` bu domainleri yalnız sayfa ve ortak durum koordinasyonu için bağlar.
 - Uygulama shell/header/sidebar, kilit/ilk kurulum görünümü ve sayfa router kompozisyonu `components/app/DesktopAppView.tsx` altında tutulur; `App.tsx` controller hooklarını başlatıp ortak sayfa/senkron state bağlantılarını kuran ince giriş noktasıdır.
 - Uygulama chrome/shell-header kompozisyonu `components/app/DesktopAppFrame.tsx`, sayfa/workspace yönlendirmesi `components/app/DesktopWorkspaceRouter.tsx` altında tutulur; `DesktopAppView` yalnız kilit/ilk kurulum ve bu iki katmanın koordinasyonunu yapar.
+
+## Mimari koruma ve denetim
+
+Frontend ayrıştırmasının ana dönemi tamamlandı. `App.tsx` controller koordinasyonu, `DesktopAppView` kilit/ilk kurulum, `DesktopAppFrame` shell/header ve `DesktopWorkspaceRouter` workspace yönlendirmesi sınırlarını korur. Controller dönüş tipleri `app/controller-types.ts` altında paylaşılır.
+
+`Desktop Finance Check` artık normal build ve servis smoke kontrollerine ek olarak masaüstü strict unused typecheck ve `scripts/smoke-desktop-frontend-architecture.mjs` mimari koruma testini çalıştırır. Bu test giriş/kompozisyon dosyalarının yeniden büyümesini, React dışı DOM mutation katmanlarının geri gelmesini ve kaldırılmış eski UX dosyalarının yeniden eklenmesini engelleyen bir koruma ağıdır.
+
+Vite ve React Vite eklentisi yalnız geliştirme/build bağımlılığı olarak tutulur; masaüstü runtime bağımlılık listesine geri taşınmamalıdır.

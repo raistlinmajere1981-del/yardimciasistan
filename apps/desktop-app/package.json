@@ -12,25 +12,26 @@
     "pack:linux": "electron-builder --linux AppImage --config electron-builder.yml --publish never",
     "pack:win": "electron-builder --win nsis --config electron-builder.yml --publish never",
     "pack:win32": "electron-builder --win nsis --ia32 --config electron-builder.win32.yml --publish never",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "typecheck:strict": "tsc -p tsconfig.json --noEmit --noUnusedLocals && tsc -p tsconfig.electron.json --noEmit --noUnusedLocals"
   },
   "dependencies": {
     "@fontsource-variable/ibm-plex-sans": "^5.2.8",
-    "@vitejs/plugin-react": "^5.0.0",
     "@yardimci-asistan/ai-core": "0.1.0",
     "@yardimci-asistan/shared": "0.1.0",
     "@yardimci-asistan/sync-core": "0.1.0",
     "@yardimci-asistan/whatsapp-bridge": "0.1.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "vite": "^7.0.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
     "electron": "43.1.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "vite": "^7.0.0"
   }
 }
