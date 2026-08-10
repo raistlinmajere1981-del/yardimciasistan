@@ -15,6 +15,7 @@ const OUTBOX_SCAN_INTERVAL_MS = 1_000;
 const INITIAL_SYNC_DELAY_MS = 1_500;
 const DEBOUNCE_DELAY_MS = 750;
 const MAX_PULL_PAGES = 20;
+const SYNC_HTTP_TIMEOUT_MS = 15_000;
 const RETRY_DELAYS_SECONDS = [5, 15, 30, 60, 300] as const;
 const REQUIRED_ANDROID_SYNC_FEATURES = ["android_device_sightings", "android_device_permissions"] as const;
 
@@ -197,7 +198,12 @@ export class SyncCoordinator {
       return this.result(false, this.message, empty);
     }
 
-    const transport = new PhpHostingSyncTransport({ ...config, clientId });
+    const runtimeFetch = globalThis.fetch;
+    const transport = new PhpHostingSyncTransport({
+      ...config,
+      clientId,
+      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
+    });
     const setup = this.options.database.getSetupData();
     this.phase = "syncing";
     this.message = "Web, masaüstü ve Android verileri eşitleniyor...";
@@ -438,6 +444,29 @@ export class SyncCoordinator {
     this.options.onStatusChanged(status);
     return status;
   }
+}
+
+export function createSyncFetchWithTimeout(fetchImpl: typeof fetch, timeoutMs = SYNC_HTTP_TIMEOUT_MS): typeof fetch {
+  const boundedTimeoutMs = Math.max(1, Math.trunc(timeoutMs));
+  return async (input, init = {}) => {
+    const controller = new AbortController();
+    const upstreamSignal = init.signal;
+    const abortFromUpstream = () => controller.abort();
+    if (upstreamSignal) {
+      if (upstreamSignal.aborted) {
+        controller.abort();
+      } else {
+        upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
+      }
+    }
+    const timeout = setTimeout(() => controller.abort(), boundedTimeoutMs);
+    try {
+      return await fetchImpl(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+      upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+    }
+  };
 }
 
 function isUsableSyncConfig(config: { baseUrl: string; syncSecret: string }) {
