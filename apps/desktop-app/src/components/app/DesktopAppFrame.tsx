@@ -1,0 +1,203 @@
+import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Eye, LockKeyhole, RefreshCw, Save, UploadCloud } from "lucide-react";
+import type { DesktopPage } from "../../app/navigation";
+import { buildNavigation, getPageMeta } from "../../app/navigation";
+import { buildDesktopNotifications, type DesktopNotificationItem } from "../../app/notifications";
+import {
+  automaticSyncTone,
+  readSidebarCollapsedPreference,
+  saveSidebarCollapsedPreference,
+  type SyncState
+} from "../../app/runtime-state";
+import type {
+  AppLockController,
+  CustomerController,
+  DesktopSyncController,
+  MenuController,
+  MessagingController,
+  SetupController
+} from "../../app/controller-types";
+import { AppShell } from "../layout/AppShell";
+import { PageHeader } from "../layout/PageHeader";
+import { Sidebar } from "../layout/Sidebar";
+import { LocalMenuPreview } from "../menu/MenuPreview";
+import { NotificationCenter } from "../notifications/NotificationCenter";
+
+interface DesktopAppFrameProps {
+  activePage: DesktopPage;
+  setActivePage: Dispatch<SetStateAction<DesktopPage>>;
+  syncState: SyncState;
+  statusMessage: string;
+  setupController: SetupController;
+  appLockController: AppLockController;
+  desktopSyncController: DesktopSyncController;
+  menuController: MenuController;
+  messagingController: MessagingController;
+  customerController: CustomerController;
+  children: ReactNode;
+}
+
+export function DesktopAppFrame({
+  activePage,
+  setActivePage,
+  syncState,
+  statusMessage,
+  setupController,
+  appLockController,
+  desktopSyncController,
+  menuController,
+  messagingController,
+  customerController,
+  children
+}: DesktopAppFrameProps) {
+  const contentRef = useRef<HTMLElement>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
+  const { setupData, setupSaveState, setupMessage, saveSetup } = setupController;
+  const { lockApp } = appLockController;
+  const {
+    dashboardData,
+    setDashboardData,
+    automaticSyncStatus,
+    pullRequests: handlePullRequests
+  } = desktopSyncController;
+  const {
+    menuPublishState,
+    menuStatusMessage,
+    menuPreviewOpen,
+    menuPreviewData,
+    publishMenu: handlePublishMenu,
+    openMenuPreview,
+    closeMenuPreview
+  } = menuController;
+  const { selectedWhatsAppRequest } = messagingController;
+  const { setSelectedRequestId } = customerController;
+  const navigationItems = useMemo(() => buildNavigation(setupData), [setupData]);
+  const pageMeta = getPageMeta(activePage);
+  const desktopNotifications = useMemo(
+    () => buildDesktopNotifications(dashboardData, automaticSyncStatus),
+    [automaticSyncStatus, dashboardData]
+  );
+
+  useEffect(() => {
+    saveSidebarCollapsedPreference(sidebarCollapsed);
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    window.scrollTo(0, 0);
+  }, [activePage]);
+
+  useEffect(() => {
+    if (!navigationItems.some((item) => item.id === activePage)) {
+      setActivePage("dashboard");
+    }
+  }, [activePage, navigationItems, setActivePage]);
+
+  function handleLockApp() {
+    closeMenuPreview();
+    void lockApp();
+  }
+
+  function openDesktopNotification(item: DesktopNotificationItem) {
+    if (item.kind === "request" && item.relatedId) {
+      setSelectedRequestId(item.relatedId);
+    }
+    const destination = navigationItems.some((navigationItem) => navigationItem.id === item.destination)
+      ? item.destination
+      : "dashboard";
+    setActivePage(destination);
+  }
+
+  async function handleSaveSetup() {
+    await saveSetup(setDashboardData);
+  }
+
+  return (
+    <AppShell
+      contentRef={contentRef}
+      sidebarCollapsed={sidebarCollapsed}
+      sidebar={(
+        <Sidebar
+          items={navigationItems}
+          activePage={activePage}
+          businessName={setupData.businessName}
+          collapsed={sidebarCollapsed}
+          onNavigate={setActivePage}
+          onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
+        />
+      )}
+      header={(
+        <PageHeader
+          eyebrow={pageMeta.eyebrow}
+          title={pageMeta.title}
+          description={pageMeta.description}
+          action={(
+            <div className="page-header-tools">
+              {activePage === "menu" ? (
+                <div className={`sync-pill sync-${menuPublishState}`}>
+                  <span role="status" aria-live="polite">{menuStatusMessage}</span>
+                  <button className="secondary-sync-action" type="button" onClick={openMenuPreview}>
+                    <Eye size={16} aria-hidden="true" />
+                    Önizle
+                  </button>
+                  <button type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
+                    <UploadCloud size={16} aria-hidden="true" />
+                    Web'e Yayınla
+                  </button>
+                </div>
+              ) : activePage === "messages" ? (
+                <div className="sync-pill sync-idle">
+                  <span>{setupData.modules.whatsapp ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin") : "AI araçları kullanıma hazır."}</span>
+                </div>
+              ) : activePage === "settings" ? (
+                <div className={`sync-pill sync-${setupSaveState}`}>
+                  <span>{setupMessage}</span>
+                  <button type="button" onClick={handleSaveSetup} disabled={setupSaveState === "loading"}>
+                    <Save size={16} aria-hidden="true" />
+                    Ayarları Kaydet
+                  </button>
+                </div>
+              ) : (
+                <div className={`sync-pill sync-${syncState === "idle" ? automaticSyncTone(automaticSyncStatus) : syncState}`}>
+                  <span role="status" aria-live="polite">
+                    {syncState === "idle" ? automaticSyncStatus.message : statusMessage}
+                    {automaticSyncStatus.pendingJobs > 0 ? ` · ${automaticSyncStatus.pendingJobs} eşitleme bekliyor` : ""}
+                  </span>
+                  <button
+                    type="button"
+                    title={automaticSyncStatus.message}
+                    onClick={handlePullRequests}
+                    disabled={automaticSyncStatus.phase === "syncing" || syncState === "loading"}
+                  >
+                    <RefreshCw size={16} aria-hidden="true" />
+                    {automaticSyncStatus.phase === "syncing" ? "Eşitleniyor" : "Şimdi Eşitle"}
+                  </button>
+                </div>
+              )}
+              <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />
+              <button
+                className="app-lock-trigger"
+                type="button"
+                aria-label="Uygulamayı kilitle"
+                title="Ekranı kilitle"
+                onClick={() => void handleLockApp()}
+              >
+                <LockKeyhole size={18} aria-hidden="true" />
+              </button>
+            </div>
+          )}
+        />
+      )}
+      overlay={menuPreviewOpen ? (
+        <LocalMenuPreview
+          menu={menuPreviewData}
+          setupData={setupData}
+          webModuleUrl={dashboardData.webModuleUrl}
+          onClose={closeMenuPreview}
+        />
+      ) : undefined}
+    >
+      {children}
+    </AppShell>
+  );
+}

@@ -85,3 +85,4 @@ Frontend temizliği sırasında kullanıcı davranışı değiştirilmemelidir. 
 
 - Mesaj/AI, müşteri-talep, oda/rezervasyon/günlük iş mutation'ları ve Android/yedek akışları ayrı controller hook'larında tutulur; `App.tsx` bu domainleri yalnız sayfa ve ortak durum koordinasyonu için bağlar.
 - Uygulama shell/header/sidebar, kilit/ilk kurulum görünümü ve sayfa router kompozisyonu `components/app/DesktopAppView.tsx` altında tutulur; `App.tsx` controller hooklarını başlatıp ortak sayfa/senkron state bağlantılarını kuran ince giriş noktasıdır.
+- Uygulama chrome/shell-header kompozisyonu `components/app/DesktopAppFrame.tsx`, sayfa/workspace yönlendirmesi `components/app/DesktopWorkspaceRouter.tsx` altında tutulur; `DesktopAppView` yalnız kilit/ilk kurulum ve bu iki katmanın koordinasyonunu yapar.
