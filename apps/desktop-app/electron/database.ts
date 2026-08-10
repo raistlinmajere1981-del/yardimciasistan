@@ -916,6 +916,15 @@ export interface UpdateReservationStatusInput {
   status: string;
 }
 
+export interface SaveManualReservationInput {
+  customerId: string;
+  roomId?: string;
+  startDate: string;
+  endDate: string;
+  guestCount: number;
+  notes: string;
+}
+
 export interface UpdateDailyTaskStatusInput {
   taskId: string;
   status: string;
@@ -3131,6 +3140,124 @@ export class DesktopDatabase {
       throw error;
     }
     return this.getTableOrderMutationResult(normalizedOrderId, "Adisyon toplamı güncellendi.");
+  }
+
+  saveManualReservation(input: SaveManualReservationInput): DesktopStatusUpdateResult {
+    const customerId = String(input?.customerId ?? "").trim();
+    const roomId = String(input?.roomId ?? "").trim();
+    const startDate = normalizeDateInput(input?.startDate);
+    const endDate = normalizeDateInput(input?.endDate);
+    const guestCount = normalizeInteger(Number(input?.guestCount ?? 0));
+    const notes = normalizeLimitedText(input?.notes, 2000);
+
+    if (!customerId || !startDate || !endDate || guestCount < 1) {
+      return { ok: false, message: "Müşteri, giriş-çıkış tarihi ve kişi sayısı zorunludur." };
+    }
+    if (endDate <= startDate) {
+      return { ok: false, message: "Çıkış tarihi giriş tarihinden sonra olmalıdır." };
+    }
+
+    const customer = this.db
+      .prepare("SELECT id, full_name, phone FROM customers WHERE id = ? AND deleted_at = ''")
+      .get(customerId) as { id?: string; full_name?: string; phone?: string } | undefined;
+    if (!customer?.id) {
+      return { ok: false, message: "Rezervasyon için geçerli bir müşteri seçin." };
+    }
+
+    let room: { id?: string; name?: string; capacity?: number; status?: string } | undefined;
+    if (roomId) {
+      room = this.db
+        .prepare("SELECT id, name, capacity, status FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+        .get(roomId) as { id?: string; name?: string; capacity?: number; status?: string } | undefined;
+      if (!room?.id) {
+        return { ok: false, message: "Seçilen oda artık kullanılamıyor." };
+      }
+      if (String(room.status ?? "") === "maintenance") {
+        return { ok: false, message: "Bakım durumundaki odaya rezervasyon açılamaz." };
+      }
+      if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity)) {
+        return { ok: false, message: `${String(room.name ?? "Oda")} en fazla ${Number(room.capacity)} kişi kapasitelidir.` };
+      }
+
+      const conflict = this.getDashboardData().reservations.find((reservation) => {
+        if (!["pending", "approved"].includes(reservation.status) || !reservation.roomIds.includes(roomId)) {
+          return false;
+        }
+        const existingStart = reservation.startDate || reservation.endDate;
+        const existingEnd = reservation.endDate || reservation.startDate;
+        if (!existingStart || !existingEnd) return false;
+        return existingStart < endDate && startDate < existingEnd;
+      });
+      if (conflict) {
+        return {
+          ok: false,
+          message: `${String(room.name ?? "Seçilen oda")} bu tarih aralığında başka bir aktif rezervasyona bağlı.`
+        };
+      }
+    }
+
+    const now = new Date().toISOString();
+    const reservationId = createId("reservation_");
+    const customerName = String(customer.full_name ?? "").trim() || "Misafir";
+    const roomIds = roomId ? [roomId] : [];
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(`
+          INSERT INTO reservations (
+            id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
+            guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+            payment_status, created_at, updated_at, deleted_at, sync_status
+          ) VALUES (?, ?, ?, 'room', 'approved', ?, ?, ?, '', ?, ?, 0, ?, '[]', ?, '',
+            'not_required', ?, ?, '', 'local_only')
+        `)
+        .run(
+          reservationId,
+          `manual:${reservationId}`,
+          customerId,
+          `${customerName} - oda rezervasyonu`,
+          startDate,
+          endDate,
+          guestCount,
+          guestCount,
+          JSON.stringify(roomIds),
+          notes,
+          now,
+          now
+        );
+
+      if (roomId && String(room?.status ?? "") === "available") {
+        this.db
+          .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+          .run(now, roomId);
+      }
+
+      this.insertEvent({
+        type: "reservation.created",
+        entityType: "reservation",
+        entityId: reservationId,
+        payload: {
+          source: "manual_desktop",
+          customer_id: customerId,
+          room_ids: roomIds,
+          start_date: startDate,
+          end_date: endDate,
+          guest_count: guestCount
+        },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return {
+      ok: true,
+      message: roomId ? "Rezervasyon oluşturuldu ve oda ayrıldı." : "Rezervasyon oluşturuldu. Odayı daha sonra atayabilirsiniz.",
+      dashboardData: this.getDashboardData()
+    };
   }
 
   updateReservationStatus(input: UpdateReservationStatusInput): DesktopStatusUpdateResult {

@@ -10,6 +10,8 @@ Aşağıdaki ana zincir çalışır durumdadır:
 - Firma hosting mini API ve local-first senkronizasyon
 - Web formu ve Web AI üzerinden müşteri talebi oluşturma
 - Masaüstünde talep, müşteri, rezervasyon, oda, masa ve günlük iş yönetimi
+- Pansiyon ve restoran için manuel günlük iş / not oluşturma, düzenleme, tamamlama ve silme
+- Masaüstünden kayıtlı müşteri için doğrudan pansiyon rezervasyonu oluşturma
 - QR menü, stok, masa adisyonu, oda folyosu ve basit ön muhasebe
 - AI cevap/özet/rapor araçları
 - WhatsApp hazır mesaj, manuel akış ve Electron içi WhatsApp Web çalışma alanı
@@ -34,32 +36,38 @@ v1 için hosting üzerinden sınırlı takip modu seçilmiştir. Doğrudan PC/LA
 
 Mimari adapter sınırı hazırdır; v1 çalışma modu WhatsApp Web/manual akıştır. Resmî API entegrasyonu zorunlu değildir ve sonraki faz seçeneğidir.
 
-## Ürün Geliştirme Öncelikleri
+## Tamamlanan Son Ürün Paketleri
 
-### 1. Manuel günlük iş / not yönetimi
+### Manuel günlük iş / not yönetimi
 
-Mevcut günlük işler görüntülenebiliyor ve durumları değiştirilebiliyor; ancak işletme sahibi kendi günlük işini doğrudan oluşturup düzenleyemiyor. Bu, gerçek günlük kullanımda en görünür eksiklerden biridir.
+Pansiyon ve restoran ekranlarında işletme sahibi kendi günlük işini/notunu başlık, açıklama, tarih ve saat ile oluşturabilir. Manuel kayıtlar düzenlenebilir, tamamlanabilir, yeniden açılabilir, iptal edilebilir ve silinebilir. Sistem tarafından üretilen görevlerin mevcut iş kuralları korunur.
 
-Hedef:
+### Doğrudan rezervasyon oluşturma
 
-- Pansiyon ve restoran ekranından yeni günlük iş ekleme
-- Başlık, not, tarih ve saat girme
-- Kullanıcının eklediği işi düzenleme ve silme
-- Dashboard, rapor ve Android özetinde otomatik görünme
-- Otomatik üretilen sistem işlerinin iş kurallarını değiştirmeme
+Pansiyon rezervasyon takibinde `Yeni Rezervasyon` ile talep açma zorunluluğu olmadan kayıt oluşturulabilir.
 
-### 2. Doğrudan rezervasyon oluşturma
+- Kayıtlı müşteri seçilir.
+- Giriş ve çıkış tarihleri ile kişi sayısı girilir.
+- Oda hemen seçilebilir veya daha sonra atanabilir.
+- Not eklenebilir.
+- Oda seçilmişse bakım durumu, kapasite ve tarih çakışması sunucu/DB katmanında doğrulanır.
+- Başarılı kayıt mevcut rezervasyon listesine, dashboard verisine ve operasyon akışına katılır.
+- Manuel kayıt `reservation.created` olayı üretir.
 
-Talep -> rezervasyon dönüşümü çalışıyor. Sonraki adımda telefonla veya yüz yüze gelen müşteri için talep açma zorunluluğu olmadan sade bir doğrudan rezervasyon formu değerlendirilecektir.
+## Sıradaki Ürün Öncelikleri
 
-### 3. Operasyon takvimi
+### 1. Operasyon takvimi
 
-Rezervasyonlar ve günlük işler tarih bazlı kayıt tutuyor. Kullanıcı geri bildirimine göre tek günlük/haftalık sade takvim görünümü eklenebilir.
+Rezervasyonlar ve günlük işler tarih bazlı kayıt tutuyor. Kullanıcı geri bildirimine göre tek günlük/haftalık sade takvim görünümü eklenebilir. Amaç yeni bir karmaşık planlama sistemi kurmak değil; yaklaşan giriş, çıkış, rezervasyon ve manuel işleri tek bakışta göstermek olacaktır.
 
-### 4. Canlı bağlantı sağlamlaştırma
+### 2. Rezervasyon kullanım akışını iyileştirme
+
+Doğrudan rezervasyon oluşturma sahada doğrulandıktan sonra ihtiyaç görülürse manuel rezervasyon düzenleme, hızlı müşteri oluşturma veya oda değiştirme gibi küçük kullanım kolaylıkları eklenebilir.
+
+### 3. Canlı bağlantı sağlamlaştırma
 
 Gerçek hosting üzerinde web yayın/senkron davranışı bilgisayar başında log ve ağ yanıtları izlenerek ayrıca ele alınacaktır. Bu çalışma ürün fonksiyonlarından bağımsız tutulacaktır.
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü tamamlanmış kabul edilir. Bundan sonraki geliştirmelerde öncelik yeni kullanıcı değeri üreten işlevlere verilir. İlk ürün paketi manuel günlük iş / not yönetimidir.
+Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler tamamlanmıştır. Doğrudan rezervasyon oluşturma v1 ürün paketine eklenmiştir. Sonraki geliştirmelerde kullanıcı değeri yüksek operasyon görünürlüğüne öncelik verilecektir.
