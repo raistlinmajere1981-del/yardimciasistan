@@ -27,6 +27,7 @@ import type {
   DesktopTableOrderResult,
   UpdateReservationStatusInput,
   SaveManualReservationInput,
+  SaveManualRestaurantReservationInput,
   UpdateDailyTaskStatusInput,
   SaveDailyTaskInput,
   MarkWhatsAppMessageSentInput,
@@ -162,6 +163,7 @@ export interface DesktopBridge {
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => Promise<DesktopTableOrderResult>;
   recalculateTableOrderTotal: (orderId: string) => Promise<DesktopTableOrderResult>;
   saveManualReservation: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
+  saveManualRestaurantReservation: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   updateReservationStatus: (input: UpdateReservationStatusInput) => Promise<DesktopStatusUpdateResult>;
   saveDailyTask: (input: SaveDailyTaskInput) => Promise<DesktopStatusUpdateResult>;
   deleteDailyTask: (taskId: string) => Promise<DesktopStatusUpdateResult>;
@@ -265,6 +267,7 @@ const bridge: DesktopBridge = {
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => ipcRenderer.invoke("tableOrder:close", { orderId, status }),
   recalculateTableOrderTotal: (orderId: string) => ipcRenderer.invoke("tableOrder:recalculate", orderId),
   saveManualReservation: (input: SaveManualReservationInput) => ipcRenderer.invoke("reservation:saveManual", input),
+  saveManualRestaurantReservation: (input: SaveManualRestaurantReservationInput) => ipcRenderer.invoke("reservation:saveManualRestaurant", input),
   updateReservationStatus: (input: UpdateReservationStatusInput) => ipcRenderer.invoke("reservation:updateStatus", input),
   saveDailyTask: (input: SaveDailyTaskInput) => ipcRenderer.invoke("dailyTask:save", input),
   deleteDailyTask: (taskId: string) => ipcRenderer.invoke("dailyTask:delete", taskId),

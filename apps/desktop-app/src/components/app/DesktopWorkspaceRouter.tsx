@@ -24,6 +24,7 @@ import { CustomersWorkspace } from "../customers/CustomersWorkspace";
 import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
 import { AiWorkspace, WhatsAppWorkspace } from "../messages/MessageWorkspaces";
 import { MenuManager } from "../menu/MenuManager";
+import { RestaurantReservationsWorkspace } from "../operations/RestaurantReservationsWorkspace";
 import {
   CustomerRoomStaysWorkspace,
   DailyTasksWorkspace,
@@ -165,6 +166,7 @@ export function DesktopWorkspaceRouter({
     handleUpdateRoomStatus,
     handleUpdateTableStatus,
     handleSaveManualReservation,
+    handleSaveManualRestaurantReservation,
     handleUpdateReservationStatus,
     handleSaveDailyTask,
     handleDeleteDailyTask,
@@ -447,6 +449,17 @@ export function DesktopWorkspaceRouter({
           data={dashboardData}
           onDashboardDataChanged={setDashboardData}
           onUpdateTableStatus={handleUpdateTableStatus}
+          reservations={(
+            <RestaurantReservationsWorkspace
+              reservations={dashboardData.reservations}
+              customers={dashboardData.customers}
+              tables={dashboardData.tables}
+              onSave={handleSaveManualRestaurantReservation}
+              onSaveCustomer={handleSaveCustomer}
+              onUpdateStatus={handleUpdateReservationStatus}
+              onOpenWhatsApp={openReservationWhatsApp}
+            />
+          )}
           tasks={(
             <DailyTasksWorkspace
               scope="restaurant"

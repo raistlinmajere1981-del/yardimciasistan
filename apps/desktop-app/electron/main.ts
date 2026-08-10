@@ -61,6 +61,7 @@ import {
   type UpdateTableOrderStatusInput,
   type UpdateReservationStatusInput,
   type SaveManualReservationInput,
+  type SaveManualRestaurantReservationInput,
   type UpdateDailyTaskStatusInput,
   type SaveDailyTaskInput,
   type MarkWhatsAppMessageSentInput,
@@ -888,6 +889,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle("reservation:saveManual", (_event, input: SaveManualReservationInput): DesktopStatusUpdateResult => {
     return finalizeDesktopOperationMutation(getDatabase().saveManualReservation(input));
+  });
+
+  ipcMain.handle("reservation:saveManualRestaurant", (_event, input: SaveManualRestaurantReservationInput): DesktopStatusUpdateResult => {
+    return finalizeDesktopOperationMutation(getDatabase().saveManualRestaurantReservation(input));
   });
 
   ipcMain.handle("reservation:updateStatus", (_event, input: UpdateReservationStatusInput): DesktopStatusUpdateResult => {

@@ -926,6 +926,15 @@ export interface SaveManualReservationInput {
   notes: string;
 }
 
+export interface SaveManualRestaurantReservationInput {
+  customerId: string;
+  tableId?: string;
+  date: string;
+  time: string;
+  guestCount: number;
+  notes: string;
+}
+
 export interface UpdateDailyTaskStatusInput {
   taskId: string;
   status: string;
@@ -3141,6 +3150,122 @@ export class DesktopDatabase {
       throw error;
     }
     return this.getTableOrderMutationResult(normalizedOrderId, "Adisyon toplamı güncellendi.");
+  }
+
+  saveManualRestaurantReservation(input: SaveManualRestaurantReservationInput): DesktopStatusUpdateResult {
+    const customerId = String(input?.customerId ?? "").trim();
+    const tableId = String(input?.tableId ?? "").trim();
+    const date = normalizeDateInput(String(input?.date ?? ""));
+    const time = normalizeTimeInput(String(input?.time ?? ""));
+    const guestCount = normalizeInteger(input?.guestCount);
+    const notes = normalizeLimitedText(input?.notes, 2000);
+
+    if (!customerId || !date || !time || guestCount < 1 || guestCount > 99) {
+      return { ok: false, message: "Müşteri, tarih, saat ve geçerli kişi sayısı zorunludur." };
+    }
+
+    const customer = this.db
+      .prepare("SELECT id, full_name, phone FROM customers WHERE id = ? AND deleted_at = ''")
+      .get(customerId) as { id?: string; full_name?: string; phone?: string } | undefined;
+    if (!customer) {
+      return { ok: false, message: "Rezervasyon için seçilen müşteri bulunamadı." };
+    }
+
+    if (tableId) {
+      const table = this.db
+        .prepare("SELECT id, name, capacity, status, is_active FROM tables WHERE id = ? AND deleted_at = ''")
+        .get(tableId) as Record<string, unknown> | undefined;
+      if (!table || Number(table.is_active ?? 0) !== 1) {
+        return { ok: false, message: "Seçilen masa aktif değil veya bulunamadı." };
+      }
+      if (String(table.status ?? "") === "maintenance") {
+        return { ok: false, message: "Bakım durumundaki masaya rezervasyon atanamaz." };
+      }
+      const capacity = Math.max(0, Number(table.capacity ?? 0));
+      if (capacity > 0 && guestCount > capacity) {
+        return { ok: false, message: `${String(table.name ?? "Masa")} en fazla ${capacity} kişi kapasitelidir.` };
+      }
+
+      const sameSlotRows = this.db
+        .prepare(`
+          SELECT id, title, table_ids_json
+          FROM reservations
+          WHERE reservation_type IN ('table', 'breakfast')
+            AND status IN ('pending', 'approved')
+            AND start_date = ?
+            AND time = ?
+            AND deleted_at = ''
+        `)
+        .all(date, time) as Array<{ id?: string; title?: string; table_ids_json?: string }>;
+      const conflict = sameSlotRows.find((row) => this.parseStringArray(row.table_ids_json).includes(tableId));
+      if (conflict) {
+        return {
+          ok: false,
+          message: `Seçilen masada ${date} ${time} için aktif rezervasyon var${conflict.title ? `: ${conflict.title}` : "."}`
+        };
+      }
+    }
+
+    const now = new Date().toISOString();
+    const reservationId = createId("reservation_");
+    const customerName = String(customer.full_name ?? "").trim() || "Misafir";
+    const tableIds = tableId ? [tableId] : [];
+
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db
+        .prepare(`
+          INSERT INTO reservations (
+            id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
+            guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+            payment_status, created_at, updated_at, deleted_at, sync_status
+          ) VALUES (?, ?, ?, 'table', 'approved', ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, '',
+            'not_required', ?, ?, '', 'local_only')
+        `)
+        .run(
+          reservationId,
+          `manual:${reservationId}`,
+          customerId,
+          `${customerName} - restoran rezervasyonu`,
+          date,
+          date,
+          time,
+          guestCount,
+          guestCount,
+          JSON.stringify(tableIds),
+          notes,
+          now,
+          now
+        );
+
+      this.insertEvent({
+        type: "reservation.created",
+        entityType: "reservation",
+        entityId: reservationId,
+        payload: {
+          source: "manual_desktop",
+          customer_id: customerId,
+          reservation_type: "table",
+          table_ids: tableIds,
+          date,
+          time,
+          guest_count: guestCount
+        },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+
+    return {
+      ok: true,
+      message: tableId
+        ? "Restoran rezervasyonu oluşturuldu ve masa planlandı."
+        : "Restoran rezervasyonu oluşturuldu. Masayı daha sonra atayabilirsiniz.",
+      dashboardData: this.getDashboardData()
+    };
   }
 
   saveManualReservation(input: SaveManualReservationInput): DesktopStatusUpdateResult {
