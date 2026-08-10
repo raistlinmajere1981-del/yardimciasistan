@@ -13,6 +13,7 @@ on:
       - "scripts/smoke-operation-calendar.mjs"
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "scripts/smoke-sync-timeout.mjs"
+      - "scripts/smoke-web-connection-test.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
   push:
@@ -31,6 +32,7 @@ on:
       - "scripts/smoke-operation-calendar.mjs"
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "scripts/smoke-sync-timeout.mjs"
+      - "scripts/smoke-web-connection-test.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
 
@@ -65,6 +67,9 @@ jobs:
 
       - name: Senkron HTTP zaman aşımı smoke
         run: node scripts/smoke-sync-timeout.mjs
+
+      - name: Web bağlantı testi smoke
+        run: node scripts/smoke-web-connection-test.mjs
 
       - name: Finans veritabanı smoke
         run: node scripts/smoke-finance-db.mjs
