@@ -1,4 +1,4 @@
-import { CalendarCheck, ClipboardList, ReceiptText, UtensilsCrossed } from "lucide-react";
+import { CalendarCheck, ChevronDown, ClipboardList, ReceiptText, UtensilsCrossed } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { DesktopDashboardData, DesktopTableOrder } from "../../electron/database";
 import { isRestaurantTask } from "../app/operations";
@@ -13,10 +13,22 @@ interface RestaurantPageProps {
   onUpdateTableStatus: (tableId: string, status: string) => void;
 }
 
+function localDateKey() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
 export function RestaurantPage({ data, reservations, tasks, onDashboardDataChanged, onUpdateTableStatus }: RestaurantPageProps) {
   const [tableOrders, setTableOrders] = useState<DesktopTableOrder[]>([]);
   const restaurantTasks = data.dailyTasks.filter((task) => isRestaurantTask(task, data.reservations));
   const pendingRestaurantTasks = restaurantTasks.filter((task) => task.status === "pending");
+  const activeRestaurantReservations = data.reservations.filter(
+    (reservation) => ["table", "breakfast"].includes(reservation.reservationType)
+      && !["rejected", "cancelled", "completed"].includes(reservation.status)
+  );
+  const pendingReservationCount = activeRestaurantReservations.filter((reservation) => reservation.status === "pending").length;
+  const todayReservationCount = activeRestaurantReservations.filter((reservation) => reservation.startDate === localDateKey()).length;
   const activeOrders = useMemo(
     () => tableOrders.filter((order) => ["open", "preparing", "served", "payment"].includes(order.status)),
     [tableOrders]
@@ -84,14 +96,26 @@ export function RestaurantPage({ data, reservations, tasks, onDashboardDataChang
           {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
         </div>
       </section>
-      <section className="operation-group-panel restaurant-reservations-section" aria-labelledby="restaurant-reservations-title">
-        <header className="operation-panel-heading">
-          <span className="operation-panel-eyebrow">Rezervasyon</span>
-          <h2 id="restaurant-reservations-title">Masa Rezervasyonları</h2>
-          <p>Telefonla, yüz yüze veya web üzerinden gelen restoran rezervasyonlarını takip edin.</p>
-        </header>
-        <div className="operation-panel-content">{reservations}</div>
-      </section>
+
+      <details className={`restaurant-reservation-details${pendingReservationCount > 0 ? " has-pending" : ""}`}>
+        <summary>
+          <span className="restaurant-reservation-summary-copy">
+            <span className="operation-panel-eyebrow">Rezervasyon</span>
+            <strong>Masa Rezervasyonları</strong>
+            <small>{todayReservationCount} bugün · {pendingReservationCount} onay bekleyen · {activeRestaurantReservations.length} aktif</small>
+          </span>
+          <span className="restaurant-reservation-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
+        </summary>
+        <section className="operation-group-panel restaurant-reservations-section" aria-labelledby="restaurant-reservations-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Rezervasyon</span>
+            <h2 id="restaurant-reservations-title">Masa Rezervasyonları</h2>
+            <p>Telefonla, yüz yüze veya web üzerinden gelen restoran rezervasyonlarını takip edin.</p>
+          </header>
+          <div className="operation-panel-content">{reservations}</div>
+        </section>
+      </details>
+
       <div className="restaurant-layout">
         <section className="operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
           <header className="operation-panel-heading">
