@@ -19,6 +19,7 @@ import { RoomManagementSection } from "./RoomManagementSection";
 type SyncState = "idle" | "loading" | "success" | "error";
 
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
+const WEB_CONNECTION_TEST_TIMEOUT_MS = 10_000;
 
 const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   id: AndroidPermissionGroupId;
@@ -100,6 +101,8 @@ export function SetupWizard({
   const [aiApiKeyRevealMessage, setAiApiKeyRevealMessage] = useState("");
   const selectedAiServiceRef = useRef(form.aiService);
   const [settingsLevel, setSettingsLevel] = useState<"basic" | "advanced">("basic");
+  const [webConnectionTestState, setWebConnectionTestState] = useState<SyncState>("idle");
+  const [webConnectionTestMessage, setWebConnectionTestMessage] = useState("Web bağlantısı henüz denenmedi.");
 
   useEffect(() => {
     selectedAiServiceRef.current = form.aiService;
@@ -109,6 +112,11 @@ export function SetupWizard({
     setAiApiKeyRevealState("idle");
     setAiApiKeyRevealMessage("");
   }, [form.aiService, form.clearAiApiKey]);
+
+  useEffect(() => {
+    setWebConnectionTestState("idle");
+    setWebConnectionTestMessage("Web bağlantısı henüz denenmedi.");
+  }, [form.webModuleUrl, form.syncSecret]);
 
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
@@ -148,6 +156,57 @@ export function SetupWizard({
     || (googleUsesStoredApiKey ? (showGoogleCurl ? revealedAiApiKey : STORED_AI_API_KEY_MASK) : "");
   const genericSecretValue = form.aiApiKey
     || (genericUsesStoredApiKey ? (showAiApiKey ? revealedAiApiKey : STORED_AI_API_KEY_MASK) : "");
+
+  const testWebConnection = async () => {
+    const baseUrl = form.webModuleUrl.trim().replace(/\/+$/, "");
+    const syncSecret = form.syncSecret.trim();
+    if (!/^https?:\/\//i.test(baseUrl)) {
+      setWebConnectionTestState("error");
+      setWebConnectionTestMessage("Web eşitleme adresi http:// veya https:// ile başlamalı.");
+      return;
+    }
+    if (syncSecret.length < 12) {
+      setWebConnectionTestState("error");
+      setWebConnectionTestMessage("Web güvenlik anahtarı en az 12 karakter olmalı.");
+      return;
+    }
+
+    setWebConnectionTestState("loading");
+    setWebConnectionTestMessage("Web modülüne bağlanılıyor...");
+    try {
+      const fetchWithTimeout = createWebConnectionTestFetch(WEB_CONNECTION_TEST_TIMEOUT_MS);
+      const response = await fetchWithTimeout(`${baseUrl}/api/sync.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-YA-Sync-Secret": syncSecret
+        },
+        body: JSON.stringify({ action: "capabilities" })
+      });
+      const payload = await readWebConnectionTestResponse(response);
+      if (!response.ok || payload?.ok !== true) {
+        setWebConnectionTestState("error");
+        setWebConnectionTestMessage(
+          typeof payload?.message === "string"
+            ? payload.message
+            : describeWebConnectionTestHttpError(response.status)
+        );
+        return;
+      }
+      if (payload.protocol_version < 2 || payload.storage !== "sqlite") {
+        setWebConnectionTestState("error");
+        setWebConnectionTestMessage("Web modülü güncel senkron protokolünü desteklemiyor. Hosting paketini güncelleyin.");
+        return;
+      }
+      setWebConnectionTestState("success");
+      setWebConnectionTestMessage("Web bağlantısı hazır. Güvenlik anahtarı ve SQLite senkron protokolü doğrulandı.");
+    } catch (error) {
+      setWebConnectionTestState("error");
+      setWebConnectionTestMessage(error instanceof DOMException && error.name === "AbortError"
+        ? "Web modülü 10 saniye içinde yanıt vermedi. Adres, SSL ve hosting durumunu kontrol edin."
+        : "Web bağlantısı kontrol edilemedi. Adres, SSL ve internet bağlantısını kontrol edin.");
+    }
+  };
 
   const toggleAiApiKeyVisibility = async (field: "google" | "generic") => {
     const isVisible = field === "google" ? showGoogleCurl : showAiApiKey;
@@ -509,6 +568,14 @@ export function SetupWizard({
               <input value={form.syncSecret} onChange={(event) => update("syncSecret", event.target.value)} placeholder="uzun-gizli-anahtar" />
             </label>
           </div>
+          <div className={`setup-ai-actions is-inline setup-web-actions sync-${webConnectionTestState}`}>
+            <button className="setup-secondary" type="button" onClick={() => void testWebConnection()} disabled={webConnectionTestState === "loading"}>
+              <RefreshCw size={16} aria-hidden="true" />
+              {webConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Web Bağlantısını Dene"}
+            </button>
+            <span role="status" aria-live="polite">{webConnectionTestMessage}</span>
+            <small>Bu kontrol yalnız bağlantıyı doğrular; talep çekmez veya veri yayınlamaz.</small>
+          </div>
         </div>
 
         <div className="setup-section setup-ai-section">
@@ -853,4 +920,46 @@ function androidDevicePermissionSummary(device: DesktopAndroidDevice): string {
     .filter((group) => device.permissionGroups?.[group.id])
     .map((group) => group.shortLabel);
   return selected.length > 0 ? selected.join(" + ") : "Görev alanı seçilmedi";
+}
+
+function createWebConnectionTestFetch(timeoutMs: number): typeof fetch {
+  const boundedTimeoutMs = Math.max(1, Math.trunc(timeoutMs));
+  return async (input, init = {}) => {
+    const controller = new AbortController();
+    const upstreamSignal = init.signal;
+    const abortFromUpstream = () => controller.abort();
+    if (upstreamSignal) {
+      if (upstreamSignal.aborted) {
+        controller.abort();
+      } else {
+        upstreamSignal.addEventListener("abort", abortFromUpstream, { once: true });
+      }
+    }
+    const timeout = globalThis.setTimeout(() => controller.abort(), boundedTimeoutMs);
+    try {
+      return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+      globalThis.clearTimeout(timeout);
+      upstreamSignal?.removeEventListener("abort", abortFromUpstream);
+    }
+  };
+}
+
+async function readWebConnectionTestResponse(response: Response): Promise<Record<string, any> | null> {
+  try {
+    const payload = await response.json();
+    return payload && typeof payload === "object" ? payload as Record<string, any> : null;
+  } catch {
+    return null;
+  }
+}
+
+function describeWebConnectionTestHttpError(status: number): string {
+  if (status === 401 || status === 403) {
+    return "Web güvenlik anahtarı kabul edilmedi. Hosting ve uygulamadaki anahtarın aynı olduğunu kontrol edin.";
+  }
+  if (status === 404) {
+    return "Web senkron uç noktası bulunamadı. Web modül adresini ve hosting paketini kontrol edin.";
+  }
+  return `Web modülü geçerli bir bağlantı yanıtı vermedi (HTTP ${status}).`;
 }
