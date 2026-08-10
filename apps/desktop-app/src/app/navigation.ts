@@ -1,5 +1,6 @@
 import {
   BedDouble,
+  CalendarDays,
   Home,
   Menu as MenuIcon,
   MessageCircle,
@@ -11,7 +12,7 @@ import {
 } from "lucide-react";
 import type { DesktopSetupData } from "../../electron/database";
 
-export type DesktopPage = "dashboard" | "customerWork" | "pension" | "restaurant" | "menu" | "messages" | "reports" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "menu" | "messages" | "reports" | "settings";
 
 export interface NavigationItem {
   id: DesktopPage;
@@ -26,6 +27,10 @@ const baseItems: NavigationItem[] = [
 
 export function buildNavigation(setup: DesktopSetupData): NavigationItem[] {
   const items = [...baseItems];
+
+  if (setup.modules.rooms || setup.modules.tables) {
+    items.push({ id: "calendar", label: "Takvim", icon: CalendarDays });
+  }
 
   if (setup.modules.rooms) {
     items.push({ id: "pension", label: "Pansiyon", icon: BedDouble });
@@ -52,6 +57,7 @@ export function getPageMeta(page: DesktopPage) {
   const meta: Record<DesktopPage, { eyebrow: string; title: string; description: string }> = {
     dashboard: { eyebrow: "Günlük özet", title: "Bugün ne var?", description: "Yeni talepler, işler ve bekleyen dönüşler." },
     customerWork: { eyebrow: "Müşteri operasyonu", title: "Müşteri İşleri", description: "Talepleri, müşterileri ve bekleyen yanıtları yönetin." },
+    calendar: { eyebrow: "Operasyon planı", title: "Takvim", description: "Giriş, çıkış, rezervasyon ve günlük işleri gün veya hafta bazında görün." },
     pension: { eyebrow: "Konaklama", title: "Pansiyon", description: "Rezervasyonları, odaları ve günlük işleri izleyin." },
     restaurant: { eyebrow: "Servis", title: "Restoran", description: "Masa durumlarını ve servis işlerini takip edin." },
     menu: { eyebrow: "İçerik", title: "Menü", description: "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın." },

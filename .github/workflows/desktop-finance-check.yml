@@ -9,6 +9,7 @@ on:
       - "scripts/smoke-room-folio-*.mjs"
       - "scripts/smoke-daily-task-*.mjs"
       - "scripts/smoke-manual-reservation.mjs"
+      - "scripts/smoke-operation-calendar.mjs"
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
@@ -24,6 +25,7 @@ on:
       - "scripts/smoke-room-folio-*.mjs"
       - "scripts/smoke-daily-task-*.mjs"
       - "scripts/smoke-manual-reservation.mjs"
+      - "scripts/smoke-operation-calendar.mjs"
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
@@ -71,6 +73,9 @@ jobs:
 
       - name: Doğrudan rezervasyon smoke
         run: node scripts/smoke-manual-reservation.mjs
+
+      - name: Operasyon takvimi smoke
+        run: node scripts/smoke-operation-calendar.mjs
 
       - name: Electron başlatma smoke
         run: node scripts/smoke-desktop-xvfb.mjs

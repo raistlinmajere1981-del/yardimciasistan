@@ -35,6 +35,7 @@ import { SetupWizard } from "../settings/SetupWizard";
 import { CustomerWorkPage } from "../../pages/CustomerWorkPage";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MessagesPage } from "../../pages/MessagesPage";
+import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
 import { PensionPage } from "../../pages/PensionPage";
 import { ReportsPage } from "../../pages/ReportsPage";
 import { RestaurantPage } from "../../pages/RestaurantPage";
@@ -327,6 +328,12 @@ export function DesktopWorkspaceRouter({
           isRequestWaitingForReply={isRequestWaitingForReply}
           formatTaskDue={formatTaskDue}
           formatReservationDate={formatReservationDate}
+        />
+      ) : activePage === "calendar" ? (
+        <OperationCalendarPage
+          data={dashboardData}
+          onOpenReservation={openDashboardReservation}
+          onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
         />
       ) : activePage === "customerWork" ? (
         <CustomerWorkPage
