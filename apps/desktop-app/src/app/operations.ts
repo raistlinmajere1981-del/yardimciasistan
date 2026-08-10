@@ -1,8 +1,8 @@
 import type { DesktopDailyTask, DesktopReservation, DesktopRoom } from "../../electron/database";
 
 const activeReservationStatuses = new Set(["pending", "approved"]);
-const restaurantTaskTypes = new Set(["table_reservation", "service", "restaurant", "table_check", "payment"]);
-const accommodationTaskTypes = new Set(["check_in", "check_out", "room_cleaning", "room_maintenance", "reservation"]);
+const restaurantTaskTypes = new Set(["table_reservation", "service", "restaurant", "table_check", "payment", "manual_restaurant"]);
+const accommodationTaskTypes = new Set(["check_in", "check_out", "room_cleaning", "room_maintenance", "reservation", "manual_pension"]);
 
 function localDateKey() {
   const now = new Date();

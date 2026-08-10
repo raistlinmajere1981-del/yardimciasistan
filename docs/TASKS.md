@@ -978,7 +978,7 @@ Kabul kriterleri:
 
 Durum:
 
-* Tamamlandı. Desktop `Günlük İşler` ekranı bekleyen/tamamlanan/iptal edilen iş filtresini, iş kartlarını, bağlantı bilgisini ve `Tamamla`, `İptal Et`, `Yeniden Aç` aksiyonlarını içerir. Durum değişikliği SQLite'a yazılır; tamamlanan işlerde `task.completed`, iptal edilen işlerde `task.cancelled`, yeniden açma gibi diğer geçişlerde `task.status_changed` event kaydı oluşturulur.
+* Tamamlandı. Desktop `Günlük İşler` ekranı bekleyen/tamamlanan/iptal edilen iş filtresini, iş kartlarını, bağlantı bilgisini ve `Tamamla`, `İptal Et`, `Yeniden Aç` aksiyonlarını içerir. Pansiyon ve restoran ekranlarından kullanıcı kendi günlük iş/not kaydını başlık, not, tarih ve saat ile ekleyebilir; yalnız manuel kayıtlar düzenlenip soft-delete ile silinebilir. Durum değişikliği SQLite'a yazılır; manuel kayıt yaşam döngüsünde `task.created`, `task.updated`, `task.deleted`, tamamlanan işlerde `task.completed`, iptal edilen işlerde `task.cancelled`, yeniden açma gibi diğer geçişlerde `task.status_changed` event kaydı oluşturulur.
 
 ---
 

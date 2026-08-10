@@ -39,6 +39,7 @@
     "smoke:table-categories": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-table-categories-db.mjs",
     "smoke:customer-room-management": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-customer-room-management-db.mjs",
     "smoke:desktop-lock": "node scripts/smoke-desktop-lock.mjs",
+    "smoke:daily-tasks": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-daily-task-management.mjs",
     "smoke:app-lock": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-app-lock.mjs",
     "smoke:reports": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-reports-db.mjs",
     "smoke:finance": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-finance-db.mjs && node scripts/smoke-finance-service.mjs",

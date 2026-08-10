@@ -5,12 +5,17 @@ import {
   CheckCircle2,
   ClipboardList,
   MessageCircle,
+  Pencil,
+  Plus,
+  Trash2,
   Users
 } from "lucide-react";
 import type {
   AssignCustomerRoomInput,
   DesktopCustomerMutationResult,
-  DesktopDashboardData
+  DesktopDashboardData,
+  DesktopStatusUpdateResult,
+  SaveDailyTaskInput
 } from "../../../electron/database";
 import {
   formatCustomerRoomStayStatus,
@@ -24,6 +29,7 @@ import {
 } from "../../app/record-formatters";
 import { getRoomDisplayInfo } from "../../app/operations";
 import { CustomerRoomStayActions, RoomAssignmentDrawer } from "../customers/CustomersWorkspace";
+import { DailyTaskEditor, type DailyTaskScope } from "./DailyTaskEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { CompactListItem } from "../ui/CompactListItem";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
@@ -91,12 +97,17 @@ function formatReservationRooms(
 }
 
 interface DailyTasksWorkspaceProps {
+  scope: DailyTaskScope;
   tasks: DesktopDashboardData["dailyTasks"];
+  onSave: (input: SaveDailyTaskInput) => Promise<DesktopStatusUpdateResult>;
+  onDelete: (taskId: string) => Promise<DesktopStatusUpdateResult>;
   onUpdateStatus: (taskId: string, status: string) => void;
 }
 
-export function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspaceProps) {
+export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateStatus }: DailyTasksWorkspaceProps) {
   const [statusFilter, setStatusFilter] = useState("pending");
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<DesktopDashboardData["dailyTasks"][number] | null>(null);
   const filteredTasks = useMemo(
     () => tasks.filter((task) => statusFilter === "all" || task.status === statusFilter),
     [statusFilter, tasks]
@@ -108,6 +119,17 @@ export function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspa
         <div className="operation-filter-summary" aria-label="Günlük iş özeti">
           <StatusBadge tone="wait">{tasks.filter((task) => task.status === "pending").length} bekleyen</StatusBadge>
           <StatusBadge tone="ok">{tasks.filter((task) => task.status === "done").length} tamamlanan</StatusBadge>
+          <ActionButton
+            size="sm"
+            type="button"
+            onClick={() => {
+              setEditingTask(null);
+              setEditorOpen(true);
+            }}
+          >
+            <Plus size={15} aria-hidden="true" />
+            Yeni İş
+          </ActionButton>
         </div>
         <div className="reservation-filters task-filters">
           <label>
@@ -130,7 +152,7 @@ export function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspa
           <div className="panel empty-state">
             <ClipboardList size={28} aria-hidden="true" />
             <strong>Günlük iş yok.</strong>
-            <p>Rezervasyon ve takip işleri burada görünür.</p>
+            <p>Rezervasyon işleri ve sizin eklediğiniz notlar burada görünür.</p>
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="panel empty-state">
@@ -166,6 +188,35 @@ export function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspa
                     <summary>Diğer işlemler</summary>
                     <div className="expanded-record-content compact-secondary-menu">
                       <div className="secondary-detail-actions">
+                        {task.taskType.startsWith("manual_") && (
+                          <>
+                            <ActionButton
+                              variant="secondary"
+                              size="sm"
+                              type="button"
+                              onClick={() => {
+                                setEditingTask(task);
+                                setEditorOpen(true);
+                              }}
+                            >
+                              <Pencil size={14} aria-hidden="true" />
+                              Düzenle
+                            </ActionButton>
+                            <ActionButton
+                              variant="danger"
+                              size="sm"
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`“${task.title}” günlük işi silinsin mi?`)) {
+                                  void onDelete(task.id);
+                                }
+                              }}
+                            >
+                              <Trash2 size={14} aria-hidden="true" />
+                              Sil
+                            </ActionButton>
+                          </>
+                        )}
                         <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "cancelled")} disabled={task.status === "cancelled"}>İptal Et</ActionButton>
                         <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(task.id, "pending")} disabled={task.status === "pending"}>Yeniden Aç</ActionButton>
                       </div>
@@ -177,6 +228,16 @@ export function DailyTasksWorkspace({ tasks, onUpdateStatus }: DailyTasksWorkspa
           ))
         )}
       </section>
+      <DailyTaskEditor
+        open={editorOpen}
+        scope={scope}
+        task={editingTask}
+        onClose={() => {
+          setEditorOpen(false);
+          setEditingTask(null);
+        }}
+        onSave={onSave}
+      />
     </section>
   );
 }

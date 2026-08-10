@@ -921,6 +921,15 @@ export interface UpdateDailyTaskStatusInput {
   status: string;
 }
 
+export interface SaveDailyTaskInput {
+  id?: string;
+  title: string;
+  description: string;
+  taskType: "manual_pension" | "manual_restaurant";
+  dueDate: string;
+  dueTime: string;
+}
+
 export interface MarkWhatsAppMessageSentInput {
   requestId: string;
   message: string;
@@ -1736,6 +1745,122 @@ export class DesktopDatabase {
         message: "Telefon işlemi yerel kayıtlara uygulanamadı. Masaüstünde kayıtları kontrol edip tekrar deneyin."
       };
     }
+  }
+
+  saveDailyTask(input: SaveDailyTaskInput): DesktopStatusUpdateResult {
+    const taskIdInput = String(input?.id ?? "").trim();
+    const title = String(input?.title ?? "").trim().replace(/\s+/g, " ");
+    const description = String(input?.description ?? "").trim();
+    const taskType = input?.taskType === "manual_pension" || input?.taskType === "manual_restaurant"
+      ? input.taskType
+      : "";
+    const dueDate = String(input?.dueDate ?? "").trim();
+    const dueTime = String(input?.dueTime ?? "").trim();
+
+    if (!title) {
+      return { ok: false, message: "Günlük iş başlığı boş olamaz." };
+    }
+    if (title.length > 160) {
+      return { ok: false, message: "Günlük iş başlığı en fazla 160 karakter olabilir." };
+    }
+    if (description.length > 1000) {
+      return { ok: false, message: "Günlük iş notu en fazla 1000 karakter olabilir." };
+    }
+    if (!taskType) {
+      return { ok: false, message: "Günlük iş alanı seçilemedi." };
+    }
+    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+      return { ok: false, message: "Günlük iş tarihi geçersiz." };
+    }
+    if (dueTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(dueTime)) {
+      return { ok: false, message: "Günlük iş saati geçersiz." };
+    }
+
+    const now = new Date().toISOString();
+    const taskId = taskIdInput || createId("task_");
+    const existing = taskIdInput
+      ? this.db.prepare("SELECT task_type FROM daily_tasks WHERE id = ? AND deleted_at = ''").get(taskId) as { task_type?: string } | undefined
+      : undefined;
+    if (taskIdInput && !existing) {
+      return { ok: false, message: "Düzenlenecek günlük iş bulunamadı." };
+    }
+    if (existing && !String(existing.task_type ?? "").startsWith("manual_")) {
+      return { ok: false, message: "Otomatik oluşturulan günlük işler yalnız durum işlemleriyle yönetilebilir." };
+    }
+
+    this.db.exec("BEGIN");
+    try {
+      if (existing) {
+        this.db.prepare(`
+          UPDATE daily_tasks
+          SET title = ?, description = ?, task_type = ?, due_date = ?, due_time = ?, updated_at = ?, sync_status = 'local_only'
+          WHERE id = ? AND deleted_at = ''
+        `).run(title, description, taskType, dueDate, dueTime, now, taskId);
+      } else {
+        this.db.prepare(`
+          INSERT INTO daily_tasks (
+            id, title, description, task_type, status, due_date, due_time, related_type, related_id,
+            created_at, updated_at, deleted_at, sync_status
+          ) VALUES (?, ?, ?, ?, 'pending', ?, ?, '', '', ?, ?, '', 'local_only')
+        `).run(taskId, title, description, taskType, dueDate, dueTime, now, now);
+      }
+      this.insertEvent({
+        type: existing ? "task.updated" : "task.created",
+        entityType: "daily_task",
+        entityId: taskId,
+        payload: { title, task_type: taskType, due_date: dueDate, due_time: dueTime },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Günlük iş kaydedilemedi."
+      };
+    }
+
+    return {
+      ok: true,
+      message: existing ? "Günlük iş güncellendi." : "Günlük iş eklendi.",
+      dashboardData: this.getDashboardData()
+    };
+  }
+
+  deleteDailyTask(taskIdInput: string): DesktopStatusUpdateResult {
+    const taskId = String(taskIdInput ?? "").trim();
+    if (!taskId) {
+      return { ok: false, message: "Silinecek günlük iş seçilmeli." };
+    }
+    const task = this.db.prepare("SELECT task_type, title FROM daily_tasks WHERE id = ? AND deleted_at = ''").get(taskId) as { task_type?: string; title?: string } | undefined;
+    if (!task) {
+      return { ok: false, message: "Günlük iş bulunamadı." };
+    }
+    if (!String(task.task_type ?? "").startsWith("manual_")) {
+      return { ok: false, message: "Otomatik oluşturulan günlük işler silinemez; durumunu tamamlandı veya iptal olarak değiştirin." };
+    }
+
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN");
+    try {
+      this.db.prepare("UPDATE daily_tasks SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(now, now, taskId);
+      this.insertEvent({
+        type: "task.deleted",
+        entityType: "daily_task",
+        entityId: taskId,
+        payload: { title: String(task.title ?? "") },
+        now
+      });
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Günlük iş silinemedi."
+      };
+    }
+
+    return { ok: true, message: "Günlük iş silindi.", dashboardData: this.getDashboardData() };
   }
 
   updateDailyTaskStatus(input: UpdateDailyTaskStatusInput): DesktopStatusUpdateResult {

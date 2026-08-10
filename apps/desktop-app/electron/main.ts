@@ -61,6 +61,7 @@ import {
   type UpdateTableOrderStatusInput,
   type UpdateReservationStatusInput,
   type UpdateDailyTaskStatusInput,
+  type SaveDailyTaskInput,
   type MarkWhatsAppMessageSentInput,
   type DeleteWhatsAppMessageInput,
   type DesktopStockImageAnalyzeInput,
@@ -888,6 +889,14 @@ function registerIpcHandlers() {
     return getDatabase().updateReservationStatus(input);
   });
 
+  ipcMain.handle("dailyTask:save", (_event, input: SaveDailyTaskInput): DesktopStatusUpdateResult => {
+    return finalizeDesktopOperationMutation(getDatabase().saveDailyTask(input));
+  });
+
+  ipcMain.handle("dailyTask:delete", (_event, taskId: unknown): DesktopStatusUpdateResult => {
+    return finalizeDesktopOperationMutation(getDatabase().deleteDailyTask(String(taskId ?? "")));
+  });
+
   ipcMain.handle("dailyTask:updateStatus", (_event, input: UpdateDailyTaskStatusInput): DesktopStatusUpdateResult => {
     return getDatabase().updateDailyTaskStatus(input);
   });
@@ -1508,6 +1517,15 @@ function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResul
   if (result.ok) {
     androidSnapshotPublishPending = true;
     notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+    getSyncCoordinator().scheduleSoon();
+  }
+  return result;
+}
+
+function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
+  if (result.ok) {
+    androidSnapshotPublishPending = true;
+    notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
   }
   return result;

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { DesktopDashboardData } from "../../electron/database";
+import type { DesktopDashboardData, DesktopStatusUpdateResult, SaveDailyTaskInput } from "../../electron/database";
 import type { SyncState } from "./runtime-state";
 
 interface UseOperationControllerOptions {
@@ -79,6 +79,54 @@ export function useOperationController({
     setStatusMessage(result.message);
   }
 
+  async function handleSaveDailyTask(input: SaveDailyTaskInput): Promise<DesktopStatusUpdateResult> {
+    setSyncState("loading");
+    setStatusMessage(input.id ? "Günlük iş güncelleniyor..." : "Günlük iş ekleniyor...");
+
+    if (!window.yardimciDesktop) {
+      const result = { ok: false as const, message: "Günlük iş kaydedilemedi. Uygulamayı yeniden başlatın." };
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    const result = await window.yardimciDesktop.saveDailyTask(input);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
+  }
+
+  async function handleDeleteDailyTask(taskId: string): Promise<DesktopStatusUpdateResult> {
+    setSyncState("loading");
+    setStatusMessage("Günlük iş siliniyor...");
+
+    if (!window.yardimciDesktop) {
+      const result = { ok: false as const, message: "Günlük iş silinemedi. Uygulamayı yeniden başlatın." };
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    const result = await window.yardimciDesktop.deleteDailyTask(taskId);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
+  }
+
   async function handleUpdateDailyTaskStatus(taskId: string, status: string) {
     setSyncState("loading");
     setStatusMessage("Günlük iş durumu güncelleniyor...");
@@ -105,6 +153,8 @@ export function useOperationController({
     handleUpdateRoomStatus,
     handleUpdateTableStatus,
     handleUpdateReservationStatus,
+    handleSaveDailyTask,
+    handleDeleteDailyTask,
     handleUpdateDailyTaskStatus
   };
 }
