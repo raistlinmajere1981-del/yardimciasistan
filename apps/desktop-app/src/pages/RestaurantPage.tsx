@@ -83,7 +83,7 @@ export function RestaurantPage({ data, tasks, onDashboardDataChanged, onUpdateTa
           {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
         </div>
       </section>
-      <div className={pendingRestaurantTasks.length > 0 ? "restaurant-layout" : "restaurant-layout is-tables-only"}>
+      <div className="restaurant-layout">
         <section className="operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Servis</span>
@@ -101,16 +101,14 @@ export function RestaurantPage({ data, tasks, onDashboardDataChanged, onUpdateTa
             />
           </div>
         </section>
-        {pendingRestaurantTasks.length > 0 && (
-          <section className="operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
-            <header className="operation-panel-heading">
-              <span className="operation-panel-eyebrow">Servis</span>
-              <h2 id="restaurant-tasks-title">Yapılacak İşler</h2>
-              <p>Bugün ilgilenmeniz gereken servis işleri</p>
-            </header>
-            <div className="operation-panel-content">{tasks}</div>
-          </section>
-        )}
+        <section className="operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Günlük İşler</span>
+            <h2 id="restaurant-tasks-title">Yapılacak İşler</h2>
+            <p>Servis işleri ve kendi eklediğiniz günlük notlar</p>
+          </header>
+          <div className="operation-panel-content">{tasks}</div>
+        </section>
       </div>
     </section>
   );
