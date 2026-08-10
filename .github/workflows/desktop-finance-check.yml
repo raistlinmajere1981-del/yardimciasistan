@@ -7,6 +7,7 @@ on:
       - "packages/shared/types/request.ts"
       - "scripts/smoke-finance-*.mjs"
       - "scripts/smoke-room-folio-*.mjs"
+      - "scripts/smoke-daily-task-*.mjs"
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
@@ -20,6 +21,7 @@ on:
       - "packages/shared/types/request.ts"
       - "scripts/smoke-finance-*.mjs"
       - "scripts/smoke-room-folio-*.mjs"
+      - "scripts/smoke-daily-task-*.mjs"
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
@@ -61,6 +63,9 @@ jobs:
 
       - name: Oda adisyonu servis smoke
         run: node scripts/smoke-room-folio-service.mjs
+
+      - name: Manuel günlük iş smoke
+        run: node scripts/smoke-daily-task-management.mjs
 
       - name: Electron başlatma smoke
         run: node scripts/smoke-desktop-xvfb.mjs

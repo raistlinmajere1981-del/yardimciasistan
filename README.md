@@ -39,6 +39,7 @@ Proje iskeleti, web modülü, desktop omurgası, QR menü ve ilk AI altyapısı 
 - [Veri Modeli](docs/DATA_MODEL.md)
 - [Event Sistemi](docs/EVENTS.md)
 - [Görev Planı](docs/TASKS.md)
+- [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md)
 - [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
 - [Firma Web Modülü Kurulumu](docs/WEB_MODULE_INSTALLATION.md)
 - [Demo Site Özelleştirme](docs/DEMO_SITE_CUSTOMIZATION.md)

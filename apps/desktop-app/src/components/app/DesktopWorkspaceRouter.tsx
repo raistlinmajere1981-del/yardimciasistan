@@ -164,6 +164,8 @@ export function DesktopWorkspaceRouter({
     handleUpdateRoomStatus,
     handleUpdateTableStatus,
     handleUpdateReservationStatus,
+    handleSaveDailyTask,
+    handleDeleteDailyTask,
     handleUpdateDailyTaskStatus
   } = operationController;
   const {
@@ -421,7 +423,10 @@ export function DesktopWorkspaceRouter({
           )}
           tasks={(
             <DailyTasksWorkspace
+              scope="pension"
               tasks={dashboardData.dailyTasks.filter((task) => isAccommodationTask(task, dashboardData.reservations))}
+              onSave={handleSaveDailyTask}
+              onDelete={handleDeleteDailyTask}
               onUpdateStatus={handleUpdateDailyTaskStatus}
             />
           )}
@@ -433,7 +438,10 @@ export function DesktopWorkspaceRouter({
           onUpdateTableStatus={handleUpdateTableStatus}
           tasks={(
             <DailyTasksWorkspace
+              scope="restaurant"
               tasks={dashboardData.dailyTasks.filter((task) => isRestaurantTask(task, dashboardData.reservations))}
+              onSave={handleSaveDailyTask}
+              onDelete={handleDeleteDailyTask}
               onUpdateStatus={handleUpdateDailyTaskStatus}
             />
           )}

@@ -27,6 +27,7 @@ import type {
   DesktopTableOrderResult,
   UpdateReservationStatusInput,
   UpdateDailyTaskStatusInput,
+  SaveDailyTaskInput,
   MarkWhatsAppMessageSentInput,
   DeleteWhatsAppMessageInput,
   DesktopStockImageAnalyzeInput,
@@ -160,6 +161,8 @@ export interface DesktopBridge {
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => Promise<DesktopTableOrderResult>;
   recalculateTableOrderTotal: (orderId: string) => Promise<DesktopTableOrderResult>;
   updateReservationStatus: (input: UpdateReservationStatusInput) => Promise<DesktopStatusUpdateResult>;
+  saveDailyTask: (input: SaveDailyTaskInput) => Promise<DesktopStatusUpdateResult>;
+  deleteDailyTask: (taskId: string) => Promise<DesktopStatusUpdateResult>;
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => Promise<DesktopStatusUpdateResult>;
   createManualBackup: () => Promise<DesktopBackupResult>;
   createOwnerReplySuggestion: (requestId: string) => Promise<RequestAiSuggestionResult>;
@@ -260,6 +263,8 @@ const bridge: DesktopBridge = {
   closeTableOrder: (orderId: string, status: "paid" | "cancelled") => ipcRenderer.invoke("tableOrder:close", { orderId, status }),
   recalculateTableOrderTotal: (orderId: string) => ipcRenderer.invoke("tableOrder:recalculate", orderId),
   updateReservationStatus: (input: UpdateReservationStatusInput) => ipcRenderer.invoke("reservation:updateStatus", input),
+  saveDailyTask: (input: SaveDailyTaskInput) => ipcRenderer.invoke("dailyTask:save", input),
+  deleteDailyTask: (taskId: string) => ipcRenderer.invoke("dailyTask:delete", taskId),
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => ipcRenderer.invoke("dailyTask:updateStatus", input),
   createManualBackup: () => ipcRenderer.invoke("backup:createManual"),
   createOwnerReplySuggestion: (requestId: string) => ipcRenderer.invoke("ai:createOwnerReplySuggestion", requestId),
