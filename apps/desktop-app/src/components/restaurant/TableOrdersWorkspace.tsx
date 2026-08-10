@@ -1,4 +1,4 @@
-import { Check, ChefHat, Minus, Plus, ReceiptText, Search, Trash2, UtensilsCrossed, X } from "lucide-react";
+import { Minus, Plus, ReceiptText, Search, Trash2, UtensilsCrossed, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import type {
@@ -34,7 +34,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
   const [searchQuery, setSearchQuery] = useState("");
   const [noteDrafts, setNoteDrafts] = useState<Record<string, string>>({});
   const [busyAction, setBusyAction] = useState("");
-  const [feedback, setFeedback] = useState("Masa siparişini yerel olarak yönetin.");
+  const [feedback, setFeedback] = useState("Ürün ve adet değişiklikleri otomatik kaydedilir.");
   const [cardFeedback, setCardFeedback] = useState("");
   const selectionRef = useRef({ generation: 0, tableId: "" });
   const busyGenerationRef = useRef(0);
@@ -506,33 +506,6 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
     }
   }
 
-  async function saveOrder() {
-    const bridge = window.yardimciDesktop;
-    if (!selectedOrderRef.current || !bridge || typeof bridge.recalculateTableOrderTotal !== "function") {
-      setFeedback("Adisyon kaydedilemedi.");
-      return;
-    }
-
-    const context = getCurrentContext();
-    const busyGeneration = startBusyAction("save");
-    try {
-      if (!await flushDirtyNotes(context) || !isCurrentContext(context)) {
-        return;
-      }
-      const orderId = selectedOrderRef.current?.id;
-      if (!orderId) {
-        return;
-      }
-      handleResult(await bridge.recalculateTableOrderTotal(orderId), context);
-    } catch {
-      if (isCurrentContext(context)) {
-        setFeedback("Adisyon toplamı güncellenemedi.");
-      }
-    } finally {
-      finishBusyAction(busyGeneration);
-    }
-  }
-
   async function runCardOrderAction(order: DesktopTableOrder, action: "payment" | "paid") {
     const bridge = window.yardimciDesktop;
     if (!bridge) {
@@ -571,9 +544,10 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
 
   function renderTableCard(table: DesktopDashboardData["tables"][number]) {
     const activeOrder = activeOrdersByTable.get(table.id);
-    const activeStatusAction = getTableStatusAction(table.status);
+    const manualTableStatus = getTableStatusAction(table.status) || table.status;
     const tableStatusLabel = formatTableStatus(table.status);
     const orderBadge = activeOrder ? getOrderBadge(activeOrder.status) : null;
+    const knownManualStatuses = ["available", "occupied", "reserved", "bill_waiting"];
     return (
       <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
         <div className="resource-card-heading">
@@ -610,20 +584,29 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
           </button>
           {activeOrder ? (
             <div className="active-table-order-actions" aria-label={`${table.name} aktif adisyon işlemleri`}>
-              <button
-                type="button"
-                onClick={() => void runCardOrderAction(activeOrder, "payment")}
-                disabled={activeOrder.status === "payment" || Boolean(busyAction)}
-              >Hesap Bekliyor</button>
-              <button className="is-close" type="button" onClick={() => void runCardOrderAction(activeOrder, "paid")} disabled={Boolean(busyAction)}>Ödendi / Kapat</button>
+              {activeOrder.status === "payment" ? (
+                <button className="is-close" type="button" onClick={() => void runCardOrderAction(activeOrder, "paid")} disabled={Boolean(busyAction)}>Ödendi / Kapat</button>
+              ) : (
+                <button type="button" onClick={() => void runCardOrderAction(activeOrder, "payment")} disabled={Boolean(busyAction)}>Hesap İste</button>
+              )}
             </div>
           ) : (
-            <div className="status-button-row compact-status-actions" aria-label={`${table.name} durumunu değiştir`}>
-              <button className={activeStatusAction === "available" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "available"} onClick={() => onUpdateStatus(table.id, "available")}>Boş</button>
-              <button className={activeStatusAction === "occupied" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "occupied"} onClick={() => onUpdateStatus(table.id, "occupied")}>Dolu</button>
-              <button className={activeStatusAction === "reserved" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "reserved"} onClick={() => onUpdateStatus(table.id, "reserved")}>Rezerve</button>
-              <button className={activeStatusAction === "bill_waiting" ? "is-active" : undefined} type="button" aria-pressed={activeStatusAction === "bill_waiting"} onClick={() => onUpdateStatus(table.id, "bill_waiting")}>Hesap</button>
-            </div>
+            <label className="table-status-select">
+              <span>Durum</span>
+              <select
+                aria-label={`${table.name} durumunu değiştir`}
+                value={manualTableStatus}
+                onChange={(event) => onUpdateStatus(table.id, event.target.value)}
+              >
+                {!knownManualStatuses.includes(manualTableStatus) && (
+                  <option value={manualTableStatus}>{tableStatusLabel}</option>
+                )}
+                <option value="available">Boş</option>
+                <option value="occupied">Dolu</option>
+                <option value="reserved">Rezerve</option>
+                <option value="bill_waiting">Hesap</option>
+              </select>
+            </label>
           )}
         </div>
       </article>
@@ -784,19 +767,32 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
 
             <footer className="table-order-drawer-footer">
               <p className={feedback.includes("edilemedi") || feedback.includes("değil") ? "is-error" : ""} aria-live="polite">{busyAction ? "İşlem kaydediliyor..." : feedback}</p>
-              <div className="table-order-footer-actions">
-                <div className="table-order-footer-action-group is-save" role="group" aria-label="Sipariş kaydetme">
-                  <ActionButton variant="secondary" size="sm" onClick={() => void saveOrder()} disabled={!selectedOrder || Boolean(busyAction)}><Check size={15} aria-hidden="true" />Siparişi Kaydet</ActionButton>
-                </div>
-                <div className="table-order-footer-action-group is-flow" role="group" aria-label="Adisyon akışı">
-                  <ActionButton className={selectedOrder?.status === "preparing" ? "is-current" : ""} aria-pressed={selectedOrder?.status === "preparing"} variant="ghost" size="sm" onClick={() => void updateOrderStatus("preparing")} disabled={!selectedOrder || Boolean(busyAction)}><ChefHat size={15} aria-hidden="true" />Hazırlanıyor</ActionButton>
-                  <ActionButton className={selectedOrder?.status === "served" ? "is-current" : ""} aria-pressed={selectedOrder?.status === "served"} variant="ghost" size="sm" onClick={() => void updateOrderStatus("served")} disabled={!selectedOrder || Boolean(busyAction)}>Servis Edildi</ActionButton>
-                  <ActionButton className={selectedOrder?.status === "payment" ? "is-current" : ""} aria-pressed={selectedOrder?.status === "payment"} variant="secondary" size="sm" onClick={() => void updateOrderStatus("payment")} disabled={!selectedOrder || Boolean(busyAction)}><ReceiptText size={15} aria-hidden="true" />Hesap Bekliyor</ActionButton>
-                </div>
-                <div className="table-order-footer-action-group is-close" role="group" aria-label="Adisyon kapatma">
-                  <ActionButton size="sm" onClick={() => void closeOrder("paid")} disabled={!selectedOrder || Boolean(busyAction)}>Ödendi / Kapat</ActionButton>
-                  <ActionButton variant="danger" size="sm" onClick={() => void closeOrder("cancelled")} disabled={!selectedOrder || Boolean(busyAction)}>İptal</ActionButton>
-                </div>
+              <div className="table-order-footer-actions restaurant-service-actions">
+                <label className="table-order-status-select">
+                  <span>Sipariş durumu</span>
+                  <select
+                    value={selectedOrder?.status ?? "open"}
+                    disabled={!selectedOrder || Boolean(busyAction)}
+                    onChange={(event) => {
+                      const nextStatus = event.target.value as "open" | "preparing" | "served" | "payment";
+                      if (nextStatus !== "open" && nextStatus !== selectedOrder?.status) {
+                        void updateOrderStatus(nextStatus);
+                      }
+                    }}
+                  >
+                    <option value="open" disabled>Açık</option>
+                    <option value="preparing">Hazırlanıyor</option>
+                    <option value="served">Servis Edildi</option>
+                    <option value="payment">Hesap Bekliyor</option>
+                  </select>
+                </label>
+                <ActionButton size="sm" onClick={() => void closeOrder("paid")} disabled={!selectedOrder || Boolean(busyAction)}>Ödendi / Kapat</ActionButton>
+                <details className="table-order-more-actions">
+                  <summary>Diğer</summary>
+                  <div>
+                    <ActionButton variant="danger" size="sm" onClick={() => void closeOrder("cancelled")} disabled={!selectedOrder || Boolean(busyAction)}>Adisyonu İptal Et</ActionButton>
+                  </div>
+                </details>
               </div>
             </footer>
           </section>
