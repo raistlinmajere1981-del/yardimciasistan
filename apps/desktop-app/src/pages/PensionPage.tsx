@@ -81,8 +81,6 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
         </div>
       </section>
 
-      <RoomFolioWorkspace refreshKey={roomFolioRefreshKey} />
-
       <div className="pension-layout pension-primary-layout">
         <section className="operation-group-panel pension-reservations-section" aria-labelledby="pension-reservations-title">
           <header className="operation-panel-heading">
@@ -109,6 +107,18 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
           <div className="operation-panel-content">{tasks}</div>
         </section>
       </div>
+
+      <details className="pension-archive-details pension-folio-details">
+        <summary>
+          <span className="pension-archive-summary-copy">
+            <span className="operation-panel-eyebrow">Oda hesabı</span>
+            <strong>Oda Hesabı ve Tahsilat</strong>
+            <small>Konaklama tutarı, ek harcamalar ve ödeme işlemleri</small>
+          </span>
+          <span className="pension-archive-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
+        </summary>
+        <RoomFolioWorkspace refreshKey={roomFolioRefreshKey} />
+      </details>
 
       <details className="pension-archive-details">
         <summary>
