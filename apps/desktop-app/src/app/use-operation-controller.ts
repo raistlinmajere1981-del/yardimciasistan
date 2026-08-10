@@ -64,7 +64,7 @@ export function useOperationController({
 
   async function handleSaveManualReservation(input: SaveManualReservationInput): Promise<DesktopStatusUpdateResult> {
     setSyncState("loading");
-    setStatusMessage("Rezervasyon kaydediliyor...");
+    setStatusMessage(input.reservationId ? "Rezervasyon güncelleniyor..." : "Rezervasyon kaydediliyor...");
 
     if (!window.yardimciDesktop) {
       const result = { ok: false as const, message: "Rezervasyon kaydedilemedi. Uygulamayı yeniden başlatın." };

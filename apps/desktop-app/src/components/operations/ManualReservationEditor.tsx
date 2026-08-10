@@ -8,11 +8,13 @@ import type {
 import { ActionButton } from "../ui/ActionButton";
 
 type EditorState = "idle" | "loading" | "error";
+type Reservation = DesktopDashboardData["reservations"][number];
 
 interface ManualReservationEditorProps {
   open: boolean;
   customers: DesktopDashboardData["customers"];
   rooms: DesktopDashboardData["rooms"];
+  reservation?: Reservation | null;
   onClose: () => void;
   onSave: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
 }
@@ -33,7 +35,21 @@ function localDateKey(dayOffset = 0) {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-function createInitialForm(customers: DesktopDashboardData["customers"]): ManualReservationFormState {
+function createInitialForm(
+  customers: DesktopDashboardData["customers"],
+  reservation?: Reservation | null
+): ManualReservationFormState {
+  if (reservation) {
+    return {
+      customerId: reservation.customerId,
+      roomId: reservation.roomIds[0] ?? "",
+      startDate: reservation.startDate,
+      endDate: reservation.endDate,
+      guestCount: Math.max(1, reservation.guestCount || 1),
+      notes: reservation.notes
+    };
+  }
+
   return {
     customerId: customers[0]?.id ?? "",
     roomId: "",
@@ -48,24 +64,28 @@ export function ManualReservationEditor({
   open,
   customers,
   rooms,
+  reservation = null,
   onClose,
   onSave
 }: ManualReservationEditorProps) {
-  const [form, setForm] = useState<ManualReservationFormState>(() => createInitialForm(customers));
+  const [form, setForm] = useState<ManualReservationFormState>(() => createInitialForm(customers, reservation));
   const [state, setState] = useState<EditorState>("idle");
   const [message, setMessage] = useState("");
+  const isEditing = Boolean(reservation);
+  const isManualReservation = Boolean(reservation?.requestId.startsWith("manual:"));
+  const detailsEditable = !isEditing || isManualReservation;
   const activeRooms = useMemo(
-    () => rooms.filter((room) => room.isActive),
-    [rooms]
+    () => rooms.filter((room) => room.isActive || reservation?.roomIds.includes(room.id)),
+    [reservation, rooms]
   );
   const selectedCustomer = customers.find((customer) => customer.id === form.customerId);
 
   useEffect(() => {
     if (!open) return;
-    setForm(createInitialForm(customers));
+    setForm(createInitialForm(customers, reservation));
     setState("idle");
     setMessage("");
-  }, [customers, open]);
+  }, [customers, open, reservation]);
 
   if (!open) return null;
 
@@ -80,7 +100,7 @@ export function ManualReservationEditor({
         <header className="manual-request-drawer-header">
           <div className="manual-request-heading">
             <p>Pansiyon rezervasyonları</p>
-            <h2 id="manual-reservation-editor-title">Yeni rezervasyon ekle</h2>
+            <h2 id="manual-reservation-editor-title">{isEditing ? "Rezervasyonu düzenle" : "Yeni rezervasyon ekle"}</h2>
           </div>
           <button
             className="drawer-close-button"
@@ -98,8 +118,9 @@ export function ManualReservationEditor({
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
-            setMessage("Rezervasyon kaydediliyor...");
+            setMessage(isEditing ? "Rezervasyon güncelleniyor..." : "Rezervasyon kaydediliyor...");
             const result = await onSave({
+              reservationId: reservation?.id,
               customerId: form.customerId,
               roomId: form.roomId || undefined,
               startDate: form.startDate,
@@ -119,8 +140,9 @@ export function ManualReservationEditor({
             <label className="manual-request-note-field">
               Müşteri
               <select
-                autoFocus
+                autoFocus={!isEditing}
                 required
+                disabled={isEditing}
                 value={form.customerId}
                 onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}
               >
@@ -135,9 +157,11 @@ export function ManualReservationEditor({
                 )}
               </select>
               <small>
-                {selectedCustomer
-                  ? "Kayıtlı müşteri seçildi."
-                  : "Yeni müşteri gerekiyorsa önce Müşteri İşleri bölümünden ekleyin."}
+                {isEditing
+                  ? "Rezervasyonun müşteri kaydı değiştirilmez."
+                  : selectedCustomer
+                    ? "Kayıtlı müşteri seçildi."
+                    : "Yeni müşteri gerekiyorsa önce Müşteri İşleri bölümünden ekleyin."}
               </small>
             </label>
 
@@ -147,6 +171,7 @@ export function ManualReservationEditor({
                 type="date"
                 lang="tr"
                 required
+                disabled={!detailsEditable}
                 value={form.startDate}
                 onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))}
               />
@@ -158,6 +183,7 @@ export function ManualReservationEditor({
                 type="date"
                 lang="tr"
                 required
+                disabled={!detailsEditable}
                 min={form.startDate || undefined}
                 value={form.endDate}
                 onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))}
@@ -171,6 +197,7 @@ export function ManualReservationEditor({
                 min={1}
                 max={99}
                 required
+                disabled={!detailsEditable}
                 value={form.guestCount}
                 onChange={(event) => setForm((current) => ({ ...current, guestCount: Number(event.target.value) }))}
               />
@@ -179,6 +206,7 @@ export function ManualReservationEditor({
             <label className="manual-request-note-field">
               Oda
               <select
+                autoFocus={isEditing}
                 value={form.roomId}
                 onChange={(event) => setForm((current) => ({ ...current, roomId: event.target.value }))}
               >
@@ -189,7 +217,7 @@ export function ManualReservationEditor({
                   </option>
                 ))}
               </select>
-              <small>Seçilen odada aynı tarihlerde aktif rezervasyon varsa kayıt engellenir.</small>
+              <small>Oda değişikliğinde kapasite, aktif konaklama ve tarih çakışmaları yeniden kontrol edilir.</small>
             </label>
 
             <label className="manual-request-note-field">
@@ -203,7 +231,12 @@ export function ManualReservationEditor({
             </label>
           </div>
 
-          {customers.length === 0 && (
+          {isEditing && !isManualReservation && (
+            <p className="form-status">
+              Web talebinden oluşan rezervasyonda tarih ve kişi bilgisi talep kaydıyla bağlıdır; burada oda ve not değiştirilebilir.
+            </p>
+          )}
+          {customers.length === 0 && !isEditing && (
             <p className="form-status sync-error">Rezervasyon açmak için önce bir müşteri kaydı oluşturun.</p>
           )}
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
@@ -223,7 +256,9 @@ export function ManualReservationEditor({
               }
             >
               {state === "loading" ? <CalendarPlus size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
-              {state === "loading" ? "Kaydediliyor" : "Rezervasyonu Kaydet"}
+              {state === "loading"
+                ? (isEditing ? "Güncelleniyor" : "Kaydediliyor")
+                : (isEditing ? "Değişiklikleri Kaydet" : "Rezervasyonu Kaydet")}
             </ActionButton>
           </div>
         </form>

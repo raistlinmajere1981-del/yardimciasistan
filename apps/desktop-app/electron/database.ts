@@ -917,6 +917,7 @@ export interface UpdateReservationStatusInput {
 }
 
 export interface SaveManualReservationInput {
+  reservationId?: string;
   customerId: string;
   roomId?: string;
   startDate: string;
@@ -3143,6 +3144,7 @@ export class DesktopDatabase {
   }
 
   saveManualReservation(input: SaveManualReservationInput): DesktopStatusUpdateResult {
+    const reservationId = String(input?.reservationId ?? "").trim();
     const customerId = String(input?.customerId ?? "").trim();
     const roomId = String(input?.roomId ?? "").trim();
     const startDate = normalizeDateInput(input?.startDate);
@@ -3164,6 +3166,57 @@ export class DesktopDatabase {
       return { ok: false, message: "Rezervasyon için geçerli bir müşteri seçin." };
     }
 
+    const existingReservation = reservationId
+      ? this.db
+        .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
+        .get(reservationId) as Record<string, unknown> | undefined
+      : undefined;
+    if (reservationId && !existingReservation) {
+      return { ok: false, message: "Düzenlenecek rezervasyon bulunamadı." };
+    }
+
+    const isEditing = Boolean(existingReservation);
+    const existingStatus = String(existingReservation?.status ?? "approved");
+    const existingRequestId = String(existingReservation?.request_id ?? "");
+    const isManualReservation = existingRequestId.startsWith("manual:");
+    const existingRoomIds = existingReservation ? this.parseStringArray(existingReservation.room_ids_json) : [];
+    const previousRoomId = existingRoomIds[0] ?? "";
+
+    if (existingReservation) {
+      if (String(existingReservation.reservation_type ?? "") !== "room") {
+        return { ok: false, message: "Bu ekrandan yalnızca pansiyon rezervasyonları düzenlenebilir." };
+      }
+      if (!["pending", "approved"].includes(existingStatus)) {
+        return { ok: false, message: "Tamamlanmış veya iptal edilmiş rezervasyon düzenlenemez." };
+      }
+      if (existingRoomIds.length > 1) {
+        return { ok: false, message: "Birden fazla odaya bağlı rezervasyon bu sade formdan düzenlenemez." };
+      }
+      if (String(existingReservation.customer_id ?? "") !== customerId) {
+        return { ok: false, message: "Rezervasyonun müşteri kaydı bu ekrandan değiştirilemez." };
+      }
+      if (!isManualReservation) {
+        if (String(existingReservation.start_date ?? "") !== startDate
+          || String(existingReservation.end_date ?? "") !== endDate
+          || Number(existingReservation.guest_count ?? 0) !== guestCount) {
+          return { ok: false, message: "Web talebinden oluşan rezervasyonda tarih ve kişi bilgisi bu ekrandan değiştirilemez." };
+        }
+      }
+      const activeStay = this.db
+        .prepare(`
+          SELECT id
+          FROM customer_room_stays
+          WHERE reservation_id = ?
+            AND status IN ('planned', 'checked_in')
+            AND deleted_at = ''
+          LIMIT 1
+        `)
+        .get(reservationId) as { id?: string } | undefined;
+      if (activeStay?.id) {
+        return { ok: false, message: "Bu rezervasyon aktif konaklamaya dönüştürülmüş. Oda ve tarih değişikliğini konaklama kaydından yönetin." };
+      }
+    }
+
     let room: { id?: string; name?: string; capacity?: number; status?: string } | undefined;
     if (roomId) {
       room = this.db
@@ -3178,8 +3231,12 @@ export class DesktopDatabase {
       if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity)) {
         return { ok: false, message: `${String(room.name ?? "Oda")} en fazla ${Number(room.capacity)} kişi kapasitelidir.` };
       }
+      if (this.hasOverlappingCustomerRoomStay(roomId, startDate, endDate)) {
+        return { ok: false, message: `${String(room.name ?? "Seçilen oda")} bu tarihlerde aktif bir konaklama kaydına bağlı.` };
+      }
 
       const conflict = this.getDashboardData().reservations.find((reservation) => {
+        if (reservation.id === reservationId) return false;
         if (!["pending", "approved"].includes(reservation.status) || !reservation.roomIds.includes(roomId)) {
           return false;
         }
@@ -3197,49 +3254,103 @@ export class DesktopDatabase {
     }
 
     const now = new Date().toISOString();
-    const reservationId = createId("reservation_");
+    const savedReservationId = reservationId || createId("reservation_");
     const customerName = String(customer.full_name ?? "").trim() || "Misafir";
     const roomIds = roomId ? [roomId] : [];
 
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      this.db
-        .prepare(`
-          INSERT INTO reservations (
-            id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
-            guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
-            payment_status, created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, ?, 'room', 'approved', ?, ?, ?, '', ?, ?, 0, ?, '[]', ?, '',
-            'not_required', ?, ?, '', 'local_only')
-        `)
-        .run(
-          reservationId,
-          `manual:${reservationId}`,
-          customerId,
-          `${customerName} - oda rezervasyonu`,
-          startDate,
-          endDate,
-          guestCount,
-          guestCount,
-          JSON.stringify(roomIds),
-          notes,
-          now,
-          now
-        );
+      if (existingReservation) {
+        const nextAdultCount = isManualReservation
+          ? guestCount
+          : Number(existingReservation.adult_count ?? guestCount);
+        const nextChildCount = isManualReservation
+          ? 0
+          : Number(existingReservation.child_count ?? 0);
+        this.db
+          .prepare(`
+            UPDATE reservations
+            SET start_date = ?,
+                end_date = ?,
+                guest_count = ?,
+                adult_count = ?,
+                child_count = ?,
+                room_ids_json = ?,
+                notes = ?,
+                updated_at = ?,
+                sync_status = 'local_only'
+            WHERE id = ? AND deleted_at = ''
+          `)
+          .run(
+            startDate,
+            endDate,
+            guestCount,
+            nextAdultCount,
+            nextChildCount,
+            JSON.stringify(roomIds),
+            notes,
+            now,
+            savedReservationId
+          );
 
-      if (roomId && String(room?.status ?? "") === "available") {
+        if (previousRoomId && previousRoomId !== roomId) {
+          const otherRows = this.db
+            .prepare(`
+              SELECT room_ids_json
+              FROM reservations
+              WHERE id != ?
+                AND status IN ('pending', 'approved')
+                AND deleted_at = ''
+            `)
+            .all(savedReservationId) as Array<{ room_ids_json?: string }>;
+          const stillReserved = otherRows.some((row) => this.parseStringArray(row.room_ids_json).includes(previousRoomId));
+          if (!stillReserved) {
+            this.db
+              .prepare("UPDATE rooms SET status = 'available', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status = 'reserved' AND deleted_at = ''")
+              .run(now, previousRoomId);
+            this.enforceActiveStayRoomStatus(previousRoomId, now);
+          }
+        }
+      } else {
+        this.db
+          .prepare(`
+            INSERT INTO reservations (
+              id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
+              guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+              payment_status, created_at, updated_at, deleted_at, sync_status
+            ) VALUES (?, ?, ?, 'room', 'approved', ?, ?, ?, '', ?, ?, 0, ?, '[]', ?, '',
+              'not_required', ?, ?, '', 'local_only')
+          `)
+          .run(
+            savedReservationId,
+            `manual:${savedReservationId}`,
+            customerId,
+            `${customerName} - oda rezervasyonu`,
+            startDate,
+            endDate,
+            guestCount,
+            guestCount,
+            JSON.stringify(roomIds),
+            notes,
+            now,
+            now
+          );
+      }
+
+      if (roomId && existingStatus === "approved" && String(room?.status ?? "") === "available") {
         this.db
           .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
           .run(now, roomId);
       }
 
       this.insertEvent({
-        type: "reservation.created",
+        type: isEditing ? "reservation.updated" : "reservation.created",
         entityType: "reservation",
-        entityId: reservationId,
+        entityId: savedReservationId,
         payload: {
-          source: "manual_desktop",
+          source: isManualReservation || !isEditing ? "manual_desktop" : "desktop_edit",
           customer_id: customerId,
+          previous_room_ids: existingRoomIds,
           room_ids: roomIds,
           start_date: startDate,
           end_date: endDate,
@@ -3255,7 +3366,13 @@ export class DesktopDatabase {
 
     return {
       ok: true,
-      message: roomId ? "Rezervasyon oluşturuldu ve oda ayrıldı." : "Rezervasyon oluşturuldu. Odayı daha sonra atayabilirsiniz.",
+      message: isEditing
+        ? roomId
+          ? "Rezervasyon güncellendi ve oda bilgisi kaydedildi."
+          : "Rezervasyon güncellendi. Odayı daha sonra atayabilirsiniz."
+        : roomId
+          ? "Rezervasyon oluşturuldu ve oda ayrıldı."
+          : "Rezervasyon oluşturuldu. Odayı daha sonra atayabilirsiniz.",
       dashboardData: this.getDashboardData()
     };
   }

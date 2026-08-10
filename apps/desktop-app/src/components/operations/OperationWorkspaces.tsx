@@ -264,6 +264,7 @@ export function ReservationsWorkspace({
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
   const [manualEditorOpen, setManualEditorOpen] = useState(false);
+  const [editingReservation, setEditingReservation] = useState<DesktopDashboardData["reservations"][number] | null>(null);
   const filteredReservations = useMemo(
     () =>
       reservations.filter((reservation) => {
@@ -280,7 +281,14 @@ export function ReservationsWorkspace({
         <div className="operation-filter-summary" aria-label="Rezervasyon özeti">
           <StatusBadge tone="info">{filteredReservations.length} görünen kayıt</StatusBadge>
           <StatusBadge tone="wait">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
-          <ActionButton size="sm" type="button" onClick={() => setManualEditorOpen(true)}>
+          <ActionButton
+            size="sm"
+            type="button"
+            onClick={() => {
+              setEditingReservation(null);
+              setManualEditorOpen(true);
+            }}
+          >
             <Plus size={15} aria-hidden="true" />
             Yeni Rezervasyon
           </ActionButton>
@@ -371,6 +379,22 @@ export function ReservationsWorkspace({
                     <div className="expanded-record-content compact-secondary-menu">
                       <p>{reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}</p>
                       <div className="secondary-detail-actions">
+                        {reservation.reservationType === "room"
+                          && ["pending", "approved"].includes(reservation.status)
+                          && reservation.roomIds.length <= 1 && (
+                            <ActionButton
+                              variant="secondary"
+                              size="sm"
+                              type="button"
+                              onClick={() => {
+                                setEditingReservation(reservation);
+                                setManualEditorOpen(true);
+                              }}
+                            >
+                              <Pencil size={14} aria-hidden="true" />
+                              Düzenle / Oda Ata
+                            </ActionButton>
+                          )}
                         <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>Reddet</ActionButton>
                         <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>İptal Et</ActionButton>
                       </div>
@@ -386,7 +410,11 @@ export function ReservationsWorkspace({
         open={manualEditorOpen}
         customers={customers}
         rooms={rooms}
-        onClose={() => setManualEditorOpen(false)}
+        reservation={editingReservation}
+        onClose={() => {
+          setManualEditorOpen(false);
+          setEditingReservation(null);
+        }}
         onSave={onSaveManual}
       />
     </section>
