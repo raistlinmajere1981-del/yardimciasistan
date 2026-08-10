@@ -71,6 +71,7 @@ import type {
   AppLockStatus,
   UpdateAppPasswordInput
 } from "./app-lock";
+import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-connection-test";
 
 export interface AiConnectionTestInput {
   provider: string;
@@ -129,6 +130,7 @@ export interface DesktopBridge {
   checkoutRoomFolio: (input: CheckoutRoomFolioInput) => Promise<DesktopRoomFolioMutationResult>;
   onDashboardDataChanged: (listener: (data: DesktopDashboardData) => void) => () => void;
   getSyncStatus: () => Promise<AutomaticSyncStatus>;
+  testWebConnection: (input: WebConnectionTestInput) => Promise<WebConnectionTestResult>;
   runSyncNow: () => Promise<AutomaticSyncCycleResult>;
   setAutoSyncEnabled: (enabled: boolean) => Promise<AutomaticSyncStatus>;
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
@@ -229,6 +231,7 @@ const bridge: DesktopBridge = {
     return () => ipcRenderer.removeListener("dashboard:dataChanged", handler);
   },
   getSyncStatus: () => ipcRenderer.invoke("sync:getStatus"),
+  testWebConnection: (input: WebConnectionTestInput) => ipcRenderer.invoke("sync:testConnection", input),
   runSyncNow: () => ipcRenderer.invoke("sync:runNow"),
   setAutoSyncEnabled: (enabled: boolean) => ipcRenderer.invoke("sync:setAutoEnabled", enabled),
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => {
