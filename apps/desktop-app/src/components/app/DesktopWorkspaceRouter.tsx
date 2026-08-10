@@ -163,6 +163,7 @@ export function DesktopWorkspaceRouter({
   const {
     handleUpdateRoomStatus,
     handleUpdateTableStatus,
+    handleSaveManualReservation,
     handleUpdateReservationStatus,
     handleSaveDailyTask,
     handleDeleteDailyTask,
@@ -400,6 +401,8 @@ export function DesktopWorkspaceRouter({
             <ReservationsWorkspace
               reservations={dashboardData.reservations}
               rooms={dashboardData.rooms}
+              customers={dashboardData.customers}
+              onSaveManual={handleSaveManualReservation}
               onUpdateStatus={handleUpdateReservationStatus}
               onOpenWhatsApp={openReservationWhatsApp}
             />

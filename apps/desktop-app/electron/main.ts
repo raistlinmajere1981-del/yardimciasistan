@@ -60,6 +60,7 @@ import {
   type UpdateTableOrderItemNoteInput,
   type UpdateTableOrderStatusInput,
   type UpdateReservationStatusInput,
+  type SaveManualReservationInput,
   type UpdateDailyTaskStatusInput,
   type SaveDailyTaskInput,
   type MarkWhatsAppMessageSentInput,
@@ -883,6 +884,10 @@ function registerIpcHandlers() {
     return typeof orderId === "string"
       ? getDatabase().recalculateTableOrderTotal(orderId)
       : invalidTableOrderPayload("Toplamı hesaplanacak adisyon geçersiz.");
+  });
+
+  ipcMain.handle("reservation:saveManual", (_event, input: SaveManualReservationInput): DesktopStatusUpdateResult => {
+    return finalizeDesktopOperationMutation(getDatabase().saveManualReservation(input));
   });
 
   ipcMain.handle("reservation:updateStatus", (_event, input: UpdateReservationStatusInput): DesktopStatusUpdateResult => {

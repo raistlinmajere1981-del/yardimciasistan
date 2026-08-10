@@ -15,7 +15,8 @@ import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
   DesktopStatusUpdateResult,
-  SaveDailyTaskInput
+  SaveDailyTaskInput,
+  SaveManualReservationInput
 } from "../../../electron/database";
 import {
   formatCustomerRoomStayStatus,
@@ -30,6 +31,7 @@ import {
 import { getRoomDisplayInfo } from "../../app/operations";
 import { CustomerRoomStayActions, RoomAssignmentDrawer } from "../customers/CustomersWorkspace";
 import { DailyTaskEditor, type DailyTaskScope } from "./DailyTaskEditor";
+import { ManualReservationEditor } from "./ManualReservationEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { CompactListItem } from "../ui/CompactListItem";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
@@ -245,13 +247,23 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
 interface ReservationsWorkspaceProps {
   reservations: DesktopDashboardData["reservations"];
   rooms: DesktopDashboardData["rooms"];
+  customers: DesktopDashboardData["customers"];
+  onSaveManual: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
   onUpdateStatus: (reservationId: string, status: string) => void;
   onOpenWhatsApp: (reservation: DesktopDashboardData["reservations"][number]) => void;
 }
 
-export function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onOpenWhatsApp }: ReservationsWorkspaceProps) {
+export function ReservationsWorkspace({
+  reservations,
+  rooms,
+  customers,
+  onSaveManual,
+  onUpdateStatus,
+  onOpenWhatsApp
+}: ReservationsWorkspaceProps) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("");
+  const [manualEditorOpen, setManualEditorOpen] = useState(false);
   const filteredReservations = useMemo(
     () =>
       reservations.filter((reservation) => {
@@ -268,6 +280,10 @@ export function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onO
         <div className="operation-filter-summary" aria-label="Rezervasyon özeti">
           <StatusBadge tone="info">{filteredReservations.length} görünen kayıt</StatusBadge>
           <StatusBadge tone="wait">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
+          <ActionButton size="sm" type="button" onClick={() => setManualEditorOpen(true)}>
+            <Plus size={15} aria-hidden="true" />
+            Yeni Rezervasyon
+          </ActionButton>
         </div>
         <div className="reservation-filters">
           <label className="reservation-status-filter">
@@ -317,7 +333,7 @@ export function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onO
           <div className="panel empty-state">
             <CalendarCheck size={28} aria-hidden="true" />
             <strong>Rezervasyon yok.</strong>
-            <p>Talepler rezervasyona çevrildiğinde burada görünür.</p>
+            <p>Web talepleri veya sizin eklediğiniz rezervasyonlar burada görünür.</p>
           </div>
         ) : filteredReservations.length === 0 ? (
           <div className="panel empty-state">
@@ -366,6 +382,13 @@ export function ReservationsWorkspace({ reservations, rooms, onUpdateStatus, onO
           ))
         )}
       </section>
+      <ManualReservationEditor
+        open={manualEditorOpen}
+        customers={customers}
+        rooms={rooms}
+        onClose={() => setManualEditorOpen(false)}
+        onSave={onSaveManual}
+      />
     </section>
   );
 }

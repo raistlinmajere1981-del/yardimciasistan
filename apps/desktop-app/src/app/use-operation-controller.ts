@@ -1,5 +1,10 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { DesktopDashboardData, DesktopStatusUpdateResult, SaveDailyTaskInput } from "../../electron/database";
+import type {
+  DesktopDashboardData,
+  DesktopStatusUpdateResult,
+  SaveDailyTaskInput,
+  SaveManualReservationInput
+} from "../../electron/database";
 import type { SyncState } from "./runtime-state";
 
 interface UseOperationControllerOptions {
@@ -55,6 +60,30 @@ export function useOperationController({
     setDashboardData(result.dashboardData);
     setSyncState("success");
     setStatusMessage(result.message);
+  }
+
+  async function handleSaveManualReservation(input: SaveManualReservationInput): Promise<DesktopStatusUpdateResult> {
+    setSyncState("loading");
+    setStatusMessage("Rezervasyon kaydediliyor...");
+
+    if (!window.yardimciDesktop) {
+      const result = { ok: false as const, message: "Rezervasyon kaydedilemedi. Uygulamayı yeniden başlatın." };
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    const result = await window.yardimciDesktop.saveManualReservation(input);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
   }
 
   async function handleUpdateReservationStatus(reservationId: string, status: string) {
@@ -152,6 +181,7 @@ export function useOperationController({
   return {
     handleUpdateRoomStatus,
     handleUpdateTableStatus,
+    handleSaveManualReservation,
     handleUpdateReservationStatus,
     handleSaveDailyTask,
     handleDeleteDailyTask,
