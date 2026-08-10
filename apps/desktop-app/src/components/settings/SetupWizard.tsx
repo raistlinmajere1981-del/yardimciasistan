@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Plus, RefreshCw, Save, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
-import {
-  getSyncCapabilities,
-  type AndroidPermissionGroupId,
-  type AndroidPermissionGroups
-} from "@yardimci-asistan/sync-core";
+import type { AndroidPermissionGroupId, AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
 import { formatDateTime } from "../../app/record-formatters";
 import {
@@ -178,26 +174,37 @@ export function SetupWizard({
     setWebConnectionTestState("loading");
     setWebConnectionTestMessage("Web modülüne bağlanılıyor...");
     try {
-      const result = await getSyncCapabilities({
-        baseUrl,
-        syncSecret,
-        fetchImpl: createWebConnectionTestFetch(WEB_CONNECTION_TEST_TIMEOUT_MS)
+      const fetchWithTimeout = createWebConnectionTestFetch(WEB_CONNECTION_TEST_TIMEOUT_MS);
+      const response = await fetchWithTimeout(`${baseUrl}/api/sync.php`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-YA-Sync-Secret": syncSecret
+        },
+        body: JSON.stringify({ action: "capabilities" })
       });
-      if (!result.ok) {
+      const payload = await readWebConnectionTestResponse(response);
+      if (!response.ok || payload?.ok !== true) {
         setWebConnectionTestState("error");
-        setWebConnectionTestMessage(result.message);
+        setWebConnectionTestMessage(
+          typeof payload?.message === "string"
+            ? payload.message
+            : describeWebConnectionTestHttpError(response.status)
+        );
         return;
       }
-      if (result.protocol_version < 2 || result.storage !== "sqlite") {
+      if (payload.protocol_version < 2 || payload.storage !== "sqlite") {
         setWebConnectionTestState("error");
         setWebConnectionTestMessage("Web modülü güncel senkron protokolünü desteklemiyor. Hosting paketini güncelleyin.");
         return;
       }
       setWebConnectionTestState("success");
       setWebConnectionTestMessage("Web bağlantısı hazır. Güvenlik anahtarı ve SQLite senkron protokolü doğrulandı.");
-    } catch {
+    } catch (error) {
       setWebConnectionTestState("error");
-      setWebConnectionTestMessage("Web bağlantısı kontrol edilemedi. Adres, SSL ve internet bağlantısını kontrol edin.");
+      setWebConnectionTestMessage(error instanceof DOMException && error.name === "AbortError"
+        ? "Web modülü 10 saniye içinde yanıt vermedi. Adres, SSL ve hosting durumunu kontrol edin."
+        : "Web bağlantısı kontrol edilemedi. Adres, SSL ve internet bağlantısını kontrol edin.");
     }
   };
 
@@ -936,4 +943,23 @@ function createWebConnectionTestFetch(timeoutMs: number): typeof fetch {
       upstreamSignal?.removeEventListener("abort", abortFromUpstream);
     }
   };
+}
+
+async function readWebConnectionTestResponse(response: Response): Promise<Record<string, any> | null> {
+  try {
+    const payload = await response.json();
+    return payload && typeof payload === "object" ? payload as Record<string, any> : null;
+  } catch {
+    return null;
+  }
+}
+
+function describeWebConnectionTestHttpError(status: number): string {
+  if (status === 401 || status === 403) {
+    return "Web güvenlik anahtarı kabul edilmedi. Hosting ve uygulamadaki anahtarın aynı olduğunu kontrol edin.";
+  }
+  if (status === 404) {
+    return "Web senkron uç noktası bulunamadı. Web modül adresini ve hosting paketini kontrol edin.";
+  }
+  return `Web modülü geçerli bir bağlantı yanıtı vermedi (HTTP ${status}).`;
 }
