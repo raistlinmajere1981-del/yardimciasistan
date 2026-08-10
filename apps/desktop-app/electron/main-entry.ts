@@ -3,10 +3,11 @@ import path from "node:path";
 import "./main";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
+import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 
-// Ana Electron süreci mevcut main.ts içinde kurulmaya devam eder. Finans ve oda
-// adisyonu IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı migration'larından
-// sonra yapılır.
+// Ana Electron süreci mevcut main.ts içinde kurulmaya devam eder. Finans, oda
+// adisyonu ve yan etkisiz web bağlantı testi IPC yüzeyleri ayrı tutulur; kayıtlar
+// ana veritabanı migration'larından sonra yapılır.
 void app.whenReady().then(() => {
   setImmediate(() => {
     const databasePath = () => path.join(
@@ -24,5 +25,7 @@ void app.whenReady().then(() => {
       databasePath,
       assertUnlocked: () => undefined
     });
+
+    registerWebConnectionIpcHandlers();
   });
 });
