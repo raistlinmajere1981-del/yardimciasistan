@@ -1,8 +1,8 @@
-import { BedDouble, CalendarCheck, ChevronDown, ClipboardCheck, LogIn, LogOut } from "lucide-react";
+import { BedDouble, CalendarCheck, ChevronDown, LogIn, LogOut } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import type { DesktopDashboardData } from "../../electron/database";
-import { getRoomDisplayInfo, isAccommodationTask } from "../app/operations";
+import { getRoomDisplayInfo } from "../app/operations";
 import { RoomFolioWorkspace } from "../components/pension/RoomFolioWorkspace";
 
 interface PensionPageProps {
@@ -29,9 +29,6 @@ function localDateKey() {
 export function PensionPage({ data, reservations, rooms, stays, tasks }: PensionPageProps) {
   const today = localDateKey();
   const activeReservations = data.reservations.filter((reservation) => !["rejected", "cancelled", "completed"].includes(reservation.status));
-  const pendingAccommodationTasks = data.dailyTasks.filter(
-    (task) => task.status !== "completed" && isAccommodationTask(task, data.reservations)
-  );
   const quickStats: PensionQuickStat[] = [
     {
       label: "Bugün giriş",
@@ -103,24 +100,14 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
           </header>
           <div className="operation-panel-content">{rooms}</div>
         </aside>
-        {pendingAccommodationTasks.length > 0 ? (
-          <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
-            <header className="operation-panel-heading">
-              <span className="operation-panel-eyebrow">Günlük İşler</span>
-              <h2 id="pension-tasks-title">Günlük Konaklama İşleri</h2>
-              <p>Giriş, çıkış, temizlik ve bakım görevleri</p>
-            </header>
-            <div className="operation-panel-content">{tasks}</div>
-          </section>
-        ) : (
-          <section className="pension-empty-tasks" aria-label="Günlük konaklama işleri">
-            <ClipboardCheck size={18} aria-hidden="true" />
-            <div>
-              <strong>Bugün yapılacak konaklama işi yok.</strong>
-              <span>Yeni giriş, çıkış, temizlik veya bakım işi oluşursa burada görünür.</span>
-            </div>
-          </section>
-        )}
+        <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
+          <header className="operation-panel-heading">
+            <span className="operation-panel-eyebrow">Günlük İşler</span>
+            <h2 id="pension-tasks-title">Günlük Konaklama İşleri</h2>
+            <p>Giriş, çıkış, temizlik, bakım ve kendi eklediğiniz işler</p>
+          </header>
+          <div className="operation-panel-content">{tasks}</div>
+        </section>
       </div>
 
       <details className="pension-archive-details">
