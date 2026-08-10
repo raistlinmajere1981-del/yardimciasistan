@@ -24,7 +24,7 @@ Aşağıdaki ana zincir çalışır durumdadır:
 
 ### Web yayın ve hosting bağlantısı
 
-Masaüstü uygulaması yayın/senkron isteğini üretiyor ve test ortamındaki otomatik akışlar mevcut. Gerçek hosting bağlantısı ortam, PHP izinleri, alan adı ve ağ koşullarına bağlı olduğundan canlı bilgisayar/hosting üzerinde ayrıca doğrulanmalıdır.
+Masaüstü uygulaması yayın/senkron isteğini üretiyor ve test ortamındaki otomatik akışlar mevcut. Renderer ve transport tarafındaki temel hata toleransı güçlendirilmiştir; gerçek hosting bağlantısı ortam, PHP izinleri, alan adı ve ağ koşullarına bağlı olduğundan canlı bilgisayar/hosting üzerinde ayrıca doğrulanmalıdır.
 
 ### Windows son saha testi
 
@@ -131,11 +131,22 @@ Basit ön muhasebe ekranındaki günlük kayıt akışı kısaltılmıştır.
 - Bekleyen oda alacakları, oda adisyonundan tahsilat yönlendirmesi, manuel kayıt silme onayı ve detaylı raporlar korunur.
 - Finans hesaplama ve tahsilat servislerinde iş kuralı değişikliği yapılmamıştır.
 
+### Canlı senkron dayanıklılığı
+
+Gerçek hosting testi öncesi masaüstü senkron bağlantısının kod tarafındaki temel hata toleransı güçlendirilmiştir.
+
+- Başlangıç ayarı, dashboard ve senkron durum bridge çağrılarındaki Promise hataları renderer tarafından yakalanır ve kullanıcıya anlaşılır durum mesajı gösterilir.
+- Manuel `Şimdi Eşitle` işlemi IPC/ağ hatasında `yükleniyor` durumunda takılı kalmaz.
+- Eşitleme başarılı olsa bile dashboard yenilemesi başarısızsa bu durum ayrı bir hata olarak görünür.
+- Otomatik senkron HTTP çağrıları 15 saniyelik zaman aşımı ile sınırlandırılır ve cevap vermeyen istek `AbortController` ile iptal edilir.
+- Mevcut retry/backoff, offline sınıflandırma, cursor, idempotency ve outbox iş kuralları korunur.
+- HTTP timeout davranışı ayrı smoke testiyle CI zincirinde doğrulanır.
+
 ## Sıradaki Ürün Öncelikleri
 
-### 1. Canlı bağlantı sağlamlaştırma
+### 1. Gerçek hosting bağlantısı doğrulaması
 
-Gerçek hosting üzerinde web yayın/senkron davranışı bilgisayar başında log ve ağ yanıtları izlenerek ayrıca ele alınacaktır. Bu çalışma ürün fonksiyonlarından bağımsız tutulacaktır.
+Renderer ve HTTP transport tarafındaki temel hata toleransı tamamlandı. Sıradaki adım gerçek hosting üzerinde web yayın/senkron davranışını bilgisayar başında log ve ağ yanıtlarıyla doğrulamaktır. PHP izinleri, SSL, alan adı/yol, güvenlik anahtarı ve gerçek ağ kesintisi senaryoları bu saha testinde kontrol edilmelidir.
 
 ### 2. Windows son saha doğrulaması
 
@@ -147,4 +158,4 @@ Pansiyon, Restoran, Müşteri İşleri ve Kasa ana günlük ekranlarının ilk s
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma, sade operasyon takvimi ve temel ön muhasebe v1 ürün omurgasındadır. Pansiyon, Restoran, Müşteri İşleri ve Kasa ana ekranlarının ilk saha kullanılabilirlik turu tamamlanmıştır. Sonraki ana geliştirme odağı gerçek hosting bağlantısı ile hedef Windows bilgisayardaki uçtan uca saha doğrulamasıdır.
+Frontend mimari refaktörü ve ana masaüstü saha kullanılabilirlik turu tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma, sade operasyon takvimi ve temel ön muhasebe v1 ürün omurgasındadır. Senkron bağlantısının renderer hata yönetimi ve HTTP zaman aşımı kod tarafında sağlamlaştırılmıştır. Sonraki ana geliştirme odağı gerçek hosting bağlantısı ile hedef Windows bilgisayardaki uçtan uca saha doğrulamasıdır.
