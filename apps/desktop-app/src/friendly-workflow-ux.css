@@ -325,3 +325,52 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Oda kartında sürekli dört durum düğmesi yerine tek, tanıdık bir kontrol kullan. */
+.room-card-actions {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.room-status-select {
+  display: grid;
+  gap: 3px;
+  min-width: 118px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.room-status-select select {
+  min-height: 32px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--surface-1);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.room-status-select select:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 1px;
+}
+
+.room-status-select select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+@media (max-width: 760px) {
+  .room-card-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .room-status-select {
+    width: 100%;
+  }
+}
