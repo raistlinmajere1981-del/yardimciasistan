@@ -51,24 +51,45 @@ export function useDesktopSync({
     }
 
     let active = true;
-
-    void bridge.getBootstrapData().then((data) => {
+    const reportInitialError = (message: string) => {
       if (!active) return;
-      const firstApplicationLoad = !appDataInitializedRef.current;
-      setDashboardData((current) => ({
-        ...current,
-        databasePath: data.databasePath,
-        backupPath: data.backupPath,
-        webModuleUrl: data.syncSettings.webModuleUrl
-      }));
-      onBootstrapSetupRef.current(data.setup, firstApplicationLoad);
-      appDataInitializedRef.current = true;
+      setSyncState("error");
+      setStatusMessage(message);
+    };
+
+    void bridge.getBootstrapData()
+      .then((data) => {
+        if (!active) return;
+        const firstApplicationLoad = !appDataInitializedRef.current;
+        setDashboardData((current) => ({
+          ...current,
+          databasePath: data.databasePath,
+          backupPath: data.backupPath,
+          webModuleUrl: data.syncSettings.webModuleUrl
+        }));
+        onBootstrapSetupRef.current(data.setup, firstApplicationLoad);
+        appDataInitializedRef.current = true;
+      })
+      .catch(() => {
+        reportInitialError("Başlangıç ayarları okunamadı. Yerel veriler korunuyor; uygulamayı yeniden başlatmayı deneyin.");
+      });
+
+    void loadDashboardData().catch(() => {
+      reportInitialError("Yerel işletme verileri okunamadı. Uygulamayı yeniden başlatmayı deneyin.");
     });
 
-    void loadDashboardData();
-    void bridge.getSyncStatus?.().then((status) => {
-      if (active) setAutomaticSyncStatus(status);
-    });
+    void bridge.getSyncStatus?.()
+      .then((status) => {
+        if (active) setAutomaticSyncStatus(status);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAutomaticSyncStatus((current) => ({
+          ...current,
+          phase: "error",
+          message: "Senkron durumu okunamadı. Şimdi Eşitle ile yeniden deneyin."
+        }));
+      });
 
     const unsubscribeDashboard = bridge.onDashboardDataChanged?.((nextDashboardData) => {
       if (active) setDashboardData(nextDashboardData);
@@ -82,7 +103,7 @@ export function useDesktopSync({
       unsubscribeDashboard?.();
       unsubscribeSync?.();
     };
-  }, [accessPhase, loadDashboardData]);
+  }, [accessPhase, loadDashboardData, setStatusMessage, setSyncState]);
 
   const pullRequests = useCallback(async () => {
     setSyncState("loading");
@@ -95,25 +116,44 @@ export function useDesktopSync({
       return;
     }
 
-    if (bridge.runSyncNow) {
-      const cycle = await bridge.runSyncNow();
-      setAutomaticSyncStatus(cycle.status);
-      await loadDashboardData();
-      setSyncState(cycle.ok ? "success" : "error");
-      setStatusMessage(cycle.message);
-      return;
-    }
+    try {
+      if (bridge.runSyncNow) {
+        const cycle = await bridge.runSyncNow();
+        setAutomaticSyncStatus(cycle.status);
+        try {
+          await loadDashboardData();
+        } catch {
+          setSyncState("error");
+          setStatusMessage(cycle.ok
+            ? "Eşitleme tamamlandı ancak ekran verileri yenilenemedi. Uygulamayı yeniden başlatmayı deneyin."
+            : `${cycle.message} Ekran verileri de yenilenemedi.`);
+          return;
+        }
+        setSyncState(cycle.ok ? "success" : "error");
+        setStatusMessage(cycle.message);
+        return;
+      }
 
-    const result = await bridge.pullRequests();
-    if (!result.ok) {
+      const result = await bridge.pullRequests();
+      if (!result.ok) {
+        setSyncState("error");
+        setStatusMessage(result.message);
+        return;
+      }
+
+      try {
+        await loadDashboardData();
+      } catch {
+        setSyncState("error");
+        setStatusMessage("Web talepleri alındı ancak ekran verileri yenilenemedi. Uygulamayı yeniden başlatmayı deneyin.");
+        return;
+      }
+      setSyncState("success");
+      setStatusMessage(result.count > 0 ? `${result.count} talep alındı.` : "Yeni talep bulunmuyor.");
+    } catch {
       setSyncState("error");
-      setStatusMessage(result.message);
-      return;
+      setStatusMessage("Senkron bağlantısı kontrol edilemedi. İnternet ve web modülü ayarlarını kontrol edip yeniden deneyin.");
     }
-
-    await loadDashboardData();
-    setSyncState("success");
-    setStatusMessage(result.count > 0 ? `${result.count} talep alındı.` : "Yeni talep bulunmuyor.");
   }, [loadDashboardData, setStatusMessage, setSyncState]);
 
   return {
