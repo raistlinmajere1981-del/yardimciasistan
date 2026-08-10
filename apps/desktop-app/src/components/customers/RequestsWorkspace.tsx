@@ -221,7 +221,7 @@ export function RequestsWorkspace({
                 <p className="detail-scroll-copy">{selectedRequest.ai_summary || "Bu talep için henüz AI özeti hazırlanmadı."}</p>
               </div>
             )}
-            <div className="operations-command-grid request-detail-actions">
+            <div className="operations-command-grid request-detail-actions request-primary-actions">
               <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(selectedRequest)}>
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
@@ -242,30 +242,39 @@ export function RequestsWorkspace({
                   {convertingRequestId === selectedRequest.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
                 </ActionButton>
               )}
-              {selectedActionMode === "open" && <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
-                <CheckCircle2 size={16} aria-hidden="true" />
-                Cevaplandı İşaretle
-              </ActionButton>}
-              {selectedActionMode === "open" && <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
-                <ClipboardList size={16} aria-hidden="true" />
-                Reddet
-              </ActionButton>}
-              {["answered", "rejected", "closed"].includes(selectedActionMode) && (
-                <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "new")}>
-                  <RefreshCw size={16} aria-hidden="true" />
-                  Yeniden Aç
-                </ActionButton>
-              )}
               {selectedActionMode === "converted" && (
                 <ActionButton size="sm" type="button" onClick={() => onOpenReservation(selectedRequest)}>
                   <CalendarCheck size={16} aria-hidden="true" />
                   Rezervasyonu Aç
                 </ActionButton>
               )}
-              <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedRequest)}>
-                <Trash2 size={16} aria-hidden="true" />
-                Talebi Sil
-              </ActionButton>
+              <details className="request-more-actions">
+                <summary>Diğer işlemler</summary>
+                <div className="request-more-actions-menu">
+                  {selectedActionMode === "open" && (
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "answered")}>
+                      <CheckCircle2 size={16} aria-hidden="true" />
+                      Cevaplandı İşaretle
+                    </ActionButton>
+                  )}
+                  {selectedActionMode === "open" && (
+                    <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "rejected")}>
+                      <ClipboardList size={16} aria-hidden="true" />
+                      Reddet
+                    </ActionButton>
+                  )}
+                  {["answered", "rejected", "closed"].includes(selectedActionMode) && (
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(selectedRequest, "new")}>
+                      <RefreshCw size={16} aria-hidden="true" />
+                      Yeniden Aç
+                    </ActionButton>
+                  )}
+                  <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedRequest)}>
+                    <Trash2 size={16} aria-hidden="true" />
+                    Talebi Sil
+                  </ActionButton>
+                </div>
+              </details>
             </div>
           </>
         ) : (
