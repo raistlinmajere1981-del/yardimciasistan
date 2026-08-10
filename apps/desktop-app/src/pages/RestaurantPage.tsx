@@ -7,12 +7,13 @@ import { MetricCard, type MetricCardProps } from "../components/ui/MetricCard";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
+  reservations: ReactNode;
   tasks: ReactNode;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
   onUpdateTableStatus: (tableId: string, status: string) => void;
 }
 
-export function RestaurantPage({ data, tasks, onDashboardDataChanged, onUpdateTableStatus }: RestaurantPageProps) {
+export function RestaurantPage({ data, reservations, tasks, onDashboardDataChanged, onUpdateTableStatus }: RestaurantPageProps) {
   const [tableOrders, setTableOrders] = useState<DesktopTableOrder[]>([]);
   const restaurantTasks = data.dailyTasks.filter((task) => isRestaurantTask(task, data.reservations));
   const pendingRestaurantTasks = restaurantTasks.filter((task) => task.status === "pending");
@@ -82,6 +83,14 @@ export function RestaurantPage({ data, tasks, onDashboardDataChanged, onUpdateTa
         <div className="operation-summary-grid">
           {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
         </div>
+      </section>
+      <section className="operation-group-panel restaurant-reservations-section" aria-labelledby="restaurant-reservations-title">
+        <header className="operation-panel-heading">
+          <span className="operation-panel-eyebrow">Rezervasyon</span>
+          <h2 id="restaurant-reservations-title">Masa Rezervasyonları</h2>
+          <p>Telefonla, yüz yüze veya web üzerinden gelen restoran rezervasyonlarını takip edin.</p>
+        </header>
+        <div className="operation-panel-content">{reservations}</div>
       </section>
       <div className="restaurant-layout">
         <section className="operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">

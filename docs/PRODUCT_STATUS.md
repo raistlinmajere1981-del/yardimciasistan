@@ -11,7 +11,7 @@ Aşağıdaki ana zincir çalışır durumdadır:
 - Web formu ve Web AI üzerinden müşteri talebi oluşturma
 - Masaüstünde talep, müşteri, rezervasyon, oda, masa ve günlük iş yönetimi
 - Pansiyon ve restoran için manuel günlük iş / not oluşturma, düzenleme, tamamlama ve silme
-- Masaüstünden doğrudan pansiyon rezervasyonu oluşturma; yeni müşteriyi rezervasyon panelinden hızlıca ekleme
+- Masaüstünden doğrudan pansiyon ve restoran rezervasyonu oluşturma; yeni müşteriyi rezervasyon panelinden hızlıca ekleme
 - Aktif pansiyon rezervasyonunda oda atama/değiştirme ve manuel rezervasyon ayrıntılarını düzenleme
 - Günlük ve haftalık sade operasyon takvimi
 - QR menü, stok, masa adisyonu, oda folyosu ve basit ön muhasebe
@@ -67,6 +67,17 @@ Aktif pansiyon rezervasyonlarındaki `Düzenle / Oda Ata` işlemi aynı sade pan
 - Aktif konaklamaya dönüştürülmüş rezervasyonlar bu formdan değiştirilmez; konaklama akışı korunur.
 - Güncellemeler `reservation.updated` olayı üretir.
 
+### Doğrudan restoran rezervasyonu
+
+Restoran ekranındaki `Masa Rezervasyonları` alanından telefonla veya yüz yüze gelen rezervasyon doğrudan oluşturulabilir.
+
+- Kayıtlı müşteri seçilebilir veya aynı panelden hızlı müşteri eklenebilir.
+- Tarih, saat, kişi sayısı, isteğe bağlı masa ve not girilir.
+- Masa seçilmişse aktiflik, bakım durumu, kapasite ve aynı tarih/saat çakışması DB katmanında doğrulanır.
+- Masa seçmeden kayıt açılabilir; masa daha sonra operasyon sırasında netleştirilebilir.
+- Manuel restoran rezervasyonu mevcut rezervasyon/takvim veri modelini kullanır ve `reservation.created` olayı üretir.
+- Webden gelen masa ve kahvaltı rezervasyonları da aynı restoran rezervasyon listesinde görünür.
+
 ### Operasyon takvimi
 
 Sol menüdeki `Takvim` sayfası pansiyon ve restoran operasyonlarını aynı tarih görünümünde birleştirir.
@@ -95,7 +106,7 @@ Pansiyon ekranının ilk saha kullanılabilirlik turu tamamlanmıştır.
 
 ### 1. Rezervasyon kullanım akışı
 
-Rezervasyon düzenleme, oda atama/değiştirme ve rezervasyon panelinden hızlı müşteri oluşturma akışları v1 kapsamına alınmıştır. Yeni rezervasyonda listede olmayan müşteri ad-soyad ve telefonla hızlıca oluşturulur ve aynı formda otomatik seçilir.
+Pansiyon rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve doğrudan restoran masa rezervasyonu akışları v1 kapsamına alınmıştır. Yeni rezervasyonda listede olmayan müşteri ad-soyad ve telefonla hızlıca oluşturulur ve aynı formda otomatik seçilir.
 
 ### 2. Canlı bağlantı sağlamlaştırma
 
@@ -107,4 +118,4 @@ Pansiyon ekranının ilk sadeleştirme turu tamamlandı. Sıradaki turda Restora
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, doğrudan rezervasyon, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve sade operasyon takvimi v1 ürün omurgasındadır. Pansiyon ekranındaki ilk saha sadeleştirmesi tamamlanmıştır. Sonraki geliştirmelerde Restoran/Müşteri İşleri/Kasa kullanılabilirlik turu ile gerçek hosting ve hedef Windows bilgisayardaki canlı bağlantı doğrulaması önceliklidir.
+Frontend mimari refaktörü tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma ve sade operasyon takvimi v1 ürün omurgasındadır. Pansiyon ekranındaki ilk saha sadeleştirmesi tamamlanmıştır. Sonraki geliştirmelerde Restoran/Müşteri İşleri/Kasa kullanılabilirlik turu ile gerçek hosting ve hedef Windows bilgisayardaki canlı bağlantı doğrulaması önceliklidir.

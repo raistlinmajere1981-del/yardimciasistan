@@ -3,7 +3,8 @@ import type {
   DesktopDashboardData,
   DesktopStatusUpdateResult,
   SaveDailyTaskInput,
-  SaveManualReservationInput
+  SaveManualReservationInput,
+  SaveManualRestaurantReservationInput
 } from "../../electron/database";
 import type { SyncState } from "./runtime-state";
 
@@ -74,6 +75,30 @@ export function useOperationController({
     }
 
     const result = await window.yardimciDesktop.saveManualReservation(input);
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    setDashboardData(result.dashboardData);
+    setSyncState("success");
+    setStatusMessage(result.message);
+    return result;
+  }
+
+  async function handleSaveManualRestaurantReservation(input: SaveManualRestaurantReservationInput): Promise<DesktopStatusUpdateResult> {
+    setSyncState("loading");
+    setStatusMessage("Restoran rezervasyonu kaydediliyor...");
+
+    if (!window.yardimciDesktop) {
+      const result = { ok: false as const, message: "Restoran rezervasyonu kaydedilemedi. Uygulamayı yeniden başlatın." };
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return result;
+    }
+
+    const result = await window.yardimciDesktop.saveManualRestaurantReservation(input);
     if (!result.ok) {
       setSyncState("error");
       setStatusMessage(result.message);
@@ -182,6 +207,7 @@ export function useOperationController({
     handleUpdateRoomStatus,
     handleUpdateTableStatus,
     handleSaveManualReservation,
+    handleSaveManualRestaurantReservation,
     handleUpdateReservationStatus,
     handleSaveDailyTask,
     handleDeleteDailyTask,
