@@ -63,6 +63,21 @@ Pansiyon modülü kullanılıyorsa:
 - Ödeme alın ve Kasa'ya otomatik işlendiğini doğrulayın.
 - Çıkış yapın; oda ve kalan alacak davranışını kontrol edin.
 
+### 4A. Android oda hesabı saha kontrolü
+
+Android companion kullanılıyorsa bu kontrol için **masaüstü, Android APK ve hosting `api/sync.php` aynı güncel sürümde** olmalıdır.
+
+- Masaüstünde giriş yapılmış bir konaklamanın açık oda hesabını ve pozitif kalan tutarını hazırlayın.
+- Android'de `Pansiyon → Hesaplar` alanını açın; müşteri, oda, toplam, alınan ve kalan tutarın masaüstüyle eşleştiğini doğrulayın.
+- `Ödeme Al` ile kalan tutarın bir bölümünü tahsil edin. İşlem masaüstüne ulaştıktan sonra hem oda hesabının kalan tutarının azaldığını hem Kasa gelirinin oluştuğunu doğrulayın.
+- Android ekranını yenilemeden masaüstünde hesabı değiştiren ikinci bir tahsilat yapıp telefondaki eski bakiye üzerinden tekrar ödeme göndermeyi deneyin. Eski bakiye işlemi uygulanmamalı ve telefon canlı veriyi yenilemeye yönlendirilmelidir.
+- Bakiye pozitifken `Çıkışı Tamamla` işleminin kullanılamadığını doğrulayın.
+- Kalan tutarın tamamını tahsil edin; güncel Android verisinde bakiye sıfır olduktan sonra `Çıkışı Tamamla` ile konaklamayı kapatın.
+- Masaüstünde oda hesabının kapandığını, konaklamanın `checked_out` olduğunu ve odanın uygun durumda tekrar boş göründüğünü doğrulayın.
+- Aynı mobil action yeniden iletilirse ikinci ödeme veya ikinci çıkış kaydı oluşmamalıdır.
+
+Mobilde zorla borçlu çıkış, ödeme geri alma, fiyat/indirim ve ek hesap kalemi düzenleme beklenmez; bu işlemler masaüstünde kalır.
+
 ## 5. Restoran Akışı
 
 Restoran modülü kullanılıyorsa:
