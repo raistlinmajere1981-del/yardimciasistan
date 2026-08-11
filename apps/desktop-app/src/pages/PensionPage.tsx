@@ -1,6 +1,6 @@
-import { BedDouble, CalendarCheck, ChevronDown, LogIn, LogOut } from "lucide-react";
+import { BedDouble, CalendarCheck, ChevronDown, LogIn, LogOut, ReceiptText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { DesktopDashboardData } from "../../electron/database";
 import { getRoomDisplayInfo } from "../app/operations";
 import { RoomFolioWorkspace } from "../components/pension/RoomFolioWorkspace";
@@ -27,6 +27,7 @@ function localDateKey() {
 }
 
 export function PensionPage({ data, reservations, rooms, stays, tasks }: PensionPageProps) {
+  const roomFolioDetailsRef = useRef<HTMLDetailsElement>(null);
   const today = localDateKey();
   const activeReservations = data.reservations.filter((reservation) => !["rejected", "cancelled", "completed"].includes(reservation.status));
   const quickStats: PensionQuickStat[] = [
@@ -60,6 +61,15 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
     ...data.rooms.map((room) => `${room.id}:${room.status}:${room.updatedAt}`)
   ].join("|");
 
+  function openRoomFolio() {
+    const details = roomFolioDetailsRef.current;
+    if (!details) return;
+    details.open = true;
+    window.requestAnimationFrame(() => {
+      details.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   return (
     <section className="combined-page pension-page" aria-label="Pansiyon yönetimi">
       <section className="pension-today-strip" aria-labelledby="pension-summary-title">
@@ -91,10 +101,21 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
           <div className="operation-panel-content">{reservations}</div>
         </section>
         <aside className="operation-group-panel pension-rooms-section" aria-labelledby="pension-rooms-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Odalar</span>
-            <h2 id="pension-rooms-title">Anlık Oda Durumu</h2>
-            <p>Odaların güncel kullanım durumu</p>
+          <header className="operation-panel-heading pension-room-heading">
+            <div className="pension-room-heading-copy">
+              <span className="operation-panel-eyebrow">Odalar</span>
+              <h2 id="pension-rooms-title">Anlık Oda Durumu</h2>
+              <p>Odaların güncel kullanım durumu</p>
+            </div>
+            <button
+              className="pension-folio-shortcut"
+              type="button"
+              aria-controls="pension-room-folio"
+              onClick={openRoomFolio}
+            >
+              <ReceiptText size={15} aria-hidden="true" />
+              Oda Hesapları
+            </button>
           </header>
           <div className="operation-panel-content">{rooms}</div>
         </aside>
@@ -108,14 +129,18 @@ export function PensionPage({ data, reservations, rooms, stays, tasks }: Pension
         </section>
       </div>
 
-      <details className="pension-archive-details pension-folio-details">
+      <details
+        className="pension-archive-details pension-folio-details"
+        id="pension-room-folio"
+        ref={roomFolioDetailsRef}
+      >
         <summary>
           <span className="pension-archive-summary-copy">
             <span className="operation-panel-eyebrow">Oda hesabı</span>
             <strong>Oda Hesabı ve Tahsilat</strong>
             <small>Konaklama tutarı, ek harcamalar ve ödeme işlemleri</small>
           </span>
-          <span className="pension-archive-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
+          <span className="pension-archive-summary-action">Hesapları Aç <ChevronDown size={16} aria-hidden="true" /></span>
         </summary>
         <RoomFolioWorkspace refreshKey={roomFolioRefreshKey} />
       </details>

@@ -24,6 +24,54 @@
   min-width: 138px;
 }
 
+.pension-room-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pension-room-heading-copy {
+  min-width: 0;
+}
+
+.pension-folio-shortcut {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.pension-folio-shortcut:hover {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary-soft) 78%, var(--primary) 22%);
+}
+
+.pension-folio-shortcut:active {
+  transform: translateY(1px);
+}
+
+.pension-folio-shortcut:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+#pension-room-folio {
+  scroll-margin-top: 84px;
+}
+
 .room-folio-payment-complete {
   display: flex;
   align-items: center;
@@ -129,6 +177,15 @@
   }
 
   .room-folio-details-actions .room-folio-secondary-button {
+    width: 100%;
+  }
+
+  .pension-room-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pension-folio-shortcut {
     width: 100%;
   }
 
