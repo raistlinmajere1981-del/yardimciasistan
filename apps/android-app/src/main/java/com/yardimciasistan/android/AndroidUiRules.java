@@ -20,6 +20,7 @@ final class AndroidUiRules {
   static final String PENSION_TASKS = "tasks";
 
   static final String RESTAURANT_TABLES = "tables";
+  static final String RESTAURANT_RESERVATIONS = "reservations";
   static final String RESTAURANT_ORDERS = "orders";
   static final String RESTAURANT_STOCK = "stock";
   static final String RESTAURANT_MENU = "menu";
@@ -101,6 +102,9 @@ final class AndroidUiRules {
     if (RESTAURANT_TABLES.equals(mode)) {
       return data.hasPermission("table.view");
     }
+    if (RESTAURANT_RESERVATIONS.equals(mode)) {
+      return data.hasPermission("reservation.view") && hasRestaurantReservationContext(data);
+    }
     if (RESTAURANT_ORDERS.equals(mode)) {
       return data.hasPermission("table_order.view");
     }
@@ -111,6 +115,33 @@ final class AndroidUiRules {
       return canDelete(data, "menu.delete");
     }
     return false;
+  }
+
+  static boolean hasRestaurantReservationContext(OperationData data) {
+    if (data == null) {
+      return false;
+    }
+    for (OperationData.ReservationRecord reservation : data.reservations) {
+      if (isRestaurantReservation(reservation)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static boolean isRestaurantReservation(OperationData.ReservationRecord reservation) {
+    return reservation != null && (
+        "table".equals(reservation.type)
+        || "room_and_table".equals(reservation.type)
+        || !reservation.tableIds.isEmpty()
+    );
+  }
+
+  static boolean isRestaurantOnlyReservation(OperationData.ReservationRecord reservation) {
+    return reservation != null && (
+        "table".equals(reservation.type)
+        || (reservation.roomIds.isEmpty() && !reservation.tableIds.isEmpty())
+    );
   }
 
   static boolean canDelete(OperationData data, String permission) {
@@ -135,6 +166,9 @@ final class AndroidUiRules {
   static String firstRestaurantMode(OperationData data) {
     if (canOpenRestaurantMode(data, RESTAURANT_TABLES)) {
       return RESTAURANT_TABLES;
+    }
+    if (canOpenRestaurantMode(data, RESTAURANT_RESERVATIONS)) {
+      return RESTAURANT_RESERVATIONS;
     }
     if (canOpenRestaurantMode(data, RESTAURANT_ORDERS)) {
       return RESTAURANT_ORDERS;
@@ -173,7 +207,8 @@ final class AndroidUiRules {
     }
     if (TAB_RESTAURANT.equals(tab)) {
       if (
-          !RESTAURANT_ORDERS.equals(mode)
+          !RESTAURANT_RESERVATIONS.equals(mode)
+          && !RESTAURANT_ORDERS.equals(mode)
           && !RESTAURANT_STOCK.equals(mode)
           && !RESTAURANT_MENU.equals(mode)
       ) {

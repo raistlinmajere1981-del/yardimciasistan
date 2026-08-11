@@ -40,7 +40,7 @@ final class NotificationEventDetector {
             "reservation",
             "Rezervasyon onay bekliyor",
             reservation.customerName + reservationSummarySuffix(reservation),
-            "pension:reservations",
+            routeForReservation(reservation),
             reservation.updatedAt,
             NotificationEvent.PRIORITY_MEDIUM
         ));
@@ -211,6 +211,12 @@ final class NotificationEventDetector {
       return "restaurant:tables";
     }
     return "today";
+  }
+
+  static String routeForReservation(OperationData.ReservationRecord reservation) {
+    return AndroidUiRules.isRestaurantOnlyReservation(reservation)
+        ? "restaurant:reservations"
+        : "pension:reservations";
   }
 
   private static NotificationEvent paymentWaitingEvent(String tableId, String tableName, double total, String updatedAt) {

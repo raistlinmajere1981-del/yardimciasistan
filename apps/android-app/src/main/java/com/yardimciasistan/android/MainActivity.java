@@ -1505,7 +1505,14 @@ public final class MainActivity extends ComponentActivity {
       counters.add(new CounterValue("Cevap", data.waitingResponses > 0 ? data.waitingResponses : countWaitingRequests(), UiKit.DANGER, "customers:waiting"));
     }
     if (canViewReservations) {
-      counters.add(new CounterValue("Rez.", data.pendingReservations, UiKit.WARNING, "pension:reservations"));
+      int pensionPending = countPensionReservations("pending");
+      int restaurantPending = countRestaurantOnlyReservations("pending");
+      if (pensionPending > 0) {
+        counters.add(new CounterValue("Oda Rez.", pensionPending, UiKit.WARNING, "pension:reservations"));
+      }
+      if (restaurantPending > 0) {
+        counters.add(new CounterValue("Masa Rez.", restaurantPending, UiKit.WARNING, "restaurant:reservations"));
+      }
     }
     if (canViewTasks) {
       counters.add(new CounterValue("İş", data.todayTasks > 0 ? data.todayTasks : data.pendingDailyTasks, UiKit.ACCENT, "pension:tasks"));
@@ -1778,6 +1785,9 @@ public final class MainActivity extends ComponentActivity {
     if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TABLES)) {
       options.add(new String[] {AndroidUiRules.RESTAURANT_TABLES, "Masalar"});
     }
+    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS)) {
+      options.add(new String[] {AndroidUiRules.RESTAURANT_RESERVATIONS, "Rezervasyonlar"});
+    }
     if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_ORDERS)) {
       options.add(new String[] {AndroidUiRules.RESTAURANT_ORDERS, "Açık Adisyon"});
     }
@@ -1808,6 +1818,26 @@ public final class MainActivity extends ComponentActivity {
       }
       for (OperationData.TableRecord table : data.tables) {
         page.addView(tableCard(table));
+      }
+    } else if (AndroidUiRules.RESTAURANT_RESERVATIONS.equals(restaurantMode)) {
+      page.addView(statusStrip(new CounterValue[] {
+          new CounterValue("Bekleyen", countRestaurantReservations("pending"), UiKit.WARNING, ""),
+          new CounterValue("Onaylı", countRestaurantReservations("approved"), UiKit.SUCCESS, ""),
+          new CounterValue("Bugün", countRestaurantReservationsToday(), UiKit.INFO, "")
+      }));
+      int reservationCount = 0;
+      for (OperationData.ReservationRecord reservation : data.reservations) {
+        if (!AndroidUiRules.isRestaurantReservation(reservation)) {
+          continue;
+        }
+        page.addView(reservationCard(reservation, false));
+        reservationCount += 1;
+      }
+      if (reservationCount == 0) {
+        page.addView(emptyCard(
+            "Restoran rezervasyonu yok",
+            "Masa ve kahvaltı rezervasyonları geldiğinde burada görünür."
+        ));
       }
     } else if (AndroidUiRules.RESTAURANT_ORDERS.equals(restaurantMode)) {
       int activeOrders = countActiveOrders();
@@ -2187,7 +2217,7 @@ public final class MainActivity extends ComponentActivity {
     if (!data.permissionsResolved || data.hasPermission("customer.view") || data.hasPermission("reservation.view")) {
       notificationPreferences.addView(notificationToggle(
           "Müşteri / Rezervasyon",
-          "Yeni talepler ve onay bekleyen rezervasyonlar",
+          "Yeni talepler ve onay bekleyen oda/masa rezervasyonları",
           NotificationEvent.CATEGORY_CUSTOMER
       ));
       hasNotificationPreference = true;
@@ -2548,6 +2578,9 @@ public final class MainActivity extends ComponentActivity {
     card.addView(UiKit.text(this, dates, 12, UiKit.MUTED, Typeface.NORMAL));
     if (!reservation.roomIds.isEmpty()) {
       card.addView(UiKit.text(this, "Oda: " + namesForRooms(reservation.roomIds), 12, UiKit.MUTED, Typeface.NORMAL));
+    }
+    if (!reservation.tableIds.isEmpty()) {
+      card.addView(UiKit.text(this, "Masa: " + namesForTables(reservation.tableIds), 12, UiKit.MUTED, Typeface.NORMAL));
     }
     LinearLayout contact = UiKit.row(this);
     LinearLayout.LayoutParams contactParams = new LinearLayout.LayoutParams(-1, -2);
@@ -3783,6 +3816,10 @@ public final class MainActivity extends ComponentActivity {
       summary.addView(UiKit.divider(this));
       summary.addView(detailLine("Oda", namesForRooms(reservation.roomIds)));
     }
+    if (!reservation.tableIds.isEmpty()) {
+      summary.addView(UiKit.divider(this));
+      summary.addView(detailLine("Masa", namesForTables(reservation.tableIds)));
+    }
     if (!reservation.notes.isEmpty()) {
       summary.addView(UiKit.divider(this));
       summary.addView(UiKit.text(this, reservation.notes, 13, UiKit.TEXT, Typeface.NORMAL));
@@ -4703,6 +4740,42 @@ public final class MainActivity extends ComponentActivity {
     return count;
   }
 
+  private int countRestaurantReservations(String status) {
+    int count = 0;
+    for (OperationData.ReservationRecord reservation : data.reservations) {
+      if (status.equals(reservation.status) && AndroidUiRules.isRestaurantReservation(reservation)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private int countRestaurantOnlyReservations(String status) {
+    int count = 0;
+    for (OperationData.ReservationRecord reservation : data.reservations) {
+      if (status.equals(reservation.status) && AndroidUiRules.isRestaurantOnlyReservation(reservation)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private int countRestaurantReservationsToday() {
+    String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
+    int count = 0;
+    for (OperationData.ReservationRecord reservation : data.reservations) {
+      if (!AndroidUiRules.isRestaurantReservation(reservation)
+          || "cancelled".equals(reservation.status)
+          || "rejected".equals(reservation.status)) {
+        continue;
+      }
+      if (today.equals(reservation.startDate)) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   private int countPensionDate(boolean checkIn) {
     String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
     int count = 0;
@@ -5016,6 +5089,19 @@ public final class MainActivity extends ComponentActivity {
       for (OperationData.RoomRecord room : data.rooms) {
         if (roomId.equals(room.id)) {
           names.add(room.name);
+          break;
+        }
+      }
+    }
+    return names.isEmpty() ? "Atama bekliyor" : joinNonEmpty(", ", names.toArray(new String[0]));
+  }
+
+  private String namesForTables(List<String> tableIds) {
+    ArrayList<String> names = new ArrayList<>();
+    for (String tableId : tableIds) {
+      for (OperationData.TableRecord table : data.tables) {
+        if (tableId.equals(table.id)) {
+          names.add(table.name);
           break;
         }
       }

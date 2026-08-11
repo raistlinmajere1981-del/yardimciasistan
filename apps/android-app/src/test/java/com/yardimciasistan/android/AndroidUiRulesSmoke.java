@@ -6,6 +6,7 @@ public final class AndroidUiRulesSmoke {
   public static void main(String[] args) {
     hidesUnauthorizedTabsAndModes();
     selectsTheFirstAuthorizedMode();
+    recognizesRestaurantReservationContext();
     deletionsRequireResolvedActiveAdmin();
     reportsRequireResolvedActiveAdmin();
     validatesReportDatePresets();
@@ -26,6 +27,10 @@ public final class AndroidUiRulesSmoke {
     assertFalse(
         AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TABLES),
         "menu or task permissions must not leak into the tables mode"
+    );
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "menu or task permissions must not leak into restaurant reservations"
     );
     assertFalse(
         AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_ORDERS),
@@ -84,6 +89,53 @@ public final class AndroidUiRulesSmoke {
         AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_STAYS),
         "staff must never open the customer stay archive"
     );
+  }
+
+  private static void recognizesRestaurantReservationContext() {
+    OperationData data = restrictedData();
+    data.permissions.add("reservation.view");
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "reservation.view alone must not create an empty restaurant reservation mode"
+    );
+
+    OperationData.TableRecord table = new OperationData.TableRecord();
+    table.id = "table-1";
+    data.tables.add(table);
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "table inventory alone must not expose an empty reservation mode"
+    );
+
+    OperationData.ReservationRecord reservation = new OperationData.ReservationRecord();
+    reservation.id = "restaurant-reservation-1";
+    reservation.type = "table";
+    data.reservations.add(reservation);
+    assertTrue(AndroidUiRules.isRestaurantReservation(reservation), "table reservation classification");
+    assertTrue(AndroidUiRules.isRestaurantOnlyReservation(reservation), "table reservation should use the restaurant-first route");
+    assertTrue(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "an existing table reservation should expose restaurant reservations"
+    );
+
+    data.permissions.remove("table.view");
+    assertEquals(
+        AndroidUiRules.RESTAURANT_RESERVATIONS,
+        AndroidUiRules.firstRestaurantMode(data),
+        "reservation-only restaurant profile should land on reservations"
+    );
+
+    OperationData.ReservationRecord pension = new OperationData.ReservationRecord();
+    pension.type = "room";
+    assertFalse(AndroidUiRules.isRestaurantReservation(pension), "room reservation must stay outside the restaurant list");
+    assertFalse(AndroidUiRules.isRestaurantOnlyReservation(pension), "room reservation must keep the pension route");
+
+    OperationData.ReservationRecord combined = new OperationData.ReservationRecord();
+    combined.type = "room_and_table";
+    combined.roomIds.add("room-1");
+    combined.tableIds.add("table-1");
+    assertTrue(AndroidUiRules.isRestaurantReservation(combined), "combined stay should be visible in restaurant operations");
+    assertFalse(AndroidUiRules.isRestaurantOnlyReservation(combined), "combined stay should remain pension-first for notifications");
   }
 
   private static void deletionsRequireResolvedActiveAdmin() {
@@ -159,6 +211,7 @@ public final class AndroidUiRulesSmoke {
     assertDestination("pension:stays", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_STAYS);
     assertDestination("pension/tasks", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_TASKS);
     assertDestination("restaurant:tables", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_TABLES);
+    assertDestination("restaurant:reservations", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_RESERVATIONS);
     assertDestination("restaurant:orders", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_ORDERS);
     assertDestination("restaurant:stock", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_STOCK);
     assertDestination("restaurant:menu", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_MENU);
