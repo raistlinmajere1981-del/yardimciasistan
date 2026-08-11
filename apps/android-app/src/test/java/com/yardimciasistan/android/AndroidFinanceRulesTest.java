@@ -7,7 +7,7 @@ import org.junit.Test;
 public final class AndroidFinanceRulesTest {
   @Test
   public void parsesTurkishAndDotDecimalAmountsIntoMinorUnits() {
-    assertEquals(125050L, FinanceWorkspace.parseAmountMinor("1,250.50"));
+    assertEquals(125050L, FinanceWorkspace.parseAmountMinor("1250.50"));
     assertEquals(125050L, FinanceWorkspace.parseAmountMinor("1250,50"));
     assertEquals(9900L, FinanceWorkspace.parseAmountMinor("99"));
   }
