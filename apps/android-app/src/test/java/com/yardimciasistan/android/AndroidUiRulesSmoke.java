@@ -96,36 +96,46 @@ public final class AndroidUiRulesSmoke {
     data.permissions.add("reservation.view");
     assertFalse(
         AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
-        "reservation.view alone must not create a restaurant tab in a pension-only snapshot"
+        "reservation.view alone must not create an empty restaurant reservation mode"
     );
 
     OperationData.TableRecord table = new OperationData.TableRecord();
     table.id = "table-1";
     data.tables.add(table);
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "table inventory alone must not expose an empty reservation mode"
+    );
+
+    OperationData.ReservationRecord reservation = new OperationData.ReservationRecord();
+    reservation.id = "restaurant-reservation-1";
+    reservation.type = "table";
+    data.reservations.add(reservation);
+    assertTrue(AndroidUiRules.isRestaurantReservation(reservation), "table reservation classification");
+    assertTrue(AndroidUiRules.isRestaurantOnlyReservation(reservation), "table reservation should use the restaurant-first route");
     assertTrue(
         AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
-        "a restaurant snapshot plus reservation.view should expose restaurant reservations"
+        "an existing table reservation should expose restaurant reservations"
     );
+
+    data.permissions.remove("table.view");
     assertEquals(
         AndroidUiRules.RESTAURANT_RESERVATIONS,
         AndroidUiRules.firstRestaurantMode(data),
         "reservation-only restaurant profile should land on reservations"
     );
 
-    data.tables.clear();
-    OperationData.ReservationRecord reservation = new OperationData.ReservationRecord();
-    reservation.id = "restaurant-reservation-1";
-    reservation.type = "table";
-    data.reservations.add(reservation);
-    assertTrue(AndroidUiRules.isRestaurantReservation(reservation), "table reservation classification");
-    assertTrue(
-        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
-        "an existing table reservation should keep the restaurant reservation mode reachable"
-    );
-
     OperationData.ReservationRecord pension = new OperationData.ReservationRecord();
     pension.type = "room";
     assertFalse(AndroidUiRules.isRestaurantReservation(pension), "room reservation must stay outside the restaurant list");
+    assertFalse(AndroidUiRules.isRestaurantOnlyReservation(pension), "room reservation must keep the pension route");
+
+    OperationData.ReservationRecord combined = new OperationData.ReservationRecord();
+    combined.type = "room_and_table";
+    combined.roomIds.add("room-1");
+    combined.tableIds.add("table-1");
+    assertTrue(AndroidUiRules.isRestaurantReservation(combined), "combined stay should be visible in restaurant operations");
+    assertFalse(AndroidUiRules.isRestaurantOnlyReservation(combined), "combined stay should remain pension-first for notifications");
   }
 
   private static void deletionsRequireResolvedActiveAdmin() {
