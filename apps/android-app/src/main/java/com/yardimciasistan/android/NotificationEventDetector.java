@@ -110,7 +110,7 @@ final class NotificationEventDetector {
           "daily_task",
           overdue ? "Günlük iş gecikti" : "Günlük iş bekliyor",
           task.title + taskDueSuffix(task),
-          "pension:tasks",
+          routeForTask(task),
           task.updatedAt,
           NotificationEvent.PRIORITY_MEDIUM
       ));
@@ -126,7 +126,7 @@ final class NotificationEventDetector {
           "action_failed",
           "Telefon işlemi uygulanamadı",
           friendlyActionError(action.errorMessage),
-          routeForAction(action.type),
+          routeForAction(action),
           firstNonEmpty(action.processedAt, action.createdAt),
           NotificationEvent.PRIORITY_HIGH
       ));
@@ -187,6 +187,13 @@ final class NotificationEventDetector {
     return message.length() > 180 ? message.substring(0, 177) + "..." : message;
   }
 
+  static String routeForAction(OperationData.ActionRecord action) {
+    if (action != null && action.type.startsWith("daily_task_") && "manual_restaurant".equals(action.taskType)) {
+      return "restaurant:tasks";
+    }
+    return routeForAction(action == null ? "" : action.type);
+  }
+
   static String routeForAction(String actionType) {
     String type = actionType == null ? "" : actionType;
     if (type.startsWith("customer_")) {
@@ -217,6 +224,10 @@ final class NotificationEventDetector {
       return "restaurant:tables";
     }
     return "today";
+  }
+
+  static String routeForTask(OperationData.TaskRecord task) {
+    return AndroidUiRules.isRestaurantTask(task) ? "restaurant:tasks" : "pension:tasks";
   }
 
   static String routeForReservation(OperationData.ReservationRecord reservation) {

@@ -66,6 +66,10 @@ public final class AndroidUiRulesSmoke {
     );
 
     data.permissions.clear();
+    data.permissions.add("daily_task.view");
+    assertEquals(AndroidUiRules.RESTAURANT_TASKS, AndroidUiRules.firstRestaurantMode(data), "task-only restaurant profile");
+
+    data.permissions.clear();
     data.permissions.add("menu.stock_view");
     assertEquals(AndroidUiRules.RESTAURANT_STOCK, AndroidUiRules.firstRestaurantMode(data), "stock-only restaurant profile");
 
@@ -213,6 +217,7 @@ public final class AndroidUiRulesSmoke {
     assertDestination("restaurant:tables", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_TABLES);
     assertDestination("restaurant:reservations", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_RESERVATIONS);
     assertDestination("restaurant:orders", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_ORDERS);
+    assertDestination("restaurant:tasks", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_TASKS);
     assertDestination("restaurant:stock", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_STOCK);
     assertDestination("restaurant:menu", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_MENU);
     assertDestination("messages:waiting", AndroidUiRules.TAB_MESSAGES, AndroidUiRules.MESSAGES_WAITING);

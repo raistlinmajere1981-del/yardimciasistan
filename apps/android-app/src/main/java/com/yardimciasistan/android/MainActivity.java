@@ -1772,17 +1772,28 @@ public final class MainActivity extends ComponentActivity {
         page.addView(customerRoomStayCard(stay));
       }
     } else {
+      if (data.hasPermission("daily_task.create")) {
+        Button createTask = UiKit.button(this, "+ Yeni İş", UiKit.PRIMARY,
+            view -> showDailyTaskEditor(DailyTaskEditorDialog.Kind.PENSION, null));
+        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+        createTask.setLayoutParams(createParams);
+        page.addView(createTask);
+      }
       page.addView(statusStrip(new CounterValue[] {
           new CounterValue("Bekleyen", countPensionTasks(false), UiKit.WARNING, ""),
           new CounterValue("Tamam", countPensionTasks(true), UiKit.SUCCESS, "")
       }));
       int taskCount = 0;
       for (OperationData.TaskRecord task : data.tasks) {
+        if (!AndroidUiRules.isPensionTask(task)) {
+          continue;
+        }
         page.addView(taskCard(task, false));
         taskCount += 1;
       }
       if (taskCount == 0) {
-        page.addView(emptyCard("Günlük iş yok", "Günlük işler sakin görünüyor."));
+        page.addView(emptyCard("Pansiyon işi yok", "Günlük pansiyon işleri sakin görünüyor."));
       }
     }
     return mainScreenScroll(page);
@@ -1799,6 +1810,9 @@ public final class MainActivity extends ComponentActivity {
     }
     if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_ORDERS)) {
       options.add(new String[] {AndroidUiRules.RESTAURANT_ORDERS, "Açık Adisyon"});
+    }
+    if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TASKS)) {
+      options.add(new String[] {AndroidUiRules.RESTAURANT_TASKS, "İşler"});
     }
     if (AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_STOCK)) {
       options.add(new String[] {AndroidUiRules.RESTAURANT_STOCK, "Stok"});
@@ -1872,6 +1886,30 @@ public final class MainActivity extends ComponentActivity {
         if (order.isActive()) {
           page.addView(activeOrderCard(order));
         }
+      }
+    } else if (AndroidUiRules.RESTAURANT_TASKS.equals(restaurantMode)) {
+      if (data.hasPermission("daily_task.create")) {
+        Button createTask = UiKit.button(this, "+ Yeni İş", UiKit.PRIMARY,
+            view -> showDailyTaskEditor(DailyTaskEditorDialog.Kind.RESTAURANT, null));
+        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+        createTask.setLayoutParams(createParams);
+        page.addView(createTask);
+      }
+      page.addView(statusStrip(new CounterValue[] {
+          new CounterValue("Bekleyen", countRestaurantTasks(false), UiKit.WARNING, ""),
+          new CounterValue("Tamam", countRestaurantTasks(true), UiKit.SUCCESS, "")
+      }));
+      int taskCount = 0;
+      for (OperationData.TaskRecord task : data.tasks) {
+        if (!AndroidUiRules.isRestaurantTask(task)) {
+          continue;
+        }
+        page.addView(taskCard(task, false));
+        taskCount += 1;
+      }
+      if (taskCount == 0) {
+        page.addView(emptyCard("Restoran işi yok", "Günlük restoran işleri sakin görünüyor."));
       }
     } else if (AndroidUiRules.RESTAURANT_STOCK.equals(restaurantMode)) {
       if (data.hasPermission("menu.stock_update")) {
@@ -2704,17 +2742,25 @@ public final class MainActivity extends ComponentActivity {
     if (!compact && !task.description.isEmpty()) {
       card.addView(UiKit.text(this, ellipsize(task.description, 130), 12, UiKit.MUTED, Typeface.NORMAL));
     }
+    boolean manualTask = AndroidUiRules.isManualTask(task);
+    boolean canEdit = manualTask && data.hasPermission("daily_task.update");
     boolean canReopen = ("done".equals(task.status) || "cancelled".equals(task.status)) && data.hasPermission("daily_task.reopen");
     boolean canComplete = !"done".equals(task.status) && !"cancelled".equals(task.status) && data.hasPermission("daily_task.complete");
-    if (canReopen || canComplete) {
+    if (canEdit || canReopen || canComplete) {
       LinearLayout actions = UiKit.row(this);
       LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
       params.setMargins(0, UiKit.dp(this, 9), 0, 0);
       actions.setLayoutParams(params);
+      if (canEdit) {
+        DailyTaskEditorDialog.Kind kind = AndroidUiRules.isRestaurantTask(task)
+            ? DailyTaskEditorDialog.Kind.RESTAURANT
+            : DailyTaskEditorDialog.Kind.PENSION;
+        UiKit.addAction(actions, UiKit.outlineButton(this, "Düzenle", view -> showDailyTaskEditor(kind, task)), this);
+      }
       if (canReopen) {
-        UiKit.addAction(actions, UiKit.button(this, "Yeniden Aç", UiKit.PRIMARY, view -> sendAction("daily_task_reopen", payload("task_id", task.id, "expected_updated_at", task.updatedAt), "Günlük iş yeniden açılmak üzere gönderildi.")), this);
-      } else {
-        UiKit.addAction(actions, UiKit.button(this, "Tamamla", UiKit.PRIMARY, view -> sendAction("daily_task_complete", payload("task_id", task.id, "expected_updated_at", task.updatedAt), "Günlük iş tamamlanmak üzere gönderildi.")), this);
+        UiKit.addAction(actions, UiKit.button(this, "Yeniden Aç", UiKit.PRIMARY, view -> sendAction("daily_task_reopen", payload("task_id", task.id, "task_type", task.type, "expected_updated_at", task.updatedAt), "Günlük iş yeniden açılmak üzere gönderildi.")), this);
+      } else if (canComplete) {
+        UiKit.addAction(actions, UiKit.button(this, "Tamamla", UiKit.PRIMARY, view -> sendAction("daily_task_complete", payload("task_id", task.id, "task_type", task.type, "expected_updated_at", task.updatedAt), "Günlük iş tamamlanmak üzere gönderildi.")), this);
       }
       card.addView(actions);
     }
@@ -4361,6 +4407,42 @@ public final class MainActivity extends ComponentActivity {
     });
   }
 
+  private void showDailyTaskEditor(DailyTaskEditorDialog.Kind kind, OperationData.TaskRecord task) {
+    boolean editing = task != null;
+    String requiredPermission = editing ? "daily_task.update" : "daily_task.create";
+    if (!data.hasPermission(requiredPermission)) {
+      showError(editing ? "Bu cihazın günlük iş düzenleme yetkisi yok." : "Bu cihazın günlük iş ekleme yetkisi yok.");
+      return;
+    }
+    if (editing && !AndroidUiRules.isManualTask(task)) {
+      showError("Otomatik oluşturulan günlük işler yalnız tamamla veya yeniden aç işlemiyle yönetilebilir.");
+      return;
+    }
+    boolean canDelete = editing && AndroidUiRules.canDelete(data, "daily_task.delete");
+    DailyTaskEditorDialog.show(this, kind, task, canDelete, new DailyTaskEditorDialog.Listener() {
+      @Override
+      public void onSave(JSONObject actionPayload) {
+        sendAction(
+            editing ? "daily_task_update" : "daily_task_create",
+            actionPayload,
+            editing ? "Günlük iş güncellenmek üzere gönderildi." : "Günlük iş eklenmek üzere gönderildi."
+        );
+      }
+
+      @Override
+      public void onDelete() {
+        if (!editing) {
+          return;
+        }
+        sendAction(
+            "daily_task_delete",
+            payload("task_id", task.id, "task_type", task.type, "expected_updated_at", task.updatedAt),
+            "Günlük iş silinmek üzere gönderildi."
+        );
+      }
+    });
+  }
+
   private void sendReservationAction(OperationData.ReservationRecord reservation, String actionType, String message) {
     sendAction(actionType, payload("reservation_id", reservation.id, "expected_updated_at", reservation.updatedAt), message);
   }
@@ -4632,6 +4714,12 @@ public final class MainActivity extends ComponentActivity {
         return "customer.reject";
       case "customer_request_convert_to_reservation":
         return "customer.convert_to_reservation";
+      case "reservation_room_create":
+      case "reservation_table_create":
+        return "reservation.create";
+      case "reservation_room_update":
+      case "reservation_table_update":
+        return "reservation.update";
       case "reservation_approve":
         return "reservation.approve";
       case "reservation_reject":
@@ -4640,6 +4728,13 @@ public final class MainActivity extends ComponentActivity {
         return "reservation.cancel";
       case "room_status_update":
         return "room.update_status";
+      case "daily_task_create":
+        return "daily_task.create";
+      case "daily_task_update":
+      case "daily_task_cancel":
+        return "daily_task.update";
+      case "daily_task_delete":
+        return "daily_task.delete";
       case "daily_task_complete":
         return "daily_task.complete";
       case "daily_task_reopen":
@@ -4694,6 +4789,7 @@ public final class MainActivity extends ComponentActivity {
         || "customer_update".equals(actionType)
         || "customer_room_assign".equals(actionType)
         || "customer_room_stay_status".equals(actionType)
+        || "daily_task_delete".equals(actionType)
         || "menu_category_delete".equals(actionType)
         || "menu_item_delete".equals(actionType)
         || "message_delete".equals(actionType);
@@ -4886,6 +4982,22 @@ public final class MainActivity extends ComponentActivity {
   private int countPensionTasks(boolean completed) {
     int count = 0;
     for (OperationData.TaskRecord task : data.tasks) {
+      if (!AndroidUiRules.isPensionTask(task)) {
+        continue;
+      }
+      if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private int countRestaurantTasks(boolean completed) {
+    int count = 0;
+    for (OperationData.TaskRecord task : data.tasks) {
+      if (!AndroidUiRules.isRestaurantTask(task)) {
+        continue;
+      }
       if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
         count += 1;
       }
