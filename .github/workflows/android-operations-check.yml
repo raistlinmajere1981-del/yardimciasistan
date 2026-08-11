@@ -60,5 +60,8 @@ jobs:
       - name: Android rezervasyon veri akışı smoke
         run: node scripts/smoke-android-reservation-actions.mjs
 
+      - name: Android günlük iş veri akışı smoke
+        run: node scripts/smoke-android-daily-task-actions.mjs
+
       - name: Android birim testleri ve debug APK
         run: npm run smoke:android:build
