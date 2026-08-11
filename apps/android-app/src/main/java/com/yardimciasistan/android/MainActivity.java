@@ -1709,6 +1709,9 @@ public final class MainActivity extends ComponentActivity {
     if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_STAYS)) {
       options.add(new String[] {AndroidUiRules.PENSION_STAYS, "Konaklamalar"});
     }
+    if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_FOLIOS)) {
+      options.add(new String[] {AndroidUiRules.PENSION_FOLIOS, "Hesaplar"});
+    }
     if (AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_TASKS)) {
       options.add(new String[] {AndroidUiRules.PENSION_TASKS, "İşler"});
     }
@@ -1779,6 +1782,9 @@ public final class MainActivity extends ComponentActivity {
       for (OperationData.CustomerRoomStayRecord stay : data.customerRoomStays) {
         page.addView(customerRoomStayCard(stay));
       }
+    } else if (AndroidUiRules.PENSION_FOLIOS.equals(pensionMode)) {
+      RoomFolioWorkspace.append(this, page, data, (actionType, actionPayload, successMessage) ->
+          sendAction(actionType, actionPayload, successMessage));
     } else {
       if (data.hasPermission("daily_task.create")) {
         Button createTask = UiKit.button(this, "+ Yeni İş", UiKit.PRIMARY,
@@ -4772,6 +4778,10 @@ public final class MainActivity extends ComponentActivity {
         return "daily_task.reopen";
       case "finance_manual_create":
         return "finance.create";
+      case "room_folio_payment_add":
+        return "room_folio.payment";
+      case "room_folio_checkout":
+        return "room_folio.checkout";
       case "table_status_update":
         return "table.update_status";
       case "table_order_open":

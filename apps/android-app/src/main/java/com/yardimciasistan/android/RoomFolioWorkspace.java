@@ -26,7 +26,11 @@ final class RoomFolioWorkspace {
 
   static ScrollView create(Context context, OperationData data, Listener listener) {
     LinearLayout page = UiKit.column(context);
+    append(context, page, data, listener);
+    return UiKit.scroll(context, page);
+  }
 
+  static void append(Context context, LinearLayout page, OperationData data, Listener listener) {
     int openCount = 0;
     long totalRemaining = 0L;
     for (OperationData.RoomFolioRecord folio : data.roomFolios) {
@@ -52,7 +56,7 @@ final class RoomFolioWorkspace {
           Typeface.NORMAL
       ));
       page.addView(empty);
-      return UiKit.scroll(context, page);
+      return;
     }
 
     for (OperationData.RoomFolioRecord folio : data.roomFolios) {
@@ -69,7 +73,6 @@ final class RoomFolioWorkspace {
         Typeface.NORMAL
     );
     page.addView(note);
-    return UiKit.scroll(context, page);
   }
 
   private static LinearLayout folioCard(

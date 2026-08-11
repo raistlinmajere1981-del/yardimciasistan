@@ -227,6 +227,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $deviceActive = ya_sync_bool($permissionProfile['is_active'] ?? false);
     $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin' && $deviceActive;
     $financeAllowed = $deviceActive && in_array('finance.view', $permissionList, true);
+    $roomFolioAllowed = $deviceActive && in_array('room_folio.view', $permissionList, true);
     $customerManagementAllowed = $reportsAllowed && in_array('customer.manage', $permissionList, true);
     ya_sync_update_state([
         'last_android_summary_at' => $now
@@ -256,6 +257,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'requests' => $visibleRequests,
         'customers' => $customerManagementAllowed ? $androidSnapshot['customers'] : [],
         'customer_room_stays' => $customerManagementAllowed ? $androidSnapshot['customer_room_stays'] : [],
+        'room_folios' => $roomFolioAllowed ? $androidSnapshot['room_folios'] : [],
         'reservations' => $androidSnapshot['reservations'],
         'rooms' => $androidSnapshot['rooms'],
         'tables' => $androidSnapshot['tables'],
@@ -855,6 +857,8 @@ function ya_sync_android_action_types(): array
         'daily_task_reopen',
         'daily_task_cancel',
         'finance_manual_create',
+        'room_folio_payment_add',
+        'room_folio_checkout',
         'table_status_update',
         'table_order_open',
         'table_order_add_item',
@@ -971,6 +975,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'requests' => ya_sync_sanitize_android_requests($snapshot['requests'] ?? []),
         'customers' => ya_sync_sanitize_android_customers($snapshot['customers'] ?? []),
         'customer_room_stays' => ya_sync_sanitize_android_customer_room_stays($snapshot['customer_room_stays'] ?? []),
+        'room_folios' => ya_sync_sanitize_android_room_folios($snapshot['room_folios'] ?? []),
         'reservations' => ya_sync_sanitize_android_reservations($snapshot['reservations'] ?? []),
         'rooms' => ya_sync_sanitize_android_rooms($snapshot['rooms'] ?? []),
         'tables' => ya_sync_sanitize_android_tables($snapshot['tables'] ?? []),
@@ -994,6 +999,46 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'reports' => ya_sync_sanitize_android_reports($snapshot['reports'] ?? []),
         'updated_at' => $updatedAt
     ];
+}
+
+function ya_sync_sanitize_android_room_folios(mixed $value): array
+{
+    $records = [];
+    foreach (array_slice(is_array($value) ? $value : [], 0, 100) as $rawFolio) {
+        if (!is_array($rawFolio)) {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawFolio['id'] ?? ''), 0, 220);
+        $stayId = mb_substr(ya_sync_string($rawFolio['stay_id'] ?? ''), 0, 220);
+        $roomId = mb_substr(ya_sync_string($rawFolio['room_id'] ?? ''), 0, 220);
+        $status = ya_sync_string($rawFolio['status'] ?? 'open');
+        if ($id === '' || $stayId === '' || $roomId === '' || $status !== 'open') {
+            continue;
+        }
+        $records[] = [
+            'id' => $id,
+            'stay_id' => $stayId,
+            'room_id' => $roomId,
+            'room_name' => mb_substr(ya_sync_string($rawFolio['room_name'] ?? 'Oda') ?: 'Oda', 0, 180),
+            'room_number' => mb_substr(ya_sync_string($rawFolio['room_number'] ?? ''), 0, 80),
+            'customer_id' => mb_substr(ya_sync_string($rawFolio['customer_id'] ?? ''), 0, 220),
+            'customer_name' => mb_substr(ya_sync_string($rawFolio['customer_name'] ?? ''), 0, 180),
+            'status' => 'open',
+            'guest_count' => max(1, min(50, ya_sync_int($rawFolio['guest_count'] ?? 1, 1))),
+            'check_in_date' => ya_sync_string($rawFolio['check_in_date'] ?? ''),
+            'planned_check_out_date' => ya_sync_string($rawFolio['planned_check_out_date'] ?? ''),
+            'nights' => max(1, ya_sync_int($rawFolio['nights'] ?? 1, 1)),
+            'nightly_price_minor' => max(0, ya_sync_int($rawFolio['nightly_price_minor'] ?? 0, 0)),
+            'currency' => mb_substr(ya_sync_string($rawFolio['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
+            'lodging_total_minor' => max(0, ya_sync_int($rawFolio['lodging_total_minor'] ?? 0, 0)),
+            'extras_total_minor' => ya_sync_int($rawFolio['extras_total_minor'] ?? 0, 0),
+            'charge_total_minor' => max(0, ya_sync_int($rawFolio['charge_total_minor'] ?? 0, 0)),
+            'paid_total_minor' => max(0, ya_sync_int($rawFolio['paid_total_minor'] ?? 0, 0)),
+            'remaining_minor' => max(0, ya_sync_int($rawFolio['remaining_minor'] ?? 0, 0)),
+            'opened_at' => ya_sync_string($rawFolio['opened_at'] ?? '')
+        ];
+    }
+    return $records;
 }
 
 function ya_sync_sanitize_android_finance(mixed $value): array
@@ -1190,6 +1235,9 @@ function ya_sync_android_permissions(): array
         'room.view',
         'room.update_status',
         'room.assign_customer',
+        'room_folio.view',
+        'room_folio.payment',
+        'room_folio.checkout',
         'daily_task.view',
         'daily_task.create',
         'daily_task.update',

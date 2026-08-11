@@ -81,6 +81,7 @@ import {
   type GenerateDesktopReportAiResult
 } from "./database";
 import { DesktopFinanceService } from "./finance";
+import { DesktopRoomFolioService, type DesktopRoomFolio } from "./room-folio";
 import {
   buildReportAiMessages,
   buildReportAiPayload,
@@ -1819,6 +1820,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     updated_at: dashboardData.menu.updated_at
   };
   const financeData = new DesktopFinanceService(getDatabase().databasePath).getData(20);
+  const roomFolioData = new DesktopRoomFolioService(getDatabase().databasePath).getData();
   const messages = getDatabase().getAndroidPreparedMessages().map((message) => ({
     id: message.id,
     request_id: message.requestId,
@@ -1925,6 +1927,31 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
       created_at: stay.createdAt,
       updated_at: stay.updatedAt
     })),
+    room_folios: roomFolioData.folios
+      .filter((folio): folio is DesktopRoomFolio & { status: "open" } => folio.status === "open")
+      .slice(0, 100)
+      .map((folio) => ({
+        id: folio.id,
+        stay_id: folio.stayId,
+        room_id: folio.roomId,
+        room_name: folio.roomName,
+        room_number: folio.roomNumber,
+        customer_id: folio.customerId,
+        customer_name: folio.customerName,
+        status: folio.status,
+        guest_count: folio.guestCount,
+        check_in_date: folio.checkInDate,
+        planned_check_out_date: folio.plannedCheckOutDate,
+        nights: folio.nights,
+        nightly_price_minor: folio.nightlyPriceMinor,
+        currency: folio.currency,
+        lodging_total_minor: folio.lodgingTotalMinor,
+        extras_total_minor: folio.extrasTotalMinor,
+        charge_total_minor: folio.chargeTotalMinor,
+        paid_total_minor: folio.paidTotalMinor,
+        remaining_minor: folio.remainingMinor,
+        opened_at: folio.openedAt
+      })),
     reservations: dashboardData.reservations.slice(0, 300).map((reservation) => ({
       id: reservation.id,
       request_id: reservation.requestId,
