@@ -119,13 +119,17 @@ try {
   }));
   assert.equal(tableConflict.ok, false, "Aynı masa/tarih/saat çakışması reddedilmeli");
 
+  const tableUpdateGuestCount = Math.max(
+    1,
+    Math.min(3, Number(tables[1].capacity ?? 0) > 0 ? Number(tables[1].capacity) : 3)
+  );
   const tableUpdated = database.applyAndroidAction(action("android_table_reservation_update_001", "reservation_table_update", {
     reservation_id: tableReservation.id,
     expected_updated_at: tableReservation.updatedAt,
     table_id: tables[1].id,
     date: "2036-05-20",
     time: "20:00",
-    guest_count: 3,
+    guest_count: tableUpdateGuestCount,
     notes: "Masa ve saat değişti"
   }));
   assert.equal(tableUpdated.ok, true, tableUpdated.message);
@@ -133,7 +137,7 @@ try {
   const movedTableReservation = dashboard.reservations.find((reservation) => reservation.id === tableReservation.id);
   assert.deepEqual(movedTableReservation?.tableIds, [tables[1].id]);
   assert.equal(movedTableReservation?.time, "20:00");
-  assert.equal(movedTableReservation?.guestCount, 3);
+  assert.equal(movedTableReservation?.guestCount, tableUpdateGuestCount);
 
   const staleUpdate = database.applyAndroidAction(action("android_table_reservation_stale_001", "reservation_table_update", {
     reservation_id: tableReservation.id,
