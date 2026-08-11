@@ -22,6 +22,8 @@ final class OperationData {
       "customer.delete",
       "request.delete",
       "reservation.view",
+      "reservation.create",
+      "reservation.update",
       "reservation.approve",
       "reservation.reject",
       "reservation.cancel",

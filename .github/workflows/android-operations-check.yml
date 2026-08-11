@@ -1,0 +1,64 @@
+name: Android Operations Check
+
+on:
+  pull_request:
+    paths:
+      - "apps/android-app/**"
+      - "apps/desktop-app/electron/**"
+      - "packages/sync-core/**"
+      - "scripts/smoke-android-*.mjs"
+      - "scripts/run-android-gradle.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-operations-check.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/android-app/**"
+      - "apps/desktop-app/electron/**"
+      - "packages/sync-core/**"
+      - "scripts/smoke-android-*.mjs"
+      - "scripts/run-android-gradle.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-operations-check.yml"
+
+jobs:
+  android-operations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v5
+
+      - name: Node.js kur
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Java kur
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Ortak paketleri derle
+        run: npm run build:packages
+
+      - name: Senkron çekirdek testleri
+        run: npm test -w @yardimci-asistan/sync-core
+
+      - name: Masaüstü veri katmanını derle
+        run: npm run build -w @yardimci-asistan/desktop-app
+
+      - name: Android rezervasyon veri akışı smoke
+        run: node scripts/smoke-android-reservation-actions.mjs
+
+      - name: Android birim testleri ve debug APK
+        run: npm run smoke:android:build

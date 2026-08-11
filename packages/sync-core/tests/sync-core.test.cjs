@@ -551,6 +551,8 @@ test("Android staff permission groups produce only their documented effective pe
     "customer.respond",
     "customer.mark_answered",
     "reservation.view",
+    "reservation.create",
+    "reservation.update",
     "reservation.approve"
   ]);
 

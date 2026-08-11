@@ -192,6 +192,12 @@ final class NotificationEventDetector {
     if (type.startsWith("customer_")) {
       return "customers:new";
     }
+    if (type.startsWith("reservation_table_")) {
+      return "restaurant:reservations";
+    }
+    if (type.startsWith("reservation_room_")) {
+      return "pension:reservations";
+    }
     if (type.startsWith("reservation_")) {
       return "pension:reservations";
     }

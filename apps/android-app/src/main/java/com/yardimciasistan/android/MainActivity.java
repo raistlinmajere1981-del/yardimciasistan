@@ -1714,6 +1714,15 @@ public final class MainActivity extends ComponentActivity {
     }));
 
     if (AndroidUiRules.PENSION_RESERVATIONS.equals(pensionMode)) {
+      if (data.hasPermission("reservation.create")) {
+        Button createReservation = UiKit.button(this, "+ Yeni Rezervasyon", UiKit.PRIMARY,
+            view -> showReservationEditor(ReservationEditorDialog.Kind.ROOM, null));
+        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+        createReservation.setLayoutParams(createParams);
+        createReservation.setEnabled(!data.customers.isEmpty());
+        page.addView(createReservation);
+      }
       page.addView(statusStrip(new CounterValue[] {
           new CounterValue("Bekleyen", countPensionReservations("pending"), UiKit.WARNING, ""),
           new CounterValue("Giriş", countPensionDate(true), UiKit.INFO, ""),
@@ -1820,6 +1829,15 @@ public final class MainActivity extends ComponentActivity {
         page.addView(tableCard(table));
       }
     } else if (AndroidUiRules.RESTAURANT_RESERVATIONS.equals(restaurantMode)) {
+      if (data.hasPermission("reservation.create")) {
+        Button createReservation = UiKit.button(this, "+ Yeni Rezervasyon", UiKit.PRIMARY,
+            view -> showReservationEditor(ReservationEditorDialog.Kind.TABLE, null));
+        LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+        createParams.setMargins(0, 0, 0, UiKit.dp(this, 10));
+        createReservation.setLayoutParams(createParams);
+        createReservation.setEnabled(!data.customers.isEmpty());
+        page.addView(createReservation);
+      }
       page.addView(statusStrip(new CounterValue[] {
           new CounterValue("Bekleyen", countRestaurantReservations("pending"), UiKit.WARNING, ""),
           new CounterValue("Onaylı", countRestaurantReservations("approved"), UiKit.SUCCESS, ""),
@@ -3835,6 +3853,19 @@ public final class MainActivity extends ComponentActivity {
     }
     page.addView(contact);
 
+    ReservationEditorDialog.Kind editKind = reservationEditorKind(reservation);
+    if (editKind != null
+        && data.hasPermission("reservation.update")
+        && ("pending".equals(reservation.status) || "approved".equals(reservation.status))) {
+      page.addView(sectionLabel("Düzenleme"));
+      Button edit = UiKit.outlineButton(this, "Rezervasyonu Düzenle", view -> {
+        dialog.dismiss();
+        showReservationEditor(editKind, reservation);
+      });
+      edit.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46)));
+      page.addView(edit);
+    }
+
     if ("pending".equals(reservation.status)
         && (data.hasPermission("reservation.approve") || data.hasPermission("reservation.reject"))) {
       page.addView(sectionLabel("Karar"));
@@ -4286,6 +4317,48 @@ public final class MainActivity extends ComponentActivity {
 
   private void updateTable(OperationData.TableRecord table, String status) {
     sendAction("table_status_update", payload("table_id", table.id, "status", status, "expected_updated_at", table.updatedAt), table.name + " durumu güncellenmek üzere gönderildi.");
+  }
+
+  private ReservationEditorDialog.Kind reservationEditorKind(OperationData.ReservationRecord reservation) {
+    if (reservation == null) {
+      return null;
+    }
+    if ("room".equals(reservation.type)) {
+      return ReservationEditorDialog.Kind.ROOM;
+    }
+    if (AndroidUiRules.isRestaurantOnlyReservation(reservation)) {
+      return ReservationEditorDialog.Kind.TABLE;
+    }
+    return null;
+  }
+
+  private void showReservationEditor(
+      ReservationEditorDialog.Kind kind,
+      OperationData.ReservationRecord reservation
+  ) {
+    boolean editing = reservation != null;
+    String requiredPermission = editing ? "reservation.update" : "reservation.create";
+    if (!data.hasPermission(requiredPermission)) {
+      showError(editing ? "Bu cihazın rezervasyon düzenleme yetkisi yok." : "Bu cihazın rezervasyon oluşturma yetkisi yok.");
+      return;
+    }
+    if (!editing && data.customers.isEmpty()) {
+      showError("Rezervasyon eklemeden önce Müşteri ekranından müşteri kaydı oluşturun.");
+      return;
+    }
+    ReservationEditorDialog.show(this, data, kind, reservation, actionPayload -> {
+      String actionType;
+      if (kind == ReservationEditorDialog.Kind.ROOM) {
+        actionType = editing ? "reservation_room_update" : "reservation_room_create";
+      } else {
+        actionType = editing ? "reservation_table_update" : "reservation_table_create";
+      }
+      sendAction(
+          actionType,
+          actionPayload,
+          editing ? "Rezervasyon güncellenmek üzere gönderildi." : "Rezervasyon oluşturulmak üzere gönderildi."
+      );
+    });
   }
 
   private void sendReservationAction(OperationData.ReservationRecord reservation, String actionType, String message) {

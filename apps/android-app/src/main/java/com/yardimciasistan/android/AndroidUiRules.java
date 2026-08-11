@@ -103,7 +103,8 @@ final class AndroidUiRules {
       return data.hasPermission("table.view");
     }
     if (RESTAURANT_RESERVATIONS.equals(mode)) {
-      return data.hasPermission("reservation.view") && hasRestaurantReservationContext(data);
+      return data.hasPermission("reservation.view")
+          && (data.hasPermission("reservation.create") || hasRestaurantReservationContext(data));
     }
     if (RESTAURANT_ORDERS.equals(mode)) {
       return data.hasPermission("table_order.view");
@@ -132,6 +133,7 @@ final class AndroidUiRules {
   static boolean isRestaurantReservation(OperationData.ReservationRecord reservation) {
     return reservation != null && (
         "table".equals(reservation.type)
+        || "breakfast".equals(reservation.type)
         || "room_and_table".equals(reservation.type)
         || !reservation.tableIds.isEmpty()
     );
@@ -140,6 +142,7 @@ final class AndroidUiRules {
   static boolean isRestaurantOnlyReservation(OperationData.ReservationRecord reservation) {
     return reservation != null && (
         "table".equals(reservation.type)
+        || "breakfast".equals(reservation.type)
         || (reservation.roomIds.isEmpty() && !reservation.tableIds.isEmpty())
     );
   }

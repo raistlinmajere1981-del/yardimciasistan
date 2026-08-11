@@ -38,6 +38,7 @@ import type {
   PushAiSettingsResult,
   SyncedCustomerRequest
 } from "@yardimci-asistan/sync-core";
+import { applyAndroidReservationAction } from "./android-reservation-actions.js";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
@@ -6900,6 +6901,17 @@ export class DesktopDatabase {
         return this.applyAndroidCustomerRoomAssignment(action, now);
       case "customer_room_stay_status":
         return this.applyAndroidCustomerRoomStayStatus(action, now);
+      case "reservation_room_create":
+      case "reservation_room_update":
+      case "reservation_table_create":
+      case "reservation_table_update":
+        return applyAndroidReservationAction({
+          db: this.db,
+          action,
+          now,
+          insertEvent: (type, entityId, payload) =>
+            this.insertAndroidActionEvent(action, type, "reservation", entityId, payload, now)
+        });
       case "reservation_approve":
         return this.applyAndroidReservationStatus(action, "approved", now);
       case "reservation_reject":
@@ -9643,6 +9655,9 @@ function androidActionResolutionKey(action: AndroidSyncAction): string {
 function androidActionTargetPage(actionType: string): DesktopAndroidActionFailure["targetPage"] {
   if (actionType.startsWith("customer_") || actionType === "message_delete") {
     return "customerWork";
+  }
+  if (actionType.startsWith("reservation_table_")) {
+    return "restaurant";
   }
   if (actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {
     return "pension";
