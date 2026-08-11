@@ -30,6 +30,9 @@ final class OperationData {
       "room.view",
       "room.update_status",
       "room.assign_customer",
+      "room_folio.view",
+      "room_folio.payment",
+      "room_folio.checkout",
       "daily_task.view",
       "daily_task.create",
       "daily_task.update",
@@ -64,6 +67,8 @@ final class OperationData {
   private static final String[] STAFF_PERMISSIONS = {
       "room.view",
       "room.update_status",
+      "room_folio.view",
+      "room_folio.checkout",
       "daily_task.view",
       "daily_task.create",
       "daily_task.update",
@@ -113,6 +118,7 @@ final class OperationData {
   final List<RequestRecord> requests = new ArrayList<>();
   final List<CustomerRecord> customers = new ArrayList<>();
   final List<CustomerRoomStayRecord> customerRoomStays = new ArrayList<>();
+  final List<RoomFolioRecord> roomFolios = new ArrayList<>();
   final List<ReservationRecord> reservations = new ArrayList<>();
   final List<RoomRecord> rooms = new ArrayList<>();
   final List<TableRecord> tables = new ArrayList<>();
@@ -167,6 +173,7 @@ final class OperationData {
     addRecords(array(root, "requests"), data.requests, RequestRecord::fromJson);
     addRecords(array(root, "customers"), data.customers, CustomerRecord::fromJson);
     addRecords(array(root, "customer_room_stays"), data.customerRoomStays, CustomerRoomStayRecord::fromJson);
+    addRecords(array(root, "room_folios"), data.roomFolios, RoomFolioRecord::fromJson);
     addRecords(array(root, "reservations"), data.reservations, ReservationRecord::fromJson);
     addRecords(array(root, "rooms"), data.rooms, RoomRecord::fromJson);
     addRecords(array(root, "tables"), data.tables, TableRecord::fromJson);
@@ -893,6 +900,58 @@ final class OperationData {
       record.createdAt = value(source, "created_at", "");
       record.processedAt = value(source, "processed_at", "");
       return record;
+    }
+  }
+
+  static final class RoomFolioRecord {
+    String id = "";
+    String stayId = "";
+    String roomId = "";
+    String roomName = "Oda";
+    String roomNumber = "";
+    String customerId = "";
+    String customerName = "";
+    String status = "open";
+    int guestCount = 1;
+    String checkInDate = "";
+    String plannedCheckOutDate = "";
+    int nights = 1;
+    long nightlyPriceMinor;
+    String currency = "TRY";
+    long lodgingTotalMinor;
+    long extrasTotalMinor;
+    long chargeTotalMinor;
+    long paidTotalMinor;
+    long remainingMinor;
+    String openedAt = "";
+
+    static RoomFolioRecord fromJson(JSONObject source) {
+      RoomFolioRecord folio = new RoomFolioRecord();
+      folio.id = value(source, "id", "");
+      folio.stayId = value(source, "stay_id", "");
+      folio.roomId = value(source, "room_id", "");
+      folio.roomName = value(source, "room_name", "Oda");
+      folio.roomNumber = value(source, "room_number", "");
+      folio.customerId = value(source, "customer_id", "");
+      folio.customerName = value(source, "customer_name", "");
+      folio.status = value(source, "status", "open");
+      folio.guestCount = Math.max(1, Math.min(50, source.optInt("guest_count", 1)));
+      folio.checkInDate = value(source, "check_in_date", "");
+      folio.plannedCheckOutDate = value(source, "planned_check_out_date", "");
+      folio.nights = Math.max(1, source.optInt("nights", 1));
+      folio.nightlyPriceMinor = Math.max(0L, source.optLong("nightly_price_minor", 0L));
+      folio.currency = value(source, "currency", "TRY");
+      folio.lodgingTotalMinor = Math.max(0L, source.optLong("lodging_total_minor", 0L));
+      folio.extrasTotalMinor = source.optLong("extras_total_minor", 0L);
+      folio.chargeTotalMinor = Math.max(0L, source.optLong("charge_total_minor", 0L));
+      folio.paidTotalMinor = Math.max(0L, source.optLong("paid_total_minor", 0L));
+      folio.remainingMinor = Math.max(0L, source.optLong("remaining_minor", 0L));
+      folio.openedAt = value(source, "opened_at", "");
+      return folio;
+    }
+
+    boolean isOpen() {
+      return "open".equals(status);
     }
   }
 

@@ -18,6 +18,7 @@ final class AndroidUiRules {
   static final String PENSION_RESERVATIONS = "reservations";
   static final String PENSION_ROOMS = "rooms";
   static final String PENSION_STAYS = "stays";
+  static final String PENSION_FOLIOS = "folios";
   static final String PENSION_TASKS = "tasks";
 
   static final String RESTAURANT_TABLES = "tables";
@@ -77,6 +78,9 @@ final class AndroidUiRules {
           && data.hasPermission("customer.manage")
           && data.hasPermission("room.assign_customer");
     }
+    if (PENSION_FOLIOS.equals(mode)) {
+      return data.hasPermission("room_folio.view");
+    }
     if (PENSION_TASKS.equals(mode)) {
       return data.hasPermission("daily_task.view");
     }
@@ -92,6 +96,9 @@ final class AndroidUiRules {
     }
     if (canOpenPensionMode(data, PENSION_STAYS)) {
       return PENSION_STAYS;
+    }
+    if (canOpenPensionMode(data, PENSION_FOLIOS)) {
+      return PENSION_FOLIOS;
     }
     if (canOpenPensionMode(data, PENSION_TASKS)) {
       return PENSION_TASKS;
@@ -226,7 +233,7 @@ final class AndroidUiRules {
       return new Destination(TAB_CUSTOMERS, mode);
     }
     if (TAB_PENSION.equals(tab)) {
-      if (!PENSION_ROOMS.equals(mode) && !PENSION_STAYS.equals(mode) && !PENSION_TASKS.equals(mode)) {
+      if (!PENSION_ROOMS.equals(mode) && !PENSION_STAYS.equals(mode) && !PENSION_FOLIOS.equals(mode) && !PENSION_TASKS.equals(mode)) {
         mode = PENSION_RESERVATIONS;
       }
       return new Destination(TAB_PENSION, mode);

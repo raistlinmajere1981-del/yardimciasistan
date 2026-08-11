@@ -76,6 +76,9 @@ jobs:
       - name: Android mobil Kasa veri akışı smoke
         run: node scripts/smoke-android-finance-actions.mjs
 
+      - name: Android oda hesabı veri akışı smoke
+        run: node scripts/smoke-android-room-folio-actions.mjs
+
       - name: Hosting otomatik senkron smoke
         run: node scripts/smoke-automatic-sync.mjs
 

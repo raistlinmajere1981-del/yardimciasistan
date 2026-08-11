@@ -202,12 +202,36 @@ export interface AndroidFinanceSnapshot {
   recent_entries: AndroidFinanceEntry[];
 }
 
+export interface AndroidRoomFolioSnapshot {
+  id: string;
+  stay_id: string;
+  room_id: string;
+  room_name: string;
+  room_number: string;
+  customer_id: string;
+  customer_name: string;
+  status: "open" | "closed";
+  guest_count: number;
+  check_in_date: string;
+  planned_check_out_date: string;
+  nights: number;
+  nightly_price_minor: number;
+  currency: string;
+  lodging_total_minor: number;
+  extras_total_minor: number;
+  charge_total_minor: number;
+  paid_total_minor: number;
+  remaining_minor: number;
+  opened_at: ISODateTimeString | "";
+}
+
 export interface AndroidOperationsSnapshot {
   summary: AndroidOperationsSummary;
   daily_tasks: AndroidSnapshotTask[];
   requests: AndroidSnapshotRequest[];
   customers: AndroidSnapshotCustomer[];
   customer_room_stays: AndroidSnapshotCustomerRoomStay[];
+  room_folios: AndroidRoomFolioSnapshot[];
   reservations: AndroidSnapshotReservation[];
   rooms: AndroidSnapshotRoom[];
   tables: AndroidSnapshotTable[];
@@ -244,6 +268,9 @@ export const ANDROID_PERMISSIONS = [
   "room.view",
   "room.update_status",
   "room.assign_customer",
+  "room_folio.view",
+  "room_folio.payment",
+  "room_folio.checkout",
   "daily_task.view",
   "daily_task.create",
   "daily_task.update",
@@ -310,11 +337,15 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
     "table_order.close_paid",
     "menu.stock_view",
     "finance.view",
-    "finance.create"
+    "finance.create",
+    "room_folio.view",
+    "room_folio.payment"
   ],
   rooms_tasks: [
     "room.view",
     "room.update_status",
+    "room_folio.view",
+    "room_folio.checkout",
     "daily_task.view",
     "daily_task.create",
     "daily_task.update",
@@ -550,6 +581,8 @@ export const ANDROID_ACTION_TYPES = [
   "daily_task_reopen",
   "daily_task_cancel",
   "finance_manual_create",
+  "room_folio_payment_add",
+  "room_folio_checkout",
   "table_status_update",
   "table_order_open",
   "table_order_add_item",
@@ -634,6 +667,8 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   daily_task_reopen: "daily_task.reopen",
   daily_task_cancel: "daily_task.update",
   finance_manual_create: "finance.create",
+  room_folio_payment_add: "room_folio.payment",
+  room_folio_checkout: "room_folio.checkout",
   table_status_update: "table.update_status",
   table_order_open: "table_order.open",
   table_order_add_item: "table_order.add_item",

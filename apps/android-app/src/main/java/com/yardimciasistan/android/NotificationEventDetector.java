@@ -208,6 +208,9 @@ final class NotificationEventDetector {
     if (type.startsWith("reservation_")) {
       return "pension:reservations";
     }
+    if (type.startsWith("room_folio_")) {
+      return "pension:folios";
+    }
     if (type.startsWith("room_")) {
       return "pension:rooms";
     }

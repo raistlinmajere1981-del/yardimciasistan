@@ -497,6 +497,8 @@ test("Android role presets and action permission mapping stay explicit", () => {
     "menu.stock_view",
     "room.view",
     "room.update_status",
+    "room_folio.view",
+    "room_folio.checkout",
     "daily_task.view",
     "daily_task.create",
     "daily_task.update",
@@ -548,7 +550,9 @@ test("Android staff permission groups produce only their documented effective pe
     "table_order.close_paid",
     "menu.stock_view",
     "finance.view",
-    "finance.create"
+    "finance.create",
+    "room_folio.view",
+    "room_folio.payment"
   ]);
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.customer_reservation, [
     "customer.view",

@@ -41,6 +41,7 @@ import type {
 import { applyAndroidReservationAction } from "./android-reservation-actions.js";
 import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
 import { applyAndroidFinanceAction } from "./android-finance-actions.js";
+import { applyAndroidRoomFolioAction } from "./android-room-folio-actions.js";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
@@ -6946,6 +6947,15 @@ export class DesktopDatabase {
           insertEvent: (type, entityId, payload) =>
             this.insertAndroidActionEvent(action, type, "finance_entry", entityId, payload, now)
         });
+      case "room_folio_payment_add":
+      case "room_folio_checkout":
+        return applyAndroidRoomFolioAction({
+          db: this.db,
+          action,
+          now,
+          insertEvent: (type, entityId, payload) =>
+            this.insertAndroidActionEvent(action, type, "room_folio", entityId, payload, now)
+        });
       case "table_status_update":
         return this.applyAndroidTableStatus(action, now);
       case "table_order_open":
@@ -9656,7 +9666,7 @@ function androidActionRelatedId(action: AndroidSyncAction): string {
   const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
     ? action.payload as Record<string, unknown>
     : {};
-  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "customer_id", "room_id", "task_id", "item_id", "menu_item_id", "category_id", "message_id"]) {
+  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "customer_id", "folio_id", "room_id", "task_id", "item_id", "menu_item_id", "category_id", "message_id"]) {
     const value = String(payload[key] ?? "").trim();
     if (value) {
       return value;
