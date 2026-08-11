@@ -39,6 +39,7 @@ import type {
   SyncedCustomerRequest
 } from "@yardimci-asistan/sync-core";
 import { applyAndroidReservationAction } from "./android-reservation-actions.js";
+import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
@@ -5504,7 +5505,7 @@ export class DesktopDatabase {
         device_id: deviceId,
         error_message: result.message,
         resolution_key: resolutionKey,
-        target_page: androidActionTargetPage(actionType),
+        target_page: androidActionTargetPage(actionType, action.payload),
         related_id: androidActionRelatedId(action)
       },
       now
@@ -6920,6 +6921,16 @@ export class DesktopDatabase {
         return this.applyAndroidReservationStatus(action, "cancelled", now);
       case "room_status_update":
         return this.applyAndroidRoomStatus(action, now);
+      case "daily_task_create":
+      case "daily_task_update":
+      case "daily_task_delete":
+        return applyAndroidDailyTaskAction({
+          db: this.db,
+          action,
+          now,
+          insertEvent: (type, entityId, payload) =>
+            this.insertAndroidActionEvent(action, type, "daily_task", entityId, payload, now)
+        });
       case "daily_task_complete":
         return this.applyAndroidDailyTaskStatus(action, "done", now);
       case "daily_task_reopen":
@@ -8981,6 +8992,7 @@ const ANDROID_ADMIN_ONLY_ACTIONS = new Set<string>([
   "customer_delete",
   "customer_room_assign",
   "customer_room_stay_status",
+  "daily_task_delete",
   "menu_category_delete",
   "menu_item_delete",
   "message_delete"
@@ -9652,11 +9664,17 @@ function androidActionResolutionKey(action: AndroidSyncAction): string {
   ].join(":");
 }
 
-function androidActionTargetPage(actionType: string): DesktopAndroidActionFailure["targetPage"] {
+function androidActionTargetPage(
+  actionType: string,
+  payload: Record<string, unknown> = {}
+): DesktopAndroidActionFailure["targetPage"] {
   if (actionType.startsWith("customer_") || actionType === "message_delete") {
     return "customerWork";
   }
   if (actionType.startsWith("reservation_table_")) {
+    return "restaurant";
+  }
+  if (actionType.startsWith("daily_task_") && String(payload.task_type ?? "").trim() === "manual_restaurant") {
     return "restaurant";
   }
   if (actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {

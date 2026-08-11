@@ -22,6 +22,7 @@ final class AndroidUiRules {
   static final String RESTAURANT_TABLES = "tables";
   static final String RESTAURANT_RESERVATIONS = "reservations";
   static final String RESTAURANT_ORDERS = "orders";
+  static final String RESTAURANT_TASKS = "tasks";
   static final String RESTAURANT_STOCK = "stock";
   static final String RESTAURANT_MENU = "menu";
 
@@ -109,6 +110,9 @@ final class AndroidUiRules {
     if (RESTAURANT_ORDERS.equals(mode)) {
       return data.hasPermission("table_order.view");
     }
+    if (RESTAURANT_TASKS.equals(mode)) {
+      return data.hasPermission("daily_task.view");
+    }
     if (RESTAURANT_STOCK.equals(mode)) {
       return data.hasPermission("menu.stock_view");
     }
@@ -147,6 +151,18 @@ final class AndroidUiRules {
     );
   }
 
+  static boolean isManualTask(OperationData.TaskRecord task) {
+    return task != null && ("manual_pension".equals(task.type) || "manual_restaurant".equals(task.type));
+  }
+
+  static boolean isRestaurantTask(OperationData.TaskRecord task) {
+    return task != null && "manual_restaurant".equals(task.type);
+  }
+
+  static boolean isPensionTask(OperationData.TaskRecord task) {
+    return task != null && !isRestaurantTask(task);
+  }
+
   static boolean canDelete(OperationData data, String permission) {
     return data != null && data.isAdmin() && data.hasPermission(permission);
   }
@@ -175,6 +191,9 @@ final class AndroidUiRules {
     }
     if (canOpenRestaurantMode(data, RESTAURANT_ORDERS)) {
       return RESTAURANT_ORDERS;
+    }
+    if (canOpenRestaurantMode(data, RESTAURANT_TASKS)) {
+      return RESTAURANT_TASKS;
     }
     if (canOpenRestaurantMode(data, RESTAURANT_STOCK)) {
       return RESTAURANT_STOCK;
@@ -212,6 +231,7 @@ final class AndroidUiRules {
       if (
           !RESTAURANT_RESERVATIONS.equals(mode)
           && !RESTAURANT_ORDERS.equals(mode)
+          && !RESTAURANT_TASKS.equals(mode)
           && !RESTAURANT_STOCK.equals(mode)
           && !RESTAURANT_MENU.equals(mode)
       ) {

@@ -31,6 +31,9 @@ final class OperationData {
       "room.update_status",
       "room.assign_customer",
       "daily_task.view",
+      "daily_task.create",
+      "daily_task.update",
+      "daily_task.delete",
       "daily_task.complete",
       "daily_task.reopen",
       "table.view",
@@ -60,6 +63,8 @@ final class OperationData {
       "room.view",
       "room.update_status",
       "daily_task.view",
+      "daily_task.create",
+      "daily_task.update",
       "daily_task.complete",
       "daily_task.reopen",
       "table.view",
@@ -869,6 +874,7 @@ final class OperationData {
     String type = "";
     String status = "pending";
     String errorMessage = "";
+    String taskType = "";
     String createdAt = "";
     String processedAt = "";
 
@@ -878,6 +884,8 @@ final class OperationData {
       record.type = value(source, "action_type", "");
       record.status = value(source, "status", "pending");
       record.errorMessage = value(source, "error_message", "");
+      JSONObject payload = source.optJSONObject("payload");
+      record.taskType = payload == null ? "" : value(payload, "task_type", "");
       record.createdAt = value(source, "created_at", "");
       record.processedAt = value(source, "processed_at", "");
       return record;

@@ -498,6 +498,8 @@ test("Android role presets and action permission mapping stay explicit", () => {
     "room.view",
     "room.update_status",
     "daily_task.view",
+    "daily_task.create",
+    "daily_task.update",
     "daily_task.complete",
     "daily_task.reopen"
   ]);
