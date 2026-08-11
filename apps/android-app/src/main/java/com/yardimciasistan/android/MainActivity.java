@@ -73,6 +73,7 @@ public final class MainActivity extends ComponentActivity {
   private static final String TAB_PENSION = AndroidUiRules.TAB_PENSION;
   private static final String TAB_RESTAURANT = AndroidUiRules.TAB_RESTAURANT;
   private static final String TAB_MESSAGES = AndroidUiRules.TAB_MESSAGES;
+  private static final String TAB_CASH = AndroidUiRules.TAB_CASH;
   private static final String TAB_REPORTS = AndroidUiRules.TAB_REPORTS;
   private static final long FOREGROUND_SYNC_INTERVAL_MS = 15_000L;
   private static final int BOTTOM_NAV_HEIGHT_DP = 70;
@@ -162,7 +163,7 @@ public final class MainActivity extends ComponentActivity {
           render();
           return;
         }
-        if (TAB_REPORTS.equals(activeTab)) {
+        if (TAB_REPORTS.equals(activeTab) || TAB_CASH.equals(activeTab)) {
           activeTab = TAB_TODAY;
           settingsOpen = true;
           render();
@@ -1335,7 +1336,7 @@ public final class MainActivity extends ComponentActivity {
     settingsButton.setVisibility(canOpenSettings ? View.VISIBLE : View.GONE);
     styleHeaderAction(settingsButton, settingsOpen);
     bottomNavigation.setVisibility(
-        settingsOpen || inactiveDevice || TAB_REPORTS.equals(activeTab) ? View.GONE : View.VISIBLE
+        settingsOpen || inactiveDevice || TAB_REPORTS.equals(activeTab) || TAB_CASH.equals(activeTab) ? View.GONE : View.VISIBLE
     );
     renderBottomNavigation();
     content.removeAllViews();
@@ -1358,6 +1359,10 @@ public final class MainActivity extends ComponentActivity {
     } else if (TAB_MESSAGES.equals(activeTab)) {
       headerTitle.setText("Mesajlar");
       screen = messagesScreen();
+    } else if (TAB_CASH.equals(activeTab)) {
+      headerTitle.setText("Kasa");
+      screen = FinanceWorkspace.create(this, data, actionPayload ->
+          sendAction("finance_manual_create", actionPayload, "Kasa hareketi gönderildi."));
     } else if (TAB_REPORTS.equals(activeTab)) {
       headerTitle.setText("Raporlar");
       screen = reportsScreen();
@@ -1409,6 +1414,9 @@ public final class MainActivity extends ComponentActivity {
     }
     if (TAB_MESSAGES.equals(activeTab)) {
       return TAB_MESSAGES + ":" + messageMode;
+    }
+    if (TAB_CASH.equals(activeTab)) {
+      return TAB_CASH;
     }
     if (TAB_REPORTS.equals(activeTab)) {
       return TAB_REPORTS + ":" + reportPreset;
@@ -2244,6 +2252,29 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout appearance = UiKit.card(this);
     appearance.addView(settingLine("Tema", themeMode.label, UiKit.PRIMARY));
     page.addView(appearance);
+    if (data.hasPermission("finance.view")) {
+      page.addView(sectionLabel("Kasa"));
+      LinearLayout cash = UiKit.card(this);
+      cash.addView(UiKit.text(this, "Mobil Kasa", 15, UiKit.TEXT, Typeface.BOLD));
+      cash.addView(UiKit.text(
+          this,
+          "Bugünkü gelir, gider, net durum, bekleyen oda alacağı ve son hareketleri hızlıca izleyin.",
+          12,
+          UiKit.SECONDARY,
+          Typeface.NORMAL
+      ));
+      Button openCash = UiKit.button(this, "Kasa'yı Aç", UiKit.PRIMARY, view -> {
+        settingsOpen = false;
+        activeTab = TAB_CASH;
+        clearError();
+        render();
+      });
+      LinearLayout.LayoutParams cashButtonParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+      cashButtonParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
+      openCash.setLayoutParams(cashButtonParams);
+      cash.addView(openCash);
+      page.addView(cash);
+    }
     if (data.isAdmin()) {
       page.addView(sectionLabel("Yönetici"));
       LinearLayout reports = UiKit.card(this);
@@ -4739,6 +4770,8 @@ public final class MainActivity extends ComponentActivity {
         return "daily_task.complete";
       case "daily_task_reopen":
         return "daily_task.reopen";
+      case "finance_manual_create":
+        return "finance.create";
       case "table_status_update":
         return "table.update_status";
       case "table_order_open":

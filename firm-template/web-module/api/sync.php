@@ -223,10 +223,11 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $permissionProfile = is_array($androidSnapshot['androidPermissions'][$deviceId] ?? null)
         ? $androidSnapshot['androidPermissions'][$deviceId]
         : [];
-    $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin'
-        && ya_sync_bool($permissionProfile['is_active'] ?? false);
-    $customerManagementAllowed = $reportsAllowed
-        && in_array('customer.manage', is_array($permissionProfile['permissions'] ?? null) ? $permissionProfile['permissions'] : [], true);
+    $permissionList = is_array($permissionProfile['permissions'] ?? null) ? $permissionProfile['permissions'] : [];
+    $deviceActive = ya_sync_bool($permissionProfile['is_active'] ?? false);
+    $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin' && $deviceActive;
+    $financeAllowed = $deviceActive && in_array('finance.view', $permissionList, true);
+    $customerManagementAllowed = $reportsAllowed && in_array('customer.manage', $permissionList, true);
     ya_sync_update_state([
         'last_android_summary_at' => $now
     ]);
@@ -265,6 +266,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'table_orders' => $androidSnapshot['table_orders'],
         'messages' => $androidSnapshot['messages'],
         'androidPermissions' => $androidSnapshot['androidPermissions'],
+        'finance' => $financeAllowed ? $androidSnapshot['finance'] : [],
         'reports' => $reportsAllowed ? $androidSnapshot['reports'] : [],
         'actions' => $actions,
         'server_revision' => ya_storage_server_revision()
@@ -838,13 +840,21 @@ function ya_sync_android_action_types(): array
         'customer_delete',
         'customer_room_assign',
         'customer_room_stay_status',
+        'reservation_room_create',
+        'reservation_room_update',
+        'reservation_table_create',
+        'reservation_table_update',
         'reservation_approve',
         'reservation_reject',
         'reservation_cancel',
         'room_status_update',
+        'daily_task_create',
+        'daily_task_update',
+        'daily_task_delete',
         'daily_task_complete',
         'daily_task_reopen',
         'daily_task_cancel',
+        'finance_manual_create',
         'table_status_update',
         'table_order_open',
         'table_order_add_item',
@@ -980,8 +990,49 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'table_orders' => ya_sync_sanitize_android_table_orders($snapshot['table_orders'] ?? []),
         'messages' => ya_sync_sanitize_android_messages($snapshot['messages'] ?? []),
         'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
+        'finance' => ya_sync_sanitize_android_finance($snapshot['finance'] ?? []),
         'reports' => ya_sync_sanitize_android_reports($snapshot['reports'] ?? []),
         'updated_at' => $updatedAt
+    ];
+}
+
+function ya_sync_sanitize_android_finance(mixed $value): array
+{
+    $finance = is_array($value) ? $value : [];
+    $entries = [];
+    foreach (array_slice(is_array($finance['recent_entries'] ?? null) ? $finance['recent_entries'] : [], 0, 50) as $rawEntry) {
+        if (!is_array($rawEntry)) {
+            continue;
+        }
+        $direction = ya_sync_string($rawEntry['direction'] ?? '');
+        $amountMinor = max(0, ya_sync_int($rawEntry['amount_minor'] ?? 0, 0));
+        if (!in_array($direction, ['income', 'expense'], true) || $amountMinor <= 0) {
+            continue;
+        }
+        $entries[] = [
+            'id' => mb_substr(ya_sync_string($rawEntry['id'] ?? ''), 0, 220),
+            'direction' => $direction,
+            'amount_minor' => $amountMinor,
+            'currency' => mb_substr(ya_sync_string($rawEntry['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
+            'payment_method' => mb_substr(ya_sync_string($rawEntry['payment_method'] ?? 'unspecified'), 0, 32),
+            'category' => mb_substr(ya_sync_string($rawEntry['category'] ?? ''), 0, 64),
+            'description' => mb_substr(ya_sync_string($rawEntry['description'] ?? ''), 0, 180),
+            'occurred_at' => ya_sync_string($rawEntry['occurred_at'] ?? ''),
+            'source_type' => mb_substr(ya_sync_string($rawEntry['source_type'] ?? ''), 0, 64),
+            'source_id' => mb_substr(ya_sync_string($rawEntry['source_id'] ?? ''), 0, 220),
+            'note' => mb_substr(ya_sync_string($rawEntry['note'] ?? ''), 0, 500),
+            'created_at' => ya_sync_string($rawEntry['created_at'] ?? '')
+        ];
+    }
+
+    return [
+        'generated_at' => ya_sync_string($finance['generated_at'] ?? ''),
+        'currency' => mb_substr(ya_sync_string($finance['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
+        'today_income_minor' => max(0, ya_sync_int($finance['today_income_minor'] ?? 0, 0)),
+        'today_expense_minor' => max(0, ya_sync_int($finance['today_expense_minor'] ?? 0, 0)),
+        'today_net_minor' => ya_sync_int($finance['today_net_minor'] ?? 0, 0),
+        'outstanding_pension_minor' => max(0, ya_sync_int($finance['outstanding_pension_minor'] ?? 0, 0)),
+        'recent_entries' => $entries
     ];
 }
 
@@ -1131,6 +1182,8 @@ function ya_sync_android_permissions(): array
         'customer.delete',
         'request.delete',
         'reservation.view',
+        'reservation.create',
+        'reservation.update',
         'reservation.approve',
         'reservation.reject',
         'reservation.cancel',
@@ -1138,6 +1191,9 @@ function ya_sync_android_permissions(): array
         'room.update_status',
         'room.assign_customer',
         'daily_task.view',
+        'daily_task.create',
+        'daily_task.update',
+        'daily_task.delete',
         'daily_task.complete',
         'daily_task.reopen',
         'table.view',
@@ -1156,6 +1212,8 @@ function ya_sync_android_permissions(): array
         'menu.edit',
         'menu.stock_view',
         'menu.stock_update',
+        'finance.view',
+        'finance.create',
         'menu.delete',
         'message.delete',
         'settings.view',

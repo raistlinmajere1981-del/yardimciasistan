@@ -214,6 +214,9 @@ final class NotificationEventDetector {
     if (type.startsWith("daily_task_")) {
       return "pension:tasks";
     }
+    if (type.startsWith("finance_")) {
+      return "cash";
+    }
     if (type.startsWith("menu_stock_")) {
       return "restaurant:stock";
     }

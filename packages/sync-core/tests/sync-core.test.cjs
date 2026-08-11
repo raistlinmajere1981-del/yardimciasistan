@@ -546,7 +546,9 @@ test("Android staff permission groups produce only their documented effective pe
     "table_order.view",
     "table_order.set_payment_waiting",
     "table_order.close_paid",
-    "menu.stock_view"
+    "menu.stock_view",
+    "finance.view",
+    "finance.create"
   ]);
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.customer_reservation, [
     "customer.view",
