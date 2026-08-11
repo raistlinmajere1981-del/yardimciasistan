@@ -214,14 +214,9 @@ final class NotificationEventDetector {
   }
 
   static String routeForReservation(OperationData.ReservationRecord reservation) {
-    if (reservation != null) {
-      boolean restaurantOnly = "table".equals(reservation.type)
-          || (reservation.roomIds.isEmpty() && !reservation.tableIds.isEmpty());
-      if (restaurantOnly) {
-        return "restaurant:reservations";
-      }
-    }
-    return "pension:reservations";
+    return AndroidUiRules.isRestaurantOnlyReservation(reservation)
+        ? "restaurant:reservations"
+        : "pension:reservations";
   }
 
   private static NotificationEvent paymentWaitingEvent(String tableId, String tableName, double total, String updatedAt) {
