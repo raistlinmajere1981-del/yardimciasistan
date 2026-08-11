@@ -40,7 +40,7 @@ final class NotificationEventDetector {
             "reservation",
             "Rezervasyon onay bekliyor",
             reservation.customerName + reservationSummarySuffix(reservation),
-            "pension:reservations",
+            routeForReservation(reservation),
             reservation.updatedAt,
             NotificationEvent.PRIORITY_MEDIUM
         ));
@@ -211,6 +211,17 @@ final class NotificationEventDetector {
       return "restaurant:tables";
     }
     return "today";
+  }
+
+  static String routeForReservation(OperationData.ReservationRecord reservation) {
+    if (reservation != null) {
+      boolean restaurantOnly = "table".equals(reservation.type)
+          || (reservation.roomIds.isEmpty() && !reservation.tableIds.isEmpty());
+      if (restaurantOnly) {
+        return "restaurant:reservations";
+      }
+    }
+    return "pension:reservations";
   }
 
   private static NotificationEvent paymentWaitingEvent(String tableId, String tableName, double total, String updatedAt) {
