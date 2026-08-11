@@ -121,9 +121,6 @@ final class AndroidUiRules {
     if (data == null) {
       return false;
     }
-    if (!data.tables.isEmpty() || !data.tableOrders.isEmpty()) {
-      return true;
-    }
     for (OperationData.ReservationRecord reservation : data.reservations) {
       if (isRestaurantReservation(reservation)) {
         return true;
@@ -137,6 +134,13 @@ final class AndroidUiRules {
         "table".equals(reservation.type)
         || "room_and_table".equals(reservation.type)
         || !reservation.tableIds.isEmpty()
+    );
+  }
+
+  static boolean isRestaurantOnlyReservation(OperationData.ReservationRecord reservation) {
+    return reservation != null && (
+        "table".equals(reservation.type)
+        || (reservation.roomIds.isEmpty() && !reservation.tableIds.isEmpty())
     );
   }
 
