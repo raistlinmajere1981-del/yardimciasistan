@@ -56,6 +56,38 @@ Yanındaki `artifacts/web-module-deploy/manifest.json` dosyası paketlenen dosya
 
 Hosting panelinde arşiv çıkarma desteği varsa `yardimci-asistan.zip` veya `yardimci-asistan.tar.gz` dosyasını yükleyip açabilirsiniz. Destek yoksa `yardimci-asistan/` klasörünün içeriğini FTP veya dosya yöneticisiyle kopyalayın.
 
+### SSH ile canlı güncelleme
+
+Alwaysdata üzerindeki mevcut kurulumu güncellemek için proje kökünde önce farkları
+kontrol edin:
+
+```bash
+npm run deploy:web -- --dry-run
+```
+
+Ardından etkileşimli onayla yayınlayın:
+
+```bash
+npm run deploy:web
+```
+
+CI veya başka bir etkileşimsiz terminalde `npm run deploy:web -- --yes` kullanılabilir.
+Script varsayılan olarak `yardimciasistan@ssh-yardimciasistan.alwaysdata.net` hedefindeki
+`/home/yardimciasistan/www/yardimci-asistan` dizinini günceller. Farklı bir kurulum için
+`--help` çıktısındaki ortam değişkenlerini kullanın.
+
+Her yayında paket yeniden üretilir ve PHP dosyaları hem yerelde hem sunucudaki geçici
+alanda doğrulanır. Canlı `data/` dizini, `config/business.json`, yerel AI ayarları,
+`knowledge/`, `assets/` ve `.env*` dosyaları yeni sürüme taşınır. Önceki sürüm runtime
+verileriyle birlikte `/home/yardimciasistan/backups/` altında saklanır; bu yedekler API
+anahtarı ve sync secret içerebileceği için herkese açık bir dizine taşınmamalıdır.
+
+Paket daha önce üretildiyse yalnız kod dağıtımını tekrar denemek için:
+
+```bash
+npm run deploy:web -- --skip-pack
+```
+
 Kaynak template dosyasını değiştirmeden, sadece üretilecek deploy paketindeki `config/business.json` değerlerini doldurmak için şu ortam değişkenleri kullanılabilir:
 
 ```bash

@@ -1,0 +1,372 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+usage() {
+  cat <<'EOF'
+Yardimci Asistan web modülünü Alwaysdata sunucusuna güvenli biçimde yayınlar.
+
+Kullanım:
+  npm run deploy:web -- [seçenekler]
+
+Seçenekler:
+  --dry-run      Sunucuda değişiklik yapmadan yayın farklarını gösterir.
+  --skip-pack    Mevcut artifacts/web-module-deploy çıktısını kullanır.
+  --yes          Etkileşimli onay istemeden yayınlar.
+  --help         Bu yardımı gösterir.
+
+Ortam değişkenleri:
+  YARDIMCI_ASISTAN_DEPLOY_HOST          SSH hedefi
+  YARDIMCI_ASISTAN_DEPLOY_ROOT          Uzak web modülü dizini
+  YARDIMCI_ASISTAN_DEPLOY_BACKUP_DIR    Uzak yedek dizini
+  YARDIMCI_ASISTAN_DEPLOY_STAGE_PARENT  Uzak geçici dizin üst yolu
+  YARDIMCI_ASISTAN_PUBLIC_URL           Canlı web modülü adresi
+
+Script canlı data/, config/business.json, config/*.local.*, knowledge/,
+assets/ ve kökteki .env* dosyalarını korur. Eski sürüm, runtime verileriyle
+birlikte sunucudaki yedek dizinine taşınır.
+EOF
+}
+
+dry_run=false
+skip_pack=false
+assume_yes=false
+
+while (($# > 0)); do
+  case "$1" in
+    --dry-run) dry_run=true ;;
+    --skip-pack) skip_pack=true ;;
+    --yes) assume_yes=true ;;
+    --help|-h) usage; exit 0 ;;
+    *) printf 'Bilinmeyen seçenek: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+project_root="$(cd -- "$script_dir/.." && pwd)"
+package_dir="$project_root/artifacts/web-module-deploy/yardimci-asistan"
+
+deploy_host="${YARDIMCI_ASISTAN_DEPLOY_HOST:-yardimciasistan@ssh-yardimciasistan.alwaysdata.net}"
+remote_root="${YARDIMCI_ASISTAN_DEPLOY_ROOT:-/home/yardimciasistan/www/yardimci-asistan}"
+remote_root="${remote_root%/}"
+remote_parent="${remote_root%/*}"
+backup_dir="${YARDIMCI_ASISTAN_DEPLOY_BACKUP_DIR:-/home/yardimciasistan/backups}"
+backup_dir="${backup_dir%/}"
+backup_parent="${backup_dir%/*}"
+stage_parent="${YARDIMCI_ASISTAN_DEPLOY_STAGE_PARENT:-$backup_parent}"
+stage_parent="${stage_parent%/}"
+public_url="${YARDIMCI_ASISTAN_PUBLIC_URL:-https://yardimciasistan.alwaysdata.net/yardimci-asistan}"
+
+if [[ ! "$deploy_host" =~ ^[A-Za-z0-9._@-]+$ ]]; then
+  printf 'Geçersiz SSH hedefi: %s\n' "$deploy_host" >&2
+  exit 2
+fi
+
+for remote_path in "$remote_root" "$backup_dir" "$stage_parent"; do
+  if [[ ! "$remote_path" =~ ^/[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)+$ ]]; then
+    printf 'Güvenli olmayan uzak yol: %s\n' "$remote_path" >&2
+    exit 2
+  fi
+done
+
+remote_basename="${remote_root##*/}"
+if [[ "$remote_basename" == "home" || "$remote_basename" == "www" || "$remote_basename" == "public_html" ]]; then
+  printf 'Uzak hedef bir web kökü kadar geniş olamaz: %s\n' "$remote_root" >&2
+  exit 2
+fi
+if [[ "$backup_dir/" == "$remote_root/"* || "$stage_parent/" == "$remote_root/"* ]]; then
+  printf 'Yedek ve geçici yayın yolları canlı modülün dışında olmalıdır.\n' >&2
+  exit 2
+fi
+
+if [[ ! "$public_url" =~ ^https?://[^[:space:]]+$ ]]; then
+  printf 'Geçersiz canlı adres: %s\n' "$public_url" >&2
+  exit 2
+fi
+
+required_commands=(npm ssh rsync php mktemp)
+for command_name in "${required_commands[@]}"; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    printf 'Gerekli komut bulunamadı: %s\n' "$command_name" >&2
+    exit 1
+  fi
+done
+
+ssh_options=(-o BatchMode=yes -o ConnectTimeout=15)
+rsync_ssh="ssh -o BatchMode=yes -o ConnectTimeout=15"
+protected_paths=(
+  '--exclude=/data/***'
+  '--exclude=/config/business.json'
+  '--exclude=/config/*.local.php'
+  '--exclude=/config/*.local.json'
+  '--exclude=/knowledge/***'
+  '--exclude=/assets/***'
+  '--exclude=/.env'
+  '--exclude=/.env.*'
+)
+
+cd -- "$project_root"
+
+if [[ "$skip_pack" == false ]]; then
+  printf 'Web modülü paketi hazırlanıyor...\n'
+  (
+    template_widget="$project_root/firm-template/web-module/widget.js"
+    widget_snapshot_dir="$(mktemp -d)"
+    cp -p "$template_widget" "$widget_snapshot_dir/widget.js"
+
+    restore_template_widget() {
+      cp -p "$widget_snapshot_dir/widget.js" "$template_widget"
+      find "$widget_snapshot_dir" -depth -delete
+    }
+    trap restore_template_widget EXIT
+
+    npm run pack:web-module
+  )
+fi
+
+required_package_files=(
+  menu.html
+  widget.js
+  api/menu.php
+  api/sync.php
+  config/business.json
+  data/.htaccess
+  knowledge/.htaccess
+)
+for package_file in "${required_package_files[@]}"; do
+  if [[ ! -f "$package_dir/$package_file" ]]; then
+    printf 'Paket dosyası eksik: %s\n' "$package_dir/$package_file" >&2
+    printf 'Paketi yeniden üretmek için npm run pack:web-module çalıştırın.\n' >&2
+    exit 1
+  fi
+done
+
+printf 'Paket içindeki PHP dosyaları doğrulanıyor...\n'
+while IFS= read -r -d '' php_file; do
+  php -l "$php_file" >/dev/null
+done < <(find "$package_dir" -type f -name '*.php' -print0)
+
+printf 'SSH bağlantısı ve canlı modül doğrulanıyor...\n'
+ssh "${ssh_options[@]}" "$deploy_host" bash -s -- \
+  "$remote_root" "$remote_parent" "$backup_parent" "$stage_parent" <<'REMOTE_CHECK'
+set -Eeuo pipefail
+remote_root="$1"
+remote_parent="$2"
+backup_parent="$3"
+stage_parent="$4"
+
+test -d "$remote_root"
+test -d "$remote_parent"
+test -d "$backup_parent"
+test -d "$stage_parent"
+for command_name in rsync php find mv cp stat; do
+  command -v "$command_name" >/dev/null
+done
+
+root_device="$(stat -c %d "$remote_parent")"
+test "$root_device" = "$(stat -c %d "$backup_parent")"
+test "$root_device" = "$(stat -c %d "$stage_parent")"
+REMOTE_CHECK
+
+printf '\nHedef: %s:%s\n' "$deploy_host" "$remote_root"
+printf 'Korunan: data/, firma ve yerel config, knowledge/, assets/, .env*\n\n'
+
+show_dry_run() {
+  printf 'Kod ve güvenlik dosyalarındaki değişiklikler:\n'
+  rsync -aznci --delete --omit-dir-times --itemize-changes \
+    "${protected_paths[@]}" \
+    -e "$rsync_ssh" \
+    "$package_dir/" "$deploy_host:$remote_root/"
+
+  printf '\nCanlıda yoksa eklenecek asset dosyaları:\n'
+  rsync -aznci --ignore-existing --omit-dir-times --itemize-changes \
+    -e "$rsync_ssh" \
+    "$package_dir/assets/" "$deploy_host:$remote_root/assets/"
+
+  printf '\nCanlıda yoksa eklenecek knowledge dosyaları:\n'
+  rsync -aznci --ignore-existing --exclude='/.htaccess' --omit-dir-times --itemize-changes \
+    -e "$rsync_ssh" \
+    "$package_dir/knowledge/" "$deploy_host:$remote_root/knowledge/"
+
+  printf '\nKorumalı klasörlerin erişim kuralları:\n'
+  rsync -aznci --omit-dir-times --itemize-changes \
+    -e "$rsync_ssh" \
+    "$package_dir/data/.htaccess" "$deploy_host:$remote_root/data/.htaccess"
+  rsync -aznci --omit-dir-times --itemize-changes \
+    -e "$rsync_ssh" \
+    "$package_dir/knowledge/.htaccess" "$deploy_host:$remote_root/knowledge/.htaccess"
+}
+
+if [[ "$dry_run" == true ]]; then
+  show_dry_run
+  printf '\nDry-run tamamlandı; sunucuda değişiklik yapılmadı.\n'
+  exit 0
+fi
+
+if [[ "$assume_yes" == false ]]; then
+  if [[ ! -t 0 ]]; then
+    printf 'Etkileşimsiz yayın için --yes kullanın.\n' >&2
+    exit 2
+  fi
+  read -r -p 'Bu paket canlı web modülüne yayınlansın mı? [e/H] ' answer
+  if [[ ! "$answer" =~ ^[eEyY]$ ]]; then
+    printf 'Yayın iptal edildi.\n'
+    exit 0
+  fi
+fi
+
+deploy_stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+remote_stage="$stage_parent/.yardimci-asistan-deploy-stage-${deploy_stamp}-$$"
+remote_backup="$backup_dir/yardimci-asistan-${deploy_stamp}"
+stage_created=false
+
+cleanup_stage() {
+  if [[ "$stage_created" != true ]]; then
+    return
+  fi
+  ssh "${ssh_options[@]}" "$deploy_host" bash -s -- "$remote_stage" <<'REMOTE_CLEANUP' \
+    >/dev/null 2>&1 || printf 'Uyarı: geçici uzak dizin temizlenemedi: %s\n' "$remote_stage" >&2
+set -Eeuo pipefail
+remote_stage="$1"
+if [[ -d "$remote_stage" ]]; then
+  find "$remote_stage" -depth -delete
+fi
+REMOTE_CLEANUP
+}
+trap cleanup_stage EXIT
+
+printf 'Geçici yayın alanı hazırlanıyor...\n'
+ssh "${ssh_options[@]}" "$deploy_host" bash -s -- \
+  "$remote_stage" "$backup_dir" "$remote_backup" <<'REMOTE_PREPARE'
+set -Eeuo pipefail
+remote_stage="$1"
+backup_dir="$2"
+remote_backup="$3"
+
+test ! -e "$remote_stage"
+test ! -e "$remote_backup"
+mkdir -p "$remote_stage" "$backup_dir"
+REMOTE_PREPARE
+stage_created=true
+
+rsync -az --delete --omit-dir-times \
+  -e "$rsync_ssh" \
+  "$package_dir/" "$deploy_host:$remote_stage/"
+
+printf 'Sunucudaki geçici paketin PHP dosyaları doğrulanıyor...\n'
+ssh "${ssh_options[@]}" "$deploy_host" \
+  "find '$remote_stage' -type f -name '*.php' -exec php -l {} \\; >/dev/null"
+
+printf 'Canlı veriler korunarak yeni sürüm etkinleştiriliyor...\n'
+ssh "${ssh_options[@]}" "$deploy_host" bash -s -- \
+  "$remote_root" "$remote_stage" "$remote_backup" <<'REMOTE_ACTIVATE'
+set -Eeuo pipefail
+remote_root="$1"
+remote_stage="$2"
+remote_backup="$3"
+old_moved=false
+
+restore_old_release() {
+  if [[ "$old_moved" == true && ! -e "$remote_root" && -d "$remote_backup" ]]; then
+    mv "$remote_backup" "$remote_root"
+  fi
+}
+trap restore_old_release EXIT
+trap 'exit 130' HUP INT TERM
+
+mv "$remote_root" "$remote_backup"
+old_moved=true
+
+if [[ -d "$remote_backup/data" ]]; then
+  data_guard="$remote_stage/.deploy-data-htaccess"
+  if [[ -f "$remote_stage/data/.htaccess" ]]; then
+    cp -p "$remote_stage/data/.htaccess" "$data_guard"
+  fi
+  if [[ -d "$remote_stage/data" ]]; then
+    find "$remote_stage/data" -depth -delete
+  fi
+  cp -a "$remote_backup/data" "$remote_stage/data"
+  if [[ -f "$data_guard" ]]; then
+    cp -p "$data_guard" "$remote_stage/data/.htaccess"
+    find "$data_guard" -delete
+  fi
+fi
+
+if [[ -f "$remote_backup/config/business.json" ]]; then
+  cp -p "$remote_backup/config/business.json" "$remote_stage/config/business.json"
+fi
+for preserved_file in \
+  "$remote_backup"/config/*.local.php \
+  "$remote_backup"/config/*.local.json; do
+  [[ -f "$preserved_file" ]] || continue
+  cp -p "$preserved_file" "$remote_stage/config/"
+done
+
+if [[ -d "$remote_backup/knowledge" ]]; then
+  mkdir -p "$remote_stage/knowledge"
+  rsync -a --exclude='/.htaccess' \
+    "$remote_backup/knowledge/" "$remote_stage/knowledge/"
+fi
+if [[ -d "$remote_backup/assets" ]]; then
+  mkdir -p "$remote_stage/assets"
+  rsync -a "$remote_backup/assets/" "$remote_stage/assets/"
+fi
+
+for preserved_file in "$remote_backup"/.env "$remote_backup"/.env.*; do
+  [[ -f "$preserved_file" ]] || continue
+  cp -p "$preserved_file" "$remote_stage/"
+done
+
+find "$remote_stage" -type f -name '*.php' -exec php -l {} \; >/dev/null
+mv "$remote_stage" "$remote_root"
+old_moved=false
+trap - EXIT HUP INT TERM
+REMOTE_ACTIVATE
+stage_created=false
+
+printf 'Yayınlanan kod dosyaları karşılaştırılıyor...\n'
+verification="$(
+  rsync -aznci --delete --omit-dir-times --itemize-changes \
+    "${protected_paths[@]}" \
+    -e "$rsync_ssh" \
+    "$package_dir/" "$deploy_host:$remote_root/" 2>&1 \
+    | awk '$1 != ".d"'
+)"
+if [[ -n "$verification" ]]; then
+  printf 'Yayın doğrulaması fark buldu:\n%s\n' "$verification" >&2
+  printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
+  exit 1
+fi
+
+printf 'Korumalı klasörlerin erişim dosyaları karşılaştırılıyor...\n'
+for protected_file in data/.htaccess knowledge/.htaccess; do
+  protected_verification="$(
+    rsync -aznci --omit-dir-times --itemize-changes \
+      -e "$rsync_ssh" \
+      "$package_dir/$protected_file" "$deploy_host:$remote_root/$protected_file" 2>&1 \
+      | awk '$1 != ".d"'
+  )"
+  if [[ -n "$protected_verification" ]]; then
+    printf 'Yayın doğrulaması %s için fark buldu:\n%s\n' \
+      "$protected_file" "$protected_verification" >&2
+    printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
+    exit 1
+  fi
+done
+
+if command -v curl >/dev/null 2>&1; then
+  printf 'Canlı menü ve API sağlık kontrolü yapılıyor...\n'
+  if ! curl --fail --silent --show-error --max-time 20 \
+      "${public_url%/}/menu.html" >/dev/null \
+    || ! curl --fail --silent --show-error --max-time 20 \
+      "${public_url%/}/api/menu.php" >/dev/null; then
+    printf 'Yayın uygulandı ancak canlı HTTP kontrolü başarısız oldu.\n' >&2
+    printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
+    exit 1
+  fi
+fi
+
+printf '\nYayın tamamlandı.\n'
+printf 'Canlı adres: %s\n' "$public_url"
+printf 'Önceki sürüm ve veri yedeği: %s\n' "$remote_backup"
+printf 'Canlı runtime verileri, firma ayarları, bilgi dosyaları ve assetler korundu.\n'

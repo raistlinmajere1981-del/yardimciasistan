@@ -31,6 +31,7 @@
     "dev:desktop": "npm run dev -w @yardimci-asistan/desktop-app",
     "dev:local": "node scripts/local-dev-lab.mjs",
     "dev:php-module": "php -S 127.0.0.1:8080 -t firm-template/web-module",
+    "deploy:web": "bash scripts/deploy-web.sh",
     "doctor": "node scripts/dev-doctor.mjs",
     "e2e": "playwright test",
     "lint:php": "node scripts/php-lint.mjs",
