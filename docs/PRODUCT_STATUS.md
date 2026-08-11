@@ -58,6 +58,19 @@ Demo hosting üzerinde masaüstü ile gerçek web modülü arasındaki saha bağ
 - Senkron durumu tekrar `Tüm veriler güncel` durumuna döndü.
 - Tekrarlı kayıt/idempotency, uygulama yeniden başlatma ve ayrıntılı kullanım kenar durumları kapsamlı son kullanım testinde toplu olarak yeniden kontrol edilecek.
 
+### Android oda hesabı, tahsilat ve çıkış
+
+Android companion içindeki Pansiyon alanı, masaüstündeki oda folyosu hesabının güvenli günlük işlemlerini kullanabilir.
+
+- `Hesaplar` görünümünde yalnız açık oda hesapları, toplam, alınan ve kalan tutarlar gösterilir.
+- Yetkili cihaz kalan tutarın tamamını veya bir bölümünü `Ödeme Al` ile kaydedebilir; tahsilat mevcut oda folyosu trigger'ı üzerinden Kasa gelirine otomatik yansır.
+- Telefonun gördüğü bakiye ile masaüstündeki güncel bakiye değişmişse işlem stale-bakiye kontrolüyle reddedilir ve canlı verinin yenilenmesi istenir.
+- Kalan tutardan büyük ödeme kabul edilmez.
+- `Çıkışı Tamamla` yalnız güncel bakiye sıfırken çalışır; action masaüstüne ulaştığında bakiye yeniden okunur ve borçlu çıkışa izin verilmez.
+- Zorla borçlu çıkış, ödeme geri alma, fiyat/indirim ve ek hesap kalemi düzenleme mobil kapsamına alınmamıştır; bu işlemler masaüstünde kalır.
+- Yeni `room_folio.view`, `room_folio.payment` ve `room_folio.checkout` izinleri mevcut görev grubu ve action-permission sınırına eklenmiştir.
+- Aynı mobil action'ın ikinci kez uygulanmasını mevcut action receipt/idempotency katmanı engeller.
+
 ### Manuel günlük iş / not yönetimi
 
 Pansiyon ve restoran ekranlarında işletme sahibi kendi günlük işini/notunu başlık, açıklama, tarih ve saat ile oluşturabilir. Manuel kayıtlar düzenlenebilir, tamamlanabilir, yeniden açılabilir, iptal edilebilir ve silinebilir. Sistem tarafından üretilen görevlerin mevcut iş kuralları korunur.
@@ -176,4 +189,4 @@ Doğrudan Android PC/LAN modu ve resmî WhatsApp API entegrasyonu v1 tamamlanma 
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü, ana masaüstü saha kullanılabilirlik turu, web talep akışı ve gerçek hosting senkron saha doğrulaması tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma, sade operasyon takvimi, temel ön muhasebe, Android companion ve local-first senkron v1 ürün omurgasındadır. Yeni özellik eklemek yerine sıradaki aşama Windows son saha doğrulamasıyla başlayan kapsamlı kullanım testi ve ardından toplu düzeltme turudur.
+Frontend mimari refaktörü, ana masaüstü saha kullanılabilirlik turu, web talep akışı ve gerçek hosting senkron saha doğrulaması tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma, sade operasyon takvimi, temel ön muhasebe, Android companion ve local-first senkron v1 ürün omurgasındadır. Android companion artık açık oda hesabını görüntüleme, yetkili tahsilat alma ve yalnız bakiye sıfırken çıkışı tamamlama günlük akışını da kapsar; riskli folyo düzenlemeleri masaüstünde kalır. Yeni özellik eklemek yerine sıradaki aşama Windows son saha doğrulamasıyla başlayan kapsamlı kullanım testi ve ardından toplu düzeltme turudur.
