@@ -1,0 +1,38 @@
+name: Android Check
+
+on:
+  pull_request:
+    paths:
+      - "apps/android-app/**"
+      - "scripts/run-android-gradle.mjs"
+      - "scripts/generate-android-connection-defaults.mjs"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/android-check.yml"
+  workflow_dispatch:
+
+jobs:
+  android-smoke:
+    name: Android unit + debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 36 SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Android smoke build
+        run: npm run smoke:android:build
