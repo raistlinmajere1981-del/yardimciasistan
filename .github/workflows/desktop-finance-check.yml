@@ -5,6 +5,8 @@ on:
     paths:
       - "apps/desktop-app/**"
       - "packages/shared/types/request.ts"
+      - "packages/web-widget/**"
+      - "firm-template/web-module/**"
       - "scripts/smoke-finance-*.mjs"
       - "scripts/smoke-room-folio-*.mjs"
       - "scripts/smoke-daily-task-*.mjs"
@@ -14,6 +16,7 @@ on:
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "scripts/smoke-sync-timeout.mjs"
       - "scripts/smoke-web-connection-test.mjs"
+      - "scripts/smoke-web-widget-module.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
   push:
@@ -24,6 +27,8 @@ on:
     paths:
       - "apps/desktop-app/**"
       - "packages/shared/types/request.ts"
+      - "packages/web-widget/**"
+      - "firm-template/web-module/**"
       - "scripts/smoke-finance-*.mjs"
       - "scripts/smoke-room-folio-*.mjs"
       - "scripts/smoke-daily-task-*.mjs"
@@ -33,6 +38,7 @@ on:
       - "scripts/smoke-desktop-frontend-architecture.mjs"
       - "scripts/smoke-sync-timeout.mjs"
       - "scripts/smoke-web-connection-test.mjs"
+      - "scripts/smoke-web-widget-module.mjs"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
 
@@ -55,6 +61,9 @@ jobs:
 
       - name: Ortak paketleri derle
         run: npm run build:packages
+
+      - name: Web widget doğrudan talep smoke
+        run: node scripts/smoke-web-widget-module.mjs
 
       - name: Masaüstü strict typecheck
         run: npm run typecheck:strict -w @yardimci-asistan/desktop-app
