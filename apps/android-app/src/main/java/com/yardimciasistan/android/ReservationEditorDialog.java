@@ -42,6 +42,9 @@ final class ReservationEditorDialog {
       Listener listener
   ) {
     boolean editing = reservation != null;
+    boolean detailsEditable = !editing
+        || reservation.requestId.startsWith("manual:")
+        || reservation.requestId.startsWith("android:");
     LinearLayout form = new LinearLayout(context);
     form.setOrientation(LinearLayout.VERTICAL);
     int padding = dp(context, 16);
@@ -72,12 +75,17 @@ final class ReservationEditorDialog {
       time = timeField(context, form, "Saat", editing ? reservation.time : "19:00");
     }
 
+    startDate.setEnabled(detailsEditable);
+    if (endDate != null) endDate.setEnabled(detailsEditable);
+    if (time != null) time.setEnabled(detailsEditable);
+
     EditText guestCount = numberField(
         context,
         form,
         "Kişi sayısı",
         String.valueOf(editing ? Math.max(1, reservation.guestCount) : 1)
     );
+    guestCount.setEnabled(detailsEditable);
 
     List<String> resourceIds = new ArrayList<>();
     List<String> resourceLabels = new ArrayList<>();
@@ -119,6 +127,9 @@ final class ReservationEditorDialog {
     TextView status = new TextView(context);
     status.setTextSize(12);
     status.setPadding(0, dp(context, 8), 0, 0);
+    if (editing && !detailsEditable) {
+      status.setText("Web talebinden oluşan rezervasyonda tarih, saat ve kişi bilgisi korunur; oda/masa ve not değiştirilebilir.");
+    }
     form.addView(status);
 
     ScrollView scroll = new ScrollView(context);
