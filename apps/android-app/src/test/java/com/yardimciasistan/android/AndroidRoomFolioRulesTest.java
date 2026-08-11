@@ -24,4 +24,10 @@ public final class AndroidRoomFolioRulesTest {
     assertEquals(AndroidUiRules.TAB_PENSION, destination.tab);
     assertEquals(AndroidUiRules.PENSION_FOLIOS, destination.mode);
   }
+
+  @Test
+  public void roomFolioActionFailuresReturnToAccountsMode() {
+    assertEquals("pension:folios", NotificationEventDetector.routeForAction("room_folio_payment_add"));
+    assertEquals("pension:folios", NotificationEventDetector.routeForAction("room_folio_checkout"));
+  }
 }
