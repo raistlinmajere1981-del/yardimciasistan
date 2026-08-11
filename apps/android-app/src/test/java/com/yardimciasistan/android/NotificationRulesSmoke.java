@@ -89,9 +89,18 @@ public final class NotificationRulesSmoke {
 
     OperationData.ReservationRecord reservation = new OperationData.ReservationRecord();
     reservation.id = "reservation-1";
+    reservation.type = "room";
     reservation.status = "pending";
     reservation.customerName = "Mehmet";
     data.reservations.add(reservation);
+
+    OperationData.ReservationRecord restaurantReservation = new OperationData.ReservationRecord();
+    restaurantReservation.id = "reservation-table-1";
+    restaurantReservation.type = "table";
+    restaurantReservation.status = "pending";
+    restaurantReservation.customerName = "Zeynep";
+    restaurantReservation.time = "19:30";
+    data.reservations.add(restaurantReservation);
 
     OperationData.TableOrder order = new OperationData.TableOrder();
     order.id = "order-1";
@@ -114,29 +123,42 @@ public final class NotificationRulesSmoke {
     data.tasks.add(task);
 
     List<NotificationEvent> events = NotificationEventDetector.detect(data, "2026-07-18");
-    assertEquals(5, events.size(), "all required snapshot events should be detected");
+    assertEquals(6, events.size(), "all required snapshot events should be detected");
 
     Set<String> enabled = allCategories();
     NotificationEvent requestEvent = event(events, "request:request-1:new");
     NotificationEvent reservationEvent = event(events, "reservation:reservation-1:pending");
+    NotificationEvent restaurantReservationEvent = event(events, "reservation:reservation-table-1:pending");
     NotificationEvent paymentEvent = event(events, "table:table-1:payment_waiting");
     NotificationEvent roomEvent = event(events, "room:room-1:cleaning");
     NotificationEvent taskEvent = event(events, "task:task-1:pending");
 
     assertEquals("customers:new", requestEvent.route, "request notification route");
-    assertEquals("pension:reservations", reservationEvent.route, "reservation notification route");
+    assertEquals("pension:reservations", reservationEvent.route, "pension reservation notification route");
+    assertEquals("restaurant:reservations", restaurantReservationEvent.route, "restaurant reservation notification route");
     assertEquals("restaurant:tables", paymentEvent.route, "payment notification route");
     assertEquals("pension:rooms", roomEvent.route, "room notification route");
     assertEquals("pension:tasks", taskEvent.route, "daily-task notification route");
     assertEquals("restaurant:stock", NotificationEventDetector.routeForAction("menu_stock_set"), "stock action route");
     assertEquals("restaurant:orders", NotificationEventDetector.routeForAction("table_order_set_served"), "order action route");
 
+    OperationData.ReservationRecord combinedReservation = new OperationData.ReservationRecord();
+    combinedReservation.type = "room_and_table";
+    combinedReservation.roomIds.add("room-1");
+    combinedReservation.tableIds.add("table-1");
+    assertEquals(
+        "pension:reservations",
+        NotificationEventDetector.routeForReservation(combinedReservation),
+        "combined lodging reservation notifications should keep the pension-first route"
+    );
+
     data.permissions.add("customer.view");
     assertTrue(NotificationEventDetector.isAllowed(requestEvent, data, enabled), "customer.view should allow request alerts");
     assertFalse(NotificationEventDetector.isAllowed(reservationEvent, data, enabled), "reservation.view should remain independent");
     data.permissions.clear();
     data.permissions.add("reservation.view");
-    assertTrue(NotificationEventDetector.isAllowed(reservationEvent, data, enabled), "reservation.view should allow reservation alerts");
+    assertTrue(NotificationEventDetector.isAllowed(reservationEvent, data, enabled), "reservation.view should allow pension reservation alerts");
+    assertTrue(NotificationEventDetector.isAllowed(restaurantReservationEvent, data, enabled), "reservation.view should allow restaurant reservation alerts");
 
     data.permissions.clear();
     data.permissions.addAll(Arrays.asList("table_order.view", "table_order.set_payment_waiting"));
