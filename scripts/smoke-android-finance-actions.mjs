@@ -93,8 +93,8 @@ try {
   assert.equal(invalid.ok, false, "Sıfır tutar reddedilmeli");
 
   const finance = new DesktopFinanceService(database.databasePath).getData(20);
-  const mobileIncome = finance.recentEntries.filter((entry) => entry.sourceId === `android:${DEVICE_ID}` && entry.direction === "income");
-  const mobileExpense = finance.recentEntries.filter((entry) => entry.sourceId === `android:${DEVICE_ID}` && entry.direction === "expense");
+  const mobileIncome = finance.recentEntries.filter((entry) => entry.sourceId.startsWith(`android:${DEVICE_ID}/`) && entry.direction === "income");
+  const mobileExpense = finance.recentEntries.filter((entry) => entry.sourceId.startsWith(`android:${DEVICE_ID}/`) && entry.direction === "expense");
   assert.equal(mobileIncome.length, 1, "Tek Android gelir kaydı oluşmalı");
   assert.equal(mobileIncome[0].amountMinor, 12550);
   assert.equal(mobileExpense.length, 1, "Android gider kaydı oluşmalı");

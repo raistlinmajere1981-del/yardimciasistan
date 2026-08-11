@@ -52,6 +52,8 @@ final class OperationData {
       "menu.edit",
       "menu.stock_view",
       "menu.stock_update",
+      "finance.view",
+      "finance.create",
       "menu.delete",
       "message.delete",
       "settings.view",
@@ -124,6 +126,7 @@ final class OperationData {
   final List<TableOrder> tableOrders = new ArrayList<>();
   final List<MessageRecord> messages = new ArrayList<>();
   final List<ActionRecord> actions = new ArrayList<>();
+  FinanceSnapshot finance = new FinanceSnapshot();
   final Map<String, ReportSnapshot> reports = new HashMap<>();
 
   static OperationData fromJson(JSONObject root) {
@@ -179,6 +182,7 @@ final class OperationData {
     }
     addRecords(array(root, "messages"), data.messages, MessageRecord::fromJson);
     addRecords(array(root, "actions"), data.actions, ActionRecord::fromJson);
+    data.finance = FinanceSnapshot.fromJson(object(root, "finance"));
     JSONObject reports = root.optJSONObject("reports");
     if (reports != null) {
       for (String preset : new String[] {"today", "yesterday", "last7", "last30"}) {
@@ -889,6 +893,64 @@ final class OperationData {
       record.createdAt = value(source, "created_at", "");
       record.processedAt = value(source, "processed_at", "");
       return record;
+    }
+  }
+
+  static final class FinanceSnapshot {
+    String generatedAt = "";
+    String currency = "TRY";
+    long todayIncomeMinor;
+    long todayExpenseMinor;
+    long todayNetMinor;
+    long outstandingPensionMinor;
+    final List<FinanceEntry> recentEntries = new ArrayList<>();
+
+    static FinanceSnapshot fromJson(JSONObject source) {
+      FinanceSnapshot finance = new FinanceSnapshot();
+      finance.generatedAt = value(source, "generated_at", "");
+      finance.currency = value(source, "currency", "TRY");
+      finance.todayIncomeMinor = source.optLong("today_income_minor", 0L);
+      finance.todayExpenseMinor = source.optLong("today_expense_minor", 0L);
+      finance.todayNetMinor = source.optLong("today_net_minor", 0L);
+      finance.outstandingPensionMinor = source.optLong("outstanding_pension_minor", 0L);
+      addRecords(array(source, "recent_entries"), finance.recentEntries, FinanceEntry::fromJson);
+      return finance;
+    }
+  }
+
+  static final class FinanceEntry {
+    String id = "";
+    String direction = "income";
+    long amountMinor;
+    String currency = "TRY";
+    String paymentMethod = "unspecified";
+    String category = "";
+    String description = "";
+    String occurredAt = "";
+    String sourceType = "";
+    String sourceId = "";
+    String note = "";
+    String createdAt = "";
+
+    static FinanceEntry fromJson(JSONObject source) {
+      FinanceEntry entry = new FinanceEntry();
+      entry.id = value(source, "id", "");
+      entry.direction = value(source, "direction", "income");
+      entry.amountMinor = Math.max(0L, source.optLong("amount_minor", 0L));
+      entry.currency = value(source, "currency", "TRY");
+      entry.paymentMethod = value(source, "payment_method", "unspecified");
+      entry.category = value(source, "category", "");
+      entry.description = value(source, "description", "");
+      entry.occurredAt = value(source, "occurred_at", "");
+      entry.sourceType = value(source, "source_type", "");
+      entry.sourceId = value(source, "source_id", "");
+      entry.note = value(source, "note", "");
+      entry.createdAt = value(source, "created_at", "");
+      return entry;
+    }
+
+    boolean isIncome() {
+      return "income".equals(direction);
     }
   }
 

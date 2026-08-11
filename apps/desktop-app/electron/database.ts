@@ -40,6 +40,7 @@ import type {
 } from "@yardimci-asistan/sync-core";
 import { applyAndroidReservationAction } from "./android-reservation-actions.js";
 import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
+import { applyAndroidFinanceAction } from "./android-finance-actions.js";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
@@ -6937,6 +6938,14 @@ export class DesktopDatabase {
         return this.applyAndroidDailyTaskStatus(action, "pending", now);
       case "daily_task_cancel":
         return this.applyAndroidDailyTaskStatus(action, "cancelled", now);
+      case "finance_manual_create":
+        return applyAndroidFinanceAction({
+          db: this.db,
+          action,
+          now,
+          insertEvent: (type, entityId, payload) =>
+            this.insertAndroidActionEvent(action, type, "finance_entry", entityId, payload, now)
+        });
       case "table_status_update":
         return this.applyAndroidTableStatus(action, now);
       case "table_order_open":

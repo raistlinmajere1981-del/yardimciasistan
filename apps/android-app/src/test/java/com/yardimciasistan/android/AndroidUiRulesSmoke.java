@@ -21,6 +21,10 @@ public final class AndroidUiRulesSmoke {
     assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_CUSTOMERS), "customer tab without customer.view");
     assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_PENSION), "pension tab without a visible mode");
     assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_RESTAURANT), "restaurant tab without a visible mode");
+    assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_CASH), "cash tab without finance.view");
+    data.permissions.add("finance.view");
+    assertTrue(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_CASH), "finance.view should expose the cash workspace");
+    data.permissions.remove("finance.view");
 
     data.permissions.add("menu.view");
     data.permissions.add("daily_task.view");
@@ -221,6 +225,7 @@ public final class AndroidUiRulesSmoke {
     assertDestination("restaurant:stock", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_STOCK);
     assertDestination("restaurant:menu", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_MENU);
     assertDestination("messages:waiting", AndroidUiRules.TAB_MESSAGES, AndroidUiRules.MESSAGES_WAITING);
+    assertDestination("cash", AndroidUiRules.TAB_CASH, "");
     assertDestination("reports", AndroidUiRules.TAB_REPORTS, "");
     assertDestination("unknown", AndroidUiRules.TAB_TODAY, "");
   }

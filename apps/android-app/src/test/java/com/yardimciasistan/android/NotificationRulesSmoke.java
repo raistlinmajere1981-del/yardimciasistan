@@ -141,6 +141,7 @@ public final class NotificationRulesSmoke {
     assertEquals("pension:tasks", taskEvent.route, "daily-task notification route");
     assertEquals("restaurant:stock", NotificationEventDetector.routeForAction("menu_stock_set"), "stock action route");
     assertEquals("restaurant:orders", NotificationEventDetector.routeForAction("table_order_set_served"), "order action route");
+    assertEquals("cash", NotificationEventDetector.routeForAction("finance_manual_create"), "finance action route");
 
     OperationData.ReservationRecord combinedReservation = new OperationData.ReservationRecord();
     combinedReservation.type = "room_and_table";

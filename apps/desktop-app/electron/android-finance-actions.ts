@@ -47,6 +47,7 @@ export function applyAndroidFinanceAction(options: ApplyAndroidFinanceActionOpti
   const note = cleanText(payload.note, 500);
   const occurredAt = timestamp(payload.occurred_at) || now;
   const entryId = `finance_android_${safeId(action.id)}`;
+  const sourceId = `android:${text(action.device_id)}/${safeId(action.id)}`;
 
   try {
     db.prepare(`
@@ -62,7 +63,7 @@ export function applyAndroidFinanceAction(options: ApplyAndroidFinanceActionOpti
       category,
       description,
       occurredAt,
-      `android:${text(action.device_id)}`,
+      sourceId,
       note,
       now,
       now

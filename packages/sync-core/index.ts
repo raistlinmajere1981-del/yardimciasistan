@@ -177,6 +177,31 @@ export interface AndroidSnapshotTask {
   updated_at: ISODateTimeString | "";
 }
 
+export interface AndroidFinanceEntry {
+  id: string;
+  direction: "income" | "expense";
+  amount_minor: number;
+  currency: string;
+  payment_method: string;
+  category: string;
+  description: string;
+  occurred_at: ISODateTimeString | "";
+  source_type: string;
+  source_id: string;
+  note: string;
+  created_at: ISODateTimeString | "";
+}
+
+export interface AndroidFinanceSnapshot {
+  generated_at: ISODateTimeString | "";
+  currency: string;
+  today_income_minor: number;
+  today_expense_minor: number;
+  today_net_minor: number;
+  outstanding_pension_minor: number;
+  recent_entries: AndroidFinanceEntry[];
+}
+
 export interface AndroidOperationsSnapshot {
   summary: AndroidOperationsSummary;
   daily_tasks: AndroidSnapshotTask[];
@@ -194,6 +219,7 @@ export interface AndroidOperationsSnapshot {
   table_orders: AndroidSnapshotTableOrder[];
   messages: AndroidSnapshotMessage[];
   androidPermissions: Record<string, AndroidSnapshotPermissionProfile>;
+  finance: AndroidFinanceSnapshot;
   reports: Record<AndroidReportPresetKey, AndroidReportSnapshot>;
   updated_at: ISODateTimeString | "";
 }
@@ -241,6 +267,8 @@ export const ANDROID_PERMISSIONS = [
   "menu.delete",
   "menu.stock_view",
   "menu.stock_update",
+  "finance.view",
+  "finance.create",
   "settings.view",
   "settings.edit",
   "message.delete",
@@ -280,7 +308,9 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
     "table_order.view",
     "table_order.set_payment_waiting",
     "table_order.close_paid",
-    "menu.stock_view"
+    "menu.stock_view",
+    "finance.view",
+    "finance.create"
   ],
   rooms_tasks: [
     "room.view",
@@ -519,6 +549,7 @@ export const ANDROID_ACTION_TYPES = [
   "daily_task_complete",
   "daily_task_reopen",
   "daily_task_cancel",
+  "finance_manual_create",
   "table_status_update",
   "table_order_open",
   "table_order_add_item",
@@ -602,6 +633,7 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   daily_task_complete: "daily_task.complete",
   daily_task_reopen: "daily_task.reopen",
   daily_task_cancel: "daily_task.update",
+  finance_manual_create: "finance.create",
   table_status_update: "table.update_status",
   table_order_open: "table_order.open",
   table_order_add_item: "table_order.add_item",

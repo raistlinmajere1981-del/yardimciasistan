@@ -80,6 +80,7 @@ import {
   type GenerateDesktopReportAiInput,
   type GenerateDesktopReportAiResult
 } from "./database";
+import { DesktopFinanceService } from "./finance";
 import {
   buildReportAiMessages,
   buildReportAiPayload,
@@ -1817,6 +1818,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     items: dashboardData.menu.items.filter((item) => item.is_available && activeMenuCategoryIds.has(item.category_id)),
     updated_at: dashboardData.menu.updated_at
   };
+  const financeData = new DesktopFinanceService(getDatabase().databasePath).getData(20);
   const messages = getDatabase().getAndroidPreparedMessages().map((message) => ({
     id: message.id,
     request_id: message.requestId,
@@ -2002,6 +2004,28 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     })),
     messages: messages.slice(0, 300),
     androidPermissions: getDatabase().getAndroidPermissionSnapshot(),
+    finance: {
+      generated_at: financeData.generatedAt,
+      currency: "TRY",
+      today_income_minor: financeData.todayIncomeMinor,
+      today_expense_minor: financeData.todayExpenseMinor,
+      today_net_minor: financeData.todayNetMinor,
+      outstanding_pension_minor: financeData.outstandingPensionMinor,
+      recent_entries: financeData.recentEntries.slice(0, 20).map((entry) => ({
+        id: entry.id,
+        direction: entry.direction,
+        amount_minor: entry.amountMinor,
+        currency: entry.currency,
+        payment_method: entry.paymentMethod,
+        category: entry.category,
+        description: entry.description,
+        occurred_at: entry.occurredAt,
+        source_type: entry.sourceType,
+        source_id: entry.sourceId,
+        note: entry.note,
+        created_at: entry.createdAt
+      }))
+    },
     reports: getDatabase().getAndroidReportPresets(today),
     updated_at: updatedAt
   };

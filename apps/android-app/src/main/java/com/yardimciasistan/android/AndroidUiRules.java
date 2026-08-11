@@ -8,6 +8,7 @@ final class AndroidUiRules {
   static final String TAB_PENSION = "pension";
   static final String TAB_RESTAURANT = "restaurant";
   static final String TAB_MESSAGES = "messages";
+  static final String TAB_CASH = "cash";
   static final String TAB_REPORTS = "reports";
 
   static final String CUSTOMER_NEW = "new";
@@ -54,6 +55,9 @@ final class AndroidUiRules {
     }
     if (TAB_RESTAURANT.equals(tab)) {
       return firstRestaurantMode(data) != null;
+    }
+    if (TAB_CASH.equals(tab)) {
+      return data != null && data.hasPermission("finance.view");
     }
     if (TAB_REPORTS.equals(tab)) {
       return data != null && data.isAdmin();
@@ -242,6 +246,9 @@ final class AndroidUiRules {
     if (TAB_MESSAGES.equals(tab)) {
       mode = MESSAGES_WAITING.equals(mode) ? MESSAGES_WAITING : MESSAGES_PREPARED;
       return new Destination(TAB_MESSAGES, mode);
+    }
+    if (TAB_CASH.equals(tab)) {
+      return new Destination(TAB_CASH, "");
     }
     if (TAB_REPORTS.equals(tab)) {
       return new Destination(TAB_REPORTS, "");
