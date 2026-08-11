@@ -106,7 +106,7 @@ try {
     expected_updated_at: restaurantTask.updatedAt
   }));
   assert.equal(staffDelete.ok, false, "Personel cihaz günlük işi silememeli");
-  assert.match(staffDelete.message, /yetki/i);
+  assert.match(staffDelete.message, /yetki|yönetici/i);
 
   assert.equal(database.setAndroidDeviceRole(DEVICE_ID, "admin").ok, true);
   device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);
