@@ -22,13 +22,9 @@ Aşağıdaki ana zincir çalışır durumdadır:
 
 ## Kısmen Tamamlanan / Canlı Ortama Bağlı Alanlar
 
-### Web yayın ve hosting bağlantısı
-
-Masaüstü uygulaması yayın/senkron isteğini üretiyor ve test ortamındaki otomatik akışlar mevcut. Renderer ve transport tarafındaki temel hata toleransı güçlendirilmiştir; gerçek hosting bağlantısı ortam, PHP izinleri, alan adı ve ağ koşullarına bağlı olduğundan canlı bilgisayar/hosting üzerinde ayrıca doğrulanmalıdır.
-
 ### Windows son saha testi
 
-Windows NSIS paketleme altyapısı hazırdır. Gerçek hedef Windows bilgisayarda installer, kullanıcı veri klasörü ve WhatsApp WebView son saha testi ayrıca yapılmalıdır.
+Windows NSIS paketleme altyapısı hazırdır. Gerçek hedef Windows bilgisayarda installer, kullanıcı veri klasörü, yerel yedek, WhatsApp WebView ve masaüstü-hosting bağlantısı son saha turunda ayrıca doğrulanmalıdır.
 
 ### Android yerel ağ modu
 
@@ -39,6 +35,28 @@ v1 için hosting üzerinden sınırlı takip modu seçilmiştir. Doğrudan PC/LA
 Mimari adapter sınırı hazırdır; v1 çalışma modu WhatsApp Web/manual akıştır. Resmî API entegrasyonu zorunlu değildir ve sonraki faz seçeneğidir.
 
 ## Tamamlanan Son Ürün Paketleri
+
+### Web talebini WhatsApp'tan bağımsızlaştırma
+
+Web widget rezervasyon ve masa taleplerinde ana işlem doğrudan Yardımcı Asistan kaydıdır.
+
+- Ana buton `Talebi Gönder` olarak çalışır.
+- Talep `api/request.php` üzerinden başarıyla kaydedilmeden tamamlanmış sayılmaz.
+- Başarılı kayıtta kullanıcıya `Talebiniz işletmeye iletildi` onayı gösterilir.
+- WhatsApp otomatik açılmaz; isteyen müşteri kayıt tamamlandıktan sonra `WhatsApp'tan da yaz` seçeneğini kullanabilir.
+- Web kaydı başarısız olursa form korunur ve WhatsApp alternatif iletişim yolu olarak sunulur.
+- Gönderim sırasında buton kilitlenerek istemsiz çift kayıt riski azaltılır.
+
+### Gerçek hosting ve bağlantı geri dönüşü doğrulaması
+
+Demo hosting üzerinde masaüstü ile gerçek web modülü arasındaki saha bağlantısı doğrulandı.
+
+- Ayarlar içindeki `Web Bağlantısını Dene` kontrolü güvenlik anahtarını ve SQLite senkron protokolünü başarıyla doğruladı.
+- Webden oluşturulan talep otomatik senkron ile masaüstü Ana Ekran ve Müşteri İşleri akışına düştü.
+- Masaüstü bilgisayarın internet bağlantısı kesikken web tarafında oluşturulan talep hostingde kaldı.
+- İnternet bağlantısı geri geldiğinde manuel eşitleme yapılmadan talep otomatik olarak masaüstüne eklendi.
+- Senkron durumu tekrar `Tüm veriler güncel` durumuna döndü.
+- Tekrarlı kayıt/idempotency, uygulama yeniden başlatma ve ayrıntılı kullanım kenar durumları kapsamlı son kullanım testinde toplu olarak yeniden kontrol edilecek.
 
 ### Manuel günlük iş / not yönetimi
 
@@ -133,7 +151,7 @@ Basit ön muhasebe ekranındaki günlük kayıt akışı kısaltılmıştır.
 
 ### Canlı senkron dayanıklılığı
 
-Gerçek hosting testi öncesi masaüstü senkron bağlantısının kod tarafındaki temel hata toleransı güçlendirilmiştir.
+Masaüstü senkron bağlantısının kod tarafındaki temel hata toleransı güçlendirilmiştir.
 
 - Başlangıç ayarı, dashboard ve senkron durum bridge çağrılarındaki Promise hataları renderer tarafından yakalanır ve kullanıcıya anlaşılır durum mesajı gösterilir.
 - Manuel `Şimdi Eşitle` işlemi IPC/ağ hatasında `yükleniyor` durumunda takılı kalmaz.
@@ -144,18 +162,18 @@ Gerçek hosting testi öncesi masaüstü senkron bağlantısının kod tarafınd
 
 ## Sıradaki Ürün Öncelikleri
 
-### 1. Gerçek hosting bağlantısı doğrulaması
+### 1. Windows son saha doğrulaması
 
-Renderer ve HTTP transport tarafındaki temel hata toleransı tamamlandı. Sıradaki adım gerçek hosting üzerinde web yayın/senkron davranışını bilgisayar başında log ve ağ yanıtlarıyla doğrulamaktır. PHP izinleri, SSL, alan adı/yol, güvenlik anahtarı ve gerçek ağ kesintisi senaryoları bu saha testinde kontrol edilmelidir.
+Hedef Windows bilgisayarda kurulum, uygulama açılışı, kullanıcı veri klasörü, yerel yedek, WhatsApp WebView ve masaüstü-hosting bağlantısı uçtan uca doğrulanmalıdır. Bu kontrol kapsamlı son kullanım testinin başlangıç bölümüne dahil edilebilir; ayrı bir özellik geliştirme paketi değildir.
 
-### 2. Windows son saha doğrulaması
+### 2. Kapsamlı uygulama kullanım testi ve toplu düzeltme turu
 
-Hedef Windows bilgisayarda kurulum, uygulama açılışı, kullanıcı veri klasörü, yerel yedek, WhatsApp WebView ve masaüstü-hosting bağlantısı uçtan uca doğrulanmalıdır.
+Ana fonksiyonlar tamamlandıktan sonra uygulama gerçek işletme akışı gibi baştan sona kullanılacaktır. Test sırasında görülen küçük UX sorunları, tutarsız metinler, gereksiz adımlar, tekrarlı kayıt/idempotency, yeniden başlatma davranışı ve diğer kenar durumları not edilip tek tek anlık müdahale yerine toplu düzeltme paketleri halinde ele alınacaktır.
 
-### 3. İkincil ekranlar ve son tutarlılık turu
+### 3. v1 sonrası bilinçli olarak ertelenen seçenekler
 
-Pansiyon, Restoran, Müşteri İşleri ve Kasa ana günlük ekranlarının ilk saha turu tamamlandı. Menü, Ayarlar, Mesajlar ve rapor ayrıntıları günlük kullanım sırasında sorun oluşturduğu görülürse aynı prensiple sadeleştirilecektir; v1 için yeni özellik eklemekten önce gerçek kullanım geri bildirimi tercih edilecektir.
+Doğrudan Android PC/LAN modu ve resmî WhatsApp API entegrasyonu v1 tamamlanma kriteri değildir. Gerçek kullanım geri bildirimi bunlardan birine ihtiyaç göstermedikçe yeni altyapı eklenmeyecektir.
 
 ## Şimdiki Karar
 
-Frontend mimari refaktörü ve ana masaüstü saha kullanılabilirlik turu tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma, sade operasyon takvimi ve temel ön muhasebe v1 ürün omurgasındadır. Senkron bağlantısının renderer hata yönetimi ve HTTP zaman aşımı kod tarafında sağlamlaştırılmıştır. Sonraki ana geliştirme odağı gerçek hosting bağlantısı ile hedef Windows bilgisayardaki uçtan uca saha doğrulamasıdır.
+Frontend mimari refaktörü, ana masaüstü saha kullanılabilirlik turu, web talep akışı ve gerçek hosting senkron saha doğrulaması tamamlanmış kabul edilir. Manuel günlük işler, pansiyon/restoran doğrudan rezervasyonları, rezervasyon düzenleme/oda değişikliği, hızlı müşteri oluşturma, sade operasyon takvimi, temel ön muhasebe, Android companion ve local-first senkron v1 ürün omurgasındadır. Yeni özellik eklemek yerine sıradaki aşama Windows son saha doğrulamasıyla başlayan kapsamlı kullanım testi ve ardından toplu düzeltme turudur.
