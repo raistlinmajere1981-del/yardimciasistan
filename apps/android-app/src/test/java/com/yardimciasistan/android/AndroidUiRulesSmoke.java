@@ -6,6 +6,7 @@ public final class AndroidUiRulesSmoke {
   public static void main(String[] args) {
     hidesUnauthorizedTabsAndModes();
     selectsTheFirstAuthorizedMode();
+    recognizesRestaurantReservationContext();
     deletionsRequireResolvedActiveAdmin();
     reportsRequireResolvedActiveAdmin();
     validatesReportDatePresets();
@@ -26,6 +27,10 @@ public final class AndroidUiRulesSmoke {
     assertFalse(
         AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TABLES),
         "menu or task permissions must not leak into the tables mode"
+    );
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "menu or task permissions must not leak into restaurant reservations"
     );
     assertFalse(
         AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_ORDERS),
@@ -84,6 +89,43 @@ public final class AndroidUiRulesSmoke {
         AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_STAYS),
         "staff must never open the customer stay archive"
     );
+  }
+
+  private static void recognizesRestaurantReservationContext() {
+    OperationData data = restrictedData();
+    data.permissions.add("reservation.view");
+    assertFalse(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "reservation.view alone must not create a restaurant tab in a pension-only snapshot"
+    );
+
+    OperationData.TableRecord table = new OperationData.TableRecord();
+    table.id = "table-1";
+    data.tables.add(table);
+    assertTrue(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "a restaurant snapshot plus reservation.view should expose restaurant reservations"
+    );
+    assertEquals(
+        AndroidUiRules.RESTAURANT_RESERVATIONS,
+        AndroidUiRules.firstRestaurantMode(data),
+        "reservation-only restaurant profile should land on reservations"
+    );
+
+    data.tables.clear();
+    OperationData.ReservationRecord reservation = new OperationData.ReservationRecord();
+    reservation.id = "restaurant-reservation-1";
+    reservation.type = "table";
+    data.reservations.add(reservation);
+    assertTrue(AndroidUiRules.isRestaurantReservation(reservation), "table reservation classification");
+    assertTrue(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_RESERVATIONS),
+        "an existing table reservation should keep the restaurant reservation mode reachable"
+    );
+
+    OperationData.ReservationRecord pension = new OperationData.ReservationRecord();
+    pension.type = "room";
+    assertFalse(AndroidUiRules.isRestaurantReservation(pension), "room reservation must stay outside the restaurant list");
   }
 
   private static void deletionsRequireResolvedActiveAdmin() {
@@ -159,6 +201,7 @@ public final class AndroidUiRulesSmoke {
     assertDestination("pension:stays", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_STAYS);
     assertDestination("pension/tasks", AndroidUiRules.TAB_PENSION, AndroidUiRules.PENSION_TASKS);
     assertDestination("restaurant:tables", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_TABLES);
+    assertDestination("restaurant:reservations", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_RESERVATIONS);
     assertDestination("restaurant:orders", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_ORDERS);
     assertDestination("restaurant:stock", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_STOCK);
     assertDestination("restaurant:menu", AndroidUiRules.TAB_RESTAURANT, AndroidUiRules.RESTAURANT_MENU);
