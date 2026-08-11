@@ -2,7 +2,11 @@
 
 Mevcut web sitelerine tek script ile eklenebilecek Yardımcı Asistan widget'ı burada geliştirilir.
 
-Widget; sağ altta AI asistan başlatıcısı, hızlı aksiyon chipleri, kompakt rezervasyon/masa akışı, öneri sorulu AI bilgi alanı ve akıllı WhatsApp mesaj hazırlama sunar. Tarih seçimi Bugün/Yarın/Hafta sonu seçenekleriyle veya görünür Türkçe tarih üreten native date picker ile yapılır. Mini API adresi verilirse talebi arka planda kaydetmeyi ve bilgi panelindeki kısa soruları `api/chat.php` üzerinden yanıtlamayı dener; bu denemeler başarısız olsa bile WhatsApp akışı devam eder. AI fallback yanıtları güvenli hata kodu, açıklama, sağlayıcı HTTP durumu ve yeniden deneme bilgisini gösterir; ham sağlayıcı cevabı veya API anahtarı tarayıcıya taşınmaz.
+Widget; sağ altta AI asistan başlatıcısı, hızlı aksiyon chipleri, kompakt rezervasyon/masa akışı, öneri sorulu AI bilgi alanı ve isteğe bağlı WhatsApp iletişimi sunar. Tarih seçimi Bugün/Yarın/Hafta sonu seçenekleriyle veya görünür Türkçe tarih üreten native date picker ile yapılır.
+
+Rezervasyon ve masa formlarında ana işlem **Talebi Gönder**'dir. Mini API adresi verildiğinde form `api/request.php` üzerinden doğrudan işletmenin Yardımcı Asistan kaydına gönderilir ve başarılı kayıt sonrasında kullanıcıya net bir onay gösterilir. WhatsApp otomatik açılmaz; isteyen kullanıcı kayıt tamamlandıktan sonra **WhatsApp'tan da yaz** seçeneğini kullanabilir. Web kaydı başarısız olursa form korunur ve WhatsApp yalnız alternatif iletişim yolu olarak sunulur.
+
+Bilgi panelindeki kısa sorular `api/chat.php` üzerinden yanıtlanır. AI fallback yanıtları güvenli hata kodu, açıklama, sağlayıcı HTTP durumu ve yeniden deneme bilgisini gösterir; ham sağlayıcı cevabı veya API anahtarı tarayıcıya taşınmaz.
 
 ## Build
 
@@ -15,6 +19,8 @@ npm run build
 ```text
 packages/web-widget/dist/widget.js
 ```
+
+Build işlemi aynı bundle'ı `firm-template/web-module/widget.js` konumuna da kopyalar. Repodaki hazır hosting şablonu build alınmadan kullanıldığında `widget.js` loader'ı geriye uyumlu `widget-core.js` ve `direct-request-flow.js` dosyalarını yükler; normal build sonrasında aynı davranış tek bundle içinde çalışır.
 
 ## Örnek Kullanım
 

@@ -56,11 +56,16 @@ try {
   });
 
   await page.locator('[data-ya-request-type="restaurant_reservation"]').click();
+  await expect(page.locator('.ya-widget-form button[type="submit"]')).toContainText("Talebi Gönder");
+  await expect(page.locator(".ya-widget-subview-intro p")).toContainText("doğrudan iletin");
+  await expect(page.locator(".ya-widget-form-note")).toContainText("WhatsApp kullanmak zorunlu değildir");
+
   await page.locator('.ya-widget-form input[name="customer_name"]').fill("Widget Misafir");
   await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 444 33 22");
   await page.locator('[data-ya-date-preset="today"]').click();
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
+
   const requestResponsePromise = page.waitForResponse((response) => response.url() === `${baseUrl}/api/request.php` && response.request().method() === "POST");
   await page.locator('.ya-widget-form button[type="submit"]').click();
   const requestResponse = await requestResponsePromise;
@@ -68,12 +73,14 @@ try {
   const requestResult = await requestResponse.json();
   expect(requestResult.ok).toBe(true);
   expect(requestResult.request_id).toMatch(/^request_/);
-  await expect(page.locator(".ya-widget-status")).toContainText("WhatsApp mesajı hazırlandı");
 
-  const openedUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
-  expect(openedUrl).toContain("https://wa.me/905316969334");
-  expect(decodeURIComponent(openedUrl)).toContain("Masa rezervasyonu");
-  expect(decodeURIComponent(openedUrl)).toContain("Widget Misafir");
+  await expect(page.locator(".ya-widget-request-success")).toBeVisible();
+  await expect(page.locator(".ya-widget-view-title")).toHaveText("Talebiniz işletmeye iletildi");
+  await expect(page.locator(".ya-widget-request-success-card")).toContainText("Talebiniz kaydedildi");
+  await expect(page.locator('[data-ya-request-whatsapp="1"]')).toContainText("WhatsApp'tan da yaz");
+
+  const openedBeforeOptionalWhatsApp = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
+  expect(openedBeforeOptionalWhatsApp).toBe("");
 
   const requestsAfterForm = await pullRequests();
   expect(requestsAfterForm).toHaveLength(1);
@@ -87,7 +94,17 @@ try {
   expect(requestsAfterForm[0].message).toContain("Bahçede sakin");
   expect(requestsAfterForm[0].sync_status).toBe("pending");
 
-  await page.locator('[data-ya-view="home"]').click();
+  await page.locator('[data-ya-request-whatsapp="1"]').click();
+  const openedUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
+  expect(openedUrl).toContain("https://wa.me/905316969334");
+  expect(decodeURIComponent(openedUrl)).toContain("Masa rezervasyonu");
+  expect(decodeURIComponent(openedUrl)).toContain("Widget Misafir");
+
+  const requestsAfterOptionalWhatsApp = await pullRequests();
+  expect(requestsAfterOptionalWhatsApp).toHaveLength(1);
+  expect(requestsAfterOptionalWhatsApp[0].id).toBe(requestResult.request_id);
+
+  await page.locator('[data-ya-request-done="1"]').click();
   await page.locator('[data-ya-view="info"]').click();
   await expect(page.locator(".ya-widget-ai textarea")).toBeVisible();
   await page.locator(".ya-widget-ai textarea").fill("Bu akşam 4 kişilik masa var mı?");
@@ -175,16 +192,12 @@ async function waitForUrl(url) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
       const response = await fetch(url);
-      if (response.ok) {
-        return;
-      }
+      if (response.ok) return;
     } catch {
       // Server is still starting.
     }
-
     await delay(100);
   }
-
   throw new Error(`PHP server did not become ready: ${url}`);
 }
 
