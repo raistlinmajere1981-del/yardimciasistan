@@ -1,72 +1,119 @@
 # Yardımcı Asistan
 
-Yardımcı Asistan; pansiyon, restoranlı pansiyon, restoran ve kafe gibi küçük işletmeler için tasarlanan sade, modüler ve local-first bir dijital asistan paketidir.
+Yardımcı Asistan; pansiyon, restoranlı pansiyon, restoran ve kafe gibi küçük işletmeler için tasarlanan sade, modüler ve local-first bir dijital işletme asistanıdır.
 
-Sistem; demo web sitesi, mevcut sitelere eklenebilir web widget, firma hostinginde çalışan mini API, PC masaüstü uygulaması, Android companion, AI adapter ve WhatsApp destek akışlarından oluşur. v1 kararına göre merkezi cloud servisine bağımlı değildir; her firma kendi hostingi, kendi PC uygulaması ve kendi verisiyle bağımsız çalışır.
+Sistem; web sitesi veya gömülebilir web widget, firma hostinginde çalışan mini API, PC masaüstü uygulaması, Android companion, AI araçları, WhatsApp destek akışları ve QR menüden oluşur. v1 merkezi bir cloud servisine bağımlı değildir; her firma kendi hostingi, kendi PC uygulaması ve kendi verisiyle bağımsız çalışır.
+
+## v1 Ürün Omurgası
+
+Güncel v1 aşağıdaki ana akışları kapsar:
+
+- Web formu ve Web AI üzerinden müşteri talebi toplama
+- Firma hostingi ile masaüstü arasında local-first otomatik senkronizasyon
+- Müşteri, rezervasyon, oda, masa ve günlük iş yönetimi
+- Pansiyon konaklama takibi, oda hesabı, tahsilat ve çıkış
+- Restoran masa adisyonu, sipariş durumu ve stok takibi
+- QR menü yayınlama
+- Günlük/haftalık operasyon takvimi
+- Basit ön muhasebe ve raporlar
+- AI destekli cevap, özet, rapor ve görselden stok/kimlik alanı çıkarımı
+- WhatsApp hazır mesaj, manuel akış ve Electron içi WhatsApp Web çalışma alanı
+- Android companion, cihaz rolleri ve görev bazlı yetkiler
+- Uygulama kilidi, yerel yedekleme ve masaüstü paketleme altyapısı
+
+AI, WhatsApp veya internet bağlantısı sistemin tamamı için tek hata noktası değildir. AI kapalıyken temel operasyonlar devam eder; WhatsApp çalışmazsa talepler ve rezervasyonlar yönetilebilir; internet yokken masaüstü yerel verisiyle çalışmaya devam eder ve bağlantı geri geldiğinde kuyruklar yeniden senkronize edilir.
 
 ## Ana Bileşenler
 
 - `apps/demo-web`: Web sitesi olmayan firmalar için özelleştirilebilir demo site.
-- `apps/desktop-app`: İşletmenin ana yönetim merkezi olacak Electron + React uygulaması.
-- `apps/android-app`: Hızlı takip ve temel onay işlemleri için sade Android companion.
-- `packages/shared`: Tüm uygulamalarda ortak kullanılacak veri tipleri ve yardımcı fonksiyonlar.
-- `packages/web-widget`: Mevcut web sitelerine tek script ile eklenebilecek widget.
+- `apps/desktop-app`: İşletmenin ana yönetim merkezi olan Electron + React uygulaması.
+- `apps/android-app`: Hızlı takip ve yetkili saha işlemleri için native Android companion.
+- `packages/shared`: Uygulamalarda ortak kullanılan veri tipleri ve yardımcı fonksiyonlar.
+- `packages/web-widget`: Mevcut web sitelerine tek script ile eklenebilen widget.
 - `packages/ai-core`: Provider bağımsız AI adapter ve prompt altyapısı.
 - `packages/whatsapp-bridge`: WhatsApp link, manuel kopyalama ve WebView akışları.
 - `packages/sync-core`: Firma hostingi ile PC uygulaması arasındaki veri alışverişi.
-- `firm-template/web-module`: Firma hostingine kurulacak mini API ve web modülü şablonu.
-- `firm-template/knowledge`: AI için firma bilgi dosyası örnekleri.
+- `firm-template/web-module`: Firma hostingine kurulacak PHP + SQLite mini API ve web modülü.
+- `firm-template/knowledge`: Web AI için firma bilgi dosyası örnekleri.
 - `firm-template/config`: Firma kurulum ayarları için şablon dosyalar.
 
-## Geliştirme Durumu
+## Ana Müşteri Talep Akışı
 
-Proje iskeleti, web modülü, desktop omurgası, QR menü ve ilk AI altyapısı kuruluyor. İlk uçtan uca hedef akış:
+Güncel akışta WhatsApp zorunlu değildir:
 
-1. Müşteri demo web sitesinde talep formu doldurur.
-2. Alternatif olarak Web AI sohbeti müşteri bilgileriyle talep açabilir.
-3. WhatsApp hazır mesajı açılır.
-4. Talep firma hostingindeki mini API'ye kaydedilir.
-5. PC uygulaması talebi çeker.
-6. İşletme sahibi talebi görür, AI cevap önerisi alabilir ve WhatsApp üzerinden dönüş yapar.
+1. Müşteri web sitesindeki formu doldurur veya Web AI ile konuşur.
+2. Talep önce firma hostingindeki mini API'ye kaydedilir.
+3. Müşteriye talebin işletmeye iletildiği onayı gösterilir.
+4. İsterse ayrıca `WhatsApp'tan da yaz` seçeneğini kullanabilir.
+5. Masaüstü uygulaması talebi otomatik senkronizasyonla çeker.
+6. İşletme sahibi talebi, müşteriyi ve varsa rezervasyon akışını tek yerde görür.
+7. AI cevap taslağı hazırlayabilir; gönderim kararı kullanıcıda kalır.
+8. İşletme sahibi arama veya WhatsApp üzerinden müşteriye döner.
+
+```text
+Web form / Web AI
+  ↓
+Firma hostingi / PHP + SQLite
+  ↓ cursor + acknowledgement
+Masaüstü SyncCoordinator / local SQLite
+  ↓ versioned outbox
+QR menü + Android operasyon snapshot'ı
+```
+
+## Güvenlik ve Dayanıklılık
+
+- PC'ye internetten port açılmaz; masaüstü bağlantıyı dışarı doğru kurar.
+- API ve AI anahtarları web frontend'ine veya Android cevaplarına çıkarılmaz.
+- Masaüstündeki AI anahtarı renderer'a geri verilmeden işletim sistemi güvenli saklama alanıyla korunur.
+- Hostingdeki `config/`, `data/` ve `knowledge/` dizinleri doğrudan web erişimine kapatılır.
+- Web talebi ve Web AI gibi müşteriye açık yazma uçlarında sunucu tarafı hız/boyut sınırı bulunur; ham istemci IP adresi diske yazılmaz.
+- Yeni görülen Android cihazlar varsayılan olarak pasif/onay bekler durumdadır. Masaüstünden açıkça onaylanmadan operasyon verisini okuyamaz veya yerel işletme verisini değiştiremez.
+- Android işlemleri action ID, stale-version ve receipt/idempotency kontrollerinden geçer.
+- Müşteri kimlik görseli kalıcı saklanmaz; analiz sırasında geçici dosya olarak kullanılır ve sonuç kullanıcı kontrolüne sunulur.
+
+Ayrıntılı güvenlik ve veri akışı için [Sistem Mimarisi](docs/ARCHITECTURE.md) ve [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md) belgeleri esas alınmalıdır.
 
 ## Dokümanlar
 
 - [Proje Özeti](docs/PROJECT_BRIEF.md)
 - [Sistem Mimarisi](docs/ARCHITECTURE.md)
 - [Otomatik Senkronizasyon](docs/AUTOMATIC_SYNC.md)
-- [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
-- [UI Kuralları](docs/UI_RULES.md)
+- [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md)
 - [Veri Modeli](docs/DATA_MODEL.md)
 - [Event Sistemi](docs/EVENTS.md)
-- [Görev Planı](docs/TASKS.md)
-- [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md)
+- [UI Kuralları](docs/UI_RULES.md)
+- [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
+- [Tarihsel Geliştirme / Görev Planı](docs/TASKS.md) — ilk geliştirme sırasını gösterir; güncel ürün davranışı için kaynak değildir.
 - [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
 - [Firma Web Modülü Kurulumu](docs/WEB_MODULE_INSTALLATION.md)
 - [Demo Site Özelleştirme](docs/DEMO_SITE_CUSTOMIZATION.md)
+- [Android Dağıtımı](docs/ANDROID_DISTRIBUTION.md)
 - [Platform Test Planı](docs/dev/PLATFORM_TEST_PLAN.md)
 - [Desktop Installer Hazırlık Planı](docs/dev/DESKTOP_INSTALLER_PLAN.md)
 - [İlk Uçtan Uca Demo Akışı](docs/dev/END_TO_END_DEMO_FLOW.md)
 
 ## Geliştirici Komutları
 
+Temel kontrol hattı:
+
 ```bash
 npm install
 npm run build
 npm run doctor
+npm test
+npm run e2e
+```
+
+Önemli smoke testleri:
+
+```bash
 npm run smoke:web-form-api
 npm run smoke:automatic-sync
+npm run smoke:android-device-approval-hosting
 npm run smoke:customer-room-management
 npm run smoke:stock-image-analysis
-npm run e2e
-npm test
 npm run smoke:demo-flow
-npm run smoke:ai-live
 npm run smoke:local-lab
-npm run dev:local
-npm run android:phone-test
-npm run android:screenshot
-npm run smoke:android-device-ui
-npm run android:mirror
 ```
 
 Linux'ta web modülü ve demo web sayfasını birlikte denemek için:
@@ -75,64 +122,40 @@ Linux'ta web modülü ve demo web sayfasını birlikte denemek için:
 npm run dev:local
 ```
 
-Komut PHP web modülünü, demo web sitesini ve demo verilerini yerel ortamda
-hazırlar; terminalde PC uygulaması ve Android testleri için kullanılacak adresleri
-yazdırır.
-
 Desktop uygulamayı ayrı pencerede denemek için:
 
 ```bash
 npm run dev:desktop
 ```
 
-Derleme ve test komutları monorepo içindeki hazır workspace paketleri üzerinden çalışır.
+Android geliştirme ve bağlı cihaz kontrolleri:
 
-## Güncel Geliştirme Akışı
-
-Web tarafı için demo site, web widget ve firma hosting mini API şablonu hazırlanmıştır. `packages/sync-core`, sağlayıcıdan bağımsız `SyncTransport` sınırını ve güncel PHP hosting adaptörünü içerir.
-
-Desktop tarafında Electron + React iskeleti, local SQLite, kalıcı outbox, cursor tabanlı talep çekme, 15 saniyelik otomatik koordinatör ve `electron-builder` tabanlı paketleme smoke kontrolü hazırdır. İnternet kesildiğinde yerel işlemler devam eder; kuyruklar bağlantı geldiğinde yeniden denenir.
-
-Müşteri kartları talep beklemeden masaüstünden veya yönetici Android uygulamasından
-oluşturulabilir. Kartta iletişim, not/etiket ve kimlik belgesi alanları bulunur; kimlik
-görseli kalıcı saklanmadan AI ile okunup kullanıcı kontrolü için forma aktarılabilir.
-Pansiyon tarafındaki `customer_room_stays` yaşam döngüsü müşteriyi odaya doğrudan
-atamayı, giriş/çıkış/iptal durumlarını ve silinmeyen konaklama arşivini yönetir.
-
-Firma web modülünde müşteriye açık `menu.html` QR menü sayfası ve `api/menu.php` üzerinden çalışan menü okuma akışı bulunur.
-
-QR menü için PC tarafında kategori/ürün yönetim ekranı bulunur; local SQLite verisi `pushMenu()` ile firma web modülündeki `publish_menu` aksiyonuna gönderilebilir.
-
-AI tarafında `packages/ai-core` provider bağımsız prompt/knowledge/adapter katmanını sağlar. Servis, bağlantı adresi, model, gizli anahtar ve zaman aşımı masaüstü Ayarlar ekranından yönetilir; anahtar işletim sistemi güvenli saklama alanıyla şifrelenir ve renderer'a geri dönmez. Aynı ayar HTTPS + `sync_secret` ile firma web modülüne yayınlanır; `api/chat.php` son yayınlanan sunucu ayarını kullanır, AI kapalıyken güvenli fallback cevap döner. Sohbet içinde müşteri adı, geçerli cep telefonu ve talep niyeti geldiğinde web modülü `source=web_ai` talebi de hosting SQLite veritabanına kaydeder.
-
-WhatsApp tarafında `packages/whatsapp-bridge` Türkiye cep telefonu normalizasyonu, `wa.me` link üretimi, manuel kopyalama ve WebView/resmi API geçişleri için ortak adapter yüzeyini sağlar.
-
-Android tarafında `apps/android-app` native companion ekranını sağlar. Masaüstü operasyon snapshot'ını kalıcı outbox üzerinden otomatik yayınlar; Android açıkken yaklaşık 15 saniyede bir, arka planda işletim sisteminin izin verdiği periyotta yeniler ve son başarılı veriyi yerel cache'den gösterebilir. Android Gradle Plugin hattı `npm run android:debug`, `npm run android:release-apk` ve `npm run android:release-aab` komutlarıyla debug APK, imzalı pilot APK ve Play Store AAB üretir; signing ve kurulum ayrıntıları `docs/ANDROID_DISTRIBUTION.md` içindedir. `npm run smoke:android-hosting` cihazsız hosting hazırlığını doğrular; gerçek telefonda yerel test için `npm run android:phone-test` demo veriyi yükler, PHP web modülünü LAN'da açar ve adb cihazı bağlıysa uygulamayı doğru web modül adresiyle başlatır.
-
-Android müşteri kartı, kimlik alanları, kimlik görseli analizi ve konaklama arşivi
-yalnız masaüstünde aktif yönetici olarak atanmış cihazlarda görünür; personel snapshot'ına
-bu kişisel veri listeleri eklenmez.
-
-Android ekran kontrolü için `npm run android:screenshot` ekran görüntüsünü
-`artifacts/android-control/` altına kaydeder, `npm run android:dump` UI ağacını
-XML olarak çıkarır, `npm run android:control -- tap <x> <y>` adb üzerinden
-dokunma gönderir. `npm run smoke:android-device-ui` bağlı telefonda kurulum,
-ekran, canlı veri butonu ve talep listesi akışını doğrular. `npm run android:mirror`
-scrcpy ile canlı ekran aynalama açar.
-
-Demo hosting ve domain kararı firma sunumu aşamasına bırakılmıştır. Güncel ana
-test hattı Linux'ta yerel PHP/demo web/desktop ve adb bağlı Android telefondur.
-
-İlk webden PC'ye talep akışı:
-
-```text
-Web form / widget
-  ↓
-firm-template/web-module/api/request.php
-  ↓
-Firma hostingi / PHP + SQLite
-  ↓ cursor + acknowledgement
-Masaüstü SyncCoordinator / local SQLite
-  ↓ versioned outbox
-QR menü + Android snapshot
+```bash
+npm run android:phone-test
+npm run android:screenshot
+npm run smoke:android-device-ui
+npm run android:mirror
 ```
+
+Daha geniş Linux doğrulama hattı:
+
+```bash
+npm run check:linux
+```
+
+## Güncel Geliştirme Aşaması
+
+Yeni v1 özellikleri eklemek yerine ürün sertleştirme ve saha doğrulama aşamasındadır.
+
+Kod tarafında demo web, web widget, PHP hosting modülü, masaüstü operasyon merkezi, Android companion, local-first senkron, QR menü, AI araçları, WhatsApp çalışma alanı, rezervasyon/oda/masa yönetimi, stok, oda folyosu ve basit finans omurgası bulunmaktadır.
+
+Tanıtım/pilot öncesindeki ana doğrulama başlıkları:
+
+- Hedef Windows bilgisayarda temiz kurulum, kullanıcı veri klasörü, yedekleme ve yeniden başlatma davranışı
+- WhatsApp WebView ve gerçek hosting bağlantısının Windows saha testi
+- Baştan sona gerçek işletme kullanım senaryosu
+- İnternet kesilmesi, tekrar bağlanma, yeniden başlatma ve tekrarlı işlem kenar durumları
+- Android yeni cihaz onay ve yetki akışının gerçek telefonlarla doğrulanması
+- Pilot işletmelerden gelen UX geri bildirimlerinin toplu değerlendirilmesi
+
+Doğrudan Android-PC/LAN modu ve resmî WhatsApp API entegrasyonu v1 tamamlanma kriteri değildir; gerçek kullanım ihtiyacı oluşursa sonraki fazda değerlendirilecektir.
