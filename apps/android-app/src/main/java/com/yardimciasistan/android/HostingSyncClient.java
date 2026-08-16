@@ -17,12 +17,12 @@ final class HostingSyncClient {
   private static final int CONNECT_TIMEOUT_MS = 12000;
   private static final int READ_TIMEOUT_MS = 18000;
 
-  OperationData fetchOperations(String baseUrl, String syncSecret, DeviceIdentity identity) throws SyncException {
-    FetchResult result = fetchOperations(baseUrl, syncSecret, identity, 0L);
+  OperationData fetchOperations(String baseUrl, String credential, DeviceIdentity identity) throws SyncException {
+    FetchResult result = fetchOperations(baseUrl, credential, identity, 0L);
     return result.data == null ? new OperationData() : result.data;
   }
 
-  FetchResult fetchOperations(String baseUrl, String syncSecret, DeviceIdentity identity, long knownServerRevision) throws SyncException {
+  FetchResult fetchOperations(String baseUrl, String credential, DeviceIdentity identity, long knownServerRevision) throws SyncException {
     JSONObject payload = new JSONObject();
     try {
       payload.put("action", "android_summary");
@@ -34,7 +34,8 @@ final class HostingSyncClient {
     } catch (Exception error) {
       throw new SyncException("Güncelleme isteği hazırlanamadı.", error);
     }
-    JSONObject response = post(baseUrl, syncSecret, payload);
+    JSONObject response = post(baseUrl, credential, identity, payload);
+    tryUpgradeDeviceCredential(baseUrl, credential, identity, response);
     if (response.optBoolean("not_modified", false)) {
       return new FetchResult(true, Math.max(0L, response.optLong("server_revision", knownServerRevision)), null, response);
     }
@@ -43,7 +44,7 @@ final class HostingSyncClient {
 
   OperationData.ActionRecord enqueueAction(
       String baseUrl,
-      String syncSecret,
+      String credential,
       DeviceIdentity identity,
       String actionId,
       String actionType,
@@ -62,7 +63,7 @@ final class HostingSyncClient {
       throw new SyncException("İşlem isteği hazırlanamadı.", error);
     }
 
-    JSONObject response = post(baseUrl, syncSecret, payload);
+    JSONObject response = post(baseUrl, credential, identity, payload);
     JSONObject action = response.optJSONObject("action");
     if (action == null) {
       throw new SyncException("İşlem gönderildi ancak bekleme kaydı alınamadı.");
@@ -72,7 +73,7 @@ final class HostingSyncClient {
 
   String generateReportComment(
       String baseUrl,
-      String syncSecret,
+      String credential,
       DeviceIdentity identity,
       String reportMode,
       String reportPreset
@@ -96,8 +97,9 @@ final class HostingSyncClient {
       throw new SyncException("AI rapor yorumu isteği hazırlanamadı.", error);
     }
     JSONObject response = postJson(
-        toChatEndpoint(baseUrl),
-        syncSecret,
+        toChatEndpoint(baseUrl, credential),
+        credential,
+        identity,
         payload,
         60_000,
         "Web modülü AI rapor yorumunu desteklemiyor. Hosting paketini güncelleyin."
@@ -111,7 +113,7 @@ final class HostingSyncClient {
 
   StockImageAnalysisResult analyzeStockImage(
       String baseUrl,
-      String syncSecret,
+      String credential,
       DeviceIdentity identity,
       String importId,
       StockImageFile.PreparedImage image,
@@ -120,7 +122,7 @@ final class HostingSyncClient {
     HttpURLConnection connection = null;
     String boundary = "----YardimciAsistanStockImage" + System.currentTimeMillis();
     try {
-      URL endpoint = new URL(toStockImageAnalysisEndpoint(baseUrl));
+      URL endpoint = new URL(toStockImageAnalysisEndpoint(baseUrl, credential));
       connection = (HttpURLConnection) endpoint.openConnection();
       connection.setRequestMethod("POST");
       connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -129,7 +131,7 @@ final class HostingSyncClient {
       connection.setChunkedStreamingMode(16 * 1024);
       connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
       connection.setRequestProperty("Accept", "application/json");
-      connection.setRequestProperty("X-YA-Sync-Secret", syncSecret);
+      applyAuthorization(connection, credential, identity);
 
       try (DataOutputStream output = new DataOutputStream(connection.getOutputStream())) {
         writeMultipartField(output, boundary, "source", "android");
@@ -163,7 +165,7 @@ final class HostingSyncClient {
             : "Görsel analiz hizmeti geçerli bir yanıt vermedi.", error);
       }
       if (status == 401) {
-        throw new SyncException("Güvenlik anahtarı hatalı. Ayarlar ekranından kontrol edin.");
+        throw new SyncException("Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.");
       }
       if (status == 403) {
         throw new SyncException("Bu cihazın stok güncelleme yetkisi yok.");
@@ -201,14 +203,14 @@ final class HostingSyncClient {
 
   IdentityImageAnalysisResult analyzeIdentityImage(
       String baseUrl,
-      String syncSecret,
+      String credential,
       DeviceIdentity identity,
       StockImageFile.PreparedImage image
   ) throws SyncException {
     HttpURLConnection connection = null;
     String boundary = "----YardimciAsistanIdentityImage" + System.currentTimeMillis();
     try {
-      URL endpoint = new URL(toIdentityImageAnalysisEndpoint(baseUrl));
+      URL endpoint = new URL(toIdentityImageAnalysisEndpoint(baseUrl, credential));
       connection = (HttpURLConnection) endpoint.openConnection();
       connection.setRequestMethod("POST");
       connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
@@ -217,7 +219,7 @@ final class HostingSyncClient {
       connection.setChunkedStreamingMode(16 * 1024);
       connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
       connection.setRequestProperty("Accept", "application/json");
-      connection.setRequestProperty("X-YA-Sync-Secret", syncSecret);
+      applyAuthorization(connection, credential, identity);
 
       try (DataOutputStream output = new DataOutputStream(connection.getOutputStream())) {
         writeMultipartField(output, boundary, "source", "android");
@@ -249,7 +251,7 @@ final class HostingSyncClient {
             : "Kimlik görseli analiz hizmeti geçerli bir yanıt vermedi.", error);
       }
       if (status == 401) {
-        throw new SyncException("Güvenlik anahtarı hatalı. Ayarlar ekranından kontrol edin.");
+        throw new SyncException("Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.");
       }
       if (status == 403) {
         throw new SyncException("Kimlik görseli analizi yalnız aktif yönetici cihazlarda kullanılabilir.");
@@ -282,10 +284,11 @@ final class HostingSyncClient {
     }
   }
 
-  private JSONObject post(String baseUrl, String syncSecret, JSONObject payload) throws SyncException {
+  private JSONObject post(String baseUrl, String credential, DeviceIdentity identity, JSONObject payload) throws SyncException {
     return postJson(
-        toSyncEndpoint(baseUrl),
-        syncSecret,
+        toSyncEndpoint(baseUrl, credential),
+        credential,
+        identity,
         payload,
         READ_TIMEOUT_MS,
         "Web modülü güncel değil. Hosting paketini güncelleyip tekrar deneyin."
@@ -294,7 +297,8 @@ final class HostingSyncClient {
 
   private JSONObject postJson(
       String endpointUrl,
-      String syncSecret,
+      String credential,
+      DeviceIdentity identity,
       JSONObject payload,
       int readTimeoutMs,
       String notFoundMessage
@@ -309,7 +313,7 @@ final class HostingSyncClient {
       connection.setDoOutput(true);
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
       connection.setRequestProperty("Accept", "application/json");
-      connection.setRequestProperty("X-YA-Sync-Secret", syncSecret);
+      applyAuthorization(connection, credential, identity);
 
       byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
       connection.setFixedLengthStreamingMode(body.length);
@@ -328,7 +332,7 @@ final class HostingSyncClient {
       }
 
       if (status == 401) {
-        throw new SyncException("Güvenlik anahtarı hatalı. Ayarlar ekranından kontrol edin.");
+        throw new SyncException("Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.");
       }
       if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
         String message = response.optString("message", "").trim();
@@ -350,51 +354,106 @@ final class HostingSyncClient {
     }
   }
 
+  private void tryUpgradeDeviceCredential(
+      String baseUrl,
+      String credential,
+      DeviceIdentity identity,
+      JSONObject summaryResponse
+  ) {
+    if (ConnectionSettings.isDeviceCredential(credential)
+        || !summaryResponse.has("approval_required")
+        || summaryResponse.optBoolean("approval_required", true)) {
+      return;
+    }
+
+    try {
+      JSONObject response = postJson(
+          toDeviceTokenEndpoint(baseUrl),
+          credential,
+          identity,
+          new JSONObject(),
+          READ_TIMEOUT_MS,
+          ""
+      );
+      String token = response.optString("device_token", "").trim();
+      if (!token.isEmpty() && !ConnectionSettings.storeDeviceToken(identity.preferences, token)) {
+        throw new SyncException("Telefonun kişisel bağlantı anahtarı kaydedilemedi.");
+      }
+    } catch (SyncException ignored) {
+      // Compatibility path: an older hosting module may not yet expose the token
+      // endpoint. The current shared-secret connection remains usable until the
+      // hosting package is upgraded.
+    }
+  }
+
+  private static void applyAuthorization(HttpURLConnection connection, String credential, DeviceIdentity identity) {
+    connection.setRequestProperty("X-YA-Device-Id", identity.deviceId);
+    if (ConnectionSettings.isDeviceCredential(credential)) {
+      connection.setRequestProperty("X-YA-Device-Token", ConnectionSettings.deviceToken(credential));
+      return;
+    }
+    connection.setRequestProperty("X-YA-Sync-Secret", credential == null ? "" : credential.trim());
+  }
+
   static String toSyncEndpoint(String baseUrl) {
-    String normalized = baseUrl == null ? "" : baseUrl.trim();
-    while (normalized.endsWith("/")) {
-      normalized = normalized.substring(0, normalized.length() - 1);
-    }
-    if (normalized.endsWith("/api/sync.php") || normalized.endsWith("/sync.php")) {
-      return normalized;
-    }
-    if (normalized.endsWith("/api")) {
-      return normalized + "/sync.php";
+    return toSyncEndpoint(baseUrl, "");
+  }
+
+  static String toSyncEndpoint(String baseUrl, String credential) {
+    String normalized = normalizeBaseUrl(baseUrl);
+    if (ConnectionSettings.isDeviceCredential(credential)) {
+      return normalized + "/api/android.php";
     }
     return normalized + "/api/sync.php";
   }
 
   static String toStockImageAnalysisEndpoint(String baseUrl) {
-    String normalized = baseUrl == null ? "" : baseUrl.trim();
-    while (normalized.endsWith("/")) {
-      normalized = normalized.substring(0, normalized.length() - 1);
-    }
-    normalized = normalized.replaceFirst("/(?:api/)?sync\\.php$", "");
-    return normalized + "/api/stock-image-analysis.php";
+    return toStockImageAnalysisEndpoint(baseUrl, "");
+  }
+
+  static String toStockImageAnalysisEndpoint(String baseUrl, String credential) {
+    String normalized = normalizeBaseUrl(baseUrl);
+    return normalized + (ConnectionSettings.isDeviceCredential(credential)
+        ? "/api/android-stock-image-analysis.php"
+        : "/api/stock-image-analysis.php");
   }
 
   static String toIdentityImageAnalysisEndpoint(String baseUrl) {
-    String normalized = baseUrl == null ? "" : baseUrl.trim();
-    while (normalized.endsWith("/")) {
-      normalized = normalized.substring(0, normalized.length() - 1);
-    }
-    normalized = normalized.replaceFirst("/(?:api/)?sync\\.php$", "");
-    return normalized + "/api/identity-image-analysis.php";
+    return toIdentityImageAnalysisEndpoint(baseUrl, "");
+  }
+
+  static String toIdentityImageAnalysisEndpoint(String baseUrl, String credential) {
+    String normalized = normalizeBaseUrl(baseUrl);
+    return normalized + (ConnectionSettings.isDeviceCredential(credential)
+        ? "/api/android-identity-image-analysis.php"
+        : "/api/identity-image-analysis.php");
   }
 
   static String toChatEndpoint(String baseUrl) {
+    return toChatEndpoint(baseUrl, "");
+  }
+
+  static String toChatEndpoint(String baseUrl, String credential) {
+    String normalized = normalizeBaseUrl(baseUrl);
+    return normalized + (ConnectionSettings.isDeviceCredential(credential)
+        ? "/api/android-chat.php"
+        : "/api/chat.php");
+  }
+
+  static String toDeviceTokenEndpoint(String baseUrl) {
+    return normalizeBaseUrl(baseUrl) + "/api/android-device-token.php";
+  }
+
+  private static String normalizeBaseUrl(String baseUrl) {
     String normalized = baseUrl == null ? "" : baseUrl.trim();
     while (normalized.endsWith("/")) {
       normalized = normalized.substring(0, normalized.length() - 1);
     }
-    if (normalized.endsWith("/api/chat.php") || normalized.endsWith("/chat.php")) {
-      return normalized;
-    }
-    normalized = normalized.replaceFirst("/(?:api/)?sync\\.php$", "");
+    normalized = normalized.replaceFirst("/(?:api/)?(?:sync|android|chat|stock-image-analysis|identity-image-analysis|android-chat|android-stock-image-analysis|android-identity-image-analysis|android-device-token)\\.php$", "");
     if (normalized.endsWith("/api")) {
-      return normalized + "/chat.php";
+      normalized = normalized.substring(0, normalized.length() - 4);
     }
-    return normalized + "/api/chat.php";
+    return normalized;
   }
 
   private static void writeMultipartField(DataOutputStream output, String boundary, String name, String value) throws Exception {
