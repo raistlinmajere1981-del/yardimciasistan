@@ -57,6 +57,9 @@ def missingSigningProperties = signingPropertyNames.findAll { key, propertyName 
 def releaseSigningReady = missingSigningProperties.isEmpty()
 def stableDebugKeystore = file(".debug/yardimci-asistan-debug.keystore")
 def generatedConnectionDirectory = layout.buildDirectory.dir("generated/source/connection")
+def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+  taskName.toLowerCase(Locale.ROOT).contains("release")
+}
 
 android {
   namespace = "com.yardimciasistan.android"
@@ -144,6 +147,7 @@ def generateConnectionDefaults = tasks.register("generateConnectionDefaults", Ex
   description = "Git-ignored local connection defaults are generated without logging secrets."
   workingDir = rootProject.projectDir
   commandLine "node", file("../../scripts/generate-android-connection-defaults.mjs").absolutePath
+  environment "YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD", releaseTaskRequested ? "1" : "0"
   inputs.file file("../../scripts/generate-android-connection-defaults.mjs")
   outputs.dir generatedConnectionDirectory
   outputs.upToDateWhen { false }
