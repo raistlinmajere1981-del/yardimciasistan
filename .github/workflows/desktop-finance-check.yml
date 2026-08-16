@@ -89,6 +89,9 @@ jobs:
       - name: Oda adisyonu servis smoke
         run: node scripts/smoke-room-folio-service.mjs
 
+      - name: Restoran adisyonunu odaya yaz smoke
+        run: node scripts/smoke-room-folio-table-order-transfer.mjs
+
       - name: Manuel günlük iş smoke
         run: node scripts/smoke-daily-task-management.mjs
 
