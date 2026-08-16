@@ -11,7 +11,12 @@ import {
   type UpdateRoomFolioDetailsInput,
   type UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
+import { transferTableOrderToRoomFolio } from "./room-folio-order-transfer";
 import { saveRoomProfile } from "./room-profile";
+
+type RoomFolioManualItemIpcInput = AddRoomFolioManualItemInput & {
+  sourceTableOrderId?: string;
+};
 
 export function registerRoomFolioIpcHandlers(options: {
   databasePath: () => string;
@@ -63,8 +68,15 @@ export function registerRoomFolioIpcHandlers(options: {
     return service().updateItemQuantity(input);
   });
 
-  ipcMain.handle("roomFolio:addManualItem", (_event, input: AddRoomFolioManualItemInput): DesktopRoomFolioMutationResult => {
+  ipcMain.handle("roomFolio:addManualItem", (_event, input: RoomFolioManualItemIpcInput): DesktopRoomFolioMutationResult => {
     options.assertUnlocked();
+    const sourceTableOrderId = typeof input?.sourceTableOrderId === "string" ? input.sourceTableOrderId.trim() : "";
+    if (sourceTableOrderId) {
+      return transferTableOrderToRoomFolio(options.databasePath(), {
+        folioId: input.folioId,
+        tableOrderId: sourceTableOrderId
+      });
+    }
     return service().addManualItem(input);
   });
 
