@@ -22,6 +22,24 @@ if (!ya_android_auth_request_authorized($businessConfig, $deviceId)) {
     ]);
 }
 
+// Bind the authenticated token to the same device id used by sync.php. This
+// prevents a valid staff token from submitting an action as another device.
+$rawBody = file_get_contents('php://input') ?: '';
+$decodedBody = json_decode($rawBody, true);
+if (is_array($decodedBody)) {
+    $payloadDeviceId = trim((string) ($decodedBody['device_id'] ?? ''));
+    if ($payloadDeviceId !== '' && !hash_equals($deviceId, $payloadDeviceId)) {
+        ya_android_gate_response(403, [
+            'ok' => false,
+            'code' => 'device_identity_mismatch',
+            'message' => 'Telefon kimliği doğrulanamadı.'
+        ]);
+    }
+    // If the included endpoint cannot reopen php://input on a given PHP build,
+    // its normal $_POST fallback still receives the exact validated payload.
+    $_POST = $decodedBody;
+}
+
 // Existing sync.php remains the authoritative transport implementation. The
 // Android gate authenticates the per-device credential first, then supplies the
 // business secret only inside the same PHP request; the token is never exposed
