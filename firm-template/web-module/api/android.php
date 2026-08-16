@@ -60,6 +60,16 @@ if ($payloadDeviceId === '' || !hash_equals($deviceId, $payloadDeviceId)) {
     ]);
 }
 
+// Inactive/pending phones may still fetch their empty approval summary, but
+// they cannot create queue traffic that the desktop would only reject later.
+if ($action === 'enqueue_android_action' && !ya_android_gate_device_active($deviceId)) {
+    ya_android_gate_response(403, [
+        'ok' => false,
+        'code' => 'device_approval_required',
+        'message' => 'Bu telefon masaüstünden onaylanmadan işlem gönderemez.'
+    ]);
+}
+
 // If the included endpoint cannot reopen php://input on a given PHP build, its
 // normal $_POST fallback still receives the exact validated payload.
 $_POST = $decodedBody;
@@ -72,6 +82,21 @@ $_SERVER['HTTP_X_YA_SYNC_SECRET'] = trim((string) ($businessConfig['sync_secret'
 unset($_SERVER['HTTP_X_YA_DEVICE_TOKEN']);
 
 require __DIR__ . '/sync.php';
+
+function ya_android_gate_device_active(string $deviceId): bool
+{
+    $snapshot = ya_storage_get_publication('android_snapshot', []);
+    $profiles = is_array($snapshot['androidPermissions'] ?? null) ? $snapshot['androidPermissions'] : [];
+    $profile = is_array($profiles[$deviceId] ?? null) ? $profiles[$deviceId] : [];
+    $active = $profile['is_active'] ?? false;
+    if (is_bool($active)) {
+        return $active;
+    }
+    if (is_string($active)) {
+        return in_array(strtolower($active), ['1', 'true', 'yes', 'on'], true);
+    }
+    return (bool) $active;
+}
 
 function ya_android_gate_load_config(string $path): array
 {
