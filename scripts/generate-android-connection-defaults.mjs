@@ -17,6 +17,9 @@ const outputPath = join(
   "ConnectionDefaults.java"
 );
 const productionWebModuleUrl = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
+const releaseBuild = ["1", "true", "yes"].includes(
+  String(process.env.YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD ?? "").trim().toLowerCase()
+);
 
 let localConfig = {};
 if (existsSync(connectionConfigPath)) {
@@ -34,13 +37,19 @@ const webModuleUrl = normalizeWebModuleUrl(
     productionWebModuleUrl
   )
 );
-const syncSecret = firstNonEmpty(
+const configuredSyncSecret = firstNonEmpty(
   process.env.YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET,
   localConfig.sync_secret
 );
-if (syncSecret && syncSecret.length < 16) {
+if (configuredSyncSecret && configuredSyncSecret.length < 16) {
   throw new Error("Android varsayılan sync anahtarı en az 16 karakter olmalı.");
 }
+
+// Release/pilot APK must never contain the business-wide bootstrap secret in
+// its bytecode. The operator enters it once during first pairing; after desktop
+// approval the app replaces it with a per-device token. Debug builds may still
+// embed a local secret to keep device automation practical.
+const syncSecret = releaseBuild ? "" : configuredSyncSecret;
 const lockEmbeddedConnection = Boolean(webModuleUrl && syncSecret);
 
 mkdirSync(dirname(outputPath), { recursive: true });
@@ -57,7 +66,10 @@ writeFileSync(outputPath, [
   ""
 ].join("\n"), { mode: 0o600 });
 
-console.log(`android-connection-mode: ${lockEmbeddedConnection ? "embedded connection locked" : "editable connection"}`);
+const mode = releaseBuild
+  ? "release editable connection (shared secret omitted)"
+  : lockEmbeddedConnection ? "embedded debug connection locked" : "editable connection";
+console.log(`android-connection-mode: ${mode}`);
 
 function firstNonEmpty(...values) {
   for (const value of values) {
