@@ -94,6 +94,7 @@ Görevleri:
     ai-settings.local.php (runtime)
   lib/
     storage.php
+    public-request-guard.php
   knowledge/
     firma.md
     odalar.md
@@ -106,6 +107,14 @@ Güncel ilk sürümde PHP `PDO_SQLITE` zorunludur. Talepler, Android action kuyr
 menü/Android yayınları, cursor'lar, revision ve idempotency receipt kayıtları hosting
 SQLite'ında tutulur. Eski JSON çalışma verileri ilk açılışta yedeklenerek tek seferlik
 içe aktarılır.
+
+Müşteriye açık `request.php` ve `chat.php` uçlarında ayrıca sessiz sunucu tarafı kötüye
+kullanım koruması vardır. Koruma ham IP adresini saklamaz; istemci adresini firmanın
+`sync_secret` değeriyle HMAC-SHA256 özetine dönüştürerek kısa dönem ve günlük sınırlar
+uygular. Aşırı büyük JSON gövdeleri sağlayıcı veya normal kayıt katmanına ulaşmadan
+reddedilir. Koruma sayacının kendi SQLite yazımı başarısız olursa gerçek müşteri akışını
+tek başına kesmemek için koruma katmanı fail-open davranır; normal endpoint depolama ve
+hata kuralları değişmez.
 
 Ama yapı ileride Node.js veya farklı backend teknolojilerine taşınabilir şekilde tasarlanmalıdır.
 
@@ -174,11 +183,16 @@ Her Android kurulumu ilk açılışta kalıcı bir cihaz kimliği üretir. Hosti
 özet isteği veya action sırasında görülen cihaz kimliği, cihaz adı ve uygulama sürümünü
 hafif bir cihaz-görülme kaydında tutar; masaüstü bu kayıtları dışarı doğru senkron
 bağlantısıyla alıp kendi `android_devices` tablosuna aktarır. Bilinmeyen cihaz ilk
-görülmede aktif `staff` profiliyle ve Servis / Sipariş ile Oda / Günlük İşler görev
-paketleri açık olarak başlar. Personel için masaüstünde teknik izin listesi düzenlenmez;
-Servis / Sipariş, Kasa / Hesap, Oda / Günlük İşler ve Müşteri / Rezervasyon paketleri
-seçilir ve `permissions_json` bu seçimlerden yeniden üretilir. Rol, aktiflik ve gerçek
-yetki kaynağı yalnız masaüstü SQLite'tır; Android'in bildirdiği role veya yetkiye güvenilmez.
+görülmede `staff` profiliyle fakat **pasif / onay bekler** durumda oluşturulur. Servis /
+Sipariş ile Oda / Günlük İşler varsayılan görev paketleri profil taslağında bulunabilir,
+ancak masaüstü kullanıcısı cihazı açıkça aktif etmeden hiçbir Android action yerel
+operasyon verisine uygulanmaz. Mevcut ve daha önce onaylanmış cihazlar bu ilk-kayıt
+kuralından etkilenmez.
+
+Personel için masaüstünde teknik izin listesi düzenlenmez; Servis / Sipariş, Kasa /
+Hesap, Oda / Günlük İşler ve Müşteri / Rezervasyon paketleri seçilir ve
+`permissions_json` bu seçimlerden yeniden üretilir. Rol, aktiflik ve gerçek yetki kaynağı
+yalnız masaüstü SQLite'tır; Android'in bildirdiği role veya yetkiye güvenilmez.
 
 Yönetici cihaz görev paketlerinden bağımsız olarak desteklenen tüm Android izinlerini
 almaya devam eder. Masaüstünün yayınladığı Android snapshot'ı cihaz bazlı etkili yetki
@@ -264,11 +278,11 @@ PC Ayarlar
 Firma Hosting Mini API
   ↓ korumalı sunucu ayarı
 Web AI chat.php
-  ↓
+  ↓ public request guard
 Seçilen AI Servisi
 ```
 
-Web widget'a servis anahtarı, model veya gizli bağlantı bilgisi gönderilmez. PC kapalıyken web AI çalışmaya devam eder; hostingde son başarıyla yayınlanan ayar kullanılır. Ayar yayını başarısız olursa PC'deki yerel ayar korunur ve kullanıcı yayını yeniden deneyebilir.
+Web widget'a servis anahtarı, model veya gizli bağlantı bilgisi gönderilmez. PC kapalıyken web AI çalışmaya devam eder; hostingde son başarıyla yayınlanan ayar kullanılır. Ayar yayını başarısız olursa PC'deki yerel ayar korunur ve kullanıcı yayını yeniden deneyebilir. Web AI'nin müşteriye açık çağrıları sağlayıcıya gitmeden önce kısa dönem ve günlük kullanım sınırından geçer; böylece tek istemcinin veya kaba otomasyonun işletmenin AI kotasını kontrolsüz tüketmesi sınırlandırılır.
 
 AI görevleri:
 
@@ -357,7 +371,9 @@ arayüzün yeni bir adaptörü eklenebilir. Ayrıntılar `docs/AUTOMATIC_SYNC.md
 7. AI opsiyonel olacak.
 8. WhatsApp opsiyonel olacak.
 9. Android companion sade tutulacak.
-10. Modüller birbirinden bağımsız çalışabilecek şekilde tasarlanacak.
+10. Yeni Android cihaz masaüstünden onaylanmadan operasyon yetkisi almayacak.
+11. Müşteriye açık yazma/AI uçları temel kötüye kullanım ve gövde boyutu sınırlarıyla korunacak.
+12. Modüller birbirinden bağımsız çalışabilecek şekilde tasarlanacak.
 
 ## Ana Veri Akışı
 
@@ -367,11 +383,11 @@ Müşteri web sitesinden bilgi talebi oluşturduğunda:
 1. Müşteri web sitesine girer.
 2. Web formu doldurur veya AI ile konuşur.
 3. Talep firmanın hostingindeki mini API’ye kaydedilir.
-4. WhatsApp hazır mesajı müşterinin cihazında açılır.
-5. Firma sahibi WhatsApp’tan mesajı alabilir.
+4. Müşteriye talebin işletmeye iletildiği onayı gösterilir.
+5. İsterse ayrıca WhatsApp hazır mesajı açabilir.
 6. PC uygulaması açıkken otomatik koordinatör yeni talepleri hostingden çeker.
 7. Talep PC uygulamasında görünür.
-8. Android companion gerekli özetleri gösterir.
+8. Android companion yalnız onaylanmış cihaz profilinin izin verdiği özetleri gösterir.
 9. Firma sahibi müşteriye arama veya WhatsApp ile dönüş yapar.
 ```
 
