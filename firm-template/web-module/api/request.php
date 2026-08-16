@@ -5,6 +5,7 @@ const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/public-request-guard.php';
 
 $businessConfig = ya_load_business_config();
 ya_apply_cors($businessConfig);
@@ -20,6 +21,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
         'message' => 'Bu işlem için form gönderimi gerekli.'
     ]);
 }
+
+ya_public_guard_enforce('request');
 
 $payloadResult = ya_read_payload();
 if (!$payloadResult['ok']) {
@@ -190,10 +193,16 @@ function ya_validate_request_payload(array $payload): array
         ];
     }
 
-    if (ya_string($payload['customer_name'] ?? '') === '') {
+    $customerName = ya_string($payload['customer_name'] ?? '');
+    if ($customerName === '') {
         $errors[] = [
             'field' => 'customer_name',
             'message' => 'Ad soyad alanı gerekli.'
+        ];
+    } elseif (strlen($customerName) > 160) {
+        $errors[] = [
+            'field' => 'customer_name',
+            'message' => 'Ad soyad alanı çok uzun.'
         ];
     }
 
@@ -205,17 +214,39 @@ function ya_validate_request_payload(array $payload): array
         ];
     }
 
-    if (ya_string($payload['date_text'] ?? '') === '' && ya_string($payload['start_date'] ?? '') === '') {
+    $dateText = ya_string($payload['date_text'] ?? '');
+    $startDate = ya_string($payload['start_date'] ?? '');
+    if ($dateText === '' && $startDate === '') {
         $errors[] = [
             'field' => 'date_text',
             'message' => 'Tarih bilgisi gerekli.'
         ];
+    } elseif (strlen($dateText) > 160 || strlen($startDate) > 40) {
+        $errors[] = [
+            'field' => 'date_text',
+            'message' => 'Tarih bilgisi çok uzun.'
+        ];
     }
 
-    if (ya_int($payload['guest_count'] ?? 0, 0) < 1) {
+    $guestCount = ya_int($payload['guest_count'] ?? 0, 0);
+    if ($guestCount < 1 || $guestCount > 200) {
         $errors[] = [
             'field' => 'guest_count',
-            'message' => 'Kişi sayısı en az 1 olmalı.'
+            'message' => 'Kişi sayısı 1 ile 200 arasında olmalı.'
+        ];
+    }
+
+    if (strlen(ya_string($payload['message'] ?? '')) > 3000) {
+        $errors[] = [
+            'field' => 'message',
+            'message' => 'Not alanı çok uzun.'
+        ];
+    }
+
+    if (strlen(ya_string($payload['whatsapp_message'] ?? '')) > 5000) {
+        $errors[] = [
+            'field' => 'whatsapp_message',
+            'message' => 'WhatsApp mesajı çok uzun.'
         ];
     }
 
