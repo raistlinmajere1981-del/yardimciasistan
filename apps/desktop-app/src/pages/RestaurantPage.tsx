@@ -8,7 +8,6 @@ import { MetricCard, type MetricCardProps } from "../components/ui/MetricCard";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
-  roomsEnabled: boolean;
   reservations: ReactNode;
   tasks: ReactNode;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
@@ -21,7 +20,7 @@ function localDateKey() {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-export function RestaurantPage({ data, roomsEnabled, reservations, tasks, onDashboardDataChanged, onUpdateTableStatus }: RestaurantPageProps) {
+export function RestaurantPage({ data, reservations, tasks, onDashboardDataChanged, onUpdateTableStatus }: RestaurantPageProps) {
   const [tableOrders, setTableOrders] = useState<DesktopTableOrder[]>([]);
   const restaurantTasks = data.dailyTasks.filter((task) => isRestaurantTask(task, data.reservations));
   const pendingRestaurantTasks = restaurantTasks.filter((task) => task.status === "pending");
@@ -118,7 +117,7 @@ export function RestaurantPage({ data, roomsEnabled, reservations, tasks, onDash
         </section>
       </details>
 
-      {roomsEnabled && data.rooms.length > 0 && (
+      {data.rooms.length > 0 && (
         <RestaurantRoomTransferPanel
           orders={tableOrders}
           onOrderChanged={handleOrderChanged}
