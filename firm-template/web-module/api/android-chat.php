@@ -15,6 +15,20 @@ if (!ya_android_auth_request_authorized($businessConfig, $deviceId)) {
     ]);
 }
 
+$rawBody = file_get_contents('php://input') ?: '';
+$decodedBody = json_decode($rawBody, true);
+if (is_array($decodedBody)) {
+    $payloadDeviceId = trim((string) ($decodedBody['device_id'] ?? ''));
+    if ($payloadDeviceId === '' || !hash_equals($deviceId, $payloadDeviceId)) {
+        ya_android_chat_response(403, [
+            'ok' => false,
+            'code' => 'device_identity_mismatch',
+            'message' => 'Telefon kimliği doğrulanamadı.'
+        ]);
+    }
+    $_POST = $decodedBody;
+}
+
 $_SERVER['HTTP_X_YA_SYNC_SECRET'] = trim((string) ($businessConfig['sync_secret'] ?? ''));
 unset($_SERVER['HTTP_X_YA_DEVICE_TOKEN']);
 require __DIR__ . '/chat.php';
