@@ -7,8 +7,8 @@ const YA_PUBLIC_GUARD_RETENTION_SECONDS = 86400;
 /**
  * Applies a lightweight, privacy-preserving abuse guard to public endpoints.
  *
- * The guard stores only a SHA-256 digest derived from REMOTE_ADDR + user agent,
- * never the raw client IP. It is intentionally independent from cookies and
+ * The guard stores only an HMAC-SHA256 digest derived from REMOTE_ADDR, never
+ * the raw client IP. It is intentionally independent from cookies and
  * JavaScript so it also protects direct endpoint calls.
  *
  * Storage failures fail open: the business must not lose legitimate requests
@@ -114,13 +114,13 @@ function ya_public_guard_policy(string $bucket): ?array
     if ($bucket === 'chat') {
         return [
             'subject_windows' => [
-                ['seconds' => 60, 'limit' => 15, 'retry_after' => 60],
-                ['seconds' => 3600, 'limit' => 120, 'retry_after' => 300],
-                ['seconds' => 86400, 'limit' => 400, 'retry_after' => 900]
+                ['seconds' => 60, 'limit' => 12, 'retry_after' => 60],
+                ['seconds' => 3600, 'limit' => 60, 'retry_after' => 300],
+                ['seconds' => 86400, 'limit' => 150, 'retry_after' => 900]
             ],
             'global_windows' => [
-                ['seconds' => 3600, 'limit' => 1200, 'retry_after' => 120],
-                ['seconds' => 86400, 'limit' => 5000, 'retry_after' => 900]
+                ['seconds' => 3600, 'limit' => 300, 'retry_after' => 120],
+                ['seconds' => 86400, 'limit' => 1500, 'retry_after' => 900]
             ]
         ];
     }
@@ -132,8 +132,8 @@ function ya_public_guard_policy(string $bucket): ?array
                 ['seconds' => 86400, 'limit' => 60, 'retry_after' => 900]
             ],
             'global_windows' => [
-                ['seconds' => 3600, 'limit' => 1000, 'retry_after' => 120],
-                ['seconds' => 86400, 'limit' => 5000, 'retry_after' => 900]
+                ['seconds' => 3600, 'limit' => 500, 'retry_after' => 120],
+                ['seconds' => 86400, 'limit' => 2000, 'retry_after' => 900]
             ]
         ];
     }
@@ -217,8 +217,30 @@ function ya_public_guard_count(
 function ya_public_guard_subject_hash(): string
 {
     $remoteAddress = trim((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-    $userAgent = substr(trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 240);
-    return hash('sha256', $remoteAddress . "\n" . $userAgent);
+    $businessConfig = ya_public_guard_business_config();
+    $key = trim((string) ($businessConfig['sync_secret'] ?? ''));
+    if ($key === '') {
+        $key = hash('sha256', dirname(__DIR__));
+    }
+    return hash_hmac('sha256', $remoteAddress, $key);
+}
+
+function ya_public_guard_business_config(): array
+{
+    static $businessConfig = null;
+    if (is_array($businessConfig)) {
+        return $businessConfig;
+    }
+
+    $configPath = dirname(__DIR__) . '/config/business.json';
+    if (!is_file($configPath)) {
+        $businessConfig = [];
+        return $businessConfig;
+    }
+
+    $decoded = json_decode((string) file_get_contents($configPath), true);
+    $businessConfig = is_array($decoded) ? $decoded : [];
+    return $businessConfig;
 }
 
 function ya_public_guard_apply_cors(): void
@@ -228,13 +250,8 @@ function ya_public_guard_apply_cors(): void
         return;
     }
 
-    $configPath = dirname(__DIR__) . '/config/business.json';
-    if (!is_file($configPath)) {
-        return;
-    }
-
-    $decoded = json_decode((string) file_get_contents($configPath), true);
-    $allowedOrigins = is_array($decoded) ? ($decoded['allowed_origins'] ?? []) : [];
+    $businessConfig = ya_public_guard_business_config();
+    $allowedOrigins = $businessConfig['allowed_origins'] ?? [];
     if (!is_array($allowedOrigins)) {
         return;
     }
