@@ -1,0 +1,65 @@
+name: Windows Pilot Check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/desktop-app/**"
+      - "packages/**"
+      - "scripts/smoke-desktop-windows-*.mjs"
+      - "scripts/smoke-desktop-windows-*.ps1"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/windows-pilot-check.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/desktop-app/**"
+      - "packages/**"
+      - "scripts/smoke-desktop-windows-*.mjs"
+      - "scripts/smoke-desktop-windows-*.ps1"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/windows-pilot-check.yml"
+
+jobs:
+  windows-pilot:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v5
+
+      - name: Node.js kur
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: Ortak paketleri derle
+        run: npm run build:packages
+
+      - name: Masaüstü strict typecheck
+        run: npm run typecheck:strict -w @yardimci-asistan/desktop-app
+
+      - name: Windows x64 NSIS installer üret
+        run: npm run pack:desktop:win
+
+      - name: Temiz kurulum ve ilk açılış smoke
+        shell: pwsh
+        run: ./scripts/smoke-desktop-windows-install.ps1
+
+      - name: Installer artifact yükle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: yardimci-asistan-windows-pilot
+          path: |
+            dist/desktop/YardimciAsistan-Setup-*.exe
+            dist/desktop/*.yml
+          if-no-files-found: warn
+          retention-days: 14
