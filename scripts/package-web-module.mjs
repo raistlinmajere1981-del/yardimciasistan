@@ -22,8 +22,14 @@ const requiredFiles = [
   "api/chat.php",
   "api/stock-image-analysis.php",
   "api/identity-image-analysis.php",
+  "api/android.php",
+  "api/android-device-token.php",
+  "api/android-chat.php",
+  "api/android-stock-image-analysis.php",
+  "api/android-identity-image-analysis.php",
   "lib/storage.php",
   "lib/public-request-guard.php",
+  "lib/android-device-auth.php",
   "lib/stock-image-analysis.php",
   "lib/identity-image-analysis.php",
   "assets/yardimci-asistan-symbol.png",
@@ -133,6 +139,20 @@ function validateSource() {
   assert.ok(syncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "AI ayar yayını header güvenlik anahtarını doğrulamalı.");
   assert.ok(syncEndpoint.includes("enqueue_android_action"), "api/sync.php Android action kuyruğunu içermeli.");
   assert.ok(syncEndpoint.includes("acknowledge_requests"), "api/sync.php cursor onayını içermeli.");
+
+  const androidAuth = readFileSync(join(sourceRoot, "lib", "android-device-auth.php"), "utf8");
+  assert.ok(androidAuth.includes("android_device_tokens"), "Android cihaz tokenları hosting SQLite içinde yönetilmeli.");
+  assert.ok(androidAuth.includes("hash('sha256', $token)"), "Android cihaz tokenı ham olarak saklanmamalı.");
+  assert.ok(androidAuth.includes("HTTP_X_YA_DEVICE_TOKEN"), "Android cihaz token header doğrulaması bulunmalı.");
+
+  const androidGate = readFileSync(join(sourceRoot, "api", "android.php"), "utf8");
+  assert.ok(androidGate.includes("android_summary") && androidGate.includes("enqueue_android_action"), "Android kapısı yalnız mobil senkron aksiyonlarını açmalı.");
+  assert.ok(androidGate.includes("android_action_scope_denied"), "Android tokenı genel masaüstü sync yetkisine dönüşmemeli.");
+  assert.ok(androidGate.includes("device_identity_mismatch"), "Android tokenı payload cihaz kimliğine bağlanmalı.");
+
+  const androidTokenEndpoint = readFileSync(join(sourceRoot, "api", "android-device-token.php"), "utf8");
+  assert.ok(androidTokenEndpoint.includes("device_approval_required"), "Onaysız telefon cihaz tokenı alamamalı.");
+  assert.ok(androidTokenEndpoint.includes("ya_android_auth_issue_token"), "Onaylı telefon kişisel token almalı.");
 
   const stockImageEndpoint = readFileSync(join(sourceRoot, "api", "stock-image-analysis.php"), "utf8");
   assert.ok(stockImageEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "Stok görseli endpoint'i header güvenlik anahtarını doğrulamalı.");
