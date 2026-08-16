@@ -32,19 +32,19 @@ export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPane
     if (!bridge) return;
     let active = true;
 
-    void bridge.getSetupData?.().then((nextSetup) => {
+    void bridge.getSetupData().then((nextSetup) => {
       if (active) setSetup(nextSetup);
     }).catch(() => undefined);
-    void bridge.getSyncStatus?.().then((status) => {
+    void bridge.getSyncStatus().then((status) => {
       if (active) setSyncStatus(status);
     }).catch(() => undefined);
 
-    const unsubscribe = bridge.onSyncStatusChanged?.((status) => {
+    const unsubscribe = bridge.onSyncStatusChanged((status) => {
       if (active) setSyncStatus(status);
     });
     return () => {
       active = false;
-      unsubscribe?.();
+      unsubscribe();
     };
   }, []);
 
@@ -119,7 +119,7 @@ export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPane
 
   async function runSyncNow() {
     const bridge = window.yardimciDesktop;
-    if (!bridge?.runSyncNow || syncing) return;
+    if (!bridge || syncing) return;
     setSyncing(true);
     try {
       const result = await bridge.runSyncNow();
