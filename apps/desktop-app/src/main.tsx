@@ -11,6 +11,7 @@ import "./cash-page-ux.css";
 import "./friendly-workflow-ux.css";
 import "./dashboard-simple-ux.css";
 import "./system-health-ux.css";
+import "./restaurant-room-transfer-ux.css";
 import "./customer-work-ux.css";
 import "./room-card-ux.css";
 import "./room-management-ux.css";
