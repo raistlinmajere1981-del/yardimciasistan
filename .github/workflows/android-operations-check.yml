@@ -11,6 +11,7 @@ on:
       - "scripts/smoke-android-*.mjs"
       - "scripts/smoke-automatic-sync.mjs"
       - "scripts/run-android-gradle.mjs"
+      - "scripts/generate-android-connection-defaults.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/android-operations-check.yml"
@@ -26,6 +27,7 @@ on:
       - "scripts/smoke-android-*.mjs"
       - "scripts/smoke-automatic-sync.mjs"
       - "scripts/run-android-gradle.mjs"
+      - "scripts/generate-android-connection-defaults.mjs"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/android-operations-check.yml"
@@ -68,6 +70,12 @@ jobs:
 
       - name: Android cihaz onay sınırı smoke
         run: node scripts/smoke-android-device-approval-hosting.mjs
+
+      - name: Android cihaz token güvenliği smoke
+        run: node scripts/smoke-android-device-token.mjs
+
+      - name: Release APK ortak anahtar gömmez smoke
+        run: node scripts/smoke-android-release-connection.mjs
 
       - name: Masaüstü veri katmanını derle
         run: npm run build -w @yardimci-asistan/desktop-app
