@@ -146,6 +146,19 @@ try {
   assert.deepEqual(inactiveBody.rooms, []);
   assert.deepEqual(inactiveBody.tables, []);
 
+  const inactiveAction = await postAndroid({
+    action: "enqueue_android_action",
+    action_id: "android_token_inactive_action_0001",
+    action_type: "room_status_update",
+    device_id: deviceId,
+    payload: {
+      room_id: "room_token_smoke",
+      status: "cleaning"
+    }
+  }, { "X-YA-Device-Token": secondToken });
+  assert.equal(inactiveAction.status, 403, "Pasif cihaz action kuyruğunu dolduramamalı.");
+  assert.equal((await inactiveAction.json()).code, "device_approval_required");
+
   console.log("android-device-token-smoke-ok");
 } catch (error) {
   if (serverOutput.trim()) console.error(serverOutput.trim());
