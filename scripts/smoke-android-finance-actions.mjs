@@ -27,8 +27,23 @@ try {
 
   let device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);
   assert.ok(device);
+  assert.equal(device.isActive, false, "Yeni Android cihaz masaüstü onayı olmadan aktif başlamamalı");
   assert.equal(device.permissions.includes("finance.view"), false, "Varsayılan personel mobil Kasa görmemeli");
   assert.equal(device.permissions.includes("finance.create"), false, "Varsayılan personel Kasa hareketi eklememeli");
+
+  const inactiveDenied = database.applyAndroidAction(action("finance-inactive-denied", {
+    direction: "income",
+    amount_minor: 12500,
+    payment_method: "cash",
+    category: "other_income",
+    description: "Onaysız cihaz denemesi"
+  }));
+  assert.equal(inactiveDenied.ok, false, "Masaüstünden onaylanmamış cihaz işlem yapamamalı");
+
+  const approved = database.setAndroidDeviceActive(DEVICE_ID, true);
+  assert.equal(approved.ok, true, approved.message);
+  device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);
+  assert.equal(device?.isActive, true, "Masaüstü onayı cihazı aktif hale getirmeli");
 
   const denied = database.applyAndroidAction(action("finance-denied", {
     direction: "income",
@@ -111,7 +126,7 @@ try {
     sqlite.close();
   }
 
-  console.log("android-finance-actions-smoke-ok: permission, income/expense, idempotency and finance totals verified");
+  console.log("android-finance-actions-smoke-ok: device approval, permission, income/expense, idempotency and finance totals verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });
