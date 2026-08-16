@@ -124,22 +124,108 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $limit = ya_sync_int($payload['limit'] ?? $_GET['limit'] ?? 100, 100);
     $limit = max(1, min($limit, 200));
     $deviceId = ya_sync_string($payload['device_id'] ?? $_GET['device_id'] ?? '');
-    if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId)) {
-        ya_storage_record_android_device([
-            'device_id' => $deviceId,
-            'device_name' => ya_sync_string($payload['device_name'] ?? $_GET['device_name'] ?? ''),
-            'app_version' => ya_sync_string($payload['app_version'] ?? $_GET['app_version'] ?? ''),
-            'last_seen_at' => date(DATE_ATOM)
+    if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId) !== 1) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Telefon kimliği geçersiz.'
         ]);
     }
-    $knownServerRevision = max(0, ya_sync_int($payload['known_server_revision'] ?? 0, 0));
+
+    ya_storage_record_android_device([
+        'device_id' => $deviceId,
+        'device_name' => ya_sync_string($payload['device_name'] ?? $_GET['device_name'] ?? ''),
+        'app_version' => ya_sync_string($payload['app_version'] ?? $_GET['app_version'] ?? ''),
+        'last_seen_at' => date(DATE_ATOM)
+    ]);
+
+    $androidSnapshot = ya_sync_load_android_snapshot();
+    $permissionProfile = is_array($androidSnapshot['androidPermissions'][$deviceId] ?? null)
+        ? $androidSnapshot['androidPermissions'][$deviceId]
+        : [];
+    $permissionList = is_array($permissionProfile['permissions'] ?? null) ? $permissionProfile['permissions'] : [];
+    $deviceActive = ya_sync_bool($permissionProfile['is_active'] ?? false);
     $serverRevision = ya_storage_server_revision();
+
+    if (!$deviceActive) {
+        $now = date(DATE_ATOM);
+        ya_sync_update_state(['last_android_summary_at' => $now]);
+        $role = ya_sync_string($permissionProfile['role'] ?? 'staff');
+        if (!in_array($role, ['admin', 'staff'], true)) {
+            $role = 'staff';
+        }
+        ya_sync_response(200, [
+            'ok' => true,
+            'code' => 'device_approval_required',
+            'message' => 'Bu cihaz masaüstünden onay bekliyor.',
+            'approval_required' => true,
+            'business' => [
+                'display_name' => ya_sync_string($businessConfig['display_name'] ?? $businessConfig['name'] ?? ''),
+                'phone' => ya_sync_string($businessConfig['phone'] ?? ''),
+                'whatsapp' => ya_sync_string($businessConfig['whatsapp'] ?? '')
+            ],
+            'summary' => [
+                'total_requests' => 0,
+                'new_requests' => 0,
+                'pending_requests' => 0,
+                'synced_requests' => 0,
+                'request_count' => 0,
+                'latest_created_at' => '',
+                'pulled_at' => $now,
+                'android_snapshot_updated_at' => ya_sync_string($androidSnapshot['updated_at'] ?? ''),
+                'pending_action_count' => 0
+            ],
+            'operations' => [
+                'pending_daily_tasks' => 0,
+                'today_tasks' => 0,
+                'available_rooms' => 0,
+                'total_rooms' => 0,
+                'available_tables' => 0,
+                'occupied_tables' => 0,
+                'bill_waiting_tables' => 0,
+                'active_table_orders' => 0,
+                'pending_reservations' => 0,
+                'prepared_whatsapp_messages' => 0,
+                'waiting_responses' => 0,
+                'active_menu_categories' => 0,
+                'available_menu_items' => 0,
+                'customer_count' => 0
+            ],
+            'daily_tasks' => [],
+            'requests' => [],
+            'customers' => [],
+            'customer_room_stays' => [],
+            'room_folios' => [],
+            'reservations' => [],
+            'rooms' => [],
+            'tables' => [],
+            'menu' => ['categories' => [], 'items' => [], 'updated_at' => ''],
+            'admin_menu' => ['categories' => [], 'items' => [], 'updated_at' => ''],
+            'trackedStockItems' => [],
+            'appliedStockImageHashes' => [],
+            'table_orders' => [],
+            'messages' => [],
+            'androidPermissions' => [
+                $deviceId => [
+                    'role' => $role,
+                    'is_active' => false,
+                    'permissions' => []
+                ]
+            ],
+            'finance' => [],
+            'reports' => [],
+            'actions' => [],
+            'server_revision' => $serverRevision
+        ]);
+    }
+
+    $knownServerRevision = max(0, ya_sync_int($payload['known_server_revision'] ?? 0, 0));
     if ($knownServerRevision > 0 && $knownServerRevision === $serverRevision) {
         $now = date(DATE_ATOM);
         ya_sync_update_state(['last_android_summary_at' => $now]);
         ya_sync_response(200, [
             'ok' => true,
             'message' => 'Android verisi zaten güncel.',
+            'approval_required' => false,
             'not_modified' => true,
             'server_revision' => $serverRevision,
             'pulled_at' => $now,
@@ -148,7 +234,6 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     }
     $records = ya_storage_all_requests();
 
-    $androidSnapshot = ya_sync_load_android_snapshot();
     $deletedRequestIds = array_fill_keys($androidSnapshot['deleted_request_ids'], true);
     $requestsById = [];
     foreach ($androidSnapshot['requests'] as $snapshotRequest) {
@@ -209,7 +294,6 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         if ($createdAt !== '' && ($latestCreatedAt === '' || strcmp($createdAt, $latestCreatedAt) > 0)) {
             $latestCreatedAt = $createdAt;
         }
-
     }
 
     $visibleRequests = array_values(array_filter($publicRequests, static function (array $record): bool {
@@ -220,14 +304,9 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $now = date(DATE_ATOM);
     $actions = ya_sync_get_android_actions($deviceId, 40);
     $pendingActionCount = ya_sync_count_pending_android_actions($deviceId);
-    $permissionProfile = is_array($androidSnapshot['androidPermissions'][$deviceId] ?? null)
-        ? $androidSnapshot['androidPermissions'][$deviceId]
-        : [];
-    $permissionList = is_array($permissionProfile['permissions'] ?? null) ? $permissionProfile['permissions'] : [];
-    $deviceActive = ya_sync_bool($permissionProfile['is_active'] ?? false);
-    $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin' && $deviceActive;
-    $financeAllowed = $deviceActive && in_array('finance.view', $permissionList, true);
-    $roomFolioAllowed = $deviceActive && in_array('room_folio.view', $permissionList, true);
+    $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin';
+    $financeAllowed = in_array('finance.view', $permissionList, true);
+    $roomFolioAllowed = in_array('room_folio.view', $permissionList, true);
     $customerManagementAllowed = $reportsAllowed && in_array('customer.manage', $permissionList, true);
     ya_sync_update_state([
         'last_android_summary_at' => $now
@@ -236,6 +315,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     ya_sync_response(200, [
         'ok' => true,
         'message' => 'Android özeti alındı.',
+        'approval_required' => false,
         'business' => [
             'display_name' => ya_sync_string($businessConfig['display_name'] ?? $businessConfig['name'] ?? ''),
             'phone' => ya_sync_string($businessConfig['phone'] ?? ''),
