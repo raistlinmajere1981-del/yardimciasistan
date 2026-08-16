@@ -19,3 +19,19 @@ CREATE TABLE IF NOT EXISTS room_folio_table_order_transfers (
 
 CREATE INDEX IF NOT EXISTS idx_room_folio_order_transfers_folio
   ON room_folio_table_order_transfers(folio_id, created_at DESC);
+
+-- Odaya yazılan restoran hesabı restoran adisyonuyla birlikte tek bir finansal
+-- izdir. Normal folyo kalemi silme akışı bu bağı koparamaz; düzeltme gerekiyorsa
+-- açık bir "transferi geri al" işlemiyle iki taraf birlikte değiştirilmelidir.
+CREATE TRIGGER IF NOT EXISTS trg_room_folio_transfer_item_delete_guard
+BEFORE UPDATE OF deleted_at ON room_folio_items
+WHEN OLD.deleted_at = ''
+  AND NEW.deleted_at != ''
+  AND EXISTS (
+    SELECT 1
+    FROM room_folio_table_order_transfers
+    WHERE folio_item_id = OLD.id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'room_folio_table_order_transfer_locked');
+END;
