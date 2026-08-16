@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (basename((string) ($_SERVER['SCRIPT_FILENAME'] ?? '')) === 'chat.php') {
+    require_once dirname(__DIR__) . '/lib/public-request-guard.php';
+    ya_public_guard_enforce('chat');
+}
+
 $enabled = getenv('YARDIMCI_ASISTAN_AI_ENABLED') ?: '';
 
 $config = [
