@@ -166,7 +166,7 @@ try {
     sqlite.close();
   }
 
-  console.log("android-reservation-actions-smoke-ok: room/table create, update, conflicts, stale version and idempotency verified");
+  console.log("android-reservation-actions-smoke-ok: approved device, room/table create, update, conflicts, stale version and idempotency verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });
@@ -180,8 +180,10 @@ function registerAdminDevice(database) {
     first_seen_at: "2026-08-11T12:00:00.000Z",
     last_seen_at: "2026-08-11T12:00:00.000Z"
   }]);
-  const result = database.setAndroidDeviceRole(DEVICE_ID, "admin");
-  assert.equal(result.ok, true, result.message);
+  const roleResult = database.setAndroidDeviceRole(DEVICE_ID, "admin");
+  assert.equal(roleResult.ok, true, roleResult.message);
+  const approvalResult = database.setAndroidDeviceActive(DEVICE_ID, true);
+  assert.equal(approvalResult.ok, true, approvalResult.message);
 }
 
 function createCustomer(database) {
