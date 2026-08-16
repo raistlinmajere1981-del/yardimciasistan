@@ -215,11 +215,11 @@ function ya_public_guard_count(
 function ya_public_guard_subject_hash(): string
 {
     $remoteAddress = trim((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-    $userAgent = mb_substr(trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 240);
+    $userAgent = substr(trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 240);
     return hash('sha256', $remoteAddress . "\n" . $userAgent);
 }
 
-function ya_public_guard_reject(int $status, string $message, int $retryAfter): never
+function ya_public_guard_reject(int $status, string $message, int $retryAfter): void
 {
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
