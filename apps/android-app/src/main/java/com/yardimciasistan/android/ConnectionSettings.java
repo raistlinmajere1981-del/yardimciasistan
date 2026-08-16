@@ -6,6 +6,7 @@ final class ConnectionSettings {
   static final String PREFS_NAME = "yardimci_asistan_android";
   static final String KEY_WEB_MODULE_URL = "web_module_url";
   static final String KEY_SYNC_SECRET = "sync_secret";
+  private static final String DEVICE_CREDENTIAL_PREFIX = "device:";
   private static final String KEY_DEBUG_CONNECTION_OVERRIDE_ACTIVE = "debug_connection_override_active";
 
   private ConnectionSettings() {}
@@ -13,13 +14,20 @@ final class ConnectionSettings {
   static void ensureDefaults(SharedPreferences preferences) {
     if (isEmbeddedConnectionLocked() && !isDebugConnectionOverrideActive(preferences)) {
       String storedUrl = storedValue(preferences, KEY_WEB_MODULE_URL);
-      String storedSecret = storedValue(preferences, KEY_SYNC_SECRET);
-      if (!ConnectionDefaults.WEB_MODULE_URL.equals(storedUrl)
-          || !ConnectionDefaults.SYNC_SECRET.equals(storedSecret)) {
-        preferences.edit()
-            .putString(KEY_WEB_MODULE_URL, ConnectionDefaults.WEB_MODULE_URL)
-            .putString(KEY_SYNC_SECRET, ConnectionDefaults.SYNC_SECRET)
-            .apply();
+      String storedCredential = storedValue(preferences, KEY_SYNC_SECRET);
+      SharedPreferences.Editor editor = null;
+      if (!ConnectionDefaults.WEB_MODULE_URL.equals(storedUrl)) {
+        editor = preferences.edit().putString(KEY_WEB_MODULE_URL, ConnectionDefaults.WEB_MODULE_URL);
+      }
+      // After desktop approval the phone replaces the shared bootstrap secret
+      // with its own device token. Embedded defaults must never overwrite it.
+      if (!isDeviceCredential(storedCredential)
+          && !ConnectionDefaults.SYNC_SECRET.equals(storedCredential)) {
+        editor = editor == null ? preferences.edit() : editor;
+        editor.putString(KEY_SYNC_SECRET, ConnectionDefaults.SYNC_SECRET);
+      }
+      if (editor != null) {
+        editor.apply();
       }
       return;
     }
@@ -44,6 +52,29 @@ final class ConnectionSettings {
   static String syncSecret(SharedPreferences preferences) {
     String stored = storedValue(preferences, KEY_SYNC_SECRET);
     return stored.isEmpty() ? ConnectionDefaults.SYNC_SECRET : stored;
+  }
+
+  static boolean isDeviceCredential(String value) {
+    String normalized = value == null ? "" : value.trim();
+    return normalized.startsWith(DEVICE_CREDENTIAL_PREFIX)
+        && normalized.substring(DEVICE_CREDENTIAL_PREFIX.length()).matches("yat_[a-f0-9]{64}");
+  }
+
+  static String deviceToken(String credential) {
+    if (!isDeviceCredential(credential)) {
+      return "";
+    }
+    return credential.trim().substring(DEVICE_CREDENTIAL_PREFIX.length());
+  }
+
+  static boolean storeDeviceToken(SharedPreferences preferences, String token) {
+    String normalized = token == null ? "" : token.trim();
+    if (!normalized.matches("yat_[a-f0-9]{64}")) {
+      return false;
+    }
+    return preferences.edit()
+        .putString(KEY_SYNC_SECRET, DEVICE_CREDENTIAL_PREFIX + normalized)
+        .commit();
   }
 
   static boolean isComplete(SharedPreferences preferences) {
