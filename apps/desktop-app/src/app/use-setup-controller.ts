@@ -1,9 +1,14 @@
-import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopDashboardData, DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import { defaultSetupData } from "./bootstrap-defaults";
 import { type SyncState } from "./runtime-state";
-import { createSaveAiServiceProfiles, toSetupForm, type SetupFormState } from "./setup-model";
+import {
+  applyBusinessTypeProfile,
+  createSaveAiServiceProfiles,
+  toSetupForm,
+  type SetupFormState
+} from "./setup-model";
 
 interface UseSetupControllerOptions {
   onInitialSetupReady?: () => void;
@@ -12,12 +17,22 @@ interface UseSetupControllerOptions {
 export function useSetupController({ onInitialSetupReady }: UseSetupControllerOptions = {}) {
   const onInitialSetupReadyRef = useRef(onInitialSetupReady);
   const [setupData, setSetupData] = useState<DesktopSetupData>(defaultSetupData);
-  const [setupForm, setSetupForm] = useState<SetupFormState>(() => toSetupForm(defaultSetupData));
+  const [setupForm, setSetupFormState] = useState<SetupFormState>(() => toSetupForm(defaultSetupData));
   const [setupMode, setSetupMode] = useState(false);
   const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
   const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
+
+  const setSetupForm = useCallback<Dispatch<SetStateAction<SetupFormState>>>((nextState) => {
+    setSetupFormState((current) => {
+      const next = typeof nextState === "function" ? nextState(current) : nextState;
+      if (next.businessType !== current.businessType) {
+        return applyBusinessTypeProfile(next, next.businessType);
+      }
+      return next;
+    });
+  }, []);
 
   onInitialSetupReadyRef.current = onInitialSetupReady;
 
@@ -32,7 +47,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
 
   function applyBootstrapSetup(nextSetupData: DesktopSetupData, firstApplicationLoad: boolean) {
     setSetupData(nextSetupData);
-    setSetupForm(toSetupForm(nextSetupData));
+    setSetupFormState(toSetupForm(nextSetupData));
     setSetupMode(nextSetupData.setupRequired);
     if (!nextSetupData.setupRequired && firstApplicationLoad) {
       onInitialSetupReadyRef.current?.();
@@ -165,7 +180,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
 
     setSetupData(result.setupData);
     setDashboardData(result.dashboardData);
-    setSetupForm(toSetupForm(result.setupData));
+    setSetupFormState(toSetupForm(result.setupData));
     const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
     setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
     setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
