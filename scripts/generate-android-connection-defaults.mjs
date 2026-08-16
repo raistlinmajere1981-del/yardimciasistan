@@ -17,9 +17,8 @@ const outputPath = join(
   "ConnectionDefaults.java"
 );
 const productionWebModuleUrl = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
-const releaseBuild = ["1", "true", "yes"].includes(
-  String(process.env.YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD ?? "").trim().toLowerCase()
-);
+const releaseBuild = truthy(process.env.YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD);
+const allowEmbeddedSyncSecret = truthy(process.env.YARDIMCI_ASISTAN_ANDROID_ALLOW_EMBEDDED_SYNC_SECRET);
 
 let localConfig = {};
 if (existsSync(connectionConfigPath)) {
@@ -45,11 +44,12 @@ if (configuredSyncSecret && configuredSyncSecret.length < 16) {
   throw new Error("Android varsayılan sync anahtarı en az 16 karakter olmalı.");
 }
 
-// Release/pilot APK must never contain the business-wide bootstrap secret in
-// its bytecode. The operator enters it once during first pairing; after desktop
-// approval the app replaces it with a per-device token. Debug builds may still
-// embed a local secret to keep device automation practical.
-const syncSecret = releaseBuild ? "" : configuredSyncSecret;
+// Embedding the business-wide bootstrap secret is deny-by-default. Gradle only
+// opts into it for explicit debug tasks used by local/device automation. Any
+// release or ambiguous multi-variant build therefore produces an APK/AAB with
+// no shared secret in bytecode.
+const mayEmbedSyncSecret = allowEmbeddedSyncSecret && !releaseBuild;
+const syncSecret = mayEmbedSyncSecret ? configuredSyncSecret : "";
 const lockEmbeddedConnection = Boolean(webModuleUrl && syncSecret);
 
 mkdirSync(dirname(outputPath), { recursive: true });
@@ -68,8 +68,12 @@ writeFileSync(outputPath, [
 
 const mode = releaseBuild
   ? "release editable connection (shared secret omitted)"
-  : lockEmbeddedConnection ? "embedded debug connection locked" : "editable connection";
+  : lockEmbeddedConnection ? "embedded debug connection locked" : "editable connection (shared secret omitted)";
 console.log(`android-connection-mode: ${mode}`);
+
+function truthy(value) {
+  return ["1", "true", "yes"].includes(String(value ?? "").trim().toLowerCase());
+}
 
 function firstNonEmpty(...values) {
   for (const value of values) {
