@@ -25,6 +25,8 @@ function ya_public_guard_enforce(string $bucket): void
         return;
     }
 
+    ya_public_guard_apply_cors();
+
     $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
     if ($contentLength > YA_PUBLIC_GUARD_MAX_BODY_BYTES) {
         ya_public_guard_reject(413, 'Gönderilen veri çok büyük. Lütfen daha kısa bir içerikle tekrar deneyin.', 0);
@@ -217,6 +219,33 @@ function ya_public_guard_subject_hash(): string
     $remoteAddress = trim((string) ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
     $userAgent = substr(trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 240);
     return hash('sha256', $remoteAddress . "\n" . $userAgent);
+}
+
+function ya_public_guard_apply_cors(): void
+{
+    $origin = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+    if ($origin === '') {
+        return;
+    }
+
+    $configPath = dirname(__DIR__) . '/config/business.json';
+    if (!is_file($configPath)) {
+        return;
+    }
+
+    $decoded = json_decode((string) file_get_contents($configPath), true);
+    $allowedOrigins = is_array($decoded) ? ($decoded['allowed_origins'] ?? []) : [];
+    if (!is_array($allowedOrigins)) {
+        return;
+    }
+
+    $allowAny = in_array('*', $allowedOrigins, true);
+    if (!$allowAny && !in_array($origin, $allowedOrigins, true)) {
+        return;
+    }
+
+    header('Access-Control-Allow-Origin: ' . ($allowAny ? '*' : $origin));
+    header('Vary: Origin');
 }
 
 function ya_public_guard_reject(int $status, string $message, int $retryAfter): void
