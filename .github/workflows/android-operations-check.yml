@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "apps/android-app/**"
+      - "apps/desktop-app/db/**"
       - "apps/desktop-app/electron/**"
       - "packages/sync-core/**"
       - "firm-template/web-module/**"
@@ -18,6 +19,7 @@ on:
       - main
     paths:
       - "apps/android-app/**"
+      - "apps/desktop-app/db/**"
       - "apps/desktop-app/electron/**"
       - "packages/sync-core/**"
       - "firm-template/web-module/**"
@@ -63,6 +65,9 @@ jobs:
 
       - name: Web modülü PHP lint
         run: node scripts/php-lint.mjs
+
+      - name: Android cihaz onay sınırı smoke
+        run: node scripts/smoke-android-device-approval-hosting.mjs
 
       - name: Masaüstü veri katmanını derle
         run: npm run build -w @yardimci-asistan/desktop-app
