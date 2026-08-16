@@ -15,11 +15,13 @@ final class DeviceIdentity {
   final String deviceId;
   final String deviceName;
   final String appVersion;
+  final SharedPreferences preferences;
 
-  private DeviceIdentity(String deviceId, String deviceName, String appVersion) {
+  private DeviceIdentity(String deviceId, String deviceName, String appVersion, SharedPreferences preferences) {
     this.deviceId = deviceId;
     this.deviceName = deviceName;
     this.appVersion = appVersion;
+    this.preferences = preferences;
   }
 
   static synchronized DeviceIdentity loadOrCreate(Context context, SharedPreferences preferences) {
@@ -39,7 +41,7 @@ final class DeviceIdentity {
         throw new IllegalStateException("Telefon kimliği kalıcı kayıttan doğrulanamadı.");
       }
     }
-    return new DeviceIdentity(deviceId, resolveDeviceName(), resolveAppVersion(context));
+    return new DeviceIdentity(deviceId, resolveDeviceName(), resolveAppVersion(context), preferences);
   }
 
   static synchronized void clearAppStateKeepingIdentity(SharedPreferences preferences) {
