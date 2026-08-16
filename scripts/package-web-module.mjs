@@ -23,6 +23,7 @@ const requiredFiles = [
   "api/stock-image-analysis.php",
   "api/identity-image-analysis.php",
   "lib/storage.php",
+  "lib/public-request-guard.php",
   "lib/stock-image-analysis.php",
   "lib/identity-image-analysis.php",
   "assets/yardimci-asistan-symbol.png",
@@ -117,6 +118,15 @@ function validateSource() {
   const aiConfig = readFileSync(join(sourceRoot, "config", "ai.php"), "utf8");
   assert.ok(aiConfig.includes("getenv('YARDIMCI_ASISTAN_AI_API_KEY')"), "config/ai.php API anahtarını ortam değişkeninden okumalı.");
   assert.ok(aiConfig.includes("data/ai-settings.local.php"), "config/ai.php masaüstünden yayınlanan korumalı AI ayarını okumalı.");
+  assert.ok(aiConfig.includes("public-request-guard.php") && aiConfig.includes("ya_public_guard_enforce('chat')"), "Web AI public abuse guard üzerinden geçmeli.");
+
+  const requestEndpoint = readFileSync(join(sourceRoot, "api", "request.php"), "utf8");
+  assert.ok(requestEndpoint.includes("public-request-guard.php") && requestEndpoint.includes("ya_public_guard_enforce('request')"), "Web talep endpoint'i public abuse guard üzerinden geçmeli.");
+
+  const publicGuard = readFileSync(join(sourceRoot, "lib", "public-request-guard.php"), "utf8");
+  assert.ok(publicGuard.includes("hash_hmac('sha256'"), "Public guard ham istemci adresi yerine HMAC özeti kullanmalı.");
+  assert.ok(publicGuard.includes("public_request_guard_events"), "Public guard kalıcı hız sınırı sayacını içermeli.");
+  assert.ok(publicGuard.includes("CONTENT_LENGTH") && publicGuard.includes("429"), "Public guard gövde boyutu ve rate-limit koruması uygulamalı.");
 
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
