@@ -124,7 +124,26 @@ try {
   assert.equal(records[1].request_type, "restaurant_reservation");
   assert.equal(records[1].time, "20:00");
 
-  console.log(`web-form-api-ok: ${records.length} requests validated and saved`);
+  for (let index = 0; index < 3; index += 1) {
+    const allowedInvalid = await postRequest({});
+    assert.equal(allowedInvalid.status, 422, "İlk sekiz POST doğrulama katmanına ulaşabilmeli");
+  }
+  const limitedResponse = await postRequest({});
+  assert.equal(limitedResponse.status, 429, "Aynı istemciden aşırı talep sunucuda sınırlandırılmalı");
+  const limitedResult = await limitedResponse.json();
+  assert.equal(limitedResult.code, "rate_limited");
+  assert.ok(Number(limitedResult.retry_after_seconds) > 0);
+  assert.ok(Number(limitedResponse.headers.get("retry-after")) > 0);
+
+  const oversizedResponse = await fetch(`${baseUrl}/api/request.php`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: "x".repeat(70_000) })
+  });
+  assert.equal(oversizedResponse.status, 413, "Aşırı büyük public payload erken reddedilmeli");
+  assert.equal((await oversizedResponse.json()).code, "payload_too_large");
+
+  console.log(`web-form-api-ok: ${records.length} requests saved, abuse and payload guards verified`);
 } catch (error) {
   if (serverOutput.trim()) {
     console.error(serverOutput.trim());
