@@ -19,6 +19,7 @@ import {
   type DashboardDateUrgency,
   type DashboardPriorityItem
 } from "../app/dashboard";
+import { SystemHealthPanel } from "../components/dashboard/SystemHealthPanel";
 import { ActionButton } from "../components/ui/ActionButton";
 import { Panel } from "../components/ui/Panel";
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
@@ -142,6 +143,8 @@ export function DashboardPage({
           <AttentionCard tone="wait" icon={CalendarCheck2} value={pendingReservationCount} label="rezervasyon onay bekliyor" />
         </div>
       </section>
+
+      <SystemHealthPanel data={data} modules={modules} aiEnabled={aiEnabled} />
 
       <section className="dashboard-workspace">
         <Panel className="dashboard-priority-panel" aria-labelledby="dashboard-priority-title">
