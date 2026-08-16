@@ -75,6 +75,16 @@ export function RestaurantRoomTransferPanel({
   async function transferToRoom() {
     const bridge = window.yardimciDesktop;
     if (!bridge?.addRoomFolioManualItem || !selectedOrder || !selectedFolio || loading) return;
+
+    const roomLabel = selectedFolio.roomNumber ? `Oda ${selectedFolio.roomNumber}` : selectedFolio.roomName;
+    const customerLabel = selectedFolio.customerName || "Misafir";
+    const orderLabel = selectedOrder.tableName || "Masa";
+    const totalLabel = formatMoney(selectedOrder.total, selectedOrder.items[0]?.currency || "TRY");
+    const confirmed = window.confirm(
+      `${orderLabel} hesabındaki ${totalLabel}, ${roomLabel} · ${customerLabel} oda hesabına aktarılsın mı?\n\nAktarım sonrası masa kapanır ve tutar oda hesabında tahsil edilmeyi bekler.`
+    );
+    if (!confirmed) return;
+
     setLoading(true);
     setMessage("Restoran adisyonu oda hesabına aktarılıyor...");
     try {
