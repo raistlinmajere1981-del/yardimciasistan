@@ -57,9 +57,10 @@ def missingSigningProperties = signingPropertyNames.findAll { key, propertyName 
 def releaseSigningReady = missingSigningProperties.isEmpty()
 def stableDebugKeystore = file(".debug/yardimci-asistan-debug.keystore")
 def generatedConnectionDirectory = layout.buildDirectory.dir("generated/source/connection")
-def releaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
-  taskName.toLowerCase(Locale.ROOT).contains("release")
-}
+def requestedTaskNames = gradle.startParameter.taskNames.collect { taskName -> taskName.toLowerCase(Locale.ROOT) }
+def releaseTaskRequested = requestedTaskNames.any { taskName -> taskName.contains("release") }
+def debugTaskRequested = requestedTaskNames.any { taskName -> taskName.contains("debug") }
+def allowEmbeddedDebugSecret = debugTaskRequested && !releaseTaskRequested
 
 android {
   namespace = "com.yardimciasistan.android"
@@ -148,6 +149,7 @@ def generateConnectionDefaults = tasks.register("generateConnectionDefaults", Ex
   workingDir = rootProject.projectDir
   commandLine "node", file("../../scripts/generate-android-connection-defaults.mjs").absolutePath
   environment "YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD", releaseTaskRequested ? "1" : "0"
+  environment "YARDIMCI_ASISTAN_ANDROID_ALLOW_EMBEDDED_SYNC_SECRET", allowEmbeddedDebugSecret ? "1" : "0"
   inputs.file file("../../scripts/generate-android-connection-defaults.mjs")
   outputs.dir generatedConnectionDirectory
   outputs.upToDateWhen { false }
