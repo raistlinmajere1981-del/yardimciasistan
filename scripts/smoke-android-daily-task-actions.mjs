@@ -22,6 +22,7 @@ try {
   let device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);
   assert.ok(device, "Smoke cihazı kaydedilmeli");
   assert.equal(device.role, "staff");
+  assert.equal(device.isActive, true, "Smoke cihazı test içinde açıkça onaylanmalı");
   assert.ok(device.permissions.includes("daily_task.create"));
   assert.ok(device.permissions.includes("daily_task.update"));
   assert.equal(device.permissions.includes("daily_task.delete"), false);
@@ -175,6 +176,8 @@ function registerStaffDevice(database) {
     first_seen_at: "2026-08-11T18:00:00.000Z",
     last_seen_at: "2026-08-11T18:00:00.000Z"
   }]);
+  const approval = database.setAndroidDeviceActive(DEVICE_ID, true);
+  assert.equal(approval.ok, true, approval.message);
 }
 
 function action(id, actionType, payload) {
