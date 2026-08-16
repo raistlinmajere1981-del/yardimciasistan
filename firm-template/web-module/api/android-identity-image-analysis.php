@@ -15,6 +15,15 @@ if (!ya_android_auth_request_authorized($businessConfig, $deviceId)) {
     ]);
 }
 
+$formDeviceId = trim((string) ($_POST['device_id'] ?? ''));
+if ($formDeviceId === '' || !hash_equals($deviceId, $formDeviceId)) {
+    ya_android_identity_gate_response(403, [
+        'ok' => false,
+        'code' => 'device_identity_mismatch',
+        'message' => 'Telefon kimliği doğrulanamadı.'
+    ]);
+}
+
 $_SERVER['HTTP_X_YA_SYNC_SECRET'] = trim((string) ($businessConfig['sync_secret'] ?? ''));
 unset($_SERVER['HTTP_X_YA_DEVICE_TOKEN']);
 require __DIR__ . '/identity-image-analysis.php';
