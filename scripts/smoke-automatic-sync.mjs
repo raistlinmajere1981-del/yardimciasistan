@@ -109,6 +109,19 @@ try {
   }, { mode: "keep" });
   assert.equal(setupResult.ok, true);
 
+  database.upsertAndroidDeviceSightings([{
+    device_id: "android-auto-smoke",
+    device_name: "Smoke Personel Telefonu",
+    app_version: "0.1.0-smoke",
+    first_seen_at: "2026-08-11T12:00:00.000Z",
+    last_seen_at: "2026-08-11T12:00:00.000Z"
+  }]);
+  const pendingStaffDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-auto-smoke");
+  assert.ok(pendingStaffDevice);
+  assert.equal(pendingStaffDevice.isActive, false, "Yeni Android cihaz masaüstü onayı olmadan aktif başlamamalı");
+  const staffApproval = database.setAndroidDeviceActive("android-auto-smoke", true);
+  assert.equal(staffApproval.ok, true, staffApproval.message);
+
   const trackedMenuItemBefore = database.getDashboardData().menu.items.find((item) => item.is_available);
   assert.ok(trackedMenuItemBefore);
   const trackedMenuSave = database.saveMenuItem({
@@ -359,14 +372,14 @@ try {
   assert.ok(sightingOnlyDevice);
   assert.equal(sightingOnlyDevice.deviceName, "Yalnız Snapshot Telefonu");
   assert.equal(sightingOnlyDevice.role, "staff");
-  assert.equal(sightingOnlyDevice.isActive, true);
+  assert.equal(sightingOnlyDevice.isActive, false, "Yalnız görülen yeni cihaz onay bekler durumda kalmalı");
   const sightingOnlyProfileResponse = await syncApi({
     action: "android_summary",
     device_id: "android-summary-only-smoke"
   });
   const sightingOnlyProfile = (await sightingOnlyProfileResponse.json()).androidPermissions["android-summary-only-smoke"];
   assert.equal(sightingOnlyProfile.role, "staff");
-  assert.equal(sightingOnlyProfile.is_active, true);
+  assert.equal(sightingOnlyProfile.is_active, false);
   assert.equal(sightingOnlyProfile.permissions.includes("table_order.close_paid"), false);
 
   const table = database.getDashboardData().tables[0];
