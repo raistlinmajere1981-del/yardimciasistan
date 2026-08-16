@@ -29,9 +29,15 @@ try {
 
   let device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);
   assert.ok(device);
+  assert.equal(device.isActive, false, "Yeni Android cihaz onay bekler durumda başlamalı");
   assert.equal(device.permissions.includes("room_folio.view"), true, "Oda/işler personeli oda hesaplarını görebilmeli");
   assert.equal(device.permissions.includes("room_folio.checkout"), true, "Oda/işler personeli ödenmiş hesabı kapatabilmeli");
   assert.equal(device.permissions.includes("room_folio.payment"), false, "Kasiyer görevi olmadan tahsilat alınmamalı");
+
+  const approved = database.setAndroidDeviceActive(DEVICE_ID, true);
+  assert.equal(approved.ok, true, approved.message);
+  device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);
+  assert.equal(device?.isActive, true, "Masaüstü onayı cihazı aktif hale getirmeli");
 
   const roomFolio = new DesktopRoomFolioService(database.databasePath);
   const finance = new DesktopFinanceService(database.databasePath);
@@ -175,7 +181,7 @@ try {
     verify.close();
   }
 
-  console.log("android-room-folio-actions-smoke-ok: permissions, stale guard, payments, finance trigger, checkout and idempotency verified");
+  console.log("android-room-folio-actions-smoke-ok: approval, permissions, stale guard, payments, finance trigger, checkout and idempotency verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });
