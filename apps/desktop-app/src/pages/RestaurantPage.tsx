@@ -2,6 +2,7 @@ import { CalendarCheck, ChevronDown, ClipboardList, ReceiptText, UtensilsCrossed
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { DesktopDashboardData, DesktopTableOrder } from "../../electron/database";
 import { isRestaurantTask } from "../app/operations";
+import { RestaurantRoomTransferPanel } from "../components/restaurant/RestaurantRoomTransferPanel";
 import { TableOrdersWorkspace } from "../components/restaurant/TableOrdersWorkspace";
 import { MetricCard, type MetricCardProps } from "../components/ui/MetricCard";
 
@@ -115,6 +116,14 @@ export function RestaurantPage({ data, reservations, tasks, onDashboardDataChang
           <div className="operation-panel-content">{reservations}</div>
         </section>
       </details>
+
+      {data.rooms.length > 0 && (
+        <RestaurantRoomTransferPanel
+          orders={tableOrders}
+          onOrderChanged={handleOrderChanged}
+          onDashboardDataChanged={onDashboardDataChanged}
+        />
+      )}
 
       <div className="restaurant-layout">
         <section className="operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
