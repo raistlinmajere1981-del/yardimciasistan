@@ -68,6 +68,77 @@ export const aiServicePresets = [
   baseUrl: string;
 }>;
 
+export interface BusinessTypeProfile {
+  label: string;
+  description: string;
+  modules: {
+    roomsEnabled: boolean;
+    tablesEnabled: boolean;
+    qrMenuEnabled: boolean;
+    whatsappEnabled: boolean;
+    androidEnabled: boolean;
+  };
+}
+
+export const businessTypeProfiles: Record<string, BusinessTypeProfile> = {
+  pension_restaurant: {
+    label: "Pansiyon + Restoran/Kafe",
+    description: "Oda, masa, QR menü, WhatsApp ve Android birlikte hazırlanır.",
+    modules: {
+      roomsEnabled: true,
+      tablesEnabled: true,
+      qrMenuEnabled: true,
+      whatsappEnabled: true,
+      androidEnabled: true
+    }
+  },
+  pension: {
+    label: "Pansiyon",
+    description: "Oda, WhatsApp ve Android akışı hazırlanır; restoran alanları kapalı başlar.",
+    modules: {
+      roomsEnabled: true,
+      tablesEnabled: false,
+      qrMenuEnabled: false,
+      whatsappEnabled: true,
+      androidEnabled: true
+    }
+  },
+  restaurant: {
+    label: "Restoran",
+    description: "Masa, QR menü, WhatsApp ve Android hazırlanır; oda alanları kapalı başlar.",
+    modules: {
+      roomsEnabled: false,
+      tablesEnabled: true,
+      qrMenuEnabled: true,
+      whatsappEnabled: true,
+      androidEnabled: true
+    }
+  },
+  cafe: {
+    label: "Kafe",
+    description: "Masa, QR menü, WhatsApp ve Android hazırlanır; oda alanları kapalı başlar.",
+    modules: {
+      roomsEnabled: false,
+      tablesEnabled: true,
+      qrMenuEnabled: true,
+      whatsappEnabled: true,
+      androidEnabled: true
+    }
+  }
+};
+
+export function applyBusinessTypeProfile(form: SetupFormState, businessType: string): SetupFormState {
+  const profile = businessTypeProfiles[businessType];
+  if (!profile) {
+    return { ...form, businessType };
+  }
+  return {
+    ...form,
+    businessType,
+    ...profile.modules
+  };
+}
+
 export function normalizeAiService(service: string): DesktopAiService {
   return aiServicePresets.some((preset) => preset.id === service)
     ? service as DesktopAiService
