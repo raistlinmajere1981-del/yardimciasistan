@@ -24,14 +24,24 @@ const definitions = {
   },
   renderer: {
     source: "smoke-desktop-renderer.mjs",
-    replacements: [[
+    replacements: [
+      [
+`      getDashboardData: async () => currentDashboardData,
+      getReportData: async (range) => {`,
+`      getDashboardData: async () => currentDashboardData,
+      getSetupData: async () => setupData,
+      onSyncStatusChanged: () => () => {},
+      getReportData: async (range) => {`
+      ],
+      [
 `  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   const notificationBell = page.getByRole("button", { name: /Bildirimler, \\d+ uyarı/ });`,
 `  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   const notificationBell = page.getByRole("button", { name: /Bildirimler, \\d+ uyarı/ });`
-    ]]
+      ]
+    ]
   }
 };
 
