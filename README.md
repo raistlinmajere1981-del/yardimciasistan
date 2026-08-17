@@ -13,6 +13,7 @@ Güncel v1 aşağıdaki ana akışları kapsar:
 - Müşteri, rezervasyon, oda, masa ve günlük iş yönetimi
 - Pansiyon konaklama takibi, oda hesabı, tahsilat ve çıkış
 - Restoran masa adisyonu, sipariş durumu ve stok takibi
+- Pansiyon + restoran işletmelerinde masa hesabını açık oda hesabına aktarma
 - QR menü yayınlama
 - Günlük/haftalık operasyon takvimi
 - Basit ön muhasebe ve raporlar
@@ -68,10 +69,11 @@ QR menü + Android operasyon snapshot'ı
 - Hostingdeki `config/`, `data/` ve `knowledge/` dizinleri doğrudan web erişimine kapatılır.
 - Web talebi ve Web AI gibi müşteriye açık yazma uçlarında sunucu tarafı hız/boyut sınırı bulunur; ham istemci IP adresi diske yazılmaz.
 - Yeni görülen Android cihazlar varsayılan olarak pasif/onay bekler durumdadır. Masaüstünden açıkça onaylanmadan operasyon verisini okuyamaz veya yerel işletme verisini değiştiremez.
-- Android işlemleri action ID, stale-version ve receipt/idempotency kontrollerinden geçer.
+- Onaylanan Android cihaz yeni hosting paketinde cihaz başına kişisel token'a geçer; release/pilot APK işletme genel `sync_secret` değerini binary içine gömmez.
+- Android işlemleri action ID, cihaz kimliği, izin, stale-version ve receipt/idempotency kontrollerinden geçer.
 - Müşteri kimlik görseli kalıcı saklanmaz; analiz sırasında geçici dosya olarak kullanılır ve sonuç kullanıcı kontrolüne sunulur.
 
-Ayrıntılı güvenlik ve veri akışı için [Sistem Mimarisi](docs/ARCHITECTURE.md) ve [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md) belgeleri esas alınmalıdır.
+Ayrıntılı güvenlik ve veri akışı için [Sistem Mimarisi](docs/ARCHITECTURE.md), [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md) ve [Pre-Pilot Sertleştirme](docs/PRE_PILOT_HARDENING_2026-08.md) belgeleri esas alınmalıdır.
 
 ## Dokümanlar
 
@@ -79,11 +81,13 @@ Ayrıntılı güvenlik ve veri akışı için [Sistem Mimarisi](docs/ARCHITECTUR
 - [Sistem Mimarisi](docs/ARCHITECTURE.md)
 - [Otomatik Senkronizasyon](docs/AUTOMATIC_SYNC.md)
 - [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md)
+- [Pre-Pilot Sertleştirme](docs/PRE_PILOT_HARDENING_2026-08.md)
+- [Pilot Saha Testi](docs/PILOT_FIELD_TEST.md)
+- [Güncel Görev Planı](docs/TASKS.md)
 - [Veri Modeli](docs/DATA_MODEL.md)
 - [Event Sistemi](docs/EVENTS.md)
 - [UI Kuralları](docs/UI_RULES.md)
 - [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
-- [Tarihsel Geliştirme / Görev Planı](docs/TASKS.md) — ilk geliştirme sırasını gösterir; güncel ürün davranışı için kaynak değildir.
 - [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
 - [Firma Web Modülü Kurulumu](docs/WEB_MODULE_INSTALLATION.md)
 - [Demo Site Özelleştirme](docs/DEMO_SITE_CUSTOMIZATION.md)
@@ -103,6 +107,20 @@ npm run doctor
 npm test
 npm run e2e
 ```
+
+Pilot öncesi tek komutluk temel kapı:
+
+```bash
+node scripts/pilot-check.mjs
+```
+
+Daha geniş, Android build + UI/e2e katmanını da isteyen tur:
+
+```bash
+node scripts/pilot-check.mjs --full
+```
+
+Pilot runner sonucu `artifacts/pilot-check/latest.json` içine de yazar. Gerçek Windows/telefon adımları için [Pilot Saha Testi](docs/PILOT_FIELD_TEST.md) izlenmelidir.
 
 Önemli smoke testleri:
 
@@ -151,11 +169,13 @@ Kod tarafında demo web, web widget, PHP hosting modülü, masaüstü operasyon 
 
 Tanıtım/pilot öncesindeki ana doğrulama başlıkları:
 
-- Hedef Windows bilgisayarda temiz kurulum, kullanıcı veri klasörü, yedekleme ve yeniden başlatma davranışı
-- WhatsApp WebView ve gerçek hosting bağlantısının Windows saha testi
-- Baştan sona gerçek işletme kullanım senaryosu
-- İnternet kesilmesi, tekrar bağlanma, yeniden başlatma ve tekrarlı işlem kenar durumları
-- Android yeni cihaz onay ve yetki akışının gerçek telefonlarla doğrulanması
-- Pilot işletmelerden gelen UX geri bildirimlerinin toplu değerlendirilmesi
+- otomatik `pilot-check` kapısının yeşil tamamlanması,
+- hedef Windows bilgisayarda temiz kurulum, kullanıcı veri klasörü, yedekleme ve yeniden başlatma davranışı,
+- WhatsApp WebView ve gerçek hosting bağlantısının Windows saha testi,
+- pansiyon + restoran senaryosunun sahte verilerle birkaç günlük gerçekçi kullanımı,
+- internet kesilmesi, tekrar bağlanma, yeniden başlatma ve tekrarlı işlem kenar durumları,
+- restoran hesabını oda hesabına aktarırken stok/kasa/idempotency bütünlüğü,
+- Android yeni cihaz onay, kişisel token, pasifleştirme ve yetki akışının gerçek telefonlarla doğrulanması,
+- pilot işletmelerden gelen UX geri bildirimlerinin toplu değerlendirilmesi.
 
 Doğrudan Android-PC/LAN modu ve resmî WhatsApp API entegrasyonu v1 tamamlanma kriteri değildir; gerçek kullanım ihtiyacı oluşursa sonraki fazda değerlendirilecektir.
