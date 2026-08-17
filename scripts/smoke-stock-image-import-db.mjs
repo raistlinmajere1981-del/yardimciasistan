@@ -160,7 +160,7 @@ try {
   assert.equal(database.getMenuStockMovements().length, beforeMovementCount, "An invalid row must roll back every movement");
 
   const adminDeviceId = "android-stock-import-admin";
-  database.upsertAndroidDeviceSightings([sighting(adminDeviceId)]);
+  registerAndApproveDevice(database, adminDeviceId);
   assert.equal(database.setAndroidDeviceRole(adminDeviceId, "admin").ok, true);
   const androidHash = "c".repeat(64);
   const androidImportId = "stock_import_android_smoke_001";
@@ -177,7 +177,7 @@ try {
   assert.equal(database.applyAndroidAction({ ...androidAction, id: "android_stock_import_action_002" }).ok, false, "A different action id cannot reapply the same import_id");
 
   const staffDeviceId = "android-stock-import-staff";
-  database.upsertAndroidDeviceSightings([sighting(staffDeviceId)]);
+  registerAndApproveDevice(database, staffDeviceId);
   const staffBefore = stock(database, first.id);
   const forbidden = database.applyAndroidAction(action(
     "android_stock_import_staff_001",
@@ -200,7 +200,7 @@ try {
   } finally {
     sqlite.close();
   }
-  console.log("stock-image-import-db-smoke-ok: drafts, ambiguity, duplicate guard, atomic apply, provenance and permissions verified");
+  console.log("stock-image-import-db-smoke-ok: drafts, ambiguity, duplicate guard, atomic apply, provenance, approval and permissions verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });
@@ -249,6 +249,14 @@ function sighting(deviceId) {
     first_seen_at: now,
     last_seen_at: now
   };
+}
+
+function registerAndApproveDevice(databaseInstance, deviceId) {
+  databaseInstance.upsertAndroidDeviceSightings([sighting(deviceId)]);
+  const pending = databaseInstance.getAndroidDevices().find((device) => device.deviceId === deviceId);
+  assert.equal(pending?.isActive, false, "New Android devices must wait for desktop approval.");
+  const approval = databaseInstance.setAndroidDeviceActive(deviceId, true);
+  assert.equal(approval.ok, true, approval.message);
 }
 
 function action(id, deviceId, importId, imageHash, lines) {
