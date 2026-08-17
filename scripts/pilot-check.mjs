@@ -24,16 +24,24 @@ const blockingChecks = [
 
 const coreChecks = [
   nodeCheck("web-form-api", "Web talebi + public abuse guard", "scripts/smoke-web-form-api.mjs"),
+  nodeCheck("web-module-menu", "Web modülü menü yayını", "scripts/smoke-web-module-menu.mjs"),
   nodeCheck("web-widget-module", "Web widget + gerçek PHP modülü", "scripts/smoke-web-widget-module.mjs"),
+  nodeCheck("sync-timeout", "Senkron HTTP zaman aşımı sınırı", "scripts/smoke-sync-timeout.mjs"),
+  nodeCheck("web-connection", "Masaüstü web bağlantı testi", "scripts/smoke-web-connection-test.mjs"),
   nodeCheck("automatic-sync", "Otomatik senkron ve geri dönüş", "scripts/smoke-automatic-sync.mjs"),
   nodeCheck("android-device-approval", "Android yeni cihaz onay sınırı", "scripts/smoke-android-device-approval-hosting.mjs"),
   nodeCheck("android-device-token", "Android cihaz token güvenliği", "scripts/smoke-android-device-token.mjs"),
   nodeCheck("android-release-secret", "Release Android bağlantısında ortak anahtar sızıntısı", "scripts/smoke-android-release-connection.mjs"),
+  nodeCheck("desktop-architecture", "Masaüstü frontend mimari sınırları", "scripts/smoke-desktop-frontend-architecture.mjs"),
   nodeCheck("app-lock", "Masaüstü uygulama kilidi", "scripts/smoke-app-lock.mjs"),
+  nodeCheck("desktop-menu-db", "Masaüstü menü veri akışı", "scripts/smoke-desktop-menu-db.mjs"),
   nodeCheck("table-categories", "Masa kategori veri akışı", "scripts/smoke-table-categories-db.mjs"),
   nodeCheck("record-deletions", "Kayıt silme ve arşivleme sınırları", "scripts/smoke-record-deletions.mjs"),
   nodeCheck("customer-room-management", "Müşteri ve oda yönetimi", "scripts/smoke-customer-room-management-db.mjs"),
   nodeCheck("daily-tasks", "Günlük iş yönetimi", "scripts/smoke-daily-task-management.mjs"),
+  nodeCheck("manual-reservation", "Doğrudan pansiyon rezervasyonu", "scripts/smoke-manual-reservation.mjs"),
+  nodeCheck("manual-restaurant-reservation", "Doğrudan restoran rezervasyonu", "scripts/smoke-manual-restaurant-reservation.mjs"),
+  nodeCheck("operation-calendar", "Operasyon takvimi", "scripts/smoke-operation-calendar.mjs"),
   nodeCheck("stock-image-db", "Stok görseli veri uygulama katmanı", "scripts/smoke-stock-image-import-db.mjs"),
   nodeCheck("reports", "Rapor veri modeli", "scripts/smoke-reports-db.mjs"),
   nodeCheck("finance-db", "Finans veri bütünlüğü", "scripts/smoke-finance-db.mjs"),
@@ -52,6 +60,7 @@ if (androidMode) {
   optionalChecks.push(npmCheck("android-build", "Android birim testleri + debug APK", ["run", "smoke:android:build"]));
 }
 if (fullMode) {
+  optionalChecks.push(npmCheck("demo-web-widget", "Demo web + gerçek widget browser smoke", ["run", "smoke:demo-web-widget"]));
   optionalChecks.push(npmCheck("e2e", "Playwright uçtan uca testleri", ["run", "e2e"]));
 }
 
