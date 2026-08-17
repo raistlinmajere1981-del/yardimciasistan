@@ -1,0 +1,59 @@
+name: Pilot Core Gate
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "firm-template/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/pilot-core-check.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/**"
+      - "packages/**"
+      - "firm-template/**"
+      - "scripts/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/pilot-core-check.yml"
+
+jobs:
+  pilot-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Kodu al
+        uses: actions/checkout@v5
+
+      - name: Node.js kur
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bağımlılıkları kur
+        run: npm ci
+
+      - name: PHP ve SQLite yeteneklerini doğrula
+        run: |
+          php --version
+          php -r 'if (!extension_loaded("pdo_sqlite")) { fwrite(STDERR, "pdo_sqlite missing\n"); exit(1); }'
+
+      - name: Pilot core kapısını çalıştır
+        run: npm run pilot:check
+
+      - name: Pilot raporunu sakla
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-core-report
+          path: artifacts/pilot-check/latest.json
+          if-no-files-found: warn
+          retention-days: 14
