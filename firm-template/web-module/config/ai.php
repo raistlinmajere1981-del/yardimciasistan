@@ -27,6 +27,15 @@ foreach ($configFiles as $configFile) {
         continue;
     }
 
+    // Masaüstü AI ayarlarını hosting çalışırken güncelleyebilir. Bazı PHP/opcache
+    // kurulumları aynı process içinde değişen dosyayı revalidate süresi dolana kadar
+    // eski bytecode ile çalıştırır. Runtime ayar dosyası küçük ve seyrek değiştiği
+    // için her okumada açıkça invalidate etmek yeni ayarı hemen görünür kılar.
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate($configFile, true);
+    }
+    clearstatcache(true, $configFile);
+
     $localConfig = require $configFile;
     if (is_array($localConfig)) {
         $config = array_merge($config, $localConfig);
