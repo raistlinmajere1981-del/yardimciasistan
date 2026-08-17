@@ -80,6 +80,16 @@ ${syncStatusStub}
       {
         before: `    page.locator(".setup-ai-actions.is-inline > button").boundingBox()`,
         after: `    page.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).boundingBox()`
+      },
+      {
+        before: `  await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(page.locator(".nav-item")).toHaveCount(8);
+  await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);`,
+        after: `  await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
+  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(page.locator(".nav-item")).toHaveCount(9);
+  await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);`
       }
     ]
   }
