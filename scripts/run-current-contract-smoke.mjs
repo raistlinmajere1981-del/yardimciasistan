@@ -90,6 +90,19 @@ ${syncStatusStub}
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.locator(".nav-item")).toHaveCount(9);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);`
+      },
+      {
+        before: `  await page.getByRole("button", { name: "Raporlar", exact: true }).click();`,
+        through: `  await page.setViewportSize({ width: 1440, height: 1000 });`,
+        after: `  await page.getByRole("button", { name: "Kasa", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Kasa", exact: true })).toBeVisible();
+  await expect(page.getByText("Bugün Gelen", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bugün Çıkan", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bugünkü Fark", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bekleyen Alacak", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Gelir Ekle", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Gider Ekle", exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 1000 });`
       }
     ]
   }
@@ -106,7 +119,7 @@ const generatedPath = join(process.cwd(), "scripts", `.current-${mode}-${process
 let source = readFileSync(sourcePath, "utf8");
 
 for (const replacement of definition.replacements) {
-  const { before, after, replaceAll = false } = replacement;
+  const { before, after, replaceAll = false, through = "" } = replacement;
   const first = source.indexOf(before);
   if (first < 0) {
     console.error(`Current-contract patch eşleşmedi: ${basename(sourcePath)}. Eski smoke dosyası değişmiş olabilir.`);
@@ -122,6 +135,17 @@ for (const replacement of definition.replacements) {
     console.error(`Current-contract patch birden fazla eşleşti: ${basename(sourcePath)}.`);
     process.exit(4);
   }
+
+  if (through) {
+    const end = source.indexOf(through, first + before.length);
+    if (end < 0) {
+      console.error(`Current-contract patch bitişi eşleşmedi: ${basename(sourcePath)}.`);
+      process.exit(5);
+    }
+    source = `${source.slice(0, first)}${after}${source.slice(end + through.length)}`;
+    continue;
+  }
+
   source = `${source.slice(0, first)}${after}${source.slice(first + before.length)}`;
 }
 
