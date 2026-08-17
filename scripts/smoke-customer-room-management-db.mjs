@@ -129,6 +129,10 @@ try {
 
   const staffDeviceId = "android-customer-room-staff";
   database.upsertAndroidDeviceSightings([sighting(staffDeviceId)]);
+  const pendingDevice = database.getAndroidDevices().find((device) => device.deviceId === staffDeviceId);
+  assert.equal(pendingDevice?.isActive, false, "New Android devices must wait for desktop approval.");
+  assert.equal(database.setAndroidDeviceActive(staffDeviceId, true).ok, true);
+
   const denied = database.applyAndroidAction(androidAction(
     "android_customer_create_staff_001",
     staffDeviceId,
@@ -140,6 +144,7 @@ try {
 
   assert.equal(database.setAndroidDeviceRole(staffDeviceId, "admin").ok, true);
   const adminDevice = database.getAndroidDevices().find((device) => device.deviceId === staffDeviceId);
+  assert.equal(adminDevice?.isActive, true);
   assert.ok(adminDevice?.permissions.includes("customer.manage"));
   assert.ok(adminDevice?.permissions.includes("room.assign_customer"));
 
@@ -207,7 +212,7 @@ try {
     sqlite.close();
   }
 
-  console.log("customer-room-management-db-smoke-ok: manual cards, identity fields, capacity, overlap, archive, lifecycle and admin Android actions verified");
+  console.log("customer-room-management-db-smoke-ok: manual cards, identity fields, capacity, overlap, archive, lifecycle and approved admin Android actions verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });
