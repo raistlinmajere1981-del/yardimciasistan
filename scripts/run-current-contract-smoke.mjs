@@ -4,6 +4,22 @@ import { basename, join } from "node:path";
 import process from "node:process";
 
 const mode = process.argv[2] ?? "";
+const syncStatusStub = `      getSyncStatus: async () => ({
+        enabled: true,
+        clientId: "renderer-smoke",
+        requestCursor: 0,
+        acknowledgedCursor: 0,
+        lastAttemptAt: "2026-07-18T12:35:00+03:00",
+        lastSuccessAt: "2026-07-18T12:00:00+03:00",
+        lastError: "",
+        consecutiveFailures: 0,
+        pendingJobs: 0,
+        nextRetryAt: "",
+        phase: "idle",
+        message: "Senkron hazır."
+      }),
+      onSyncStatusChanged: () => () => {},`;
+
 const definitions = {
   "automatic-sync": {
     source: "smoke-automatic-sync.mjs",
@@ -32,6 +48,23 @@ const definitions = {
       getSetupData: async () => setupData,
       onSyncStatusChanged: () => () => {},
       getReportData: async (range) => {`
+      ],
+      [
+`      getDashboardData: async () => currentDashboardData,
+      getSetupData: async () => setupData,
+      saveInitialSetup: async () => ({ ok: false, message: "smoke" }),`,
+`      getDashboardData: async () => currentDashboardData,
+      getSetupData: async () => setupData,
+${syncStatusStub}
+      saveInitialSetup: async () => ({ ok: false, message: "smoke" }),`
+      ],
+      [
+`      getDashboardData: async () => currentDashboardData,
+      listTableOrders: async () => tableOrders,`,
+`      getDashboardData: async () => currentDashboardData,
+      getSetupData: async () => setupData,
+${syncStatusStub}
+      listTableOrders: async () => tableOrders,`
       ],
       [
 `  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
