@@ -98,6 +98,9 @@ function assertDesktopMenuDeletion(database) {
 }
 
 function assertAndroidAdminOnlyDeletion(database) {
+  const deviceId = "android-delete-smoke";
+  registerAndApproveDevice(database, deviceId);
+
   const staffRequest = createRequest(database, "Personel Koruması", "+905550000104");
   const denied = database.applyAndroidAction(androidAction(
     "android_delete_staff_denied_001",
@@ -107,15 +110,17 @@ function assertAndroidAdminOnlyDeletion(database) {
   assert.equal(denied.ok, false);
   assert.match(denied.message, /yalnız yönetici/i);
   assert.equal(database.getDashboardData().requests.some((request) => request.id === staffRequest.id), true);
-  const staffDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-delete-smoke");
+  const staffDevice = database.getAndroidDevices().find((device) => device.deviceId === deviceId);
+  assert.equal(staffDevice?.isActive, true);
   assert.equal(staffDevice?.role, "staff");
   assert.equal(staffDevice?.permissions.includes("request.delete"), false);
   assert.equal(staffDevice?.permissions.includes("customer.delete"), false);
   assert.equal(staffDevice?.permissions.includes("menu.delete"), false);
   assert.equal(staffDevice?.permissions.includes("message.delete"), false);
 
-  assert.equal(database.setAndroidDeviceRole("android-delete-smoke", "admin").ok, true);
-  const adminDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-delete-smoke");
+  assert.equal(database.setAndroidDeviceRole(deviceId, "admin").ok, true);
+  const adminDevice = database.getAndroidDevices().find((device) => device.deviceId === deviceId);
+  assert.equal(adminDevice?.isActive, true);
   assert.equal(adminDevice?.permissions.includes("request.delete"), true);
   assert.equal(adminDevice?.permissions.includes("customer.delete"), true);
   assert.equal(adminDevice?.permissions.includes("menu.delete"), true);
@@ -171,6 +176,21 @@ function assertAndroidAdminOnlyDeletion(database) {
   )).ok, true);
   assert.equal(database.getDashboardData().menu.categories.some((candidate) => candidate.id === category.id), false);
   assert.equal(database.getDashboardData().menu.items.some((item) => item.id === secondItem.id), false);
+}
+
+function registerAndApproveDevice(database, deviceId) {
+  const now = new Date().toISOString();
+  database.upsertAndroidDeviceSightings([{
+    device_id: deviceId,
+    device_name: "Deletion Smoke",
+    app_version: "smoke",
+    first_seen_at: now,
+    last_seen_at: now
+  }]);
+  const pending = database.getAndroidDevices().find((device) => device.deviceId === deviceId);
+  assert.equal(pending?.isActive, false, "New Android devices must wait for desktop approval.");
+  const approval = database.setAndroidDeviceActive(deviceId, true);
+  assert.equal(approval.ok, true, approval.message);
 }
 
 function assertSoftDeleteRows(database) {
