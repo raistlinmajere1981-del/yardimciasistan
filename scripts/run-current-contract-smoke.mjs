@@ -23,11 +23,11 @@ const syncStatusStub = `      getSyncStatus: async () => ({
 const definitions = {
   "automatic-sync": {
     source: "smoke-automatic-sync.mjs",
-    replacements: [[
-`  const inactiveAction = await getAndroidAction(inactiveActionId);
+    replacements: [{
+      before: `  const inactiveAction = await getAndroidAction(inactiveActionId);
   assert.equal(inactiveAction.status, "failed");
   assert.equal(inactiveAction.error_message, "Cihaz masaüstünde pasifleştirilmiş.");`,
-`  const inactiveSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
+      after: `  const inactiveSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
   assert.equal(inactiveSummaryResponse.status, 200);
   const inactiveSummary = await inactiveSummaryResponse.json();
   assert.equal(inactiveSummary.approval_required, true);
@@ -36,44 +36,47 @@ const definitions = {
   assert.equal(pendingAfterInactiveResponse.status, 200);
   const pendingAfterInactive = await pendingAfterInactiveResponse.json();
   assert.equal(pendingAfterInactive.actions.some((candidate) => candidate.id === inactiveActionId), false);`
-    ]]
+    }]
   },
   renderer: {
     source: "smoke-desktop-renderer.mjs",
     replacements: [
-      [
-`      getDashboardData: async () => currentDashboardData,
+      {
+        before: `      getDashboardData: async () => currentDashboardData,
       getReportData: async (range) => {`,
-`      getDashboardData: async () => currentDashboardData,
+        after: `      getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
       onSyncStatusChanged: () => () => {},
-      getReportData: async (range) => {`
-      ],
-      [
-`      getDashboardData: async () => currentDashboardData,
+      getReportData: async (range) => {`,
+        replaceAll: true
+      },
+      {
+        before: `      getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
       saveInitialSetup: async () => ({ ok: false, message: "smoke" }),`,
-`      getDashboardData: async () => currentDashboardData,
+        after: `      getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
 ${syncStatusStub}
-      saveInitialSetup: async () => ({ ok: false, message: "smoke" }),`
-      ],
-      [
-`      getDashboardData: async () => currentDashboardData,
+      saveInitialSetup: async () => ({ ok: false, message: "smoke" }),`,
+        replaceAll: true
+      },
+      {
+        before: `      getDashboardData: async () => currentDashboardData,
       listTableOrders: async () => tableOrders,`,
-`      getDashboardData: async () => currentDashboardData,
+        after: `      getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
 ${syncStatusStub}
-      listTableOrders: async () => tableOrders,`
-      ],
-      [
-`  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+      listTableOrders: async () => tableOrders,`,
+        replaceAll: true
+      },
+      {
+        before: `  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   const notificationBell = page.getByRole("button", { name: /Bildirimler, \\d+ uyarı/ });`,
-`  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+        after: `  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   const notificationBell = page.getByRole("button", { name: /Bildirimler, \\d+ uyarı/ });`
-      ]
+      }
     ]
   }
 };
@@ -88,12 +91,19 @@ const sourcePath = join(process.cwd(), "scripts", definition.source);
 const generatedPath = join(process.cwd(), "scripts", `.current-${mode}-${process.pid}.mjs`);
 let source = readFileSync(sourcePath, "utf8");
 
-for (const [before, after] of definition.replacements) {
+for (const replacement of definition.replacements) {
+  const { before, after, replaceAll = false } = replacement;
   const first = source.indexOf(before);
   if (first < 0) {
     console.error(`Current-contract patch eşleşmedi: ${basename(sourcePath)}. Eski smoke dosyası değişmiş olabilir.`);
     process.exit(3);
   }
+
+  if (replaceAll) {
+    source = source.split(before).join(after);
+    continue;
+  }
+
   if (source.indexOf(before, first + before.length) >= 0) {
     console.error(`Current-contract patch birden fazla eşleşti: ${basename(sourcePath)}.`);
     process.exit(4);
