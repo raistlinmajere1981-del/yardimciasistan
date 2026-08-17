@@ -31,14 +31,21 @@ try {
     SELECT id, name FROM tables WHERE deleted_at = '' AND is_active = 1 ORDER BY sort_order, name LIMIT 1
   `).get();
   const menuItem = sqlite.prepare(`
-    SELECT id, name, price, currency, stock_quantity
+    SELECT id, name, price, currency, stock_quantity, stock_consumption_quantity
     FROM menu_items
-    WHERE deleted_at = '' AND is_available = 1
-    ORDER BY sort_order, name LIMIT 1
+    WHERE deleted_at = ''
+      AND is_available = 1
+      AND (
+        stock_quantity IS NULL
+        OR stock_consumption_quantity <= 0
+        OR stock_quantity >= stock_consumption_quantity
+      )
+    ORDER BY CASE WHEN stock_quantity IS NULL THEN 1 ELSE 0 END, sort_order, name
+    LIMIT 1
   `).get();
   assert.ok(room?.id, "Transfer smoke needs an active room.");
   assert.ok(table?.id, "Transfer smoke needs an active table.");
-  assert.ok(menuItem?.id, "Transfer smoke needs a menu item.");
+  assert.ok(menuItem?.id, "Transfer smoke needs a sellable menu item.");
 
   const now = new Date().toISOString();
   const today = now.slice(0, 10);
@@ -58,45 +65,54 @@ try {
   `).run("room_transfer_smoke_stay", "room_transfer_smoke_customer", room.id, today, checkout, now, now);
   sqlite.close();
 
-  const opened = folioService.openFolio("room_transfer_smoke_stay");
-  assert.equal(opened.ok, true);
-  assert.ok(opened.folioId);
+  const openedFolio = folioService.openFolio("room_transfer_smoke_stay");
+  assert.equal(openedFolio.ok, true);
+  assert.ok(openedFolio.folioId);
 
-  const orderId = "room_transfer_smoke_order";
-  const orderItemId = "room_transfer_smoke_order_item";
-  const orderTotal = Math.max(1, Number(menuItem.price ?? 1));
-  const currency = String(menuItem.currency || "TRY");
-  const orderDb = new DatabaseSync(database.databasePath);
-  orderDb.exec("PRAGMA foreign_keys = ON;");
-  const stockBefore = orderDb.prepare(`SELECT stock_quantity FROM menu_items WHERE id = ?`).get(menuItem.id)?.stock_quantity ?? null;
-  orderDb.exec("BEGIN");
-  try {
-    orderDb.prepare(`
-      INSERT INTO table_orders (
-        id, table_id, status, opened_at, closed_at, subtotal, discount_total, total,
-        note, created_at, updated_at
-      ) VALUES (?, ?, 'payment', ?, '', ?, 0, ?, '', ?, ?)
-    `).run(orderId, table.id, now, orderTotal, orderTotal, now, now);
-    orderDb.prepare(`
-      INSERT INTO table_order_items (
-        id, order_id, menu_item_id, product_name, unit_price, currency, quantity,
-        line_total, note, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, '', 'served', ?, ?)
-    `).run(orderItemId, orderId, menuItem.id, menuItem.name, orderTotal, currency, orderTotal, now, now);
-    orderDb.prepare(`
-      UPDATE tables SET status = 'bill_waiting', updated_at = ?, sync_status = 'local_only' WHERE id = ?
-    `).run(now, table.id);
-    orderDb.exec("COMMIT");
-  } catch (error) {
-    orderDb.exec("ROLLBACK");
-    throw error;
-  } finally {
-    orderDb.close();
+  // Use the same table-order service path as the real desktop UI. This proves
+  // stock is consumed by the restaurant order exactly once before the bill is
+  // moved to the room folio.
+  const stockDbBefore = new DatabaseSync(database.databasePath);
+  const stockBefore = stockDbBefore.prepare(`
+    SELECT stock_quantity FROM menu_items WHERE id = ?
+  `).get(menuItem.id)?.stock_quantity ?? null;
+  stockDbBefore.close();
+
+  const openedOrder = database.openTableOrder(table.id);
+  assert.equal(openedOrder.ok, true, openedOrder.message);
+  const orderId = openedOrder.order.id;
+
+  const itemAdded = database.addTableOrderItem({
+    orderId,
+    menuItemId: menuItem.id,
+    quantity: 1,
+    note: "Pilot transfer smoke"
+  });
+  assert.equal(itemAdded.ok, true, itemAdded.message);
+
+  const stockDbAfterOrder = new DatabaseSync(database.databasePath);
+  const stockAfterOrder = stockDbAfterOrder.prepare(`
+    SELECT stock_quantity FROM menu_items WHERE id = ?
+  `).get(menuItem.id)?.stock_quantity ?? null;
+  stockDbAfterOrder.close();
+
+  if (stockBefore !== null && Number(menuItem.stock_consumption_quantity ?? 0) > 0) {
+    assert.equal(
+      Number(stockAfterOrder),
+      Number(stockBefore) - Number(menuItem.stock_consumption_quantity),
+      "Adding the restaurant item must consume tracked stock exactly once."
+    );
   }
+
+  const paymentWaiting = database.updateTableOrderStatus({ orderId, status: "payment" });
+  assert.equal(paymentWaiting.ok, true, paymentWaiting.message);
+  assert.equal(paymentWaiting.order.status, "payment");
+  const orderTotal = paymentWaiting.order.total;
+  assert.ok(orderTotal > 0, "Payment-waiting restaurant order must have a positive total.");
 
   const financeBefore = finance.getData();
   const transfer = transferTableOrderToRoomFolio(database.databasePath, {
-    folioId: opened.folioId,
+    folioId: openedFolio.folioId,
     tableOrderId: orderId
   });
   assert.equal(transfer.ok, true, transfer.message);
@@ -104,7 +120,7 @@ try {
   const after = new DatabaseSync(database.databasePath);
   const orderAfter = after.prepare(`SELECT status, closed_at FROM table_orders WHERE id = ?`).get(orderId);
   const tableAfter = after.prepare(`SELECT status FROM tables WHERE id = ?`).get(table.id);
-  const stockAfter = after.prepare(`SELECT stock_quantity FROM menu_items WHERE id = ?`).get(menuItem.id)?.stock_quantity ?? null;
+  const stockAfterTransfer = after.prepare(`SELECT stock_quantity FROM menu_items WHERE id = ?`).get(menuItem.id)?.stock_quantity ?? null;
   const transferCount = Number(after.prepare(`
     SELECT COUNT(*) AS count FROM room_folio_table_order_transfers WHERE table_order_id = ?
   `).get(orderId)?.count ?? 0);
@@ -119,21 +135,25 @@ try {
   assert.equal(orderAfter.status, "paid", "Transferred restaurant order must close as paid without a cash entry.");
   assert.ok(orderAfter.closed_at);
   assert.equal(tableAfter.status, "available", "Transferred table must become available.");
-  assert.equal(stockAfter, stockBefore, "Room transfer must not consume menu stock a second time.");
+  assert.equal(
+    stockAfterTransfer,
+    stockAfterOrder,
+    "Moving a restaurant bill to a room must not consume tracked stock a second time."
+  );
   assert.equal(transferCount, 1);
   assert.equal(linkedItem.kind, "manual_charge");
   assert.equal(linkedItem.line_total_minor, Math.round(orderTotal * 100));
   assert.match(linkedItem.label, /Restoran/);
 
-  const financeAfter = finance.getData();
+  const financeAfterTransfer = finance.getData();
   assert.equal(
-    financeAfter.todayIncomeMinor,
+    financeAfterTransfer.todayIncomeMinor,
     financeBefore.todayIncomeMinor,
     "Moving a restaurant bill to a room must not record cash before the guest actually pays."
   );
 
   const repeated = transferTableOrderToRoomFolio(database.databasePath, {
-    folioId: opened.folioId,
+    folioId: openedFolio.folioId,
     tableOrderId: orderId
   });
   assert.equal(repeated.ok, true, "Repeating the same transfer must be idempotent.");
@@ -146,10 +166,30 @@ try {
     SELECT COUNT(*) AS count
     FROM room_folio_items
     WHERE folio_id = ? AND note = ? AND deleted_at = ''
-  `).get(opened.folioId, `Masa adisyonu · ${orderId}`)?.count ?? 0);
+  `).get(openedFolio.folioId, `Masa adisyonu · ${orderId}`)?.count ?? 0);
   duplicateCheck.close();
   assert.equal(duplicateTransferCount, 1);
   assert.equal(duplicateFolioItems, 1, "Idempotent retry must not duplicate the room charge.");
+
+  const folioAfterTransfer = folioService.getData().folios.find((folio) => folio.id === openedFolio.folioId);
+  assert.ok(folioAfterTransfer);
+  assert.ok(folioAfterTransfer.remainingMinor >= Math.round(orderTotal * 100));
+
+  const paymentAmount = Math.min(folioAfterTransfer.remainingMinor, Math.round(orderTotal * 100));
+  const roomPayment = folioService.addPayment({
+    folioId: openedFolio.folioId,
+    amountMinor: paymentAmount,
+    paymentMethod: "cash",
+    note: "Restoran oda transfer smoke tahsilatı"
+  });
+  assert.equal(roomPayment.ok, true, roomPayment.message);
+
+  const financeAfterPayment = finance.getData();
+  assert.equal(
+    financeAfterPayment.todayIncomeMinor,
+    financeAfterTransfer.todayIncomeMinor + paymentAmount,
+    "Transferred restaurant revenue must enter cash only when the room payment is actually collected."
+  );
 
   console.log("room-folio-table-order-transfer-smoke-ok");
 } finally {
