@@ -61,11 +61,28 @@ ${syncStatusStub}
         replaceAll: true
       },
       {
+        before: `      getDashboardData: async () => dashboardData,
+      getSetupData: async () => setupData,
+      saveInitialSetup: async (input) => {`,
+        after: `      getDashboardData: async () => dashboardData,
+      getSetupData: async () => setupData,
+${syncStatusStub}
+      saveInitialSetup: async (input) => {`
+      },
+      {
         before: `      getDashboardData: async () => currentDashboardData,
       listTableOrders: async () => tableOrders,`,
         after: `      getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
 ${syncStatusStub}
+      getRoomFolioData: async () => ({
+        generatedAt: "",
+        rooms: [],
+        activeStays: [],
+        folios: [],
+        menuCategories: [],
+        menuItems: []
+      }),
       listTableOrders: async () => tableOrders,`,
         replaceAll: true
       },
@@ -95,7 +112,7 @@ ${syncStatusStub}
         before: `  await page.getByRole("button", { name: "Raporlar", exact: true }).click();`,
         through: `  await page.setViewportSize({ width: 1440, height: 1000 });`,
         after: `  await page.getByRole("button", { name: "Kasa", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Kasa", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kasa", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByText("Bugün Gelen", { exact: true })).toBeVisible();
   await expect(page.getByText("Bugün Çıkan", { exact: true })).toBeVisible();
   await expect(page.getByText("Bugünkü Fark", { exact: true })).toBeVisible();
