@@ -26,6 +26,10 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
   await page.addInitScript(({ setupData, dashboardData, reportData }) => {
+    const uiPreferencesKey = "yardimci-asistan.ui-preferences";
+    if (window.localStorage.getItem(uiPreferencesKey) === null) {
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "dark", scale: 1 }));
+    }
     let currentDashboardData = dashboardData;
     const mutateDevice = (deviceId, mutation, message) => {
       const devices = currentDashboardData.androidDevices.map((device) => device.deviceId === deviceId ? mutation(device) : device);
@@ -197,6 +201,12 @@ try {
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({
+    theme: "dark",
+    scale: 1,
+    mode: "pro"
+  });
   const notificationBell = page.getByRole("button", { name: /Bildirimler, \d+ uyarı/ });
   await expect(notificationBell).toBeVisible();
   await notificationBell.click();
@@ -205,7 +215,7 @@ try {
   await expect(notificationCenter.getByText("Rezervasyon onay bekliyor", { exact: true })).toBeVisible();
   await expect(notificationCenter.getByText("Masa hesap bekliyor", { exact: true })).toBeVisible();
   await expect(notificationCenter.getByText(/Günlük iş (?:bekliyor|gecikti)/)).toHaveCount(2);
-  await expect(notificationCenter.getByText("Sync bağlantı sorunu", { exact: true })).toBeVisible();
+  await expect(notificationCenter.getByText("Web bağlantı sorunu", { exact: true })).toBeVisible();
   await expect(notificationCenter.getByText("Android işlemi uygulanamadı", { exact: true })).toBeVisible();
   await notificationCenter.locator(".notification-item", { hasText: "Yeni müşteri talebi" }).getByRole("button", { name: /ilgili sayfaya git/ }).click();
   await expect(page.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
@@ -278,24 +288,31 @@ try {
   await expect(page.getByText("Firma Bilgileri", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Modüller", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Kapasite ve Yardımcı", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: /Büyük ve Sade Görünüm/ })).not.toBeChecked();
+  await expect(page.getByRole("radio", { name: "Kompakt ve Gelişmiş Görünüm" })).toBeChecked();
   await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1");
+  await expect(page.getByLabel("Karanlık tema")).toBeChecked();
   await page.getByLabel("Arayüz ölçeği").selectOption("1.1");
-  await page.getByLabel("Karanlık tema").check();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1.1");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "dark", scale: 1.1 });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "dark", scale: 1.1, mode: "pro" });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Ayarlar" }).click();
+  await expect(page.getByRole("radio", { name: "Kompakt ve Gelişmiş Görünüm" })).toBeChecked();
   await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1.1");
   await expect(page.getByLabel("Karanlık tema")).toBeChecked();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
   await page.screenshot({ path: "artifacts/screenshots/desktop-settings-dark.png", fullPage: true });
   await page.getByLabel("Arayüz ölçeği").selectOption("1");
   await page.getByLabel("Karanlık tema").uncheck();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "light", scale: 1 });
+  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "light", scale: 1, mode: "pro" });
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
   await page.getByRole("button", { name: "Ayarlar" }).click();
   await page.getByLabel("AI cevap önerileri açık").check();
   await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
@@ -572,6 +589,10 @@ try {
 
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await conversionPage.addInitScript(({ setupData, dashboardData }) => {
+    const uiPreferencesKey = "yardimci-asistan.ui-preferences";
+    if (window.localStorage.getItem(uiPreferencesKey) === null) {
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+    }
     let currentDashboardData = dashboardData;
     window.__identityAnalysisCalls = [];
     window.yardimciDesktop = {
@@ -943,6 +964,7 @@ try {
     dashboardData: createDashboardConversionFixture()
   });
   await conversionPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await expect(conversionPage.locator("html")).toHaveAttribute("data-mode", "pro");
   await conversionPage.getByRole("button", { name: "Ayarlar" }).click();
   await conversionPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await expect(conversionPage.getByRole("button", { name: "Yedek Al" })).toBeVisible();
@@ -1112,6 +1134,10 @@ try {
 
   const compactPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   await compactPage.addInitScript(({ setupData, dashboardData }) => {
+    const uiPreferencesKey = "yardimci-asistan.ui-preferences";
+    if (window.localStorage.getItem(uiPreferencesKey) === null) {
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+    }
     let tableOrders = [];
     let currentDashboardData = dashboardData;
     window.__tableOrderAdds = [];
@@ -1246,6 +1272,7 @@ try {
   await compactPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
 
   await expect(compactPage.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(compactPage.locator("html")).toHaveAttribute("data-mode", "pro");
   expect(await compactPage.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1");
   const [sidebarWidth, expandedContentWidth, pageHeaderHeight] = await Promise.all([
     compactPage.locator(".sidebar").evaluate((sidebar) => sidebar.getBoundingClientRect().width),
@@ -1325,6 +1352,10 @@ try {
 
   const aiOnlyPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
   await aiOnlyPage.addInitScript(({ setupData, dashboardData }) => {
+    const uiPreferencesKey = "yardimci-asistan.ui-preferences";
+    if (window.localStorage.getItem(uiPreferencesKey) === null) {
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+    }
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
@@ -1364,6 +1395,7 @@ try {
     dashboardData: createCompactUiFixture()
   });
   await aiOnlyPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await expect(aiOnlyPage.locator("html")).toHaveAttribute("data-mode", "pro");
   const aiOnlyRequestPriority = aiOnlyPage.locator(".dashboard-priority-item.priority-request").filter({ hasText: "Kompakt Misafir 1" });
   await aiOnlyRequestPriority.getByRole("button").click();
   await expect(aiOnlyPage.getByRole("heading", { name: "Mesajlar", exact: true })).toBeVisible();
@@ -1808,6 +1840,10 @@ try {
 
   const pullPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await pullPage.addInitScript(({ setupData, dashboardData, pulledRequest }) => {
+    const uiPreferencesKey = "yardimci-asistan.ui-preferences";
+    if (window.localStorage.getItem(uiPreferencesKey) === null) {
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+    }
     let currentDashboardData = dashboardData;
     window.yardimciDesktop = {
       getBootstrapData: async () => ({
@@ -1882,6 +1918,7 @@ try {
     pulledRequest: createPulledRequestFixture()
   });
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await expect(pullPage.locator("html")).toHaveAttribute("data-mode", "pro");
   await expect(pullPage.locator(".dashboard-attention-card").first().locator("strong")).toHaveText("0");
   await pullPage.getByRole("button", { name: "Şimdi Eşitle", exact: true }).click();
   await expect(pullPage.getByText("1 talep alındı.")).toBeVisible();
@@ -1891,6 +1928,10 @@ try {
 
   const setupPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   await setupPage.addInitScript(({ setupData, dashboardData }) => {
+    const uiPreferencesKey = "yardimci-asistan.ui-preferences";
+    if (window.localStorage.getItem(uiPreferencesKey) === null) {
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+    }
     window.__aiConnectionTestCount = 0;
     const storedAiApiKeys = {
       openai: "sk-openai-stored-smoke"
@@ -2022,12 +2063,13 @@ try {
     dashboardData: createDashboardFixture()
   });
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
+  await expect(setupPage.locator("html")).toHaveAttribute("data-mode", "pro");
   await expect(setupPage.getByRole("heading", { name: "İşletme panelini kullanıma hazırlayın." })).toBeVisible();
   await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Deniz Çiçeği Pansiyon & Kafe");
   await setupPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   const storedOpenAiKeyInput = setupPage.getByLabel("AI güvenlik anahtarı");
   await expect(storedOpenAiKeyInput).toHaveValue("********************");
-  await expect(setupPage.getByText("Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilirsiniz.")).toBeVisible();
+  await expect(setupPage.getByText("Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz.")).toBeVisible();
   await setupPage.getByRole("button", { name: "Göster" }).click();
   await expect(storedOpenAiKeyInput).toHaveValue("sk-openai-stored-smoke");
   await setupPage.getByRole("button", { name: "Gizle" }).click();
@@ -2067,7 +2109,7 @@ try {
   await expect(setupPage.getByText("2 görsel ve metin modeli bu sağlayıcı altında kayıtlı.")).toBeVisible();
   const storedGeminiKeyInput = setupPage.getByLabel("Google AI Studio cURL bağlantısı");
   await expect(storedGeminiKeyInput).toHaveValue("********************");
-  await expect(setupPage.getByText("Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz.")).toBeVisible();
+  await expect(setupPage.getByText("Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz.")).toBeVisible();
   await setupPage.getByRole("button", { name: "Göster" }).click();
   await expect(storedGeminiKeyInput).toHaveValue("AQ.smoke-key");
   await setupPage.getByRole("button", { name: "Gizle" }).click();

@@ -104,7 +104,7 @@ export function buildDesktopNotifications(
       key: `sync:error:${syncErrorCode(syncStatus.lastError)}`,
       kind: "sync",
       priority: "high",
-      title: "Sync bağlantı sorunu",
+      title: "Web bağlantı sorunu",
       message: compact(syncStatus.lastError, 150),
       occurredAt: syncStatus.lastAttemptAt,
       destination: "settings",

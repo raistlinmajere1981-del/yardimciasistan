@@ -164,6 +164,242 @@
   --neutral-strong: #cbd5e1;
 }
 
+/*
+ * Sonradan yüklenen kullanım-kolaylığı katmanlarının eski pro ölçülerini
+ * birebir koruyan köprü değerleri. Easy karşılıkları aşağıda ana ölçek
+ * token'larına bağlanır; böylece override dosyalarında çıplak ölçü kalmaz.
+ */
+:root {
+  --override-space-2: 2px;
+  --override-space-3: 3px;
+  --override-space-5: 5px;
+  --override-space-6: 6px;
+  --override-space-7: 7px;
+  --override-space-9: 9px;
+  --override-space-10: 10px;
+  --override-space-11: 11px;
+  --override-space-13: 13px;
+  --override-space-14: 14px;
+  --override-space-18: 18px;
+  --override-space-28: 28px;
+  --override-space-42: 42px;
+  --override-space-46: 46px;
+
+  --override-control-24: 24px;
+  --override-control-28: 28px;
+  --override-control-31: 31px;
+  --override-control-32: 32px;
+  --override-control-34: 34px;
+  --override-control-36: 36px;
+  --override-control-38: 38px;
+  --override-control-40: 40px;
+  --override-control-42: 42px;
+
+  --override-size-16: 16px;
+  --override-size-30: 30px;
+  --override-size-32: 32px;
+  --override-size-34: 34px;
+  --override-size-36: 36px;
+
+  --override-radius-7: 7px;
+  --override-radius-9: 9px;
+  --override-radius-11: 11px;
+  --override-radius-12: 12px;
+  --override-radius-14: 14px;
+
+  --override-text-069: 0.69rem;
+  --override-text-070: 0.7rem;
+  --override-text-073: 0.73rem;
+  --override-text-076: 0.76rem;
+  --override-text-077: 0.77rem;
+  --override-text-087: 0.87rem;
+  --override-text-10: 10px;
+  --override-text-11: 11px;
+  --override-text-12: 12px;
+  --override-text-13: 13px;
+
+  --override-health-muted: #7d8795;
+  --override-health-ok: #2f9e62;
+  --override-health-warning-fill: #c98b22;
+  --override-health-warning: #b27a1e;
+  --override-health-border: rgba(128, 139, 156, 0.2);
+  --override-health-surface: #ffffff;
+  --override-health-danger: #c84f4f;
+  --override-health-info: #3d7edb;
+
+  --override-room-transfer-border: #8b96a6;
+  --override-room-transfer-surface: #fff;
+  --override-room-transfer-accent: #4c86d7;
+  --override-room-transfer-muted: #788391;
+  --override-room-transfer-control-border: rgba(128, 139, 156, 0.25);
+  --override-room-transfer-danger: #c84f4f;
+}
+
+:root[data-mode="easy"] {
+  color-scheme: light;
+
+  /* Renkler — mevcut light temanın sıcak krem paletine yakın başlıyoruz,
+     çünkü UI_RULES.md'deki tanıma zaten uygun; asıl fark aşağıdaki ölçekte. */
+  --bg: #fff8ee;
+  --surface-1: #fffdf7;
+  --surface-2: #ffffff;
+  --surface-3: #fbf3e2;
+  --surface-4: #f3e9d6;
+
+  --ink: #2b2723;
+  --ink-muted: #6b6259;
+  --ink-dim: #a39c8f;
+
+  --border: rgba(43, 39, 35, 0.10);
+  --border-strong: rgba(43, 39, 35, 0.18);
+  --border-focus: #d97a4d;
+
+  /* Vurgu — bilinçli olarak "pro" modun teal'inden farklı, sıcak turuncu/mercan */
+  --primary: #d97a4d;
+  --primary-dim: #c2673d;
+  --primary-bg: rgba(217, 122, 77, 0.12);
+  --primary-border: rgba(217, 122, 77, 0.28);
+
+  --status-green: #4f9d76;
+  --status-green-bg: rgba(79, 157, 118, 0.12);
+  --status-amber: #d9a441;
+  --status-amber-bg: rgba(217, 164, 65, 0.14);
+  --status-red: #c4594c;
+  --status-red-bg: rgba(196, 89, 76, 0.12);
+  --status-blue: #5b86ad;
+  --status-blue-bg: rgba(91, 134, 173, 0.12);
+
+  --sidebar-bg: #fffdf7;
+  --sidebar-active-bg: rgba(217, 122, 77, 0.12);
+  --sidebar-active-border: rgba(217, 122, 77, 0.32);
+  --nav-text: #6b6259;
+  --nav-text-active: #d97a4d;
+
+  /* Tipografi — belirgin biçimde büyük, "pro"dan türetilmemiş */
+  --text-xs: 0.85rem;   /* 13.6px */
+  --text-sm: 0.95rem;   /* 15.2px */
+  --text-base: 1.0625rem; /* 17px */
+  --text-md: 1.125rem;  /* 18px */
+  --text-lg: 1.3rem;    /* 20.8px */
+  --text-xl: 1.5rem;    /* 24px */
+  --text-2xl: 1.85rem;  /* 29.6px */
+
+  /* Boşluk ölçeği — belirgin biçimde ferah */
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --space-5: 24px;
+  --space-6: 30px;
+  --space-8: 40px;
+  --space-10: 48px;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+
+  --shadow-sm: 0 1px 3px rgba(43, 39, 35, 0.08);
+  --shadow-md: 0 4px 10px rgba(43, 39, 35, 0.08);
+  --shadow-lg: 0 8px 20px rgba(43, 39, 35, 0.10);
+  --shadow-xl: 0 16px 36px rgba(43, 39, 35, 0.12);
+
+  --sidebar-width: 224px;
+  --page-header-height: 64px;
+  --page-padding: 24px;
+  --control-height: 46px;
+}
+
+:root[data-mode="easy"] {
+  /* Tema ekseninden doğrudan değer alan semantik alias'ları da sabitle. */
+  --control-border: rgba(43, 39, 35, 0.28);
+  --surface-disabled: var(--surface-4);
+  --warning-line: rgba(217, 164, 65, 0.30);
+  --warning-ink: #78591d;
+  --blue-solid: #4b769c;
+  --danger-line: rgba(196, 89, 76, 0.30);
+  --neutral-strong: var(--surface-4);
+
+  /* Geç yüklenen eski ekranların renk adlarını easy paletine bağla. */
+  --line-soft: var(--border);
+  --surface-subtle: var(--surface-3);
+  --surface: var(--surface-2);
+  --surface-soft: var(--surface-3);
+  --text-muted: var(--ink-muted);
+  --border-soft: var(--border-strong);
+  --surface-elevated: var(--surface-2);
+  --danger: var(--status-red);
+
+  --override-health-muted: var(--ink-muted);
+  --override-health-ok: var(--status-green);
+  --override-health-warning-fill: var(--status-amber);
+  --override-health-warning: var(--warning-ink);
+  --override-health-border: var(--border);
+  --override-health-surface: var(--surface-2);
+  --override-health-danger: var(--status-red);
+  --override-health-info: var(--status-blue);
+
+  --override-room-transfer-border: var(--border-strong);
+  --override-room-transfer-surface: var(--surface-2);
+  --override-room-transfer-accent: var(--status-blue);
+  --override-room-transfer-muted: var(--ink-muted);
+  --override-room-transfer-control-border: var(--control-border);
+  --override-room-transfer-danger: var(--status-red);
+
+  --override-space-2: calc(var(--space-1) / 2);
+  --override-space-3: calc(var(--space-1) * 0.75);
+  --override-space-5: var(--space-1);
+  --override-space-6: var(--space-1);
+  --override-space-7: var(--space-2);
+  --override-space-9: var(--space-2);
+  --override-space-10: var(--space-3);
+  --override-space-11: var(--space-3);
+  --override-space-13: var(--space-4);
+  --override-space-14: var(--space-4);
+  --override-space-18: var(--space-5);
+  --override-space-28: var(--space-8);
+  --override-space-42: var(--space-10);
+  --override-space-46: var(--space-10);
+
+  --override-control-24: var(--space-8);
+  --override-control-28: var(--control-height);
+  --override-control-31: var(--control-height);
+  --override-control-32: var(--control-height);
+  --override-control-34: var(--control-height);
+  --override-control-36: var(--control-height);
+  --override-control-38: var(--control-height);
+  --override-control-40: var(--control-height);
+  --override-control-42: var(--control-height);
+
+  --override-size-16: var(--space-4);
+  --override-size-30: var(--space-8);
+  --override-size-32: var(--space-8);
+  --override-size-34: var(--control-height);
+  --override-size-36: var(--control-height);
+
+  --override-radius-7: var(--radius-md);
+  --override-radius-9: var(--radius-lg);
+  --override-radius-11: var(--radius-lg);
+  --override-radius-12: var(--radius-lg);
+  --override-radius-14: var(--radius-lg);
+
+  --override-text-069: var(--text-xs);
+  --override-text-070: var(--text-xs);
+  --override-text-073: var(--text-xs);
+  --override-text-076: var(--text-xs);
+  --override-text-077: var(--text-xs);
+  --override-text-087: var(--text-sm);
+  --override-text-10: var(--text-xs);
+  --override-text-11: var(--text-xs);
+  --override-text-12: var(--text-xs);
+  --override-text-13: var(--text-sm);
+}
+
+/* İlk kurulum ekranındaki ana eylem de easy dokunma hedefini kullanır. */
+:root[data-mode="easy"] .setup-primary {
+  min-height: var(--control-height);
+}
+
 * {
   box-sizing: border-box;
   scrollbar-width: thin;
@@ -5179,6 +5415,67 @@ button {
   margin: 0;
 }
 
+.appearance-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.appearance-mode-card {
+  appearance: none;
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: calc(var(--control-height) + var(--control-height) + var(--space-2));
+  padding: var(--space-3);
+  color: var(--ink);
+  text-align: left;
+  background: var(--field);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.appearance-mode-card:hover {
+  background: var(--surface-tint);
+  border-color: var(--primary-border);
+}
+
+.appearance-mode-card.is-selected {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary-border), var(--shadow-sm);
+}
+
+.appearance-mode-card strong,
+.appearance-mode-card small {
+  display: block;
+}
+
+.appearance-mode-card strong {
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 1.3;
+}
+
+.appearance-mode-card strong span {
+  color: var(--primary);
+  font-size: var(--text-sm);
+}
+
+.appearance-mode-card small {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  line-height: 1.45;
+}
+
+.appearance-controls {
+  margin-top: var(--space-3);
+}
+
 .settings-technical-info {
   margin-bottom: 14px;
 }
@@ -5728,6 +6025,172 @@ button {
 .setup-shell.is-embedded .settings-storage-section .menu-status {
   min-height: 18px;
   font-size: var(--text-xs);
+}
+
+/* Easy kurulum ve Ayarlar yüzeyi: formun tamamı büyük metin ve dokunma hedefi kullanır. */
+:root[data-mode="easy"] .settings-level-tabs {
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+}
+
+:root[data-mode="easy"] .settings-level-tabs button {
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+:root[data-mode="easy"] .setup-section {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+}
+
+:root[data-mode="easy"] .setup-section-title {
+  margin-bottom: var(--space-2);
+}
+
+:root[data-mode="easy"] .setup-section-title h2 {
+  font-size: var(--text-lg);
+  line-height: 1.3;
+}
+
+:root[data-mode="easy"] .setup-eyebrow,
+:root[data-mode="easy"] .setup-section-title p {
+  margin-bottom: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+:root[data-mode="easy"] .setup-section-description {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+:root[data-mode="easy"] .setup-grid,
+:root[data-mode="easy"] .setup-toggle-grid {
+  gap: var(--space-2);
+}
+
+:root[data-mode="easy"] .setup-grid label,
+:root[data-mode="easy"] .setup-count-row label,
+:root[data-mode="easy"] .setup-field {
+  gap: var(--space-1);
+  font-size: var(--text-base);
+}
+
+:root[data-mode="easy"] .setup-grid input,
+:root[data-mode="easy"] .setup-grid select,
+:root[data-mode="easy"] .setup-count-row input,
+:root[data-mode="easy"] .setup-field input {
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+:root[data-mode="easy"] .setup-field > small,
+:root[data-mode="easy"] .setup-grid label > small {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+:root[data-mode="easy"] .setup-secret-input {
+  gap: var(--space-2);
+}
+
+:root[data-mode="easy"] .setup-toggle-grid label,
+:root[data-mode="easy"] .setup-checkline {
+  min-height: var(--control-height);
+  gap: var(--space-2) !important;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+:root[data-mode="easy"] .setup-toggle-grid input,
+:root[data-mode="easy"] .setup-checkline input {
+  width: var(--space-4);
+  min-height: var(--space-4);
+}
+
+:root[data-mode="easy"] .table-category-editor {
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+:root[data-mode="easy"] .table-category-heading {
+  gap: var(--space-3);
+}
+
+:root[data-mode="easy"] .table-category-heading > div {
+  gap: var(--space-1);
+}
+
+:root[data-mode="easy"] .table-category-heading strong {
+  font-size: var(--text-base);
+}
+
+:root[data-mode="easy"] .table-category-heading small,
+:root[data-mode="easy"] .table-category-empty small,
+:root[data-mode="easy"] .table-category-note {
+  font-size: var(--text-xs);
+}
+
+:root[data-mode="easy"] .table-category-heading > span {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
+:root[data-mode="easy"] .table-category-list {
+  gap: var(--space-2);
+}
+
+:root[data-mode="easy"] .table-category-row {
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto) var(--control-height);
+  gap: var(--space-2);
+}
+
+:root[data-mode="easy"] .table-category-row label {
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+:root[data-mode="easy"] .table-category-row input,
+:root[data-mode="easy"] .table-category-remove,
+:root[data-mode="easy"] .table-category-add,
+:root[data-mode="easy"] .setup-primary,
+:root[data-mode="easy"] .setup-secondary,
+:root[data-mode="easy"] .setup-secret-input button {
+  min-height: var(--control-height);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+}
+
+:root[data-mode="easy"] .table-category-row input,
+:root[data-mode="easy"] .table-category-add,
+:root[data-mode="easy"] .setup-primary,
+:root[data-mode="easy"] .setup-secondary,
+:root[data-mode="easy"] .setup-secret-input button {
+  padding: var(--space-2) var(--space-3);
+}
+
+:root[data-mode="easy"] .table-category-empty {
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+:root[data-mode="easy"] .setup-footer {
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+}
+
+:root[data-mode="easy"] .android-device-actions .setup-secondary,
+:root[data-mode="easy"] .android-removed-device-row > .setup-secondary {
+  min-height: var(--control-height) !important;
+  padding: var(--space-2) var(--space-3) !important;
 }
 
 .menu-manager {

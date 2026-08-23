@@ -11,9 +11,11 @@ public final class AppThemeSmoke {
   }
 
   private static void switchesAndFallsBackSafely() {
-    assertEquals(AppTheme.Mode.NIGHT, AppTheme.Mode.fromStoredValue(null), "null mode fallback");
-    assertEquals(AppTheme.Mode.NIGHT, AppTheme.Mode.fromStoredValue("system"), "future mode fallback");
+    assertEquals(AppTheme.Mode.DAY, AppTheme.Mode.fromStoredValue(null), "null mode fallback");
+    assertEquals(AppTheme.Mode.DAY, AppTheme.Mode.fromStoredValue(""), "empty mode fallback");
+    assertEquals(AppTheme.Mode.DAY, AppTheme.Mode.fromStoredValue("system"), "future mode fallback");
     assertEquals(AppTheme.Mode.DAY, AppTheme.Mode.fromStoredValue("day"), "day persistence value");
+    assertEquals(AppTheme.Mode.NIGHT, AppTheme.Mode.fromStoredValue("night"), "night persistence value");
     assertEquals(AppTheme.Mode.NIGHT, AppTheme.Mode.DAY.toggled(), "day toggles to night");
     assertEquals(AppTheme.Mode.DAY, AppTheme.Mode.NIGHT.toggled(), "night toggles to day");
     assertEquals("Gece moduna geç", AppTheme.Mode.DAY.switchDescription, "day action description");

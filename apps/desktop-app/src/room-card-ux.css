@@ -5,7 +5,7 @@
 }
 
 .compact-resource-grid .resource-compact-card > button {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .compact-resource-grid .resource-compact-card .compact-status-actions {
@@ -26,9 +26,9 @@
   content: "•••  Durumu değiştir";
   display: block;
   width: fit-content;
-  margin: 6px 0 0 auto;
+  margin: var(--override-space-6) 0 0 auto;
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: var(--override-text-11);
   font-weight: 650;
   letter-spacing: 0.01em;
 }
@@ -40,22 +40,22 @@
 
 .compact-resource-grid .resource-compact-card:hover .compact-status-actions,
 .compact-resource-grid .resource-compact-card:focus-within .compact-status-actions {
-  max-height: 42px;
-  margin-top: 6px;
+  max-height: calc(var(--override-control-28) + var(--override-space-14));
+  margin-top: var(--override-space-6);
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);
 }
 
 .compact-resource-grid .resource-compact-card .compact-status-actions button {
-  min-height: 28px;
-  font-size: 11px;
+  min-height: var(--override-control-28);
+  font-size: var(--override-text-11);
 }
 
 @media (max-width: 900px) {
   .compact-resource-grid .resource-compact-card .compact-status-actions {
     max-height: none;
-    margin-top: 6px;
+    margin-top: var(--override-space-6);
     opacity: 1;
     pointer-events: auto;
     transform: none;

@@ -87,14 +87,6 @@ ${syncStatusStub}
         replaceAll: true
       },
       {
-        before: `  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  const notificationBell = page.getByRole("button", { name: /Bildirimler, \\d+ uyarı/ });`,
-        after: `  await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  const notificationBell = page.getByRole("button", { name: /Bildirimler, \\d+ uyarı/ });`
-      },
-      {
         before: `    page.locator(".setup-ai-actions.is-inline > button").boundingBox()`,
         after: `    page.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).boundingBox()`
       },

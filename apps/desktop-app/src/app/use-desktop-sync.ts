@@ -87,7 +87,7 @@ export function useDesktopSync({
         setAutomaticSyncStatus((current) => ({
           ...current,
           phase: "error",
-          message: "Senkron durumu okunamadı. Şimdi Eşitle ile yeniden deneyin."
+          message: "Güncelleme durumu okunamadı. Şimdi Eşitle ile yeniden deneyin."
         }));
       });
 
@@ -152,7 +152,7 @@ export function useDesktopSync({
       setStatusMessage(result.count > 0 ? `${result.count} talep alındı.` : "Yeni talep bulunmuyor.");
     } catch {
       setSyncState("error");
-      setStatusMessage("Senkron bağlantısı kontrol edilemedi. İnternet ve web modülü ayarlarını kontrol edip yeniden deneyin.");
+      setStatusMessage("Bağlantı kontrol edilemedi. İnternet ve web modülü ayarlarını kontrol edip yeniden deneyin.");
     }
   }, [loadDashboardData, setStatusMessage, setSyncState]);
 

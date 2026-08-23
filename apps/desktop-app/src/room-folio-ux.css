@@ -2,8 +2,8 @@
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 14px;
-  margin-top: 10px;
+  gap: var(--override-space-14);
+  margin-top: var(--override-space-10);
 }
 
 .room-folio-details-actions > div {
@@ -16,19 +16,19 @@
 }
 
 .room-folio-details-actions .room-folio-total-input {
-  margin: 8px 0 0;
+  margin: var(--space-2) 0 0;
 }
 
 .room-folio-details-actions .room-folio-secondary-button {
   flex: 0 0 auto;
-  min-width: 138px;
+  min-width: calc(var(--space-10) + var(--space-10) + var(--space-10) + var(--override-space-18));
 }
 
 .pension-room-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .pension-room-heading-copy {
@@ -40,9 +40,9 @@
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 0 11px;
+  gap: var(--override-space-7);
+  min-height: var(--override-control-34);
+  padding: 0 var(--override-space-11);
   border: 1px solid var(--primary-line);
   border-radius: var(--radius-md);
   background: var(--primary-soft);
@@ -65,19 +65,19 @@
 
 .pension-folio-shortcut:focus-visible {
   outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline-offset: var(--override-space-2);
 }
 
 #pension-room-folio {
-  scroll-margin-top: 84px;
+  scroll-margin-top: calc(var(--space-10) + var(--space-8) + var(--space-3));
 }
 
 .room-folio-payment-complete {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-top: 10px;
-  padding: 10px 12px;
+  gap: var(--override-space-9);
+  margin-top: var(--override-space-10);
+  padding: var(--override-space-10) var(--space-3);
   border: 1px solid var(--primary-line);
   border-radius: var(--radius-md);
   background: var(--primary-soft);
@@ -86,7 +86,7 @@
 
 .room-folio-payment-complete > div {
   display: grid;
-  gap: 2px;
+  gap: var(--override-space-2);
 }
 
 .room-folio-payment-complete strong {
@@ -105,13 +105,13 @@
   z-index: 260;
   display: grid;
   place-items: center;
-  padding: 20px;
+  padding: var(--space-5);
   background: rgba(0, 0, 0, 0.58);
 }
 
 .room-folio-confirm-dialog {
   width: min(480px, calc(100vw - 40px));
-  padding: 18px;
+  padding: var(--override-space-18);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-xl);
   background: var(--surface-2);
@@ -124,13 +124,13 @@
 }
 
 .room-folio-confirm-copy h3 {
-  margin-top: 4px;
+  margin-top: var(--space-1);
   color: var(--ink);
   font-size: var(--text-xl);
 }
 
 .room-folio-confirm-copy > p:last-child {
-  margin-top: 8px;
+  margin-top: var(--space-2);
   color: var(--muted);
   line-height: 1.5;
 }
@@ -138,13 +138,13 @@
 .room-folio-confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 18px;
+  gap: var(--space-2);
+  margin-top: var(--override-space-18);
 }
 
 .room-folio-confirm-actions button {
-  min-height: 40px;
-  padding: 0 14px;
+  min-height: var(--override-control-40);
+  padding: 0 var(--override-space-14);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--field);

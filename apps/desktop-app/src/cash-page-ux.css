@@ -7,11 +7,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 56px;
-  margin: 16px 0 0;
-  padding: 12px 46px 12px 16px;
+  min-height: calc(var(--space-10) + var(--space-4));
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) var(--override-space-46) var(--space-3) var(--space-4);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-xl);
   background: var(--surface-1);
   cursor: pointer;
   user-select: none;
@@ -26,7 +26,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: var(--override-space-2);
 }
 
 .reports-page .cash-details-toggle span {
@@ -49,7 +49,7 @@
 
 .reports-page .cash-details-toggle:focus-visible {
   outline: 2px solid var(--border-focus);
-  outline-offset: 2px;
+  outline-offset: var(--override-space-2);
 }
 
 .reports-page .cash-details-toggle:hover {
@@ -60,7 +60,7 @@
 .reports-page .cash-details-toggle > div::after {
   content: "Aç";
   position: absolute;
-  right: 16px;
+  right: var(--space-4);
   top: 50%;
   transform: translateY(-50%);
   color: var(--primary);
@@ -73,13 +73,13 @@
 }
 
 .reports-page:not(.reports-details-collapsed) .cash-details-toggle {
-  margin-bottom: 14px;
+  margin-bottom: var(--override-space-14);
   border-color: var(--primary-border);
   background: var(--primary-soft);
 }
 
 @media (max-width: 760px) {
   .reports-page .cash-details-toggle {
-    padding-right: 42px;
+    padding-right: var(--override-space-42);
   }
 }

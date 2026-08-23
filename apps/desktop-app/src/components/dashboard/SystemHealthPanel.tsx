@@ -128,7 +128,7 @@ export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPane
       setSyncStatus((current) => current ? {
         ...current,
         phase: "error",
-        message: "Senkron kontrolü tamamlanamadı."
+        message: "Web bağlantısı kontrol edilemedi. Biraz sonra yeniden deneyin."
       } : current);
     } finally {
       setSyncing(false);
@@ -175,7 +175,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
   if (!webUrl) {
     return {
       key: "web",
-      label: "Web senkron",
+      label: "Web bağlantısı",
       value: "Bağlantı yok",
       detail: "Web modülü adresi Ayarlar bölümünden tamamlanmalı.",
       tone: "warn",
@@ -185,7 +185,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
   if (!enabled) {
     return {
       key: "web",
-      label: "Web senkron",
+      label: "Web bağlantısı",
       value: "Otomatik eşitleme kapalı",
       detail: compactUrl(webUrl),
       tone: "warn",
@@ -195,7 +195,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
   if (status?.phase === "offline" || status?.phase === "error") {
     return {
       key: "web",
-      label: "Web senkron",
+      label: "Web bağlantısı",
       value: status.phase === "offline" ? "Çevrimdışı" : "Hata",
       detail: status.message || compactUrl(webUrl),
       tone: status.phase === "offline" ? "warn" : "danger",
@@ -205,7 +205,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
   if (status?.phase === "syncing") {
     return {
       key: "web",
-      label: "Web senkron",
+      label: "Web bağlantısı",
       value: "Eşitleniyor",
       detail: status.pendingJobs > 0 ? `${status.pendingJobs} değişiklik sırada.` : compactUrl(webUrl),
       tone: "info",
@@ -215,7 +215,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
   if (status?.pendingJobs && status.pendingJobs > 0) {
     return {
       key: "web",
-      label: "Web senkron",
+      label: "Web bağlantısı",
       value: `${status.pendingJobs} değişiklik bekliyor`,
       detail: status.lastSuccessAt ? `Son başarılı: ${formatRelativeTime(status.lastSuccessAt)}` : compactUrl(webUrl),
       tone: "info",
@@ -224,7 +224,7 @@ function buildWebHealth(webUrl: string, enabled: boolean, status: AutomaticSyncS
   }
   return {
     key: "web",
-    label: "Web senkron",
+    label: "Web bağlantısı",
     value: "Hazır",
     detail: status?.lastSuccessAt ? `Son başarılı: ${formatRelativeTime(status.lastSuccessAt)}` : compactUrl(webUrl),
     tone: "ok",

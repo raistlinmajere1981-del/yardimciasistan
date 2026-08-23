@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ExternalLink, Plus, RefreshCw, Save, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
 import type { AndroidPermissionGroupId, AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
@@ -12,7 +12,7 @@ import {
   toAiServiceFormDraft,
   type SetupFormState
 } from "../../app/setup-model";
-import { UI_SCALE_OPTIONS, type UiPreferences } from "../../ui-preferences";
+import { UI_SCALE_OPTIONS, type UiMode, type UiPreferences } from "../../ui-preferences";
 import { PasswordSettings } from "../security/PasswordSettings";
 import { RoomManagementSection } from "./RoomManagementSection";
 
@@ -99,6 +99,7 @@ export function SetupWizard({
   const [aiApiKeyRevealState, setAiApiKeyRevealState] = useState<"idle" | "loading" | "error">("idle");
   const [aiApiKeyRevealMessage, setAiApiKeyRevealMessage] = useState("");
   const selectedAiServiceRef = useRef(form.aiService);
+  const appearanceModeRefs = useRef<Record<UiMode, HTMLButtonElement | null>>({ easy: null, pro: null });
   const [settingsLevel, setSettingsLevel] = useState<"basic" | "advanced">("basic");
   const [webConnectionTestState, setWebConnectionTestState] = useState<SyncState>("idle");
   const [webConnectionTestMessage, setWebConnectionTestMessage] = useState("Web bağlantısı henüz denenmedi.");
@@ -119,6 +120,28 @@ export function SetupWizard({
 
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
+  };
+
+  const handleAppearanceModeKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, currentMode: UiMode) => {
+    const modes: UiMode[] = ["easy", "pro"];
+    const currentIndex = modes.indexOf(currentMode);
+    let nextMode: UiMode | undefined;
+
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextMode = modes[(currentIndex + 1) % modes.length];
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextMode = modes[(currentIndex - 1 + modes.length) % modes.length];
+    } else if (event.key === "Home") {
+      nextMode = modes[0];
+    } else if (event.key === "End") {
+      nextMode = modes[modes.length - 1];
+    }
+
+    if (!nextMode) return;
+
+    event.preventDefault();
+    onUiPreferencesChange({ ...uiPreferences, mode: nextMode });
+    appearanceModeRefs.current[nextMode]?.focus();
   };
 
   const updateTableCategory = (key: string, field: "name" | "tableCount", value: string) => {
@@ -210,7 +233,7 @@ export function SetupWizard({
     const bridge = window.yardimciDesktop;
     if (!bridge?.revealAiApiKey) {
       setAiApiKeyRevealState("error");
-      setAiApiKeyRevealMessage("API anahtarı gösterilemiyor. Uygulamayı yeniden başlatın.");
+      setAiApiKeyRevealMessage("Bağlantı anahtarı gösterilemiyor. Uygulamayı yeniden başlatın.");
       return;
     }
 
@@ -328,12 +351,44 @@ export function SetupWizard({
           <button className={settingsLevel === "advanced" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "advanced"} onClick={() => setSettingsLevel("advanced")}>Gelişmiş Ayarlar</button>
         </div>
         {settingsLevel === "basic" && <div className="settings-section-grid settings-basic-grid">
-        {embedded && <div className="setup-section appearance-settings">
+        <div className="setup-section appearance-settings">
           <div className="setup-section-title">
             <h2>Uygulama Görünümü</h2>
           </div>
-          <p className="setup-section-description">Ekranınıza uygun boyutu ve tema görünümünü seçin. Değişiklikler anında uygulanır ve bu bilgisayarda saklanır.</p>
-          <div className="setup-grid two">
+          <p className="setup-section-description">Size rahat gelen görünümü seçin. Değişiklikler anında uygulanır ve bu bilgisayarda saklanır.</p>
+          <div className="appearance-mode-options" role="radiogroup" aria-label="Görünüm biçimi">
+            <button
+              className={`appearance-mode-card${uiPreferences.mode === "easy" ? " is-selected" : ""}`}
+              ref={(node) => {
+                appearanceModeRefs.current.easy = node;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={uiPreferences.mode === "easy"}
+              tabIndex={uiPreferences.mode === "easy" ? 0 : -1}
+              onClick={() => onUiPreferencesChange({ ...uiPreferences, mode: "easy" })}
+              onKeyDown={(event) => handleAppearanceModeKeyDown(event, "easy")}
+            >
+              <strong>Büyük ve Sade Görünüm <span>(Önerilen)</span></strong>
+              <small>Daha büyük yazılar, ferah alanlar ve sıcak bir görünüm sunar.</small>
+            </button>
+            <button
+              className={`appearance-mode-card${uiPreferences.mode === "pro" ? " is-selected" : ""}`}
+              ref={(node) => {
+                appearanceModeRefs.current.pro = node;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={uiPreferences.mode === "pro"}
+              tabIndex={uiPreferences.mode === "pro" ? 0 : -1}
+              onClick={() => onUiPreferencesChange({ ...uiPreferences, mode: "pro" })}
+              onKeyDown={(event) => handleAppearanceModeKeyDown(event, "pro")}
+            >
+              <strong>Kompakt ve Gelişmiş Görünüm</strong>
+              <small>Daha çok bilgiyi ekrana sığdırır; açık veya karanlık tema seçmenizi sağlar.</small>
+            </button>
+          </div>
+          <div className={`setup-grid appearance-controls${uiPreferences.mode === "pro" ? " two" : ""}`}>
             <label>
               Arayüz ölçeği
               <select
@@ -346,7 +401,7 @@ export function SetupWizard({
               </select>
               <small>Metinler, menüler ve içerik alanları birlikte ölçeklenir.</small>
             </label>
-            <div className="setup-field">
+            {uiPreferences.mode === "pro" && <div className="setup-field">
               <span>Tema</span>
               <label className="setup-checkline appearance-theme-toggle">
                 <input
@@ -357,9 +412,9 @@ export function SetupWizard({
                 Karanlık tema
               </label>
               <small>Az ışıklı ortamlarda daha rahat bir görünüm sağlar.</small>
-            </div>
+            </div>}
           </div>
-        </div>}
+        </div>
         <div className="setup-section settings-identity-section">
           <div className="setup-section-title">
             {!embedded && <p>Firma Bilgileri</p>}
@@ -611,7 +666,7 @@ export function SetupWizard({
                       {aiApiKeyRevealState === "loading" ? "Açılıyor" : showGoogleCurl ? "Gizle" : "Göster"}
                     </button>
                   </div>
-                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz." : "Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır."}</small>
+                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz." : "Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır."}</small>
                   {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
                 </div>
                 {renderAiConnectionActions(true)}
@@ -665,7 +720,7 @@ export function SetupWizard({
                   {aiApiKeyRevealState === "loading" ? "Açılıyor" : showAiApiKey ? "Gizle" : "Göster"}
                 </button>
               </div>
-              <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı API anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
+              <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
               {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
             </div>}
             {form.aiStoredApiKeyConfigured && (

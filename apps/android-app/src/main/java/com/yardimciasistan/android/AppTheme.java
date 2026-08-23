@@ -24,19 +24,19 @@ final class AppTheme {
     }
 
     static Mode fromStoredValue(String value) {
-      if (DAY.storedValue.equals(value)) {
-        return DAY;
+      if (NIGHT.storedValue.equals(value)) {
+        return NIGHT;
       }
-      // Unknown values intentionally fall back to night. Future SYSTEM/AUTO modes can
+      // Unknown values intentionally fall back to day. Future SYSTEM/AUTO modes can
       // be added here without changing the persistence or token consumers.
-      return NIGHT;
+      return DAY;
     }
   }
 
   private AppTheme() {}
 
   static Mode load(SharedPreferences preferences) {
-    return Mode.fromStoredValue(preferences.getString(KEY_MODE, Mode.NIGHT.storedValue));
+    return Mode.fromStoredValue(preferences.getString(KEY_MODE, Mode.DAY.storedValue));
   }
 
   static boolean save(SharedPreferences preferences, Mode mode) {

@@ -1,19 +1,19 @@
 .system-health-panel {
-  margin-top: 18px;
+  margin-top: var(--override-space-18);
 }
 
 .system-health-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 14px;
+  gap: var(--space-4);
+  margin-bottom: var(--override-space-14);
 }
 
 .system-health-heading p {
-  margin: 0 0 3px;
-  color: var(--text-muted, #7d8795);
-  font-size: 0.76rem;
+  margin: 0 0 var(--override-space-3);
+  color: var(--override-health-muted, #7d8795);
+  font-size: var(--override-text-076);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -21,7 +21,7 @@
 
 .system-health-heading h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-md);
 }
 
 .system-health-heading-actions {
@@ -29,100 +29,100 @@
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .system-health-summary {
   border-radius: 999px;
-  padding: 5px 9px;
-  font-size: 0.73rem;
+  padding: var(--override-space-5) var(--override-space-9);
+  font-size: var(--override-text-073);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .system-health-summary.is-ok {
-  background: color-mix(in srgb, #2f9e62 14%, transparent);
-  color: #2f9e62;
+  background: color-mix(in srgb, var(--override-health-ok, #2f9e62) 14%, transparent);
+  color: var(--override-health-ok, #2f9e62);
 }
 
 .system-health-summary.is-warning {
-  background: color-mix(in srgb, #c98b22 15%, transparent);
-  color: #b27a1e;
+  background: color-mix(in srgb, var(--override-health-warning-fill, #c98b22) 15%, transparent);
+  color: var(--override-health-warning, #b27a1e);
 }
 
 .system-health-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
+  gap: var(--override-space-10);
 }
 
 .system-health-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 9px;
+  gap: var(--override-space-9);
   min-width: 0;
-  border: 1px solid var(--border-soft, rgba(128, 139, 156, 0.2));
-  border-radius: 12px;
-  padding: 11px;
-  background: color-mix(in srgb, var(--surface-elevated, #ffffff) 88%, transparent);
+  border: 1px solid var(--override-health-border, rgba(128, 139, 156, 0.2));
+  border-radius: var(--override-radius-12);
+  padding: var(--override-space-11);
+  background: color-mix(in srgb, var(--override-health-surface, #ffffff) 88%, transparent);
 }
 
 .system-health-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
+  width: var(--override-size-30);
+  height: var(--override-size-30);
+  border-radius: var(--override-radius-9);
   background: color-mix(in srgb, currentColor 10%, transparent);
 }
 
 .system-health-item > div {
   display: grid;
-  gap: 2px;
+  gap: var(--override-space-2);
   min-width: 0;
 }
 
 .system-health-item span:not(.system-health-icon) {
-  color: var(--text-muted, #7d8795);
-  font-size: 0.72rem;
+  color: var(--override-health-muted, #7d8795);
+  font-size: var(--text-xs);
 }
 
 .system-health-item strong {
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 0.87rem;
+  font-size: var(--override-text-087);
   white-space: nowrap;
 }
 
 .system-health-item small {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--text-muted, #7d8795);
-  font-size: 0.69rem;
+  color: var(--override-health-muted, #7d8795);
+  font-size: var(--override-text-069);
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
 .system-health-item.tone-ok {
-  color: #2f9e62;
+  color: var(--override-health-ok, #2f9e62);
 }
 
 .system-health-item.tone-warn {
-  color: #b27a1e;
+  color: var(--override-health-warning, #b27a1e);
 }
 
 .system-health-item.tone-danger {
-  color: #c84f4f;
+  color: var(--override-health-danger, #c84f4f);
 }
 
 .system-health-item.tone-info {
-  color: #3d7edb;
+  color: var(--override-health-info, #3d7edb);
 }
 
 .system-health-item.tone-muted {
-  color: var(--text-muted, #7d8795);
+  color: var(--override-health-muted, #7d8795);
 }
 
 .is-spinning {

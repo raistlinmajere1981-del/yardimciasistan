@@ -17,7 +17,7 @@ export const defaultAutomaticSyncStatus: AutomaticSyncStatus = {
   pendingJobs: 0,
   nextRetryAt: "",
   phase: "idle",
-  message: "Otomatik senkron hazır."
+  message: "Otomatik eşitleme hazır."
 };
 
 export function readSidebarCollapsedPreference() {

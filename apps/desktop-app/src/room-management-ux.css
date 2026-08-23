@@ -14,13 +14,13 @@
 
 .room-management-heading {
   align-items: center;
-  gap: 18px;
+  gap: var(--override-space-18);
 }
 
 .room-management-heading > div:first-child > p {
-  margin: 0 0 3px;
+  margin: 0 0 var(--override-space-3);
   color: var(--accent);
-  font-size: 11px;
+  font-size: var(--override-text-11);
   font-weight: 750;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -34,39 +34,39 @@
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
-  gap: 12px;
+  gap: var(--space-3);
   margin-left: auto;
 }
 
 .room-management-count-control {
   display: grid;
-  grid-template-columns: auto 72px;
-  gap: 7px;
+  grid-template-columns: auto calc(var(--space-10) + var(--space-8));
+  gap: var(--override-space-7);
   align-items: center;
 }
 
 .room-management-count-control > span {
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: var(--override-text-11);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .room-management-count-input {
-  width: 72px;
-  min-height: 32px;
-  padding-block: 4px;
+  width: calc(var(--space-10) + var(--space-8));
+  min-height: var(--override-control-32);
+  padding-block: var(--space-1);
   text-align: center;
 }
 
 .room-management-save-state {
-  min-width: 150px;
-  min-height: 32px;
+  min-width: calc(var(--space-10) + var(--space-10) + var(--space-10) + var(--space-6) + var(--override-space-6));
+  min-height: var(--override-control-32);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   color: var(--ink-muted);
-  font-size: 12px;
+  font-size: var(--override-text-12);
   font-weight: 650;
   text-align: right;
 }
@@ -81,32 +81,32 @@
 
 .room-management-list {
   display: grid;
-  gap: 4px;
-  margin-top: 12px;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
 }
 
 .room-management-list-head,
 .room-management-row {
   display: grid;
   grid-template-columns: 110px minmax(280px, 1fr) minmax(190px, 320px);
-  gap: 10px;
+  gap: var(--override-space-10);
   align-items: center;
 }
 
 .room-management-list-head {
-  padding: 0 9px 3px;
+  padding: 0 var(--override-space-9) var(--override-space-3);
   color: var(--ink-muted);
-  font-size: 10px;
+  font-size: var(--override-text-10);
   font-weight: 750;
   letter-spacing: .035em;
   text-transform: uppercase;
 }
 
 .room-management-row {
-  min-height: 42px;
-  padding: 5px 9px;
+  min-height: var(--override-control-42);
+  padding: var(--override-space-5) var(--override-space-9);
   border: 1px solid var(--line-soft);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--surface-subtle);
 }
 
@@ -118,34 +118,34 @@
   display: block;
   overflow: hidden;
   color: var(--ink);
-  font-size: 12px;
+  font-size: var(--override-text-12);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .room-management-row input {
   width: 100%;
-  min-height: 31px;
-  padding-block: 4px;
+  min-height: var(--override-control-31);
+  padding-block: var(--space-1);
 }
 
 .room-management-price-wrap {
   display: grid;
   grid-template-columns: minmax(100px, 1fr) auto;
-  gap: 7px;
+  gap: var(--override-space-7);
   align-items: center;
 }
 
 .room-management-price-wrap > span {
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: var(--override-text-11);
   white-space: nowrap;
 }
 
 .room-management-loading {
-  padding: 14px;
+  padding: var(--override-space-14);
   border: 1px dashed var(--line-soft);
-  border-radius: 9px;
+  border-radius: var(--override-radius-9);
   color: var(--ink-muted);
   text-align: center;
 }
@@ -158,16 +158,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  margin-top: 10px;
-  padding-top: 10px;
+  gap: var(--override-space-14);
+  margin-top: var(--override-space-10);
+  padding-top: var(--override-space-10);
   border-top: 1px solid var(--line-soft);
 }
 
 .room-management-footer > span {
   max-width: 760px;
   color: var(--ink-muted);
-  font-size: 11px;
+  font-size: var(--override-text-11);
   line-height: 1.4;
 }
 
@@ -179,9 +179,9 @@
 .room-folio-close,
 .drawer-close-button {
   width: auto !important;
-  min-width: 68px;
-  padding-inline: 12px !important;
-  font-size: 12px !important;
+  min-width: calc(var(--space-10) + var(--override-space-28));
+  padding-inline: var(--space-3) !important;
+  font-size: var(--override-text-12) !important;
   font-weight: 700;
 }
 
@@ -202,7 +202,7 @@
 
 .room-folio-checkout-button::after {
   content: "Konaklamayı Bitir";
-  font-size: 13px;
+  font-size: var(--override-text-13);
   font-weight: 750;
 }
 
@@ -213,7 +213,7 @@
 
 .table-order-footer-action-group.is-close > button:first-child::after {
   content: "Ödendi / Adisyonu Kapat";
-  font-size: 12px;
+  font-size: var(--override-text-12);
   font-weight: 700;
 }
 
