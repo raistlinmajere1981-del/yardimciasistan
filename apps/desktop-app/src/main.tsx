@@ -17,6 +17,7 @@ import "./room-card-ux.css";
 import "./room-management-ux.css";
 import "./secondary-pages-ux.css";
 import "./menu-image-preview-ux.css";
+import "./backup-manager-ux.css";
 import { applyUiPreferences, readUiPreferences } from "./ui-preferences";
 
 applyUiPreferences(readUiPreferences());
