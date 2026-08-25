@@ -1,4 +1,4 @@
-import { ArchiveRestore, Save, Trash2 } from "lucide-react";
+import { RotateCcw, Save, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 type MaintenanceState = "idle" | "loading" | "success" | "error";
@@ -115,7 +115,7 @@ export function DataMaintenanceSettings() {
           {action === "backup" ? "Yedekleniyor" : "Yedek Al"}
         </button>
         <button className="setup-secondary" type="button" onClick={() => void restoreBackup()} disabled={busy}>
-          <ArchiveRestore size={16} aria-hidden="true" />
+          <RotateCcw size={16} aria-hidden="true" />
           {action === "restore" ? "Yedek Seçiliyor" : "Yedekten Geri Yükle"}
         </button>
         <button className="setup-secondary password-remove-button" type="button" onClick={() => void resetLocalData()} disabled={busy}>
