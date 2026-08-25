@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { KeyRound, LockKeyhole, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { DataMaintenanceSettings } from "../settings/DataMaintenanceSettings";
 
 interface PasswordSettingsProps {
   configured: boolean;
@@ -145,116 +146,119 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
   }
 
   return (
-    <div className="setup-section settings-password-section">
-      <div className="setup-section-title settings-password-title">
-        <div>
-          <p>Gizlilik</p>
-          <h2>Uygulama Şifresi</h2>
+    <>
+      <div className="setup-section settings-password-section">
+        <div className="setup-section-title settings-password-title">
+          <div>
+            <p>Gizlilik</p>
+            <h2>Uygulama Şifresi</h2>
+          </div>
+          <span className={configured ? "password-status is-enabled" : "password-status"}>
+            {configured ? <ShieldCheck size={16} aria-hidden="true" /> : <ShieldOff size={16} aria-hidden="true" />}
+            {configured ? "Şifre açık" : "İsteğe bağlı"}
+          </span>
         </div>
-        <span className={configured ? "password-status is-enabled" : "password-status"}>
-          {configured ? <ShieldCheck size={16} aria-hidden="true" /> : <ShieldOff size={16} aria-hidden="true" />}
-          {configured ? "Şifre açık" : "İsteğe bağlı"}
-        </span>
-      </div>
-      <p className="setup-section-description">
-        Uygulama açılışını ve üst bardaki ekran kilidini korur. Şifreniz düz metin olarak saklanmaz.
-      </p>
+        <p className="setup-section-description">
+          Uygulama açılışını ve üst bardaki ekran kilidini korur. Şifreniz düz metin olarak saklanmaz.
+        </p>
 
-      <form className="password-settings-form" onSubmit={savePassword}>
-        {configured && (
-          <label>
-            Mevcut şifre
-            <span className="password-settings-input">
-              <KeyRound size={16} aria-hidden="true" />
-              <input
-                value={currentPassword}
-                onChange={(event) => setCurrentPassword(event.target.value)}
-                type="password"
-                autoComplete="current-password"
-                placeholder="Mevcut şifreniz"
-                disabled={Boolean(busyAction)}
-              />
-            </span>
-          </label>
-        )}
-        <div className="password-settings-grid">
-          <label>
-            {configured ? "Yeni şifre" : "Şifre belirleyin"}
-            <input
-              value={newPassword}
-              onChange={(event) => setNewPassword(event.target.value)}
-              type="password"
-              autoComplete="new-password"
-              placeholder="En az 6 karakter"
-              disabled={Boolean(busyAction)}
-            />
-          </label>
-          <label>
-            Yeni şifre tekrar
-            <input
-              value={passwordConfirmation}
-              onChange={(event) => setPasswordConfirmation(event.target.value)}
-              type="password"
-              autoComplete="new-password"
-              placeholder="Şifreyi tekrar girin"
-              disabled={Boolean(busyAction)}
-            />
-          </label>
-        </div>
-        <div className="password-settings-actions">
-          <button className="setup-primary" type="submit" disabled={Boolean(busyAction)}>
-            <LockKeyhole size={16} aria-hidden="true" />
-            {busyAction === "save"
-              ? "Kaydediliyor"
-              : configured
-                ? "Şifreyi Değiştir"
-                : "Şifreyi Belirle"}
-          </button>
+        <form className="password-settings-form" onSubmit={savePassword}>
           {configured && (
-            <button className="setup-secondary password-remove-button" type="button" onClick={removePassword} disabled={Boolean(busyAction)}>
-              <Trash2 size={16} aria-hidden="true" />
-              {busyAction === "remove" ? "Kaldırılıyor" : "Şifreyi Kaldır"}
-            </button>
-          )}
-        </div>
-      </form>
-
-      {configured && (
-        <div className="password-settings-recovery">
-          <button
-            className="password-settings-link"
-            type="button"
-            aria-expanded={recoveryOpen}
-            onClick={() => setRecoveryOpen((current) => !current)}
-            disabled={Boolean(busyAction)}
-          >
-            <RotateCcw size={15} aria-hidden="true" />
-            Şifremi Unuttum
-          </button>
-          {recoveryOpen && (
-            <form onSubmit={resetPassword}>
-              <label>
-                Web güvenlik anahtarı
+            <label>
+              Mevcut şifre
+              <span className="password-settings-input">
+                <KeyRound size={16} aria-hidden="true" />
                 <input
-                  value={webSecurityKey}
-                  onChange={(event) => setWebSecurityKey(event.target.value)}
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
                   type="password"
-                  autoComplete="off"
-                  placeholder="Web bağlantısındaki güvenlik anahtarı"
+                  autoComplete="current-password"
+                  placeholder="Mevcut şifreniz"
                   disabled={Boolean(busyAction)}
                 />
-              </label>
-              <button type="submit" disabled={Boolean(busyAction)}>
-                {busyAction === "reset" ? "Kontrol ediliyor" : "Şifreyi Sıfırla"}
-              </button>
-            </form>
+              </span>
+            </label>
           )}
-        </div>
-      )}
+          <div className="password-settings-grid">
+            <label>
+              {configured ? "Yeni şifre" : "Şifre belirleyin"}
+              <input
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                type="password"
+                autoComplete="new-password"
+                placeholder="En az 6 karakter"
+                disabled={Boolean(busyAction)}
+              />
+            </label>
+            <label>
+              Yeni şifre tekrar
+              <input
+                value={passwordConfirmation}
+                onChange={(event) => setPasswordConfirmation(event.target.value)}
+                type="password"
+                autoComplete="new-password"
+                placeholder="Şifreyi tekrar girin"
+                disabled={Boolean(busyAction)}
+              />
+            </label>
+          </div>
+          <div className="password-settings-actions">
+            <button className="setup-primary" type="submit" disabled={Boolean(busyAction)}>
+              <LockKeyhole size={16} aria-hidden="true" />
+              {busyAction === "save"
+                ? "Kaydediliyor"
+                : configured
+                  ? "Şifreyi Değiştir"
+                  : "Şifreyi Belirle"}
+            </button>
+            {configured && (
+              <button className="setup-secondary password-remove-button" type="button" onClick={removePassword} disabled={Boolean(busyAction)}>
+                <Trash2 size={16} aria-hidden="true" />
+                {busyAction === "remove" ? "Kaldırılıyor" : "Şifreyi Kaldır"}
+              </button>
+            )}
+          </div>
+        </form>
 
-      <p className={`password-settings-message is-${messageTone}`} role="status" aria-live="polite">
-        {message}
-      </p>
-    </div>
+        {configured && (
+          <div className="password-settings-recovery">
+            <button
+              className="password-settings-link"
+              type="button"
+              aria-expanded={recoveryOpen}
+              onClick={() => setRecoveryOpen((current) => !current)}
+              disabled={Boolean(busyAction)}
+            >
+              <RotateCcw size={15} aria-hidden="true" />
+              Şifremi Unuttum
+            </button>
+            {recoveryOpen && (
+              <form onSubmit={resetPassword}>
+                <label>
+                  Web güvenlik anahtarı
+                  <input
+                    value={webSecurityKey}
+                    onChange={(event) => setWebSecurityKey(event.target.value)}
+                    type="password"
+                    autoComplete="off"
+                    placeholder="Web bağlantısındaki güvenlik anahtarı"
+                    disabled={Boolean(busyAction)}
+                  />
+                </label>
+                <button type="submit" disabled={Boolean(busyAction)}>
+                  {busyAction === "reset" ? "Kontrol ediliyor" : "Şifreyi Sıfırla"}
+                </button>
+              </form>
+            )}
+          </div>
+        )}
+
+        <p className={`password-settings-message is-${messageTone}`} role="status" aria-live="polite">
+          {message}
+        </p>
+      </div>
+      <DataMaintenanceSettings />
+    </>
   );
 }
