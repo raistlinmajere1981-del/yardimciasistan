@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-electron/
 dist-renderer/
+backup/
 apps/android-app/build/
 .gradle/
 apps/android-app/.debug/
