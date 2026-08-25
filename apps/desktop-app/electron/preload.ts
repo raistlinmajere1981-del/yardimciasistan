@@ -47,6 +47,7 @@ import type {
   GenerateDesktopReportAiInput,
   GenerateDesktopReportAiResult
 } from "./database";
+import type { DesktopDataMaintenanceResult } from "./data-maintenance";
 import type {
   AddPensionPaymentInput,
   DesktopFinanceData,
@@ -171,6 +172,8 @@ export interface DesktopBridge {
   deleteDailyTask: (taskId: string) => Promise<DesktopStatusUpdateResult>;
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => Promise<DesktopStatusUpdateResult>;
   createManualBackup: () => Promise<DesktopBackupResult>;
+  restoreLocalBackup: () => Promise<DesktopDataMaintenanceResult>;
+  resetLocalData: () => Promise<DesktopDataMaintenanceResult>;
   createOwnerReplySuggestion: (requestId: string) => Promise<RequestAiSuggestionResult>;
   generateAiWorkspace: (input: GenerateAiWorkspaceInput) => Promise<GenerateAiWorkspaceResult>;
   getAiWorkspaceHistory: (limit?: number) => Promise<AiWorkspaceHistoryEntry[]>;
@@ -276,6 +279,8 @@ const bridge: DesktopBridge = {
   deleteDailyTask: (taskId: string) => ipcRenderer.invoke("dailyTask:delete", taskId),
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => ipcRenderer.invoke("dailyTask:updateStatus", input),
   createManualBackup: () => ipcRenderer.invoke("backup:createManual"),
+  restoreLocalBackup: () => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:restoreBackup"),
+  resetLocalData: () => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:resetLocalData"),
   createOwnerReplySuggestion: (requestId: string) => ipcRenderer.invoke("ai:createOwnerReplySuggestion", requestId),
   generateAiWorkspace: (input: GenerateAiWorkspaceInput) => ipcRenderer.invoke("ai:generateWorkspace", input),
   getAiWorkspaceHistory: (limit?: number) => ipcRenderer.invoke("ai:getWorkspaceHistory", limit),
