@@ -17,7 +17,6 @@ import type {
   SaveAiWorkspaceResultInput,
   SaveAiWorkspaceResult,
   AiWorkspaceHistoryEntry,
-  DesktopBackupResult,
   DesktopAndroidDeviceMutationResult,
   DesktopStatusUpdateResult,
   UpdateRequestStatusInput,
@@ -47,7 +46,12 @@ import type {
   GenerateDesktopReportAiInput,
   GenerateDesktopReportAiResult
 } from "./database";
-import type { DesktopDataMaintenanceResult } from "./data-maintenance";
+import type {
+  DesktopBackupActionResult,
+  DesktopBackupCreateResult,
+  DesktopBackupListResult,
+  DesktopDataMaintenanceResult
+} from "./data-maintenance";
 import type {
   AddPensionPaymentInput,
   DesktopFinanceData,
@@ -171,8 +175,12 @@ export interface DesktopBridge {
   saveDailyTask: (input: SaveDailyTaskInput) => Promise<DesktopStatusUpdateResult>;
   deleteDailyTask: (taskId: string) => Promise<DesktopStatusUpdateResult>;
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => Promise<DesktopStatusUpdateResult>;
-  createManualBackup: () => Promise<DesktopBackupResult>;
-  restoreLocalBackup: () => Promise<DesktopDataMaintenanceResult>;
+  createManualBackup: () => Promise<DesktopBackupCreateResult>;
+  listLocalBackups: () => Promise<DesktopBackupListResult>;
+  openLocalBackupDirectory: () => Promise<DesktopBackupActionResult>;
+  openLocalBackupItemDirectory: (backupId: string) => Promise<DesktopBackupActionResult>;
+  deleteLocalBackup: (backupId: string) => Promise<DesktopBackupActionResult>;
+  restoreLocalBackup: (backupId: string) => Promise<DesktopDataMaintenanceResult>;
   resetLocalData: () => Promise<DesktopDataMaintenanceResult>;
   createOwnerReplySuggestion: (requestId: string) => Promise<RequestAiSuggestionResult>;
   generateAiWorkspace: (input: GenerateAiWorkspaceInput) => Promise<GenerateAiWorkspaceResult>;
@@ -278,8 +286,12 @@ const bridge: DesktopBridge = {
   saveDailyTask: (input: SaveDailyTaskInput) => ipcRenderer.invoke("dailyTask:save", input),
   deleteDailyTask: (taskId: string) => ipcRenderer.invoke("dailyTask:delete", taskId),
   updateDailyTaskStatus: (input: UpdateDailyTaskStatusInput) => ipcRenderer.invoke("dailyTask:updateStatus", input),
-  createManualBackup: () => ipcRenderer.invoke("backup:createManual"),
-  restoreLocalBackup: () => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:restoreBackup"),
+  createManualBackup: () => invokeWhenUnlocked<DesktopBackupCreateResult>("dataMaintenance:createBackup"),
+  listLocalBackups: () => invokeWhenUnlocked<DesktopBackupListResult>("dataMaintenance:listBackups"),
+  openLocalBackupDirectory: () => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:openBackupDirectory"),
+  openLocalBackupItemDirectory: (backupId: string) => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:openBackupItemDirectory", backupId),
+  deleteLocalBackup: (backupId: string) => invokeWhenUnlocked<DesktopBackupActionResult>("dataMaintenance:deleteBackup", backupId),
+  restoreLocalBackup: (backupId: string) => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:restoreBackup", backupId),
   resetLocalData: () => invokeWhenUnlocked<DesktopDataMaintenanceResult>("dataMaintenance:resetLocalData"),
   createOwnerReplySuggestion: (requestId: string) => ipcRenderer.invoke("ai:createOwnerReplySuggestion", requestId),
   generateAiWorkspace: (input: GenerateAiWorkspaceInput) => ipcRenderer.invoke("ai:generateWorkspace", input),
