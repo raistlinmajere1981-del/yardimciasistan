@@ -107,7 +107,7 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
 
   async function handleCreateManualBackup() {
     setBackupState("loading");
-    setBackupMessage("Yerel kayıtların yedeği oluşturuluyor...");
+    setBackupMessage("Yerel kayıtların ve QR menü görsellerinin yedeği oluşturuluyor...");
 
     if (!window.yardimciDesktop) {
       setBackupState("error");
@@ -122,9 +122,8 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
       return;
     }
 
-    setDashboardData(result.dashboardData);
     setBackupState("success");
-    setBackupMessage(`${result.message} ${result.backupFileName}`);
+    setBackupMessage(`${result.message} ${result.backup.folderName}`);
   }
 
   return {
