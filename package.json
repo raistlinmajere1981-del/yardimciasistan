@@ -19,6 +19,7 @@
     "pilot:prepare-ui": "npx playwright install chromium",
     "build:android": "npm run android:debug",
     "android:debug": "npm run debug -w @yardimci-asistan/android-app",
+    "android:install": "node scripts/install-android-app.mjs",
     "android:release-apk": "npm run release-apk -w @yardimci-asistan/android-app",
     "android:release-aab": "npm run release-aab -w @yardimci-asistan/android-app",
     "configure:android:connection": "node scripts/configure-android-connection.mjs",

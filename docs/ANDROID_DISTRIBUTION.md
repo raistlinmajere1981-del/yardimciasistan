@@ -79,6 +79,31 @@ cache'inde tutulur; repoya eklenmez. JDK 17 ve Android SDK Platform 36 gerekir.
 Runner, `ANDROID_HOME`/`ANDROID_SDK_ROOT` yanında Linux'ta `~/Android/Sdk` ve
 Windows'ta `%LOCALAPPDATA%\Android\Sdk` konumlarını da kontrol eder.
 
+## USB ile bağlı geliştirme cihazına kurulum/güncelleme
+
+USB hata ayıklaması açık ve ADB tarafından yetkilendirilmiş telefona debug APK'yı
+derleyip kurmak için depo kökünde çalıştırın:
+
+```bash
+npm run android:install
+```
+
+Uygulama telefonda zaten varsa script `adb install -r` kullanarak uygulama verisini
+korur ve APK'yı günceller. İmza uyuşmazlığında veri kaybına yol açabilecek otomatik
+kaldırma işlemi yapmaz. Kullanılabilir seçenekler:
+
+```bash
+npm run android:install -- --serial <cihaz-serisi>
+npm run android:install -- --no-build
+npm run android:install -- --launch
+npm run android:install -- --release
+```
+
+Birden fazla cihaz bağlıysa `--serial` zorunludur; bunun yerine `ANDROID_SERIAL`
+ortam değişkeni de kullanılabilir. `--release`, aşağıda açıklanan kalıcı release
+keystore yapılandırmasını gerektirir. Tüm seçenekler için
+`npm run android:install -- --help` komutunu kullanın.
+
 ## Release keystore hazırlığı
 
 İlk gerçek pilot APK'dan **önce**, repo dışında kalıcı bir release keystore

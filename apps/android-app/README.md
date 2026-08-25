@@ -134,6 +134,17 @@ npm run android:release-apk
 npm run android:release-aab
 ```
 
+USB hata ayıklaması açık bağlı telefona debug APK'yı tek komutta derleyip kurmak
+veya mevcut kurulumu verisini koruyarak güncellemek için depo kökünde çalıştırın:
+
+```bash
+npm run android:install
+```
+
+Birden fazla bağlı cihaz varsa `npm run android:install -- --serial <cihaz-serisi>`,
+mevcut APK'yı yeniden derlemeden kurmak için `-- --no-build`, imzalı release APK
+için `-- --release` kullanılabilir. Tüm seçenekler `-- --help` ile görülebilir.
+
 Release komutları repo dışındaki kalıcı keystore için environment veya
 git-ignored Gradle properties ister. Keystore kurulumu, sürüm artırma, USB
 debugging gerektirmeyen APK kurulumu ve Play checklist'i

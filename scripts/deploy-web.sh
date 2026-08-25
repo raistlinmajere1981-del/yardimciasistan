@@ -105,6 +105,10 @@ protected_paths=(
   '--exclude=/.env.*'
 )
 
+filter_rsync_changes() {
+  awk '$1 !~ /^\.[fdLDS]$/'
+}
+
 cd -- "$project_root"
 
 if [[ "$skip_pack" == false ]]; then
@@ -176,25 +180,30 @@ show_dry_run() {
   rsync -aznci --delete --omit-dir-times --itemize-changes \
     "${protected_paths[@]}" \
     -e "$rsync_ssh" \
-    "$package_dir/" "$deploy_host:$remote_root/"
+    "$package_dir/" "$deploy_host:$remote_root/" \
+    | filter_rsync_changes
 
   printf '\nCanlıda yoksa eklenecek asset dosyaları:\n'
   rsync -aznci --ignore-existing --omit-dir-times --itemize-changes \
     -e "$rsync_ssh" \
-    "$package_dir/assets/" "$deploy_host:$remote_root/assets/"
+    "$package_dir/assets/" "$deploy_host:$remote_root/assets/" \
+    | filter_rsync_changes
 
   printf '\nCanlıda yoksa eklenecek knowledge dosyaları:\n'
   rsync -aznci --ignore-existing --exclude='/.htaccess' --omit-dir-times --itemize-changes \
     -e "$rsync_ssh" \
-    "$package_dir/knowledge/" "$deploy_host:$remote_root/knowledge/"
+    "$package_dir/knowledge/" "$deploy_host:$remote_root/knowledge/" \
+    | filter_rsync_changes
 
   printf '\nKorumalı klasörlerin erişim kuralları:\n'
   rsync -aznci --omit-dir-times --itemize-changes \
     -e "$rsync_ssh" \
-    "$package_dir/data/.htaccess" "$deploy_host:$remote_root/data/.htaccess"
+    "$package_dir/data/.htaccess" "$deploy_host:$remote_root/data/.htaccess" \
+    | filter_rsync_changes
   rsync -aznci --omit-dir-times --itemize-changes \
     -e "$rsync_ssh" \
-    "$package_dir/knowledge/.htaccess" "$deploy_host:$remote_root/knowledge/.htaccess"
+    "$package_dir/knowledge/.htaccess" "$deploy_host:$remote_root/knowledge/.htaccess" \
+    | filter_rsync_changes
 }
 
 if [[ "$dry_run" == true ]]; then
@@ -330,7 +339,7 @@ verification="$(
     "${protected_paths[@]}" \
     -e "$rsync_ssh" \
     "$package_dir/" "$deploy_host:$remote_root/" 2>&1 \
-    | awk '$1 != ".d"'
+    | filter_rsync_changes
 )"
 if [[ -n "$verification" ]]; then
   printf 'Yayın doğrulaması fark buldu:\n%s\n' "$verification" >&2
@@ -344,7 +353,7 @@ for protected_file in data/.htaccess knowledge/.htaccess; do
     rsync -aznci --omit-dir-times --itemize-changes \
       -e "$rsync_ssh" \
       "$package_dir/$protected_file" "$deploy_host:$remote_root/$protected_file" 2>&1 \
-      | awk '$1 != ".d"'
+      | filter_rsync_changes
   )"
   if [[ -n "$protected_verification" ]]; then
     printf 'Yayın doğrulaması %s için fark buldu:\n%s\n' \

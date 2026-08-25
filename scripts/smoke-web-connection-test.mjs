@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { createRequire } from "node:module";
+import {
+  getDefaultAutoSelectFamilyAttemptTimeout,
+  setDefaultAutoSelectFamilyAttemptTimeout
+} from "node:net";
 
 const require = createRequire(import.meta.url);
 const { testWebConnection } = require("../apps/desktop-app/dist-electron/web-connection-test.js");
+const {
+  configureNetworkFamilyAttemptTimeout,
+  MINIMUM_NETWORK_FAMILY_ATTEMPT_TIMEOUT_MS
+} = require("../apps/desktop-app/dist-electron/network-runtime.js");
 
 const validSecret = "web-connection-secret-123";
 const slowSecret = "slow-connection-secret-123";
@@ -52,6 +60,25 @@ await new Promise((resolve, reject) => {
 });
 
 try {
+  const originalFamilyAttemptTimeout = getDefaultAutoSelectFamilyAttemptTimeout();
+  try {
+    setDefaultAutoSelectFamilyAttemptTimeout(250);
+    assert.equal(
+      configureNetworkFamilyAttemptTimeout(),
+      MINIMUM_NETWORK_FAMILY_ATTEMPT_TIMEOUT_MS,
+      "Electron's short default should be raised for slower dual-stack hosts."
+    );
+
+    setDefaultAutoSelectFamilyAttemptTimeout(2_000);
+    assert.equal(
+      configureNetworkFamilyAttemptTimeout(),
+      2_000,
+      "An operator-supplied higher timeout should be preserved."
+    );
+  } finally {
+    setDefaultAutoSelectFamilyAttemptTimeout(originalFamilyAttemptTimeout);
+  }
+
   const address = server.address();
   assert.ok(address && typeof address === "object");
   const baseUrl = `http://127.0.0.1:${address.port}`;

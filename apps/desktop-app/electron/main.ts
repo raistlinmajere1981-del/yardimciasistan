@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from "electron";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import {
   generateConfiguredChat,
   generateOwnerReplySuggestion,
@@ -102,6 +103,8 @@ import {
   type AppLockStatus,
   type UpdateAppPasswordInput
 } from "./app-lock";
+
+configureNetworkFamilyAttemptTimeout();
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const WHATSAPP_WEB_PARTITION = "persist:yardimci-whatsapp";

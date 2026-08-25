@@ -149,11 +149,16 @@ npm run dev:desktop
 Android geliştirme ve bağlı cihaz kontrolleri:
 
 ```bash
+npm run android:install
 npm run android:phone-test
 npm run android:screenshot
 npm run smoke:android-device-ui
 npm run android:mirror
 ```
+
+`android:install`, debug APK'yı derleyip USB hata ayıklaması açık bağlı telefona
+kurar; uygulama zaten kuruluysa verisini koruyarak günceller. Birden fazla cihaz
+için `-- --serial <cihaz-serisi>`, imzalı pilot APK için `-- --release` eklenebilir.
 
 Daha geniş Linux doğrulama hattı:
 
