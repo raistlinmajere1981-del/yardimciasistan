@@ -1,17 +1,24 @@
 import { app, BrowserWindow } from "electron";
 import path from "node:path";
-import "./main";
 import { DesktopDatabase } from "./database";
+import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers } from "./data-maintenance";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
 import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 
+const userDataPath = () => process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData");
+
+// Restore/reset operations are intentionally applied before main.ts opens the
+// long-lived SQLite connection. This keeps WAL state and live database handles
+// out of destructive maintenance operations.
+applyPendingDataMaintenanceAtStartup(userDataPath());
+const mainProcessReady = import("./main");
+
 // Ana Electron süreci mevcut main.ts içinde kurulmaya devam eder. Finans, oda
-// hesabı ve yan etkisiz web bağlantı testi IPC yüzeyleri ayrı tutulur; kayıtlar
-// ana veritabanı migration'larından sonra yapılır.
-void app.whenReady().then(() => {
+// hesabı, veri bakımı ve yan etkisiz web bağlantı testi IPC yüzeyleri ayrı tutulur;
+// kayıtlar ana veritabanı migration'larından sonra yapılır.
+void mainProcessReady.then(() => app.whenReady()).then(() => {
   setImmediate(() => {
-    const userDataPath = () => process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData");
     const databasePath = () => path.join(userDataPath(), "yardimci-asistan.sqlite");
 
     const publishCommittedMutation = () => {
@@ -41,6 +48,8 @@ void app.whenReady().then(() => {
         database.close();
       }
     };
+
+    registerDataMaintenanceIpcHandlers(userDataPath);
 
     registerFinanceIpcHandlers({
       databasePath,
