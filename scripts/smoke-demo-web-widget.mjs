@@ -46,7 +46,8 @@ try {
   const page = await browser.newPage({ viewport: { width: 420, height: 760 } });
   await page.goto(demoWebUrl, { waitUntil: "networkidle" });
 
-  await expect(page.getByRole("heading", { name: "Deniz Çiçeği Pansiyon & Kafe" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Günlük işletme işlerini/i }).first()).toBeVisible();
+  await expect(page.getByText("Market / Perakende", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Yardımcı Asistan'ı aç" })).toBeVisible();
   await expect(page.locator(".ya-widget-button img.ya-widget-mark")).toHaveAttribute("src", `${webModuleUrl}/assets/yardimci-asistan-symbol.png`);
 
@@ -58,7 +59,7 @@ try {
   });
 
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
-  await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
+  await expect(page.locator(".ya-widget-header strong")).toContainText("Yardımcı Asistan");
   await expect(page.getByRole("heading", { name: "Size nasıl yardımcı olayım?" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
   await expect(page.locator(".ya-widget-panel")).not.toContainText("mm/dd/yyyy");
@@ -142,7 +143,7 @@ async function pullRequests() {
     },
     body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 20 })
   });
-  expect(response.status).toBe(200);
+  expect(response.status()).toBe(200);
   return (await response.json()).requests;
 }
 
