@@ -85,7 +85,7 @@
     "pack:hosting-demo": "node scripts/package-hosting-demo.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "smoke:desktop-clean-startup": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-clean-startup.mjs"
+    "smoke:desktop-clean-startup": "npm run build:packages && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-clean-startup.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
