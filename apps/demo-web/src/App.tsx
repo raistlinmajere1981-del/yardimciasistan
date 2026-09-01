@@ -1,62 +1,44 @@
-import { useEffect, useId, useMemo, useState, type CSSProperties, type FormEvent } from "react";
-import { buildCustomerRequestWhatsAppMessage, createWhatsAppUrl } from "@yardimci-asistan/whatsapp-bridge";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowRight,
   BedDouble,
-  CalendarDays,
-  CalendarPlus,
-  Check,
+  Boxes,
+  CheckCircle2,
   Coffee,
-  Copy,
+  Database,
   Download,
-  Home,
-  Images,
+  Globe2,
+  HardDrive,
   KeyRound,
-  Link2,
-  MapPin,
-  Menu as MenuIcon,
-  MessageCircle,
-  MessageSquareText,
-  Minus,
-  MonitorDown,
-  MonitorSmartphone,
-  Navigation,
-  Phone,
-  Plus,
-  Send,
-  Settings,
+  Layers3,
+  Monitor,
+  PackageSearch,
+  RefreshCw,
+  Server,
   ShieldCheck,
-  Sparkles,
   Smartphone,
+  Sparkles,
+  Store,
   UtensilsCrossed,
-  Users
+  WifiOff
 } from "lucide-react";
-import businessJson from "../config/business.json";
-import ProductGuidePage from "./pages/ProductGuidePage";
-import type { BusinessConfig, PageKey } from "./types";
 
-const business = businessJson as BusinessConfig;
-type RequestSubmitState = "idle" | "saving" | "saved" | "fallback" | "error";
-const DEMO_WIDGET_SCRIPT_ID = "yardimci-asistan-demo-widget-script";
-const DEMO_WIDGET_VERSION = "20260722-menu-link-removed";
 const DEFAULT_WEB_MODULE_URL = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
+const WEB_MODULE_URL = String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? DEFAULT_WEB_MODULE_URL).trim().replace(/\/+$/, "");
+const SYNC_SECRET = String(import.meta.env.VITE_YA_SYNC_SECRET ?? "change-this-secret").trim();
+const SHOWCASE_DEVICE_ID = String(import.meta.env.VITE_YA_SHOWCASE_DEVICE_ID ?? "web-showcase-console").trim();
+const WIDGET_SCRIPT_ID = "yardimci-asistan-product-widget-script";
+const WIDGET_VERSION = "20260901-product-site";
+const SHOWCASE_BUSINESS_NAME = "Yardımcı Asistan Tanıtım İşletmesi";
+const SHOWCASE_WHATSAPP = "+905316969334";
 const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.2").trim() || "0.1.2";
 const DESKTOP_INSTALLER_URL =
   String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_URL ?? "").trim() ||
   `/downloads/YardimciAsistan-Setup-${DESKTOP_INSTALLER_VERSION}.exe`;
-const DESKTOP_INSTALLER_X86_URL =
-  String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_X86_URL ?? "").trim() ||
-  `/downloads/YardimciAsistan-Setup-${DESKTOP_INSTALLER_VERSION}-x86.exe`;
 const ANDROID_APP_VERSION = String(import.meta.env.VITE_YA_ANDROID_APP_VERSION ?? "0.1.1").trim() || "0.1.1";
 const ANDROID_APK_URL =
   String(import.meta.env.VITE_YA_ANDROID_APK_URL ?? "").trim() ||
   `/downloads/YardimciAsistan-Android-${ANDROID_APP_VERSION}.apk`;
-const DEMO_SYNC_SECRET = String(import.meta.env.VITE_YA_SYNC_SECRET ?? "").trim();
-const DEFAULT_DOCUMENT_TITLE = "Yardımcı Asistan Demo Web";
-const DEFAULT_META_DESCRIPTION =
-  "Yardımcı Asistan demo web sitesi: pansiyon, restoran ve kafe işletmeleri için sıcak ve sade müşteri vitrini.";
-const PRODUCT_DOCUMENT_TITLE = "Yardımcı Asistan | Tanıtım ve Hızlı Kullanım";
-const PRODUCT_META_DESCRIPTION =
-  "Pansiyon, restoran ve kafeler için masaüstü, web ve Android destekli Yardımcı Asistan sistemini ve temel kullanım akışlarını inceleyin.";
 
 declare global {
   interface Window {
@@ -66,129 +48,463 @@ declare global {
   }
 }
 
-const navItems: Array<{ key: PageKey; label: string; icon: typeof Home }> = [
-  { key: "home", label: "Ana Sayfa", icon: Home },
-  { key: "rooms", label: "Odalar", icon: BedDouble },
-  { key: "restaurant", label: "Restoran / Kafe", icon: Coffee },
-  { key: "menu", label: "QR Menü", icon: MenuIcon },
-  { key: "gallery", label: "Galeri", icon: Images },
-  { key: "product", label: "Uygulama", icon: MonitorSmartphone },
-  { key: "location", label: "Ulaşım", icon: MapPin },
-  { key: "contact", label: "İletişim", icon: Phone }
-];
+type LiveStatus = "loading" | "online" | "partial" | "offline";
 
-const pageKeys: PageKey[] = [
-  "home",
-  "rooms",
-  "restaurant",
-  "menu",
-  "gallery",
-  "product",
-  "location",
-  "contact",
-  "request",
-  "settings"
-];
-
-const requestTypeOptions = [
-  { value: "pension_reservation", label: "Oda rezervasyonu", icon: BedDouble },
-  { value: "restaurant_reservation", label: "Masa talebi", icon: UtensilsCrossed },
-  { value: "general_info", label: "Bilgi al", icon: MessageSquareText }
-] as const;
-type RequestType = (typeof requestTypeOptions)[number]["value"];
-type NavigateToPage = (page: PageKey, requestType?: RequestType) => void;
-
-const serviceIcons = {
-  bed: BedDouble,
-  coffee: Coffee,
-  table: UtensilsCrossed
+type LiveSystemState = {
+  status: LiveStatus;
+  checkedAt: string;
+  protocolVersion?: number;
+  storage?: string;
+  serverRevision?: number;
+  menuCategories?: number;
+  menuItems?: number;
+  menuUpdatedAt?: string;
+  snapshotUpdatedAt?: string;
+  approvalRequired?: boolean;
+  operations?: {
+    totalRooms: number;
+    availableRooms: number;
+    availableTables: number;
+    occupiedTables: number;
+    activeOrders: number;
+    pendingReservations: number;
+    pendingTasks: number;
+    customerCount: number;
+  };
+  message?: string;
 };
 
-function App() {
-  const [activePage, setActivePage] = useState<PageKey>(() => getPageFromLocation());
-  const [initialRequestType, setInitialRequestType] = useState<RequestType>("pension_reservation");
-  const themeStyle = {
-    "--primary": business.colors.primary,
-    "--accent": business.colors.accent,
-    "--ink": business.colors.ink
-  } as CSSProperties;
+const features = [
+  {
+    icon: BedDouble,
+    title: "Konaklama",
+    text: "Oda, rezervasyon, giriş-çıkış, müşteri ve oda hesabını aynı akışta yönetin."
+  },
+  {
+    icon: UtensilsCrossed,
+    title: "Restoran & Kafe",
+    text: "Masa, adisyon, sipariş, servis durumu ve oda hesabına aktarımı tek merkezden takip edin."
+  },
+  {
+    icon: PackageSearch,
+    title: "Menü & Stok",
+    text: "QR menüyü yayınlayın, stokları izleyin ve görselden stok girişini kullanıcı onayıyla hızlandırın."
+  },
+  {
+    icon: Sparkles,
+    title: "AI Araçları",
+    text: "Müşteri cevap önerileri, rapor yorumları, fatura ve kimlik alanı çıkarımı gibi yardımcı işlemleri isteğe bağlı kullanın."
+  },
+  {
+    icon: Smartphone,
+    title: "Android Companion",
+    text: "Yönetici ve personel, yetkisine göre saha işlemlerini telefondan yapabilsin."
+  },
+  {
+    icon: HardDrive,
+    title: "Local-first",
+    text: "Ana işletme verisi bilgisayardaki SQLite veritabanında yaşar; internet veya AI tek hata noktası değildir."
+  }
+];
 
-  useDemoWidget();
+const capabilityGroups = [
+  {
+    title: "Müşteri & Operasyon",
+    items: ["Web talepleri", "Müşteri kayıtları", "Rezervasyonlar", "Günlük görevler", "Takvim", "Bildirimler"]
+  },
+  {
+    title: "Konaklama",
+    items: ["Oda yönetimi", "Giriş / çıkış", "Konaklama kaydı", "Oda folyosu", "Tahsilat", "Restoran hesabını odaya aktarma"]
+  },
+  {
+    title: "Yiyecek & İçecek",
+    items: ["Masa yönetimi", "Adisyon", "Sipariş durumu", "QR menü", "Stok takibi", "Kasa ve raporlar"]
+  },
+  {
+    title: "Bağlantılar",
+    items: ["Web widget", "Firma hostingi", "Otomatik senkron", "WhatsApp çalışma alanı", "Android cihaz rolleri", "Yedekleme / geri yükleme"]
+  }
+];
+
+function App() {
+  const [liveState, setLiveState] = useState<LiveSystemState>({ status: "loading", checkedAt: "" });
+  useProductWidget();
 
   useEffect(() => {
-    const isProductPage = activePage === "product";
-    document.title = isProductPage ? PRODUCT_DOCUMENT_TITLE : DEFAULT_DOCUMENT_TITLE;
+    document.title = "Yardımcı Asistan | Küçük İşletmeler İçin Modüler İşletme Sistemi";
     document
       .querySelector<HTMLMetaElement>('meta[name="description"]')
-      ?.setAttribute("content", isProductPage ? PRODUCT_META_DESCRIPTION : DEFAULT_META_DESCRIPTION);
-  }, [activePage]);
-
-  useEffect(() => {
-    const syncPageFromLocation = () => {
-      setActivePage(getPageFromLocation());
-      window.scrollTo({ top: 0 });
-    };
-
-    window.addEventListener("popstate", syncPageFromLocation);
-    return () => window.removeEventListener("popstate", syncPageFromLocation);
+      ?.setAttribute(
+        "content",
+        "Yardımcı Asistan; küçük işletmeler için masaüstü, web ve Android'i birleştiren local-first, modüler işletme yönetim sistemidir."
+      );
   }, []);
 
-  function goToPage(page: PageKey, requestType?: RequestType) {
-    if (page === "request" && requestType) {
-      setInitialRequestType(requestType);
-    }
-    setActivePage(page);
-    const nextUrl = new URL(window.location.href);
-    nextUrl.hash = page === "home" ? "" : page;
-    window.history.pushState({ page }, "", `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  useEffect(() => {
+    void refreshLiveSystem(setLiveState);
+    const timer = window.setInterval(() => void refreshLiveSystem(setLiveState), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const liveLabel = useMemo(() => {
+    if (liveState.status === "online") return "Canlı sistem bağlı";
+    if (liveState.status === "partial") return "Canlı sistem kısmen bağlı";
+    if (liveState.status === "offline") return "Canlı sistem bekleniyor";
+    return "Canlı sistem kontrol ediliyor";
+  }, [liveState.status]);
+
+  function openAssistant() {
+    const button = document.querySelector<HTMLButtonElement>(".ya-widget-button");
+    button?.click();
   }
 
   return (
-    <div className="app" style={themeStyle}>
-      <Header activePage={activePage} onNavigate={goToPage} />
-      <main>
-        {activePage === "home" && <HomePage onNavigate={goToPage} />}
-        {activePage === "rooms" && <RoomsPage onNavigate={goToPage} />}
-        {activePage === "restaurant" && <RestaurantPage onNavigate={goToPage} />}
-        {activePage === "menu" && <MenuPage onNavigate={goToPage} />}
-        {activePage === "gallery" && <GalleryPage />}
-        {activePage === "product" && <ProductGuidePage onNavigate={goToPage} />}
-        {activePage === "location" && <LocationPage />}
-        {activePage === "contact" && <ContactPage onNavigate={goToPage} />}
-        {activePage === "request" && <RequestPage initialRequestType={initialRequestType} />}
-        {activePage === "settings" && <SettingsPage />}
+    <div className="product-site">
+      <header className="topbar">
+        <a className="brand" href="#top" aria-label="Yardımcı Asistan ana bölümü">
+          <img src="/assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
+          <span>
+            <strong>Yardımcı Asistan</strong>
+            <small>Modüler işletme sistemi</small>
+          </span>
+        </a>
+        <nav aria-label="Tanıtım bölümleri">
+          <a href="#urun">Ürün</a>
+          <a href="#yetenekler">Yetenekler</a>
+          <a href="#canli">Canlı Sistem</a>
+          <a href="#alanlar">İşletme Profilleri</a>
+          <a href="#kurulum">Kurulum</a>
+        </nav>
+        <a className="topbar-cta" href="#canli">Canlıyı Gör</a>
+      </header>
+
+      <main id="top">
+        <section className="hero-section" id="urun">
+          <div className="hero-glow hero-glow-one" />
+          <div className="hero-glow hero-glow-two" />
+          <div className="hero-copy">
+            <div className="hero-kicker"><Layers3 size={17} /> Küçük işletmeler için tek merkez</div>
+            <h1>Günlük işletme işlerini <span>tek sistemde</span> birleştirin.</h1>
+            <p className="hero-lead">
+              Müşteri talepleri, rezervasyonlar, odalar, masalar, siparişler, stok, kasa ve günlük işler;
+              masaüstü, web ve Android üzerinde aynı işletme verisiyle birlikte çalışır.
+            </p>
+            <div className="hero-actions">
+              <a className="button primary" href="#canli">Canlı sistemi incele <ArrowRight size={18} /></a>
+              <a className="button secondary" href={DESKTOP_INSTALLER_URL} download>
+                <Download size={18} /> Windows uygulaması
+              </a>
+            </div>
+            <div className="hero-badges" aria-label="Ürün özellikleri">
+              <span>Local-first</span><span>Windows</span><span>Android</span><span>Web</span><span>AI isteğe bağlı</span>
+            </div>
+          </div>
+
+          <div className="hero-product" aria-label="Yardımcı Asistan uygulama ekranları">
+            <div className="desktop-frame">
+              <div className="frame-bar"><i /><i /><i /><span>Yardımcı Asistan · Masaüstü</span></div>
+              <img src="/assets/product-guide/desktop-dashboard.webp" alt="Yardımcı Asistan masaüstü günlük yönetim ekranı" />
+            </div>
+            <div className="phone-frame">
+              <div className="phone-speaker" />
+              <img src="/assets/product-guide/android-today.webp" alt="Yardımcı Asistan Android Bugün ekranı" />
+            </div>
+            <div className="hero-live-chip"><span className="status-dot online" /> Web · Hosting · Desktop · Android</div>
+          </div>
+        </section>
+
+        <section className="surface-section section-shell">
+          <div className="section-intro compact">
+            <p className="eyebrow">Tek veri · üç çalışma yüzeyi</p>
+            <h2>İşletmenin merkezi masaüstünde, gerekli işler her yerde.</h2>
+          </div>
+          <div className="surface-grid">
+            <article>
+              <Monitor size={25} />
+              <span className="surface-label">Masaüstü</span>
+              <h3>Ana yönetim merkezi</h3>
+              <p>Müşteri, rezervasyon, oda, masa, stok, finans, rapor ve sistem ayarları burada yönetilir.</p>
+            </article>
+            <article>
+              <Globe2 size={25} />
+              <span className="surface-label">Web</span>
+              <h3>Müşteriyle ilk temas</h3>
+              <p>Web formu, AI bilgi asistanı, QR menü ve firma hostingindeki mini API aynı sisteme bağlanır.</p>
+            </article>
+            <article>
+              <Smartphone size={25} />
+              <span className="surface-label">Android</span>
+              <h3>Sahadaki hızlı işlemler</h3>
+              <p>Telefonlar yönetici veya personel rolüne göre yalnız gerekli ekran ve işlemleri gösterir.</p>
+            </article>
+          </div>
+        </section>
+
+        <section className="flow-section">
+          <div className="section-shell flow-layout">
+            <div className="section-intro">
+              <p className="eyebrow">Gerçek iş akışı</p>
+              <h2>Bir kayıt sisteme girer, bütün çalışma yüzeylerine ulaşır.</h2>
+              <p>
+                Yardımcı Asistan ayrı ayrı çalışan araçlar toplamı değildir. Web talebinden masaüstü operasyonuna,
+                Android görünümünden QR menü yayınına kadar aynı işletme omurgasını kullanır.
+              </p>
+            </div>
+            <div className="flow-diagram" aria-label="Yardımcı Asistan veri akışı">
+              <FlowNode icon={Globe2} label="Web" text="Talep · AI · QR Menü" />
+              <div className="flow-arrow">→</div>
+              <FlowNode icon={Server} label="Firma Hosting" text="PHP · SQLite · Sync" />
+              <div className="flow-arrow">→</div>
+              <FlowNode icon={Monitor} label="Masaüstü" text="Ana işletme verisi" accent />
+              <div className="flow-arrow down">↕</div>
+              <FlowNode icon={Smartphone} label="Android" text="Yetkili saha işlemleri" />
+            </div>
+          </div>
+        </section>
+
+        <section className="feature-section section-shell" id="yetenekler">
+          <div className="section-intro">
+            <p className="eyebrow">Bugünkü ürün</p>
+            <h2>Pansiyon ve restoran operasyonunun büyük kısmı tek uygulamada.</h2>
+            <p>AI veya internet bağlantısı faydalı bir katmandır; işletmenin temel kayıt sistemi bunlara bağımlı değildir.</p>
+          </div>
+          <div className="feature-grid">
+            {features.map(({ icon: Icon, title, text }) => (
+              <article className="feature-card" key={title}>
+                <div className="feature-icon"><Icon size={23} /></div>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="capability-grid">
+            {capabilityGroups.map((group) => (
+              <article key={group.title}>
+                <h3>{group.title}</h3>
+                <ul>
+                  {group.items.map((item) => <li key={item}><CheckCircle2 size={15} /> {item}</li>)}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="screens-section">
+          <div className="section-shell">
+            <div className="section-intro">
+              <p className="eyebrow">Gerçek uygulama ekranları</p>
+              <h2>Tanıtım için ayrı bir maket değil, çalışan ürün.</h2>
+            </div>
+            <div className="screens-grid">
+              <ScreenCard src="/assets/product-guide/desktop-requests.webp" title="Web talepleri" text="Webden gelen talebi inceleyin ve rezervasyon akışına alın." />
+              <ScreenCard src="/assets/product-guide/desktop-orders.webp" title="Restoran operasyonu" text="Masa, adisyon ve sipariş durumunu yönetin." />
+              <ScreenCard src="/assets/product-guide/desktop-stock.webp" title="Stok ve AI" text="Fatura görselinden bulunan stok satırlarını kontrol ederek ekleyin." />
+              <ScreenCard src="/assets/product-guide/desktop-reports.webp" title="Raporlar" text="Satış, rezervasyon, talep ve işletme özetlerini görün." />
+            </div>
+          </div>
+        </section>
+
+        <section className="live-section section-shell" id="canli">
+          <div className="live-heading">
+            <div className="section-intro">
+              <p className="eyebrow">Canlı Yardımcı Asistan kurulumu</p>
+              <h2>Bu sayfanın arkasında ürünün gerçek web modülü çalışıyor.</h2>
+              <p>
+                Aşağıdaki bilgiler tanıtım için hazırlanmış ayrı bir mock API'den değil; Yardımcı Asistan'ın firma hostingine
+                kurulan PHP + SQLite modülünden okunur. Masaüstü yayın yaptığında bu görünüm de değişir.
+              </p>
+            </div>
+            <button className="refresh-button" type="button" onClick={() => void refreshLiveSystem(setLiveState)}>
+              <RefreshCw size={17} /> Yenile
+            </button>
+          </div>
+
+          <div className="live-console">
+            <div className="live-console-top">
+              <div>
+                <span className={`status-dot ${liveState.status === "online" ? "online" : liveState.status === "partial" ? "partial" : "offline"}`} />
+                <strong>{liveLabel}</strong>
+              </div>
+              <span>{liveState.checkedAt ? `Son kontrol ${formatTime(liveState.checkedAt)}` : "Bağlantı kontrol ediliyor"}</span>
+            </div>
+
+            <div className="live-system-grid">
+              <StatusCard label="Web Modülü" value={liveState.status === "offline" ? "Bekleniyor" : "Çalışıyor"} detail={WEB_MODULE_URL.replace(/^https?:\/\//, "")} />
+              <StatusCard label="Senkron Protokolü" value={liveState.protocolVersion ? `v${liveState.protocolVersion}` : "—"} detail={liveState.storage ? `${liveState.storage} depolama` : "Hosting bağlantısı"} />
+              <StatusCard label="QR Menü" value={typeof liveState.menuItems === "number" ? `${liveState.menuItems} ürün` : "—"} detail={typeof liveState.menuCategories === "number" ? `${liveState.menuCategories} kategori` : "Yayın bekleniyor"} />
+              <StatusCard label="Server Revision" value={typeof liveState.serverRevision === "number" ? String(liveState.serverRevision) : "—"} detail={liveState.snapshotUpdatedAt ? `Snapshot ${formatTime(liveState.snapshotUpdatedAt)}` : "Canlı veri sürümü"} />
+            </div>
+
+            {liveState.operations ? (
+              <div className="operations-grid" aria-label="Canlı işletme özeti">
+                <Operation label="Oda" value={`${liveState.operations.availableRooms}/${liveState.operations.totalRooms}`} detail="müsait / toplam" />
+                <Operation label="Masa" value={String(liveState.operations.availableTables)} detail="müsait" />
+                <Operation label="Aktif adisyon" value={String(liveState.operations.activeOrders)} detail="açık işlem" />
+                <Operation label="Rezervasyon" value={String(liveState.operations.pendingReservations)} detail="bekleyen" />
+                <Operation label="Görev" value={String(liveState.operations.pendingTasks)} detail="bekleyen" />
+                <Operation label="Müşteri" value={String(liveState.operations.customerCount)} detail="snapshot" />
+              </div>
+            ) : (
+              <div className="live-note">
+                <Database size={20} />
+                <div>
+                  <strong>{liveState.approvalRequired ? "Canlı operasyon görünümü masaüstü onayı bekliyor." : "Canlı operasyon snapshot'ı henüz yayınlanmadı."}</strong>
+                  <p>{liveState.message ?? "QR menü ve hosting bağlantısı yine gerçek web modülünden kontrol ediliyor."}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="live-actions">
+              <button className="button primary" type="button" onClick={openAssistant}>Web iletişimini dene <ArrowRight size={18} /></button>
+              <a className="button secondary" href={`${WEB_MODULE_URL}/menu.html`} target="_blank" rel="noreferrer">Canlı QR menüyü aç</a>
+              <details className="technical-details">
+                <summary>Teknik bağlantı</summary>
+                <div><span>Endpoint</span><code>{WEB_MODULE_URL}/api/sync.php</code></div>
+                <div><span>Sync key</span><code>{SYNC_SECRET}</code></div>
+                <div><span>Showcase device</span><code>{SHOWCASE_DEVICE_ID}</code></div>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <section className="profiles-section" id="alanlar">
+          <div className="section-shell">
+            <div className="section-intro">
+              <p className="eyebrow">Modüler ürün yönü</p>
+              <h2>Yazılım bir sektöre kilitlenmek yerine işletme profilleriyle büyüyor.</h2>
+              <p>Bugün konaklama ve yiyecek-içecek aktif. Sıradaki hedef, aynı çekirdeği perakende operasyonuna açmak.</p>
+            </div>
+            <div className="profile-grid">
+              <ProfileCard icon={BedDouble} title="Pansiyon" status="Kullanılabilir" text="Oda, rezervasyon, müşteri, konaklama, oda folyosu ve günlük işler." />
+              <ProfileCard icon={Coffee} title="Restoran / Kafe" status="Kullanılabilir" text="Masa, adisyon, menü, stok, servis, kasa ve rapor akışı." />
+              <ProfileCard icon={Layers3} title="Pansiyon + Restoran" status="Kullanılabilir" text="İki domain birlikte; masa hesabını açık oda hesabına aktarabilen hibrit profil." />
+              <ProfileCard icon={Store} title="Market / Perakende" status="Sıradaki hedef" upcoming text="Barkod, hızlı satış, stok, etiket ve Android telefonu barkod tarayıcı olarak kullanma yönü." />
+            </div>
+          </div>
+        </section>
+
+        <section className="local-section section-shell">
+          <div className="local-card">
+            <div className="local-copy">
+              <p className="eyebrow">Local-first tasarım</p>
+              <h2>İşletmenin ana kayıtları kendi bilgisayarında.</h2>
+              <p>
+                Masaüstü uygulaması yerel SQLite veritabanıyla çalışır. Firma hostingine web talepleri, yayınlar ve Android için
+                gerekli senkron verileri gider. Bağlantı geri geldiğinde kuyruklar çalışmaya devam eder.
+              </p>
+              <div className="resilience-list">
+                <span><WifiOff size={17} /> İnternet kesilse de yerel operasyon devam eder.</span>
+                <span><Sparkles size={17} /> AI kapalıyken temel işletme sistemi çalışır.</span>
+                <span><ShieldCheck size={17} /> Yedekleme ve geri yükleme masaüstünden yönetilir.</span>
+              </div>
+            </div>
+            <div className="local-visual">
+              <div className="local-node small"><Globe2 size={22} /><span>Web</span></div>
+              <div className="local-line vertical" />
+              <div className="local-node"><Monitor size={28} /><span>Masaüstü + SQLite</span><small>Ana kayıt merkezi</small></div>
+              <div className="local-line horizontal" />
+              <div className="local-node small phone"><Smartphone size={22} /><span>Android</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section className="install-section" id="kurulum">
+          <div className="section-shell install-layout">
+            <div className="section-intro">
+              <p className="eyebrow">Kurulum</p>
+              <h2>Özel POS donanımıyla başlamak zorunda değilsiniz.</h2>
+              <p>
+                Windows bilgisayar ana merkezdir. Android telefon mevcut cihazlarla saha terminali olarak kullanılabilir;
+                işletme büyüdükçe yeni donanımlar ve domain modülleri eklenebilir.
+              </p>
+            </div>
+            <div className="download-grid">
+              <a className="download-card" href={DESKTOP_INSTALLER_URL} download>
+                <Monitor size={27} />
+                <div><small>Windows 10 / 11 · x64</small><strong>Yardımcı Asistan Desktop</strong><span>Sürüm {DESKTOP_INSTALLER_VERSION}</span></div>
+                <Download size={20} />
+              </a>
+              <a className="download-card" href={ANDROID_APK_URL} download>
+                <Smartphone size={27} />
+                <div><small>Android 8.0+</small><strong>Android Companion</strong><span>Sürüm {ANDROID_APP_VERSION}</span></div>
+                <Download size={20} />
+              </a>
+            </div>
+          </div>
+        </section>
       </main>
-      <Footer onNavigate={goToPage} />
+
+      <footer>
+        <div className="footer-brand">
+          <img src="/assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
+          <div><strong>Yardımcı Asistan</strong><span>Küçük işletmeler için modüler, local-first işletme sistemi.</span></div>
+        </div>
+        <a href="#top">Başa dön ↑</a>
+      </footer>
     </div>
   );
 }
 
-function useDemoWidget() {
+function FlowNode({ icon: Icon, label, text, accent = false }: { icon: typeof Globe2; label: string; text: string; accent?: boolean }) {
+  return (
+    <div className={accent ? "flow-node accent" : "flow-node"}>
+      <Icon size={22} />
+      <strong>{label}</strong>
+      <span>{text}</span>
+    </div>
+  );
+}
+
+function ScreenCard({ src, title, text }: { src: string; title: string; text: string }) {
+  return (
+    <article className="screen-card">
+      <div className="screen-image"><img src={src} alt={`${title} Yardımcı Asistan ekranı`} loading="lazy" /></div>
+      <div><h3>{title}</h3><p>{text}</p></div>
+    </article>
+  );
+}
+
+function StatusCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <article className="status-card"><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>;
+}
+
+function Operation({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <article><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>;
+}
+
+function ProfileCard({ icon: Icon, title, status, text, upcoming = false }: { icon: typeof BedDouble; title: string; status: string; text: string; upcoming?: boolean }) {
+  return (
+    <article className={upcoming ? "profile-card upcoming" : "profile-card"}>
+      <div className="profile-card-top"><Icon size={25} /><span>{status}</span></div>
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </article>
+  );
+}
+
+function useProductWidget() {
   useEffect(() => {
-    const webModuleBaseUrl = getWebModuleBaseUrl();
-    if (!webModuleBaseUrl) {
-      return;
-    }
+    if (!WEB_MODULE_URL) return;
 
     const config = {
-      businessName: business.display_name,
-      whatsappPhone: business.whatsapp,
-      apiBaseUrl: getWebModuleApiBaseUrl(),
-      logoUrl: `${webModuleBaseUrl}/assets/yardimci-asistan-symbol.png`,
-      primaryColor: business.colors.primary,
-      accentColor: business.colors.accent
+      businessName: SHOWCASE_BUSINESS_NAME,
+      whatsappPhone: SHOWCASE_WHATSAPP,
+      apiBaseUrl: WEB_MODULE_URL,
+      logoUrl: `${WEB_MODULE_URL}/assets/yardimci-asistan-symbol.png`,
+      primaryColor: "#2dd4bf",
+      accentColor: "#5eead4"
     };
 
-    const existingScript = document.getElementById(DEMO_WIDGET_SCRIPT_ID);
-    if (existingScript) {
+    const existing = document.getElementById(WIDGET_SCRIPT_ID);
+    if (existing) {
       window.YardimciAsistanWidget?.init(config);
       return;
     }
 
     const script = document.createElement("script");
-    script.id = DEMO_WIDGET_SCRIPT_ID;
-    script.src = `${webModuleBaseUrl}/widget.js?v=${DEMO_WIDGET_VERSION}`;
+    script.id = WIDGET_SCRIPT_ID;
+    script.src = `${WEB_MODULE_URL}/widget.js?v=${WIDGET_VERSION}`;
     script.async = true;
     script.dataset.businessName = config.businessName;
     script.dataset.whatsappPhone = config.whatsappPhone;
@@ -200,957 +516,117 @@ function useDemoWidget() {
   }, []);
 }
 
-function Header({ activePage, onNavigate }: { activePage: PageKey; onNavigate: NavigateToPage }) {
-  const brandLogoUrl = business.logo_url || "/assets/yardimci-asistan-symbol.png";
+async function refreshLiveSystem(setState: (value: LiveSystemState) => void) {
+  setState({ status: "loading", checkedAt: new Date().toISOString() });
+  const checkedAt = new Date().toISOString();
 
-  return (
-    <header className="site-header">
-      <button className="brand-button" onClick={() => onNavigate("home")} aria-label="Ana sayfaya git">
-        <img className="brand-symbol" src={brandLogoUrl} alt="" aria-hidden="true" />
-        <span>
-          <strong>{business.display_name}</strong>
-          <small>Yardımcı Asistan Demo</small>
-        </span>
-      </button>
-      <nav className="site-nav" aria-label="Ana menü">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              className={activePage === item.key ? "nav-button is-active" : "nav-button"}
-              onClick={() => onNavigate(item.key)}
-              aria-label={item.label}
-              aria-current={activePage === item.key ? "page" : undefined}
-            >
-              <Icon size={17} aria-hidden="true" />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
-    </header>
-  );
-}
-
-function HomePage({ onNavigate }: { onNavigate: NavigateToPage }) {
-  return (
-    <>
-      <section className="hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(23, 32, 51, 0.78), rgba(23, 32, 51, 0.2)), url(${business.hero.image_url})` }}>
-        <div className="hero-content">
-          <p className="eyebrow">{business.hero.eyebrow}</p>
-          <h1>{business.hero.title}</h1>
-          <p>{business.hero.summary}</p>
-          <div className="hero-actions">
-            <button className="primary-button" onClick={() => onNavigate("request", "pension_reservation")}>
-              <CalendarPlus size={19} aria-hidden="true" />
-              Rezervasyon Talebi Oluştur
-            </button>
-            <a className="secondary-button" href={createWhatsAppLink(business.whatsapp, "Merhaba, bilgi almak istiyorum.")} target="_blank" rel="noreferrer">
-              <MessageCircle size={19} aria-hidden="true" />
-              WhatsApp'tan Yaz
-            </a>
-          </div>
-        </div>
-      </section>
-
-      <section className="quick-strip" aria-label="Öne çıkan bilgiler">
-        {business.highlights.map((highlight) => (
-          <article key={highlight.label} className="quick-item">
-            <strong>{highlight.label}</strong>
-            <span>{highlight.description}</span>
-          </article>
-        ))}
-      </section>
-
-      <SectionHeading title="Sizin İçin Hazır" text={business.description} />
-      <section className="service-grid">
-        {business.services.map((service) => {
-          const Icon = serviceIcons[service.icon];
-          return (
-            <article className="info-card" key={service.title}>
-              <Icon size={24} aria-hidden="true" />
-              <h3>{service.title}</h3>
-              <p>{service.description}</p>
-            </article>
-          );
-        })}
-      </section>
-
-      <section className="feature-band">
-        <img src="/assets/demo-breakfast.webp" alt="Bahçe kahvaltı masası" />
-        <div>
-          <p className="eyebrow">Günlük Akış</p>
-          <h2>Konaklama ve masa talepleri tek yerden başlar.</h2>
-          <p>Misafir formu doldurur, WhatsApp mesajı hazır açılır ve işletme talebi kolayca takip eder.</p>
-          <div className="inline-actions">
-            <button className="primary-button" onClick={() => onNavigate("rooms")}>
-              <BedDouble size={18} aria-hidden="true" />
-              Odaları Gör
-            </button>
-            <button className="ghost-button" onClick={() => onNavigate("menu")}>
-              <MenuIcon size={18} aria-hidden="true" />
-              Menüyü Aç
-            </button>
-          </div>
-        </div>
-      </section>
-    </>
-  );
-}
-
-function RoomsPage({ onNavigate }: { onNavigate: NavigateToPage }) {
-  return (
-    <PageShell title="Pansiyon / Odalar" text="Müsaitlik ve fiyat bilgisi işletme tarafından kontrol edilerek paylaşılır.">
-      <section className="room-grid">
-        {business.rooms.map((room) => (
-          <article className="room-card" key={room.id}>
-            <img src={room.image_url} alt={room.name} />
-            <div className="room-card-body">
-              <div className="card-title-row">
-                <h3>{room.name}</h3>
-                <span className="badge">
-                  <Users size={15} aria-hidden="true" />
-                  {room.capacity} kişi
-                </span>
-              </div>
-              <p>{room.description}</p>
-              <p className="muted">{room.bed_info}</p>
-              <div className="chip-row">
-                {room.features.map((feature) => (
-                  <span key={feature}>{feature}</span>
-                ))}
-              </div>
-              <p className="note">{room.price_note}</p>
-              <button className="primary-button" onClick={() => onNavigate("request", "pension_reservation")}>
-                <CalendarPlus size={18} aria-hidden="true" />
-                Bu Oda İçin Talep Oluştur
-              </button>
-            </div>
-          </article>
-        ))}
-      </section>
-    </PageShell>
-  );
-}
-
-function RestaurantPage({ onNavigate }: { onNavigate: NavigateToPage }) {
-  return (
-    <PageShell title="Restoran / Kafe" text="Bahçe masaları, kahvaltı ve hafif lezzetler için hızlıca masa talebi oluşturabilirsiniz.">
-      <section className="feature-band reverse">
-        <img src="/assets/demo-breakfast.webp" alt="Kahvaltı ve kafe masası" />
-        <div>
-          <p className="eyebrow">Bahçe ve Salon</p>
-          <h2>Sakin kahvaltı, akşam servisi ve gün boyu kafe.</h2>
-          <p>Kalabalık gruplar ve özel masa tercihleri için not bırakabilirsiniz.</p>
-          <div className="table-list">
-            {business.tables.map((table) => (
-              <span key={`${table.name}-${table.area}`}>
-                {table.name} • {table.area} • {table.capacity} kişi
-              </span>
-            ))}
-          </div>
-          <div className="inline-actions">
-            <button className="primary-button" onClick={() => onNavigate("request", "restaurant_reservation")}>
-              <CalendarPlus size={18} aria-hidden="true" />
-              Masa Talebi Oluştur
-            </button>
-            <button className="ghost-button" onClick={() => onNavigate("menu")}>
-              <MenuIcon size={18} aria-hidden="true" />
-              QR Menü
-            </button>
-          </div>
-        </div>
-      </section>
-    </PageShell>
-  );
-}
-
-function MenuPage({ onNavigate }: { onNavigate: NavigateToPage }) {
-  const formatter = useMemo(() => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }), []);
-
-  return (
-    <PageShell title="QR Menü" text="Ege kahvaltısından yerel ana yemeklere, günlük tatlılardan kafe içeceklerine.">
-      <section className="menu-layout">
-        {business.menu.categories.map((category) => {
-          const items = business.menu.items.filter((item) => item.category_id === category.id);
-          return (
-            <article className="menu-category" key={category.id}>
-              <h3>{category.name}</h3>
-              <div className="menu-items">
-                {items.map((item) => (
-                  <div className="menu-item" key={item.id}>
-                    <img src={item.image_url} alt="" loading="lazy" />
-                    <div className="menu-item-copy">
-                      <strong>{item.name}</strong>
-                      <p>{item.description}</p>
-                    </div>
-                    <span className="menu-item-price">{formatter.format(item.price)}</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-          );
-        })}
-      </section>
-      <div className="center-actions">
-        <button className="primary-button" onClick={() => onNavigate("request", "restaurant_reservation")}>
-          <CalendarPlus size={18} aria-hidden="true" />
-          Masa veya Bilgi Talebi Oluştur
-        </button>
-      </div>
-    </PageShell>
-  );
-}
-
-function GalleryPage() {
-  return (
-    <PageShell title="Galeri" text="Mekan, oda ve kahvaltı alanından örnek görüntüler.">
-      <section className="gallery-grid">
-        {business.gallery.map((item) => (
-          <figure key={item.title} className="gallery-item">
-            <img src={item.image_url} alt={item.title} />
-            <figcaption>{item.title}</figcaption>
-          </figure>
-        ))}
-      </section>
-    </PageShell>
-  );
-}
-
-function LocationPage() {
-  return (
-    <PageShell title="Ulaşım" text="Sahil yoluna yakın, yürüyerek ulaşımı kolay bir konum.">
-      <section className="contact-layout">
-        <article className="info-panel">
-          <MapPin size={24} aria-hidden="true" />
-          <h3>Adres</h3>
-          <p>{business.address}</p>
-          <a className="primary-button" href={business.map_url} target="_blank" rel="noreferrer">
-            <Navigation size={18} aria-hidden="true" />
-            Haritada Aç
-          </a>
-        </article>
-        <article className="map-placeholder">
-          <MapPin size={42} aria-hidden="true" />
-          <span>{business.address}</span>
-        </article>
-      </section>
-    </PageShell>
-  );
-}
-
-function ContactPage({ onNavigate }: { onNavigate: NavigateToPage }) {
-  return (
-    <PageShell title="İletişim" text="Sorularınız ve rezervasyon talepleriniz için işletmeye kolayca ulaşabilirsiniz.">
-      <section className="contact-layout">
-        <article className="info-panel">
-          <Phone size={24} aria-hidden="true" />
-          <h3>Telefon</h3>
-          <p>{business.phone}</p>
-          <a className="secondary-button dark" href={`tel:${business.phone.replace(/\s/g, "")}`}>
-            <Phone size={18} aria-hidden="true" />
-            Telefonla Ara
-          </a>
-        </article>
-        <article className="info-panel">
-          <MessageCircle size={24} aria-hidden="true" />
-          <h3>WhatsApp</h3>
-          <p>{business.whatsapp}</p>
-          <a className="primary-button" href={createWhatsAppLink(business.whatsapp, "Merhaba, bilgi almak istiyorum.")} target="_blank" rel="noreferrer">
-            <MessageCircle size={18} aria-hidden="true" />
-            WhatsApp'tan Yaz
-          </a>
-        </article>
-        <article className="info-panel">
-          <CalendarPlus size={24} aria-hidden="true" />
-          <h3>Çalışma Saatleri</h3>
-          {business.working_hours.map((hour) => (
-            <p key={hour}>{hour}</p>
-          ))}
-          <button className="ghost-button" onClick={() => onNavigate("request", "general_info")}>
-            <Send size={18} aria-hidden="true" />
-            Talep Oluştur
-          </button>
-        </article>
-      </section>
-    </PageShell>
-  );
-}
-
-function RequestPage({ initialRequestType }: { initialRequestType: RequestType }) {
-  const [form, setForm] = useState({
-    requestType: initialRequestType,
-    name: "",
-    phone: "",
-    date: "",
-    time: "",
-    guests: "2",
-    note: ""
-  });
-  const [lastMessage, setLastMessage] = useState("");
-  const [submitState, setSubmitState] = useState<RequestSubmitState>("idle");
-  const [submitMessage, setSubmitMessage] = useState("");
-  const selectedRequestType = requestTypeOptions.find((option) => option.value === form.requestType) ?? requestTypeOptions[0];
-
-  function updateField(field: keyof typeof form, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const message = buildRequestMessage(form);
-    const requestApiEndpoint = getRequestApiEndpoint();
-    setLastMessage(message);
-    if (requestApiEndpoint) {
-      setSubmitState("saving");
-      setSubmitMessage("Talep web modülüne kaydediliyor...");
-      void submitRequestToMiniApi(requestApiEndpoint, toRequestApiPayload(form, message)).then((result) => {
-        setSubmitState(result.ok ? "saved" : "fallback");
-        setSubmitMessage(result.message);
+  try {
+    const menuPromise = fetch(`${WEB_MODULE_URL}/api/menu.php`, { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("menu_unavailable");
+        return await response.json() as {
+          ok?: boolean;
+          categories?: unknown[];
+          items?: unknown[];
+          updated_at?: string;
+          server_revision?: number;
+        };
       });
-    } else {
-      setSubmitState("fallback");
-      setSubmitMessage("WhatsApp mesajı hazırlandı. Web modül bağlantısı bu demo oturumunda kapalı.");
-    }
 
-    window.open(createWhatsAppLink(business.whatsapp, message), "_blank", "noopener,noreferrer");
+    const capabilitiesPromise = callSync({ action: "capabilities" });
+    const snapshotPromise = callSync({
+      action: "android_summary",
+      device_id: SHOWCASE_DEVICE_ID,
+      device_name: "Yardımcı Asistan Tanıtım Sitesi",
+      app_version: "web-showcase-1",
+      known_server_revision: 0,
+      limit: 20
+    });
+
+    const [menuResult, capabilitiesResult, snapshotResult] = await Promise.allSettled([
+      menuPromise,
+      capabilitiesPromise,
+      snapshotPromise
+    ]);
+
+    const menu = menuResult.status === "fulfilled" ? menuResult.value : null;
+    const capabilities = capabilitiesResult.status === "fulfilled" ? capabilitiesResult.value : null;
+    const snapshot = snapshotResult.status === "fulfilled" ? snapshotResult.value : null;
+    const anyOnline = Boolean(menu?.ok || capabilities?.ok || snapshot?.ok);
+    const operations = snapshot?.ok && snapshot.approval_required !== true
+      ? normalizeOperations(snapshot.operations)
+      : undefined;
+
+    setState({
+      status: operations && menu?.ok && capabilities?.ok ? "online" : anyOnline ? "partial" : "offline",
+      checkedAt,
+      protocolVersion: toOptionalNumber(capabilities?.protocol_version),
+      storage: typeof capabilities?.storage === "string" ? capabilities.storage : undefined,
+      serverRevision: toOptionalNumber(snapshot?.server_revision ?? capabilities?.server_revision ?? menu?.server_revision),
+      menuCategories: Array.isArray(menu?.categories) ? menu.categories.length : undefined,
+      menuItems: Array.isArray(menu?.items) ? menu.items.length : undefined,
+      menuUpdatedAt: typeof menu?.updated_at === "string" ? menu.updated_at : undefined,
+      snapshotUpdatedAt: typeof snapshot?.summary?.android_snapshot_updated_at === "string" ? snapshot.summary.android_snapshot_updated_at : undefined,
+      approvalRequired: snapshot?.approval_required === true,
+      operations,
+      message: snapshot?.approval_required === true
+        ? `Masaüstünde ${SHOWCASE_DEVICE_ID} cihazını bir kez onayladığınızda oda, masa ve operasyon özeti burada canlı görünür.`
+        : !operations
+          ? "Masaüstü henüz Android operasyon snapshot'ı yayınlamadı."
+          : undefined
+    });
+  } catch (error) {
+    setState({
+      status: "offline",
+      checkedAt,
+      message: error instanceof Error ? error.message : "Canlı web modülüne ulaşılamadı."
+    });
   }
-
-  return (
-    <PageShell
-      className="request-page"
-      title="Talebinizi birlikte hazırlayalım"
-      text="Birkaç kısa seçim yapın; mesajınızı WhatsApp'ta hazır açalım. Müsaitlik ve son onay işletme tarafından verilir."
-    >
-      <section className="request-workspace">
-        <form className="request-form" onSubmit={handleSubmit}>
-          <div className="request-form-heading wide-field">
-            <span className="request-form-icon" aria-hidden="true">
-              <Sparkles size={20} />
-            </span>
-            <div>
-              <p className="eyebrow">Hızlı Talep</p>
-              <h2>{selectedRequestType.label}</h2>
-            </div>
-          </div>
-
-          <fieldset className="request-choice-group wide-field">
-            <legend>Size nasıl yardımcı olalım?</legend>
-            <div className="request-type-options">
-              {requestTypeOptions.map((option) => {
-                const Icon = option.icon;
-                const isActive = form.requestType === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    className={isActive ? "request-type-option is-active" : "request-type-option"}
-                    aria-pressed={isActive}
-                    onClick={() => updateField("requestType", option.value)}
-                  >
-                    <Icon size={17} aria-hidden="true" />
-                    {option.label}
-                    {isActive && <Check className="request-option-check" size={15} aria-hidden="true" />}
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <DateQuickPicker value={form.date} onChange={(value) => updateField("date", value)} />
-
-          <label className="form-field">
-            <span>Ad soyad</span>
-            <input
-              required
-              autoComplete="name"
-              value={form.name}
-              onChange={(event) => updateField("name", event.target.value)}
-              placeholder="Adınız soyadınız"
-            />
-          </label>
-          <label className="form-field">
-            <span>Telefon</span>
-            <input
-              required
-              value={form.phone}
-              onChange={(event) => updateField("phone", event.target.value)}
-              placeholder="05xx xxx xx xx"
-              inputMode="tel"
-              autoComplete="tel"
-            />
-          </label>
-
-          {form.requestType === "restaurant_reservation" && (
-            <label className="form-field">
-              <span>Saat <small>(isteğe bağlı)</small></span>
-              <input type="time" value={form.time} onChange={(event) => updateField("time", event.target.value)} />
-            </label>
-          )}
-
-          <GuestStepper value={form.guests} onChange={(value) => updateField("guests", value)} />
-
-          <label className="form-field wide-field">
-            <span>Kısa not <small>(isteğe bağlı)</small></span>
-            <textarea
-              rows={2}
-              value={form.note}
-              onChange={(event) => updateField("note", event.target.value)}
-              placeholder="Oda tercihi, çocuk sayısı veya masa notu"
-            />
-          </label>
-
-          <p className="form-note">
-            <ShieldCheck size={16} aria-hidden="true" />
-            Bilgileriniz yalnızca talebinize dönüş yapılması için işletmeye iletilir.
-          </p>
-          {submitMessage && (
-            <p className={`form-status status-${submitState}`} role="status">
-              {submitMessage}
-            </p>
-          )}
-          <button className="primary-button wide-button request-submit" type="submit">
-            <MessageCircle size={19} aria-hidden="true" />
-            WhatsApp'ta Aç
-          </button>
-        </form>
-
-        <aside className="prepared-message" aria-live="polite">
-          <div className="prepared-message-heading">
-            <span aria-hidden="true">
-              <MessageCircle size={20} />
-            </span>
-            <div>
-              <p className="eyebrow">Hazır Mesaj</p>
-              <h2>Kontrol sizde</h2>
-            </div>
-          </div>
-          {lastMessage ? (
-            <div className="message-preview-bubble">
-              <strong>WhatsApp mesajınız hazır</strong>
-              <pre>{lastMessage}</pre>
-            </div>
-          ) : (
-            <div className="message-placeholder">
-              <p>Formu tamamladığınızda WhatsApp mesajınız burada hazır görünecek.</p>
-              <ol>
-                <li>Bilgilerinizi seçin.</li>
-                <li>WhatsApp'ta açın.</li>
-                <li>Mesajı kontrol edip gönderin.</li>
-              </ol>
-            </div>
-          )}
-          <p className="prepared-message-trust">
-            <ShieldCheck size={16} aria-hidden="true" />
-            Son müsaitlik ve rezervasyon onayını işletme verir.
-          </p>
-        </aside>
-      </section>
-    </PageShell>
-  );
 }
 
-type DatePreset = "today" | "tomorrow" | "weekend" | "custom";
-
-function DateQuickPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const inputId = useId();
-  const [selection, setSelection] = useState<DatePreset | "">("");
-  const today = new Date();
-  const todayIso = toLocalIsoDate(today);
-  const presets: Array<{ key: Exclude<DatePreset, "custom">; label: string; value: string }> = [
-    { key: "today", label: "Bugün", value: todayIso },
-    { key: "tomorrow", label: "Yarın", value: toLocalIsoDate(addLocalDays(today, 1)) },
-    { key: "weekend", label: "Hafta sonu", value: toLocalIsoDate(nextWeekendDate(today)) }
-  ];
-
-  function choosePreset(preset: (typeof presets)[number]) {
-    setSelection(preset.key);
-    onChange(preset.value);
-  }
-
-  return (
-    <fieldset className="request-choice-group date-choice-group wide-field">
-      <legend>Ne zaman?</legend>
-      <div className="date-quick-options">
-        {presets.map((preset) => {
-          const isActive = selection === preset.key;
-          return (
-            <button
-              key={preset.key}
-              type="button"
-              className={isActive ? "date-quick-option is-active" : "date-quick-option"}
-              aria-pressed={isActive}
-              aria-label={`${preset.label}: ${formatTurkishCalendarDate(preset.value)}`}
-              onClick={() => choosePreset(preset)}
-            >
-              {preset.label}
-            </button>
-          );
-        })}
-        <label className={selection === "custom" ? "date-quick-option custom-date-option is-active" : "date-quick-option custom-date-option"} htmlFor={inputId}>
-          <CalendarDays size={17} aria-hidden="true" />
-          <span>{selection === "custom" && value ? formatTurkishCalendarDate(value) : "Tarih seç"}</span>
-          <input
-            id={inputId}
-            className="native-date-control"
-            type="date"
-            required
-            min={todayIso}
-            value={value}
-            aria-label="Tarih seç"
-            onChange={(event) => {
-              setSelection("custom");
-              onChange(event.target.value);
-            }}
-          />
-        </label>
-      </div>
-      <p className="selected-date" aria-live="polite">
-        {value ? `Seçilen tarih: ${formatRequestDate(value)}` : "Tarih seçiminizi hızlı seçeneklerden yapabilirsiniz."}
-      </p>
-    </fieldset>
-  );
-}
-
-function GuestStepper({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const inputId = useId();
-  const parsedValue = Number(value);
-  const safeValue = Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : 1;
-
-  function step(amount: number) {
-    onChange(String(Math.min(30, Math.max(1, safeValue + amount))));
-  }
-
-  return (
-    <fieldset className="guest-stepper-field">
-      <legend>Kişi sayısı</legend>
-      <div className="guest-stepper">
-        <button type="button" aria-label="Kişi sayısını azalt" onClick={() => step(-1)} disabled={safeValue <= 1}>
-          <Minus size={17} aria-hidden="true" />
-        </button>
-        <input
-          id={inputId}
-          required
-          aria-label="Kişi sayısı"
-          inputMode="numeric"
-          min="1"
-          max="30"
-          type="number"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <button type="button" aria-label="Kişi sayısını artır" onClick={() => step(1)} disabled={safeValue >= 30}>
-          <Plus size={17} aria-hidden="true" />
-        </button>
-      </div>
-    </fieldset>
-  );
-}
-
-function SettingsPage() {
-  const [copyStatus, setCopyStatus] = useState("");
-  const webModuleUrl = getWebModuleBaseUrl();
-  const displayedSyncSecret = DEMO_SYNC_SECRET || "Canlı demo paketi oluşturulurken eklenir";
-
-  async function copyConnectionValue(label: string, value: string) {
-    if (!value || (label === "Güvenlik anahtarı" && !DEMO_SYNC_SECRET)) {
-      setCopyStatus("Demo güvenlik anahtarı bu yerel build'e eklenmemiş.");
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyStatus(`${label} kopyalandı.`);
-    } catch {
-      setCopyStatus("Tarayıcı kopyalamaya izin vermedi; alanı seçerek elle kopyalayabilirsiniz.");
-    }
-  }
-
-  return (
-    <PageShell
-      className="settings-page"
-      title="Kurulum"
-      text="Yardımcı Asistan uygulamalarını indirin ve masaüstü bağlantısını aşağıdaki hazır demo bilgileriyle tamamlayın."
-    >
-      <section className="connection-setup-card" aria-labelledby="connection-setup-title">
-        <div className="connection-setup-heading">
-          <div className="connection-setup-icon" aria-hidden="true">
-            <KeyRound size={29} />
-          </div>
-          <div>
-            <p className="eyebrow">Demo Bağlantısı</p>
-            <h2 id="connection-setup-title">Ortak kurulum bilgileri</h2>
-            <p>Masaüstü uygulamasındaki Web Bağlantısı alanına bu iki değeri girin. Android demo APK aynı bağlantıyla hazır gelir.</p>
-          </div>
-        </div>
-
-        <div className="connection-fields">
-          <label className="connection-field">
-            <span><Link2 size={16} aria-hidden="true" /> Yardımcı Asistan kurulum yolu</span>
-            <div className="connection-field-control">
-              <input aria-label="Yardımcı Asistan kurulum yolu" readOnly spellCheck={false} value={webModuleUrl} />
-              <button type="button" onClick={() => void copyConnectionValue("Kurulum yolu", webModuleUrl)}>
-                <Copy size={16} aria-hidden="true" />
-                Kopyala
-              </button>
-            </div>
-            <small>Masaüstünde: Ayarlar → Gelişmiş Ayarlar → Web Bağlantısı → Web eşitleme adresi</small>
-          </label>
-
-          <label className="connection-field">
-            <span><KeyRound size={16} aria-hidden="true" /> Web güvenlik anahtarı</span>
-            <div className="connection-field-control">
-              <input aria-label="Web güvenlik anahtarı" readOnly spellCheck={false} value={displayedSyncSecret} />
-              <button
-                type="button"
-                disabled={!DEMO_SYNC_SECRET}
-                onClick={() => void copyConnectionValue("Güvenlik anahtarı", displayedSyncSecret)}
-              >
-                <Copy size={16} aria-hidden="true" />
-                Kopyala
-              </button>
-            </div>
-            <small>Masaüstü, Android ve web modülünün kullandığı ortak demo anahtarı</small>
-          </label>
-        </div>
-        <p className="connection-copy-status" role="status" aria-live="polite">{copyStatus}</p>
-      </section>
-
-      <section className="installation-steps" aria-labelledby="installation-steps-title">
-        <div className="installation-steps-heading">
-          <p className="eyebrow">Adım Adım</p>
-          <h2 id="installation-steps-title">Yardımcı Asistan nasıl kurulur?</h2>
-        </div>
-        <ol>
-          <li>
-            <span>1</span>
-            <div><strong>Windows uygulamasını indirin</strong><p>Bilgisayarınıza uygun 64 bit veya 32 bit kurulum dosyasını aşağıdan çalıştırın.</p></div>
-          </li>
-          <li>
-            <span>2</span>
-            <div><strong>Demo bağlantısını kaydedin</strong><p>İlk açılışta yukarıdaki kurulum yolunu ve güvenlik anahtarını Web Bağlantısı alanlarına yapıştırın.</p></div>
-          </li>
-          <li>
-            <span>3</span>
-            <div><strong>Android uygulamasını kurun</strong><p>APK dosyasını telefona yükleyin. Demo bağlantısı uygulamanın içinde hazır olduğundan ayrıca anahtar girmeniz gerekmez.</p></div>
-          </li>
-        </ol>
-      </section>
-
-      <section className="desktop-download-card" aria-labelledby="desktop-download-title">
-        <div className="download-icon" aria-hidden="true">
-          <MonitorDown size={34} />
-        </div>
-        <div className="download-copy">
-          <p className="eyebrow">Masaüstü Uygulaması</p>
-          <h2 id="desktop-download-title">Windows kurulum dosyası</h2>
-          <p>
-            Talep takibi, QR menü, AI yardımcı ve işletme ayarlarına masaüstünden erişmek için Yardımcı Asistan'ı kurun.
-          </p>
-          <div className="download-meta" aria-label="Kurulum dosyası bilgileri">
-            <span>Windows 10 / 11</span>
-            <span>64 bit (x64)</span>
-            <span>Sürüm {DESKTOP_INSTALLER_VERSION}</span>
-          </div>
-          <a className="primary-button download-button" href={DESKTOP_INSTALLER_URL} download>
-            <Download size={19} aria-hidden="true" />
-            Kurulum Dosyasını İndir
-          </a>
-        </div>
-      </section>
-
-      <section className="additional-downloads" aria-label="Diğer uygulama indirmeleri">
-        <article className="platform-download-card">
-          <div className="platform-download-icon" aria-hidden="true">
-            <MonitorDown size={27} />
-          </div>
-          <div>
-            <p className="eyebrow">Eski Windows Cihazlar</p>
-            <h2>Windows 32 bit</h2>
-            <p>32 bit işlemci veya 32 bit Windows kullanan bilgisayarlar için ayrı NSIS kurulum paketidir.</p>
-            <div className="download-meta" aria-label="Windows 32 bit kurulum bilgileri">
-              <span>Windows 10 / 11</span>
-              <span>32 bit (x86)</span>
-              <span>Sürüm {DESKTOP_INSTALLER_VERSION}</span>
-            </div>
-            <a className="ghost-button platform-download-button" href={DESKTOP_INSTALLER_X86_URL} download>
-              <Download size={18} aria-hidden="true" />
-              Windows 32 Bit İndir
-            </a>
-          </div>
-        </article>
-
-        <article className="platform-download-card">
-          <div className="platform-download-icon android" aria-hidden="true">
-            <Smartphone size={27} />
-          </div>
-          <div>
-            <p className="eyebrow">Android Uygulaması</p>
-            <h2>Android APK</h2>
-            <p>Telefon üzerinden talepleri ve işletme özetini takip etmek için Android test uygulamasıdır.</p>
-            <div className="download-meta" aria-label="Android APK bilgileri">
-              <span>Android 8.0+</span>
-              <span>APK</span>
-              <span>Sürüm {ANDROID_APP_VERSION}</span>
-            </div>
-            <a className="ghost-button platform-download-button" href={ANDROID_APK_URL} download>
-              <Download size={18} aria-hidden="true" />
-              Android APK İndir
-            </a>
-          </div>
-        </article>
-      </section>
-
-      <section className="installer-notes" aria-label="Kurulum bilgileri">
-        <article className="info-panel">
-          <ShieldCheck size={24} aria-hidden="true" />
-          <h3>Veriler bu bilgisayarda kalır</h3>
-          <p>Masaüstü uygulaması işletme verilerini yerel SQLite veritabanında saklar ve manuel yedek almanızı sağlar.</p>
-        </article>
-        <article className="info-panel">
-          <Settings size={24} aria-hidden="true" />
-          <h3>Kurulumdan sonra</h3>
-          <p>Firma, web modülü, WhatsApp ve isteğe bağlı AI bağlantısı bilgilerini ilk açılış ekranında tamamlayabilirsiniz.</p>
-        </article>
-      </section>
-
-      <p className="installer-warning">
-        Windows geliştirme paketleri henüz ticari kod imzasına sahip değildir ve yayıncı uyarısı gösterebilir. Android APK debug/test anahtarıyla imzalıdır; kurulum için tarayıcıya “bilinmeyen uygulama yükleme” izni vermeniz gerekebilir.
-      </p>
-    </PageShell>
-  );
-}
-
-function SectionHeading({ title, text }: { title: string; text: string }) {
-  return (
-    <section className="section-heading">
-      <p className="eyebrow">Yardımcı Asistan</p>
-      <h2>{title}</h2>
-      <p>{text}</p>
-    </section>
-  );
-}
-
-function PageShell({
-  title,
-  text,
-  children,
-  className = ""
-}: {
-  title: string;
-  text: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={`page-shell ${className}`.trim()}>
-      <div className="page-title">
-        <p className="eyebrow">{business.display_name}</p>
-        <h1>{title}</h1>
-        <p>{text}</p>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Footer({ onNavigate }: { onNavigate: NavigateToPage }) {
-  return (
-    <footer className="site-footer">
-      <div>
-        <strong>{business.display_name}</strong>
-        <p>{business.address}</p>
-      </div>
-      <div className="footer-actions">
-        <button className="ghost-button" onClick={() => onNavigate("product")}>
-          <MonitorSmartphone size={17} aria-hidden="true" />
-          Yardımcı Asistan’ı Tanıyın
-        </button>
-        <button className="ghost-button" onClick={() => onNavigate("settings")}>
-          <Download size={17} aria-hidden="true" />
-          Kurulum
-        </button>
-        <button className="ghost-button" onClick={() => onNavigate("location")}>
-          <MapPin size={17} aria-hidden="true" />
-          Ulaşım
-        </button>
-        <a className="primary-button" href={createWhatsAppLink(business.whatsapp, "Merhaba, bilgi almak istiyorum.")} target="_blank" rel="noreferrer">
-          <MessageCircle size={17} aria-hidden="true" />
-          WhatsApp
-        </a>
-      </div>
-    </footer>
-  );
-}
-
-function buildRequestMessage(form: {
-  requestType: string;
-  name: string;
-  phone: string;
-  date: string;
-  time: string;
-  guests: string;
-  note: string;
-}) {
-  return buildCustomerRequestWhatsAppMessage(
-    {
-      request_type: form.requestType,
-      customer_name: form.name,
-      customer_phone: form.phone,
-      date_text: formatRequestDate(form.date),
-      time_text: form.time,
-      guest_count: form.guests,
-      message: form.note
+async function callSync(payload: Record<string, unknown>) {
+  const response = await fetch(`${WEB_MODULE_URL}/api/sync.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-YA-Sync-Secret": SYNC_SECRET
     },
-    business.display_name
-  );
+    body: JSON.stringify({ ...payload, sync_secret: SYNC_SECRET })
+  });
+  const result = await response.json().catch(() => null) as Record<string, any> | null;
+  if (!response.ok || !result) throw new Error(`sync_${response.status}`);
+  return result;
 }
 
-function toRequestApiPayload(
-  form: {
-    requestType: string;
-    name: string;
-    phone: string;
-    date: string;
-    time: string;
-    guests: string;
-    note: string;
-  },
-  whatsappMessage: string
-) {
+function normalizeOperations(value: unknown): LiveSystemState["operations"] | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const data = value as Record<string, unknown>;
   return {
-    source: "web_form",
-    request_type: form.requestType,
-    customer_name: form.name,
-    customer_phone: form.phone,
-    date_text: formatRequestDate(form.date),
-    start_date: form.date,
-    time: form.time,
-    guest_count: Number(form.guests),
-    message: form.note,
-    whatsapp_message: whatsappMessage
+    totalRooms: toNumber(data.total_rooms),
+    availableRooms: toNumber(data.available_rooms),
+    availableTables: toNumber(data.available_tables),
+    occupiedTables: toNumber(data.occupied_tables),
+    activeOrders: toNumber(data.active_table_orders),
+    pendingReservations: toNumber(data.pending_reservations),
+    pendingTasks: toNumber(data.pending_daily_tasks),
+    customerCount: toNumber(data.customer_count)
   };
 }
 
-function getRequestApiEndpoint() {
-  const baseUrl = getWebModuleApiBaseUrl();
-  return baseUrl ? `${baseUrl}/api/request.php` : "";
+function toNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getWebModuleBaseUrl() {
-  return String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? DEFAULT_WEB_MODULE_URL).trim().replace(/\/+$/, "");
+function toOptionalNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function getWebModuleApiBaseUrl() {
-  const configuredUrl = String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? "").trim().replace(/\/+$/, "");
-  if (configuredUrl) {
-    return configuredUrl;
-  }
-
-  return import.meta.env.DEV ? "/__yardimci_asistan_live" : DEFAULT_WEB_MODULE_URL;
-}
-
-async function submitRequestToMiniApi(endpoint: string, payload: Record<string, string | number>) {
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    const result = (await response.json().catch(() => null)) as { ok?: boolean; message?: string; request_id?: string } | null;
-
-    if (response.ok && result?.ok === true) {
-      return {
-        ok: true,
-        message: result.request_id ? `Talep web modülüne kaydedildi: ${result.request_id}` : "Talep web modülüne kaydedildi."
-      };
-    }
-
-    return {
-      ok: false,
-      message: result?.message ? `${result.message} WhatsApp mesajı hazırlandı.` : "Talep web modülüne kaydedilemedi. WhatsApp mesajı hazırlandı."
-    };
-  } catch {
-    return {
-      ok: false,
-      message: "Web modülüne ulaşılamadı. WhatsApp mesajı hazırlandı."
-    };
-  }
-}
-
-function createWhatsAppLink(phone: string, message: string) {
-  return createWhatsAppUrl(phone, message);
-}
-
-function getPageFromLocation(): PageKey {
-  const hashPage = decodeURIComponent(window.location.hash.replace(/^#/, "")).trim();
-  return pageKeys.includes(hashPage as PageKey) ? (hashPage as PageKey) : "home";
-}
-
-function addLocalDays(date: Date, amount: number) {
-  const nextDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  nextDate.setDate(nextDate.getDate() + amount);
-  return nextDate;
-}
-
-function nextWeekendDate(date: Date) {
-  const day = date.getDay();
-  const daysUntilWeekend = day === 0 || day === 6 ? 0 : 6 - day;
-  return addLocalDays(date, daysUntilWeekend);
-}
-
-function toLocalIsoDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function parseLocalIsoDate(value: string) {
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) {
-    return null;
-  }
-
-  const date = new Date(year, month - 1, day);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function formatTurkishCalendarDate(value: string) {
-  const date = parseLocalIsoDate(value);
-  if (!date) {
-    return "Tarih seç";
-  }
-
-  const includeYear = date.getFullYear() !== new Date().getFullYear();
-  return new Intl.DateTimeFormat("tr-TR", {
-    day: "numeric",
-    month: "long",
-    ...(includeYear ? { year: "numeric" as const } : {})
-  }).format(date);
-}
-
-function formatRequestDate(value: string) {
-  const date = parseLocalIsoDate(value);
-  if (!date) {
-    return value;
-  }
-
-  const calendarDate = formatTurkishCalendarDate(value);
-  const today = toLocalIsoDate(new Date());
-  const tomorrow = toLocalIsoDate(addLocalDays(new Date(), 1));
-
-  if (value === today) {
-    return `Bugün, ${calendarDate}`;
-  }
-  if (value === tomorrow) {
-    return `Yarın, ${calendarDate}`;
-  }
-
-  return calendarDate;
+function formatTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(date);
 }
 
 export default App;
