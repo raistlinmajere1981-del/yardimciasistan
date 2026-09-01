@@ -26,7 +26,7 @@ const requiredEntries = [
   "/db/migrations/001_initial_schema.sql",
   "/db/migrations/002_setup_completion.sql",
   "/db/migrations/020_app_lock.sql",
-  "/db/seeds/001_demo.sql"
+  "/db/demo-profiles/pension-restaurant.sql"
 ];
 
 for (const entry of requiredEntries) {

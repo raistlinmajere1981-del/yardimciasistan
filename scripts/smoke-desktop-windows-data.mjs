@@ -17,8 +17,13 @@ try {
   assert.equal(String(scalar(database, "PRAGMA integrity_check")), "ok");
   const migrationCount = Number(scalar(database, "SELECT COUNT(*) FROM schema_migrations"));
   assert.ok(migrationCount >= 29, `Beklenen migration'lar uygulanmadı: ${migrationCount}`);
-  assert.equal(Number(scalar(database, "SELECT setup_completed FROM settings WHERE deleted_at = '' LIMIT 1")), 0);
-  assert.equal(String(scalar(database, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1")), "change-this-secret");
+  for (const table of ["business", "settings", "rooms", "tables", "menu_categories", "menu_items"]) {
+    assert.equal(
+      Number(scalar(database, `SELECT COUNT(*) FROM ${table}`)),
+      0,
+      `Temiz Windows kurulumunda ${table} tablosu boş olmalı.`
+    );
+  }
   assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM room_folio_table_order_transfers")), 0);
 
   const approvalTrigger = Number(scalar(database, `

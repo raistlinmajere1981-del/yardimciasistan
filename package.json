@@ -74,7 +74,7 @@
     "smoke:web-widget-module": "npm run build -w @yardimci-asistan/web-widget && node scripts/smoke-web-widget-module.mjs",
     "smoke:demo-web-widget": "npm run build -w @yardimci-asistan/web-widget && node scripts/smoke-demo-web-widget.mjs",
     "smoke:web-module": "node scripts/smoke-web-module-menu.mjs",
-    "smoke:desktop:linux": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-app-lock.mjs && node scripts/smoke-android-permission-matrix.mjs && node scripts/smoke-table-categories-db.mjs && node scripts/smoke-record-deletions.mjs && node scripts/smoke-customer-room-management-db.mjs && node scripts/smoke-stock-image-import-db.mjs && node scripts/smoke-reports-db.mjs && node scripts/smoke-finance-db.mjs && node scripts/smoke-finance-service.mjs && node scripts/smoke-room-folio-service.mjs && node scripts/smoke-room-folio-table-order-transfer.mjs && node scripts/smoke-desktop-xvfb.mjs",
+    "smoke:desktop:linux": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-clean-startup.mjs && node scripts/smoke-app-lock.mjs && node scripts/smoke-android-permission-matrix.mjs && node scripts/smoke-table-categories-db.mjs && node scripts/smoke-record-deletions.mjs && node scripts/smoke-customer-room-management-db.mjs && node scripts/smoke-stock-image-import-db.mjs && node scripts/smoke-reports-db.mjs && node scripts/smoke-finance-db.mjs && node scripts/smoke-finance-service.mjs && node scripts/smoke-room-folio-service.mjs && node scripts/smoke-room-folio-table-order-transfer.mjs && node scripts/smoke-desktop-xvfb.mjs",
     "smoke:legacy-desktop-menu-db": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-menu-db.mjs",
     "smoke:stock-image-db": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-stock-image-import-db.mjs",
     "pack:desktop:dir": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:dir -w @yardimci-asistan/desktop-app",
@@ -84,7 +84,8 @@
     "pack:web-module": "npm run build -w @yardimci-asistan/web-widget && node scripts/package-web-module.mjs",
     "pack:hosting-demo": "node scripts/package-hosting-demo.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "smoke:desktop-clean-startup": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-clean-startup.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",

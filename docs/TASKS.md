@@ -45,6 +45,10 @@ GitHub Actions tekrar çalışabilir hale geldiğinde aynı çekirdek sözleşme
 
 `docs/PILOT_FIELD_TEST.md` içindeki Windows turu gerçek hedef makinede uygulanır.
 
+Temiz kurulum ve `Verileri Sıfırla` sonrasında yalnız şema oluşturulur. İşletme,
+oda, masa, menü ve stok örnekleri otomatik eklenmez; uygulama kurulum sihirbazıyla
+açılır. Tanıtım verisi yalnız açıkça seçilen `pension-restaurant` demo profiline aittir.
+
 Kabul kriterleri:
 
 - NSIS kurulum başarılı,

@@ -43,9 +43,17 @@ import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
 import { applyAndroidFinanceAction } from "./android-finance-actions.js";
 import { applyAndroidRoomFolioAction } from "./android-room-folio-actions.js";
 
+export type DesktopDemoProfile = "pension-restaurant";
+
 export interface DesktopDatabaseOptions {
   appPath: string;
   userDataPath: string;
+  /**
+   * Production Electron starts without sample business data. Node-based smoke
+   * tests keep the historical pension/restaurant fixture unless they
+   * explicitly pass null.
+   */
+  demoProfile?: DesktopDemoProfile | null;
 }
 
 export interface DashboardSummary {
@@ -1065,11 +1073,9 @@ export class DesktopDatabase {
       }
     }
 
-    const needsDemoSeed = this.getCount("business") === 0 || this.getCount("menu_categories") === 0 || this.getCount("menu_items") === 0;
-    if (needsDemoSeed) {
-      for (const seed of this.readSqlFiles("db/seeds")) {
-        this.db.exec(seed.sql);
-      }
+    const demoProfile = this.resolveDemoProfile();
+    if (demoProfile && this.getCount("business") === 0) {
+      this.db.exec(this.readDemoProfileSql(demoProfile));
     }
 
     this.ensureSyncClientId();
@@ -8886,6 +8892,33 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE settings SET sync_client_id = ?, updated_at = ? WHERE id = ?")
       .run(clientId, new Date().toISOString(), settings.id);
+  }
+
+  private resolveDemoProfile(): DesktopDemoProfile | null {
+    if (this.options.demoProfile !== undefined) {
+      return this.options.demoProfile;
+    }
+
+    const requestedProfile = String(process.env.YA_DESKTOP_DEMO_PROFILE ?? "").trim();
+    if (requestedProfile) {
+      if (requestedProfile === "pension-restaurant") {
+        return requestedProfile;
+      }
+      throw new Error(`Desteklenmeyen masaüstü demo profili: ${requestedProfile}`);
+    }
+
+    // Existing database smoke tests run under Node and intentionally exercise
+    // the realistic hybrid-business fixture. Electron (development and
+    // packaged production) must always start from an empty operational store.
+    return process.versions.electron ? null : "pension-restaurant";
+  }
+
+  private readDemoProfileSql(profile: DesktopDemoProfile) {
+    const profilePath = path.join(this.options.appPath, "db", "demo-profiles", `${profile}.sql`);
+    if (!fs.existsSync(profilePath)) {
+      throw new Error(`Masaüstü demo profili bulunamadı: ${profile}`);
+    }
+    return fs.readFileSync(profilePath, "utf8");
   }
 
   private readSqlFiles(relativeDir: string) {
