@@ -3,6 +3,7 @@ dist/
 dist-electron/
 dist-renderer/
 backup/
+.demo-runtime/
 apps/android-app/build/
 .gradle/
 apps/android-app/.debug/
