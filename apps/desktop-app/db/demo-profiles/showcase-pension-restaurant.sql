@@ -27,7 +27,7 @@ INSERT OR IGNORE INTO settings (
   'settings_showcase_001',
   'business_showcase_001',
   'https://yardimciasistan.alwaysdata.net/yardimci-asistan',
-  'yardimci-asistan-tanitim-secret',
+  'change-this-secret',
   0,
   1,
   'webview',
