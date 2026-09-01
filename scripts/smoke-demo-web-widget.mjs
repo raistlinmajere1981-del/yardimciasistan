@@ -143,7 +143,7 @@ async function pullRequests() {
     },
     body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 20 })
   });
-  expect(response.status()).toBe(200);
+  expect(response.status).toBe(200);
   return (await response.json()).requests;
 }
 
