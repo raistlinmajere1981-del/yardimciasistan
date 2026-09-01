@@ -26,9 +26,8 @@ import {
 const DEFAULT_WEB_MODULE_URL = "https://yardimciasistan.alwaysdata.net/yardimci-asistan";
 const WEB_MODULE_URL = String(import.meta.env.VITE_YA_WEB_MODULE_URL ?? DEFAULT_WEB_MODULE_URL).trim().replace(/\/+$/, "");
 const SYNC_SECRET = String(import.meta.env.VITE_YA_SYNC_SECRET ?? "change-this-secret").trim();
-const SHOWCASE_DEVICE_ID = String(import.meta.env.VITE_YA_SHOWCASE_DEVICE_ID ?? "web-showcase-console").trim();
 const WIDGET_SCRIPT_ID = "yardimci-asistan-product-widget-script";
-const WIDGET_VERSION = "20260901-product-site";
+const WIDGET_VERSION = "20260902-product-site";
 const SHOWCASE_BUSINESS_NAME = "Yardımcı Asistan Tanıtım İşletmesi";
 const SHOWCASE_WHATSAPP = "+905316969334";
 const DESKTOP_INSTALLER_VERSION = String(import.meta.env.VITE_YA_DESKTOP_INSTALLER_VERSION ?? "0.1.2").trim() || "0.1.2";
@@ -60,7 +59,6 @@ type LiveSystemState = {
   menuItems?: number;
   menuUpdatedAt?: string;
   snapshotUpdatedAt?: string;
-  approvalRequired?: boolean;
   operations?: {
     totalRooms: number;
     availableRooms: number;
@@ -349,7 +347,7 @@ function App() {
               <div className="live-note">
                 <Database size={20} />
                 <div>
-                  <strong>{liveState.approvalRequired ? "Canlı operasyon görünümü masaüstü onayı bekliyor." : "Canlı operasyon snapshot'ı henüz yayınlanmadı."}</strong>
+                  <strong>Canlı operasyon snapshot'ı henüz yayınlanmadı.</strong>
                   <p>{liveState.message ?? "QR menü ve hosting bağlantısı yine gerçek web modülünden kontrol ediliyor."}</p>
                 </div>
               </div>
@@ -360,9 +358,9 @@ function App() {
               <a className="button secondary" href={`${WEB_MODULE_URL}/menu.html`} target="_blank" rel="noreferrer">Canlı QR menüyü aç</a>
               <details className="technical-details">
                 <summary>Teknik bağlantı</summary>
-                <div><span>Endpoint</span><code>{WEB_MODULE_URL}/api/sync.php</code></div>
+                <div><span>Sync endpoint</span><code>{WEB_MODULE_URL}/api/sync.php</code></div>
+                <div><span>Canlı özet</span><code>{WEB_MODULE_URL}/api/operations.php</code></div>
                 <div><span>Sync key</span><code>{SYNC_SECRET}</code></div>
-                <div><span>Showcase device</span><code>{SHOWCASE_DEVICE_ID}</code></div>
               </details>
             </div>
           </div>
@@ -534,27 +532,30 @@ async function refreshLiveSystem(setState: (value: LiveSystemState) => void) {
       });
 
     const capabilitiesPromise = callSync({ action: "capabilities" });
-    const snapshotPromise = callSync({
-      action: "android_summary",
-      device_id: SHOWCASE_DEVICE_ID,
-      device_name: "Yardımcı Asistan Tanıtım Sitesi",
-      app_version: "web-showcase-1",
-      known_server_revision: 0,
-      limit: 20
+    const operationsPromise = fetch(`${WEB_MODULE_URL}/api/operations.php`, {
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "X-YA-Sync-Secret": SYNC_SECRET
+      }
+    }).then(async (response) => {
+      const result = await response.json().catch(() => null) as Record<string, any> | null;
+      if (!response.ok || !result) throw new Error(`operations_${response.status}`);
+      return result;
     });
 
-    const [menuResult, capabilitiesResult, snapshotResult] = await Promise.allSettled([
+    const [menuResult, capabilitiesResult, operationsResult] = await Promise.allSettled([
       menuPromise,
       capabilitiesPromise,
-      snapshotPromise
+      operationsPromise
     ]);
 
     const menu = menuResult.status === "fulfilled" ? menuResult.value : null;
     const capabilities = capabilitiesResult.status === "fulfilled" ? capabilitiesResult.value : null;
-    const snapshot = snapshotResult.status === "fulfilled" ? snapshotResult.value : null;
-    const anyOnline = Boolean(menu?.ok || capabilities?.ok || snapshot?.ok);
-    const operations = snapshot?.ok && snapshot.approval_required !== true
-      ? normalizeOperations(snapshot.operations)
+    const liveOperations = operationsResult.status === "fulfilled" ? operationsResult.value : null;
+    const anyOnline = Boolean(menu?.ok || capabilities?.ok || liveOperations?.ok);
+    const operations = liveOperations?.ok && liveOperations.published === true
+      ? normalizeOperations(liveOperations.operations)
       : undefined;
 
     setState({
@@ -562,18 +563,15 @@ async function refreshLiveSystem(setState: (value: LiveSystemState) => void) {
       checkedAt,
       protocolVersion: toOptionalNumber(capabilities?.protocol_version),
       storage: typeof capabilities?.storage === "string" ? capabilities.storage : undefined,
-      serverRevision: toOptionalNumber(snapshot?.server_revision ?? capabilities?.server_revision ?? menu?.server_revision),
+      serverRevision: toOptionalNumber(liveOperations?.server_revision ?? capabilities?.server_revision ?? menu?.server_revision),
       menuCategories: Array.isArray(menu?.categories) ? menu.categories.length : undefined,
       menuItems: Array.isArray(menu?.items) ? menu.items.length : undefined,
       menuUpdatedAt: typeof menu?.updated_at === "string" ? menu.updated_at : undefined,
-      snapshotUpdatedAt: typeof snapshot?.summary?.android_snapshot_updated_at === "string" ? snapshot.summary.android_snapshot_updated_at : undefined,
-      approvalRequired: snapshot?.approval_required === true,
+      snapshotUpdatedAt: typeof liveOperations?.updated_at === "string" ? liveOperations.updated_at : undefined,
       operations,
-      message: snapshot?.approval_required === true
-        ? `Masaüstünde ${SHOWCASE_DEVICE_ID} cihazını bir kez onayladığınızda oda, masa ve operasyon özeti burada canlı görünür.`
-        : !operations
-          ? "Masaüstü henüz Android operasyon snapshot'ı yayınlamadı."
-          : undefined
+      message: !operations
+        ? (typeof liveOperations?.message === "string" ? liveOperations.message : "Masaüstü henüz operasyon snapshot'ı yayınlamadı.")
+        : undefined
     });
   } catch (error) {
     setState({
