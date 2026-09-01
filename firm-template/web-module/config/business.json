@@ -11,7 +11,7 @@
   "map_url": "",
   "primary_color": "#2DD4BF",
   "accent_color": "#5EEAD4",
-  "sync_secret": "change-this-secret",
+  "sync_secret": "112233445566",
   "allowed_origins": [
     "https://yardimciasistan.alwaysdata.net",
     "http://127.0.0.1:5173",
