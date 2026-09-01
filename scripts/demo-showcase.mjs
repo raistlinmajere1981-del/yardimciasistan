@@ -77,7 +77,7 @@ try {
     stockTracked: Number(scalar(sqlite, "SELECT COUNT(*) FROM menu_items WHERE deleted_at = '' AND stock_quantity IS NOT NULL")),
     customers: Number(scalar(sqlite, "SELECT COUNT(*) FROM customers WHERE deleted_at = ''")),
     reservations: Number(scalar(sqlite, "SELECT COUNT(*) FROM reservations WHERE deleted_at = ''")),
-    tableOrders: Number(scalar(sqlite, "SELECT COUNT(*) FROM table_orders WHERE deleted_at = ''"))
+    tableOrders: Number(scalar(sqlite, "SELECT COUNT(*) FROM table_orders"))
   };
 
   assert.deepEqual(summary, {
