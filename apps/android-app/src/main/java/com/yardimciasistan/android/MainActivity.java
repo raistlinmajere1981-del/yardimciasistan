@@ -1754,6 +1754,7 @@ public final class MainActivity extends ComponentActivity {
       page.addView(statusStrip(new CounterValue[] {
           new CounterValue("Boş", countRoomsByStatus("available"), UiKit.SUCCESS, ""),
           new CounterValue("Dolu", countRoomsByStatus("occupied"), UiKit.INFO, ""),
+          new CounterValue("Rezerve", countRoomsByStatus("reserved"), UiKit.WARNING, ""),
           new CounterValue("Temizlik", countRoomsByStatus("cleaning"), UiKit.WARNING, ""),
           new CounterValue("Bakım", countRoomsByStatus("maintenance"), UiKit.DANGER, "")
       }));
