@@ -81,3 +81,24 @@ INSERT OR IGNORE INTO menu_items (
   ('showcase_item_07', 'showcase_cat_drinks', 'Türk Kahvesi', 'Geleneksel Türk kahvesi.', 110, 'TRY', '', 1, 1, '[]', '["sıcak"]', 10, 30, 8, 0, 'Tanıtım stoğu', 'piece', 1, '2026-09-01T12:00:00+03:00', '2026-09-01T12:00:00+03:00'),
   ('showcase_item_08', 'showcase_cat_drinks', 'Limonata', 'Ev yapımı limonata.', 125, 'TRY', '', 1, 0, '[]', '["soğuk"]', 20, 16, 5, 0, 'Tanıtım stoğu', 'piece', 1, '2026-09-01T12:00:00+03:00', '2026-09-01T12:00:00+03:00'),
   ('showcase_item_09', 'showcase_cat_drinks', 'Su', 'Şişe su.', 45, 'TRY', '', 1, 0, '[]', '["soğuk"]', 30, 40, 10, 0, 'Tanıtım stoğu', 'piece', 1, '2026-09-01T12:00:00+03:00', '2026-09-01T12:00:00+03:00');
+
+-- Ürün sitesi canlı sistem panelini gerçek Android snapshot hattından okur.
+-- Tanıtım profiline bu sanal cihazı önceden ekleyerek site açılır açılmaz
+-- operasyon özetini göstermesini sağlarız; gerçek telefon onay akışı değişmez.
+INSERT OR IGNORE INTO android_devices (
+  id, device_id, device_name, app_version, role, is_active, permissions_json,
+  first_seen_at, last_seen_at, created_at, updated_at, revoked_at
+) VALUES (
+  'android_showcase_web_console',
+  'web-showcase-console',
+  'Yardımcı Asistan Tanıtım Sitesi',
+  'web-showcase-1',
+  'admin',
+  1,
+  '[]',
+  '2026-09-01T12:00:00+03:00',
+  '2026-09-01T12:00:00+03:00',
+  '2026-09-01T12:00:00+03:00',
+  '2026-09-01T12:00:00+03:00',
+  NULL
+);
