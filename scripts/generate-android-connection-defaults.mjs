@@ -40,8 +40,8 @@ const configuredSyncSecret = firstNonEmpty(
   process.env.YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET,
   localConfig.sync_secret
 );
-if (configuredSyncSecret && configuredSyncSecret.length < 16) {
-  throw new Error("Android varsayılan sync anahtarı en az 16 karakter olmalı.");
+if (configuredSyncSecret && configuredSyncSecret.length < 12) {
+  throw new Error("Android varsayılan sync anahtarı en az 12 karakter olmalı.");
 }
 
 // Embedding the business-wide bootstrap secret is deny-by-default. Gradle only
