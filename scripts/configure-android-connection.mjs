@@ -7,8 +7,8 @@ const outputPath = join(repoRoot, "apps", "android-app", "connection.local.json"
 const webModuleUrl = normalizeWebModuleUrl(process.env.YARDIMCI_ASISTAN_ANDROID_WEB_MODULE_URL ?? "");
 const syncSecret = String(process.env.YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET ?? "").trim();
 
-if (syncSecret.length < 16) {
-  throw new Error("YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET en az 16 karakter olmalı.");
+if (syncSecret.length < 12) {
+  throw new Error("YARDIMCI_ASISTAN_ANDROID_SYNC_SECRET en az 12 karakter olmalı.");
 }
 
 writeFileSync(outputPath, `${JSON.stringify({
