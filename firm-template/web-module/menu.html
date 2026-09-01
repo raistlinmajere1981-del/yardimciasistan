@@ -3,79 +3,87 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Deniz Çiçeği QR Menü</title>
+    <meta name="color-scheme" content="light" />
+    <title>QR Menü</title>
     <style>
       :root {
         color-scheme: light;
         --primary: #2f6f5e;
         --accent: #e47863;
+        --primary-soft: color-mix(in srgb, var(--primary) 12%, white);
+        --accent-soft: color-mix(in srgb, var(--accent) 12%, white);
         --ink: #172033;
         --paper: #fffaf2;
+        --surface: #ffffff;
         --line: #eadfce;
         --muted: #65707d;
       }
 
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
 
       body {
         margin: 0;
         background: var(--paper);
         color: var(--ink);
-        font-family:
-          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-          sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
-      button,
-      a {
-        font: inherit;
-      }
+      button, a { font: inherit; }
 
       .menu-hero {
+        position: relative;
         min-height: min(390px, 48vh);
         display: flex;
         align-items: flex-end;
-        background-image:
-          linear-gradient(90deg, rgba(23, 32, 51, 0.82), rgba(23, 32, 51, 0.28)),
-          url("/assets/menu-breakfast.webp");
-        background-position: center;
-        background-size: cover;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--primary) 42%, transparent), transparent 36%),
+          linear-gradient(120deg, #111827, #1f2937 58%, color-mix(in srgb, var(--primary) 48%, #172033));
         color: #fff;
-        padding: 28px;
+        padding: 30px;
       }
 
-      .hero-inner,
-      .content,
-      .menu-footer {
+      .menu-hero.has-image::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(90deg, rgba(12, 19, 31, 0.88), rgba(12, 19, 31, 0.38)),
+          var(--hero-image);
+        background-position: center;
+        background-size: cover;
+      }
+
+      .hero-inner, .content, .menu-footer {
         width: min(1080px, 100%);
         margin: 0 auto;
       }
 
+      .hero-inner { position: relative; z-index: 1; }
+
       .hero-kicker {
         margin: 0 0 10px;
-        color: #ffd5be;
+        color: color-mix(in srgb, var(--accent) 42%, white);
         font-size: 0.82rem;
-        font-weight: 800;
-        letter-spacing: 0;
+        font-weight: 900;
+        letter-spacing: 0.11em;
         text-transform: uppercase;
       }
 
       h1 {
-        max-width: 760px;
+        max-width: 780px;
         margin: 0;
-        font-size: clamp(2.3rem, 8vw, 5rem);
-        line-height: 0.96;
-        letter-spacing: 0;
+        font-size: clamp(2.25rem, 7vw, 4.8rem);
+        line-height: 0.98;
+        letter-spacing: -0.04em;
       }
 
-      .hero-inner > p:last-of-type {
-        max-width: 620px;
+      .hero-description {
+        max-width: 660px;
         margin: 16px 0 0;
-        color: rgba(255, 255, 255, 0.88);
-        font-size: 1.06rem;
-        line-height: 1.7;
+        color: rgba(255, 255, 255, 0.82);
+        font-size: 1.04rem;
+        line-height: 1.65;
       }
 
       .hero-meta {
@@ -86,17 +94,17 @@
       }
 
       .hero-meta span {
-        border: 1px solid rgba(255, 255, 255, 0.34);
+        border: 1px solid rgba(255, 255, 255, 0.28);
         border-radius: 999px;
         padding: 8px 12px;
-        background: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.1);
         color: #fff;
-        font-weight: 700;
+        font-size: 0.88rem;
+        font-weight: 750;
+        backdrop-filter: blur(8px);
       }
 
-      .content {
-        padding: 22px 20px 48px;
-      }
+      .content { padding: 22px 20px 48px; }
 
       .menu-toolbar {
         display: flex;
@@ -112,6 +120,7 @@
         gap: 8px;
         overflow-x: auto;
         padding-bottom: 4px;
+        scrollbar-width: thin;
       }
 
       .category-tabs button {
@@ -119,12 +128,14 @@
         flex: 0 0 auto;
         border: 1px solid var(--line);
         border-radius: 999px;
-        background: #fff;
+        background: var(--surface);
         color: var(--ink);
         padding: 0 16px;
         font-weight: 800;
         cursor: pointer;
       }
+
+      .category-tabs button:hover { border-color: var(--primary); }
 
       .category-tabs button.is-active {
         border-color: var(--primary);
@@ -135,7 +146,7 @@
       .updated-at {
         margin: 0;
         color: var(--muted);
-        font-size: 0.92rem;
+        font-size: 0.9rem;
         white-space: nowrap;
       }
 
@@ -145,9 +156,7 @@
         color: var(--muted);
       }
 
-      .menu-section {
-        padding: 18px 0 24px;
-      }
+      .menu-section { padding: 18px 0 24px; }
 
       .section-title {
         display: grid;
@@ -157,8 +166,8 @@
 
       .section-title h2 {
         margin: 0;
-        font-size: clamp(1.55rem, 4vw, 2.4rem);
-        letter-spacing: 0;
+        font-size: clamp(1.55rem, 4vw, 2.35rem);
+        letter-spacing: -0.025em;
       }
 
       .section-title p {
@@ -177,27 +186,28 @@
       .menu-item {
         min-width: 0;
         display: grid;
-        grid-template-columns: 112px minmax(0, 1fr);
+        grid-template-columns: 132px minmax(0, 1fr);
         overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #fff;
+        border-radius: 16px;
+        background: var(--surface);
+        box-shadow: 0 10px 28px rgba(23, 32, 51, 0.04);
       }
 
-      .menu-item.no-image {
-        grid-template-columns: 1fr;
-      }
+      .menu-item.no-image { grid-template-columns: 1fr; }
 
       .menu-item img {
         width: 100%;
         height: 100%;
-        min-height: 154px;
+        min-height: 158px;
         object-fit: cover;
+        background: var(--primary-soft);
       }
 
       .item-body {
         min-width: 0;
         display: grid;
+        align-content: start;
         gap: 10px;
         padding: 16px;
       }
@@ -209,9 +219,7 @@
         gap: 12px;
       }
 
-      .item-title-row strong {
-        font-size: 1.04rem;
-      }
+      .item-title-row strong { font-size: 1.04rem; }
 
       .price {
         color: var(--primary);
@@ -233,22 +241,20 @@
 
       .chip-row span {
         border-radius: 999px;
-        background: #f5eadb;
-        color: #614735;
+        background: var(--accent-soft);
+        color: color-mix(in srgb, var(--accent) 72%, #3d2b24);
         padding: 6px 9px;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         font-weight: 800;
       }
 
-      .featured {
-        color: var(--accent);
-      }
+      .featured { color: var(--accent); }
 
       .empty-state {
         border: 1px dashed var(--line);
-        border-radius: 8px;
+        border-radius: 16px;
         padding: 22px;
-        background: #fff;
+        background: var(--surface);
         color: var(--muted);
       }
 
@@ -262,17 +268,17 @@
         color: var(--muted);
       }
 
-      .menu-footer strong {
-        color: var(--ink);
-      }
+      .menu-footer strong { color: var(--ink); }
+
+      .footer-address { margin-top: 5px; }
 
       .whatsapp-link {
-        display: inline-flex;
+        display: none;
         align-items: center;
         justify-content: center;
         min-height: 44px;
         border-radius: 999px;
-        background: var(--accent);
+        background: var(--primary);
         color: #fff;
         padding: 0 18px;
         font-weight: 900;
@@ -280,64 +286,34 @@
         white-space: nowrap;
       }
 
+      .whatsapp-link.is-visible { display: inline-flex; }
+
       @media (max-width: 780px) {
-        .menu-hero {
-          min-height: 340px;
-          padding: 22px 18px;
-        }
-
-        .menu-toolbar {
-          display: grid;
-          align-items: start;
-        }
-
-        .updated-at {
-          white-space: normal;
-        }
-
-        .menu-grid {
-          grid-template-columns: 1fr;
-        }
-
-        .menu-item {
-          grid-template-columns: 92px minmax(0, 1fr);
-        }
-
-        .menu-item img {
-          min-height: 142px;
-        }
-
-        .menu-footer {
-          display: grid;
-        }
+        .menu-hero { min-height: 330px; padding: 24px 18px; }
+        .menu-toolbar { display: grid; align-items: start; }
+        .updated-at { white-space: normal; }
+        .menu-grid { grid-template-columns: 1fr; }
+        .menu-item { grid-template-columns: 104px minmax(0, 1fr); }
+        .menu-item img { min-height: 146px; }
+        .menu-footer { display: grid; }
       }
 
       @media (max-width: 460px) {
-        .menu-item,
-        .menu-item.no-image {
-          grid-template-columns: 1fr;
-        }
-
-        .menu-item img {
-          height: 190px;
-        }
-
-        .item-title-row {
-          display: grid;
-        }
+        .menu-item, .menu-item.no-image { grid-template-columns: 1fr; }
+        .menu-item img { height: 210px; }
+        .item-title-row { display: grid; }
       }
     </style>
   </head>
   <body>
-    <header class="menu-hero">
+    <header id="menu-hero" class="menu-hero">
       <div class="hero-inner">
         <p class="hero-kicker">QR Menü</p>
-        <h1>Deniz Çiçeği Menü</h1>
-        <p>Ege kahvaltısı, zeytinyağlı başlangıçlar, yerel ana yemekler ve ev yapımı tatlılar.</p>
-        <div class="hero-meta" aria-label="Menü bilgileri">
+        <h1 id="business-title">Menü hazırlanıyor</h1>
+        <p id="business-description" class="hero-description">İşletmenin güncel ürünleri ve fiyatları burada yayınlanır.</p>
+        <div id="hero-meta" class="hero-meta" aria-label="Menü bilgileri">
           <span>Güncel fiyatlar</span>
-          <span>Bahçe ve salon servisi</span>
-          <span>Akyaka / Muğla</span>
+          <span>Masaüstünden canlı yayın</span>
         </div>
       </div>
     </header>
@@ -353,10 +329,10 @@
 
     <footer class="menu-footer">
       <div>
-        <strong>Deniz Çiçeği Pansiyon & Kafe</strong>
-        <div>Sahil Yolu No: 18, Akyaka / Muğla</div>
+        <strong id="footer-business-name">Yardımcı Asistan İşletmesi</strong>
+        <div id="footer-address" class="footer-address"></div>
       </div>
-      <a class="whatsapp-link" href="https://wa.me/905316969334?text=Merhaba%2C%20men%C3%BC%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noreferrer">WhatsApp</a>
+      <a id="whatsapp-link" class="whatsapp-link" target="_blank" rel="noreferrer">WhatsApp</a>
     </footer>
 
     <script>
@@ -365,7 +341,8 @@
         categories: [],
         items: [],
         updatedAt: "",
-        etag: ""
+        etag: "",
+        business: null
       };
 
       const formatterCache = new Map();
@@ -373,51 +350,60 @@
       const list = document.querySelector("#menu-list");
       const status = document.querySelector("#status");
       const updatedAt = document.querySelector("#updated-at");
+      const hero = document.querySelector("#menu-hero");
+      const businessTitle = document.querySelector("#business-title");
+      const businessDescription = document.querySelector("#business-description");
+      const heroMeta = document.querySelector("#hero-meta");
+      const footerBusinessName = document.querySelector("#footer-business-name");
+      const footerAddress = document.querySelector("#footer-address");
+      const whatsappLink = document.querySelector("#whatsapp-link");
 
-      loadMenu();
+      Promise.allSettled([loadBusiness(), loadMenu()]);
+
       window.setInterval(() => {
-        if (document.visibilityState === "visible") {
-          loadMenu(true);
-        }
+        if (document.visibilityState === "visible") loadMenu(true);
       }, 15000);
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") {
-          loadMenu(true);
-        }
+        if (document.visibilityState === "visible") loadMenu(true);
       });
       window.addEventListener("focus", () => loadMenu(true));
+
+      async function loadBusiness() {
+        try {
+          const response = await fetch("api/business.php", { cache: "no-store" });
+          if (!response.ok) throw new Error("business_unavailable");
+          const payload = await response.json();
+          if (!payload?.ok || !payload.business) throw new Error("business_invalid");
+          state.business = payload.business;
+          renderBusiness();
+        } catch {
+          renderBusiness();
+        }
+      }
 
       async function loadMenu(silent = false) {
         try {
           const response = await fetch("api/menu.php", {
+            cache: "no-store",
             headers: {
               Accept: "application/json",
               ...(state.etag ? { "If-None-Match": state.etag } : {})
             }
           });
-
-          if (response.status === 304) {
-            return;
-          }
-
-          if (!response.ok) {
-            throw new Error("Menü şu anda okunamadı.");
-          }
+          if (response.status === 304) return;
+          if (!response.ok) throw new Error("Menü şu anda okunamadı.");
 
           const menu = await response.json();
           state.etag = response.headers.get("ETag") || state.etag;
           state.categories = Array.isArray(menu.categories) ? menu.categories : [];
           state.items = Array.isArray(menu.items) ? menu.items : [];
           state.updatedAt = typeof menu.updated_at === "string" ? menu.updated_at : "";
-          if (state.activeCategoryId !== "all"
-              && !state.categories.some((category) => category.id === state.activeCategoryId)) {
+          if (state.activeCategoryId !== "all" && !state.categories.some((category) => category.id === state.activeCategoryId)) {
             state.activeCategoryId = "all";
           }
           render();
         } catch (error) {
-          if (silent && state.categories.length > 0) {
-            return;
-          }
+          if (silent && state.categories.length > 0) return;
           status.textContent = error instanceof Error ? error.message : "Menü şu anda okunamadı.";
           list.replaceChildren();
         }
@@ -427,12 +413,50 @@
         renderTabs();
         renderUpdatedAt();
         renderMenu();
+        renderHeroImage();
+      }
+
+      function renderBusiness() {
+        const business = state.business || {};
+        const displayName = business.display_name || "Yardımcı Asistan İşletmesi";
+        document.title = `${displayName} · QR Menü`;
+        businessTitle.textContent = `${displayName} Menü`;
+        footerBusinessName.textContent = displayName;
+        footerAddress.textContent = business.address || "";
+        businessDescription.textContent = business.address
+          ? `${business.address} · Güncel ürünler ve fiyatlar`
+          : "İşletmenin güncel ürünleri ve fiyatları burada yayınlanır.";
+
+        if (isHexColor(business.primary_color)) document.documentElement.style.setProperty("--primary", business.primary_color);
+        if (isHexColor(business.accent_color)) document.documentElement.style.setProperty("--accent", business.accent_color);
+
+        heroMeta.replaceChildren(metaChip("Güncel fiyatlar"), metaChip("Masaüstünden canlı yayın"));
+        if (business.business_type) heroMeta.append(metaChip(formatBusinessType(business.business_type)));
+
+        const whatsapp = String(business.whatsapp || "").replace(/\D/g, "");
+        if (whatsapp) {
+          whatsappLink.href = `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Merhaba, ${displayName} menüsü hakkında bilgi almak istiyorum.`)}`;
+          whatsappLink.classList.add("is-visible");
+        } else {
+          whatsappLink.classList.remove("is-visible");
+          whatsappLink.removeAttribute("href");
+        }
+      }
+
+      function renderHeroImage() {
+        const firstImage = state.items.find((item) => typeof item.image_url === "string" && item.image_url.trim())?.image_url;
+        if (!firstImage) {
+          hero.classList.remove("has-image");
+          hero.style.removeProperty("--hero-image");
+          return;
+        }
+        hero.style.setProperty("--hero-image", `url(${JSON.stringify(firstImage)})`);
+        hero.classList.add("has-image");
       }
 
       function renderTabs() {
         tabs.replaceChildren();
-        const allButton = createCategoryButton("all", "Tüm Ürünler");
-        tabs.append(allButton, ...state.categories.map((category) => createCategoryButton(category.id, category.name)));
+        tabs.append(createCategoryButton("all", "Tüm Ürünler"), ...state.categories.map((category) => createCategoryButton(category.id, category.name)));
       }
 
       function createCategoryButton(categoryId, label) {
@@ -456,16 +480,12 @@
         list.replaceChildren();
         status.textContent = "";
 
-        const categories =
-          state.activeCategoryId === "all"
-            ? state.categories
-            : state.categories.filter((category) => category.id === state.activeCategoryId);
+        const categories = state.activeCategoryId === "all"
+          ? state.categories
+          : state.categories.filter((category) => category.id === state.activeCategoryId);
 
         const visibleSections = categories
-          .map((category) => ({
-            category,
-            items: state.items.filter((item) => item.category_id === category.id)
-          }))
+          .map((category) => ({ category, items: state.items.filter((item) => item.category_id === category.id) }))
           .filter((section) => section.items.length > 0);
 
         if (visibleSections.length === 0) {
@@ -476,34 +496,25 @@
           return;
         }
 
-        for (const section of visibleSections) {
-          list.append(createMenuSection(section.category, section.items));
-        }
+        for (const section of visibleSections) list.append(createMenuSection(section.category, section.items));
       }
 
       function createMenuSection(category, items) {
         const section = document.createElement("section");
         section.className = "menu-section";
-
         const title = document.createElement("div");
         title.className = "section-title";
-
         const heading = document.createElement("h2");
         heading.textContent = category.name;
         title.append(heading);
-
         if (category.description) {
           const description = document.createElement("p");
           description.textContent = category.description;
           title.append(description);
         }
-
         const grid = document.createElement("div");
         grid.className = "menu-grid";
-        for (const item of items) {
-          grid.append(createMenuItem(item));
-        }
-
+        for (const item of items) grid.append(createMenuItem(item));
         section.append(title, grid);
         return section;
       }
@@ -516,29 +527,23 @@
           const image = document.createElement("img");
           image.src = item.image_url;
           image.alt = item.name;
+          image.loading = "lazy";
           article.append(image);
         }
 
         const body = document.createElement("div");
         body.className = "item-body";
-
         const titleRow = document.createElement("div");
         titleRow.className = "item-title-row";
-
         const title = document.createElement("strong");
         title.textContent = item.name;
-        if (item.is_featured) {
-          title.className = "featured";
-        }
-
+        if (item.is_featured) title.className = "featured";
         const price = document.createElement("span");
         price.className = "price";
         price.textContent = formatPrice(Number(item.price || 0), item.currency || "TRY");
         titleRow.append(title, price);
-
         const description = document.createElement("p");
         description.textContent = item.description || "";
-
         body.append(titleRow, description);
 
         if (Array.isArray(item.tags) && item.tags.length > 0) {
@@ -556,31 +561,42 @@
         return article;
       }
 
+      function metaChip(text) {
+        const span = document.createElement("span");
+        span.textContent = text;
+        return span;
+      }
+
+      function formatBusinessType(value) {
+        const labels = {
+          pension_restaurant: "Pansiyon + Restoran",
+          pension: "Pansiyon",
+          restaurant: "Restoran",
+          cafe: "Kafe",
+          market: "Market"
+        };
+        return labels[value] || "Yardımcı Asistan";
+      }
+
+      function isHexColor(value) {
+        return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
+      }
+
       function formatPrice(price, currency) {
         if (!formatterCache.has(currency)) {
-          formatterCache.set(
+          formatterCache.set(currency, new Intl.NumberFormat("tr-TR", {
+            style: "currency",
             currency,
-            new Intl.NumberFormat("tr-TR", {
-              style: "currency",
-              currency,
-              maximumFractionDigits: 0
-            })
-          );
+            maximumFractionDigits: 0
+          }));
         }
-
         return formatterCache.get(currency).format(price);
       }
 
       function formatDate(value) {
         const date = new Date(value);
-        if (Number.isNaN(date.getTime())) {
-          return value;
-        }
-
-        return new Intl.DateTimeFormat("tr-TR", {
-          dateStyle: "medium",
-          timeStyle: "short"
-        }).format(date);
+        if (Number.isNaN(date.getTime())) return value;
+        return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(date);
       }
     </script>
   </body>
