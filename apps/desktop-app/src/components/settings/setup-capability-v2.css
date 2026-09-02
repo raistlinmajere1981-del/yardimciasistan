@@ -22,11 +22,13 @@
   pointer-events: none;
 }
 
-.setup-capability-editor-shell {
-  margin-top: var(--space-4);
+/* Embedded Settings already exposes the full backup/restore manager. The
+ * legacy advanced "Kayıt ve Yedekleme" card is only useful in the standalone
+ * first-run wizard and otherwise creates two competing backup surfaces. */
+.setup-capability-v2 .setup-shell.is-embedded .settings-storage-section {
+  display: none;
 }
 
-.setup-capability-editor-shell > summary {
-  cursor: pointer;
-  font-weight: var(--weight-semibold);
+.setup-capability-editor-shell {
+  margin-top: var(--space-4);
 }
