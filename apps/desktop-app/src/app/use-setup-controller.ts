@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { legacyModuleDefaultsForProfile } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import { defaultSetupData } from "./bootstrap-defaults";
@@ -132,6 +133,12 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       return;
     }
 
+    // Domain workspaces are now profile/capability driven. The old setup IPC
+    // still requires module-shaped fields while database.ts is being split, so
+    // submit a canonical compatibility projection instead of treating the old
+    // room/table/QR checkboxes as an independent runtime source of truth.
+    const profileModules = legacyModuleDefaultsForProfile(setupForm.businessType);
+
     const input: SaveInitialSetupInput = {
       businessName: setupForm.businessName,
       businessType: setupForm.businessType,
@@ -154,9 +161,9 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
       modules: {
-        rooms: setupForm.roomsEnabled,
-        tables: setupForm.tablesEnabled,
-        qrMenu: setupForm.qrMenuEnabled,
+        rooms: profileModules.roomsEnabled,
+        tables: profileModules.tablesEnabled,
+        qrMenu: profileModules.qrMenuEnabled,
         whatsapp: setupForm.whatsappEnabled,
         android: setupForm.androidEnabled
       },
