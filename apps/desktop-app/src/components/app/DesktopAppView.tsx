@@ -83,6 +83,7 @@ export function DesktopAppView({
 
   async function handleSaveSetup() {
     await saveSetup(desktopSyncController.setDashboardData);
+    await desktopSyncController.loadBusinessCapabilities();
   }
 
   if (appAccessPhase !== "unlocked") {
