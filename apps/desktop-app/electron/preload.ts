@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
+import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
   DesktopDashboardData,
@@ -77,6 +78,7 @@ import type {
   UpdateAppPasswordInput
 } from "./app-lock";
 import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-connection-test";
+import type { BusinessCapabilitySnapshot } from "./business-capability-store";
 
 export interface AiConnectionTestInput {
   provider: string;
@@ -141,6 +143,10 @@ export interface DesktopBridge {
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
+  getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
+  setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
+  clearBusinessCapabilityOverride: (capability: BusinessCapability) => Promise<BusinessCapabilitySnapshot>;
+  applyBusinessProfile: (profileId: string, preserveUserOverrides?: boolean) => Promise<BusinessCapabilitySnapshot>;
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
@@ -252,6 +258,10 @@ const bridge: DesktopBridge = {
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => ipcRenderer.invoke("setup:saveInitial", input),
+  getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
+  setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
+  clearBusinessCapabilityOverride: (capability: BusinessCapability) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:clearOverride", capability),
+  applyBusinessProfile: (profileId: string, preserveUserOverrides = true) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:applyProfile", profileId, preserveUserOverrides),
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => ipcRenderer.invoke("androidDevice:setPermissionGroups", deviceId, groups),
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
