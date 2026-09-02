@@ -33,31 +33,40 @@ try {
   assert.equal(initial.enabledCapabilities.includes(C.QR_MENU), true);
   assert.equal(initial.enabledCapabilities.includes(C.RETAIL_BARCODE), false);
 
+  // QR menu is a leaf capability, so it can be independently disabled without
+  // invalidating food menu/catalog/inventory prerequisites.
   const overridden = setBusinessCapability(databasePath, {
-    capability: C.ACCOMMODATION_ROOMS,
+    capability: C.QR_MENU,
     enabled: false
   });
-  const roomOverride = overridden.capabilities.find((entry) => entry.capability === C.ACCOMMODATION_ROOMS);
-  assert.equal(roomOverride?.enabled, false);
-  assert.equal(roomOverride?.source, "user");
+  const qrOverride = overridden.capabilities.find((entry) => entry.capability === C.QR_MENU);
+  assert.equal(qrOverride?.enabled, false);
+  assert.equal(qrOverride?.source, "user");
 
-  // v2 no longer mirrors room/table/QR settings booleans into capabilities.
-  // A stale compatibility write therefore cannot overwrite an explicit
-  // capability decision.
+  // v2 no longer mirrors legacy settings booleans into capabilities. A stale
+  // compatibility write therefore cannot overwrite an explicit decision.
   const raw = new DatabaseSync(databasePath);
   try {
     const now = new Date().toISOString();
-    raw.prepare("UPDATE settings SET rooms_enabled = 0, updated_at = ? WHERE deleted_at = ''").run(now);
-    raw.prepare("UPDATE settings SET rooms_enabled = 1, updated_at = ? WHERE deleted_at = ''").run(now);
+    raw.prepare("UPDATE settings SET qr_menu_enabled = 0, updated_at = ? WHERE deleted_at = ''").run(now);
+    raw.prepare("UPDATE settings SET qr_menu_enabled = 1, updated_at = ? WHERE deleted_at = ''").run(now);
   } finally {
     raw.close();
   }
 
   const afterLegacyWrite = readBusinessCapabilitySnapshot(databasePath);
-  const protectedRoomOverride = afterLegacyWrite.capabilities.find((entry) => entry.capability === C.ACCOMMODATION_ROOMS);
-  assert.equal(protectedRoomOverride?.enabled, false);
-  assert.equal(protectedRoomOverride?.source, "user");
-  assert.equal(afterLegacyWrite.enabledCapabilities.includes(C.ACCOMMODATION_STAYS), true);
+  const protectedQrOverride = afterLegacyWrite.capabilities.find((entry) => entry.capability === C.QR_MENU);
+  assert.equal(protectedQrOverride?.enabled, false);
+  assert.equal(protectedQrOverride?.source, "user");
+  assert.equal(afterLegacyWrite.enabledCapabilities.includes(C.FOOD_MENU), true);
+
+  // Catalog is a prerequisite of inventory/sales. Disabling it while those
+  // capabilities are still enabled must be rejected rather than creating an
+  // invalid hybrid configuration.
+  assert.throws(
+    () => setBusinessCapability(databasePath, { capability: C.CATALOG, enabled: false }),
+    /bağlı/i
+  );
 
   assert.throws(
     () => setBusinessCapability(databasePath, { capability: C.FINANCE, enabled: false }),
