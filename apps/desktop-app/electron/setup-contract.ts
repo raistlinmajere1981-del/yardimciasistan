@@ -1,6 +1,7 @@
 import {
   BUSINESS_CAPABILITIES,
   getBusinessProfile,
+  validateBusinessCapabilitySet,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
@@ -19,19 +20,49 @@ const DOMAIN_PROJECTION_CAPABILITIES = {
   qrMenu: BUSINESS_CAPABILITIES.QR_MENU
 } as const satisfies Record<"rooms" | "tables" | "qrMenu", BusinessCapability>;
 
-function resolveProjectedDomainCapability(
-  capability: BusinessCapability,
-  targetProfileId: string,
+const DIRECT_SERVICE_CAPABILITIES = new Set<BusinessCapability>([
+  BUSINESS_CAPABILITIES.WHATSAPP,
+  BUSINESS_CAPABILITIES.ANDROID,
+  BUSINESS_CAPABILITIES.AI
+]);
+
+function setCapability(enabled: Set<BusinessCapability>, capability: BusinessCapability, value: boolean) {
+  if (value) {
+    enabled.add(capability);
+  } else {
+    enabled.delete(capability);
+  }
+}
+
+function projectTargetCapabilities(
+  input: SaveCapabilitySetupInput,
   snapshot: BusinessCapabilitySnapshot | null | undefined
 ) {
-  const userOverride = snapshot?.capabilities.find(
-    (entry) => entry.capability === capability && entry.source === "user"
-  );
-  if (userOverride) {
-    return userOverride.enabled;
+  const enabled = new Set<BusinessCapability>(getBusinessProfile(input.businessType).defaultCapabilities);
+
+  // Profile changes keep explicit domain overrides. Service switches are edited
+  // directly by the current setup form, so the submitted values take priority
+  // over an older persisted service override.
+  for (const entry of snapshot?.capabilities ?? []) {
+    if (entry.source !== "user" || DIRECT_SERVICE_CAPABILITIES.has(entry.capability)) {
+      continue;
+    }
+    setCapability(enabled, entry.capability, entry.enabled);
   }
 
-  return getBusinessProfile(targetProfileId).defaultCapabilities.includes(capability);
+  setCapability(enabled, BUSINESS_CAPABILITIES.WHATSAPP, input.servicePreferences.whatsapp);
+  setCapability(enabled, BUSINESS_CAPABILITIES.ANDROID, input.servicePreferences.android);
+  setCapability(enabled, BUSINESS_CAPABILITIES.AI, input.aiEnabled);
+
+  const violations = validateBusinessCapabilitySet(enabled);
+  if (violations.length > 0) {
+    const first = violations[0];
+    throw new Error(
+      `${first.capability} yeteneği için önce şu yetenekleri etkinleştirin: ${first.missingDependencies.join(", ")}.`
+    );
+  }
+
+  return enabled;
 }
 
 /**
@@ -48,25 +79,14 @@ export function toLegacySetupSaveInput(
   snapshot: BusinessCapabilitySnapshot | null | undefined
 ): SaveInitialSetupInput {
   const { servicePreferences, ...setup } = input;
+  const enabled = projectTargetCapabilities(input, snapshot);
 
   return {
     ...setup,
     modules: {
-      rooms: resolveProjectedDomainCapability(
-        DOMAIN_PROJECTION_CAPABILITIES.rooms,
-        input.businessType,
-        snapshot
-      ),
-      tables: resolveProjectedDomainCapability(
-        DOMAIN_PROJECTION_CAPABILITIES.tables,
-        input.businessType,
-        snapshot
-      ),
-      qrMenu: resolveProjectedDomainCapability(
-        DOMAIN_PROJECTION_CAPABILITIES.qrMenu,
-        input.businessType,
-        snapshot
-      ),
+      rooms: enabled.has(DOMAIN_PROJECTION_CAPABILITIES.rooms),
+      tables: enabled.has(DOMAIN_PROJECTION_CAPABILITIES.tables),
+      qrMenu: enabled.has(DOMAIN_PROJECTION_CAPABILITIES.qrMenu),
       whatsapp: servicePreferences.whatsapp,
       android: servicePreferences.android
     }
