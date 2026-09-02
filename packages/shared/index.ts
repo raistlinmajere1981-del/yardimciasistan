@@ -1,5 +1,6 @@
 export * from "./types/ai";
 export * from "./types/business";
+export * from "./types/business-capabilities";
 export * from "./types/common";
 export * from "./types/customer";
 export * from "./types/event";
