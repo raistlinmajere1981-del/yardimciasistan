@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { Eye, LockKeyhole, RefreshCw, Save, UploadCloud } from "lucide-react";
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage } from "../../app/navigation";
 import { buildNavigation, getPageMeta } from "../../app/navigation";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "../../app/notifications";
@@ -57,6 +59,8 @@ export function DesktopAppFrame({
   const {
     dashboardData,
     setDashboardData,
+    businessCapabilities,
+    loadBusinessCapabilities,
     automaticSyncStatus,
     pullRequests: handlePullRequests
   } = desktopSyncController;
@@ -71,12 +75,13 @@ export function DesktopAppFrame({
   } = menuController;
   const { selectedWhatsAppRequest } = messagingController;
   const { setSelectedRequestId } = customerController;
-  const navigationItems = useMemo(() => buildNavigation(setupData), [setupData]);
+  const navigationItems = useMemo(() => buildNavigation(businessCapabilities), [businessCapabilities]);
   const pageMeta = getPageMeta(activePage);
   const desktopNotifications = useMemo(
     () => buildDesktopNotifications(dashboardData, automaticSyncStatus),
     [automaticSyncStatus, dashboardData]
   );
+  const whatsappEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP);
 
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
@@ -110,6 +115,7 @@ export function DesktopAppFrame({
 
   async function handleSaveSetup() {
     await saveSetup(setDashboardData);
+    await loadBusinessCapabilities();
   }
 
   return (
@@ -147,7 +153,7 @@ export function DesktopAppFrame({
                 </div>
               ) : activePage === "messages" ? (
                 <div className="sync-pill sync-idle">
-                  <span>{setupData.modules.whatsapp ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin") : "AI araçları kullanıma hazır."}</span>
+                  <span>{whatsappEnabled ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin") : "AI araçları kullanıma hazır."}</span>
                 </div>
               ) : activePage === "settings" ? (
                 <div className={`sync-pill sync-${setupSaveState}`}>
