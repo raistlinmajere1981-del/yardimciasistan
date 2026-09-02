@@ -11,8 +11,8 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
-import type { DesktopSetupData } from "../../electron/database";
-import { setupHasCapability } from "./capabilities";
+import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
+import { runtimeHasCapability } from "./capabilities";
 
 export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "menu" | "messages" | "reports" | "settings";
 
@@ -27,31 +27,31 @@ const baseItems: NavigationItem[] = [
   { id: "customerWork", label: "Müşteri İşleri", icon: Users }
 ];
 
-export function buildNavigation(setup: DesktopSetupData): NavigationItem[] {
+export function buildNavigation(capabilities: BusinessCapabilitySnapshot | null | undefined): NavigationItem[] {
   const items = [...baseItems];
   const C = BUSINESS_CAPABILITIES;
 
-  if (setupHasCapability(setup, C.CALENDAR)) {
+  if (runtimeHasCapability(capabilities, C.CALENDAR)) {
     items.push({ id: "calendar", label: "Takvim", icon: CalendarDays });
   }
 
-  if (setupHasCapability(setup, C.ACCOMMODATION_ROOMS)) {
+  if (runtimeHasCapability(capabilities, C.ACCOMMODATION_ROOMS)) {
     items.push({ id: "pension", label: "Pansiyon", icon: BedDouble });
   }
 
-  if (setupHasCapability(setup, C.FOOD_TABLES)) {
+  if (runtimeHasCapability(capabilities, C.FOOD_TABLES)) {
     items.push({ id: "restaurant", label: "Restoran", icon: UtensilsCrossed });
   }
 
-  if (setupHasCapability(setup, C.FOOD_MENU)) {
+  if (runtimeHasCapability(capabilities, C.FOOD_MENU)) {
     items.push({ id: "menu", label: "Menü", icon: MenuIcon });
   }
 
-  if (setupHasCapability(setup, C.WHATSAPP) || setupHasCapability(setup, C.AI)) {
+  if (runtimeHasCapability(capabilities, C.WHATSAPP) || runtimeHasCapability(capabilities, C.AI)) {
     items.push({ id: "messages", label: "Mesajlar", icon: MessageCircle });
   }
 
-  if (setupHasCapability(setup, C.FINANCE)) {
+  if (runtimeHasCapability(capabilities, C.FINANCE)) {
     items.push({ id: "reports", label: "Kasa", icon: WalletCards });
   }
   items.push({ id: "settings", label: "Ayarlar", icon: Settings });
