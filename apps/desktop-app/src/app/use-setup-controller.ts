@@ -162,7 +162,14 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       }))
     };
 
-    const result = await bridge.saveInitialSetup(input);
+    let result;
+    try {
+      result = await bridge.saveInitialSetup(input);
+    } catch (error) {
+      setSetupSaveState("error");
+      setSetupMessage(error instanceof Error ? error.message : "Ayarlar kaydedilemedi.");
+      return;
+    }
     if (!result.ok) {
       setSetupSaveState("error");
       setSetupMessage(result.message);
