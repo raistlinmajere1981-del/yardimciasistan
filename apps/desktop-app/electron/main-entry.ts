@@ -2,11 +2,17 @@ import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { DesktopDatabase } from "./database";
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers } from "./data-maintenance";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
 import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
+import { registerBusinessCapabilityIpcHandlers } from "./business-capability-ipc";
+import {
+  assertPersistedBusinessCapability,
+  hasPersistedBusinessCapability
+} from "./business-capability-runtime";
 
 const DEV_RELAUNCH_EXIT_CODE = 75;
 const userDataPath = () => process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData");
@@ -89,7 +95,8 @@ function prepareRestoredStateForFullRepublish() {
   }
 
   // Re-open once so DesktopDatabase generates the new client id, then queue
-  // both durable publications. The normal SyncCoordinator will push these on
+  // durable publications according to the persisted capability set rather than
+  // legacy module booleans. The normal SyncCoordinator will push these on
   // startup, making Web and Android converge to the restored SQLite state.
   const database = new DesktopDatabase({
     appPath: app.getAppPath(),
@@ -97,11 +104,10 @@ function prepareRestoredStateForFullRepublish() {
   });
   try {
     database.initialize();
-    const setup = database.getSetupData();
-    if (setup.modules.qrMenu) {
+    if (hasPersistedBusinessCapability(restoredDatabasePath, BUSINESS_CAPABILITIES.QR_MENU)) {
       database.queueSyncJob("menu_publish", now);
     }
-    if (setup.modules.android) {
+    if (hasPersistedBusinessCapability(restoredDatabasePath, BUSINESS_CAPABILITIES.ANDROID)) {
       database.queueSyncJob("android_snapshot", now);
     }
   } finally {
@@ -126,8 +132,8 @@ if (pendingMaintenanceKind === "restore") {
 const mainProcessReady = import("./main");
 
 // Ana Electron süreci mevcut main.ts içinde kurulmaya devam eder. Finans, oda
-// hesabı, veri bakımı ve yan etkisiz web bağlantı testi IPC yüzeyleri ayrı tutulur;
-// kayıtlar ana veritabanı migration'larından sonra yapılır.
+// hesabı, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı testi
+// IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı migration'larından sonra yapılır.
 void mainProcessReady.then(() => app.whenReady()).then(() => {
   setImmediate(() => {
     const databasePath = () => path.join(userDataPath(), "yardimci-asistan.sqlite");
@@ -135,18 +141,15 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
     const publishCommittedMutation = () => {
       // Finance/folio services use their own short-lived SQLite connection and
       // therefore cannot reach main.ts's in-memory SyncCoordinator directly.
-      // Queue the same durable Android snapshot job used by DesktopDatabase;
-      // the regular coordinator picks it up on its next cycle even after a
-      // process restart. Also broadcast a fresh dashboard to all renderer
-      // windows so cross-page totals stay coherent immediately.
+      // Queue Android publication only when the persisted runtime capability is
+      // enabled; legacy settings booleans are no longer consulted here.
       const database = new DesktopDatabase({
         appPath: app.getAppPath(),
         userDataPath: userDataPath()
       });
       try {
         database.initialize();
-        const setup = database.getSetupData();
-        if (setup.modules.android) {
+        if (hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.ANDROID)) {
           database.queueSyncJob("android_snapshot");
         }
         const dashboard = database.getDashboardData();
@@ -162,6 +165,12 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
 
     registerDataMaintenanceIpcHandlers(userDataPath);
 
+    registerBusinessCapabilityIpcHandlers({
+      databasePath,
+      assertUnlocked: () => undefined,
+      onMutation: publishCommittedMutation
+    });
+
     registerFinanceIpcHandlers({
       databasePath,
       // The isolated preload bridge checks appLock:getStatus before exposing
@@ -174,6 +183,11 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
     registerRoomFolioIpcHandlers({
       databasePath,
       assertUnlocked: () => undefined,
+      assertCapability: () => assertPersistedBusinessCapability(
+        databasePath(),
+        BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO,
+        "Oda hesabı bu işletme profilinde etkin değil."
+      ),
       onMutation: publishCommittedMutation
     });
 
