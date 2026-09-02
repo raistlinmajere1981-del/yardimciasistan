@@ -1,0 +1,20 @@
+/*
+ * Capability v2 transition layer.
+ *
+ * The first three controls in the legacy setup module section are the old
+ * rooms/tables/QR booleans. They remain in LegacySetupWizard temporarily so
+ * the large settings component can be split without a risky all-at-once
+ * rewrite, but they are no longer operator controls or runtime authority.
+ */
+.setup-capability-v2 .settings-modules-section .setup-toggle-grid > label:nth-child(-n + 3) {
+  display: none;
+}
+
+.setup-capability-editor-shell {
+  margin-top: var(--space-4);
+}
+
+.setup-capability-editor-shell > summary {
+  cursor: pointer;
+  font-weight: var(--weight-semibold);
+}
