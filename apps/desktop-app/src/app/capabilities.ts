@@ -1,29 +1,25 @@
 import {
   hasBusinessCapability,
-  resolveBusinessCapabilities,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
-import type { DesktopSetupData } from "../../electron/database";
+import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 
 /**
  * Renderer-facing capability seam.
  *
- * Desktop persistence still exposes the old module flags today. Keep all
- * compatibility logic here so navigation/pages do not spread legacy module
- * checks across the UI. When capabilities become persisted in SQLite this
- * adapter is the only layer that needs to change.
+ * v2 no longer reconstructs runtime capabilities from business_type or the
+ * historical rooms/tables/QR boolean projection. The persisted capability
+ * snapshot received from Electron is authoritative.
  */
-export function getSetupCapabilities(setup: DesktopSetupData): BusinessCapability[] {
-  return resolveBusinessCapabilities({
-    businessType: setup.businessType,
-    modules: setup.modules,
-    aiEnabled: setup.aiEnabled
-  });
+export function getEnabledBusinessCapabilities(
+  snapshot: BusinessCapabilitySnapshot | null | undefined
+): BusinessCapability[] {
+  return snapshot?.enabledCapabilities ?? [];
 }
 
-export function setupHasCapability(
-  setup: DesktopSetupData,
+export function runtimeHasCapability(
+  snapshot: BusinessCapabilitySnapshot | null | undefined,
   capability: BusinessCapability
 ): boolean {
-  return hasBusinessCapability(getSetupCapabilities(setup), capability);
+  return hasBusinessCapability(getEnabledBusinessCapabilities(snapshot), capability);
 }
