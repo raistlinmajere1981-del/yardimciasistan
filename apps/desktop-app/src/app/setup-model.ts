@@ -1,3 +1,7 @@
+import {
+  getAvailableBusinessProfiles,
+  legacyModuleDefaultsForProfile
+} from "@yardimci-asistan/shared";
 import type {
   DesktopAiModelOption,
   DesktopAiService,
@@ -80,52 +84,22 @@ export interface BusinessTypeProfile {
   };
 }
 
-export const businessTypeProfiles: Record<string, BusinessTypeProfile> = {
-  pension_restaurant: {
-    label: "Pansiyon + Restoran/Kafe",
-    description: "Oda, masa, QR menü, WhatsApp ve Android birlikte hazırlanır.",
-    modules: {
-      roomsEnabled: true,
-      tablesEnabled: true,
-      qrMenuEnabled: true,
-      whatsappEnabled: true,
-      androidEnabled: true
+/**
+ * Existing setup UI consumes the old module-shaped profile object. Build it
+ * from the shared capability registry so profile knowledge no longer lives in
+ * the renderer. Planned profiles (Market/General) stay out of the selector
+ * until their workspaces are ready.
+ */
+export const businessTypeProfiles: Record<string, BusinessTypeProfile> = Object.fromEntries(
+  getAvailableBusinessProfiles().map((profile) => [
+    profile.id,
+    {
+      label: profile.label,
+      description: profile.description,
+      modules: legacyModuleDefaultsForProfile(profile.id)
     }
-  },
-  pension: {
-    label: "Pansiyon",
-    description: "Oda, WhatsApp ve Android akışı hazırlanır; restoran alanları kapalı başlar.",
-    modules: {
-      roomsEnabled: true,
-      tablesEnabled: false,
-      qrMenuEnabled: false,
-      whatsappEnabled: true,
-      androidEnabled: true
-    }
-  },
-  restaurant: {
-    label: "Restoran",
-    description: "Masa, QR menü, WhatsApp ve Android hazırlanır; oda alanları kapalı başlar.",
-    modules: {
-      roomsEnabled: false,
-      tablesEnabled: true,
-      qrMenuEnabled: true,
-      whatsappEnabled: true,
-      androidEnabled: true
-    }
-  },
-  cafe: {
-    label: "Kafe",
-    description: "Masa, QR menü, WhatsApp ve Android hazırlanır; oda alanları kapalı başlar.",
-    modules: {
-      roomsEnabled: false,
-      tablesEnabled: true,
-      qrMenuEnabled: true,
-      whatsappEnabled: true,
-      androidEnabled: true
-    }
-  }
-};
+  ])
+);
 
 export function applyBusinessTypeProfile(form: SetupFormState, businessType: string): SetupFormState {
   const profile = businessTypeProfiles[businessType];
@@ -258,7 +232,7 @@ export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
     modelOptions: form.aiModelOptions,
     apiKey: form.aiApiKey,
     storedApiKeyConfigured: form.aiStoredApiKeyConfigured,
-    clearApiKey: form.clearAiApiKey,
+    clearApiKey: form.clearApiKey,
     timeoutSeconds: form.aiTimeoutSeconds
   };
 }
