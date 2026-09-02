@@ -10,7 +10,9 @@ import {
   WalletCards,
   type LucideIcon
 } from "lucide-react";
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type { DesktopSetupData } from "../../electron/database";
+import { setupHasCapability } from "./capabilities";
 
 export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "menu" | "messages" | "reports" | "settings";
 
@@ -27,28 +29,31 @@ const baseItems: NavigationItem[] = [
 
 export function buildNavigation(setup: DesktopSetupData): NavigationItem[] {
   const items = [...baseItems];
+  const C = BUSINESS_CAPABILITIES;
 
-  if (setup.modules.rooms || setup.modules.tables) {
+  if (setupHasCapability(setup, C.CALENDAR)) {
     items.push({ id: "calendar", label: "Takvim", icon: CalendarDays });
   }
 
-  if (setup.modules.rooms) {
+  if (setupHasCapability(setup, C.ACCOMMODATION_ROOMS)) {
     items.push({ id: "pension", label: "Pansiyon", icon: BedDouble });
   }
 
-  if (setup.modules.tables) {
+  if (setupHasCapability(setup, C.FOOD_TABLES)) {
     items.push({ id: "restaurant", label: "Restoran", icon: UtensilsCrossed });
   }
 
-  if (setup.modules.qrMenu) {
+  if (setupHasCapability(setup, C.FOOD_MENU)) {
     items.push({ id: "menu", label: "Menü", icon: MenuIcon });
   }
 
-  if (setup.modules.whatsapp || setup.aiEnabled) {
+  if (setupHasCapability(setup, C.WHATSAPP) || setupHasCapability(setup, C.AI)) {
     items.push({ id: "messages", label: "Mesajlar", icon: MessageCircle });
   }
 
-  items.push({ id: "reports", label: "Kasa", icon: WalletCards });
+  if (setupHasCapability(setup, C.FINANCE)) {
+    items.push({ id: "reports", label: "Kasa", icon: WalletCards });
+  }
   items.push({ id: "settings", label: "Ayarlar", icon: Settings });
   return items;
 }
