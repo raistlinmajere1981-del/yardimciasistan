@@ -56,8 +56,7 @@ export function SetupWizard(props: SetupWizardProps) {
       />
 
       {props.embedded && capabilityRuntime.snapshot?.businessId && (
-        <details className="setup-capability-editor-shell">
-          <summary>Gelişmiş işletme yetenekleri</summary>
+        <div className="setup-capability-editor-shell">
           <BusinessCapabilityEditor
             businessType={props.form.businessType}
             snapshot={capabilityRuntime.snapshot}
@@ -70,7 +69,7 @@ export function SetupWizard(props: SetupWizardProps) {
               void capabilityRuntime.clearOverride(capability);
             }}
           />
-        </details>
+        </div>
       )}
     </div>
   );
