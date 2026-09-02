@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { BusinessCapabilityRuntimeProvider } from "./app/business-capability-context";
 import { runtimeHasCapability } from "./app/capabilities";
 import { buildDesktopNotifications } from "./app/notifications";
 import type { DesktopPage } from "./app/navigation";
@@ -69,22 +70,32 @@ function App() {
   });
 
   return (
-    <DesktopAppView
-      activePage={activePage}
-      setActivePage={setActivePage}
-      syncState={syncState}
-      setSyncState={setSyncState}
-      statusMessage={statusMessage}
-      setStatusMessage={setStatusMessage}
-      setupController={setupController}
-      appLockController={appLockController}
-      desktopSyncController={desktopSyncController}
-      menuController={menuController}
-      messagingController={messagingController}
-      customerController={customerController}
-      operationController={operationController}
-      deviceController={deviceController}
-    />
+    <BusinessCapabilityRuntimeProvider
+      value={{
+        snapshot: desktopSyncController.businessCapabilities,
+        state: desktopSyncController.businessCapabilityState,
+        message: desktopSyncController.businessCapabilityMessage,
+        setCapability: desktopSyncController.setRuntimeBusinessCapability,
+        clearOverride: desktopSyncController.clearRuntimeBusinessCapabilityOverride
+      }}
+    >
+      <DesktopAppView
+        activePage={activePage}
+        setActivePage={setActivePage}
+        syncState={syncState}
+        setSyncState={setSyncState}
+        statusMessage={statusMessage}
+        setStatusMessage={setStatusMessage}
+        setupController={setupController}
+        appLockController={appLockController}
+        desktopSyncController={desktopSyncController}
+        menuController={menuController}
+        messagingController={messagingController}
+        customerController={customerController}
+        operationController={operationController}
+        deviceController={deviceController}
+      />
+    </BusinessCapabilityRuntimeProvider>
   );
 }
 
