@@ -1,7 +1,12 @@
 import type { ISODateTimeString, TimestampedRecord } from "./common";
 
-export type BusinessType = "pension" | "restaurant" | "pension_restaurant" | "cafe" | "other";
+export type BusinessType = "pension" | "restaurant" | "pension_restaurant" | "cafe" | "market" | "other";
 
+/**
+ * Legacy persisted module flags. New application code should prefer the
+ * capability model in business-capabilities.ts and use these only through the
+ * compatibility adapter while old installations are migrated.
+ */
 export interface BusinessModules {
   rooms: boolean;
   tables: boolean;
