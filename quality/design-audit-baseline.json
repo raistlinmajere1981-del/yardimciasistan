@@ -1,0 +1,542 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-02T20:37:40.048Z",
+  "files": {
+    "apps/demo-web/src/App.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/demo-web/src/main.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/demo-web/src/pages/ProductGuidePage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 2
+    },
+    "apps/demo-web/src/pages/product-guide.css": {
+      "rawColor": 49,
+      "hardcodedRadius": 21,
+      "hardcodedShadow": 7,
+      "hardcodedFontSize": 18,
+      "important": 4,
+      "inlineStyle": 0
+    },
+    "apps/demo-web/src/styles.css": {
+      "rawColor": 78,
+      "hardcodedRadius": 24,
+      "hardcodedShadow": 10,
+      "hardcodedFontSize": 40,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/App.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/backup-manager-ux.css": {
+      "rawColor": 30,
+      "hardcodedRadius": 6,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 8,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/cash-page-ux.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 1,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 2,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/app/DesktopAppFrame.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/app/DesktopAppView.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/app/DesktopWorkspaceRouter.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/CustomersWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/RequestsWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/dashboard/SystemHealthPanel.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/finance/FinanceWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/layout/AppShell.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/layout/PageHeader.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/layout/Sidebar.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/menu/MenuManager.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/menu/MenuPreview.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/messages/MessageWorkspaces.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/notifications/NotificationCenter.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/operations/DailyTaskEditor.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/operations/ManualReservationEditor.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/operations/ManualRestaurantReservationEditor.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/operations/OperationWorkspaces.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/operations/QuickCustomerCreator.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/operations/RestaurantReservationsWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/pension/RoomFolioWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/restaurant/RestaurantRoomTransferPanel.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/restaurant/StockImageImportWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 1
+    },
+    "apps/desktop-app/src/components/restaurant/TableOrdersWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/security/AppLockScreen.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/security/PasswordSettings.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/settings/DataMaintenanceSettings.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 1
+    },
+    "apps/desktop-app/src/components/settings/RoomManagementSection.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/settings/SetupWizard.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/ActionButton.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/CompactList.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/CompactListItem.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/MetricCard.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/Panel.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/SegmentedControl.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/StatusBadge.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/customer-work-ux.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 3,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/dashboard-simple-ux.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 2,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/finance-ux.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 8,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/friendly-overrides.css": {
+      "rawColor": 2,
+      "hardcodedRadius": 11,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 5,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/friendly-workflow-ux.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 10,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/main.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/menu-image-preview-ux.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 1,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/operation-calendar.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 5,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 12,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/pages/CustomerWorkPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/pages/DashboardPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/pages/MessagesPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/pages/OperationCalendarPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/pages/PensionPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/pages/ReportsPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 1
+    },
+    "apps/desktop-app/src/pages/RestaurantPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/restaurant-room-transfer-ux.css": {
+      "rawColor": 11,
+      "hardcodedRadius": 3,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/room-card-ux.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/room-folio-ux.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 4,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/room-folio.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 10,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/room-management-ux.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 2,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 7,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/secondary-pages-ux.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 2,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 1,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 21,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/system-health-ux.css": {
+      "rawColor": 14,
+      "hardcodedRadius": 3,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    }
+  }
+}
