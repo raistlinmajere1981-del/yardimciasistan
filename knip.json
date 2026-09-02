@@ -1,0 +1,63 @@
+{
+  "$schema": "https://unpkg.com/knip/schema.json",
+  "ignore": [
+    "**/dist/**",
+    "**/dist-renderer/**",
+    "**/dist-electron/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.demo-runtime/**",
+    "firm-template/**",
+    "demo-data/**"
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "playwright.config.ts",
+        "scripts/**/*.{js,mjs,cjs,ts}",
+        "tests/**/*.{js,mjs,cjs,ts}"
+      ],
+      "project": [
+        "scripts/**/*.{js,mjs,cjs,ts}",
+        "tests/**/*.{js,mjs,cjs,ts}"
+      ]
+    },
+    "apps/desktop-app": {
+      "entry": [
+        "src/main.tsx",
+        "electron/main-entry.ts",
+        "scripts/**/*.{js,mjs,cjs,ts}"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}",
+        "electron/**/*.ts",
+        "scripts/**/*.{js,mjs,cjs,ts}",
+        "*.config.ts"
+      ]
+    },
+    "apps/demo-web": {
+      "entry": ["src/main.tsx"],
+      "project": ["src/**/*.{ts,tsx}", "*.config.ts"]
+    },
+    "packages/shared": {
+      "entry": ["index.ts"],
+      "project": ["**/*.ts"]
+    },
+    "packages/ai-core": {
+      "entry": ["index.ts"],
+      "project": ["**/*.ts"]
+    },
+    "packages/sync-core": {
+      "entry": ["index.ts"],
+      "project": ["**/*.ts"]
+    },
+    "packages/whatsapp-bridge": {
+      "entry": ["index.ts"],
+      "project": ["**/*.ts"]
+    },
+    "packages/web-widget": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.ts", "vite.config.ts"]
+    }
+  }
+}
