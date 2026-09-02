@@ -232,7 +232,7 @@ export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
     modelOptions: form.aiModelOptions,
     apiKey: form.aiApiKey,
     storedApiKeyConfigured: form.aiStoredApiKeyConfigured,
-    clearApiKey: form.clearApiKey,
+    clearApiKey: form.clearAiApiKey,
     timeoutSeconds: form.aiTimeoutSeconds
   };
 }
