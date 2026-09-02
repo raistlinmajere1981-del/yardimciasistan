@@ -1,40 +1,21 @@
 import { DatabaseSync } from "node:sqlite";
 import {
-  BUSINESS_CAPABILITIES,
   createId,
-  normalizeBusinessType,
-  type BusinessCapability
+  type CatalogProduct,
+  type CommerceSale,
+  type CommerceSupplier,
+  type CommerceUnit,
+  type InventoryBalance,
+  type InventoryMovement,
+  type InventoryMovementType
 } from "@yardimci-asistan/shared";
-import { assertPersistedBusinessCapability } from "./business-capability-runtime";
 
-export type CatalogProductUnit = "piece" | "kg" | "g" | "l" | "ml" | "meter" | "pack";
-export type InventoryMovementType = "purchase" | "sale" | "waste" | "count" | "adjust" | "sale_return" | "purchase_return";
-
-export interface CatalogCategory {
-  id: string;
-  businessId: string;
-  name: string;
-  sortOrder: number;
-  active: boolean;
-}
-
-export interface CatalogProduct {
-  id: string;
-  businessId: string;
-  categoryId: string;
-  name: string;
-  sku: string;
-  barcode: string;
-  salePrice: number;
-  purchasePrice: number;
-  currency: string;
-  unit: CatalogProductUnit;
-  taxRate: number;
-  trackInventory: boolean;
-  active: boolean;
-  minimumQuantity: number;
-  currentQuantity: number;
-}
+const COMMERCE_UNITS = new Set<CommerceUnit>([
+  "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
+]);
+const INVENTORY_MOVEMENT_TYPES = new Set<InventoryMovementType>([
+  "sale", "purchase", "waste", "count", "adjust", "return_in", "return_out"
+]);
 
 export interface SaveCatalogProductInput {
   id?: string;
@@ -42,24 +23,18 @@ export interface SaveCatalogProductInput {
   name: string;
   sku?: string;
   barcode?: string;
+  description?: string;
   salePrice?: number;
   purchasePrice?: number;
   currency?: string;
-  unit?: CatalogProductUnit;
+  unit?: CommerceUnit;
   taxRate?: number;
   trackInventory?: boolean;
   isActive?: boolean;
   minimumQuantity?: number;
 }
 
-export interface InventoryBalance {
-  productId: string;
-  locationId: string;
-  quantity: number;
-  minimumQuantity: number;
-}
-
-export interface RecordInventoryMovementInput {
+export interface ApplyInventoryMovementInput {
   productId: string;
   locationId?: string;
   type: InventoryMovementType;
@@ -68,153 +43,74 @@ export interface RecordInventoryMovementInput {
   referenceType?: string;
   referenceId?: string;
   note?: string;
+  actorSource?: string;
 }
 
-export interface Supplier {
-  id: string;
-  businessId: string;
-  name: string;
-  phone: string;
-  email: string;
-  taxNumber: string;
-  notes: string;
-  active: boolean;
+export interface CreateCommerceSaleInput {
+  paymentMethod?: string;
+  source?: string;
+  locationId?: string;
+  discountTotal?: number;
+  items: Array<{
+    productId: string;
+    quantity: number;
+  }>;
 }
 
-export interface SaveSupplierInput {
+export interface SaveCommerceSupplierInput {
   id?: string;
   name: string;
   phone?: string;
   email?: string;
   taxNumber?: string;
   notes?: string;
-  active?: boolean;
+  isActive?: boolean;
 }
 
-export interface CompleteSaleItemInput {
-  productId: string;
-  quantity: number;
-  unitPrice?: number;
-}
-
-export interface CompleteSaleInput {
-  items: CompleteSaleItemInput[];
-  paymentMethod?: string;
-  note?: string;
-  reference?: string;
-}
-
-export interface CompletedSale {
-  id: string;
-  businessId: string;
-  subtotal: number;
-  discountTotal: number;
-  total: number;
-  currency: string;
-  paymentMethod: string;
-  itemCount: number;
-  soldAt: string;
-}
-
-interface ActiveBusinessRow {
-  id?: string;
-  business_type?: string;
-}
-
-interface ProductRow extends Record<string, unknown> {
-  id?: string;
-  business_id?: string;
-  category_id?: string;
-  name?: string;
-  sku?: string;
-  barcode?: string;
-  sale_price?: number;
-  purchase_price?: number;
-  currency?: string;
-  unit?: string;
-  tax_rate?: number;
-  track_inventory?: number;
-  is_active?: number;
-  created_at?: string;
+export interface CommerceStoreSnapshot {
+  products: CatalogProduct[];
+  suppliers: CommerceSupplier[];
 }
 
 function openDatabase(databasePath: string) {
   const database = new DatabaseSync(databasePath);
+  database.exec("PRAGMA busy_timeout = 5000;");
   database.exec("PRAGMA foreign_keys = ON;");
   return database;
 }
 
-function getActiveBusiness(database: DatabaseSync) {
-  const row = database
-    .prepare("SELECT id, business_type FROM business WHERE deleted_at = '' ORDER BY created_at ASC LIMIT 1")
-    .get() as ActiveBusinessRow | undefined;
-  const businessId = String(row?.id ?? "").trim();
-  if (!businessId) {
-    throw new Error("Aktif işletme bulunamadı.");
-  }
-  return { businessId, businessType: normalizeBusinessType(row?.business_type) };
-}
-
-function requireCapability(databasePath: string, capability: BusinessCapability) {
-  assertPersistedBusinessCapability(databasePath, capability, `Bu işlem için ${capability} yeteneği etkin olmalı.`);
-}
-
-function normalizeText(value: unknown, max = 200) {
-  return String(value ?? "").trim().slice(0, max);
-}
-
-function normalizeMoney(value: unknown) {
-  const amount = Number(value ?? 0);
-  if (!Number.isFinite(amount)) return 0;
-  return Math.round(Math.max(0, amount) * 100) / 100;
-}
-
-function normalizeTaxRate(value: unknown) {
-  const rate = Number(value ?? 0);
-  if (!Number.isFinite(rate)) return 0;
-  return Math.min(100, Math.max(0, Math.round(rate * 100) / 100));
-}
-
-function normalizeUnit(value: unknown): CatalogProductUnit {
-  const unit = String(value ?? "piece").trim() as CatalogProductUnit;
-  return ["piece", "kg", "g", "l", "ml", "meter", "pack"].includes(unit) ? unit : "piece";
+function roundMoney(value: number) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
 function roundQuantity(value: number) {
-  return Math.round(value * 1000) / 1000;
+  return Math.round((Number(value) + Number.EPSILON) * 10000) / 10000;
 }
 
-function ensurePrimaryLocation(database: DatabaseSync, businessId: string, now: string) {
-  const existing = database
-    .prepare("SELECT id FROM inventory_locations WHERE business_id = ? AND is_primary = 1 ORDER BY created_at ASC LIMIT 1")
-    .get(businessId) as { id?: string } | undefined;
-  if (existing?.id) return existing.id;
-
-  const id = createId("inventory_location_");
-  database.prepare(`
-    INSERT INTO inventory_locations (
-      id, business_id, name, code, is_primary, is_active, created_at, updated_at
-    ) VALUES (?, ?, 'Ana Stok', 'MAIN', 1, 1, ?, ?)
-  `).run(id, businessId, now, now);
-  return id;
-}
-
-function getProductRow(database: DatabaseSync, businessId: string, productId: string) {
-  return database.prepare(`
-    SELECT p.*,
-           COALESCE(b.minimum_quantity, 0) AS minimum_quantity,
-           COALESCE(b.quantity, 0) AS current_quantity
-    FROM catalog_products p
-    LEFT JOIN inventory_locations l
-      ON l.business_id = p.business_id AND l.is_primary = 1
-    LEFT JOIN inventory_balances b
-      ON b.product_id = p.id AND b.location_id = l.id
-    WHERE p.business_id = ? AND p.id = ? AND p.deleted_at = ''
+function activeBusinessId(database: DatabaseSync) {
+  const row = database.prepare(`
+    SELECT id
+    FROM business
+    WHERE deleted_at = ''
+    ORDER BY created_at ASC
     LIMIT 1
-  `).get(businessId, productId) as ProductRow | undefined;
+  `).get() as { id?: unknown } | undefined;
+  const businessId = String(row?.id ?? "").trim();
+  if (!businessId) throw new Error("Aktif işletme bulunamadı.");
+  return businessId;
 }
 
-function mapProduct(row: ProductRow): CatalogProduct {
+function normalizeCurrency(value: unknown) {
+  const currency = String(value ?? "TRY").trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
+}
+
+function normalizeUnit(value: unknown): CommerceUnit {
+  const unit = String(value ?? "piece") as CommerceUnit;
+  return COMMERCE_UNITS.has(unit) ? unit : "piece";
+}
+
+function mapProduct(row: Record<string, unknown>): CatalogProduct {
   return {
     id: String(row.id ?? ""),
     businessId: String(row.business_id ?? ""),
@@ -222,78 +118,214 @@ function mapProduct(row: ProductRow): CatalogProduct {
     name: String(row.name ?? ""),
     sku: String(row.sku ?? ""),
     barcode: String(row.barcode ?? ""),
-    salePrice: Number(row.sale_price ?? 0),
-    purchasePrice: Number(row.purchase_price ?? 0),
-    currency: String(row.currency ?? "TRY"),
+    description: String(row.description ?? ""),
+    salePrice: roundMoney(Number(row.sale_price ?? 0)),
+    purchasePrice: roundMoney(Number(row.purchase_price ?? 0)),
+    currency: normalizeCurrency(row.currency),
     unit: normalizeUnit(row.unit),
     taxRate: Number(row.tax_rate ?? 0),
     trackInventory: Number(row.track_inventory ?? 0) === 1,
-    active: Number(row.is_active ?? 0) === 1,
-    minimumQuantity: Number(row.minimum_quantity ?? 0),
-    currentQuantity: Number(row.current_quantity ?? 0)
+    isActive: Number(row.is_active ?? 0) === 1,
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? "")
+  };
+}
+
+function mapSupplier(row: Record<string, unknown>): CommerceSupplier {
+  return {
+    id: String(row.id ?? ""),
+    businessId: String(row.business_id ?? ""),
+    name: String(row.name ?? ""),
+    phone: String(row.phone ?? ""),
+    email: String(row.email ?? ""),
+    taxNumber: String(row.tax_number ?? ""),
+    notes: String(row.notes ?? ""),
+    isActive: Number(row.is_active ?? 0) === 1,
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? "")
+  };
+}
+
+function ensurePrimaryLocation(database: DatabaseSync, businessId: string, now = new Date().toISOString()) {
+  const existing = database.prepare(`
+    SELECT id
+    FROM inventory_locations
+    WHERE business_id = ? AND is_primary = 1 AND deleted_at = ''
+    LIMIT 1
+  `).get(businessId) as { id?: unknown } | undefined;
+  if (existing?.id) return String(existing.id);
+
+  const id = createId("inventory_location_");
+  database.prepare(`
+    INSERT INTO inventory_locations (
+      id, business_id, name, code, is_primary, is_active, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, 'Ana Stok', 'main', 1, 1, ?, ?, '')
+  `).run(id, businessId, now, now);
+  return id;
+}
+
+function getProductRow(database: DatabaseSync, businessId: string, productId: string) {
+  return database.prepare(`
+    SELECT *
+    FROM catalog_products
+    WHERE id = ? AND business_id = ? AND deleted_at = ''
+    LIMIT 1
+  `).get(productId, businessId) as Record<string, unknown> | undefined;
+}
+
+function getInventoryBalanceRow(database: DatabaseSync, productId: string, locationId: string) {
+  return database.prepare(`
+    SELECT quantity, minimum_quantity, updated_at
+    FROM inventory_balances
+    WHERE product_id = ? AND location_id = ?
+  `).get(productId, locationId) as Record<string, unknown> | undefined;
+}
+
+function applyInventoryMovementInTransaction(
+  database: DatabaseSync,
+  businessId: string,
+  input: ApplyInventoryMovementInput,
+  now: string
+): InventoryMovement {
+  if (!INVENTORY_MOVEMENT_TYPES.has(input.type)) {
+    throw new Error(`Geçersiz stok hareketi: ${input.type}`);
+  }
+  const productId = String(input.productId ?? "").trim();
+  const product = getProductRow(database, businessId, productId);
+  if (!product) throw new Error("Stok hareketi için ürün bulunamadı.");
+  if (Number(product.track_inventory ?? 0) !== 1) {
+    throw new Error("Bu ürün stok takibine kapalı.");
+  }
+
+  const locationId = String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
+  const location = database.prepare(`
+    SELECT id
+    FROM inventory_locations
+    WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
+    LIMIT 1
+  `).get(locationId, businessId) as { id?: unknown } | undefined;
+  if (!location?.id) throw new Error("Stok konumu bulunamadı.");
+
+  const quantityDelta = roundQuantity(Number(input.quantityDelta));
+  if (!Number.isFinite(quantityDelta) || quantityDelta === 0) {
+    throw new Error("Stok hareketi sıfırdan farklı olmalı.");
+  }
+
+  const before = getInventoryBalanceRow(database, productId, locationId);
+  const quantityBefore = roundQuantity(Number(before?.quantity ?? 0));
+  const quantityAfter = roundQuantity(quantityBefore + quantityDelta);
+  if (quantityAfter < 0) {
+    throw new Error(`Yetersiz stok. Mevcut: ${quantityBefore}.`);
+  }
+
+  const minimumQuantity = Math.max(0, roundQuantity(Number(before?.minimum_quantity ?? 0)));
+  database.prepare(`
+    INSERT INTO inventory_balances (product_id, location_id, quantity, minimum_quantity, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(product_id, location_id) DO UPDATE SET
+      quantity = excluded.quantity,
+      updated_at = excluded.updated_at
+  `).run(productId, locationId, quantityAfter, minimumQuantity, now);
+
+  const movementId = createId("inventory_movement_");
+  const unitCost = Math.max(0, roundMoney(Number(input.unitCost ?? 0)));
+  const referenceType = String(input.referenceType ?? "").trim().slice(0, 80);
+  const referenceId = String(input.referenceId ?? "").trim().slice(0, 160);
+  const note = String(input.note ?? "").trim().slice(0, 1000);
+  const actorSource = String(input.actorSource ?? "desktop").trim().slice(0, 80) || "desktop";
+
+  database.prepare(`
+    INSERT INTO inventory_movements (
+      id, business_id, product_id, location_id, movement_type,
+      quantity_delta, quantity_after, unit_cost, reference_type, reference_id,
+      note, actor_source, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    movementId,
+    businessId,
+    productId,
+    locationId,
+    input.type,
+    quantityDelta,
+    quantityAfter,
+    unitCost,
+    referenceType,
+    referenceId,
+    note,
+    actorSource,
+    now
+  );
+
+  return {
+    id: movementId,
+    businessId,
+    productId,
+    locationId,
+    type: input.type,
+    quantityDelta,
+    quantityAfter,
+    unitCost,
+    referenceType,
+    referenceId,
+    note,
+    actorSource,
+    createdAt: now
   };
 }
 
 export function listCatalogProducts(databasePath: string): CatalogProduct[] {
-  requireCapability(databasePath, BUSINESS_CAPABILITIES.CATALOG);
   const database = openDatabase(databasePath);
   try {
-    const { businessId } = getActiveBusiness(database);
-    const rows = database.prepare(`
-      SELECT p.*,
-             COALESCE(b.minimum_quantity, 0) AS minimum_quantity,
-             COALESCE(b.quantity, 0) AS current_quantity
-      FROM catalog_products p
-      LEFT JOIN inventory_locations l
-        ON l.business_id = p.business_id AND l.is_primary = 1
-      LEFT JOIN inventory_balances b
-        ON b.product_id = p.id AND b.location_id = l.id
-      WHERE p.business_id = ? AND p.deleted_at = ''
-      ORDER BY p.name COLLATE NOCASE, p.id
-    `).all(businessId) as ProductRow[];
-    return rows.map(mapProduct);
+    const businessId = activeBusinessId(database);
+    return (database.prepare(`
+      SELECT *
+      FROM catalog_products
+      WHERE business_id = ? AND deleted_at = ''
+      ORDER BY is_active DESC, name COLLATE NOCASE ASC
+    `).all(businessId) as Array<Record<string, unknown>>).map(mapProduct);
   } finally {
     database.close();
   }
 }
 
 export function saveCatalogProduct(databasePath: string, input: SaveCatalogProductInput): CatalogProduct {
-  requireCapability(databasePath, BUSINESS_CAPABILITIES.CATALOG);
   const database = openDatabase(databasePath);
   try {
-    const { businessId } = getActiveBusiness(database);
-    const id = normalizeText(input.id, 180) || createId("product_");
-    const name = normalizeText(input.name, 240);
+    const businessId = activeBusinessId(database);
+    const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
     if (!name) throw new Error("Ürün adı gerekli.");
-    const categoryId = normalizeText(input.categoryId, 180);
-    const sku = normalizeText(input.sku, 120);
-    const barcode = normalizeText(input.barcode, 160);
-    const currency = normalizeText(input.currency || "TRY", 12).toUpperCase() || "TRY";
-    const salePrice = normalizeMoney(input.salePrice);
-    const purchasePrice = normalizeMoney(input.purchasePrice);
+    if (name.length > 180) throw new Error("Ürün adı en fazla 180 karakter olabilir.");
+
+    const id = String(input.id ?? "").trim() || createId("product_");
+    const existing = getProductRow(database, businessId, id);
+    if (input.id && !existing) throw new Error("Düzenlenecek ürün bulunamadı.");
+    const now = new Date().toISOString();
+    const sku = String(input.sku ?? "").trim().slice(0, 80);
+    const barcode = String(input.barcode ?? "").trim().slice(0, 80);
+    const description = String(input.description ?? "").trim().slice(0, 2000);
+    const salePrice = Math.max(0, roundMoney(Number(input.salePrice ?? 0)));
+    const purchasePrice = Math.max(0, roundMoney(Number(input.purchasePrice ?? 0)));
+    const currency = normalizeCurrency(input.currency);
     const unit = normalizeUnit(input.unit);
-    const taxRate = normalizeTaxRate(input.taxRate);
+    const taxRate = Math.max(0, Math.min(100, Number(input.taxRate ?? 0)));
     const trackInventory = input.trackInventory !== false;
     const isActive = input.isActive !== false;
-    const now = new Date().toISOString();
-
-    const existing = database.prepare(
-      "SELECT id, created_at FROM catalog_products WHERE business_id = ? AND id = ? LIMIT 1"
-    ).get(businessId, id) as { id?: string; created_at?: string } | undefined;
+    const categoryId = String(input.categoryId ?? "").trim();
 
     database.exec("BEGIN IMMEDIATE");
     try {
       database.prepare(`
         INSERT INTO catalog_products (
-          id, business_id, category_id, name, sku, barcode,
+          id, business_id, category_id, name, sku, barcode, description,
           sale_price, purchase_price, currency, unit, tax_rate,
           track_inventory, is_active, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
         ON CONFLICT(id) DO UPDATE SET
           category_id = excluded.category_id,
           name = excluded.name,
           sku = excluded.sku,
           barcode = excluded.barcode,
+          description = excluded.description,
           sale_price = excluded.sale_price,
           purchase_price = excluded.purchase_price,
           currency = excluded.currency,
@@ -304,7 +336,7 @@ export function saveCatalogProduct(databasePath: string, input: SaveCatalogProdu
           updated_at = excluded.updated_at,
           deleted_at = ''
       `).run(
-        id, businessId, categoryId, name, sku, barcode,
+        id, businessId, categoryId, name, sku, barcode, description,
         salePrice, purchasePrice, currency, unit, taxRate,
         trackInventory ? 1 : 0, isActive ? 1 : 0,
         String(existing?.created_at ?? now), now
@@ -342,55 +374,34 @@ export function saveCatalogProduct(databasePath: string, input: SaveCatalogProdu
   }
 }
 
-export function recordInventoryMovement(databasePath: string, input: RecordInventoryMovementInput): InventoryBalance {
-  requireCapability(databasePath, BUSINESS_CAPABILITIES.INVENTORY);
+export function getInventoryBalance(databasePath: string, productId: string, locationId?: string): InventoryBalance {
   const database = openDatabase(databasePath);
   try {
-    const { businessId } = getActiveBusiness(database);
-    const productId = normalizeText(input.productId, 180);
-    const quantityDelta = roundQuantity(Number(input.quantityDelta ?? 0));
-    if (!productId || !Number.isFinite(quantityDelta) || quantityDelta === 0) {
-      throw new Error("Geçerli ürün ve stok miktarı gerekli.");
-    }
-    const now = new Date().toISOString();
-    const locationId = normalizeText(input.locationId, 180) || ensurePrimaryLocation(database, businessId, now);
-    const product = database.prepare(`
-      SELECT id, track_inventory FROM catalog_products
-      WHERE business_id = ? AND id = ? AND deleted_at = '' AND is_active = 1
-    `).get(businessId, productId) as { id?: string; track_inventory?: number } | undefined;
-    if (!product?.id) throw new Error("Stok hareketi için aktif ürün bulunamadı.");
-    if (Number(product.track_inventory ?? 0) !== 1) throw new Error("Bu ürün için stok takibi kapalı.");
+    const businessId = activeBusinessId(database);
+    const resolvedLocationId = String(locationId ?? "").trim() || ensurePrimaryLocation(database, businessId);
+    const row = getInventoryBalanceRow(database, productId, resolvedLocationId);
+    return {
+      productId,
+      locationId: resolvedLocationId,
+      quantity: roundQuantity(Number(row?.quantity ?? 0)),
+      minimumQuantity: Math.max(0, roundQuantity(Number(row?.minimum_quantity ?? 0))),
+      updatedAt: String(row?.updated_at ?? "")
+    };
+  } finally {
+    database.close();
+  }
+}
 
+export function applyInventoryMovement(databasePath: string, input: ApplyInventoryMovementInput): InventoryMovement {
+  const database = openDatabase(databasePath);
+  try {
+    const businessId = activeBusinessId(database);
+    const now = new Date().toISOString();
     database.exec("BEGIN IMMEDIATE");
     try {
-      const balance = database.prepare(`
-        SELECT quantity, minimum_quantity FROM inventory_balances
-        WHERE product_id = ? AND location_id = ?
-      `).get(productId, locationId) as { quantity?: number; minimum_quantity?: number } | undefined;
-      const nextQuantity = roundQuantity(Number(balance?.quantity ?? 0) + quantityDelta);
-      if (nextQuantity < 0) throw new Error("Stok miktarı sıfırın altına düşemez.");
-
-      database.prepare(`
-        INSERT INTO inventory_balances (product_id, location_id, quantity, minimum_quantity, updated_at)
-        VALUES (?, ?, ?, 0, ?)
-        ON CONFLICT(product_id, location_id) DO UPDATE SET
-          quantity = excluded.quantity,
-          updated_at = excluded.updated_at
-      `).run(productId, locationId, nextQuantity, now);
-
-      database.prepare(`
-        INSERT INTO inventory_movements (
-          id, business_id, product_id, location_id, movement_type,
-          quantity_delta, unit_cost, reference_type, reference_id, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        createId("inventory_movement_"), businessId, productId, locationId,
-        input.type, quantityDelta, normalizeMoney(input.unitCost),
-        normalizeText(input.referenceType, 100), normalizeText(input.referenceId, 180),
-        normalizeText(input.note, 500), now
-      );
+      const movement = applyInventoryMovementInTransaction(database, businessId, input, now);
       database.exec("COMMIT");
-      return { productId, locationId, quantity: nextQuantity, minimumQuantity: Number(balance?.minimum_quantity ?? 0) };
+      return movement;
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;
@@ -400,18 +411,133 @@ export function recordInventoryMovement(databasePath: string, input: RecordInven
   }
 }
 
-export function saveSupplier(databasePath: string, input: SaveSupplierInput): Supplier {
-  requireCapability(databasePath, BUSINESS_CAPABILITIES.RETAIL_SUPPLIERS);
+export function createPaidCommerceSale(databasePath: string, input: CreateCommerceSaleInput): CommerceSale {
   const database = openDatabase(databasePath);
   try {
-    const { businessId } = getActiveBusiness(database);
-    const id = normalizeText(input.id, 180) || createId("supplier_");
-    const name = normalizeText(input.name, 240);
-    if (!name) throw new Error("Tedarikçi adı gerekli.");
+    const businessId = activeBusinessId(database);
+    if (!Array.isArray(input.items) || input.items.length === 0) {
+      throw new Error("Satış için en az bir ürün gerekli.");
+    }
+
     const now = new Date().toISOString();
+    const saleId = createId("sale_");
+    const locationId = String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
+    let currency = "";
+    let subtotal = 0;
+    const preparedItems: Array<{
+      product: CatalogProduct;
+      quantity: number;
+      lineTotal: number;
+    }> = [];
+
+    for (const item of input.items) {
+      const quantity = roundQuantity(Number(item.quantity));
+      if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Satış adedi sıfırdan büyük olmalı.");
+      const row = getProductRow(database, businessId, String(item.productId ?? "").trim());
+      if (!row || Number(row.is_active ?? 0) !== 1) throw new Error("Satış ürünlerinden biri aktif değil veya bulunamadı.");
+      const product = mapProduct(row);
+      if (currency && product.currency !== currency) throw new Error("Tek satışta birden fazla para birimi kullanılamaz.");
+      currency = product.currency;
+      const lineTotal = roundMoney(product.salePrice * quantity);
+      subtotal = roundMoney(subtotal + lineTotal);
+      preparedItems.push({ product, quantity, lineTotal });
+    }
+
+    const discountTotal = Math.max(0, Math.min(subtotal, roundMoney(Number(input.discountTotal ?? 0))));
+    const total = roundMoney(subtotal - discountTotal);
+    const paymentMethod = String(input.paymentMethod ?? "cash").trim().slice(0, 80) || "cash";
+    const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
+
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      database.prepare(`
+        INSERT INTO commerce_sales (
+          id, business_id, status, subtotal, discount_total, total, currency,
+          payment_method, source, opened_at, closed_at, created_at, updated_at, deleted_at
+        ) VALUES (?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+      `).run(
+        saleId, businessId, subtotal, discountTotal, total, currency || "TRY",
+        paymentMethod, source, now, now, now, now
+      );
+
+      for (const prepared of preparedItems) {
+        const saleItemId = createId("sale_item_");
+        database.prepare(`
+          INSERT INTO commerce_sale_items (
+            id, sale_id, product_id, product_name, barcode, unit_price,
+            quantity, line_total, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          saleItemId,
+          saleId,
+          prepared.product.id,
+          prepared.product.name,
+          prepared.product.barcode,
+          prepared.product.salePrice,
+          prepared.quantity,
+          prepared.lineTotal,
+          now
+        );
+
+        if (prepared.product.trackInventory) {
+          applyInventoryMovementInTransaction(database, businessId, {
+            productId: prepared.product.id,
+            locationId,
+            type: "sale",
+            quantityDelta: -prepared.quantity,
+            unitCost: prepared.product.purchasePrice,
+            referenceType: "commerce_sale",
+            referenceId: saleId,
+            note: `${prepared.product.name} satışı`,
+            actorSource: source
+          }, now);
+        }
+      }
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+
+    return {
+      id: saleId,
+      businessId,
+      status: "paid",
+      subtotal,
+      discountTotal,
+      total,
+      currency: currency || "TRY",
+      paymentMethod,
+      source,
+      openedAt: now,
+      closedAt: now,
+      createdAt: now,
+      updatedAt: now
+    };
+  } finally {
+    database.close();
+  }
+}
+
+export function saveCommerceSupplier(databasePath: string, input: SaveCommerceSupplierInput): CommerceSupplier {
+  const database = openDatabase(databasePath);
+  try {
+    const businessId = activeBusinessId(database);
+    const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
+    if (!name) throw new Error("Tedarikçi adı gerekli.");
+    const id = String(input.id ?? "").trim() || createId("supplier_");
+    const existing = database.prepare(`
+      SELECT * FROM commerce_suppliers
+      WHERE id = ? AND business_id = ? AND deleted_at = ''
+      LIMIT 1
+    `).get(id, businessId) as Record<string, unknown> | undefined;
+    if (input.id && !existing) throw new Error("Düzenlenecek tedarikçi bulunamadı.");
+    const now = new Date().toISOString();
+
     database.prepare(`
-      INSERT INTO suppliers (
-        id, business_id, name, phone, email, tax_number, notes, is_active, created_at, updated_at, deleted_at
+      INSERT INTO commerce_suppliers (
+        id, business_id, name, phone, email, tax_number, notes,
+        is_active, created_at, updated_at, deleted_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
       ON CONFLICT(id) DO UPDATE SET
         name = excluded.name,
@@ -423,145 +549,45 @@ export function saveSupplier(databasePath: string, input: SaveSupplierInput): Su
         updated_at = excluded.updated_at,
         deleted_at = ''
     `).run(
-      id, businessId, name,
-      normalizeText(input.phone, 80), normalizeText(input.email, 200),
-      normalizeText(input.taxNumber, 80), normalizeText(input.notes, 800),
-      input.active === false ? 0 : 1, now, now
+      id,
+      businessId,
+      name,
+      String(input.phone ?? "").trim().slice(0, 80),
+      String(input.email ?? "").trim().slice(0, 160),
+      String(input.taxNumber ?? "").trim().slice(0, 80),
+      String(input.notes ?? "").trim().slice(0, 2000),
+      input.isActive === false ? 0 : 1,
+      String(existing?.created_at ?? now),
+      now
     );
-    const row = database.prepare(`
-      SELECT * FROM suppliers WHERE business_id = ? AND id = ? AND deleted_at = '' LIMIT 1
-    `).get(businessId, id) as Record<string, unknown> | undefined;
-    if (!row) throw new Error("Tedarikçi kaydedildi ancak yeniden okunamadı.");
-    return {
-      id: String(row.id ?? ""),
-      businessId: String(row.business_id ?? ""),
-      name: String(row.name ?? ""),
-      phone: String(row.phone ?? ""),
-      email: String(row.email ?? ""),
-      taxNumber: String(row.tax_number ?? ""),
-      notes: String(row.notes ?? ""),
-      active: Number(row.is_active ?? 0) === 1
-    };
+
+    const saved = database.prepare(`
+      SELECT * FROM commerce_suppliers
+      WHERE id = ? AND business_id = ? AND deleted_at = ''
+      LIMIT 1
+    `).get(id, businessId) as Record<string, unknown> | undefined;
+    if (!saved) throw new Error("Tedarikçi kaydedildi ancak yeniden okunamadı.");
+    return mapSupplier(saved);
   } finally {
     database.close();
   }
 }
 
-export function completeSale(databasePath: string, input: CompleteSaleInput): CompletedSale {
-  requireCapability(databasePath, BUSINESS_CAPABILITIES.SALES);
-  requireCapability(databasePath, BUSINESS_CAPABILITIES.CATALOG);
+export function getCommerceStoreSnapshot(databasePath: string): CommerceStoreSnapshot {
   const database = openDatabase(databasePath);
   try {
-    const { businessId } = getActiveBusiness(database);
-    if (!Array.isArray(input.items) || input.items.length === 0) {
-      throw new Error("Satış için en az bir ürün gerekli.");
-    }
-    const now = new Date().toISOString();
-    const saleId = createId("sale_");
-    const locationId = ensurePrimaryLocation(database, businessId, now);
-    const rows: Array<{
-      productId: string;
-      quantity: number;
-      unitPrice: number;
-      lineTotal: number;
-      trackInventory: boolean;
-    }> = [];
-    let currency = "TRY";
-
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      for (const item of input.items) {
-        const productId = normalizeText(item.productId, 180);
-        const quantity = Math.max(0, roundQuantity(Number(item.quantity ?? 0)));
-        if (!productId || !Number.isFinite(quantity) || quantity <= 0) {
-          throw new Error("Satış ürünlerinde geçerli miktar gerekli.");
-        }
-        const product = database.prepare(`
-          SELECT id, sale_price, currency, track_inventory FROM catalog_products
-          WHERE business_id = ? AND id = ? AND deleted_at = '' AND is_active = 1
-        `).get(businessId, productId) as {
-          id?: string;
-          sale_price?: number;
-          currency?: string;
-          track_inventory?: number;
-        } | undefined;
-        if (!product?.id) throw new Error("Satıştaki ürünlerden biri bulunamadı veya pasif.");
-        const unitPrice = item.unitPrice === undefined ? Number(product.sale_price ?? 0) : normalizeMoney(item.unitPrice);
-        if (rows.length === 0) currency = String(product.currency ?? "TRY");
-        if (String(product.currency ?? "TRY") !== currency) {
-          throw new Error("Tek satış içinde birden fazla para birimi kullanılamaz.");
-        }
-        const trackInventory = Number(product.track_inventory ?? 0) === 1;
-        if (trackInventory) {
-          const balance = database.prepare(`
-            SELECT quantity FROM inventory_balances WHERE product_id = ? AND location_id = ?
-          `).get(productId, locationId) as { quantity?: number } | undefined;
-          const current = Number(balance?.quantity ?? 0);
-          if (current < quantity) throw new Error("Yetersiz stok: satış tamamlanamadı.");
-        }
-        rows.push({
-          productId,
-          quantity,
-          unitPrice,
-          lineTotal: normalizeMoney(unitPrice * quantity),
-          trackInventory
-        });
-      }
-
-      const total = normalizeMoney(rows.reduce((sum, row) => sum + row.lineTotal, 0));
-      database.prepare(`
-        INSERT INTO sales (
-          id, business_id, status, subtotal, discount_total, total, currency,
-          payment_method, note, reference, sold_at, created_at, updated_at
-        ) VALUES (?, ?, 'completed', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        saleId, businessId, total, total, currency,
-        normalizeText(input.paymentMethod || "cash", 80), normalizeText(input.note, 500),
-        normalizeText(input.reference, 180), now, now, now
-      );
-
-      rows.forEach((row) => {
-        database.prepare(`
-          INSERT INTO sale_items (
-            id, sale_id, product_id, quantity, unit_price, discount_total, line_total, created_at
-          ) VALUES (?, ?, ?, ?, ?, 0, ?, ?)
-        `).run(createId("sale_item_"), saleId, row.productId, row.quantity, row.unitPrice, row.lineTotal, now);
-        if (!row.trackInventory) return;
-        const balance = database.prepare(`
-          SELECT quantity, minimum_quantity FROM inventory_balances
-          WHERE product_id = ? AND location_id = ?
-        `).get(row.productId, locationId) as { quantity?: number; minimum_quantity?: number } | undefined;
-        const nextQuantity = roundQuantity(Number(balance?.quantity ?? 0) - row.quantity);
-        database.prepare(`
-          UPDATE inventory_balances SET quantity = ?, updated_at = ?
-          WHERE product_id = ? AND location_id = ?
-        `).run(nextQuantity, now, row.productId, locationId);
-        database.prepare(`
-          INSERT INTO inventory_movements (
-            id, business_id, product_id, location_id, movement_type,
-            quantity_delta, unit_cost, reference_type, reference_id, note, created_at
-          ) VALUES (?, ?, ?, ?, 'sale', ?, ?, 'sale', ?, '', ?)
-        `).run(
-          createId("inventory_movement_"), businessId, row.productId, locationId,
-          -row.quantity, row.unitPrice, saleId, now
-        );
-      });
-      database.exec("COMMIT");
-      return {
-        id: saleId,
-        businessId,
-        subtotal: total,
-        discountTotal: 0,
-        total,
-        currency,
-        paymentMethod: normalizeText(input.paymentMethod || "cash", 80),
-        itemCount: rows.reduce((sum, row) => sum + row.quantity, 0),
-        soldAt: now
-      };
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
+    const businessId = activeBusinessId(database);
+    const products = (database.prepare(`
+      SELECT * FROM catalog_products
+      WHERE business_id = ? AND deleted_at = ''
+      ORDER BY is_active DESC, name COLLATE NOCASE ASC
+    `).all(businessId) as Array<Record<string, unknown>>).map(mapProduct);
+    const suppliers = (database.prepare(`
+      SELECT * FROM commerce_suppliers
+      WHERE business_id = ? AND deleted_at = ''
+      ORDER BY is_active DESC, name COLLATE NOCASE ASC
+    `).all(businessId) as Array<Record<string, unknown>>).map(mapSupplier);
+    return { products, suppliers };
   } finally {
     database.close();
   }
