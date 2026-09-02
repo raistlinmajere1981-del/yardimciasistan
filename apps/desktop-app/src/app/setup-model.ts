@@ -1,9 +1,9 @@
 import type {
   DesktopAiModelOption,
   DesktopAiService,
-  DesktopSetupData,
-  SaveInitialSetupInput
+  DesktopSetupData
 } from "../../electron/database";
+import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
 
 export interface TableCategoryFormState {
   key: string;
@@ -206,7 +206,7 @@ export function isAiServiceProfileStored(form: CapabilitySetupFormState, service
     : Boolean(form.aiServiceDrafts[service]?.storedApiKeyConfigured);
 }
 
-export function createSaveAiServiceProfiles(form: CapabilitySetupFormState): NonNullable<SaveInitialSetupInput["aiProfiles"]> {
+export function createSaveAiServiceProfiles(form: CapabilitySetupFormState): NonNullable<SaveCapabilitySetupInput["aiProfiles"]> {
   return aiServicePresets.map((preset) => {
     const draft = preset.id === form.aiService
       ? toAiServiceFormDraft(form)
