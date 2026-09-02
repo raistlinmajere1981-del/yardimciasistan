@@ -44,6 +44,10 @@ export default tseslint.config(
       "no-empty": ["error", { "allowEmptyCatch": true }],
       "prefer-const": "warn",
       "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-empty-object-type": [
+        "error",
+        { "allowInterfaces": "with-single-extends" }
+      ],
       "@typescript-eslint/no-unused-vars": [
         "warn",
         {
