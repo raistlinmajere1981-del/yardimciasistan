@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { legacyModuleDefaultsForProfile } from "@yardimci-asistan/shared";
-import type { DesktopDashboardData, DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
+import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
+import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import { defaultSetupData } from "./bootstrap-defaults";
 import { type SyncState } from "./runtime-state";
@@ -126,12 +126,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       return;
     }
 
-    // The controller no longer stores room/table/QR toggles. The old setup IPC
-    // still accepts module-shaped compatibility fields, so derive that projection
-    // only at the persistence boundary until database.ts is cut over as well.
-    const profileModules = legacyModuleDefaultsForProfile(setupForm.businessType);
-
-    const input: SaveInitialSetupInput = {
+    const input: SaveCapabilitySetupInput = {
       businessName: setupForm.businessName,
       businessType: setupForm.businessType,
       phone: setupForm.phone,
@@ -152,10 +147,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       clearAiApiKey: setupForm.clearAiApiKey,
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
-      modules: {
-        rooms: profileModules.roomsEnabled,
-        tables: profileModules.tablesEnabled,
-        qrMenu: profileModules.qrMenuEnabled,
+      servicePreferences: {
         whatsapp: setupForm.whatsappEnabled,
         android: setupForm.androidEnabled
       },
