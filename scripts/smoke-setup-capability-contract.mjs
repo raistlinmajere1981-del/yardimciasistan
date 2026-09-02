@@ -91,4 +91,23 @@ assert.equal(restaurantProjection.modules.rooms, false);
 assert.equal(restaurantProjection.modules.tables, true);
 assert.equal(restaurantProjection.modules.qrMenu, true);
 
+assert.throws(
+  () => toLegacySetupSaveInput(baseInput, {
+    businessId: "business_smoke",
+    businessType: "pension",
+    profileId: "pension",
+    capabilities: [
+      {
+        capability: "accommodation.folio",
+        enabled: true,
+        source: "user",
+        updatedAt: "2026-09-03T00:00:00.000Z"
+      }
+    ],
+    enabledCapabilities: ["accommodation.folio"]
+  }),
+  /accommodation\.folio/i,
+  "A preserved user override must not create an invalid target-profile dependency graph."
+);
+
 console.log("setup-capability-contract-smoke-ok");
