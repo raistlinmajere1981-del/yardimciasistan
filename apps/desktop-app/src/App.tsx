@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
-import { setupHasCapability } from "./app/capabilities";
+import { runtimeHasCapability } from "./app/capabilities";
 import { buildDesktopNotifications } from "./app/notifications";
 import type { DesktopPage } from "./app/navigation";
 import type { SyncState } from "./app/runtime-state";
@@ -47,8 +47,8 @@ function App() {
     setSyncState,
     setStatusMessage,
     messagesActive: activePage === "messages",
-    aiEnabled: setupHasCapability(setupController.setupData, BUSINESS_CAPABILITIES.AI),
-    whatsappEnabled: setupHasCapability(setupController.setupData, BUSINESS_CAPABILITIES.WHATSAPP),
+    aiEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.AI),
+    whatsappEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP),
     onOpenMessages: () => setActivePage("messages")
   });
   const customerController = useCustomerController({
