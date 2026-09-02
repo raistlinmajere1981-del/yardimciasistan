@@ -26,6 +26,7 @@ try {
 
   const initial = readBusinessCapabilitySnapshot(databasePath);
   assert.ok(initial.businessId, "Demo fixture should create an active business.");
+  assert.equal(initial.profileId, "pension_restaurant");
   assert.equal(initial.enabledCapabilities.includes(C.CUSTOMERS), true);
   assert.equal(initial.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), true);
   assert.equal(initial.enabledCapabilities.includes(C.FOOD_TABLES), true);
@@ -40,8 +41,9 @@ try {
   assert.equal(roomOverride?.enabled, false);
   assert.equal(roomOverride?.source, "user");
 
-  // The legacy setup screen still writes rooms_enabled. Its migration trigger
-  // must not overwrite an explicit capability override.
+  // v2 no longer mirrors room/table/QR settings booleans into capabilities.
+  // A stale compatibility write therefore cannot overwrite an explicit
+  // capability decision.
   const raw = new DatabaseSync(databasePath);
   try {
     const now = new Date().toISOString();
