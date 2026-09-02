@@ -1,7 +1,3 @@
-import {
-  getAvailableBusinessProfiles,
-  legacyModuleDefaultsForProfile
-} from "@yardimci-asistan/shared";
 import type {
   DesktopAiModelOption,
   DesktopAiService,
@@ -71,47 +67,6 @@ export const aiServicePresets = [
   label: string;
   baseUrl: string;
 }>;
-
-export interface BusinessTypeProfile {
-  label: string;
-  description: string;
-  modules: {
-    roomsEnabled: boolean;
-    tablesEnabled: boolean;
-    qrMenuEnabled: boolean;
-    whatsappEnabled: boolean;
-    androidEnabled: boolean;
-  };
-}
-
-/**
- * Existing setup UI consumes the old module-shaped profile object. Build it
- * from the shared capability registry so profile knowledge no longer lives in
- * the renderer. Planned profiles (Market/General) stay out of the selector
- * until their workspaces are ready.
- */
-export const businessTypeProfiles: Record<string, BusinessTypeProfile> = Object.fromEntries(
-  getAvailableBusinessProfiles().map((profile) => [
-    profile.id,
-    {
-      label: profile.label,
-      description: profile.description,
-      modules: legacyModuleDefaultsForProfile(profile.id)
-    }
-  ])
-);
-
-export function applyBusinessTypeProfile(form: SetupFormState, businessType: string): SetupFormState {
-  const profile = businessTypeProfiles[businessType];
-  if (!profile) {
-    return { ...form, businessType };
-  }
-  return {
-    ...form,
-    businessType,
-    ...profile.modules
-  };
-}
 
 export function normalizeAiService(service: string): DesktopAiService {
   return aiServicePresets.some((preset) => preset.id === service)
