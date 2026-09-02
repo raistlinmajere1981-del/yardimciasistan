@@ -14,6 +14,10 @@ const {
   readBusinessCapabilitySnapshot,
   setBusinessCapability
 } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const {
+  assertPersistedBusinessCapability,
+  hasPersistedBusinessCapability
+} = require("../apps/desktop-app/dist-electron/business-capability-runtime.js");
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
 
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-asistan-cap-runtime-v2-"));
@@ -31,6 +35,8 @@ try {
   assert.equal(initial.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), true);
   assert.equal(initial.enabledCapabilities.includes(C.FOOD_TABLES), true);
   assert.equal(initial.enabledCapabilities.includes(C.RETAIL_BARCODE), false);
+  assert.equal(hasPersistedBusinessCapability(databasePath, C.ACCOMMODATION_FOLIO), true);
+  assert.doesNotThrow(() => assertPersistedBusinessCapability(databasePath, C.ACCOMMODATION_FOLIO));
 
   const market = applyBusinessProfileCapabilities(databasePath, "market", {
     preserveUserOverrides: false
@@ -44,6 +50,11 @@ try {
   assert.equal(market.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), false);
   assert.equal(market.enabledCapabilities.includes(C.FOOD_TABLES), false);
   assert.equal(market.enabledCapabilities.includes(C.QR_MENU), false);
+  assert.equal(hasPersistedBusinessCapability(databasePath, C.ACCOMMODATION_FOLIO), false);
+  assert.throws(
+    () => assertPersistedBusinessCapability(databasePath, C.ACCOMMODATION_FOLIO, "folio-disabled"),
+    /folio-disabled/
+  );
 
   // modules_json is now a compatibility projection. A direct legacy write must
   // not be able to turn Market into a room/table application.
@@ -72,6 +83,8 @@ try {
   assert.equal(roomOverride?.enabled, true);
   assert.equal(roomOverride?.source, "user");
   assert.equal(database.getSetupData().modules.rooms, true);
+  assert.equal(hasPersistedBusinessCapability(databasePath, C.ACCOMMODATION_ROOMS), true);
+  assert.equal(hasPersistedBusinessCapability(databasePath, C.ACCOMMODATION_FOLIO), false, "Capabilities remain independently composable.");
 
   const restaurantHybrid = applyBusinessProfileCapabilities(databasePath, "restaurant");
   assert.equal(restaurantHybrid.profileId, "restaurant");
