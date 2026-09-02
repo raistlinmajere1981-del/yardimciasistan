@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction } from "react";
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
+import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage } from "../../app/navigation";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "../../app/operations";
 import {
@@ -86,7 +88,12 @@ export function DesktopWorkspaceRouter({
     saveSetup
   } = setupController;
   const { setPasswordConfigured: handleAppPasswordConfiguredChange } = appLockController;
-  const { dashboardData, setDashboardData } = desktopSyncController;
+  const {
+    dashboardData,
+    setDashboardData,
+    businessCapabilities,
+    loadBusinessCapabilities
+  } = desktopSyncController;
   const {
     menuEditState,
     menuEditMessage,
@@ -188,6 +195,19 @@ export function DesktopWorkspaceRouter({
     handleCreateManualBackup
   } = deviceController;
 
+  const C = BUSINESS_CAPABILITIES;
+  const aiEnabled = runtimeHasCapability(businessCapabilities, C.AI);
+  const whatsappEnabled = runtimeHasCapability(businessCapabilities, C.WHATSAPP);
+  const roomsEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_ROOMS);
+  const tablesEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_TABLES);
+  const runtimeModules = {
+    rooms: roomsEnabled,
+    tables: tablesEnabled,
+    qrMenu: runtimeHasCapability(businessCapabilities, C.QR_MENU),
+    whatsapp: whatsappEnabled,
+    android: runtimeHasCapability(businessCapabilities, C.ANDROID)
+  };
+
   function openDashboardCustomerWork(request?: SyncedCustomerRequest) {
     if (request) {
       setSelectedRequestId(request.id);
@@ -196,11 +216,11 @@ export function DesktopWorkspaceRouter({
   }
 
   function openDashboardReply(request: SyncedCustomerRequest) {
-    if (setupData.modules.whatsapp) {
+    if (whatsappEnabled) {
       openWhatsApp(request);
       return;
     }
-    if (setupData.aiEnabled) {
+    if (aiEnabled) {
       openAiTools("reply", request.id);
       return;
     }
@@ -215,11 +235,16 @@ export function DesktopWorkspaceRouter({
       return;
     }
 
-    if (["table", "breakfast"].includes(reservation.reservationType) && setupData.modules.tables) {
+    if (["table", "breakfast"].includes(reservation.reservationType) && tablesEnabled) {
       setActivePage("restaurant");
       return;
     }
-    setActivePage("pension");
+    if (roomsEnabled) {
+      setActivePage("pension");
+      return;
+    }
+    setSyncState("error");
+    setStatusMessage("Bu rezervasyon için etkin bir operasyon alanı bulunmuyor.");
   }
 
   function openDashboardReservation(reservation: DesktopDashboardData["reservations"][number]) {
@@ -228,7 +253,7 @@ export function DesktopWorkspaceRouter({
       openDashboardCustomerWork(request);
       return;
     }
-    if (!["table", "breakfast"].includes(reservation.reservationType) && setupData.modules.rooms) {
+    if (!["table", "breakfast"].includes(reservation.reservationType) && roomsEnabled) {
       setActivePage("pension");
       return;
     }
@@ -238,12 +263,13 @@ export function DesktopWorkspaceRouter({
 
   async function handleSaveSetup() {
     await saveSetup(setDashboardData);
+    await loadBusinessCapabilities();
   }
 
   const persistentMessagesPage = (
     <MessagesPage
-      aiEnabled={setupData.aiEnabled}
-      whatsappEnabled={setupData.modules.whatsapp}
+      aiEnabled={aiEnabled}
+      whatsappEnabled={whatsappEnabled}
       aiOpen={messagesAiOpen}
       active={activePage === "messages"}
       safeMode={(
@@ -253,7 +279,7 @@ export function DesktopWorkspaceRouter({
           selectedRequest={selectedWhatsAppRequest}
           selectedMessage={selectedWhatsAppMessage}
           selectedUrl={selectedWhatsAppUrl}
-          aiEnabled={setupData.aiEnabled}
+          aiEnabled={aiEnabled}
           aiState={aiState}
           aiMessage={aiMessage}
           getRequestStatusTone={getRequestStatusTone}
@@ -272,7 +298,7 @@ export function DesktopWorkspaceRouter({
           selectedRequest={selectedWhatsAppRequest}
           selectedMessage={selectedWhatsAppMessage}
           selectedUrl={selectedWhatsAppUrl}
-          aiEnabled={setupData.aiEnabled}
+          aiEnabled={aiEnabled}
           aiState={aiState}
           aiMessage={aiMessage}
           getRequestStatusTone={getRequestStatusTone}
@@ -316,8 +342,8 @@ export function DesktopWorkspaceRouter({
       {activePage === "dashboard" ? (
         <DashboardPage
           data={dashboardData}
-          modules={setupData.modules}
-          aiEnabled={setupData.aiEnabled}
+          modules={runtimeModules}
+          aiEnabled={aiEnabled}
           availableRoomCount={dashboardData.rooms.filter((room) => getRoomDisplayInfo(room, dashboardData.reservations).status === "available").length}
           onReplyRequest={openDashboardReply}
           onOpenCustomerWork={openDashboardCustomerWork}
@@ -343,7 +369,7 @@ export function DesktopWorkspaceRouter({
             <RequestsWorkspace
               requests={dashboardData.requests}
               selectedRequest={selectedRequest}
-              aiEnabled={setupData.aiEnabled}
+              aiEnabled={aiEnabled}
               convertingRequestId={convertingRequestId}
               suggestingRequestId={suggestingRequestId}
               manualRequestForm={manualRequestForm}
@@ -368,7 +394,7 @@ export function DesktopWorkspaceRouter({
               reservations={dashboardData.reservations}
               rooms={dashboardData.rooms}
               stays={dashboardData.customerRoomStays}
-              aiEnabled={setupData.aiEnabled}
+              aiEnabled={aiEnabled}
               onCall={callCustomerRecord}
               onWhatsApp={openCustomerWhatsApp}
               onSummarize={(requestId) => openAiTools("summary", requestId)}
@@ -383,7 +409,7 @@ export function DesktopWorkspaceRouter({
             <RequestsWorkspace
               requests={dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status))}
               selectedRequest={dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status)).find((request) => request.id === selectedRequestId) ?? dashboardData.requests.find((request) => isRequestWaitingForReply(request.status))}
-              aiEnabled={setupData.aiEnabled}
+              aiEnabled={aiEnabled}
               convertingRequestId={convertingRequestId}
               suggestingRequestId={suggestingRequestId}
               manualRequestForm={manualRequestForm}
@@ -492,7 +518,7 @@ export function DesktopWorkspaceRouter({
           onDashboardDataChanged={setDashboardData}
         />
       ) : activePage === "reports" ? (
-        <ReportsPage aiEnabled={setupData.aiEnabled} />
+        <ReportsPage aiEnabled={aiEnabled} />
       ) : activePage === "messages" ? null : (
         <SetupWizard
           embedded
