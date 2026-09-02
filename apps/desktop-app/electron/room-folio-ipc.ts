@@ -21,9 +21,14 @@ type RoomFolioManualItemIpcInput = AddRoomFolioManualItemInput & {
 export function registerRoomFolioIpcHandlers(options: {
   databasePath: () => string;
   assertUnlocked: () => void;
+  assertCapability?: () => void;
   onMutation?: () => void;
 }) {
   const service = () => new DesktopRoomFolioService(options.databasePath());
+  const assertAccess = () => {
+    options.assertUnlocked();
+    options.assertCapability?.();
+  };
   const finalize = (result: DesktopRoomFolioMutationResult): DesktopRoomFolioMutationResult => {
     if (result.ok) {
       options.onMutation?.();
@@ -32,12 +37,12 @@ export function registerRoomFolioIpcHandlers(options: {
   };
 
   ipcMain.handle("roomFolio:getData", (): DesktopRoomFolioData => {
-    options.assertUnlocked();
+    assertAccess();
     return service().getData();
   });
 
   ipcMain.handle("roomFolio:setRoomNightlyPrice", (_event, input: SetRoomNightlyPriceInput & { name?: string }): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
 
     if (typeof input?.name === "string") {
       const result = saveRoomProfile(options.databasePath(), {
@@ -56,27 +61,27 @@ export function registerRoomFolioIpcHandlers(options: {
   });
 
   ipcMain.handle("roomFolio:open", (_event, stayId: string): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().openFolio(stayId));
   });
 
   ipcMain.handle("roomFolio:updateDetails", (_event, input: UpdateRoomFolioDetailsInput): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().updateFolioDetails(input));
   });
 
   ipcMain.handle("roomFolio:addMenuItem", (_event, input: AddRoomFolioMenuItemInput): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().addMenuItem(input));
   });
 
   ipcMain.handle("roomFolio:updateItemQuantity", (_event, input: UpdateRoomFolioItemQuantityInput): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().updateItemQuantity(input));
   });
 
   ipcMain.handle("roomFolio:addManualItem", (_event, input: RoomFolioManualItemIpcInput): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     const sourceTableOrderId = typeof input?.sourceTableOrderId === "string" ? input.sourceTableOrderId.trim() : "";
     if (sourceTableOrderId) {
       return finalize(transferTableOrderToRoomFolio(options.databasePath(), {
@@ -88,22 +93,22 @@ export function registerRoomFolioIpcHandlers(options: {
   });
 
   ipcMain.handle("roomFolio:removeItem", (_event, itemId: string): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().removeItem(itemId));
   });
 
   ipcMain.handle("roomFolio:addPayment", (_event, input: AddRoomFolioPaymentInput): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().addPayment(input));
   });
 
   ipcMain.handle("roomFolio:voidPayment", (_event, paymentId: string): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().voidPayment(paymentId));
   });
 
   ipcMain.handle("roomFolio:checkout", (_event, input: CheckoutRoomFolioInput): DesktopRoomFolioMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().checkout(input));
   });
 }
