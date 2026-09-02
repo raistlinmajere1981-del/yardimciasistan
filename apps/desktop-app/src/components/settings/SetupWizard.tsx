@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability } from "@yardimci-asistan/shared";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
+import type { CapabilitySetupFormState, SetupFormState } from "../../app/setup-model";
 import {
   BusinessCapabilityEditor,
   getEffectiveSetupCapabilities
@@ -8,16 +9,19 @@ import {
 import { SetupWizard as LegacySetupWizard } from "./LegacySetupWizard";
 import "./setup-capability-v2.css";
 
-type SetupWizardProps = ComponentProps<typeof LegacySetupWizard>;
+type LegacySetupWizardProps = ComponentProps<typeof LegacySetupWizard>;
+type SetupWizardProps = Omit<LegacySetupWizardProps, "form" | "onFormChange"> & {
+  form: CapabilitySetupFormState;
+  onFormChange: (form: CapabilitySetupFormState) => void;
+};
 
 /**
  * Capability-first setup boundary.
  *
- * The historical wizard still owns the large collection of connection/device
- * forms while it is being split into smaller settings panels. Domain toggles
- * are no longer allowed to become a second runtime authority: the legacy form
- * receives a read-only compatibility projection derived from the persisted
- * capability snapshot (or, during first setup, from the selected profile).
+ * The controller-owned form no longer contains room/table/QR booleans. The
+ * historical wizard still needs that shape while its connection/device panels
+ * are being split, so those three values are projected here from capabilities
+ * and stripped again before any form mutation reaches application state.
  */
 export function SetupWizard(props: SetupWizardProps) {
   const capabilityRuntime = useBusinessCapabilityRuntime();
@@ -26,20 +30,21 @@ export function SetupWizard(props: SetupWizardProps) {
     capabilityRuntime.snapshot
   );
   const C = BUSINESS_CAPABILITIES;
-  const capabilityForm = {
+  const capabilityForm: SetupFormState = {
     ...props.form,
     roomsEnabled: hasBusinessCapability(effectiveCapabilities, C.ACCOMMODATION_ROOMS),
     tablesEnabled: hasBusinessCapability(effectiveCapabilities, C.FOOD_TABLES),
     qrMenuEnabled: hasBusinessCapability(effectiveCapabilities, C.QR_MENU)
   };
 
-  const handleLegacyFormChange: SetupWizardProps["onFormChange"] = (nextForm) => {
-    props.onFormChange({
-      ...nextForm,
-      roomsEnabled: capabilityForm.roomsEnabled,
-      tablesEnabled: capabilityForm.tablesEnabled,
-      qrMenuEnabled: capabilityForm.qrMenuEnabled
-    });
+  const handleLegacyFormChange: LegacySetupWizardProps["onFormChange"] = (nextForm) => {
+    const {
+      roomsEnabled: _roomsEnabled,
+      tablesEnabled: _tablesEnabled,
+      qrMenuEnabled: _qrMenuEnabled,
+      ...nextCapabilityForm
+    } = nextForm;
+    props.onFormChange(nextCapabilityForm);
   };
 
   return (
