@@ -1,15 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip/schema.json",
-  "ignore": [
-    "**/dist/**",
-    "**/dist-renderer/**",
-    "**/dist-electron/**",
-    "**/build/**",
-    "**/coverage/**",
-    "**/.demo-runtime/**",
-    "firm-template/**",
-    "demo-data/**"
-  ],
+  "ignoreBinaries": ["adb", "php", "scrcpy"],
   "workspaces": {
     ".": {
       "entry": [
@@ -26,6 +17,7 @@
       "entry": [
         "src/main.tsx",
         "electron/main-entry.ts",
+        "electron/commerce-store.ts",
         "scripts/**/*.{js,mjs,cjs,ts}"
       ],
       "project": [
