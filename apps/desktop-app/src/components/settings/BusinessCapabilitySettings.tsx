@@ -1,6 +1,5 @@
 import {
   BUSINESS_CAPABILITIES,
-  BUSINESS_PROFILES,
   getBusinessCapabilityDependencies,
   getBusinessProfile,
   getEnabledBusinessCapabilityDependents,
@@ -76,8 +75,6 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
   }
 ];
 
-export const BUSINESS_PROFILE_OPTIONS = Object.values(BUSINESS_PROFILES);
-
 export function getEffectiveSetupCapabilities(
   businessType: string,
   snapshot: BusinessCapabilitySnapshot | null | undefined
@@ -86,58 +83,6 @@ export function getEffectiveSetupCapabilities(
     return snapshot.enabledCapabilities;
   }
   return getBusinessProfile(businessType).defaultCapabilities;
-}
-
-interface BusinessProfileSettingsProps {
-  businessType: string;
-  whatsappEnabled: boolean;
-  androidEnabled: boolean;
-  snapshot?: BusinessCapabilitySnapshot | null;
-  onWhatsAppEnabledChange: (enabled: boolean) => void;
-  onAndroidEnabledChange: (enabled: boolean) => void;
-}
-
-export function BusinessProfileSettings({
-  businessType,
-  whatsappEnabled,
-  androidEnabled,
-  snapshot,
-  onWhatsAppEnabledChange,
-  onAndroidEnabledChange
-}: BusinessProfileSettingsProps) {
-  const profile = getBusinessProfile(businessType);
-  const enabled = new Set(getEffectiveSetupCapabilities(businessType, snapshot));
-  const areas = [
-    enabled.has(C.ACCOMMODATION_ROOMS) ? "Konaklama" : "",
-    enabled.has(C.FOOD_TABLES) ? "Restoran / Kafe" : "",
-    enabled.has(C.CATALOG) ? "Katalog / Stok / Satış" : ""
-  ].filter(Boolean);
-
-  return (
-    <div className="setup-section settings-modules-section">
-      <div className="setup-section-title">
-        <h2>İşletme Profili</h2>
-      </div>
-      <p className="setup-section-description">
-        Profil yalnız başlangıç şablonudur. Çalışma alanlarını profil belirler; özel kombinasyonlar Gelişmiş Ayarlar bölümündeki yeteneklerden yönetilir.
-      </p>
-      <dl className="info-list settings-technical-info">
-        <div><dt>Profil</dt><dd>{profile.label}</dd></div>
-        <div><dt>Çalışma alanları</dt><dd>{areas.length > 0 ? areas.join(" · ") : "Ortak işletme çekirdeği"}</dd></div>
-      </dl>
-      <small>{profile.description}</small>
-      <div className="setup-toggle-grid">
-        <label>
-          <input checked={whatsappEnabled} onChange={(event) => onWhatsAppEnabledChange(event.target.checked)} type="checkbox" />
-          WhatsApp
-        </label>
-        <label>
-          <input checked={androidEnabled} onChange={(event) => onAndroidEnabledChange(event.target.checked)} type="checkbox" />
-          Android
-        </label>
-      </div>
-    </div>
-  );
 }
 
 interface BusinessCapabilityEditorProps {
