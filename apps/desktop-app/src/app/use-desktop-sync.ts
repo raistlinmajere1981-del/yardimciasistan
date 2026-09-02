@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
 import { defaultDashboardData } from "./bootstrap-defaults";
@@ -23,6 +24,7 @@ export function useDesktopSync({
   const onBootstrapSetupRef = useRef(onBootstrapSetup);
   const onDashboardLoadedRef = useRef(onDashboardLoaded);
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
+  const [businessCapabilities, setBusinessCapabilities] = useState<BusinessCapabilitySnapshot | null>(null);
   const [automaticSyncStatus, setAutomaticSyncStatus] = useState<AutomaticSyncStatus>(defaultAutomaticSyncStatus);
 
   onBootstrapSetupRef.current = onBootstrapSetup;
@@ -38,6 +40,16 @@ export function useDesktopSync({
     setDashboardData(nextDashboardData);
     onDashboardLoadedRef.current?.(nextDashboardData);
     return nextDashboardData;
+  }, []);
+
+  const loadBusinessCapabilities = useCallback(async () => {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.getBusinessCapabilitySnapshot) {
+      return undefined;
+    }
+    const snapshot = await bridge.getBusinessCapabilitySnapshot();
+    setBusinessCapabilities(snapshot);
+    return snapshot;
   }, []);
 
   useEffect(() => {
@@ -74,6 +86,19 @@ export function useDesktopSync({
         reportInitialError("Başlangıç ayarları okunamadı. Yerel veriler korunuyor; uygulamayı yeniden başlatmayı deneyin.");
       });
 
+    // main-entry registers the capability IPC immediately after main.ts is
+    // ready. Retry once to make startup deterministic even on a very fast
+    // renderer where the first effect wins that small registration race.
+    void loadBusinessCapabilities().catch(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (!active) return;
+      try {
+        await loadBusinessCapabilities();
+      } catch {
+        reportInitialError("İşletme yetenekleri okunamadı. Uygulamayı yeniden başlatmayı deneyin.");
+      }
+    });
+
     void loadDashboardData().catch(() => {
       reportInitialError("Yerel işletme verileri okunamadı. Uygulamayı yeniden başlatmayı deneyin.");
     });
@@ -103,7 +128,7 @@ export function useDesktopSync({
       unsubscribeDashboard?.();
       unsubscribeSync?.();
     };
-  }, [accessPhase, loadDashboardData, setStatusMessage, setSyncState]);
+  }, [accessPhase, loadBusinessCapabilities, loadDashboardData, setStatusMessage, setSyncState]);
 
   const pullRequests = useCallback(async () => {
     setSyncState("loading");
@@ -121,7 +146,7 @@ export function useDesktopSync({
         const cycle = await bridge.runSyncNow();
         setAutomaticSyncStatus(cycle.status);
         try {
-          await loadDashboardData();
+          await Promise.all([loadDashboardData(), loadBusinessCapabilities()]);
         } catch {
           setSyncState("error");
           setStatusMessage(cycle.ok
@@ -142,7 +167,7 @@ export function useDesktopSync({
       }
 
       try {
-        await loadDashboardData();
+        await Promise.all([loadDashboardData(), loadBusinessCapabilities()]);
       } catch {
         setSyncState("error");
         setStatusMessage("Web talepleri alındı ancak ekran verileri yenilenemedi. Uygulamayı yeniden başlatmayı deneyin.");
@@ -154,11 +179,14 @@ export function useDesktopSync({
       setSyncState("error");
       setStatusMessage("Bağlantı kontrol edilemedi. İnternet ve web modülü ayarlarını kontrol edip yeniden deneyin.");
     }
-  }, [loadDashboardData, setStatusMessage, setSyncState]);
+  }, [loadBusinessCapabilities, loadDashboardData, setStatusMessage, setSyncState]);
 
   return {
     dashboardData,
     setDashboardData,
+    businessCapabilities,
+    setBusinessCapabilities,
+    loadBusinessCapabilities,
     automaticSyncStatus,
     loadDashboardData,
     pullRequests
