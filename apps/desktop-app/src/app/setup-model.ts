@@ -24,6 +24,12 @@ export interface AiServiceFormDraft {
   timeoutSeconds: string;
 }
 
+/**
+ * Historical form shape still consumed by LegacySetupWizard while that large
+ * component is being split. Domain booleans in this interface are a renderer
+ * compatibility projection only; CapabilitySetupFormState is the actual
+ * controller-owned setup state.
+ */
 export interface SetupFormState {
   businessName: string;
   businessType: string;
@@ -56,6 +62,11 @@ export interface SetupFormState {
   tableCategories: TableCategoryFormState[];
 }
 
+export type CapabilitySetupFormState = Omit<
+  SetupFormState,
+  "roomsEnabled" | "tablesEnabled" | "qrMenuEnabled"
+>;
+
 export const aiServicePresets = [
   { id: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1" },
   { id: "openrouter", label: "OpenRouter", baseUrl: "https://openrouter.ai/api/v1" },
@@ -74,7 +85,7 @@ export function normalizeAiService(service: string): DesktopAiService {
     : "openai";
 }
 
-export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
+export function toSetupForm(setupData: DesktopSetupData): CapabilitySetupFormState {
   const service = normalizeAiService(setupData.aiService);
   const aiServiceDrafts = createAiServiceFormDrafts(setupData);
   const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
@@ -102,9 +113,6 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     clearAiApiKey: activeAiDraft.clearApiKey,
     aiTimeoutSeconds: activeAiDraft.timeoutSeconds,
     aiServiceDrafts,
-    roomsEnabled: setupData.modules.rooms,
-    tablesEnabled: setupData.modules.tables,
-    qrMenuEnabled: setupData.modules.qrMenu,
     whatsappEnabled: setupData.modules.whatsapp,
     androidEnabled: setupData.modules.android,
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
@@ -178,7 +186,7 @@ export function createDefaultAiServiceDraft(service: DesktopAiService): AiServic
   };
 }
 
-export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
+export function toAiServiceFormDraft(form: CapabilitySetupFormState): AiServiceFormDraft {
   return {
     projectName: form.aiProjectName,
     googleCurl: form.aiGoogleCurl,
@@ -192,13 +200,13 @@ export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
   };
 }
 
-export function isAiServiceProfileStored(form: SetupFormState, service: DesktopAiService): boolean {
+export function isAiServiceProfileStored(form: CapabilitySetupFormState, service: DesktopAiService): boolean {
   return service === form.aiService
     ? form.aiStoredApiKeyConfigured
     : Boolean(form.aiServiceDrafts[service]?.storedApiKeyConfigured);
 }
 
-export function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInitialSetupInput["aiProfiles"]> {
+export function createSaveAiServiceProfiles(form: CapabilitySetupFormState): NonNullable<SaveInitialSetupInput["aiProfiles"]> {
   return aiServicePresets.map((preset) => {
     const draft = preset.id === form.aiService
       ? toAiServiceFormDraft(form)
