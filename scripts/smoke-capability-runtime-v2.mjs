@@ -73,8 +73,9 @@ try {
   assert.equal(projectedMarketSetup.modules.tables, false);
   assert.equal(projectedMarketSetup.modules.qrMenu, false);
 
-  // Profiles are presets, not mutually exclusive permanent business types.
-  // An explicit user capability can compose a hybrid without adding a new id.
+  // Profiles are presets, not mutually exclusive permanent business types. A
+  // user may compose Market + Rooms, but dependent capabilities cannot be
+  // enabled in an invalid order.
   const marketWithRooms = setBusinessCapability(databasePath, {
     capability: C.ACCOMMODATION_ROOMS,
     enabled: true
@@ -86,12 +87,41 @@ try {
   assert.equal(hasPersistedBusinessCapability(databasePath, C.ACCOMMODATION_ROOMS), true);
   assert.equal(hasPersistedBusinessCapability(databasePath, C.ACCOMMODATION_FOLIO), false, "Capabilities remain independently composable.");
 
+  assert.throws(
+    () => setBusinessCapability(databasePath, {
+      capability: C.ACCOMMODATION_FOLIO,
+      enabled: true
+    }),
+    /accommodation\.stays/
+  );
+
+  setBusinessCapability(databasePath, {
+    capability: C.ACCOMMODATION_STAYS,
+    enabled: true
+  });
+  const marketWithFolio = setBusinessCapability(databasePath, {
+    capability: C.ACCOMMODATION_FOLIO,
+    enabled: true
+  });
+  assert.equal(marketWithFolio.enabledCapabilities.includes(C.ACCOMMODATION_FOLIO), true);
+
   const restaurantHybrid = applyBusinessProfileCapabilities(databasePath, "restaurant");
   assert.equal(restaurantHybrid.profileId, "restaurant");
   assert.equal(restaurantHybrid.enabledCapabilities.includes(C.FOOD_TABLES), true);
   assert.equal(restaurantHybrid.enabledCapabilities.includes(C.RETAIL_BARCODE), false);
   assert.equal(restaurantHybrid.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), true, "User override must survive profile changes.");
+  assert.equal(restaurantHybrid.enabledCapabilities.includes(C.ACCOMMODATION_STAYS), true);
+  assert.equal(restaurantHybrid.enabledCapabilities.includes(C.ACCOMMODATION_FOLIO), true);
 
+  // A prerequisite override cannot be cleared while preserved user capabilities
+  // still depend on it.
+  assert.throws(
+    () => clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_ROOMS),
+    /gerekli yetenekler|bağlı/i
+  );
+
+  clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_FOLIO);
+  clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_STAYS);
   const restaurantDefault = clearBusinessCapabilityOverride(databasePath, C.ACCOMMODATION_ROOMS);
   const clearedRoom = restaurantDefault.capabilities.find((entry) => entry.capability === C.ACCOMMODATION_ROOMS);
   assert.equal(clearedRoom?.enabled, false);
