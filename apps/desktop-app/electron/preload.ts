@@ -5,6 +5,7 @@ import type {
   DesktopDashboardData,
   DesktopSetupData,
   DesktopSetupSaveResult,
+  SaveInitialSetupInput,
   SaveMenuCategoryInput,
   SaveMenuItemInput,
   DesktopMenuSaveResult,
@@ -78,10 +79,7 @@ import type {
 } from "./app-lock";
 import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-connection-test";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
-import {
-  toLegacySetupSaveInput,
-  type SaveCapabilitySetupInput
-} from "./setup-contract";
+import type { SaveCapabilitySetupInput } from "./setup-contract";
 
 export interface AiConnectionTestInput {
   provider: string;
@@ -161,7 +159,7 @@ export interface DesktopBridge {
   deleteRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
   deleteCustomer: (customerId: string) => Promise<DesktopStatusUpdateResult>;
   saveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
-  assignCustomerToRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
+  assignCustomerRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => Promise<DesktopCustomerMutationResult>;
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => Promise<DesktopIdentityImageAnalyzeResult>;
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => Promise<DesktopStatusUpdateResult>;
@@ -261,8 +259,8 @@ const bridge: DesktopBridge = {
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: async (input: SaveCapabilitySetupInput) => {
-    const snapshot = await invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot");
-    return ipcRenderer.invoke("setup:saveInitial", toLegacySetupSaveInput(input, snapshot));
+    const adapted = await invokeWhenUnlocked<SaveInitialSetupInput>("capability:adaptSetupSave", input);
+    return ipcRenderer.invoke("setup:saveInitial", adapted);
   },
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
@@ -279,7 +277,7 @@ const bridge: DesktopBridge = {
   deleteRequest: (requestId: string) => ipcRenderer.invoke("request:delete", requestId),
   deleteCustomer: (customerId: string) => ipcRenderer.invoke("customer:delete", customerId),
   saveCustomer: (input: SaveCustomerInput) => ipcRenderer.invoke("customer:save", input),
-  assignCustomerToRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),
+  assignCustomerRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => ipcRenderer.invoke("customer:updateRoomStayStatus", input),
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => ipcRenderer.invoke("customer:analyzeIdentityImage", input),
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => ipcRenderer.invoke("whatsapp:markMessageSent", input),
