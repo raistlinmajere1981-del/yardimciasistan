@@ -66,7 +66,34 @@ export interface LegacyBusinessModuleDefaults {
   androidEnabled: boolean;
 }
 
+export interface BusinessCapabilityDependencyViolation {
+  capability: BusinessCapability;
+  missingDependencies: BusinessCapability[];
+}
+
 const C = BUSINESS_CAPABILITIES;
+
+/**
+ * Capability dependencies describe structural requirements, not UI bundles.
+ * A capability may still be toggled independently as long as its prerequisites
+ * remain enabled. This prevents invalid hybrid profiles without reintroducing
+ * hardcoded business-type combinations.
+ */
+export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability, readonly BusinessCapability[]>> = {
+  [C.ACCOMMODATION_RESERVATIONS]: [C.ACCOMMODATION_ROOMS],
+  [C.ACCOMMODATION_STAYS]: [C.ACCOMMODATION_ROOMS],
+  [C.ACCOMMODATION_FOLIO]: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS, C.FINANCE],
+
+  [C.FOOD_RESERVATIONS]: [C.FOOD_TABLES],
+  [C.FOOD_ORDERS]: [C.FOOD_TABLES, C.FOOD_MENU],
+  [C.QR_MENU]: [C.FOOD_MENU],
+
+  [C.INVENTORY]: [C.CATALOG],
+  [C.SALES]: [C.CATALOG],
+  [C.RETAIL_BARCODE]: [C.CATALOG],
+  [C.RETAIL_PURCHASING]: [C.CATALOG, C.INVENTORY],
+  [C.RETAIL_LABELS]: [C.CATALOG]
+};
 
 export const CORE_BUSINESS_CAPABILITIES: BusinessCapability[] = [
   C.CUSTOMERS,
@@ -118,62 +145,112 @@ function uniqueCapabilities(...groups: BusinessCapability[][]): BusinessCapabili
   return [...new Set(groups.flat())];
 }
 
+export function getBusinessCapabilityDependencies(capability: BusinessCapability): readonly BusinessCapability[] {
+  return BUSINESS_CAPABILITY_DEPENDENCIES[capability] ?? [];
+}
+
+export function expandBusinessCapabilities(capabilities: Iterable<BusinessCapability>): BusinessCapability[] {
+  const expanded = new Set<BusinessCapability>(capabilities);
+  const pending = [...expanded];
+
+  while (pending.length > 0) {
+    const capability = pending.pop();
+    if (!capability) continue;
+    for (const dependency of getBusinessCapabilityDependencies(capability)) {
+      if (expanded.has(dependency)) continue;
+      expanded.add(dependency);
+      pending.push(dependency);
+    }
+  }
+
+  return [...expanded];
+}
+
+export function validateBusinessCapabilitySet(
+  capabilities: Iterable<BusinessCapability>
+): BusinessCapabilityDependencyViolation[] {
+  const enabled = new Set(capabilities);
+  const violations: BusinessCapabilityDependencyViolation[] = [];
+
+  for (const capability of enabled) {
+    const missingDependencies = getBusinessCapabilityDependencies(capability)
+      .filter((dependency) => !enabled.has(dependency));
+    if (missingDependencies.length > 0) {
+      violations.push({ capability, missingDependencies: [...missingDependencies] });
+    }
+  }
+
+  return violations;
+}
+
+export function getEnabledBusinessCapabilityDependents(
+  capability: BusinessCapability,
+  enabledCapabilities: Iterable<BusinessCapability>
+): BusinessCapability[] {
+  const enabled = [...new Set(enabledCapabilities)];
+  return enabled.filter((candidate) => {
+    if (candidate === capability) return false;
+    const closure = new Set(expandBusinessCapabilities([candidate]));
+    return closure.has(capability);
+  });
+}
+
 export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> = {
   pension_restaurant: {
     id: "pension_restaurant",
     label: "Pansiyon + Restoran/Kafe",
     description: "Konaklama ve yiyecek-içecek operasyonları aynı işletme omurgasında çalışır.",
     availability: "available",
-    defaultCapabilities: uniqueCapabilities(
+    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
       ACCOMMODATION_CAPABILITIES,
       FOOD_SERVICE_CAPABILITIES
-    )
+    ))
   },
   pension: {
     id: "pension",
     label: "Pansiyon",
     description: "Konaklama, müşteri, finans, web ve saha operasyonları için hazır profil.",
     availability: "available",
-    defaultCapabilities: uniqueCapabilities(
+    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
       ACCOMMODATION_CAPABILITIES
-    )
+    ))
   },
   restaurant: {
     id: "restaurant",
     label: "Restoran",
     description: "Masa, sipariş, menü, stok, satış ve saha operasyonları için hazır profil.",
     availability: "available",
-    defaultCapabilities: uniqueCapabilities(
+    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
       FOOD_SERVICE_CAPABILITIES
-    )
+    ))
   },
   cafe: {
     id: "cafe",
     label: "Kafe",
     description: "Restoran profilinin daha hafif kullanım biçimi; aynı yiyecek-içecek yeteneklerini kullanır.",
     availability: "available",
-    defaultCapabilities: uniqueCapabilities(
+    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
       FOOD_SERVICE_CAPABILITIES
-    )
+    ))
   },
   market: {
     id: "market",
     label: "Market / Perakende",
     description: "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için planlanan profil.",
     availability: "planned",
-    defaultCapabilities: uniqueCapabilities(
+    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
       RETAIL_CAPABILITIES
-    )
+    ))
   },
   other: {
     id: "other",
@@ -222,8 +299,8 @@ export function legacyModuleDefaultsForProfile(businessType: string): LegacyBusi
 
 /**
  * Transitional adapter for installations that still persist rooms/tables/etc.
- * The rest of the application can depend on capabilities now, while storage
- * can be migrated independently later.
+ * New runtime code should read business_capabilities directly. Keep this only
+ * until the legacy setup/storage projection is physically removed.
  */
 export function resolveBusinessCapabilities(input: {
   businessType: string;
@@ -249,12 +326,9 @@ export function resolveBusinessCapabilities(input: {
   if (modules.android) resolved.add(C.ANDROID);
   if (input.aiEnabled) resolved.add(C.AI);
 
-  // Market is the first profile that cannot be represented by the legacy
-  // room/table flags. Until capability persistence lands, make the domain
-  // semantics available from the profile id itself.
   if (normalizeBusinessType(input.businessType) === "market") {
     RETAIL_CAPABILITIES.forEach((capability) => resolved.add(capability));
   }
 
-  return [...resolved];
+  return expandBusinessCapabilities(resolved);
 }
