@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
@@ -25,6 +26,8 @@ export function useDesktopSync({
   const onDashboardLoadedRef = useRef(onDashboardLoaded);
   const [dashboardData, setDashboardData] = useState<DesktopDashboardData>(defaultDashboardData);
   const [businessCapabilities, setBusinessCapabilities] = useState<BusinessCapabilitySnapshot | null>(null);
+  const [businessCapabilityState, setBusinessCapabilityState] = useState<SyncState>("idle");
+  const [businessCapabilityMessage, setBusinessCapabilityMessage] = useState("İşletme yetenekleri profil varsayımlarını kullanıyor.");
   const [automaticSyncStatus, setAutomaticSyncStatus] = useState<AutomaticSyncStatus>(defaultAutomaticSyncStatus);
 
   onBootstrapSetupRef.current = onBootstrapSetup;
@@ -50,6 +53,52 @@ export function useDesktopSync({
     const snapshot = await bridge.getBusinessCapabilitySnapshot();
     setBusinessCapabilities(snapshot);
     return snapshot;
+  }, []);
+
+  const setRuntimeBusinessCapability = useCallback(async (capability: BusinessCapability, enabled: boolean) => {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.setBusinessCapability) {
+      setBusinessCapabilityState("error");
+      setBusinessCapabilityMessage("İşletme yetenekleri değiştirilemiyor. Uygulamayı yeniden başlatın.");
+      return undefined;
+    }
+
+    setBusinessCapabilityState("loading");
+    setBusinessCapabilityMessage(`${capability} ${enabled ? "açılıyor" : "kapatılıyor"}...`);
+    try {
+      const snapshot = await bridge.setBusinessCapability(capability, enabled);
+      setBusinessCapabilities(snapshot);
+      setBusinessCapabilityState("success");
+      setBusinessCapabilityMessage(`${capability} ${enabled ? "etkinleştirildi" : "kapatıldı"}.`);
+      return snapshot;
+    } catch (error) {
+      setBusinessCapabilityState("error");
+      setBusinessCapabilityMessage(error instanceof Error ? error.message : "İşletme yeteneği güncellenemedi.");
+      return undefined;
+    }
+  }, []);
+
+  const clearRuntimeBusinessCapabilityOverride = useCallback(async (capability: BusinessCapability) => {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.clearBusinessCapabilityOverride) {
+      setBusinessCapabilityState("error");
+      setBusinessCapabilityMessage("İşletme yeteneği profil varsayımına döndürülemiyor. Uygulamayı yeniden başlatın.");
+      return undefined;
+    }
+
+    setBusinessCapabilityState("loading");
+    setBusinessCapabilityMessage(`${capability} profil varsayımına döndürülüyor...`);
+    try {
+      const snapshot = await bridge.clearBusinessCapabilityOverride(capability);
+      setBusinessCapabilities(snapshot);
+      setBusinessCapabilityState("success");
+      setBusinessCapabilityMessage(`${capability} profil varsayımına döndürüldü.`);
+      return snapshot;
+    } catch (error) {
+      setBusinessCapabilityState("error");
+      setBusinessCapabilityMessage(error instanceof Error ? error.message : "İşletme yeteneği sıfırlanamadı.");
+      return undefined;
+    }
   }, []);
 
   useEffect(() => {
@@ -186,7 +235,11 @@ export function useDesktopSync({
     setDashboardData,
     businessCapabilities,
     setBusinessCapabilities,
+    businessCapabilityState,
+    businessCapabilityMessage,
     loadBusinessCapabilities,
+    setRuntimeBusinessCapability,
+    clearRuntimeBusinessCapabilityOverride,
     automaticSyncStatus,
     loadDashboardData,
     pullRequests
