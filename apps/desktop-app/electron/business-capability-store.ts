@@ -3,7 +3,9 @@ import {
   BUSINESS_CAPABILITIES,
   CORE_BUSINESS_CAPABILITIES,
   getBusinessProfile,
+  getEnabledBusinessCapabilityDependents,
   normalizeBusinessType,
+  validateBusinessCapabilitySet,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 
@@ -68,6 +70,21 @@ function readEnabledCapabilities(database: DatabaseSync, businessId: string) {
     `).all(businessId) as Array<{ capability_id?: unknown }>)
       .map((row) => String(row.capability_id ?? "") as BusinessCapability)
       .filter((capability) => KNOWN_CAPABILITIES.has(capability))
+  );
+}
+
+function formatCapabilityList(capabilities: Iterable<BusinessCapability>) {
+  return [...capabilities].join(", ");
+}
+
+function assertValidCapabilityState(database: DatabaseSync, businessId: string) {
+  const enabled = readEnabledCapabilities(database, businessId);
+  const violations = validateBusinessCapabilitySet(enabled);
+  if (violations.length === 0) return;
+
+  const first = violations[0];
+  throw new Error(
+    `${first.capability} yeteneği için gerekli yetenekler etkin değil: ${formatCapabilityList(first.missingDependencies)}.`
   );
 }
 
@@ -168,8 +185,9 @@ export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCa
 
 /**
  * Applies a profile as a preset, not as a permanent business type constraint.
- * User overrides survive by default, so profiles remain composable: a Market
- * can later enable accommodation.rooms without inventing "market_pension".
+ * User overrides survive by default, so profiles remain composable. Before the
+ * transaction commits the resulting set is dependency-validated; an orphaned
+ * override can never leave runtime in an internally inconsistent state.
  */
 export function applyBusinessProfileCapabilities(
   databasePath: string,
@@ -229,6 +247,7 @@ export function applyBusinessProfileCapabilities(
         );
       }
 
+      assertValidCapabilityState(database, businessId);
       syncLegacyProjection(database, businessId, now);
       database.exec("COMMIT");
     } catch (error) {
@@ -243,10 +262,9 @@ export function applyBusinessProfileCapabilities(
 }
 
 /**
- * Writes an explicit operator override. Core capabilities are deliberately
- * immutable here: disabling the common data/sync/backup foundation would make
- * domain profiles impossible to reason about. Domain/service capabilities can
- * be independently enabled or disabled without changing the selected profile.
+ * Writes an explicit operator override. Core capabilities are immutable. Domain
+ * capabilities may be composed freely, but a mutation is rejected when it
+ * would violate a declared capability dependency.
  */
 export function setBusinessCapability(
   databasePath: string,
@@ -266,6 +284,16 @@ export function setBusinessCapability(
     if (!businessId) throw new Error("Aktif işletme bulunamadı.");
     const now = new Date().toISOString();
 
+    const currentlyEnabled = readEnabledCapabilities(database, businessId);
+    if (!input.enabled) {
+      const dependents = getEnabledBusinessCapabilityDependents(input.capability, currentlyEnabled);
+      if (dependents.length > 0) {
+        throw new Error(
+          `${input.capability} kapatılamaz; şu etkin yetenekler buna bağlı: ${formatCapabilityList(dependents)}.`
+        );
+      }
+    }
+
     database.exec("BEGIN IMMEDIATE");
     try {
       database.prepare(`
@@ -277,6 +305,8 @@ export function setBusinessCapability(
           source = 'user',
           updated_at = excluded.updated_at
       `).run(businessId, input.capability, input.enabled ? 1 : 0, now, now);
+
+      assertValidCapabilityState(database, businessId);
       syncLegacyProjection(database, businessId, now);
       database.exec("COMMIT");
     } catch (error) {
@@ -321,6 +351,8 @@ export function clearBusinessCapabilityOverride(
           source = 'profile',
           updated_at = excluded.updated_at
       `).run(businessId, capability, profileDefaults.has(capability) ? 1 : 0, now, now);
+
+      assertValidCapabilityState(database, businessId);
       syncLegacyProjection(database, businessId, now);
       database.exec("COMMIT");
     } catch (error) {
