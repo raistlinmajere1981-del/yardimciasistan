@@ -11,7 +11,7 @@ import type { BusinessCapabilitySnapshot } from "../../electron/business-capabil
  * historical rooms/tables/QR boolean projection. The persisted capability
  * snapshot received from Electron is authoritative.
  */
-export function getEnabledBusinessCapabilities(
+function getEnabledBusinessCapabilities(
   snapshot: BusinessCapabilitySnapshot | null | undefined
 ): BusinessCapability[] {
   return snapshot?.enabledCapabilities ?? [];
