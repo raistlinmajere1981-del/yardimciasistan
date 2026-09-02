@@ -79,17 +79,19 @@ function auditFile(file) {
   const sourceFile = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, scriptKind(file));
   const normalizedFile = normalize(file);
   const isDesktopRenderer = normalizedFile.startsWith("apps/desktop-app/src/");
+  const isDesktopPreload = normalizedFile === "apps/desktop-app/electron/preload.ts";
   const isPackageSource = normalizedFile.startsWith("packages/");
 
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const specifier = node.moduleSpecifier.text;
       const resolved = resolveRelativeImport(file, specifier);
+      const typeOnly = importClauseIsTypeOnly(node.importClause);
 
       if (
         isDesktopRenderer
         && resolved?.includes("/apps/desktop-app/electron/")
-        && !importClauseIsTypeOnly(node.importClause)
+        && !typeOnly
       ) {
         report(
           file,
@@ -97,6 +99,16 @@ function auditFile(file) {
           sourceFile,
           "renderer-no-electron-runtime-import",
           "Renderer, Electron katmanından yalnız `import type` ile tip alabilir. Runtime erişimi preload/IPC üzerinden yapılmalı."
+        );
+      }
+
+      if (isDesktopPreload && !typeOnly && specifier !== "electron") {
+        report(
+          file,
+          node,
+          sourceFile,
+          "preload-no-runtime-app-import",
+          "Sandboxed preload yalnız Electron runtime modülünü yüklemeli; uygulama/package bağımlılıkları `import type` kalmalı ve runtime işi IPC ana sürecine taşınmalı."
         );
       }
 
