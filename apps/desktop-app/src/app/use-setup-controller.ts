@@ -5,7 +5,6 @@ import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import { defaultSetupData } from "./bootstrap-defaults";
 import { type SyncState } from "./runtime-state";
 import {
-  applyBusinessTypeProfile,
   createSaveAiServiceProfiles,
   toSetupForm,
   type SetupFormState
@@ -29,7 +28,10 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     setSetupFormState((current) => {
       const next = typeof nextState === "function" ? nextState(current) : nextState;
       if (next.businessType !== current.businessType) {
-        return applyBusinessTypeProfile(next, next.businessType);
+        return {
+          ...next,
+          ...legacyModuleDefaultsForProfile(next.businessType)
+        };
       }
       return next;
     });
