@@ -7,7 +7,7 @@ import { type SyncState } from "./runtime-state";
 import {
   createSaveAiServiceProfiles,
   toSetupForm,
-  type SetupFormState
+  type CapabilitySetupFormState
 } from "./setup-model";
 
 interface UseSetupControllerOptions {
@@ -17,24 +17,15 @@ interface UseSetupControllerOptions {
 export function useSetupController({ onInitialSetupReady }: UseSetupControllerOptions = {}) {
   const onInitialSetupReadyRef = useRef(onInitialSetupReady);
   const [setupData, setSetupData] = useState<DesktopSetupData>(defaultSetupData);
-  const [setupForm, setSetupFormState] = useState<SetupFormState>(() => toSetupForm(defaultSetupData));
+  const [setupForm, setSetupFormState] = useState<CapabilitySetupFormState>(() => toSetupForm(defaultSetupData));
   const [setupMode, setSetupMode] = useState(false);
   const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
   const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
 
-  const setSetupForm = useCallback<Dispatch<SetStateAction<SetupFormState>>>((nextState) => {
-    setSetupFormState((current) => {
-      const next = typeof nextState === "function" ? nextState(current) : nextState;
-      if (next.businessType !== current.businessType) {
-        return {
-          ...next,
-          ...legacyModuleDefaultsForProfile(next.businessType)
-        };
-      }
-      return next;
-    });
+  const setSetupForm = useCallback<Dispatch<SetStateAction<CapabilitySetupFormState>>>((nextState) => {
+    setSetupFormState(nextState);
   }, []);
 
   onInitialSetupReadyRef.current = onInitialSetupReady;
@@ -135,10 +126,9 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       return;
     }
 
-    // Domain workspaces are now profile/capability driven. The old setup IPC
-    // still requires module-shaped fields while database.ts is being split, so
-    // submit a canonical compatibility projection instead of treating the old
-    // room/table/QR checkboxes as an independent runtime source of truth.
+    // The controller no longer stores room/table/QR toggles. The old setup IPC
+    // still accepts module-shaped compatibility fields, so derive that projection
+    // only at the persistence boundary until database.ts is cut over as well.
     const profileModules = legacyModuleDefaultsForProfile(setupForm.businessType);
 
     const input: SaveInitialSetupInput = {
