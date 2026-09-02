@@ -208,7 +208,7 @@ export function useCustomerController({
     }
     setSyncState("loading");
     setStatusMessage("Müşteri oda kaydı oluşturuluyor...");
-    const result = await window.yardimciDesktop.assignCustomerToRoom(input);
+    const result = await window.yardimciDesktop.assignCustomerRoom(input);
     if (!result.ok) {
       setSyncState("error");
       setStatusMessage(result.message);
