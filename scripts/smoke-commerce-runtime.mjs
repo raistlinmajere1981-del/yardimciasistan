@@ -220,6 +220,14 @@ try {
   assert.equal(getCommerceRuntimeSnapshot(databasePath).suppliers.length, 0);
   assert.throws(() => listRuntimeSuppliers(databasePath), /tedarikçi/i);
   assert.throws(() => saveRuntimeSupplier(databasePath, { name: "Kapalı Tedarikçi" }), /tedarikçi/i);
+  assert.throws(
+    () => receiveRuntimePurchase(databasePath, {
+      supplierId: supplier.id,
+      items: [{ productId: product.id, quantity: 1, unitCost: 13 }]
+    }),
+    /tedarikçi/i
+  );
+  assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 9);
 
   const supplierlessPurchase = receiveRuntimePurchase(databasePath, {
     source: "runtime-purchase-smoke",
