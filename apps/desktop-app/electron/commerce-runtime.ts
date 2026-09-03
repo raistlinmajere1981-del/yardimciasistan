@@ -7,32 +7,34 @@ import {
   type InventoryBalance,
   type InventoryMovement
 } from "@yardimci-asistan/shared";
-import { assertPersistedBusinessCapability } from "./business-capability-runtime";
+import {
+  assertPersistedBusinessCapability,
+  hasPersistedBusinessCapability
+} from "./business-capability-runtime";
 import {
   applyInventoryMovement,
   createPaidCommerceSale,
+  findCatalogProductByBarcode,
   getCommerceStoreSnapshot,
   getInventoryBalance,
   listCatalogProducts,
+  listCommerceSuppliers,
+  listInventoryMovements,
   saveCatalogProduct,
   saveCommerceSupplier,
+  setInventoryCount,
   type ApplyInventoryMovementInput,
   type CommerceStoreSnapshot,
   type CreateCommerceSaleInput,
+  type ListCatalogProductsOptions,
+  type ListCommerceSuppliersOptions,
+  type ListInventoryMovementsOptions,
   type SaveCatalogProductInput,
-  type SaveCommerceSupplierInput
+  type SaveCommerceSupplierInput,
+  type SetInventoryCountInput
 } from "./commerce-store";
 
-export interface SetInventoryCountInput {
-  productId: string;
-  locationId?: string;
-  countedQuantity: number;
-  unitCost?: number;
-  referenceType?: string;
-  referenceId?: string;
-  note?: string;
-  actorSource?: string;
-}
+export type { SetInventoryCountInput };
 
 export interface InventoryCountResult {
   balance: InventoryBalance;
@@ -49,7 +51,25 @@ export function getCommerceRuntimeSnapshot(databasePath: string): CommerceStoreS
     BUSINESS_CAPABILITIES.CATALOG,
     "Ürün kataloğu bu işletmede etkin değil."
   );
-  return getCommerceStoreSnapshot(databasePath);
+  const snapshot = getCommerceStoreSnapshot(databasePath);
+  return {
+    products: snapshot.products,
+    suppliers: hasPersistedBusinessCapability(databasePath, BUSINESS_CAPABILITIES.RETAIL_SUPPLIERS)
+      ? snapshot.suppliers
+      : []
+  };
+}
+
+export function listRuntimeCatalogProducts(
+  databasePath: string,
+  options: ListCatalogProductsOptions = {}
+): CatalogProduct[] {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  return listCatalogProducts(databasePath, options);
 }
 
 export function saveRuntimeCatalogProduct(
@@ -84,6 +104,18 @@ export function getRuntimeInventoryBalance(
   return getInventoryBalance(databasePath, productId, locationId);
 }
 
+export function listRuntimeInventoryMovements(
+  databasePath: string,
+  options: ListInventoryMovementsOptions = {}
+): InventoryMovement[] {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.INVENTORY,
+    "Stok hareketleri bu işletmede etkin değil."
+  );
+  return listInventoryMovements(databasePath, options);
+}
+
 export function applyRuntimeInventoryMovement(
   databasePath: string,
   input: ApplyInventoryMovementInput
@@ -97,10 +129,8 @@ export function applyRuntimeInventoryMovement(
 }
 
 /**
- * A physical count is an absolute observation, not a delta entered by the UI.
- * Convert the counted quantity to an auditable `count` movement against the
- * current balance. When the count matches exactly, keep the balance unchanged
- * and avoid generating a meaningless zero movement.
+ * Physical count is an absolute observation. The store owns the read/delta/write
+ * transaction so a concurrent stock mutation cannot race between those steps.
  */
 export function setRuntimeInventoryCount(
   databasePath: string,
@@ -111,35 +141,7 @@ export function setRuntimeInventoryCount(
     BUSINESS_CAPABILITIES.INVENTORY,
     "Stok sayımı bu işletmede etkin değil."
   );
-
-  const countedQuantity = Number(input.countedQuantity);
-  if (!Number.isFinite(countedQuantity) || countedQuantity < 0) {
-    throw new Error("Sayım miktarı 0 veya daha büyük bir sayı olmalı.");
-  }
-
-  const current = getInventoryBalance(databasePath, input.productId, input.locationId);
-  const roundedCount = Math.round((countedQuantity + Number.EPSILON) * 10000) / 10000;
-  const quantityDelta = Math.round((roundedCount - current.quantity + Number.EPSILON) * 10000) / 10000;
-  if (quantityDelta === 0) {
-    return { balance: current, movement: null };
-  }
-
-  const movement = applyInventoryMovement(databasePath, {
-    productId: input.productId,
-    locationId: current.locationId,
-    type: "count",
-    quantityDelta,
-    unitCost: input.unitCost,
-    referenceType: input.referenceType || "inventory_count",
-    referenceId: input.referenceId,
-    note: input.note || `Fiziksel sayım: ${roundedCount}`,
-    actorSource: input.actorSource || "desktop"
-  });
-
-  return {
-    movement,
-    balance: getInventoryBalance(databasePath, input.productId, current.locationId)
-  };
+  return setInventoryCount(databasePath, input);
 }
 
 export function findRuntimeProductByBarcode(
@@ -151,13 +153,7 @@ export function findRuntimeProductByBarcode(
     BUSINESS_CAPABILITIES.RETAIL_BARCODE,
     "Barkod işlemleri bu işletmede etkin değil."
   );
-  const barcode = String(barcodeInput ?? "").trim();
-  if (!barcode) {
-    throw new Error("Barkod boş olamaz.");
-  }
-
-  return listCatalogProducts(databasePath)
-    .find((product) => product.isActive && product.barcode === barcode) ?? null;
+  return findCatalogProductByBarcode(databasePath, barcodeInput);
 }
 
 export function createRuntimePaidSale(
@@ -170,6 +166,18 @@ export function createRuntimePaidSale(
     "Satış işlemleri bu işletmede etkin değil."
   );
   return createPaidCommerceSale(databasePath, input);
+}
+
+export function listRuntimeSuppliers(
+  databasePath: string,
+  options: ListCommerceSuppliersOptions = {}
+): CommerceSupplier[] {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.RETAIL_SUPPLIERS,
+    "Tedarikçi yönetimi bu işletmede etkin değil."
+  );
+  return listCommerceSuppliers(databasePath, options);
 }
 
 export function saveRuntimeSupplier(
