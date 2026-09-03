@@ -1,5 +1,10 @@
-import type { ComponentProps } from "react";
-import { BUSINESS_CAPABILITIES, hasBusinessCapability } from "@yardimci-asistan/shared";
+import { useEffect, useRef, type ComponentProps } from "react";
+import {
+  BUSINESS_CAPABILITIES,
+  getAvailableBusinessProfiles,
+  getBusinessProfile,
+  hasBusinessCapability
+} from "@yardimci-asistan/shared";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import type { CapabilitySetupFormState, SetupFormState } from "../../app/setup-model";
 import {
@@ -25,6 +30,7 @@ type SetupWizardProps = Omit<LegacySetupWizardProps, "form" | "onFormChange"> & 
  */
 export function SetupWizard(props: SetupWizardProps) {
   const capabilityRuntime = useBusinessCapabilityRuntime();
+  const setupRootRef = useRef<HTMLDivElement>(null);
   const effectiveCapabilities = getEffectiveSetupCapabilities(
     props.form.businessType,
     capabilityRuntime.snapshot
@@ -37,6 +43,40 @@ export function SetupWizard(props: SetupWizardProps) {
     qrMenuEnabled: hasBusinessCapability(effectiveCapabilities, C.QR_MENU)
   };
 
+  useEffect(() => {
+    // LegacySetupWizard still owns the visual identity form and its onChange
+    // handler, but its sector options predate the capability/profile registry.
+    // Keep that large component stable while projecting the authoritative
+    // available profile list into its select. Existing installations using a
+    // now-planned profile keep their current value so settings never go blank.
+    const selector = setupRootRef.current?.querySelector<HTMLSelectElement>(
+      ".settings-identity-section > .setup-grid.two > label:nth-child(2) select"
+    );
+    if (!selector) return;
+
+    const availableProfiles = getAvailableBusinessProfiles();
+    const currentProfile = getBusinessProfile(props.form.businessType);
+    const profiles = availableProfiles.some((profile) => profile.id === currentProfile.id)
+      ? availableProfiles
+      : [...availableProfiles, currentProfile];
+    const nextSignature = profiles.map((profile) => `${profile.id}:${profile.label}`).join("|");
+    const currentSignature = Array.from(selector.options)
+      .map((option) => `${option.value}:${option.textContent ?? ""}`)
+      .join("|");
+
+    if (nextSignature !== currentSignature) {
+      const fragment = document.createDocumentFragment();
+      for (const profile of profiles) {
+        const option = document.createElement("option");
+        option.value = profile.id;
+        option.textContent = profile.label;
+        fragment.appendChild(option);
+      }
+      selector.replaceChildren(fragment);
+    }
+    selector.value = currentProfile.id;
+  }, [props.form.businessType]);
+
   const handleLegacyFormChange: LegacySetupWizardProps["onFormChange"] = (nextForm) => {
     const {
       roomsEnabled: _roomsEnabled,
@@ -48,7 +88,7 @@ export function SetupWizard(props: SetupWizardProps) {
   };
 
   return (
-    <div className="setup-capability-v2">
+    <div className="setup-capability-v2" ref={setupRootRef}>
       <LegacySetupWizard
         {...props}
         form={capabilityForm}
