@@ -1,0 +1,168 @@
+.market-label-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.8fr) minmax(0, 1.2fr);
+  gap: var(--space-4);
+}
+
+.market-label-controls {
+  align-self: start;
+}
+
+.market-label-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius:var(--radius-md);
+  background: var(--surface-1);
+}
+
+.market-label-product-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(100px, 0.8fr) minmax(120px, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius:var(--radius-md);
+  background: var(--surface-1);
+}
+
+.market-label-product-summary > span {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.market-label-product-summary small,
+.market-label-adapters small,
+.market-label-preview-message {
+  color: var(--ink-muted);
+}
+
+.market-label-product-summary strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-label-warning {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--warning-line);
+  border-radius:var(--radius-md);
+  background: var(--warning-soft);
+  color: var(--warning-ink);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.market-label-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.market-label-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 42px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--primary-border);
+  border-radius:var(--radius-md);
+  background: var(--primary-solid);
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.market-label-actions button:disabled {
+  opacity: 0.55;
+}
+
+.market-label-adapters {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.market-label-adapter-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.market-label-adapter-heading svg {
+  color: var(--primary);
+}
+
+.market-label-adapter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.market-label-preview-panel {
+  align-self: start;
+}
+
+.market-label-preview-panel .market-panel-heading-row > svg {
+  color: var(--ink-muted);
+}
+
+.market-label-preview-stage {
+  display: grid;
+  place-items: center;
+  min-height: 420px;
+  padding: var(--space-6);
+  border: 1px dashed var(--border-strong);
+  border-radius:var(--radius-lg);
+  background: var(--surface-1);
+  overflow: auto;
+}
+
+.market-label-preview-stage img {
+  display: block;
+  max-width: 100%;
+  max-height: 520px;
+  object-fit: contain;
+  box-shadow:var(--shadow-md);
+}
+
+.market-label-preview-empty {
+  display: grid;
+  place-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.market-label-preview-empty svg {
+  color: var(--primary);
+}
+
+.market-label-preview-message {
+  display: block;
+  min-height: 20px;
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 1120px) {
+  .market-label-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .market-label-preview-stage {
+    min-height: 340px;
+  }
+}
+
+@media (max-width: 720px) {
+  .market-label-options,
+  .market-label-product-summary,
+  .market-label-actions {
+    grid-template-columns: 1fr;
+  }
+}
