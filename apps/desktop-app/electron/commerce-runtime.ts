@@ -3,6 +3,8 @@ import {
   type BusinessCapability,
   type CatalogCategory,
   type CatalogProduct,
+  type CommercePurchaseOrder,
+  type CommercePurchaseOrderDetail,
   type CommerceSale,
   type CommerceSupplier,
   type InventoryBalance,
@@ -21,6 +23,13 @@ import {
   type ListCatalogCategoriesOptions,
   type SaveCatalogCategoryInput
 } from "./commerce-category-store";
+import {
+  getCommercePurchaseOrder,
+  listCommercePurchaseOrders,
+  receiveCommercePurchase,
+  type ListCommercePurchaseOrdersOptions,
+  type ReceiveCommercePurchaseInput
+} from "./commerce-purchase-store";
 import {
   applyInventoryMovement,
   createPaidCommerceSale,
@@ -44,7 +53,7 @@ import {
   type SetInventoryCountInput
 } from "./commerce-store";
 
-export type { SetInventoryCountInput };
+export type { ReceiveCommercePurchaseInput, SetInventoryCountInput };
 
 export interface InventoryCountResult {
   balance: InventoryBalance;
@@ -254,4 +263,40 @@ export function saveRuntimeSupplier(
     "Tedarikçi yönetimi bu işletmede etkin değil."
   );
   return saveCommerceSupplier(databasePath, input);
+}
+
+export function listRuntimePurchaseOrders(
+  databasePath: string,
+  options: ListCommercePurchaseOrdersOptions = {}
+): CommercePurchaseOrder[] {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.RETAIL_PURCHASING,
+    "Satın alma yönetimi bu işletmede etkin değil."
+  );
+  return listCommercePurchaseOrders(databasePath, options);
+}
+
+export function getRuntimePurchaseOrder(
+  databasePath: string,
+  purchaseOrderId: string
+): CommercePurchaseOrderDetail | null {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.RETAIL_PURCHASING,
+    "Satın alma yönetimi bu işletmede etkin değil."
+  );
+  return getCommercePurchaseOrder(databasePath, purchaseOrderId);
+}
+
+export function receiveRuntimePurchase(
+  databasePath: string,
+  input: ReceiveCommercePurchaseInput
+): CommercePurchaseOrderDetail {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.RETAIL_PURCHASING,
+    "Satın alma ve stok girişi bu işletmede etkin değil."
+  );
+  return receiveCommercePurchase(databasePath, input);
 }
