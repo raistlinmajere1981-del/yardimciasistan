@@ -12,7 +12,8 @@ const marketPage = read("apps/desktop-app/src/pages/MarketPage.tsx");
 const marketProducts = read("apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx");
 const marketInventory = read("apps/desktop-app/src/components/market/MarketInventoryWorkspace.tsx");
 const marketPurchasing = read("apps/desktop-app/src/components/market/MarketPurchasingWorkspace.tsx");
-const marketSource = [marketPage, marketProducts, marketInventory, marketPurchasing].join("\n");
+const marketLabels = read("apps/desktop-app/src/components/market/MarketLabelsWorkspace.tsx");
+const marketSource = [marketPage, marketProducts, marketInventory, marketPurchasing, marketLabels].join("\n");
 const preload = read("apps/desktop-app/electron/preload.ts");
 
 assert.match(navigation, /\| "market" \|/, "DesktopPage must include the market route.");
