@@ -1,12 +1,38 @@
 # Yardımcı Asistan
 
-Yardımcı Asistan; pansiyon, restoranlı pansiyon, restoran ve kafe gibi küçük işletmeler için tasarlanan sade, modüler ve local-first bir dijital işletme asistanıdır.
+Yardımcı Asistan; **tek lokasyonlu küçük fiziksel işletmeler** için tasarlanan modüler, local-first bir işletme sistemidir. İlk çalışan ürün pansiyon/restoran/kafe akışlarıyla olgunlaştı; mimari artık sektör tipine değil persisted **business capability** setine göre çalışma alanlarını açar. Market/perakende, bu ortak çekirdek üzerine eklenecek sıradaki sektördür.
 
-Sistem; web sitesi veya gömülebilir web widget, firma hostinginde çalışan mini API, PC masaüstü uygulaması, Android companion, AI araçları, WhatsApp destek akışları ve QR menüden oluşur. v1 merkezi bir cloud servisine bağımlı değildir; her firma kendi hostingi, kendi PC uygulaması ve kendi verisiyle bağımsız çalışır.
+Sistem; web sitesi veya gömülebilir web widget, firma hostinginde çalışan mini API, PC masaüstü uygulaması, Android companion, AI araçları, WhatsApp destek akışları ve sektör çalışma alanlarından oluşur. Merkezi bir cloud servisi zorunlu değildir; her firma kendi hostingi, kendi PC uygulaması ve kendi verisiyle bağımsız çalışabilir.
 
-## v1 Ürün Omurgası
+## Ürün Mimarisi
 
-Güncel v1 aşağıdaki ana akışları kapsar:
+Canonical yön:
+
+```text
+Business
+  ↓
+Profile = ilk kurulum preset'i
+  ↓
+Persisted Capabilities = runtime source of truth
+  ↓
+Workspaces / Services / Devices
+```
+
+Profil bir sınıf değildir. Hibrit işletmeler yeni `businessType` kombinasyonları üreterek değil capability ekleyip çıkararak oluşur.
+
+Ortak çekirdek; müşteri, görev/takvim, bildirim, finans, rapor, web, senkron, yedekleme ve cihaz yönetimini taşır. Sektör domain'leri bunun üzerine eklenir:
+
+```text
+accommodation.*
+food_service.*
+commerce.*
+retail.*
+channel.qr_menu
+```
+
+Ayrıntılı ve güncel mimari sözleşme için [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) esas alınmalıdır.
+
+## Çalışan Ürün Omurgası
 
 - Web formu ve Web AI üzerinden müşteri talebi toplama
 - Firma hostingi ile masaüstü arasında local-first otomatik senkronizasyon
@@ -17,39 +43,89 @@ Güncel v1 aşağıdaki ana akışları kapsar:
 - QR menü yayınlama
 - Günlük/haftalık operasyon takvimi
 - Basit ön muhasebe ve raporlar
-- AI destekli cevap, özet, rapor ve görselden stok/kimlik alanı çıkarımı
+- AI destekli cevap, özet, rapor ve görselden veri çıkarımı
 - WhatsApp hazır mesaj, manuel akış ve Electron içi WhatsApp Web çalışma alanı
 - Android companion, cihaz rolleri ve görev bazlı yetkiler
 - Uygulama kilidi, yerel yedekleme ve masaüstü paketleme altyapısı
 
-AI, WhatsApp veya internet bağlantısı sistemin tamamı için tek hata noktası değildir. AI kapalıyken temel operasyonlar devam eder; WhatsApp çalışmazsa talepler ve rezervasyonlar yönetilebilir; internet yokken masaüstü yerel verisiyle çalışmaya devam eder ve bağlantı geri geldiğinde kuyruklar yeniden senkronize edilir.
+AI, WhatsApp veya internet bağlantısı sistemin tamamı için tek hata noktası değildir. Masaüstü temel operasyonları yerel SQLite ile sürdürebilir; bağlantı geri geldiğinde kuyruklar yeniden senkronize edilir.
 
 ## Ana Bileşenler
 
 - `apps/demo-web`: Web sitesi olmayan firmalar için özelleştirilebilir demo site.
 - `apps/desktop-app`: İşletmenin ana yönetim merkezi olan Electron + React uygulaması.
 - `apps/android-app`: Hızlı takip ve yetkili saha işlemleri için native Android companion.
-- `packages/shared`: Uygulamalarda ortak kullanılan veri tipleri ve yardımcı fonksiyonlar.
-- `packages/web-widget`: Mevcut web sitelerine tek script ile eklenebilen widget.
+- `packages/shared`: Ortak tipler, capability registry ve domain sözleşmeleri.
+- `packages/web-widget`: Mevcut web sitelerine eklenebilen widget.
 - `packages/ai-core`: Provider bağımsız AI adapter ve prompt altyapısı.
 - `packages/whatsapp-bridge`: WhatsApp link, manuel kopyalama ve WebView akışları.
-- `packages/sync-core`: Firma hostingi ile PC uygulaması arasındaki veri alışverişi.
+- `packages/sync-core`: Firma hostingi ile PC/Android arasındaki taşıma sözleşmeleri.
 - `firm-template/web-module`: Firma hostingine kurulacak PHP + SQLite mini API ve web modülü.
-- `firm-template/knowledge`: Web AI için firma bilgi dosyası örnekleri.
-- `firm-template/config`: Firma kurulum ayarları için şablon dosyalar.
+
+## Capability-first Runtime
+
+Gerçek çalışma alanı kaynağı masaüstü SQLite içindeki `business_capabilities` tablosudur.
+
+Çekirdek capability örnekleri:
+
+```text
+core.customers
+core.tasks
+core.calendar
+core.finance
+core.reports
+core.web
+core.sync
+core.backups
+core.devices
+```
+
+Sektör capability örnekleri:
+
+```text
+accommodation.rooms
+accommodation.folio
+food_service.tables
+food_service.orders
+food_service.menu
+commerce.catalog
+commerce.inventory
+commerce.sales
+retail.barcode
+retail.suppliers
+retail.labels
+```
+
+`businessType` yalnız profil/preset bilgisidir; yeni runtime feature gate'leri `businessType === ...` şeklinde yazılmamalıdır.
+
+## Commerce / Market Temeli
+
+Market UI henüz normal ürün akışına açılmamıştır; ancak sektör bağımsız commerce omurgası hazırdır:
+
+```text
+catalog_categories
+catalog_products
+inventory_locations
+inventory_balances
+inventory_movements
+commerce_suppliers
+purchase_orders
+purchase_order_items
+commerce_sales
+commerce_sale_items
+```
+
+`apps/desktop-app/electron/commerce-runtime.ts`, katalog/stok/satış/barkod/tedarikçi işlemlerini persisted capability'lerle korur. Market MVP'nin UI ve cihaz adapter aşaması sonraki geliştirme fazıdır.
 
 ## Ana Müşteri Talep Akışı
-
-Güncel akışta WhatsApp zorunlu değildir:
 
 1. Müşteri web sitesindeki formu doldurur veya Web AI ile konuşur.
 2. Talep önce firma hostingindeki mini API'ye kaydedilir.
 3. Müşteriye talebin işletmeye iletildiği onayı gösterilir.
-4. İsterse ayrıca `WhatsApp'tan da yaz` seçeneğini kullanabilir.
+4. İsterse ayrıca WhatsApp iletişim yolunu kullanabilir.
 5. Masaüstü uygulaması talebi otomatik senkronizasyonla çeker.
 6. İşletme sahibi talebi, müşteriyi ve varsa rezervasyon akışını tek yerde görür.
 7. AI cevap taslağı hazırlayabilir; gönderim kararı kullanıcıda kalır.
-8. İşletme sahibi arama veya WhatsApp üzerinden müşteriye döner.
 
 ```text
 Web form / Web AI
@@ -65,88 +141,79 @@ QR menü + Android operasyon snapshot'ı
 
 - PC'ye internetten port açılmaz; masaüstü bağlantıyı dışarı doğru kurar.
 - API ve AI anahtarları web frontend'ine veya Android cevaplarına çıkarılmaz.
-- Masaüstündeki AI anahtarı renderer'a geri verilmeden işletim sistemi güvenli saklama alanıyla korunur.
-- Hostingdeki `config/`, `data/` ve `knowledge/` dizinleri doğrudan web erişimine kapatılır.
-- Web talebi ve Web AI gibi müşteriye açık yazma uçlarında sunucu tarafı hız/boyut sınırı bulunur; ham istemci IP adresi diske yazılmaz.
-- Yeni görülen Android cihazlar varsayılan olarak pasif/onay bekler durumdadır. Masaüstünden açıkça onaylanmadan operasyon verisini okuyamaz veya yerel işletme verisini değiştiremez.
-- Onaylanan Android cihaz yeni hosting paketinde cihaz başına kişisel token'a geçer; release/pilot APK işletme genel `sync_secret` değerini binary içine gömmez.
+- Masaüstündeki AI anahtarı renderer'a başlangıç verisi olarak verilmez.
+- Hostingdeki gizli/runtime dizinler doğrudan web erişimine kapatılır.
+- Public yazma/AI uçlarında sunucu tarafı hız ve gövde boyutu sınırları bulunur.
+- Yeni Android cihaz varsayılan olarak pasif/onay bekler durumundadır.
 - Android işlemleri action ID, cihaz kimliği, izin, stale-version ve receipt/idempotency kontrollerinden geçer.
-- Müşteri kimlik görseli kalıcı saklanmaz; analiz sırasında geçici dosya olarak kullanılır ve sonuç kullanıcı kontrolüne sunulur.
+- Renderer → preload/IPC → Electron main katman sınırı architecture audit ile korunur.
 
-Ayrıntılı güvenlik ve veri akışı için [Sistem Mimarisi](docs/ARCHITECTURE.md), [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md) ve [Pre-Pilot Sertleştirme](docs/PRE_PILOT_HARDENING_2026-08.md) belgeleri esas alınmalıdır.
+## Kalite Kapıları
 
-## Dokümanlar
+Repo artık yalnız build/test ile kontrol edilmez.
 
-- [Proje Özeti](docs/PROJECT_BRIEF.md)
-- [Sistem Mimarisi](docs/ARCHITECTURE.md)
-- [Otomatik Senkronizasyon](docs/AUTOMATIC_SYNC.md)
-- [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md)
-- [Pre-Pilot Sertleştirme](docs/PRE_PILOT_HARDENING_2026-08.md)
-- [Pilot Saha Testi](docs/PILOT_FIELD_TEST.md)
-- [Güncel Görev Planı](docs/TASKS.md)
-- [Veri Modeli](docs/DATA_MODEL.md)
-- [Event Sistemi](docs/EVENTS.md)
-- [UI Kuralları](docs/UI_RULES.md)
-- [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
-- [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
-- [Firma Web Modülü Kurulumu](docs/WEB_MODULE_INSTALLATION.md)
-- [Demo Site Özelleştirme](docs/DEMO_SITE_CUSTOMIZATION.md)
-- [Android Dağıtımı](docs/ANDROID_DISTRIBUTION.md)
-- [Platform Test Planı](docs/dev/PLATFORM_TEST_PLAN.md)
-- [Desktop Installer Hazırlık Planı](docs/dev/DESKTOP_INSTALLER_PLAN.md)
-- [İlk Uçtan Uca Demo Akışı](docs/dev/END_TO_END_DEMO_FLOW.md)
+```text
+ESLint
+Knip
+Design system debt audit
+Architecture audit
+TypeScript
+Workspace tests
+Capability/commerce smoke testleri
+```
+
+Günlük kalite kontrolü:
+
+```bash
+npm run quality:strict
+```
+
+Capability-first ve commerce temelinin tam checkpoint'i:
+
+```bash
+node scripts/check-modular-foundation.mjs
+```
+
+Başarı çıktısı:
+
+```text
+modular-foundation-check-ok
+```
+
+Bu runner build, quality gate ve aşağıdaki kritik sözleşmeleri birlikte doğrular:
+
+```text
+business-capabilities-smoke-ok
+capability-runtime-v2-smoke-ok
+setup-capability-contract-smoke-ok
+commerce-foundation-smoke-ok
+commerce-runtime-smoke-ok
+```
 
 ## Geliştirici Komutları
 
-Temel kontrol hattı:
+Kurulum ve genel build:
 
 ```bash
 npm install
 npm run build
-npm run doctor
+npm run typecheck
 npm test
-npm run e2e
 ```
 
-Pilot öncesi tek komutluk temel kapı:
-
-```bash
-node scripts/pilot-check.mjs
-```
-
-Daha geniş, Android build + UI/e2e katmanını da isteyen tur:
-
-```bash
-node scripts/pilot-check.mjs --full
-```
-
-Pilot runner sonucu `artifacts/pilot-check/latest.json` içine de yazar. Gerçek Windows/telefon adımları için [Pilot Saha Testi](docs/PILOT_FIELD_TEST.md) izlenmelidir.
-
-Önemli smoke testleri:
-
-```bash
-npm run smoke:web-form-api
-npm run smoke:automatic-sync
-npm run smoke:android-device-approval-hosting
-npm run smoke:customer-room-management
-npm run smoke:stock-image-analysis
-npm run smoke:demo-flow
-npm run smoke:local-lab
-```
-
-Linux'ta web modülü ve demo web sayfasını birlikte denemek için:
-
-```bash
-npm run dev:local
-```
-
-Desktop uygulamayı ayrı pencerede denemek için:
+Desktop:
 
 ```bash
 npm run dev:desktop
 ```
 
-Android geliştirme ve bağlı cihaz kontrolleri:
+Daha geniş Linux doğrulaması:
+
+```bash
+npm run check:linux
+```
+
+Android geliştirme:
 
 ```bash
 npm run android:install
@@ -156,31 +223,35 @@ npm run smoke:android-device-ui
 npm run android:mirror
 ```
 
-`android:install`, debug APK'yı derleyip USB hata ayıklaması açık bağlı telefona
-kurar; uygulama zaten kuruluysa verisini koruyarak günceller. Birden fazla cihaz
-için `-- --serial <cihaz-serisi>`, imzalı pilot APK için `-- --release` eklenebilir.
-
-Daha geniş Linux doğrulama hattı:
+Showcase runtime:
 
 ```bash
-npm run check:linux
+npm run showcase:data:prepare
+npm run showcase:data:reset
+YA_DESKTOP_DATA_DIR="$PWD/.demo-runtime/pension-restaurant" npm run dev:desktop
 ```
+
+## Dokümanlar
+
+- [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md)
+- [Proje Özeti](docs/PROJECT_BRIEF.md)
+- [Sistem Mimarisi](docs/ARCHITECTURE.md)
+- [Güncel Ürün Durumu](docs/PRODUCT_STATUS.md)
+- [Güncel Görev Planı](docs/TASKS.md)
+- [Veri Modeli](docs/DATA_MODEL.md)
+- [Otomatik Senkronizasyon](docs/AUTOMATIC_SYNC.md)
+- [Pilot Saha Testi](docs/PILOT_FIELD_TEST.md)
+- [UI Kuralları](docs/UI_RULES.md)
+- [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
+- [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
+- [Firma Web Modülü Kurulumu](docs/WEB_MODULE_INSTALLATION.md)
+- [Demo Site Özelleştirme](docs/DEMO_SITE_CUSTOMIZATION.md)
+- [Android Dağıtımı](docs/ANDROID_DISTRIBUTION.md)
 
 ## Güncel Geliştirme Aşaması
 
-Yeni v1 özellikleri eklemek yerine ürün sertleştirme ve saha doğrulama aşamasındadır.
+Pansiyon/restoran showcase omurgası ve capability-first modüler altyapı oluşturulmuştur. Market/perakende sıradaki sektör çalışma alanıdır.
 
-Kod tarafında demo web, web widget, PHP hosting modülü, masaüstü operasyon merkezi, Android companion, local-first senkron, QR menü, AI araçları, WhatsApp çalışma alanı, rezervasyon/oda/masa yönetimi, stok, oda folyosu ve basit finans omurgası bulunmaktadır.
+Market geliştirmesi başlamadan önce `node scripts/check-modular-foundation.mjs` yeşil olmalıdır. Market için planlanan sıra, veri modeli, capability kararları, barkod/etiket cihaz abstraction'ı ve MVP sınırı [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) içinde kayıtlıdır.
 
-Tanıtım/pilot öncesindeki ana doğrulama başlıkları:
-
-- otomatik `pilot-check` kapısının yeşil tamamlanması,
-- hedef Windows bilgisayarda temiz kurulum, kullanıcı veri klasörü, yedekleme ve yeniden başlatma davranışı,
-- WhatsApp WebView ve gerçek hosting bağlantısının Windows saha testi,
-- pansiyon + restoran senaryosunun sahte verilerle birkaç günlük gerçekçi kullanımı,
-- internet kesilmesi, tekrar bağlanma, yeniden başlatma ve tekrarlı işlem kenar durumları,
-- restoran hesabını oda hesabına aktarırken stok/kasa/idempotency bütünlüğü,
-- Android yeni cihaz onay, kişisel token, pasifleştirme ve yetki akışının gerçek telefonlarla doğrulanması,
-- pilot işletmelerden gelen UX geri bildirimlerinin toplu değerlendirilmesi.
-
-Doğrudan Android-PC/LAN modu ve resmî WhatsApp API entegrasyonu v1 tamamlanma kriteri değildir; gerçek kullanım ihtiyacı oluşursa sonraki fazda değerlendirilecektir.
+Eski `modules_json`, `rooms_enabled`, `tables_enabled`, `qr_menu_enabled` gibi alanlar bazı backend compatibility yollarında geçici olarak bulunabilir; yeni kod bunları source of truth kabul etmez. Fiziksel kaldırma işi, büyük setup persistence katmanı daha küçük servislere ayrılırken yapılacaktır ve yeni Market kodu bu alanlara bağlanmayacaktır.
