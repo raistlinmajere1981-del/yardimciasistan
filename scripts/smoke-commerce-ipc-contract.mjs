@@ -34,12 +34,12 @@ const channels = [
 
 for (const channel of channels) {
   assert.equal(
-    ipcSource.split(`\"${channel}\"`).length - 1,
+    ipcSource.split(`"${channel}"`).length - 1,
     1,
     `Commerce IPC handler must register ${channel} exactly once.`
   );
   assert.equal(
-    preloadSource.split(`\"${channel}\"`).length - 1,
+    preloadSource.split(`"${channel}"`).length - 1,
     1,
     `Commerce preload bridge must invoke ${channel} exactly once.`
   );
@@ -91,7 +91,7 @@ for (const forbiddenImport of [
   "./commerce-purchase-store"
 ]) {
   assert.equal(
-    ipcSource.includes(`from \"${forbiddenImport}\"`),
+    ipcSource.includes(`from "${forbiddenImport}"`),
     false,
     `Commerce IPC must not bypass commerce-runtime via ${forbiddenImport}.`
   );
