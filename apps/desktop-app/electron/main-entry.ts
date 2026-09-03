@@ -9,6 +9,7 @@ import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
 import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 import { registerBusinessCapabilityIpcHandlers } from "./business-capability-ipc";
+import { registerCommerceIpcHandlers } from "./commerce-ipc";
 import {
   assertPersistedBusinessCapability,
   hasPersistedBusinessCapability
@@ -132,17 +133,18 @@ if (pendingMaintenanceKind === "restore") {
 const mainProcessReady = import("./main");
 
 // Ana Electron süreci mevcut main.ts içinde kurulmaya devam eder. Finans, oda
-// hesabı, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı testi
-// IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı migration'larından sonra yapılır.
+// hesabı, commerce, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı
+// testi IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı migration'larından
+// sonra yapılır.
 void mainProcessReady.then(() => app.whenReady()).then(() => {
   setImmediate(() => {
     const databasePath = () => path.join(userDataPath(), "yardimci-asistan.sqlite");
 
     const publishCommittedMutation = () => {
-      // Finance/folio services use their own short-lived SQLite connection and
-      // therefore cannot reach main.ts's in-memory SyncCoordinator directly.
-      // Queue Android publication only when the persisted runtime capability is
-      // enabled; legacy settings booleans are no longer consulted here.
+      // Short-lived domain services cannot reach main.ts's in-memory
+      // SyncCoordinator directly. Queue Android publication only when the
+      // persisted runtime capability is enabled; legacy settings booleans are
+      // no longer consulted here.
       const database = new DesktopDatabase({
         appPath: app.getAppPath(),
         userDataPath: userDataPath()
@@ -188,6 +190,14 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
         BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO,
         "Oda hesabı bu işletme profilinde etkin değil."
       ),
+      onMutation: publishCommittedMutation
+    });
+
+    registerCommerceIpcHandlers({
+      databasePath,
+      // Commerce runtime performs capability checks. Renderer access remains
+      // behind the same app-lock-aware preload bridge used by finance/folio.
+      assertUnlocked: () => undefined,
       onMutation: publishCommittedMutation
     });
 
