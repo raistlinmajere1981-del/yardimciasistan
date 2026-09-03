@@ -18,6 +18,12 @@ export type InventoryMovementType =
   | "return_in"
   | "return_out";
 
+export type CommercePurchaseOrderStatus =
+  | "draft"
+  | "ordered"
+  | "received"
+  | "cancelled";
+
 export interface CatalogCategory {
   id: string;
   businessId: string;
@@ -123,4 +129,36 @@ export interface CommerceSupplier {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CommercePurchaseOrder {
+  id: string;
+  businessId: string;
+  supplierId: string;
+  status: CommercePurchaseOrderStatus;
+  orderedAt: string;
+  receivedAt: string;
+  subtotal: number;
+  total: number;
+  currency: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommercePurchaseOrderItem {
+  id: string;
+  purchaseOrderId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitCost: number;
+  lineTotal: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommercePurchaseOrderDetail {
+  order: CommercePurchaseOrder;
+  items: CommercePurchaseOrderItem[];
 }
