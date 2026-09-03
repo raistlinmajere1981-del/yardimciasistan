@@ -20,13 +20,13 @@ test("restaurant profile resolves from capabilities instead of renderer-specific
   });
 });
 
-test("market profile exists as planned retail foundation without accommodation coupling", () => {
+test("market profile is available as retail foundation without accommodation coupling", () => {
   const market = BUSINESS_PROFILES.market;
-  assert.equal(market.availability, "planned");
+  assert.equal(market.availability, "available");
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.RETAIL_BARCODE), true);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.INVENTORY), true);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.ACCOMMODATION_ROOMS), false);
-  assert.equal(getAvailableBusinessProfiles().some((profile) => profile.id === "market"), false);
+  assert.equal(getAvailableBusinessProfiles().some((profile) => profile.id === "market"), true);
 });
 
 test("legacy persisted flags can be translated once at the capability boundary", () => {
