@@ -1,4 +1,4 @@
-import { Archive, Boxes, Printer, ShoppingBasket, Tags, Truck, type LucideIcon } from "lucide-react";
+import { Archive, Boxes, ShoppingBasket, Tags, Truck, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
@@ -9,6 +9,7 @@ import {
 import { runtimeHasCapability } from "../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../app/business-capability-context";
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
+import { MarketLabelsWorkspace } from "../components/market/MarketLabelsWorkspace";
 import { MarketProductsWorkspace } from "../components/market/MarketProductsWorkspace";
 import { MarketPurchasingWorkspace } from "../components/market/MarketPurchasingWorkspace";
 import { MarketQuickSaleWorkspace } from "../components/market/MarketQuickSaleWorkspace";
@@ -22,15 +23,6 @@ interface MarketTabDefinition {
   description: string;
   icon: LucideIcon;
   enabled: boolean;
-}
-
-function MarketEmptyState({ icon: Icon, title, description }: { icon: LucideIcon; title: string; description: string }) {
-  return (
-    <section className="market-empty-state">
-      <Icon size={30} aria-hidden="true" />
-      <div><strong>{title}</strong><p>{description}</p></div>
-    </section>
-  );
 }
 
 export function MarketPage() {
@@ -151,13 +143,12 @@ export function MarketPage() {
           onStateChange={handleStateChange}
         />
       ) : (
-        <section className="market-panel">
-          <header className="market-panel-heading"><span>Etiket</span><h2>Etiketler</h2><p>Çıktı adaptörleri M5 aşamasında bağlanacak.</p></header>
-          <div className="market-placeholder-grid">
-            <MarketEmptyState icon={Printer} title="Preview / PDF / PNG" description="İlk etiket adaptörü cihaz gerektirmeyen önizleme ve dosya çıktısı olacak." />
-            <MarketEmptyState icon={Tags} title="Yazıcı adaptör yuvası" description="ZPL, TSPL ve sistem yazıcısı daha sonra aynı LabelPrinter sözleşmesine takılabilecek." />
-          </div>
-        </section>
+        <MarketLabelsWorkspace
+          products={products}
+          categories={categories}
+          busy={dataState === "loading"}
+          onStateChange={handleStateChange}
+        />
       )}
     </section>
   );
