@@ -1,18 +1,21 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
-import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
+import type { DesktopDashboardData } from "../../electron/database";
 import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
 import { defaultDashboardData } from "./bootstrap-defaults";
 import { defaultAutomaticSyncStatus, type AppAccessPhase, type SyncState } from "./runtime-state";
+import {
+  toCapabilitySetupData,
+  type CapabilitySetupData
+} from "./setup-runtime";
 
 interface UseDesktopSyncOptions {
   accessPhase: AppAccessPhase;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
   onBootstrapSetup: (
-    setup: DesktopSetupData,
-    capabilitySnapshot: BusinessCapabilitySnapshot,
+    setup: CapabilitySetupData,
     firstApplicationLoad: boolean
   ) => void;
   onDashboardLoaded?: (dashboardData: DesktopDashboardData) => void;
@@ -150,7 +153,10 @@ export function useDesktopSync({
           backupPath: data.backupPath,
           webModuleUrl: data.syncSettings.webModuleUrl
         }));
-        onBootstrapSetupRef.current(data.setup, capabilitySnapshot, firstApplicationLoad);
+        onBootstrapSetupRef.current(
+          toCapabilitySetupData(data.setup, capabilitySnapshot),
+          firstApplicationLoad
+        );
         appDataInitializedRef.current = true;
       })
       .catch(() => {
