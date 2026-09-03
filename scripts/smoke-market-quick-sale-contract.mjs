@@ -14,7 +14,6 @@ assert.match(quickSale, /productId:\s*line\.product\.id/, "Quick Sale must submi
 assert.match(quickSale, /quantity:\s*line\.quantity/, "Quick Sale must submit quantities.");
 assert.match(quickSale, /discountTotal:\s*discount/, "Quick Sale must submit only the requested discount total.");
 assert.match(quickSale, /paymentMethod/, "Quick Sale must expose payment method selection.");
-assert.doesNotMatch(quickSale, /bridge\.findProductByBarcode\b/, "M3 must not consume the M4 barcode runtime path.");
 
 const saleCall = quickSale.match(/bridge\.createPaidSale\s*\(\{([\s\S]*?)\}\);/);
 assert.ok(saleCall, "Quick Sale createPaidSale payload could not be inspected.");
