@@ -298,5 +298,12 @@ export function receiveRuntimePurchase(
     BUSINESS_CAPABILITIES.RETAIL_PURCHASING,
     "Satın alma ve stok girişi bu işletmede etkin değil."
   );
+  if (String(input.supplierId ?? "").trim()) {
+    requireCapability(
+      databasePath,
+      BUSINESS_CAPABILITIES.RETAIL_SUPPLIERS,
+      "Tedarikçili satın alma için tedarikçi yönetimi etkin olmalı."
+    );
+  }
   return receiveCommercePurchase(databasePath, input);
 }
