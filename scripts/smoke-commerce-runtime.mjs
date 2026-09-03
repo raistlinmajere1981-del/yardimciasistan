@@ -14,12 +14,16 @@ const {
 const {
   applyRuntimeInventoryMovement,
   createRuntimePaidSale,
+  deleteRuntimeCatalogCategory,
   findRuntimeProductByBarcode,
   getCommerceRuntimeSnapshot,
+  getRuntimeCatalogCategory,
   getRuntimeInventoryBalance,
+  listRuntimeCatalogCategories,
   listRuntimeCatalogProducts,
   listRuntimeInventoryMovements,
   listRuntimeSuppliers,
+  saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct,
   saveRuntimeSupplier,
   setRuntimeInventoryCount
@@ -45,7 +49,47 @@ try {
 
   applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
 
+  const rootCategory = saveRuntimeCatalogCategory(databasePath, {
+    name: "İçecek",
+    code: "drink",
+    sortOrder: 10
+  });
+  const coldCategory = saveRuntimeCatalogCategory(databasePath, {
+    parentId: rootCategory.id,
+    name: "Soğuk İçecek",
+    code: "cold-drink",
+    sortOrder: 20
+  });
+  assert.equal(getRuntimeCatalogCategory(databasePath, coldCategory.id)?.parentId, rootCategory.id);
+  assert.deepEqual(
+    listRuntimeCatalogCategories(databasePath, { parentId: rootCategory.id }).map((category) => category.id),
+    [coldCategory.id]
+  );
+  assert.throws(
+    () => saveRuntimeCatalogCategory(databasePath, {
+      id: rootCategory.id,
+      parentId: coldCategory.id,
+      name: rootCategory.name,
+      code: rootCategory.code,
+      sortOrder: rootCategory.sortOrder
+    }),
+    /döngü/i
+  );
+  assert.throws(
+    () => deleteRuntimeCatalogCategory(databasePath, rootCategory.id),
+    /alt kategori/i
+  );
+  assert.throws(
+    () => saveRuntimeCatalogProduct(databasePath, {
+      categoryId: "missing-category",
+      name: "Geçersiz Kategorili Ürün",
+      salePrice: 10
+    }),
+    /kategori/i
+  );
+
   const product = saveRuntimeCatalogProduct(databasePath, {
+    categoryId: coldCategory.id,
     name: "Runtime Test Ürünü",
     sku: "RT-001",
     barcode: "8690000000097",
@@ -53,9 +97,18 @@ try {
     purchasePrice: 15,
     minimumQuantity: 2
   });
+  assert.equal(product.categoryId, coldCategory.id);
+  assert.throws(
+    () => deleteRuntimeCatalogCategory(databasePath, coldCategory.id),
+    /ürün bağlı/i
+  );
 
   assert.deepEqual(
     listRuntimeCatalogProducts(databasePath, { search: "RT-001" }).map((item) => item.id),
+    [product.id]
+  );
+  assert.deepEqual(
+    listRuntimeCatalogProducts(databasePath, { categoryId: coldCategory.id }).map((item) => item.id),
     [product.id]
   );
 
@@ -112,6 +165,27 @@ try {
   assert.equal(snapshot.products.length, 1);
   assert.equal(snapshot.suppliers.length, 1);
 
+  saveRuntimeCatalogProduct(databasePath, {
+    id: product.id,
+    categoryId: "",
+    name: product.name,
+    sku: product.sku,
+    barcode: product.barcode,
+    description: product.description,
+    salePrice: product.salePrice,
+    purchasePrice: product.purchasePrice,
+    currency: product.currency,
+    unit: product.unit,
+    taxRate: product.taxRate,
+    trackInventory: product.trackInventory,
+    isActive: product.isActive,
+    minimumQuantity: 2
+  });
+  assert.equal(deleteRuntimeCatalogCategory(databasePath, coldCategory.id).id, coldCategory.id);
+  assert.equal(getRuntimeCatalogCategory(databasePath, coldCategory.id), null);
+  assert.equal(deleteRuntimeCatalogCategory(databasePath, rootCategory.id).id, rootCategory.id);
+  assert.equal(listRuntimeCatalogCategories(databasePath).length, 0);
+
   // Snapshot is catalog-oriented; supplier data must not leak when only the
   // supplier capability is disabled while catalog remains available.
   setBusinessCapability(databasePath, {
@@ -126,6 +200,14 @@ try {
   applyBusinessProfileCapabilities(databasePath, "pension", { preserveUserOverrides: false });
   assert.throws(
     () => getCommerceRuntimeSnapshot(databasePath),
+    /ürün kataloğu/i
+  );
+  assert.throws(
+    () => listRuntimeCatalogCategories(databasePath),
+    /ürün kataloğu/i
+  );
+  assert.throws(
+    () => saveRuntimeCatalogCategory(databasePath, { name: "Kapalı Kategori" }),
     /ürün kataloğu/i
   );
   assert.throws(
