@@ -1,5 +1,15 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
-import type { BusinessCapability } from "@yardimci-asistan/shared";
+import type {
+  BusinessCapability,
+  CatalogCategory,
+  CatalogProduct,
+  CommercePurchaseOrder,
+  CommercePurchaseOrderDetail,
+  CommerceSale,
+  CommerceSupplier,
+  InventoryBalance,
+  InventoryMovement
+} from "@yardimci-asistan/shared";
 import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
   DesktopDashboardData,
@@ -80,6 +90,10 @@ import type {
 import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-connection-test";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
 import type { SaveCapabilitySetupInput } from "./setup-contract";
+import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
+import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
+import type { CommerceStoreSnapshot } from "./commerce-store";
+import type { InventoryCountResult } from "./commerce-runtime";
 
 export interface AiConnectionTestInput {
   provider: string;
@@ -148,6 +162,7 @@ export interface DesktopBridge {
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => Promise<BusinessCapabilitySnapshot>;
   applyBusinessProfile: (profileId: string, preserveUserOverrides?: boolean) => Promise<BusinessCapabilitySnapshot>;
+  commerce: DesktopCommerceBridge;
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
@@ -266,6 +281,26 @@ const bridge: DesktopBridge = {
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:clearOverride", capability),
   applyBusinessProfile: (profileId: string, preserveUserOverrides = true) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:applyProfile", profileId, preserveUserOverrides),
+  commerce: {
+    getSnapshot: () => invokeWhenUnlocked<CommerceStoreSnapshot>("commerce:getSnapshot"),
+    listCategories: (options) => invokeWhenUnlocked<CatalogCategory[]>("commerce:category:list", options),
+    getCategory: (categoryId) => invokeWhenUnlocked<CatalogCategory | null>("commerce:category:get", categoryId),
+    saveCategory: (input) => invokeWhenUnlocked<CatalogCategory>("commerce:category:save", input),
+    deleteCategory: (categoryId) => invokeWhenUnlocked<DeleteCatalogCategoryResult>("commerce:category:delete", categoryId),
+    listProducts: (options) => invokeWhenUnlocked<CatalogProduct[]>("commerce:product:list", options),
+    saveProduct: (input) => invokeWhenUnlocked<CatalogProduct>("commerce:product:save", input),
+    findProductByBarcode: (barcode) => invokeWhenUnlocked<CatalogProduct | null>("commerce:product:findByBarcode", barcode),
+    getInventoryBalance: (productId, locationId) => invokeWhenUnlocked<InventoryBalance>("commerce:inventory:getBalance", productId, locationId),
+    listInventoryMovements: (options) => invokeWhenUnlocked<InventoryMovement[]>("commerce:inventory:listMovements", options),
+    applyInventoryMovement: (input) => invokeWhenUnlocked<InventoryMovement>("commerce:inventory:applyMovement", input),
+    setInventoryCount: (input) => invokeWhenUnlocked<InventoryCountResult>("commerce:inventory:setCount", input),
+    createPaidSale: (input) => invokeWhenUnlocked<CommerceSale>("commerce:sale:createPaid", input),
+    listSuppliers: (options) => invokeWhenUnlocked<CommerceSupplier[]>("commerce:supplier:list", options),
+    saveSupplier: (input) => invokeWhenUnlocked<CommerceSupplier>("commerce:supplier:save", input),
+    listPurchaseOrders: (options) => invokeWhenUnlocked<CommercePurchaseOrder[]>("commerce:purchase:list", options),
+    getPurchaseOrder: (purchaseOrderId) => invokeWhenUnlocked<CommercePurchaseOrderDetail | null>("commerce:purchase:get", purchaseOrderId),
+    receivePurchase: (input) => invokeWhenUnlocked<CommercePurchaseOrderDetail>("commerce:purchase:receive", input)
+  },
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => ipcRenderer.invoke("androidDevice:setPermissionGroups", deviceId, groups),
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
