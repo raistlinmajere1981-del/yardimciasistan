@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { PublishedMenuItem } from "@yardimci-asistan/sync-core";
-import type { DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
+import type { DesktopDashboardData } from "../../../electron/database";
+import type { CapabilitySetupData } from "../../app/setup-runtime";
 import {
   compareMenuRecords,
   formatCurrency,
@@ -12,7 +13,7 @@ import {
 
 interface LocalMenuPreviewProps {
   menu: DesktopDashboardData["menu"];
-  setupData: DesktopSetupData;
+  setupData: CapabilitySetupData;
   webModuleUrl: string;
   onClose: () => void;
 }
@@ -91,7 +92,7 @@ export function LocalMenuPreview({ menu, setupData, webModuleUrl, onClose }: Loc
 
 interface MenuPreviewCanvasProps {
   menu: DesktopDashboardData["menu"];
-  setupData: DesktopSetupData;
+  setupData: CapabilitySetupData;
   webModuleUrl: string;
   embedded?: boolean;
   activeCategoryHint?: string;
