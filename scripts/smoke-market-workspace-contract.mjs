@@ -9,6 +9,10 @@ const read = (path) => readFileSync(join(root, path), "utf8");
 const navigation = read("apps/desktop-app/src/app/navigation.ts");
 const appView = read("apps/desktop-app/src/components/app/DesktopAppView.tsx");
 const marketPage = read("apps/desktop-app/src/pages/MarketPage.tsx");
+const marketProducts = read("apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx");
+const marketInventory = read("apps/desktop-app/src/components/market/MarketInventoryWorkspace.tsx");
+const marketPurchasing = read("apps/desktop-app/src/components/market/MarketPurchasingWorkspace.tsx");
+const marketSource = [marketPage, marketProducts, marketInventory, marketPurchasing].join("\n");
 const preload = read("apps/desktop-app/electron/preload.ts");
 
 assert.match(navigation, /\| "market" \|/, "DesktopPage must include the market route.");
@@ -41,9 +45,9 @@ for (const method of [
   "listPurchaseOrders",
   "receivePurchase"
 ]) {
-  assert.match(marketPage, new RegExp(`bridge\\.${method}\\b`), `Market workspace must use commerce.${method}.`);
+  assert.match(marketSource, new RegExp(`bridge\\.${method}\\b`), `Market workspaces must use commerce.${method}.`);
 }
-assert.match(preload, /commerce:\s*DesktopCommerceBridge;/, "Preload must expose the typed commerce bridge used by MarketPage.");
-assert.doesNotMatch(marketPage, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/, "Market renderer must not bind to legacy business/profile flags.");
+assert.match(preload, /commerce:\s*DesktopCommerceBridge;/, "Preload must expose the typed commerce bridge used by Market workspaces.");
+assert.doesNotMatch(marketSource, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/, "Market renderer must not bind to legacy business/profile flags.");
 
 console.log("market-workspace-contract-smoke-ok");
