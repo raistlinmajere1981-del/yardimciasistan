@@ -1,6 +1,11 @@
-import { Minus, Plus, Search, ShoppingCart, Trash2, WalletCards } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Barcode, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CatalogCategory, CatalogProduct, CommerceSale } from "@yardimci-asistan/shared";
+import {
+  createBarcodeSimulatorAdapter,
+  createKeyboardBarcodeInputAdapter,
+  type BarcodeScan
+} from "../../app/barcode-input";
 import "../../market-quick-sale-ux.css";
 
 interface CartLine {
@@ -8,9 +13,12 @@ interface CartLine {
   quantity: number;
 }
 
+type BarcodeMode = "keyboard-wedge" | "simulator";
+
 interface MarketQuickSaleWorkspaceProps {
   products: CatalogProduct[];
   categories: CatalogCategory[];
+  barcodeEnabled: boolean;
   busy: boolean;
   onSaleCompleted: (sale: CommerceSale) => Promise<void> | void;
   onError: (message: string) => void;
@@ -32,9 +40,16 @@ function money(value: number, currency = "TRY") {
   }
 }
 
+function barcodeSourceLabel(scan: BarcodeScan) {
+  if (scan.source === "keyboard-wedge") return "USB okuyucu";
+  if (scan.source === "simulator") return "Simülatör";
+  return "Kamera";
+}
+
 export function MarketQuickSaleWorkspace({
   products,
   categories,
+  barcodeEnabled,
   busy,
   onSaleCompleted,
   onError
@@ -47,7 +62,13 @@ export function MarketQuickSaleWorkspace({
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [lastSale, setLastSale] = useState<CommerceSale | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [barcodeMode, setBarcodeMode] = useState<BarcodeMode>("keyboard-wedge");
+  const [simulatedBarcode, setSimulatedBarcode] = useState("");
+  const [barcodeMessage, setBarcodeMessage] = useState("USB okuyucu hazır; barkodu okutun.");
+  const [scanning, setScanning] = useState(false);
 
+  const simulatorAdapter = useMemo(() => createBarcodeSimulatorAdapter(), []);
+  const keyboardAdapter = useMemo(() => createKeyboardBarcodeInputAdapter(), []);
   const activeProducts = useMemo(
     () => products.filter((product) => product.isActive),
     [products]
@@ -83,10 +104,10 @@ export function MarketQuickSaleWorkspace({
   const previewTotal = roundMoney(subtotal - discount);
   const currency = cartLines[0]?.product.currency ?? "TRY";
 
-  function addProduct(product: CatalogProduct) {
+  const addProduct = useCallback((product: CatalogProduct) => {
     if (cartCurrency && product.currency !== cartCurrency) {
       onError("Tek satışta birden fazla para birimi kullanılamaz.");
-      return;
+      return false;
     }
     setCart((current) => {
       const existing = current.find((line) => line.productId === product.id);
@@ -97,7 +118,44 @@ export function MarketQuickSaleWorkspace({
       }
       return [...current, { productId: product.id, quantity: 1 }];
     });
-  }
+    return true;
+  }, [cartCurrency, onError]);
+
+  const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
+    if (!barcodeEnabled || !bridge || busy || submitting || scanning) return;
+    setScanning(true);
+    setSearch("");
+    setBarcodeMessage(`${barcodeSourceLabel(scan)}: ${scan.value} aranıyor…`);
+    try {
+      const product = await bridge.findProductByBarcode(scan.value);
+      if (!product) {
+        const message = `Barkod bulunamadı: ${scan.value}`;
+        setBarcodeMessage(message);
+        onError(message);
+        return;
+      }
+      if (addProduct(product)) {
+        setBarcodeMessage(`${product.name} sepete eklendi · ${barcodeSourceLabel(scan)}`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Barkod okunamadı.";
+      setBarcodeMessage(message);
+      onError(message);
+    } finally {
+      setScanning(false);
+    }
+  }, [addProduct, barcodeEnabled, bridge, busy, onError, scanning, submitting]);
+
+  useEffect(() => {
+    if (!barcodeEnabled) return;
+    const adapter = barcodeMode === "simulator" ? simulatorAdapter : keyboardAdapter;
+    setBarcodeMessage(barcodeMode === "simulator"
+      ? "Simülatör hazır; test barkodunu girin."
+      : "USB okuyucu hazır; barkodu okutun.");
+    return adapter.start((scan) => {
+      void handleBarcodeScan(scan);
+    });
+  }, [barcodeEnabled, barcodeMode, handleBarcodeScan, keyboardAdapter, simulatorAdapter]);
 
   function setQuantity(productId: string, quantityInput: number) {
     const quantity = roundQuantity(quantityInput);
@@ -114,6 +172,11 @@ export function MarketQuickSaleWorkspace({
     setCart([]);
     setDiscountTotal("0");
     setPaymentMethod("cash");
+  }
+
+  function submitSimulatedBarcode() {
+    const scan = simulatorAdapter.submit(simulatedBarcode);
+    if (scan) setSimulatedBarcode("");
   }
 
   async function completeSale() {
@@ -155,8 +218,38 @@ export function MarketQuickSaleWorkspace({
         <header className="market-panel-heading">
           <span>Satış</span>
           <h2>Ürün Ekle</h2>
-          <p>Ürün seçin veya ad, SKU ya da barkod metniyle arayın. Barkod okuyucu entegrasyonu M4 kapsamındadır.</p>
+          <p>Ürün seçin, arayın veya etkinse barkod girişini kullanın.</p>
         </header>
+
+        {barcodeEnabled && (
+          <section className="market-barcode-panel" aria-label="Barkod girişi">
+            <div className="market-barcode-heading">
+              <span><Barcode size={17} aria-hidden="true" /><strong>Barkod Girişi</strong></span>
+              <select value={barcodeMode} onChange={(event) => setBarcodeMode(event.target.value as BarcodeMode)} disabled={disabled || scanning}>
+                <option value="keyboard-wedge">USB Klavye Okuyucu</option>
+                <option value="simulator">Simülatör</option>
+              </select>
+            </div>
+            {barcodeMode === "simulator" && (
+              <div className="market-barcode-simulator">
+                <input
+                  value={simulatedBarcode}
+                  onChange={(event) => setSimulatedBarcode(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") submitSimulatedBarcode();
+                  }}
+                  placeholder="Test barkodu"
+                  disabled={disabled || scanning}
+                />
+                <button type="button" className="market-secondary-button" onClick={submitSimulatedBarcode} disabled={disabled || scanning || !simulatedBarcode.trim()}>
+                  Barkodu Gönder
+                </button>
+              </div>
+            )}
+            <small className="market-barcode-status" role="status" aria-live="polite">{barcodeMessage}</small>
+          </section>
+        )}
+
         <div className="market-sale-filters">
           <label className="market-search-field">
             <Search size={16} aria-hidden="true" />
@@ -164,7 +257,6 @@ export function MarketQuickSaleWorkspace({
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Ürün ara"
-              autoFocus
             />
           </label>
           <label className="market-field">
@@ -221,29 +313,11 @@ export function MarketQuickSaleWorkspace({
                 <small>{money(line.product.salePrice, line.product.currency)} / {line.product.unit}</small>
               </div>
               <div className="market-sale-quantity">
-                <button
-                  type="button"
-                  aria-label={`${line.product.name} miktarını azalt`}
-                  onClick={() => setQuantity(line.product.id, line.quantity - 1)}
-                  disabled={disabled}
-                >
+                <button type="button" aria-label={`${line.product.name} miktarını azalt`} onClick={() => setQuantity(line.product.id, line.quantity - 1)} disabled={disabled}>
                   <Minus size={15} aria-hidden="true" />
                 </button>
-                <input
-                  type="number"
-                  min="0.0001"
-                  step="0.0001"
-                  aria-label={`${line.product.name} miktarı`}
-                  value={line.quantity}
-                  onChange={(event) => setQuantity(line.product.id, Number(event.target.value))}
-                  disabled={disabled}
-                />
-                <button
-                  type="button"
-                  aria-label={`${line.product.name} miktarını artır`}
-                  onClick={() => setQuantity(line.product.id, line.quantity + 1)}
-                  disabled={disabled}
-                >
+                <input type="number" min="0.0001" step="0.0001" aria-label={`${line.product.name} miktarı`} value={line.quantity} onChange={(event) => setQuantity(line.product.id, Number(event.target.value))} disabled={disabled} />
+                <button type="button" aria-label={`${line.product.name} miktarını artır`} onClick={() => setQuantity(line.product.id, line.quantity + 1)} disabled={disabled}>
                   <Plus size={15} aria-hidden="true" />
                 </button>
               </div>
@@ -270,14 +344,7 @@ export function MarketQuickSaleWorkspace({
           </label>
           <label className="market-field">
             İndirim
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={discountTotal}
-              onChange={(event) => setDiscountTotal(event.target.value)}
-              disabled={disabled}
-            />
+            <input type="number" min="0" step="0.01" value={discountTotal} onChange={(event) => setDiscountTotal(event.target.value)} disabled={disabled} />
           </label>
         </div>
 
@@ -287,12 +354,7 @@ export function MarketQuickSaleWorkspace({
           <span className="market-sale-grand-total"><small>Ödenecek</small><strong>{money(previewTotal, currency)}</strong></span>
         </div>
 
-        <button
-          type="button"
-          className="market-sale-complete"
-          onClick={() => void completeSale()}
-          disabled={disabled || cartLines.length === 0}
-        >
+        <button type="button" className="market-sale-complete" onClick={() => void completeSale()} disabled={disabled || cartLines.length === 0}>
           <WalletCards size={18} aria-hidden="true" />
           {submitting ? "Satış işleniyor…" : "Ödemeyi Al ve Satışı Tamamla"}
         </button>
