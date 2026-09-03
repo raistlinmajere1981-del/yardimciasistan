@@ -244,8 +244,8 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
   market: {
     id: "market",
     label: "Market / Perakende",
-    description: "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için planlanan profil.",
-    availability: "planned",
+    description: "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için hazır profil.",
+    availability: "available",
     defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
