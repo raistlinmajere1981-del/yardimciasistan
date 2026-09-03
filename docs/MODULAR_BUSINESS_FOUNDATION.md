@@ -74,13 +74,13 @@ Yeni workspace veya servis görünürlüğü için `businessType` kontrolü ekle
 - `pension`
 - `restaurant`
 - `cafe`
+- `market`
 
 ### Planlı
 
-- `market`
 - `other`
 
-`market` shared registry'de tanımlıdır ancak minimum Market workspace'i oluşana kadar normal kurulum seçicisinde planlı kalır.
+`market` minimum günlük perakende akışı tamamlandığı için normal kurulum seçicisinde kullanılabilir durumdadır. Kurulum seçicisi authoritative `getAvailableBusinessProfiles()` registry çıktısını kullanır; yeni profil açılışları ikinci bir hardcoded sektör listesine bağlanmamalıdır.
 
 Market varsayımları:
 
@@ -166,15 +166,15 @@ Temel Ayarlar'da yalnız doğrudan kullanıcı tercihi olan bağlı servis kontr
 - WhatsApp
 - Android
 
-Domain yetenekleri `Ayarlar → Özel Yetenekler` alanından yönetilir.
+Domain yetenekleri `Ayarlar → Özel Yetenekler` alanından yönetilir. Burada Konaklama, Yiyecek & İçecek, Ticaret Çekirdeği ve Perakende grupları ayrı görünür; böylece Market + Pansiyon gibi hibritler profil çoğaltmadan kullanıcı override'larıyla kurulabilir.
 
-Eski büyük `LegacySetupWizard` henüz tamamen parçalanmadığı için setup save yolunda Electron-side geçici compatibility adapter vardır. Bu adapter yeni kodun source of truth'u değildir.
+Eski büyük `LegacySetupWizard` henüz tamamen parçalanmadığı için setup save yolunda Electron-side geçici compatibility adapter vardır. Görsel sektör seçicisinin statik legacy seçenekleri de capability-first `SetupWizard` boundary'sinde `getAvailableBusinessProfiles()` çıktısıyla senkronlanır. Bu projection yeni source of truth değildir; authoritative kaynak shared profile registry'dir.
 
 **Kural:** Yeni renderer kodu `DesktopSetupData.modules` okumamalı ve yeni setup alanı eski `modules` sözleşmesine eklenmemelidir.
 
 ## 7. Commerce foundation
 
-Market UI başlamadan önce sektör bağımsız commerce omurgası oluşturuldu.
+Market UI'den bağımsız sektör ortak commerce omurgası oluşturuldu.
 
 Shared tipler:
 
@@ -197,22 +197,39 @@ commerce_sale_items
 
 Bu tablolar restoranın mevcut `menu_items`, `tables`, `table_orders` yapısından bağımsızdır. Amaç food-service ve retail domain'lerinin commerce kavramlarını paylaşabilmesi, birbirine sıkı bağlanmamasıdır.
 
-Store:
+Store/runtime sınırları:
 
 - `apps/desktop-app/electron/commerce-store.ts`
-
-Capability-guarded runtime:
-
+- `apps/desktop-app/electron/commerce-category-store.ts`
+- `apps/desktop-app/electron/commerce-purchase-store.ts`
 - `apps/desktop-app/electron/commerce-runtime.ts`
+- `apps/desktop-app/electron/commerce-ipc.ts`
+- `apps/desktop-app/electron/commerce-ipc-contract.ts`
+
+Renderer akışı:
+
+```text
+Market Workspace
+  ↓
+preload bridge
+  ↓
+commerce IPC
+  ↓
+commerce-runtime
+  ↓
+commerce stores / SQLite
+```
 
 Runtime kuralları:
 
 ```text
-commerce.catalog   → katalog işlemleri
-commerce.inventory → stok işlemleri
-commerce.sales     → satış işlemleri
-retail.barcode     → barkod lookup
-retail.suppliers   → tedarikçi yönetimi
+commerce.catalog    → katalog işlemleri
+commerce.inventory  → stok işlemleri
+commerce.sales      → satış işlemleri
+retail.barcode      → barkod lookup
+retail.purchasing   → satın alma / stock-in
+retail.suppliers    → tedarikçi yönetimi
+retail.labels       → etiket workspace görünürlüğü
 ```
 
 ### Stok sayımı kararı
@@ -231,30 +248,36 @@ Fiziksel sayım: 6
 
 Aynı miktar yeniden sayılırsa anlamsız `0` hareketi oluşturulmaz.
 
-## 8. Market cihaz abstraction yönü
+## 8. Market cihaz abstraction durumu
 
-Market workspace'e donanım bağlanırken UI cihaz markasına bağlanmamalıdır.
+Market workspace donanım markasına bağlanmaz.
 
-Planlanan sınırlar:
+Mevcut sınırlar:
 
 ```text
 BarcodeInput
-  Simulator
-  USB Keyboard Scanner
-  Camera Scanner
+  Simulator             → available
+  USB Keyboard Scanner  → available
+  Camera Scanner        → reserved / later
 
 LabelPrinter
-  Preview / PDF / PNG
-  ZPL
-  TSPL
-  Windows printer adapter (gerektiğinde)
+  Preview               → available
+  PNG                    → available
+  PDF                    → available
+  ZPL                    → planned
+  TSPL                   → planned
+  System printer        → planned
 ```
 
-İlk Market MVP donanım zorunluluğu getirmeyecektir. Klavye gibi davranan USB scanner en basit fiziksel yol; Android kamera scanner daha sonra hosting/LAN transport tercihiyle eklenebilir.
+USB keyboard-wedge scanner hızlı karakter dizisi + `Enter` terminator davranışıyla normal kullanıcı yazımından ayrılır. Tarama sonucu mevcut capability-guarded exact barcode lookup hattına gider.
+
+Etiket motoru aynı `LabelPrintJob` sözleşmesini Preview, PNG ve PDF adaptörlerinde kullanır. Code 128-B barkod üretimi, label-size preset'leri ve çoklu PDF kopyası desteklenir. ZPL/TSPL/sistem yazıcısı gerçek saha donanımı belli olduğunda aynı `LabelPrinterAdapter` sınırına takılacaktır.
+
+İlk Market MVP donanım zorunluluğu getirmez. Android kamera scanner daha sonra hosting/LAN transport tercihiyle eklenebilir ve mevcut desktop Market kullanımını bloke etmez.
 
 ## 9. Kalite kapıları
 
-Repo artık yalnız build/test ile kontrol edilmez.
+Repo yalnız build/test ile kontrol edilmez.
 
 Aktif kalite katmanları:
 
@@ -265,7 +288,7 @@ Design system debt audit
 Architecture boundary audit
 TypeScript typecheck
 Workspace tests
-Capability/commerce smokes
+Capability/commerce/Market smokes
 ```
 
 Önemli komutlar:
@@ -290,7 +313,7 @@ Başarı çıktısı:
 modular-foundation-check-ok
 ```
 
-Bu runner şu kritik smokeları da çalıştırır:
+Runner'ın kritik smoke zinciri:
 
 ```text
 business-capabilities-smoke-ok
@@ -298,6 +321,13 @@ capability-runtime-v2-smoke-ok
 setup-capability-contract-smoke-ok
 commerce-foundation-smoke-ok
 commerce-runtime-smoke-ok
+commerce-ipc-contract-smoke-ok
+market-workspace-contract-smoke-ok
+market-quick-sale-contract-smoke-ok
+market-sale-runtime-smoke-ok
+market-barcode-input-contract-smoke-ok
+market-label-printer-contract-smoke-ok
+market-profile-availability-smoke-ok
 ```
 
 ## 10. Architecture audit tarafından korunan sınırlar
@@ -307,7 +337,7 @@ commerce-runtime-smoke-ok
 - Sandboxed preload, `electron` dışında uygulama runtime modülü yüklememelidir.
 - Renderer → preload/IPC → Electron main sınırı korunmalıdır.
 
-Yeni Market kodu bu kuralları gevşetmemelidir.
+Market kodu bu kuralları gevşetmemelidir.
 
 ## 11. Bilinçli olarak kalan geçiş borcu
 
@@ -324,44 +354,24 @@ Bunlar **runtime source of truth değildir**. Capability tablosu authoritative'd
 
 Bu alanları fiziksel olarak kaldırmak, çok büyük `database.ts` setup persistence metodunu daha küçük repository/service parçalarına ayırma işiyle birlikte yapılmalıdır. Market workspace'i bunlara bağlanmadığı sürece bu temizlik Market mimarisini bloke etmez.
 
-Aynı şekilde `LegacySetupWizard` ismi ve compatibility form shape'i yeni özellik geliştirme yüzeyi değildir. Yeni Market ayarları doğrudan capability/runtime modellerine eklenmelidir.
+Aynı şekilde `LegacySetupWizard` ismi ve compatibility form shape'i yeni özellik geliştirme yüzeyi değildir. Statik sektör `<option>` listesinin registry projection'ı da geçici bir compatibility katmanıdır; wizard parçalandığında normal React profile selector doğrudan shared registry'yi kullanmalıdır.
 
-## 12. Yeni session: Market MVP çalışma sırası
+## 12. Market MVP tamamlanma durumu
 
-Yeni session'da aşağıdaki sırayla ilerle:
+### M1 — Commerce backend zinciri — CLOSED
 
-### M1 — Commerce repository'yi Market kullanımına tamamla
+- repository/store primitives
+- kategori yönetimi
+- ürün arama + exact barcode lookup
+- inventory balance + movement history + fiziksel count
+- supplier CRUD
+- atomik purchasing/stock-in
+- capability-guarded runtime
+- IPC + preload contract
 
-- kategori CRUD
-- ürün listeleme/arama
-- barkod exact lookup
-- stok balance + hareket geçmişi
-- fiziksel sayım
-- tedarikçi CRUD
-- satın alma/stock-in servis sınırı
-- gerekiyorsa purchase order minimum servisleri
+### M2 — Market workspace/navigation — CLOSED
 
-### M2 — Market IPC/preload contract
-
-Renderer store dosyalarını import etmemeli.
-
-```text
-Market Workspace
-  ↓
-preload bridge
-  ↓
-commerce IPC
-  ↓
-commerce-runtime
-  ↓
-commerce-store / SQLite
-```
-
-Her IPC capability guard ile korunmalı.
-
-### M3 — Market workspace MVP
-
-İlk ekran büyük ERP paneli olmamalı. Günlük küçük market akışına göre:
+Capability-driven Market route ve günlük yönetim alanları:
 
 ```text
 Hızlı Satış
@@ -371,38 +381,40 @@ Tedarikçiler / Alım
 Etiketler
 ```
 
-İlk görünümün odağı hızlı satış ve barkod girişi olmalıdır.
+Workspace `businessType` ile değil persisted capabilities ile açılır.
 
-### M4 — Hızlı satış
+### M3 — Hızlı Satış — CLOSED
 
-- barkod veya ürün arama
-- sepete ekleme
+- ürün arama / sepet
 - adet değiştirme
-- toplam
-- nakit/kart gibi basit ödeme yöntemi
-- tek transaction ile paid sale
-- stok düşümü
-- başarısız satışta tam rollback
+- indirim
+- nakit/kart/havale/diğer ödeme
+- backend-authoritative fiyat/toplam
+- tek transaction paid sale + stok düşümü
+- başarısız satışta rollback
 
-### M5 — Barkod input abstraction
+### M4 — Barcode Input abstraction — CLOSED
 
-Önce simulator + keyboard scanner.
+- simulator
+- USB keyboard-wedge scanner
+- exact guarded lookup
+- camera/Android extension point reserved
 
-Android camera scanner daha sonra eklenir; desktop Market MVP'yi bloke etmez.
+### M5 — Label MVP — CLOSED
 
-### M6 — Etiket MVP
+- Preview
+- PNG
+- PDF
+- 58×40 / 50×30 / 40×30 mm presets
+- Code 128-B
+- ZPL / TSPL / system printer extension points reserved
 
-Önce preview/PDF/PNG üretimi. ZPL/TSPL cihaz adaptörleri gerçek saha donanımı belli olduğunda eklenir.
+### M6 — Market profile availability — CLOSED (foundation gate sonrası)
 
-### M7 — Market profilini kullanılabilir yap
-
-Market workspace'in minimum günlük akışı çalıştıktan ve smoke'lar yeşil olduktan sonra:
-
-```text
-market.availability = available
-```
-
-Setup selector'a o zaman eklenir.
+- `market.availability = available`
+- normal setup selector registry üzerinden Market'i gösterir
+- Perakende capability override grubu hibrit işletmeler için görünür
+- `other` planlı kalır
 
 ## 13. Market MVP veri alanları
 
@@ -434,7 +446,7 @@ return_out
 
 MVP'nin amacı ileri ERP/muhasebe değildir. Küçük işletmede ürün bulma, satış, stok düzeltme ve temel alım kaydını hızlı ve güvenli yapmaktır.
 
-## 14. Yeni session'da geri dönülmemesi gereken kararlar
+## 14. Geri dönülmemesi gereken kararlar
 
 1. `businessType` runtime feature gate değildir.
 2. Profil yalnız preset'tir; capability gerçek yetkidir.
@@ -446,13 +458,14 @@ MVP'nin amacı ileri ERP/muhasebe değildir. Küçük işletmede ürün bulma, s
 8. Stok ve satış mutation'ları transaction + audit movement üretir.
 9. Donanım adapter arkasında kalır.
 10. Market MVP sade günlük kullanım ürünüdür; ERP kapsamına genişlemez.
+11. Normal setup profil listesi shared `availability` registry'sinden türetilir.
 
-## 15. Yeni session başlangıç kontrolü
+## 15. Sonraki session başlangıç kontrolü
 
-Yeni session'ın ilk işi repo head'ini okuyup aşağıdaki komutu istemek veya çalıştırmak olmalıdır:
+Yeni session'ın ilk işi repo head'ini okuyup aşağıdaki checkpoint'i doğrulamak olmalıdır:
 
 ```bash
 node scripts/check-modular-foundation.mjs
 ```
 
-Bu yeşil değilse Market UI geliştirmesine başlanmamalıdır.
+Bu yeşil değilse yeni sektör veya ileri Market geliştirmesine başlanmamalıdır. Market MVP foundation temizse sonraki iş artık temel Market özelliği eklemek değil; canlı kullanım/saha testi, ergonomi düzeltmeleri ve gerçek cihaz ihtiyacına göre adapter genişletmeleridir.
