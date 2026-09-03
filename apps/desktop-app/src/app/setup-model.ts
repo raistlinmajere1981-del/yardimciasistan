@@ -1,9 +1,12 @@
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type {
   DesktopAiModelOption,
   DesktopAiService,
   DesktopSetupData
 } from "../../electron/database";
 import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
+import { runtimeHasCapability } from "./capabilities";
 
 export interface TableCategoryFormState {
   key: string;
@@ -85,10 +88,14 @@ export function normalizeAiService(service: string): DesktopAiService {
     : "openai";
 }
 
-export function toSetupForm(setupData: DesktopSetupData): CapabilitySetupFormState {
+export function toSetupForm(
+  setupData: DesktopSetupData,
+  capabilitySnapshot?: BusinessCapabilitySnapshot | null
+): CapabilitySetupFormState {
   const service = normalizeAiService(setupData.aiService);
   const aiServiceDrafts = createAiServiceFormDrafts(setupData);
   const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
+  const C = BUSINESS_CAPABILITIES;
 
   return {
     businessName: setupData.businessName || "Deniz Çiçeği Pansiyon & Kafe",
@@ -113,8 +120,8 @@ export function toSetupForm(setupData: DesktopSetupData): CapabilitySetupFormSta
     clearAiApiKey: activeAiDraft.clearApiKey,
     aiTimeoutSeconds: activeAiDraft.timeoutSeconds,
     aiServiceDrafts,
-    whatsappEnabled: setupData.modules.whatsapp,
-    androidEnabled: setupData.modules.android,
+    whatsappEnabled: runtimeHasCapability(capabilitySnapshot, C.WHATSAPP),
+    androidEnabled: runtimeHasCapability(capabilitySnapshot, C.ANDROID),
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
     tableCategories: toTableCategoryForm(setupData)
   };
