@@ -19,10 +19,13 @@ const {
   getCommerceRuntimeSnapshot,
   getRuntimeCatalogCategory,
   getRuntimeInventoryBalance,
+  getRuntimePurchaseOrder,
   listRuntimeCatalogCategories,
   listRuntimeCatalogProducts,
   listRuntimeInventoryMovements,
+  listRuntimePurchaseOrders,
   listRuntimeSuppliers,
+  receiveRuntimePurchase,
   saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct,
   saveRuntimeSupplier,
@@ -39,12 +42,16 @@ try {
   database.initialize();
   const databasePath = database.databasePath;
 
-  // Restaurant profiles share some commerce concepts, but retail-only barcode
-  // and supplier operations stay unavailable until persisted retail capabilities
-  // are explicitly enabled.
+  // Restaurant profiles share some commerce concepts, but retail-only barcode,
+  // supplier and purchasing operations stay unavailable until persisted retail
+  // capabilities are explicitly enabled.
   assert.throws(
     () => findRuntimeProductByBarcode(databasePath, "8690000000097"),
     /barkod/i
+  );
+  assert.throws(
+    () => listRuntimePurchaseOrders(databasePath),
+    /satın alma/i
   );
 
   applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
@@ -161,6 +168,23 @@ try {
   assert.equal(supplier.name, "Runtime Tedarikçi");
   assert.deepEqual(listRuntimeSuppliers(databasePath).map((item) => item.id), [supplier.id]);
 
+  const receivedPurchase = receiveRuntimePurchase(databasePath, {
+    supplierId: supplier.id,
+    source: "runtime-purchase-smoke",
+    items: [{ productId: product.id, quantity: 5, unitCost: 14 }]
+  });
+  assert.equal(receivedPurchase.order.status, "received");
+  assert.equal(receivedPurchase.order.supplierId, supplier.id);
+  assert.equal(receivedPurchase.order.total, 70);
+  assert.equal(receivedPurchase.items.length, 1);
+  assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 9);
+  assert.deepEqual(
+    listRuntimePurchaseOrders(databasePath, { supplierId: supplier.id }).map((order) => order.id),
+    [receivedPurchase.order.id]
+  );
+  assert.equal(getRuntimePurchaseOrder(databasePath, receivedPurchase.order.id)?.items.length, 1);
+  assert.equal(listRuntimeInventoryMovements(databasePath, { productId: product.id }).length, 4);
+
   const snapshot = getCommerceRuntimeSnapshot(databasePath);
   assert.equal(snapshot.products.length, 1);
   assert.equal(snapshot.suppliers.length, 1);
@@ -186,8 +210,8 @@ try {
   assert.equal(deleteRuntimeCatalogCategory(databasePath, rootCategory.id).id, rootCategory.id);
   assert.equal(listRuntimeCatalogCategories(databasePath).length, 0);
 
-  // Snapshot is catalog-oriented; supplier data must not leak when only the
-  // supplier capability is disabled while catalog remains available.
+  // Supplier capability owns supplier data access, but purchasing remains a
+  // separate capability and can still receive an unsourced stock entry.
   setBusinessCapability(databasePath, {
     capability: "retail.suppliers",
     enabled: false
@@ -196,6 +220,28 @@ try {
   assert.equal(getCommerceRuntimeSnapshot(databasePath).suppliers.length, 0);
   assert.throws(() => listRuntimeSuppliers(databasePath), /tedarikçi/i);
   assert.throws(() => saveRuntimeSupplier(databasePath, { name: "Kapalı Tedarikçi" }), /tedarikçi/i);
+
+  const supplierlessPurchase = receiveRuntimePurchase(databasePath, {
+    source: "runtime-purchase-smoke",
+    items: [{ productId: product.id, quantity: 1, unitCost: 13 }]
+  });
+  assert.equal(supplierlessPurchase.order.supplierId, "");
+  assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 10);
+  assert.equal(listRuntimePurchaseOrders(databasePath).length, 2);
+
+  setBusinessCapability(databasePath, {
+    capability: "retail.purchasing",
+    enabled: false
+  });
+  assert.throws(() => listRuntimePurchaseOrders(databasePath), /satın alma/i);
+  assert.throws(() => getRuntimePurchaseOrder(databasePath, receivedPurchase.order.id), /satın alma/i);
+  assert.throws(
+    () => receiveRuntimePurchase(databasePath, {
+      items: [{ productId: product.id, quantity: 1, unitCost: 12 }]
+    }),
+    /satın alma/i
+  );
+  assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 10);
 
   applyBusinessProfileCapabilities(databasePath, "pension", { preserveUserOverrides: false });
   assert.throws(
@@ -217,6 +263,10 @@ try {
   assert.throws(
     () => listRuntimeInventoryMovements(databasePath),
     /stok hareketleri/i
+  );
+  assert.throws(
+    () => listRuntimePurchaseOrders(databasePath),
+    /satın alma/i
   );
 
   console.log("commerce-runtime-smoke-ok");
