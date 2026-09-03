@@ -104,7 +104,7 @@ try {
   );
   assert.throws(
     () => getCommerceRuntimeSnapshot(databasePath),
-    /katalog/i
+    /ürün kataloğu/i
   );
 
   console.log("commerce-runtime-smoke-ok");
