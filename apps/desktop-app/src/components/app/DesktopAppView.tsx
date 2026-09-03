@@ -17,6 +17,7 @@ import {
   saveUiPreferences,
   type UiPreferences
 } from "../../ui-preferences";
+import { MarketPage } from "../../pages/MarketPage";
 import { AppLockScreen } from "../security/AppLockScreen";
 import { SetupWizard } from "../settings/SetupWizard";
 import { DesktopAppFrame } from "./DesktopAppFrame";
@@ -130,22 +131,26 @@ export function DesktopAppView({
       messagingController={messagingController}
       customerController={customerController}
     >
-      <DesktopWorkspaceRouter
-        activePage={activePage}
-        setActivePage={setActivePage}
-        setSyncState={setSyncState}
-        setStatusMessage={setStatusMessage}
-        setupController={setupController}
-        appLockController={appLockController}
-        desktopSyncController={desktopSyncController}
-        menuController={menuController}
-        messagingController={messagingController}
-        customerController={customerController}
-        operationController={operationController}
-        deviceController={deviceController}
-        uiPreferences={uiPreferences}
-        setUiPreferences={setUiPreferences}
-      />
+      {activePage === "market" ? (
+        <MarketPage />
+      ) : (
+        <DesktopWorkspaceRouter
+          activePage={activePage}
+          setActivePage={setActivePage}
+          setSyncState={setSyncState}
+          setStatusMessage={setStatusMessage}
+          setupController={setupController}
+          appLockController={appLockController}
+          desktopSyncController={desktopSyncController}
+          menuController={menuController}
+          messagingController={messagingController}
+          customerController={customerController}
+          operationController={operationController}
+          deviceController={deviceController}
+          uiPreferences={uiPreferences}
+          setUiPreferences={setUiPreferences}
+        />
+      )}
     </DesktopAppFrame>
   );
 }
