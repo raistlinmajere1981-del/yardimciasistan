@@ -1,5 +1,6 @@
 import {
   BUSINESS_CAPABILITIES,
+  type BusinessCapability,
   type CatalogProduct,
   type CommerceSale,
   type CommerceSupplier,
@@ -38,8 +39,8 @@ export interface InventoryCountResult {
   movement: InventoryMovement | null;
 }
 
-function requireCapability(databasePath: string, capability: string, message: string) {
-  assertPersistedBusinessCapability(databasePath, capability as never, message);
+function requireCapability(databasePath: string, capability: BusinessCapability, message: string) {
+  assertPersistedBusinessCapability(databasePath, capability, message);
 }
 
 export function getCommerceRuntimeSnapshot(databasePath: string): CommerceStoreSnapshot {
