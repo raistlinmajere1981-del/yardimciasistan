@@ -15,6 +15,11 @@ const {
   saveCatalogCategory
 } = require("../apps/desktop-app/dist-electron/commerce-category-store.js");
 const {
+  getCommercePurchaseOrder,
+  listCommercePurchaseOrders,
+  receiveCommercePurchase
+} = require("../apps/desktop-app/dist-electron/commerce-purchase-store.js");
+const {
   applyInventoryMovement,
   createPaidCommerceSale,
   findCatalogProductByBarcode,
@@ -193,6 +198,66 @@ try {
     [supplier.id]
   );
 
+  const receivedPurchase = receiveCommercePurchase(databasePath, {
+    supplierId: supplier.id,
+    source: "foundation-smoke",
+    notes: "İki ürünlü stok girişi",
+    items: [
+      { productId: product.id, quantity: 4, unitCost: 30 },
+      { productId: secondProduct.id, quantity: 6, unitCost: 18 }
+    ]
+  });
+  assert.equal(receivedPurchase.order.status, "received");
+  assert.equal(receivedPurchase.order.supplierId, supplier.id);
+  assert.equal(receivedPurchase.order.subtotal, 228);
+  assert.equal(receivedPurchase.order.total, 228);
+  assert.equal(receivedPurchase.items.length, 2);
+  assert.equal(getInventoryBalance(databasePath, product.id).quantity, 9);
+  assert.equal(getInventoryBalance(databasePath, secondProduct.id).quantity, 6);
+  assert.deepEqual(
+    listCommercePurchaseOrders(databasePath, { supplierId: supplier.id }).map((order) => order.id),
+    [receivedPurchase.order.id]
+  );
+  const loadedPurchase = getCommercePurchaseOrder(databasePath, receivedPurchase.order.id);
+  assert.equal(loadedPurchase?.order.id, receivedPurchase.order.id);
+  assert.equal(loadedPurchase?.items.length, 2);
+  assert.deepEqual(
+    new Set(loadedPurchase?.items.map((item) => item.productId)),
+    new Set([product.id, secondProduct.id])
+  );
+
+  const rollbackProbe = new DatabaseSync(databasePath);
+  try {
+    rollbackProbe.exec(`
+      CREATE TRIGGER smoke_fail_purchase_movement
+      BEFORE INSERT ON inventory_movements
+      WHEN NEW.reference_type = 'purchase_order' AND NEW.actor_source = 'rollback-smoke'
+      BEGIN
+        SELECT RAISE(ABORT, 'forced purchase rollback');
+      END;
+    `);
+  } finally {
+    rollbackProbe.close();
+  }
+
+  assert.throws(
+    () => receiveCommercePurchase(databasePath, {
+      supplierId: supplier.id,
+      source: "rollback-smoke",
+      items: [{ productId: product.id, quantity: 1, unitCost: 29 }]
+    }),
+    /forced purchase rollback/i
+  );
+
+  const rollbackCleanup = new DatabaseSync(databasePath);
+  try {
+    rollbackCleanup.exec("DROP TRIGGER smoke_fail_purchase_movement;");
+  } finally {
+    rollbackCleanup.close();
+  }
+  assert.equal(getInventoryBalance(databasePath, product.id).quantity, 9, "Failed receipt must roll back stock.");
+  assert.equal(listCommercePurchaseOrders(databasePath).length, 1, "Failed receipt must roll back its order header.");
+
   const snapshot = getCommerceStoreSnapshot(databasePath);
   assert.equal(snapshot.products.length, 2);
   assert.equal(snapshot.suppliers.length, 1);
@@ -213,7 +278,7 @@ try {
     }),
     /yetersiz stok/i
   );
-  assert.equal(getInventoryBalance(databasePath, product.id).quantity, 5, "Failed sale must not mutate stock.");
+  assert.equal(getInventoryBalance(databasePath, product.id).quantity, 9, "Failed sale must not mutate stock.");
 
   saveCatalogProduct(databasePath, {
     id: product.id,
@@ -250,6 +315,20 @@ try {
     assert.equal(Number(saleMovement?.quantity_delta), -2);
     assert.equal(Number(saleMovement?.quantity_after), 5);
 
+    const purchaseMovementCount = raw.prepare(`
+      SELECT COUNT(*) AS count
+      FROM inventory_movements
+      WHERE reference_type = 'purchase_order' AND reference_id = ?
+    `).get(receivedPurchase.order.id);
+    assert.equal(Number(purchaseMovementCount?.count), 2, "Each received purchase line must have a stock movement.");
+
+    const purchaseItemCount = raw.prepare(`
+      SELECT COUNT(*) AS count
+      FROM purchase_order_items
+      WHERE purchase_order_id = ?
+    `).get(receivedPurchase.order.id);
+    assert.equal(Number(purchaseItemCount?.count), 2);
+
     const unchangedMovement = raw.prepare(`
       SELECT COUNT(*) AS count
       FROM inventory_movements
@@ -259,6 +338,8 @@ try {
 
     const saleCount = raw.prepare("SELECT COUNT(*) AS count FROM commerce_sales WHERE deleted_at = ''").get();
     assert.equal(Number(saleCount?.count), 1, "Failed sale must roll back its sale header too.");
+    const purchaseCount = raw.prepare("SELECT COUNT(*) AS count FROM purchase_orders WHERE deleted_at = ''").get();
+    assert.equal(Number(purchaseCount?.count), 1, "Failed receipt must roll back all purchase records.");
   } finally {
     raw.close();
   }
