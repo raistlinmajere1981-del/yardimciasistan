@@ -1,12 +1,9 @@
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
-import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type {
   DesktopAiModelOption,
-  DesktopAiService,
-  DesktopSetupData
+  DesktopAiService
 } from "../../electron/database";
 import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
-import { runtimeHasCapability } from "./capabilities";
+import type { CapabilitySetupData } from "./setup-runtime";
 
 export interface TableCategoryFormState {
   key: string;
@@ -88,14 +85,10 @@ export function normalizeAiService(service: string): DesktopAiService {
     : "openai";
 }
 
-export function toSetupForm(
-  setupData: DesktopSetupData,
-  capabilitySnapshot?: BusinessCapabilitySnapshot | null
-): CapabilitySetupFormState {
+export function toSetupForm(setupData: CapabilitySetupData): CapabilitySetupFormState {
   const service = normalizeAiService(setupData.aiService);
   const aiServiceDrafts = createAiServiceFormDrafts(setupData);
   const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
-  const C = BUSINESS_CAPABILITIES;
 
   return {
     businessName: setupData.businessName || "Deniz Çiçeği Pansiyon & Kafe",
@@ -120,8 +113,8 @@ export function toSetupForm(
     clearAiApiKey: activeAiDraft.clearApiKey,
     aiTimeoutSeconds: activeAiDraft.timeoutSeconds,
     aiServiceDrafts,
-    whatsappEnabled: runtimeHasCapability(capabilitySnapshot, C.WHATSAPP),
-    androidEnabled: runtimeHasCapability(capabilitySnapshot, C.ANDROID),
+    whatsappEnabled: setupData.servicePreferences.whatsapp,
+    androidEnabled: setupData.servicePreferences.android,
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
     tableCategories: toTableCategoryForm(setupData)
   };
@@ -134,7 +127,7 @@ export function nextTableCategoryFormKey() {
   return `table-category-${tableCategoryFormSequence}`;
 }
 
-function toTableCategoryForm(setupData: DesktopSetupData): TableCategoryFormState[] {
+function toTableCategoryForm(setupData: CapabilitySetupData): TableCategoryFormState[] {
   const savedCategories = Array.isArray(setupData.tableCategories) ? setupData.tableCategories : [];
   if (savedCategories.length > 0) {
     return savedCategories.map((category) => ({
@@ -156,7 +149,7 @@ function toTableCategoryForm(setupData: DesktopSetupData): TableCategoryFormStat
     : [];
 }
 
-function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {
+function createAiServiceFormDrafts(setupData: CapabilitySetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {
   const profiles = Array.isArray(setupData.aiProfiles) ? setupData.aiProfiles : [];
   return Object.fromEntries(aiServicePresets.map((preset) => {
     const profile = profiles.find((candidate) => candidate.service === preset.id);
