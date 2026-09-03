@@ -10,7 +10,11 @@ interface UseDesktopSyncOptions {
   accessPhase: AppAccessPhase;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
-  onBootstrapSetup: (setup: DesktopSetupData, firstApplicationLoad: boolean) => void;
+  onBootstrapSetup: (
+    setup: DesktopSetupData,
+    capabilitySnapshot: BusinessCapabilitySnapshot,
+    firstApplicationLoad: boolean
+  ) => void;
   onDashboardLoaded?: (dashboardData: DesktopDashboardData) => void;
 }
 
@@ -118,9 +122,27 @@ export function useDesktopSync({
       setStatusMessage(message);
     };
 
-    void bridge.getBootstrapData()
-      .then((data) => {
+    const loadInitialCapabilitySnapshot = async () => {
+      try {
+        return await loadBusinessCapabilities();
+      } catch {
+        // main-entry registers capability IPC just after main.ts becomes ready.
+        // Keep a single short retry for the very small first-render race.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        if (!active) return undefined;
+        return loadBusinessCapabilities();
+      }
+    };
+
+    void Promise.all([
+      bridge.getBootstrapData(),
+      loadInitialCapabilitySnapshot()
+    ])
+      .then(([data, capabilitySnapshot]) => {
         if (!active) return;
+        if (!capabilitySnapshot) {
+          throw new Error("İşletme yetenekleri okunamadı.");
+        }
         const firstApplicationLoad = !appDataInitializedRef.current;
         setDashboardData((current) => ({
           ...current,
@@ -128,25 +150,12 @@ export function useDesktopSync({
           backupPath: data.backupPath,
           webModuleUrl: data.syncSettings.webModuleUrl
         }));
-        onBootstrapSetupRef.current(data.setup, firstApplicationLoad);
+        onBootstrapSetupRef.current(data.setup, capabilitySnapshot, firstApplicationLoad);
         appDataInitializedRef.current = true;
       })
       .catch(() => {
-        reportInitialError("Başlangıç ayarları okunamadı. Yerel veriler korunuyor; uygulamayı yeniden başlatmayı deneyin.");
+        reportInitialError("Başlangıç ayarları ve işletme yetenekleri birlikte okunamadı. Yerel veriler korunuyor; uygulamayı yeniden başlatmayı deneyin.");
       });
-
-    // main-entry registers the capability IPC immediately after main.ts is
-    // ready. Retry once to make startup deterministic even on a very fast
-    // renderer where the first effect wins that small registration race.
-    void loadBusinessCapabilities().catch(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      if (!active) return;
-      try {
-        await loadBusinessCapabilities();
-      } catch {
-        reportInitialError("İşletme yetenekleri okunamadı. Uygulamayı yeniden başlatmayı deneyin.");
-      }
-    });
 
     void loadDashboardData().catch(() => {
       reportInitialError("Yerel işletme verileri okunamadı. Uygulamayı yeniden başlatmayı deneyin.");
