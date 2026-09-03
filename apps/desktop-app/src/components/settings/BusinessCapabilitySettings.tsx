@@ -70,8 +70,18 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
   },
   {
     title: "Ticaret Çekirdeği",
-    description: "Restoran ve yaklaşan Market profilinin ortak katalog, stok ve satış omurgası.",
+    description: "Restoran ve Market çalışma alanlarının ortak katalog, stok ve satış omurgası.",
     capabilities: [C.CATALOG, C.INVENTORY, C.SALES]
+  },
+  {
+    title: "Perakende",
+    description: "Market çalışma alanını açan barkod, satın alma, tedarikçi ve etiket yetenekleri.",
+    capabilities: [
+      C.RETAIL_BARCODE,
+      C.RETAIL_PURCHASING,
+      C.RETAIL_SUPPLIERS,
+      C.RETAIL_LABELS
+    ]
   }
 ];
 
