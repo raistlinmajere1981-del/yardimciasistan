@@ -40,6 +40,7 @@ export function MarketPage() {
   const catalogEnabled = runtimeHasCapability(snapshot, C.CATALOG);
   const inventoryEnabled = runtimeHasCapability(snapshot, C.INVENTORY);
   const salesEnabled = runtimeHasCapability(snapshot, C.SALES);
+  const barcodeEnabled = runtimeHasCapability(snapshot, C.RETAIL_BARCODE);
   const purchasingEnabled = runtimeHasCapability(snapshot, C.RETAIL_PURCHASING);
   const suppliersEnabled = runtimeHasCapability(snapshot, C.RETAIL_SUPPLIERS);
   const labelsEnabled = runtimeHasCapability(snapshot, C.RETAIL_LABELS);
@@ -124,6 +125,7 @@ export function MarketPage() {
         <MarketQuickSaleWorkspace
           products={products}
           categories={categories}
+          barcodeEnabled={barcodeEnabled}
           busy={dataState === "loading"}
           onSaleCompleted={handleSaleCompleted}
           onError={(nextMessage) => handleStateChange("error", nextMessage)}
