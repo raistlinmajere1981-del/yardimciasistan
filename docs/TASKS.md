@@ -1,219 +1,248 @@
 # Yardımcı Asistan — Güncel Görev Planı
 
-Bu belge Yardımcı Asistan'ın **güncel çalışma sırasını** tanımlar. İlk monorepo kurulumundan Android companion'a kadar olan tarihsel geliştirme görevleri tamamlanmıştır; ayrıntıları Git geçmişinde korunur.
+> Güncellik: 2026-09-03
 
-Güncel ürün davranışı için bu dosya, `docs/PRODUCT_STATUS.md`, `docs/PRE_PILOT_HARDENING_2026-08.md` ve `docs/PILOT_FIELD_TEST.md` birlikte esas alınmalıdır.
+Bu belge Yardımcı Asistan'ın güncel çalışma sırasını tanımlar. Ayrıntılı capability/commerce kararları için `docs/MODULAR_BUSINESS_FOUNDATION.md` esas alınır.
 
-## Güncel ürün sözleşmesi
+## Değiştirilmeyecek ürün sözleşmesi
 
-Aşağıdaki kararlar geriye dönülüp eski akışlara çevrilmemelidir:
-
-- Web formu veya Web AI talebi **önce firma hostingine kaydolur**.
-- WhatsApp ana kayıt kanalı değildir; başarılı kayıttan sonra isteğe bağlı ek iletişim yoludur.
-- Masaüstü uygulaması local-first çalışır; internet kesilmesi temel operasyonları durdurmaz.
-- Android companion PC SQLite'a doğrudan bağlanmaz; hosting action/snapshot sözleşmesini kullanır.
-- Yeni Android cihaz varsayılan olarak pasif/onay bekler.
-- Onaylı Android cihaz mümkün olduğunda işletme genel `sync_secret` yerine cihaz başına token kullanır.
-- AI yardımcı katmandır; ürünün rezervasyon, müşteri, oda, masa, finans ve günlük iş omurgası AI olmadan çalışmalıdır.
-- Resmî WhatsApp API ve doğrudan Android↔PC LAN modu v1 pilot kriteri değildir.
+- Masaüstü local-first çalışır; internet temel operasyonları durdurmaz.
+- Hosting mini API, Web/Android ile Desktop arasında değişim noktasıdır; PC'ye dışarıdan port açılmaz.
+- AI ve WhatsApp yardımcı/opsiyonel servislerdir.
+- Android doğrudan Desktop SQLite'a bağlanmaz; action/snapshot sözleşmesini kullanır.
+- İşletme profili yalnız ilk preset'tir.
+- **Persisted business capabilities runtime source of truth'tur.**
+- Yeni feature gate'leri `businessType === ...` üzerinden yazılmaz.
+- Hibrit işletmeler yeni business type kombinasyonlarıyla değil capability ekleme/çıkarma ile oluşur.
+- Renderer SQLite/store import etmez; Electron erişimi preload/IPC üzerinden yapılır.
+- Sandboxed preload dependency-light kalır.
 
 ---
 
-# P0 — Pilot öncesi kapılar
+# Aşama 0 — Modüler altyapı checkpoint'i
 
-## P0.1 — Otomatik pilot kontrolünü yeşile getir
+Bu aşama Market UI başlamadan önce tamamlanmış kabul edilir.
 
-Komut:
+Tam kontrol:
 
 ```bash
-node scripts/pilot-check.mjs
+node scripts/check-modular-foundation.mjs
 ```
 
-Kabul kriterleri:
+Beklenen son satır:
 
-- build/typecheck/PHP lint geçer,
-- web talebi + public abuse guard geçer,
-- otomatik sync geçer,
-- Android cihaz onayı ve cihaz token testleri geçer,
-- finans, oda hesabı ve restoran→oda transfer testleri geçer,
-- demo web→desktop→Android akışı geçer,
-- `artifacts/pilot-check/latest.json` sonucu `passed` olur.
+```text
+modular-foundation-check-ok
+```
 
-GitHub Actions tekrar çalışabilir hale geldiğinde aynı çekirdek sözleşmeler CI'da da yeşil görülmelidir.
+Runner şunları kapsar:
 
-## P0.2 — Windows temiz kurulum
+```text
+build:packages
+desktop build
+quality:strict
+business capabilities smoke
+capability runtime v2 smoke
+setup capability contract smoke
+commerce foundation smoke
+commerce runtime smoke
+```
 
-`docs/PILOT_FIELD_TEST.md` içindeki Windows turu gerçek hedef makinede uygulanır.
+Aşağıdaki eski alanlar bazı backend compatibility yollarında fiziksel olarak kalabilir ancak yeni kod tarafından source of truth olarak kullanılmaz:
 
-Temiz kurulum ve `Verileri Sıfırla` sonrasında yalnız şema oluşturulur. İşletme,
-oda, masa, menü ve stok örnekleri otomatik eklenmez; uygulama kurulum sihirbazıyla
-açılır. Tanıtım verisi yalnız açıkça seçilen `pension-restaurant` demo profiline aittir.
+```text
+business.modules_json
+settings.rooms_enabled
+settings.tables_enabled
+settings.qr_menu_enabled
+```
 
-Kabul kriterleri:
-
-- NSIS kurulum başarılı,
-- uygulama ilk açılışta çalışıyor,
-- user-data ve backup klasörü doğru yerde,
-- restart sonrası veri korunuyor,
-- WhatsApp WebView ve hosting bağlantısı çalışıyor.
-
-## P0.3 — Hibrit işletme günü
-
-Pansiyon + restoran senaryosu sahte verilerle baştan sona uygulanır.
-
-Kabul kriterleri:
-
-- rezervasyon → check-in → oda hesabı,
-- restoran adisyonu → stok düşümü → hesap bekliyor,
-- restoran hesabını odaya yazma,
-- kısmi ödeme → restart → kalan bakiye,
-- çıkış ve kasa hareketi,
-- hiçbir aşamada duplicate stok/gelir/kayıt oluşmaması.
-
-## P0.4 — Android gerçek telefon
-
-Kabul kriterleri:
-
-- yeni telefon veri görmeden onay bekler,
-- masaüstü onayından sonra çalışır,
-- pasifleştirilince veri/action yetkisi kapanır,
-- revoke/yeniden eşleştirme akışı anlaşılırdır,
-- release APK işletme genel anahtarını binary içinde taşımaz.
-
-## P0.5 — Restart + kalıcı sync kuyruğu
-
-Finans/oda hesabı veya restoran→oda aktarımı yapıldıktan hemen sonra uygulama kapatılıp açılır.
-
-Kabul kriterleri:
-
-- yerel işlem kaybolmaz,
-- `android_snapshot` outbox işi restart sonrası korunur,
-- Android sonraki sync'te güncel duruma gelir.
-
-## P0.6 — Kimlik verisi kararı
-
-İlk pilotta gerçek kimlik verisi toplanmayacaksa bu açıkça pilot kuralı olarak korunur.
-
-Gerçek kimlik verisi toplanacaksa ayrıca:
-
-- güncel KVKK gereksinimleri,
-- at-rest şifreleme/anahtar saklama,
-- yedek/restore ve anahtar kurtarma
-
-birlikte tasarlanmadan "güvenli saklama tamamlandı" kabul edilmez.
+Bunların fiziksel silinmesi, büyük setup/database persistence kodu daha küçük repository/service katmanlarına ayrılırken yapılacak bakım işidir; Market mimarisini bloke etmez.
 
 ---
 
-# P1 — Pilot sırasında ölçülecek konular
+# Aşama 1 — Market / Perakende MVP
 
-Bunlar ilk tanıtımı otomatik olarak engellemez; gerçek işletme kullanımıyla ölçülür.
+Yeni session'ın ana işi budur.
 
-## P1.1 — İlk kurulum sürtünmesi
+## M1.1 — Commerce repository tamamla
 
-Ölç:
+- kategori CRUD
+- ürün liste/arama
+- exact barkod lookup
+- stok bakiye ve hareket geçmişi
+- fiziksel sayım
+- tedarikçi CRUD
+- temel satın alma / stock-in servis sınırı
+- gerekirse minimum purchase order servisleri
 
-- işletme tipi seçimi anlaşılır mı,
-- hangi alanlarda kullanıcı durup yardım istiyor,
-- oda/masa/menu tanımı ne kadar kolay,
-- web bağlantısı ve Android eşleştirme teknik mi hissettiriyor.
+## M1.2 — Market IPC / preload contract
 
-## P1.2 — Ana ekran anlaşılabilirliği
+```text
+Renderer Market Workspace
+  ↓
+preload bridge
+  ↓
+commerce IPC
+  ↓
+commerce-runtime
+  ↓
+commerce-store
+  ↓
+SQLite
+```
 
-Ölç:
+Her mutation ilgili capability ile korunmalıdır.
 
-- işletme sahibi günün işini Ana Ekran'dan anlayabiliyor mu,
-- Sistem Sağlığı paneli gerçekten işe yarıyor mu,
-- teknik terimler azaltılmalı mı.
+## M1.3 — Market workspace
 
-## P1.3 — Pansiyon operasyonu
+İlk ekran küçük işletmenin günlük hızına göre düzenlenir:
 
-Ölç:
+```text
+Hızlı Satış
+Ürünler
+Stok
+Tedarikçiler / Alım
+Etiketler
+```
 
-- rezervasyon, oda atama, check-in ve oda hesabı sırası doğal mı,
-- ödeme/çıkış ekranlarında fazla adım var mı,
-- konaklama geçmişi bulunabiliyor mu.
+Büyük ERP dashboard'u yapılmaz.
 
-## P1.4 — Restoran operasyonu
+## M1.4 — Hızlı satış
 
-Ölç:
+Kabul kriterleri:
 
-- masaya sipariş ekleme hızlı mı,
-- hesap bekliyor/ödendi ayrımı anlaşılır mı,
-- odaya yaz paneli doğru zamanda görünür mü,
-- stok uyarıları günlük kullanımda faydalı mı.
+- barkod veya ürün arama,
+- sepete ekleme,
+- adet değiştirme,
+- toplam hesaplama,
+- basit ödeme yöntemi (nakit/kart),
+- tek transaction ile paid sale,
+- stok düşümü,
+- yetersiz stok/başarısız işlemde tam rollback,
+- duplicate sale üretmeme.
 
-## P1.5 — Android companion
+## M1.5 — Barkod abstraction
 
-Ölç:
+İlk sıra:
 
-- işletme sahibi rol/izin mantığını anlıyor mu,
-- personel için gereksiz ekran var mı,
-- mobilde hangi 2–3 işlem gerçekten sık kullanılıyor.
+1. Simulator / elle barkod girişi
+2. USB keyboard scanner
+3. Android camera scanner (sonraki alt faz)
 
-## P1.6 — WhatsApp ve AI
+Market MVP gerçek scanner donanımına bağımlı olmamalıdır.
 
-Ölç:
+## M1.6 — Etiket MVP
 
-- hazır mesaj/WhatsApp Web gerçek iş akışını hızlandırıyor mu,
-- AI cevap/özetleri gerçekten kullanılıyor mu,
-- AI kapalıyken ürünün algılanan değeri yeterli mi.
+İlk sürüm:
+
+- Preview
+- PDF/PNG
+
+Gerçek saha yazıcısı belli olduğunda adapter:
+
+- ZPL
+- TSPL
+- gerekirse Windows printer adapter
+
+## M1.7 — Market profilini aç
+
+Market workspace'in minimum günlük akışı ve smoke testleri tamamlandıktan sonra shared registry'de:
+
+```text
+market.availability = available
+```
+
+olur ve setup selector'a eklenir.
 
 ---
 
-# P2 — Pilot sonrası toplu iyileştirme
+# Aşama 2 — Market saha testi
 
-Pilot boyunca küçük UX istekleri tek tek anında uygulanmaz; veri bütünlüğü veya işi durdurma sorunu değilse gruplanır.
+MVP tamamlandıktan sonra sahte ürün verisiyle en az şu akışlar test edilir:
 
-Örnekler:
+- yeni ürün + barkod,
+- ilk stok girişi,
+- barkodla art arda satış,
+- stok minimum uyarısı,
+- fiziksel sayım farkı,
+- fire/waste hareketi,
+- tedarikçiden alım,
+- restart sonrası stok/satış bütünlüğü,
+- yanlış/tekrarlı barkod,
+- yetersiz stok rollback,
+- profil/capability kapatıldığında Market mutation'larının backend'de reddedilmesi.
 
-- buton/etiket isimleri,
-- panel sıralaması,
-- varsayılan filtreler,
-- daha az tıklama,
-- rapor sunumu,
-- küçük görsel düzenlemeler.
+---
 
-Pilot sonunda benzer şikâyetler tek paket halinde ele alınır.
+# Aşama 3 — Ortak commerce entegrasyon kararları
+
+Market sahası görüldükten sonra restoran ve retail commerce ortaklığı tekrar değerlendirilir.
+
+Şimdilik:
+
+- restoran `menu_items/table_orders` yapısı korunur,
+- retail `catalog_products/commerce_sales/inventory_*` kullanır,
+- iki domain birbirine zorla migrate edilmez,
+- ortak kavramlar shared commerce tiplerinde tutulur.
+
+Gerçek tekrar ve saha ihtiyacı görülmeden iki veri modelini birleştirme refaktörü yapılmaz.
+
+---
+
+# Paralel kalite kuralları
+
+Her anlamlı paket sonunda:
+
+```bash
+npm run quality:strict
+```
+
+Market altyapı checkpoint'lerinde ayrıca:
+
+```bash
+node scripts/check-modular-foundation.mjs
+```
+
+Yeni testler mevcut runner'a veya Market'e özel yeni smoke'a eklenmelidir.
+
+Lint için yeni error kabul edilmez. Knip'te yeni unused file/dependency/unlisted dependency bırakılmaz. Design audit baseline borcu artırılmaz. Architecture audit kuralları gevşetilmez.
+
+---
+
+# Pilot / dağıtım backlog'u
+
+Market geliştirmesinden bağımsız olarak mevcut ürünün gerçek saha doğrulamasında hâlâ değerlendirilecek başlıklar:
+
+- hedef Windows bilgisayarda temiz installer testi,
+- birkaç günlük pansiyon + restoran gerçekçi kullanım,
+- restart + kalıcı sync kuyruğu,
+- gerçek Android cihaz onay/token/pasifleştirme akışı,
+- WhatsApp WebView ve gerçek hosting bağlantısı,
+- veri/kimlik kullanımına göre KVKK ve at-rest encryption kararı.
+
+Bunlar capability-first Market mimarisini eski sektör modeline geri çevirmek için gerekçe değildir.
 
 ---
 
 # Bilinçli olarak ertelenenler
 
-Aşağıdakiler gerçek pilot ihtiyacı kanıtlanmadan eklenmez:
+Gerçek ihtiyaç kanıtlanmadan eklenmez:
 
 - resmî WhatsApp Business API,
 - Android↔PC doğrudan LAN modu,
 - merkezi Yardımcı Asistan cloud servisi,
-- büyük ölçekli rol/organizasyon sistemi,
-- ileri muhasebe/ERP özellikleri,
-- büyük frontend/backend refaktörü,
-- yeni sektörler.
+- büyük ölçekli organizasyon/rol sistemi,
+- ileri muhasebe/ERP,
+- gelişmiş satın alma/lojistik sistemi,
+- her yazıcı/scanner markasına özel doğrudan UI kodu.
 
 ---
 
-# P0 hata tanımı
+# Yeni session başlangıç sırası
 
-Aşağıdakilerden biri görülürse yeni özellik işi durur ve önce bu hata çözülür:
-
-- para hareketinin kaybolması veya iki kez yazılması,
-- stokun yanlış/iki kez düşmesi,
-- rezervasyon/müşteri/oda kaydının kaybolması veya duplicate olması,
-- restart sonrası kayıt veya sync kuyruğu kaybı,
-- onaysız/pasif cihazın işletme verisine erişmesi,
-- installer veya uygulama açılışının hedef Windows'ta çalışmaması,
-- yedeğin aktif veritabanını bozması.
-
----
-
-# Bir pilot düzeltmesinin tamamlanma tanımı
-
-Her düzeltmede mümkünse:
-
-1. problem tekrar üretilebilir olmalı,
-2. veri bütünlüğü etkisi açıklanmalı,
-3. kod düzeltmesi küçük tutulmalı,
-4. ilgili otomatik smoke/regresyon testi eklenmeli veya güncellenmeli,
-5. `pilot-check` tekrar çalıştırılmalı,
-6. saha davranışı değiştiyse `PILOT_FIELD_TEST.md` veya `PRODUCT_STATUS.md` güncellenmeli.
-
-Şu aşamadaki ana hedef daha fazla özellik değil: **ilk gerçek işletmenin üçüncü gününde sistemi bırakmasına neden olacak problemi pilot başlamadan yakalamak.**
+1. Repo `main` güncel head'i oku.
+2. `docs/MODULAR_BUSINESS_FOUNDATION.md` dosyasını oku.
+3. `node scripts/check-modular-foundation.mjs` çalıştır.
+4. Yeşilse **M1.1 Commerce repository** işinden başla.
+5. Market UI'ye geçmeden önce commerce IPC/runtime sözleşmesini tamamla.
