@@ -4,6 +4,52 @@
   gap: var(--space-4);
 }
 
+.market-barcode-panel {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--primary-border);
+  border-radius:var(--radius-md);
+  background: var(--primary-bg);
+}
+
+.market-barcode-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.market-barcode-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.market-barcode-heading > span svg {
+  color: var(--primary);
+}
+
+.market-barcode-heading select,
+.market-barcode-simulator input {
+  min-height: var(--control-height);
+  border: 1px solid var(--control-border);
+  border-radius:var(--radius-md);
+  background: var(--field);
+  color: var(--ink);
+  padding: 0 var(--space-3);
+}
+
+.market-barcode-simulator {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.market-barcode-status {
+  color: var(--ink-muted);
+}
+
 .market-sale-filters {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr);
@@ -208,6 +254,12 @@
 }
 
 @media (max-width: 720px) {
+  .market-barcode-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .market-barcode-simulator,
   .market-sale-filters,
   .market-sale-payment,
   .market-sale-cart-line {
