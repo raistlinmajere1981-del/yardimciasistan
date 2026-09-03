@@ -1,6 +1,7 @@
 import {
   BUSINESS_CAPABILITIES,
   type BusinessCapability,
+  type CatalogCategory,
   type CatalogProduct,
   type CommerceSale,
   type CommerceSupplier,
@@ -11,6 +12,15 @@ import {
   assertPersistedBusinessCapability,
   hasPersistedBusinessCapability
 } from "./business-capability-runtime";
+import {
+  deleteCatalogCategory,
+  getCatalogCategory,
+  listCatalogCategories,
+  saveCatalogCategory,
+  type DeleteCatalogCategoryResult,
+  type ListCatalogCategoriesOptions,
+  type SaveCatalogCategoryInput
+} from "./commerce-category-store";
 import {
   applyInventoryMovement,
   createPaidCommerceSale,
@@ -60,6 +70,54 @@ export function getCommerceRuntimeSnapshot(databasePath: string): CommerceStoreS
   };
 }
 
+export function listRuntimeCatalogCategories(
+  databasePath: string,
+  options: ListCatalogCategoriesOptions = {}
+): CatalogCategory[] {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  return listCatalogCategories(databasePath, options);
+}
+
+export function getRuntimeCatalogCategory(
+  databasePath: string,
+  categoryId: string
+): CatalogCategory | null {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  return getCatalogCategory(databasePath, categoryId);
+}
+
+export function saveRuntimeCatalogCategory(
+  databasePath: string,
+  input: SaveCatalogCategoryInput
+): CatalogCategory {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  return saveCatalogCategory(databasePath, input);
+}
+
+export function deleteRuntimeCatalogCategory(
+  databasePath: string,
+  categoryId: string
+): DeleteCatalogCategoryResult {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  return deleteCatalogCategory(databasePath, categoryId);
+}
+
 export function listRuntimeCatalogProducts(
   databasePath: string,
   options: ListCatalogProductsOptions = {}
@@ -88,6 +146,12 @@ export function saveRuntimeCatalogProduct(
       "Stok takibi bu işletmede etkin değil."
     );
   }
+
+  const categoryId = String(input.categoryId ?? "").trim();
+  if (categoryId && !getCatalogCategory(databasePath, categoryId)) {
+    throw new Error("Seçilen ürün kategorisi bulunamadı.");
+  }
+
   return saveCatalogProduct(databasePath, input);
 }
 
