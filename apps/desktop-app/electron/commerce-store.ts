@@ -17,6 +17,13 @@ const INVENTORY_MOVEMENT_TYPES = new Set<InventoryMovementType>([
   "sale", "purchase", "waste", "count", "adjust", "return_in", "return_out"
 ]);
 
+export interface ListCatalogProductsOptions {
+  search?: string;
+  categoryId?: string;
+  activeOnly?: boolean;
+  limit?: number;
+}
+
 export interface SaveCatalogProductInput {
   id?: string;
   categoryId?: string;
@@ -46,6 +53,29 @@ export interface ApplyInventoryMovementInput {
   actorSource?: string;
 }
 
+export interface ListInventoryMovementsOptions {
+  productId?: string;
+  locationId?: string;
+  type?: InventoryMovementType;
+  limit?: number;
+}
+
+export interface SetInventoryCountInput {
+  productId: string;
+  locationId?: string;
+  countedQuantity: number;
+  unitCost?: number;
+  referenceType?: string;
+  referenceId?: string;
+  note?: string;
+  actorSource?: string;
+}
+
+export interface InventoryCountResult {
+  balance: InventoryBalance;
+  movement: InventoryMovement | null;
+}
+
 export interface CreateCommerceSaleInput {
   paymentMethod?: string;
   source?: string;
@@ -55,6 +85,12 @@ export interface CreateCommerceSaleInput {
     productId: string;
     quantity: number;
   }>;
+}
+
+export interface ListCommerceSuppliersOptions {
+  search?: string;
+  activeOnly?: boolean;
+  limit?: number;
 }
 
 export interface SaveCommerceSupplierInput {
@@ -85,6 +121,12 @@ function roundMoney(value: number) {
 
 function roundQuantity(value: number) {
   return Math.round((Number(value) + Number.EPSILON) * 10000) / 10000;
+}
+
+function normalizeLimit(value: unknown, fallback = 200, maximum = 500) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(1, Math.min(maximum, Math.trunc(numeric)));
 }
 
 function activeBusinessId(database: DatabaseSync) {
@@ -146,6 +188,24 @@ function mapSupplier(row: Record<string, unknown>): CommerceSupplier {
   };
 }
 
+function mapInventoryMovement(row: Record<string, unknown>): InventoryMovement {
+  return {
+    id: String(row.id ?? ""),
+    businessId: String(row.business_id ?? ""),
+    productId: String(row.product_id ?? ""),
+    locationId: String(row.location_id ?? ""),
+    type: String(row.movement_type ?? "adjust") as InventoryMovementType,
+    quantityDelta: roundQuantity(Number(row.quantity_delta ?? 0)),
+    quantityAfter: roundQuantity(Number(row.quantity_after ?? 0)),
+    unitCost: Math.max(0, roundMoney(Number(row.unit_cost ?? 0))),
+    referenceType: String(row.reference_type ?? ""),
+    referenceId: String(row.reference_id ?? ""),
+    note: String(row.note ?? ""),
+    actorSource: String(row.actor_source ?? ""),
+    createdAt: String(row.created_at ?? "")
+  };
+}
+
 function ensurePrimaryLocation(database: DatabaseSync, businessId: string, now = new Date().toISOString()) {
   const existing = database.prepare(`
     SELECT id
@@ -173,12 +233,53 @@ function getProductRow(database: DatabaseSync, businessId: string, productId: st
   `).get(productId, businessId) as Record<string, unknown> | undefined;
 }
 
+function requireTrackedProductRow(database: DatabaseSync, businessId: string, productIdInput: string) {
+  const productId = String(productIdInput ?? "").trim();
+  const product = getProductRow(database, businessId, productId);
+  if (!product) throw new Error("Stok işlemi için ürün bulunamadı.");
+  if (Number(product.track_inventory ?? 0) !== 1) {
+    throw new Error("Bu ürün stok takibine kapalı.");
+  }
+  return { productId, product };
+}
+
+function resolveInventoryLocation(
+  database: DatabaseSync,
+  businessId: string,
+  locationIdInput: string | undefined,
+  now = new Date().toISOString()
+) {
+  const locationId = String(locationIdInput ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
+  const location = database.prepare(`
+    SELECT id
+    FROM inventory_locations
+    WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
+    LIMIT 1
+  `).get(locationId, businessId) as { id?: unknown } | undefined;
+  if (!location?.id) throw new Error("Stok konumu bulunamadı.");
+  return locationId;
+}
+
 function getInventoryBalanceRow(database: DatabaseSync, productId: string, locationId: string) {
   return database.prepare(`
     SELECT quantity, minimum_quantity, updated_at
     FROM inventory_balances
     WHERE product_id = ? AND location_id = ?
   `).get(productId, locationId) as Record<string, unknown> | undefined;
+}
+
+function mapInventoryBalance(
+  productId: string,
+  locationId: string,
+  row: Record<string, unknown> | undefined
+): InventoryBalance {
+  return {
+    productId,
+    locationId,
+    quantity: roundQuantity(Number(row?.quantity ?? 0)),
+    minimumQuantity: Math.max(0, roundQuantity(Number(row?.minimum_quantity ?? 0))),
+    updatedAt: String(row?.updated_at ?? "")
+  };
 }
 
 function applyInventoryMovementInTransaction(
@@ -190,21 +291,8 @@ function applyInventoryMovementInTransaction(
   if (!INVENTORY_MOVEMENT_TYPES.has(input.type)) {
     throw new Error(`Geçersiz stok hareketi: ${input.type}`);
   }
-  const productId = String(input.productId ?? "").trim();
-  const product = getProductRow(database, businessId, productId);
-  if (!product) throw new Error("Stok hareketi için ürün bulunamadı.");
-  if (Number(product.track_inventory ?? 0) !== 1) {
-    throw new Error("Bu ürün stok takibine kapalı.");
-  }
-
-  const locationId = String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
-  const location = database.prepare(`
-    SELECT id
-    FROM inventory_locations
-    WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
-    LIMIT 1
-  `).get(locationId, businessId) as { id?: unknown } | undefined;
-  if (!location?.id) throw new Error("Stok konumu bulunamadı.");
+  const { productId } = requireTrackedProductRow(database, businessId, input.productId);
+  const locationId = resolveInventoryLocation(database, businessId, input.locationId, now);
 
   const quantityDelta = roundQuantity(Number(input.quantityDelta));
   if (!Number.isFinite(quantityDelta) || quantityDelta === 0) {
@@ -273,16 +361,55 @@ function applyInventoryMovementInTransaction(
   };
 }
 
-export function listCatalogProducts(databasePath: string): CatalogProduct[] {
+export function listCatalogProducts(
+  databasePath: string,
+  options: ListCatalogProductsOptions = {}
+): CatalogProduct[] {
   const database = openDatabase(databasePath);
   try {
     const businessId = activeBusinessId(database);
+    const conditions = ["business_id = ?", "deleted_at = ''"];
+    const params: Array<string | number> = [businessId];
+    const search = String(options.search ?? "").trim();
+    const categoryId = String(options.categoryId ?? "").trim();
+
+    if (options.activeOnly) conditions.push("is_active = 1");
+    if (categoryId) {
+      conditions.push("category_id = ?");
+      params.push(categoryId);
+    }
+    if (search) {
+      const pattern = `%${search}%`;
+      conditions.push("(name LIKE ? COLLATE NOCASE OR sku LIKE ? COLLATE NOCASE OR barcode LIKE ? COLLATE NOCASE)");
+      params.push(pattern, pattern, pattern);
+    }
+    params.push(normalizeLimit(options.limit));
+
     return (database.prepare(`
       SELECT *
       FROM catalog_products
-      WHERE business_id = ? AND deleted_at = ''
+      WHERE ${conditions.join(" AND ")}
       ORDER BY is_active DESC, name COLLATE NOCASE ASC
-    `).all(businessId) as Array<Record<string, unknown>>).map(mapProduct);
+      LIMIT ?
+    `).all(...params) as Array<Record<string, unknown>>).map(mapProduct);
+  } finally {
+    database.close();
+  }
+}
+
+export function findCatalogProductByBarcode(databasePath: string, barcodeInput: string): CatalogProduct | null {
+  const database = openDatabase(databasePath);
+  try {
+    const businessId = activeBusinessId(database);
+    const barcode = String(barcodeInput ?? "").trim();
+    if (!barcode) throw new Error("Barkod boş olamaz.");
+    const row = database.prepare(`
+      SELECT *
+      FROM catalog_products
+      WHERE business_id = ? AND barcode = ? AND barcode <> '' AND is_active = 1 AND deleted_at = ''
+      LIMIT 1
+    `).get(businessId, barcode) as Record<string, unknown> | undefined;
+    return row ? mapProduct(row) : null;
   } finally {
     database.close();
   }
@@ -374,19 +501,59 @@ export function saveCatalogProduct(databasePath: string, input: SaveCatalogProdu
   }
 }
 
-export function getInventoryBalance(databasePath: string, productId: string, locationId?: string): InventoryBalance {
+export function getInventoryBalance(databasePath: string, productIdInput: string, locationId?: string): InventoryBalance {
   const database = openDatabase(databasePath);
   try {
     const businessId = activeBusinessId(database);
-    const resolvedLocationId = String(locationId ?? "").trim() || ensurePrimaryLocation(database, businessId);
-    const row = getInventoryBalanceRow(database, productId, resolvedLocationId);
-    return {
+    const { productId } = requireTrackedProductRow(database, businessId, productIdInput);
+    const resolvedLocationId = resolveInventoryLocation(database, businessId, locationId);
+    return mapInventoryBalance(
       productId,
-      locationId: resolvedLocationId,
-      quantity: roundQuantity(Number(row?.quantity ?? 0)),
-      minimumQuantity: Math.max(0, roundQuantity(Number(row?.minimum_quantity ?? 0))),
-      updatedAt: String(row?.updated_at ?? "")
-    };
+      resolvedLocationId,
+      getInventoryBalanceRow(database, productId, resolvedLocationId)
+    );
+  } finally {
+    database.close();
+  }
+}
+
+export function listInventoryMovements(
+  databasePath: string,
+  options: ListInventoryMovementsOptions = {}
+): InventoryMovement[] {
+  const database = openDatabase(databasePath);
+  try {
+    const businessId = activeBusinessId(database);
+    const conditions = ["business_id = ?"];
+    const params: Array<string | number> = [businessId];
+    const productId = String(options.productId ?? "").trim();
+    const locationId = String(options.locationId ?? "").trim();
+
+    if (productId) {
+      requireTrackedProductRow(database, businessId, productId);
+      conditions.push("product_id = ?");
+      params.push(productId);
+    }
+    if (locationId) {
+      conditions.push("location_id = ?");
+      params.push(locationId);
+    }
+    if (options.type !== undefined) {
+      if (!INVENTORY_MOVEMENT_TYPES.has(options.type)) {
+        throw new Error(`Geçersiz stok hareketi: ${options.type}`);
+      }
+      conditions.push("movement_type = ?");
+      params.push(options.type);
+    }
+    params.push(normalizeLimit(options.limit, 100, 500));
+
+    return (database.prepare(`
+      SELECT *
+      FROM inventory_movements
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?
+    `).all(...params) as Array<Record<string, unknown>>).map(mapInventoryMovement);
   } finally {
     database.close();
   }
@@ -402,6 +569,59 @@ export function applyInventoryMovement(databasePath: string, input: ApplyInvento
       const movement = applyInventoryMovementInTransaction(database, businessId, input, now);
       database.exec("COMMIT");
       return movement;
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+  } finally {
+    database.close();
+  }
+}
+
+export function setInventoryCount(databasePath: string, input: SetInventoryCountInput): InventoryCountResult {
+  const countedQuantity = roundQuantity(Number(input.countedQuantity));
+  if (!Number.isFinite(countedQuantity) || countedQuantity < 0) {
+    throw new Error("Sayım miktarı 0 veya daha büyük bir sayı olmalı.");
+  }
+
+  const database = openDatabase(databasePath);
+  try {
+    const businessId = activeBusinessId(database);
+    const now = new Date().toISOString();
+    database.exec("BEGIN IMMEDIATE");
+    try {
+      const { productId } = requireTrackedProductRow(database, businessId, input.productId);
+      const locationId = resolveInventoryLocation(database, businessId, input.locationId, now);
+      const current = mapInventoryBalance(
+        productId,
+        locationId,
+        getInventoryBalanceRow(database, productId, locationId)
+      );
+      const quantityDelta = roundQuantity(countedQuantity - current.quantity);
+
+      if (quantityDelta === 0) {
+        database.exec("COMMIT");
+        return { balance: current, movement: null };
+      }
+
+      const movement = applyInventoryMovementInTransaction(database, businessId, {
+        productId,
+        locationId,
+        type: "count",
+        quantityDelta,
+        unitCost: input.unitCost,
+        referenceType: input.referenceType || "inventory_count",
+        referenceId: input.referenceId,
+        note: input.note || `Fiziksel sayım: ${countedQuantity}`,
+        actorSource: input.actorSource || "desktop"
+      }, now);
+      const balance = mapInventoryBalance(
+        productId,
+        locationId,
+        getInventoryBalanceRow(database, productId, locationId)
+      );
+      database.exec("COMMIT");
+      return { balance, movement };
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;
@@ -514,6 +734,37 @@ export function createPaidCommerceSale(databasePath: string, input: CreateCommer
       createdAt: now,
       updatedAt: now
     };
+  } finally {
+    database.close();
+  }
+}
+
+export function listCommerceSuppliers(
+  databasePath: string,
+  options: ListCommerceSuppliersOptions = {}
+): CommerceSupplier[] {
+  const database = openDatabase(databasePath);
+  try {
+    const businessId = activeBusinessId(database);
+    const conditions = ["business_id = ?", "deleted_at = ''"];
+    const params: Array<string | number> = [businessId];
+    const search = String(options.search ?? "").trim();
+
+    if (options.activeOnly) conditions.push("is_active = 1");
+    if (search) {
+      const pattern = `%${search}%`;
+      conditions.push("(name LIKE ? COLLATE NOCASE OR phone LIKE ? COLLATE NOCASE OR email LIKE ? COLLATE NOCASE OR tax_number LIKE ? COLLATE NOCASE)");
+      params.push(pattern, pattern, pattern, pattern);
+    }
+    params.push(normalizeLimit(options.limit));
+
+    return (database.prepare(`
+      SELECT *
+      FROM commerce_suppliers
+      WHERE ${conditions.join(" AND ")}
+      ORDER BY is_active DESC, name COLLATE NOCASE ASC
+      LIMIT ?
+    `).all(...params) as Array<Record<string, unknown>>).map(mapSupplier);
   } finally {
     database.close();
   }
