@@ -13,7 +13,8 @@ const checks = [
   ["node", ["scripts/smoke-commerce-ipc-contract.mjs"]],
   ["node", ["scripts/smoke-market-workspace-contract.mjs"]],
   ["node", ["scripts/smoke-market-quick-sale-contract.mjs"]],
-  ["node", ["scripts/smoke-market-sale-runtime.mjs"]]
+  ["node", ["scripts/smoke-market-sale-runtime.mjs"]],
+  ["node", ["scripts/smoke-market-barcode-input-contract.mjs"]]
 ];
 
 for (const [command, args] of checks) {
