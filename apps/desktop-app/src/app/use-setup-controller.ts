@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
-import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
+import type { DesktopDashboardData } from "../../electron/database";
 import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import { defaultSetupData } from "./bootstrap-defaults";
@@ -10,15 +10,21 @@ import {
   toSetupForm,
   type CapabilitySetupFormState
 } from "./setup-model";
+import {
+  toCapabilitySetupData,
+  type CapabilitySetupData
+} from "./setup-runtime";
 
 interface UseSetupControllerOptions {
   onInitialSetupReady?: () => void;
 }
 
+const defaultCapabilitySetupData = toCapabilitySetupData(defaultSetupData, null);
+
 export function useSetupController({ onInitialSetupReady }: UseSetupControllerOptions = {}) {
   const onInitialSetupReadyRef = useRef(onInitialSetupReady);
-  const [setupData, setSetupData] = useState<DesktopSetupData>(defaultSetupData);
-  const [setupForm, setSetupFormState] = useState<CapabilitySetupFormState>(() => toSetupForm(defaultSetupData));
+  const [setupData, setSetupData] = useState<CapabilitySetupData>(defaultCapabilitySetupData);
+  const [setupForm, setSetupFormState] = useState<CapabilitySetupFormState>(() => toSetupForm(defaultCapabilitySetupData));
   const [setupMode, setSetupMode] = useState(false);
   const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
@@ -41,12 +47,11 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
   }, [setupForm.aiService, setupForm.aiStoredApiKeyConfigured]);
 
   function applyBootstrapSetup(
-    nextSetupData: DesktopSetupData,
-    capabilitySnapshot: BusinessCapabilitySnapshot,
+    nextSetupData: CapabilitySetupData,
     firstApplicationLoad: boolean
   ) {
     setSetupData(nextSetupData);
-    setSetupFormState(toSetupForm(nextSetupData, capabilitySnapshot));
+    setSetupFormState(toSetupForm(nextSetupData));
     setSetupMode(nextSetupData.setupRequired);
     if (!nextSetupData.setupRequired && firstApplicationLoad) {
       onInitialSetupReadyRef.current?.();
@@ -190,9 +195,10 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       return;
     }
 
-    setSetupData(result.setupData);
+    const nextSetupData = toCapabilitySetupData(result.setupData, capabilitySnapshot);
+    setSetupData(nextSetupData);
     setDashboardData(result.dashboardData);
-    setSetupFormState(toSetupForm(result.setupData, capabilitySnapshot));
+    setSetupFormState(toSetupForm(nextSetupData));
     const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
     setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
     setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
