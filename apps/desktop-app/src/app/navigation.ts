@@ -5,6 +5,7 @@ import {
   Menu as MenuIcon,
   MessageCircle,
   Settings,
+  Store,
   Users,
   UtensilsCrossed,
   WalletCards,
@@ -14,7 +15,7 @@ import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { runtimeHasCapability } from "./capabilities";
 
-export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "menu" | "messages" | "reports" | "settings";
+export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "messages" | "reports" | "settings";
 
 export interface NavigationItem {
   id: DesktopPage;
@@ -26,6 +27,14 @@ const baseItems: NavigationItem[] = [
   { id: "dashboard", label: "Ana Ekran", icon: Home },
   { id: "customerWork", label: "Müşteri İşleri", icon: Users }
 ];
+
+export function hasRetailWorkspaceCapability(
+  capabilities: BusinessCapabilitySnapshot | null | undefined
+): boolean {
+  const C = BUSINESS_CAPABILITIES;
+  return [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS]
+    .some((capability) => runtimeHasCapability(capabilities, capability));
+}
 
 export function buildNavigation(capabilities: BusinessCapabilitySnapshot | null | undefined): NavigationItem[] {
   const items = [...baseItems];
@@ -41,6 +50,10 @@ export function buildNavigation(capabilities: BusinessCapabilitySnapshot | null 
 
   if (runtimeHasCapability(capabilities, C.FOOD_TABLES)) {
     items.push({ id: "restaurant", label: "Restoran", icon: UtensilsCrossed });
+  }
+
+  if (hasRetailWorkspaceCapability(capabilities)) {
+    items.push({ id: "market", label: "Market", icon: Store });
   }
 
   if (runtimeHasCapability(capabilities, C.FOOD_MENU)) {
@@ -65,6 +78,7 @@ export function getPageMeta(page: DesktopPage) {
     calendar: { eyebrow: "Operasyon planı", title: "Takvim", description: "Giriş, çıkış, rezervasyon ve günlük işleri gün veya hafta bazında görün." },
     pension: { eyebrow: "Konaklama", title: "Pansiyon", description: "Rezervasyonları, odaları ve günlük işleri izleyin." },
     restaurant: { eyebrow: "Servis", title: "Restoran", description: "Masa durumlarını ve servis işlerini takip edin." },
+    market: { eyebrow: "Perakende operasyonu", title: "Market", description: "Ürün, stok, tedarik ve satış akışlarını tek çalışma alanında yönetin." },
     menu: { eyebrow: "İçerik", title: "Menü", description: "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın." },
     messages: { eyebrow: "Mesaj merkezi", title: "Mesajlar", description: "Hazır yanıtları ve WhatsApp görüşmelerini yönetin." },
     reports: { eyebrow: "Günlük para takibi", title: "Kasa", description: "Bugünün para giriş çıkışını ve bekleyen alacakları takip edin." },
