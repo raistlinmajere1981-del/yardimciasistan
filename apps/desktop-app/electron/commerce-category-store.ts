@@ -165,7 +165,7 @@ export function saveCatalogCategory(
     if (!name) throw new Error("Kategori adı gerekli.");
     if (name.length > 160) throw new Error("Kategori adı en fazla 160 karakter olabilir.");
 
-    const id = String(input.id ?? "").trim() || createId("catalog_category_");
+    const id = String(input.id ?? "").trim() || createId("cat_");
     const parentId = String(input.parentId ?? "").trim();
     const code = String(input.code ?? "").trim().slice(0, 80);
     const sortOrder = normalizeSortOrder(input.sortOrder);
