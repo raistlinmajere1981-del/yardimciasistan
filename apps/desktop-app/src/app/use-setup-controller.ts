@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
@@ -39,9 +40,13 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     );
   }, [setupForm.aiService, setupForm.aiStoredApiKeyConfigured]);
 
-  function applyBootstrapSetup(nextSetupData: DesktopSetupData, firstApplicationLoad: boolean) {
+  function applyBootstrapSetup(
+    nextSetupData: DesktopSetupData,
+    capabilitySnapshot: BusinessCapabilitySnapshot,
+    firstApplicationLoad: boolean
+  ) {
     setSetupData(nextSetupData);
-    setSetupFormState(toSetupForm(nextSetupData));
+    setSetupFormState(toSetupForm(nextSetupData, capabilitySnapshot));
     setSetupMode(nextSetupData.setupRequired);
     if (!nextSetupData.setupRequired && firstApplicationLoad) {
       onInitialSetupReadyRef.current?.();
@@ -176,9 +181,18 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       return;
     }
 
+    let capabilitySnapshot: BusinessCapabilitySnapshot;
+    try {
+      capabilitySnapshot = await bridge.getBusinessCapabilitySnapshot();
+    } catch {
+      setSetupSaveState("error");
+      setSetupMessage("Ayarlar kaydedildi ancak işletme yetenekleri yeniden okunamadı. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
     setSetupData(result.setupData);
     setDashboardData(result.dashboardData);
-    setSetupFormState(toSetupForm(result.setupData));
+    setSetupFormState(toSetupForm(result.setupData, capabilitySnapshot));
     const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
     setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
     setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
