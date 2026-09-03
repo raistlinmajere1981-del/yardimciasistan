@@ -9,6 +9,12 @@ import process from "node:process";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const {
+  deleteCatalogCategory,
+  getCatalogCategory,
+  listCatalogCategories,
+  saveCatalogCategory
+} = require("../apps/desktop-app/dist-electron/commerce-category-store.js");
+const {
   applyInventoryMovement,
   createPaidCommerceSale,
   findCatalogProductByBarcode,
@@ -32,7 +38,47 @@ try {
   database.initialize();
   const databasePath = database.databasePath;
 
+  const dairyCategory = saveCatalogCategory(databasePath, {
+    name: "Süt Ürünleri",
+    code: "dairy",
+    sortOrder: 10
+  });
+  const chilledCategory = saveCatalogCategory(databasePath, {
+    parentId: dairyCategory.id,
+    name: "Soğuk Ürünler",
+    code: "chilled",
+    sortOrder: 20
+  });
+  assert.equal(getCatalogCategory(databasePath, chilledCategory.id)?.parentId, dairyCategory.id);
+  assert.deepEqual(
+    listCatalogCategories(databasePath, { parentId: "" }).map((category) => category.id),
+    [dairyCategory.id]
+  );
+  assert.deepEqual(
+    listCatalogCategories(databasePath, { parentId: dairyCategory.id }).map((category) => category.id),
+    [chilledCategory.id]
+  );
+  assert.deepEqual(
+    listCatalogCategories(databasePath, { search: "chill" }).map((category) => category.id),
+    [chilledCategory.id]
+  );
+  assert.throws(
+    () => saveCatalogCategory(databasePath, {
+      id: dairyCategory.id,
+      parentId: chilledCategory.id,
+      name: dairyCategory.name,
+      code: dairyCategory.code,
+      sortOrder: dairyCategory.sortOrder
+    }),
+    /döngü/i
+  );
+  assert.throws(
+    () => deleteCatalogCategory(databasePath, dairyCategory.id),
+    /alt kategori/i
+  );
+
   const product = saveCatalogProduct(databasePath, {
+    categoryId: chilledCategory.id,
     name: "Test Süt 1L",
     sku: "SUT-1L",
     barcode: "8690000000011",
@@ -44,7 +90,12 @@ try {
   });
   assert.equal(product.name, "Test Süt 1L");
   assert.equal(product.barcode, "8690000000011");
+  assert.equal(product.categoryId, chilledCategory.id);
   assert.equal(product.trackInventory, true);
+  assert.throws(
+    () => deleteCatalogCategory(databasePath, chilledCategory.id),
+    /ürün bağlı/i
+  );
 
   const secondProduct = saveCatalogProduct(databasePath, {
     name: "Test Yoğurt 500g",
@@ -55,6 +106,11 @@ try {
     minimumQuantity: 1
   });
 
+  assert.deepEqual(
+    listCatalogProducts(databasePath, { categoryId: chilledCategory.id }).map((item) => item.id),
+    [product.id],
+    "Product category filter should use persisted category id."
+  );
   assert.deepEqual(
     listCatalogProducts(databasePath, { search: "SUT-1L" }).map((item) => item.id),
     [product.id],
@@ -158,6 +214,29 @@ try {
     /yetersiz stok/i
   );
   assert.equal(getInventoryBalance(databasePath, product.id).quantity, 5, "Failed sale must not mutate stock.");
+
+  saveCatalogProduct(databasePath, {
+    id: product.id,
+    categoryId: "",
+    name: product.name,
+    sku: product.sku,
+    barcode: product.barcode,
+    description: product.description,
+    salePrice: product.salePrice,
+    purchasePrice: product.purchasePrice,
+    currency: product.currency,
+    unit: product.unit,
+    taxRate: product.taxRate,
+    trackInventory: product.trackInventory,
+    isActive: product.isActive,
+    minimumQuantity: 3
+  });
+  const deletedChild = deleteCatalogCategory(databasePath, chilledCategory.id);
+  assert.equal(deletedChild.id, chilledCategory.id);
+  assert.equal(getCatalogCategory(databasePath, chilledCategory.id), null);
+  const deletedParent = deleteCatalogCategory(databasePath, dairyCategory.id);
+  assert.equal(deletedParent.id, dairyCategory.id);
+  assert.equal(listCatalogCategories(databasePath).length, 0);
 
   const raw = new DatabaseSync(databasePath);
   try {
