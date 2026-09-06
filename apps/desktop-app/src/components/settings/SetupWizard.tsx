@@ -35,6 +35,13 @@ export function SetupWizard(props: SetupWizardProps) {
     props.form.businessType,
     capabilityRuntime.snapshot
   );
+  // Existing device controls mutate the persisted business immediately. Keep
+  // their visibility anchored to the persisted snapshot until a pending profile
+  // selection is actually saved. First setup has no persisted business yet, so
+  // the selected profile defaults remain the correct preview there.
+  const deviceRuntimeCapabilities = capabilityRuntime.snapshot?.businessId
+    ? capabilityRuntime.snapshot.enabledCapabilities
+    : effectiveCapabilities;
   const C = BUSINESS_CAPABILITIES;
   const capabilityForm: SetupFormState = {
     ...props.form,
@@ -92,7 +99,7 @@ export function SetupWizard(props: SetupWizardProps) {
       <LegacySetupWizard
         {...props}
         form={capabilityForm}
-        enabledCapabilities={effectiveCapabilities}
+        enabledCapabilities={deviceRuntimeCapabilities}
         onFormChange={handleLegacyFormChange}
       />
 
