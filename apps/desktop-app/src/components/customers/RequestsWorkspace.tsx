@@ -14,6 +14,11 @@ import {
   X
 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import {
+  canConvertRequestToReservation,
+  isRequestTypeAvailable,
+  type BusinessCapability
+} from "@yardimci-asistan/shared";
 import { formatCustomerSource } from "../../app/customer-model";
 import type { ManualRequestFormState } from "../../app/request-model";
 import {
@@ -79,6 +84,8 @@ interface RequestsWorkspaceProps {
   requests: SyncedCustomerRequest[];
   selectedRequest: SyncedCustomerRequest | undefined;
   aiEnabled: boolean;
+  whatsappEnabled: boolean;
+  enabledCapabilities: BusinessCapability[];
   convertingRequestId: string;
   suggestingRequestId: string;
   manualRequestForm: ManualRequestFormState;
@@ -101,6 +108,8 @@ export function RequestsWorkspace({
   requests,
   selectedRequest,
   aiEnabled,
+  whatsappEnabled,
+  enabledCapabilities,
   convertingRequestId,
   suggestingRequestId,
   manualRequestForm,
@@ -121,6 +130,12 @@ export function RequestsWorkspace({
   const [manualFormOpen, setManualFormOpen] = useState(false);
   const manualDrawerCloseRef = useRef<HTMLButtonElement>(null);
   const selectedActionMode = selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
+  const selectedRequestSupportsReservation = selectedRequest
+    ? canConvertRequestToReservation(enabledCapabilities, selectedRequest.request_type)
+    : false;
+  const availableManualRequestTypes = manualRequestTypeOptions.filter((requestType) =>
+    isRequestTypeAvailable(enabledCapabilities, requestType)
+  );
   const updateManualRequestForm = <Key extends keyof ManualRequestFormState,>(key: Key, value: ManualRequestFormState[Key]) => {
     onManualRequestFormChange({ ...manualRequestForm, [key]: value });
   };
@@ -154,7 +169,7 @@ export function RequestsWorkspace({
             <div className="empty-state compact-empty">
               <Bell size={24} aria-hidden="true" />
               <strong>Talep yok.</strong>
-              <p>Web, AI ve manuel kayıtlar burada listelenir.</p>
+              <p>Web{aiEnabled ? ", AI" : ""} ve manuel kayıtlar burada listelenir.</p>
             </div>
           ) : (
             requests.map((request) => (
@@ -174,7 +189,18 @@ export function RequestsWorkspace({
         </CompactList>
 
         {showManualForm && (
-          <ActionButton className="manual-request-toggle" variant="ghost" type="button" aria-expanded={manualFormOpen} onClick={() => setManualFormOpen(true)}>
+          <ActionButton
+            className="manual-request-toggle"
+            variant="ghost"
+            type="button"
+            aria-expanded={manualFormOpen}
+            onClick={() => {
+              if (!isRequestTypeAvailable(enabledCapabilities, manualRequestForm.requestType)) {
+                onManualRequestFormChange({ ...manualRequestForm, requestType: "general_info" });
+              }
+              setManualFormOpen(true);
+            }}
+          >
             <Plus size={17} aria-hidden="true" />
             Elle Talep Ekle
           </ActionButton>
@@ -226,23 +252,25 @@ export function RequestsWorkspace({
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
               </ActionButton>
-              <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
-                <MessageCircle size={16} aria-hidden="true" />
-                WhatsApp'tan Yaz
-              </ActionButton>
+              {whatsappEnabled && (
+                <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedRequest)}>
+                  <MessageCircle size={16} aria-hidden="true" />
+                  WhatsApp'tan Yaz
+                </ActionButton>
+              )}
               {aiEnabled && selectedActionMode === "open" && (
                 <ActionButton variant="ghost" size="sm" type="button" onClick={() => onSuggest(selectedRequest)} disabled={suggestingRequestId === selectedRequest.id}>
                   <Sparkles size={16} aria-hidden="true" />
                   {suggestingRequestId === selectedRequest.id ? "Hazırlanıyor" : "AI Cevap Hazırla"}
                 </ActionButton>
               )}
-              {(selectedActionMode === "open" || selectedActionMode === "answered") && (
+              {selectedRequestSupportsReservation && (selectedActionMode === "open" || selectedActionMode === "answered") && (
                 <ActionButton size="sm" type="button" onClick={() => onConvert(selectedRequest)} disabled={convertingRequestId === selectedRequest.id}>
                   <CalendarCheck size={16} aria-hidden="true" />
                   {convertingRequestId === selectedRequest.id ? "Onaylanıyor" : "Rezervasyona Çevir"}
                 </ActionButton>
               )}
-              {selectedActionMode === "converted" && (
+              {selectedRequestSupportsReservation && selectedActionMode === "converted" && (
                 <ActionButton size="sm" type="button" onClick={() => onOpenReservation(selectedRequest)}>
                   <CalendarCheck size={16} aria-hidden="true" />
                   Rezervasyonu Aç
@@ -316,7 +344,7 @@ export function RequestsWorkspace({
                 <label>
                   Talep türü
                   <select value={manualRequestForm.requestType} onChange={(event) => updateManualRequestForm("requestType", event.target.value)}>
-                    {manualRequestTypeOptions.map((requestType) => (
+                    {availableManualRequestTypes.map((requestType) => (
                       <option key={requestType} value={requestType}>{formatRequestType(requestType)}</option>
                     ))}
                   </select>

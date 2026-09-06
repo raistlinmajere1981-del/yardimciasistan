@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, MessageCircle, Plus } from "lucide-react";
+import { getReservationDomain } from "@yardimci-asistan/shared";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
@@ -15,8 +16,10 @@ import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
 interface RestaurantReservationsWorkspaceProps {
   reservations: DesktopDashboardData["reservations"];
+  accommodationReservationsEnabled: boolean;
   customers: DesktopDashboardData["customers"];
   tables: DesktopDashboardData["tables"];
+  whatsappEnabled: boolean;
   onSave: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onUpdateStatus: (reservationId: string, status: string) => void;
@@ -46,8 +49,10 @@ function formatRestaurantReservationTable(
 
 export function RestaurantReservationsWorkspace({
   reservations,
+  accommodationReservationsEnabled,
   customers,
   tables,
+  whatsappEnabled,
   onSave,
   onSaveCustomer,
   onUpdateStatus,
@@ -57,9 +62,17 @@ export function RestaurantReservationsWorkspace({
   const [showAll, setShowAll] = useState(false);
   const restaurantReservations = useMemo(
     () => reservations
-      .filter((reservation) => ["table", "breakfast"].includes(reservation.reservationType))
+      .filter((reservation) => {
+        const domain = getReservationDomain(reservation.reservationType, {
+          roomIds: reservation.roomIds,
+          tableIds: reservation.tableIds
+        });
+        return domain === "food_service"
+          || domain === "mixed"
+          || (domain === "generic" && !accommodationReservationsEnabled);
+      })
       .sort((left, right) => `${left.startDate} ${left.time}`.localeCompare(`${right.startDate} ${right.time}`)),
-    [reservations]
+    [accommodationReservationsEnabled, reservations]
   );
   const activeReservations = restaurantReservations.filter((reservation) => !["cancelled", "rejected", "completed"].includes(reservation.status));
   const visibleReservations = showAll ? restaurantReservations : activeReservations;
@@ -110,16 +123,18 @@ export function RestaurantReservationsWorkspace({
                       Onayla
                     </ActionButton>
                   )}
-                  <ActionButton
-                    variant="whatsapp"
-                    size="sm"
-                    type="button"
-                    onClick={() => onOpenWhatsApp(reservation)}
-                    disabled={!reservation.customerPhone}
-                  >
-                    <MessageCircle size={15} aria-hidden="true" />
-                    WhatsApp
-                  </ActionButton>
+                  {whatsappEnabled && (
+                    <ActionButton
+                      variant="whatsapp"
+                      size="sm"
+                      type="button"
+                      onClick={() => onOpenWhatsApp(reservation)}
+                      disabled={!reservation.customerPhone}
+                    >
+                      <MessageCircle size={15} aria-hidden="true" />
+                      WhatsApp
+                    </ActionButton>
+                  )}
                   {["pending", "approved"].includes(reservation.status) && (
                     <ActionButton variant="secondary" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "cancelled")}>
                       İptal Et

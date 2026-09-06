@@ -16,6 +16,9 @@ interface TableOrdersWorkspaceProps {
   tables: DesktopDashboardData["tables"];
   menu: PublishedQrMenu;
   orders: DesktopTableOrder[];
+  ordersEnabled: boolean;
+  reservationsEnabled: boolean;
+  menuEnabled: boolean;
   onOrderChanged: (order: DesktopTableOrder) => void;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
   onUpdateStatus: (tableId: string, status: string) => void;
@@ -26,7 +29,17 @@ interface DrawerRequestContext {
   tableId: string;
 }
 
-export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onDashboardDataChanged, onUpdateStatus }: TableOrdersWorkspaceProps) {
+export function TableOrdersWorkspace({
+  tables,
+  menu,
+  orders,
+  ordersEnabled,
+  reservationsEnabled,
+  menuEnabled,
+  onOrderChanged,
+  onDashboardDataChanged,
+  onUpdateStatus
+}: TableOrdersWorkspaceProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<DesktopDashboardData["tables"][number] | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<DesktopTableOrder | null>(null);
@@ -80,6 +93,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
     [activeCategories]
   );
   const availableItems = useMemo(() => {
+    if (!menuEnabled) return [];
     const activeCategoryIds = new Set(activeCategories.map((category) => category.id));
     const normalizedQuery = searchQuery.trim().toLocaleLowerCase("tr-TR");
     return menu.items
@@ -94,7 +108,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
           .includes(normalizedQuery);
       })
       .sort(compareMenuRecords);
-  }, [activeCategories, categoryNames, menu.items, searchQuery, selectedCategoryId]);
+  }, [activeCategories, categoryNames, menu.items, menuEnabled, searchQuery, selectedCategoryId]);
 
   useEffect(() => {
     if (!drawerOpen) {
@@ -543,7 +557,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
   }
 
   function renderTableCard(table: DesktopDashboardData["tables"][number]) {
-    const activeOrder = activeOrdersByTable.get(table.id);
+    const activeOrder = ordersEnabled ? activeOrdersByTable.get(table.id) : undefined;
     const manualTableStatus = getTableStatusAction(table.status) || table.status;
     const tableStatusLabel = formatTableStatus(table.status);
     const orderBadge = activeOrder ? getOrderBadge(activeOrder.status) : null;
@@ -573,15 +587,17 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
             <>
               <span>{table.area || "Genel"}</span>
               <span>{table.capacity} kişi</span>
-              <span>{table.activeReservationTitle || "Rezervasyon yok"}</span>
+              {reservationsEnabled && <span>{table.activeReservationTitle || "Rezervasyon yok"}</span>}
             </>
           )}
         </div>
         <div className={`table-card-actions${activeOrder ? " has-active-order" : ""}`}>
-          <button className="table-order-open-button" type="button" onClick={() => void openOrderDrawer(table)} disabled={Boolean(busyAction)}>
-            <ReceiptText size={13} aria-hidden="true" />
-            {activeOrder ? "Siparişi Aç" : "Sipariş Aç"}
-          </button>
+          {ordersEnabled && (
+            <button className="table-order-open-button" type="button" onClick={() => void openOrderDrawer(table)} disabled={Boolean(busyAction)}>
+              <ReceiptText size={13} aria-hidden="true" />
+              {activeOrder ? "Siparişi Aç" : "Sipariş Aç"}
+            </button>
+          )}
           {activeOrder ? (
             <div className="active-table-order-actions" aria-label={`${table.name} aktif adisyon işlemleri`}>
               {activeOrder.status === "payment" ? (
@@ -603,8 +619,8 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
                 )}
                 <option value="available">Boş</option>
                 <option value="occupied">Dolu</option>
-                <option value="reserved">Rezerve</option>
-                <option value="bill_waiting">Hesap</option>
+                {reservationsEnabled && <option value="reserved">Rezerve</option>}
+                {ordersEnabled && <option value="bill_waiting">Hesap</option>}
               </select>
             </label>
           )}
@@ -637,7 +653,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
       </section>
       <span className="table-order-live-feedback" role="status" aria-live="polite">{cardFeedback}</span>
 
-      {drawerOpen && selectedTable && (
+      {ordersEnabled && drawerOpen && selectedTable && (
         <div className="table-order-backdrop" role="presentation" onClick={(event) => {
           if (event.target === event.currentTarget) {
             void requestCloseDrawer();
@@ -661,7 +677,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
             </header>
 
             <div className="table-order-drawer-body">
-              <section className="table-order-menu-pane" aria-labelledby="table-order-menu-title">
+              {menuEnabled && <section className="table-order-menu-pane" aria-labelledby="table-order-menu-title">
                 <div className="table-order-pane-heading">
                   <div>
                     <h3 id="table-order-menu-title">Menüden Ekle</h3>
@@ -702,7 +718,7 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
                     </article>
                   ))}
                 </div>
-              </section>
+              </section>}
 
               <section className="table-order-ticket-pane" aria-labelledby="table-order-ticket-title">
                 <div className="table-order-pane-heading ticket-heading">
@@ -715,7 +731,9 @@ export function TableOrdersWorkspace({ tables, menu, orders, onOrderChanged, onD
                 <div className="table-order-item-list">
                   {!selectedOrder && <p className="table-order-empty">Adisyon hazırlanıyor...</p>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
-                    <p className="table-order-empty">Henüz ürün eklenmedi. Soldaki aktif menüden ürün seçin.</p>
+                    <p className="table-order-empty">{menuEnabled
+                      ? "Henüz ürün eklenmedi. Soldaki aktif menüden ürün seçin."
+                      : "Bu adisyonda henüz ürün yok."}</p>
                   )}
                   {selectedOrder?.items.map((item) => (
                     <article className="table-order-item-row" key={item.id}>

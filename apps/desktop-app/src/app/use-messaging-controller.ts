@@ -20,6 +20,7 @@ interface UseMessagingControllerOptions {
   setStatusMessage: Dispatch<SetStateAction<string>>;
   messagesActive: boolean;
   aiEnabled: boolean;
+  customersEnabled: boolean;
   whatsappEnabled: boolean;
   onOpenMessages: () => void;
 }
@@ -31,6 +32,7 @@ export function useMessagingController({
   setStatusMessage,
   messagesActive,
   aiEnabled,
+  customersEnabled,
   whatsappEnabled,
   onOpenMessages
 }: UseMessagingControllerOptions) {
@@ -47,13 +49,14 @@ export function useMessagingController({
   const [aiWorkspaceState, setAiWorkspaceState] = useState<SyncState>("idle");
   const [aiWorkspaceMessage, setAiWorkspaceMessage] = useState("Bir araç seçip AI sonucunu hazırlayın.");
   const [messagesAiOpen, setMessagesAiOpen] = useState(false);
+  const surfaceAiWorkspaceMode: AiWorkspaceMode = customersEnabled ? aiWorkspaceMode : "daily";
 
   useEffect(() => {
-    if (!messagesActive || !messagesAiOpen || !window.yardimciDesktop) {
+    if (!messagesActive || !messagesAiOpen || !aiEnabled || !window.yardimciDesktop) {
       return;
     }
     void window.yardimciDesktop.getAiWorkspaceHistory(16).then(setAiWorkspaceHistory);
-  }, [messagesActive, messagesAiOpen]);
+  }, [aiEnabled, messagesActive, messagesAiOpen]);
 
   useEffect(() => {
     if (messagesActive && aiEnabled && !whatsappEnabled) {
@@ -74,20 +77,27 @@ export function useMessagingController({
   );
 
   const selectedWhatsAppMessage = useMemo(
-    () => selectedWhatsAppRequest
-      ? buildOwnerReplyWhatsAppMessage(selectedWhatsAppRequest.ai_suggested_reply || selectedWhatsAppRequest.whatsapp_message)
+    () => whatsappEnabled && selectedWhatsAppRequest
+      ? buildOwnerReplyWhatsAppMessage(
+          (aiEnabled ? selectedWhatsAppRequest.ai_suggested_reply : "")
+          || selectedWhatsAppRequest.whatsapp_message
+        )
       : "",
-    [selectedWhatsAppRequest]
+    [aiEnabled, selectedWhatsAppRequest, whatsappEnabled]
   );
 
   const selectedWhatsAppUrl = useMemo(
-    () => selectedWhatsAppRequest
+    () => whatsappEnabled && selectedWhatsAppRequest
       ? createWhatsAppWebUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage)
       : "",
-    [selectedWhatsAppMessage, selectedWhatsAppRequest]
+    [selectedWhatsAppMessage, selectedWhatsAppRequest, whatsappEnabled]
   );
 
   function openWhatsApp(request: SyncedCustomerRequest) {
+    if (!whatsappEnabled) {
+      setStatusMessage("WhatsApp bu işletmede etkin değil.");
+      return;
+    }
     setSelectedWhatsAppRequestId(request.id);
     onOpenMessages();
   }
@@ -101,6 +111,10 @@ export function useMessagingController({
   }
 
   function openCustomerWhatsApp(customer: DesktopDashboardData["customers"][number]) {
+    if (!whatsappEnabled) {
+      setStatusMessage("WhatsApp bu işletmede etkin değil.");
+      return;
+    }
     if (!customer.phone) {
       setStatusMessage("WhatsApp bağlantısı için müşteri telefonu gerekiyor.");
       return;
@@ -111,6 +125,10 @@ export function useMessagingController({
   }
 
   function openReservationWhatsApp(reservation: DesktopDashboardData["reservations"][number]) {
+    if (!whatsappEnabled) {
+      setStatusMessage("WhatsApp bu işletmede etkin değil.");
+      return;
+    }
     if (!reservation.customerPhone) {
       setStatusMessage("WhatsApp bağlantısı için rezervasyonda müşteri telefonu gerekiyor.");
       return;
@@ -121,6 +139,10 @@ export function useMessagingController({
   }
 
   function openSelectedWhatsAppExternal() {
+    if (!whatsappEnabled) {
+      setStatusMessage("WhatsApp bu işletmede etkin değil.");
+      return;
+    }
     if (!selectedWhatsAppUrl) {
       setStatusMessage("WhatsApp bağlantısı için geçerli müşteri telefonu ve mesaj gerekiyor.");
       return;
@@ -130,6 +152,9 @@ export function useMessagingController({
   }
 
   async function handleWhatsAppMessageSent(requestId: string, message: string) {
+    if (!whatsappEnabled) {
+      return { ok: false as const, message: "WhatsApp bu işletmede etkin değil." };
+    }
     if (!window.yardimciDesktop) {
       return {
         ok: false as const,
@@ -145,6 +170,10 @@ export function useMessagingController({
   }
 
   async function handleDeleteWhatsAppMessage(request: SyncedCustomerRequest) {
+    if (!whatsappEnabled) {
+      setStatusMessage("WhatsApp bu işletmede etkin değil.");
+      return;
+    }
     if (!window.yardimciDesktop || !window.confirm(`${request.customer_name} için hazırlanmış mesaj silinsin mi? Talep kaydı korunur.`)) {
       return;
     }
@@ -164,6 +193,11 @@ export function useMessagingController({
   }
 
   async function handleCreateOwnerReplySuggestion(request: SyncedCustomerRequest) {
+    if (!aiEnabled) {
+      setAiState("error");
+      setAiMessage("AI bu işletmede etkin değil.");
+      return;
+    }
     setSuggestingRequestId(request.id);
     setAiState("loading");
     setAiMessage(`${request.customer_name} için cevap taslağı hazırlanıyor...`);
@@ -191,6 +225,11 @@ export function useMessagingController({
   }
 
   async function handleGenerateAiWorkspace() {
+    if (!aiEnabled) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("AI bu işletmede etkin değil.");
+      return;
+    }
     if (!window.yardimciDesktop) {
       setAiWorkspaceState("error");
       setAiWorkspaceMessage("AI araçları hazır değil. Uygulamayı yeniden başlatın.");
@@ -199,8 +238,8 @@ export function useMessagingController({
     setAiWorkspaceState("loading");
     setAiWorkspaceMessage("AI sonucu hazırlanıyor...");
     const result = await window.yardimciDesktop.generateAiWorkspace({
-      mode: aiWorkspaceMode,
-      requestId: aiWorkspaceMode === "daily" ? "" : aiWorkspaceRequestId,
+      mode: surfaceAiWorkspaceMode,
+      requestId: surfaceAiWorkspaceMode === "daily" ? "" : aiWorkspaceRequestId,
       instructions: aiWorkspaceInstructions
     });
     if (!result.ok) {
@@ -216,6 +255,11 @@ export function useMessagingController({
   }
 
   async function persistAiWorkspaceResult() {
+    if (!aiEnabled) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("AI bu işletmede etkin değil.");
+      return false;
+    }
     if (!window.yardimciDesktop || !aiWorkspaceEntry) {
       setAiWorkspaceState("error");
       setAiWorkspaceMessage("Önce bir AI sonucu hazırlayın.");
@@ -260,6 +304,11 @@ export function useMessagingController({
   }
 
   async function handlePrepareAiWorkspaceWhatsApp() {
+    if (!whatsappEnabled) {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("WhatsApp bu işletmede etkin değil.");
+      return;
+    }
     if (!aiWorkspaceEntry || aiWorkspaceEntry.mode !== "reply") {
       setAiWorkspaceState("error");
       setAiWorkspaceMessage("WhatsApp için cevap taslağı türünde bir sonuç hazırlayın.");
@@ -272,8 +321,13 @@ export function useMessagingController({
   }
 
   function openAiTools(mode: AiWorkspaceMode, requestId = "", instructions = "") {
-    setAiWorkspaceMode(mode);
-    if (requestId) {
+    if (!aiEnabled) {
+      setStatusMessage("AI bu işletmede etkin değil.");
+      return;
+    }
+    const allowedMode = customersEnabled ? mode : "daily";
+    setAiWorkspaceMode(allowedMode);
+    if (customersEnabled && requestId) {
       setAiWorkspaceRequestId(requestId);
     }
     setAiWorkspaceInstructions(instructions);
@@ -286,6 +340,11 @@ export function useMessagingController({
   }
 
   async function handleRewriteWhatsAppMessage(instructions: string) {
+    if (!whatsappEnabled || !aiEnabled) {
+      setAiState("error");
+      setAiMessage(!whatsappEnabled ? "WhatsApp bu işletmede etkin değil." : "AI bu işletmede etkin değil.");
+      return;
+    }
     if (!selectedWhatsAppRequest || !window.yardimciDesktop) {
       setAiState("error");
       setAiMessage("Mesajı yenilemek için bir müşteri talebi seçin.");
@@ -330,6 +389,11 @@ export function useMessagingController({
   }
 
   function selectAiWorkspaceHistoryEntry(entry: AiWorkspaceHistoryEntry) {
+    if (!customersEnabled && entry.mode !== "daily") {
+      setAiWorkspaceState("error");
+      setAiWorkspaceMessage("Müşteri odaklı AI çalışmaları bu işletmede etkin değil.");
+      return;
+    }
     setAiWorkspaceMode(entry.mode);
     setAiWorkspaceRequestId(entry.requestId);
     setAiWorkspaceInstructions(entry.instructions);
@@ -340,7 +404,7 @@ export function useMessagingController({
   }
 
   function changeAiWorkspaceMode(mode: AiWorkspaceMode) {
-    setAiWorkspaceMode(mode);
+    setAiWorkspaceMode(customersEnabled ? mode : "daily");
     setAiWorkspaceEntry(null);
     setAiWorkspaceContent("");
     setAiWorkspaceState("idle");
@@ -364,7 +428,7 @@ export function useMessagingController({
     suggestingRequestId,
     aiState,
     aiMessage,
-    aiWorkspaceMode,
+    aiWorkspaceMode: surfaceAiWorkspaceMode,
     aiWorkspaceRequestId,
     aiWorkspaceInstructions,
     setAiWorkspaceInstructions,

@@ -1,8 +1,7 @@
 import type { DesktopDailyTask, DesktopReservation, DesktopRoom } from "../../electron/database";
+import { getOperationalTaskDomain, type OperationalTaskDomain } from "@yardimci-asistan/shared";
 
 const activeReservationStatuses = new Set(["pending", "approved"]);
-const restaurantTaskTypes = new Set(["table_reservation", "service", "restaurant", "table_check", "payment", "manual_restaurant"]);
-const accommodationTaskTypes = new Set(["check_in", "check_out", "room_cleaning", "room_maintenance", "reservation", "manual_pension"]);
 
 function localDateKey() {
   const now = new Date();
@@ -60,43 +59,30 @@ function relatedReservation(task: DesktopDailyTask, reservations: DesktopReserva
   return reservations.find((reservation) => reservation.id === task.relatedId);
 }
 
-export function isRestaurantTask(task: DesktopDailyTask, reservations: DesktopReservation[]) {
-  if (restaurantTaskTypes.has(task.taskType)) {
-    return true;
-  }
-  if (accommodationTaskTypes.has(task.taskType)) {
-    return false;
-  }
-  if (task.relatedType === "table") {
-    return true;
-  }
-  if (task.relatedType === "room") {
-    return false;
-  }
-
+export function getDesktopTaskDomain(
+  task: DesktopDailyTask,
+  reservations: DesktopReservation[]
+): OperationalTaskDomain {
   const reservation = relatedReservation(task, reservations);
-  return reservation?.reservationType === "table" || reservation?.reservationType === "breakfast";
+  return getOperationalTaskDomain(
+    task.taskType,
+    task.relatedType,
+    reservation?.reservationType,
+    {
+      roomIds: reservation?.roomIds,
+      tableIds: reservation?.tableIds
+    }
+  );
+}
+
+export function isRestaurantTask(task: DesktopDailyTask, reservations: DesktopReservation[]) {
+  const domain = getDesktopTaskDomain(task, reservations);
+  return domain === "food_service" || domain === "mixed";
 }
 
 export function isAccommodationTask(task: DesktopDailyTask, reservations: DesktopReservation[]) {
-  if (accommodationTaskTypes.has(task.taskType)) {
-    return true;
-  }
-  if (restaurantTaskTypes.has(task.taskType)) {
-    return false;
-  }
-  if (task.relatedType === "room") {
-    return true;
-  }
-  if (task.relatedType === "table") {
-    return false;
-  }
-
-  const reservation = relatedReservation(task, reservations);
-  if (reservation) {
-    return reservation.reservationType === "room" || reservation.reservationType === "mixed";
-  }
-  return task.relatedType === "reservation";
+  const domain = getDesktopTaskDomain(task, reservations);
+  return domain === "accommodation" || domain === "mixed";
 }
 
 export function formatTableStatus(value: string) {
@@ -117,4 +103,3 @@ export function getTableStatusAction(value: string) {
   if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) return "bill_waiting";
   return ["available", "occupied", "reserved"].includes(value) ? value : "";
 }
-

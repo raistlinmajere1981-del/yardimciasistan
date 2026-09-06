@@ -22,6 +22,7 @@ const EMPTY_DATA: DesktopRoomFolioData = {
 
 interface RoomFolioWorkspaceProps {
   refreshKey: string;
+  menuEnabled: boolean;
 }
 
 type ConfirmationAction =
@@ -29,7 +30,7 @@ type ConfirmationAction =
   | { kind: "void-payment"; paymentId: string; amountMinor: number }
   | null;
 
-export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
+export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspaceProps) {
   const [data, setData] = useState<DesktopRoomFolioData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -73,13 +74,14 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
   );
 
   const filteredMenu = useMemo(() => {
+    if (!menuEnabled) return [];
     const search = menuSearch.trim().toLocaleLowerCase("tr-TR");
     return data.menuItems.filter((item) => {
       if (menuCategory !== "all" && item.categoryId !== menuCategory) return false;
       if (!search) return true;
       return `${item.name} ${item.description}`.toLocaleLowerCase("tr-TR").includes(search);
     });
-  }, [data.menuItems, menuCategory, menuSearch]);
+  }, [data.menuItems, menuCategory, menuEnabled, menuSearch]);
 
   const checkedInCount = data.activeStays.filter((stay) => stay.status === "checked_in").length;
   const openFolios = data.folios.filter((folio) => folio.status === "open");
@@ -387,7 +389,7 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
               </section>
 
               <div className="room-folio-account-layout">
-                <section className="room-folio-menu-panel">
+                {menuEnabled && <section className="room-folio-menu-panel">
                   <div className="room-folio-subheading"><h3>Restoran Menüsünden Ekle</h3><span>{filteredMenu.length} ürün</span></div>
                   <input className="room-folio-menu-search" value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} placeholder="Ürün ara" />
                   <div className="room-folio-category-tabs">
@@ -404,7 +406,7 @@ export function RoomFolioWorkspace({ refreshKey }: RoomFolioWorkspaceProps) {
                       </article>
                     ))}
                   </div>
-                </section>
+                </section>}
 
                 <section className="room-folio-account-panel">
                   <div className="room-folio-subheading"><h3>Hesap</h3><span>{selectedFolio.items.length + 1} kalem</span></div>

@@ -54,12 +54,20 @@ const EXPENSE_CATEGORIES: readonly CategoryOption[] = [
 ];
 
 const INCOME_CATEGORIES: readonly CategoryOption[] = [
-  ["other_income", "Diğer gelir"],
-  ["pension", "Pansiyon"],
-  ["restaurant", "Restoran"]
+  ["other_income", "Diğer gelir"]
 ];
 
-export function FinanceWorkspace() {
+interface FinanceWorkspaceProps {
+  accommodationEnabled: boolean;
+  accommodationFolioEnabled: boolean;
+  foodServiceEnabled: boolean;
+}
+
+export function FinanceWorkspace({
+  accommodationEnabled,
+  accommodationFolioEnabled,
+  foodServiceEnabled
+}: FinanceWorkspaceProps) {
   const [data, setData] = useState<DesktopFinanceData>(EMPTY_DATA);
   const [roomData, setRoomData] = useState<DesktopRoomFolioData>(EMPTY_ROOM_DATA);
   const [loading, setLoading] = useState(true);
@@ -83,7 +91,7 @@ export function FinanceWorkspace() {
       return () => { active = false; };
     }
 
-    const roomPromise = bridge.getRoomFolioData
+    const roomPromise = accommodationFolioEnabled && bridge.getRoomFolioData
       ? bridge.getRoomFolioData().catch(() => EMPTY_ROOM_DATA)
       : Promise.resolve(EMPTY_ROOM_DATA);
 
@@ -97,15 +105,26 @@ export function FinanceWorkspace() {
       .finally(() => { if (active) setLoading(false); });
 
     return () => { active = false; };
-  }, []);
+  }, [accommodationFolioEnabled]);
 
-  const categoryOptions: readonly CategoryOption[] = entryMode === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+  const incomeCategories = useMemo(() => {
+    const options: CategoryOption[] = [...INCOME_CATEGORIES];
+    if (accommodationEnabled) options.push(["pension", "Pansiyon"]);
+    if (foodServiceEnabled) options.push(["restaurant", "Restoran"]);
+    return options;
+  }, [accommodationEnabled, foodServiceEnabled]);
+  const categoryOptions: readonly CategoryOption[] = entryMode === "income" ? incomeCategories : EXPENSE_CATEGORIES;
+  useEffect(() => {
+    if (categoryOptions.some(([value]) => value === entryCategory)) return;
+    setEntryCategory(entryMode === "income" ? "other_income" : "other_expense");
+  }, [categoryOptions, entryCategory, entryMode]);
   const visibleRecentEntries = showAllEntries
     ? data.recentEntries
     : data.recentEntries.slice(0, RECENT_ENTRY_PREVIEW_COUNT);
   const hasOlderEntries = data.recentEntries.length > RECENT_ENTRY_PREVIEW_COUNT;
 
   const outstandingRows = useMemo(() => {
+    if (!accommodationFolioEnabled) return [];
     const rows: OutstandingRow[] = [];
     const folioReservationIds = new Set<string>();
 
@@ -155,7 +174,7 @@ export function FinanceWorkspace() {
     }
 
     return rows;
-  }, [data.outstandingPensionMinor, data.pensionBalances, roomData.folios]);
+  }, [accommodationFolioEnabled, data.outstandingPensionMinor, data.pensionBalances, roomData.folios]);
 
   function openEntry(mode: FinanceDirection) {
     setEntryMode(mode);
@@ -237,7 +256,7 @@ export function FinanceWorkspace() {
         <div>
           <p className="panel-eyebrow">Günlük kasa</p>
           <h2 id="finance-title">Kasa</h2>
-          <p>Bugünün para hareketlerini ve bekleyen alacakları tek bakışta görün.</p>
+          <p>{accommodationFolioEnabled ? "Bugünün para hareketlerini ve bekleyen oda alacaklarını tek bakışta görün." : "Bugünün para hareketlerini tek bakışta görün."}</p>
         </div>
         <div className="finance-primary-actions">
           <button className="finance-income-button" type="button" onClick={() => openEntry("income")}>
@@ -253,7 +272,7 @@ export function FinanceWorkspace() {
         <MetricCard compact title="Bugün Gelen" value={minorMoney(data.todayIncomeMinor)} detail="Kasaya giren" tone="ok" icon={Banknote} />
         <MetricCard compact title="Bugün Çıkan" value={minorMoney(data.todayExpenseMinor)} detail="Kaydedilen gider" tone="wait" icon={WalletCards} />
         <MetricCard compact title="Bugünkü Fark" value={minorMoney(data.todayNetMinor)} detail="Gelen - çıkan" tone={data.todayNetMinor >= 0 ? "info" : "wait"} icon={CreditCard} />
-        <MetricCard compact title="Bekleyen Alacak" value={minorMoney(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "wait" : "ok"} icon={Landmark} />
+        {accommodationFolioEnabled && <MetricCard compact title="Bekleyen Alacak" value={minorMoney(data.outstandingPensionMinor)} detail="Oda hesapları" tone={data.outstandingPensionMinor > 0 ? "wait" : "ok"} icon={Landmark} />}
       </div>
 
       {outstandingRows.length > 0 && (
@@ -342,7 +361,7 @@ export function FinanceWorkspace() {
           <div>
             <h3>Son Hareketler</h3>
             <p>
-              Restoran, oda tahsilatı ve elle eklenen kayıtlar
+              Otomatik ve elle eklenen kasa kayıtları
               {hasOlderEntries && !showAllEntries ? ` · son ${RECENT_ENTRY_PREVIEW_COUNT} kayıt` : ""}
             </p>
           </div>

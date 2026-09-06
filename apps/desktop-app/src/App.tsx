@@ -27,7 +27,8 @@ function App() {
     passwordConfigured: setupController.setupData.appPasswordConfigured,
     getNotificationCount: () => buildDesktopNotifications(
       desktopSyncController.dashboardData,
-      desktopSyncController.automaticSyncStatus
+      desktopSyncController.automaticSyncStatus,
+      desktopSyncController.businessCapabilities?.enabledCapabilities ?? []
     ).length,
     onPasswordConfiguredChange: setupController.setPasswordConfigured
   });
@@ -49,6 +50,7 @@ function App() {
     setStatusMessage,
     messagesActive: activePage === "messages",
     aiEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.AI),
+    customersEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
     whatsappEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP),
     onOpenMessages: () => setActivePage("messages")
   });

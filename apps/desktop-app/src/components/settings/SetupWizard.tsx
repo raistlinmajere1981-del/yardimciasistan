@@ -15,7 +15,7 @@ import { SetupWizard as LegacySetupWizard } from "./LegacySetupWizard";
 import "./setup-capability-v2.css";
 
 type LegacySetupWizardProps = ComponentProps<typeof LegacySetupWizard>;
-type SetupWizardProps = Omit<LegacySetupWizardProps, "form" | "onFormChange"> & {
+type SetupWizardProps = Omit<LegacySetupWizardProps, "form" | "onFormChange" | "enabledCapabilities"> & {
   form: CapabilitySetupFormState;
   onFormChange: (form: CapabilitySetupFormState) => void;
 };
@@ -92,6 +92,7 @@ export function SetupWizard(props: SetupWizardProps) {
       <LegacySetupWizard
         {...props}
         form={capabilityForm}
+        enabledCapabilities={effectiveCapabilities}
         onFormChange={handleLegacyFormChange}
       />
 

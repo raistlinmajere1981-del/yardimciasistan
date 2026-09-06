@@ -15,10 +15,13 @@ interface LocalMenuPreviewProps {
   menu: DesktopDashboardData["menu"];
   setupData: CapabilitySetupData;
   webModuleUrl: string;
+  whatsappEnabled: boolean;
+  qrMenuEnabled: boolean;
+  inventoryEnabled: boolean;
   onClose: () => void;
 }
 
-export function LocalMenuPreview({ menu, setupData, webModuleUrl, onClose }: LocalMenuPreviewProps) {
+export function LocalMenuPreview({ menu, setupData, webModuleUrl, whatsappEnabled, qrMenuEnabled, inventoryEnabled, onClose }: LocalMenuPreviewProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
 
@@ -74,7 +77,7 @@ export function LocalMenuPreview({ menu, setupData, webModuleUrl, onClose }: Loc
         <header className="local-menu-preview-toolbar">
           <div>
             <strong id="local-menu-preview-title">Yerel Menü Önizlemesi</strong>
-            <span>Düzenleme alanındaki canlı taslak gösteriliyor; kaydetmeden web yayını etkilenmez.</span>
+            <span>{qrMenuEnabled ? "Düzenleme alanındaki canlı taslak gösteriliyor; kaydetmeden web yayını etkilenmez." : "Düzenleme alanındaki yerel menü taslağı gösteriliyor."}</span>
           </div>
           <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
             <X size={18} aria-hidden="true" />
@@ -83,7 +86,7 @@ export function LocalMenuPreview({ menu, setupData, webModuleUrl, onClose }: Loc
         </header>
 
         <div className="local-menu-preview-viewport">
-          <MenuPreviewCanvas menu={menu} setupData={setupData} webModuleUrl={webModuleUrl} />
+          <MenuPreviewCanvas menu={menu} setupData={setupData} webModuleUrl={webModuleUrl} whatsappEnabled={whatsappEnabled} qrMenuEnabled={qrMenuEnabled} inventoryEnabled={inventoryEnabled} />
         </div>
       </section>
     </div>
@@ -94,6 +97,9 @@ interface MenuPreviewCanvasProps {
   menu: DesktopDashboardData["menu"];
   setupData: CapabilitySetupData;
   webModuleUrl: string;
+  whatsappEnabled: boolean;
+  qrMenuEnabled: boolean;
+  inventoryEnabled: boolean;
   embedded?: boolean;
   activeCategoryHint?: string;
   focusedItemId?: string;
@@ -104,6 +110,9 @@ function MenuPreviewCanvas({
   menu,
   setupData,
   webModuleUrl,
+  whatsappEnabled,
+  qrMenuEnabled,
+  inventoryEnabled,
   embedded = false,
   activeCategoryHint = "all",
   focusedItemId = "",
@@ -118,9 +127,9 @@ function MenuPreviewCanvas({
   const activeCategoryIds = useMemo(() => new Set(categories.map((category) => category.id)), [categories]);
   const items = useMemo(
     () => menu.items
-      .filter((item) => item.is_available && activeCategoryIds.has(item.category_id) && !isQrHiddenByStock(item))
+      .filter((item) => item.is_available && activeCategoryIds.has(item.category_id) && (!(qrMenuEnabled && inventoryEnabled) || !isQrHiddenByStock(item)))
       .sort(compareMenuRecords),
-    [activeCategoryIds, menu.items]
+    [activeCategoryIds, inventoryEnabled, menu.items, qrMenuEnabled]
   );
 
   useEffect(() => {
@@ -161,9 +170,9 @@ function MenuPreviewCanvas({
         {visibleHeroImageUrl && <img src={visibleHeroImageUrl} alt="" onError={() => setFailedHeroImageUrl(visibleHeroImageUrl)} />}
         <div className="local-menu-hero-shade" />
         <div className="local-menu-hero-content">
-          <p>QR Menü · {embedded ? "Canlı Taslak" : "Yerel Önizleme"}</p>
+          <p>{qrMenuEnabled ? "QR Menü" : "Menü"} · {embedded ? "Canlı Taslak" : "Yerel Önizleme"}</p>
           <h2>{setupData.businessName || "İşletme"} Menü</h2>
-          <span>Güncel ürünleri ve fiyatları yayınlamadan önce kontrol edin.</span>
+          <span>{qrMenuEnabled ? "Güncel ürünleri ve fiyatları yayınlamadan önce kontrol edin." : "Güncel ürünleri ve fiyatları kontrol edin."}</span>
           <div className="local-menu-hero-meta" aria-label="Menü bilgileri">
             <span>Güncel fiyatlar</span>
             <span>{categories.length} kategori</span>
@@ -227,7 +236,7 @@ function MenuPreviewCanvas({
           <strong>{setupData.businessName || "İşletme"}</strong>
           {setupData.address && <span>{setupData.address}</span>}
         </div>
-        {setupData.whatsapp && <span className="local-menu-preview-whatsapp">WhatsApp</span>}
+        {whatsappEnabled && setupData.whatsapp && <span className="local-menu-preview-whatsapp">WhatsApp</span>}
       </footer>
     </article>
   );

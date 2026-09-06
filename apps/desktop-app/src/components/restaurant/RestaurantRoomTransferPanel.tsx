@@ -17,7 +17,6 @@ export function RestaurantRoomTransferPanel({
 }: RestaurantRoomTransferPanelProps) {
   const paymentOrders = useMemo(() => orders.filter((order) => order.status === "payment" && order.total > 0), [orders]);
   const paymentOrderKey = paymentOrders.map((order) => `${order.id}:${order.updatedAt}`).join("|");
-  const [roomsModuleEnabled, setRoomsModuleEnabled] = useState<boolean | null>(null);
   const [folioData, setFolioData] = useState<DesktopRoomFolioData | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState("");
   const [selectedFolioId, setSelectedFolioId] = useState("");
@@ -28,25 +27,6 @@ export function RestaurantRoomTransferPanel({
     () => folioData?.folios.filter((folio) => folio.status === "open") ?? [],
     [folioData]
   );
-
-  useEffect(() => {
-    const bridge = window.yardimciDesktop;
-    if (!bridge) {
-      setRoomsModuleEnabled(false);
-      return;
-    }
-    let active = true;
-    void bridge.getSetupData()
-      .then((setup) => {
-        if (active) setRoomsModuleEnabled(setup.modules.rooms);
-      })
-      .catch(() => {
-        if (active) setRoomsModuleEnabled(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (paymentOrders.length === 0) {
@@ -69,7 +49,7 @@ export function RestaurantRoomTransferPanel({
   }, [openFolios, selectedFolioId]);
 
   useEffect(() => {
-    if (roomsModuleEnabled !== true || paymentOrders.length === 0) return;
+    if (paymentOrders.length === 0) return;
     const bridge = window.yardimciDesktop;
     if (!bridge) return;
     let active = true;
@@ -83,9 +63,9 @@ export function RestaurantRoomTransferPanel({
     return () => {
       active = false;
     };
-  }, [paymentOrderKey, paymentOrders.length, roomsModuleEnabled]);
+  }, [paymentOrderKey, paymentOrders.length]);
 
-  if (roomsModuleEnabled !== true || paymentOrders.length === 0) {
+  if (paymentOrders.length === 0) {
     return null;
   }
 

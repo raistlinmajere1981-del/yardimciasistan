@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Copy, ExternalLink, MessageCircle, Phone, Save, Send, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { prepareWhatsAppAction, WHATSAPP_WEB_HOME_URL } from "@yardimci-asistan/whatsapp-bridge";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
-import type { AiWorkspaceHistoryEntry, AiWorkspaceMode, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
+import type { AiWorkspaceHistoryEntry, AiWorkspaceMode, DesktopDashboardData } from "../../../electron/database";
 import { formatCustomerSource } from "../../app/customer-model";
 import { formatDateTime, formatRequestStatus, formatRequestType } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
@@ -22,8 +22,10 @@ function getAiWorkspaceModeLabel(mode: AiWorkspaceMode) {
 }
 
 interface AiWorkspaceProps {
-  setupData: DesktopSetupData;
   dashboardData: DesktopDashboardData;
+  aiEnabled: boolean;
+  customersEnabled: boolean;
+  whatsappEnabled: boolean;
   mode: AiWorkspaceMode;
   selectedRequestId: string;
   instructions: string;
@@ -44,8 +46,10 @@ interface AiWorkspaceProps {
 }
 
 export function AiWorkspace({
-  setupData,
   dashboardData,
+  aiEnabled,
+  customersEnabled,
+  whatsappEnabled,
   mode,
   selectedRequestId,
   instructions,
@@ -66,15 +70,22 @@ export function AiWorkspace({
 }: AiWorkspaceProps) {
   const needsRequest = mode !== "daily";
   const selectedRequest = dashboardData.requests.find((request) => request.id === selectedRequestId);
-  const generateDisabled = !setupData.aiEnabled || state === "loading" || (needsRequest && !selectedRequest);
+  const generateDisabled = !aiEnabled || state === "loading" || (needsRequest && !selectedRequest);
+  const modes: Array<[AiWorkspaceMode, string, string]> = customersEnabled
+    ? [
+        ["reply", "Cevap taslağı", whatsappEnabled ? "WhatsApp için sıcak ve kontrollü yanıt" : "Sıcak ve kontrollü müşteri yanıtı"],
+        ["summary", "Talebi özetle", "Eksikleri ve önemli noktaları çıkar"],
+        ["daily", "Günü değerlendir", "İşleri, riskleri ve öncelikleri sırala"]
+      ]
+    : [["daily", "Günü değerlendir", "Etkin işletme alanlarını ve öncelikleri sırala"]];
 
   return (
     <section className="ai-workspace" aria-label="AI Yardımcı çalışma alanı">
       <div className="ai-status-grid">
         <article className="ai-status-card">
           <span>AI önerileri</span>
-          <strong className={setupData.aiEnabled ? "is-online" : "is-offline"}>{setupData.aiEnabled ? "Kullanıma hazır" : "Kapalı"}</strong>
-          <small>Hazır mesaj ve özetler</small>
+          <strong className={aiEnabled ? "is-online" : "is-offline"}>{aiEnabled ? "Kullanıma hazır" : "Kapalı"}</strong>
+          <small>{customersEnabled ? "Hazır mesaj ve özetler" : "Günlük işletme değerlendirmesi"}</small>
         </article>
         <article className="ai-status-card">
           <span>Son çalışmalar</span>
@@ -97,11 +108,7 @@ export function AiWorkspace({
             </div>
           </div>
           <div className="ai-mode-list" role="tablist" aria-label="AI çalışma türleri">
-            {([
-              ["reply", "Cevap taslağı", "WhatsApp için sıcak ve kontrollü yanıt"],
-              ["summary", "Talebi özetle", "Eksikleri ve önemli noktaları çıkar"],
-              ["daily", "Günü değerlendir", "İşleri, riskleri ve öncelikleri sırala"]
-            ] as Array<[AiWorkspaceMode, string, string]>).map(([value, label, description]) => (
+            {modes.map(([value, label, description]) => (
               <button
                 className={mode === value ? "ai-mode-button is-active" : "ai-mode-button"}
                 type="button"
@@ -116,7 +123,7 @@ export function AiWorkspace({
             ))}
           </div>
 
-          <label className="ai-field">
+          {customersEnabled && <label className="ai-field">
             Talep / müşteri
             <select value={selectedRequestId} onChange={(event) => onRequestChange(event.target.value)} disabled={!needsRequest}>
               {dashboardData.requests.length === 0 && <option value="">Talep bulunmuyor</option>}
@@ -124,7 +131,7 @@ export function AiWorkspace({
                 <option value={request.id} key={request.id}>{request.customer_name} — {formatRequestType(request.request_type)}</option>
               ))}
             </select>
-          </label>
+          </label>}
           {selectedRequest && needsRequest && (
             <div className="ai-request-context">
               <strong>{selectedRequest.customer_name}</strong>
@@ -137,7 +144,7 @@ export function AiWorkspace({
             <textarea
               value={instructions}
               onChange={(event) => onInstructionsChange(event.target.value.slice(0, 800))}
-              placeholder={mode === "reply" ? "Örn. Daha kısa ve samimi yaz." : "Örn. Bugünkü girişleri öne al."}
+              placeholder={mode === "reply" ? "Örn. Daha kısa ve samimi yaz." : "Örn. Öncelikli alanları öne al."}
               rows={4}
             />
             <small>{instructions.length}/800</small>
@@ -178,23 +185,29 @@ export function AiWorkspace({
               />
               <div className="ai-result-actions">
                 <button type="button" onClick={onCopy}><Copy size={16} aria-hidden="true" />Kopyala</button>
-                <button type="button" onClick={onSave} disabled={entry.mode === "daily"}><Save size={16} aria-hidden="true" />Talebe Kaydet</button>
-                <button className="whatsapp-action" type="button" onClick={onWhatsApp} disabled={entry.mode !== "reply"}>
-                  <MessageCircle size={16} aria-hidden="true" />WhatsApp'a Hazırla
-                </button>
+                {customersEnabled && entry.mode !== "daily" && (
+                  <button type="button" onClick={onSave}><Save size={16} aria-hidden="true" />Talebe Kaydet</button>
+                )}
+                {whatsappEnabled && (
+                  <button className="whatsapp-action" type="button" onClick={onWhatsApp} disabled={entry.mode !== "reply"}>
+                    <MessageCircle size={16} aria-hidden="true" />WhatsApp'a Hazırla
+                  </button>
+                )}
               </div>
             </>
           ) : (
             <div className="empty-state ai-empty-result">
               <Sparkles size={34} aria-hidden="true" />
               <strong>AI çalışma alanı hazır.</strong>
-              <p>Sol taraftan araç ve talep seçip sonucu hazırlayın. Üretilen metin gönderilmeden önce mutlaka sizin kontrolünüzden geçer.</p>
+              <p>{customersEnabled
+                ? "Sol taraftan araç ve talep seçip sonucu hazırlayın. Üretilen metin gönderilmeden önce mutlaka sizin kontrolünüzden geçer."
+                : "Günlük işletme değerlendirmesini hazırlayın. Üretilen metin kullanılmadan önce mutlaka sizin kontrolünüzden geçer."}</p>
             </div>
           )}
           <p className={`ai-workspace-message sync-${state}`}>{message}</p>
           <div className="ai-guardrail-note">
             <CheckCircle2 size={18} aria-hidden="true" />
-            <span>AI kesin rezervasyon, müsaitlik veya fiyat onayı vermez. Son karar ve gönderim her zaman işletme sahibindedir.</span>
+            <span>AI kesin işlem, müsaitlik veya fiyat onayı vermez. Son karar ve gönderim her zaman işletme sahibindedir.</span>
           </div>
         </article>
       </div>

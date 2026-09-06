@@ -1,8 +1,13 @@
 import type { Dispatch, SetStateAction } from "react";
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import {
+  BUSINESS_CAPABILITIES,
+  getReservationDomain,
+  isReservationTypeAvailable
+} from "@yardimci-asistan/shared";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { runtimeHasCapability } from "../../app/capabilities";
+import { projectDesktopDashboardData } from "../../app/capability-projection";
 import type { DesktopPage } from "../../app/navigation";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "../../app/operations";
 import {
@@ -196,10 +201,34 @@ export function DesktopWorkspaceRouter({
   } = deviceController;
 
   const C = BUSINESS_CAPABILITIES;
+  const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
+  const customersEnabled = runtimeHasCapability(businessCapabilities, C.CUSTOMERS);
+  const tasksEnabled = runtimeHasCapability(businessCapabilities, C.TASKS);
   const aiEnabled = runtimeHasCapability(businessCapabilities, C.AI);
   const whatsappEnabled = runtimeHasCapability(businessCapabilities, C.WHATSAPP);
   const roomsEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_ROOMS);
+  const accommodationReservationsEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_RESERVATIONS);
+  const accommodationStaysEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_STAYS);
+  const accommodationFolioEnabled = runtimeHasCapability(businessCapabilities, C.ACCOMMODATION_FOLIO);
   const tablesEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_TABLES);
+  const foodReservationsEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_RESERVATIONS);
+  const foodOrdersEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_ORDERS);
+  const foodMenuEnabled = runtimeHasCapability(businessCapabilities, C.FOOD_MENU);
+  const inventoryEnabled = runtimeHasCapability(businessCapabilities, C.INVENTORY);
+  const customerMessagingEnabled = customersEnabled && whatsappEnabled;
+  const surfaceData = projectDesktopDashboardData(dashboardData, enabledCapabilities);
+  const pensionReservations = surfaceData.reservations.filter((reservation) => {
+    const domain = getReservationDomain(reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    });
+    return domain === "accommodation" || domain === "mixed" || domain === "generic";
+  });
+  const surfaceSelectedRequest = surfaceData.requests.find((request) => request.id === selectedRequest?.id)
+    ?? surfaceData.requests[0];
+  const surfaceSelectedWhatsAppRequest = surfaceData.requests.find(
+    (request) => request.id === selectedWhatsAppRequest?.id
+  );
   const runtimeModules = {
     rooms: roomsEnabled,
     tables: tablesEnabled,
@@ -228,18 +257,31 @@ export function DesktopWorkspaceRouter({
   }
 
   function openRequestReservation(request: SyncedCustomerRequest) {
-    const reservation = dashboardData.reservations.find((item) => item.requestId === request.id);
+    const reservation = surfaceData.reservations.find((item) => item.requestId === request.id);
     if (!reservation) {
       setSyncState("error");
       setStatusMessage("Talebe bağlı rezervasyon bulunamadı.");
       return;
     }
 
-    if (["table", "breakfast"].includes(reservation.reservationType) && tablesEnabled) {
+    if (!isReservationTypeAvailable(enabledCapabilities, reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    })) {
+      setSyncState("error");
+      setStatusMessage("Bu rezervasyon alanı işletmenin etkin yeteneklerinde kullanılamıyor.");
+      return;
+    }
+    const domain = getReservationDomain(reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    });
+    if ((domain === "food_service" || (domain === "generic" && !accommodationReservationsEnabled))
+        && foodReservationsEnabled) {
       setActivePage("restaurant");
       return;
     }
-    if (roomsEnabled) {
+    if (accommodationReservationsEnabled) {
       setActivePage("pension");
       return;
     }
@@ -248,12 +290,29 @@ export function DesktopWorkspaceRouter({
   }
 
   function openDashboardReservation(reservation: DesktopDashboardData["reservations"][number]) {
-    const request = dashboardData.requests.find((item) => item.id === reservation.requestId);
+    if (!isReservationTypeAvailable(enabledCapabilities, reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    })) {
+      setSyncState("error");
+      setStatusMessage("Bu rezervasyon alanı işletmenin etkin yeteneklerinde kullanılamıyor.");
+      return;
+    }
+    const request = surfaceData.requests.find((item) => item.id === reservation.requestId);
     if (request) {
       openDashboardCustomerWork(request);
       return;
     }
-    if (!["table", "breakfast"].includes(reservation.reservationType) && roomsEnabled) {
+    const domain = getReservationDomain(reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    });
+    if ((domain === "food_service" || (domain === "generic" && !accommodationReservationsEnabled))
+        && foodReservationsEnabled) {
+      setActivePage("restaurant");
+      return;
+    }
+    if (accommodationReservationsEnabled) {
       setActivePage("pension");
       return;
     }
@@ -269,23 +328,23 @@ export function DesktopWorkspaceRouter({
   const persistentMessagesPage = (
     <MessagesPage
       aiEnabled={aiEnabled}
-      whatsappEnabled={whatsappEnabled}
+      whatsappEnabled={customerMessagingEnabled}
       aiOpen={messagesAiOpen}
       active={activePage === "messages"}
       safeMode={(
         <WhatsAppWorkspace
           view="safe"
-          requests={dashboardData.requests}
-          selectedRequest={selectedWhatsAppRequest}
-          selectedMessage={selectedWhatsAppMessage}
-          selectedUrl={selectedWhatsAppUrl}
+          requests={surfaceData.requests}
+          selectedRequest={surfaceSelectedWhatsAppRequest}
+          selectedMessage={surfaceSelectedWhatsAppRequest ? selectedWhatsAppMessage : ""}
+          selectedUrl={surfaceSelectedWhatsAppRequest ? selectedWhatsAppUrl : ""}
           aiEnabled={aiEnabled}
           aiState={aiState}
           aiMessage={aiMessage}
           getRequestStatusTone={getRequestStatusTone}
           onSelectRequest={setSelectedWhatsAppRequestId}
           onOpenExternal={openSelectedWhatsAppExternal}
-          onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
+          onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
           onRewrite={handleRewriteWhatsAppMessage}
           onMessageSent={handleWhatsAppMessageSent}
           onDeleteMessage={handleDeleteWhatsAppMessage}
@@ -294,10 +353,10 @@ export function DesktopWorkspaceRouter({
       webMode={(onReturnToSafe) => (
         <WhatsAppWorkspace
           view="web"
-          requests={dashboardData.requests}
-          selectedRequest={selectedWhatsAppRequest}
-          selectedMessage={selectedWhatsAppMessage}
-          selectedUrl={selectedWhatsAppUrl}
+          requests={surfaceData.requests}
+          selectedRequest={surfaceSelectedWhatsAppRequest}
+          selectedMessage={surfaceSelectedWhatsAppRequest ? selectedWhatsAppMessage : ""}
+          selectedUrl={surfaceSelectedWhatsAppRequest ? selectedWhatsAppUrl : ""}
           aiEnabled={aiEnabled}
           aiState={aiState}
           aiMessage={aiMessage}
@@ -305,7 +364,7 @@ export function DesktopWorkspaceRouter({
           onSelectRequest={setSelectedWhatsAppRequestId}
           onOpenExternal={openSelectedWhatsAppExternal}
           onReturnToSafe={onReturnToSafe}
-          onCall={selectedWhatsAppRequest ? () => callCustomer(selectedWhatsAppRequest) : undefined}
+          onCall={surfaceSelectedWhatsAppRequest ? () => callCustomer(surfaceSelectedWhatsAppRequest) : undefined}
           onRewrite={handleRewriteWhatsAppMessage}
           onMessageSent={handleWhatsAppMessageSent}
           onDeleteMessage={handleDeleteWhatsAppMessage}
@@ -313,8 +372,10 @@ export function DesktopWorkspaceRouter({
       )}
       aiTools={(
         <AiWorkspace
-          setupData={setupData}
-          dashboardData={dashboardData}
+          dashboardData={surfaceData}
+          aiEnabled={aiEnabled}
+          customersEnabled={customersEnabled}
+          whatsappEnabled={customerMessagingEnabled}
           mode={aiWorkspaceMode}
           selectedRequestId={aiWorkspaceRequestId}
           instructions={aiWorkspaceInstructions}
@@ -341,10 +402,14 @@ export function DesktopWorkspaceRouter({
     <>
       {activePage === "dashboard" ? (
         <DashboardPage
-          data={dashboardData}
+          data={surfaceData}
           modules={runtimeModules}
           aiEnabled={aiEnabled}
-          availableRoomCount={dashboardData.rooms.filter((room) => getRoomDisplayInfo(room, dashboardData.reservations).status === "available").length}
+          customersEnabled={customersEnabled}
+          tasksEnabled={tasksEnabled}
+          calendarEnabled={runtimeHasCapability(businessCapabilities, C.CALENDAR)}
+          reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
+          availableRoomCount={surfaceData.rooms.filter((room) => getRoomDisplayInfo(room, surfaceData.reservations).status === "available").length}
           onReplyRequest={openDashboardReply}
           onOpenCustomerWork={openDashboardCustomerWork}
           onOpenReservation={openDashboardReservation}
@@ -359,7 +424,10 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "calendar" ? (
         <OperationCalendarPage
-          data={dashboardData}
+          data={surfaceData}
+          accommodationReservationsEnabled={accommodationReservationsEnabled}
+          foodReservationsEnabled={foodReservationsEnabled}
+          tasksEnabled={tasksEnabled}
           onOpenReservation={openDashboardReservation}
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
         />
@@ -367,9 +435,11 @@ export function DesktopWorkspaceRouter({
         <CustomerWorkPage
           requests={(
             <RequestsWorkspace
-              requests={dashboardData.requests}
-              selectedRequest={selectedRequest}
+              requests={surfaceData.requests}
+              selectedRequest={surfaceSelectedRequest}
               aiEnabled={aiEnabled}
+              whatsappEnabled={whatsappEnabled}
+              enabledCapabilities={enabledCapabilities}
               convertingRequestId={convertingRequestId}
               suggestingRequestId={suggestingRequestId}
               manualRequestForm={manualRequestForm}
@@ -389,12 +459,15 @@ export function DesktopWorkspaceRouter({
           )}
           customers={(
             <CustomersWorkspace
-              customers={dashboardData.customers}
-              requests={dashboardData.requests}
-              reservations={dashboardData.reservations}
-              rooms={dashboardData.rooms}
-              stays={dashboardData.customerRoomStays}
+              customers={surfaceData.customers}
+              requests={surfaceData.requests}
+              reservations={surfaceData.reservations}
+              rooms={surfaceData.rooms}
+              stays={surfaceData.customerRoomStays}
               aiEnabled={aiEnabled}
+              whatsappEnabled={whatsappEnabled}
+              reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
+              staysEnabled={accommodationStaysEnabled}
               onCall={callCustomerRecord}
               onWhatsApp={openCustomerWhatsApp}
               onSummarize={(requestId) => openAiTools("summary", requestId)}
@@ -407,9 +480,11 @@ export function DesktopWorkspaceRouter({
           )}
           waiting={(
             <RequestsWorkspace
-              requests={dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status))}
-              selectedRequest={dashboardData.requests.filter((request) => isRequestWaitingForReply(request.status)).find((request) => request.id === selectedRequestId) ?? dashboardData.requests.find((request) => isRequestWaitingForReply(request.status))}
+              requests={surfaceData.requests.filter((request) => isRequestWaitingForReply(request.status))}
+              selectedRequest={surfaceData.requests.filter((request) => isRequestWaitingForReply(request.status)).find((request) => request.id === selectedRequestId) ?? surfaceData.requests.find((request) => isRequestWaitingForReply(request.status))}
               aiEnabled={aiEnabled}
+              whatsappEnabled={whatsappEnabled}
+              enabledCapabilities={enabledCapabilities}
               convertingRequestId={convertingRequestId}
               suggestingRequestId={suggestingRequestId}
               manualRequestForm={manualRequestForm}
@@ -431,39 +506,47 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "pension" ? (
         <PensionPage
-          data={dashboardData}
-          reservations={(
+          data={surfaceData}
+          reservationsEnabled={accommodationReservationsEnabled}
+          staysEnabled={accommodationStaysEnabled}
+          folioEnabled={accommodationFolioEnabled}
+          menuEnabled={foodMenuEnabled}
+          tasksEnabled={tasksEnabled}
+          reservations={accommodationReservationsEnabled ? (
             <ReservationsWorkspace
-              reservations={dashboardData.reservations}
-              rooms={dashboardData.rooms}
-              customers={dashboardData.customers}
+              reservations={pensionReservations}
+              rooms={surfaceData.rooms}
+              customers={surfaceData.customers}
+              whatsappEnabled={whatsappEnabled}
               onSaveCustomer={handleSaveCustomer}
               onSaveManual={handleSaveManualReservation}
               onUpdateStatus={handleUpdateReservationStatus}
               onOpenWhatsApp={openReservationWhatsApp}
             />
-          )}
+          ) : null}
           rooms={(
             <RoomsWorkspace
-              rooms={dashboardData.rooms}
-              reservations={dashboardData.reservations}
-              customers={dashboardData.customers}
-              stays={dashboardData.customerRoomStays}
+              rooms={surfaceData.rooms}
+              reservations={pensionReservations}
+              customers={surfaceData.customers}
+              stays={surfaceData.customerRoomStays}
+              reservationsEnabled={accommodationReservationsEnabled}
+              staysEnabled={accommodationStaysEnabled}
               onUpdateStatus={handleUpdateRoomStatus}
               onAssignRoom={handleAssignCustomerToRoom}
               onUpdateStayStatus={handleUpdateCustomerRoomStayStatus}
             />
           )}
-          stays={(
+          stays={accommodationStaysEnabled ? (
             <CustomerRoomStaysWorkspace
-              stays={dashboardData.customerRoomStays}
+              stays={surfaceData.customerRoomStays}
               onUpdateStatus={handleUpdateCustomerRoomStayStatus}
             />
-          )}
+          ) : null}
           tasks={(
             <DailyTasksWorkspace
               scope="pension"
-              tasks={dashboardData.dailyTasks.filter((task) => isAccommodationTask(task, dashboardData.reservations))}
+              tasks={surfaceData.dailyTasks.filter((task) => isAccommodationTask(task, surfaceData.reservations))}
               onSave={handleSaveDailyTask}
               onDelete={handleDeleteDailyTask}
               onUpdateStatus={handleUpdateDailyTaskStatus}
@@ -472,24 +555,32 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "restaurant" ? (
         <RestaurantPage
-          data={dashboardData}
+          data={surfaceData}
+          accommodationReservationsEnabled={accommodationReservationsEnabled}
+          reservationsEnabled={foodReservationsEnabled}
+          ordersEnabled={foodOrdersEnabled}
+          menuEnabled={foodMenuEnabled}
+          roomFolioTransferEnabled={foodOrdersEnabled && accommodationFolioEnabled}
+          tasksEnabled={tasksEnabled}
           onDashboardDataChanged={setDashboardData}
           onUpdateTableStatus={handleUpdateTableStatus}
-          reservations={(
+          reservations={foodReservationsEnabled ? (
             <RestaurantReservationsWorkspace
-              reservations={dashboardData.reservations}
-              customers={dashboardData.customers}
-              tables={dashboardData.tables}
+              reservations={surfaceData.reservations}
+              accommodationReservationsEnabled={accommodationReservationsEnabled}
+              customers={surfaceData.customers}
+              tables={surfaceData.tables}
+              whatsappEnabled={whatsappEnabled}
               onSave={handleSaveManualRestaurantReservation}
               onSaveCustomer={handleSaveCustomer}
               onUpdateStatus={handleUpdateReservationStatus}
               onOpenWhatsApp={openReservationWhatsApp}
             />
-          )}
+          ) : null}
           tasks={(
             <DailyTasksWorkspace
               scope="restaurant"
-              tasks={dashboardData.dailyTasks.filter((task) => isRestaurantTask(task, dashboardData.reservations))}
+              tasks={surfaceData.dailyTasks.filter((task) => isRestaurantTask(task, surfaceData.reservations))}
               onSave={handleSaveDailyTask}
               onDelete={handleDeleteDailyTask}
               onUpdateStatus={handleUpdateDailyTaskStatus}
@@ -498,7 +589,10 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "menu" ? (
         <MenuManager
-          dashboardData={dashboardData}
+          dashboardData={surfaceData}
+          qrMenuEnabled={runtimeModules.qrMenu}
+          inventoryEnabled={inventoryEnabled}
+          stockImageImportEnabled={aiEnabled && inventoryEnabled}
           categoryForm={categoryForm}
           itemForm={itemForm}
           selectedCategoryId={selectedCategoryId}
@@ -518,13 +612,27 @@ export function DesktopWorkspaceRouter({
           onDashboardDataChanged={setDashboardData}
         />
       ) : activePage === "reports" ? (
-        <ReportsPage aiEnabled={aiEnabled} />
+        <ReportsPage
+          aiEnabled={aiEnabled}
+          financeEnabled={runtimeHasCapability(businessCapabilities, C.FINANCE)}
+          reportsEnabled={runtimeHasCapability(businessCapabilities, C.REPORTS)}
+          customersEnabled={runtimeHasCapability(businessCapabilities, C.CUSTOMERS)}
+          tasksEnabled={tasksEnabled}
+          accommodationEnabled={roomsEnabled || accommodationReservationsEnabled || accommodationStaysEnabled || accommodationFolioEnabled}
+          accommodationReservationsEnabled={accommodationReservationsEnabled}
+          accommodationFolioEnabled={accommodationFolioEnabled}
+          foodServiceEnabled={tablesEnabled || foodReservationsEnabled || foodOrdersEnabled || foodMenuEnabled}
+          foodReservationsEnabled={foodReservationsEnabled}
+          foodOrdersEnabled={foodOrdersEnabled}
+          foodMenuEnabled={foodMenuEnabled}
+          inventoryEnabled={inventoryEnabled}
+        />
       ) : activePage === "messages" ? null : (
         <SetupWizard
           embedded
           form={setupForm}
           setupData={setupData}
-          dashboardData={dashboardData}
+          dashboardData={surfaceData}
           saveState={setupSaveState}
           message={setupMessage}
           backupState={backupState}

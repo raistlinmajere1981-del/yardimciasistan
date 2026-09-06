@@ -22,6 +22,9 @@ type SyncState = "idle" | "loading" | "success" | "error";
 
 interface MenuManagerProps {
   dashboardData: DesktopDashboardData;
+  qrMenuEnabled: boolean;
+  inventoryEnabled: boolean;
+  stockImageImportEnabled: boolean;
   categoryForm: CategoryFormState;
   itemForm: ItemFormState;
   selectedCategoryId: string;
@@ -48,6 +51,9 @@ const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"])
 
 export function MenuManager({
   dashboardData,
+  qrMenuEnabled,
+  inventoryEnabled,
+  stockImageImportEnabled,
   categoryForm,
   itemForm,
   selectedCategoryId,
@@ -125,7 +131,7 @@ export function MenuManager({
   }
 
   return (
-    <section className="menu-manager" aria-label="QR menü yönetimi">
+    <section className="menu-manager" aria-label={qrMenuEnabled ? "QR menü yönetimi" : "Menü yönetimi"}>
       <div className="menu-management-grid">
         <section className="panel menu-list-panel category-panel">
           <div className="panel-heading compact">
@@ -149,7 +155,7 @@ export function MenuManager({
               >
                 <span>
                   <strong>{category.name}</strong>
-                  <small>{dashboardData.menu.items.filter((item) => item.category_id === category.id).length} ürün · {category.is_active ? "Yayında" : "Gizli"}</small>
+                  <small>{dashboardData.menu.items.filter((item) => item.category_id === category.id).length} ürün · {category.is_active ? (qrMenuEnabled ? "Yayında" : "Aktif") : (qrMenuEnabled ? "Gizli" : "Pasif")}</small>
                 </span>
                 <span className={category.is_active ? "dot is-on" : "dot"} aria-hidden="true" />
               </button>
@@ -179,7 +185,7 @@ export function MenuManager({
                 onChange={(event) => onCategoryFormChange({ ...categoryForm, is_active: event.target.checked })}
                 type="checkbox"
               />
-              Yayında göster
+              {qrMenuEnabled ? "Yayında göster" : "Menüde etkin"}
             </label>
             <div className="form-details category-details menu-always-open-details">
               <label>
@@ -213,7 +219,9 @@ export function MenuManager({
               <span>{selectedCategoryName}</span>
             </div>
             <div className="menu-heading-actions">
-              <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
+              {stockImageImportEnabled && (
+                <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
+              )}
               <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
               <button className="icon-command" type="button" onClick={onNewItem} aria-label="Ürün ekle" title="Ürün ekle">
                 <Plus size={18} aria-hidden="true" />
@@ -238,8 +246,8 @@ export function MenuManager({
                     <small>{formatCurrency(item.price, item.currency)} · {item.is_available ? "Mevcut" : "Kapalı"}{item.is_featured ? " · Öne çıkan" : ""}</small>
                   </span>
                   <span className="menu-stock-badges">
-                    {stockBadge && <StatusBadge tone={stockBadge.tone}>{stockBadge.label}</StatusBadge>}
-                    {isQrHiddenByStock(item) && <StatusBadge tone="neutral">QR menüde gizli</StatusBadge>}
+                    {inventoryEnabled && stockBadge && <StatusBadge tone={stockBadge.tone}>{stockBadge.label}</StatusBadge>}
+                    {inventoryEnabled && qrMenuEnabled && isQrHiddenByStock(item) && <StatusBadge tone="neutral">QR menüde gizli</StatusBadge>}
                     {item.is_featured
                       ? <Star className="manager-row-star" size={14} aria-hidden="true" />
                       : <span className={item.is_available ? "dot is-on dot" : "dot"} aria-hidden="true" />}
@@ -290,7 +298,7 @@ export function MenuManager({
               </label>
             </div>
 
-            <details className="menu-stock-editor" key={itemForm.id || "new-menu-item"}>
+            {inventoryEnabled && <details className="menu-stock-editor" key={itemForm.id || "new-menu-item"}>
               <summary className="menu-stock-editor-heading">
                 <span>
                   <strong id="menu-stock-editor-title">Stok</strong>
@@ -324,10 +332,12 @@ export function MenuManager({
                     <input value={itemForm.stock_consumption_quantity} onChange={(event) => onItemFormChange({ ...itemForm, stock_consumption_quantity: event.target.value })} inputMode="decimal" type="number" min="0.001" step="any" placeholder="Örn. 1" />
                   </label>
                 </div>
-                <label className="toggle-label">
-                  <input checked={itemForm.hide_when_out_of_stock} onChange={(event) => onItemFormChange({ ...itemForm, hide_when_out_of_stock: event.target.checked })} type="checkbox" />
-                  Stok bitince QR menüden gizle
-                </label>
+                {qrMenuEnabled && (
+                  <label className="toggle-label">
+                    <input checked={itemForm.hide_when_out_of_stock} onChange={(event) => onItemFormChange({ ...itemForm, hide_when_out_of_stock: event.target.checked })} type="checkbox" />
+                    Stok bitince QR menüden gizle
+                  </label>
+                )}
                 <label>
                   Stok notu
                   <textarea value={itemForm.stock_note} onChange={(event) => onItemFormChange({ ...itemForm, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" />
@@ -336,7 +346,7 @@ export function MenuManager({
                   <button className="stock-stop-action" type="button" onClick={() => onItemFormChange({ ...itemForm, stock_quantity: "" })}>Stok takibini bırak</button>
                 )}
               </div>
-            </details>
+            </details>}
 
             <div className="form-details item-details has-menu-image-preview menu-always-open-details">
               <div className="menu-image-picker-label">

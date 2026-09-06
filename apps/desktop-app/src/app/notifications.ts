@@ -2,8 +2,16 @@ import type {
   DesktopAndroidActionFailure,
   DesktopDashboardData
 } from "../../electron/database";
+import {
+  BUSINESS_CAPABILITIES,
+  getReservationDomain,
+  hasBusinessCapability,
+  isReservationTypeAvailable,
+  type BusinessCapability
+} from "@yardimci-asistan/shared";
 import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
 import type { DesktopPage } from "./navigation";
+import { getDesktopTaskDomain, isAccommodationTask, isRestaurantTask } from "./operations";
 
 export type DesktopNotificationPriority = "high" | "medium" | "low";
 export type DesktopNotificationKind = "request" | "reservation" | "table" | "task" | "sync" | "action";
@@ -22,12 +30,15 @@ export interface DesktopNotificationItem {
 export function buildDesktopNotifications(
   data: DesktopDashboardData,
   syncStatus: AutomaticSyncStatus,
+  capabilities: Iterable<BusinessCapability>,
   now = new Date()
 ): DesktopNotificationItem[] {
   const notifications: DesktopNotificationItem[] = [];
   const today = localDateKey(now);
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  if (!enabled.has(BUSINESS_CAPABILITIES.NOTIFICATIONS)) return notifications;
 
-  for (const request of data.requests) {
+  for (const request of hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.CUSTOMERS) ? data.requests : []) {
     if (request.status !== "new") continue;
     notifications.push({
       key: `request:${request.id}:new`,
@@ -42,7 +53,10 @@ export function buildDesktopNotifications(
   }
 
   for (const reservation of data.reservations) {
-    if (reservation.status !== "pending") continue;
+    const reservationContext = { roomIds: reservation.roomIds, tableIds: reservation.tableIds };
+    if (reservation.status !== "pending"
+        || !isReservationTypeAvailable(enabled, reservation.reservationType, reservationContext)) continue;
+    const reservationDomain = getReservationDomain(reservation.reservationType, reservationContext);
     notifications.push({
       key: `reservation:${reservation.id}:pending`,
       kind: "reservation",
@@ -50,14 +64,17 @@ export function buildDesktopNotifications(
       title: "Rezervasyon onay bekliyor",
       message: [reservation.customerName || reservation.title, reservation.startDate, reservation.time].filter(Boolean).join(" · "),
       occurredAt: reservation.updatedAt,
-      destination: ["table", "breakfast"].includes(reservation.reservationType) ? "restaurant" : "pension",
+      destination: reservationDomain === "food_service"
+        || (reservationDomain === "generic" && !enabled.has(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS))
+        ? "restaurant"
+        : "pension",
       relatedId: reservation.id
     });
   }
 
   const tableById = new Map(data.tables.map((table) => [table.id, table]));
   const paymentTableIds = new Set<string>();
-  for (const order of data.paymentWaitingTableOrders ?? []) {
+  for (const order of hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_ORDERS) ? data.paymentWaitingTableOrders ?? [] : []) {
     paymentTableIds.add(order.tableId);
     notifications.push({
       key: `table:${order.tableId || order.id}:payment_waiting`,
@@ -71,7 +88,9 @@ export function buildDesktopNotifications(
     });
   }
   for (const table of data.tables) {
-    if (paymentTableIds.has(table.id) || !["payment", "bill_waiting"].includes(table.status)) continue;
+    if (!hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_ORDERS)
+        || paymentTableIds.has(table.id)
+        || !["payment", "bill_waiting"].includes(table.status)) continue;
     notifications.push({
       key: `table:${table.id}:payment_waiting`,
       kind: "table",
@@ -84,9 +103,14 @@ export function buildDesktopNotifications(
     });
   }
 
-  for (const task of data.dailyTasks) {
+  for (const task of hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.TASKS) ? data.dailyTasks : []) {
     if (task.status !== "pending") continue;
+    if (isAccommodationTask(task, data.reservations)
+        && !hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS)) continue;
+    if (isRestaurantTask(task, data.reservations)
+        && !hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_TABLES)) continue;
     const overdue = Boolean(task.dueDate && task.dueDate < today);
+    const taskDomain = getDesktopTaskDomain(task, data.reservations);
     notifications.push({
       key: `task:${task.id}:pending`,
       kind: "task",
@@ -94,7 +118,9 @@ export function buildDesktopNotifications(
       title: overdue ? "Günlük iş gecikti" : "Günlük iş bekliyor",
       message: [task.title, task.dueDate, task.dueTime].filter(Boolean).join(" · "),
       occurredAt: task.updatedAt,
-      destination: isRestaurantTask(task.taskType, task.relatedType) ? "restaurant" : "pension",
+      destination: taskDomain === "food_service" ? "restaurant"
+        : taskDomain === "accommodation" || taskDomain === "mixed" ? "pension"
+          : "dashboard",
       relatedId: task.id
     });
   }
@@ -112,8 +138,10 @@ export function buildDesktopNotifications(
     });
   }
 
-  for (const failure of data.androidActionFailures ?? []) {
-    notifications.push(actionFailureNotification(failure));
+  if (hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ANDROID)) {
+    for (const failure of data.androidActionFailures ?? []) {
+      notifications.push(actionFailureNotification(failure));
+    }
   }
 
   return notifications.sort((left, right) => {
@@ -134,11 +162,6 @@ function actionFailureNotification(failure: DesktopAndroidActionFailure): Deskto
     destination: failure.targetPage,
     relatedId: failure.relatedId
   };
-}
-
-function isRestaurantTask(taskType: string, relatedType: string) {
-  return ["table_reservation", "breakfast", "restaurant", "service"].includes(taskType)
-    || relatedType === "table";
 }
 
 function compact(value: string, limit = 110) {

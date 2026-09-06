@@ -45,6 +45,9 @@ interface CustomersWorkspaceProps {
   rooms: DesktopDashboardData["rooms"];
   stays: DesktopDashboardData["customerRoomStays"];
   aiEnabled: boolean;
+  whatsappEnabled: boolean;
+  reservationsEnabled: boolean;
+  staysEnabled: boolean;
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSummarize: (requestId: string) => void;
@@ -65,6 +68,9 @@ export function CustomersWorkspace({
   rooms,
   stays,
   aiEnabled,
+  whatsappEnabled,
+  reservationsEnabled,
+  staysEnabled,
   onCall,
   onWhatsApp,
   onSummarize,
@@ -130,7 +136,11 @@ export function CustomersWorkspace({
         </div>
         <label className="customer-search">
           <span>Ara</span>
-          <input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Ad, telefon, kimlik, etiket veya oda" />
+          <input
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder={staysEnabled ? "Ad, telefon, kimlik, etiket veya oda" : "Ad, telefon, kimlik veya etiket"}
+          />
         </label>
         <CompactList className="manager-list operation-compact-list operations-list">
           {filteredCustomers.length === 0 ? (
@@ -166,7 +176,7 @@ export function CustomersWorkspace({
                 <h2>{selectedCustomer.fullName}</h2>
               </div>
               <div className="customer-heading-actions">
-                <StatusBadge tone="info">{selectedCustomer.stayCount} konaklama</StatusBadge>
+                {staysEnabled && <StatusBadge tone="info">{selectedCustomer.stayCount} konaklama</StatusBadge>}
                 <ActionButton
                   variant="secondary"
                   size="sm"
@@ -194,10 +204,12 @@ export function CustomersWorkspace({
                 <dt>Son temas</dt>
                 <dd title={selectedCustomer.lastContactAt || selectedCustomer.updatedAt || undefined}>{formatCustomerLastContactDate(selectedCustomer.lastContactAt || selectedCustomer.updatedAt)}</dd>
               </div>
-              <div>
-                <dt>Rezervasyon</dt>
-                <dd>{selectedCustomer.reservationCount} kayıt</dd>
-              </div>
+              {reservationsEnabled && (
+                <div>
+                  <dt>Rezervasyon</dt>
+                  <dd>{selectedCustomer.reservationCount} kayıt</dd>
+                </div>
+              )}
               <div>
                 <dt>Kimlik türü</dt>
                 <dd>{formatIdentityType(selectedCustomer.identityType)}</dd>
@@ -249,25 +261,29 @@ export function CustomersWorkspace({
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
               </ActionButton>
-              <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedCustomer)} disabled={!selectedCustomer.phone}>
-                <MessageCircle size={16} aria-hidden="true" />
-                WhatsApp'tan Yaz
-              </ActionButton>
+              {whatsappEnabled && (
+                <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedCustomer)} disabled={!selectedCustomer.phone}>
+                  <MessageCircle size={16} aria-hidden="true" />
+                  WhatsApp'tan Yaz
+                </ActionButton>
+              )}
               {aiEnabled && (
                 <ActionButton variant="ghost" size="sm" type="button" onClick={() => onSummarize(selectedRequests[0]?.id ?? "")} disabled={selectedRequests.length === 0}>
                   <Sparkles size={16} aria-hidden="true" />
                   Geçmişi Özetle
                 </ActionButton>
               )}
-              <ActionButton
-                size="sm"
-                type="button"
-                onClick={() => setAssignmentCustomerId(selectedCustomer.id)}
-                disabled={rooms.length === 0}
-              >
-                <BedDouble size={16} aria-hidden="true" />
-                Odaya Ata
-              </ActionButton>
+              {staysEnabled && (
+                <ActionButton
+                  size="sm"
+                  type="button"
+                  onClick={() => setAssignmentCustomerId(selectedCustomer.id)}
+                  disabled={rooms.length === 0}
+                >
+                  <BedDouble size={16} aria-hidden="true" />
+                  Odaya Ata
+                </ActionButton>
+              )}
               <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedCustomer)}>
                 <Trash2 size={16} aria-hidden="true" />
                 Müşteriyi Sil
@@ -288,34 +304,38 @@ export function CustomersWorkspace({
                   ))
                 )}
               </section>
-              <section>
-                <h3>Rezervasyonlar</h3>
-                {selectedReservations.length === 0 ? (
-                  <p>Rezervasyon yok.</p>
-                ) : (
-                  selectedReservations.slice(0, 4).map((reservation) => (
-                    <article key={reservation.id}>
-                      <strong>{reservation.title}</strong>
-                      <span>{formatReservationStatus(reservation.status)} · {formatReservationDate(reservation)}</span>
-                    </article>
-                  ))
-                )}
-              </section>
-              <section className="customer-stay-history">
-                <h3>Oda / Konaklama Geçmişi</h3>
-                {selectedStays.length === 0 ? (
-                  <p>Oda kaydı yok.</p>
-                ) : (
-                  selectedStays.map((stay) => (
-                    <article key={stay.id}>
-                      <strong>{stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}</strong>
-                      <span>{formatCustomerRoomStayStatus(stay.status)} · {formatStayDateRange(stay)}</span>
-                      {stay.notes && <p>{stay.notes}</p>}
-                      <CustomerRoomStayActions stay={stay} onUpdateStatus={onUpdateStayStatus} />
-                    </article>
-                  ))
-                )}
-              </section>
+              {reservationsEnabled && (
+                <section>
+                  <h3>Rezervasyonlar</h3>
+                  {selectedReservations.length === 0 ? (
+                    <p>Rezervasyon yok.</p>
+                  ) : (
+                    selectedReservations.slice(0, 4).map((reservation) => (
+                      <article key={reservation.id}>
+                        <strong>{reservation.title}</strong>
+                        <span>{formatReservationStatus(reservation.status)} · {formatReservationDate(reservation)}</span>
+                      </article>
+                    ))
+                  )}
+                </section>
+              )}
+              {staysEnabled && (
+                <section className="customer-stay-history">
+                  <h3>Oda / Konaklama Geçmişi</h3>
+                  {selectedStays.length === 0 ? (
+                    <p>Oda kaydı yok.</p>
+                  ) : (
+                    selectedStays.map((stay) => (
+                      <article key={stay.id}>
+                        <strong>{stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}</strong>
+                        <span>{formatCustomerRoomStayStatus(stay.status)} · {formatStayDateRange(stay)}</span>
+                        {stay.notes && <p>{stay.notes}</p>}
+                        <CustomerRoomStayActions stay={stay} onUpdateStatus={onUpdateStayStatus} />
+                      </article>
+                    ))
+                  )}
+                </section>
+              )}
             </div>
           </>
         ) : (
@@ -342,21 +362,23 @@ export function CustomersWorkspace({
         }}
         onAnalyzeIdentity={onAnalyzeIdentity}
       />
-      <RoomAssignmentDrawer
-        open={Boolean(assignmentCustomerId)}
-        customers={customers}
-        rooms={rooms}
-        initialCustomerId={assignmentCustomerId}
-        initialRoomId=""
-        onClose={() => setAssignmentCustomerId("")}
-        onAssign={async (input) => {
-          const result = await onAssignRoom(input);
-          if (result.ok) {
-            setAssignmentCustomerId("");
-          }
-          return result;
-        }}
-      />
+      {staysEnabled && (
+        <RoomAssignmentDrawer
+          open={Boolean(assignmentCustomerId)}
+          customers={customers}
+          rooms={rooms}
+          initialCustomerId={assignmentCustomerId}
+          initialRoomId=""
+          onClose={() => setAssignmentCustomerId("")}
+          onAssign={async (input) => {
+            const result = await onAssignRoom(input);
+            if (result.ok) {
+              setAssignmentCustomerId("");
+            }
+            return result;
+          }}
+        />
+      )}
     </section>
   );
 }
@@ -486,7 +508,7 @@ export function CustomerEditorDrawer({
               <label>Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
               <label>Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="05xx xxx xx xx" /></label>
               <label>E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
-              <label>Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="pansiyon, düzenli müşteri" /></label>
+              <label>Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
               <label className="manual-request-note-field">Not<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
             </div>
           </section>

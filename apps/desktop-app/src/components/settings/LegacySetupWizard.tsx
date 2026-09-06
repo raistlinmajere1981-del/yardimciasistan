@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ExternalLink, Plus, RefreshCw, Save, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
-import type { AndroidPermissionGroupId, AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
+import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
+import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
 import { formatDateTime } from "../../app/record-formatters";
 import {
@@ -34,6 +35,7 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
 
 interface SetupWizardProps {
   form: SetupFormState;
+  enabledCapabilities: BusinessCapability[];
   setupData: DesktopSetupData;
   dashboardData?: DesktopDashboardData;
   embedded?: boolean;
@@ -65,6 +67,7 @@ interface SetupWizardProps {
 
 export function SetupWizard({
   form,
+  enabledCapabilities,
   setupData,
   dashboardData,
   embedded = false,
@@ -574,6 +577,7 @@ export function SetupWizard({
         {embedded && form.androidEnabled && (
           <AndroidDevicesSection
             devices={dashboardData?.androidDevices ?? []}
+            enabledCapabilities={enabledCapabilities}
             state={androidDeviceState}
             message={androidDeviceMessage}
             onSetRole={onSetAndroidDeviceRole}
@@ -777,6 +781,7 @@ export function SetupWizard({
 
 interface AndroidDevicesSectionProps {
   devices: DesktopAndroidDevice[];
+  enabledCapabilities: BusinessCapability[];
   state: SyncState;
   message: string;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
@@ -788,6 +793,7 @@ interface AndroidDevicesSectionProps {
 
 function AndroidDevicesSection({
   devices,
+  enabledCapabilities,
   state,
   message,
   onSetRole,
@@ -797,6 +803,10 @@ function AndroidDevicesSection({
   onRevoke
 }: AndroidDevicesSectionProps) {
   const busy = state === "loading";
+  const availableGroupIds = new Set(androidAvailablePermissionGroupIds(enabledCapabilities));
+  const permissionGroupOptions = ANDROID_PERMISSION_GROUP_OPTIONS
+    .filter((group) => availableGroupIds.has(group.id))
+    .map((group) => capabilityAwareAndroidGroupCopy(group, enabledCapabilities));
   const availableDevices = devices.filter((device) => !device.revokedAt);
   const removedDevices = devices.filter((device) => Boolean(device.revokedAt));
   const restoreDevice = (device: DesktopAndroidDevice) => {
@@ -847,21 +857,21 @@ function AndroidDevicesSection({
                 <dl className="android-device-details">
                   <div><dt>Son bağlantı</dt><dd>{device.lastSeenAt ? formatDateTime(device.lastSeenAt) : "Henüz yok"}</dd></div>
                   <div><dt>Uygulama</dt><dd>{device.appVersion || "Sürüm bilinmiyor"}</dd></div>
-                  <div><dt>Görev özeti</dt><dd>{androidDevicePermissionSummary(device)}</dd></div>
+                  <div><dt>Görev özeti</dt><dd>{androidDevicePermissionSummary(device, permissionGroupOptions)}</dd></div>
                 </dl>
                 {device.role === "admin" ? (
                   <div className="android-device-all-permissions">
                     <ShieldCheck size={18} aria-hidden="true" />
                     <div>
-                      <strong>Tüm yetkiler açık</strong>
-                      <span>Yönetici cihaz bütün görev alanlarını kullanabilir.</span>
+                      <strong>Etkin alanlarda yönetici</strong>
+                      <span>Yalnız işletmede etkin yeteneklerin izinleri kullanılabilir.</span>
                     </div>
                   </div>
                 ) : (
                   <fieldset className="android-device-permission-groups" disabled={busy}>
                     <legend>Görev alanları</legend>
                     <div className="android-device-permission-grid">
-                      {ANDROID_PERMISSION_GROUP_OPTIONS.map((group) => {
+                      {permissionGroupOptions.map((group) => {
                         const checked = Boolean(device.permissionGroups?.[group.id]);
                         return (
                           <label className={`android-permission-group${checked ? " is-selected" : ""}`} key={group.id}>
@@ -952,15 +962,65 @@ function androidPermissionGroupsWith(
   ])) as AndroidPermissionGroups;
 }
 
-function androidDevicePermissionSummary(device: DesktopAndroidDevice): string {
+function androidDevicePermissionSummary(
+  device: DesktopAndroidDevice,
+  groupOptions: typeof ANDROID_PERMISSION_GROUP_OPTIONS = ANDROID_PERMISSION_GROUP_OPTIONS
+): string {
   if (!device.isActive) {
     return "Yetkisiz / Pasif";
   }
   if (device.role === "admin") {
-    return "Tüm yetkiler";
+    return "Etkin yeteneklerde tüm izinler";
   }
-  const selected = ANDROID_PERMISSION_GROUP_OPTIONS
+  const selected = groupOptions
     .filter((group) => device.permissionGroups?.[group.id])
     .map((group) => group.shortLabel);
   return selected.length > 0 ? selected.join(" + ") : "Görev alanı seçilmedi";
+}
+
+function capabilityAwareAndroidGroupCopy(
+  group: typeof ANDROID_PERMISSION_GROUP_OPTIONS[number],
+  capabilities: Iterable<BusinessCapability>
+): typeof ANDROID_PERMISSION_GROUP_OPTIONS[number] {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  if (group.id === "service_orders") {
+    const hasService = hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_TABLES)
+      || hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_ORDERS);
+    if (!hasService) {
+      const inventory = hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.INVENTORY);
+      return {
+        ...group,
+        label: inventory ? "Menü / Stok" : "Menü",
+        shortLabel: inventory ? "Menü / Stok" : "Menü",
+        description: inventory ? "Menü ve stok durumunu görüntüleme" : "Menü kayıtlarını görüntüleme"
+      };
+    }
+  }
+  if (group.id === "cashier") {
+    const hasDomainCheckout = hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_ORDERS)
+      || hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO);
+    return hasDomainCheckout
+      ? group
+      : { ...group, label: "Kasa / Finans", shortLabel: "Kasa", description: "Finans kayıtlarını görüntüleme ve ekleme" };
+  }
+  if (group.id === "rooms_tasks"
+      && !hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS)) {
+    return {
+      ...group,
+      label: "Günlük İşler",
+      shortLabel: "İşler",
+      description: "Genel günlük işleri görüntüleme ve tamamlama"
+    };
+  }
+  if (group.id === "customer_reservation"
+      && !hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS)
+      && !hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS)) {
+    return {
+      ...group,
+      label: "Müşteri Talepleri",
+      shortLabel: "Müşteri",
+      description: "Talepleri görüntüleme ve yanıtlama"
+    };
+  }
+  return group;
 }

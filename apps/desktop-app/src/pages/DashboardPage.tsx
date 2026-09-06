@@ -30,6 +30,10 @@ interface DashboardPageProps {
   data: DesktopDashboardData;
   modules: DesktopSetupData["modules"];
   aiEnabled: boolean;
+  customersEnabled: boolean;
+  tasksEnabled: boolean;
+  calendarEnabled: boolean;
+  reservationsEnabled: boolean;
   availableRoomCount: number;
   onReplyRequest: (request: DashboardRequest) => void;
   onOpenCustomerWork: (request?: DashboardRequest) => void;
@@ -48,6 +52,10 @@ export function DashboardPage({
   data,
   modules,
   aiEnabled,
+  customersEnabled,
+  tasksEnabled,
+  calendarEnabled,
+  reservationsEnabled,
   availableRoomCount,
   onReplyRequest,
   onOpenCustomerWork,
@@ -69,6 +77,8 @@ export function DashboardPage({
   const visiblePriorityItems = dashboard.priorityItems.slice(0, 6);
   const hiddenPriorityCount = Math.max(0, attentionCount - visiblePriorityItems.length);
   const visibleScheduleItems = dashboard.scheduleItems.slice(0, 4);
+  const hasCapacityMetrics = modules.rooms || modules.tables || (modules.whatsapp && customersEnabled);
+  const capacityVisible = hasCapacityMetrics || aiEnabled;
 
   const renderPriorityItem = (item: DashboardPriorityItem, index: number) => (
     <li className={`dashboard-priority-item priority-${item.kind}`} key={item.key}>
@@ -138,9 +148,9 @@ export function DashboardPage({
         </div>
 
         <div className="dashboard-attention-grid" aria-label="İlgi bekleyen konular">
-          <AttentionCard tone="info" icon={MessageCircle} value={waitingRequestCount} label="müşteri yanıt bekliyor" />
-          <AttentionCard tone="wait" icon={ClipboardCheck} value={openTaskCount} label="açık iş bulunuyor" />
-          <AttentionCard tone="wait" icon={CalendarCheck2} value={pendingReservationCount} label="rezervasyon onay bekliyor" />
+          {customersEnabled && <AttentionCard tone="info" icon={MessageCircle} value={waitingRequestCount} label="müşteri yanıt bekliyor" />}
+          {tasksEnabled && <AttentionCard tone="wait" icon={ClipboardCheck} value={openTaskCount} label="açık iş bulunuyor" />}
+          {reservationsEnabled && <AttentionCard tone="wait" icon={CalendarCheck2} value={pendingReservationCount} label="rezervasyon onay bekliyor" />}
         </div>
       </section>
 
@@ -153,16 +163,18 @@ export function DashboardPage({
               <p>Öncelik sırası</p>
               <h2 id="dashboard-priority-title">Şimdi yapılacaklar</h2>
             </div>
-            <ActionButton variant="ghost" size="sm" onClick={() => onOpenCustomerWork()}>
-              Tüm talepler
-              <ChevronRight size={15} aria-hidden="true" />
-            </ActionButton>
+            {customersEnabled && (
+              <ActionButton variant="ghost" size="sm" onClick={() => onOpenCustomerWork()}>
+                Tüm talepler
+                <ChevronRight size={15} aria-hidden="true" />
+              </ActionButton>
+            )}
           </div>
 
           {visiblePriorityItems.length === 0 ? (
             <div className="dashboard-clear-state">
               <CheckCircle2 size={30} aria-hidden="true" />
-              <div><strong>Öncelikli bir iş görünmüyor.</strong><p>Yeni talepler ve açık işler burada sıralanacak.</p></div>
+              <div><strong>Öncelikli bir iş görünmüyor.</strong><p>Etkin operasyonlardaki yeni işler burada sıralanacak.</p></div>
             </div>
           ) : (
             <ol className="dashboard-priority-list" id="dashboard-priority-list">
@@ -175,8 +187,8 @@ export function DashboardPage({
           )}
         </Panel>
 
-        <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
-          <Panel className="dashboard-timeline-panel" padding="compact">
+        {(calendarEnabled || capacityVisible) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
+          {calendarEnabled && <Panel className="dashboard-timeline-panel" padding="compact">
             <div className="dashboard-section-heading compact">
               <div>
                 <p>Takvim</p>
@@ -188,7 +200,10 @@ export function DashboardPage({
             </div>
 
             {visibleScheduleItems.length === 0 ? (
-              <p className="dashboard-side-empty">Planlanmış açık iş veya rezervasyon yok.</p>
+              <p className="dashboard-side-empty">{reservationsEnabled && tasksEnabled
+                ? "Planlanmış açık iş veya rezervasyon yok."
+                : reservationsEnabled ? "Planlanmış rezervasyon yok."
+                  : tasksEnabled ? "Planlanmış açık iş yok." : "Takvimde gösterilecek kayıt yok."}</p>
             ) : (
               <ol className="dashboard-timeline-list">
                 {visibleScheduleItems.map((item) => (
@@ -206,31 +221,36 @@ export function DashboardPage({
             {dashboard.scheduleItems.length > visibleScheduleItems.length && (
               <p className="dashboard-side-note">{dashboard.scheduleItems.length - visibleScheduleItems.length} planlı kayıt daha var.</p>
             )}
-          </Panel>
+          </Panel>}
 
-          <Panel className="dashboard-capacity-panel" padding="compact">
+          {capacityVisible && <Panel className="dashboard-capacity-panel" padding="compact">
             <div className="dashboard-section-heading compact">
-              <div><p>Anlık durum</p><h2>İşletme kapasitesi</h2></div>
+              <div>
+                <p>{hasCapacityMetrics ? "Anlık durum" : "AI Yardımcı"}</p>
+                <h2>{hasCapacityMetrics ? "İşletme kapasitesi" : "Günlük değerlendirme"}</h2>
+              </div>
             </div>
-            <div className="dashboard-capacity-list">
-              {modules.rooms && (
-                <div><BedDouble size={17} aria-hidden="true" /><span><strong>{availableRoomCount}/{data.summary.totalRooms}</strong> oda uygun</span></div>
-              )}
-              {modules.tables && (
-                <div><UtensilsCrossed size={17} aria-hidden="true" /><span><strong>{data.summary.availableTables}</strong> masa uygun</span></div>
-              )}
-              {(modules.whatsapp || aiEnabled) && (
-                <div><MessageSquareText size={17} aria-hidden="true" /><span><strong>{data.summary.preparedWhatsAppMessages}</strong> hazır cevap</span></div>
-              )}
-            </div>
+            {hasCapacityMetrics && (
+              <div className="dashboard-capacity-list">
+                {modules.rooms && (
+                  <div><BedDouble size={17} aria-hidden="true" /><span><strong>{availableRoomCount}/{data.summary.totalRooms}</strong> oda uygun</span></div>
+                )}
+                {modules.tables && (
+                  <div><UtensilsCrossed size={17} aria-hidden="true" /><span><strong>{data.summary.availableTables}</strong> masa uygun</span></div>
+                )}
+                {modules.whatsapp && customersEnabled && (
+                  <div><MessageSquareText size={17} aria-hidden="true" /><span><strong>{data.summary.preparedWhatsAppMessages}</strong> hazır cevap</span></div>
+                )}
+              </div>
+            )}
             {aiEnabled && (
               <ActionButton className="dashboard-ai-command" variant="secondary" size="sm" onClick={onOpenDailyAi}>
                 <Sparkles size={15} aria-hidden="true" />
                 Günü değerlendir
               </ActionButton>
             )}
-          </Panel>
-        </aside>
+          </Panel>}
+        </aside>}
       </section>
     </div>
   );

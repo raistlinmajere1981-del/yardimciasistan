@@ -107,7 +107,7 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
 
   async function handleCreateManualBackup() {
     setBackupState("loading");
-    setBackupMessage("Yerel kayıtların ve QR menü görsellerinin yedeği oluşturuluyor...");
+    setBackupMessage("Yerel kayıtların ve menü görsellerinin yedeği oluşturuluyor...");
 
     if (!window.yardimciDesktop) {
       setBackupState("error");

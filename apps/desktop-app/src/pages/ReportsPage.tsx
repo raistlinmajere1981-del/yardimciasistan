@@ -24,6 +24,18 @@ import { Panel } from "../components/ui/Panel";
 
 interface ReportsPageProps {
   aiEnabled: boolean;
+  financeEnabled: boolean;
+  reportsEnabled: boolean;
+  customersEnabled: boolean;
+  tasksEnabled: boolean;
+  accommodationEnabled: boolean;
+  accommodationReservationsEnabled: boolean;
+  accommodationFolioEnabled: boolean;
+  foodServiceEnabled: boolean;
+  foodReservationsEnabled: boolean;
+  foodOrdersEnabled: boolean;
+  foodMenuEnabled: boolean;
+  inventoryEnabled: boolean;
 }
 
 const AI_ACTIONS: Array<{ mode: DesktopReportAiMode; label: string }> = [
@@ -40,7 +52,21 @@ const REPORT_PRESETS: Array<{ preset: Exclude<DesktopReportPreset, "custom">; la
   { preset: "last30", label: "Son 30 Gün" }
 ];
 
-export function ReportsPage({ aiEnabled }: ReportsPageProps) {
+export function ReportsPage({
+  aiEnabled,
+  financeEnabled,
+  reportsEnabled,
+  customersEnabled,
+  tasksEnabled,
+  accommodationEnabled,
+  accommodationReservationsEnabled,
+  accommodationFolioEnabled,
+  foodServiceEnabled,
+  foodReservationsEnabled,
+  foodOrdersEnabled,
+  foodMenuEnabled,
+  inventoryEnabled
+}: ReportsPageProps) {
   const initialRange = useMemo(() => createPresetRange("last7"), []);
   const [range, setRange] = useState<DesktopReportRangeInput>(initialRange);
   const [customStart, setCustomStart] = useState(initialRange.startDate);
@@ -58,6 +84,14 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
     setAiMode("");
     setAiContent("");
     setAiMessage("Bir yorum türü seçtiğinizde AI yalnız hazırlanmış rapor sonucunu kullanır.");
+    if (!reportsEnabled) {
+      setReport(emptyReport(range));
+      setLoading(false);
+      setReportMessage("");
+      return () => {
+        active = false;
+      };
+    }
     if (!window.yardimciDesktop) {
       setReport(emptyReport(range));
       return () => {
@@ -81,7 +115,17 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
     return () => {
       active = false;
     };
-  }, [range]);
+  }, [
+    accommodationReservationsEnabled,
+    customersEnabled,
+    foodMenuEnabled,
+    foodOrdersEnabled,
+    foodReservationsEnabled,
+    inventoryEnabled,
+    range,
+    reportsEnabled,
+    tasksEnabled
+  ]);
 
   function selectPreset(preset: Exclude<DesktopReportPreset, "custom">) {
     const nextRange = createPresetRange(preset);
@@ -147,11 +191,26 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
   }
 
   const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
+  const reservationsEnabled = accommodationReservationsEnabled || foodReservationsEnabled;
+  const stockEnabled = foodMenuEnabled && inventoryEnabled;
+  const visibleAttentionItems = report.attention.items.filter((item) => {
+    if (item.kind === "pending_request") return customersEnabled;
+    if (item.kind === "overdue_task" || item.kind === "open_task") return tasksEnabled;
+    if (item.kind === "pending_reservation") return reservationsEnabled;
+    if (item.kind === "payment_waiting") return foodOrdersEnabled;
+    if (["out_of_stock", "low_stock"].includes(item.kind)) return stockEnabled;
+    return true;
+  });
 
   return (
-    <section className={`reports-page${detailsOpen ? "" : " reports-details-collapsed"}`} aria-label="Kasa ve işletme raporları">
-      <FinanceWorkspace />
+    <section className={`reports-page${detailsOpen ? "" : " reports-details-collapsed"}`} aria-label={financeEnabled && reportsEnabled ? "Kasa ve işletme raporları" : financeEnabled ? "Kasa" : "İşletme raporları"}>
+      {financeEnabled && <FinanceWorkspace
+        accommodationEnabled={accommodationEnabled}
+        accommodationFolioEnabled={accommodationFolioEnabled}
+        foodServiceEnabled={foodServiceEnabled}
+      />}
 
+      {reportsEnabled && <>
       <button
         className="reports-detail-divider cash-details-toggle"
         type="button"
@@ -239,16 +298,16 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
           </div>
         </div>
         <div className="report-summary-metrics">
-          <MetricCard compact title="Restoran cirosu" value={money(report.summary.restaurantRevenue)} detail="Yalnız ödenmiş adisyonlar" tone="ok" icon={Banknote} />
-          <MetricCard compact title="Kapatılan adisyon" value={count(report.summary.closedOrders)} detail="Ödendi olarak kapatılan" tone="info" icon={ReceiptText} />
-          <MetricCard compact title="Ortalama hesap" value={report.summary.closedOrders > 0 ? money(report.summary.averageOrder) : "Veri yok"} detail="Ciro / ödenmiş adisyon" tone="neutral" icon={Calculator} />
-          <MetricCard compact title="Onaylanan rezervasyon" value={count(report.summary.approvedReservations)} detail="Onaylı veya tamamlanmış" tone="info" icon={CalendarCheck} />
-          <MetricCard compact title="Yeni müşteri talebi" value={count(report.summary.newRequests)} detail="Dönemde alınan talepler" tone="info" icon={Inbox} />
-          <MetricCard compact title="Tamamlanmayan günlük iş" value={count(report.summary.pendingTasks)} detail="Döneme bağlı açık işler" tone={report.summary.pendingTasks > 0 ? "wait" : "ok"} icon={ClipboardList} />
+          {foodOrdersEnabled && <MetricCard compact title="Restoran cirosu" value={money(report.summary.restaurantRevenue)} detail="Yalnız ödenmiş adisyonlar" tone="ok" icon={Banknote} />}
+          {foodOrdersEnabled && <MetricCard compact title="Kapatılan adisyon" value={count(report.summary.closedOrders)} detail="Ödendi olarak kapatılan" tone="info" icon={ReceiptText} />}
+          {foodOrdersEnabled && <MetricCard compact title="Ortalama hesap" value={report.summary.closedOrders > 0 ? money(report.summary.averageOrder) : "Veri yok"} detail="Ciro / ödenmiş adisyon" tone="neutral" icon={Calculator} />}
+          {reservationsEnabled && <MetricCard compact title="Onaylanan rezervasyon" value={count(report.summary.approvedReservations)} detail="Etkin alanlardaki onaylı veya tamamlanmış kayıtlar" tone="info" icon={CalendarCheck} />}
+          {customersEnabled && <MetricCard compact title="Yeni müşteri talebi" value={count(report.summary.newRequests)} detail="Dönemde alınan talepler" tone="info" icon={Inbox} />}
+          {tasksEnabled && <MetricCard compact title="Tamamlanmayan günlük iş" value={count(report.summary.pendingTasks)} detail="Döneme bağlı açık işler" tone={report.summary.pendingTasks > 0 ? "wait" : "ok"} icon={ClipboardList} />}
         </div>
       </section>
 
-      <Panel className="report-section-panel">
+      {foodOrdersEnabled && <Panel className="report-section-panel">
         <div className="report-section-title">
           <div>
             <p>Ödenmiş adisyonlar</p>
@@ -311,38 +370,38 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
             )}
           </section>
         </div>
-      </Panel>
+      </Panel>}
 
-      <Panel className="report-section-panel">
+      {(reservationsEnabled || customersEnabled) && <Panel className="report-section-panel">
         <div className="report-section-title">
           <div>
-            <p>Konaklama ve müşteri hareketleri</p>
-            <h2>Pansiyon ve Talepler</h2>
+            <p>{reservationsEnabled && customersEnabled ? "Rezervasyon ve müşteri hareketleri" : reservationsEnabled ? "Rezervasyon hareketleri" : "Müşteri hareketleri"}</p>
+            <h2>{reservationsEnabled && customersEnabled ? "Rezervasyonlar ve Talepler" : reservationsEnabled ? "Rezervasyonlar" : "Müşteri Talepleri"}</h2>
           </div>
         </div>
         <div className="report-operation-grid">
-          <section>
-            <h3>Rezervasyonlar</h3>
+          {reservationsEnabled && <section>
+            <h3>Etkin rezervasyon alanları</h3>
             <div className="report-compact-counters">
               <ReportCounter label="Gelen rezervasyon" value={report.pensionAndRequests.incomingReservations} />
               <ReportCounter label="Onaylanan" value={report.pensionAndRequests.approvedReservations} />
               <ReportCounter label="Bekleyen" value={report.pensionAndRequests.pendingReservations} warning />
               <ReportCounter label="İptal / reddedilen" value={report.pensionAndRequests.cancelledOrRejectedReservations} />
-              <ReportCounter label="Konaklama gecesi" value={report.pensionAndRequests.accommodationNights} />
+              {accommodationReservationsEnabled && <ReportCounter label="Konaklama gecesi" value={report.pensionAndRequests.accommodationNights} />}
             </div>
-          </section>
-          <section>
+          </section>}
+          {customersEnabled && <section>
             <h3>Müşteri talepleri</h3>
             <div className="report-compact-counters">
               <ReportCounter label="Yeni müşteri talebi" value={report.pensionAndRequests.newRequests} />
               <ReportCounter label="Cevaplanan talep" value={report.pensionAndRequests.answeredRequests} />
               <ReportCounter label="Cevap bekleyen" value={report.pensionAndRequests.waitingRequests} warning />
             </div>
-          </section>
+          </section>}
         </div>
-      </Panel>
+      </Panel>}
 
-      <Panel className="report-section-panel">
+      {stockEnabled && <Panel className="report-section-panel">
         <div className="report-section-title">
           <div>
             <p>Seçilen dönem</p>
@@ -373,7 +432,7 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
           <MovementList title="Görselden / faturadan eklenenler" movements={report.stock.imageMovements} />
         </div>
         <MovementTable movements={report.stock.recentMovements} />
-      </Panel>
+      </Panel>}
 
       <Panel className="report-section-panel report-attention-panel">
         <div className="report-section-title">
@@ -383,11 +442,11 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
           </div>
           <span className="report-live-label">Tarih filtresinden bağımsız</span>
         </div>
-        {report.attention.items.length === 0 ? (
+        {visibleAttentionItems.length === 0 ? (
           <ReportEmpty message="Şu anda dikkat gerektiren açık kayıt yok." />
         ) : (
           <div className="report-attention-list">
-            {report.attention.items.map((item, index) => (
+            {visibleAttentionItems.map((item, index) => (
               <article key={`${item.kind}-${item.title}-${index}`}>
                 <AlertTriangle size={17} aria-hidden="true" />
                 <div><strong>{item.title}</strong><p>{item.detail}</p></div>
@@ -397,7 +456,7 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
         )}
       </Panel>
 
-      <Panel className="report-section-panel report-ai-panel">
+      {aiEnabled && <Panel className="report-section-panel report-ai-panel">
         <div className="report-section-title">
           <div>
             <p>İsteğe bağlı</p>
@@ -406,7 +465,7 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
           <Sparkles size={20} aria-hidden="true" />
         </div>
         <div className="report-ai-actions">
-          {AI_ACTIONS.map((action) => (
+          {AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
             <button
               className={aiMode === action.mode ? "is-active" : ""}
               type="button"
@@ -420,7 +479,8 @@ export function ReportsPage({ aiEnabled }: ReportsPageProps) {
         </div>
         <p className="report-ai-status" role="status">{aiMessage}</p>
         {aiContent && <div className="report-ai-result">{aiContent}</div>}
-      </Panel>
+      </Panel>}
+      </>}
     </section>
   );
 }
@@ -516,6 +576,10 @@ function emptyReport(range: DesktopReportRangeInput): DesktopReportData {
       closedOrders: 0,
       averageOrder: 0,
       approvedReservations: 0,
+      approvedAccommodationReservations: 0,
+      approvedFoodReservations: 0,
+      approvedMixedReservations: 0,
+      approvedGenericReservations: 0,
       newRequests: 0,
       pendingTasks: 0
     },

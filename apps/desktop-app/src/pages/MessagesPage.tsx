@@ -58,7 +58,7 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
           {webMode(() => selectMode("safe"))}
         </div>
       )}
-      {aiEnabled && aiOpen && mode === "safe" && <div className="messages-ai-tools">{aiTools}</div>}
+      {aiEnabled && (aiOpen || !whatsappEnabled) && mode === "safe" && <div className="messages-ai-tools">{aiTools}</div>}
     </section>
   );
 }

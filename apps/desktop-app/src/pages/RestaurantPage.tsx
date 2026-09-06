@@ -1,5 +1,6 @@
 import { CalendarCheck, ChevronDown, ClipboardList, ReceiptText, UtensilsCrossed } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { getReservationDomain } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopTableOrder } from "../../electron/database";
 import { isRestaurantTask } from "../app/operations";
 import { RestaurantRoomTransferPanel } from "../components/restaurant/RestaurantRoomTransferPanel";
@@ -8,6 +9,12 @@ import { MetricCard, type MetricCardProps } from "../components/ui/MetricCard";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
+  accommodationReservationsEnabled: boolean;
+  reservationsEnabled: boolean;
+  ordersEnabled: boolean;
+  menuEnabled: boolean;
+  roomFolioTransferEnabled: boolean;
+  tasksEnabled: boolean;
   reservations: ReactNode;
   tasks: ReactNode;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
@@ -20,14 +27,32 @@ function localDateKey() {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-export function RestaurantPage({ data, reservations, tasks, onDashboardDataChanged, onUpdateTableStatus }: RestaurantPageProps) {
+export function RestaurantPage({
+  data,
+  accommodationReservationsEnabled,
+  reservationsEnabled,
+  ordersEnabled,
+  menuEnabled,
+  roomFolioTransferEnabled,
+  tasksEnabled,
+  reservations,
+  tasks,
+  onDashboardDataChanged,
+  onUpdateTableStatus
+}: RestaurantPageProps) {
   const [tableOrders, setTableOrders] = useState<DesktopTableOrder[]>([]);
   const restaurantTasks = data.dailyTasks.filter((task) => isRestaurantTask(task, data.reservations));
   const pendingRestaurantTasks = restaurantTasks.filter((task) => task.status === "pending");
-  const activeRestaurantReservations = data.reservations.filter(
-    (reservation) => ["table", "breakfast"].includes(reservation.reservationType)
-      && !["rejected", "cancelled", "completed"].includes(reservation.status)
-  );
+  const activeRestaurantReservations = data.reservations.filter((reservation) => {
+    const domain = getReservationDomain(reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    });
+    const belongsToRestaurant = domain === "food_service"
+      || domain === "mixed"
+      || (domain === "generic" && !accommodationReservationsEnabled);
+    return belongsToRestaurant && !["rejected", "cancelled", "completed"].includes(reservation.status);
+  });
   const pendingReservationCount = activeRestaurantReservations.filter((reservation) => reservation.status === "pending").length;
   const todayReservationCount = activeRestaurantReservations.filter((reservation) => reservation.startDate === localDateKey()).length;
   const activeOrders = useMemo(
@@ -50,12 +75,16 @@ export function RestaurantPage({ data, reservations, tasks, onDashboardDataChang
   }, [data.tables, paymentTableIds]);
   const metrics: MetricCardProps[] = [
     { title: "Boş masalar", value: String(data.tables.filter((table) => table.status === "available" && !activeOrderTableIds.has(table.id)).length), tone: "ok", icon: UtensilsCrossed, compact: true },
-    { title: "Rezerve", value: String(data.tables.filter((table) => table.status === "reserved").length), tone: "wait", icon: CalendarCheck, compact: true },
-    { title: "Hesap bekleyen", value: String(billWaitingTableIds.size), tone: "info", icon: ReceiptText, compact: true },
-    { title: "Yapılacak işler", value: String(pendingRestaurantTasks.length), tone: "neutral", icon: ClipboardList, compact: true }
+    ...(reservationsEnabled ? [{ title: "Rezerve", value: String(data.tables.filter((table) => table.status === "reserved").length), tone: "wait" as const, icon: CalendarCheck, compact: true }] : []),
+    ...(ordersEnabled ? [{ title: "Hesap bekleyen", value: String(billWaitingTableIds.size), tone: "info" as const, icon: ReceiptText, compact: true }] : []),
+    ...(tasksEnabled ? [{ title: "Yapılacak işler", value: String(pendingRestaurantTasks.length), tone: "neutral" as const, icon: ClipboardList, compact: true }] : [])
   ];
 
   useEffect(() => {
+    if (!ordersEnabled) {
+      setTableOrders([]);
+      return;
+    }
     const bridge = window.yardimciDesktop;
     if (!bridge || typeof bridge.listTableOrders !== "function") {
       return;
@@ -74,7 +103,7 @@ export function RestaurantPage({ data, reservations, tasks, onDashboardDataChang
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [ordersEnabled]);
 
   function handleOrderChanged(order: DesktopTableOrder) {
     setTableOrders((current) => {
@@ -98,7 +127,7 @@ export function RestaurantPage({ data, reservations, tasks, onDashboardDataChang
         </div>
       </section>
 
-      <details className={`restaurant-reservation-details${pendingReservationCount > 0 ? " has-pending" : ""}`}>
+      {reservationsEnabled && <details className={`restaurant-reservation-details${pendingReservationCount > 0 ? " has-pending" : ""}`}>
         <summary>
           <span className="restaurant-reservation-summary-copy">
             <span className="operation-panel-eyebrow">Rezervasyon</span>
@@ -115,9 +144,9 @@ export function RestaurantPage({ data, reservations, tasks, onDashboardDataChang
           </header>
           <div className="operation-panel-content">{reservations}</div>
         </section>
-      </details>
+      </details>}
 
-      {data.rooms.length > 0 && (
+      {roomFolioTransferEnabled && data.rooms.length > 0 && (
         <RestaurantRoomTransferPanel
           orders={tableOrders}
           onOrderChanged={handleOrderChanged}
@@ -130,27 +159,30 @@ export function RestaurantPage({ data, reservations, tasks, onDashboardDataChang
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Servis</span>
             <h2 id="restaurant-tables-title">Masalar</h2>
-            <p>Masaya dokunun; sipariş ve hesap işlemleri seçtiğiniz masa üzerinden açılır.</p>
+            <p>{ordersEnabled ? "Masaya dokunun; sipariş ve hesap işlemleri seçtiğiniz masa üzerinden açılır." : "Masaların güncel kullanım durumunu yönetin."}</p>
           </header>
           <div className="operation-panel-content">
             <TableOrdersWorkspace
               tables={data.tables}
               menu={data.menu}
               orders={tableOrders}
+              ordersEnabled={ordersEnabled}
+              reservationsEnabled={reservationsEnabled}
+              menuEnabled={menuEnabled}
               onOrderChanged={handleOrderChanged}
               onDashboardDataChanged={onDashboardDataChanged}
               onUpdateStatus={onUpdateTableStatus}
             />
           </div>
         </section>
-        <section className="operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
+        {tasksEnabled && <section className="operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Günlük İşler</span>
             <h2 id="restaurant-tasks-title">Yapılacak İşler</h2>
             <p>Servis işleri ve kendi eklediğiniz günlük notlar</p>
           </header>
           <div className="operation-panel-content">{tasks}</div>
-        </section>
+        </section>}
       </div>
     </section>
   );

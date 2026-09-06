@@ -10,6 +10,7 @@ import {
   UtensilsCrossed
 } from "lucide-react";
 import type { DesktopDashboardData } from "../../electron/database";
+import { getReservationDomain } from "@yardimci-asistan/shared";
 import { ActionButton } from "../components/ui/ActionButton";
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
 import "../operation-calendar.css";
@@ -40,13 +41,23 @@ type CalendarItem =
 
 interface OperationCalendarPageProps {
   data: DesktopDashboardData;
+  accommodationReservationsEnabled: boolean;
+  foodReservationsEnabled: boolean;
+  tasksEnabled: boolean;
   onOpenReservation: (reservation: ReservationRecord) => void;
   onCompleteTask: (taskId: string) => void;
 }
 
 const hiddenReservationStatuses = new Set(["rejected", "cancelled"]);
 
-export function OperationCalendarPage({ data, onOpenReservation, onCompleteTask }: OperationCalendarPageProps) {
+export function OperationCalendarPage({
+  data,
+  accommodationReservationsEnabled,
+  foodReservationsEnabled,
+  tasksEnabled,
+  onOpenReservation,
+  onCompleteTask
+}: OperationCalendarPageProps) {
   const [viewMode, setViewMode] = useState<CalendarViewMode>("week");
   const [selectedDate, setSelectedDate] = useState(() => toLocalDateKey(new Date()));
 
@@ -55,8 +66,16 @@ export function OperationCalendarPage({ data, onOpenReservation, onCompleteTask 
     [selectedDate, viewMode]
   );
   const dayEntries = useMemo(
-    () => visibleDates.map((date) => ({ date, items: buildCalendarItems(date, data) })),
-    [data, visibleDates]
+    () => visibleDates.map((date) => ({
+      date,
+      items: buildCalendarItems(
+        date,
+        data,
+        accommodationReservationsEnabled,
+        foodReservationsEnabled
+      )
+    })),
+    [accommodationReservationsEnabled, data, foodReservationsEnabled, visibleDates]
   );
   const summary = useMemo(() => {
     const items = dayEntries.flatMap((entry) => entry.items);
@@ -81,7 +100,11 @@ export function OperationCalendarPage({ data, onOpenReservation, onCompleteTask 
           </div>
           <div>
             <strong>{formatRangeTitle(visibleDates)}</strong>
-            <span>Rezervasyon giriş-çıkışları ve günlük işler tek görünümde.</span>
+            <span>{(accommodationReservationsEnabled || foodReservationsEnabled) && tasksEnabled
+              ? "Etkin rezervasyon alanları ve günlük işler tek görünümde."
+              : accommodationReservationsEnabled || foodReservationsEnabled
+                ? "Etkin rezervasyon alanları tek görünümde."
+                : tasksEnabled ? "Günlük işler tek görünümde." : "Etkin takvim alanı bulunmuyor."}</span>
           </div>
         </div>
 
@@ -123,10 +146,10 @@ export function OperationCalendarPage({ data, onOpenReservation, onCompleteTask 
       </div>
 
       <div className="operation-calendar-summary" aria-label="Takvim özeti">
-        <StatusBadge tone="info">{summary.arrivals} giriş</StatusBadge>
-        <StatusBadge tone="neutral">{summary.departures} çıkış</StatusBadge>
-        <StatusBadge tone="ok">{summary.restaurant} restoran rezervasyonu</StatusBadge>
-        <StatusBadge tone="wait">{summary.pendingTasks} bekleyen iş</StatusBadge>
+        {accommodationReservationsEnabled && <StatusBadge tone="info">{summary.arrivals} giriş</StatusBadge>}
+        {accommodationReservationsEnabled && <StatusBadge tone="neutral">{summary.departures} çıkış</StatusBadge>}
+        {foodReservationsEnabled && <StatusBadge tone="ok">{summary.restaurant} restoran rezervasyonu</StatusBadge>}
+        {tasksEnabled && <StatusBadge tone="wait">{summary.pendingTasks} bekleyen iş</StatusBadge>}
       </div>
 
       <div className={`operation-calendar-grid ${viewMode === "day" ? "is-day" : "is-week"}`}>
@@ -151,6 +174,7 @@ export function OperationCalendarPage({ data, onOpenReservation, onCompleteTask 
                       key={item.key}
                       item={item}
                       rooms={data.rooms}
+                      tables={data.tables}
                       onOpenReservation={onOpenReservation}
                       onCompleteTask={onCompleteTask}
                     />
@@ -168,11 +192,13 @@ export function OperationCalendarPage({ data, onOpenReservation, onCompleteTask 
 function CalendarItemRow({
   item,
   rooms,
+  tables,
   onOpenReservation,
   onCompleteTask
 }: {
   item: CalendarItem;
   rooms: DesktopDashboardData["rooms"];
+  tables: DesktopDashboardData["tables"];
   onOpenReservation: (reservation: ReservationRecord) => void;
   onCompleteTask: (taskId: string) => void;
 }) {
@@ -189,7 +215,14 @@ function CalendarItemRow({
       </div>
       <strong className="operation-calendar-item-title">{item.title}</strong>
       <span className="operation-calendar-item-meta">
-        {item.kind === "task" ? item.meta : [item.meta, formatReservationRooms(item.reservation, rooms)].filter(Boolean).join(" · ")}
+        {item.kind === "task"
+          ? item.meta
+          : [
+              item.meta,
+              item.kind === "restaurant"
+                ? formatReservationTables(item.reservation, tables)
+                : formatReservationRooms(item.reservation, rooms)
+            ].filter(Boolean).join(" · ")}
       </span>
       {item.detail && <p>{item.detail}</p>}
       <div className="operation-calendar-item-actions">
@@ -210,12 +243,22 @@ function CalendarItemRow({
   );
 }
 
-function buildCalendarItems(date: string, data: DesktopDashboardData): CalendarItem[] {
+function buildCalendarItems(
+  date: string,
+  data: DesktopDashboardData,
+  accommodationReservationsEnabled: boolean,
+  foodReservationsEnabled: boolean
+): CalendarItem[] {
   const items: CalendarItem[] = [];
 
   for (const reservation of data.reservations) {
     if (hiddenReservationStatuses.has(reservation.status)) continue;
-    const isRestaurant = ["table", "breakfast"].includes(reservation.reservationType);
+    const domain = getReservationDomain(reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    });
+    const isRestaurant = domain === "food_service"
+      || (domain === "generic" && foodReservationsEnabled && !accommodationReservationsEnabled);
     if (isRestaurant) {
       const eventDate = reservation.startDate || reservation.endDate;
       if (eventDate === date) {
@@ -309,6 +352,14 @@ function formatReservationRooms(reservation: ReservationRecord, rooms: DesktopDa
     .map((roomId) => rooms.find((room) => room.id === roomId)?.name)
     .filter((name): name is string => Boolean(name));
   return roomNames.length > 0 ? roomNames.join(", ") : "Oda atanmadı";
+}
+
+function formatReservationTables(reservation: ReservationRecord, tables: DesktopDashboardData["tables"]) {
+  if (reservation.tableIds.length === 0) return "Masa atanmadı";
+  const tableNames = reservation.tableIds
+    .map((tableId) => tables.find((table) => table.id === tableId)?.name)
+    .filter((name): name is string => Boolean(name));
+  return tableNames.length > 0 ? tableNames.join(", ") : "Masa atanmadı";
 }
 
 function toLocalDateKey(date: Date) {

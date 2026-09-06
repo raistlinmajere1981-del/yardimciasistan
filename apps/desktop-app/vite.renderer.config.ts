@@ -3,18 +3,17 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const sharedSource = fileURLToPath(new URL("../../packages/shared/index.ts", import.meta.url));
+const syncCoreSource = fileURLToPath(new URL("../../packages/sync-core/index.ts", import.meta.url));
 
 export default defineConfig({
   base: "./",
   plugins: [react()],
   resolve: {
-    // The workspace shared package is emitted as CommonJS for Electron/Node.
-    // Renderer code is bundled by Vite/Rollup and should consume the TypeScript
-    // source directly instead of trying to statically infer named exports from
-    // the generated CommonJS barrel. This also keeps renderer builds independent
-    // from a possibly stale packages/shared/dist artifact.
+    // Workspace packages are emitted as CommonJS for Electron/Node. Renderer
+    // code consumes their TypeScript sources so Rollup can use named exports.
     alias: {
-      "@yardimci-asistan/shared": sharedSource
+      "@yardimci-asistan/shared": sharedSource,
+      "@yardimci-asistan/sync-core": syncCoreSource
     }
   },
   server: {

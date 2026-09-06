@@ -155,7 +155,7 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
           <div className="panel empty-state">
             <ClipboardList size={28} aria-hidden="true" />
             <strong>Günlük iş yok.</strong>
-            <p>Rezervasyon işleri ve sizin eklediğiniz notlar burada görünür.</p>
+            <p>Yeni işler ve sizin eklediğiniz notlar burada görünür.</p>
           </div>
         ) : filteredTasks.length === 0 ? (
           <div className="panel empty-state">
@@ -249,6 +249,7 @@ interface ReservationsWorkspaceProps {
   reservations: DesktopDashboardData["reservations"];
   rooms: DesktopDashboardData["rooms"];
   customers: DesktopDashboardData["customers"];
+  whatsappEnabled: boolean;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onSaveManual: (input: SaveManualReservationInput) => Promise<DesktopStatusUpdateResult>;
   onUpdateStatus: (reservationId: string, status: string) => void;
@@ -259,6 +260,7 @@ export function ReservationsWorkspace({
   reservations,
   rooms,
   customers,
+  whatsappEnabled,
   onSaveCustomer,
   onSaveManual,
   onUpdateStatus,
@@ -373,10 +375,12 @@ export function ReservationsWorkspace({
                     <CheckCircle2 size={15} aria-hidden="true" />
                     Onayla
                   </ActionButton>
-                  <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
-                    <MessageCircle size={15} aria-hidden="true" />
-                    WhatsApp
-                  </ActionButton>
+                  {whatsappEnabled && (
+                    <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
+                      <MessageCircle size={15} aria-hidden="true" />
+                      WhatsApp
+                    </ActionButton>
+                  )}
                   <details className="expandable-details compact-action-details">
                     <summary>Detay</summary>
                     <div className="expanded-record-content compact-secondary-menu">
@@ -430,6 +434,8 @@ interface RoomsWorkspaceProps {
   reservations: DesktopDashboardData["reservations"];
   customers: DesktopDashboardData["customers"];
   stays: DesktopDashboardData["customerRoomStays"];
+  reservationsEnabled: boolean;
+  staysEnabled: boolean;
   onUpdateStatus: (roomId: string, status: string) => void;
   onAssignRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
   onUpdateStayStatus: (
@@ -443,6 +449,8 @@ export function RoomsWorkspace({
   reservations,
   customers,
   stays,
+  reservationsEnabled,
+  staysEnabled,
   onUpdateStatus,
   onAssignRoom,
   onUpdateStayStatus
@@ -470,18 +478,18 @@ export function RoomsWorkspace({
               <span>{room.floor || "Kat bilgisi yok"}</span>
               <span>{room.bedInfo || "Yatak bilgisi yok"}</span>
             </div>
-            {activeStay ? (
+            {staysEnabled && activeStay ? (
               <div className="room-customer-assignment">
                 <strong>{activeStay.customerName}</strong>
                 <span>{formatCustomerRoomStayStatus(activeStay.status)} · {formatStayDateRange(activeStay)}</span>
                 <CustomerRoomStayActions stay={activeStay} onUpdateStatus={onUpdateStayStatus} />
               </div>
-            ) : (
+            ) : reservationsEnabled ? (
               <p className="compact-reservation-line line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
-            )}
+            ) : null}
             {(room.description || room.features.length > 0) && <p className="resource-description line-clamp-1">{room.description || room.features.join(", ")}</p>}
             <div className="room-card-actions">
-              {!activeStay && (
+              {staysEnabled && !activeStay && (
                 <ActionButton
                   size="sm"
                   type="button"
@@ -513,19 +521,21 @@ export function RoomsWorkspace({
           </article>;
         })}
       </section>
-      <RoomAssignmentDrawer
-        open={Boolean(assignmentRoomId)}
-        customers={customers}
-        rooms={rooms}
-        initialCustomerId=""
-        initialRoomId={assignmentRoomId}
-        onClose={() => setAssignmentRoomId("")}
-        onAssign={async (input) => {
-          const result = await onAssignRoom(input);
-          if (result.ok) setAssignmentRoomId("");
-          return result;
-        }}
-      />
+      {staysEnabled && (
+        <RoomAssignmentDrawer
+          open={Boolean(assignmentRoomId)}
+          customers={customers}
+          rooms={rooms}
+          initialCustomerId=""
+          initialRoomId={assignmentRoomId}
+          onClose={() => setAssignmentRoomId("")}
+          onAssign={async (input) => {
+            const result = await onAssignRoom(input);
+            if (result.ok) setAssignmentRoomId("");
+            return result;
+          }}
+        />
+      )}
     </>
   );
 }

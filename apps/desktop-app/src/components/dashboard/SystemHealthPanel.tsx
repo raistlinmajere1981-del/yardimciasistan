@@ -54,46 +54,32 @@ export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPane
     const webUrl = setup?.webModuleUrl || data.webModuleUrl;
     const webItem = buildWebHealth(webUrl, setup?.autoSyncEnabled ?? syncStatus?.enabled ?? false, syncStatus);
 
-    return [
-      webItem,
-      modules.android
-        ? {
-            key: "android",
-            label: "Android",
-            value: pendingDevices > 0 ? `${pendingDevices} onay bekliyor` : `${activeDevices} aktif cihaz`,
-            detail: pendingDevices > 0
-              ? "Yeni telefon masaüstünden onaylanmadan işletme verisini göremez."
-              : activeDevices > 0 ? "Telefon yetkileri masaüstünden yönetiliyor." : "Henüz onaylanmış telefon yok.",
-            tone: pendingDevices > 0 ? "warn" : activeDevices > 0 ? "ok" : "muted",
-            icon: Smartphone
-          }
-        : {
-            key: "android",
-            label: "Android",
-            value: "Kapalı",
-            detail: "Android modülü bu işletmede kullanılmıyor.",
-            tone: "muted",
-            icon: Smartphone
-          },
-      aiEnabled
-        ? {
-            key: "ai",
-            label: "AI",
-            value: setup?.aiApiKeyConfigured ? "Hazır" : "Anahtar gerekli",
-            detail: setup?.aiApiKeyConfigured
-              ? `${setup.aiService || "AI"} · ${setup.aiModel || "model seçili"}`
-              : "AI açık ancak servis anahtarı henüz tamamlanmamış.",
-            tone: setup?.aiApiKeyConfigured ? "ok" : "warn",
-            icon: Bot
-          }
-        : {
-            key: "ai",
-            label: "AI",
-            value: "Kapalı",
-            detail: "AI devre dışı olsa da işletme akışları çalışmaya devam eder.",
-            tone: "muted",
-            icon: Bot
-          },
+    const items: HealthItem[] = [webItem];
+    if (modules.android) {
+      items.push({
+        key: "android",
+        label: "Android",
+        value: pendingDevices > 0 ? `${pendingDevices} onay bekliyor` : `${activeDevices} aktif cihaz`,
+        detail: pendingDevices > 0
+          ? "Yeni telefon masaüstünden onaylanmadan işletme verisini göremez."
+          : activeDevices > 0 ? "Telefon yetkileri masaüstünden yönetiliyor." : "Henüz onaylanmış telefon yok.",
+        tone: pendingDevices > 0 ? "warn" : activeDevices > 0 ? "ok" : "muted",
+        icon: Smartphone
+      });
+    }
+    if (aiEnabled) {
+      items.push({
+        key: "ai",
+        label: "AI",
+        value: setup?.aiApiKeyConfigured ? "Hazır" : "Anahtar gerekli",
+        detail: setup?.aiApiKeyConfigured
+          ? `${setup.aiService || "AI"} · ${setup.aiModel || "model seçili"}`
+          : "AI açık ancak servis anahtarı henüz tamamlanmamış.",
+        tone: setup?.aiApiKeyConfigured ? "ok" : "warn",
+        icon: Bot
+      });
+    }
+    items.push(
       {
         key: "lock",
         label: "Uygulama kilidi",
@@ -112,7 +98,8 @@ export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPane
         tone: data.backupPath ? "ok" : "warn",
         icon: DatabaseBackup
       }
-    ];
+    );
+    return items;
   }, [aiEnabled, data.androidDevices, data.backupPath, data.webModuleUrl, modules.android, setup, syncStatus]);
 
   const attentionCount = items.filter((item) => item.tone === "warn" || item.tone === "danger").length;

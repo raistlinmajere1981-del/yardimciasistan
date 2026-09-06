@@ -62,7 +62,7 @@ export function DataMaintenanceSettings() {
     setAction("backup");
     setActiveBackupId("");
     setState("loading");
-    setMessage("Yerel kayıtlar ve QR menü görselleri yedekleniyor...");
+    setMessage("Yerel kayıtlar ve menü görselleri yedekleniyor...");
     try {
       const result = await bridge.createManualBackup();
       if (!result.ok) {
@@ -217,7 +217,7 @@ export function DataMaintenanceSettings() {
         {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
       </div>
       <p className="setup-section-description">
-        Her yedek proje klasöründeki <strong>backup</strong> dizininde ayrı bir klasör olarak tutulur. Veritabanının yanında QR menü görselleri de okunabilir dosyalar halinde saklanır.
+        Her yedek proje klasöründeki <strong>backup</strong> dizininde ayrı bir klasör olarak tutulur. Veritabanının yanında menü görselleri de okunabilir dosyalar halinde saklanır.
       </p>
 
       <div className="backup-manager-toolbar">
@@ -256,7 +256,7 @@ export function DataMaintenanceSettings() {
                 </div>
                 <div className="backup-row-meta">
                   <span>{formatBytes(backup.sizeBytes)}</span>
-                  <span>{backup.imageCount > 0 ? `${backup.imageCount} QR görseli` : "QR görseli yok"}</span>
+                  <span>{backup.imageCount > 0 ? `${backup.imageCount} menü görseli` : "Menü görseli yok"}</span>
                   <span className="backup-folder-name" title={backup.folderName}>{backup.folderName}</span>
                 </div>
               </div>

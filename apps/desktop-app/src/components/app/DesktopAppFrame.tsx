@@ -76,12 +76,23 @@ export function DesktopAppFrame({
   const { selectedWhatsAppRequest } = messagingController;
   const { setSelectedRequestId } = customerController;
   const navigationItems = useMemo(() => buildNavigation(businessCapabilities), [businessCapabilities]);
-  const pageMeta = getPageMeta(activePage);
+  const pageMeta = getPageMeta(activePage, businessCapabilities);
   const desktopNotifications = useMemo(
-    () => buildDesktopNotifications(dashboardData, automaticSyncStatus),
-    [automaticSyncStatus, dashboardData]
+    () => buildDesktopNotifications(
+      dashboardData,
+      automaticSyncStatus,
+      businessCapabilities?.enabledCapabilities ?? []
+    ),
+    [automaticSyncStatus, businessCapabilities, dashboardData]
   );
   const whatsappEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP);
+  const customersEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS);
+  const aiEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.AI);
+  const customerMessagingEnabled = whatsappEnabled && customersEnabled;
+  const menuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_MENU);
+  const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
+  const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
+  const inventoryEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.INVENTORY);
 
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
@@ -141,19 +152,25 @@ export function DesktopAppFrame({
             <div className="page-header-tools">
               {activePage === "menu" ? (
                 <div className={`sync-pill sync-${menuPublishState}`}>
-                  <span role="status" aria-live="polite">{menuStatusMessage}</span>
+                  <span role="status" aria-live="polite">
+                    {qrMenuEnabled ? menuStatusMessage : "Menü içeriği yerel olarak düzenleniyor."}
+                  </span>
                   <button className="secondary-sync-action" type="button" onClick={openMenuPreview}>
                     <Eye size={16} aria-hidden="true" />
                     Önizle
                   </button>
-                  <button type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
-                    <UploadCloud size={16} aria-hidden="true" />
-                    Web'e Yayınla
-                  </button>
+                  {qrMenuEnabled && (
+                    <button type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
+                      <UploadCloud size={16} aria-hidden="true" />
+                      Web'e Yayınla
+                    </button>
+                  )}
                 </div>
               ) : activePage === "messages" ? (
                 <div className="sync-pill sync-idle">
-                  <span>{whatsappEnabled ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin") : "AI araçları kullanıma hazır."}</span>
+                  <span>{customerMessagingEnabled
+                    ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin")
+                    : (aiEnabled ? "AI araçları kullanıma hazır." : "Mesaj araçları bu işletmede etkin değil.")}</span>
                 </div>
               ) : activePage === "settings" ? (
                 <div className={`sync-pill sync-${setupSaveState}`}>
@@ -180,7 +197,7 @@ export function DesktopAppFrame({
                   </button>
                 </div>
               )}
-              <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />
+              {notificationsEnabled && <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />}
               <button
                 className="app-lock-trigger"
                 type="button"
@@ -194,11 +211,14 @@ export function DesktopAppFrame({
           )}
         />
       )}
-      overlay={menuPreviewOpen ? (
+      overlay={menuEnabled && menuPreviewOpen ? (
         <LocalMenuPreview
           menu={menuPreviewData}
           setupData={setupData}
           webModuleUrl={dashboardData.webModuleUrl}
+          whatsappEnabled={whatsappEnabled}
+          qrMenuEnabled={qrMenuEnabled}
+          inventoryEnabled={inventoryEnabled}
           onClose={closeMenuPreview}
         />
       ) : undefined}
