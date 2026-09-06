@@ -6,6 +6,7 @@ const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 const YA_AI_SETTINGS_FILE = YA_BASE_DIR . '/data/ai-settings.local.php';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 
 $businessConfig = ya_sync_load_json(YA_CONFIG_FILE, []);
 ya_sync_apply_cors($businessConfig);
@@ -131,14 +132,24 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         ]);
     }
 
+    $androidSnapshot = ya_sync_load_android_snapshot();
+    if (!ya_android_auth_snapshot_has_capabilities(['service.android'], $androidSnapshot)) {
+        ya_sync_response(403, [
+            'ok' => false,
+            'code' => 'android_capability_disabled',
+            'message' => 'Android bağlantısı bu işletmede etkin değil.'
+        ]);
+    }
     ya_storage_record_android_device([
         'device_id' => $deviceId,
         'device_name' => ya_sync_string($payload['device_name'] ?? $_GET['device_name'] ?? ''),
         'app_version' => ya_sync_string($payload['app_version'] ?? $_GET['app_version'] ?? ''),
         'last_seen_at' => date(DATE_ATOM)
     ]);
-
-    $androidSnapshot = ya_sync_load_android_snapshot();
+    $businessCapabilities = array_fill_keys($androidSnapshot['business_capabilities'], true);
+    $customersEnabled = isset($businessCapabilities['core.customers']);
+    $aiEnabled = isset($businessCapabilities['service.ai']);
+    $whatsAppEnabled = isset($businessCapabilities['service.whatsapp']);
     $permissionProfile = is_array($androidSnapshot['androidPermissions'][$deviceId] ?? null)
         ? $androidSnapshot['androidPermissions'][$deviceId]
         : [];
@@ -161,7 +172,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'business' => [
                 'display_name' => ya_sync_string($businessConfig['display_name'] ?? $businessConfig['name'] ?? ''),
                 'phone' => ya_sync_string($businessConfig['phone'] ?? ''),
-                'whatsapp' => ya_sync_string($businessConfig['whatsapp'] ?? '')
+                'whatsapp' => $whatsAppEnabled ? ya_sync_string($businessConfig['whatsapp'] ?? '') : ''
             ],
             'summary' => [
                 'total_requests' => 0,
@@ -190,6 +201,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
                 'available_menu_items' => 0,
                 'customer_count' => 0
             ],
+            'business_capabilities' => $androidSnapshot['business_capabilities'],
             'daily_tasks' => [],
             'requests' => [],
             'customers' => [],
@@ -218,6 +230,17 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         ]);
     }
 
+    $visibleActionHistory = ya_sync_get_visible_android_actions(
+        $deviceId,
+        200,
+        $androidSnapshot,
+        $permissionProfile
+    );
+    $pendingActionCount = count(array_filter(
+        $visibleActionHistory,
+        static fn (array $action): bool => ya_sync_string($action['status'] ?? '') === 'pending'
+    ));
+
     $knownServerRevision = max(0, ya_sync_int($payload['known_server_revision'] ?? 0, 0));
     if ($knownServerRevision > 0 && $knownServerRevision === $serverRevision) {
         $now = date(DATE_ATOM);
@@ -229,14 +252,14 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'not_modified' => true,
             'server_revision' => $serverRevision,
             'pulled_at' => $now,
-            'pending_action_count' => ya_sync_count_pending_android_actions($deviceId)
+            'pending_action_count' => $pendingActionCount
         ]);
     }
-    $records = ya_storage_all_requests();
+    $records = $customersEnabled ? ya_storage_all_requests() : [];
 
     $deletedRequestIds = array_fill_keys($androidSnapshot['deleted_request_ids'], true);
     $requestsById = [];
-    foreach ($androidSnapshot['requests'] as $snapshotRequest) {
+    foreach ($customersEnabled ? $androidSnapshot['requests'] : [] as $snapshotRequest) {
         if (!is_array($snapshotRequest)) {
             continue;
         }
@@ -265,6 +288,16 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     }
 
     $publicRequests = array_values($requestsById);
+    foreach ($publicRequests as &$publicRequest) {
+        if (!$aiEnabled) {
+            $publicRequest['ai_summary'] = '';
+            $publicRequest['ai_suggested_reply'] = '';
+        }
+        if (!$whatsAppEnabled) {
+            $publicRequest['whatsapp_message'] = '';
+        }
+    }
+    unset($publicRequest);
     usort($publicRequests, static function (array $left, array $right): int {
         return strcmp(ya_sync_string($right['created_at'] ?? ''), ya_sync_string($left['created_at'] ?? ''));
     });
@@ -302,12 +335,15 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
     $visibleRequests = array_slice($visibleRequests, 0, $limit);
 
     $now = date(DATE_ATOM);
-    $actions = ya_sync_get_android_actions($deviceId, 40);
-    $pendingActionCount = ya_sync_count_pending_android_actions($deviceId);
-    $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin';
-    $financeAllowed = in_array('finance.view', $permissionList, true);
+    $actions = array_slice($visibleActionHistory, 0, 40);
+    $reportsAllowed = ($permissionProfile['role'] ?? 'staff') === 'admin'
+        && isset($businessCapabilities['core.reports']);
+    $financeAllowed = isset($businessCapabilities['core.finance'])
+        && in_array('finance.view', $permissionList, true);
     $roomFolioAllowed = in_array('room_folio.view', $permissionList, true);
-    $customerManagementAllowed = $reportsAllowed && in_array('customer.manage', $permissionList, true);
+    $customerManagementAllowed = $customersEnabled
+        && ($permissionProfile['role'] ?? 'staff') === 'admin'
+        && in_array('customer.manage', $permissionList, true);
     ya_sync_update_state([
         'last_android_summary_at' => $now
     ]);
@@ -319,7 +355,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'business' => [
             'display_name' => ya_sync_string($businessConfig['display_name'] ?? $businessConfig['name'] ?? ''),
             'phone' => ya_sync_string($businessConfig['phone'] ?? ''),
-            'whatsapp' => ya_sync_string($businessConfig['whatsapp'] ?? '')
+            'whatsapp' => $whatsAppEnabled ? ya_sync_string($businessConfig['whatsapp'] ?? '') : ''
         ],
         'summary' => [
             'total_requests' => $totalRequests,
@@ -333,6 +369,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'pending_action_count' => $pendingActionCount
         ],
         'operations' => $androidSnapshot['summary'],
+        'business_capabilities' => $androidSnapshot['business_capabilities'],
         'daily_tasks' => $androidSnapshot['daily_tasks'],
         'requests' => $visibleRequests,
         'customers' => $customerManagementAllowed ? $androidSnapshot['customers'] : [],
@@ -347,7 +384,15 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         'appliedStockImageHashes' => $androidSnapshot['appliedStockImageHashes'],
         'table_orders' => $androidSnapshot['table_orders'],
         'messages' => $androidSnapshot['messages'],
-        'androidPermissions' => $androidSnapshot['androidPermissions'],
+        'androidPermissions' => [
+            $deviceId => [
+                'role' => in_array(ya_sync_string($permissionProfile['role'] ?? ''), ['admin', 'staff'], true)
+                    ? ya_sync_string($permissionProfile['role'])
+                    : 'staff',
+                'is_active' => true,
+                'permissions' => $permissionList
+            ]
+        ],
         'finance' => $financeAllowed ? $androidSnapshot['finance'] : [],
         'reports' => $reportsAllowed ? $androidSnapshot['reports'] : [],
         'actions' => $actions,
@@ -487,6 +532,14 @@ function ya_sync_enqueue_android_action(array $payload): void
     $deviceName = ya_sync_string($payload['device_name'] ?? '');
     $appVersion = ya_sync_string($payload['app_version'] ?? '');
     $actionPayload = $payload['payload'] ?? null;
+    $snapshot = ya_sync_load_android_snapshot();
+    if (!ya_android_auth_snapshot_has_capabilities(['service.android'], $snapshot)) {
+        ya_sync_response(403, [
+            'ok' => false,
+            'code' => 'android_capability_disabled',
+            'message' => 'Android bağlantısı bu işletmede etkin değil.'
+        ]);
+    }
 
     if (!preg_match('/^[A-Za-z0-9_-]{12,120}$/', $actionId)) {
         ya_sync_response(422, [
@@ -516,16 +569,23 @@ function ya_sync_enqueue_android_action(array $payload): void
         ]);
     }
 
+    $permissionProfile = is_array($snapshot['androidPermissions'][$deviceId] ?? null)
+        ? $snapshot['androidPermissions'][$deviceId]
+        : [];
+    if (!ya_sync_bool($permissionProfile['is_active'] ?? false)) {
+        ya_sync_response(403, [
+            'ok' => false,
+            'code' => 'device_approval_required',
+            'message' => 'Bu telefon masaüstünden onaylanmadan işlem gönderemez.'
+        ]);
+    }
+    $permissions = is_array($permissionProfile['permissions'] ?? null)
+        ? $permissionProfile['permissions']
+        : [];
     $managementPermission = ya_sync_android_management_action_permission($actionType);
     if ($managementPermission !== '') {
-        $snapshot = ya_sync_load_android_snapshot();
-        $profile = is_array($snapshot['androidPermissions'][$deviceId] ?? null)
-            ? $snapshot['androidPermissions'][$deviceId]
-            : [];
-        $permissions = is_array($profile['permissions'] ?? null) ? $profile['permissions'] : [];
         if (
-            !ya_sync_bool($profile['is_active'] ?? false)
-            || ya_sync_string($profile['role'] ?? '') !== 'admin'
+            ya_sync_string($permissionProfile['role'] ?? '') !== 'admin'
             || !in_array($managementPermission, $permissions, true)
             || (
                 in_array($actionType, ['customer_room_assign', 'customer_room_stay_status'], true)
@@ -538,6 +598,21 @@ function ya_sync_enqueue_android_action(array $payload): void
                 'message' => 'Müşteri ve konaklama yönetimi yalnız yetkili yönetici cihazlarda kullanılabilir.'
             ]);
         }
+    }
+    $requiredPermission = ya_sync_android_action_permission($actionType, $actionPayload);
+    if ($requiredPermission === '' || !in_array($requiredPermission, $permissions, true)) {
+        ya_sync_response(403, [
+            'ok' => false,
+            'code' => 'android_action_permission_denied',
+            'message' => 'Bu telefonun bu işlem için etkin yetkisi yok.'
+        ]);
+    }
+    if (!ya_sync_android_action_capability_allowed($actionType, $actionPayload, $snapshot)) {
+        ya_sync_response(403, [
+            'ok' => false,
+            'code' => 'android_action_capability_disabled',
+            'message' => 'Bu işlem işletmenin etkin yeteneklerinde kullanılamıyor.'
+        ]);
     }
 
     $encodedPayload = json_encode($actionPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
@@ -972,6 +1047,263 @@ function ya_sync_android_management_action_permission(string $actionType): strin
     return '';
 }
 
+function ya_sync_android_action_permission(string $actionType, array $payload): string
+{
+    $permissions = [
+        'customer_request_mark_answered' => 'customer.mark_answered',
+        'customer_request_reopen' => 'customer.respond',
+        'customer_request_approve' => 'customer.respond',
+        'customer_request_reject' => 'customer.reject',
+        'customer_request_convert_to_reservation' => 'customer.convert_to_reservation',
+        'customer_request_delete' => 'request.delete',
+        'customer_create' => 'customer.manage',
+        'customer_update' => 'customer.manage',
+        'customer_delete' => 'customer.delete',
+        'customer_room_assign' => 'room.assign_customer',
+        'customer_room_stay_status' => 'room.assign_customer',
+        'reservation_room_create' => 'reservation.create',
+        'reservation_room_update' => 'reservation.update',
+        'reservation_table_create' => 'reservation.create',
+        'reservation_table_update' => 'reservation.update',
+        'reservation_approve' => 'reservation.approve',
+        'reservation_reject' => 'reservation.reject',
+        'reservation_cancel' => 'reservation.cancel',
+        'room_status_update' => 'room.update_status',
+        'daily_task_create' => 'daily_task.create',
+        'daily_task_update' => 'daily_task.update',
+        'daily_task_delete' => 'daily_task.delete',
+        'daily_task_complete' => 'daily_task.complete',
+        'daily_task_reopen' => 'daily_task.reopen',
+        'daily_task_cancel' => 'daily_task.update',
+        'finance_manual_create' => 'finance.create',
+        'room_folio_payment_add' => 'room_folio.payment',
+        'room_folio_checkout' => 'room_folio.checkout',
+        'table_status_update' => 'table.update_status',
+        'table_order_open' => 'table_order.open',
+        'table_order_add_item' => 'table_order.add_item',
+        'table_order_update_item_quantity' => 'table_order.update_item',
+        'table_order_remove_item' => 'table_order.remove_item',
+        'table_order_set_preparing' => 'table_order.set_preparing',
+        'table_order_set_served' => 'table_order.set_served',
+        'table_order_set_payment_waiting' => 'table_order.set_payment_waiting',
+        'table_order_close_paid' => 'table_order.close_paid',
+        'table_order_cancel' => 'table_order.cancel',
+        'menu_category_delete' => 'menu.delete',
+        'menu_item_delete' => 'menu.delete',
+        'message_delete' => 'message.delete',
+        'menu_stock_add' => 'menu.stock_update',
+        'menu_stock_set' => 'menu.stock_update',
+        'menu_stock_adjust' => 'menu.stock_update',
+        'menu_stock_image_import_apply' => 'menu.stock_update'
+    ];
+    if (isset($permissions[$actionType])) {
+        return $permissions[$actionType];
+    }
+    if ($actionType === 'table_order_set_status') {
+        return match (ya_sync_string($payload['status'] ?? '')) {
+            'preparing' => 'table_order.set_preparing',
+            'served' => 'table_order.set_served',
+            'payment' => 'table_order.set_payment_waiting',
+            default => ''
+        };
+    }
+    if ($actionType === 'table_order_close') {
+        return match (ya_sync_string($payload['status'] ?? '')) {
+            'paid' => 'table_order.close_paid',
+            'cancelled' => 'table_order.cancel',
+            default => ''
+        };
+    }
+    return '';
+}
+
+function ya_sync_android_action_capability_allowed(string $actionType, array $payload, array $snapshot): bool
+{
+    $capabilities = array_fill_keys(
+        is_array($snapshot['business_capabilities'] ?? null) ? $snapshot['business_capabilities'] : [],
+        true
+    );
+    if (str_starts_with($actionType, 'reservation_room_')) {
+        return isset($capabilities['accommodation.reservations']);
+    }
+    if (str_starts_with($actionType, 'reservation_table_')) {
+        return isset($capabilities['food_service.reservations']);
+    }
+    if ($actionType === 'customer_request_convert_to_reservation') {
+        $request = ya_sync_android_snapshot_record(
+            $snapshot['requests'] ?? [],
+            'id',
+            ya_sync_string($payload['request_id'] ?? '')
+        );
+        $requestType = ya_sync_string($request['request_type'] ?? '');
+        if ($requestType === 'pension_reservation') {
+            return isset($capabilities['core.customers'], $capabilities['accommodation.reservations']);
+        }
+        if (in_array($requestType, ['restaurant_reservation', 'breakfast_request'], true)) {
+            return isset($capabilities['core.customers'], $capabilities['food_service.reservations']);
+        }
+        return false;
+    }
+    if (in_array($actionType, ['reservation_approve', 'reservation_reject', 'reservation_cancel'], true)) {
+        $reservation = ya_sync_android_snapshot_record(
+            $snapshot['reservations'] ?? [],
+            'id',
+            ya_sync_string($payload['reservation_id'] ?? '')
+        );
+        return $reservation !== []
+            && ya_sync_android_reservation_capability_allowed($reservation, $capabilities);
+    }
+    if (str_starts_with($actionType, 'daily_task_')) {
+        if ($actionType === 'daily_task_create') {
+            return ya_sync_android_task_capability_allowed($payload, $snapshot, $capabilities);
+        }
+        $task = ya_sync_android_snapshot_record(
+            $snapshot['daily_tasks'] ?? [],
+            'id',
+            ya_sync_string($payload['task_id'] ?? '')
+        );
+        return $task !== [] && ya_sync_android_task_capability_allowed($task, $snapshot, $capabilities);
+    }
+    if ($actionType === 'room_status_update'
+        && ya_sync_string($payload['status'] ?? '') === 'reserved') {
+        return isset($capabilities['accommodation.rooms'], $capabilities['accommodation.reservations']);
+    }
+    if ($actionType === 'table_status_update') {
+        $status = ya_sync_string($payload['status'] ?? '');
+        if ($status === 'reserved') {
+            return isset($capabilities['food_service.tables'], $capabilities['food_service.reservations']);
+        }
+        if (in_array($status, ['bill_waiting', 'waiting_bill', 'checkout', 'payment'], true)) {
+            return isset($capabilities['food_service.tables'], $capabilities['food_service.orders']);
+        }
+    }
+
+    $requirements = [
+        'customer_request_mark_answered' => ['core.customers'],
+        'customer_request_reopen' => ['core.customers'],
+        'customer_request_approve' => ['core.customers'],
+        'customer_request_reject' => ['core.customers'],
+        'customer_request_delete' => ['core.customers'],
+        'customer_create' => ['core.customers'],
+        'customer_update' => ['core.customers'],
+        'customer_delete' => ['core.customers'],
+        'customer_room_assign' => ['core.customers', 'accommodation.stays'],
+        'customer_room_stay_status' => ['core.customers', 'accommodation.stays'],
+        'room_status_update' => ['accommodation.rooms'],
+        'finance_manual_create' => ['core.finance'],
+        'room_folio_payment_add' => ['accommodation.folio'],
+        'room_folio_checkout' => ['accommodation.folio'],
+        'table_status_update' => ['food_service.tables'],
+        'table_order_open' => ['food_service.orders'],
+        'table_order_add_item' => ['food_service.orders', 'food_service.menu'],
+        'table_order_update_item_quantity' => ['food_service.orders'],
+        'table_order_remove_item' => ['food_service.orders'],
+        'table_order_set_preparing' => ['food_service.orders'],
+        'table_order_set_served' => ['food_service.orders'],
+        'table_order_set_payment_waiting' => ['food_service.orders'],
+        'table_order_close_paid' => ['food_service.orders'],
+        'table_order_cancel' => ['food_service.orders'],
+        'table_order_set_status' => ['food_service.orders'],
+        'table_order_close' => ['food_service.orders'],
+        'menu_category_delete' => ['food_service.menu'],
+        'menu_item_delete' => ['food_service.menu'],
+        'menu_stock_add' => ['food_service.menu', 'commerce.inventory'],
+        'menu_stock_set' => ['food_service.menu', 'commerce.inventory'],
+        'menu_stock_adjust' => ['food_service.menu', 'commerce.inventory'],
+        'menu_stock_image_import_apply' => ['food_service.menu', 'commerce.inventory', 'service.ai'],
+        'message_delete' => ['core.customers', 'service.whatsapp']
+    ];
+    if (!isset($requirements[$actionType])) {
+        return false;
+    }
+    return ya_sync_android_capabilities_include($capabilities, $requirements[$actionType]);
+}
+
+function ya_sync_android_capabilities_include(array $capabilities, array $required): bool
+{
+    foreach ($required as $capability) {
+        if (!isset($capabilities[$capability])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function ya_sync_android_reservation_capability_allowed(array $reservation, array $capabilities): bool
+{
+    $reservationType = ya_sync_string($reservation['reservation_type'] ?? '');
+    $hasRooms = in_array($reservationType, ['room', 'room_and_table', 'mixed'], true)
+        || ya_sync_string_array($reservation['room_ids'] ?? []) !== [];
+    $hasTables = in_array($reservationType, ['table', 'breakfast', 'room_and_table', 'mixed'], true)
+        || ya_sync_string_array($reservation['table_ids'] ?? []) !== [];
+    if ($hasRooms && $hasTables) {
+        return isset($capabilities['accommodation.reservations'], $capabilities['food_service.reservations']);
+    }
+    if ($hasRooms) {
+        return isset($capabilities['accommodation.reservations']);
+    }
+    if ($hasTables) {
+        return isset($capabilities['food_service.reservations']);
+    }
+    return isset($capabilities['accommodation.reservations'])
+        || isset($capabilities['food_service.reservations']);
+}
+
+function ya_sync_android_task_capability_allowed(array $payload, array $snapshot, array $capabilities): bool
+{
+    if (!isset($capabilities['core.tasks'])) {
+        return false;
+    }
+    $taskType = ya_sync_string($payload['task_type'] ?? '');
+    $relatedType = ya_sync_string($payload['related_type'] ?? '');
+    if ($relatedType === 'reservation') {
+        $reservation = ya_sync_android_snapshot_record(
+            $snapshot['reservations'] ?? [],
+            'id',
+            ya_sync_string($payload['related_id'] ?? '')
+        );
+        $reservationType = ya_sync_string($payload['related_reservation_type'] ?? '');
+        if ($reservationType === '') {
+            $reservationType = ya_sync_string($reservation['reservation_type'] ?? '');
+        }
+        $hasRooms = in_array($reservationType, ['room', 'room_and_table', 'mixed'], true)
+            || ya_sync_string_array($reservation['room_ids'] ?? []) !== [];
+        $hasTables = in_array($reservationType, ['table', 'breakfast', 'room_and_table', 'mixed'], true)
+            || ya_sync_string_array($reservation['table_ids'] ?? []) !== [];
+        if ($hasRooms && $hasTables) {
+            return isset($capabilities['accommodation.rooms'], $capabilities['food_service.tables']);
+        }
+        if ($hasRooms) {
+            return isset($capabilities['accommodation.rooms']);
+        }
+        if ($hasTables) {
+            return isset($capabilities['food_service.tables']);
+        }
+    }
+    if (in_array($taskType, ['check_in', 'check_out', 'room_cleaning', 'room_maintenance', 'reservation', 'manual_pension'], true)
+        || $relatedType === 'room') {
+        return isset($capabilities['accommodation.rooms']);
+    }
+    if (in_array($taskType, ['table_reservation', 'breakfast', 'service', 'table_service', 'restaurant', 'table_check', 'payment', 'manual_restaurant'], true)
+        || $relatedType === 'table') {
+        return isset($capabilities['food_service.tables']);
+    }
+    return isset($capabilities['core.tasks']);
+}
+
+function ya_sync_android_snapshot_record(mixed $records, string $key, string $value): array
+{
+    if (!is_array($records) || $value === '') {
+        return [];
+    }
+    foreach ($records as $record) {
+        if (is_array($record) && hash_equals(ya_sync_string($record[$key] ?? ''), $value)) {
+            return $record;
+        }
+    }
+    return [];
+}
+
 function ya_sync_public_android_action(array $record): array
 {
     $status = ya_sync_string($record['status'] ?? 'pending');
@@ -998,8 +1330,46 @@ function ya_sync_get_android_actions(string $deviceId, int $limit): array
     }
     return array_map(
         'ya_sync_public_android_action',
-        ya_storage_get_android_actions($deviceId, max(1, min($limit, 100)))
+        ya_storage_get_android_actions($deviceId, max(1, min($limit, 200)))
     );
+}
+
+function ya_sync_get_visible_android_actions(
+    string $deviceId,
+    int $limit,
+    array $snapshot,
+    array $permissionProfile
+): array
+{
+    $permissions = is_array($permissionProfile['permissions'] ?? null)
+        ? $permissionProfile['permissions']
+        : [];
+    $role = ya_sync_string($permissionProfile['role'] ?? '');
+    return array_values(array_filter(
+        ya_sync_get_android_actions($deviceId, $limit),
+        static function (array $action) use ($snapshot, $permissions, $role): bool {
+            $actionType = ya_sync_string($action['action_type'] ?? '');
+            $payload = is_array($action['payload'] ?? null) ? $action['payload'] : [];
+            $requiredPermission = ya_sync_android_action_permission($actionType, $payload);
+            if (
+                $requiredPermission === ''
+                || !in_array($requiredPermission, $permissions, true)
+                || !ya_sync_android_action_capability_allowed($actionType, $payload, $snapshot)
+            ) {
+                return false;
+            }
+            $managementPermission = ya_sync_android_management_action_permission($actionType);
+            if ($managementPermission === '') {
+                return true;
+            }
+            return $role === 'admin'
+                && in_array($managementPermission, $permissions, true)
+                && (
+                    !in_array($actionType, ['customer_room_assign', 'customer_room_stay_status'], true)
+                    || in_array('customer.manage', $permissions, true)
+                );
+        }
+    ));
 }
 
 function ya_sync_count_pending_android_actions(string $deviceId): int
@@ -1035,6 +1405,9 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
     }, $adminCategories);
 
     return [
+        'business_capabilities' => ya_sync_sanitize_business_capabilities(
+            $snapshot['business_capabilities'] ?? []
+        ),
         'summary' => [
             'pending_daily_tasks' => max(0, ya_sync_int($summary['pending_daily_tasks'] ?? 0, 0)),
             'today_tasks' => max(0, ya_sync_int($summary['today_tasks'] ?? 0, 0)),
@@ -1079,6 +1452,46 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'reports' => ya_sync_sanitize_android_reports($snapshot['reports'] ?? []),
         'updated_at' => $updatedAt
     ];
+}
+
+function ya_sync_sanitize_business_capabilities(mixed $value): array
+{
+    $allowed = [
+        'core.customers',
+        'core.tasks',
+        'core.calendar',
+        'core.notifications',
+        'core.finance',
+        'core.reports',
+        'core.web',
+        'core.sync',
+        'core.backups',
+        'core.devices',
+        'service.whatsapp',
+        'service.ai',
+        'service.android',
+        'accommodation.rooms',
+        'accommodation.reservations',
+        'accommodation.stays',
+        'accommodation.folio',
+        'food_service.tables',
+        'food_service.reservations',
+        'food_service.orders',
+        'food_service.menu',
+        'channel.qr_menu',
+        'commerce.catalog',
+        'commerce.inventory',
+        'commerce.sales',
+        'retail.barcode',
+        'retail.purchasing',
+        'retail.suppliers',
+        'retail.labels'
+    ];
+
+    return array_values(array_unique(array_filter(
+        ya_sync_string_array($value),
+        static fn(string $capability): bool => in_array($capability, $allowed, true)
+    )));
 }
 
 function ya_sync_sanitize_android_room_folios(mixed $value): array
@@ -1271,6 +1684,10 @@ function ya_sync_sanitize_android_reports(mixed $reports): array
                 'closed_orders' => max(0, ya_sync_int($summary['closed_orders'] ?? 0, 0)),
                 'average_order' => max(0, ya_sync_float($summary['average_order'] ?? 0, 0)),
                 'approved_reservations' => max(0, ya_sync_int($summary['approved_reservations'] ?? 0, 0)),
+                'approved_accommodation_reservations' => max(0, ya_sync_int($summary['approved_accommodation_reservations'] ?? 0, 0)),
+                'approved_food_reservations' => max(0, ya_sync_int($summary['approved_food_reservations'] ?? 0, 0)),
+                'approved_mixed_reservations' => max(0, ya_sync_int($summary['approved_mixed_reservations'] ?? 0, 0)),
+                'approved_generic_reservations' => max(0, ya_sync_int($summary['approved_generic_reservations'] ?? 0, 0)),
                 'new_requests' => max(0, ya_sync_int($summary['new_requests'] ?? 0, 0)),
                 'attention_count' => max(0, ya_sync_int($summary['attention_count'] ?? 0, 0))
             ],
@@ -1375,6 +1792,7 @@ function ya_sync_sanitize_android_tasks(array $tasks): array
             'due_time' => ya_sync_string($task['due_time'] ?? ''),
             'related_type' => ya_sync_string($task['related_type'] ?? ''),
             'related_id' => ya_sync_string($task['related_id'] ?? ''),
+            'related_reservation_type' => ya_sync_string($task['related_reservation_type'] ?? ''),
             'updated_at' => ya_sync_string($task['updated_at'] ?? '')
         ];
 

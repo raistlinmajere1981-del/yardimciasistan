@@ -40,6 +40,13 @@ if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId) !== 1) {
 }
 
 $snapshot = ya_storage_get_publication('android_snapshot', []);
+if (!ya_android_auth_snapshot_has_capabilities(['service.android'], $snapshot)) {
+    ya_android_token_response(403, [
+        'ok' => false,
+        'code' => 'android_capability_disabled',
+        'message' => 'Android bağlantısı bu işletmede etkin değil.'
+    ]);
+}
 $profiles = is_array($snapshot['androidPermissions'] ?? null) ? $snapshot['androidPermissions'] : [];
 $profile = is_array($profiles[$deviceId] ?? null) ? $profiles[$deviceId] : [];
 if (!ya_android_token_bool($profile['is_active'] ?? false)) {

@@ -14,6 +14,13 @@ if (!ya_android_auth_request_authorized($businessConfig, $deviceId)) {
         'message' => 'Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.'
     ]);
 }
+if (!ya_android_auth_snapshot_has_capabilities(['service.android', 'service.ai', 'core.customers'])) {
+    ya_android_identity_gate_response(403, [
+        'ok' => false,
+        'code' => 'android_identity_capability_disabled',
+        'message' => 'Android kimlik analizi bu işletmede etkin değil.'
+    ]);
+}
 
 $formDeviceId = trim((string) ($_POST['device_id'] ?? ''));
 if ($formDeviceId === '' || !hash_equals($deviceId, $formDeviceId)) {

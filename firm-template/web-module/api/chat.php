@@ -8,6 +8,7 @@ const YA_KNOWLEDGE_DIR = YA_BASE_DIR . '/knowledge';
 const YA_AI_CONVERSATIONS_FILE = YA_BASE_DIR . '/data/ai-conversations.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/android-device-auth.php';
 
 $businessConfig = ya_chat_load_json(YA_CONFIG_FILE, []);
 $aiConfig = is_file(YA_AI_CONFIG_FILE) ? require YA_AI_CONFIG_FILE : [];
@@ -40,6 +41,13 @@ if (!$payloadResult['ok']) {
 $payload = $payloadResult['data'];
 if (array_key_exists('report_mode', $payload)) {
     ya_chat_generate_android_report($businessConfig, $aiConfig, $payload);
+}
+if (!ya_android_auth_snapshot_has_capabilities(['service.ai'])) {
+    ya_chat_response(403, [
+        'ok' => false,
+        'code' => 'ai_capability_disabled',
+        'message' => 'AI bu işletmede etkin değil.'
+    ]);
 }
 $message = ya_chat_string($payload['message'] ?? '');
 
@@ -150,6 +158,13 @@ function ya_chat_generate_android_report(array $businessConfig, array $aiConfig,
         ya_chat_response(403, [
             'ok' => false,
             'message' => 'Bu cihazın raporlara erişim yetkisi yok.'
+        ]);
+    }
+    if (!ya_android_auth_snapshot_has_capabilities(['service.android', 'service.ai', 'core.reports'], $snapshot)) {
+        ya_chat_response(403, [
+            'ok' => false,
+            'code' => 'android_ai_capability_disabled',
+            'message' => 'Android AI rapor yorumu bu işletmede etkin değil.'
         ]);
     }
 

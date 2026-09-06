@@ -14,6 +14,18 @@ if (!ya_android_auth_request_authorized($businessConfig, $deviceId)) {
         'message' => 'Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.'
     ]);
 }
+if (!ya_android_auth_snapshot_has_capabilities([
+    'service.android',
+    'service.ai',
+    'food_service.menu',
+    'commerce.inventory'
+])) {
+    ya_android_stock_gate_response(403, [
+        'ok' => false,
+        'code' => 'android_stock_capability_disabled',
+        'message' => 'Android stok analizi bu işletmede etkin değil.'
+    ]);
+}
 
 $formDeviceId = trim((string) ($_POST['device_id'] ?? ''));
 if ($formDeviceId === '' || !hash_equals($deviceId, $formDeviceId)) {

@@ -3,6 +3,30 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/storage.php';
 
+function ya_android_auth_snapshot(): array
+{
+    $snapshot = ya_storage_get_publication('android_snapshot', []);
+    unset($snapshot['_publication']);
+    return is_array($snapshot) ? $snapshot : [];
+}
+
+function ya_android_auth_snapshot_has_capabilities(array $required, ?array $snapshot = null): bool
+{
+    $source = $snapshot ?? ya_android_auth_snapshot();
+    $stored = is_array($source['business_capabilities'] ?? null)
+        ? $source['business_capabilities']
+        : [];
+    $enabled = array_fill_keys(array_values(array_filter($stored, static function (mixed $value): bool {
+        return is_string($value) && $value !== '';
+    })), true);
+    foreach ($required as $capability) {
+        if (!is_string($capability) || !isset($enabled[$capability])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function ya_android_auth_ensure_schema(): void
 {
     ya_storage_open()->exec(<<<'SQL'

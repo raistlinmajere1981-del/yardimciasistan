@@ -5,6 +5,7 @@ const YA_STOCK_IMAGE_BASE_DIR = __DIR__ . '/..';
 const YA_STOCK_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 require_once YA_STOCK_IMAGE_BASE_DIR . '/lib/storage.php';
+require_once YA_STOCK_IMAGE_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_STOCK_IMAGE_BASE_DIR . '/lib/stock-image-analysis.php';
 
 $businessConfig = ya_stock_endpoint_load_config(YA_STOCK_IMAGE_BASE_DIR . '/config/business.json');
@@ -36,6 +37,17 @@ $importId = ya_stock_image_string($_POST['import_id'] ?? '');
 if (!in_array($source, ['desktop', 'android'], true)
     || preg_match('/^[A-Za-z0-9._:-]{8,160}$/', $importId) !== 1) {
     ya_stock_endpoint_response(422, ['ok' => false, 'code' => 'invalid_request', 'message' => 'Görsel içe aktarma bilgileri geçersiz.']);
+}
+$requiredCapabilities = ['service.ai', 'food_service.menu', 'commerce.inventory'];
+if ($source === 'android') {
+    $requiredCapabilities[] = 'service.android';
+}
+if (!ya_android_auth_snapshot_has_capabilities($requiredCapabilities)) {
+    ya_stock_endpoint_response(403, [
+        'ok' => false,
+        'code' => 'stock_capability_disabled',
+        'message' => 'AI stok analizi bu işletmede etkin değil.'
+    ]);
 }
 if ($source === 'android' && !ya_stock_endpoint_android_authorized($deviceId)) {
     ya_stock_endpoint_response(403, ['ok' => false, 'code' => 'stock_permission_denied', 'message' => 'Bu cihazın stok güncelleme yetkisi yok.']);

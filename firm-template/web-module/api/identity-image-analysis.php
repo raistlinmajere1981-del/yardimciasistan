@@ -5,6 +5,7 @@ const YA_IDENTITY_IMAGE_BASE_DIR = __DIR__ . '/..';
 const YA_IDENTITY_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
 require_once YA_IDENTITY_IMAGE_BASE_DIR . '/lib/storage.php';
+require_once YA_IDENTITY_IMAGE_BASE_DIR . '/lib/android-device-auth.php';
 require_once YA_IDENTITY_IMAGE_BASE_DIR . '/lib/stock-image-analysis.php';
 require_once YA_IDENTITY_IMAGE_BASE_DIR . '/lib/identity-image-analysis.php';
 
@@ -50,6 +51,17 @@ if (!in_array($source, ['desktop', 'android'], true)) {
         'ok' => false,
         'code' => 'invalid_request',
         'message' => 'Kimlik görseli analiz bilgileri geçersiz.'
+    ]);
+}
+$requiredCapabilities = ['service.ai', 'core.customers'];
+if ($source === 'android') {
+    $requiredCapabilities[] = 'service.android';
+}
+if (!ya_android_auth_snapshot_has_capabilities($requiredCapabilities)) {
+    ya_identity_endpoint_response(403, [
+        'ok' => false,
+        'code' => 'identity_capability_disabled',
+        'message' => 'AI kimlik analizi bu işletmede etkin değil.'
     ]);
 }
 if ($source === 'android' && !ya_identity_endpoint_android_admin_authorized($deviceId)) {

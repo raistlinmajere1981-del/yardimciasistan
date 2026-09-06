@@ -28,6 +28,13 @@ if (!ya_android_auth_request_authorized($businessConfig, $deviceId)) {
         'message' => 'Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.'
     ]);
 }
+if (!ya_android_auth_snapshot_has_capabilities(['service.android'])) {
+    ya_android_gate_response(403, [
+        'ok' => false,
+        'code' => 'android_capability_disabled',
+        'message' => 'Android bağlantısı bu işletmede etkin değil.'
+    ]);
+}
 
 // Device tokens are intentionally not general sync credentials. They may only
 // call the two transport actions required by the Android companion.

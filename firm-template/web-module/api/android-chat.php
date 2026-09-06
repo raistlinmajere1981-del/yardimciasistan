@@ -14,6 +14,13 @@ if (!ya_android_auth_request_authorized($businessConfig, $deviceId)) {
         'message' => 'Telefon bağlantısı doğrulanamadı. Cihazı masaüstünden yeniden eşleştirin.'
     ]);
 }
+if (!ya_android_auth_snapshot_has_capabilities(['service.android', 'service.ai', 'core.reports'])) {
+    ya_android_chat_response(403, [
+        'ok' => false,
+        'code' => 'android_ai_capability_disabled',
+        'message' => 'Android AI rapor yorumu bu işletmede etkin değil.'
+    ]);
+}
 
 $rawBody = file_get_contents('php://input') ?: '';
 $decodedBody = json_decode($rawBody, true);
