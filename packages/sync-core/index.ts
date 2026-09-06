@@ -1,4 +1,13 @@
-import type { CustomerRequest, ISODateTimeString, MenuStockUnit } from "@yardimci-asistan/shared";
+import {
+  BUSINESS_CAPABILITIES,
+  canConvertRequestToReservation,
+  isOperationalTaskAvailable,
+  isReservationTypeAvailable,
+  type BusinessCapability,
+  type CustomerRequest,
+  type ISODateTimeString,
+  type MenuStockUnit
+} from "@yardimci-asistan/shared";
 
 export interface SyncCoreConfig {
   baseUrl: string;
@@ -139,6 +148,10 @@ export interface AndroidReportSnapshot {
     closed_orders: number;
     average_order: number;
     approved_reservations: number;
+    approved_accommodation_reservations?: number;
+    approved_food_reservations?: number;
+    approved_mixed_reservations?: number;
+    approved_generic_reservations?: number;
     new_requests: number;
     attention_count: number;
   };
@@ -174,6 +187,8 @@ export interface AndroidSnapshotTask {
   due_time: string;
   related_type: string;
   related_id: string;
+  /** Domain hint retained when the related reservation itself is projected out. */
+  related_reservation_type?: string;
   updated_at: ISODateTimeString | "";
 }
 
@@ -226,6 +241,8 @@ export interface AndroidRoomFolioSnapshot {
 }
 
 export interface AndroidOperationsSnapshot {
+  /** Persisted runtime capabilities used by desktop projection and Android UI. */
+  business_capabilities: BusinessCapability[];
   summary: AndroidOperationsSummary;
   daily_tasks: AndroidSnapshotTask[];
   requests: AndroidSnapshotRequest[];
@@ -375,6 +392,227 @@ export function androidPermissionsForGroups(groups: AndroidPermissionGroups): An
     groups[groupId] ? ANDROID_PERMISSION_GROUP_PERMISSIONS[groupId] : []
   );
   return [...new Set(permissions)];
+}
+
+const C = BUSINESS_CAPABILITIES;
+
+export interface AndroidPermissionCapabilityRequirement {
+  allOf?: readonly BusinessCapability[];
+  anyOf?: readonly BusinessCapability[];
+}
+
+const ANDROID_RESERVATION_CAPABILITIES = [
+  C.ACCOMMODATION_RESERVATIONS,
+  C.FOOD_RESERVATIONS
+] as const;
+
+/**
+ * Coarse permission exposure policy. Actions that share a generic permission
+ * across domains (reservations and scoped tasks) receive a second, contextual
+ * check through androidActionAllowedByCapabilities.
+ */
+export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<AndroidPermission, AndroidPermissionCapabilityRequirement>> = {
+  "customer.view": { allOf: [C.CUSTOMERS] },
+  "customer.manage": { allOf: [C.CUSTOMERS] },
+  "customer.respond": { allOf: [C.CUSTOMERS] },
+  "customer.mark_answered": { allOf: [C.CUSTOMERS] },
+  "customer.reject": { allOf: [C.CUSTOMERS] },
+  "customer.convert_to_reservation": { allOf: [C.CUSTOMERS], anyOf: ANDROID_RESERVATION_CAPABILITIES },
+  "customer.delete": { allOf: [C.CUSTOMERS] },
+  "request.delete": { allOf: [C.CUSTOMERS] },
+  "reservation.view": { anyOf: ANDROID_RESERVATION_CAPABILITIES },
+  "reservation.create": { anyOf: ANDROID_RESERVATION_CAPABILITIES },
+  "reservation.update": { anyOf: ANDROID_RESERVATION_CAPABILITIES },
+  "reservation.approve": { anyOf: ANDROID_RESERVATION_CAPABILITIES },
+  "reservation.reject": { anyOf: ANDROID_RESERVATION_CAPABILITIES },
+  "reservation.cancel": { anyOf: ANDROID_RESERVATION_CAPABILITIES },
+  "room.view": { allOf: [C.ACCOMMODATION_ROOMS] },
+  "room.update_status": { allOf: [C.ACCOMMODATION_ROOMS] },
+  "room.assign_customer": { allOf: [C.CUSTOMERS, C.ACCOMMODATION_STAYS] },
+  "room_folio.view": { allOf: [C.ACCOMMODATION_FOLIO] },
+  "room_folio.payment": { allOf: [C.ACCOMMODATION_FOLIO] },
+  "room_folio.checkout": { allOf: [C.ACCOMMODATION_FOLIO] },
+  "daily_task.view": { allOf: [C.TASKS] },
+  "daily_task.create": { allOf: [C.TASKS] },
+  "daily_task.update": { allOf: [C.TASKS] },
+  "daily_task.delete": { allOf: [C.TASKS] },
+  "daily_task.complete": { allOf: [C.TASKS] },
+  "daily_task.reopen": { allOf: [C.TASKS] },
+  "table.view": { allOf: [C.FOOD_TABLES] },
+  "table.update_status": { allOf: [C.FOOD_TABLES] },
+  "table_order.view": { allOf: [C.FOOD_ORDERS] },
+  "table_order.open": { allOf: [C.FOOD_ORDERS] },
+  "table_order.add_item": { allOf: [C.FOOD_ORDERS, C.FOOD_MENU] },
+  "table_order.update_item": { allOf: [C.FOOD_ORDERS] },
+  "table_order.remove_item": { allOf: [C.FOOD_ORDERS] },
+  "table_order.set_preparing": { allOf: [C.FOOD_ORDERS] },
+  "table_order.set_served": { allOf: [C.FOOD_ORDERS] },
+  "table_order.set_payment_waiting": { allOf: [C.FOOD_ORDERS] },
+  "table_order.close_paid": { allOf: [C.FOOD_ORDERS] },
+  "table_order.cancel": { allOf: [C.FOOD_ORDERS] },
+  "menu.view": { allOf: [C.FOOD_MENU] },
+  "menu.edit": { allOf: [C.FOOD_MENU] },
+  "menu.delete": { allOf: [C.FOOD_MENU] },
+  "menu.stock_view": { allOf: [C.FOOD_MENU, C.INVENTORY] },
+  "menu.stock_update": { allOf: [C.FOOD_MENU, C.INVENTORY] },
+  "finance.view": { allOf: [C.FINANCE] },
+  "finance.create": { allOf: [C.FINANCE] },
+  "settings.view": { allOf: [C.DEVICES] },
+  "settings.edit": { allOf: [C.DEVICES] },
+  "message.delete": { allOf: [C.CUSTOMERS, C.WHATSAPP] },
+  "android_devices.view": { allOf: [C.DEVICES] },
+  "android_devices.manage": { allOf: [C.DEVICES] }
+};
+
+function capabilityRequirementSatisfied(
+  requirement: AndroidPermissionCapabilityRequirement,
+  enabled: ReadonlySet<BusinessCapability>
+): boolean {
+  return (requirement.allOf ?? []).every((capability) => enabled.has(capability))
+    && (!(requirement.anyOf?.length) || requirement.anyOf.some((capability) => enabled.has(capability)));
+}
+
+export function androidPermissionAllowedByCapabilities(
+  permission: AndroidPermission,
+  capabilities: Iterable<BusinessCapability>
+): boolean {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  return enabled.has(C.ANDROID)
+    && capabilityRequirementSatisfied(ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS[permission], enabled);
+}
+
+export function androidEffectivePermissions(
+  grantedPermissions: Iterable<AndroidPermission>,
+  capabilities: Iterable<BusinessCapability>
+): AndroidPermission[] {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  return [...new Set(grantedPermissions)]
+    .filter((permission) => androidPermissionAllowedByCapabilities(permission, enabled));
+}
+
+export function androidEffectivePermissionsForGroups(
+  groups: AndroidPermissionGroups,
+  capabilities: Iterable<BusinessCapability>
+): AndroidPermission[] {
+  return androidEffectivePermissions(androidPermissionsForGroups(groups), capabilities);
+}
+
+export function androidEffectivePermissionsForRole(
+  role: AndroidDeviceRole,
+  storedPermissions: Iterable<AndroidPermission>,
+  capabilities: Iterable<BusinessCapability>
+): AndroidPermission[] {
+  const granted = role === "admin" ? ANDROID_PERMISSIONS : storedPermissions;
+  return androidEffectivePermissions(granted, capabilities);
+}
+
+export function androidAvailablePermissionGroupIds(
+  capabilities: Iterable<BusinessCapability>
+): AndroidPermissionGroupId[] {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  if (!enabled.has(C.ANDROID)) return [];
+
+  return ANDROID_PERMISSION_GROUP_IDS.filter((groupId) => {
+    switch (groupId) {
+      case "service_orders":
+        return enabled.has(C.FOOD_TABLES) || enabled.has(C.FOOD_ORDERS) || enabled.has(C.FOOD_MENU);
+      case "cashier":
+        return enabled.has(C.FINANCE) || enabled.has(C.ACCOMMODATION_FOLIO) || enabled.has(C.FOOD_ORDERS);
+      case "rooms_tasks":
+        return enabled.has(C.TASKS)
+          || enabled.has(C.ACCOMMODATION_ROOMS)
+          || enabled.has(C.ACCOMMODATION_STAYS)
+          || enabled.has(C.ACCOMMODATION_FOLIO);
+      case "customer_reservation":
+        return enabled.has(C.CUSTOMERS)
+          || ANDROID_RESERVATION_CAPABILITIES.some((capability) => enabled.has(capability));
+    }
+  });
+}
+
+export interface AndroidActionCapabilityContext {
+  requestType?: string;
+  reservationType?: string;
+  reservationRoomIds?: readonly unknown[];
+  reservationTableIds?: readonly unknown[];
+  taskType?: string;
+  relatedType?: string;
+  relatedReservationType?: string;
+  relatedReservationRoomIds?: readonly unknown[];
+  relatedReservationTableIds?: readonly unknown[];
+  payload?: Record<string, unknown>;
+}
+
+export function androidTaskAllowedByCapabilities(
+  capabilities: Iterable<BusinessCapability>,
+  taskType: string,
+  relatedType = "",
+  relatedReservationType = "",
+  relatedReservationRoomIds: readonly unknown[] = [],
+  relatedReservationTableIds: readonly unknown[] = []
+): boolean {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  return enabled.has(C.ANDROID)
+    && isOperationalTaskAvailable(enabled, taskType, relatedType, relatedReservationType, {
+      roomIds: relatedReservationRoomIds,
+      tableIds: relatedReservationTableIds
+    });
+}
+
+/** Contextual capability guard used at the Android mutation boundary. */
+export function androidActionAllowedByCapabilities(
+  actionType: string,
+  capabilities: Iterable<BusinessCapability>,
+  context: AndroidActionCapabilityContext = {}
+): boolean {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  if (!enabled.has(C.ANDROID)) return false;
+
+  if (actionType === "customer_request_convert_to_reservation") {
+    return canConvertRequestToReservation(enabled, context.requestType ?? "");
+  }
+  if (actionType.startsWith("reservation_room_")) {
+    return enabled.has(C.ACCOMMODATION_RESERVATIONS);
+  }
+  if (actionType.startsWith("reservation_table_")) {
+    return enabled.has(C.FOOD_RESERVATIONS);
+  }
+  if (["reservation_approve", "reservation_reject", "reservation_cancel"].includes(actionType)) {
+    return isReservationTypeAvailable(enabled, context.reservationType ?? "", {
+      roomIds: context.reservationRoomIds,
+      tableIds: context.reservationTableIds
+    });
+  }
+  if (actionType.startsWith("daily_task_")) {
+    return androidTaskAllowedByCapabilities(
+      enabled,
+      context.taskType ?? "",
+      context.relatedType ?? "",
+      context.relatedReservationType ?? "",
+      context.relatedReservationRoomIds,
+      context.relatedReservationTableIds
+    );
+  }
+  if (actionType === "menu_stock_image_import_apply") {
+    return enabled.has(C.FOOD_MENU)
+      && enabled.has(C.INVENTORY)
+      && enabled.has(C.AI);
+  }
+  if (actionType === "room_status_update" && String(context.payload?.status ?? "").trim() === "reserved") {
+    return enabled.has(C.ACCOMMODATION_ROOMS) && enabled.has(C.ACCOMMODATION_RESERVATIONS);
+  }
+  if (actionType === "table_status_update") {
+    const status = String(context.payload?.status ?? "").trim();
+    if (status === "reserved") {
+      return enabled.has(C.FOOD_TABLES) && enabled.has(C.FOOD_RESERVATIONS);
+    }
+    if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(status)) {
+      return enabled.has(C.FOOD_TABLES) && enabled.has(C.FOOD_ORDERS);
+    }
+  }
+
+  const permission = resolveAndroidActionPermission(actionType, context.payload ?? {});
+  return permission !== null && androidPermissionAllowedByCapabilities(permission, enabled);
 }
 
 export const ANDROID_STAFF_PERMISSIONS: readonly AndroidPermission[] = androidPermissionsForGroups({
