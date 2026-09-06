@@ -3,6 +3,24 @@ package com.yardimciasistan.android;
 import java.util.Locale;
 
 final class AndroidUiRules {
+  static final String CAPABILITY_WHATSAPP = "service.whatsapp";
+  static final String CAPABILITY_AI = "service.ai";
+  static final String CAPABILITY_ANDROID = "service.android";
+  static final String CAPABILITY_CUSTOMERS = "core.customers";
+  static final String CAPABILITY_TASKS = "core.tasks";
+  static final String CAPABILITY_NOTIFICATIONS = "core.notifications";
+  static final String CAPABILITY_FINANCE = "core.finance";
+  static final String CAPABILITY_REPORTS = "core.reports";
+  static final String CAPABILITY_ROOMS = "accommodation.rooms";
+  static final String CAPABILITY_ACCOMMODATION_RESERVATIONS = "accommodation.reservations";
+  static final String CAPABILITY_STAYS = "accommodation.stays";
+  static final String CAPABILITY_FOLIO = "accommodation.folio";
+  static final String CAPABILITY_TABLES = "food_service.tables";
+  static final String CAPABILITY_FOOD_RESERVATIONS = "food_service.reservations";
+  static final String CAPABILITY_ORDERS = "food_service.orders";
+  static final String CAPABILITY_MENU = "food_service.menu";
+  static final String CAPABILITY_INVENTORY = "commerce.inventory";
+
   static final String TAB_TODAY = "today";
   static final String TAB_CUSTOMERS = "customers";
   static final String TAB_PENSION = "pension";
@@ -49,7 +67,7 @@ final class AndroidUiRules {
       );
     }
     if (TAB_MESSAGES.equals(tab)) {
-      return data.hasPermission("customer.view");
+      return canUseWhatsApp(data) && data.hasPermission("customer.view");
     }
     if (TAB_PENSION.equals(tab)) {
       return firstPensionMode(data) != null;
@@ -61,28 +79,35 @@ final class AndroidUiRules {
       return data != null && data.hasPermission("finance.view");
     }
     if (TAB_REPORTS.equals(tab)) {
-      return data != null && data.isAdmin();
+      return data != null && data.isAdmin() && data.hasBusinessCapability(CAPABILITY_REPORTS);
     }
     return false;
   }
 
   static boolean canOpenPensionMode(OperationData data, String mode) {
+    if (data == null) {
+      return false;
+    }
     if (PENSION_RESERVATIONS.equals(mode)) {
-      return data.hasPermission("reservation.view");
+      return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
+          && data.hasPermission("reservation.view");
     }
     if (PENSION_ROOMS.equals(mode)) {
-      return data.hasPermission("room.view");
+      return data.hasBusinessCapability(CAPABILITY_ROOMS) && data.hasPermission("room.view");
     }
     if (PENSION_STAYS.equals(mode)) {
-      return data.isAdmin()
+      return data.hasBusinessCapability(CAPABILITY_STAYS)
+          && data.isAdmin()
           && data.hasPermission("customer.manage")
           && data.hasPermission("room.assign_customer");
     }
     if (PENSION_FOLIOS.equals(mode)) {
-      return data.hasPermission("room_folio.view");
+      return data.hasBusinessCapability(CAPABILITY_FOLIO) && data.hasPermission("room_folio.view");
     }
     if (PENSION_TASKS.equals(mode)) {
-      return data.hasPermission("daily_task.view");
+      return data.hasBusinessCapability(CAPABILITY_TASKS)
+          && data.hasBusinessCapability(CAPABILITY_ROOMS)
+          && data.hasPermission("daily_task.view");
     }
     return false;
   }
@@ -111,24 +136,32 @@ final class AndroidUiRules {
   }
 
   static boolean canOpenRestaurantMode(OperationData data, String mode) {
+    if (data == null) {
+      return false;
+    }
     if (RESTAURANT_TABLES.equals(mode)) {
-      return data.hasPermission("table.view");
+      return data.hasBusinessCapability(CAPABILITY_TABLES) && data.hasPermission("table.view");
     }
     if (RESTAURANT_RESERVATIONS.equals(mode)) {
-      return data.hasPermission("reservation.view")
+      return data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS)
+          && data.hasPermission("reservation.view")
           && (data.hasPermission("reservation.create") || hasRestaurantReservationContext(data));
     }
     if (RESTAURANT_ORDERS.equals(mode)) {
-      return data.hasPermission("table_order.view");
+      return data.hasBusinessCapability(CAPABILITY_ORDERS) && data.hasPermission("table_order.view");
     }
     if (RESTAURANT_TASKS.equals(mode)) {
-      return data.hasPermission("daily_task.view");
+      return data.hasBusinessCapability(CAPABILITY_TASKS)
+          && data.hasBusinessCapability(CAPABILITY_TABLES)
+          && data.hasPermission("daily_task.view");
     }
     if (RESTAURANT_STOCK.equals(mode)) {
-      return data.hasPermission("menu.stock_view");
+      return data.hasBusinessCapability(CAPABILITY_MENU)
+          && data.hasBusinessCapability(CAPABILITY_INVENTORY)
+          && data.hasPermission("menu.stock_view");
     }
     if (RESTAURANT_MENU.equals(mode)) {
-      return canDelete(data, "menu.delete");
+      return data.hasBusinessCapability(CAPABILITY_MENU) && canDelete(data, "menu.delete");
     }
     return false;
   }
@@ -138,7 +171,7 @@ final class AndroidUiRules {
       return false;
     }
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (isRestaurantReservation(reservation)) {
+      if (isRestaurantReservation(data, reservation)) {
         return true;
       }
     }
@@ -146,20 +179,56 @@ final class AndroidUiRules {
   }
 
   static boolean isRestaurantReservation(OperationData.ReservationRecord reservation) {
-    return reservation != null && (
-        "table".equals(reservation.type)
-        || "breakfast".equals(reservation.type)
-        || "room_and_table".equals(reservation.type)
-        || !reservation.tableIds.isEmpty()
-    );
+    String domain = reservationDomain(reservation);
+    return "food_service".equals(domain) || "mixed".equals(domain);
+  }
+
+  static boolean isRestaurantReservation(OperationData data, OperationData.ReservationRecord reservation) {
+    if (isRestaurantReservation(reservation)) {
+      return true;
+    }
+    return data != null
+        && reservation != null
+        && reservation.roomIds.isEmpty()
+        && reservation.tableIds.isEmpty()
+        && !data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
+        && data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
   }
 
   static boolean isRestaurantOnlyReservation(OperationData.ReservationRecord reservation) {
-    return reservation != null && (
-        "table".equals(reservation.type)
+    return "food_service".equals(reservationDomain(reservation));
+  }
+
+  static boolean isPensionReservation(OperationData data, OperationData.ReservationRecord reservation) {
+    if (reservation == null) {
+      return false;
+    }
+    String domain = reservationDomain(reservation);
+    if ("accommodation".equals(domain) || "mixed".equals(domain)) {
+      return true;
+    }
+    return data != null
+        && "generic".equals(domain)
+        && data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS);
+  }
+
+  static String reservationDomain(OperationData.ReservationRecord reservation) {
+    if (reservation == null) {
+      return "generic";
+    }
+    boolean hasRooms = "room".equals(reservation.type)
+        || "room_and_table".equals(reservation.type)
+        || "mixed".equals(reservation.type)
+        || !reservation.roomIds.isEmpty();
+    boolean hasTables = "table".equals(reservation.type)
         || "breakfast".equals(reservation.type)
-        || (reservation.roomIds.isEmpty() && !reservation.tableIds.isEmpty())
-    );
+        || "room_and_table".equals(reservation.type)
+        || "mixed".equals(reservation.type)
+        || !reservation.tableIds.isEmpty();
+    if (hasRooms && hasTables) return "mixed";
+    if (hasRooms) return "accommodation";
+    if (hasTables) return "food_service";
+    return "generic";
   }
 
   static boolean isManualTask(OperationData.TaskRecord task) {
@@ -167,11 +236,209 @@ final class AndroidUiRules {
   }
 
   static boolean isRestaurantTask(OperationData.TaskRecord task) {
-    return task != null && "manual_restaurant".equals(task.type);
+    return "food_service".equals(taskDomain(null, task));
+  }
+
+  static boolean isRestaurantTask(OperationData data, OperationData.TaskRecord task) {
+    String domain = taskDomain(data, task);
+    return "food_service".equals(domain) || "mixed".equals(domain);
   }
 
   static boolean isPensionTask(OperationData.TaskRecord task) {
-    return task != null && !isRestaurantTask(task);
+    return "accommodation".equals(taskDomain(null, task));
+  }
+
+  static boolean isPensionTask(OperationData data, OperationData.TaskRecord task) {
+    String domain = taskDomain(data, task);
+    return "accommodation".equals(domain) || "mixed".equals(domain);
+  }
+
+  static String taskDomain(OperationData data, OperationData.TaskRecord task) {
+    if (task == null) {
+      return "core";
+    }
+    if ("reservation".equals(task.relatedType) && data != null) {
+      OperationData.ReservationRecord reservation = data.reservationById(task.relatedId);
+      String reservationType = reservation == null ? task.relatedReservationType : reservation.type;
+      boolean hasRooms = "room".equals(reservationType)
+          || "room_and_table".equals(reservationType)
+          || "mixed".equals(reservationType)
+          || (reservation != null && !reservation.roomIds.isEmpty());
+      boolean hasTables = "table".equals(reservationType)
+          || "breakfast".equals(reservationType)
+          || "room_and_table".equals(reservationType)
+          || "mixed".equals(reservationType)
+          || (reservation != null && !reservation.tableIds.isEmpty());
+      if (hasRooms && hasTables) return "mixed";
+      if (hasTables) return "food_service";
+      if (hasRooms) return "accommodation";
+    }
+    if ("manual_restaurant".equals(task.type)
+        || "table_reservation".equals(task.type)
+        || "breakfast".equals(task.type)
+        || "service".equals(task.type)
+        || "table_service".equals(task.type)
+        || "restaurant".equals(task.type)
+        || "table_check".equals(task.type)
+        || "payment".equals(task.type)
+        || "table".equals(task.relatedType)) {
+      return "food_service";
+    }
+    if ("check_in".equals(task.type)
+        || "check_out".equals(task.type)
+        || "room_cleaning".equals(task.type)
+        || "room_maintenance".equals(task.type)
+        || "reservation".equals(task.type)
+        || "manual_pension".equals(task.type)
+        || "room".equals(task.relatedType)) {
+      return "accommodation";
+    }
+    return "core";
+  }
+
+  static boolean canUseWhatsApp(OperationData data) {
+    return data != null && data.hasBusinessCapability(CAPABILITY_WHATSAPP);
+  }
+
+  static boolean canUseAi(OperationData data) {
+    return data != null && data.hasBusinessCapability(CAPABILITY_AI);
+  }
+
+  static boolean canCreateRoomReservation(OperationData data) {
+    return data != null
+        && data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
+        && data.hasPermission("reservation.create");
+  }
+
+  static boolean canCreateTableReservation(OperationData data) {
+    return data != null
+        && data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS)
+        && data.hasPermission("reservation.create");
+  }
+
+  static boolean canConvertRequest(OperationData data, OperationData.RequestRecord request) {
+    if (data == null || request == null || !data.hasPermission("customer.convert_to_reservation")) {
+      return false;
+    }
+    return requestTypeCanConvert(data, request.type);
+  }
+
+  static boolean requestTypeCanConvert(OperationData data, String requestType) {
+    if (data == null || requestType == null) {
+      return false;
+    }
+    if ("pension_reservation".equals(requestType)) {
+      return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    }
+    if ("restaurant_reservation".equals(requestType) || "breakfast_request".equals(requestType)) {
+      return data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
+    }
+    return false;
+  }
+
+  static boolean reservationTypeAllowed(OperationData data, String reservationType) {
+    if (data == null || reservationType == null) {
+      return false;
+    }
+    if ("room".equals(reservationType)) {
+      return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    }
+    if ("table".equals(reservationType) || "breakfast".equals(reservationType)) {
+      return data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
+    }
+    if ("room_and_table".equals(reservationType) || "mixed".equals(reservationType)) {
+      return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
+          && data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
+    }
+    return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
+        || data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
+  }
+
+  static boolean reservationAllowed(OperationData data, OperationData.ReservationRecord reservation) {
+    if (data == null || reservation == null) {
+      return false;
+    }
+    switch (reservationDomain(reservation)) {
+      case "accommodation":
+        return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS);
+      case "food_service":
+        return data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
+      case "mixed":
+        return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
+            && data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
+      default:
+        return data.hasBusinessCapability(CAPABILITY_ACCOMMODATION_RESERVATIONS)
+            || data.hasBusinessCapability(CAPABILITY_FOOD_RESERVATIONS);
+    }
+  }
+
+  static boolean taskTypeAllowed(OperationData data, String taskType, String relatedType) {
+    return taskTypeAllowed(data, taskType, relatedType, "");
+  }
+
+  static boolean taskTypeAllowed(
+      OperationData data,
+      String taskType,
+      String relatedType,
+      String relatedReservationType
+  ) {
+    if (data == null || !data.hasBusinessCapability(CAPABILITY_TASKS)) {
+      return false;
+    }
+    if ("reservation".equals(relatedType) && !relatedReservationType.isEmpty()) {
+      if ("room_and_table".equals(relatedReservationType) || "mixed".equals(relatedReservationType)) {
+        return data.hasBusinessCapability(CAPABILITY_ROOMS)
+            && data.hasBusinessCapability(CAPABILITY_TABLES);
+      }
+      if ("table".equals(relatedReservationType) || "breakfast".equals(relatedReservationType)) {
+        return data.hasBusinessCapability(CAPABILITY_TABLES);
+      }
+      if ("room".equals(relatedReservationType)) {
+        return data.hasBusinessCapability(CAPABILITY_ROOMS);
+      }
+    }
+    if ("manual_restaurant".equals(taskType)
+        || "table_reservation".equals(taskType)
+        || "breakfast".equals(taskType)
+        || "service".equals(taskType)
+        || "table_service".equals(taskType)
+        || "restaurant".equals(taskType)
+        || "table_check".equals(taskType)
+        || "payment".equals(taskType)
+        || "table".equals(relatedType)) {
+      return data.hasBusinessCapability(CAPABILITY_TABLES);
+    }
+    if ("check_in".equals(taskType)
+        || "check_out".equals(taskType)
+        || "room_cleaning".equals(taskType)
+        || "room_maintenance".equals(taskType)
+        || "reservation".equals(taskType)
+        || "manual_pension".equals(taskType)
+        || "room".equals(relatedType)) {
+      return data.hasBusinessCapability(CAPABILITY_ROOMS);
+    }
+    return true;
+  }
+
+  static boolean taskAllowed(OperationData data, OperationData.TaskRecord task) {
+    if (data == null || task == null) {
+      return false;
+    }
+    if (!data.hasBusinessCapability(CAPABILITY_TASKS)) {
+      return false;
+    }
+    String domain = taskDomain(data, task);
+    if ("mixed".equals(domain)) {
+      return data.hasBusinessCapability(CAPABILITY_ROOMS)
+          && data.hasBusinessCapability(CAPABILITY_TABLES);
+    }
+    if ("food_service".equals(domain)) {
+      return data.hasBusinessCapability(CAPABILITY_TABLES);
+    }
+    if ("accommodation".equals(domain)) {
+      return data.hasBusinessCapability(CAPABILITY_ROOMS);
+    }
+    return true;
   }
 
   static boolean canDelete(OperationData data, String permission) {

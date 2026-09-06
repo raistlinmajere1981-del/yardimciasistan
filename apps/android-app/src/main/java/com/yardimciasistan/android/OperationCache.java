@@ -49,6 +49,12 @@ final class OperationCache {
     }
   }
 
+  void clear() throws CacheException {
+    if (!preferences.edit().remove(KEY_CACHE).remove(profileKey()).commit()) {
+      throw new CacheException("Eski Android verisi telefon önbelleğinden temizlenemedi.");
+    }
+  }
+
   private void applyRememberedPermissionProfile(OperationData data) {
     String serialized = preferences.getString(profileKey(), "");
     if (serialized == null || serialized.trim().isEmpty()) {

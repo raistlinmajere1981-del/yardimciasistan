@@ -13,7 +13,7 @@ final class NotificationEventDetector {
 
   static List<NotificationEvent> detect(OperationData data, String today) {
     ArrayList<NotificationEvent> events = new ArrayList<>();
-    if (data == null) {
+    if (data == null || !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_NOTIFICATIONS)) {
       return events;
     }
 
@@ -24,7 +24,7 @@ final class NotificationEventDetector {
             NotificationEvent.CATEGORY_CUSTOMER,
             "request",
             "Yeni müşteri talebi",
-            request.customerName + requestSummarySuffix(request),
+            request.customerName + requestSummarySuffix(request, data),
             "customers:new",
             firstNonEmpty(request.createdAt, request.updatedAt),
             NotificationEvent.PRIORITY_HIGH
@@ -33,14 +33,16 @@ final class NotificationEventDetector {
     }
 
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (!reservation.id.isEmpty() && "pending".equals(reservation.status)) {
+      if (!reservation.id.isEmpty()
+          && "pending".equals(reservation.status)
+          && AndroidUiRules.reservationAllowed(data, reservation)) {
         events.add(new NotificationEvent(
             "reservation:" + reservation.id + ":pending",
             NotificationEvent.CATEGORY_CUSTOMER,
             "reservation",
             "Rezervasyon onay bekliyor",
             reservation.customerName + reservationSummarySuffix(reservation),
-            routeForReservation(reservation),
+            routeForReservation(data, reservation),
             reservation.updatedAt,
             NotificationEvent.PRIORITY_MEDIUM
         ));
@@ -100,17 +102,22 @@ final class NotificationEventDetector {
     }
 
     for (OperationData.TaskRecord task : data.tasks) {
-      if (task.id.isEmpty() || !"pending".equals(task.status)) {
+      if (task.id.isEmpty()
+          || !"pending".equals(task.status)
+          || !AndroidUiRules.taskAllowed(data, task)) {
         continue;
       }
       boolean overdue = isOverdue(task.dueDate, today);
+      String taskDomain = AndroidUiRules.taskDomain(data, task);
       events.add(new NotificationEvent(
           "task:" + task.id + ":pending",
-          NotificationEvent.CATEGORY_ROOMS,
+          "food_service".equals(taskDomain)
+              ? NotificationEvent.CATEGORY_RESTAURANT
+              : NotificationEvent.CATEGORY_ROOMS,
           "daily_task",
           overdue ? "Günlük iş gecikti" : "Günlük iş bekliyor",
           task.title + taskDueSuffix(task),
-          routeForTask(task),
+          routeForTask(data, task),
           task.updatedAt,
           NotificationEvent.PRIORITY_MEDIUM
       ));
@@ -135,11 +142,15 @@ final class NotificationEventDetector {
   }
 
   static boolean isAllowed(NotificationEvent event, OperationData data, Set<String> enabledCategories) {
-    if (event == null || data == null || !data.permissionsResolved || !enabledCategories.contains(event.category)) {
+    if (event == null
+        || data == null
+        || !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_NOTIFICATIONS)
+        || !data.permissionsResolved
+        || !enabledCategories.contains(event.category)) {
       return false;
     }
     if (NotificationEvent.CATEGORY_ACTION.equals(event.category)) {
-      return true;
+      return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID);
     }
     if (!data.deviceActive) {
       return false;
@@ -148,7 +159,12 @@ final class NotificationEventDetector {
       case "request":
         return data.hasPermission("customer.view");
       case "reservation":
-        return data.hasPermission("reservation.view");
+        return data.hasPermission("reservation.view") && (
+            (event.route.startsWith("pension:")
+                && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS))
+            || (event.route.startsWith("restaurant:")
+                && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS))
+        );
       case "table_order":
         return canViewTables(data);
       case "payment_waiting":
@@ -158,9 +174,17 @@ final class NotificationEventDetector {
       case "room":
         return data.hasPermission("room.view");
       case "daily_task":
-        return data.hasPermission("daily_task.view");
+        return data.hasPermission("daily_task.view")
+            && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TASKS)
+            && (
+            (event.route.startsWith("pension:")
+                && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS))
+            || (event.route.startsWith("restaurant:")
+                && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES))
+            || "today".equals(event.route)
+        );
       case "sync_error":
-        return "admin".equals(data.deviceRole) || data.hasPermission("settings.view");
+        return data.hasPermission("settings.view");
       default:
         return false;
     }
@@ -233,11 +257,23 @@ final class NotificationEventDetector {
   }
 
   static String routeForTask(OperationData.TaskRecord task) {
-    return AndroidUiRules.isRestaurantTask(task) ? "restaurant:tasks" : "pension:tasks";
+    return routeForTask(null, task);
+  }
+
+  static String routeForTask(OperationData data, OperationData.TaskRecord task) {
+    String domain = AndroidUiRules.taskDomain(data, task);
+    if ("food_service".equals(domain)) return "restaurant:tasks";
+    if ("accommodation".equals(domain)) return "pension:tasks";
+    return "today";
   }
 
   static String routeForReservation(OperationData.ReservationRecord reservation) {
-    return AndroidUiRules.isRestaurantOnlyReservation(reservation)
+    return routeForReservation(null, reservation);
+  }
+
+  static String routeForReservation(OperationData data, OperationData.ReservationRecord reservation) {
+    return AndroidUiRules.isRestaurantReservation(data, reservation)
+        && !AndroidUiRules.isPensionReservation(data, reservation)
         ? "restaurant:reservations"
         : "pension:reservations";
   }
@@ -270,8 +306,10 @@ final class NotificationEventDetector {
         && dueDate.compareTo(today) < 0;
   }
 
-  private static String requestSummarySuffix(OperationData.RequestRecord request) {
-    String summary = firstNonEmpty(request.aiSummary, request.message);
+  private static String requestSummarySuffix(OperationData.RequestRecord request, OperationData data) {
+    String summary = AndroidUiRules.canUseAi(data)
+        ? firstNonEmpty(request.aiSummary, request.message)
+        : request.message;
     return summary.isEmpty() ? " yeni bir talep gönderdi." : " · " + ellipsize(summary, 96);
   }
 

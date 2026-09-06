@@ -73,9 +73,18 @@ public final class NotificationRulesSmoke {
     );
     data.permissions.clear();
     data.deviceRole = "admin";
-    assertTrue(
+    assertFalse(
         NotificationEventDetector.isAllowed(syncFailure, data, enabled),
-        "the administrator profile should allow technical sync alerts"
+        "the administrator label must not bypass the effective settings permission"
+    );
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_NOTIFICATIONS);
+    assertFalse(
+        NotificationEventDetector.isAllowed(actionFailure, data, allCategories()),
+        "core.notifications=false must suppress every notification category"
+    );
+    assertTrue(
+        NotificationEventDetector.detect(data, "2026-07-18").isEmpty(),
+        "core.notifications=false must suppress snapshot event generation"
     );
   }
 
@@ -138,7 +147,7 @@ public final class NotificationRulesSmoke {
     assertEquals("restaurant:reservations", restaurantReservationEvent.route, "restaurant reservation notification route");
     assertEquals("restaurant:tables", paymentEvent.route, "payment notification route");
     assertEquals("pension:rooms", roomEvent.route, "room notification route");
-    assertEquals("pension:tasks", taskEvent.route, "daily-task notification route");
+    assertEquals("today", taskEvent.route, "domain-neutral daily-task notification route");
     assertEquals("restaurant:stock", NotificationEventDetector.routeForAction("menu_stock_set"), "stock action route");
     assertEquals("restaurant:orders", NotificationEventDetector.routeForAction("table_order_set_served"), "order action route");
     assertEquals("cash", NotificationEventDetector.routeForAction("finance_manual_create"), "finance action route");
@@ -321,8 +330,19 @@ public final class NotificationRulesSmoke {
   private static OperationData baseData() {
     OperationData data = new OperationData();
     data.permissionsResolved = true;
+    data.capabilitiesResolved = true;
     data.deviceActive = true;
     data.permissions.clear();
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ANDROID);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_CUSTOMERS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_TASKS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_NOTIFICATIONS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ROOMS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_TABLES);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ORDERS);
+    data.businessCapabilities.add("core.devices");
     return data;
   }
 

@@ -9,9 +9,12 @@ public final class AndroidUiRulesSmoke {
     recognizesRestaurantReservationContext();
     deletionsRequireResolvedActiveAdmin();
     reportsRequireResolvedActiveAdmin();
+    capabilitiesBoundEveryRoleAndDomain();
+    classifiesAutomaticTasksByDomain();
     validatesReportDatePresets();
     resolvesNotificationDestinations();
     resolvesReportAiEndpoint();
+    invalidatesRevokedAndroidState();
     System.out.println("android-ui-rules-smoke-ok");
   }
 
@@ -144,6 +147,36 @@ public final class AndroidUiRulesSmoke {
     combined.tableIds.add("table-1");
     assertTrue(AndroidUiRules.isRestaurantReservation(combined), "combined stay should be visible in restaurant operations");
     assertFalse(AndroidUiRules.isRestaurantOnlyReservation(combined), "combined stay should remain pension-first for notifications");
+
+    OperationData.ReservationRecord mixed = new OperationData.ReservationRecord();
+    mixed.type = "mixed";
+    assertTrue(AndroidUiRules.isRestaurantReservation(mixed), "mixed reservations should remain visible in restaurant operations");
+    assertTrue(AndroidUiRules.isPensionReservation(data, mixed), "mixed reservations should remain visible in pension operations");
+    assertTrue(AndroidUiRules.reservationAllowed(data, mixed), "mixed reservations require and accept both active domains");
+
+    OperationData.ReservationRecord generic = new OperationData.ReservationRecord();
+    generic.type = "event";
+    assertFalse(
+        AndroidUiRules.isRestaurantReservation(data, generic),
+        "generic reservations default to pension when both reservation domains are enabled"
+    );
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    assertTrue(
+        AndroidUiRules.isRestaurantReservation(data, generic),
+        "a generic reservation must remain reachable from a food-only profile"
+    );
+
+    OperationData.ReservationRecord contextual = new OperationData.ReservationRecord();
+    contextual.type = "event";
+    contextual.roomIds.add("room-1");
+    contextual.tableIds.add("table-1");
+    OperationData.TaskRecord contextualTask = new OperationData.TaskRecord();
+    contextualTask.type = "reservation";
+    contextualTask.relatedType = "reservation";
+    contextualTask.relatedId = "contextual";
+    contextual.id = contextualTask.relatedId;
+    data.reservations.add(contextual);
+    assertEquals("mixed", AndroidUiRules.taskDomain(data, contextualTask), "resource-linked generic task domain");
   }
 
   private static void deletionsRequireResolvedActiveAdmin() {
@@ -195,6 +228,112 @@ public final class AndroidUiRulesSmoke {
     assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_REPORTS), "inactive admin must fail closed");
   }
 
+  private static void capabilitiesBoundEveryRoleAndDomain() {
+    OperationData data = restrictedData();
+    data.deviceRole = "admin";
+    data.permissions.add("room.view");
+    data.permissions.add("reservation.view");
+    data.permissions.add("reservation.create");
+    data.permissions.add("customer.convert_to_reservation");
+    data.permissions.add("table.view");
+    data.permissions.add("customer.respond");
+    data.permissions.add("message.delete");
+
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    assertTrue(
+        AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_ROOMS),
+        "rooms must remain available without room reservations"
+    );
+    assertFalse(
+        AndroidUiRules.canCreateRoomReservation(data),
+        "an admin permission must not bypass a disabled accommodation reservation capability"
+    );
+    OperationData.RequestRecord pensionRequest = new OperationData.RequestRecord();
+    pensionRequest.type = "pension_reservation";
+    assertFalse(
+        AndroidUiRules.canConvertRequest(data, pensionRequest),
+        "a pension request must not convert when accommodation reservations are disabled"
+    );
+
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
+    assertTrue(
+        AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TABLES),
+        "tables must remain available without food reservations"
+    );
+    assertFalse(
+        AndroidUiRules.canCreateTableReservation(data),
+        "an admin permission must not bypass a disabled food reservation capability"
+    );
+
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_CUSTOMERS);
+    data.permissions.add("room.assign_customer");
+    assertFalse(
+        data.hasPermission("room.assign_customer"),
+        "room assignment must require the customer domain as well as accommodation stays"
+    );
+    assertFalse(
+        data.hasPermission("message.delete"),
+        "message deletion must require the customer domain as well as WhatsApp"
+    );
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_CUSTOMERS);
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_WHATSAPP);
+    assertFalse(AndroidUiRules.canUseWhatsApp(data), "WhatsApp must follow its service capability");
+    assertFalse(
+        AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_MESSAGES),
+        "message navigation must disappear when WhatsApp is disabled"
+    );
+  }
+
+  private static void classifiesAutomaticTasksByDomain() {
+    OperationData.TaskRecord service = new OperationData.TaskRecord();
+    service.type = "table_service";
+    assertTrue(AndroidUiRules.isRestaurantTask(service), "table service belongs to restaurant tasks");
+    assertFalse(AndroidUiRules.isPensionTask(service), "table service must not leak into pension tasks");
+
+    OperationData.TaskRecord room = new OperationData.TaskRecord();
+    room.type = "room_cleaning";
+    assertTrue(AndroidUiRules.isPensionTask(room), "room cleaning belongs to pension tasks");
+    assertFalse(AndroidUiRules.isRestaurantTask(room), "room cleaning must not leak into restaurant tasks");
+
+    OperationData data = restrictedData();
+    OperationData.ReservationRecord mixedReservation = new OperationData.ReservationRecord();
+    mixedReservation.id = "mixed-reservation";
+    mixedReservation.type = "mixed";
+    data.reservations.add(mixedReservation);
+    OperationData.TaskRecord mixed = new OperationData.TaskRecord();
+    mixed.type = "reservation";
+    mixed.relatedType = "reservation";
+    mixed.relatedId = mixedReservation.id;
+    assertTrue(AndroidUiRules.isPensionTask(data, mixed), "mixed reservation task belongs to pension tasks");
+    assertTrue(AndroidUiRules.isRestaurantTask(data, mixed), "mixed reservation task belongs to restaurant tasks");
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_TABLES);
+    assertFalse(AndroidUiRules.taskAllowed(data, mixed), "mixed task requires both operation domains");
+
+    OperationData hintedTableTaskData = restrictedData();
+    hintedTableTaskData.businessCapabilities.remove(AndroidUiRules.CAPABILITY_ROOMS);
+    hintedTableTaskData.businessCapabilities.remove(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
+    OperationData.TaskRecord hintedTableTask = new OperationData.TaskRecord();
+    hintedTableTask.type = "reservation";
+    hintedTableTask.relatedType = "reservation";
+    hintedTableTask.relatedReservationType = "table";
+    assertTrue(
+        AndroidUiRules.isRestaurantTask(hintedTableTaskData, hintedTableTask),
+        "a task must retain its table domain after the reservation record is projected out"
+    );
+    assertTrue(
+        AndroidUiRules.taskAllowed(hintedTableTaskData, hintedTableTask),
+        "table operations should retain their linked tasks without reservation capability"
+    );
+
+    OperationData market = restrictedData();
+    market.businessCapabilities.remove(AndroidUiRules.CAPABILITY_ROOMS);
+    market.businessCapabilities.remove(AndroidUiRules.CAPABILITY_TABLES);
+    assertTrue(
+        AndroidUiRules.taskTypeAllowed(market, "note", ""),
+        "domain-neutral tasks remain available from the core task capability"
+    );
+  }
+
   private static void validatesReportDatePresets() {
     for (String preset : new String[] {
         AndroidUiRules.REPORT_TODAY,
@@ -243,11 +382,53 @@ public final class AndroidUiRulesSmoke {
     );
   }
 
+  private static void invalidatesRevokedAndroidState() {
+    HostingSyncClient.SyncException serviceDisabled = new HostingSyncClient.SyncException(
+        "Android bağlantısı bu işletmede etkin değil.",
+        "android_capability_disabled",
+        403
+    );
+    assertTrue(serviceDisabled.disablesAndroidService(), "service.android revocation must be terminal");
+    assertTrue(serviceDisabled.invalidatesPendingAction(), "service.android revocation must invalidate queued actions");
+
+    HostingSyncClient.SyncException permissionRevoked = new HostingSyncClient.SyncException(
+        "Bu telefonun bu işlem için etkin yetkisi yok.",
+        "android_action_permission_denied",
+        403
+    );
+    assertFalse(permissionRevoked.disablesAndroidService(), "one revoked permission must not disable Android");
+    assertTrue(permissionRevoked.invalidatesPendingAction(), "revoked permission must discard its stale action");
+
+    OperationData disabled = OperationData.androidCapabilityDisabled();
+    assertTrue(disabled.capabilitiesResolved, "disabled state must resolve capabilities fail-closed");
+    assertTrue(disabled.permissionsResolved, "disabled state must resolve permissions fail-closed");
+    assertFalse(disabled.deviceActive, "disabled state must deactivate the device UI");
+    assertFalse(disabled.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID), "disabled state must not retain service.android");
+  }
+
   private static OperationData restrictedData() {
     OperationData data = new OperationData();
     data.deviceActive = true;
     data.permissionsResolved = true;
+    data.capabilitiesResolved = true;
     data.permissions.clear();
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ANDROID);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_CUSTOMERS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_TASKS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_FINANCE);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_REPORTS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_WHATSAPP);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_AI);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ROOMS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_STAYS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_FOLIO);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_TABLES);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ORDERS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_MENU);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_INVENTORY);
+    data.businessCapabilities.add("core.devices");
     return data;
   }
 

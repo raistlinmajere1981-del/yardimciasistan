@@ -86,16 +86,48 @@ public final class SyncJobService extends JobService {
       if (!pending.matchesTarget(baseUrl, syncSecret)) {
         continue;
       }
-      client.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
-      outbox.remove(pending.id);
+      try {
+        client.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
+        outbox.remove(pending.id);
+      } catch (HostingSyncClient.SyncException error) {
+        if (!error.invalidatesPendingAction()) {
+          throw error;
+        }
+        outbox.remove(pending.id);
+        if (error.disablesAndroidService()) {
+          clearDisabledAndroidState(cache, outbox, notifications, previousData);
+          return;
+        }
+      }
     }
 
-    HostingSyncClient.FetchResult fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision());
+    HostingSyncClient.FetchResult fetched;
+    try {
+      fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision());
+    } catch (HostingSyncClient.SyncException error) {
+      if (error.disablesAndroidService()) {
+        clearDisabledAndroidState(cache, outbox, notifications, previousData);
+        return;
+      }
+      throw error;
+    }
     if (!fetched.notModified && fetched.data != null) {
       cache.save(fetched.payload);
       OperationData currentData = cache.load();
       notifications.processSnapshot(previousData, currentData == null ? fetched.data : currentData);
     }
+    notifications.recordSyncSuccess();
+  }
+
+  private static void clearDisabledAndroidState(
+      OperationCache cache,
+      ActionOutbox outbox,
+      LocalNotificationCenter notifications,
+      OperationData previousData
+  ) throws OperationCache.CacheException, ActionOutbox.OutboxException {
+    cache.clear();
+    outbox.clear();
+    notifications.processSnapshot(previousData, OperationData.androidCapabilityDisabled());
     notifications.recordSyncSuccess();
   }
 

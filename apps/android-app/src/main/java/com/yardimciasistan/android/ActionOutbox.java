@@ -67,6 +67,10 @@ final class ActionOutbox {
     persist(remaining);
   }
 
+  synchronized void clear() throws OutboxException {
+    persist(new ArrayList<>());
+  }
+
   static String createActionId() {
     return "android_action_" + UUID.randomUUID().toString().replace("-", "");
   }

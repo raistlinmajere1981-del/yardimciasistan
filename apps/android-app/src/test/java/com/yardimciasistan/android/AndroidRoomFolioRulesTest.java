@@ -10,7 +10,10 @@ public final class AndroidRoomFolioRulesTest {
   public void roomFolioPermissionOpensPensionAccountsMode() {
     OperationData data = new OperationData();
     data.permissionsResolved = true;
+    data.capabilitiesResolved = true;
     data.deviceActive = true;
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ANDROID);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_FOLIO);
     data.permissions.clear();
     data.permissions.add("room_folio.view");
 

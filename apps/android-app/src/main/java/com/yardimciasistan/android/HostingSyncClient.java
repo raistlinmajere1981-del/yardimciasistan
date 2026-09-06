@@ -336,7 +336,11 @@ final class HostingSyncClient {
       }
       if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
         String message = response.optString("message", "").trim();
-        throw new SyncException(message.isEmpty() ? "İşlem web modülü tarafından kabul edilmedi." : message);
+        throw new SyncException(
+            message.isEmpty() ? "İşlem web modülü tarafından kabul edilmedi." : message,
+            response.optString("code", "").trim(),
+            status
+        );
       }
       return response;
     } catch (SyncException error) {
@@ -478,12 +482,37 @@ final class HostingSyncClient {
   }
 
   static final class SyncException extends Exception {
+    final String code;
+    final int httpStatus;
+
     SyncException(String message) {
-      super(message);
+      this(message, "", 0, null);
     }
 
     SyncException(String message, Throwable cause) {
+      this(message, "", 0, cause);
+    }
+
+    SyncException(String message, String code, int httpStatus) {
+      this(message, code, httpStatus, null);
+    }
+
+    private SyncException(String message, String code, int httpStatus, Throwable cause) {
       super(message, cause);
+      this.code = code == null ? "" : code.trim();
+      this.httpStatus = httpStatus;
+    }
+
+    boolean disablesAndroidService() {
+      return "android_capability_disabled".equals(code);
+    }
+
+    boolean invalidatesPendingAction() {
+      return disablesAndroidService()
+          || "device_approval_required".equals(code)
+          || "customer_management_permission_denied".equals(code)
+          || "android_action_permission_denied".equals(code)
+          || "android_action_capability_disabled".equals(code);
     }
   }
 

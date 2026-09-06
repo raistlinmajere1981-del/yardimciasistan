@@ -64,28 +64,36 @@ final class OperationData {
       "android_devices.view",
       "android_devices.manage"
   };
-  private static final String[] STAFF_PERMISSIONS = {
-      "room.view",
-      "room.update_status",
-      "room_folio.view",
-      "room_folio.checkout",
-      "daily_task.view",
-      "daily_task.create",
-      "daily_task.update",
-      "daily_task.complete",
-      "daily_task.reopen",
-      "table.view",
-      "table.update_status",
-      "table_order.view",
-      "table_order.open",
-      "table_order.add_item",
-      "table_order.update_item",
-      "table_order.remove_item",
-      "table_order.set_preparing",
-      "table_order.set_served",
-      "table_order.set_payment_waiting",
-      "menu.view",
-      "menu.stock_view"
+  private static final String[] KNOWN_BUSINESS_CAPABILITIES = {
+      "core.customers",
+      "core.tasks",
+      "core.calendar",
+      "core.notifications",
+      "core.finance",
+      "core.reports",
+      "core.web",
+      "core.sync",
+      "core.backups",
+      "core.devices",
+      "service.whatsapp",
+      "service.ai",
+      "service.android",
+      "accommodation.rooms",
+      "accommodation.reservations",
+      "accommodation.stays",
+      "accommodation.folio",
+      "food_service.tables",
+      "food_service.reservations",
+      "food_service.orders",
+      "food_service.menu",
+      "channel.qr_menu",
+      "commerce.catalog",
+      "commerce.inventory",
+      "commerce.sales",
+      "retail.barcode",
+      "retail.purchasing",
+      "retail.suppliers",
+      "retail.labels"
   };
 
   String businessName = "Yardımcı Asistan";
@@ -113,7 +121,9 @@ final class OperationData {
   String deviceRole = "staff";
   boolean deviceActive = true;
   boolean permissionsResolved;
-  final Set<String> permissions = new HashSet<>(Arrays.asList(STAFF_PERMISSIONS));
+  boolean capabilitiesResolved;
+  final Set<String> permissions = new HashSet<>();
+  final Set<String> businessCapabilities = new HashSet<>();
 
   final List<RequestRecord> requests = new ArrayList<>();
   final List<CustomerRecord> customers = new ArrayList<>();
@@ -139,6 +149,14 @@ final class OperationData {
     return fromJson(root, "");
   }
 
+  static OperationData androidCapabilityDisabled() {
+    OperationData data = new OperationData();
+    data.capabilitiesResolved = true;
+    data.permissionsResolved = true;
+    data.deviceActive = false;
+    return data;
+  }
+
   static OperationData fromJson(JSONObject root, String deviceId) {
     OperationData data = new OperationData();
     data.serverRevision = Math.max(0L, root.optLong("server_revision", 0L));
@@ -147,6 +165,30 @@ final class OperationData {
     data.businessName = value(business, "display_name", "Yardımcı Asistan");
     data.businessPhone = value(business, "phone", "");
     data.businessWhatsapp = value(business, "whatsapp", data.businessPhone);
+
+    JSONArray businessCapabilities = root.optJSONArray("business_capabilities");
+    data.capabilitiesResolved = businessCapabilities != null;
+    if (businessCapabilities != null) {
+      Set<String> knownCapabilities = new HashSet<>(Arrays.asList(KNOWN_BUSINESS_CAPABILITIES));
+      for (int index = 0; index < businessCapabilities.length(); index += 1) {
+        String capability = businessCapabilities.optString(index, "").trim();
+        if (knownCapabilities.contains(capability)) {
+          data.businessCapabilities.add(capability);
+        }
+      }
+    }
+
+    // A snapshot without the persisted capability manifest is legacy/unknown and
+    // must not repopulate operational data. A manifest that revokes Android is a
+    // terminal tombstone even if a malformed payload still carries stale arrays.
+    if (!data.capabilitiesResolved) {
+      return data;
+    }
+    if (!data.businessCapabilities.contains("service.android")) {
+      data.permissionsResolved = true;
+      data.deviceActive = false;
+      return data;
+    }
 
     JSONObject summary = object(root, "summary");
     data.totalRequests = number(summary, "total_requests");
@@ -235,11 +277,83 @@ final class OperationData {
   }
 
   boolean hasPermission(String permission) {
-    return deviceActive && permissions.contains(permission);
+    return permissionsResolved
+        && deviceActive
+        && hasBusinessCapability("service.android")
+        && permissionAllowedByCapabilities(permission)
+        && permissions.contains(permission);
+  }
+
+  boolean hasBusinessCapability(String capability) {
+    return capabilitiesResolved && businessCapabilities.contains(capability);
+  }
+
+  private boolean permissionAllowedByCapabilities(String permission) {
+    if (permission == null || permission.isEmpty()) {
+      return false;
+    }
+    if (permission.startsWith("room_folio.")) {
+      return hasBusinessCapability("accommodation.folio");
+    }
+    if ("room.assign_customer".equals(permission)) {
+      return hasBusinessCapability("core.customers")
+          && hasBusinessCapability("accommodation.stays");
+    }
+    if (permission.startsWith("room.")) {
+      return hasBusinessCapability("accommodation.rooms");
+    }
+    if ("table_order.add_item".equals(permission)) {
+      return hasBusinessCapability("food_service.orders")
+          && hasBusinessCapability("food_service.menu");
+    }
+    if (permission.startsWith("table_order.")) {
+      return hasBusinessCapability("food_service.orders");
+    }
+    if (permission.startsWith("table.")) {
+      return hasBusinessCapability("food_service.tables");
+    }
+    if (permission.startsWith("menu.stock_")) {
+      return hasBusinessCapability("food_service.menu")
+          && hasBusinessCapability("commerce.inventory");
+    }
+    if (permission.startsWith("menu.")) {
+      return hasBusinessCapability("food_service.menu");
+    }
+    if (permission.startsWith("reservation.")) {
+      return hasAnyReservationCapability();
+    }
+    if ("customer.convert_to_reservation".equals(permission)) {
+      return hasBusinessCapability("core.customers") && hasAnyReservationCapability();
+    }
+    if (permission.startsWith("customer.") || permission.startsWith("request.")) {
+      return hasBusinessCapability("core.customers");
+    }
+    if (permission.startsWith("daily_task.")) {
+      return hasBusinessCapability("core.tasks");
+    }
+    if (permission.startsWith("finance.")) {
+      return hasBusinessCapability("core.finance");
+    }
+    if (permission.startsWith("settings.") || permission.startsWith("android_devices.")) {
+      return hasBusinessCapability("core.devices");
+    }
+    if ("message.delete".equals(permission)) {
+      return hasBusinessCapability("core.customers")
+          && hasBusinessCapability("service.whatsapp");
+    }
+    return false;
+  }
+
+  boolean hasAnyReservationCapability() {
+    return hasBusinessCapability("accommodation.reservations")
+        || hasBusinessCapability("food_service.reservations");
   }
 
   boolean isAdmin() {
-    return permissionsResolved && deviceActive && "admin".equals(deviceRole);
+    return permissionsResolved
+        && deviceActive
+        && hasBusinessCapability("service.android")
+        && "admin".equals(deviceRole);
   }
 
   String deviceRoleLabel() {
@@ -271,10 +385,6 @@ final class OperationData {
     deviceActive = profile.optBoolean("is_active", false);
     permissions.clear();
     JSONArray profilePermissions = profile.optJSONArray("permissions");
-    if (profilePermissions == null && "admin".equals(deviceRole)) {
-      permissions.addAll(Arrays.asList(ALL_PERMISSIONS));
-      return;
-    }
     if (profilePermissions == null) {
       return;
     }
@@ -300,6 +410,24 @@ final class OperationData {
     for (RequestRecord request : requests) {
       if (requestId.equals(request.id)) {
         return request;
+      }
+    }
+    return null;
+  }
+
+  ReservationRecord reservationById(String reservationId) {
+    for (ReservationRecord reservation : reservations) {
+      if (reservationId.equals(reservation.id)) {
+        return reservation;
+      }
+    }
+    return null;
+  }
+
+  TaskRecord taskById(String taskId) {
+    for (TaskRecord task : tasks) {
+      if (taskId.equals(task.id)) {
+        return task;
       }
     }
     return null;
@@ -685,6 +813,7 @@ final class OperationData {
     String dueTime = "";
     String relatedType = "";
     String relatedId = "";
+    String relatedReservationType = "";
     String updatedAt = "";
 
     static TaskRecord fromJson(JSONObject source) {
@@ -698,6 +827,7 @@ final class OperationData {
       record.dueTime = value(source, "due_time", "");
       record.relatedType = value(source, "related_type", "");
       record.relatedId = value(source, "related_id", "");
+      record.relatedReservationType = value(source, "related_reservation_type", "");
       record.updatedAt = value(source, "updated_at", "");
       return record;
     }

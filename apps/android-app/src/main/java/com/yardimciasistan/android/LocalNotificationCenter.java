@@ -307,7 +307,7 @@ final class LocalNotificationCenter {
         "Acil operasyon uyarıları",
         NotificationManager.IMPORTANCE_HIGH
     );
-    high.setDescription("Yeni talepler, hesap bekleyen masalar, işlem ve bağlantı hataları");
+    high.setDescription("Yeni talepler, öncelikli operasyonlar, işlem ve bağlantı hataları");
     high.enableLights(true);
     high.setLightColor(Color.rgb(236, 180, 56));
 
@@ -316,7 +316,7 @@ final class LocalNotificationCenter {
         "Günlük operasyon hatırlatmaları",
         NotificationManager.IMPORTANCE_DEFAULT
     );
-    medium.setDescription("Rezervasyon, oda ve günlük iş hatırlatmaları");
+    medium.setDescription("Etkin çalışma alanları ve günlük iş hatırlatmaları");
 
     NotificationChannel low = new NotificationChannel(
         CHANNEL_LOW,

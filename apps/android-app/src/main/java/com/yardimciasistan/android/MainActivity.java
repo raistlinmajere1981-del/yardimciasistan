@@ -309,8 +309,8 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void launchStockCamera() {
-    if (!data.hasPermission("menu.stock_update")) {
-      showError("Bu cihazın stok güncelleme yetkisi yok.");
+    if (!data.hasPermission("menu.stock_update") || !AndroidUiRules.canUseAi(data)) {
+      showError("Bu cihazda AI destekli stok girişi kullanılamıyor.");
       return;
     }
     try {
@@ -336,8 +336,8 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void launchStockGallery() {
-    if (!data.hasPermission("menu.stock_update")) {
-      showError("Bu cihazın stok güncelleme yetkisi yok.");
+    if (!data.hasPermission("menu.stock_update") || !AndroidUiRules.canUseAi(data)) {
+      showError("Bu cihazda AI destekli stok girişi kullanılamıyor.");
       return;
     }
     try {
@@ -375,7 +375,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showIdentityImageSourceDialog() {
-    if (!data.isAdmin() || !data.hasPermission("customer.manage")) {
+    if (!data.isAdmin() || !data.hasPermission("customer.manage") || !AndroidUiRules.canUseAi(data)) {
       showError("Kimlik görseli analizi yalnız yönetici cihazlarda kullanılabilir.");
       return;
     }
@@ -436,6 +436,11 @@ public final class MainActivity extends ComponentActivity {
     CustomerFormSession session = activeCustomerFormSession;
     if (session == null || !session.dialog.isShowing()) {
       deletePendingIdentityCameraFile();
+      return;
+    }
+    if (!AndroidUiRules.canUseAi(data)) {
+      deletePendingIdentityCameraFile();
+      session.setStatus("AI capability kapalı olduğu için kimlik analizi kullanılamıyor.", UiKit.DANGER);
       return;
     }
     String baseUrl = ConnectionSettings.webModuleUrl(preferences);
@@ -526,6 +531,11 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showStockImagePreviewDialog(Uri sourceUri) {
+    if (!data.hasPermission("menu.stock_update") || !AndroidUiRules.canUseAi(data)) {
+      deletePendingStockCameraFile();
+      showError("Bu cihazda AI destekli stok girişi kullanılamıyor.");
+      return;
+    }
     Dialog dialog = new Dialog(this);
     dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
     LinearLayout root = UiKit.column(this);
@@ -1342,7 +1352,7 @@ public final class MainActivity extends ComponentActivity {
     content.removeAllViews();
     View screen;
     if (inactiveDevice) {
-      headerTitle.setText("Cihaz Pasif");
+      headerTitle.setText(data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID) ? "Cihaz Pasif" : "Android Kapalı");
       screen = inactiveDeviceScreen();
     } else if (settingsOpen) {
       headerTitle.setText("Ayarlar");
@@ -1462,7 +1472,10 @@ public final class MainActivity extends ComponentActivity {
 
   private View inactiveDeviceScreen() {
     LinearLayout page = UiKit.column(this);
-    page.addView(screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yeniden etkinleştirmek için masaüstü yöneticinize başvurun.", false));
+    boolean androidEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID);
+    page.addView(androidEnabled
+        ? screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yeniden etkinleştirmek için masaüstü yöneticinize başvurun.", false)
+        : screenIntro("ERİŞİM DURUMU", "Android bağlantısı kapalı", "İşletmenin Android hizmeti kapatıldığı için telefondaki işletme verileri temizlendi.", false));
     LinearLayout card = UiKit.card(this);
     card.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
     card.addView(UiKit.divider(this));
@@ -1502,6 +1515,8 @@ public final class MainActivity extends ComponentActivity {
     boolean canViewCustomers = data.hasPermission("customer.view");
     boolean canViewReservations = data.hasPermission("reservation.view");
     boolean canViewRooms = data.hasPermission("room.view");
+    boolean canViewPensionTasks = AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_TASKS);
+    boolean canViewRestaurantTasks = AndroidUiRules.canOpenRestaurantMode(data, AndroidUiRules.RESTAURANT_TASKS);
     boolean canViewTasks = data.hasPermission("daily_task.view");
     boolean canViewTables = data.hasPermission("table.view");
     boolean canViewOrders = data.hasPermission("table_order.view");
@@ -1522,8 +1537,39 @@ public final class MainActivity extends ComponentActivity {
         counters.add(new CounterValue("Masa Rez.", restaurantPending, UiKit.WARNING, "restaurant:reservations"));
       }
     }
+    int visibleTaskCount = 0;
+    boolean hasPensionTasks = false;
+    boolean hasRestaurantTasks = false;
+    boolean hasOtherTasks = false;
     if (canViewTasks) {
-      counters.add(new CounterValue("İş", data.todayTasks > 0 ? data.todayTasks : data.pendingDailyTasks, UiKit.ACCENT, "pension:tasks"));
+      for (OperationData.TaskRecord task : data.tasks) {
+        if (!"pending".equals(task.status) || !AndroidUiRules.taskAllowed(data, task)) {
+          continue;
+        }
+        String domain = AndroidUiRules.taskDomain(data, task);
+        if ("accommodation".equals(domain) && canViewPensionTasks) {
+          hasPensionTasks = true;
+        } else if ("food_service".equals(domain) && canViewRestaurantTasks) {
+          hasRestaurantTasks = true;
+        } else if ("mixed".equals(domain) && canViewPensionTasks && canViewRestaurantTasks) {
+          hasPensionTasks = true;
+          hasRestaurantTasks = true;
+        } else if ("core".equals(domain)) {
+          hasOtherTasks = true;
+        } else {
+          continue;
+        }
+        visibleTaskCount += 1;
+      }
+    }
+    if (visibleTaskCount > 0) {
+      String taskLabel = hasPensionTasks && !hasRestaurantTasks && !hasOtherTasks
+          ? "Oda işi"
+          : (hasRestaurantTasks && !hasPensionTasks && !hasOtherTasks ? "Servis işi" : "İş");
+      String taskRoute = hasPensionTasks && !hasRestaurantTasks && !hasOtherTasks
+          ? "pension:tasks"
+          : (hasRestaurantTasks && !hasPensionTasks && !hasOtherTasks ? "restaurant:tasks" : "today");
+      counters.add(new CounterValue(taskLabel, visibleTaskCount, UiKit.ACCENT, taskRoute));
     }
     if (canViewRooms) {
       counters.add(new CounterValue("Oda", data.availableRooms, UiKit.SUCCESS, "pension:rooms"));
@@ -1559,7 +1605,10 @@ public final class MainActivity extends ComponentActivity {
     categoryShown = 0;
     if (canViewReservations) {
       for (OperationData.ReservationRecord reservation : data.reservations) {
-        if (!"pending".equals(reservation.status) || categoryShown >= 2 || shown >= 8) {
+        if (!AndroidUiRules.reservationAllowed(data, reservation)
+            || !"pending".equals(reservation.status)
+            || categoryShown >= 2
+            || shown >= 8) {
           continue;
         }
         page.addView(priorityReservationCard(reservation));
@@ -1592,7 +1641,10 @@ public final class MainActivity extends ComponentActivity {
     categoryShown = 0;
     if (canViewTasks) {
       for (OperationData.TaskRecord task : data.tasks) {
-        if (!isPriorityTask(task) || categoryShown >= 2 || shown >= 8) {
+        if (!AndroidUiRules.taskAllowed(data, task)
+            || !isPriorityTask(task)
+            || categoryShown >= 2
+            || shown >= 8) {
           continue;
         }
         page.addView(taskCard(task, true));
@@ -1725,7 +1777,7 @@ public final class MainActivity extends ComponentActivity {
     }));
 
     if (AndroidUiRules.PENSION_RESERVATIONS.equals(pensionMode)) {
-      if (data.hasPermission("reservation.create")) {
+      if (AndroidUiRules.canCreateRoomReservation(data)) {
         Button createReservation = UiKit.button(this, "+ Yeni Rezervasyon", UiKit.PRIMARY,
             view -> showReservationEditor(ReservationEditorDialog.Kind.ROOM, null));
         LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
@@ -1741,7 +1793,7 @@ public final class MainActivity extends ComponentActivity {
       }));
       int reservationCount = 0;
       for (OperationData.ReservationRecord reservation : data.reservations) {
-        if (!isPensionReservation(reservation)) {
+        if (!isPensionReservation(reservation) || !AndroidUiRules.reservationAllowed(data, reservation)) {
           continue;
         }
         page.addView(reservationCard(reservation, false));
@@ -1787,7 +1839,8 @@ public final class MainActivity extends ComponentActivity {
       RoomFolioWorkspace.append(this, page, data, (actionType, actionPayload, successMessage) ->
           sendAction(actionType, actionPayload, successMessage));
     } else {
-      if (data.hasPermission("daily_task.create")) {
+      if (data.hasPermission("daily_task.create")
+          && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)) {
         Button createTask = UiKit.button(this, "+ Yeni İş", UiKit.PRIMARY,
             view -> showDailyTaskEditor(DailyTaskEditorDialog.Kind.PENSION, null));
         LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
@@ -1801,7 +1854,7 @@ public final class MainActivity extends ComponentActivity {
       }));
       int taskCount = 0;
       for (OperationData.TaskRecord task : data.tasks) {
-        if (!AndroidUiRules.isPensionTask(task)) {
+        if (!AndroidUiRules.isPensionTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
           continue;
         }
         page.addView(taskCard(task, false));
@@ -1845,12 +1898,14 @@ public final class MainActivity extends ComponentActivity {
     }));
 
     if (AndroidUiRules.RESTAURANT_TABLES.equals(restaurantMode)) {
-      page.addView(statusStrip(new CounterValue[] {
-          new CounterValue("Boş", countTablesByStatus("available"), UiKit.SUCCESS, ""),
-          new CounterValue("Dolu", countTablesByStatus("occupied"), UiKit.INFO, ""),
-          new CounterValue("Hesap", countPaymentWaitingTables(), UiKit.WARNING, ""),
-          new CounterValue("Açık", countActiveOrders(), UiKit.ACCENT, "restaurant:orders")
-      }));
+      ArrayList<CounterValue> tableCounters = new ArrayList<>();
+      tableCounters.add(new CounterValue("Boş", countTablesByStatus("available"), UiKit.SUCCESS, ""));
+      tableCounters.add(new CounterValue("Dolu", countTablesByStatus("occupied"), UiKit.INFO, ""));
+      if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)) {
+        tableCounters.add(new CounterValue("Hesap", countPaymentWaitingTables(), UiKit.WARNING, ""));
+        tableCounters.add(new CounterValue("Açık", countActiveOrders(), UiKit.ACCENT, "restaurant:orders"));
+      }
+      page.addView(statusStrip(tableCounters.toArray(new CounterValue[0])));
       if (data.tables.isEmpty()) {
         page.addView(emptyCard("Masa verisi yayınlanmamış", "Masaüstünden Android özetini yayınlayın."));
       }
@@ -1858,7 +1913,7 @@ public final class MainActivity extends ComponentActivity {
         page.addView(tableCard(table));
       }
     } else if (AndroidUiRules.RESTAURANT_RESERVATIONS.equals(restaurantMode)) {
-      if (data.hasPermission("reservation.create")) {
+      if (AndroidUiRules.canCreateTableReservation(data)) {
         Button createReservation = UiKit.button(this, "+ Yeni Rezervasyon", UiKit.PRIMARY,
             view -> showReservationEditor(ReservationEditorDialog.Kind.TABLE, null));
         LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
@@ -1874,7 +1929,8 @@ public final class MainActivity extends ComponentActivity {
       }));
       int reservationCount = 0;
       for (OperationData.ReservationRecord reservation : data.reservations) {
-        if (!AndroidUiRules.isRestaurantReservation(reservation)) {
+        if (!AndroidUiRules.isRestaurantReservation(data, reservation)
+            || !AndroidUiRules.reservationAllowed(data, reservation)) {
           continue;
         }
         page.addView(reservationCard(reservation, false));
@@ -1903,7 +1959,8 @@ public final class MainActivity extends ComponentActivity {
         }
       }
     } else if (AndroidUiRules.RESTAURANT_TASKS.equals(restaurantMode)) {
-      if (data.hasPermission("daily_task.create")) {
+      if (data.hasPermission("daily_task.create")
+          && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)) {
         Button createTask = UiKit.button(this, "+ Yeni İş", UiKit.PRIMARY,
             view -> showDailyTaskEditor(DailyTaskEditorDialog.Kind.RESTAURANT, null));
         LinearLayout.LayoutParams createParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
@@ -1917,7 +1974,7 @@ public final class MainActivity extends ComponentActivity {
       }));
       int taskCount = 0;
       for (OperationData.TaskRecord task : data.tasks) {
-        if (!AndroidUiRules.isRestaurantTask(task)) {
+        if (!AndroidUiRules.isRestaurantTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
           continue;
         }
         page.addView(taskCard(task, false));
@@ -1927,7 +1984,7 @@ public final class MainActivity extends ComponentActivity {
         page.addView(emptyCard("Restoran işi yok", "Günlük restoran işleri sakin görünüyor."));
       }
     } else if (AndroidUiRules.RESTAURANT_STOCK.equals(restaurantMode)) {
-      if (data.hasPermission("menu.stock_update")) {
+      if (data.hasPermission("menu.stock_update") && AndroidUiRules.canUseAi(data)) {
         page.addView(stockImageImportCard());
       }
       page.addView(statusStrip(new CounterValue[] {
@@ -1995,7 +2052,7 @@ public final class MainActivity extends ComponentActivity {
 
   private View messagesScreen() {
     LinearLayout page = UiKit.column(this);
-    if (!data.hasPermission("customer.view")) {
+    if (!AndroidUiRules.canUseWhatsApp(data) || !data.hasPermission("customer.view")) {
       page.addView(permissionDeniedCard());
       return mainScreenScroll(page);
     }
@@ -2042,7 +2099,9 @@ public final class MainActivity extends ComponentActivity {
     page.addView(screenIntro(
         "YÖNETİCİ RAPORU",
         "İşletmenin kısa görünümü",
-        "Tutarlar ve adetler masaüstündeki SQLite verisinden hazırlanır. AI yalnız bu hazır özeti açıklar.",
+        AndroidUiRules.canUseAi(data)
+            ? "Tutarlar ve adetler masaüstündeki SQLite verisinden hazırlanır. AI yalnız bu hazır özeti açıklar."
+            : "Tutarlar ve adetler masaüstündeki SQLite verisinden hazırlanır.",
         true
     ));
     page.addView(filterBar(new String[][] {
@@ -2067,6 +2126,12 @@ public final class MainActivity extends ComponentActivity {
       ));
       return UiKit.scroll(this, page);
     }
+    boolean ordersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
+    boolean customersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS);
+    boolean reservationsEnabled = data.hasAnyReservationCapability();
+    boolean tasksEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TASKS);
+    boolean stockEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_MENU)
+        && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_INVENTORY);
 
     LinearLayout period = UiKit.card(this);
     period.addView(settingLine("Dönem", report.label.isEmpty() ? reportPresetLabel(reportPreset) : report.label, UiKit.PRIMARY));
@@ -2076,38 +2141,56 @@ public final class MainActivity extends ComponentActivity {
 
     page.addView(sectionLabel("Genel özet"));
     LinearLayout summary = UiKit.card(this);
-    addReportMetric(summary, "Restoran cirosu", money(report.restaurantRevenue, "TRY"), UiKit.SUCCESS);
-    addReportMetric(summary, "Kapanan hesap", String.valueOf(report.closedOrders), UiKit.INFO);
-    addReportMetric(summary, "Ortalama hesap", money(report.averageOrder, "TRY"), UiKit.ACCENT);
-    addReportMetric(summary, "Onaylanan rezervasyon", String.valueOf(report.approvedReservations), UiKit.PRIMARY);
-    addReportMetric(summary, "Yeni talep", String.valueOf(report.newRequests), UiKit.WARNING);
+    if (ordersEnabled) {
+      addReportMetric(summary, "Restoran cirosu", money(report.restaurantRevenue, "TRY"), UiKit.SUCCESS);
+      addReportMetric(summary, "Kapanan hesap", String.valueOf(report.closedOrders), UiKit.INFO);
+      addReportMetric(summary, "Ortalama hesap", money(report.averageOrder, "TRY"), UiKit.ACCENT);
+    }
+    if (reservationsEnabled) {
+      addReportMetric(summary, "Onaylanan rezervasyon", String.valueOf(report.approvedReservations), UiKit.PRIMARY);
+    }
+    if (customersEnabled) {
+      addReportMetric(summary, "Yeni talep", String.valueOf(report.newRequests), UiKit.WARNING);
+    }
     addReportMetric(summary, "Dikkat gerektiren", String.valueOf(report.attentionCount), report.attentionCount > 0 ? UiKit.DANGER : UiKit.SUCCESS);
     page.addView(summary);
 
-    page.addView(sectionLabel("Restoran"));
-    LinearLayout restaurant = UiKit.card(this);
-    addReportMetric(restaurant, "Satılan ürün", String.valueOf(report.soldItemCount), UiKit.INFO);
-    addReportMetric(restaurant, "İptal edilen hesap", String.valueOf(report.cancelledOrders), report.cancelledOrders > 0 ? UiKit.WARNING : UiKit.SUCCESS);
-    page.addView(restaurant);
+    if (ordersEnabled) {
+      page.addView(sectionLabel("Restoran"));
+      LinearLayout restaurant = UiKit.card(this);
+      addReportMetric(restaurant, "Satılan ürün", String.valueOf(report.soldItemCount), UiKit.INFO);
+      addReportMetric(restaurant, "İptal edilen hesap", String.valueOf(report.cancelledOrders), report.cancelledOrders > 0 ? UiKit.WARNING : UiKit.SUCCESS);
+      page.addView(restaurant);
 
-    page.addView(sectionLabel("En çok satılan 3 ürün"));
-    if (report.topItems.isEmpty()) {
-      page.addView(emptyCard("Satış satırı yok", "Seçili dönemde kapanmış hesaplara bağlı ürün satışı bulunmuyor."));
-    } else {
-      int rank = 1;
-      for (OperationData.ReportTopItem item : report.topItems) {
-        page.addView(reportTopItemCard(item, rank));
-        rank += 1;
+      page.addView(sectionLabel("En çok satılan 3 ürün"));
+      if (report.topItems.isEmpty()) {
+        page.addView(emptyCard("Satış satırı yok", "Seçili dönemde kapanmış hesaplara bağlı ürün satışı bulunmuyor."));
+      } else {
+        int rank = 1;
+        for (OperationData.ReportTopItem item : report.topItems) {
+          page.addView(reportTopItemCard(item, rank));
+          rank += 1;
+        }
       }
     }
 
     page.addView(sectionLabel("Şu an dikkat gerektirenler"));
     LinearLayout attentionSummary = UiKit.card(this);
-    addReportMetric(attentionSummary, "Bekleyen müşteri talebi", String.valueOf(report.pendingRequests), UiKit.WARNING);
-    addReportMetric(attentionSummary, "Bekleyen rezervasyon", String.valueOf(report.pendingReservations), UiKit.WARNING);
-    addReportMetric(attentionSummary, "Hesap bekleyen masa", String.valueOf(report.paymentWaitingTables), UiKit.DANGER);
-    addReportMetric(attentionSummary, "Geciken / tamamlanmayan iş", report.overdueTasks + " / " + report.incompleteTasks, UiKit.ACCENT);
-    addReportMetric(attentionSummary, "Tükenen / az stok", report.outOfStockItems + " / " + report.lowStockItems, UiKit.DANGER);
+    if (customersEnabled) {
+      addReportMetric(attentionSummary, "Bekleyen müşteri talebi", String.valueOf(report.pendingRequests), UiKit.WARNING);
+    }
+    if (reservationsEnabled) {
+      addReportMetric(attentionSummary, "Bekleyen rezervasyon", String.valueOf(report.pendingReservations), UiKit.WARNING);
+    }
+    if (ordersEnabled) {
+      addReportMetric(attentionSummary, "Hesap bekleyen masa", String.valueOf(report.paymentWaitingTables), UiKit.DANGER);
+    }
+    if (tasksEnabled) {
+      addReportMetric(attentionSummary, "Geciken / tamamlanmayan iş", report.overdueTasks + " / " + report.incompleteTasks, UiKit.ACCENT);
+    }
+    if (stockEnabled) {
+      addReportMetric(attentionSummary, "Tükenen / az stok", report.outOfStockItems + " / " + report.lowStockItems, UiKit.DANGER);
+    }
     page.addView(attentionSummary);
     if (report.attentionItems.isEmpty()) {
       page.addView(emptyCard("Acil başlık yok", "Şu anda ayrıca listelenecek dikkat başlığı bulunmuyor."));
@@ -2117,29 +2200,33 @@ public final class MainActivity extends ComponentActivity {
       }
     }
 
-    page.addView(sectionLabel("AI yorumu (isteğe bağlı)"));
-    page.addView(UiKit.text(
-        this,
-        "AI yeni hesap yapmaz; yalnız yukarıdaki hazır JSON özetini kısa ve sade biçimde açıklar.",
-        12,
-        UiKit.SECONDARY,
-        Typeface.NORMAL
-    ));
-    page.addView(reportAiButton("Bu dönemi özetle", "summary"));
-    page.addView(reportAiButton("Dikkat edilmesi gerekenler", "attention"));
-    page.addView(reportAiButton("Satışları yorumla", "sales"));
-    page.addView(reportAiButton("3 kısa öneri ver", "recommendations"));
-    if (reportAiLoading) {
-      page.addView(emptyCard("AI yorumu hazırlanıyor", "Hazır rapor güvenli sunucu bağlantısı üzerinden yorumlanıyor."));
-    } else if (!reportAiAnswer.isEmpty()) {
-      LinearLayout answer = UiKit.card(this);
-      answer.setBackground(UiKit.rounded(this, UiKit.PRIMARY_DARK, UiKit.PRIMARY, 14));
-      answer.addView(UiKit.text(this, reportAiAnswer, 13, UiKit.TEXT, Typeface.NORMAL));
-      page.addView(answer);
-    } else if (!reportAiMessage.isEmpty()) {
-      LinearLayout message = UiKit.card(this);
-      message.addView(UiKit.text(this, reportAiMessage, 13, UiKit.WARNING, Typeface.BOLD));
-      page.addView(message);
+    if (AndroidUiRules.canUseAi(data)) {
+      page.addView(sectionLabel("AI yorumu (isteğe bağlı)"));
+      page.addView(UiKit.text(
+          this,
+          "AI yeni hesap yapmaz; yalnız yukarıdaki hazır JSON özetini kısa ve sade biçimde açıklar.",
+          12,
+          UiKit.SECONDARY,
+          Typeface.NORMAL
+      ));
+      page.addView(reportAiButton("Bu dönemi özetle", "summary"));
+      page.addView(reportAiButton("Dikkat edilmesi gerekenler", "attention"));
+      if (ordersEnabled) {
+        page.addView(reportAiButton("Satışları yorumla", "sales"));
+      }
+      page.addView(reportAiButton("3 kısa öneri ver", "recommendations"));
+      if (reportAiLoading) {
+        page.addView(emptyCard("AI yorumu hazırlanıyor", "Hazır rapor güvenli sunucu bağlantısı üzerinden yorumlanıyor."));
+      } else if (!reportAiAnswer.isEmpty()) {
+        LinearLayout answer = UiKit.card(this);
+        answer.setBackground(UiKit.rounded(this, UiKit.PRIMARY_DARK, UiKit.PRIMARY, 14));
+        answer.addView(UiKit.text(this, reportAiAnswer, 13, UiKit.TEXT, Typeface.NORMAL));
+        page.addView(answer);
+      } else if (!reportAiMessage.isEmpty()) {
+        LinearLayout message = UiKit.card(this);
+        message.addView(UiKit.text(this, reportAiMessage, 13, UiKit.WARNING, Typeface.BOLD));
+        page.addView(message);
+      }
     }
     return UiKit.scroll(this, page);
   }
@@ -2188,9 +2275,14 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void requestReportAi(String mode) {
-    if (!data.isAdmin()) {
+    if (!data.isAdmin() || !AndroidUiRules.canUseAi(data)) {
       reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.";
       showError(reportAiMessage);
+      render();
+      return;
+    }
+    if ("sales".equals(mode) && !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)) {
+      reportAiMessage = "Restoran sipariş capability'si kapalı olduğu için satış yorumu kullanılamıyor.";
       render();
       return;
     }
@@ -2227,7 +2319,7 @@ public final class MainActivity extends ComponentActivity {
             return;
           }
           reportAiLoading = false;
-          if (!data.isAdmin()) {
+          if (!data.isAdmin() || !AndroidUiRules.canUseAi(data)) {
             reportAiAnswer = "";
             reportAiMessage = "Bu cihazın raporlara erişim yetkisi yok.";
           } else {
@@ -2265,7 +2357,9 @@ public final class MainActivity extends ComponentActivity {
       cash.addView(UiKit.text(this, "Mobil Kasa", 15, UiKit.TEXT, Typeface.BOLD));
       cash.addView(UiKit.text(
           this,
-          "Bugünkü gelir, gider, net durum, bekleyen oda alacağı ve son hareketleri hızlıca izleyin.",
+          data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOLIO)
+              ? "Bugünkü gelir, gider, net durum, bekleyen oda alacağı ve son hareketleri hızlıca izleyin."
+              : "Bugünkü gelir, gider, net durum ve son hareketleri hızlıca izleyin.",
           12,
           UiKit.SECONDARY,
           Typeface.NORMAL
@@ -2282,13 +2376,22 @@ public final class MainActivity extends ComponentActivity {
       cash.addView(openCash);
       page.addView(cash);
     }
-    if (data.isAdmin()) {
+    if (AndroidUiRules.canOpenTab(data, TAB_REPORTS)) {
       page.addView(sectionLabel("Yönetici"));
       LinearLayout reports = UiKit.card(this);
       reports.addView(UiKit.text(this, "İşletme raporları", 15, UiKit.TEXT, Typeface.BOLD));
+      boolean reportOrdersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
+      boolean reportCustomersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS);
+      String reportDescription = reportOrdersEnabled && reportCustomersEnabled
+          ? "Satışları, müşteri taleplerini ve güncel dikkat listesini kısa dönemlerle izleyin."
+          : reportOrdersEnabled
+              ? "Satışları ve etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin."
+              : reportCustomersEnabled
+                  ? "Müşteri taleplerini ve etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin."
+                  : "Etkin operasyonların güncel dikkat listesini kısa dönemlerle izleyin.";
       reports.addView(UiKit.text(
           this,
-          "Restoran satışlarını, talepleri ve güncel dikkat listesini kısa dönemlerle izleyin.",
+          reportDescription,
           12,
           UiKit.SECONDARY,
           Typeface.NORMAL
@@ -2305,31 +2408,48 @@ public final class MainActivity extends ComponentActivity {
       reports.addView(openReports);
       page.addView(reports);
     }
-    page.addView(sectionLabel("Bildirim tercihleri"));
-    LinearLayout notificationPreferences = UiKit.card(this);
-    boolean hasNotificationPreference = false;
-    if (!data.permissionsResolved || data.hasPermission("customer.view") || data.hasPermission("reservation.view")) {
+    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_NOTIFICATIONS)) {
+      page.addView(sectionLabel("Bildirim tercihleri"));
+      LinearLayout notificationPreferences = UiKit.card(this);
+      boolean hasNotificationPreference = false;
+    boolean customerNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS)
+        && (!data.permissionsResolved || data.hasPermission("customer.view"));
+    boolean reservationNotifications = data.hasAnyReservationCapability()
+        && (!data.permissionsResolved || data.hasPermission("reservation.view"));
+    if (customerNotifications || reservationNotifications) {
       notificationPreferences.addView(notificationToggle(
-          "Müşteri / Rezervasyon",
-          "Yeni talepler ve onay bekleyen oda/masa rezervasyonları",
+          customerNotifications && reservationNotifications
+              ? "Müşteri / Rezervasyon"
+              : (reservationNotifications ? "Rezervasyon" : "Müşteri Talepleri"),
+          customerNotifications && reservationNotifications
+              ? "Yeni talepler ve etkin alanlardaki onay bekleyen rezervasyonlar"
+              : (reservationNotifications ? "Etkin alanlardaki onay bekleyen rezervasyonlar" : "Yeni ve yanıt bekleyen müşteri talepleri"),
           NotificationEvent.CATEGORY_CUSTOMER
       ));
       hasNotificationPreference = true;
     }
-    if (!data.permissionsResolved || data.hasPermission("table.view") || data.hasPermission("table_order.view")) {
+    boolean orderNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)
+        && (!data.permissionsResolved || data.hasPermission("table_order.view"));
+    if (orderNotifications) {
       if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
       notificationPreferences.addView(notificationToggle(
-          "Restoran / Masa",
-          "Masa siparişi ve hesap bekleyen adisyonlar",
+          "Restoran / Sipariş",
+          "Masa siparişleri ve hesap bekleyen adisyonlar",
           NotificationEvent.CATEGORY_RESTAURANT
       ));
       hasNotificationPreference = true;
     }
-    if (!data.permissionsResolved || data.hasPermission("room.view") || data.hasPermission("daily_task.view")) {
+    boolean roomNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)
+        && (!data.permissionsResolved || data.hasPermission("room.view"));
+    boolean taskNotifications = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TASKS)
+        && (!data.permissionsResolved || data.hasPermission("daily_task.view"));
+    if (roomNotifications || taskNotifications) {
       if (hasNotificationPreference) notificationPreferences.addView(UiKit.divider(this));
       notificationPreferences.addView(notificationToggle(
-          "Oda / Günlük İş",
-          "Temizlik, bakım ve bekleyen günlük işler",
+          roomNotifications && taskNotifications ? "Oda / Günlük İş" : (roomNotifications ? "Oda" : "Günlük İşler"),
+          roomNotifications && taskNotifications
+              ? "Temizlik, bakım ve etkin alanlardaki bekleyen işler"
+              : (roomNotifications ? "Temizlik ve bakım bekleyen odalar" : "Bekleyen ve geciken günlük işler"),
           NotificationEvent.CATEGORY_ROOMS
       ));
       hasNotificationPreference = true;
@@ -2356,7 +2476,8 @@ public final class MainActivity extends ComponentActivity {
         UiKit.MUTED,
         Typeface.NORMAL
     ));
-    page.addView(notificationPreferences);
+      page.addView(notificationPreferences);
+    }
 
     if (!canViewTechnicalSettings) {
       return UiKit.scroll(this, page);
@@ -2575,7 +2696,7 @@ public final class MainActivity extends ComponentActivity {
     }
     LinearLayout actions = UiKit.row(this);
     UiKit.addAction(actions, UiKit.outlineButton(this, "Ara", view -> openDialer(request.customerPhone)), this);
-    if (data.hasPermission("customer.respond")) {
+    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
       UiKit.addAction(actions, UiKit.outlineButton(this, "WhatsApp", view -> openWhatsApp(request.customerPhone, request.readyMessage())), this);
     }
     UiKit.addAction(actions, UiKit.button(this, "Aç", UiKit.PRIMARY, view -> showRequestDetail(request)), this);
@@ -2602,7 +2723,9 @@ public final class MainActivity extends ComponentActivity {
     }
     String preview = !message.message.isEmpty()
         ? message.message
-        : (!request.aiSummary.isEmpty() ? request.aiSummary : request.message);
+        : (AndroidUiRules.canUseAi(data) && !request.aiSummary.isEmpty()
+            ? request.aiSummary
+            : request.message);
     return messageCard(message, "Cevap bekliyor", UiKit.WARNING, preview);
   }
 
@@ -2618,8 +2741,7 @@ public final class MainActivity extends ComponentActivity {
       top.addView(statusBadge("Konaklıyor", UiKit.INFO));
     }
     card.addView(top);
-    String counts = customer.requestCount + " talep · " + customer.reservationCount + " rezervasyon · "
-        + customer.stayCount + " konaklama";
+    String counts = customerRecordSummary(customer);
     card.addView(UiKit.text(this, counts, 12, UiKit.MUTED, Typeface.NORMAL));
     String identitySummary = customerIdentitySummary(customer);
     if (!identitySummary.isEmpty()) {
@@ -2645,7 +2767,7 @@ public final class MainActivity extends ComponentActivity {
     }
     LinearLayout actions = UiKit.row(this);
     UiKit.addAction(actions, UiKit.outlineButton(this, "Ara", view -> openDialer(customer.phone)), this);
-    if (data.hasPermission("customer.respond")) {
+    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
       UiKit.addAction(actions, UiKit.outlineButton(this, "WhatsApp", view -> openWhatsApp(customer.phone, "")), this);
     }
     UiKit.addAction(actions, UiKit.button(this, "Aç", UiKit.PRIMARY, view -> showCustomerDetail(customer)), this);
@@ -2654,6 +2776,9 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View reservationCard(OperationData.ReservationRecord reservation, boolean compact) {
+    if (!AndroidUiRules.reservationAllowed(data, reservation)) {
+      return new View(this);
+    }
     LinearLayout card = UiKit.card(this);
     card.setOnClickListener(view -> showReservationDetail(reservation));
     LinearLayout top = UiKit.row(this);
@@ -2704,7 +2829,8 @@ public final class MainActivity extends ComponentActivity {
     if (activeStay != null) {
       String staySummary = activeStay.customerName + " · " + joinDateRange(activeStay.checkInDate, activeStay.checkOutDate);
       card.addView(UiKit.text(this, staySummary, 12, UiKit.INFO, Typeface.BOLD));
-    } else if (!room.activeReservation.isEmpty()) {
+    } else if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS)
+        && !room.activeReservation.isEmpty()) {
       card.addView(UiKit.text(this, room.activeReservation, 12, UiKit.INFO, Typeface.BOLD));
     }
     if (canManageCustomerRoomStays()) {
@@ -2790,7 +2916,7 @@ public final class MainActivity extends ComponentActivity {
       params.setMargins(0, UiKit.dp(this, 9), 0, 0);
       actions.setLayoutParams(params);
       if (canEdit) {
-        DailyTaskEditorDialog.Kind kind = AndroidUiRules.isRestaurantTask(task)
+        DailyTaskEditorDialog.Kind kind = AndroidUiRules.isRestaurantTask(data, task)
             ? DailyTaskEditorDialog.Kind.RESTAURANT
             : DailyTaskEditorDialog.Kind.PENSION;
         UiKit.addAction(actions, UiKit.outlineButton(this, "Düzenle", view -> showDailyTaskEditor(kind, task)), this);
@@ -2806,14 +2932,17 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private View tableCard(OperationData.TableRecord table) {
-    OperationData.TableOrder order = data.activeOrderForTable(table.id);
+    boolean ordersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
+    OperationData.TableOrder order = ordersEnabled ? data.activeOrderForTable(table.id) : null;
     LinearLayout card = UiKit.card(this);
     LinearLayout top = UiKit.row(this);
     LinearLayout identity = UiKit.column(this);
     identity.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
     identity.addView(UiKit.text(this, table.name, 16, UiKit.TEXT, Typeface.BOLD));
     identity.addView(UiKit.text(this,
-        formatTableStatus(table.status) + " · " + (order == null ? "Adisyon yok" : formatOrderStatus(order.status)),
+        ordersEnabled
+            ? formatTableStatus(table.status) + " · " + (order == null ? "Adisyon yok" : formatOrderStatus(order.status))
+            : formatTableStatus(table.status),
         12,
         UiKit.MUTED,
         Typeface.NORMAL
@@ -2828,7 +2957,8 @@ public final class MainActivity extends ComponentActivity {
       totalParams.setMargins(0, UiKit.dp(this, 5), 0, 0);
       total.setLayoutParams(totalParams);
       card.addView(total);
-    } else if (!table.activeReservation.isEmpty()) {
+    } else if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS)
+        && !table.activeReservation.isEmpty()) {
       card.addView(UiKit.text(this, table.activeReservation, 12, UiKit.INFO, Typeface.BOLD));
     }
 
@@ -3001,12 +3131,21 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showTableStatusDialog(OperationData.TableRecord table) {
-    showStatusSelectionDialog("Masa durumunu değiştir", table.status, new String[][] {
-        {"available", "Boş"},
-        {"occupied", "Dolu"},
-        {"reserved", "Rezerve"},
-        {"bill_waiting", "Hesap"}
-    }, status -> updateTable(table, status));
+    ArrayList<String[]> options = new ArrayList<>();
+    options.add(new String[] {"available", "Boş"});
+    options.add(new String[] {"occupied", "Dolu"});
+    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS)) {
+      options.add(new String[] {"reserved", "Rezerve"});
+    }
+    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)) {
+      options.add(new String[] {"bill_waiting", "Hesap"});
+    }
+    showStatusSelectionDialog(
+        "Masa durumunu değiştir",
+        table.status,
+        options.toArray(new String[0][]),
+        status -> updateTable(table, status)
+    );
   }
 
   private void showStatusSelectionDialog(String title, String current, String[][] options, StatusSelection listener) {
@@ -3188,7 +3327,7 @@ public final class MainActivity extends ComponentActivity {
     body.setPadding(0, UiKit.dp(this, 6), 0, UiKit.dp(this, 8));
     card.addView(body);
     LinearLayout actions = UiKit.row(this);
-    if (data.hasPermission("customer.respond")) {
+    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
       Button copy = UiKit.outlineButton(this, "Kopyala", view -> copyText(message.message));
       copy.setEnabled(!message.message.isEmpty());
       UiKit.addAction(actions, copy, this);
@@ -3253,8 +3392,7 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout summary = UiKit.card(this);
     summary.addView(detailLine(
         "Kayıtlar",
-        customer.requestCount + " talep · " + customer.reservationCount + " rezervasyon · "
-            + customer.stayCount + " konaklama"
+        customerRecordSummary(customer)
     ));
     if (!customer.phone.isEmpty()) {
       summary.addView(UiKit.divider(this));
@@ -3298,7 +3436,7 @@ public final class MainActivity extends ComponentActivity {
     if (!customer.phone.isEmpty()) {
       LinearLayout contact = UiKit.row(this);
       UiKit.addAction(contact, UiKit.outlineButton(this, "Ara", view -> openDialer(customer.phone)), this);
-      if (data.hasPermission("customer.respond")) {
+      if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
         UiKit.addAction(contact, UiKit.button(this, "WhatsApp", UiKit.PRIMARY, view -> openWhatsApp(customer.phone, "")), this);
       }
       page.addView(contact);
@@ -3384,13 +3522,15 @@ public final class MainActivity extends ComponentActivity {
     shell.addView(header);
 
     LinearLayout form = UiKit.column(this);
-    form.addView(UiKit.text(
-        this,
-        "Kimlik görseli yalnız alanları önermek için işlenir; görsel müşteri kartında saklanmaz.",
-        12,
-        UiKit.MUTED,
-        Typeface.NORMAL
-    ));
+    if (AndroidUiRules.canUseAi(data)) {
+      form.addView(UiKit.text(
+          this,
+          "Kimlik görseli yalnız alanları önermek için işlenir; görsel müşteri kartında saklanmaz.",
+          12,
+          UiKit.MUTED,
+          Typeface.NORMAL
+      ));
+    }
 
     CustomerFormSession session = new CustomerFormSession(dialog);
     session.fullName = addCustomerFormInput(form, "Ad soyad *", "Örn. Ayşe Yılmaz", value(existing, "fullName"), false);
@@ -3436,11 +3576,13 @@ public final class MainActivity extends ComponentActivity {
     session.issuingAuthority = addCustomerFormInput(form, "Düzenleyen makam", "Belgeyi düzenleyen makam", value(existing, "issuingAuthority"), false);
     session.address = addCustomerFormInput(form, "Adres", "Kimlikte yer alıyorsa", value(existing, "address"), true);
 
-    session.imageButton = UiKit.outlineButton(this, "Kimlik Görselinden AI ile Doldur", view -> showIdentityImageSourceDialog());
-    LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48));
-    imageParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
-    session.imageButton.setLayoutParams(imageParams);
-    form.addView(session.imageButton);
+    if (AndroidUiRules.canUseAi(data)) {
+      session.imageButton = UiKit.outlineButton(this, "Kimlik Görselinden AI ile Doldur", view -> showIdentityImageSourceDialog());
+      LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48));
+      imageParams.setMargins(0, UiKit.dp(this, 12), 0, 0);
+      session.imageButton.setLayoutParams(imageParams);
+      form.addView(session.imageButton);
+    }
 
     session.status = UiKit.text(this, "", 12, UiKit.MUTED, Typeface.BOLD);
     LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
@@ -3783,7 +3925,7 @@ public final class MainActivity extends ComponentActivity {
       summary.addView(UiKit.divider(this));
       summary.addView(UiKit.text(this, request.message, 14, UiKit.TEXT, Typeface.NORMAL));
     }
-    if (!request.aiSummary.isEmpty()) {
+    if (AndroidUiRules.canUseAi(data) && !request.aiSummary.isEmpty()) {
       summary.addView(UiKit.divider(this));
       summary.addView(UiKit.text(this, "Kısa özet", 12, UiKit.PRIMARY, Typeface.BOLD));
       summary.addView(UiKit.text(this, request.aiSummary, 13, UiKit.TEXT, Typeface.NORMAL));
@@ -3793,13 +3935,15 @@ public final class MainActivity extends ComponentActivity {
     page.addView(UiKit.sectionTitle(this, "İletişim"));
     LinearLayout contact = UiKit.row(this);
     UiKit.addAction(contact, UiKit.outlineButton(this, "Ara", view -> openDialer(request.customerPhone)), this);
-    if (data.hasPermission("customer.respond")) {
+    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
       UiKit.addAction(contact, UiKit.button(this, "WhatsApp", UiKit.PRIMARY, view -> openWhatsApp(request.customerPhone, request.readyMessage())), this);
     }
     page.addView(contact);
 
     String readyMessage = request.readyMessage();
-    if (!readyMessage.isEmpty() && data.hasPermission("customer.respond")) {
+    if (!readyMessage.isEmpty()
+        && AndroidUiRules.canUseWhatsApp(data)
+        && data.hasPermission("customer.respond")) {
       Button ready = UiKit.outlineButton(this, "Hazır Cevabı Göster", view -> showPreparedReply(request.customerName, readyMessage));
       LinearLayout.LayoutParams readyParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
       readyParams.setMargins(0, UiKit.dp(this, 8), 0, 0);
@@ -3807,7 +3951,7 @@ public final class MainActivity extends ComponentActivity {
       page.addView(ready);
     }
 
-    boolean canConvert = data.hasPermission("customer.convert_to_reservation");
+    boolean canConvert = AndroidUiRules.canConvertRequest(data, request);
     boolean canRespond = data.hasPermission("customer.respond");
     boolean canReject = data.hasPermission("customer.reject");
     boolean canMarkAnswered = data.hasPermission("customer.mark_answered");
@@ -3890,6 +4034,11 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showReservationDetail(OperationData.ReservationRecord reservation) {
+    if (!AndroidUiRules.reservationAllowed(data, reservation)
+        || !data.hasPermission("reservation.view")) {
+      showError("Bu rezervasyon alanı işletmede etkin değil.");
+      return;
+    }
     Dialog dialog = new Dialog(this);
     LinearLayout shell = UiKit.column(this);
     shell.setBackgroundColor(UiKit.BG);
@@ -3931,7 +4080,7 @@ public final class MainActivity extends ComponentActivity {
     page.addView(sectionLabel("İletişim"));
     LinearLayout contact = UiKit.row(this);
     UiKit.addAction(contact, UiKit.outlineButton(this, "Ara", view -> openDialer(reservation.customerPhone)), this);
-    if (data.hasPermission("customer.respond")) {
+    if (AndroidUiRules.canUseWhatsApp(data) && data.hasPermission("customer.respond")) {
       UiKit.addAction(contact, UiKit.button(this, "WhatsApp", UiKit.PRIMARY,
           view -> openWhatsApp(reservation.customerPhone, reservationMessage(reservation))), this);
     }
@@ -4023,7 +4172,9 @@ public final class MainActivity extends ComponentActivity {
     messageCard.addView(body);
     page.addView(messageCard);
 
-    if (data.hasPermission("customer.respond") && !message.message.isEmpty()) {
+    if (AndroidUiRules.canUseWhatsApp(data)
+        && data.hasPermission("customer.respond")
+        && !message.message.isEmpty()) {
       LinearLayout responseActions = UiKit.row(this);
       UiKit.addAction(responseActions, UiKit.outlineButton(this, "Kopyala", view -> copyText(message.message)), this);
       UiKit.addAction(responseActions, UiKit.button(this, "WhatsApp'ta Aç", UiKit.PRIMARY,
@@ -4103,6 +4254,11 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void showTableOrder(OperationData.TableRecord table) {
+    if (!data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)
+        || !data.hasPermission("table_order.view")) {
+      showError("Bu işletmede masa siparişi kullanılamıyor.");
+      return;
+    }
     OperationData.TableOrder order = data.activeOrderForTable(table.id);
     Dialog dialog = new Dialog(this);
     LinearLayout shell = UiKit.column(this);
@@ -4422,7 +4578,10 @@ public final class MainActivity extends ComponentActivity {
   ) {
     boolean editing = reservation != null;
     String requiredPermission = editing ? "reservation.update" : "reservation.create";
-    if (!data.hasPermission(requiredPermission)) {
+    boolean capabilityAllowed = kind == ReservationEditorDialog.Kind.ROOM
+        ? data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS)
+        : data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
+    if (!capabilityAllowed || !data.hasPermission(requiredPermission)) {
       showError(editing ? "Bu cihazın rezervasyon düzenleme yetkisi yok." : "Bu cihazın rezervasyon oluşturma yetkisi yok.");
       return;
     }
@@ -4448,7 +4607,12 @@ public final class MainActivity extends ComponentActivity {
   private void showDailyTaskEditor(DailyTaskEditorDialog.Kind kind, OperationData.TaskRecord task) {
     boolean editing = task != null;
     String requiredPermission = editing ? "daily_task.update" : "daily_task.create";
-    if (!data.hasPermission(requiredPermission)) {
+    boolean capabilityAllowed = editing
+        ? AndroidUiRules.taskAllowed(data, task)
+        : (kind == DailyTaskEditorDialog.Kind.RESTAURANT
+            ? data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)
+            : data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS));
+    if (!capabilityAllowed || !data.hasPermission(requiredPermission)) {
       showError(editing ? "Bu cihazın günlük iş düzenleme yetkisi yok." : "Bu cihazın günlük iş ekleme yetkisi yok.");
       return;
     }
@@ -4482,7 +4646,11 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void sendReservationAction(OperationData.ReservationRecord reservation, String actionType, String message) {
-    sendAction(actionType, payload("reservation_id", reservation.id, "expected_updated_at", reservation.updatedAt), message);
+    sendAction(actionType, payload(
+        "reservation_id", reservation.id,
+        "reservation_type", reservation.type,
+        "expected_updated_at", reservation.updatedAt
+    ), message);
   }
 
   private void syncFromHosting(boolean readSettingsInputs) {
@@ -4533,11 +4701,24 @@ public final class MainActivity extends ComponentActivity {
     final OperationData fallbackData = data;
     executor.execute(() -> {
       try {
+        int invalidatedPendingActions = 0;
         for (ActionOutbox.PendingAction pending : pendingToRetry) {
-          syncClient.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
-          actionOutbox.remove(pending.id);
+          try {
+            syncClient.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
+            actionOutbox.remove(pending.id);
+          } catch (HostingSyncClient.SyncException error) {
+            if (!error.invalidatesPendingAction()) {
+              throw error;
+            }
+            actionOutbox.remove(pending.id);
+            invalidatedPendingActions += 1;
+            if (error.disablesAndroidService()) {
+              actionOutbox.clear();
+              throw error;
+            }
+          }
         }
-        HostingSyncClient.FetchResult fetched = syncClient.fetchOperations(baseUrl, syncSecret, identity, data.serverRevision);
+        HostingSyncClient.FetchResult fetched = syncClient.fetchOperations(baseUrl, syncSecret, identity, fallbackData.serverRevision);
         final OperationData nextData;
         if (!fetched.notModified && fetched.data != null) {
           operationCache.save(fetched.payload);
@@ -4552,16 +4733,43 @@ public final class MainActivity extends ComponentActivity {
           localNotifications.processSnapshot(previousData, nextData);
         }
         localNotifications.recordSyncSuccess();
+        final int discardedActionCount = invalidatedPendingActions;
         runOnUiThread(() -> {
           data = nextData;
           loading = false;
           connectionState = "Bağlantı hazır";
-          clearError();
+          if (discardedActionCount > 0) {
+            showError(discardedActionCount + " bekleyen telefon işlemi yeni yetki veya capability sınırı nedeniyle iptal edildi.");
+          } else {
+            clearError();
+          }
           if (!fetched.notModified || !pendingToRetry.isEmpty()) {
             render();
           }
         });
       } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
+        if (error instanceof HostingSyncClient.SyncException
+            && ((HostingSyncClient.SyncException) error).disablesAndroidService()) {
+          OperationData disabledData = OperationData.androidCapabilityDisabled();
+          String disabledMessage = error.getMessage();
+          try {
+            operationCache.clear();
+            actionOutbox.clear();
+          } catch (OperationCache.CacheException | ActionOutbox.OutboxException cleanupError) {
+            disabledMessage += " " + cleanupError.getMessage();
+          }
+          localNotifications.processSnapshot(previousData, disabledData);
+          localNotifications.recordSyncSuccess();
+          final String visibleDisabledMessage = disabledMessage;
+          runOnUiThread(() -> {
+            data = disabledData;
+            loading = false;
+            connectionState = visibleDisabledMessage;
+            showError(visibleDisabledMessage);
+            render();
+          });
+          return;
+        }
         localNotifications.recordSyncFailure(previousData, error.getMessage());
         runOnUiThread(() -> {
           loading = false;
@@ -4590,6 +4798,12 @@ public final class MainActivity extends ComponentActivity {
     for (ActionSpec action : actions) {
       if (isAdminOnlyAction(action.type) && !data.isAdmin()) {
         String message = "Bu işlem yalnız yönetici cihazlarda kullanılabilir.";
+        showError(message);
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+        return;
+      }
+      if (!actionAllowedByCapabilities(action)) {
+        String message = "Bu işlem işletmenin etkin özellikleri dışında.";
         showError(message);
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
         return;
@@ -4724,6 +4938,75 @@ public final class MainActivity extends ComponentActivity {
       }
     }
     return null;
+  }
+
+  private boolean actionAllowedByCapabilities(ActionSpec action) {
+    if (action == null || !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID)) {
+      return false;
+    }
+    if ("customer_request_convert_to_reservation".equals(action.type)) {
+      OperationData.RequestRecord request = data.requestById(action.payload.optString("request_id", ""));
+      return AndroidUiRules.canConvertRequest(data, request);
+    }
+    if (action.type.startsWith("reservation_room_")) {
+      return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    }
+    if (action.type.startsWith("reservation_table_")) {
+      return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
+    }
+    if ("reservation_approve".equals(action.type)
+        || "reservation_reject".equals(action.type)
+        || "reservation_cancel".equals(action.type)) {
+      OperationData.ReservationRecord reservation = data.reservationById(
+          action.payload.optString("reservation_id", "")
+      );
+      return AndroidUiRules.reservationAllowed(data, reservation);
+    }
+    if (action.type.startsWith("daily_task_")) {
+      String taskType = action.payload.optString("task_type", "");
+      String relatedType = action.payload.optString("related_type", "");
+      OperationData.TaskRecord task = "daily_task_create".equals(action.type)
+          ? null
+          : data.taskById(action.payload.optString("task_id", ""));
+      if (task != null) {
+        return AndroidUiRules.taskAllowed(data, task);
+      }
+      OperationData.ReservationRecord reservation = "reservation".equals(relatedType)
+          ? data.reservationById(action.payload.optString("related_id", ""))
+          : null;
+      return AndroidUiRules.taskTypeAllowed(
+          data,
+          taskType,
+          relatedType,
+          reservation == null ? "" : reservation.type
+      );
+    }
+    if ("room_status_update".equals(action.type)
+        && "reserved".equals(action.payload.optString("status", ""))) {
+      return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)
+          && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS);
+    }
+    if ("table_status_update".equals(action.type)) {
+      String status = action.payload.optString("status", "");
+      if ("reserved".equals(status)) {
+        return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)
+            && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS);
+      }
+      if ("bill_waiting".equals(status)
+          || "waiting_bill".equals(status)
+          || "checkout".equals(status)
+          || "payment".equals(status)) {
+        return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)
+            && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
+      }
+    }
+    if ("menu_stock_image_import_apply".equals(action.type)) {
+      return AndroidUiRules.canUseAi(data);
+    }
+    if ("message_delete".equals(action.type)) {
+      return AndroidUiRules.canUseWhatsApp(data);
+    }
+    return true;
   }
 
   private String requiredPermissionForAction(String actionType, JSONObject actionPayload) {
@@ -4886,6 +5169,10 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void openWhatsApp(String phone, String message) {
+    if (!AndroidUiRules.canUseWhatsApp(data) || !data.hasPermission("customer.respond")) {
+      Toast.makeText(this, "WhatsApp bu işletmede etkin değil.", Toast.LENGTH_SHORT).show();
+      return;
+    }
     String normalizedPhone = normalizeWhatsAppPhone(phone);
     if (normalizedPhone.isEmpty()) {
       Toast.makeText(this, "WhatsApp için telefon numarası bulunamadı.", Toast.LENGTH_SHORT).show();
@@ -4946,7 +5233,9 @@ public final class MainActivity extends ComponentActivity {
   private int countPensionReservations(String status) {
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (status.equals(reservation.status) && isPensionReservation(reservation)) {
+      if (status.equals(reservation.status)
+          && isPensionReservation(reservation)
+          && AndroidUiRules.reservationAllowed(data, reservation)) {
         count += 1;
       }
     }
@@ -4956,7 +5245,9 @@ public final class MainActivity extends ComponentActivity {
   private int countRestaurantReservations(String status) {
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (status.equals(reservation.status) && AndroidUiRules.isRestaurantReservation(reservation)) {
+      if (status.equals(reservation.status)
+          && AndroidUiRules.isRestaurantReservation(data, reservation)
+          && AndroidUiRules.reservationAllowed(data, reservation)) {
         count += 1;
       }
     }
@@ -4966,7 +5257,10 @@ public final class MainActivity extends ComponentActivity {
   private int countRestaurantOnlyReservations(String status) {
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (status.equals(reservation.status) && AndroidUiRules.isRestaurantOnlyReservation(reservation)) {
+      if (status.equals(reservation.status)
+          && AndroidUiRules.isRestaurantReservation(data, reservation)
+          && !AndroidUiRules.isPensionReservation(data, reservation)
+          && AndroidUiRules.reservationAllowed(data, reservation)) {
         count += 1;
       }
     }
@@ -4977,7 +5271,8 @@ public final class MainActivity extends ComponentActivity {
     String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (!AndroidUiRules.isRestaurantReservation(reservation)
+      if (!AndroidUiRules.isRestaurantReservation(data, reservation)
+          || !AndroidUiRules.reservationAllowed(data, reservation)
           || "cancelled".equals(reservation.status)
           || "rejected".equals(reservation.status)) {
         continue;
@@ -4993,7 +5288,9 @@ public final class MainActivity extends ComponentActivity {
     String today = new SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(new Date());
     int count = 0;
     for (OperationData.ReservationRecord reservation : data.reservations) {
-      if (!isPensionReservation(reservation) || "cancelled".equals(reservation.status)) {
+      if (!isPensionReservation(reservation)
+          || !AndroidUiRules.reservationAllowed(data, reservation)
+          || "cancelled".equals(reservation.status)) {
         continue;
       }
       if (today.equals(checkIn ? reservation.startDate : reservation.endDate)) {
@@ -5026,7 +5323,7 @@ public final class MainActivity extends ComponentActivity {
   private int countPensionTasks(boolean completed) {
     int count = 0;
     for (OperationData.TaskRecord task : data.tasks) {
-      if (!AndroidUiRules.isPensionTask(task)) {
+      if (!AndroidUiRules.isPensionTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
         continue;
       }
       if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
@@ -5039,7 +5336,20 @@ public final class MainActivity extends ComponentActivity {
   private int countRestaurantTasks(boolean completed) {
     int count = 0;
     for (OperationData.TaskRecord task : data.tasks) {
-      if (!AndroidUiRules.isRestaurantTask(task)) {
+      if (!AndroidUiRules.isRestaurantTask(data, task) || !AndroidUiRules.taskAllowed(data, task)) {
+        continue;
+      }
+      if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  private int countCoreTasks(boolean completed) {
+    int count = 0;
+    for (OperationData.TaskRecord task : data.tasks) {
+      if (!"core".equals(AndroidUiRules.taskDomain(data, task)) || !AndroidUiRules.taskAllowed(data, task)) {
         continue;
       }
       if ((completed && "done".equals(task.status)) || (!completed && "pending".equals(task.status))) {
@@ -5122,9 +5432,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private boolean isPensionReservation(OperationData.ReservationRecord reservation) {
-    return "room".equals(reservation.type)
-        || "room_and_table".equals(reservation.type)
-        || (!reservation.roomIds.isEmpty() && !"table".equals(reservation.type));
+    return AndroidUiRules.isPensionReservation(data, reservation);
   }
 
   private String requestDate(OperationData.RequestRecord request) {
@@ -5198,6 +5506,18 @@ public final class MainActivity extends ComponentActivity {
     return data.isAdmin()
         && data.hasPermission("customer.manage")
         && data.hasPermission("room.assign_customer");
+  }
+
+  private String customerRecordSummary(OperationData.CustomerRecord customer) {
+    ArrayList<String> parts = new ArrayList<>();
+    parts.add(customer.requestCount + " talep");
+    if (data.hasAnyReservationCapability()) {
+      parts.add(customer.reservationCount + " rezervasyon");
+    }
+    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_STAYS)) {
+      parts.add(customer.stayCount + " konaklama");
+    }
+    return String.join(" · ", parts);
   }
 
   private boolean canTransitionCustomerRoomStay(OperationData.CustomerRoomStayRecord stay) {

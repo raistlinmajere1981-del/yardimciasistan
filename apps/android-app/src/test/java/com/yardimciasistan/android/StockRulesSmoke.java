@@ -5,8 +5,16 @@ public final class StockRulesSmoke {
 
   public static void main(String[] args) {
     OperationData data = new OperationData();
-    assertTrue(data.hasPermission("menu.stock_view"), "default service staff should see tracked stock");
-    assertFalse(data.hasPermission("menu.stock_update"), "default service staff must not update stock manually");
+    assertFalse(data.hasPermission("menu.stock_view"), "an unresolved device profile must fail closed");
+    data.permissionsResolved = true;
+    data.capabilitiesResolved = true;
+    data.deviceActive = true;
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ANDROID);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_MENU);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_INVENTORY);
+    data.permissions.add("menu.stock_view");
+    assertTrue(data.hasPermission("menu.stock_view"), "effective service staff permission should expose tracked stock");
+    assertFalse(data.hasPermission("menu.stock_update"), "staff must not update stock without the explicit permission");
 
     OperationData.MenuItem untracked = new OperationData.MenuItem();
     untracked.id = "untracked";

@@ -37,11 +37,13 @@ final class FinanceWorkspace {
     summary.addView(line(context, "Gelir", money(finance.todayIncomeMinor), UiKit.SUCCESS));
     summary.addView(line(context, "Gider", money(finance.todayExpenseMinor), UiKit.DANGER));
     summary.addView(line(context, "Net", signedMoney(finance.todayNetMinor), finance.todayNetMinor >= 0 ? UiKit.SUCCESS : UiKit.DANGER));
-    summary.addView(line(context, "Bekleyen oda alacağı", money(finance.outstandingPensionMinor), UiKit.WARNING));
+    if (data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOLIO)) {
+      summary.addView(line(context, "Bekleyen oda alacağı", money(finance.outstandingPensionMinor), UiKit.WARNING));
+    }
     page.addView(summary);
 
     if (data.hasPermission("finance.create")) {
-      Button add = UiKit.button(context, "+ Kasa Hareketi Ekle", UiKit.PRIMARY, view -> showCreateDialog(context, listener));
+      Button add = UiKit.button(context, "+ Kasa Hareketi Ekle", UiKit.PRIMARY, view -> showCreateDialog(context, data, listener));
       LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(context, 48));
       params.setMargins(0, 0, 0, dp(context, 12));
       add.setLayoutParams(params);
@@ -105,7 +107,7 @@ final class FinanceWorkspace {
     return text;
   }
 
-  private static void showCreateDialog(Context context, Listener listener) {
+  private static void showCreateDialog(Context context, OperationData data, Listener listener) {
     LinearLayout form = new LinearLayout(context);
     form.setOrientation(LinearLayout.VERTICAL);
     int padding = dp(context, 16);
@@ -125,10 +127,10 @@ final class FinanceWorkspace {
         new Choice("Banka / Havale", "bank"),
         new Choice("Diğer", "other")
     });
-    Spinner category = spinner(context, form, "Kategori", incomeCategories());
+    Spinner category = spinner(context, form, "Kategori", incomeCategories(data));
     direction.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
       Choice selected = (Choice) direction.getSelectedItem();
-      setChoices(context, category, "expense".equals(selected.value) ? expenseCategories() : incomeCategories());
+      setChoices(context, category, "expense".equals(selected.value) ? expenseCategories() : incomeCategories(data));
     }));
 
     TextView status = new TextView(context);
@@ -187,12 +189,30 @@ final class FinanceWorkspace {
     }
   }
 
-  private static Choice[] incomeCategories() {
-    return new Choice[] {
-        new Choice("Diğer gelir", "other_income"),
-        new Choice("Restoran", "restaurant"),
-        new Choice("Pansiyon", "pension")
-    };
+  private static Choice[] incomeCategories(OperationData data) {
+    ArrayList<Choice> choices = new ArrayList<>();
+    choices.add(new Choice("Diğer gelir", "other_income"));
+    if (hasAnyFoodServiceCapability(data)) {
+      choices.add(new Choice("Restoran", "restaurant"));
+    }
+    if (hasAnyAccommodationCapability(data)) {
+      choices.add(new Choice("Pansiyon", "pension"));
+    }
+    return choices.toArray(new Choice[0]);
+  }
+
+  private static boolean hasAnyAccommodationCapability(OperationData data) {
+    return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ROOMS)
+        || data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ACCOMMODATION_RESERVATIONS)
+        || data.hasBusinessCapability(AndroidUiRules.CAPABILITY_STAYS)
+        || data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOLIO);
+  }
+
+  private static boolean hasAnyFoodServiceCapability(OperationData data) {
+    return data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TABLES)
+        || data.hasBusinessCapability(AndroidUiRules.CAPABILITY_FOOD_RESERVATIONS)
+        || data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS)
+        || data.hasBusinessCapability(AndroidUiRules.CAPABILITY_MENU);
   }
 
   private static Choice[] expenseCategories() {
