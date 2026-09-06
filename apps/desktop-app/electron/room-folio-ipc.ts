@@ -1,4 +1,5 @@
 import { ipcMain } from "electron";
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import {
   DesktopRoomFolioService,
   type AddRoomFolioManualItemInput,
@@ -12,7 +13,11 @@ import {
   type UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
 import { transferTableOrderToRoomFolio } from "./room-folio-order-transfer";
-import { saveRoomProfile } from "./room-profile";
+import { listRoomProfiles, saveRoomProfile } from "./room-profile";
+import {
+  assertPersistedBusinessCapability,
+  hasPersistedBusinessCapability
+} from "./business-capability-runtime";
 
 type RoomFolioManualItemIpcInput = AddRoomFolioManualItemInput & {
   sourceTableOrderId?: string;
@@ -22,15 +27,45 @@ export function registerRoomFolioIpcHandlers(options: {
   databasePath: () => string;
   assertUnlocked: () => void;
   assertCapability?: () => void;
+  assertRoomCapability?: () => void;
+  hasFolioCapability?: () => boolean;
   canUseMenu?: () => boolean;
   assertMenuCapability?: () => void;
   assertOrderTransferCapability?: () => void;
   onMutation?: () => void;
 }) {
   const service = () => new DesktopRoomFolioService(options.databasePath());
+  const hasFolioCapability = () => options.hasFolioCapability?.()
+    ?? hasPersistedBusinessCapability(options.databasePath(), BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO);
   const assertAccess = () => {
     options.assertUnlocked();
     options.assertCapability?.();
+  };
+  const assertRoomAccess = () => {
+    options.assertUnlocked();
+    if (options.assertRoomCapability) {
+      options.assertRoomCapability();
+      return;
+    }
+    assertPersistedBusinessCapability(
+      options.databasePath(),
+      BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS,
+      "Oda yönetimi bu işletme profilinde etkin değil."
+    );
+  };
+  const roomProfileData = (): DesktopRoomFolioData => ({
+    generatedAt: new Date().toISOString(),
+    rooms: listRoomProfiles(options.databasePath()),
+    activeStays: [],
+    folios: [],
+    menuCategories: [],
+    menuItems: []
+  });
+  const folioData = (): DesktopRoomFolioData => {
+    const data = service().getData();
+    return options.canUseMenu?.() === false
+      ? { ...data, menuCategories: [], menuItems: [] }
+      : data;
   };
   const finalize = (result: DesktopRoomFolioMutationResult): DesktopRoomFolioMutationResult => {
     if (result.ok) {
@@ -40,30 +75,35 @@ export function registerRoomFolioIpcHandlers(options: {
   };
 
   ipcMain.handle("roomFolio:getData", (): DesktopRoomFolioData => {
-    assertAccess();
-    const data = service().getData();
-    return options.canUseMenu?.() === false
-      ? { ...data, menuCategories: [], menuItems: [] }
-      : data;
+    options.assertUnlocked();
+    if (!hasFolioCapability()) {
+      assertRoomAccess();
+      return roomProfileData();
+    }
+    options.assertCapability?.();
+    return folioData();
   });
 
   ipcMain.handle("roomFolio:setRoomNightlyPrice", (_event, input: SetRoomNightlyPriceInput & { name?: string }): DesktopRoomFolioMutationResult => {
-    assertAccess();
+    assertRoomAccess();
 
-    if (typeof input?.name === "string") {
-      const result = saveRoomProfile(options.databasePath(), {
-        roomId: input.roomId,
-        name: input.name,
-        amountMinor: input.amountMinor,
-        currency: input.currency
-      });
-      if (!result.ok) {
-        return result;
-      }
-      return finalize({ ok: true, message: result.message, data: service().getData() });
+    const currentRoom = listRoomProfiles(options.databasePath()).find((room) => room.id === String(input?.roomId ?? "").trim());
+    const roomName = typeof input?.name === "string" ? input.name : currentRoom?.name ?? "";
+    const result = saveRoomProfile(options.databasePath(), {
+      roomId: input?.roomId,
+      name: roomName,
+      amountMinor: input?.amountMinor,
+      currency: input?.currency
+    });
+    if (!result.ok) {
+      return result;
     }
 
-    return finalize(service().setRoomNightlyPrice(input));
+    return finalize({
+      ok: true,
+      message: result.message,
+      data: hasFolioCapability() ? folioData() : roomProfileData()
+    });
   });
 
   ipcMain.handle("roomFolio:open", (_event, stayId: string): DesktopRoomFolioMutationResult => {
