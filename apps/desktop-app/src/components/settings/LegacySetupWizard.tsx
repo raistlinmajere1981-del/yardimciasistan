@@ -580,6 +580,9 @@ export function SetupWizard({
             enabledCapabilities={enabledCapabilities}
             state={androidDeviceState}
             message={androidDeviceMessage}
+            publishState={androidPublishState}
+            publishMessage={androidPublishMessage}
+            onPublish={onPublishAndroid}
             onSetRole={onSetAndroidDeviceRole}
             onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
             onSetActive={onSetAndroidDeviceActive}
@@ -784,6 +787,9 @@ interface AndroidDevicesSectionProps {
   enabledCapabilities: BusinessCapability[];
   state: SyncState;
   message: string;
+  publishState: SyncState;
+  publishMessage: string;
+  onPublish?: () => void;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetPermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetActive?: (deviceId: string, active: boolean) => void;
@@ -796,6 +802,9 @@ function AndroidDevicesSection({
   enabledCapabilities,
   state,
   message,
+  publishState,
+  publishMessage,
+  onPublish,
   onSetRole,
   onSetPermissionGroups,
   onSetActive,
@@ -826,7 +835,18 @@ function AndroidDevicesSection({
           <p>Telefon Yetkileri</p>
           <h2>Android Cihazlar</h2>
         </div>
-        <span>{availableDevices.length} cihaz</span>
+        <div className="android-devices-heading-actions">
+          <span>{availableDevices.length} cihaz</span>
+          <button
+            className="setup-secondary"
+            type="button"
+            onClick={onPublish}
+            disabled={!onPublish || publishState === "loading"}
+          >
+            <UploadCloud size={15} aria-hidden="true" />
+            {publishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}
+          </button>
+        </div>
       </div>
       <p className="setup-section-description">Rol ve görev alanları yalnız bu bilgisayardan değiştirilebilir. Kaldırılan cihazlar ana listeden çıkarılır ve erişimleri kapalı kalır.</p>
       {availableDevices.length === 0 ? (
@@ -941,6 +961,7 @@ function AndroidDevicesSection({
         </details>
       )}
       <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>
+      <p className={`menu-status sync-${publishState}`} role="status" aria-live="polite">{publishMessage}</p>
     </section>
   );
 }

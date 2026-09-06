@@ -2,6 +2,7 @@ import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import http from "node:http";
+import { createCapabilitySnapshotFixture } from "./capability-smoke-fixture.mjs";
 
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -27,7 +28,7 @@ try {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
 
-  await page.addInitScript(({ setupData, dashboardData }) => {
+  await page.addInitScript(({ capabilitySnapshot, setupData, dashboardData }) => {
     let locked = true;
     let passwordConfigured = true;
     let password = "başlangıç-şifresi";
@@ -40,6 +41,7 @@ try {
     const result = (ok, message) => ({ ok, message, status: status() });
     window.__appLockBootstrapCalls = 0;
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       setUiScale: () => undefined,
       getAppLockStatus: async () => status(),
       lockApp: async () => {
@@ -129,6 +131,7 @@ try {
       })
     };
   }, {
+    capabilitySnapshot: createCapabilitySnapshotFixture(createSetupData(), "lock-smoke-business"),
     setupData: createSetupData(),
     dashboardData: createDashboardData()
   });

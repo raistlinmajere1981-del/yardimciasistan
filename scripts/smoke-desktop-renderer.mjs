@@ -245,7 +245,7 @@ try {
   await expect(androidDeviceSection.getByText("Telefon görev alanları güncellendi.", { exact: true })).toBeVisible();
   await androidDeviceSection.getByRole("button", { name: "Yönetici Yap" }).click();
   await expect(androidDeviceSection.getByText("Yönetici", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText("Tüm yetkiler açık", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Etkin yeteneklerde tüm izinler", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByRole("checkbox")).toHaveCount(0);
   await androidDeviceSection.getByRole("button", { name: "Personel Yap" }).click();
   await expect(androidDeviceSection.getByText("Telefon personel yapıldı.", { exact: true })).toBeVisible();
@@ -277,7 +277,7 @@ try {
   await removedDevices.getByRole("button", { name: /Smoke Personel Telefonu.*cihazını geri yükle/ }).click();
   await expect(androidDeviceSection.locator(".android-device-list").getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-device-list").getByText("Yönetici", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.getByText("Tüm yetkiler açık", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Etkin yeteneklerde tüm izinler", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("1 cihaz", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-removed-devices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
@@ -759,7 +759,7 @@ try {
           dashboardData: currentDashboardData
         };
       },
-      assignCustomerToRoom: async (input) => {
+      assignCustomerRoom: async (input) => {
         const savedId = "customer_room_stay_smoke_001";
         const customer = currentDashboardData.customers.find((item) => item.id === input.customerId);
         const room = currentDashboardData.rooms.find((item) => item.id === input.roomId);
@@ -889,15 +889,25 @@ try {
           dailyTasks: dashboardData.dailyTasks.map((task) => task.id === taskId ? { ...task, status } : task)
         }
       }),
-      createManualBackup: async () => ({
-        ok: true,
-        message: "Yerel veritabanı yedeği oluşturuldu.",
-        backupDirectory: "/tmp/yardimci-asistan/backups",
-        backupFileName: "yardimci-asistan-smoke.sqlite",
-        backupFilePath: "/tmp/yardimci-asistan/backups/yardimci-asistan-smoke.sqlite",
-        createdAt: "2026-07-11T10:16:00+03:00",
-        dashboardData
-      }),
+      createManualBackup: async () => {
+        const backup = {
+          id: "backup-smoke-001",
+          createdAt: "2026-07-11T10:16:00+03:00",
+          kind: "manual",
+          folderName: "yardimci-asistan-smoke",
+          folderPath: "/tmp/yardimci-asistan/backups/yardimci-asistan-smoke",
+          databaseFileName: "yardimci-asistan.sqlite",
+          imageCount: 0,
+          sizeBytes: 4096
+        };
+        return {
+          ok: true,
+          message: "Yerel veritabanı yedeği oluşturuldu.",
+          backupDirectory: "/tmp/yardimci-asistan/backups",
+          backup,
+          backups: [backup]
+        };
+      },
       createOwnerReplySuggestion: async (requestId) => ({
         ok: true,
         message: "AI cevap taslağı yenilendi.",
@@ -966,10 +976,9 @@ try {
   await conversionPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(conversionPage.locator("html")).toHaveAttribute("data-mode", "pro");
   await conversionPage.getByRole("button", { name: "Ayarlar" }).click();
-  await conversionPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await expect(conversionPage.getByRole("button", { name: "Yedek Al" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Yedek Al" }).click();
-  await expect(conversionPage.getByText("yardimci-asistan-smoke.sqlite")).toBeVisible();
+  await expect(conversionPage.getByText("yardimci-asistan-smoke", { exact: true })).toBeVisible();
   await expect(conversionPage.getByRole("button", { name: "Android'e Yayınla" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Android'e Yayınla" }).click();
   await expect(conversionPage.getByText("2 günlük iş ile Android özeti yayınlandı.")).toBeVisible();
@@ -999,8 +1008,9 @@ try {
   await expect(conversionPage.getByLabel("Talep / müşteri")).toBeDisabled();
   await conversionPage.getByRole("button", { name: "AI Sonucunu Hazırla" }).click();
   await expect(conversionPage.getByLabel("AI sonucu")).toHaveValue(/Öncelikler/);
-  await expect(conversionPage.getByRole("button", { name: "Talebe Kaydet" })).toBeDisabled();
+  await expect(conversionPage.getByRole("button", { name: "Talebe Kaydet" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
+  await conversionPage.getByRole("button", { name: /Smoke Misafir Pansiyon rezervasyonu/ }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Rezervasyona Çevir" }).click();
   await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Rezervasyona çevrildi", { exact: true })).toBeVisible();
@@ -1041,7 +1051,7 @@ try {
   await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
   await expect(conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
-  await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
   await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
   await expect(conversionPage.getByLabel("Müşteri yönetimi")).toBeVisible();
@@ -1811,7 +1821,7 @@ try {
     const box = section.getBoundingClientRect();
     return { x: box.x, y: box.y, width: box.width, height: box.height };
   }));
-  expect(basicSettingsBoxes).toHaveLength(7);
+  expect(basicSettingsBoxes).toHaveLength(8);
   expect(new Set(basicSettingsBoxes.map((box) => Math.round(box.x))).size).toBe(2);
   expect(basicSettingsBoxes.filter((box) => box.y < 768).length).toBeGreaterThanOrEqual(5);
   await expect(compactPage.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();

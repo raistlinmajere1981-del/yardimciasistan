@@ -5492,6 +5492,7 @@ button {
 }
 
 .android-devices-heading,
+.android-devices-heading-actions,
 .android-device-identity,
 .android-device-actions {
   display: flex;
@@ -5507,7 +5508,7 @@ button {
   min-width: 0;
 }
 
-.android-devices-heading > span,
+.android-devices-heading-actions > span,
 .device-role,
 .device-state {
   padding: 5px 8px;
@@ -5516,10 +5517,15 @@ button {
   font-weight: var(--weight-bold);
 }
 
-.android-devices-heading > span {
+.android-devices-heading-actions > span {
   color: var(--muted);
   background: var(--surface-neutral);
   border: 1px solid var(--line);
+}
+
+.android-devices-heading-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .android-devices-empty {

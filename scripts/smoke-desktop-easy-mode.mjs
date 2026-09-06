@@ -5,6 +5,7 @@ import http from "node:http";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { createCapabilitySnapshotFixture } from "./capability-smoke-fixture.mjs";
 
 const UI_PREFERENCES_KEY = "yardimci-asistan.ui-preferences";
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
@@ -338,7 +339,8 @@ async function verifyMalformedPreferenceMigration(activeBrowser, rendererUrl) {
 
 async function createIsolatedContext(activeBrowser, initialPreferences, setupRequired = true) {
   const context = await activeBrowser.newContext({ viewport: { width: 1440, height: 1000 } });
-  await context.addInitScript(({ dashboardData, setupData, preferenceKey, preferenceSeed }) => {
+  const setupData = createSetupFixture(setupRequired);
+  await context.addInitScript(({ capabilitySnapshot, dashboardData, setupData, preferenceKey, preferenceSeed }) => {
     if (preferenceSeed !== null && localStorage.getItem(preferenceKey) === null) {
       localStorage.setItem(
         preferenceKey,
@@ -347,6 +349,7 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
     }
     window.__easyModeSmokeInitialPreferenceRecord = localStorage.getItem(preferenceKey);
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "easy-mode-smoke",
@@ -384,8 +387,9 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
       onSyncStatusChanged: () => () => {}
     };
   }, {
+    capabilitySnapshot: createCapabilitySnapshotFixture(setupData, "easy-mode-smoke-business"),
     dashboardData: createEmptyDashboardFixture(),
-    setupData: createSetupFixture(setupRequired),
+    setupData,
     preferenceKey: UI_PREFERENCES_KEY,
     preferenceSeed: initialPreferences ?? null
   });

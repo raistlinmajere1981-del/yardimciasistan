@@ -19,6 +19,50 @@ const syncStatusStub = `      getSyncStatus: async () => ({
         message: "Senkron hazır."
       }),
       onSyncStatusChanged: () => () => {},`;
+const capabilitySnapshotStub = `      getBusinessCapabilitySnapshot: async () => {
+        const enabledCapabilities = [
+          "core.customers",
+          "core.tasks",
+          "core.calendar",
+          "core.notifications",
+          "core.finance",
+          "core.reports",
+          "core.web",
+          "core.sync",
+          "core.backups",
+          "core.devices",
+          ...(setupData.modules.rooms ? [
+            "accommodation.rooms",
+            "accommodation.reservations",
+            "accommodation.stays",
+            "accommodation.folio"
+          ] : []),
+          ...(setupData.modules.tables ? [
+            "food_service.tables",
+            "food_service.reservations",
+            "food_service.orders",
+            "food_service.menu",
+            "commerce.catalog",
+            "commerce.sales"
+          ] : []),
+          ...(setupData.modules.qrMenu ? ["channel.qr_menu", "commerce.inventory"] : []),
+          ...(setupData.modules.whatsapp ? ["service.whatsapp"] : []),
+          ...(setupData.aiEnabled ? ["service.ai"] : []),
+          ...(setupData.modules.android ? ["service.android"] : [])
+        ];
+        return {
+          businessId: "renderer-smoke-business",
+          businessType: setupData.businessType,
+          profileId: setupData.businessType,
+          capabilities: enabledCapabilities.map((capability) => ({
+            capability,
+            enabled: true,
+            source: capability.startsWith("core.") ? "system" : "profile",
+            updatedAt: "2026-07-18T12:00:00+03:00"
+          })),
+          enabledCapabilities
+        };
+      },`;
 
 const definitions = {
   "automatic-sync": {
@@ -41,6 +85,11 @@ const definitions = {
   renderer: {
     source: "smoke-desktop-renderer.mjs",
     replacements: [
+      {
+        before: `    window.yardimciDesktop = {`,
+        after: `    window.yardimciDesktop = {\n${capabilitySnapshotStub}`,
+        replaceAll: true
+      },
       {
         before: `      getDashboardData: async () => currentDashboardData,
       getReportData: async (range) => {`,
