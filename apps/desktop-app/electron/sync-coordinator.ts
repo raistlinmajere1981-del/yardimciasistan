@@ -5,6 +5,7 @@ import {
   type SyncFailure,
   type SyncTransport
 } from "@yardimci-asistan/sync-core";
+import { BUSINESS_CAPABILITIES, hasBusinessCapability } from "@yardimci-asistan/shared";
 import {
   DesktopDatabase,
   type DesktopSyncRuntimeStatus
@@ -204,7 +205,8 @@ export class SyncCoordinator {
       clientId,
       ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
     });
-    const setup = this.options.database.getSetupData();
+    const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
+    const androidEnabled = hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ANDROID);
     this.phase = "syncing";
     this.message = "Web, masaüstü ve Android verileri eşitleniyor...";
     this.options.database.recordSyncAttempt();
@@ -212,11 +214,11 @@ export class SyncCoordinator {
 
     const counts = { ...empty };
     const errors: string[] = [];
-    const targetKey = `${config.baseUrl}\u0000${clientId}\u0000android:${setup.modules.android ? "1" : "0"}`;
+    const targetKey = `${config.baseUrl}\u0000${clientId}\u0000android:${androidEnabled ? "1" : "0"}`;
     if (this.capabilitiesTarget !== targetKey) {
       const capabilities = await transport.getCapabilities();
       const missingAndroidCapabilities = capabilities.ok
-        && setup.modules.android
+        && androidEnabled
         && !supportsAndroidDevicePermissionSync(capabilities);
       if (!capabilities.ok
           || capabilities.protocol_version < 2
@@ -336,8 +338,8 @@ export class SyncCoordinator {
     devicesChanged: number;
     error: string;
   }> {
-    const setup = this.options.database.getSetupData();
-    if (!setup.modules.android) {
+    const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
+    if (!hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ANDROID)) {
       return { pulled: 0, applied: 0, failed: 0, devicesChanged: 0, error: "" };
     }
     const pulled = await transport.pullAndroidActions({ limit: 100 });
@@ -377,13 +379,13 @@ export class SyncCoordinator {
 
   private async publishOutbox(transport: SyncTransport): Promise<{ published: number; errors: string[] }> {
     const jobs = this.options.database.getPendingSyncJobs();
-    const setup = this.options.database.getSetupData();
+    const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
     const clientId = this.options.database.getSyncRuntimeStatus().clientId;
     const errors: string[] = [];
     let published = 0;
     for (const job of jobs) {
-      if ((job.jobType === "menu_publish" && !setup.modules.qrMenu)
-          || (job.jobType === "android_snapshot" && !setup.modules.android)) {
+      if (job.jobType === "menu_publish"
+          && !hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.QR_MENU)) {
         this.options.database.completeSyncJob(job.jobKey, job.sourceRevision);
         continue;
       }

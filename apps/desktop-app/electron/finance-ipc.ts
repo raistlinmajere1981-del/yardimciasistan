@@ -11,6 +11,9 @@ import {
 export function registerFinanceIpcHandlers(options: {
   databasePath: () => string;
   assertUnlocked: () => void;
+  assertCapability?: () => void;
+  assertAccommodationReservationCapability?: () => void;
+  assertAccommodationFolioCapability?: () => void;
   onMutation?: () => void;
 }) {
   const service = () => new DesktopFinanceService(options.databasePath());
@@ -20,29 +23,34 @@ export function registerFinanceIpcHandlers(options: {
     }
     return result;
   };
+  const assertAccess = () => {
+    options.assertUnlocked();
+    options.assertCapability?.();
+  };
 
   ipcMain.handle("finance:getData", (_event, limit?: number): DesktopFinanceData => {
-    options.assertUnlocked();
+    assertAccess();
     return service().getData(limit);
   });
 
   ipcMain.handle(
     "finance:saveManualEntry",
     (_event, input: SaveManualFinanceEntryInput): DesktopFinanceMutationResult => {
-      options.assertUnlocked();
+      assertAccess();
       return finalize(service().saveManualEntry(input));
     }
   );
 
   ipcMain.handle("finance:deleteManualEntry", (_event, entryId: string): DesktopFinanceMutationResult => {
-    options.assertUnlocked();
+    assertAccess();
     return finalize(service().deleteManualEntry(entryId));
   });
 
   ipcMain.handle(
     "finance:setReservationTotal",
     (_event, input: SetReservationAgreedTotalInput): DesktopFinanceMutationResult => {
-      options.assertUnlocked();
+      assertAccess();
+      options.assertAccommodationReservationCapability?.();
       return finalize(service().setReservationAgreedTotal(input));
     }
   );
@@ -50,7 +58,8 @@ export function registerFinanceIpcHandlers(options: {
   ipcMain.handle(
     "finance:addPensionPayment",
     (_event, input: AddPensionPaymentInput): DesktopFinanceMutationResult => {
-      options.assertUnlocked();
+      assertAccess();
+      options.assertAccommodationFolioCapability?.();
       return finalize(service().addPensionPayment(input));
     }
   );

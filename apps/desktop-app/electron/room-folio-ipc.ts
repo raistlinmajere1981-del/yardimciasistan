@@ -22,6 +22,9 @@ export function registerRoomFolioIpcHandlers(options: {
   databasePath: () => string;
   assertUnlocked: () => void;
   assertCapability?: () => void;
+  canUseMenu?: () => boolean;
+  assertMenuCapability?: () => void;
+  assertOrderTransferCapability?: () => void;
   onMutation?: () => void;
 }) {
   const service = () => new DesktopRoomFolioService(options.databasePath());
@@ -38,7 +41,10 @@ export function registerRoomFolioIpcHandlers(options: {
 
   ipcMain.handle("roomFolio:getData", (): DesktopRoomFolioData => {
     assertAccess();
-    return service().getData();
+    const data = service().getData();
+    return options.canUseMenu?.() === false
+      ? { ...data, menuCategories: [], menuItems: [] }
+      : data;
   });
 
   ipcMain.handle("roomFolio:setRoomNightlyPrice", (_event, input: SetRoomNightlyPriceInput & { name?: string }): DesktopRoomFolioMutationResult => {
@@ -72,6 +78,7 @@ export function registerRoomFolioIpcHandlers(options: {
 
   ipcMain.handle("roomFolio:addMenuItem", (_event, input: AddRoomFolioMenuItemInput): DesktopRoomFolioMutationResult => {
     assertAccess();
+    options.assertMenuCapability?.();
     return finalize(service().addMenuItem(input));
   });
 
@@ -84,6 +91,7 @@ export function registerRoomFolioIpcHandlers(options: {
     assertAccess();
     const sourceTableOrderId = typeof input?.sourceTableOrderId === "string" ? input.sourceTableOrderId.trim() : "";
     if (sourceTableOrderId) {
+      options.assertOrderTransferCapability?.();
       return finalize(transferTableOrderToRoomFolio(options.databasePath(), {
         folioId: input.folioId,
         tableOrderId: sourceTableOrderId

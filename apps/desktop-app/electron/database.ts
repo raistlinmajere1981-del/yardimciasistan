@@ -3,8 +3,13 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
+  BUSINESS_CAPABILITIES,
+  canConvertRequestToReservation,
   createId,
+  getRequestReservationType,
+  isRequestTypeAvailable,
   normalizePhone,
+  type BusinessCapability,
   type CustomerGender,
   type CustomerIdentityType,
   type IdentityImageAnalysis,
@@ -22,6 +27,8 @@ import {
   ANDROID_PERMISSION_GROUP_IDS,
   ANDROID_PERMISSIONS,
   ANDROID_STAFF_PERMISSIONS,
+  androidActionAllowedByCapabilities,
+  androidEffectivePermissionsForRole,
   androidPermissionsForGroups,
   resolveAndroidActionPermission
 } from "@yardimci-asistan/sync-core";
@@ -326,6 +333,10 @@ export interface DesktopReportData {
     closedOrders: number;
     averageOrder: number;
     approvedReservations: number;
+    approvedAccommodationReservations: number;
+    approvedFoodReservations: number;
+    approvedMixedReservations: number;
+    approvedGenericReservations: number;
     newRequests: number;
     pendingTasks: number;
   };
@@ -1081,6 +1092,21 @@ export class DesktopDatabase {
     this.ensureSyncClientId();
   }
 
+  getEnabledBusinessCapabilities(): BusinessCapability[] {
+    const knownCapabilities = new Set<BusinessCapability>(Object.values(BUSINESS_CAPABILITIES));
+    const rows = this.db.prepare(`
+      SELECT business_capabilities.capability_id
+      FROM business_capabilities
+      INNER JOIN business ON business.id = business_capabilities.business_id
+      WHERE business.deleted_at = '' AND business_capabilities.is_enabled = 1
+      ORDER BY business_capabilities.capability_id ASC
+    `).all() as Array<{ capability_id?: unknown }>;
+
+    return rows
+      .map((row) => String(row.capability_id ?? "") as BusinessCapability)
+      .filter((capability) => knownCapabilities.has(capability));
+  }
+
   getDashboardData(): DesktopDashboardData {
     const settings = this.db.prepare("SELECT web_module_url FROM settings LIMIT 1").get() as { web_module_url?: string } | undefined;
 
@@ -1137,6 +1163,14 @@ export class DesktopDatabase {
     const period = normalizeDesktopReportRange(input);
     const { startDate, endDate } = period;
     const generatedAt = new Date().toISOString();
+    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
+    const customerReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
+    const restaurantReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
+    const stockReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_MENU)
+      && enabledCapabilities.has(BUSINESS_CAPABILITIES.INVENTORY);
+    const reservationCapabilityClause = reportReservationCapabilitySqlClause(enabledCapabilities);
+    const reservationDomainSql = reportReservationDomainSql();
+    const taskCapabilityClause = reportTaskCapabilitySqlClause(enabledCapabilities);
 
     const paidSummary = this.db
       .prepare(`
@@ -1232,6 +1266,30 @@ export class DesktopDatabase {
         SELECT
           COUNT(*) AS incoming,
           COALESCE(SUM(CASE WHEN status IN ('approved', 'completed') THEN 1 ELSE 0 END), 0) AS approved,
+          COALESCE(SUM(CASE
+            WHEN status IN ('approved', 'completed')
+              AND ${reservationDomainSql.hasRooms}
+              AND NOT ${reservationDomainSql.hasTables}
+            THEN 1 ELSE 0
+          END), 0) AS approved_accommodation,
+          COALESCE(SUM(CASE
+            WHEN status IN ('approved', 'completed')
+              AND ${reservationDomainSql.hasTables}
+              AND NOT ${reservationDomainSql.hasRooms}
+            THEN 1 ELSE 0
+          END), 0) AS approved_food,
+          COALESCE(SUM(CASE
+            WHEN status IN ('approved', 'completed')
+              AND ${reservationDomainSql.hasRooms}
+              AND ${reservationDomainSql.hasTables}
+            THEN 1 ELSE 0
+          END), 0) AS approved_mixed,
+          COALESCE(SUM(CASE
+            WHEN status IN ('approved', 'completed')
+              AND NOT ${reservationDomainSql.hasRooms}
+              AND NOT ${reservationDomainSql.hasTables}
+            THEN 1 ELSE 0
+          END), 0) AS approved_generic,
           COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pending,
           COALESCE(SUM(CASE WHEN status IN ('cancelled', 'rejected') THEN 1 ELSE 0 END), 0) AS cancelled_or_rejected,
           COALESCE(SUM(
@@ -1245,6 +1303,7 @@ export class DesktopDatabase {
           ), 0) AS accommodation_nights
         FROM reservations
         WHERE deleted_at = ''
+          ${reservationCapabilityClause}
           AND date(created_at, 'localtime') BETWEEN ? AND ?
       `)
       .get(startDate, endDate) as Record<string, unknown> | undefined;
@@ -1271,6 +1330,7 @@ export class DesktopDatabase {
         FROM daily_tasks
         WHERE deleted_at = ''
           AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+          ${taskCapabilityClause}
           AND (
             (due_date != '' AND date(due_date) BETWEEN ? AND ?)
             OR (due_date = '' AND date(created_at, 'localtime') BETWEEN ? AND ?)
@@ -1334,29 +1394,37 @@ export class DesktopDatabase {
     const manualMovements = this.getReportStockMovements(startDate, endDate, "manual");
     const imageMovements = this.getReportStockMovements(startDate, endDate, "image");
     const recentMovements = this.getReportStockMovements(startDate, endDate, "all");
-    const attention = this.getReportAttention();
+    const attention = this.getReportAttention(enabledCapabilities);
     const approvedReservations = Math.max(0, Number(reservationSummary?.approved ?? 0));
-    const newRequests = Math.max(0, Number(requestSummary?.incoming ?? 0));
+    const approvedAccommodationReservations = Math.max(0, Number(reservationSummary?.approved_accommodation ?? 0));
+    const approvedFoodReservations = Math.max(0, Number(reservationSummary?.approved_food ?? 0));
+    const approvedMixedReservations = Math.max(0, Number(reservationSummary?.approved_mixed ?? 0));
+    const approvedGenericReservations = Math.max(0, Number(reservationSummary?.approved_generic ?? 0));
+    const newRequests = customerReportsEnabled ? Math.max(0, Number(requestSummary?.incoming ?? 0)) : 0;
 
     return {
       period,
       generatedAt,
       summary: {
-        restaurantRevenue,
-        closedOrders,
-        averageOrder,
+        restaurantRevenue: restaurantReportsEnabled ? restaurantRevenue : 0,
+        closedOrders: restaurantReportsEnabled ? closedOrders : 0,
+        averageOrder: restaurantReportsEnabled ? averageOrder : 0,
         approvedReservations,
+        approvedAccommodationReservations,
+        approvedFoodReservations,
+        approvedMixedReservations,
+        approvedGenericReservations,
         newRequests,
         pendingTasks
       },
       restaurant: {
-        revenue: restaurantRevenue,
-        closedOrders,
-        averageOrder,
-        soldItemCount,
-        cancelledOrders,
-        dailyRevenue,
-        topItems
+        revenue: restaurantReportsEnabled ? restaurantRevenue : 0,
+        closedOrders: restaurantReportsEnabled ? closedOrders : 0,
+        averageOrder: restaurantReportsEnabled ? averageOrder : 0,
+        soldItemCount: restaurantReportsEnabled ? soldItemCount : 0,
+        cancelledOrders: restaurantReportsEnabled ? cancelledOrders : 0,
+        dailyRevenue: restaurantReportsEnabled ? dailyRevenue : [],
+        topItems: restaurantReportsEnabled ? topItems : []
       },
       pensionAndRequests: {
         incomingReservations: Math.max(0, Number(reservationSummary?.incoming ?? 0)),
@@ -1365,16 +1433,16 @@ export class DesktopDatabase {
         cancelledOrRejectedReservations: Math.max(0, Number(reservationSummary?.cancelled_or_rejected ?? 0)),
         accommodationNights: Math.max(0, Number(reservationSummary?.accommodation_nights ?? 0)),
         newRequests,
-        answeredRequests: Math.max(0, Number(requestSummary?.answered ?? 0)),
-        waitingRequests: Math.max(0, Number(requestSummary?.waiting ?? 0))
+        answeredRequests: customerReportsEnabled ? Math.max(0, Number(requestSummary?.answered ?? 0)) : 0,
+        waitingRequests: customerReportsEnabled ? Math.max(0, Number(requestSummary?.waiting ?? 0)) : 0
       },
       stock: {
-        topConsumed,
-        manualMovementCount,
-        imageMovementCount,
-        manualMovements,
-        imageMovements,
-        recentMovements
+        topConsumed: stockReportsEnabled ? topConsumed : [],
+        manualMovementCount: stockReportsEnabled ? manualMovementCount : 0,
+        imageMovementCount: stockReportsEnabled ? imageMovementCount : 0,
+        manualMovements: stockReportsEnabled ? manualMovements : [],
+        imageMovements: stockReportsEnabled ? imageMovements : [],
+        recentMovements: stockReportsEnabled ? recentMovements : []
       },
       attention
     };
@@ -1420,6 +1488,7 @@ export class DesktopDatabase {
   }
 
   getAndroidDevices(): DesktopAndroidDevice[] {
+    const enabledCapabilities = this.getEnabledBusinessCapabilities();
     const rows = this.db
       .prepare(`
         SELECT *
@@ -1437,7 +1506,7 @@ export class DesktopDatabase {
         role,
         isActive: Number(row.is_active ?? 0) === 1 && !String(row.revoked_at ?? "").trim(),
         permissionGroups: parseStoredAndroidPermissionGroups(row.permission_groups_json),
-        permissions: effectiveAndroidPermissions(role, row.permissions_json),
+        permissions: effectiveAndroidPermissions(role, row.permissions_json, enabledCapabilities),
         firstSeenAt: String(row.first_seen_at ?? ""),
         lastSeenAt: String(row.last_seen_at ?? ""),
         createdAt: String(row.created_at ?? ""),
@@ -1557,7 +1626,11 @@ export class DesktopDatabase {
       return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
     }
     if (normalizeAndroidDeviceRole(row.role) === "admin") {
-      return { ok: false, message: "Yönetici cihazlarda tüm yetkiler açıktır.", devices: this.getAndroidDevices() };
+      return {
+        ok: false,
+        message: "Yönetici cihazlarda yalnız işletmenin etkin yeteneklerine ait izinler kullanılır.",
+        devices: this.getAndroidDevices()
+      };
     }
     const result = this.db
       .prepare(`
@@ -4404,12 +4477,13 @@ export class DesktopDatabase {
       throw error;
     }
 
-    if (input.modules.qrMenu) {
+    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
+    if (enabledCapabilities.has(BUSINESS_CAPABILITIES.QR_MENU)) {
       this.queueSyncJob("menu_publish", now);
     }
-    if (input.modules.android) {
-      this.queueSyncJob("android_snapshot", now);
-    }
+    // This publication is also the persisted capability manifest consumed by
+    // hosted service endpoints. Publish a tombstone even when Android is off.
+    this.queueSyncJob("android_snapshot", now);
 
     return {
       ok: true,
@@ -4847,6 +4921,13 @@ export class DesktopDatabase {
   }
 
   createManualRequest(input: CreateManualRequestInput): CreateManualRequestResult {
+    const requestType = normalizeRequestType(input.requestType);
+    if (!isRequestTypeAvailable(this.getEnabledBusinessCapabilities(), requestType)) {
+      return {
+        ok: false,
+        message: "Bu talep türü işletmenin etkin yeteneklerinde kullanılamıyor."
+      };
+    }
     const customerName = input.customerName.trim();
     if (!customerName) {
       return {
@@ -4919,7 +5000,7 @@ export class DesktopDatabase {
       id: createId("request_"),
       customer_id: "",
       source: "manual",
-      request_type: normalizeRequestType(input.requestType) as SyncedCustomerRequest["request_type"],
+      request_type: requestType as SyncedCustomerRequest["request_type"],
       status: "new",
       customer_name: customerName,
       customer_phone: phone.e164,
@@ -5319,10 +5400,20 @@ export class DesktopDatabase {
       };
     }
 
+    const requestType = String(request.request_type ?? "");
+    const reservationType = getRequestReservationType(requestType);
+    if (!reservationType || !canConvertRequestToReservation(this.getEnabledBusinessCapabilities(), requestType)) {
+      return {
+        ok: false,
+        message: reservationType
+          ? "Bu rezervasyon türü işletmenin etkin yeteneklerinde kullanılamıyor."
+          : "Bu talep türü rezervasyona dönüştürülemez."
+      };
+    }
+
     const existingReservation = this.db.prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1").get(id) as { id?: string } | undefined;
     const now = new Date().toISOString();
     const reservationId = existingReservation?.id || createId("reservation_");
-    const reservationType = getReservationTypeForRequest(String(request.request_type ?? ""));
     const title = buildReservationTitle(request, reservationType);
     let customerId = "";
 
@@ -6314,19 +6405,28 @@ export class DesktopDatabase {
     });
   }
 
-  private getReportAttention(): DesktopReportData["attention"] {
+  private getReportAttention(
+    enabledCapabilities: ReadonlySet<BusinessCapability>
+  ): DesktopReportData["attention"] {
     const today = formatLocalIsoDate(new Date());
-    const pendingRequests = this.getScalarCount(`
+    const customerReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
+    const restaurantReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
+    const stockReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_MENU)
+      && enabledCapabilities.has(BUSINESS_CAPABILITIES.INVENTORY);
+    const reservationCapabilityClause = reportReservationCapabilitySqlClause(enabledCapabilities);
+    const taskCapabilityClause = reportTaskCapabilitySqlClause(enabledCapabilities);
+    const pendingRequests = customerReportsEnabled ? this.getScalarCount(`
       SELECT COUNT(*) AS count
       FROM requests
       WHERE deleted_at = ''
         AND status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress')
-    `);
+    `) : 0;
     const pendingReservations = this.getScalarCount(`
       SELECT COUNT(*) AS count
       FROM reservations
       WHERE deleted_at = ''
         AND status = 'pending'
+        ${reservationCapabilityClause}
     `);
     const paymentWaitingRows = this.db
       .prepare(`
@@ -6341,12 +6441,13 @@ export class DesktopDatabase {
         ORDER BY tables.sort_order ASC, tables.name COLLATE NOCASE ASC
       `)
       .all() as Array<Record<string, unknown>>;
-    const paymentWaitingTables = paymentWaitingRows.length;
+    const paymentWaitingTables = restaurantReportsEnabled ? paymentWaitingRows.length : 0;
     const incompleteTasks = this.getScalarCount(`
       SELECT COUNT(*) AS count
       FROM daily_tasks
       WHERE deleted_at = ''
         AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+        ${taskCapabilityClause}
     `);
     const overdueTasks = this.getScalarCount(
       `
@@ -6354,6 +6455,7 @@ export class DesktopDatabase {
         FROM daily_tasks
         WHERE deleted_at = ''
           AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+          ${taskCapabilityClause}
           AND due_date != ''
           AND date(due_date) < ?
       `,
@@ -6365,6 +6467,7 @@ export class DesktopDatabase {
         FROM daily_tasks
         WHERE deleted_at = ''
           AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
+          ${taskCapabilityClause}
         ORDER BY
           CASE WHEN due_date != '' AND date(due_date) < ? THEN 0 ELSE 1 END,
           CASE WHEN due_date = '' THEN 1 ELSE 0 END,
@@ -6396,8 +6499,8 @@ export class DesktopDatabase {
       const minimum = nullableNumber(row.stock_min_quantity);
       return quantity >= consumption && minimum !== null && quantity <= minimum;
     });
-    const outOfStockItems = outOfStockRows.length;
-    const lowStockItems = lowStockRows.length;
+    const outOfStockItems = stockReportsEnabled ? outOfStockRows.length : 0;
+    const lowStockItems = stockReportsEnabled ? lowStockRows.length : 0;
     const items: DesktopReportAttentionItem[] = [];
 
     if (pendingRequests > 0) {
@@ -6441,21 +6544,21 @@ export class DesktopDatabase {
         detail: "Açık günlük işleri planlanan sırayla tamamlayın."
       });
     }
-    for (const row of outOfStockRows.slice(0, 4)) {
+    for (const row of (stockReportsEnabled ? outOfStockRows : []).slice(0, 4)) {
       items.push({
         kind: "out_of_stock",
         title: `${String(row.name ?? "Ürün")} stokta yok`,
         detail: "Satış için gereken en az birim stok bulunmuyor."
       });
     }
-    if (outOfStockRows.length > 4) {
+    if (stockReportsEnabled && outOfStockRows.length > 4) {
       items.push({
         kind: "out_of_stock",
         title: `${outOfStockRows.length - 4} ürün daha stokta yok`,
         detail: "Stok listesindeki diğer tükenen ürünleri kontrol edin."
       });
     }
-    for (const row of lowStockRows.slice(0, 4)) {
+    for (const row of (stockReportsEnabled ? lowStockRows : []).slice(0, 4)) {
       const unit = normalizeMenuStockUnit(row.stock_unit);
       items.push({
         kind: "low_stock",
@@ -6463,7 +6566,7 @@ export class DesktopDatabase {
         detail: `${formatReportStockQuantity(Number(row.stock_quantity ?? 0), unit)} kaldı.`
       });
     }
-    if (lowStockRows.length > 4) {
+    if (stockReportsEnabled && lowStockRows.length > 4) {
       items.push({
         kind: "low_stock",
         title: `${lowStockRows.length - 4} ürün daha minimum stok seviyesinde`,
@@ -6868,7 +6971,12 @@ export class DesktopDatabase {
     if (isAndroidAdminOnlyAction(action.action_type) && role !== "admin") {
       return { ok: false, message: "Müşteri yönetimi ve kayıt silme işlemleri yalnız yönetici cihazlarda kullanılabilir." };
     }
-    const permissions = effectiveAndroidPermissions(role, device.permissions_json);
+    const enabledCapabilities = this.getEnabledBusinessCapabilities();
+    const capabilityContext = this.getAndroidActionCapabilityContext(action);
+    if (!androidActionAllowedByCapabilities(action.action_type, enabledCapabilities, capabilityContext)) {
+      return { ok: false, message: "Bu işlem işletmenin etkin yeteneklerinde kullanılamıyor." };
+    }
+    const permissions = effectiveAndroidPermissions(role, device.permissions_json, enabledCapabilities);
     if (!permissions.includes(requiredPermission)) {
       return {
         ok: false,
@@ -6884,6 +6992,61 @@ export class DesktopDatabase {
       return { ok: false, message: "Bu cihazın müşteri yönetimi yetkisi yok." };
     }
     return { ok: true, message: "Telefon işlemi yetkilendirildi." };
+  }
+
+  private getAndroidActionCapabilityContext(action: AndroidSyncAction) {
+    const context = {
+      requestType: "",
+      reservationType: "",
+      reservationRoomIds: [] as string[],
+      reservationTableIds: [] as string[],
+      taskType: String(action.payload.task_type ?? "").trim(),
+      relatedType: String(action.payload.related_type ?? "").trim(),
+      relatedReservationType: "",
+      relatedReservationRoomIds: [] as string[],
+      relatedReservationTableIds: [] as string[],
+      payload: action.payload
+    };
+
+    if (action.action_type === "customer_request_convert_to_reservation") {
+      const requestId = androidPayloadString(action.payload, "request_id");
+      const request = requestId
+        ? this.db.prepare("SELECT request_type FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { request_type?: unknown } | undefined
+        : undefined;
+      context.requestType = String(request?.request_type ?? "");
+    }
+
+    if (["reservation_approve", "reservation_reject", "reservation_cancel"].includes(action.action_type)) {
+      const reservationId = androidPayloadString(action.payload, "reservation_id");
+      const reservation = reservationId
+        ? this.db.prepare("SELECT reservation_type, room_ids_json, table_ids_json FROM reservations WHERE id = ? AND deleted_at = ''").get(reservationId) as Record<string, unknown> | undefined
+        : undefined;
+      context.reservationType = String(reservation?.reservation_type ?? "");
+      context.reservationRoomIds = this.parseStringArray(reservation?.room_ids_json);
+      context.reservationTableIds = this.parseStringArray(reservation?.table_ids_json);
+    }
+
+    if (action.action_type.startsWith("daily_task_")) {
+      const taskId = action.action_type === "daily_task_create"
+        ? ""
+        : androidPayloadString(action.payload, "task_id");
+      const task = taskId
+        ? this.db.prepare("SELECT task_type, related_type, related_id FROM daily_tasks WHERE id = ? AND deleted_at = ''").get(taskId) as Record<string, unknown> | undefined
+        : undefined;
+      context.taskType = String(task?.task_type ?? context.taskType).trim();
+      context.relatedType = String(task?.related_type ?? context.relatedType).trim();
+      if (context.relatedType === "reservation") {
+        const relatedId = String(task?.related_id ?? action.payload.related_id ?? "").trim();
+        const reservation = relatedId
+          ? this.db.prepare("SELECT reservation_type, room_ids_json, table_ids_json FROM reservations WHERE id = ? AND deleted_at = ''").get(relatedId) as Record<string, unknown> | undefined
+          : undefined;
+        context.relatedReservationType = String(reservation?.reservation_type ?? "");
+        context.relatedReservationRoomIds = this.parseStringArray(reservation?.room_ids_json);
+        context.relatedReservationTableIds = this.parseStringArray(reservation?.table_ids_json);
+      }
+    }
+
+    return context;
   }
 
   private applyAndroidActionInTransaction(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
@@ -7330,7 +7493,7 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
       .run(status, updatedAt, requestId);
-    if (status === "answered") {
+    if (status === "answered" && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.WHATSAPP)) {
       this.markPreparedWhatsAppMessagesSentInTransaction(requestId, updatedAt);
     }
     this.insertAndroidActionEvent(action, "request.status_changed", "request", requestId, {
@@ -7357,11 +7520,16 @@ export class DesktopDatabase {
     }
     const updatedAt = nextMutationTimestamp(request.updated_at, now);
 
+    const requestType = String(request.request_type ?? "");
+    const reservationType = getRequestReservationType(requestType);
+    if (!reservationType || !canConvertRequestToReservation(this.getEnabledBusinessCapabilities(), requestType)) {
+      return { ok: false, message: "Bu talep türü etkin bir rezervasyon alanına dönüştürülemez." };
+    }
+
     const existingReservation = this.db
       .prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1")
       .get(requestId) as { id?: string } | undefined;
     const reservationId = existingReservation?.id || createAndroidEntityId("reservation_", action.id);
-    const reservationType = getReservationTypeForRequest(String(request.request_type ?? ""));
     const customerId = this.ensureCustomerForRequest(request, now);
     this.db
       .prepare(`
@@ -9129,21 +9297,23 @@ function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPermissio
   return Object.fromEntries(ANDROID_PERMISSION_GROUP_IDS.map((groupId) => [groupId, record[groupId]])) as AndroidPermissionGroups;
 }
 
-function effectiveAndroidPermissions(role: AndroidDeviceRole, value: unknown): AndroidPermission[] {
-  if (role === "admin") {
-    return androidPermissionsForRole("admin");
-  }
+function effectiveAndroidPermissions(
+  role: AndroidDeviceRole,
+  value: unknown,
+  capabilities: Iterable<BusinessCapability>
+): AndroidPermission[] {
+  let storedPermissions: AndroidPermission[] = [];
   try {
     const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
+    if (Array.isArray(parsed)) {
+      storedPermissions = [...new Set(parsed
+        .map((permission) => String(permission).trim())
+        .filter((permission): permission is AndroidPermission => ANDROID_PERMISSION_SET.has(permission)))];
     }
-    return [...new Set(parsed
-      .map((permission) => String(permission).trim())
-      .filter((permission): permission is AndroidPermission => ANDROID_PERMISSION_SET.has(permission)))];
   } catch {
-    return [];
+    storedPermissions = [];
   }
+  return androidEffectivePermissionsForRole(role, storedPermissions, capabilities);
 }
 
 function normalizeAndroidTimestamp(value: unknown, fallback: string): string {
@@ -9854,7 +10024,7 @@ function normalizeUrl(value: string) {
 }
 
 function normalizeBusinessType(value: string) {
-  const supported = new Set(["pension", "restaurant", "pension_restaurant", "cafe", "other"]);
+  const supported = new Set(["pension", "restaurant", "pension_restaurant", "cafe", "market", "other"]);
   return supported.has(value) ? value : "pension_restaurant";
 }
 
@@ -9869,18 +10039,6 @@ function slugifyBusinessName(value: string) {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "") || "firma"
   );
-}
-
-function getReservationTypeForRequest(requestType: string) {
-  if (requestType === "pension_reservation") {
-    return "room";
-  }
-
-  if (requestType === "restaurant_reservation" || requestType === "breakfast_request") {
-    return "table";
-  }
-
-  return "other";
 }
 
 function buildReservationTitle(request: Record<string, unknown>, reservationType: string) {
@@ -9944,6 +10102,79 @@ function enumerateIsoDateRange(startDate: string, endDate: string): string[] {
   return Array.from({ length: dayCount + 1 }, (_value, index) => shiftIsoDate(startDate, index));
 }
 
+function reportReservationCapabilitySqlClause(
+  enabledCapabilities: ReadonlySet<BusinessCapability>
+): string {
+  const accommodation = enabledCapabilities.has(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS);
+  const foodService = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_RESERVATIONS);
+  if (accommodation && foodService) {
+    return "";
+  }
+  const domain = reportReservationDomainSql();
+  if (accommodation) {
+    return `AND NOT ${domain.hasTables}`;
+  }
+  if (foodService) {
+    return `AND NOT ${domain.hasRooms}`;
+  }
+  return "AND 1 = 0";
+}
+
+function reportReservationDomainSql(alias = ""): { hasRooms: string; hasTables: string } {
+  const column = (name: string) => alias ? `${alias}.${name}` : name;
+  const hasJsonItems = (name: string) => `json_array_length(CASE
+    WHEN json_valid(${column(name)}) THEN ${column(name)}
+    ELSE '[]'
+  END) > 0`;
+  return {
+    hasRooms: `(${column("reservation_type")} IN ('room', 'room_and_table', 'mixed') OR ${hasJsonItems("room_ids_json")})`,
+    hasTables: `(${column("reservation_type")} IN ('table', 'breakfast', 'room_and_table', 'mixed') OR ${hasJsonItems("table_ids_json")})`
+  };
+}
+
+function reportTaskCapabilitySqlClause(
+  enabledCapabilities: ReadonlySet<BusinessCapability>
+): string {
+  if (!enabledCapabilities.has(BUSINESS_CAPABILITIES.TASKS)) {
+    return "AND 1 = 0";
+  }
+  const accommodation = enabledCapabilities.has(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS) ? 1 : 0;
+  const foodService = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_TABLES) ? 1 : 0;
+  if (accommodation === 1 && foodService === 1) return "";
+  const reservationDomain = reportReservationDomainSql("task_reservation");
+
+  // Reservation-linked tasks use the reservation's actual domain before the
+  // generic task_type fallback, matching the shared/Android classifiers.
+  return `AND CASE
+    WHEN related_type = 'reservation' AND EXISTS (
+      SELECT 1 FROM reservations AS task_reservation
+      WHERE task_reservation.id = daily_tasks.related_id
+        AND task_reservation.deleted_at = ''
+        AND ${reservationDomain.hasRooms}
+        AND ${reservationDomain.hasTables}
+    ) THEN ${accommodation === 1 && foodService === 1 ? 1 : 0}
+    WHEN related_type = 'reservation' AND EXISTS (
+      SELECT 1 FROM reservations AS task_reservation
+      WHERE task_reservation.id = daily_tasks.related_id
+        AND task_reservation.deleted_at = ''
+        AND ${reservationDomain.hasRooms}
+        AND NOT ${reservationDomain.hasTables}
+    ) THEN ${accommodation}
+    WHEN related_type = 'reservation' AND EXISTS (
+      SELECT 1 FROM reservations AS task_reservation
+      WHERE task_reservation.id = daily_tasks.related_id
+        AND task_reservation.deleted_at = ''
+        AND ${reservationDomain.hasTables}
+        AND NOT ${reservationDomain.hasRooms}
+    ) THEN ${foodService}
+    WHEN task_type IN ('check_in', 'check_out', 'room_cleaning', 'room_maintenance', 'reservation', 'manual_pension')
+      OR related_type = 'room' THEN ${accommodation}
+    WHEN task_type IN ('table_reservation', 'breakfast', 'service', 'table_service', 'restaurant', 'table_check', 'payment', 'manual_restaurant')
+      OR related_type = 'table' THEN ${foodService}
+    ELSE 1
+  END = 1`;
+}
+
 function shiftIsoDate(value: string, days: number): string {
   const date = new Date(`${value}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() + days);
@@ -9991,6 +10222,10 @@ function toAndroidReportSnapshot(
       closed_orders: report.summary.closedOrders,
       average_order: report.summary.averageOrder,
       approved_reservations: report.summary.approvedReservations,
+      approved_accommodation_reservations: report.summary.approvedAccommodationReservations,
+      approved_food_reservations: report.summary.approvedFoodReservations,
+      approved_mixed_reservations: report.summary.approvedMixedReservations,
+      approved_generic_reservations: report.summary.approvedGenericReservations,
       new_requests: report.summary.newRequests,
       attention_count: report.attention.totalCount
     },

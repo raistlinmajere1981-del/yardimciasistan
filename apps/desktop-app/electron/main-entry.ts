@@ -108,9 +108,9 @@ function prepareRestoredStateForFullRepublish() {
     if (hasPersistedBusinessCapability(restoredDatabasePath, BUSINESS_CAPABILITIES.QR_MENU)) {
       database.queueSyncJob("menu_publish", now);
     }
-    if (hasPersistedBusinessCapability(restoredDatabasePath, BUSINESS_CAPABILITIES.ANDROID)) {
-      database.queueSyncJob("android_snapshot", now);
-    }
+    // The projected snapshot is also the hosted capability manifest; when
+    // Android is disabled it deliberately publishes data/permission tombstones.
+    database.queueSyncJob("android_snapshot", now);
   } finally {
     database.close();
   }
@@ -140,19 +140,24 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
   setImmediate(() => {
     const databasePath = () => path.join(userDataPath(), "yardimci-asistan.sqlite");
 
-    const publishCommittedMutation = () => {
+    const publishCommittedMutation = (capabilitiesChanged = false) => {
       // Short-lived domain services cannot reach main.ts's in-memory
-      // SyncCoordinator directly. Queue Android publication only when the
-      // persisted runtime capability is enabled; legacy settings booleans are
-      // no longer consulted here.
+      // SyncCoordinator directly. Domain mutations only affect the Android
+      // publication while that service is active; setup/restore separately
+      // queue the tombstone that clears stale hosted data when it is disabled.
       const database = new DesktopDatabase({
         appPath: app.getAppPath(),
         userDataPath: userDataPath()
       });
       try {
         database.initialize();
-        if (hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.ANDROID)) {
+        if (capabilitiesChanged
+            || hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.ANDROID)) {
           database.queueSyncJob("android_snapshot");
+        }
+        if (capabilitiesChanged
+            && hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.QR_MENU)) {
+          database.queueSyncJob("menu_publish");
         }
         const dashboard = database.getDashboardData();
         for (const window of BrowserWindow.getAllWindows()) {
@@ -170,7 +175,9 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
     registerBusinessCapabilityIpcHandlers({
       databasePath,
       assertUnlocked: () => undefined,
-      onMutation: publishCommittedMutation
+      // Capability changes must always publish the hosted manifest, including
+      // the tombstone created while service.android is being switched off.
+      onMutation: () => publishCommittedMutation(true)
     });
 
     registerFinanceIpcHandlers({
@@ -179,6 +186,21 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
       // these channels to renderer code. The handler remains internal-only;
       // nodeIntegration is disabled in the renderer.
       assertUnlocked: () => undefined,
+      assertCapability: () => assertPersistedBusinessCapability(
+        databasePath(),
+        BUSINESS_CAPABILITIES.FINANCE,
+        "Finans yönetimi bu işletme profilinde etkin değil."
+      ),
+      assertAccommodationReservationCapability: () => assertPersistedBusinessCapability(
+        databasePath(),
+        BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS,
+        "Konaklama bedeli bu işletmede etkin değil."
+      ),
+      assertAccommodationFolioCapability: () => assertPersistedBusinessCapability(
+        databasePath(),
+        BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO,
+        "Konaklama tahsilatı bu işletmede etkin değil."
+      ),
       onMutation: publishCommittedMutation
     });
 
@@ -189,6 +211,17 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
         databasePath(),
         BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO,
         "Oda hesabı bu işletme profilinde etkin değil."
+      ),
+      canUseMenu: () => hasPersistedBusinessCapability(databasePath(), BUSINESS_CAPABILITIES.FOOD_MENU),
+      assertMenuCapability: () => assertPersistedBusinessCapability(
+        databasePath(),
+        BUSINESS_CAPABILITIES.FOOD_MENU,
+        "Menüden oda hesabına ürün ekleme bu işletmede etkin değil."
+      ),
+      assertOrderTransferCapability: () => assertPersistedBusinessCapability(
+        databasePath(),
+        BUSINESS_CAPABILITIES.FOOD_ORDERS,
+        "Restoran adisyonu aktarımı bu işletmede etkin değil."
       ),
       onMutation: publishCommittedMutation
     });

@@ -10,7 +10,18 @@ import {
   verifyGoogleAiStudioVisionModel
 } from "@yardimci-asistan/ai-core";
 import type { AIProviderName } from "@yardimci-asistan/ai-core";
-import type { IdentityImageAnalysis, StockImageAnalysis, StockImageApplyLine } from "@yardimci-asistan/shared";
+import {
+  BUSINESS_CAPABILITIES,
+  getOperationalTaskDomain,
+  getRequestTypeRequiredCapability,
+  hasBusinessCapability,
+  isOperationalTaskAvailable,
+  isReservationTypeAvailable,
+  type BusinessCapability,
+  type IdentityImageAnalysis,
+  type StockImageAnalysis,
+  type StockImageApplyLine
+} from "@yardimci-asistan/shared";
 import {
   markAndroidActionResult,
   markRequestsSynced,
@@ -82,6 +93,11 @@ import {
   type GenerateDesktopReportAiResult
 } from "./database";
 import { DesktopFinanceService } from "./finance";
+import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
+import {
+  applyBusinessProfileCapabilities,
+  setBusinessCapability
+} from "./business-capability-store";
 import { DesktopRoomFolioService, type DesktopRoomFolio } from "./room-folio";
 import {
   buildReportAiMessages,
@@ -120,6 +136,100 @@ const stockImageAnalysisControllers = new Map<string, AbortController>();
 const STOCK_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const APP_LOCK_FAILURE_LIMIT = 5;
 const APP_LOCK_RETRY_DELAY_MS = 30_000;
+const C = BUSINESS_CAPABILITIES;
+
+function enabledBusinessCapabilities(): BusinessCapability[] {
+  return getDatabase().getEnabledBusinessCapabilities();
+}
+
+function assertDesktopCapability(capability: BusinessCapability, message = "Bu işlem işletmenin etkin yeteneklerinde kullanılamıyor.") {
+  if (!hasBusinessCapability(enabledBusinessCapabilities(), capability)) {
+    throw new Error(message);
+  }
+}
+
+function assertDesktopRequestType(requestType: string) {
+  assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+  const requiredCapability = getRequestTypeRequiredCapability(requestType);
+  if (requiredCapability) {
+    assertDesktopCapability(requiredCapability, "Bu talep türü işletmenin etkin yeteneklerinde kullanılamıyor.");
+  }
+}
+
+function assertMenuItemSubfeatureMutation(input: SaveMenuItemInput) {
+  const capabilities = new Set(enabledBusinessCapabilities());
+  const itemId = input.id?.trim();
+  const existing = itemId
+    ? getDatabase().getPublishedMenu().items.find((item) => item.id === itemId)
+    : undefined;
+  const baseline = existing ?? {
+    stock_quantity: null,
+    stock_min_quantity: null,
+    stock_unit: "piece",
+    stock_consumption_quantity: 1,
+    hide_when_out_of_stock: false,
+    stock_note: null
+  };
+  const stockChanged = !nullableNumberEqual(input.stock_quantity, baseline.stock_quantity)
+    || !nullableNumberEqual(input.stock_min_quantity, baseline.stock_min_quantity)
+    || input.stock_unit !== baseline.stock_unit
+    || Number(input.stock_consumption_quantity) !== Number(baseline.stock_consumption_quantity)
+    || String(input.stock_note ?? "").trim() !== String(baseline.stock_note ?? "").trim();
+  if (stockChanged && !capabilities.has(C.INVENTORY)) {
+    throw new Error("Stok alanları bu işletmede etkin değil.");
+  }
+  if (Boolean(input.hide_when_out_of_stock) !== Boolean(baseline.hide_when_out_of_stock)
+      && (!capabilities.has(C.INVENTORY) || !capabilities.has(C.QR_MENU))) {
+    throw new Error("Stokta yokken QR menüden gizleme bu işletmede etkin değil.");
+  }
+}
+
+function nullableNumberEqual(left: unknown, right: unknown): boolean {
+  const leftEmpty = left === null || left === undefined;
+  const rightEmpty = right === null || right === undefined;
+  if (leftEmpty || rightEmpty) return leftEmpty && rightEmpty;
+  return Number.isFinite(Number(left)) && Number(left) === Number(right);
+}
+
+function assertDesktopReservationType(
+  reservationType: string,
+  roomIds: readonly unknown[] = [],
+  tableIds: readonly unknown[] = []
+) {
+  if (!isReservationTypeAvailable(enabledBusinessCapabilities(), reservationType, { roomIds, tableIds })) {
+    throw new Error("Bu rezervasyon alanı işletmenin etkin yeteneklerinde kullanılamıyor.");
+  }
+}
+
+function assertDesktopTaskScope(
+  taskType: string,
+  relatedType = "",
+  relatedReservationType = "",
+  relatedReservationRoomIds: readonly unknown[] = [],
+  relatedReservationTableIds: readonly unknown[] = []
+) {
+  const capabilities = enabledBusinessCapabilities();
+  const reservationContext = { roomIds: relatedReservationRoomIds, tableIds: relatedReservationTableIds };
+  if (!isOperationalTaskAvailable(capabilities, taskType, relatedType, relatedReservationType, reservationContext)) {
+    const domain = getOperationalTaskDomain(taskType, relatedType, relatedReservationType, reservationContext);
+    if (domain === "accommodation") {
+      throw new Error("Konaklama işi bu işletmenin etkin yeteneklerinde kullanılamıyor.");
+    }
+    if (domain === "food_service") {
+      throw new Error("Restoran işi bu işletmenin etkin yeteneklerinde kullanılamıyor.");
+    }
+    throw new Error("Günlük işler bu işletmenin etkin yeteneklerinde kullanılamıyor.");
+  }
+}
+
+function isWhatsAppUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return ["wa.me", "www.wa.me", "web.whatsapp.com", "api.whatsapp.com"].includes(url.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 interface AndroidActionProcessSummary {
   pulled: number;
@@ -200,7 +310,9 @@ function createMainWindow() {
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) {
-      void shell.openExternal(url);
+      if (!isWhatsAppUrl(url) || hasBusinessCapability(enabledBusinessCapabilities(), C.WHATSAPP)) {
+        void shell.openExternal(url);
+      }
     }
 
     return { action: "deny" };
@@ -358,6 +470,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle("report:getData", (_event, input: GenerateDesktopReportAiInput["range"]): DesktopReportQueryResult => {
     assertAppSessionUnlocked();
+    assertDesktopCapability(C.REPORTS, "Raporlar bu işletmede etkin değil.");
     try {
       return { ok: true, data: getDatabase().getReportData(input) };
     } catch (error) {
@@ -371,6 +484,8 @@ function registerIpcHandlers() {
   ipcMain.handle(
     "report:generateAiComment",
     async (_event, input: GenerateDesktopReportAiInput): Promise<GenerateDesktopReportAiResult> => {
+      assertDesktopCapability(C.REPORTS, "Raporlar bu işletmede etkin değil.");
+      assertDesktopCapability(C.AI, "AI rapor yorumu bu işletmede etkin değil.");
       return generateDesktopReportAiComment(input);
     }
   );
@@ -457,6 +572,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("sync:pushMenu", async (): Promise<PushMenuResult> => {
+    assertDesktopCapability(C.QR_MENU, "QR menü yayını bu işletmede etkin değil.");
     const setup = getDatabase().getSetupData();
     const result = await pushMenu({
       ...getWebSyncConfig(setup),
@@ -485,6 +601,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("sync:pushAndroidSnapshot", async (): Promise<PushAndroidSnapshotResult> => {
+    assertDesktopCapability(C.ANDROID, "Android yayını bu işletmede etkin değil.");
     return publishCurrentAndroidSnapshot();
   });
 
@@ -493,26 +610,37 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("menu:saveCategory", (_event, input: SaveMenuCategoryInput): DesktopMenuSaveResult => {
+    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     return getDatabase().saveMenuCategory(input);
   });
 
   ipcMain.handle("menu:saveItem", (_event, input: SaveMenuItemInput): DesktopMenuSaveResult => {
+    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    assertMenuItemSubfeatureMutation(input);
     return getDatabase().saveMenuItem(input);
   });
 
   ipcMain.handle("menu:deleteCategory", (_event, categoryId: unknown): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     return finalizeDesktopRecordDeletion(getDatabase().deleteMenuCategory(String(categoryId ?? "")));
   });
 
   ipcMain.handle("menu:deleteItem", (_event, itemId: unknown): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     return finalizeDesktopRecordDeletion(getDatabase().deleteMenuItem(String(itemId ?? "")));
   });
 
   ipcMain.handle("stockImage:analyze", async (_event, value: unknown): Promise<DesktopStockImageAnalyzeResult> => {
+    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    assertDesktopCapability(C.AI, "AI stok analizi bu işletmede etkin değil.");
+    assertDesktopCapability(C.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
     return analyzeDesktopStockImage(value);
   });
 
   ipcMain.handle("stockImage:cancel", (_event, importIdValue: unknown): boolean => {
+    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    assertDesktopCapability(C.AI, "AI stok analizi bu işletmede etkin değil.");
+    assertDesktopCapability(C.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
     const importId = normalizeStockImageImportId(String(importIdValue ?? ""));
     if (!importId) {
       return false;
@@ -524,6 +652,9 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("stockImage:apply", (_event, value: unknown): DesktopStockImageApplyResult => {
+    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    assertDesktopCapability(C.AI, "AI stok analizi bu işletmede etkin değil.");
+    assertDesktopCapability(C.INVENTORY, "Stok yönetimi bu işletmede etkin değil.");
     const input = parseStockImageApplyInput(value);
     if (!input) {
       return { ok: false, message: "Görsel stok taslağı geçersiz." };
@@ -569,25 +700,30 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
+    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     const result = getDatabase().setAndroidDeviceRole(String(deviceId ?? ""), String(role ?? ""));
     return finalizeAndroidDeviceMutation(result);
   });
 
   ipcMain.handle("androidDevice:setPermissionGroups", (_event, deviceId: unknown, groups: unknown): DesktopAndroidDeviceMutationResult => {
+    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     const result = getDatabase().setAndroidDevicePermissionGroups(String(deviceId ?? ""), groups);
     return finalizeAndroidDeviceMutation(result);
   });
 
   ipcMain.handle("androidDevice:setActive", (_event, deviceId: unknown, active: unknown): DesktopAndroidDeviceMutationResult => {
+    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     const result = getDatabase().setAndroidDeviceActive(String(deviceId ?? ""), active === true);
     return finalizeAndroidDeviceMutation(result);
   });
 
   ipcMain.handle("androidDevice:resetPermissions", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
+    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     return finalizeAndroidDeviceMutation(getDatabase().resetAndroidDevicePermissions(String(deviceId ?? "")));
   });
 
   ipcMain.handle("androidDevice:revoke", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
+    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     return finalizeAndroidDeviceMutation(getDatabase().revokeAndroidDevice(String(deviceId ?? "")));
   });
 
@@ -610,6 +746,27 @@ function registerIpcHandlers() {
     if (!localResult.ok) {
       return localResult;
     }
+
+    // The selected profile is only a preset; persist its resulting capability
+    // set (while retaining explicit domain overrides) before any runtime reads
+    // setup state again. Service switches are explicit operator choices.
+    applyBusinessProfileCapabilities(getDatabase().databasePath, input.businessType, {
+      preserveUserOverrides: true
+    });
+    for (const [capability, enabled] of [
+      [C.WHATSAPP, input.modules.whatsapp],
+      [C.ANDROID, input.modules.android],
+      [C.AI, input.aiEnabled]
+    ] as const) {
+      setBusinessCapability(getDatabase().databasePath, { capability, enabled });
+    }
+    const setupCapabilities = new Set(enabledBusinessCapabilities());
+    if (setupCapabilities.has(C.QR_MENU)) {
+      getDatabase().queueSyncJob("menu_publish");
+    }
+    // The hosted module consumes this projection as its capability manifest,
+    // so service.android=false still requires a tombstone publication.
+    getDatabase().queueSyncJob("android_snapshot");
 
     const aiWebSync = await publishSavedAiSettings();
     getSyncCoordinator().restart();
@@ -776,76 +933,113 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("request:createManual", (_event, input: CreateManualRequestInput): CreateManualRequestResult => {
+    assertDesktopRequestType(String(input?.requestType ?? ""));
     return getDatabase().createManualRequest(input);
   });
 
   ipcMain.handle("request:convertToReservation", (_event, requestId: string): RequestReservationConversionResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    const request = getDatabase().getRequestById(requestId);
+    assertDesktopRequestType(request?.request_type ?? "");
     return getDatabase().convertRequestToReservation(requestId);
   });
 
   ipcMain.handle("request:updateStatus", (_event, input: UpdateRequestStatusInput): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
     return getDatabase().updateRequestStatus(input);
   });
 
   ipcMain.handle("request:delete", (_event, requestId: unknown): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
     return finalizeDesktopRecordDeletion(getDatabase().deleteRequest(String(requestId ?? "")));
   });
 
   ipcMain.handle("customer:delete", (_event, customerId: unknown): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     return finalizeDesktopRecordDeletion(getDatabase().deleteCustomer(String(customerId ?? "")));
   });
 
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     return finalizeDesktopCustomerMutation(getDatabase().saveCustomer(input));
   });
 
   ipcMain.handle("customer:assignRoom", (_event, input: AssignCustomerRoomInput): DesktopCustomerMutationResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    assertDesktopCapability(C.ACCOMMODATION_STAYS, "Konaklama ataması bu işletmede etkin değil.");
     return finalizeDesktopCustomerMutation(getDatabase().assignCustomerToRoom(input));
   });
 
   ipcMain.handle(
     "customer:updateRoomStayStatus",
     (_event, input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult => {
+      assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+      assertDesktopCapability(C.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
       return finalizeDesktopCustomerMutation(getDatabase().updateCustomerRoomStayStatus(input));
     }
   );
 
   ipcMain.handle(
     "customer:analyzeIdentityImage",
-    async (_event, value: unknown): Promise<DesktopIdentityImageAnalyzeResult> => analyzeDesktopIdentityImage(value)
+    async (_event, value: unknown): Promise<DesktopIdentityImageAnalyzeResult> => {
+      assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+      assertDesktopCapability(C.AI, "AI kimlik analizi bu işletmede etkin değil.");
+      return analyzeDesktopIdentityImage(value);
+    }
   );
 
   ipcMain.handle("whatsapp:markMessageSent", (_event, input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
     return getDatabase().markWhatsAppMessageSent(input);
   });
 
   ipcMain.handle("whatsapp:deleteMessage", (_event, input: DeleteWhatsAppMessageInput): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
     return finalizeDesktopRecordDeletion(getDatabase().deleteWhatsAppMessage(input));
   });
 
   ipcMain.handle("room:updateStatus", (_event, input: UpdateRoomStatusInput): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.ACCOMMODATION_ROOMS, "Oda yönetimi bu işletmede etkin değil.");
+    if (String(input?.status ?? "").trim() === "reserved") {
+      assertDesktopCapability(C.ACCOMMODATION_RESERVATIONS, "Odayı rezerve etmek için konaklama rezervasyonları etkin olmalı.");
+    }
     return getDatabase().updateRoomStatus(input);
   });
 
   ipcMain.handle("table:updateStatus", (_event, input: UpdateTableStatusInput): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.FOOD_TABLES, "Masa yönetimi bu işletmede etkin değil.");
+    const requestedStatus = String(input?.status ?? "").trim();
+    if (requestedStatus === "reserved") {
+      assertDesktopCapability(C.FOOD_RESERVATIONS, "Masayı rezerve etmek için restoran rezervasyonları etkin olmalı.");
+    }
+    if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(requestedStatus)) {
+      assertDesktopCapability(C.FOOD_ORDERS, "Hesap durumu için sipariş yönetimi etkin olmalı.");
+    }
     return getDatabase().updateTableStatus(input);
   });
 
   ipcMain.handle("tableOrder:list", (): DesktopTableOrder[] => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     return getDatabase().listTableOrders();
   });
 
   ipcMain.handle("tableOrder:getActive", (_event, tableId: unknown): DesktopTableOrder | null => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     return typeof tableId === "string" ? getDatabase().getActiveTableOrder(tableId) : null;
   });
 
   ipcMain.handle("tableOrder:open", (_event, tableId: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     return typeof tableId === "string"
       ? getDatabase().openTableOrder(tableId)
       : invalidTableOrderPayload("Sipariş açmak için geçerli bir masa seçin.");
   });
 
   ipcMain.handle("tableOrder:addItem", (_event, input: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
+    assertDesktopCapability(C.FOOD_MENU, "Siparişe ürün eklemek için menü yönetimi etkin olmalı.");
     const parsedInput = parseAddTableOrderItemInput(input);
     return parsedInput
       ? getDatabase().addTableOrderItem(parsedInput)
@@ -853,6 +1047,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("tableOrder:updateItemQuantity", (_event, input: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     const parsedInput = parseUpdateTableOrderItemQuantityInput(input);
     return parsedInput
       ? getDatabase().updateTableOrderItemQuantity(parsedInput)
@@ -860,6 +1055,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("tableOrder:updateItemNote", (_event, input: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     const parsedInput = parseUpdateTableOrderItemNoteInput(input);
     return parsedInput
       ? getDatabase().updateTableOrderItemNote(parsedInput)
@@ -867,12 +1063,14 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("tableOrder:removeItem", (_event, itemId: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     return typeof itemId === "string"
       ? getDatabase().removeTableOrderItem(itemId)
       : invalidTableOrderPayload("Silinecek sipariş satırı geçersiz.");
   });
 
   ipcMain.handle("tableOrder:updateStatus", (_event, input: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     const parsedInput = parseUpdateTableOrderStatusInput(input);
     return parsedInput
       ? getDatabase().updateTableOrderStatus(parsedInput)
@@ -880,6 +1078,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("tableOrder:close", (_event, input: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     const parsedInput = parseUpdateTableOrderStatusInput(input);
     return parsedInput
       ? getDatabase().closeTableOrder(parsedInput)
@@ -887,32 +1086,82 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("tableOrder:recalculate", (_event, orderId: unknown): DesktopTableOrderResult => {
+    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
     return typeof orderId === "string"
       ? getDatabase().recalculateTableOrderTotal(orderId)
       : invalidTableOrderPayload("Toplamı hesaplanacak adisyon geçersiz.");
   });
 
   ipcMain.handle("reservation:saveManual", (_event, input: SaveManualReservationInput): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.ACCOMMODATION_RESERVATIONS, "Pansiyon rezervasyonları bu işletmede etkin değil.");
     return finalizeDesktopOperationMutation(getDatabase().saveManualReservation(input));
   });
 
   ipcMain.handle("reservation:saveManualRestaurant", (_event, input: SaveManualRestaurantReservationInput): DesktopStatusUpdateResult => {
+    assertDesktopCapability(C.FOOD_RESERVATIONS, "Restoran rezervasyonları bu işletmede etkin değil.");
     return finalizeDesktopOperationMutation(getDatabase().saveManualRestaurantReservation(input));
   });
 
   ipcMain.handle("reservation:updateStatus", (_event, input: UpdateReservationStatusInput): DesktopStatusUpdateResult => {
+    const reservation = getDatabase().getDashboardData().reservations.find((item) => item.id === String(input?.reservationId ?? ""));
+    assertDesktopReservationType(
+      reservation?.reservationType ?? "",
+      reservation?.roomIds,
+      reservation?.tableIds
+    );
     return getDatabase().updateReservationStatus(input);
   });
 
   ipcMain.handle("dailyTask:save", (_event, input: SaveDailyTaskInput): DesktopStatusUpdateResult => {
+    const dashboard = getDatabase().getDashboardData();
+    const existingTask = input?.id
+      ? dashboard.dailyTasks.find((item) => item.id === String(input.id))
+      : undefined;
+    const existingReservation = existingTask?.relatedType === "reservation"
+      ? dashboard.reservations.find((reservation) => reservation.id === existingTask.relatedId)
+      : undefined;
+    if (existingTask) {
+      assertDesktopTaskScope(
+        existingTask.taskType,
+        existingTask.relatedType,
+        existingReservation?.reservationType ?? "",
+        existingReservation?.roomIds,
+        existingReservation?.tableIds
+      );
+    }
+    assertDesktopTaskScope(String(input?.taskType ?? ""));
     return finalizeDesktopOperationMutation(getDatabase().saveDailyTask(input));
   });
 
   ipcMain.handle("dailyTask:delete", (_event, taskId: unknown): DesktopStatusUpdateResult => {
+    const dashboard = getDatabase().getDashboardData();
+    const task = dashboard.dailyTasks.find((item) => item.id === String(taskId ?? ""));
+    const reservation = task?.relatedType === "reservation"
+      ? dashboard.reservations.find((item) => item.id === task.relatedId)
+      : undefined;
+    assertDesktopTaskScope(
+      task?.taskType ?? "",
+      task?.relatedType ?? "",
+      reservation?.reservationType ?? "",
+      reservation?.roomIds,
+      reservation?.tableIds
+    );
     return finalizeDesktopOperationMutation(getDatabase().deleteDailyTask(String(taskId ?? "")));
   });
 
   ipcMain.handle("dailyTask:updateStatus", (_event, input: UpdateDailyTaskStatusInput): DesktopStatusUpdateResult => {
+    const dashboard = getDatabase().getDashboardData();
+    const task = dashboard.dailyTasks.find((item) => item.id === String(input?.taskId ?? ""));
+    const reservation = task?.relatedType === "reservation"
+      ? dashboard.reservations.find((item) => item.id === task.relatedId)
+      : undefined;
+    assertDesktopTaskScope(
+      task?.taskType ?? "",
+      task?.relatedType ?? "",
+      reservation?.reservationType ?? "",
+      reservation?.roomIds,
+      reservation?.tableIds
+    );
     return getDatabase().updateDailyTaskStatus(input);
   });
 
@@ -921,6 +1170,8 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("ai:createOwnerReplySuggestion", async (_event, requestId: string): Promise<RequestAiSuggestionResult> => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    assertDesktopCapability(C.AI, "AI bu işletmede etkin değil.");
     const request = getDatabase().getRequestById(requestId);
     if (!request) {
       return {
@@ -961,20 +1212,33 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("ai:generateWorkspace", async (_event, input: GenerateAiWorkspaceInput): Promise<GenerateAiWorkspaceResult> => {
+    assertDesktopCapability(C.AI, "AI bu işletmede etkin değil.");
+    if (String(input?.requestId ?? "").trim()) {
+      assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    }
     return generateAiWorkspaceEntry(input);
   });
 
   ipcMain.handle("ai:getWorkspaceHistory", (_event, limit?: number): AiWorkspaceHistoryEntry[] => {
-    return getDatabase().getAiWorkspaceHistory(limit);
+    assertDesktopCapability(C.AI, "AI bu işletmede etkin değil.");
+    const history = getDatabase().getAiWorkspaceHistory(limit);
+    return hasBusinessCapability(enabledBusinessCapabilities(), C.CUSTOMERS)
+      ? history
+      : history.filter((entry) => !entry.requestId);
   });
 
   ipcMain.handle("ai:saveWorkspaceResult", (_event, input: SaveAiWorkspaceResultInput): SaveAiWorkspaceResult => {
+    assertDesktopCapability(C.AI, "AI bu işletmede etkin değil.");
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
     return getDatabase().saveAiWorkspaceResult(input);
   });
 
   ipcMain.handle("shell:openExternal", async (_event, url: string) => {
     if (!/^https?:\/\//.test(url) && !/^tel:/.test(url)) {
       return false;
+    }
+    if (isWhatsAppUrl(url)) {
+      assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
     }
 
     await shell.openExternal(url);
@@ -1688,7 +1952,7 @@ function getSyncCoordinator() {
 
 function canUseAndroidSync(setup: DesktopSetupData, allowPlaceholderSecret: boolean) {
   const { baseUrl, syncSecret } = getWebSyncConfig(setup);
-  return setup.modules.android
+  return hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)
     && Boolean(baseUrl.trim())
     && Boolean(syncSecret.trim())
     && (allowPlaceholderSecret || syncSecret.trim() !== "change-this-secret");
@@ -1834,7 +2098,8 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     updated_at: message.updatedAt
   }));
 
-  return {
+  const source: AndroidOperationsSnapshot = {
+    business_capabilities: [],
     summary: {
       pending_daily_tasks: dashboardData.summary.pendingDailyTasks,
       today_tasks: dashboardData.dailyTasks.filter((task) => task.dueDate === today && task.status !== "archived").length,
@@ -1864,6 +2129,9 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
         due_time: task.dueTime,
         related_type: task.relatedType,
         related_id: task.relatedId,
+        related_reservation_type: task.relatedType === "reservation"
+          ? dashboardData.reservations.find((reservation) => reservation.id === task.relatedId)?.reservationType ?? ""
+          : "",
         updated_at: task.updatedAt
       })),
     requests: dashboardData.requests.slice(0, 300).map((request) => ({
@@ -2059,6 +2327,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
     reports: getDatabase().getAndroidReportPresets(today),
     updated_at: updatedAt
   };
+  return projectAndroidOperationsSnapshot(source, enabledBusinessCapabilities(), today);
 }
 
 function getMenuStockStatus(quantity: number, minimum: number | null, consumptionQuantity = 1): "out_of_stock" | "low_stock" | "in_stock" {
@@ -2081,7 +2350,7 @@ function formatLocalDateKey(date: Date): string {
 function createDesktopAiConfig(setup: DesktopSetupData) {
   const legacyEnvApiKey = (process.env.YARDIMCI_ASISTAN_AI_API_KEY ?? process.env.OPENAI_API_KEY ?? "").trim();
   const useLegacyEnvironment = !setup.aiApiKeyConfigured && legacyEnvApiKey !== "";
-  const enabled = setup.aiEnabled;
+  const enabled = hasBusinessCapability(enabledBusinessCapabilities(), C.AI);
   const provider = (setup.aiProvider || "openai_compatible") as AIProviderName;
   const timeoutSeconds = normalizeAiTimeoutSeconds(
     useLegacyEnvironment ? Number(process.env.YARDIMCI_ASISTAN_AI_TIMEOUT_SECONDS ?? setup.aiTimeoutSeconds) : setup.aiTimeoutSeconds
@@ -2105,6 +2374,9 @@ async function generateDesktopReportAiComment(
   const mode = input?.mode;
   if (!["summary", "attention", "sales", "recommendations"].includes(mode)) {
     return { ok: false, message: "Geçerli bir AI yorum türü seçin." };
+  }
+  if (mode === "sales" && !hasBusinessCapability(enabledBusinessCapabilities(), C.FOOD_ORDERS)) {
+    return { ok: false, message: "Restoran satış yorumu bu işletmede etkin değil." };
   }
 
   const setup = getDatabase().getSetupData();
@@ -2186,10 +2458,11 @@ async function generateAiWorkspaceEntry(input: GenerateAiWorkspaceInput): Promis
     fallback = suggestion.fallback === true;
     providerMessage = suggestion.providerMessage ?? "";
   } else {
-    const dashboard = getDatabase().getDashboardData();
+    const capabilities = enabledBusinessCapabilities();
+    const dashboard = projectDashboardForAi(getDatabase().getDashboardData(), capabilities);
     const localFallback = mode === "summary" && request
       ? buildLocalRequestSummary(request)
-      : buildLocalDailyEvaluation(dashboard);
+      : buildLocalDailyEvaluation(dashboard, capabilities);
     if (!config.enabled || config.provider === "disabled") {
       content = localFallback;
       summary = mode === "summary" ? localFallback.slice(0, 1600) : "Günlük işletme değerlendirmesi";
@@ -2249,6 +2522,71 @@ async function generateAiWorkspaceEntry(input: GenerateAiWorkspaceInput): Promis
   };
 }
 
+function projectDashboardForAi(
+  source: DesktopDashboardData,
+  capabilities: Iterable<BusinessCapability>
+): DesktopDashboardData {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  const rooms = enabled.has(C.ACCOMMODATION_ROOMS) ? source.rooms : [];
+  const tables = enabled.has(C.FOOD_TABLES) ? source.tables : [];
+  const reservations = source.reservations.filter((reservation) =>
+    isReservationTypeAvailable(enabled, reservation.reservationType, {
+      roomIds: reservation.roomIds,
+      tableIds: reservation.tableIds
+    })
+  );
+  const dailyTasks = source.dailyTasks.filter((task) => {
+    const relatedReservation = task.relatedType === "reservation"
+      ? source.reservations.find((reservation) => reservation.id === task.relatedId)
+      : undefined;
+    return isOperationalTaskAvailable(
+      enabled,
+      task.taskType,
+      task.relatedType,
+      relatedReservation?.reservationType ?? "",
+      { roomIds: relatedReservation?.roomIds, tableIds: relatedReservation?.tableIds }
+    );
+  });
+  const stays = enabled.has(C.ACCOMMODATION_STAYS) ? source.customerRoomStays : [];
+  const requests = enabled.has(C.CUSTOMERS) ? source.requests : [];
+  const customers = enabled.has(C.CUSTOMERS) ? source.customers : [];
+  const menu = enabled.has(C.FOOD_MENU)
+    ? source.menu
+    : { categories: [], items: [], updated_at: source.menu.updated_at };
+
+  return {
+    ...source,
+    rooms,
+    tables,
+    requests,
+    customers,
+    reservations,
+    dailyTasks,
+    customerRoomStays: stays,
+    androidDevices: enabled.has(C.ANDROID) ? source.androidDevices : [],
+    androidActionFailures: enabled.has(C.ANDROID) ? source.androidActionFailures : [],
+    paymentWaitingTableOrders: enabled.has(C.FOOD_ORDERS)
+      ? source.paymentWaitingTableOrders
+      : [],
+    menu,
+    summary: {
+      ...source.summary,
+      newRequests: enabled.has(C.CUSTOMERS) ? source.summary.newRequests : 0,
+      waitingRequests: enabled.has(C.CUSTOMERS) ? source.summary.waitingRequests : 0,
+      pendingDailyTasks: dailyTasks.filter((task) => task.status === "pending").length,
+      availableRooms: rooms.filter((room) => room.status === "available").length,
+      totalRooms: rooms.length,
+      availableTables: tables.filter((table) => table.status === "available").length,
+      pendingReservations: reservations.filter((reservation) => reservation.status === "pending").length,
+      preparedWhatsAppMessages: enabled.has(C.CUSTOMERS) && enabled.has(C.WHATSAPP)
+        ? source.summary.preparedWhatsAppMessages
+        : 0,
+      activeMenuCategories: menu.categories.filter((category) => category.is_active).length,
+      availableMenuItems: menu.items.filter((item) => item.is_available).length
+    }
+  };
+}
+
 function buildAiWorkspaceMessages(input: {
   mode: "summary" | "daily";
   businessName: string;
@@ -2271,7 +2609,16 @@ function buildAiWorkspaceMessages(input: {
       {
         role: "user" as const,
         content: JSON.stringify({
-          request: input.request,
+          request: {
+            customer: input.request.customer_name,
+            type: input.request.request_type,
+            status: input.request.status,
+            date: input.request.date_text || input.request.start_date,
+            endDate: input.request.end_date,
+            time: input.request.time,
+            guestCount: input.request.guest_count,
+            message: input.request.message
+          },
           additionalInstructions: input.instructions
         })
       }
@@ -2313,17 +2660,45 @@ function buildLocalRequestSummary(request: NonNullable<ReturnType<DesktopDatabas
   return fields.map((field) => `• ${field}`).join("\n");
 }
 
-function buildLocalDailyEvaluation(dashboard: DesktopDashboardData) {
+function buildLocalDailyEvaluation(
+  dashboard: DesktopDashboardData,
+  capabilities: Iterable<BusinessCapability>
+) {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   const pendingTasks = dashboard.dailyTasks.filter((task) => task.status !== "completed");
+  const priorities: string[] = [];
+  const recommendedOrder: string[] = [];
+  if (enabled.has(C.CUSTOMERS)) {
+    priorities.push(`• ${dashboard.summary.newRequests} yeni talebi kontrol edin.`);
+    recommendedOrder.push("yeni talepleri");
+  }
+  if (enabled.has(C.ACCOMMODATION_RESERVATIONS) || enabled.has(C.FOOD_RESERVATIONS)) {
+    priorities.push(`• ${dashboard.summary.pendingReservations} bekleyen rezervasyonu değerlendirin.`);
+    recommendedOrder.push("rezervasyon onaylarını");
+  }
+  if (enabled.has(C.TASKS)) {
+    priorities.push(`• ${pendingTasks.length} tamamlanmamış günlük işi takip edin.`);
+    recommendedOrder.push("günlük işleri");
+  }
+  if (priorities.length === 0) {
+    priorities.push("• Etkin işletme alanlarındaki güncel durumu kontrol edin.");
+  }
+  const risks: string[] = [];
+  if (enabled.has(C.ACCOMMODATION_ROOMS)) {
+    risks.push(`Boş oda: ${dashboard.summary.availableRooms}/${dashboard.summary.totalRooms}`);
+  }
+  if (enabled.has(C.FOOD_TABLES)) {
+    risks.push(`boş masa: ${dashboard.summary.availableTables}`);
+  }
   return [
     "Öncelikler",
-    `• ${dashboard.summary.newRequests} yeni talebi kontrol edin.`,
-    `• ${dashboard.summary.pendingReservations} bekleyen rezervasyonu değerlendirin.`,
-    `• ${pendingTasks.length} tamamlanmamış günlük işi takip edin.`,
+    ...priorities,
     "Riskler",
-    `• Boş oda: ${dashboard.summary.availableRooms}/${dashboard.summary.totalRooms}; boş masa: ${dashboard.summary.availableTables}.`,
+    risks.length > 0 ? `• ${risks.join("; ")}.` : "• Etkin operasyonlarda kritik kapasite uyarısı yok.",
     "Önerilen Sıra",
-    "• Önce yeni talepler, sonra rezervasyon onayları, ardından günlük işler."
+    recommendedOrder.length > 0
+      ? `• Önce ${recommendedOrder.join(", ardından ")} sonuçlandırın.`
+      : "• Önce güncel işletme durumunu gözden geçirin."
   ].join("\n");
 }
 
@@ -2340,15 +2715,16 @@ function formatWorkspaceRequestType(value: string) {
 
 async function publishSavedAiSettings(): Promise<PushAiSettingsResult> {
   const setup = getDatabase().getSetupData();
+  const aiCapabilityEnabled = hasBusinessCapability(enabledBusinessCapabilities(), C.AI);
   const result = await pushAiSettings({
     ...getWebSyncConfig(setup),
     aiSettings: {
-      enabled: setup.aiEnabled,
+      enabled: aiCapabilityEnabled,
       provider: setup.aiProvider || "openai_compatible",
       service: setup.aiService || "custom",
       baseUrl: setup.aiBaseUrl,
       model: setup.aiModel,
-      apiKey: setup.aiEnabled ? getEffectiveAiApiKey(setup.aiService) : "",
+      apiKey: aiCapabilityEnabled ? getEffectiveAiApiKey(setup.aiService) : "",
       timeoutSeconds: normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds)
     }
   });
