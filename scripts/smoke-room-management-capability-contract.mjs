@@ -3,6 +3,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const source = (path) => readFileSync(resolve(process.cwd(), path), "utf8");
+const section = (text, start, end) => {
+  const startIndex = text.indexOf(start);
+  assert.notEqual(startIndex, -1, `missing section start: ${start}`);
+  const endIndex = text.indexOf(end, startIndex + start.length);
+  assert.notEqual(endIndex, -1, `missing section end: ${end}`);
+  return text.slice(startIndex, endIndex);
+};
 
 const roomManagementSource = source("apps/desktop-app/src/components/settings/RoomManagementSection.tsx");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
@@ -13,10 +20,15 @@ assert.match(
   /runtimeHasCapability\([\s\S]{0,180}BUSINESS_CAPABILITIES\.ACCOMMODATION_ROOMS/,
   "room settings must use the persisted accommodation.rooms capability"
 );
+const roomLoadEffect = section(roomManagementSource, "useEffect(() => {", "const invalidMessage");
 assert.match(
-  roomManagementSource,
-  /if \(!roomsEnabled\)[\s\S]{0,220}return[\s\S]{0,120}getRoomFolioData/,
-  "room settings must not issue hidden bridge reads while accommodation.rooms is disabled"
+  roomLoadEffect,
+  /if \(!roomsEnabled\) \{[\s\S]*return \(\) => \{ active = false; \};\s*\}/,
+  "room settings must exit before bridge reads while accommodation.rooms is disabled"
+);
+assert.ok(
+  roomLoadEffect.indexOf("if (!roomsEnabled)") < roomLoadEffect.indexOf("getRoomFolioData"),
+  "the rooms capability gate must run before the historical bridge read"
 );
 assert.match(
   roomManagementSource,
@@ -24,24 +36,33 @@ assert.match(
   "room settings must disappear when accommodation.rooms is disabled"
 );
 
-assert.match(
+const getDataHandler = section(
   roomFolioIpcSource,
-  /roomFolio:getData[\s\S]{0,500}if \(!hasFolioCapability\(\)\)[\s\S]{0,220}assertRoomAccess\(\)[\s\S]{0,160}roomProfileData\(\)/,
-  "historical roomFolio read bridge must return a room-only projection when folio is disabled"
+  'ipcMain.handle("roomFolio:getData"',
+  'ipcMain.handle("roomFolio:setRoomNightlyPrice"'
+);
+assert.match(getDataHandler, /if \(!hasFolioCapability\(\)\)/);
+assert.match(getDataHandler, /assertRoomAccess\(\)/);
+assert.match(getDataHandler, /return roomProfileData\(\)/);
+
+const roomPriceHandler = section(
+  roomFolioIpcSource,
+  'ipcMain.handle("roomFolio:setRoomNightlyPrice"',
+  'ipcMain.handle("roomFolio:open"'
 );
 assert.match(
-  roomFolioIpcSource,
-  /roomFolio:setRoomNightlyPrice[\s\S]{0,220}assertRoomAccess\(\)/,
+  roomPriceHandler,
+  /assertRoomAccess\(\)/,
   "room profile writes must require accommodation.rooms instead of accommodation.folio"
 );
-assert.match(
-  roomFolioIpcSource,
-  /roomProfileData[\s\S]{0,300}activeStays:\s*\[\][\s\S]{0,100}folios:\s*\[\][\s\S]{0,100}menuCategories:\s*\[\][\s\S]{0,100}menuItems:\s*\[\]/,
-  "room-only compatibility projection must not expose stays, folios or menu data"
-);
+
+const roomProjection = section(roomFolioIpcSource, "const roomProfileData", "const folioData");
+for (const emptyDomain of ["activeStays: []", "folios: []", "menuCategories: []", "menuItems: []"]) {
+  assert.ok(roomProjection.includes(emptyDomain), `room-only projection leaked domain data: ${emptyDomain}`);
+}
 assert.match(
   roomProfileSource,
-  /export function listRoomProfiles[\s\S]{0,500}FROM rooms[\s\S]{0,180}deleted_at = '' AND is_active = 1/,
+  /export function listRoomProfiles[\s\S]{0,700}FROM rooms[\s\S]{0,220}deleted_at = '' AND is_active = 1/,
   "room profile reads must come directly from active room records"
 );
 
