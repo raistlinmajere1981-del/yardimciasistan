@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 const require = createRequire(import.meta.url);
+const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-stock-import-db-"));
 const database = new DesktopDatabase({
   appPath: join(process.cwd(), "apps", "desktop-app"),
@@ -167,6 +169,10 @@ try {
   const androidAction = action("android_stock_import_action_001", adminDeviceId, androidImportId, androidHash, [
     { menu_item_id: first.id, quantity: 2, raw_text: `${firstName} 2 AD`, confidence: "high" }
   ]);
+  const aiDisabledResult = database.applyAndroidAction(androidAction);
+  assert.equal(aiDisabledResult.ok, false);
+  assert.match(aiDisabledResult.message, /etkin yeteneklerinde kullanılamıyor/i);
+  setBusinessCapability(database.databasePath, { capability: C.AI, enabled: true });
   const androidResult = database.applyAndroidAction(androidAction);
   assert.equal(androidResult.ok, true, androidResult.message);
   assert.equal(stock(database, first.id), beforeAtomic + 2);

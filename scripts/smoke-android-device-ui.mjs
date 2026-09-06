@@ -8,11 +8,12 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const artifactDir = join(repoRoot, "artifacts", "android-device-ui");
 const packageName = "com.yardimciasistan.android";
 const activityName = ".MainActivity";
-const syncSecret = "change-this-secret";
+const businessConfig = JSON.parse(readFileSync(join(repoRoot, "firm-template", "web-module", "config", "business.json"), "utf8"));
+const syncSecret = String(businessConfig.sync_secret ?? "").trim();
 const demoSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
 const stockGalleryFixture = join(repoRoot, "firm-template", "web-module", "assets", "yardimci-asistan-symbol.png");
 const stockGalleryDeviceFile = "/sdcard/Download/yardimci-stock-image-smoke.png";
-const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "r", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
+const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "connection", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
 const serviceOrderPermissions = [
   "table.view",
   "table.update_status",
@@ -51,17 +52,29 @@ const customerReservationPermissions = [
 const staffPermissions = [...serviceOrderPermissions, ...roomsTasksPermissions];
 const adminPermissions = [
   "customer.view",
+  "customer.manage",
   "customer.respond",
   "customer.mark_answered",
   "customer.reject",
   "customer.convert_to_reservation",
+  "customer.delete",
+  "request.delete",
   "reservation.view",
+  "reservation.create",
+  "reservation.update",
   "reservation.approve",
   "reservation.reject",
   "reservation.cancel",
   "room.view",
   "room.update_status",
+  "room.assign_customer",
+  "room_folio.view",
+  "room_folio.payment",
+  "room_folio.checkout",
   "daily_task.view",
+  "daily_task.create",
+  "daily_task.update",
+  "daily_task.delete",
   "daily_task.complete",
   "daily_task.reopen",
   "table.view",
@@ -78,16 +91,21 @@ const adminPermissions = [
   "table_order.cancel",
   "menu.view",
   "menu.edit",
+  "menu.delete",
   "menu.stock_view",
   "menu.stock_update",
+  "finance.view",
+  "finance.create",
   "settings.view",
   "settings.edit",
+  "message.delete",
   "android_devices.view",
   "android_devices.manage"
 ];
 let snapshotRevision = 100;
 let uiTestBaseUrl = "";
 let deviceIdBeforeUiReset = "";
+let originalDeviceOrientation = null;
 
 const options = parseArgs(process.argv.slice(2));
 let phoneTest = null;
@@ -106,6 +124,7 @@ try {
 async function main() {
   ensureArtifactDir();
   ensureAdbDevice();
+  lockDevicePortrait();
   prepareStockGalleryFixture();
 
   phoneTest = startPhoneTest();
@@ -135,6 +154,16 @@ async function main() {
   await delay(400);
 
   let topXml = dumpUi("top.xml");
+  for (let index = 0; index < 3 && topXml.includes('content-desc="Gece moduna geç"'); index += 1) {
+    adb(["shell", "cmd", "statusbar", "collapse"], { allowFailure: true });
+    await delay(300);
+    tap(centerOf(findClickableBoundsByDescription(topXml, "Gece moduna geç")));
+    await delay(800);
+    topXml = dumpUi(`top-theme-normalize-${index}.xml`);
+  }
+  if (!topXml.includes('content-desc="Gündüz moduna geç"')) {
+    throw new Error("UI smoke başlangıç teması geceye alınamadı.");
+  }
   captureScreenshot("top.png");
   assertContains(topXml, ["Bugün", "Öncelikli işler", "Pansiyon", "Restoran", 'content-desc="Yenile"', 'content-desc="Gündüz moduna geç"', 'content-desc="Ayarlar"', 'text="İş 2"', 'text="Oda 1"', 'text="Hesap 0"', 'text="Stok yok 1"']);
   assertNotContains(topXml, ["GÜNLÜK OPERASYON", 'content-desc="Bildirimler"', 'text="Müşteri"', 'text="Mesajlar"', "Canlı veri çekiliyor", "Canlı veri alındı", "Veriler zaten güncel", "Son yayın:"]);
@@ -213,7 +242,7 @@ async function main() {
   tap(centerOf(findClickableBoundsByDescription(topXml, "Ayarlar")));
   await delay(400);
   const staffSettingsXml = dumpUi("staff-settings.xml");
-  assertContains(staffSettingsXml, ["Ayarlar", "Görünüm", "Tema", "Gece Modu", 'content-desc="Gündüz moduna geç"', "Bildirim tercihleri", "Restoran / Masa", "Oda / Günlük İş", "İşlem hataları"]);
+  assertContains(staffSettingsXml, ["Ayarlar", "Görünüm", "Tema", "Gece Modu", 'content-desc="Gündüz moduna geç"', "Bildirim tercihleri", "Restoran / Sipariş", "Oda / Günlük İş", "İşlem hataları"]);
   assertNotContains(staffSettingsXml, ["Bildirimler", "Sync bağlantısı", "Bağlantı özeti", "Güvenlik anahtarı", "İşletme raporları", "Raporları Aç", syncSecret]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
@@ -248,11 +277,19 @@ async function main() {
   await publishMissingDeviceProfile(baseUrl);
   relaunchApp();
   await waitForUiCondition(
-    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && xml.includes('content-desc="Ayarlar"'),
+    (xml) => xml.includes("Cihaz Pasif") && xml.includes("Bu cihaz pasifleştirildi"),
     12000,
-    "Daha önce çözülmüş personel profili eksik snapshot sonrasında korunmadı."
+    "Eksik cihaz profili eski personel yetkilerini fail-closed kapatmadı."
   );
   assert.equal(readPreferenceValue("device_id"), deviceId);
+
+  await publishDeviceRole(baseUrl, deviceId, "staff");
+  relaunchApp();
+  await waitForUiCondition(
+    (xml) => xml.includes("Personel") && xml.includes('text="Pansiyon"') && xml.includes('content-desc="Ayarlar"'),
+    12000,
+    "Personel profili eksik profil testinden sonra yeniden uygulanamadı."
+  );
 
   topXml = dumpUi("staff-after-profile-gap.xml");
   tap(centerOf(findClickableBoundsByText(topXml, "Pansiyon")));
@@ -262,20 +299,33 @@ async function main() {
   assertNotContains(staffPensionRoomsXml, ["Oda 101 giriş hazırlığı", "Tamamla", "Rezervasyonlar"]);
   tap(centerOf(findClickableBoundsByText(staffPensionRoomsXml, "İşler")));
   const staffPensionTasksXml = await waitForUiCondition(
-    (xml) => xml.includes("Oda 101 giriş hazırlığı") && xml.includes("Bahçe servis kontrolü"),
+    (xml) => xml.includes("Oda 101 giriş hazırlığı") && !xml.includes("Bahçe servis kontrolü"),
     5000,
     "Personel günlük iş modu açılmadı."
   );
   writeFileSync(join(artifactDir, "staff-pension-tasks.xml"), staffPensionTasksXml);
-  assertContains(staffPensionTasksXml, ["Oda 101 giriş hazırlığı", "Bahçe servis kontrolü", "Tamamla"]);
-  assertNotContains(staffPensionTasksXml, ["Balkonlu Oda", "Aile Odası"]);
+  assertContains(staffPensionTasksXml, ["Oda 101 giriş hazırlığı", "Tamamla"]);
+  assertNotContains(staffPensionTasksXml, ["Bahçe servis kontrolü", "Balkonlu Oda", "Aile Odası"]);
 
   tap(centerOf(findClickableBoundsByText(staffPensionTasksXml, "Restoran")));
   await delay(500);
 
   let staffRestaurantXml = dumpUi("staff-restaurant.xml");
-  assertContains(staffRestaurantXml, ["Masalar", "Açık Adisyon", "Stok", "Salon Masası 1", "Siparişi Aç"]);
+  assertContains(staffRestaurantXml, ["Masalar", "Açık Adisyon", "İşler", "Stok", "Salon Masası 1", "Siparişi Aç"]);
   assertNotContains(staffRestaurantXml, ["Ev Limonatası", "Aktif adisyonlar"]);
+  tap(centerOf(findClickableBoundsByText(staffRestaurantXml, "İşler")));
+  const staffRestaurantTasksXml = await waitForUiCondition(
+    (xml) => xml.includes("Bahçe servis kontrolü") && !xml.includes("Oda 101 giriş hazırlığı"),
+    5000,
+    "Personel restoran iş modu açılmadı."
+  );
+  assertNotContains(staffRestaurantTasksXml, ["Oda 101 giriş hazırlığı", "Salon Masası 1"]);
+  tap(centerOf(findClickableBoundsByText(staffRestaurantTasksXml, "Masalar")));
+  staffRestaurantXml = await waitForUiCondition(
+    (xml) => xml.includes("Salon Masası 1") && xml.includes("Siparişi Aç"),
+    5000,
+    "Personel restoran masa moduna dönemedi."
+  );
   tap(centerOf(findBoundsByText(staffRestaurantXml, "Siparişi Aç")));
   await delay(500);
   const staffOrderXml = dumpUi("staff-table-order.xml");
@@ -300,11 +350,11 @@ async function main() {
         && staffStockXml.includes("Ev Limonatası")) {
       break;
     }
-    swipe(360, 1080, 360, 760, 360);
+    swipe(360, 900, 360, 300, 420);
     await delay(300);
   }
   assertContains(staffStockXml, ["Stokta yok", "Az stok", "Tüm takip edilen ürünler", "Ev Limonatası", "Serpme Kahvaltı"]);
-  assertNotContains(staffStockXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç", "Stok Güncelle", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
+  assertNotContains(staffStockXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç", "Stok Güncelle", "+1 adet Ekle", "Miktarı Ayarla", "Fark Gir"]);
 
   await publishDeviceRole(baseUrl, deviceId, "staff", { permissions: serviceOrderPermissions });
   relaunchApp();
@@ -640,7 +690,7 @@ async function main() {
   await delay(500);
   const pensionXml = dumpUi("pension.xml");
   captureScreenshot("pension.png");
-  assertContains(pensionXml, ["Pansiyon", "Rezervasyonlar", "Odalar", "İşler", "Demo Aile", 'text="Bekleyen 1"', 'text="Giriş 0"', 'text="Çıkış 0"']);
+  assertContains(pensionXml, ["Pansiyon", "Rezervasyonlar", "Odalar", "Konaklamalar", "Demo Aile", 'text="Bekleyen 1"', 'text="Giriş 0"', 'text="Çıkış 0"']);
   assertNotContains(pensionXml, ["Durumu Değiştir", "Oda 101 giriş hazırlığı", "Konaklama operasyonu"]);
   assertCounterStripFits(pensionXml, ["Bekleyen 1", "Giriş 0", "Çıkış 0"]);
   tap(centerOf(findClickableBoundsByText(pensionXml, "Odalar")));
@@ -651,20 +701,27 @@ async function main() {
   );
   assertContains(pensionRoomsXml, ["Odalar", "Balkonlu Oda", "Temizlik"]);
   assertNotContains(pensionRoomsXml, ["Demo Aile", "Oda 101 giriş hazırlığı"]);
-  tap(centerOf(findClickableBoundsByText(pensionRoomsXml, "İşler")));
+  let pensionRoomModesXml = pensionRoomsXml;
+  for (let index = 0; index < 3 && !pensionRoomModesXml.includes('text="İşler"'); index += 1) {
+    swipe(650, 245, 180, 245, 320);
+    await delay(300);
+    pensionRoomModesXml = dumpUi(`pension-room-modes-${index}.xml`);
+  }
+  assertContains(pensionRoomModesXml, ['text="İşler"']);
+  tap(centerOf(findClickableBoundsByText(pensionRoomModesXml, "İşler")));
   const pensionTasksXml = await waitForUiCondition(
-    (xml) => xml.includes("Oda 101 giriş hazırlığı") && xml.includes("Bahçe servis kontrolü"),
+    (xml) => xml.includes("Oda 101 giriş hazırlığı") && !xml.includes("Bahçe servis kontrolü"),
     5000,
     "Yönetici günlük iş modu açılmadı."
   );
   writeFileSync(join(artifactDir, "pension-tasks.xml"), pensionTasksXml);
-  assertContains(pensionTasksXml, ["İşler", "Oda 101 giriş hazırlığı", "Bahçe servis kontrolü"]);
-  assertNotContains(pensionTasksXml, ["Balkonlu Oda", "Demo Aile"]);
+  assertContains(pensionTasksXml, ["Oda 101 giriş hazırlığı"]);
+  assertNotContains(pensionTasksXml, ["Bahçe servis kontrolü", "Balkonlu Oda", "Demo Aile"]);
 
   tap(centerOf(findClickableBoundsByText(pensionTasksXml, "Restoran")));
   await delay(500);
   const restaurantXml = dumpUi("restaurant.xml");
-  assertContains(restaurantXml, ["Restoran", "Masalar", "Açık Adisyon", "Stok", "Salon Masası 1", "Siparişi Aç", 'text="Boş 1"', 'text="Dolu 1"', 'text="Hesap 0"', 'text="Açık 1"']);
+  assertContains(restaurantXml, ["Restoran", "Masalar", "Rezervasyonlar", "Açık Adisyon", "İşler", "Salon Masası 1", "Siparişi Aç", 'text="Boş 1"', 'text="Dolu 1"', 'text="Hesap 0"', 'text="Açık 1"']);
   assertNotContains(restaurantXml, ["Servis ve masa yönetimi", "Ev Limonatası"]);
   assertCounterStripFits(restaurantXml, ["Boş 1", "Dolu 1", "Hesap 0", "Açık 1"]);
   captureScreenshot("restaurant.png");
@@ -683,7 +740,13 @@ async function main() {
 
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
-  const restaurantAfterDialog = dumpUi("restaurant-after-dialog.xml");
+  let restaurantAfterDialog = dumpUi("restaurant-after-dialog.xml");
+  for (let index = 0; index < 3 && !restaurantAfterDialog.includes('text="Stok"'); index += 1) {
+    swipe(650, 245, 180, 245, 320);
+    await delay(300);
+    restaurantAfterDialog = dumpUi(`restaurant-modes-${index}.xml`);
+  }
+  assertContains(restaurantAfterDialog, ['text="Stok"']);
   tap(centerOf(findClickableBoundsByText(restaurantAfterDialog, "Stok")));
   await delay(400);
   let adminStockXml = "";
@@ -712,6 +775,8 @@ async function main() {
   assertContains(adminStockTopXml, ["AI DESTEKLİ STOK GİRİŞİ", "Kamera ile çek", "Galeriden seç", "Stoklar siz onaylamadan değişmez"]);
   captureScreenshot("admin-stock-image-import.png");
   await exerciseStockImageSources(adminStockTopXml);
+  lockDevicePortrait();
+  await delay(800);
   let stockUpdateAfterSourcesXml = "";
   for (let index = 0; index < 8; index += 1) {
     const currentXml = dumpUi(`admin-stock-update-after-sources-${index}.xml`);
@@ -719,14 +784,14 @@ async function main() {
       stockUpdateAfterSourcesXml = currentXml;
       break;
     }
-    swipe(360, 1080, 360, 760, 360);
+    swipe(360, 900, 360, 300, 420);
     await delay(300);
   }
   assertContains(stockUpdateAfterSourcesXml, ["Stok Güncelle"]);
   tap(centerOf(findBoundsByText(stockUpdateAfterSourcesXml, "Stok Güncelle")));
   await delay(300);
   const stockActionsXml = dumpUi("admin-stock-actions.xml");
-  assertContains(stockActionsXml, ["STOK GÜNCELLE", "+1 Ekle", "Adedi Ayarla", "Fark Gir"]);
+  assertContains(stockActionsXml, ["STOK GÜNCELLE", "+1 adet Ekle", "Miktarı Ayarla", "Fark Gir"]);
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
   await delay(300);
   const restaurantAfterStockXml = dumpUi("restaurant-after-stock.xml");
@@ -1042,6 +1107,42 @@ function ensureAdbDevice() {
   }
 }
 
+function lockDevicePortrait() {
+  if (!originalDeviceOrientation) {
+    const accelerometerRotation = adb(
+      ["shell", "settings", "get", "system", "accelerometer_rotation"],
+      { capture: true }
+    ).stdout.trim();
+    const userRotation = adb(
+      ["shell", "settings", "get", "system", "user_rotation"],
+      { capture: true }
+    ).stdout.trim();
+    if (!/^[01]$/.test(accelerometerRotation) || !/^[0-3]$/.test(userRotation)) {
+      throw new Error("Android ekran yönü test öncesinde güvenli biçimde okunamadı.");
+    }
+    originalDeviceOrientation = { accelerometerRotation, userRotation };
+  }
+  adb(["shell", "settings", "put", "system", "accelerometer_rotation", "0"]);
+  adb(["shell", "settings", "put", "system", "user_rotation", "0"]);
+  adb(["shell", "wm", "set-user-rotation", "lock", "0"], { allowFailure: true });
+}
+
+function restoreDeviceOrientation() {
+  if (!originalDeviceOrientation) {
+    return;
+  }
+  const { accelerometerRotation, userRotation } = originalDeviceOrientation;
+  originalDeviceOrientation = null;
+  adb(["shell", "settings", "put", "system", "user_rotation", userRotation], { allowFailure: true });
+  adb(["shell", "settings", "put", "system", "accelerometer_rotation", accelerometerRotation], { allowFailure: true });
+  adb(
+    accelerometerRotation === "1"
+      ? ["shell", "wm", "set-user-rotation", "free"]
+      : ["shell", "wm", "set-user-rotation", "lock", userRotation],
+    { allowFailure: true }
+  );
+}
+
 function dumpUi(fileName) {
   adb(["shell", "uiautomator", "dump", "/sdcard/window.xml"]);
   const outputPath = join(artifactDir, fileName);
@@ -1077,7 +1178,7 @@ function prepareAppForUi(baseUrl) {
   adb(["shell", "wm", "dismiss-keyguard"], { allowFailure: true });
   adb(["shell", "am", "force-stop", "com.android.documentsui"], { allowFailure: true });
   prepareSystemCameraForUiTest();
-  adb(["shell", "input", "keyevent", "KEYCODE_MENU"], { allowFailure: true });
+  adb(["shell", "cmd", "statusbar", "collapse"], { allowFailure: true });
   adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
   adb([
@@ -1270,11 +1371,15 @@ async function restoreEmbeddedConnectionAfterTest() {
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
   adb(["shell", "am", "start", "-n", `${packageName}/${activityName}`]);
   const startedAt = Date.now();
-  let restoredUrl = readPreferenceValue("web_module_url");
-  while (restoredUrl === uiTestBaseUrl && Date.now() - startedAt < 8000) {
+  let restoredUrl = "";
+  while (Date.now() - startedAt < 8000) {
+    restoredUrl = readPreferenceValueIfPresent("web_module_url");
+    if (restoredUrl && restoredUrl !== uiTestBaseUrl) {
+      break;
+    }
     await delay(250);
-    restoredUrl = readPreferenceValue("web_module_url");
   }
+  assert.ok(restoredUrl, "Gömülü Android bağlantısı test sonunda geri yüklenmedi.");
   assert.notEqual(restoredUrl, uiTestBaseUrl);
   assert.equal(new URL(restoredUrl).protocol, "https:");
   adb(["shell", "am", "force-stop", packageName], { allowFailure: true });
@@ -1551,6 +1656,7 @@ function scrollToTop() {
   for (let index = 0; index < 3; index += 1) {
     swipe(360, 300, 360, 1120, 300);
   }
+  adb(["shell", "cmd", "statusbar", "collapse"], { allowFailure: true });
 }
 
 function scrollToBottom() {
@@ -1950,6 +2056,7 @@ function cleanup() {
   if (focusedPackage() === "net.sourceforge.opencamera") {
     adb(["shell", "input", "keyevent", "KEYCODE_BACK"], { allowFailure: true });
   }
+  restoreDeviceOrientation();
   if (phoneTest && phoneTest.exitCode === null) {
     phoneTest.kill();
   }

@@ -8,10 +8,11 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageName = "com.yardimciasistan.android";
 const activityName = ".MainActivity";
-const syncSecret = "change-this-secret";
-const outputApk = join(repoRoot, "apps", "android-app", "build", "outputs", "apk", "debug", "yardimci-asistan-debug.apk");
-const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "r", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
 const webModuleRoot = join(repoRoot, "firm-template", "web-module");
+const businessConfig = JSON.parse(readFileSync(join(webModuleRoot, "config", "business.json"), "utf8"));
+const syncSecret = String(businessConfig.sync_secret ?? "").trim();
+const outputApk = join(repoRoot, "apps", "android-app", "build", "outputs", "apk", "debug", "yardimci-asistan-debug.apk");
+const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "connection", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
 const requestsFile = join(webModuleRoot, "data", "requests.json");
 const syncStateFile = join(webModuleRoot, "data", "sync-state.json");
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
@@ -19,6 +20,26 @@ const androidSnapshotFile = join(webModuleRoot, "data", "android-snapshot.json")
 const androidActionsFile = join(webModuleRoot, "data", "android-actions.json");
 const demoRequestsFile = join(repoRoot, "demo-data", "web-module-requests.json");
 const demoAndroidSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
+const verificationDeviceId = "android-phone-smoke";
+const defaultPhonePermissions = [
+  "room.view",
+  "room.update_status",
+  "daily_task.view",
+  "daily_task.complete",
+  "daily_task.reopen",
+  "table.view",
+  "table.update_status",
+  "table_order.view",
+  "table_order.open",
+  "table_order.add_item",
+  "table_order.update_item",
+  "table_order.remove_item",
+  "table_order.set_preparing",
+  "table_order.set_served",
+  "table_order.set_payment_waiting",
+  "menu.view",
+  "menu.stock_view"
+];
 const runtimeFiles = [
   "yardimci-asistan.sqlite",
   "yardimci-asistan.sqlite-wal",
@@ -55,8 +76,10 @@ async function main() {
   const localBaseUrl = `http://127.0.0.1:${port}`;
   const lanUrls = getLanUrls(port);
   const primaryLanUrl = lanUrls[0] ?? localBaseUrl;
+  const connectedDevice = options.noAdb ? null : getAdbDevices()[0] ?? null;
+  const installedDeviceId = connectedDevice ? readInstalledDeviceId(connectedDevice.serial) : "";
 
-  seedDemoData();
+  seedDemoData([verificationDeviceId, installedDeviceId].filter(Boolean));
 
   if (!options.noBuild) {
     run("npm", ["run", "build:android"]);
@@ -74,7 +97,7 @@ async function main() {
   phpServer.stderr.on("data", collectPhpOutput);
 
   await waitForServer(localBaseUrl);
-  await verifyAndroidSummary(localBaseUrl);
+  await verifyAndroidSummary(localBaseUrl, verificationDeviceId);
 
   const adbResult = options.noAdb ? { state: "skipped" } : installAndLaunchWithAdb(port, primaryLanUrl);
   printReady({ port, localBaseUrl, lanUrls, adbResult });
@@ -147,12 +170,20 @@ function parseArgs(args) {
   return parsed;
 }
 
-function seedDemoData() {
+function seedDemoData(approvedDeviceIds) {
   for (const path of runtimeFiles) {
     rmSync(path, { force: true });
   }
   const requests = JSON.parse(readFileSync(demoRequestsFile, "utf8"));
   const androidSnapshot = JSON.parse(readFileSync(demoAndroidSnapshotFile, "utf8"));
+  androidSnapshot.androidPermissions = Object.fromEntries(approvedDeviceIds.map((deviceId) => [
+    deviceId,
+    {
+      role: "staff",
+      is_active: true,
+      permissions: defaultPhonePermissions
+    }
+  ]));
   writeJson(requestsFile, requests);
   writeJson(conversationsFile, []);
   writeJson(androidSnapshotFile, androidSnapshot);
@@ -272,7 +303,7 @@ function printReady({ port, localBaseUrl, lanUrls, adbResult }) {
   console.log("android-phone-test-ready");
   console.log(`PHP sunucusu: ${options.host}:${port}`);
   console.log(`Yerel kontrol: ${localBaseUrl}/api/sync.php`);
-  console.log(`Sync anahtarı: ${syncSecret}`);
+  console.log(`Sync anahtarı: ${syncSecret ? `yapılandırıldı (${syncSecret.length} karakter)` : "eksik"}`);
   console.log(`Demo kayıt: 3 web talebi`);
 
   if (lanUrls.length > 0) {
@@ -290,7 +321,7 @@ function printReady({ port, localBaseUrl, lanUrls, adbResult }) {
     console.log(`ADB reverse: ${adbResult.reverse ? "aktif" : "pasif"}`);
   } else if (adbResult.state === "missing") {
     console.log(`ADB cihazı bulunamadı. APK: ${outputApk}`);
-    console.log(`Manuel başlatma örneği: adb shell am start -n ${packageName}/${activityName} --es ya_web_module_url ${lanUrls[0] ?? localBaseUrl} --es ya_sync_secret ${syncSecret}`);
+    console.log(`Manuel başlatma örneği: adb shell am start -n ${packageName}/${activityName} --es ya_web_module_url ${lanUrls[0] ?? localBaseUrl} --es ya_sync_secret '<sync-secret>'`);
   } else {
     console.log("ADB adımı atlandı.");
   }
@@ -300,7 +331,7 @@ function printReady({ port, localBaseUrl, lanUrls, adbResult }) {
   }
 }
 
-async function verifyAndroidSummary(baseUrl) {
+async function verifyAndroidSummary(baseUrl, deviceId) {
   const response = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: {
@@ -309,6 +340,7 @@ async function verifyAndroidSummary(baseUrl) {
     },
     body: JSON.stringify({
       action: "android_summary",
+      device_id: deviceId,
       limit: 10
     })
   });

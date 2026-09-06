@@ -8,6 +8,7 @@ const checks = [
   ["node", ["scripts/smoke-business-capabilities.mjs"]],
   ["node", ["scripts/smoke-capability-runtime-v2.mjs"]],
   ["node", ["scripts/smoke-setup-capability-contract.mjs"]],
+  ["node", ["scripts/smoke-capability-surface-consistency.mjs"]],
   ["node", ["scripts/smoke-commerce-foundation.mjs"]],
   ["node", ["scripts/smoke-commerce-runtime.mjs"]],
   ["node", ["scripts/smoke-commerce-ipc-contract.mjs"]],

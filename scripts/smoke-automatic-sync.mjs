@@ -9,6 +9,8 @@ import process from "node:process";
 
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { BUSINESS_CAPABILITIES } = require("../packages/shared/dist/index.js");
 const {
   SyncCoordinator,
   supportsAndroidDevicePermissionSync
@@ -108,6 +110,12 @@ try {
     initialCounts: { rooms: 2, tables: 2 }
   }, { mode: "keep" });
   assert.equal(setupResult.ok, true);
+  // Keep the business capability enabled while the hosted provider remains
+  // disabled below; this exercises capability and provider gates separately.
+  setBusinessCapability(database.databasePath, {
+    capability: BUSINESS_CAPABILITIES.AI,
+    enabled: true
+  });
 
   database.upsertAndroidDeviceSightings([{
     device_id: "android-auto-smoke",
@@ -146,6 +154,15 @@ try {
   });
   assert.equal(trackedMenuSave.ok, true);
   const trackedMenuItemId = trackedMenuSave.savedId;
+
+  const bootstrapSnapshot = await syncApi({
+    action: "publish_android_snapshot",
+    client_id: "android-action-bootstrap-smoke",
+    source_revision: 1,
+    idempotency_key: "android-action-bootstrap-smoke-1",
+    snapshot: createSnapshot(database)
+  });
+  assert.equal(bootstrapSnapshot.status, 200);
 
   const requestResponse = await postJson(`${baseUrl}/api/request.php`, {
     request_type: "pension_reservation",
@@ -422,20 +439,17 @@ try {
   assert.equal(outOfStockMenu.items.some((item) => item.id === trackedMenuItemId), false);
 
   const forbiddenStockActionId = "android_permission_stock_staff_0001";
-  await assertQueued(await enqueueAndroidAction(forbiddenStockActionId, "menu_stock_add", {
+  const forbiddenStockResponse = await enqueueAndroidAction(forbiddenStockActionId, "menu_stock_add", {
     menu_item_id: trackedMenuItemId,
     quantity: 1,
     note: "Personel yetki testi"
-  }));
-  const forbiddenStockCycle = await coordinator.runNow();
-  assert.equal(forbiddenStockCycle.appliedActions, 0);
-  assert.equal(forbiddenStockCycle.failedActions, 1);
+  });
+  assert.equal(forbiddenStockResponse.status, 403);
+  assert.equal((await forbiddenStockResponse.json()).code, "android_action_permission_denied");
   assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 0);
-  const forbiddenStockResult = await getAndroidAction(forbiddenStockActionId);
-  assert.match(forbiddenStockResult.error_message, /yetkisi yok/i);
 
   const forbiddenImageImportActionId = "android_permission_stock_image_staff_0001";
-  await assertQueued(await enqueueAndroidAction(forbiddenImageImportActionId, "menu_stock_image_import_apply", {
+  const forbiddenImageImportResponse = await enqueueAndroidAction(forbiddenImageImportActionId, "menu_stock_image_import_apply", {
     import_id: "stock_import_staff_queue_0001",
     image_hash: "b".repeat(64),
     duplicate_warning_acknowledged: false,
@@ -445,12 +459,10 @@ try {
       raw_text: "2 adet personel yetki testi",
       confidence: "high"
     }]
-  }));
-  const forbiddenImageImportCycle = await coordinator.runNow();
-  assert.equal(forbiddenImageImportCycle.appliedActions, 0);
-  assert.equal(forbiddenImageImportCycle.failedActions, 1);
+  });
+  assert.equal(forbiddenImageImportResponse.status, 403);
+  assert.equal((await forbiddenImageImportResponse.json()).code, "android_action_permission_denied");
   assert.equal(database.getDashboardData().menu.items.find((item) => item.id === trackedMenuItemId)?.stock_quantity, 0);
-  assert.match((await getAndroidAction(forbiddenImageImportActionId)).error_message, /yetkisi yok/i);
 
   const paymentActionId = "android_permission_payment_0001";
   await assertQueued(await enqueueAndroidAction(paymentActionId, "table_order_set_payment_waiting", {
@@ -466,27 +478,18 @@ try {
   assert.equal(order.status, "payment");
 
   const forbiddenCloseActionId = "android_permission_close_staff_0001";
-  await assertQueued(await enqueueAndroidAction(forbiddenCloseActionId, "table_order_close_paid", {
+  const forbiddenCloseResponse = await enqueueAndroidAction(forbiddenCloseActionId, "table_order_close_paid", {
     order_id: order.id,
     table_id: table.id,
     expected_updated_at: order.updatedAt
-  }));
-  const forbiddenCloseCycle = await coordinator.runNow();
-  assert.equal(forbiddenCloseCycle.appliedActions, 0);
-  assert.equal(forbiddenCloseCycle.failedActions, 1);
+  });
+  assert.equal(forbiddenCloseResponse.status, 403);
+  assert.equal((await forbiddenCloseResponse.json()).code, "android_action_permission_denied");
   order = database.getActiveTableOrder(table.id);
   assert.ok(order);
   assert.equal(order.status, "payment");
-  const forbiddenCloseResult = await getAndroidAction(forbiddenCloseActionId);
-  assert.equal(forbiddenCloseResult.status, "failed");
-  assert.equal(forbiddenCloseResult.error_message, "Bu cihazın hesap kapatma yetkisi yok.");
   const failureDashboard = database.getDashboardData();
   assert.equal(failureDashboard.paymentWaitingTableOrders.some((candidate) => candidate.id === order.id), true);
-  assert.equal(failureDashboard.androidActionFailures.some((failure) => (
-    failure.id === forbiddenCloseActionId
-      && failure.message === "Bu cihazın hesap kapatma yetkisi yok."
-      && failure.targetPage === "restaurant"
-  )), true);
 
   const cashierResult = database.setAndroidDevicePermissionGroups("android-auto-smoke", {
     service_orders: true,
@@ -513,7 +516,6 @@ try {
   assert.equal(cashierCloseCycle.appliedActions, 1);
   assert.equal(cashierCloseCycle.failedActions, 0);
   assert.equal(database.getActiveTableOrder(table.id), null);
-  assert.equal(database.getDashboardData().androidActionFailures.some((failure) => failure.id === forbiddenCloseActionId), false);
 
   const deletionTargetResult = database.createManualRequest({
     requestType: "general_info",
@@ -532,13 +534,11 @@ try {
   assert.equal(deletionTargetResult.ok, true);
   const deletionTargetId = deletionTargetResult.savedId;
   const staffDeleteActionId = "android_request_delete_staff_0001";
-  await assertQueued(await enqueueAndroidAction(staffDeleteActionId, "customer_request_delete", {
+  const staffDeleteResponse = await enqueueAndroidAction(staffDeleteActionId, "customer_request_delete", {
     request_id: deletionTargetId
-  }));
-  const staffDeleteCycle = await coordinator.runNow();
-  assert.equal(staffDeleteCycle.appliedActions, 0);
-  assert.equal(staffDeleteCycle.failedActions, 1);
-  assert.match((await getAndroidAction(staffDeleteActionId)).error_message, /yalnız yönetici/i);
+  });
+  assert.equal(staffDeleteResponse.status, 403);
+  assert.equal((await staffDeleteResponse.json()).code, "android_action_permission_denied");
   assert.equal(database.getDashboardData().requests.some((request) => request.id === deletionTargetId), true);
 
   const managedCustomerResult = database.saveCustomer({
@@ -793,6 +793,14 @@ return [
   assert.equal(inactiveCycle.appliedActions, 0);
   assert.equal(inactiveCycle.failedActions, 1);
   assert.equal(database.getDashboardData().rooms.find((room) => room.id === roomBeforeInactiveAction.id)?.status, roomBeforeInactiveAction.status);
+  const inactiveSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
+  assert.equal(inactiveSummaryResponse.status, 200);
+  const inactiveSummary = await inactiveSummaryResponse.json();
+  assert.equal(inactiveSummary.approval_required, true);
+  assert.deepEqual(inactiveSummary.actions, [], "Pasif cihaz eski action sonuçlarını görmemeli.");
+  const reactivateResult = database.setAndroidDeviceActive("android-auto-smoke", true);
+  assert.equal(reactivateResult.ok, true);
+  await coordinator.runNow();
   const inactiveAction = await getAndroidAction(inactiveActionId);
   assert.equal(inactiveAction.status, "failed");
   assert.equal(inactiveAction.error_message, "Cihaz masaüstünde pasifleştirilmiş.");
@@ -901,6 +909,55 @@ return [
     "Son 100 kaydın dışındaki Android action hatası başarıyla çözülemedi."
   );
 
+  const stalePermissionSnapshot = createSnapshot(database);
+  stalePermissionSnapshot.business_capabilities = stalePermissionSnapshot.business_capabilities.filter((capability) => ![
+    BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS,
+    BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS,
+    BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS,
+    BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO
+  ].includes(capability));
+  stalePermissionSnapshot.androidPermissions["android-auto-smoke"] = {
+    role: "admin",
+    is_active: true,
+    permissions: ["room.update_status"]
+  };
+  const stalePermissionPublication = await syncApi({
+    action: "publish_android_snapshot",
+    client_id: "android-stale-capability-boundary-smoke",
+    source_revision: 1,
+    idempotency_key: "android-stale-capability-boundary-smoke-1",
+    snapshot: stalePermissionSnapshot
+  });
+  assert.equal(stalePermissionPublication.status, 200);
+  const staleCapabilitySummary = await (await syncApi({
+    action: "android_summary",
+    device_id: "android-auto-smoke"
+  })).json();
+  assert.deepEqual(
+    staleCapabilitySummary.actions,
+    [],
+    "Capability dışı eski Android action geçmişi telefona geri sızmamalı."
+  );
+  assert.equal(staleCapabilitySummary.summary.pending_action_count, 0);
+  const unchangedStaleCapabilitySummary = await (await syncApi({
+    action: "android_summary",
+    device_id: "android-auto-smoke",
+    known_server_revision: staleCapabilitySummary.server_revision
+  })).json();
+  assert.equal(unchangedStaleCapabilitySummary.not_modified, true);
+  assert.equal(
+    unchangedStaleCapabilitySummary.pending_action_count,
+    0,
+    "Not-modified özeti capability dışı bekleyen action sayısını göstermemeli."
+  );
+  const staleRoomPermissionResponse = await enqueueAndroidAction(
+    "android_stale_room_capability_0001",
+    "room_status_update",
+    { room_id: roomBefore.id, status: "cleaning" }
+  );
+  assert.equal(staleRoomPermissionResponse.status, 403);
+  assert.equal((await staleRoomPermissionResponse.json()).code, "android_action_capability_disabled");
+
   assert.equal(readFileSync(join(webModuleRoot, "data", "requests.json"), "utf8"), "[]\n");
   assert.equal(existsSync(join(webModuleRoot, "data", "yardimci-asistan.sqlite")), true);
   assert.equal(existsSync(join(webModuleRoot, "data", "requests.json.legacy-backup-v1")), true);
@@ -925,6 +982,7 @@ function createSnapshot(databaseInstance) {
   const activeTableOrders = databaseInstance.listTableOrders()
     .filter((order) => ["open", "preparing", "served", "payment"].includes(order.status));
   return {
+    business_capabilities: databaseInstance.getEnabledBusinessCapabilities(),
     summary: {
       pending_daily_tasks: data.summary.pendingDailyTasks,
       today_tasks: data.dailyTasks.length,

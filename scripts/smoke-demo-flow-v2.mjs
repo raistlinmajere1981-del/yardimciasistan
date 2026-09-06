@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { cpSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import net from "node:net";
@@ -25,6 +25,10 @@ cpSync(join(process.cwd(), "firm-template", "web-module"), webRoot, { recursive:
 for (const name of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
   rmSync(join(webRoot, "data", name), { force: true });
 }
+const businessFile = join(webRoot, "config", "business.json");
+const businessConfig = JSON.parse(readFileSync(businessFile, "utf8"));
+businessConfig.sync_secret = syncSecret;
+writeFileSync(businessFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
 
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
@@ -198,6 +202,7 @@ function snapshotFromDashboard(databaseInstance, dashboard) {
   }));
 
   return {
+    business_capabilities: databaseInstance.getEnabledBusinessCapabilities(),
     summary: {
       pending_daily_tasks: dashboard.summary.pendingDailyTasks,
       today_tasks: 0,

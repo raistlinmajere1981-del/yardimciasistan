@@ -33,6 +33,32 @@ server.stderr.on("data", (chunk) => { serverOutput += chunk.toString(); });
 try {
   await waitForUrl(`${baseUrl}/api/menu.php`);
 
+  const disabledPublication = await postJson(`${baseUrl}/api/sync.php`, {
+    action: "publish_android_snapshot",
+    client_id: "android-token-smoke-desktop",
+    source_revision: 1,
+    idempotency_key: "android-token-smoke-snapshot-disabled",
+    snapshot: createSnapshot(false, false)
+  }, {
+    "X-YA-Sync-Secret": syncSecret
+  });
+  assert.equal(disabledPublication.status, 200);
+
+  const disabledClaim = await claimToken();
+  assert.equal(disabledClaim.status, 403, "Android capability olmadan cihaz token alamamalı.");
+  assert.equal((await disabledClaim.json()).code, "android_capability_disabled");
+
+  const inactivePublication = await postJson(`${baseUrl}/api/sync.php`, {
+    action: "publish_android_snapshot",
+    client_id: "android-token-smoke-desktop",
+    source_revision: 2,
+    idempotency_key: "android-token-smoke-snapshot-2",
+    snapshot: createSnapshot(false)
+  }, {
+    "X-YA-Sync-Secret": syncSecret
+  });
+  assert.equal(inactivePublication.status, 200);
+
   const pendingClaim = await claimToken();
   assert.equal(pendingClaim.status, 403, "Onaysız cihaz token alamamalı.");
   assert.equal((await pendingClaim.json()).code, "device_approval_required");
@@ -40,8 +66,8 @@ try {
   const publication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
     client_id: "android-token-smoke-desktop",
-    source_revision: 1,
-    idempotency_key: "android-token-smoke-snapshot-1",
+    source_revision: 3,
+    idempotency_key: "android-token-smoke-snapshot-3",
     snapshot: createSnapshot(true)
   }, {
     "X-YA-Sync-Secret": syncSecret
@@ -127,14 +153,14 @@ try {
   });
   assert.equal(rotatedToken.status, 200);
 
-  const inactivePublication = await postJson(`${baseUrl}/api/sync.php`, {
+  const deactivationPublication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
     client_id: "android-token-smoke-desktop",
-    source_revision: 2,
-    idempotency_key: "android-token-smoke-snapshot-2",
+    source_revision: 4,
+    idempotency_key: "android-token-smoke-snapshot-4",
     snapshot: createSnapshot(false)
   }, { "X-YA-Sync-Secret": syncSecret });
-  assert.equal(inactivePublication.status, 200);
+  assert.equal(deactivationPublication.status, 200);
 
   const inactiveSummary = await postAndroid({ action: "android_summary", device_id: deviceId }, {
     "X-YA-Device-Token": secondToken
@@ -168,8 +194,15 @@ try {
   rmSync(tempRoot, { recursive: true, force: true });
 }
 
-function createSnapshot(isActive) {
+function createSnapshot(isActive, androidEnabled = true) {
   return {
+    business_capabilities: [
+      "core.customers",
+      ...(androidEnabled ? ["service.android"] : []),
+      "accommodation.rooms",
+      "food_service.tables",
+      "food_service.menu"
+    ],
     summary: {},
     daily_tasks: [],
     requests: [{

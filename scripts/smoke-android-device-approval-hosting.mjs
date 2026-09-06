@@ -110,6 +110,16 @@ async function publishSnapshot(sourceRevision, androidPermissions) {
     source_revision: sourceRevision,
     idempotency_key: `approval-smoke-${sourceRevision}`,
     snapshot: {
+      business_capabilities: [
+        "core.customers",
+        "core.tasks",
+        "core.finance",
+        "core.reports",
+        "service.android",
+        "accommodation.rooms",
+        "food_service.tables",
+        "food_service.menu"
+      ],
       summary: {
         pending_daily_tasks: 1,
         today_tasks: 1,

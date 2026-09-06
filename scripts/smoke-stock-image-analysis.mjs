@@ -19,6 +19,18 @@ const businessPath = join(webRoot, "config", "business.json");
 const business = JSON.parse(readFileSync(businessPath, "utf8"));
 business.sync_secret = secret;
 writeFileSync(businessPath, `${JSON.stringify(business, null, 2)}\n`);
+const enabledCapabilities = [
+  "core.customers",
+  "service.ai",
+  "service.android",
+  "food_service.menu",
+  "commerce.catalog",
+  "commerce.inventory"
+];
+const initialSnapshotPath = join(webRoot, "data", "android-snapshot.json");
+const initialSnapshot = JSON.parse(readFileSync(initialSnapshotPath, "utf8"));
+initialSnapshot.business_capabilities = enabledCapabilities;
+writeFileSync(initialSnapshotPath, `${JSON.stringify(initialSnapshot, null, 2)}\n`);
 
 const providerPort = await freePort();
 const providerRequests = [];
@@ -169,6 +181,7 @@ try {
       action: "publish_android_snapshot",
       client_id: "stock-image-smoke",
       snapshot: {
+        business_capabilities: enabledCapabilities,
         summary: {}, daily_tasks: [], requests: [], customers: [], reservations: [], rooms: [], tables: [],
         customer_room_stays: [],
         menu: { categories: [], items: [], updated_at: "2026-07-22T12:00:00+03:00" },

@@ -13,6 +13,10 @@ const menuFile = join(webModuleRoot, "data", "menu.json");
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
 const requestsFile = join(webModuleRoot, "data", "requests.json");
 const aiSettingsFile = join(webModuleRoot, "data", "ai-settings.local.php");
+const businessConfigFile = join(webModuleRoot, "config", "business.json");
+const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
+businessConfig.sync_secret = "change-this-secret";
+writeFileSync(businessConfigFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
 for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
 }
@@ -81,7 +85,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
   await page.goto(`${baseUrl}/menu.html`);
-  await expect(page.getByRole("heading", { name: "Deniz Çiçeği Menü" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: `${businessConfig.display_name} Menü` })).toBeVisible();
   await expect(page.getByRole("button", { name: "Kahvaltı" })).toBeVisible();
   await expect(page.getByText("Serpme Kahvaltı")).toBeVisible();
   await expect(page.getByRole("img", { name: "Serpme Kahvaltı (2 Kişilik)" })).toBeVisible();
@@ -213,43 +217,50 @@ try {
     stock_note: "Smoke stok notu"
   });
 
+  const androidStockSnapshot = {
+    business_capabilities: [
+      "service.android",
+      "food_service.menu",
+      "commerce.catalog",
+      "commerce.inventory"
+    ],
+    summary: {},
+    daily_tasks: [],
+    requests: [],
+    customers: [],
+    reservations: [],
+    rooms: [],
+    tables: [],
+    menu: { categories: [], items: [], updated_at: "2026-07-18T10:00:00+03:00" },
+    trackedStockItems: [
+      {
+        menu_item_id: "item_stock_snapshot_001",
+        name: "Snapshot Stok Ürünü",
+        category: "Smoke Test",
+        price: 12,
+        stock_quantity: 0,
+        stock_min_quantity: 2,
+        hide_when_out_of_stock: true,
+        stock_status: "out_of_stock"
+      }
+    ],
+    appliedStockImageHashes: ["A".repeat(64), "invalid-hash", "a".repeat(64)],
+    table_orders: [],
+    messages: [],
+    androidPermissions: {
+      "android-stock-web-smoke": {
+        role: "admin",
+        is_active: true,
+        permissions: ["menu.stock_view", "menu.stock_update"]
+      }
+    },
+    updated_at: "2026-07-18T10:00:00+03:00"
+  };
   const androidStockSnapshotResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
     data: {
       action: "publish_android_snapshot",
       sync_secret: "change-this-secret",
-      snapshot: {
-        summary: {},
-        daily_tasks: [],
-        requests: [],
-        customers: [],
-        reservations: [],
-        rooms: [],
-        tables: [],
-        menu: { categories: [], items: [], updated_at: "2026-07-18T10:00:00+03:00" },
-        trackedStockItems: [
-          {
-            menu_item_id: "item_stock_snapshot_001",
-            name: "Snapshot Stok Ürünü",
-            category: "Smoke Test",
-            price: 12,
-            stock_quantity: 0,
-            stock_min_quantity: 2,
-            hide_when_out_of_stock: true,
-            stock_status: "out_of_stock"
-          }
-        ],
-        appliedStockImageHashes: ["A".repeat(64), "invalid-hash", "a".repeat(64)],
-        table_orders: [],
-        messages: [],
-        androidPermissions: {
-          "android-stock-web-smoke": {
-            role: "admin",
-            is_active: true,
-            permissions: ["menu.stock_view", "menu.stock_update"]
-          }
-        },
-        updated_at: "2026-07-18T10:00:00+03:00"
-      }
+      snapshot: androidStockSnapshot
     }
   });
   expect(androidStockSnapshotResponse.ok()).toBe(true);
@@ -282,7 +293,7 @@ try {
     "menu.stock_update"
   ]);
 
-  for (const [index, actionType] of ["menu_stock_add", "menu_stock_set", "menu_stock_adjust", "menu_stock_image_import_apply"].entries()) {
+  for (const [index, actionType] of ["menu_stock_add", "menu_stock_set", "menu_stock_adjust"].entries()) {
     const enqueueStockAction = await page.request.post(`${baseUrl}/api/sync.php`, {
       data: {
         action: "enqueue_android_action",
@@ -290,28 +301,78 @@ try {
         action_id: `android_stock_action_${index}_0001`,
         action_type: actionType,
         device_id: "android-stock-web-smoke",
-        payload: actionType === "menu_stock_image_import_apply"
-          ? {
-              import_id: "stock_import_web_queue_0001",
-              image_hash: "b".repeat(64),
-              lines: [{ menu_item_id: "item_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
-            }
-          : { menu_item_id: "item_stock_snapshot_001", quantity: 1, quantity_change: 1, note: "Smoke" }
+        payload: { menu_item_id: "item_stock_snapshot_001", quantity: 1, quantity_change: 1, note: "Smoke" }
       }
     });
     expect(enqueueStockAction.ok()).toBe(true);
   }
 
-  const chatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+  const disabledAiStockImport = await page.request.post(`${baseUrl}/api/sync.php`, {
     data: {
-      message: "12 Temmuz için kesin rezervasyon yapabilir misiniz?",
-      history: [
-        {
-          role: "assistant",
-          content: "Merhaba, nasıl yardımcı olabilirim?"
-        }
-      ]
+      action: "enqueue_android_action",
+      sync_secret: "change-this-secret",
+      action_id: "android_stock_action_3_disabled",
+      action_type: "menu_stock_image_import_apply",
+      device_id: "android-stock-web-smoke",
+      payload: {
+        import_id: "stock_import_web_queue_disabled",
+        image_hash: "b".repeat(64),
+        lines: [{ menu_item_id: "item_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
+      }
     }
+  });
+  expect(disabledAiStockImport.status()).toBe(403);
+  expect(await disabledAiStockImport.json()).toMatchObject({ code: "android_action_capability_disabled" });
+
+  const disabledAiChatPayload = {
+    message: "12 Temmuz için kesin rezervasyon yapabilir misiniz?",
+    history: [
+      {
+        role: "assistant",
+        content: "Merhaba, nasıl yardımcı olabilirim?"
+      }
+    ]
+  };
+  const disabledAiChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: disabledAiChatPayload
+  });
+  expect(disabledAiChatResponse.status()).toBe(403);
+  expect(await disabledAiChatResponse.json()).toMatchObject({
+    ok: false,
+    code: "ai_capability_disabled"
+  });
+
+  const aiEnabledSnapshotResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    data: {
+      action: "publish_android_snapshot",
+      sync_secret: "change-this-secret",
+      snapshot: {
+        ...androidStockSnapshot,
+        business_capabilities: [...androidStockSnapshot.business_capabilities, "service.ai"],
+        updated_at: "2026-07-18T10:01:00+03:00"
+      }
+    }
+  });
+  expect(aiEnabledSnapshotResponse.ok()).toBe(true);
+
+  const enabledAiStockImport = await page.request.post(`${baseUrl}/api/sync.php`, {
+    data: {
+      action: "enqueue_android_action",
+      sync_secret: "change-this-secret",
+      action_id: "android_stock_action_3_0001",
+      action_type: "menu_stock_image_import_apply",
+      device_id: "android-stock-web-smoke",
+      payload: {
+        import_id: "stock_import_web_queue_0001",
+        image_hash: "b".repeat(64),
+        lines: [{ menu_item_id: "item_stock_snapshot_001", quantity: 1, raw_text: "1 adet", confidence: "high" }]
+      }
+    }
+  });
+  expect(enabledAiStockImport.ok()).toBe(true);
+
+  const chatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: disabledAiChatPayload
   });
   expect(chatResponse.ok()).toBe(true);
   const chatResult = await chatResponse.json();

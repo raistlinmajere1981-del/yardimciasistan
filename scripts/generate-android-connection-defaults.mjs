@@ -44,6 +44,7 @@ const configuredSyncSecret = firstNonEmpty(
   localConfig.sync_secret
 );
 const syncSecret = releaseBuild && !allowEmbeddedSyncSecret ? "" : configuredSyncSecret;
+const lockEmbeddedConnection = Boolean(webModuleUrl && syncSecret);
 const generatedAt = new Date().toISOString();
 
 if (!webModuleUrl) {
@@ -65,6 +66,7 @@ package com.yardimciasistan.android;
 final class ConnectionDefaults {
     static final String WEB_MODULE_URL = ${javaString(webModuleUrl)};
     static final String SYNC_SECRET = ${javaString(syncSecret)};
+    static final boolean LOCK_EMBEDDED_CONNECTION = ${lockEmbeddedConnection};
 
     private ConnectionDefaults() {}
 }
