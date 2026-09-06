@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
+import { runtimeHasCapability } from "../../app/capabilities";
 
 interface RoomDraftData {
   id: string;
@@ -21,6 +24,11 @@ interface RoomManagementSectionProps {
 }
 
 export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCountChange }: RoomManagementSectionProps) {
+  const capabilityRuntime = useBusinessCapabilityRuntime();
+  const roomsEnabled = runtimeHasCapability(
+    capabilityRuntime.snapshot,
+    BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS
+  );
   const [rooms, setRooms] = useState<RoomDraftState[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
@@ -28,6 +36,14 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
 
   useEffect(() => {
     let active = true;
+    if (!roomsEnabled) {
+      setRooms([]);
+      setLoading(false);
+      setSaveState("idle");
+      setMessage("");
+      return () => { active = false; };
+    }
+
     const load = async () => {
       const bridge = window.yardimciDesktop;
       if (!bridge?.getRoomFolioData) {
@@ -55,7 +71,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
     };
     void load();
     return () => { active = false; };
-  }, [dashboardRoomCount]);
+  }, [dashboardRoomCount, roomsEnabled]);
 
   const invalidMessage = useMemo(() => {
     const invalid = rooms.find((room) => !room.id || !room.name.trim() || parseMoneyToMinor(room.price) < 0);
@@ -73,7 +89,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
 
   const saveRooms = async () => {
     const bridge = window.yardimciDesktop;
-    if (!bridge?.setRoomNightlyPrice || !bridge.getRoomFolioData) return;
+    if (!roomsEnabled || !bridge?.setRoomNightlyPrice || !bridge.getRoomFolioData) return;
     if (invalidMessage) {
       setSaveState("error");
       setMessage(invalidMessage);
@@ -102,6 +118,10 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
       setMessage(error instanceof Error && error.message ? error.message : "Oda bilgileri kaydedilemedi.");
     }
   };
+
+  if (!roomsEnabled) {
+    return null;
+  }
 
   return (
     <section className="setup-section room-management-settings">
