@@ -162,3 +162,50 @@ export interface CommercePurchaseOrderDetail {
   order: CommercePurchaseOrder;
   items: CommercePurchaseOrderItem[];
 }
+
+export type MarketDraftStatus = "pending" | "reviewed";
+
+export interface CatalogProductDraft {
+  id: string;
+  businessId: string;
+  barcode: string;
+  proposedName: string;
+  sku: string;
+  proposedCategory: string;
+  proposedPurchasePrice: number;
+  proposedSalePrice: number;
+  currency: string;
+  unit: CommerceUnit;
+  note: string;
+  source: string;
+  createdByDevice: string;
+  status: MarketDraftStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommerceSaleDraft {
+  id: string;
+  businessId: string;
+  status: MarketDraftStatus;
+  source: string;
+  createdByDevice: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommerceSaleDraftItem {
+  id: string;
+  draftId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CommerceSaleDraftDetail {
+  draft: CommerceSaleDraft;
+  items: CommerceSaleDraftItem[];
+}

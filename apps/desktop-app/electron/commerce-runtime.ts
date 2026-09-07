@@ -54,6 +54,19 @@ import {
 } from "./commerce-store";
 
 export type { ReceiveCommercePurchaseInput, SetInventoryCountInput };
+export {
+  createMarketCartDraft,
+  createMarketProductDraft,
+  getMarketCartDraft,
+  listMarketCartDrafts,
+  listMarketProductDrafts
+} from "./market-companion-runtime";
+export type {
+  CreateMarketCartDraftInput,
+  CreateMarketProductDraftInput,
+  ListMarketCartDraftsOptions,
+  ListMarketProductDraftsOptions
+} from "./market-companion-runtime";
 
 export interface InventoryCountResult {
   balance: InventoryBalance;
