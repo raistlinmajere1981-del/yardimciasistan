@@ -33,6 +33,41 @@ takipli ürünün ekleme aksiyonu devre dışıdır.
 Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
 `Ayarlar` ekranında gösterilir.
 
+## Market Companion Foundation Reservation (M7.1)
+
+Market için ürün rolü şöyledir:
+
+```text
+Desktop = source of truth
+Android = retail handheld companion
+```
+
+M7.1 yalnız veri, izin, action queue, persistence ve Java model temelini ayırır; bu
+sürümde Market ekranı veya barkod kamera akışı eklenmedi. Hazırlanan sonraki mobil MVP
+hedefleri `Stock Count`, `Receiving`, `Product Draft`, `Cart Draft` ve kısa `Market
+Summary` akışlarıdır.
+
+Masaüstündeki tek `Market / El Terminali` görev grubu altı `market.*` iznini verir.
+İzinler cihaz rolünden sonra persisted business capability'lerle tekrar kesişir; admin
+rolü kapalı commerce/retail capability'sini aşamaz. Hosting kuyruğu aşağıdaki sözleşmeleri
+taşımaya hazırdır:
+
+```text
+market_stock_count          → absolute fiziksel stok sayımı
+market_purchase_receive     → mevcut atomik purchase + stock-in akışı
+market_product_draft_create → gerçek üründen ayrı inceleme taslağı
+market_cart_draft_create    → satış/stok/ödeme üretmeyen sepet taslağı
+```
+
+Snapshot'ın `market` alanı ürün, tedarikçi, yakın mal kabul ve draft listelerini ilgili
+capability kapalıyken kırpar. `retail.barcode` yoksa barkodlar yayınlanmaz. Satın alma
+modelinde bekleyen sipariş workflow'u bulunmadığından yalnız gerçek `received` kayıtları
+yakın mal kabul bilgisi olarak taşınır. Alan hiç yoksa Java parser boş Market modeliyle
+devam eder; eski ve Market dışı snapshot'lar geçerliliğini korur.
+
+Android Market UI, full mobile POS, telefonda ödeme, iadeler, fatura OCR, ürün
+fotoğrafları ve local LAN transport M7.2 veya sonrasına bırakılmıştır.
+
 Uygulama ön plandayken canlı özet yaklaşık 15 saniyede bir otomatik kontrol edilir.
 Sunucu revision'ı değişmediyse tam snapshot indirilmez. Son başarılı JSON özeti
 `SharedPreferences` cache'inde tutulduğu için uygulama ağ yokken de son veriyi açabilir.

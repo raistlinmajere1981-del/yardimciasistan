@@ -1,6 +1,6 @@
 # Yardımcı Asistan — Modüler İşletme Temeli ve Market Handoff
 
-> Güncellik: 2026-09-03  
+> Güncellik: 2026-09-07
 > Amaç: Pansiyon/restoran odaklı ilk üründen, farklı küçük işletme türlerinin aynı çekirdeği paylaşabildiği capability-first mimariye geçişte alınan kararların tek referansı olmak.
 
 ## 1. Ürün yönü
@@ -328,6 +328,7 @@ market-sale-runtime-smoke-ok
 market-barcode-input-contract-smoke-ok
 market-label-printer-contract-smoke-ok
 market-profile-availability-smoke-ok
+market-android-foundation-smoke-ok
 ```
 
 ## 10. Architecture audit tarafından korunan sınırlar
@@ -416,6 +417,94 @@ Workspace `businessType` ile değil persisted capabilities ile açılır.
 - Perakende capability override grubu hibrit işletmeler için görünür
 - `other` planlı kalır
 
+### M7.1 — Android Market Companion foundation — CLOSED
+
+Rol ayrımı açıktır:
+
+```text
+Desktop = source of truth
+Android = retail handheld companion
+```
+
+Android masaüstü Market'in küçük bir kopyası veya masaüstü çalışmasının bağımlılığı
+değildir. Bu aşamada Android UI eklenmedi. Snapshot parser, action queue, masaüstü
+uygulama sınırı ve explicit draft persistence aşağıdaki sonraki mobil MVP akışlarını
+taşıyacak biçimde hazırlandı:
+
+```text
+Stock Count
+Receiving
+Product Draft
+Cart Draft
+Market Summary
+```
+
+Tek kullanıcı görevi `market_operations` (`Market / El Terminali`) grubudur. Grup
+şu granular izinleri verir ve her izin ayrıca persisted business capability ile
+kesiştirilir:
+
+```text
+market.summary.view   → etkin commerce/retail capability'lerinden en az biri
+market.product.view   → commerce.catalog
+market.stock_count    → commerce.inventory
+market.receiving      → retail.purchasing
+market.product_draft  → commerce.catalog
+market.cart_draft     → commerce.catalog + commerce.sales
+```
+
+Admin rolü de bu capability kesişimini aşamaz. Saf Market profilinde Android ayarları
+yalnız `market_operations` grubunu gösterir; oda, rezervasyon, masa, restoran siparişi
+ve restoran menü stok izinleri Market grubuna taşınmaz.
+
+Snapshot'taki ayrı `market` alanı kısa satış/stok/mal kabul özetini, mobil için gereken
+minimum ürün alanlarını, izinli tedarikçileri, yakın mal kabullerini ve iki taslak
+türünü taşır. Barkod `retail.barcode`, stok alanları `commerce.inventory`, tedarikçi
+kimliği `retail.suppliers`, yakın alımlar `retail.purchasing`, satış özeti ve sepet
+taslakları `commerce.sales` ile kırpılır. Mevcut satın alma store'u bekleyen sipariş
+workflow'u üretmediği için snapshot sahte `pending purchase order` içermez; yalnız
+gerçek `received` kayıtlarından yakın mal kabul bağlamı yayınlanır.
+
+Android action sözleşmeleri:
+
+```text
+market_stock_count
+market_purchase_receive
+market_product_draft_create
+market_cart_draft_create
+```
+
+`market_stock_count` telefondan absolute fiziksel miktar alır; delta masaüstündeki
+mevcut inventory transaction'ında hesaplanır ve aynı miktar için sıfır hareket yazılmaz.
+`market_purchase_receive` mevcut atomik purchase + stock-in store'unu kullanır. İki
+taslak action'ı gerçek ürün veya satış oluşturmaz.
+
+Yeni additive SQLite tabloları:
+
+```text
+catalog_product_drafts
+commerce_sale_drafts
+commerce_sale_draft_items
+```
+
+Product draft bilinmeyen barkod, önerilen ürün alanları, kaynak/cihaz, zaman ve
+`pending|reviewed` durumunu tutar. Cart draft ürün adı snapshot'lı satırları ve miktarı
+tutar; stok, `commerce_sales`, ödeme veya finans kaydı üretmez. Masaüstü UI'den bağımsız
+create/list/get runtime yardımcıları sonraki entegrasyon için hazırdır. Her Android
+mutation'ı cihaz effective permission, persisted capability, payload/store validation,
+tek transaction ve mevcut action receipt idempotency sınırından geçer.
+
+M7.2 ve sonrasına bırakılanlar:
+
+```text
+Android Market UI
+full mobile POS
+payment
+returns
+invoice OCR
+product photos
+local LAN transport
+```
+
 ## 13. Market MVP veri alanları
 
 Ürün:
@@ -468,4 +557,7 @@ Yeni session'ın ilk işi repo head'ini okuyup aşağıdaki checkpoint'i doğrul
 node scripts/check-modular-foundation.mjs
 ```
 
-Bu yeşil değilse yeni sektör veya ileri Market geliştirmesine başlanmamalıdır. Market MVP foundation temizse sonraki iş artık temel Market özelliği eklemek değil; canlı kullanım/saha testi, ergonomi düzeltmeleri ve gerçek cihaz ihtiyacına göre adapter genişletmeleridir.
+Bu yeşil değilse yeni sektör veya ileri Market geliştirmesine başlanmamalıdır. M7.1
+foundation temizse sonraki Market işi M7.2 kapsamındaki Android ekranları ve masaüstü
+taslak içe alma deneyimi olarak ayrıca planlanmalıdır; M7.1 veri sözleşmesine tam mobil
+POS veya ödeme davranışı eklenmemelidir.
