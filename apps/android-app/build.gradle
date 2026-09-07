@@ -141,6 +141,7 @@ dependencies {
   implementation "androidx.core:core:1.16.0"
   implementation "androidx.exifinterface:exifinterface:1.4.1"
   testImplementation "junit:junit:4.13.2"
+  testImplementation "org.json:json:20240303"
 }
 
 def generateConnectionDefaults = tasks.register("generateConnectionDefaults", Exec) {
