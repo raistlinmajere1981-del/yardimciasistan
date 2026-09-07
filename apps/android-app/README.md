@@ -6,7 +6,8 @@ kaynağı olmaya devam eder.
 
 ## Ekranlar
 
-Alt navigasyonda beş operasyon ekranı bulunur:
+Alt navigasyon işletmenin capability ve cihaz izinlerine göre ilgili operasyon
+ekranlarını gösterir:
 
 - **Bugün:** kompakt sayaç şeridi ile yeni talep, rezervasyon, günlük iş, hesap ve
   kritik stok kayıtlarından oluşan tek bir öncelikli işler listesi.
@@ -17,6 +18,8 @@ Alt navigasyonda beş operasyon ekranı bulunur:
 - **Restoran:** yetkiye göre gösterilen `Masalar`, `Açık Adisyon` ve `Stok` modları.
   Masa kartları en fazla iki ana aksiyon taşır; stok düzenleme ayrıca açılan işlem
   yüzeyindedir.
+- **Market:** barkod/ürün arama, mutlak fiziksel stok sayımı, çok satırlı mal kabul,
+  masaüstüne gönderilen sepet taslağı, yeni ürün taslağı ve gerçek Market özeti.
 - **Mesajlar:** `Hazır Mesajlar` ve `Cevap Bekleyenler` segmentleri. Kartlar kısa
   önizleme gösterir, uzun mesaj tam ekran detayda açılır.
 
@@ -33,7 +36,7 @@ takipli ürünün ekleme aksiyonu devre dışıdır.
 Bağlantı adresi, güvenlik anahtarı, son senkron zamanı ve telefon işlem sonuçları ayrı
 `Ayarlar` ekranında gösterilir.
 
-## Market Companion Foundation Reservation (M7.1)
+## Market Companion (M7.2)
 
 Market için ürün rolü şöyledir:
 
@@ -42,10 +45,11 @@ Desktop = source of truth
 Android = retail handheld companion
 ```
 
-M7.1 yalnız veri, izin, action queue, persistence ve Java model temelini ayırır; bu
-sürümde Market ekranı veya barkod kamera akışı eklenmedi. Hazırlanan sonraki mobil MVP
-hedefleri `Stock Count`, `Receiving`, `Product Draft`, `Cart Draft` ve kısa `Market
-Summary` akışlarıdır.
+M7.1'in veri, izin, action queue ve persistence temeli M7.2'de telefon odaklı Market
+ekranlarıyla kullanılır. Uygulama masaüstü POS'unu kopyalamaz: sayım fiziksel miktarı
+mutlak değer olarak yollar, mal kabul mevcut purchase runtime'ını kullanır, ürün ve
+sepet yalnız inceleme taslağıdır. Telefonda satış, ödeme, stok düşürme veya finance
+mutation oluşturulmaz.
 
 Masaüstündeki tek `Market / El Terminali` görev grubu altı `market.*` iznini verir.
 İzinler cihaz rolünden sonra persisted business capability'lerle tekrar kesişir; admin
@@ -65,8 +69,13 @@ modelinde bekleyen sipariş workflow'u bulunmadığından yalnız gerçek `recei
 yakın mal kabul bilgisi olarak taşınır. Alan hiç yoksa Java parser boş Market modeliyle
 devam eder; eski ve Market dışı snapshot'lar geçerliliğini korur.
 
-Android Market UI, full mobile POS, telefonda ödeme, iadeler, fatura OCR, ürün
-fotoğrafları ve local LAN transport M7.2 veya sonrasına bırakılmıştır.
+Market ana ekranındaki barkod alanı harici/HID el terminali girişini ve elle barkod
+girişini aynı çözümleme akışında kullanır. Repoda kamera görüntüsünden barkod çözen bir
+altyapı olmadığı için M7.2 yeni scanner framework eklemez; `retail.barcode` kapalıysa
+`Barkod Tara` CTA'ları tamamen gizlenir ve ürün seçme/arama akışı açık kalır.
+
+Full mobile POS, telefonda ödeme, iadeler, fatura OCR, ürün fotoğrafları, bekleyen satın
+alma siparişi ve local LAN transport kapsam dışıdır.
 
 Uygulama ön plandayken canlı özet yaklaşık 15 saniyede bir otomatik kontrol edilir.
 Sunucu revision'ı değişmediyse tam snapshot indirilmez. Son başarılı JSON özeti
@@ -242,6 +251,13 @@ Bağlı telefonda gerçek UI ve action queue smoke testi:
 
 ```bash
 npm run smoke:android-device-ui
+```
+
+Saf Market profili, barkod akışları, ekran dönüşünde sepet state'i ve taslak gönderimi
+için odaklı fiziksel cihaz smoke testi:
+
+```bash
+npm run smoke:android-market-device-ui
 ```
 
 ADB üzerinden ekran görüntüsü, UI ağacı ve aynalama:

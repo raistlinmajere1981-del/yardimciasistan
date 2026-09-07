@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "npm run debug",
+    "test": "node ../../scripts/run-android-gradle.mjs testDebugUnitTest",
     "debug": "node ../../scripts/run-android-gradle.mjs assembleDebug",
     "release-apk": "node ../../scripts/run-android-gradle.mjs assembleRelease",
     "release-aab": "node ../../scripts/run-android-gradle.mjs bundleRelease",

@@ -49,6 +49,14 @@ const customerReservationPermissions = [
   "reservation.view",
   "reservation.approve"
 ];
+const marketPermissions = [
+  "market.summary.view",
+  "market.product.view",
+  "market.stock_count",
+  "market.receiving",
+  "market.product_draft",
+  "market.cart_draft"
+];
 const staffPermissions = [...serviceOrderPermissions, ...roomsTasksPermissions];
 const adminPermissions = [
   "customer.view",
@@ -134,6 +142,14 @@ async function main() {
   prepareAppForUi(baseUrl);
   await delay(options.settleMs);
   await waitForUiText("Öncelikli işler", 12000);
+  if (options.marketOnly) {
+    await runMarketOnly(baseUrl);
+    await restoreEmbeddedConnectionAfterTest();
+    console.log("android-market-device-ui-smoke-ok");
+    cleanup();
+    await waitForPhoneTestExit();
+    return;
+  }
   if (options.reportsOnly) {
     await runReportsOnly(baseUrl);
     await restoreEmbeddedConnectionAfterTest();
@@ -824,7 +840,8 @@ function parseArgs(args) {
     settleMs: 1800,
     noBuild: false,
     stockImageOnly: false,
-    reportsOnly: false
+    reportsOnly: false,
+    marketOnly: false
   };
 
   for (let index = 0; index < args.length; index += 1) {
@@ -835,6 +852,8 @@ function parseArgs(args) {
       parsed.stockImageOnly = true;
     } else if (arg === "--reports-only") {
       parsed.reportsOnly = true;
+    } else if (arg === "--market-only") {
+      parsed.marketOnly = true;
     } else if (arg.startsWith("--hold-ms=")) {
       parsed.holdMs = Number(arg.slice("--hold-ms=".length));
     } else if (arg === "--hold-ms") {
@@ -863,11 +882,263 @@ function parseArgs(args) {
   if (parsed.holdMs < 8000) {
     throw new Error("--hold-ms Android UI smoke için en az 8000 olmalı.");
   }
-  if (parsed.stockImageOnly && parsed.reportsOnly) {
-    throw new Error("--stock-image-only ve --reports-only birlikte kullanılamaz.");
+  if ([parsed.stockImageOnly, parsed.reportsOnly, parsed.marketOnly].filter(Boolean).length > 1) {
+    throw new Error("--stock-image-only, --reports-only ve --market-only birlikte kullanılamaz.");
   }
 
   return parsed;
+}
+
+async function runMarketOnly(baseUrl) {
+  const deviceId = readDeviceId();
+  const snapshot = JSON.parse(readFileSync(demoSnapshotFile, "utf8"));
+  snapshot.business_capabilities = [
+    "service.android",
+    "commerce.catalog",
+    "commerce.inventory",
+    "commerce.sales",
+    "retail.barcode",
+    "retail.purchasing",
+    "retail.suppliers"
+  ];
+  snapshot.androidPermissions = {
+    [deviceId]: {
+      role: "staff",
+      is_active: true,
+      permissions: marketPermissions
+    }
+  };
+  snapshot.market = {
+    summary: {
+      today_sale_count: 3,
+      today_sales_total: 105,
+      currency: "TRY",
+      critical_stock_count: 1,
+      recent_stock_adjustments: [
+        {
+          id: "market-adjustment-device-1",
+          product_id: "market-product-cola",
+          product_name: "Test Kola 330 ml",
+          type: "count",
+          quantity_delta: -1,
+          quantity_after: 7,
+          note: "Sabah raf sayımı",
+          created_at: new Date().toISOString()
+        }
+      ],
+      recent_receiving_count: 1
+    },
+    products: [
+      {
+        id: "market-product-cola",
+        name: "Test Kola 330 ml",
+        sku: "KOLA-330",
+        barcode: "8690000000001",
+        unit: "piece",
+        sale_price: 35,
+        currency: "TRY",
+        is_active: true,
+        track_inventory: true,
+        current_quantity: 7,
+        minimum_quantity: 8,
+        inventory_updated_at: new Date().toISOString()
+      },
+      {
+        id: "market-product-water",
+        name: "Test Su 500 ml",
+        sku: "SU-500",
+        barcode: "8690000000002",
+        unit: "piece",
+        sale_price: 10,
+        currency: "TRY",
+        is_active: true,
+        track_inventory: true,
+        current_quantity: 24,
+        minimum_quantity: 5,
+        inventory_updated_at: new Date().toISOString()
+      }
+    ],
+    suppliers: [
+      { id: "market-supplier-device-1", name: "Test Tedarikçi", is_active: true }
+    ],
+    recent_purchases: [
+      {
+        id: "market-purchase-device-1",
+        supplier_id: "market-supplier-device-1",
+        supplier_name: "Test Tedarikçi",
+        status: "received",
+        received_at: new Date().toISOString(),
+        total: 120,
+        currency: "TRY",
+        line_count: 2
+      }
+    ],
+    product_drafts: [],
+    cart_drafts: []
+  };
+  await publishSnapshot(baseUrl, snapshot, "Market cihaz testi");
+  relaunchApp();
+
+  let xml = await waitForUiCondition(
+    (candidate) => candidate.includes('text="Market"')
+      && !candidate.includes('text="Pansiyon"')
+      && !candidate.includes('text="Restoran"'),
+    12000,
+    "Saf Market profili Android navigation'a uygulanmadı."
+  );
+  assertNotContains(xml, ['text="Pansiyon"', 'text="Restoran"', 'text="Müşteri"']);
+  tap(centerOf(findClickableBoundsByText(xml, "Market")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Saha işlemleri")
+      && candidate.includes("Barkod Tara")
+      && candidate.includes("Stok Say")
+      && candidate.includes("Mal Kabul")
+      && candidate.includes("Yeni Ürün"),
+    8000,
+    "Market ana ekranı açılamadı."
+  );
+  assertContains(xml, [
+    "MARKET", "Saha işlemleri", "Barkod Tara", "Stok Say", "Mal Kabul", "Sepet", "Yeni Ürün",
+    "Bugün", "Satış", "Kritik stok"
+  ]);
+  assertNotContains(xml, ["Bekleyen sipariş", "Satışı Tamamla"]);
+  captureScreenshot("market-home.png");
+  scrollToBottom();
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Son stok hareketleri")
+      && candidate.includes("Son mal kabuller")
+      && candidate.includes("Test Tedarikçi"),
+    5000,
+    "Market gerçek hareket özetleri kaydırma alanında görünmedi."
+  );
+  assertContains(xml, ["Son stok hareketleri", "Test Kola 330 ml", "Son mal kabuller", "Test Tedarikçi"]);
+  captureScreenshot("market-home-summary.png");
+  scrollToTop();
+  await delay(300);
+  xml = dumpUi("market-home-top.xml");
+
+  tap(centerOf(findClickableBoundsByText(xml, "Stok Say")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Fiziksel miktarı olduğu gibi kaydedin")
+      && candidate.includes("Ürün seçilmedi"),
+    5000,
+    "Market stok sayım ekranı açılamadı."
+  );
+  assertContains(xml, ["Barkod Tara", "Ürün Seç", "Ürün seçilmedi"]);
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiText("Saha işlemleri", 5000);
+
+  xml = dumpUi("market-home-before-receiving.xml");
+  tap(centerOf(findClickableBoundsByText(xml, "Mal Kabul")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Birden çok ürün satırı hazırlayın")
+      && candidate.includes("Tedarikçi seçilmedi")
+      && candidate.includes("Ürün satırları"),
+    5000,
+    "Market mal kabul ekranı açılamadı."
+  );
+  assertContains(xml, ["Tedarikçi (isteğe bağlı)", "Toplam satır", "Tahmini maliyet"]);
+  scrollToBottom();
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Not (isteğe bağlı)") && candidate.includes("Mal Kabulü Gönder"),
+    5000,
+    "Market mal kabul alt eylemleri görünmedi."
+  );
+  scrollToTop();
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiText("Saha işlemleri", 5000);
+
+  await enterMarketBarcode("8699999999999");
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Barkod kayıtlı değil.")
+      && candidate.includes("Yeni Ürün Taslağı"),
+    5000,
+    "Bilinmeyen barkod akışı açılamadı."
+  );
+  tap(centerOf(findClickableBoundsByText(xml, "Yeni Ürün Taslağı")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Masaüstünde kontrol edilip ürün kartına dönüştürülecek.")
+      && candidate.includes("Ürün adı")
+      && candidate.includes("SKU (isteğe bağlı)"),
+    5000,
+    "Yeni ürün taslak ekranı açılamadı."
+  );
+  assertContains(xml, ["Barkod", "8699999999999", "Ürün adı", "SKU (isteğe bağlı)", "Birim", "Alış fiyatı (isteğe bağlı)"]);
+  captureScreenshot("market-product-draft.png");
+  scrollToBottom();
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Satış fiyatı (isteğe bağlı)")
+      && candidate.includes("Kategori (isteğe bağlı)")
+      && candidate.includes("Taslak Gönder"),
+    5000,
+    "Yeni ürün taslağının alt alanları görünmedi."
+  );
+  assertContains(xml, ["Satış fiyatı (isteğe bağlı)", "Kategori (isteğe bağlı)", "Not", "Taslak Gönder"]);
+  captureScreenshot("market-product-draft-bottom.png");
+  adb(["shell", "input", "keyevent", "KEYCODE_BACK"]);
+  await waitForUiText("Saha işlemleri", 5000);
+
+  await enterMarketBarcode("8690000000001");
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Test Kola 330 ml")
+      && candidate.includes("Sepete Ekle")
+      && candidate.includes("Mal Kabule Ekle"),
+    5000,
+    "Bilinen barkod ürün kartına çözülemedi."
+  );
+  assertContains(xml, ["Barkod: 8690000000001", "Stok: 7 adet", "Fiyat:", "35", "Sepete Ekle", "Stok Say", "Mal Kabule Ekle"]);
+  captureScreenshot("market-known-barcode.png");
+  tap(centerOf(findClickableBoundsByText(xml, "Sepete Ekle")));
+  await waitForUiText("Sepet satırları", 5000);
+  await enterMarketBarcode("8690000000001");
+  await waitForUiText("Sepet satırları", 5000);
+  scrollToBottom();
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Masaüstüne Gönder") && candidate.includes("70,00"),
+    5000,
+    "Aynı barkod ikinci okutulduğunda sepet miktarı artırılmadı."
+  );
+  assertNotContains(xml, ["Ödeme", "Satışı Tamamla"]);
+
+  adb(["shell", "settings", "put", "system", "user_rotation", "1"]);
+  adb(["shell", "wm", "set-user-rotation", "lock", "1"], { allowFailure: true });
+  await waitForUiCondition(
+    (candidate) => candidate.includes("Sepet satırları") && candidate.includes("70,00"),
+    8000,
+    "Sepet draft state ekran dönüşünde korunmadı."
+  );
+  captureScreenshot("market-cart-landscape.png");
+  adb(["shell", "settings", "put", "system", "user_rotation", "0"]);
+  adb(["shell", "wm", "set-user-rotation", "lock", "0"], { allowFailure: true });
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Sepet satırları") && candidate.includes("70,00"),
+    8000,
+    "Sepet portreye dönüşte korunmadı."
+  );
+  scrollToBottom();
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Masaüstüne Gönder") && candidate.includes("70,00"),
+    5000,
+    "Sepet gönderim eylemi kaydırma alanında görünmedi."
+  );
+  tap(centerOf(findClickableBoundsByText(xml, "Masaüstüne Gönder")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("Sepet masaüstü için hazırlandı."),
+    12000,
+    "Sepet taslağı gönderim geri bildirimi alınamadı."
+  );
+  assertContains(xml, ["Masaüstü uygulaması bekleniyor", "Sepet masaüstü için hazırlandı."]);
+  captureScreenshot("market-cart-sent.png");
+}
+
+async function enterMarketBarcode(barcode) {
+  let xml = dumpUi(`market-barcode-before-${barcode}.xml`);
+  const barcodeButton = xml.includes('text="▣  Barkod Tara"') ? "▣  Barkod Tara" : "Barkod Tara";
+  tap(centerOf(findClickableBoundsByText(xml, barcodeButton)));
+  await waitForUiText("El terminaliyle okutun veya barkodu elle girin.", 5000);
+  adb(["shell", "input", "text", barcode]);
+  xml = dumpUi(`market-barcode-entry-${barcode}.xml`);
+  tap(centerOf(findClickableBoundsByText(xml, "BUL")));
 }
 
 async function runReportsOnly(baseUrl) {
