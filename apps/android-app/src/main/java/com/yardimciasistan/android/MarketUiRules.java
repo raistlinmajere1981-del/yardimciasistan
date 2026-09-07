@@ -280,7 +280,14 @@ final class MarketUiRules {
       }
       CartLine existing = lines.get(product.id);
       if (existing == null) {
-        lines.put(product.id, new CartLine(product.id, product.name, product.salePrice, product.currency, 1));
+        lines.put(product.id, new CartLine(
+            product.id,
+            product.name,
+            product.salePrice,
+            product.currency,
+            product.unit,
+            1
+        ));
       } else {
         existing.quantity = round(existing.quantity + 1, 4);
       }
@@ -353,13 +360,22 @@ final class MarketUiRules {
     final String productName;
     final double unitPrice;
     final String currency;
+    final String unit;
     double quantity;
 
-    CartLine(String productId, String productName, double unitPrice, String currency, double quantity) {
+    CartLine(
+        String productId,
+        String productName,
+        double unitPrice,
+        String currency,
+        String unit,
+        double quantity
+    ) {
       this.productId = productId;
       this.productName = productName;
       this.unitPrice = Math.max(0, unitPrice);
       this.currency = text(currency).isEmpty() ? "TRY" : text(currency);
+      this.unit = text(unit).isEmpty() ? "piece" : text(unit);
       this.quantity = quantity;
     }
   }
@@ -376,12 +392,18 @@ final class MarketUiRules {
       }
       double quantity = parsePositiveQuantity(rawQuantity, "Miktar");
       double unitCost = parseUnitCost(rawUnitCost);
+      String currency = text(product.currency).isEmpty() ? "TRY" : text(product.currency);
+      for (ReceivingLine existing : lines.values()) {
+        if (!existing.productId.equals(product.id) && !existing.currency.equals(currency)) {
+          throw new ValidationException("Tek mal kabulünde ürün para birimleri aynı olmalı.");
+        }
+      }
       lines.put(product.id, new ReceivingLine(
           product.id,
           product.name,
           quantity,
           round(unitCost, 2),
-          text(product.currency).isEmpty() ? "TRY" : text(product.currency)
+          currency
       ));
     }
 

@@ -72,6 +72,7 @@ public final class MainActivity extends ComponentActivity {
   private static final String TAB_CUSTOMERS = AndroidUiRules.TAB_CUSTOMERS;
   private static final String TAB_PENSION = AndroidUiRules.TAB_PENSION;
   private static final String TAB_RESTAURANT = AndroidUiRules.TAB_RESTAURANT;
+  private static final String TAB_MARKET = AndroidUiRules.TAB_MARKET;
   private static final String TAB_MESSAGES = AndroidUiRules.TAB_MESSAGES;
   private static final String TAB_CASH = AndroidUiRules.TAB_CASH;
   private static final String TAB_REPORTS = AndroidUiRules.TAB_REPORTS;
@@ -93,6 +94,7 @@ public final class MainActivity extends ComponentActivity {
   private ActionOutbox actionOutbox;
   private OperationCache operationCache;
   private LocalNotificationCenter localNotifications;
+  private MarketWorkspace marketWorkspace;
   private OperationData data = new OperationData();
   private DeviceIdentity identity;
   private String activeTab = TAB_TODAY;
@@ -163,6 +165,9 @@ public final class MainActivity extends ComponentActivity {
           render();
           return;
         }
+        if (TAB_MARKET.equals(activeTab) && marketWorkspace != null && marketWorkspace.handleBack()) {
+          return;
+        }
         if (TAB_REPORTS.equals(activeTab) || TAB_CASH.equals(activeTab)) {
           activeTab = TAB_TODAY;
           settingsOpen = true;
@@ -183,6 +188,22 @@ public final class MainActivity extends ComponentActivity {
     actionOutbox = new ActionOutbox(preferences);
     operationCache = new OperationCache(preferences, identity.deviceId);
     localNotifications = new LocalNotificationCenter(this, preferences);
+    marketWorkspace = new MarketWorkspace(this, new MarketWorkspace.Listener() {
+      @Override
+      public boolean onSubmit(
+          String actionType,
+          JSONObject actionPayload,
+          String acceptedMessage,
+          String queuedMessage
+      ) {
+        return sendMarketAction(actionType, actionPayload, acceptedMessage, queuedMessage);
+      }
+
+      @Override
+      public void onRenderRequested() {
+        render();
+      }
+    });
     OperationData cachedData = operationCache.load();
     if (cachedData != null) {
       data = cachedData;
@@ -1366,6 +1387,9 @@ public final class MainActivity extends ComponentActivity {
     } else if (TAB_RESTAURANT.equals(activeTab)) {
       headerTitle.setText("Restoran");
       screen = restaurantScreen();
+    } else if (TAB_MARKET.equals(activeTab)) {
+      headerTitle.setText("Market");
+      screen = marketWorkspace.create(data, localPendingActionCount(), loading);
     } else if (TAB_MESSAGES.equals(activeTab)) {
       headerTitle.setText("Mesajlar");
       screen = messagesScreen();
@@ -1422,6 +1446,9 @@ public final class MainActivity extends ComponentActivity {
     if (TAB_RESTAURANT.equals(activeTab)) {
       return TAB_RESTAURANT + ":" + restaurantMode;
     }
+    if (TAB_MARKET.equals(activeTab)) {
+      return TAB_MARKET + ":" + (marketWorkspace == null ? "home" : marketWorkspace.screenKey());
+    }
     if (TAB_MESSAGES.equals(activeTab)) {
       return TAB_MESSAGES + ":" + messageMode;
     }
@@ -1460,6 +1487,9 @@ public final class MainActivity extends ComponentActivity {
     }
     if (canOpenTab(TAB_RESTAURANT)) {
       addNavButton("Restoran", TAB_RESTAURANT);
+    }
+    if (canOpenTab(TAB_MARKET)) {
+      addNavButton("Market", TAB_MARKET);
     }
     if (canOpenTab(TAB_MESSAGES)) {
       addNavButton("Mesajlar", TAB_MESSAGES);
@@ -4689,6 +4719,10 @@ public final class MainActivity extends ComponentActivity {
       showError(error.getMessage());
       return;
     }
+    final boolean retryingOnlyMarketActions = containsOnlyMarketActions(pendingToRetry);
+    final String retriedMarketActionType = retryingOnlyMarketActions && !pendingToRetry.isEmpty()
+        ? pendingToRetry.get(pendingToRetry.size() - 1).type
+        : "";
 
     preferences.edit()
         .putString(ConnectionSettings.KEY_WEB_MODULE_URL, baseUrl)
@@ -4742,6 +4776,12 @@ public final class MainActivity extends ComponentActivity {
             showError(discardedActionCount + " bekleyen telefon işlemi yeni yetki veya capability sınırı nedeniyle iptal edildi.");
           } else {
             clearError();
+            if (retryingOnlyMarketActions && marketWorkspace != null) {
+              marketWorkspace.onSubmissionAccepted(
+                  retriedMarketActionType,
+                  "Bekleyen Market işlemi masaüstüne gönderildi."
+              );
+            }
           }
           if (!fetched.notModified || !pendingToRetry.isEmpty()) {
             render();
@@ -4774,10 +4814,27 @@ public final class MainActivity extends ComponentActivity {
         runOnUiThread(() -> {
           loading = false;
           connectionState = error.getMessage();
-          showError(error.getMessage());
+          if (retryingOnlyMarketActions && marketWorkspace != null) {
+            clearError();
+            marketWorkspace.onSubmissionQueued(
+                retriedMarketActionType,
+                "Gönderim bekliyor. Bağlantı gelince yeniden gönderilecek."
+            );
+            render();
+          } else {
+            showError(error.getMessage());
+          }
         });
       }
     });
+  }
+
+  private boolean containsOnlyMarketActions(List<ActionOutbox.PendingAction> pendingActions) {
+    if (pendingActions == null || pendingActions.isEmpty()) return false;
+    for (ActionOutbox.PendingAction pending : pendingActions) {
+      if (MarketUiRules.requiredPermissionForAction(pending.type) == null) return false;
+    }
+    return true;
   }
 
   private void sendAction(String actionType, JSONObject actionPayload, String successMessage) {
@@ -4787,26 +4844,45 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void sendActions(List<ActionSpec> actions, String successMessage) {
+    sendActionsInternal(actions, successMessage, null);
+  }
+
+  private boolean sendMarketAction(
+      String actionType,
+      JSONObject actionPayload,
+      String acceptedMessage,
+      String queuedMessage
+  ) {
+    ArrayList<ActionSpec> actions = new ArrayList<>();
+    actions.add(new ActionSpec(actionType, actionPayload));
+    return sendActionsInternal(actions, acceptedMessage, queuedMessage);
+  }
+
+  private boolean sendActionsInternal(
+      List<ActionSpec> actions,
+      String successMessage,
+      String marketQueuedMessage
+  ) {
     if (loading) {
       Toast.makeText(this, "Devam eden bağlantı işleminin bitmesini bekleyin.", Toast.LENGTH_SHORT).show();
-      return;
+      return false;
     }
     if (data.permissionsResolved && !data.deviceActive) {
       showError("Cihaz masaüstünde pasifleştirilmiş.");
-      return;
+      return false;
     }
     for (ActionSpec action : actions) {
       if (isAdminOnlyAction(action.type) && !data.isAdmin()) {
         String message = "Bu işlem yalnız yönetici cihazlarda kullanılabilir.";
         showError(message);
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        return;
+        return false;
       }
       if (!actionAllowedByCapabilities(action)) {
         String message = "Bu işlem işletmenin etkin özellikleri dışında.";
         showError(message);
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        return;
+        return false;
       }
       String requiredPermission = requiredPermissionForAction(action.type, action.payload);
       if (requiredPermission == null || !data.hasPermission(requiredPermission)) {
@@ -4815,30 +4891,30 @@ public final class MainActivity extends ComponentActivity {
             : "Bu cihazın bu işlem için yetkisi yok.";
         showError(message);
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
-        return;
+        return false;
       }
     }
     String baseUrl = ConnectionSettings.webModuleUrl(preferences);
     String syncSecret = ConnectionSettings.syncSecret(preferences);
     if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
       showError("İşlem gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
-      return;
+      return false;
     }
 
     try {
       if (!actionOutbox.load().isEmpty()) {
         Toast.makeText(this, "Önce telefonda bekleyen işlem yeniden gönderiliyor.", Toast.LENGTH_SHORT).show();
         syncFromHosting(false);
-        return;
+        return false;
       }
     } catch (ActionOutbox.OutboxException error) {
       showError(error.getMessage());
-      return;
+      return false;
     }
     if (data.pendingActions > 0) {
       showError("Önce masaüstünü bekleyen işlemleri uygulayın ve canlı veriyi yenileyin.");
       Toast.makeText(this, "Güncel sonuç alınmadan yeni işlem gönderilemez.", Toast.LENGTH_SHORT).show();
-      return;
+      return false;
     }
 
     ArrayList<ActionOutbox.PendingAction> pendingActions = new ArrayList<>();
@@ -4855,9 +4931,10 @@ public final class MainActivity extends ComponentActivity {
       actionOutbox.appendAll(pendingActions);
     } catch (ActionOutbox.OutboxException error) {
       showError(error.getMessage());
-      return;
+      return false;
     }
 
+    final String feedbackActionType = actions.size() == 1 ? actions.get(0).type : "";
     loading = true;
     clearError();
     executor.execute(() -> {
@@ -4875,9 +4952,25 @@ public final class MainActivity extends ComponentActivity {
           }
           data.pendingActions += queued.size();
           clearError();
+          if (marketQueuedMessage != null && marketWorkspace != null) {
+            marketWorkspace.onSubmissionAccepted(feedbackActionType, successMessage);
+            Toast.makeText(this, successMessage, Toast.LENGTH_SHORT).show();
+          }
           render();
         });
       } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException error) {
+        boolean rejected = error instanceof HostingSyncClient.SyncException
+            && ((HostingSyncClient.SyncException) error).invalidatesPendingAction();
+        if (rejected) {
+          for (ActionOutbox.PendingAction pending : pendingActions) {
+            try {
+              actionOutbox.remove(pending.id);
+            } catch (ActionOutbox.OutboxException ignored) {
+              // The visible error remains actionable and the next sync retries cleanup.
+            }
+          }
+        }
+        final boolean actionRemainsQueued = !rejected && marketQueuedMessage != null;
         runOnUiThread(() -> {
           loading = false;
           if (!queued.isEmpty()) {
@@ -4886,13 +4979,21 @@ public final class MainActivity extends ComponentActivity {
             }
             data.pendingActions += queued.size();
           }
-          showError(queued.isEmpty()
-              ? "İşlem gönderilemedi. " + error.getMessage()
-              : "İşlemin bir bölümü gönderildi; kalan bölüm gönderilemedi. " + error.getMessage());
+          if (actionRemainsQueued && marketWorkspace != null) {
+            connectionState = error.getMessage();
+            clearError();
+            marketWorkspace.onSubmissionQueued(feedbackActionType, marketQueuedMessage);
+            Toast.makeText(this, marketQueuedMessage, Toast.LENGTH_SHORT).show();
+          } else {
+            showError(queued.isEmpty()
+                ? "İşlem gönderilemedi. " + error.getMessage()
+                : "İşlemin bir bölümü gönderildi; kalan bölüm gönderilemedi. " + error.getMessage());
+          }
           render();
         });
       }
     });
+    return true;
   }
 
   private void showError(String message) {
@@ -4943,6 +5044,10 @@ public final class MainActivity extends ComponentActivity {
   private boolean actionAllowedByCapabilities(ActionSpec action) {
     if (action == null || !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID)) {
       return false;
+    }
+    String marketPermission = MarketUiRules.requiredPermissionForAction(action.type);
+    if (marketPermission != null) {
+      return data.hasPermission(marketPermission);
     }
     if ("customer_request_convert_to_reservation".equals(action.type)) {
       OperationData.RequestRecord request = data.requestById(action.payload.optString("request_id", ""));
@@ -5091,6 +5196,14 @@ public final class MainActivity extends ComponentActivity {
       case "menu_stock_adjust":
       case "menu_stock_image_import_apply":
         return "menu.stock_update";
+      case MarketUiRules.ACTION_STOCK_COUNT:
+        return MarketUiRules.PERMISSION_STOCK_COUNT;
+      case MarketUiRules.ACTION_PURCHASE_RECEIVE:
+        return MarketUiRules.PERMISSION_RECEIVING;
+      case MarketUiRules.ACTION_PRODUCT_DRAFT_CREATE:
+        return MarketUiRules.PERMISSION_PRODUCT_DRAFT;
+      case MarketUiRules.ACTION_CART_DRAFT_CREATE:
+        return MarketUiRules.PERMISSION_CART_DRAFT;
       case "table_order_set_status":
         String status = actionPayload.optString("status", "");
         if ("served".equals(status)) {
@@ -5830,6 +5943,10 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private String formatActionType(String value) {
+    if (MarketUiRules.ACTION_STOCK_COUNT.equals(value)) return "Market stok sayımı";
+    if (MarketUiRules.ACTION_PURCHASE_RECEIVE.equals(value)) return "Market mal kabulü";
+    if (MarketUiRules.ACTION_PRODUCT_DRAFT_CREATE.equals(value)) return "Yeni ürün taslağı";
+    if (MarketUiRules.ACTION_CART_DRAFT_CREATE.equals(value)) return "Market sepet taslağı";
     if ("customer_create".equals(value)) return "Müşteri oluşturma";
     if ("customer_update".equals(value)) return "Müşteri güncelleme";
     if ("customer_room_assign".equals(value)) return "Müşteri-oda ataması";

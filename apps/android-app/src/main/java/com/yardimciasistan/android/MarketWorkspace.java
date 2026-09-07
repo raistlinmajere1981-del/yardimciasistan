@@ -1,0 +1,1222 @@
+package com.yardimciasistan.android;
+
+import android.app.AlertDialog;
+import android.content.Context;
+import android.graphics.Typeface;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.Spinner;
+import android.widget.TextView;
+
+import org.json.JSONObject;
+
+import java.text.NumberFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/** Phone-first Market companion surface backed only by M7.1 snapshots/actions. */
+final class MarketWorkspace {
+  interface Listener {
+    boolean onSubmit(
+        String actionType,
+        JSONObject payload,
+        String acceptedMessage,
+        String queuedMessage
+    );
+
+    void onRenderRequested();
+  }
+
+  private interface ProductListener {
+    void onProduct(OperationData.MarketProduct product);
+  }
+
+  private static final String SCREEN_HOME = "home";
+  private static final String SCREEN_BARCODE_RESULT = "barcode_result";
+  private static final String SCREEN_STOCK = "stock";
+  private static final String SCREEN_RECEIVING = "receiving";
+  private static final String SCREEN_CART = "cart";
+  private static final String SCREEN_PRODUCT_DRAFT = "product_draft";
+
+  private static final String PURPOSE_LOOKUP = "lookup";
+  private static final String PURPOSE_STOCK = "stock";
+  private static final String PURPOSE_RECEIVING = "receiving";
+  private static final String PURPOSE_CART = "cart";
+  private static final String PURPOSE_PRODUCT_DRAFT = "product_draft";
+
+  private static final String[] UNIT_VALUES = {
+      "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
+  };
+  private static final String[] UNIT_LABELS = {
+      "Adet", "Kilogram", "Gram", "Litre", "Mililitre", "Paket", "Kutu", "Metre", "Diğer"
+  };
+
+  private final Context context;
+  private final Listener listener;
+  private final MarketUiRules.CartDraft cart = new MarketUiRules.CartDraft();
+  private final MarketUiRules.ReceivingDraft receiving = new MarketUiRules.ReceivingDraft();
+
+  private OperationData data = new OperationData();
+  private String screen = SCREEN_HOME;
+  private String resultReturnScreen = SCREEN_HOME;
+  private String barcodeResult = "";
+  private String barcodeResultProductId = "";
+  private String stockProductId = "";
+  private String stockCountText = "";
+  private String stockNote = "";
+  private String productDraftBarcode = "";
+  private String productDraftName = "";
+  private String productDraftSku = "";
+  private String productDraftUnit = "piece";
+  private String productDraftPurchasePrice = "";
+  private String productDraftSalePrice = "";
+  private String productDraftCategory = "";
+  private String productDraftNote = "";
+  private String visibleMessage = "";
+  private boolean visibleMessagePending;
+  private String formError = "";
+  private int localPendingCount;
+  private boolean loading;
+
+  MarketWorkspace(Context context, Listener listener) {
+    this.context = context;
+    this.listener = listener;
+  }
+
+  ScrollView create(OperationData nextData, int nextLocalPendingCount, boolean nextLoading) {
+    data = nextData == null ? new OperationData() : nextData;
+    localPendingCount = Math.max(0, nextLocalPendingCount);
+    loading = nextLoading;
+    enforceVisibleScreen();
+
+    LinearLayout page;
+    if (SCREEN_STOCK.equals(screen)) {
+      page = stockScreen();
+    } else if (SCREEN_RECEIVING.equals(screen)) {
+      page = receivingScreen();
+    } else if (SCREEN_CART.equals(screen)) {
+      page = cartScreen();
+    } else if (SCREEN_PRODUCT_DRAFT.equals(screen)) {
+      page = productDraftScreen();
+    } else if (SCREEN_BARCODE_RESULT.equals(screen)) {
+      page = barcodeResultScreen();
+    } else {
+      page = homeScreen();
+    }
+    return UiKit.scroll(context, page);
+  }
+
+  boolean handleBack() {
+    if (SCREEN_HOME.equals(screen)) return false;
+    if (SCREEN_BARCODE_RESULT.equals(screen)) {
+      screen = resultReturnScreen;
+    } else {
+      screen = SCREEN_HOME;
+    }
+    formError = "";
+    listener.onRenderRequested();
+    return true;
+  }
+
+  String screenKey() {
+    return screen;
+  }
+
+  void onSubmissionAccepted(String actionType, String message) {
+    if (!isMarketAction(actionType)) return;
+    visibleMessage = message;
+    visibleMessagePending = false;
+  }
+
+  void onSubmissionQueued(String actionType, String message) {
+    if (!isMarketAction(actionType)) return;
+    visibleMessage = message;
+    visibleMessagePending = true;
+  }
+
+  private void enforceVisibleScreen() {
+    if (!MarketUiRules.canOpenMarket(data)) {
+      screen = SCREEN_HOME;
+      return;
+    }
+    if (SCREEN_STOCK.equals(screen) && !MarketUiRules.canStockCount(data)) screen = SCREEN_HOME;
+    if (SCREEN_RECEIVING.equals(screen) && !MarketUiRules.canReceive(data)) screen = SCREEN_HOME;
+    if (SCREEN_CART.equals(screen) && !MarketUiRules.canCreateCartDraft(data)) screen = SCREEN_HOME;
+    if (SCREEN_PRODUCT_DRAFT.equals(screen) && !MarketUiRules.canCreateProductDraft(data)) screen = SCREEN_HOME;
+    if (SCREEN_BARCODE_RESULT.equals(screen) && !MarketUiRules.canViewProducts(data)) screen = SCREEN_HOME;
+  }
+
+  private LinearLayout homeScreen() {
+    LinearLayout page = UiKit.column(context);
+    page.addView(UiKit.eyebrow(context, "MARKET"));
+    TextView title = UiKit.title(context, "Saha işlemleri");
+    LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+    titleParams.setMargins(0, dp(3), 0, dp(12));
+    title.setLayoutParams(titleParams);
+    page.addView(title);
+
+    addPendingState(page);
+
+    if (MarketUiRules.canScanBarcode(data)) {
+      Button barcode = UiKit.button(context, "▣  Barkod Tara", UiKit.PRIMARY,
+          view -> showBarcodeEntry(PURPOSE_LOOKUP));
+      barcode.setContentDescription("Barkod tara veya barkod okuyucudan gir");
+      barcode.setLayoutParams(fullButtonParams(58, 0, 12));
+      page.addView(barcode);
+    }
+
+    ArrayList<ActionItem> actions = new ArrayList<>();
+    if (MarketUiRules.canStockCount(data)) {
+      actions.add(new ActionItem("Stok Say", () -> openScreen(SCREEN_STOCK)));
+    }
+    if (MarketUiRules.canReceive(data)) {
+      actions.add(new ActionItem("Mal Kabul", () -> openScreen(SCREEN_RECEIVING)));
+    }
+    if (MarketUiRules.canCreateCartDraft(data)) {
+      actions.add(new ActionItem("Sepet", () -> openScreen(SCREEN_CART)));
+    }
+    if (MarketUiRules.canCreateProductDraft(data)) {
+      actions.add(new ActionItem("Yeni Ürün", () -> showBarcodeEntry(PURPOSE_PRODUCT_DRAFT)));
+    }
+    addActionGrid(page, actions);
+
+    if (MarketUiRules.canViewProducts(data)) {
+      Button search = UiKit.outlineButton(context, "Ürün Ara", view -> showProductPicker(PURPOSE_LOOKUP, false));
+      search.setLayoutParams(fullButtonParams(48, actions.isEmpty() ? 0 : 2, 10));
+      page.addView(search);
+    }
+
+    if (MarketUiRules.canViewSummary(data)) {
+      addMarketSummary(page);
+    }
+    return page;
+  }
+
+  private void addActionGrid(LinearLayout page, List<ActionItem> actions) {
+    for (int index = 0; index < actions.size(); index += 2) {
+      LinearLayout row = UiKit.row(context);
+      LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+      rowParams.setMargins(0, 0, 0, dp(8));
+      row.setLayoutParams(rowParams);
+      addGridAction(row, actions.get(index));
+      if (index + 1 < actions.size()) {
+        addGridAction(row, actions.get(index + 1));
+      } else {
+        View spacer = new View(context);
+        LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(0, dp(52), 1f);
+        spacerParams.setMargins(dp(7), 0, 0, 0);
+        spacer.setLayoutParams(spacerParams);
+        row.addView(spacer);
+      }
+      page.addView(row);
+    }
+  }
+
+  private void addGridAction(LinearLayout row, ActionItem action) {
+    Button button = UiKit.outlineButton(context, action.label, view -> action.action.run());
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(52), 1f);
+    if (row.getChildCount() > 0) params.setMargins(dp(7), 0, 0, 0);
+    button.setLayoutParams(params);
+    row.addView(button);
+  }
+
+  private void addPendingState(LinearLayout page) {
+    String outboxState = MarketUiRules.pendingStatus(localPendingCount, data.pendingActions);
+    if (!outboxState.isEmpty()) {
+      page.addView(messageCard(outboxState, true));
+    }
+    if (!visibleMessage.isEmpty() && !visibleMessage.equals(outboxState)) {
+      page.addView(messageCard(visibleMessage, visibleMessagePending));
+    }
+  }
+
+  private void addMarketSummary(LinearLayout page) {
+    page.addView(UiKit.sectionTitle(context, "Bugün"));
+    OperationData.MarketSummary summary = data.market.summary;
+    LinearLayout metrics = UiKit.card(context);
+    int metricsShown = 0;
+    if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_SALES)) {
+      addMetric(metrics, metricsShown++, "Satış", summary.todaySaleCount + " · " + money(summary.todaySalesTotal, summary.currency), UiKit.SUCCESS);
+    }
+    if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)) {
+      addMetric(metrics, metricsShown++, "Kritik stok", String.valueOf(summary.criticalStockCount),
+          summary.criticalStockCount > 0 ? UiKit.WARNING : UiKit.SUCCESS);
+    }
+    if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_PURCHASING)) {
+      addMetric(metrics, metricsShown++, "Mal kabul", String.valueOf(summary.recentReceivingCount), UiKit.INFO);
+    }
+    if (metricsShown > 0) page.addView(metrics);
+
+    if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)
+        && !summary.recentStockAdjustments.isEmpty()) {
+      page.addView(UiKit.sectionTitle(context, "Son stok hareketleri"));
+      int shown = 0;
+      for (OperationData.MarketStockAdjustment adjustment : summary.recentStockAdjustments) {
+        if (shown >= 8) break;
+        LinearLayout card = UiKit.card(context);
+        card.addView(UiKit.text(context, adjustment.productName, 14, UiKit.TEXT, Typeface.BOLD));
+        card.addView(UiKit.text(
+            context,
+            "Gerçek stok: " + quantity(adjustment.quantityAfter) + " · " + shortTime(adjustment.createdAt),
+            12,
+            UiKit.SECONDARY,
+            Typeface.NORMAL
+        ));
+        if (!adjustment.note.isEmpty()) {
+          card.addView(UiKit.text(context, adjustment.note, 11, UiKit.MUTED, Typeface.NORMAL));
+        }
+        page.addView(card);
+        shown += 1;
+      }
+    }
+
+    if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_PURCHASING)
+        && !data.market.recentPurchases.isEmpty()) {
+      page.addView(UiKit.sectionTitle(context, "Son mal kabuller"));
+      int shown = 0;
+      for (OperationData.MarketPurchase purchase : data.market.recentPurchases) {
+        if (shown >= 6) break;
+        LinearLayout card = UiKit.card(context);
+        card.addView(UiKit.text(
+            context,
+            purchase.supplierName.isEmpty() ? "Mal kabul" : purchase.supplierName,
+            14,
+            UiKit.TEXT,
+            Typeface.BOLD
+        ));
+        card.addView(UiKit.text(
+            context,
+            purchase.lineCount + " satır · " + money(purchase.total, purchase.currency)
+                + " · " + shortTime(purchase.receivedAt),
+            12,
+            UiKit.SECONDARY,
+            Typeface.NORMAL
+        ));
+        page.addView(card);
+        shown += 1;
+      }
+    }
+  }
+
+  private void addMetric(LinearLayout card, int index, String label, String value, int tone) {
+    if (index > 0) card.addView(UiKit.divider(context));
+    LinearLayout row = UiKit.row(context);
+    TextView labelView = UiKit.text(context, label, 13, UiKit.SECONDARY, Typeface.NORMAL);
+    labelView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    row.addView(labelView);
+    row.addView(UiKit.text(context, value, 14, tone, Typeface.BOLD));
+    card.addView(row);
+  }
+
+  private LinearLayout barcodeResultScreen() {
+    LinearLayout page = UiKit.column(context);
+    addBackHeader(page, "Barkod sonucu", barcodeResult);
+    addPendingState(page);
+    OperationData.MarketProduct product = MarketUiRules.productById(data, barcodeResultProductId);
+    if (product == null) {
+      LinearLayout unknown = UiKit.card(context);
+      unknown.addView(UiKit.text(context, "Barkod kayıtlı değil.", 18, UiKit.TEXT, Typeface.BOLD));
+      unknown.addView(UiKit.text(context, "Barkod: " + barcodeResult, 13, UiKit.SECONDARY, Typeface.NORMAL));
+      if (MarketUiRules.canCreateProductDraft(data)) {
+        Button draft = UiKit.button(context, "Yeni Ürün Taslağı", UiKit.PRIMARY, view -> startProductDraft(barcodeResult));
+        draft.setLayoutParams(fullButtonParams(48, 12, 0));
+        unknown.addView(draft);
+      }
+      page.addView(unknown);
+      if (MarketUiRules.canScanBarcode(data)) {
+        Button retry = UiKit.outlineButton(context, "Başka Barkod Tara", view -> showBarcodeEntry(PURPOSE_LOOKUP));
+        retry.setLayoutParams(fullButtonParams(48, 2, 0));
+        page.addView(retry);
+      }
+      return page;
+    }
+
+    page.addView(productCard(product, true));
+    return page;
+  }
+
+  private LinearLayout productCard(OperationData.MarketProduct product, boolean withActions) {
+    LinearLayout card = UiKit.card(context);
+    card.addView(UiKit.text(context, product.name, 18, UiKit.TEXT, Typeface.BOLD));
+    if (!product.barcode.isEmpty()) {
+      card.addView(UiKit.text(context, "Barkod: " + product.barcode, 12, UiKit.SECONDARY, Typeface.NORMAL));
+    }
+    if (data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY) && product.trackInventory) {
+      card.addView(UiKit.text(
+          context,
+          "Stok: " + quantity(product.currentQuantity) + " " + unitLabel(product.unit),
+          14,
+          UiKit.WARNING,
+          Typeface.BOLD
+      ));
+    }
+    card.addView(UiKit.text(
+        context,
+        "Fiyat: " + money(product.salePrice, product.currency),
+        14,
+        UiKit.SUCCESS,
+        Typeface.BOLD
+    ));
+    if (!withActions) return card;
+
+    ArrayList<ActionItem> actions = new ArrayList<>();
+    if (MarketUiRules.canCreateCartDraft(data)) {
+      actions.add(new ActionItem("Sepete Ekle", () -> addProductToCart(product)));
+    }
+    if (MarketUiRules.canStockCount(data) && product.trackInventory) {
+      actions.add(new ActionItem("Stok Say", () -> {
+        stockProductId = product.id;
+        openScreen(SCREEN_STOCK);
+      }));
+    }
+    if (MarketUiRules.canReceive(data) && product.trackInventory) {
+      actions.add(new ActionItem("Mal Kabule Ekle", () -> showReceivingLineDialog(product)));
+    }
+    for (ActionItem action : actions) {
+      Button button = UiKit.outlineButton(context, action.label, view -> action.action.run());
+      button.setLayoutParams(fullButtonParams(48, 10, 0));
+      card.addView(button);
+    }
+    return card;
+  }
+
+  private LinearLayout stockScreen() {
+    LinearLayout page = UiKit.column(context);
+    addBackHeader(page, "Stok Say", "Fiziksel miktarı olduğu gibi kaydedin");
+    addPendingState(page);
+    addFormError(page);
+    addProductSelectionActions(page, PURPOSE_STOCK, true);
+
+    OperationData.MarketProduct product = MarketUiRules.productById(data, stockProductId);
+    if (product == null || !product.trackInventory) {
+      page.addView(emptyCard("Ürün seçilmedi", "Barkod okutun veya stok takibine açık bir ürün seçin."));
+      return page;
+    }
+
+    LinearLayout productInfo = UiKit.card(context);
+    productInfo.addView(UiKit.text(context, product.name, 17, UiKit.TEXT, Typeface.BOLD));
+    productInfo.addView(UiKit.text(
+        context,
+        "Sistem miktarı: " + quantity(product.currentQuantity) + " " + unitLabel(product.unit),
+        13,
+        UiKit.SECONDARY,
+        Typeface.NORMAL
+    ));
+    productInfo.addView(UiKit.text(
+        context,
+        "Gönderimden sonra bu değer tahmini olarak değiştirilmez; yeni snapshot beklenir.",
+        11,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    ));
+    page.addView(productInfo);
+
+    EditText counted = labeledInput(page, "Fiziksel miktar", "0");
+    counted.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+    bind(counted, stockCountText, value -> stockCountText = value);
+    EditText note = labeledMultiline(page, "Not (isteğe bağlı)", "Raf / sayım notu");
+    bind(note, stockNote, value -> stockNote = value);
+
+    Button save = UiKit.button(context, "Sayımı Kaydet", UiKit.PRIMARY, view -> submitStockCount(product));
+    save.setEnabled(!submissionBlocked());
+    save.setLayoutParams(fullButtonParams(52, 4, 0));
+    page.addView(save);
+    return page;
+  }
+
+  private void submitStockCount(OperationData.MarketProduct product) {
+    try {
+      JSONObject payload = MarketUiRules.stockCountPayload(product, stockCountText, stockNote);
+      boolean queued = listener.onSubmit(
+          MarketUiRules.ACTION_STOCK_COUNT,
+          payload,
+          "Sayım masaüstüne gönderildi. Gerçek stok yeni snapshot ile gösterilecek.",
+          "Sayım gönderim kuyruğuna alındı. Gerçek stok yeni snapshot ile gösterilecek."
+      );
+      if (queued) {
+        stockCountText = "";
+        stockNote = "";
+        formError = "";
+        visibleMessage = "Sayım gönderim kuyruğuna alındı. Gerçek stok yeni snapshot ile gösterilecek.";
+        visibleMessagePending = true;
+        listener.onRenderRequested();
+      }
+    } catch (MarketUiRules.ValidationException error) {
+      showFormError(error.getMessage());
+    }
+  }
+
+  private LinearLayout receivingScreen() {
+    LinearLayout page = UiKit.column(context);
+    addBackHeader(page, "Mal Kabul", "Birden çok ürün satırı hazırlayın");
+    addPendingState(page);
+    addFormError(page);
+
+    addSupplierPicker(page);
+    addProductSelectionActions(page, PURPOSE_RECEIVING, true);
+
+    page.addView(UiKit.sectionTitle(context, "Ürün satırları"));
+    if (receiving.size() == 0) {
+      page.addView(emptyCard("Henüz ürün yok", "Barkod okutun veya listeden ürün ekleyin."));
+    } else {
+      for (MarketUiRules.ReceivingLine line : receiving.lines()) {
+        page.addView(receivingLineCard(line));
+      }
+    }
+
+    LinearLayout totals = UiKit.card(context);
+    addMetric(totals, 0, "Toplam satır", String.valueOf(receiving.size()), UiKit.INFO);
+    addMetric(totals, 1, "Tahmini maliyet", money(receiving.total(), receivingCurrency()), UiKit.SUCCESS);
+    page.addView(totals);
+
+    EditText note = labeledMultiline(page, "Not (isteğe bağlı)", "Mal kabul notu");
+    bind(note, receiving.note, value -> receiving.note = value);
+
+    Button submit = UiKit.button(context, "Mal Kabulü Gönder", UiKit.PRIMARY, view -> confirmReceiving());
+    submit.setEnabled(receiving.size() > 0 && !submissionBlocked());
+    submit.setLayoutParams(fullButtonParams(52, 4, 0));
+    page.addView(submit);
+    return page;
+  }
+
+  private void addSupplierPicker(LinearLayout page) {
+    if (data.market.suppliers.isEmpty()) return;
+    ArrayList<SupplierChoice> choices = new ArrayList<>();
+    choices.add(new SupplierChoice("", "Tedarikçi seçilmedi"));
+    int selected = 0;
+    for (OperationData.MarketSupplier supplier : data.market.suppliers) {
+      if (!supplier.active) continue;
+      choices.add(new SupplierChoice(supplier.id, supplier.name));
+      if (supplier.id.equals(receiving.supplierId)) selected = choices.size() - 1;
+    }
+    if (choices.size() <= 1) return;
+    addFieldLabel(page, "Tedarikçi (isteğe bağlı)");
+    Spinner spinner = new Spinner(context);
+    ArrayAdapter<SupplierChoice> adapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, choices);
+    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spinner.setAdapter(adapter);
+    spinner.setSelection(selected);
+    spinner.setBackground(UiKit.rounded(context, UiKit.SURFACE, UiKit.BORDER, 11));
+    spinner.setLayoutParams(fieldParams(50));
+    spinner.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
+      SupplierChoice choice = (SupplierChoice) spinner.getSelectedItem();
+      receiving.supplierId = choice == null ? "" : choice.id;
+    }));
+    page.addView(spinner);
+  }
+
+  private LinearLayout receivingLineCard(MarketUiRules.ReceivingLine line) {
+    LinearLayout card = UiKit.card(context);
+    card.addView(UiKit.text(context, line.productName, 15, UiKit.TEXT, Typeface.BOLD));
+    card.addView(UiKit.text(
+        context,
+        quantity(line.quantity) + " × " + money(line.unitCost, line.currency)
+            + " = " + money(line.quantity * line.unitCost, line.currency),
+        12,
+        UiKit.SECONDARY,
+        Typeface.NORMAL
+    ));
+    LinearLayout actions = UiKit.row(context);
+    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
+    actionParams.setMargins(0, dp(9), 0, 0);
+    actions.setLayoutParams(actionParams);
+    OperationData.MarketProduct product = MarketUiRules.productById(data, line.productId);
+    Button edit = UiKit.outlineButton(context, "Düzenle", view -> {
+      if (product != null) showReceivingLineDialog(product);
+    });
+    edit.setEnabled(product != null);
+    UiKit.addAction(actions, edit, context);
+    UiKit.addAction(actions, UiKit.dangerButton(context, "Kaldır", view -> {
+      receiving.remove(line.productId);
+      listener.onRenderRequested();
+    }), context);
+    card.addView(actions);
+    return card;
+  }
+
+  private void showReceivingLineDialog(OperationData.MarketProduct product) {
+    if (product == null || !product.trackInventory || !MarketUiRules.canReceive(data)) return;
+    MarketUiRules.ReceivingLine existing = receiving.line(product.id);
+    LinearLayout form = dialogForm();
+    form.addView(UiKit.text(context, product.name, 16, UiKit.TEXT, Typeface.BOLD));
+    EditText quantity = labeledInput(form, "Miktar", "1");
+    quantity.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+    quantity.setText(existing == null ? "1" : quantity(existing.quantity));
+    EditText unitCost = labeledInput(form, "Birim alış fiyatı", "0,00");
+    unitCost.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+    unitCost.setText(existing == null ? "" : quantity(existing.unitCost));
+    TextView status = statusText();
+    form.addView(status);
+
+    AlertDialog dialog = new AlertDialog.Builder(context)
+        .setTitle(existing == null ? "Mal kabule ekle" : "Satırı düzenle")
+        .setView(wrapDialog(form))
+        .setNegativeButton("Vazgeç", null)
+        .setPositiveButton(existing == null ? "Satır Ekle" : "Kaydet", null)
+        .create();
+    dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+      try {
+        receiving.putProduct(product, value(quantity), value(unitCost));
+        formError = "";
+        screen = SCREEN_RECEIVING;
+        dialog.dismiss();
+        listener.onRenderRequested();
+      } catch (MarketUiRules.ValidationException error) {
+        status.setText(error.getMessage());
+      }
+    }));
+    dialog.show();
+  }
+
+  private void confirmReceiving() {
+    final JSONObject payload;
+    try {
+      payload = receiving.toPayload();
+    } catch (MarketUiRules.ValidationException error) {
+      showFormError(error.getMessage());
+      return;
+    }
+    String supplier = supplierName(receiving.supplierId);
+    String message = receiving.size() + " ürün satırı\n"
+        + "Tahmini maliyet: " + money(receiving.total(), receivingCurrency())
+        + (supplier.isEmpty() ? "" : "\nTedarikçi: " + supplier);
+    new AlertDialog.Builder(context)
+        .setTitle("Mal kabulünü gönder")
+        .setMessage(message)
+        .setNegativeButton("Geri Dön", null)
+        .setPositiveButton("Gönder", (dialog, which) -> {
+          boolean queued = listener.onSubmit(
+              MarketUiRules.ACTION_PURCHASE_RECEIVE,
+              payload,
+              "Mal kabulü masaüstüne gönderildi.",
+              "Mal kabulü gönderim kuyruğuna alındı."
+          );
+          if (queued) {
+            receiving.clear();
+            formError = "";
+            visibleMessage = "Mal kabulü gönderim kuyruğuna alındı.";
+            visibleMessagePending = true;
+            listener.onRenderRequested();
+          }
+        })
+        .show();
+  }
+
+  private LinearLayout cartScreen() {
+    LinearLayout page = UiKit.column(context);
+    addBackHeader(page, "Sepet", "Satış değil; masaüstü için taslak hazırlayın");
+    addPendingState(page);
+    addFormError(page);
+    addProductSelectionActions(page, PURPOSE_CART, false);
+
+    page.addView(UiKit.sectionTitle(context, "Sepet satırları"));
+    if (cart.size() == 0) {
+      page.addView(emptyCard("Sepet boş", "Barkod okutun veya ürün seçin. Her okutma miktarı 1 artırır."));
+    } else {
+      for (MarketUiRules.CartLine line : cart.lines()) {
+        page.addView(cartLineCard(line));
+      }
+    }
+
+    LinearLayout total = UiKit.card(context);
+    addMetric(total, 0, "Toplam ürün", String.valueOf(cart.size()), UiKit.INFO);
+    addMetric(total, 1, "Tahmini toplam", money(cart.estimatedTotal(), cartCurrency()), UiKit.SUCCESS);
+    page.addView(total);
+
+    EditText note = labeledMultiline(page, "Not (isteğe bağlı)", "Masaüstü için sepet notu");
+    bind(note, cart.note, value -> cart.note = value);
+
+    Button send = UiKit.button(context, "Masaüstüne Gönder", UiKit.PRIMARY, view -> submitCart());
+    send.setEnabled(cart.size() > 0 && !submissionBlocked());
+    send.setLayoutParams(fullButtonParams(54, 4, 0));
+    page.addView(send);
+    return page;
+  }
+
+  private LinearLayout cartLineCard(MarketUiRules.CartLine line) {
+    LinearLayout card = UiKit.card(context);
+    LinearLayout header = UiKit.row(context);
+    TextView name = UiKit.text(context, line.productName, 15, UiKit.TEXT, Typeface.BOLD);
+    name.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
+    header.addView(name);
+    header.addView(UiKit.text(
+        context,
+        money(line.quantity * line.unitPrice, line.currency),
+        13,
+        UiKit.SUCCESS,
+        Typeface.BOLD
+    ));
+    card.addView(header);
+    card.addView(UiKit.text(context, money(line.unitPrice, line.currency) + " / " + unitLabel(line.unit), 11, UiKit.MUTED, Typeface.NORMAL));
+
+    LinearLayout controls = UiKit.row(context);
+    LinearLayout.LayoutParams controlsParams = new LinearLayout.LayoutParams(-1, -2);
+    controlsParams.setMargins(0, dp(9), 0, 0);
+    controls.setLayoutParams(controlsParams);
+    Button minus = UiKit.outlineButton(context, "−", view -> {
+      cart.changeQuantity(line.productId, -1);
+      listener.onRenderRequested();
+    });
+    minus.setContentDescription(line.productName + " miktarını azalt");
+    UiKit.addAction(controls, minus, context);
+    TextView amount = UiKit.text(context, quantity(line.quantity), 16, UiKit.TEXT, Typeface.BOLD);
+    amount.setGravity(Gravity.CENTER);
+    amount.setLayoutParams(new LinearLayout.LayoutParams(0, dp(44), 1f));
+    controls.addView(amount);
+    Button plus = UiKit.outlineButton(context, "+", view -> {
+      cart.changeQuantity(line.productId, 1);
+      listener.onRenderRequested();
+    });
+    plus.setContentDescription(line.productName + " miktarını artır");
+    UiKit.addAction(controls, plus, context);
+    Button remove = UiKit.dangerButton(context, "Sil", view -> {
+      cart.remove(line.productId);
+      listener.onRenderRequested();
+    });
+    UiKit.addAction(controls, remove, context);
+    card.addView(controls);
+    return card;
+  }
+
+  private void addProductToCart(OperationData.MarketProduct product) {
+    try {
+      cart.addProduct(product);
+      screen = SCREEN_CART;
+      formError = "";
+      visibleMessage = product.name + " sepete eklendi.";
+      visibleMessagePending = false;
+      listener.onRenderRequested();
+    } catch (MarketUiRules.ValidationException error) {
+      showFormError(error.getMessage());
+    }
+  }
+
+  private void submitCart() {
+    try {
+      JSONObject payload = cart.toPayload();
+      boolean queued = listener.onSubmit(
+          MarketUiRules.ACTION_CART_DRAFT_CREATE,
+          payload,
+          "Sepet masaüstü için hazırlandı.",
+          "Sepet gönderim kuyruğuna alındı."
+      );
+      if (queued) {
+        cart.clear();
+        formError = "";
+        visibleMessage = "Sepet gönderim kuyruğuna alındı.";
+        visibleMessagePending = true;
+        listener.onRenderRequested();
+      }
+    } catch (MarketUiRules.ValidationException error) {
+      showFormError(error.getMessage());
+    }
+  }
+
+  private LinearLayout productDraftScreen() {
+    LinearLayout page = UiKit.column(context);
+    addBackHeader(page, "Yeni Ürün Taslağı", "Masaüstünde kontrol edilip ürün kartına dönüştürülecek.");
+    addPendingState(page);
+    addFormError(page);
+
+    EditText barcode = labeledInput(page, "Barkod", "");
+    barcode.setText(productDraftBarcode);
+    barcode.setEnabled(false);
+    EditText name = labeledInput(page, "Ürün adı", "Örn. Test Kola 330 ml");
+    bind(name, productDraftName, value -> productDraftName = value);
+    EditText sku = labeledInput(page, "SKU (isteğe bağlı)", "");
+    bind(sku, productDraftSku, value -> productDraftSku = value);
+
+    addFieldLabel(page, "Birim");
+    Spinner unit = new Spinner(context);
+    ArrayList<UnitChoice> unitChoices = new ArrayList<>();
+    int unitSelection = 0;
+    for (int index = 0; index < UNIT_VALUES.length; index += 1) {
+      unitChoices.add(new UnitChoice(UNIT_VALUES[index], UNIT_LABELS[index]));
+      if (UNIT_VALUES[index].equals(productDraftUnit)) unitSelection = index;
+    }
+    ArrayAdapter<UnitChoice> unitAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, unitChoices);
+    unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    unit.setAdapter(unitAdapter);
+    unit.setSelection(unitSelection);
+    unit.setBackground(UiKit.rounded(context, UiKit.SURFACE, UiKit.BORDER, 11));
+    unit.setLayoutParams(fieldParams(50));
+    unit.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
+      UnitChoice choice = (UnitChoice) unit.getSelectedItem();
+      productDraftUnit = choice == null ? "piece" : choice.value;
+    }));
+    page.addView(unit);
+
+    EditText purchase = labeledInput(page, "Alış fiyatı (isteğe bağlı)", "0,00");
+    purchase.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+    bind(purchase, productDraftPurchasePrice, value -> productDraftPurchasePrice = value);
+    EditText sale = labeledInput(page, "Satış fiyatı (isteğe bağlı)", "0,00");
+    sale.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+    bind(sale, productDraftSalePrice, value -> productDraftSalePrice = value);
+    EditText category = labeledInput(page, "Kategori (isteğe bağlı)", "");
+    bind(category, productDraftCategory, value -> productDraftCategory = value);
+    EditText note = labeledMultiline(page, "Not", "Masaüstü inceleme notu");
+    bind(note, productDraftNote, value -> productDraftNote = value);
+
+    Button submit = UiKit.button(context, "Taslak Gönder", UiKit.PRIMARY, view -> submitProductDraft());
+    submit.setEnabled(!submissionBlocked());
+    submit.setLayoutParams(fullButtonParams(54, 4, 0));
+    page.addView(submit);
+    return page;
+  }
+
+  private void submitProductDraft() {
+    try {
+      JSONObject payload = MarketUiRules.productDraftPayload(
+          productDraftBarcode,
+          productDraftName,
+          productDraftSku,
+          productDraftUnit,
+          productDraftPurchasePrice,
+          productDraftSalePrice,
+          productDraftCategory,
+          productDraftNote
+      );
+      boolean queued = listener.onSubmit(
+          MarketUiRules.ACTION_PRODUCT_DRAFT_CREATE,
+          payload,
+          "Ürün taslağı masaüstü incelemesi için gönderildi.",
+          "Ürün taslağı gönderim kuyruğuna alındı."
+      );
+      if (queued) {
+        clearProductDraft();
+        screen = SCREEN_HOME;
+        formError = "";
+        visibleMessage = "Ürün taslağı gönderim kuyruğuna alındı.";
+        visibleMessagePending = true;
+        listener.onRenderRequested();
+      }
+    } catch (MarketUiRules.ValidationException error) {
+      showFormError(error.getMessage());
+    }
+  }
+
+  private void clearProductDraft() {
+    productDraftBarcode = "";
+    productDraftName = "";
+    productDraftSku = "";
+    productDraftUnit = "piece";
+    productDraftPurchasePrice = "";
+    productDraftSalePrice = "";
+    productDraftCategory = "";
+    productDraftNote = "";
+  }
+
+  private void addProductSelectionActions(LinearLayout page, String purpose, boolean inventoryOnly) {
+    LinearLayout row = UiKit.row(context);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, 0, 0, dp(10));
+    row.setLayoutParams(params);
+    if (MarketUiRules.canScanBarcode(data)) {
+      UiKit.addAction(row, UiKit.button(context, "Barkod Tara", UiKit.PRIMARY,
+          view -> showBarcodeEntry(purpose)), context);
+    }
+    UiKit.addAction(row, UiKit.outlineButton(context, "Ürün Seç",
+        view -> showProductPicker(purpose, inventoryOnly)), context);
+    page.addView(row);
+  }
+
+  private void showBarcodeEntry(String purpose) {
+    boolean directDraft = PURPOSE_PRODUCT_DRAFT.equals(purpose);
+    if (!directDraft && !MarketUiRules.canScanBarcode(data)) return;
+    LinearLayout form = dialogForm();
+    TextView help = UiKit.text(
+        context,
+        directDraft
+            ? "Ürün taslağının barkodunu girin."
+            : "El terminaliyle okutun veya barkodu elle girin.",
+        12,
+        UiKit.SECONDARY,
+        Typeface.NORMAL
+    );
+    form.addView(help);
+    EditText barcode = labeledInput(form, "Barkod", "Barkodu okutun veya girin");
+    barcode.setInputType(InputType.TYPE_CLASS_TEXT);
+    TextView status = statusText();
+    form.addView(status);
+    AlertDialog dialog = new AlertDialog.Builder(context)
+        .setTitle(directDraft ? "Yeni ürün barkodu" : "Barkod Tara")
+        .setView(form)
+        .setNegativeButton("Vazgeç", null)
+        .setPositiveButton(directDraft ? "Devam Et" : "Bul", null)
+        .create();
+    dialog.setOnShowListener(ignored -> {
+      Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+      Runnable submit = () -> {
+        String raw = value(barcode);
+        if (raw.length() < 3) {
+          status.setText("Geçerli bir barkod girin.");
+          return;
+        }
+        dialog.dismiss();
+        handleBarcode(raw, purpose);
+      };
+      positive.setOnClickListener(view -> submit.run());
+      barcode.setOnEditorActionListener((view, actionId, event) -> {
+        submit.run();
+        return true;
+      });
+      barcode.requestFocus();
+    });
+    dialog.show();
+  }
+
+  private void handleBarcode(String rawBarcode, String purpose) {
+    String barcode = rawBarcode == null ? "" : rawBarcode.trim();
+    if (PURPOSE_PRODUCT_DRAFT.equals(purpose)) {
+      startProductDraft(barcode);
+      return;
+    }
+    OperationData.MarketProduct product = MarketUiRules.resolveBarcode(data, barcode);
+    if (product == null) {
+      resultReturnScreen = screen;
+      barcodeResult = barcode;
+      barcodeResultProductId = "";
+      screen = SCREEN_BARCODE_RESULT;
+      formError = "";
+      listener.onRenderRequested();
+      return;
+    }
+    handleSelectedProduct(product, purpose);
+  }
+
+  private void handleSelectedProduct(OperationData.MarketProduct product, String purpose) {
+    if (PURPOSE_STOCK.equals(purpose)) {
+      stockProductId = product.id;
+      screen = SCREEN_STOCK;
+      formError = "";
+      listener.onRenderRequested();
+    } else if (PURPOSE_RECEIVING.equals(purpose)) {
+      screen = SCREEN_RECEIVING;
+      showReceivingLineDialog(product);
+    } else if (PURPOSE_CART.equals(purpose)) {
+      addProductToCart(product);
+    } else {
+      resultReturnScreen = screen;
+      barcodeResult = product.barcode;
+      barcodeResultProductId = product.id;
+      screen = SCREEN_BARCODE_RESULT;
+      formError = "";
+      listener.onRenderRequested();
+    }
+  }
+
+  private void showProductPicker(String purpose, boolean inventoryOnly) {
+    if (!MarketUiRules.canViewProducts(data)) return;
+    LinearLayout form = dialogForm();
+    EditText search = labeledInput(form, "Ürün ara", "Ad, SKU veya barkod");
+    LinearLayout results = UiKit.column(context);
+    form.addView(results);
+    ScrollView scroll = wrapDialog(form);
+    AlertDialog dialog = new AlertDialog.Builder(context)
+        .setTitle("Ürün Seç")
+        .setView(scroll)
+        .setNegativeButton("Kapat", null)
+        .create();
+    Runnable refresh = () -> {
+      results.removeAllViews();
+      int shown = 0;
+      for (OperationData.MarketProduct product : MarketUiRules.searchProducts(data, value(search))) {
+        if (inventoryOnly && !product.trackInventory) continue;
+        Button choice = UiKit.outlineButton(
+            context,
+            product.name + productMeta(product),
+            view -> {
+              dialog.dismiss();
+              handleSelectedProduct(product, purpose);
+            }
+        );
+        choice.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        choice.setLayoutParams(fullButtonParams(52, 0, 7));
+        results.addView(choice);
+        shown += 1;
+        if (shown >= 40) break;
+      }
+      if (shown == 0) {
+        results.addView(UiKit.text(
+            context,
+            inventoryOnly ? "Stok takibine açık eşleşen ürün yok." : "Eşleşen ürün yok.",
+            13,
+            UiKit.MUTED,
+            Typeface.NORMAL
+        ));
+      }
+    };
+    search.addTextChangedListener(watcher(value -> refresh.run()));
+    dialog.setOnShowListener(ignored -> refresh.run());
+    dialog.show();
+  }
+
+  private String productMeta(OperationData.MarketProduct product) {
+    String barcode = product.barcode.isEmpty() ? "" : " · " + product.barcode;
+    return "\n" + money(product.salePrice, product.currency) + barcode;
+  }
+
+  private void startProductDraft(String barcode) {
+    if (!MarketUiRules.canCreateProductDraft(data)) return;
+    clearProductDraft();
+    productDraftBarcode = barcode == null ? "" : barcode.trim();
+    screen = SCREEN_PRODUCT_DRAFT;
+    formError = "";
+    listener.onRenderRequested();
+  }
+
+  private void openScreen(String next) {
+    screen = next;
+    formError = "";
+    listener.onRenderRequested();
+  }
+
+  private void addBackHeader(LinearLayout page, String title, String subtitle) {
+    Button back = UiKit.outlineButton(context, "← Market", view -> handleBack());
+    back.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+    LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(-1, dp(44));
+    backParams.setMargins(0, 0, 0, dp(10));
+    back.setLayoutParams(backParams);
+    page.addView(back);
+    page.addView(UiKit.title(context, title));
+    if (!subtitle.isEmpty()) {
+      TextView description = UiKit.text(context, subtitle, 12, UiKit.SECONDARY, Typeface.NORMAL);
+      LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
+      descriptionParams.setMargins(0, dp(2), 0, dp(12));
+      description.setLayoutParams(descriptionParams);
+      page.addView(description);
+    }
+  }
+
+  private View messageCard(String message, boolean pending) {
+    LinearLayout card = UiKit.card(context);
+    int tone = pending ? UiKit.WARNING : UiKit.SUCCESS;
+    card.setBackground(UiKit.rounded(context, UiKit.withAlpha(tone, 25), UiKit.withAlpha(tone, 100), 14));
+    card.addView(UiKit.text(context, message, 13, tone, Typeface.BOLD));
+    return card;
+  }
+
+  private View emptyCard(String title, String detail) {
+    LinearLayout card = UiKit.card(context);
+    card.addView(UiKit.text(context, title, 14, UiKit.TEXT, Typeface.BOLD));
+    card.addView(UiKit.text(context, detail, 12, UiKit.MUTED, Typeface.NORMAL));
+    return card;
+  }
+
+  private void addFormError(LinearLayout page) {
+    if (!formError.isEmpty()) {
+      page.addView(messageCard(formError, true));
+    }
+  }
+
+  private void showFormError(String message) {
+    formError = message == null ? "Bilgileri kontrol edin." : message;
+    listener.onRenderRequested();
+  }
+
+  private void addFieldLabel(LinearLayout form, String label) {
+    TextView text = UiKit.text(context, label, 12, UiKit.SECONDARY, Typeface.BOLD);
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+    params.setMargins(0, dp(4), 0, dp(5));
+    text.setLayoutParams(params);
+    form.addView(text);
+  }
+
+  private EditText labeledInput(LinearLayout form, String label, String hint) {
+    addFieldLabel(form, label);
+    EditText input = UiKit.input(context, hint);
+    input.setLayoutParams(fieldParams(50));
+    form.addView(input);
+    return input;
+  }
+
+  private EditText labeledMultiline(LinearLayout form, String label, String hint) {
+    addFieldLabel(form, label);
+    EditText input = UiKit.input(context, hint);
+    input.setSingleLine(false);
+    input.setGravity(Gravity.TOP | Gravity.START);
+    input.setPadding(dp(12), dp(11), dp(12), dp(11));
+    input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+    input.setLayoutParams(fieldParams(82));
+    form.addView(input);
+    return input;
+  }
+
+  private void bind(EditText input, String initial, ValueListener listener) {
+    input.setText(initial == null ? "" : initial);
+    input.addTextChangedListener(watcher(listener));
+  }
+
+  private TextWatcher watcher(ValueListener listener) {
+    return new TextWatcher() {
+      @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+      @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
+        listener.onValue(value == null ? "" : value.toString());
+      }
+      @Override public void afterTextChanged(Editable value) {}
+    };
+  }
+
+  private LinearLayout dialogForm() {
+    LinearLayout form = UiKit.column(context);
+    form.setPadding(dp(16), dp(10), dp(16), dp(8));
+    return form;
+  }
+
+  private ScrollView wrapDialog(View content) {
+    ScrollView scroll = new ScrollView(context);
+    scroll.addView(content);
+    return scroll;
+  }
+
+  private TextView statusText() {
+    TextView status = UiKit.text(context, "", 12, UiKit.DANGER, Typeface.BOLD);
+    status.setPadding(0, dp(5), 0, 0);
+    return status;
+  }
+
+  private LinearLayout.LayoutParams fieldParams(int height) {
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(height));
+    params.setMargins(0, 0, 0, dp(9));
+    return params;
+  }
+
+  private LinearLayout.LayoutParams fullButtonParams(int height, int top, int bottom) {
+    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(height));
+    params.setMargins(0, dp(top), 0, dp(bottom));
+    return params;
+  }
+
+  private boolean submissionBlocked() {
+    return loading || localPendingCount > 0 || data.pendingActions > 0;
+  }
+
+  private String supplierName(String supplierId) {
+    for (OperationData.MarketSupplier supplier : data.market.suppliers) {
+      if (supplier.id.equals(supplierId)) return supplier.name;
+    }
+    return "";
+  }
+
+  private String receivingCurrency() {
+    List<MarketUiRules.ReceivingLine> lines = receiving.lines();
+    return lines.isEmpty() ? "TRY" : lines.get(0).currency;
+  }
+
+  private String cartCurrency() {
+    List<MarketUiRules.CartLine> lines = cart.lines();
+    return lines.isEmpty() ? "TRY" : lines.get(0).currency;
+  }
+
+  private String money(double value, String currency) {
+    NumberFormat format = NumberFormat.getCurrencyInstance(new Locale("tr", "TR"));
+    try {
+      format.setCurrency(java.util.Currency.getInstance(
+          currency == null || currency.trim().isEmpty() ? "TRY" : currency.trim().toUpperCase(Locale.ROOT)
+      ));
+    } catch (IllegalArgumentException ignored) {
+      // Snapshot currency is already sanitized; keep the locale default as a safe fallback.
+    }
+    return format.format(Math.max(0, value));
+  }
+
+  private String quantity(double value) {
+    if (value == Math.rint(value)) return String.valueOf((long) value);
+    return String.format(Locale.US, "%.4f", value).replaceAll("0+$", "").replaceAll("\\.$", "").replace('.', ',');
+  }
+
+  private String unitLabel(String unit) {
+    if ("kg".equals(unit)) return "kg";
+    if ("g".equals(unit)) return "g";
+    if ("l".equals(unit)) return "l";
+    if ("ml".equals(unit)) return "ml";
+    if ("pack".equals(unit)) return "paket";
+    if ("box".equals(unit)) return "kutu";
+    if ("meter".equals(unit)) return "metre";
+    if ("other".equals(unit)) return "birim";
+    return "adet";
+  }
+
+  private String shortTime(String raw) {
+    String value = raw == null ? "" : raw.trim().replace('T', ' ');
+    return value.length() > 16 ? value.substring(0, 16) : value;
+  }
+
+  private String value(EditText input) {
+    return input == null || input.getText() == null ? "" : input.getText().toString().trim();
+  }
+
+  private int dp(int value) {
+    return UiKit.dp(context, value);
+  }
+
+  private boolean isMarketAction(String actionType) {
+    return MarketUiRules.requiredPermissionForAction(actionType) != null;
+  }
+
+  private interface ValueListener {
+    void onValue(String value);
+  }
+
+  private interface PositionListener {
+    void onSelected(int position);
+  }
+
+  private static final class SimpleItemSelectedListener implements android.widget.AdapterView.OnItemSelectedListener {
+    private final PositionListener listener;
+
+    SimpleItemSelectedListener(PositionListener listener) {
+      this.listener = listener;
+    }
+
+    @Override
+    public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+      listener.onSelected(position);
+    }
+
+    @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+  }
+
+  private static final class ActionItem {
+    final String label;
+    final Runnable action;
+
+    ActionItem(String label, Runnable action) {
+      this.label = label;
+      this.action = action;
+    }
+  }
+
+  private static final class SupplierChoice {
+    final String id;
+    final String label;
+
+    SupplierChoice(String id, String label) {
+      this.id = id;
+      this.label = label;
+    }
+
+    @Override public String toString() { return label; }
+  }
+
+  private static final class UnitChoice {
+    final String value;
+    final String label;
+
+    UnitChoice(String value, String label) {
+      this.value = value;
+      this.label = label;
+    }
+
+    @Override public String toString() { return label; }
+  }
+}
