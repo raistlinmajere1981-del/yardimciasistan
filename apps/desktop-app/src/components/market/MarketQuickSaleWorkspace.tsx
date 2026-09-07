@@ -1,6 +1,6 @@
 import { Barcode, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CatalogCategory, CatalogProduct, CommerceSale } from "@yardimci-asistan/shared";
+import type { CatalogCategory, CatalogProduct, CommerceSale, CommerceUnit } from "@yardimci-asistan/shared";
 import {
   createBarcodeSimulatorAdapter,
   createKeyboardBarcodeInputAdapter,
@@ -22,6 +22,29 @@ interface MarketQuickSaleWorkspaceProps {
   busy: boolean;
   onSaleCompleted: (sale: CommerceSale) => Promise<void> | void;
   onError: (message: string) => void;
+}
+
+const unitLabels: Record<CommerceUnit, string> = {
+  piece: "adet",
+  kg: "kg",
+  g: "g",
+  l: "litre",
+  ml: "ml",
+  pack: "paket",
+  box: "kutu",
+  meter: "metre",
+  other: "birim"
+};
+
+const paymentMethodLabels: Record<string, string> = {
+  cash: "Nakit",
+  card: "Kart",
+  transfer: "Havale / EFT",
+  other: "Diğer"
+};
+
+function paymentMethodLabel(value: string) {
+  return paymentMethodLabels[value] ?? value;
 }
 
 function roundQuantity(value: number) {
@@ -296,7 +319,7 @@ export function MarketQuickSaleWorkspace({
           <div>
             <span>Sepet</span>
             <h2>Hızlı Satış</h2>
-            <p>{cartLines.length} kalem · fiyat ve stok doğrulaması ödeme anında backend tarafından yapılır.</p>
+            <p>{cartLines.length} kalem · fiyat ve stok ödeme sırasında tekrar doğrulanır.</p>
           </div>
           {cartLines.length > 0 && (
             <button type="button" className="market-secondary-button" onClick={clearSale} disabled={disabled}>
@@ -310,7 +333,7 @@ export function MarketQuickSaleWorkspace({
             <div className="market-sale-cart-line" key={line.product.id}>
               <div>
                 <strong>{line.product.name}</strong>
-                <small>{money(line.product.salePrice, line.product.currency)} / {line.product.unit}</small>
+                <small>{money(line.product.salePrice, line.product.currency)} / {unitLabels[line.product.unit]}</small>
               </div>
               <div className="market-sale-quantity">
                 <button type="button" aria-label={`${line.product.name} miktarını azalt`} onClick={() => setQuantity(line.product.id, line.quantity - 1)} disabled={disabled}>
@@ -362,8 +385,7 @@ export function MarketQuickSaleWorkspace({
         {lastSale && (
           <div className="market-sale-receipt" role="status">
             <strong>Satış tamamlandı</strong>
-            <span>{money(lastSale.total, lastSale.currency)} · {lastSale.paymentMethod}</span>
-            <small>İşlem: {lastSale.id}</small>
+            <span>{money(lastSale.total, lastSale.currency)} · {paymentMethodLabel(lastSale.paymentMethod)}</span>
           </div>
         )}
       </section>
