@@ -20,6 +20,18 @@ const unitLabels: Record<CommerceUnit, string> = {
   other: "Diğer"
 };
 
+const movementTypeLabels: Record<string, string> = {
+  count: "Fiziksel sayım",
+  purchase: "Alım",
+  sale: "Satış",
+  adjustment: "Düzeltme",
+  return: "İade"
+};
+
+function movementTypeLabel(type: string) {
+  return movementTypeLabels[type] ?? type;
+}
+
 function localDateTime(value: string) {
   if (!value) return "—";
   const parsed = new Date(value);
@@ -93,7 +105,7 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
   return (
     <div className="market-two-column">
       <section className="market-panel">
-        <header className="market-panel-heading"><span>Stok</span><h2>Fiziksel Sayım</h2><p>Mevcut fiziksel miktarı yazın; delta hesabını store yapar.</p></header>
+        <header className="market-panel-heading"><span>Stok</span><h2>Fiziksel Sayım</h2><p>Mevcut fiziksel miktarı yazın; fark sistem tarafından hesaplanır.</p></header>
         <label className="market-field">
           Ürün
           <select value={productId} onChange={(event) => setProductId(event.target.value)}>
@@ -114,11 +126,11 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
       </section>
 
       <section className="market-panel">
-        <header className="market-panel-heading"><span>Audit</span><h2>Stok Hareketleri</h2><p>Son 50 hareket; satış, alım ve sayım aynı kayıt zincirinde.</p></header>
+        <header className="market-panel-heading"><span>Hareket Geçmişi</span><h2>Stok Hareketleri</h2><p>Son 50 hareket; satış, alım ve sayım aynı kayıt zincirinde.</p></header>
         <div className="market-history-list">
           {movements.map((movement) => (
             <div className="market-history-row" key={movement.id}>
-              <span><strong>{movement.type}</strong><small>{localDateTime(movement.createdAt)} · {movement.note || movement.referenceType || "Manuel hareket"}</small></span>
+              <span><strong>{movementTypeLabel(movement.type)}</strong><small>{localDateTime(movement.createdAt)} · {movement.note || movement.referenceType || "Manuel hareket"}</small></span>
               <span className={movement.quantityDelta >= 0 ? "is-positive" : "is-negative"}>{movement.quantityDelta >= 0 ? "+" : ""}{movement.quantityDelta} → {movement.quantityAfter}</span>
             </div>
           ))}
