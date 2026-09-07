@@ -225,6 +225,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             ],
             'finance' => [],
             'reports' => [],
+            'market' => ya_sync_empty_android_market(),
             'actions' => [],
             'server_revision' => $serverRevision
         ]);
@@ -395,6 +396,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         ],
         'finance' => $financeAllowed ? $androidSnapshot['finance'] : [],
         'reports' => $reportsAllowed ? $androidSnapshot['reports'] : [],
+        'market' => ya_sync_android_market_for_permissions($androidSnapshot['market'], $permissionList),
         'actions' => $actions,
         'server_revision' => ya_storage_server_revision()
     ]);
@@ -1030,6 +1032,10 @@ function ya_sync_android_action_types(): array
         'menu_stock_set',
         'menu_stock_adjust',
         'menu_stock_image_import_apply',
+        'market_stock_count',
+        'market_purchase_receive',
+        'market_product_draft_create',
+        'market_cart_draft_create',
         'menu_category_delete',
         'menu_item_delete',
         'message_delete'
@@ -1094,7 +1100,11 @@ function ya_sync_android_action_permission(string $actionType, array $payload): 
         'menu_stock_add' => 'menu.stock_update',
         'menu_stock_set' => 'menu.stock_update',
         'menu_stock_adjust' => 'menu.stock_update',
-        'menu_stock_image_import_apply' => 'menu.stock_update'
+        'menu_stock_image_import_apply' => 'menu.stock_update',
+        'market_stock_count' => 'market.stock_count',
+        'market_purchase_receive' => 'market.receiving',
+        'market_product_draft_create' => 'market.product_draft',
+        'market_cart_draft_create' => 'market.cart_draft'
     ];
     if (isset($permissions[$actionType])) {
         return $permissions[$actionType];
@@ -1211,6 +1221,10 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
         'menu_stock_set' => ['food_service.menu', 'commerce.inventory'],
         'menu_stock_adjust' => ['food_service.menu', 'commerce.inventory'],
         'menu_stock_image_import_apply' => ['food_service.menu', 'commerce.inventory', 'service.ai'],
+        'market_stock_count' => ['commerce.inventory'],
+        'market_purchase_receive' => ['retail.purchasing'],
+        'market_product_draft_create' => ['commerce.catalog'],
+        'market_cart_draft_create' => ['commerce.sales', 'commerce.catalog'],
         'message_delete' => ['core.customers', 'service.whatsapp']
     ];
     if (!isset($requirements[$actionType])) {
@@ -1450,6 +1464,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'androidPermissions' => ya_sync_sanitize_android_permissions($snapshot['androidPermissions'] ?? []),
         'finance' => ya_sync_sanitize_android_finance($snapshot['finance'] ?? []),
         'reports' => ya_sync_sanitize_android_reports($snapshot['reports'] ?? []),
+        'market' => ya_sync_sanitize_android_market($snapshot['market'] ?? []),
         'updated_at' => $updatedAt
     ];
 }
@@ -1492,6 +1507,230 @@ function ya_sync_sanitize_business_capabilities(mixed $value): array
         ya_sync_string_array($value),
         static fn(string $capability): bool => in_array($capability, $allowed, true)
     )));
+}
+
+function ya_sync_empty_android_market(): array
+{
+    return [
+        'summary' => [
+            'today_sale_count' => 0,
+            'today_sales_total' => 0.0,
+            'currency' => 'TRY',
+            'critical_stock_count' => 0,
+            'recent_stock_adjustments' => [],
+            'recent_receiving_count' => 0
+        ],
+        'products' => [],
+        'suppliers' => [],
+        'recent_purchases' => [],
+        'product_drafts' => [],
+        'cart_drafts' => []
+    ];
+}
+
+function ya_sync_sanitize_android_market(mixed $value): array
+{
+    $market = is_array($value) ? $value : [];
+    $summary = is_array($market['summary'] ?? null) ? $market['summary'] : [];
+
+    $adjustments = [];
+    foreach (array_slice(is_array($summary['recent_stock_adjustments'] ?? null)
+        ? $summary['recent_stock_adjustments']
+        : [], 0, 20) as $rawAdjustment) {
+        if (!is_array($rawAdjustment)) {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawAdjustment['id'] ?? ''), 0, 220);
+        $productId = mb_substr(ya_sync_string($rawAdjustment['product_id'] ?? ''), 0, 220);
+        $type = ya_sync_string($rawAdjustment['type'] ?? '');
+        if ($id === '' || $productId === '' || !in_array($type, ['count', 'adjust'], true)) {
+            continue;
+        }
+        $adjustments[] = [
+            'id' => $id,
+            'product_id' => $productId,
+            'product_name' => mb_substr(ya_sync_string($rawAdjustment['product_name'] ?? ''), 0, 240),
+            'type' => $type,
+            'quantity_delta' => ya_sync_float($rawAdjustment['quantity_delta'] ?? 0, 0),
+            'quantity_after' => max(0, ya_sync_float($rawAdjustment['quantity_after'] ?? 0, 0)),
+            'note' => mb_substr(ya_sync_string($rawAdjustment['note'] ?? ''), 0, 1000),
+            'created_at' => ya_sync_string($rawAdjustment['created_at'] ?? '')
+        ];
+    }
+
+    $products = [];
+    foreach (array_slice(is_array($market['products'] ?? null) ? $market['products'] : [], 0, 500) as $rawProduct) {
+        if (!is_array($rawProduct)) {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawProduct['id'] ?? ''), 0, 220);
+        $name = mb_substr(ya_sync_string($rawProduct['name'] ?? ''), 0, 240);
+        if ($id === '' || $name === '') {
+            continue;
+        }
+        $products[] = [
+            'id' => $id,
+            'name' => $name,
+            'sku' => mb_substr(ya_sync_string($rawProduct['sku'] ?? ''), 0, 120),
+            'barcode' => mb_substr(ya_sync_string($rawProduct['barcode'] ?? ''), 0, 120),
+            'unit' => ya_sync_commerce_unit($rawProduct['unit'] ?? 'piece'),
+            'sale_price' => max(0, ya_sync_float($rawProduct['sale_price'] ?? 0, 0)),
+            'currency' => mb_substr(ya_sync_string($rawProduct['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
+            'is_active' => ya_sync_bool($rawProduct['is_active'] ?? false),
+            'track_inventory' => ya_sync_bool($rawProduct['track_inventory'] ?? false),
+            'current_quantity' => max(0, ya_sync_float($rawProduct['current_quantity'] ?? 0, 0)),
+            'minimum_quantity' => max(0, ya_sync_float($rawProduct['minimum_quantity'] ?? 0, 0)),
+            'inventory_updated_at' => ya_sync_string($rawProduct['inventory_updated_at'] ?? '')
+        ];
+    }
+
+    $suppliers = [];
+    foreach (array_slice(is_array($market['suppliers'] ?? null) ? $market['suppliers'] : [], 0, 300) as $rawSupplier) {
+        if (!is_array($rawSupplier)) {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawSupplier['id'] ?? ''), 0, 220);
+        $name = mb_substr(ya_sync_string($rawSupplier['name'] ?? ''), 0, 240);
+        if ($id !== '' && $name !== '') {
+            $suppliers[] = [
+                'id' => $id,
+                'name' => $name,
+                'is_active' => ya_sync_bool($rawSupplier['is_active'] ?? false)
+            ];
+        }
+    }
+
+    $purchases = [];
+    foreach (array_slice(is_array($market['recent_purchases'] ?? null) ? $market['recent_purchases'] : [], 0, 20) as $rawPurchase) {
+        if (!is_array($rawPurchase) || ya_sync_string($rawPurchase['status'] ?? '') !== 'received') {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawPurchase['id'] ?? ''), 0, 220);
+        if ($id === '') {
+            continue;
+        }
+        $purchases[] = [
+            'id' => $id,
+            'supplier_id' => mb_substr(ya_sync_string($rawPurchase['supplier_id'] ?? ''), 0, 220),
+            'supplier_name' => mb_substr(ya_sync_string($rawPurchase['supplier_name'] ?? ''), 0, 240),
+            'status' => 'received',
+            'received_at' => ya_sync_string($rawPurchase['received_at'] ?? ''),
+            'total' => max(0, ya_sync_float($rawPurchase['total'] ?? 0, 0)),
+            'currency' => mb_substr(ya_sync_string($rawPurchase['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
+            'line_count' => max(0, ya_sync_int($rawPurchase['line_count'] ?? 0, 0))
+        ];
+    }
+
+    $productDrafts = [];
+    foreach (array_slice(is_array($market['product_drafts'] ?? null) ? $market['product_drafts'] : [], 0, 100) as $rawDraft) {
+        if (!is_array($rawDraft)) {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawDraft['id'] ?? ''), 0, 220);
+        $name = mb_substr(ya_sync_string($rawDraft['proposed_name'] ?? ''), 0, 240);
+        $status = ya_sync_string($rawDraft['status'] ?? 'pending');
+        if ($id === '' || $name === '' || !in_array($status, ['pending', 'reviewed'], true)) {
+            continue;
+        }
+        $productDrafts[] = [
+            'id' => $id,
+            'barcode' => mb_substr(ya_sync_string($rawDraft['barcode'] ?? ''), 0, 120),
+            'proposed_name' => $name,
+            'sku' => mb_substr(ya_sync_string($rawDraft['sku'] ?? ''), 0, 120),
+            'proposed_category' => mb_substr(ya_sync_string($rawDraft['proposed_category'] ?? ''), 0, 180),
+            'proposed_purchase_price' => max(0, ya_sync_float($rawDraft['proposed_purchase_price'] ?? 0, 0)),
+            'proposed_sale_price' => max(0, ya_sync_float($rawDraft['proposed_sale_price'] ?? 0, 0)),
+            'currency' => mb_substr(ya_sync_string($rawDraft['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
+            'unit' => ya_sync_commerce_unit($rawDraft['unit'] ?? 'piece'),
+            'note' => mb_substr(ya_sync_string($rawDraft['note'] ?? ''), 0, 2000),
+            'source' => mb_substr(ya_sync_string($rawDraft['source'] ?? ''), 0, 80),
+            'created_by_device' => mb_substr(ya_sync_string($rawDraft['created_by_device'] ?? ''), 0, 120),
+            'status' => $status,
+            'created_at' => ya_sync_string($rawDraft['created_at'] ?? ''),
+            'updated_at' => ya_sync_string($rawDraft['updated_at'] ?? '')
+        ];
+    }
+
+    $cartDrafts = [];
+    foreach (array_slice(is_array($market['cart_drafts'] ?? null) ? $market['cart_drafts'] : [], 0, 100) as $rawDraft) {
+        if (!is_array($rawDraft)) {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawDraft['id'] ?? ''), 0, 220);
+        $status = ya_sync_string($rawDraft['status'] ?? 'pending');
+        if ($id === '' || !in_array($status, ['pending', 'reviewed'], true)) {
+            continue;
+        }
+        $lines = [];
+        foreach (array_slice(is_array($rawDraft['lines'] ?? null) ? $rawDraft['lines'] : [], 0, 200) as $rawLine) {
+            if (!is_array($rawLine)) {
+                continue;
+            }
+            $lineId = mb_substr(ya_sync_string($rawLine['id'] ?? ''), 0, 220);
+            $productId = mb_substr(ya_sync_string($rawLine['product_id'] ?? ''), 0, 220);
+            $quantity = ya_sync_float($rawLine['quantity'] ?? 0, 0);
+            if ($lineId === '' || $productId === '' || $quantity <= 0) {
+                continue;
+            }
+            $lines[] = [
+                'id' => $lineId,
+                'product_id' => $productId,
+                'product_name' => mb_substr(ya_sync_string($rawLine['product_name'] ?? ''), 0, 240),
+                'quantity' => $quantity
+            ];
+        }
+        if ($lines === []) {
+            continue;
+        }
+        $cartDrafts[] = [
+            'id' => $id,
+            'status' => $status,
+            'source' => mb_substr(ya_sync_string($rawDraft['source'] ?? ''), 0, 80),
+            'created_by_device' => mb_substr(ya_sync_string($rawDraft['created_by_device'] ?? ''), 0, 120),
+            'note' => mb_substr(ya_sync_string($rawDraft['note'] ?? ''), 0, 2000),
+            'lines' => $lines,
+            'created_at' => ya_sync_string($rawDraft['created_at'] ?? ''),
+            'updated_at' => ya_sync_string($rawDraft['updated_at'] ?? '')
+        ];
+    }
+
+    return [
+        'summary' => [
+            'today_sale_count' => max(0, ya_sync_int($summary['today_sale_count'] ?? 0, 0)),
+            'today_sales_total' => max(0, ya_sync_float($summary['today_sales_total'] ?? 0, 0)),
+            'currency' => mb_substr(ya_sync_string($summary['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
+            'critical_stock_count' => max(0, ya_sync_int($summary['critical_stock_count'] ?? 0, 0)),
+            'recent_stock_adjustments' => $adjustments,
+            'recent_receiving_count' => count($purchases)
+        ],
+        'products' => $products,
+        'suppliers' => $suppliers,
+        'recent_purchases' => $purchases,
+        'product_drafts' => $productDrafts,
+        'cart_drafts' => $cartDrafts
+    ];
+}
+
+function ya_sync_android_market_for_permissions(array $market, array $permissions): array
+{
+    $result = ya_sync_empty_android_market();
+    if (in_array('market.summary.view', $permissions, true)) {
+        $result['summary'] = $market['summary'];
+    }
+    if (in_array('market.product.view', $permissions, true)) {
+        $result['products'] = $market['products'];
+    }
+    if (in_array('market.receiving', $permissions, true)) {
+        $result['suppliers'] = $market['suppliers'];
+        $result['recent_purchases'] = $market['recent_purchases'];
+    }
+    if (in_array('market.product_draft', $permissions, true)) {
+        $result['product_drafts'] = $market['product_drafts'];
+    }
+    if (in_array('market.cart_draft', $permissions, true)) {
+        $result['cart_drafts'] = $market['cart_drafts'];
+    }
+    return $result;
 }
 
 function ya_sync_sanitize_android_room_folios(mixed $value): array
@@ -1764,7 +2003,13 @@ function ya_sync_android_permissions(): array
         'settings.view',
         'settings.edit',
         'android_devices.view',
-        'android_devices.manage'
+        'android_devices.manage',
+        'market.summary.view',
+        'market.product.view',
+        'market.stock_count',
+        'market.receiving',
+        'market.product_draft',
+        'market.cart_draft'
     ];
 }
 
@@ -2533,6 +2778,14 @@ function ya_sync_positive_float(mixed $value, float $fallback): float
 function ya_sync_stock_unit(mixed $value): string
 {
     return ya_sync_string($value) === 'gram' ? 'gram' : 'piece';
+}
+
+function ya_sync_commerce_unit(mixed $value): string
+{
+    $unit = ya_sync_string($value);
+    return in_array($unit, ['piece', 'kg', 'g', 'l', 'ml', 'pack', 'box', 'meter', 'other'], true)
+        ? $unit
+        : 'piece';
 }
 
 function ya_sync_string_array(mixed $value): array

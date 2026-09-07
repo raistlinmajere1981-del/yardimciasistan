@@ -94,6 +94,7 @@ import {
 } from "./database";
 import { DesktopFinanceService } from "./finance";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
+import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
 import {
   applyBusinessProfileCapabilities,
   setBusinessCapability
@@ -2325,6 +2326,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
       }))
     },
     reports: getDatabase().getAndroidReportPresets(today),
+    market: createAndroidMarketSnapshotSource(getDatabase().databasePath, today),
     updated_at: updatedAt
   };
   return projectAndroidOperationsSnapshot(source, enabledBusinessCapabilities(), today);

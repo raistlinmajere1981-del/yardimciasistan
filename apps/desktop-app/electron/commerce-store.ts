@@ -64,6 +64,7 @@ export interface SetInventoryCountInput {
   productId: string;
   locationId?: string;
   countedQuantity: number;
+  expectedUpdatedAt?: string;
   unitCost?: number;
   referenceType?: string;
   referenceId?: string;
@@ -579,49 +580,13 @@ export function applyInventoryMovement(databasePath: string, input: ApplyInvento
 }
 
 export function setInventoryCount(databasePath: string, input: SetInventoryCountInput): InventoryCountResult {
-  const countedQuantity = roundQuantity(Number(input.countedQuantity));
-  if (!Number.isFinite(countedQuantity) || countedQuantity < 0) {
-    throw new Error("Sayım miktarı 0 veya daha büyük bir sayı olmalı.");
-  }
-
   const database = openDatabase(databasePath);
   try {
-    const businessId = activeBusinessId(database);
-    const now = new Date().toISOString();
     database.exec("BEGIN IMMEDIATE");
     try {
-      const { productId } = requireTrackedProductRow(database, businessId, input.productId);
-      const locationId = resolveInventoryLocation(database, businessId, input.locationId, now);
-      const current = mapInventoryBalance(
-        productId,
-        locationId,
-        getInventoryBalanceRow(database, productId, locationId)
-      );
-      const quantityDelta = roundQuantity(countedQuantity - current.quantity);
-
-      if (quantityDelta === 0) {
-        database.exec("COMMIT");
-        return { balance: current, movement: null };
-      }
-
-      const movement = applyInventoryMovementInTransaction(database, businessId, {
-        productId,
-        locationId,
-        type: "count",
-        quantityDelta,
-        unitCost: input.unitCost,
-        referenceType: input.referenceType || "inventory_count",
-        referenceId: input.referenceId,
-        note: input.note || `Fiziksel sayım: ${countedQuantity}`,
-        actorSource: input.actorSource || "desktop"
-      }, now);
-      const balance = mapInventoryBalance(
-        productId,
-        locationId,
-        getInventoryBalanceRow(database, productId, locationId)
-      );
+      const result = setInventoryCountInTransaction(database, input, new Date().toISOString());
       database.exec("COMMIT");
-      return { balance, movement };
+      return result;
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;
@@ -629,6 +594,55 @@ export function setInventoryCount(databasePath: string, input: SetInventoryCount
   } finally {
     database.close();
   }
+}
+
+/**
+ * Transaction-aware physical count primitive. Android action receipts and the
+ * inventory mutation share one outer transaction through this entry point.
+ */
+export function setInventoryCountInTransaction(
+  database: DatabaseSync,
+  input: SetInventoryCountInput,
+  now: string
+): InventoryCountResult {
+  const countedQuantity = roundQuantity(Number(input.countedQuantity));
+  if (!Number.isFinite(countedQuantity) || countedQuantity < 0) {
+    throw new Error("Sayım miktarı 0 veya daha büyük bir sayı olmalı.");
+  }
+
+  const businessId = activeBusinessId(database);
+  const { productId } = requireTrackedProductRow(database, businessId, input.productId);
+  const locationId = resolveInventoryLocation(database, businessId, input.locationId, now);
+  const current = mapInventoryBalance(
+    productId,
+    locationId,
+    getInventoryBalanceRow(database, productId, locationId)
+  );
+  const expectedUpdatedAt = String(input.expectedUpdatedAt ?? "").trim();
+  if (expectedUpdatedAt && expectedUpdatedAt !== current.updatedAt) {
+    throw new Error("Stok bu sayımdan sonra değişti. Güncel miktarı alıp yeniden sayın.");
+  }
+  const quantityDelta = roundQuantity(countedQuantity - current.quantity);
+
+  if (quantityDelta === 0) return { balance: current, movement: null };
+
+  const movement = applyInventoryMovementInTransaction(database, businessId, {
+    productId,
+    locationId,
+    type: "count",
+    quantityDelta,
+    unitCost: input.unitCost,
+    referenceType: input.referenceType || "inventory_count",
+    referenceId: input.referenceId,
+    note: input.note || `Fiziksel sayım: ${countedQuantity}`,
+    actorSource: input.actorSource || "desktop"
+  }, now);
+  const balance = mapInventoryBalance(
+    productId,
+    locationId,
+    getInventoryBalanceRow(database, productId, locationId)
+  );
+  return { balance, movement };
 }
 
 export function createPaidCommerceSale(databasePath: string, input: CreateCommerceSaleInput): CommerceSale {

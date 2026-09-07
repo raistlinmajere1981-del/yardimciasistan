@@ -240,6 +240,103 @@ export interface AndroidRoomFolioSnapshot {
   opened_at: ISODateTimeString | "";
 }
 
+export interface AndroidMarketStockAdjustment {
+  id: string;
+  product_id: string;
+  product_name: string;
+  type: "count" | "adjust";
+  quantity_delta: number;
+  quantity_after: number;
+  note: string;
+  created_at: ISODateTimeString | "";
+}
+
+export interface AndroidMarketSummary {
+  today_sale_count: number;
+  today_sales_total: number;
+  currency: string;
+  critical_stock_count: number;
+  recent_stock_adjustments: AndroidMarketStockAdjustment[];
+  recent_receiving_count: number;
+}
+
+export interface AndroidMarketProduct {
+  id: string;
+  name: string;
+  sku: string;
+  barcode: string;
+  unit: string;
+  sale_price: number;
+  currency: string;
+  is_active: boolean;
+  track_inventory: boolean;
+  current_quantity: number;
+  minimum_quantity: number;
+  inventory_updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidMarketSupplier {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface AndroidMarketPurchase {
+  id: string;
+  supplier_id: string;
+  supplier_name: string;
+  status: "received";
+  received_at: ISODateTimeString | "";
+  total: number;
+  currency: string;
+  line_count: number;
+}
+
+export interface AndroidMarketProductDraft {
+  id: string;
+  barcode: string;
+  proposed_name: string;
+  sku: string;
+  proposed_category: string;
+  proposed_purchase_price: number;
+  proposed_sale_price: number;
+  currency: string;
+  unit: string;
+  note: string;
+  source: string;
+  created_by_device: string;
+  status: "pending" | "reviewed";
+  created_at: ISODateTimeString | "";
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidMarketCartDraftLine {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+}
+
+export interface AndroidMarketCartDraft {
+  id: string;
+  status: "pending" | "reviewed";
+  source: string;
+  created_by_device: string;
+  note: string;
+  lines: AndroidMarketCartDraftLine[];
+  created_at: ISODateTimeString | "";
+  updated_at: ISODateTimeString | "";
+}
+
+export interface AndroidMarketSnapshot {
+  summary: AndroidMarketSummary;
+  products: AndroidMarketProduct[];
+  suppliers: AndroidMarketSupplier[];
+  recent_purchases: AndroidMarketPurchase[];
+  product_drafts: AndroidMarketProductDraft[];
+  cart_drafts: AndroidMarketCartDraft[];
+}
+
 export interface AndroidOperationsSnapshot {
   /** Persisted runtime capabilities used by desktop projection and Android UI. */
   business_capabilities: BusinessCapability[];
@@ -262,6 +359,7 @@ export interface AndroidOperationsSnapshot {
   androidPermissions: Record<string, AndroidSnapshotPermissionProfile>;
   finance: AndroidFinanceSnapshot;
   reports: Record<AndroidReportPresetKey, AndroidReportSnapshot>;
+  market: AndroidMarketSnapshot;
   updated_at: ISODateTimeString | "";
 }
 
@@ -317,7 +415,13 @@ export const ANDROID_PERMISSIONS = [
   "settings.edit",
   "message.delete",
   "android_devices.view",
-  "android_devices.manage"
+  "android_devices.manage",
+  "market.summary.view",
+  "market.product.view",
+  "market.stock_count",
+  "market.receiving",
+  "market.product_draft",
+  "market.cart_draft"
 ] as const;
 
 export type AndroidPermission = typeof ANDROID_PERMISSIONS[number];
@@ -326,7 +430,8 @@ export const ANDROID_PERMISSION_GROUP_IDS = [
   "service_orders",
   "cashier",
   "rooms_tasks",
-  "customer_reservation"
+  "customer_reservation",
+  "market_operations"
 ] as const;
 
 export type AndroidPermissionGroupId = typeof ANDROID_PERMISSION_GROUP_IDS[number];
@@ -377,6 +482,14 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
     "reservation.create",
     "reservation.update",
     "reservation.approve"
+  ],
+  market_operations: [
+    "market.summary.view",
+    "market.product.view",
+    "market.stock_count",
+    "market.receiving",
+    "market.product_draft",
+    "market.cart_draft"
   ]
 };
 
@@ -384,7 +497,8 @@ export const ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS: Readonly<AndroidPermission
   service_orders: true,
   cashier: false,
   rooms_tasks: true,
-  customer_reservation: false
+  customer_reservation: false,
+  market_operations: false
 };
 
 export function androidPermissionsForGroups(groups: AndroidPermissionGroups): AndroidPermission[] {
@@ -404,6 +518,26 @@ export interface AndroidPermissionCapabilityRequirement {
 const ANDROID_RESERVATION_CAPABILITIES = [
   C.ACCOMMODATION_RESERVATIONS,
   C.FOOD_RESERVATIONS
+] as const;
+
+const ANDROID_MARKET_CAPABILITIES = [
+  C.CATALOG,
+  C.INVENTORY,
+  C.SALES,
+  C.RETAIL_BARCODE,
+  C.RETAIL_PURCHASING,
+  C.RETAIL_SUPPLIERS
+] as const;
+
+const ANDROID_LEGACY_OPERATION_CAPABILITIES = [
+  C.ACCOMMODATION_ROOMS,
+  C.ACCOMMODATION_RESERVATIONS,
+  C.ACCOMMODATION_STAYS,
+  C.ACCOMMODATION_FOLIO,
+  C.FOOD_TABLES,
+  C.FOOD_RESERVATIONS,
+  C.FOOD_ORDERS,
+  C.FOOD_MENU
 ] as const;
 
 /**
@@ -461,7 +595,13 @@ export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<Android
   "settings.edit": { allOf: [C.DEVICES] },
   "message.delete": { allOf: [C.CUSTOMERS, C.WHATSAPP] },
   "android_devices.view": { allOf: [C.DEVICES] },
-  "android_devices.manage": { allOf: [C.DEVICES] }
+  "android_devices.manage": { allOf: [C.DEVICES] },
+  "market.summary.view": { anyOf: ANDROID_MARKET_CAPABILITIES },
+  "market.product.view": { allOf: [C.CATALOG] },
+  "market.stock_count": { allOf: [C.INVENTORY] },
+  "market.receiving": { allOf: [C.RETAIL_PURCHASING] },
+  "market.product_draft": { allOf: [C.CATALOG] },
+  "market.cart_draft": { allOf: [C.SALES, C.CATALOG] }
 };
 
 function capabilityRequirementSatisfied(
@@ -512,7 +652,12 @@ export function androidAvailablePermissionGroupIds(
   const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   if (!enabled.has(C.ANDROID)) return [];
 
+  const hasMarketOperations = ANDROID_MARKET_CAPABILITIES.some((capability) => enabled.has(capability));
+  const isRetailOnly = hasMarketOperations
+    && !ANDROID_LEGACY_OPERATION_CAPABILITIES.some((capability) => enabled.has(capability));
+
   return ANDROID_PERMISSION_GROUP_IDS.filter((groupId) => {
+    if (isRetailOnly && groupId !== "market_operations") return false;
     switch (groupId) {
       case "service_orders":
         return enabled.has(C.FOOD_TABLES) || enabled.has(C.FOOD_ORDERS) || enabled.has(C.FOOD_MENU);
@@ -526,6 +671,8 @@ export function androidAvailablePermissionGroupIds(
       case "customer_reservation":
         return enabled.has(C.CUSTOMERS)
           || ANDROID_RESERVATION_CAPABILITIES.some((capability) => enabled.has(capability));
+      case "market_operations":
+        return hasMarketOperations;
     }
   });
 }
@@ -839,7 +986,11 @@ export const ANDROID_ACTION_TYPES = [
   "menu_stock_add",
   "menu_stock_set",
   "menu_stock_adjust",
-  "menu_stock_image_import_apply"
+  "menu_stock_image_import_apply",
+  "market_stock_count",
+  "market_purchase_receive",
+  "market_product_draft_create",
+  "market_cart_draft_create"
 ] as const;
 
 export type AndroidActionType = typeof ANDROID_ACTION_TYPES[number];
@@ -857,6 +1008,44 @@ export interface AndroidSyncAction {
   status: AndroidActionStatus;
   error_message: string;
   processed_at?: ISODateTimeString | "";
+}
+
+export interface AndroidMarketStockCountPayload {
+  product_id: string;
+  counted_quantity: number;
+  note?: string;
+  expected_updated_at?: ISODateTimeString | "";
+}
+
+export interface AndroidMarketPurchaseReceivePayload {
+  supplier_id?: string;
+  note?: string;
+  ordered_at?: ISODateTimeString | "";
+  lines: Array<{
+    product_id: string;
+    quantity: number;
+    unit_cost: number;
+  }>;
+}
+
+export interface AndroidMarketProductDraftCreatePayload {
+  barcode: string;
+  proposed_name: string;
+  sku?: string;
+  proposed_category?: string;
+  proposed_purchase_price?: number;
+  proposed_sale_price?: number;
+  currency?: string;
+  unit?: string;
+  note?: string;
+}
+
+export interface AndroidMarketCartDraftCreatePayload {
+  note?: string;
+  lines: Array<{
+    product_id: string;
+    quantity: number;
+  }>;
 }
 
 export interface PullAndroidActionsOptions extends SyncCoreConfig {
@@ -923,7 +1112,11 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   menu_stock_add: "menu.stock_update",
   menu_stock_set: "menu.stock_update",
   menu_stock_adjust: "menu.stock_update",
-  menu_stock_image_import_apply: "menu.stock_update"
+  menu_stock_image_import_apply: "menu.stock_update",
+  market_stock_count: "market.stock_count",
+  market_purchase_receive: "market.receiving",
+  market_product_draft_create: "market.product_draft",
+  market_cart_draft_create: "market.cart_draft"
 };
 
 export function resolveAndroidActionPermission(

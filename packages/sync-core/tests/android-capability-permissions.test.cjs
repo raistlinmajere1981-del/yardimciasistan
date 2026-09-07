@@ -16,7 +16,8 @@ const allGroups = {
   service_orders: true,
   cashier: true,
   rooms_tasks: true,
-  customer_reservation: true
+  customer_reservation: true,
+  market_operations: true
 };
 
 test("stored Android groups cannot grant disabled room or food domains", () => {
@@ -40,6 +41,48 @@ test("admin remains bounded by active business capabilities", () => {
 
   assert.equal(androidActionAllowedByCapabilities("room_status_update", core), false);
   assert.equal(androidActionAllowedByCapabilities("reservation_room_create", core), false);
+});
+
+test("pure Market exposes one handheld group and capability-bounded permissions", () => {
+  const market = [
+    C.ANDROID,
+    C.CATALOG,
+    C.INVENTORY,
+    C.SALES,
+    C.RETAIL_BARCODE,
+    C.RETAIL_SUPPLIERS,
+    C.RETAIL_PURCHASING
+  ];
+  assert.deepEqual(androidAvailablePermissionGroupIds(market), ["market_operations"]);
+  const effective = androidEffectivePermissionsForGroups({
+    service_orders: false,
+    cashier: false,
+    rooms_tasks: false,
+    customer_reservation: false,
+    market_operations: true
+  }, market);
+  for (const permission of [
+    "market.summary.view",
+    "market.product.view",
+    "market.stock_count",
+    "market.receiving",
+    "market.product_draft",
+    "market.cart_draft"
+  ]) {
+    assert.equal(effective.includes(permission), true, `${permission} should be effective`);
+  }
+  for (const permission of ["room.view", "table.view", "table_order.view", "reservation.view", "menu.view"]) {
+    assert.equal(effective.includes(permission), false, `${permission} leaked into Market`);
+  }
+});
+
+test("Market permissions, including admin grants, close with their business capability", () => {
+  const withoutPurchasing = [C.ANDROID, C.CATALOG, C.INVENTORY, C.SALES, C.RETAIL_BARCODE];
+  const admin = androidEffectivePermissionsForRole("admin", ANDROID_PERMISSIONS, withoutPurchasing);
+  assert.equal(admin.includes("market.receiving"), false);
+  assert.equal(admin.includes("market.stock_count"), true);
+  assert.equal(androidActionAllowedByCapabilities("market_purchase_receive", withoutPurchasing), false);
+  assert.equal(androidActionAllowedByCapabilities("market_stock_count", withoutPurchasing), true);
 });
 
 test("room-customer assignment requires both customer and stay capabilities", () => {

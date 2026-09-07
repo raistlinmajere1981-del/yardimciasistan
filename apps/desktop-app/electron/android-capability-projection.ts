@@ -7,10 +7,12 @@ import {
 import {
   androidEffectivePermissions,
   androidTaskAllowedByCapabilities,
+  type AndroidMarketSnapshot,
   type AndroidOperationsSnapshot,
   type AndroidReportSnapshot,
   type PublishedQrMenu
 } from "@yardimci-asistan/sync-core";
+import { emptyAndroidMarketSnapshot } from "./market-android-snapshot.js";
 
 const C = BUSINESS_CAPABILITIES;
 
@@ -111,6 +113,11 @@ export function projectAndroidOperationsSnapshot(
     : [];
   const activeMenuCategories = menu.categories.filter((category) => category.is_active).length;
   const availableMenuItems = menu.items.filter((item) => item.is_available).length;
+  const market = projectAndroidMarketSnapshot(
+    source.market ?? emptyAndroidMarketSnapshot(),
+    enabled,
+    androidEnabled
+  );
 
   return {
     ...source,
@@ -169,7 +176,60 @@ export function projectAndroidOperationsSnapshot(
     reports: Object.fromEntries(Object.entries(source.reports).map(([key, report]) => [
       key,
       projectReport(report, enabled, androidEnabled, reservations, tasks, today)
-    ])) as AndroidOperationsSnapshot["reports"]
+    ])) as AndroidOperationsSnapshot["reports"],
+    market
+  };
+}
+
+export function projectAndroidMarketSnapshot(
+  source: AndroidMarketSnapshot,
+  enabled: ReadonlySet<BusinessCapability>,
+  androidEnabled = enabled.has(C.ANDROID)
+): AndroidMarketSnapshot {
+  if (!androidEnabled) return emptyAndroidMarketSnapshot(source.summary.currency || "TRY");
+
+  const catalogEnabled = enabled.has(C.CATALOG);
+  const inventoryEnabled = enabled.has(C.INVENTORY);
+  const salesEnabled = enabled.has(C.SALES);
+  const barcodeEnabled = enabled.has(C.RETAIL_BARCODE);
+  const suppliersEnabled = enabled.has(C.RETAIL_SUPPLIERS);
+  const purchasingEnabled = enabled.has(C.RETAIL_PURCHASING);
+  const recentPurchases = purchasingEnabled
+    ? source.recent_purchases.map((purchase) => ({
+        ...purchase,
+        supplier_id: suppliersEnabled ? purchase.supplier_id : "",
+        supplier_name: suppliersEnabled ? purchase.supplier_name : ""
+      }))
+    : [];
+
+  return {
+    summary: {
+      today_sale_count: salesEnabled ? source.summary.today_sale_count : 0,
+      today_sales_total: salesEnabled ? source.summary.today_sales_total : 0,
+      currency: salesEnabled ? source.summary.currency : "TRY",
+      critical_stock_count: inventoryEnabled ? source.summary.critical_stock_count : 0,
+      recent_stock_adjustments: inventoryEnabled ? source.summary.recent_stock_adjustments : [],
+      recent_receiving_count: recentPurchases.length
+    },
+    products: catalogEnabled
+      ? source.products.map((product) => ({
+          ...product,
+          barcode: barcodeEnabled ? product.barcode : "",
+          track_inventory: inventoryEnabled && product.track_inventory,
+          current_quantity: inventoryEnabled ? product.current_quantity : 0,
+          minimum_quantity: inventoryEnabled ? product.minimum_quantity : 0,
+          inventory_updated_at: inventoryEnabled ? product.inventory_updated_at : ""
+        }))
+      : [],
+    suppliers: suppliersEnabled ? source.suppliers : [],
+    recent_purchases: recentPurchases,
+    product_drafts: catalogEnabled
+      ? source.product_drafts.map((draft) => ({
+          ...draft,
+          barcode: barcodeEnabled ? draft.barcode : ""
+        }))
+      : [],
+    cart_drafts: catalogEnabled && salesEnabled ? source.cart_drafts : []
   };
 }
 

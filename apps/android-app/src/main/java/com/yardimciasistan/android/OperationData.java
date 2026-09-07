@@ -62,7 +62,13 @@ final class OperationData {
       "settings.view",
       "settings.edit",
       "android_devices.view",
-      "android_devices.manage"
+      "android_devices.manage",
+      "market.summary.view",
+      "market.product.view",
+      "market.stock_count",
+      "market.receiving",
+      "market.product_draft",
+      "market.cart_draft"
   };
   private static final String[] KNOWN_BUSINESS_CAPABILITIES = {
       "core.customers",
@@ -144,6 +150,7 @@ final class OperationData {
   final List<ActionRecord> actions = new ArrayList<>();
   FinanceSnapshot finance = new FinanceSnapshot();
   final Map<String, ReportSnapshot> reports = new HashMap<>();
+  MarketSnapshot market = new MarketSnapshot();
 
   static OperationData fromJson(JSONObject root) {
     return fromJson(root, "");
@@ -232,6 +239,7 @@ final class OperationData {
     addRecords(array(root, "messages"), data.messages, MessageRecord::fromJson);
     addRecords(array(root, "actions"), data.actions, ActionRecord::fromJson);
     data.finance = FinanceSnapshot.fromJson(object(root, "finance"));
+    data.market = MarketSnapshot.fromJson(object(root, "market"));
     JSONObject reports = root.optJSONObject("reports");
     if (reports != null) {
       for (String preset : new String[] {"today", "yesterday", "last7", "last30"}) {
@@ -341,12 +349,37 @@ final class OperationData {
       return hasBusinessCapability("core.customers")
           && hasBusinessCapability("service.whatsapp");
     }
+    if ("market.summary.view".equals(permission)) {
+      return hasAnyMarketCapability();
+    }
+    if ("market.product.view".equals(permission) || "market.product_draft".equals(permission)) {
+      return hasBusinessCapability("commerce.catalog");
+    }
+    if ("market.stock_count".equals(permission)) {
+      return hasBusinessCapability("commerce.inventory");
+    }
+    if ("market.receiving".equals(permission)) {
+      return hasBusinessCapability("retail.purchasing");
+    }
+    if ("market.cart_draft".equals(permission)) {
+      return hasBusinessCapability("commerce.catalog")
+          && hasBusinessCapability("commerce.sales");
+    }
     return false;
   }
 
   boolean hasAnyReservationCapability() {
     return hasBusinessCapability("accommodation.reservations")
         || hasBusinessCapability("food_service.reservations");
+  }
+
+  boolean hasAnyMarketCapability() {
+    return hasBusinessCapability("commerce.catalog")
+        || hasBusinessCapability("commerce.inventory")
+        || hasBusinessCapability("commerce.sales")
+        || hasBusinessCapability("retail.barcode")
+        || hasBusinessCapability("retail.purchasing")
+        || hasBusinessCapability("retail.suppliers");
   }
 
   boolean isAdmin() {
@@ -563,6 +596,218 @@ final class OperationData {
       }
     }
     return values;
+  }
+
+  static final class MarketSnapshot {
+    MarketSummary summary = new MarketSummary();
+    final List<MarketProduct> products = new ArrayList<>();
+    final List<MarketSupplier> suppliers = new ArrayList<>();
+    final List<MarketPurchase> recentPurchases = new ArrayList<>();
+    final List<MarketProductDraft> productDrafts = new ArrayList<>();
+    final List<MarketCartDraft> cartDrafts = new ArrayList<>();
+
+    static MarketSnapshot fromJson(JSONObject source) {
+      MarketSnapshot market = new MarketSnapshot();
+      market.summary = MarketSummary.fromJson(object(source, "summary"));
+      addRecords(array(source, "products"), market.products, MarketProduct::fromJson);
+      addRecords(array(source, "suppliers"), market.suppliers, MarketSupplier::fromJson);
+      addRecords(array(source, "recent_purchases"), market.recentPurchases, MarketPurchase::fromJson);
+      addRecords(array(source, "product_drafts"), market.productDrafts, MarketProductDraft::fromJson);
+      addRecords(array(source, "cart_drafts"), market.cartDrafts, MarketCartDraft::fromJson);
+      return market;
+    }
+  }
+
+  static final class MarketSummary {
+    int todaySaleCount;
+    double todaySalesTotal;
+    String currency = "TRY";
+    int criticalStockCount;
+    int recentReceivingCount;
+    final List<MarketStockAdjustment> recentStockAdjustments = new ArrayList<>();
+
+    static MarketSummary fromJson(JSONObject source) {
+      MarketSummary summary = new MarketSummary();
+      summary.todaySaleCount = number(source, "today_sale_count");
+      summary.todaySalesTotal = decimal(source, "today_sales_total");
+      summary.currency = value(source, "currency", "TRY");
+      summary.criticalStockCount = number(source, "critical_stock_count");
+      summary.recentReceivingCount = number(source, "recent_receiving_count");
+      addRecords(array(source, "recent_stock_adjustments"), summary.recentStockAdjustments, MarketStockAdjustment::fromJson);
+      return summary;
+    }
+  }
+
+  static final class MarketStockAdjustment {
+    String id = "";
+    String productId = "";
+    String productName = "Ürün";
+    String type = "count";
+    double quantityDelta;
+    double quantityAfter;
+    String note = "";
+    String createdAt = "";
+
+    static MarketStockAdjustment fromJson(JSONObject source) {
+      MarketStockAdjustment adjustment = new MarketStockAdjustment();
+      adjustment.id = value(source, "id", "");
+      adjustment.productId = value(source, "product_id", "");
+      adjustment.productName = value(source, "product_name", "Ürün");
+      adjustment.type = "adjust".equals(value(source, "type", "count")) ? "adjust" : "count";
+      adjustment.quantityDelta = source.optDouble("quantity_delta", 0);
+      adjustment.quantityAfter = decimal(source, "quantity_after");
+      adjustment.note = value(source, "note", "");
+      adjustment.createdAt = value(source, "created_at", "");
+      return adjustment;
+    }
+  }
+
+  static final class MarketProduct {
+    String id = "";
+    String name = "Ürün";
+    String sku = "";
+    String barcode = "";
+    String unit = "piece";
+    double salePrice;
+    String currency = "TRY";
+    boolean active;
+    boolean trackInventory;
+    double currentQuantity;
+    double minimumQuantity;
+    String inventoryUpdatedAt = "";
+
+    static MarketProduct fromJson(JSONObject source) {
+      MarketProduct product = new MarketProduct();
+      product.id = value(source, "id", "");
+      product.name = value(source, "name", "Ürün");
+      product.sku = value(source, "sku", "");
+      product.barcode = value(source, "barcode", "");
+      product.unit = value(source, "unit", "piece");
+      product.salePrice = decimal(source, "sale_price");
+      product.currency = value(source, "currency", "TRY");
+      product.active = source.optBoolean("is_active", false);
+      product.trackInventory = source.optBoolean("track_inventory", false);
+      product.currentQuantity = decimal(source, "current_quantity");
+      product.minimumQuantity = decimal(source, "minimum_quantity");
+      product.inventoryUpdatedAt = value(source, "inventory_updated_at", "");
+      return product;
+    }
+  }
+
+  static final class MarketSupplier {
+    String id = "";
+    String name = "Tedarikçi";
+    boolean active;
+
+    static MarketSupplier fromJson(JSONObject source) {
+      MarketSupplier supplier = new MarketSupplier();
+      supplier.id = value(source, "id", "");
+      supplier.name = value(source, "name", "Tedarikçi");
+      supplier.active = source.optBoolean("is_active", false);
+      return supplier;
+    }
+  }
+
+  static final class MarketPurchase {
+    String id = "";
+    String supplierId = "";
+    String supplierName = "";
+    String status = "received";
+    String receivedAt = "";
+    double total;
+    String currency = "TRY";
+    int lineCount;
+
+    static MarketPurchase fromJson(JSONObject source) {
+      MarketPurchase purchase = new MarketPurchase();
+      purchase.id = value(source, "id", "");
+      purchase.supplierId = value(source, "supplier_id", "");
+      purchase.supplierName = value(source, "supplier_name", "");
+      purchase.status = value(source, "status", "received");
+      purchase.receivedAt = value(source, "received_at", "");
+      purchase.total = decimal(source, "total");
+      purchase.currency = value(source, "currency", "TRY");
+      purchase.lineCount = number(source, "line_count");
+      return purchase;
+    }
+  }
+
+  static final class MarketProductDraft {
+    String id = "";
+    String barcode = "";
+    String proposedName = "";
+    String sku = "";
+    String proposedCategory = "";
+    double proposedPurchasePrice;
+    double proposedSalePrice;
+    String currency = "TRY";
+    String unit = "piece";
+    String note = "";
+    String source = "";
+    String createdByDevice = "";
+    String status = "pending";
+    String createdAt = "";
+    String updatedAt = "";
+
+    static MarketProductDraft fromJson(JSONObject source) {
+      MarketProductDraft draft = new MarketProductDraft();
+      draft.id = value(source, "id", "");
+      draft.barcode = value(source, "barcode", "");
+      draft.proposedName = value(source, "proposed_name", "");
+      draft.sku = value(source, "sku", "");
+      draft.proposedCategory = value(source, "proposed_category", "");
+      draft.proposedPurchasePrice = decimal(source, "proposed_purchase_price");
+      draft.proposedSalePrice = decimal(source, "proposed_sale_price");
+      draft.currency = value(source, "currency", "TRY");
+      draft.unit = value(source, "unit", "piece");
+      draft.note = value(source, "note", "");
+      draft.source = value(source, "source", "");
+      draft.createdByDevice = value(source, "created_by_device", "");
+      draft.status = "reviewed".equals(value(source, "status", "pending")) ? "reviewed" : "pending";
+      draft.createdAt = value(source, "created_at", "");
+      draft.updatedAt = value(source, "updated_at", "");
+      return draft;
+    }
+  }
+
+  static final class MarketCartDraftLine {
+    String id = "";
+    String productId = "";
+    String productName = "Ürün";
+    double quantity;
+
+    static MarketCartDraftLine fromJson(JSONObject source) {
+      MarketCartDraftLine line = new MarketCartDraftLine();
+      line.id = value(source, "id", "");
+      line.productId = value(source, "product_id", "");
+      line.productName = value(source, "product_name", "Ürün");
+      line.quantity = decimal(source, "quantity");
+      return line;
+    }
+  }
+
+  static final class MarketCartDraft {
+    String id = "";
+    String status = "pending";
+    String source = "";
+    String createdByDevice = "";
+    String note = "";
+    String createdAt = "";
+    String updatedAt = "";
+    final List<MarketCartDraftLine> lines = new ArrayList<>();
+
+    static MarketCartDraft fromJson(JSONObject source) {
+      MarketCartDraft draft = new MarketCartDraft();
+      draft.id = value(source, "id", "");
+      draft.status = "reviewed".equals(value(source, "status", "pending")) ? "reviewed" : "pending";
+      draft.source = value(source, "source", "");
+      draft.createdByDevice = value(source, "created_by_device", "");
+      draft.note = value(source, "note", "");
+      draft.createdAt = value(source, "created_at", "");
+      draft.updatedAt = value(source, "updated_at", "");
+      addRecords(array(source, "lines"), draft.lines, MarketCartDraftLine::fromJson);
+      return draft;
+    }
   }
 
   static final class RequestRecord {

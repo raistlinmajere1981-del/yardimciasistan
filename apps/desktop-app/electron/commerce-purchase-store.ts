@@ -264,174 +264,13 @@ export function receiveCommercePurchase(
   databasePath: string,
   input: ReceiveCommercePurchaseInput
 ): CommercePurchaseOrderDetail {
-  if (!Array.isArray(input.items) || input.items.length === 0) {
-    throw new Error("Satın alma için en az bir ürün gerekli.");
-  }
-
   const database = openDatabase(databasePath);
   try {
-    const businessId = activeBusinessId(database);
-    const now = new Date().toISOString();
-    const purchaseOrderId = createId("purchase_order_");
-    const supplierId = String(input.supplierId ?? "").trim();
-    const notes = String(input.notes ?? "").trim().slice(0, 2000);
-    const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
-    const orderedAt = normalizeIsoTimestamp(input.orderedAt, now, "Sipariş tarihi");
-
     database.exec("BEGIN IMMEDIATE");
     try {
-      if (supplierId) {
-        const supplier = database.prepare(`
-          SELECT id
-          FROM commerce_suppliers
-          WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
-          LIMIT 1
-        `).get(supplierId, businessId) as { id?: unknown } | undefined;
-        if (!supplier?.id) throw new Error("Seçilen tedarikçi bulunamadı veya aktif değil.");
-      }
-
-      const locationId = resolveInventoryLocation(database, businessId, input.locationId, now);
-      const seenProductIds = new Set<string>();
-      let currency = "";
-      let subtotal = 0;
-      const preparedItems: Array<{
-        id: string;
-        productId: string;
-        productName: string;
-        quantity: number;
-        unitCost: number;
-        lineTotal: number;
-      }> = [];
-
-      for (const item of input.items) {
-        const productId = String(item.productId ?? "").trim();
-        if (!productId) throw new Error("Satın alma ürün kimliği gerekli.");
-        if (seenProductIds.has(productId)) {
-          throw new Error("Aynı ürün satın alma kaydında yalnız bir kez bulunabilir.");
-        }
-        seenProductIds.add(productId);
-
-        const quantity = roundQuantity(Number(item.quantity));
-        if (!Number.isFinite(quantity) || quantity <= 0) {
-          throw new Error("Satın alma adedi sıfırdan büyük olmalı.");
-        }
-        const unitCost = roundMoney(Number(item.unitCost));
-        if (!Number.isFinite(unitCost) || unitCost < 0) {
-          throw new Error("Satın alma birim maliyeti 0 veya daha büyük olmalı.");
-        }
-
-        const product = database.prepare(`
-          SELECT id, name, currency, track_inventory, is_active
-          FROM catalog_products
-          WHERE id = ? AND business_id = ? AND deleted_at = ''
-          LIMIT 1
-        `).get(productId, businessId) as Record<string, unknown> | undefined;
-        if (!product || Number(product.is_active ?? 0) !== 1) {
-          throw new Error("Satın alma ürünlerinden biri aktif değil veya bulunamadı.");
-        }
-        if (Number(product.track_inventory ?? 0) !== 1) {
-          throw new Error("Satın alma ile stok girişi yapılacak ürün stok takibine açık olmalı.");
-        }
-
-        const productCurrency = String(product.currency ?? "TRY").trim().toUpperCase() || "TRY";
-        if (currency && productCurrency !== currency) {
-          throw new Error("Tek satın alma kaydında birden fazla para birimi kullanılamaz.");
-        }
-        currency = productCurrency;
-
-        const lineTotal = roundMoney(quantity * unitCost);
-        subtotal = roundMoney(subtotal + lineTotal);
-        preparedItems.push({
-          id: createId("purchase_order_item_"),
-          productId,
-          productName: String(product.name ?? ""),
-          quantity,
-          unitCost,
-          lineTotal
-        });
-      }
-
-      database.prepare(`
-        INSERT INTO purchase_orders (
-          id, business_id, supplier_id, status, ordered_at, received_at,
-          subtotal, total, currency, notes, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, '')
-      `).run(
-        purchaseOrderId,
-        businessId,
-        supplierId,
-        orderedAt,
-        now,
-        subtotal,
-        subtotal,
-        currency || "TRY",
-        notes,
-        now,
-        now
-      );
-
-      const resultItems: CommercePurchaseOrderItem[] = [];
-      for (const prepared of preparedItems) {
-        database.prepare(`
-          INSERT INTO purchase_order_items (
-            id, purchase_order_id, product_id, product_name,
-            quantity, unit_cost, line_total, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          prepared.id,
-          purchaseOrderId,
-          prepared.productId,
-          prepared.productName,
-          prepared.quantity,
-          prepared.unitCost,
-          prepared.lineTotal,
-          now,
-          now
-        );
-
-        applyPurchaseStockIn(database, {
-          businessId,
-          locationId,
-          purchaseOrderId,
-          productId: prepared.productId,
-          productName: prepared.productName,
-          quantity: prepared.quantity,
-          unitCost: prepared.unitCost,
-          source,
-          now
-        });
-
-        resultItems.push({
-          id: prepared.id,
-          purchaseOrderId,
-          productId: prepared.productId,
-          productName: prepared.productName,
-          quantity: prepared.quantity,
-          unitCost: prepared.unitCost,
-          lineTotal: prepared.lineTotal,
-          createdAt: now,
-          updatedAt: now
-        });
-      }
-
+      const result = receiveCommercePurchaseInTransaction(database, input, new Date().toISOString());
       database.exec("COMMIT");
-      return {
-        order: {
-          id: purchaseOrderId,
-          businessId,
-          supplierId,
-          status: "received",
-          orderedAt,
-          receivedAt: now,
-          subtotal,
-          total: subtotal,
-          currency: currency || "TRY",
-          notes,
-          createdAt: now,
-          updatedAt: now
-        },
-        items: resultItems
-      };
+      return result;
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;
@@ -439,4 +278,177 @@ export function receiveCommercePurchase(
   } finally {
     database.close();
   }
+}
+
+/**
+ * Transaction-aware receiving primitive. The Android receipt, purchase rows,
+ * and inventory movements are committed or rolled back together.
+ */
+export function receiveCommercePurchaseInTransaction(
+  database: DatabaseSync,
+  input: ReceiveCommercePurchaseInput,
+  now: string
+): CommercePurchaseOrderDetail {
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new Error("Satın alma için en az bir ürün gerekli.");
+  }
+
+  const businessId = activeBusinessId(database);
+  const purchaseOrderId = createId("purchase_order_");
+  const supplierId = String(input.supplierId ?? "").trim();
+  const notes = String(input.notes ?? "").trim().slice(0, 2000);
+  const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
+  const orderedAt = normalizeIsoTimestamp(input.orderedAt, now, "Sipariş tarihi");
+
+  if (supplierId) {
+    const supplier = database.prepare(`
+      SELECT id
+      FROM commerce_suppliers
+      WHERE id = ? AND business_id = ? AND is_active = 1 AND deleted_at = ''
+      LIMIT 1
+    `).get(supplierId, businessId) as { id?: unknown } | undefined;
+    if (!supplier?.id) throw new Error("Seçilen tedarikçi bulunamadı veya aktif değil.");
+  }
+
+  const locationId = resolveInventoryLocation(database, businessId, input.locationId, now);
+  const seenProductIds = new Set<string>();
+  let currency = "";
+  let subtotal = 0;
+  const preparedItems: Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitCost: number;
+    lineTotal: number;
+  }> = [];
+
+  for (const item of input.items) {
+    const productId = String(item.productId ?? "").trim();
+    if (!productId) throw new Error("Satın alma ürün kimliği gerekli.");
+    if (seenProductIds.has(productId)) {
+      throw new Error("Aynı ürün satın alma kaydında yalnız bir kez bulunabilir.");
+    }
+    seenProductIds.add(productId);
+
+    const quantity = roundQuantity(Number(item.quantity));
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error("Satın alma adedi sıfırdan büyük olmalı.");
+    }
+    const unitCost = roundMoney(Number(item.unitCost));
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      throw new Error("Satın alma birim maliyeti 0 veya daha büyük olmalı.");
+    }
+
+    const product = database.prepare(`
+      SELECT id, name, currency, track_inventory, is_active
+      FROM catalog_products
+      WHERE id = ? AND business_id = ? AND deleted_at = ''
+      LIMIT 1
+    `).get(productId, businessId) as Record<string, unknown> | undefined;
+    if (!product || Number(product.is_active ?? 0) !== 1) {
+      throw new Error("Satın alma ürünlerinden biri aktif değil veya bulunamadı.");
+    }
+    if (Number(product.track_inventory ?? 0) !== 1) {
+      throw new Error("Satın alma ile stok girişi yapılacak ürün stok takibine açık olmalı.");
+    }
+
+    const productCurrency = String(product.currency ?? "TRY").trim().toUpperCase() || "TRY";
+    if (currency && productCurrency !== currency) {
+      throw new Error("Tek satın alma kaydında birden fazla para birimi kullanılamaz.");
+    }
+    currency = productCurrency;
+
+    const lineTotal = roundMoney(quantity * unitCost);
+    subtotal = roundMoney(subtotal + lineTotal);
+    preparedItems.push({
+      id: createId("purchase_order_item_"),
+      productId,
+      productName: String(product.name ?? ""),
+      quantity,
+      unitCost,
+      lineTotal
+    });
+  }
+
+  database.prepare(`
+    INSERT INTO purchase_orders (
+      id, business_id, supplier_id, status, ordered_at, received_at,
+      subtotal, total, currency, notes, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, '')
+  `).run(
+    purchaseOrderId,
+    businessId,
+    supplierId,
+    orderedAt,
+    now,
+    subtotal,
+    subtotal,
+    currency || "TRY",
+    notes,
+    now,
+    now
+  );
+
+  const resultItems: CommercePurchaseOrderItem[] = [];
+  for (const prepared of preparedItems) {
+    database.prepare(`
+      INSERT INTO purchase_order_items (
+        id, purchase_order_id, product_id, product_name,
+        quantity, unit_cost, line_total, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      prepared.id,
+      purchaseOrderId,
+      prepared.productId,
+      prepared.productName,
+      prepared.quantity,
+      prepared.unitCost,
+      prepared.lineTotal,
+      now,
+      now
+    );
+
+    applyPurchaseStockIn(database, {
+      businessId,
+      locationId,
+      purchaseOrderId,
+      productId: prepared.productId,
+      productName: prepared.productName,
+      quantity: prepared.quantity,
+      unitCost: prepared.unitCost,
+      source,
+      now
+    });
+
+    resultItems.push({
+      id: prepared.id,
+      purchaseOrderId,
+      productId: prepared.productId,
+      productName: prepared.productName,
+      quantity: prepared.quantity,
+      unitCost: prepared.unitCost,
+      lineTotal: prepared.lineTotal,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+
+  return {
+    order: {
+      id: purchaseOrderId,
+      businessId,
+      supplierId,
+      status: "received",
+      orderedAt,
+      receivedAt: now,
+      subtotal,
+      total: subtotal,
+      currency: currency || "TRY",
+      notes,
+      createdAt: now,
+      updatedAt: now
+    },
+    items: resultItems
+  };
 }

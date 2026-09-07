@@ -49,6 +49,7 @@ import { applyAndroidReservationAction } from "./android-reservation-actions.js"
 import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
 import { applyAndroidFinanceAction } from "./android-finance-actions.js";
 import { applyAndroidRoomFolioAction } from "./android-room-folio-actions.js";
+import { applyMarketAndroidAction } from "./market-android-actions.js";
 
 export type DesktopDemoProfile = "pension-restaurant";
 
@@ -7168,6 +7169,18 @@ export class DesktopDatabase {
         return this.applyAndroidMenuStockAction(action, "adjust", now);
       case "menu_stock_image_import_apply":
         return this.applyAndroidStockImageImport(action, now);
+      case "market_stock_count":
+      case "market_purchase_receive":
+      case "market_product_draft_create":
+      case "market_cart_draft_create":
+        return applyMarketAndroidAction({
+          db: this.db,
+          action,
+          now,
+          insertEvent: (type, entityType, entityId, payload) =>
+            this.insertAndroidActionEvent(action, type, entityType, entityId, payload, now),
+          queueSnapshot: () => this.queueSyncJob("android_snapshot", now)
+        });
       default:
         return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
     }
@@ -9265,7 +9278,8 @@ function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
     service_orders: false,
     cashier: false,
     rooms_tasks: false,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   };
 }
 
@@ -9291,10 +9305,17 @@ function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPermissio
     return null;
   }
   const record = value as Record<string, unknown>;
-  if (ANDROID_PERMISSION_GROUP_IDS.some((groupId) => typeof record[groupId] !== "boolean")) {
-    return null;
+  const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
+  for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
+    if (!(groupId in record)) {
+      // Older desktop and Android clients predate the additive Market group.
+      if (groupId === "market_operations") continue;
+      return null;
+    }
+    if (typeof record[groupId] !== "boolean") return null;
+    groups[groupId] = record[groupId];
   }
-  return Object.fromEntries(ANDROID_PERMISSION_GROUP_IDS.map((groupId) => [groupId, record[groupId]])) as AndroidPermissionGroups;
+  return groups;
 }
 
 function effectiveAndroidPermissions(

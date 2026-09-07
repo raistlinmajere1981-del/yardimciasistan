@@ -527,6 +527,10 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("menu_category_delete"), "menu.delete");
   assert.equal(resolveAndroidActionPermission("menu_item_delete"), "menu.delete");
   assert.equal(resolveAndroidActionPermission("message_delete"), "message.delete");
+  assert.equal(resolveAndroidActionPermission("market_stock_count"), "market.stock_count");
+  assert.equal(resolveAndroidActionPermission("market_purchase_receive"), "market.receiving");
+  assert.equal(resolveAndroidActionPermission("market_product_draft_create"), "market.product_draft");
+  assert.equal(resolveAndroidActionPermission("market_cart_draft_create"), "market.cart_draft");
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("customer.delete"), false);
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("customer.manage"), false);
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("room.assign_customer"), false);
@@ -541,8 +545,17 @@ test("Android staff permission groups produce only their documented effective pe
     service_orders: true,
     cashier: false,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   });
+  assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_operations, [
+    "market.summary.view",
+    "market.product.view",
+    "market.stock_count",
+    "market.receiving",
+    "market.product_draft",
+    "market.cart_draft"
+  ]);
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.cashier, [
     "table.view",
     "table_order.view",

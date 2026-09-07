@@ -359,5 +359,20 @@
       "updated_at": "2026-07-17T08:35:00+03:00"
     }
   ],
+  "market": {
+    "summary": {
+      "today_sale_count": 0,
+      "today_sales_total": 0,
+      "currency": "TRY",
+      "critical_stock_count": 0,
+      "recent_stock_adjustments": [],
+      "recent_receiving_count": 0
+    },
+    "products": [],
+    "suppliers": [],
+    "recent_purchases": [],
+    "product_drafts": [],
+    "cart_drafts": []
+  },
   "updated_at": "2026-07-17T09:20:00+03:00"
 }

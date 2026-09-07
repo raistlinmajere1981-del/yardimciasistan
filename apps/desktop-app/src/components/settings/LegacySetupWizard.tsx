@@ -30,7 +30,13 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   { id: "service_orders", label: "Servis / Sipariş", shortLabel: "Servis", description: "Masa, sipariş ve servis akışı" },
   { id: "cashier", label: "Kasa / Hesap", shortLabel: "Kasa", description: "Ödendi / Kapat işlemi" },
   { id: "rooms_tasks", label: "Oda / Günlük İşler", shortLabel: "Oda işleri", description: "Oda durumu ve günlük işler" },
-  { id: "customer_reservation", label: "Müşteri / Rezervasyon", shortLabel: "Müşteri / Rezervasyon", description: "Talep yanıtı ve rezervasyon onayı" }
+  { id: "customer_reservation", label: "Müşteri / Rezervasyon", shortLabel: "Müşteri / Rezervasyon", description: "Talep yanıtı ve rezervasyon onayı" },
+  {
+    id: "market_operations",
+    label: "Market / El Terminali",
+    shortLabel: "Market",
+    description: "Barkod, stok sayımı, mal kabulü, ürün taslağı ve sepet hazırlama"
+  }
 ];
 
 interface SetupWizardProps {
