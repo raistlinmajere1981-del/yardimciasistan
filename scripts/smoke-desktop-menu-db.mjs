@@ -752,7 +752,8 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
     service_orders: true,
     cashier: false,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   });
   assert.equal(automaticallyRegisteredDevice.permissions.includes("table_order.open"), true);
   assert.equal(automaticallyRegisteredDevice.permissions.includes("room.update_status"), true);
@@ -807,7 +808,8 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
     service_orders: true,
     cashier: false,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   };
   assert.equal(database.setAndroidDevicePermissionGroups("android-smoke-device", defaultGroups).ok, true);
   const allowedRoomUpdate = database.applyAndroidAction(androidAction("android_action_package_room_allowed_001", "room_status_update", {

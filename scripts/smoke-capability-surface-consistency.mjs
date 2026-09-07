@@ -34,7 +34,8 @@ const allGroups = {
   service_orders: true,
   cashier: true,
   rooms_tasks: true,
-  customer_reservation: true
+  customer_reservation: true,
+  market_operations: false
 };
 const androidCore = [C.ANDROID, C.CUSTOMERS, C.TASKS, C.FINANCE, C.REPORTS, C.DEVICES];
 
@@ -242,14 +243,28 @@ assert.equal(marketCapabilities.includes(C.ACCOMMODATION_ROOMS), false);
 assert.equal(marketCapabilities.includes(C.FOOD_TABLES), false);
 assert.deepEqual(
   androidAvailablePermissionGroupIds(marketCapabilities),
-  ["cashier", "rooms_tasks", "customer_reservation"]
+  ["market_operations"]
 );
-const marketPermissions = androidEffectivePermissionsForGroups(allGroups, marketCapabilities);
+const marketPermissions = androidEffectivePermissionsForGroups({
+  service_orders: false,
+  cashier: false,
+  rooms_tasks: false,
+  customer_reservation: false,
+  market_operations: true
+}, marketCapabilities);
 for (const permission of ["room.view", "room_folio.view", "table.view", "table_order.view", "reservation.view"]) {
   assert.equal(marketPermissions.includes(permission), false, `${permission} leaked into Market`);
 }
-assert.equal(marketPermissions.includes("daily_task.view"), true);
-assert.equal(marketPermissions.includes("customer.view"), true);
+for (const permission of [
+  "market.summary.view",
+  "market.product.view",
+  "market.stock_count",
+  "market.receiving",
+  "market.product_draft",
+  "market.cart_draft"
+]) {
+  assert.equal(marketPermissions.includes(permission), true, `${permission} missing from Market group`);
+}
 const marketProjection = projectAndroidOperationsSnapshot(fullSnapshot, marketCapabilities, "2026-07-17");
 assert.deepEqual(marketProjection.rooms, []);
 assert.deepEqual(marketProjection.customer_room_stays, []);
@@ -261,8 +276,7 @@ assert.deepEqual(marketProjection.menu.items, []);
 assert.equal(marketProjection.reports.today.attention.overdue_tasks, 0);
 assert.equal(marketProjection.reports.today.attention.incomplete_tasks, 0);
 assert.match(settingsSource, /androidAvailablePermissionGroupIds\(enabledCapabilities\)/);
-assert.match(settingsSource, /label: "Günlük İşler"/);
-assert.match(settingsSource, /label: "Müşteri Talepleri"/);
+assert.match(settingsSource, /label: "Market \/ El Terminali"/);
 
 const menuWithoutInventory = projectAndroidOperationsSnapshot(
   { ...fullSnapshot, appliedStockImageHashes: ["sha256-capability-smoke"] },

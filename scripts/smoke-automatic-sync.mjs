@@ -231,7 +231,8 @@ try {
     service_orders: true,
     cashier: false,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   });
   assert.equal(staffDevice.permissions.includes("table_order.open"), true);
   assert.equal(staffDevice.permissions.includes("room.update_status"), true);
