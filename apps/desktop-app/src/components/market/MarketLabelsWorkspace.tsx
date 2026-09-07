@@ -128,7 +128,7 @@ export function MarketLabelsWorkspace({
         <header className="market-panel-heading">
           <span>Etiket</span>
           <h2>Etiket Hazırla</h2>
-          <p>Donanım gerekmeden önizleyin; PNG veya label-boyutlu PDF üretin.</p>
+          <p>Donanım gerekmeden önizleyin; PNG veya etiket ölçüsünde PDF üretin.</p>
         </header>
 
         <div className="market-form-grid">
@@ -196,10 +196,10 @@ export function MarketLabelsWorkspace({
           </button>
         </div>
 
-        <section className="market-label-adapters" aria-label="Etiket çıktı adaptörleri">
+        <section className="market-label-adapters" aria-label="Etiket çıktı seçenekleri">
           <div className="market-label-adapter-heading">
             <Printer size={17} aria-hidden="true" />
-            <strong>LabelPrinter adaptörleri</strong>
+            <strong>Çıktı seçenekleri</strong>
           </div>
           <div className="market-label-adapter-list">
             {LABEL_PRINTER_CATALOG.map((adapter) => (
@@ -208,16 +208,16 @@ export function MarketLabelsWorkspace({
               </span>
             ))}
           </div>
-          <small>ZPL, TSPL ve sistem yazıcısı saha donanımı belli olduğunda aynı sözleşmeye takılacak.</small>
+          <small>ZPL, TSPL ve sistem yazıcısı seçenekleri saha donanımı belli olduğunda etkinleştirilecek.</small>
         </section>
       </section>
 
       <section className="market-panel market-label-preview-panel">
         <header className="market-panel-heading market-panel-heading-row">
           <div>
-            <span>Preview</span>
+            <span>Önizleme</span>
             <h2>Etiket Önizleme</h2>
-            <p>{size.label} · PNG/PDF ile aynı render sözleşmesi</p>
+            <p>{size.label} · PNG ve PDF çıktısıyla aynı görünüm</p>
           </div>
           <Download size={18} aria-hidden="true" />
         </header>
