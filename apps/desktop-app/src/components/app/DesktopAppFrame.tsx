@@ -39,6 +39,8 @@ interface DesktopAppFrameProps {
   children: ReactNode;
 }
 
+const OFFLINE_SYNC_MESSAGE = "İnternet bağlantısı yok. Yerel işlemler devam ediyor; eşitleme bağlantı gelince yapılacak.";
+
 export function DesktopAppFrame({
   activePage,
   setActivePage,
@@ -93,6 +95,9 @@ export function DesktopAppFrame({
   const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
   const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
   const inventoryEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.INVENTORY);
+  const syncDisplayMessage = automaticSyncStatus.phase === "offline"
+    ? OFFLINE_SYNC_MESSAGE
+    : syncState === "idle" ? automaticSyncStatus.message : statusMessage;
 
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
@@ -183,7 +188,7 @@ export function DesktopAppFrame({
               ) : (
                 <div className={`sync-pill sync-${syncState === "idle" ? automaticSyncTone(automaticSyncStatus) : syncState}`}>
                   <span role="status" aria-live="polite">
-                    {syncState === "idle" ? automaticSyncStatus.message : statusMessage}
+                    {syncDisplayMessage}
                     {automaticSyncStatus.pendingJobs > 0 ? ` · ${automaticSyncStatus.pendingJobs} eşitleme bekliyor` : ""}
                   </span>
                   <button
