@@ -170,12 +170,13 @@ export function useCustomerController({
     if (!result.ok) {
       setSyncState("error");
       setStatusMessage(result.message);
-      return;
+      return result;
     }
 
     setDashboardData(result.dashboardData);
     setSyncState("success");
     setStatusMessage(result.message);
+    return result;
   }
 
   async function handleSaveCustomer(input: SaveCustomerInput): Promise<DesktopCustomerMutationResult> {

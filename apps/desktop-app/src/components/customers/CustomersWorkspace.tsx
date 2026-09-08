@@ -6,6 +6,7 @@ import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
   DesktopIdentityImageAnalyzeResult,
+  DesktopStatusUpdateResult,
   SaveCustomerInput
 } from "../../../electron/database";
 import {
@@ -35,6 +36,8 @@ import { ActionButton } from "../ui/ActionButton";
 import { CompactList } from "../ui/CompactList";
 import { CompactListButton } from "../ui/CompactListItem";
 import { StatusBadge } from "../ui/StatusBadge";
+import { CustomerCreditPanel } from "./CustomerCreditPanel";
+import { customerCreditError } from "../../app/customer-credit-ui";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
@@ -48,6 +51,7 @@ interface CustomersWorkspaceProps {
   whatsappEnabled: boolean;
   reservationsEnabled: boolean;
   staysEnabled: boolean;
+  customerCreditEnabled?: boolean;
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSummarize: (requestId: string) => void;
@@ -58,7 +62,7 @@ interface CustomersWorkspaceProps {
     stayId: string,
     status: "planned" | "checked_in" | "checked_out" | "cancelled"
   ) => Promise<DesktopCustomerMutationResult>;
-  onDelete: (customer: DesktopDashboardData["customers"][number]) => void;
+  onDelete: (customer: DesktopDashboardData["customers"][number]) => Promise<DesktopStatusUpdateResult | undefined>;
 }
 
 export function CustomersWorkspace({
@@ -71,6 +75,7 @@ export function CustomersWorkspace({
   whatsappEnabled,
   reservationsEnabled,
   staysEnabled,
+  customerCreditEnabled = false,
   onCall,
   onWhatsApp,
   onSummarize,
@@ -85,6 +90,7 @@ export function CustomersWorkspace({
   const [customerEditorOpen, setCustomerEditorOpen] = useState(false);
   const [customerBeingEdited, setCustomerBeingEdited] = useState<DesktopDashboardData["customers"][number] | null>(null);
   const [assignmentCustomerId, setAssignmentCustomerId] = useState("");
+  const [deleteError, setDeleteError] = useState<{ customerId: string; message: string } | null>(null);
   const filteredCustomers = useMemo(
     () =>
       customers.filter((customer) => {
@@ -284,11 +290,21 @@ export function CustomersWorkspace({
                   Odaya Ata
                 </ActionButton>
               )}
-              <ActionButton variant="danger" size="sm" type="button" onClick={() => onDelete(selectedCustomer)}>
+              <ActionButton variant="danger" size="sm" type="button" onClick={async () => {
+                setDeleteError(null);
+                try {
+                  const result = await onDelete(selectedCustomer);
+                  if (result && !result.ok) setDeleteError({ customerId: selectedCustomer.id, message: result.message });
+                } catch (error) {
+                  setDeleteError({ customerId: selectedCustomer.id, message: customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin.") });
+                }
+              }}>
                 <Trash2 size={16} aria-hidden="true" />
                 Müşteriyi Sil
               </ActionButton>
             </div>
+            {deleteError?.customerId === selectedCustomer.id && <p role="alert">{deleteError.message}</p>}
+            {customerCreditEnabled && <CustomerCreditPanel key={selectedCustomer.id} customerId={selectedCustomer.id} />}
             <div className="customer-history-grid">
               <section>
                 <h3>Son Talepler</h3>

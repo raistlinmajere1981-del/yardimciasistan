@@ -468,6 +468,7 @@ export function DesktopWorkspaceRouter({
               whatsappEnabled={whatsappEnabled}
               reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
               staysEnabled={accommodationStaysEnabled}
+              customerCreditEnabled={runtimeHasCapability(businessCapabilities, C.CUSTOMER_CREDIT)}
               onCall={callCustomerRecord}
               onWhatsApp={openCustomerWhatsApp}
               onSummarize={(requestId) => openAiTools("summary", requestId)}

@@ -1,0 +1,49 @@
+import { useEffect, useId, useRef, useState } from "react";
+import { useCustomerCreditAccount } from "../../app/use-customer-credit-account";
+import { ActionButton } from "../ui/ActionButton";
+import { CustomerCreditBalances } from "./CustomerCreditBalances";
+import { CustomerCreditForm } from "./CustomerCreditForm";
+import { CustomerCreditHistory, CustomerCreditMovement } from "./CustomerCreditHistory";
+import "../../customer-credit-ux.css";
+
+export function CustomerCreditPanel({ customerId }: { customerId: string }) {
+  const { account, loading, error, reload } = useCustomerCreditAccount(customerId);
+  const [expanded, setExpanded] = useState(false);
+  const [form, setForm] = useState<"payment" | "adjustment" | null>(null);
+  const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  const debtExists = account?.balances.some((balance) => balance.amountMinor > 0) ?? false;
+
+  useEffect(() => {
+    if (expanded && form === null && !saving) toggle.current?.focus();
+  }, [expanded, form, saving]);
+
+  function closeForm() { setForm(null); }
+
+  return <section className="customer-credit-panel" aria-label="Veresiye hesabı" aria-busy={loading}>
+    <div className="customer-credit-heading"><h3>Veresiye</h3><span>Güncel borç</span></div>
+    {loading && <p role="status">Hesap yükleniyor…</p>}
+    {error && <div role="alert"><p>{error}</p><ActionButton variant="secondary" onClick={() => void reload()}>Hesabı Yenile</ActionButton></div>}
+    {message && <p role="status" className="customer-credit-success">{message}</p>}
+    {account && <>
+      <CustomerCreditBalances balances={account.balances} />
+      {!expanded && account.entries[0] && <div className="customer-credit-last">
+        <small>Son hareket</small><div><CustomerCreditMovement entry={account.entries[0]} /></div>
+      </div>}
+      <div className="customer-credit-actions">
+        <button ref={toggle} type="button" className="action-button action-button-secondary action-button-sm" aria-expanded={expanded} aria-controls={panelId}
+          disabled={saving}
+          onClick={() => { setExpanded((current) => !current); setForm(null); }}>{expanded ? "Hesabı Kapat" : "Hesabı Aç"}</button>
+        {!account.customer.deletedAt && <ActionButton disabled={loading || !debtExists || form !== null} onClick={() => { setExpanded(true); setForm("payment"); setMessage(""); }}>Tahsilat Al</ActionButton>}
+      </div>
+      {expanded && <div id={panelId} className="customer-credit-detail">
+        <p><strong>{account.customer.fullName}</strong></p>
+        {!form && !account.customer.deletedAt && <ActionButton variant="ghost" size="sm" disabled={loading} onClick={() => { setForm("adjustment"); setMessage(""); }}>Düzeltme</ActionButton>}
+        {form && <CustomerCreditForm account={account} mode={form} loading={loading} onSavingChange={setSaving} onClose={closeForm} onSaved={(text) => { setMessage(text); closeForm(); }} />}
+        <CustomerCreditHistory account={account} />
+      </div>}
+    </>}
+  </section>;
+}
