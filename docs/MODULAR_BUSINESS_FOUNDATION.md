@@ -1,6 +1,6 @@
 # Yardımcı Asistan — Modüler İşletme Temeli ve Market Handoff
 
-> Güncellik: 2026-09-07
+> Güncellik: 2026-09-08
 > Amaç: Pansiyon/restoran odaklı ilk üründen, farklı küçük işletme türlerinin aynı çekirdeği paylaşabildiği capability-first mimariye geçişte alınan kararların tek referansı olmak.
 
 ## 1. Ürün yönü
@@ -91,6 +91,7 @@ service.android
 commerce.catalog
 commerce.inventory
 commerce.sales
+commerce.customer_credit
 retail.barcode
 retail.purchasing
 retail.suppliers
@@ -114,6 +115,7 @@ channel.qr_menu             → food_service.menu
 
 commerce.inventory         → commerce.catalog
 commerce.sales             → commerce.catalog
+commerce.customer_credit   → core.customers + commerce.sales + core.finance
 retail.barcode              → commerce.catalog
 retail.purchasing           → commerce.catalog + commerce.inventory
 retail.labels               → commerce.catalog
@@ -557,7 +559,78 @@ Yeni session'ın ilk işi repo head'ini okuyup aşağıdaki checkpoint'i doğrul
 node scripts/check-modular-foundation.mjs
 ```
 
-Bu yeşil değilse yeni sektör veya ileri Market geliştirmesine başlanmamalıdır. M7.1
-foundation temizse sonraki Market işi M7.2 kapsamındaki Android ekranları ve masaüstü
-taslak içe alma deneyimi olarak ayrıca planlanmalıdır; M7.1 veri sözleşmesine tam mobil
-POS veya ödeme davranışı eklenmemelidir.
+Bu yeşil değilse yeni sektör veya ileri Market geliştirmesine başlanmamalıdır.
+M7.1–M7.3 ve M8.1 Customer Credit foundation tamamlandı;
+M8.2 masaüstü veresiye UI ve M8.3 isteğe bağlı WhatsApp entegrasyonu ayrı işlerdir.
+
+## 16. M8.1 — Customer Credit / Veresiye foundation — CLOSED
+
+Capability `commerce.customer_credit`; structural dependencies `core.customers`,
+`commerce.sales`, `core.finance`. Market profilinde varsayılan açıktır. Diğer
+profiller capability üzerinden hibrit olarak açabilir; business_type runtime gate
+yoktur. WhatsApp, Android ve sync coordinator bu runtime'ın bağımlılığı değildir.
+
+Model: `customer_credit_entries` immutable ledger; bakiye tablosu/kolonu yoktur.
+Tutar pozitif integer minor units, işaret `debit|credit` yönüdür. Bakiye işletme,
+müşteri ve currency başına `SUM(debit) - SUM(credit)` ile türetilir. TRY ve EUR
+birleştirilmez. Düzeltme yeni, notu zorunlu `adjustment_debit|adjustment_credit`
+hareketidir. Fazla tahsilat, avans ve negatif bakiye desteklenmez.
+
+Settlement kararı: mevcut `CommerceSale.status` union'ına `credit` eklenir.
+`paid` mevcut anlamını korur; `credit` kapanmış veresiye satışını ifade eder,
+payment_method boştur. Tahsilat müşteri hesabına uygulanır; M8.1 satış bazında
+tahsilat dağıtımı/partial settlement yapmaz ve satışın `credit` durumunu değiştirmez.
+Market satış sayısı/cirosu `paid` ve `credit` satışları kapsar. Mevcut genel raporlar
+restoran/konaklama ve kasa verilerini kullanır; yeni bir ticaret rapor motoru yoktur.
+
+Veresiye satış: aktif kayıtlı müşteri doğrulaması, güncel katalog fiyatı/indirim,
+satış, ürün snapshot'ları, stok düşümü ve tek ledger debit aynı `BEGIN IMMEDIATE`
+transaction'ındadır. Paid ve credit satışlar aynı transaction-aware primitive'i
+kullanır. `credit_sale != cash income`: veresiye satışında kasa geliri oluşmaz.
+Mevcut paid commerce sale'in kasa projection davranışı değiştirilmez.
+
+Tahsilat: mevcut currency borcu doğrulanır; ledger credit ve `finance_entries`
+income aynı transaction'da oluşur. `source_type=customer_credit_payment`,
+`source_id=ledger entry id`, kategori mevcut `other_income`; ödeme yöntemleri
+`cash|card|bank|other`. Kasa TRY özetleri yalnız TRY hareketlerini toplar; diğer
+currency hareketleri kendi currency bilgisiyle hareket listesinde korunur.
+
+`039_customer_credit_ledger.sql` müşteri sahipliğini de ekler: eski tek işletmeli
+müşteriler aktif işletmeye bağlanır, eski insert yolları aynı kuralı izler.
+Ledger müşteri/satış foreign key'leriyle korunur. Açık pozitif borç müşteri
+soft-delete işlemini engeller; sıfır borçlu silinmiş müşterinin geçmişi okunabilir,
+yeni hareketi reddedilir. Ledger UPDATE/DELETE endpoint'i yoktur.
+
+Bridge `DesktopCommerceBridge` içinde guarded list/get/entries, sale, payment,
+adjustment metotlarıdır. Main canonical database path, unlock kontrolü, persisted
+capability kontrolü ve başarılı mutation sonrası onMutation kullanılır. Capability
+kapalıyken read/mutation reddedilir; açıldığında aynı yerel geçmiş erişilir.
+
+Tüm işlemler offline SQLite üzerinde çalışır. Tam SQLite yedeği ledger, indeks,
+trigger ve sahiplik verisini doğal olarak taşır; ayrı yedek sistemi yoktur.
+`scripts/smoke-market-customer-credit-foundation.mjs` foundation zincirine dahildir.
+
+Hesap detayındaki `entries` en yeni 200 hareketi döndürür; tam geçmiş
+`listCustomerCreditEntries(customerId, { currency?, limit?, offset? })` ile sayfalanır.
+Bakiyeler her zaman tüm ledger üzerinden hesaplanır. Hesap listesi müşteri bilgisi,
+currency bazında pozitif borçlar, son hareket zamanı ve son tahsilat bilgisini verir.
+
+2026-09-08 doğrulaması:
+
+- `npm run build:packages` ve desktop build: geçti.
+- `npm run test`: 87 Node testi ve 30 Android testi, sıfır hata.
+- Yeni targeted smoke: `market-customer-credit-foundation-smoke-ok`.
+- `node scripts/check-modular-foundation.mjs`: `modular-foundation-check-ok`;
+  lint, Knip, design/architecture, typecheck ve tüm M7 smoke'ları geçti.
+- `npm run android:debug`: `BUILD SUCCESSFUL`; Android source değişmedi.
+- Ek record-deletions, customer-room-management, app-lock, finance-db,
+  finance-service ve reports-db smoke'ları geçti.
+- Targeted smoke; 038→039 migration, mevcut kullanıcı override'ları, authoritative
+  fiyat, currency ayrımı, duplicate debit, tam rollback, fazla tahsilat, iki ayrı
+  süreçten eşzamanlı ödeme, hibrit profil, kilitli IPC, müşteri silme ve yedekten
+  yeniden açma/integrity/foreign-key kontrollerini kapsar.
+
+M8.1'de veresiye UI, Hızlı Satış ödeme seçeneği, müşteri borç paneli, WhatsApp mesajı
+ve Android veresiye ekranı yoktur. WhatsApp gelecekte optional formatter/bridge
+entegrasyonudur. Faiz, taksit, vade, limit, risk, avans, satışa kısmi ödeme,
+iade entegrasyonu, PDF ve toplu hatırlatma kapsam dışıdır.
