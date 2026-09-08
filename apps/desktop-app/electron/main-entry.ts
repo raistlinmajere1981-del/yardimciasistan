@@ -136,7 +136,8 @@ const mainProcessReady = import("./main");
 // hesabı, commerce, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı
 // testi IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı migration'larından
 // sonra yapılır.
-void mainProcessReady.then(() => app.whenReady()).then(() => {
+void mainProcessReady.then(async ({ assertAppSessionUnlocked }) => {
+  await app.whenReady();
   setImmediate(() => {
     const databasePath = () => path.join(userDataPath(), "yardimci-asistan.sqlite");
 
@@ -228,9 +229,8 @@ void mainProcessReady.then(() => app.whenReady()).then(() => {
 
     registerCommerceIpcHandlers({
       databasePath,
-      // Commerce runtime performs capability checks. Renderer access remains
-      // behind the same app-lock-aware preload bridge used by finance/folio.
-      assertUnlocked: () => undefined,
+      // Recheck the main-process session even if the app locked after preload's check.
+      assertUnlocked: assertAppSessionUnlocked,
       onMutation: publishCommittedMutation
     });
 

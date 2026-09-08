@@ -7276,6 +7276,13 @@ export class DesktopDatabase {
     if (!customer) {
       return { ok: false, message: "Müşteri masaüstü kayıtlarında bulunamadı." };
     }
+    const creditDebt = this.db.prepare(`
+      SELECT 1 FROM customer_credit_balances
+      WHERE customer_id = ? AND amount_minor > 0 LIMIT 1
+    `).get(customerId);
+    if (creditDebt) {
+      return { ok: false, message: "Bu müşterinin açık veresiye borcu var." };
+    }
     const activeStay = this.db
       .prepare(`
         SELECT customer_room_stays.id, rooms.name AS room_name

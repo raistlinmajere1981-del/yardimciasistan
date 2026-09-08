@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import {
   createId,
+  moneyToMinor,
   type CatalogProduct,
   type CommerceSale,
   type CommerceSupplier,
@@ -648,109 +649,123 @@ export function setInventoryCountInTransaction(
 export function createPaidCommerceSale(databasePath: string, input: CreateCommerceSaleInput): CommerceSale {
   const database = openDatabase(databasePath);
   try {
-    const businessId = activeBusinessId(database);
-    if (!Array.isArray(input.items) || input.items.length === 0) {
-      throw new Error("Satış için en az bir ürün gerekli.");
-    }
-
-    const now = new Date().toISOString();
-    const saleId = createId("sale_");
-    const locationId = String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
-    let currency = "";
-    let subtotal = 0;
-    const preparedItems: Array<{
-      product: CatalogProduct;
-      quantity: number;
-      lineTotal: number;
-    }> = [];
-
-    for (const item of input.items) {
-      const quantity = roundQuantity(Number(item.quantity));
-      if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Satış adedi sıfırdan büyük olmalı.");
-      const row = getProductRow(database, businessId, String(item.productId ?? "").trim());
-      if (!row || Number(row.is_active ?? 0) !== 1) throw new Error("Satış ürünlerinden biri aktif değil veya bulunamadı.");
-      const product = mapProduct(row);
-      if (currency && product.currency !== currency) throw new Error("Tek satışta birden fazla para birimi kullanılamaz.");
-      currency = product.currency;
-      const lineTotal = roundMoney(product.salePrice * quantity);
-      subtotal = roundMoney(subtotal + lineTotal);
-      preparedItems.push({ product, quantity, lineTotal });
-    }
-
-    const discountTotal = Math.max(0, Math.min(subtotal, roundMoney(Number(input.discountTotal ?? 0))));
-    const total = roundMoney(subtotal - discountTotal);
-    const paymentMethod = String(input.paymentMethod ?? "cash").trim().slice(0, 80) || "cash";
-    const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
-
     database.exec("BEGIN IMMEDIATE");
     try {
-      database.prepare(`
-        INSERT INTO commerce_sales (
-          id, business_id, status, subtotal, discount_total, total, currency,
-          payment_method, source, opened_at, closed_at, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, 'paid', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
-      `).run(
-        saleId, businessId, subtotal, discountTotal, total, currency || "TRY",
-        paymentMethod, source, now, now, now, now
-      );
-
-      for (const prepared of preparedItems) {
-        const saleItemId = createId("sale_item_");
-        database.prepare(`
-          INSERT INTO commerce_sale_items (
-            id, sale_id, product_id, product_name, barcode, unit_price,
-            quantity, line_total, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          saleItemId,
-          saleId,
-          prepared.product.id,
-          prepared.product.name,
-          prepared.product.barcode,
-          prepared.product.salePrice,
-          prepared.quantity,
-          prepared.lineTotal,
-          now
-        );
-
-        if (prepared.product.trackInventory) {
-          applyInventoryMovementInTransaction(database, businessId, {
-            productId: prepared.product.id,
-            locationId,
-            type: "sale",
-            quantityDelta: -prepared.quantity,
-            unitCost: prepared.product.purchasePrice,
-            referenceType: "commerce_sale",
-            referenceId: saleId,
-            note: `${prepared.product.name} satışı`,
-            actorSource: source
-          }, now);
-        }
-      }
+      const sale = createCommerceSaleInTransaction(database, input, "paid", new Date().toISOString());
       database.exec("COMMIT");
+      return sale;
     } catch (error) {
       database.exec("ROLLBACK");
       throw error;
     }
-
-    return {
-      id: saleId,
-      businessId,
-      status: "paid",
-      subtotal,
-      discountTotal,
-      total,
-      currency: currency || "TRY",
-      paymentMethod,
-      source,
-      openedAt: now,
-      closedAt: now,
-      createdAt: now,
-      updatedAt: now
-    };
   } finally {
     database.close();
   }
+}
+
+/** Caller owns BEGIN IMMEDIATE / COMMIT, including current-price resolution. */
+export function createCommerceSaleInTransaction(
+  database: DatabaseSync,
+  input: CreateCommerceSaleInput,
+  status: "paid" | "credit",
+  now: string
+): CommerceSale {
+  const businessId = activeBusinessId(database);
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    throw new Error("Satış için en az bir ürün gerekli.");
+  }
+
+  const saleId = createId("sale_");
+  const locationId = String(input.locationId ?? "").trim() || ensurePrimaryLocation(database, businessId, now);
+  let currency = "";
+  let subtotal = 0;
+  const preparedItems: Array<{
+    product: CatalogProduct;
+    quantity: number;
+    lineTotal: number;
+  }> = [];
+
+  for (const item of input.items) {
+    const quantity = roundQuantity(Number(item.quantity));
+    if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("Satış adedi sıfırdan büyük olmalı.");
+    const row = getProductRow(database, businessId, String(item.productId ?? "").trim());
+    if (!row || Number(row.is_active ?? 0) !== 1) throw new Error("Satış ürünlerinden biri aktif değil veya bulunamadı.");
+    const product = mapProduct(row);
+    moneyToMinor(product.salePrice);
+    if (currency && product.currency !== currency) throw new Error("Tek satışta birden fazla para birimi kullanılamaz.");
+    currency = product.currency;
+    const lineTotal = roundMoney(product.salePrice * quantity);
+    moneyToMinor(lineTotal);
+    subtotal = roundMoney(subtotal + lineTotal);
+    moneyToMinor(subtotal);
+    preparedItems.push({ product, quantity, lineTotal });
+  }
+
+  const requestedDiscount = Number(input.discountTotal ?? 0);
+  moneyToMinor(requestedDiscount);
+  const discountTotal = Math.min(subtotal, roundMoney(requestedDiscount));
+  const total = roundMoney(subtotal - discountTotal);
+  const paymentMethod = status === "credit" ? "" : String(input.paymentMethod ?? "cash").trim().slice(0, 80) || "cash";
+  const source = String(input.source ?? "desktop").trim().slice(0, 80) || "desktop";
+
+  database.prepare(`
+    INSERT INTO commerce_sales (
+      id, business_id, status, subtotal, discount_total, total, currency,
+      payment_method, source, opened_at, closed_at, created_at, updated_at, deleted_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+  `).run(
+    saleId, businessId, status, subtotal, discountTotal, total, currency || "TRY",
+    paymentMethod, source, now, now, now, now
+  );
+
+  for (const prepared of preparedItems) {
+    const saleItemId = createId("sale_item_");
+    database.prepare(`
+      INSERT INTO commerce_sale_items (
+        id, sale_id, product_id, product_name, barcode, unit_price,
+        quantity, line_total, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      saleItemId,
+      saleId,
+      prepared.product.id,
+      prepared.product.name,
+      prepared.product.barcode,
+      prepared.product.salePrice,
+      prepared.quantity,
+      prepared.lineTotal,
+      now
+    );
+
+    if (prepared.product.trackInventory) {
+      applyInventoryMovementInTransaction(database, businessId, {
+        productId: prepared.product.id,
+        locationId,
+        type: "sale",
+        quantityDelta: -prepared.quantity,
+        unitCost: prepared.product.purchasePrice,
+        referenceType: "commerce_sale",
+        referenceId: saleId,
+        note: `${prepared.product.name} satışı`,
+        actorSource: source
+      }, now);
+    }
+  }
+  return {
+    id: saleId,
+    businessId,
+    status,
+    subtotal,
+    discountTotal,
+    total,
+    currency: currency || "TRY",
+    paymentMethod,
+    source,
+    openedAt: now,
+    closedAt: now,
+    createdAt: now,
+    updatedAt: now
+  };
 }
 
 export function listCommerceSuppliers(

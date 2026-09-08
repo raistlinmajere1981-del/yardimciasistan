@@ -1,6 +1,12 @@
 import { ipcMain } from "electron";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
 import {
+  addCustomerCreditAdjustment,
+  createCustomerCreditSale,
+  getCustomerCreditAccount,
+  listCustomerCreditAccounts,
+  listCustomerCreditEntries,
+  recordCustomerCreditPayment,
   applyRuntimeInventoryMovement,
   createRuntimePaidSale,
   consumePendingMarketBarcodeScans,
@@ -91,6 +97,25 @@ export function registerCommerceIpcHandlers(options: {
 
   ipcMain.handle("commerce:sale:createPaid", (_event, input: Parameters<DesktopCommerceBridge["createPaidSale"]>[0]) =>
     mutate(() => createRuntimePaidSale(databasePath(), input))
+  );
+
+  ipcMain.handle("commerce:customerCredit:list", (_event, input: Parameters<DesktopCommerceBridge["listCustomerCreditAccounts"]>[0]) =>
+    read(() => listCustomerCreditAccounts(databasePath(), input))
+  );
+  ipcMain.handle("commerce:customerCredit:get", (_event, customerId: string) =>
+    read(() => getCustomerCreditAccount(databasePath(), customerId))
+  );
+  ipcMain.handle("commerce:customerCredit:entries", (_event, customerId: string, input: Parameters<DesktopCommerceBridge["listCustomerCreditEntries"]>[1]) =>
+    read(() => listCustomerCreditEntries(databasePath(), customerId, input))
+  );
+  ipcMain.handle("commerce:customerCredit:sale", (_event, input: Parameters<DesktopCommerceBridge["createCustomerCreditSale"]>[0]) =>
+    mutate(() => createCustomerCreditSale(databasePath(), input))
+  );
+  ipcMain.handle("commerce:customerCredit:payment", (_event, input: Parameters<DesktopCommerceBridge["recordCustomerCreditPayment"]>[0]) =>
+    mutate(() => recordCustomerCreditPayment(databasePath(), input))
+  );
+  ipcMain.handle("commerce:customerCredit:adjustment", (_event, input: Parameters<DesktopCommerceBridge["addCustomerCreditAdjustment"]>[0]) =>
+    mutate(() => addCustomerCreditAdjustment(databasePath(), input))
   );
 
   ipcMain.handle("commerce:productDraft:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listProductDrafts"]>[0]) =>

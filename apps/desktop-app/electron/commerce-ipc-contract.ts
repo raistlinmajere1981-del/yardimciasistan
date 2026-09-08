@@ -1,4 +1,12 @@
 import type {
+  AddCustomerCreditAdjustmentInput,
+  CreateCustomerCreditSaleInput,
+  CustomerCreditAccountDetail,
+  CustomerCreditAccountSummary,
+  CustomerCreditEntry,
+  ListCustomerCreditAccountsOptions,
+  ListCustomerCreditEntriesOptions,
+  RecordCustomerCreditPaymentInput,
   CatalogCategory,
   CatalogProduct,
   CatalogProductDraft,
@@ -68,6 +76,12 @@ export interface DesktopCommerceBridge {
   setInventoryCount: (input: SetInventoryCountInput) => Promise<InventoryCountResult>;
 
   createPaidSale: (input: CreateCommerceSaleInput) => Promise<CommerceSale>;
+  listCustomerCreditAccounts: (options?: ListCustomerCreditAccountsOptions) => Promise<CustomerCreditAccountSummary[]>;
+  getCustomerCreditAccount: (customerId: string) => Promise<CustomerCreditAccountDetail>;
+  listCustomerCreditEntries: (customerId: string, options?: ListCustomerCreditEntriesOptions) => Promise<CustomerCreditEntry[]>;
+  createCustomerCreditSale: (input: CreateCustomerCreditSaleInput) => Promise<CommerceSale>;
+  recordCustomerCreditPayment: (input: RecordCustomerCreditPaymentInput) => Promise<CustomerCreditEntry>;
+  addCustomerCreditAdjustment: (input: AddCustomerCreditAdjustmentInput) => Promise<CustomerCreditEntry>;
 
   listProductDrafts: (options?: ListMarketProductDraftsOptions) => Promise<CatalogProductDraft[]>;
   markProductDraftReviewed: (draftId: string) => Promise<CatalogProductDraft>;

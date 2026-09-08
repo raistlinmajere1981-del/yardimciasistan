@@ -73,6 +73,7 @@ try {
   assert.equal(sale.paymentMethod, "card");
   assert.equal(getRuntimeInventoryBalance(databasePath, product.id).quantity, 0);
 
+  setBusinessCapability(databasePath, { capability: "commerce.customer_credit", enabled: false });
   setBusinessCapability(databasePath, { capability: "commerce.sales", enabled: false });
   assert.throws(
     () => createRuntimePaidSale(databasePath, {

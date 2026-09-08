@@ -1960,7 +1960,7 @@ function resetAppLockFailures() {
   appLockBlockedUntil = 0;
 }
 
-function assertAppSessionUnlocked() {
+export function assertAppSessionUnlocked() {
   if (appSessionLocked) {
     throw new Error("Uygulama kilitli. Devam etmek için kilidi açın.");
   }

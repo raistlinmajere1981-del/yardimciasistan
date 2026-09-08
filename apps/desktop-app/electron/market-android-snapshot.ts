@@ -89,7 +89,7 @@ export function createAndroidMarketSnapshotSource(
         COUNT(DISTINCT currency) AS currency_count
       FROM commerce_sales
       WHERE business_id = ?
-        AND status = 'paid'
+        AND status IN ('paid', 'credit')
         AND deleted_at = ''
         AND date(closed_at, 'localtime') = ?
     `).get(businessId, today) as Record<string, unknown> | undefined;

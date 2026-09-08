@@ -55,6 +55,14 @@ import {
 
 export type { ReceiveCommercePurchaseInput, SetInventoryCountInput };
 export {
+  addCustomerCreditAdjustment,
+  createCustomerCreditSale,
+  getCustomerCreditAccount,
+  listCustomerCreditAccounts,
+  listCustomerCreditEntries,
+  recordCustomerCreditPayment
+} from "./customer-credit-runtime";
+export {
   createMarketCartDraft,
   createMarketProductDraft,
   consumePendingMarketBarcodeScans,

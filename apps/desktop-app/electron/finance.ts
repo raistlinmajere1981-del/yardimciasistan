@@ -88,6 +88,7 @@ export class DesktopFinanceService {
           COALESCE(SUM(CASE WHEN direction = 'expense' THEN amount_minor ELSE 0 END), 0) AS expense_minor
         FROM finance_entries
         WHERE deleted_at = ''
+          AND currency = 'TRY'
           AND date(occurred_at, 'localtime') = date('now', 'localtime')
       `).get() as { income_minor?: number; expense_minor?: number } | undefined;
 
