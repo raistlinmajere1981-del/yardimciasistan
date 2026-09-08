@@ -560,8 +560,8 @@ node scripts/check-modular-foundation.mjs
 ```
 
 Bu yeşil değilse yeni sektör veya ileri Market geliştirmesine başlanmamalıdır.
-M7.1–M7.3 ve M8.1 Customer Credit foundation tamamlandı;
-M8.2 masaüstü veresiye UI ve M8.3 isteğe bağlı WhatsApp entegrasyonu ayrı işlerdir.
+M7.1–M7.3, M8.1 Customer Credit foundation ve M8.2 masaüstü veresiye UI tamamlandı.
+M8.3 isteğe bağlı WhatsApp entegrasyonu ayrı iştir.
 
 ## 16. M8.1 — Customer Credit / Veresiye foundation — CLOSED
 
@@ -634,3 +634,81 @@ M8.1'de veresiye UI, Hızlı Satış ödeme seçeneği, müşteri borç paneli, 
 ve Android veresiye ekranı yoktur. WhatsApp gelecekte optional formatter/bridge
 entegrasyonudur. Faiz, taksit, vade, limit, risk, avans, satışa kısmi ödeme,
 iade entegrasyonu, PDF ve toplu hatırlatma kapsam dışıdır.
+
+## 17. M8.2 — Desktop Veresiye UI — CLOSED
+
+Hızlı Satış'ta `commerce.customer_credit` açıkken **Veresiye** ödeme seçeneği
+görünür. Küçük `CustomerPicker`, mevcut dashboard'ın aktif kayıtlı müşterilerini
+kullanır; ad/telefon arama, seçme ve temizleme sağlar. Ayrı müşteri deposu veya
+yönetim ekranı yoktur. Seçilen müşterinin mevcut borcu hesap API'sinden okunur.
+Capability kapalıyken picker/hesap paneli mount edilmez, gizli hesap read'i yapılmaz.
+`business_type`, WhatsApp ve Android görünürlüğe karar vermez.
+
+Normal yöntemler `createPaidSale`, veresiye `createCustomerCreditSale` çağırır.
+Renderer yalnız müşteri/ürün kimlikleri, miktarlar, indirim ve source gönderir;
+satış tutarı backend sonucudur. Başarıda sepet/müşteri temizlenir, yöntem nakde
+döner, katalog yenilenir. Makbuz: “Veresiye satış kaydedildi.” ve “Müşteri hesabına
+… borç işlendi.” Tahsil edilmiş gibi gösterilmez.
+
+Mevcut Müşteriler kartında küçük Veresiye özeti, para birimi başına ayrı borç ve
+son hareket vardır. `Hesabı Aç` satır içi detay açar; son 200 hareketten sonra
+`Daha Eski Hareketler` hesap geçmişi API'sini sayfalar. Türkçe tür adları, tarih,
+tutar, not, tahsilat yöntemi ve gerekiyorsa “Satış kaydı” gösterilir; UUID/teknik
+ledger alanları gösterilmez. Bakiye satış durumundan veya sayfalı geçmişten
+türetilmez. Liste badge'i eklenmedi; N+1 hesap sorgusu yoktur.
+
+`Tahsilat Al` seçilen currency için pozitif, mevcut borcu aşmayan tutar ister.
+Yalnız `recordCustomerCreditPayment` kullanılır; ikinci finance yazımı yoktur.
+İkinci plandaki `Düzeltme`, zorunlu açıklamayla `addCustomerCreditAdjustment`
+çağırır; mevcut kayıt güncelleme/silme yoktur. Borcu azaltma mevcut borcu aşamaz.
+UI ön doğrulama yapar; eşzamanlı değişikliklerde backend son otoritedir.
+Mutation sırasında çift submit engellenir. Başarılı mutation'dan sonra başarısız
+hesap yenilemesi ayrı hata olarak gösterilir; kaydedilmiş ödeme tekrar sunulmaz.
+Formlar etiketli ve klavyeyle kullanılabilir; Escape/Vazgeç sonrası odak hesap
+düğmesine döner. Tasarım tokenları ve mevcut masaüstü responsive düzeni kullanılır.
+
+Borçlu müşteriyi silme hatası kartta açıkça gösterilir; tüm currency borçları
+kapandıktan sonra mevcut onaylı soft-delete akışı çalışır. Yenilemeler müşteri
+kimliğine kapsamlı yerel bir olayla hesap API'sine yönelir; satışta ayrıca katalog
+yenilenir. Veresiye mutation'ları tüm uygulama bootstrap'ını yenilemez.
+
+M7 telefon sepeti ve canlı barkod aynı Quick Sale sepetini kullanır; ayrı veresiye
+scanner yolu yoktur. Paid/credit başarıdan sonra kaynak taslak reviewed olur;
+kapatma başarısızsa yalnız taslak kapatma yeniden denenir, satış yinelenmez.
+Bekleyen sepet yüklemesini durum render'larında iptal eden callback değişkenliği
+giderildi; yükleme koruması Strict Mode iptal/yeniden kurulumunu da destekler.
+
+Veresiye ekranları yerel bridge/SQLite ile offline çalışır. Telefon barkodunun
+mevcut hosting aktarımı yine internet gerektirebilir; bu, veresiye bağımlılığı
+değildir. Android source ve veresiye runtime/schema değiştirilmedi.
+
+`scripts/smoke-market-customer-credit-ui-contract.mjs` foundation zincirindedir.
+Test, gerçek React workspaces + Strict Mode + geçici SQLite runtime kullanır;
+sayfa yüklendikten sonra tarayıcı ağı kapatılır. Yalnız Electron transport ve
+telefon tarama aktarımı test adaptörüyle sağlanır; ürün lookup, sepet, satış,
+tahsilat, düzeltme, geçmiş ve silme gerçek uygulama koduyla çalışır.
+
+2026-09-08 doğrulaması:
+
+- `npm run build:packages` ve desktop build geçti.
+- `npm run test`: 87 Node testi ve 30 Android testi, sıfır hata.
+- `node scripts/check-modular-foundation.mjs`: `modular-foundation-check-ok`;
+  lint, Knip, design/architecture, typecheck ve tüm M7/M8 smoke'ları geçti.
+- M8.1 targeted smoke: `market-customer-credit-foundation-smoke-ok`.
+- M8.2 targeted smoke: `market-customer-credit-ui-contract-smoke-ok`;
+  dört normal ödeme yöntemi, backend fiyat değişimi, müşteri seçme/temizleme,
+  kapalı capability'de mount/fetch engeli, fazla/çift tahsilat engeli, başarısız
+  yenileme sonrası kayıt koruması, düzeltme, 203 hareketin sayfalanması, borç
+  kapatma/silme, M7 reviewed recovery, scanner sepeti ve offline işlemler geçti.
+- 1440px ve 900px viewport'ta hesap/picker kontrolleri geçti. Mevcut Electron
+  pencere alt sınırı 1080px; test, CSS body alt sınırı olan 900px'i de kapsar.
+- `npm run android:debug`: `BUILD SUCCESSFUL`; Android source değişmedi.
+- Ek finance-db, finance-service, record-deletions ve customer-room-management
+  smoke'ları geçti. Test logları `artifacts/test-results/m82/`, görsel kanıtlar
+  `artifacts/screenshots/m82-credit/` altında (git dışında).
+- Mevcut Vite büyük bundle uyarısı sürer; derleme hatası değildir.
+
+M8.3'e bırakılan: isteğe bağlı borç durumunu WhatsApp'tan gönderme aksiyonu ve
+formatter/bridge. M8.2'de buton, şablon, mesaj oluşturma veya otomatik hatırlatma
+yoktur. Android veresiye UI, faiz/vade/taksit/limit, avans/negatif bakiye, parçalı
+nakit+veresiye, PDF ve raporlar da kapsam dışıdır.
