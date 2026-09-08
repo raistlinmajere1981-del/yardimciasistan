@@ -1,15 +1,23 @@
 import {
   BUSINESS_CAPABILITIES,
   type CatalogProductDraft,
-  type CommerceSaleDraftDetail
+  type CommerceSaleDraft,
+  type CommerceSaleDraftDetail,
+  type MarketBarcodeScanEvent,
+  type MarketCartDraftLoadResult
 } from "@yardimci-asistan/shared";
 import { assertPersistedBusinessCapability } from "./business-capability-runtime.js";
 import {
   createMarketCartDraftRecord,
   createMarketProductDraftRecord,
+  consumePendingMarketBarcodeScanRecords,
   getMarketCartDraftRecord,
+  loadMarketCartDraftForQuickSaleRecord,
   listMarketCartDraftRecords,
   listMarketProductDraftRecords,
+  markMarketCartDraftReviewedRecord,
+  markMarketProductDraftReviewedRecord,
+  type ConsumePendingMarketBarcodeScansOptions,
   type CreateMarketCartDraftInput,
   type CreateMarketProductDraftInput,
   type ListMarketCartDraftsOptions,
@@ -20,7 +28,8 @@ export type {
   CreateMarketCartDraftInput,
   CreateMarketProductDraftInput,
   ListMarketCartDraftsOptions,
-  ListMarketProductDraftsOptions
+  ListMarketProductDraftsOptions,
+  ConsumePendingMarketBarcodeScansOptions
 };
 
 function requireCatalog(databasePath: string): void {
@@ -39,6 +48,14 @@ function requireSales(databasePath: string): void {
   );
 }
 
+function requireBarcode(databasePath: string): void {
+  assertPersistedBusinessCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.RETAIL_BARCODE,
+    "Telefon barkod modu için barkod yeteneği etkin olmalı."
+  );
+}
+
 export function createMarketProductDraft(
   databasePath: string,
   input: CreateMarketProductDraftInput
@@ -53,6 +70,14 @@ export function listMarketProductDrafts(
 ): CatalogProductDraft[] {
   requireCatalog(databasePath);
   return listMarketProductDraftRecords(databasePath, options);
+}
+
+export function markMarketProductDraftReviewed(
+  databasePath: string,
+  draftId: string
+): CatalogProductDraft {
+  requireCatalog(databasePath);
+  return markMarketProductDraftReviewedRecord(databasePath, draftId);
 }
 
 export function createMarketCartDraft(
@@ -80,4 +105,32 @@ export function getMarketCartDraft(
   requireCatalog(databasePath);
   requireSales(databasePath);
   return getMarketCartDraftRecord(databasePath, draftId);
+}
+
+export function loadMarketCartDraftForQuickSale(
+  databasePath: string,
+  draftId: string
+): MarketCartDraftLoadResult {
+  requireCatalog(databasePath);
+  requireSales(databasePath);
+  return loadMarketCartDraftForQuickSaleRecord(databasePath, draftId);
+}
+
+export function markMarketCartDraftReviewed(
+  databasePath: string,
+  draftId: string
+): CommerceSaleDraft {
+  requireCatalog(databasePath);
+  requireSales(databasePath);
+  return markMarketCartDraftReviewedRecord(databasePath, draftId);
+}
+
+export function consumePendingMarketBarcodeScans(
+  databasePath: string,
+  options: ConsumePendingMarketBarcodeScansOptions = {}
+): MarketBarcodeScanEvent[] {
+  requireCatalog(databasePath);
+  requireSales(databasePath);
+  requireBarcode(databasePath);
+  return consumePendingMarketBarcodeScanRecords(databasePath, options);
 }

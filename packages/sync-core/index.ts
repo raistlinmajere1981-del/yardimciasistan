@@ -421,7 +421,8 @@ export const ANDROID_PERMISSIONS = [
   "market.stock_count",
   "market.receiving",
   "market.product_draft",
-  "market.cart_draft"
+  "market.cart_draft",
+  "market.scan_to_desktop"
 ] as const;
 
 export type AndroidPermission = typeof ANDROID_PERMISSIONS[number];
@@ -489,7 +490,8 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
     "market.stock_count",
     "market.receiving",
     "market.product_draft",
-    "market.cart_draft"
+    "market.cart_draft",
+    "market.scan_to_desktop"
   ]
 };
 
@@ -601,7 +603,8 @@ export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<Android
   "market.stock_count": { allOf: [C.INVENTORY] },
   "market.receiving": { allOf: [C.RETAIL_PURCHASING] },
   "market.product_draft": { allOf: [C.CATALOG] },
-  "market.cart_draft": { allOf: [C.SALES, C.CATALOG] }
+  "market.cart_draft": { allOf: [C.SALES, C.CATALOG] },
+  "market.scan_to_desktop": { allOf: [C.RETAIL_BARCODE, C.CATALOG, C.SALES] }
 };
 
 function capabilityRequirementSatisfied(
@@ -990,7 +993,8 @@ export const ANDROID_ACTION_TYPES = [
   "market_stock_count",
   "market_purchase_receive",
   "market_product_draft_create",
-  "market_cart_draft_create"
+  "market_cart_draft_create",
+  "market_barcode_scan"
 ] as const;
 
 export type AndroidActionType = typeof ANDROID_ACTION_TYPES[number];
@@ -1046,6 +1050,11 @@ export interface AndroidMarketCartDraftCreatePayload {
     product_id: string;
     quantity: number;
   }>;
+}
+
+export interface AndroidMarketBarcodeScanPayload {
+  barcode: string;
+  scanned_at: ISODateTimeString;
 }
 
 export interface PullAndroidActionsOptions extends SyncCoreConfig {
@@ -1116,7 +1125,8 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   market_stock_count: "market.stock_count",
   market_purchase_receive: "market.receiving",
   market_product_draft_create: "market.product_draft",
-  market_cart_draft_create: "market.cart_draft"
+  market_cart_draft_create: "market.cart_draft",
+  market_barcode_scan: "market.scan_to_desktop"
 };
 
 export function resolveAndroidActionPermission(

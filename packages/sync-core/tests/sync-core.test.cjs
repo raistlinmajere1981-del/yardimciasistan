@@ -531,6 +531,7 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("market_purchase_receive"), "market.receiving");
   assert.equal(resolveAndroidActionPermission("market_product_draft_create"), "market.product_draft");
   assert.equal(resolveAndroidActionPermission("market_cart_draft_create"), "market.cart_draft");
+  assert.equal(resolveAndroidActionPermission("market_barcode_scan"), "market.scan_to_desktop");
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("customer.delete"), false);
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("customer.manage"), false);
   assert.equal(ANDROID_STAFF_PERMISSIONS.includes("room.assign_customer"), false);
@@ -554,7 +555,8 @@ test("Android staff permission groups produce only their documented effective pe
     "market.stock_count",
     "market.receiving",
     "market.product_draft",
-    "market.cart_draft"
+    "market.cart_draft",
+    "market.scan_to_desktop"
   ]);
   assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.cashier, [
     "table.view",

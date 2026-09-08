@@ -7173,6 +7173,7 @@ export class DesktopDatabase {
       case "market_purchase_receive":
       case "market_product_draft_create":
       case "market_cart_draft_create":
+      case "market_barcode_scan":
         return applyMarketAndroidAction({
           db: this.db,
           action,

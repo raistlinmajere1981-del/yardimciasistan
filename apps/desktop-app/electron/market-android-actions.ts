@@ -3,6 +3,7 @@ import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import { receiveCommercePurchaseInTransaction } from "./commerce-purchase-store.js";
 import { setInventoryCountInTransaction } from "./commerce-store.js";
 import {
+  createMarketBarcodeScanEventInTransaction,
   createMarketCartDraftInTransaction,
   createMarketProductDraftInTransaction
 } from "./market-companion-store.js";
@@ -37,6 +38,8 @@ export function applyMarketAndroidAction(
         return applyProductDraftCreate(context);
       case "market_cart_draft_create":
         return applyCartDraftCreate(context);
+      case "market_barcode_scan":
+        return applyBarcodeScan(context);
       default:
         return { ok: false, message: "Market telefon işlem türü desteklenmiyor." };
     }
@@ -161,6 +164,21 @@ function applyCartDraftCreate(context: MarketAndroidActionContext): MarketAndroi
     line_count: draft.items.length
   });
   return { ok: true, message: "Sepet taslağı masaüstü için kaydedildi; satış oluşturulmadı." };
+}
+
+function applyBarcodeScan(context: MarketAndroidActionContext): MarketAndroidActionResult {
+  const event = createMarketBarcodeScanEventInTransaction(context.db, {
+    androidActionId: context.action.id,
+    deviceId: context.action.device_id,
+    barcode: text(context.action.payload.barcode),
+    scannedAt: text(context.action.payload.scanned_at)
+  }, context.now);
+  if (!event) {
+    // A successful no-op commits the normal action receipt. Persisted Android
+    // outbox retries can therefore never surface an old scan in a later cart.
+    return { ok: true, message: "Barkod taraması zaman aşımına uğradı; sepete iletilmedi." };
+  }
+  return { ok: true, message: "Barkod masaüstü kasasına gönderildi." };
 }
 
 function record(value: unknown): Record<string, unknown> {

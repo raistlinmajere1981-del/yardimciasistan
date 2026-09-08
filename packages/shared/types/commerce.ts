@@ -209,3 +209,45 @@ export interface CommerceSaleDraftDetail {
   draft: CommerceSaleDraft;
   items: CommerceSaleDraftItem[];
 }
+
+export interface MarketCartDraftResolvedItem {
+  draftItemId: string;
+  product: CatalogProduct;
+  quantity: number;
+}
+
+export interface MarketCartDraftSkippedItem {
+  draftItemId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  reason: "missing_or_inactive";
+}
+
+/**
+ * Read-only hand-off from a phone cart draft to desktop Quick Sale. Product
+ * snapshots in this result come from the current local catalog, never Android.
+ */
+export interface MarketCartDraftLoadResult {
+  draft: CommerceSaleDraft;
+  items: MarketCartDraftResolvedItem[];
+  skippedItems: MarketCartDraftSkippedItem[];
+}
+
+export type MarketBarcodeScanEventStatus = "pending" | "consumed" | "expired";
+
+/**
+ * Transport-neutral, ephemeral barcode observation. It is deliberately not a
+ * sale, cart draft, inventory movement, or finance record.
+ */
+export interface MarketBarcodeScanEvent {
+  id: string;
+  businessId: string;
+  androidActionId: string;
+  deviceId: string;
+  barcode: string;
+  scannedAt: string;
+  receivedAt: string;
+  consumedAt: string;
+  status: MarketBarcodeScanEventStatus;
+}

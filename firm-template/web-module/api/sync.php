@@ -1036,6 +1036,7 @@ function ya_sync_android_action_types(): array
         'market_purchase_receive',
         'market_product_draft_create',
         'market_cart_draft_create',
+        'market_barcode_scan',
         'menu_category_delete',
         'menu_item_delete',
         'message_delete'
@@ -1104,7 +1105,8 @@ function ya_sync_android_action_permission(string $actionType, array $payload): 
         'market_stock_count' => 'market.stock_count',
         'market_purchase_receive' => 'market.receiving',
         'market_product_draft_create' => 'market.product_draft',
-        'market_cart_draft_create' => 'market.cart_draft'
+        'market_cart_draft_create' => 'market.cart_draft',
+        'market_barcode_scan' => 'market.scan_to_desktop'
     ];
     if (isset($permissions[$actionType])) {
         return $permissions[$actionType];
@@ -1225,6 +1227,7 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
         'market_purchase_receive' => ['retail.purchasing'],
         'market_product_draft_create' => ['commerce.catalog'],
         'market_cart_draft_create' => ['commerce.sales', 'commerce.catalog'],
+        'market_barcode_scan' => ['retail.barcode', 'commerce.catalog', 'commerce.sales'],
         'message_delete' => ['core.customers', 'service.whatsapp']
     ];
     if (!isset($requirements[$actionType])) {
@@ -2009,7 +2012,8 @@ function ya_sync_android_permissions(): array
         'market.stock_count',
         'market.receiving',
         'market.product_draft',
-        'market.cart_draft'
+        'market.cart_draft',
+        'market.scan_to_desktop'
     ];
 }
 

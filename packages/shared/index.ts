@@ -17,5 +17,6 @@ export * from "./types/table";
 export * from "./types/whatsapp";
 export * from "./utils/date";
 export * from "./utils/id";
+export * from "./utils/market-companion";
 export * from "./utils/phone";
 export * from "./utils/validation";

@@ -261,7 +261,8 @@ for (const permission of [
   "market.stock_count",
   "market.receiving",
   "market.product_draft",
-  "market.cart_draft"
+  "market.cart_draft",
+  "market.scan_to_desktop"
 ]) {
   assert.equal(marketPermissions.includes(permission), true, `${permission} missing from Market group`);
 }

@@ -67,7 +67,8 @@ test("pure Market exposes one handheld group and capability-bounded permissions"
     "market.stock_count",
     "market.receiving",
     "market.product_draft",
-    "market.cart_draft"
+    "market.cart_draft",
+    "market.scan_to_desktop"
   ]) {
     assert.equal(effective.includes(permission), true, `${permission} should be effective`);
   }
@@ -83,6 +84,15 @@ test("Market permissions, including admin grants, close with their business capa
   assert.equal(admin.includes("market.stock_count"), true);
   assert.equal(androidActionAllowedByCapabilities("market_purchase_receive", withoutPurchasing), false);
   assert.equal(androidActionAllowedByCapabilities("market_stock_count", withoutPurchasing), true);
+  assert.equal(androidActionAllowedByCapabilities("market_barcode_scan", withoutPurchasing), true);
+  assert.equal(
+    androidActionAllowedByCapabilities("market_barcode_scan", withoutPurchasing.filter((capability) => capability !== C.SALES)),
+    false
+  );
+  assert.equal(
+    androidActionAllowedByCapabilities("market_barcode_scan", withoutPurchasing.filter((capability) => capability !== C.RETAIL_BARCODE)),
+    false
+  );
 });
 
 test("room-customer assignment requires both customer and stay capabilities", () => {

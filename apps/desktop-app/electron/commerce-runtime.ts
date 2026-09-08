@@ -57,11 +57,16 @@ export type { ReceiveCommercePurchaseInput, SetInventoryCountInput };
 export {
   createMarketCartDraft,
   createMarketProductDraft,
+  consumePendingMarketBarcodeScans,
   getMarketCartDraft,
+  loadMarketCartDraftForQuickSale,
   listMarketCartDrafts,
-  listMarketProductDrafts
+  listMarketProductDrafts,
+  markMarketCartDraftReviewed,
+  markMarketProductDraftReviewed
 } from "./market-companion-runtime";
 export type {
+  ConsumePendingMarketBarcodeScansOptions,
   CreateMarketCartDraftInput,
   CreateMarketProductDraftInput,
   ListMarketCartDraftsOptions,

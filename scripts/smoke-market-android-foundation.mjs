@@ -53,7 +53,8 @@ const MARKET_PERMISSIONS = [
   "market.stock_count",
   "market.receiving",
   "market.product_draft",
-  "market.cart_draft"
+  "market.cart_draft",
+  "market.scan_to_desktop"
 ];
 const MARKET_GROUPS = {
   service_orders: false,
@@ -89,7 +90,8 @@ for (const [actionType, permission] of [
   ["market_stock_count", "market.stock_count"],
   ["market_purchase_receive", "market.receiving"],
   ["market_product_draft_create", "market.product_draft"],
-  ["market_cart_draft_create", "market.cart_draft"]
+  ["market_cart_draft_create", "market.cart_draft"],
+  ["market_barcode_scan", "market.scan_to_desktop"]
 ]) {
   assert.equal(resolveAndroidActionPermission(actionType), permission);
   assert.equal(androidActionAllowedByCapabilities(actionType, marketCapabilities), true);
@@ -539,7 +541,8 @@ function assertMirroredTransportContracts() {
     ["market_stock_count", "market.stock_count"],
     ["market_purchase_receive", "market.receiving"],
     ["market_product_draft_create", "market.product_draft"],
-    ["market_cart_draft_create", "market.cart_draft"]
+    ["market_cart_draft_create", "market.cart_draft"],
+    ["market_barcode_scan", "market.scan_to_desktop"]
   ]) {
     assert.match(hosting, new RegExp(`'${actionType}'\\s*=>\\s*'${permission.replace(".", "\\.")}'`));
   }
