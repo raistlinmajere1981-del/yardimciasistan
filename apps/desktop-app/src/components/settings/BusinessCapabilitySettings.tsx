@@ -36,6 +36,7 @@ const CAPABILITY_LABELS: Readonly<Record<BusinessCapability, string>> = {
   [C.CATALOG]: "Ürün kataloğu",
   [C.INVENTORY]: "Stok",
   [C.SALES]: "Satış",
+  [C.CUSTOMER_CREDIT]: "Veresiye / Müşteri Hesabı",
   [C.RETAIL_BARCODE]: "Barkod",
   [C.RETAIL_PURCHASING]: "Satın alma",
   [C.RETAIL_SUPPLIERS]: "Tedarikçiler",
@@ -71,7 +72,7 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
   {
     title: "Ticaret Çekirdeği",
     description: "Restoran ve Market çalışma alanlarının ortak katalog, stok ve satış omurgası.",
-    capabilities: [C.CATALOG, C.INVENTORY, C.SALES]
+    capabilities: [C.CATALOG, C.INVENTORY, C.SALES, C.CUSTOMER_CREDIT]
   },
   {
     title: "Perakende",
@@ -164,7 +165,9 @@ export function BusinessCapabilityEditor({
                       />
                       {capabilityLabel(capability)}
                     </label>
-                    <small>{blockedReason || capability}</small>
+                    <small>{blockedReason || (capability === C.CUSTOMER_CREDIT
+                      ? "Kayıtlı müşterilerin veresiye satış ve tahsilat hareketlerini takip eder."
+                      : capability)}</small>
                     {entry?.source === "user" && (
                       <button
                         className="setup-secondary"

@@ -93,7 +93,9 @@ export interface InventoryMovement {
 export interface CommerceSale {
   id: string;
   businessId: string;
-  status: "open" | "paid" | "cancelled";
+  /** credit is a completed sale charged to an account, never cash received.
+   * Account payments are not allocated back to individual sales in M8.1. */
+  status: "open" | "paid" | "credit" | "cancelled";
   subtotal: number;
   discountTotal: number;
   total: number;
