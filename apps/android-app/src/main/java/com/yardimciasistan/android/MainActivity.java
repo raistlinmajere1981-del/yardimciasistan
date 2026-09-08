@@ -200,6 +200,11 @@ public final class MainActivity extends ComponentActivity {
       }
 
       @Override
+      public boolean onBarcodeScan(String barcode, JSONObject actionPayload) {
+        return sendMarketBarcodeScan(barcode, actionPayload);
+      }
+
+      @Override
       public void onRenderRequested() {
         render();
       }
@@ -4858,6 +4863,95 @@ public final class MainActivity extends ComponentActivity {
     return sendActionsInternal(actions, acceptedMessage, queuedMessage);
   }
 
+  /**
+   * Persists and dispatches one ephemeral scanner observation without the normal
+   * one-operation-at-a-time UI gate. The desktop TTL remains the authority that
+   * prevents a delayed outbox replay from reaching a later customer's cart.
+   */
+  private boolean sendMarketBarcodeScan(String barcode, JSONObject actionPayload) {
+    if (!MarketUiRules.canScanToDesktop(data)) {
+      showError("Bu cihazın masaüstüne barkod gönderme yetkisi yok.");
+      return false;
+    }
+    String baseUrl = ConnectionSettings.webModuleUrl(preferences);
+    String syncSecret = ConnectionSettings.syncSecret(preferences);
+    if (baseUrl.isEmpty() || syncSecret.isEmpty()) {
+      showError("Barkod gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
+      return false;
+    }
+
+    try {
+      for (ActionOutbox.PendingAction existing : actionOutbox.load()) {
+        if (!existing.matchesTarget(baseUrl, syncSecret)) {
+          showError("Telefonda önceki bağlantıya ait bekleyen işlem var.");
+          return false;
+        }
+      }
+    } catch (ActionOutbox.OutboxException error) {
+      showError(error.getMessage());
+      return false;
+    }
+
+    final ActionOutbox.PendingAction pending;
+    try {
+      pending = ActionOutbox.PendingAction.create(
+          ActionOutbox.createActionId(),
+          MarketUiRules.ACTION_BARCODE_SCAN,
+          actionPayload,
+          baseUrl,
+          syncSecret
+      );
+      ArrayList<ActionOutbox.PendingAction> additions = new ArrayList<>();
+      additions.add(pending);
+      actionOutbox.appendAll(additions);
+    } catch (ActionOutbox.OutboxException error) {
+      showError(error.getMessage());
+      return false;
+    }
+
+    clearError();
+    executor.execute(() -> {
+      try {
+        OperationData.ActionRecord accepted = syncClient.enqueueAction(
+            baseUrl,
+            syncSecret,
+            identity,
+            pending.id,
+            pending.type,
+            pending.payload
+        );
+        actionOutbox.remove(pending.id);
+        runOnUiThread(() -> {
+          data.actions.add(0, accepted);
+          data.pendingActions += 1;
+          if (marketWorkspace != null) marketWorkspace.onBarcodeScanAccepted(barcode, "Gönderildi");
+        });
+      } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException error) {
+        boolean rejected = error instanceof HostingSyncClient.SyncException
+            && ((HostingSyncClient.SyncException) error).invalidatesPendingAction();
+        if (rejected) {
+          try {
+            actionOutbox.remove(pending.id);
+          } catch (ActionOutbox.OutboxException ignored) {
+            // The action id remains safe to replay because desktop receipts are idempotent.
+          }
+        }
+        runOnUiThread(() -> {
+          if (marketWorkspace != null) {
+            marketWorkspace.onBarcodeScanQueued(
+                barcode,
+                rejected
+                    ? "Gönderilemedi"
+                    : "Gönderim bekliyor; eski taramalar masaüstünde zaman aşımına uğrar"
+            );
+          }
+          if (rejected) showError(error.getMessage());
+        });
+      }
+    });
+    return true;
+  }
+
   private boolean sendActionsInternal(
       List<ActionSpec> actions,
       String successMessage,
@@ -5204,6 +5298,8 @@ public final class MainActivity extends ComponentActivity {
         return MarketUiRules.PERMISSION_PRODUCT_DRAFT;
       case MarketUiRules.ACTION_CART_DRAFT_CREATE:
         return MarketUiRules.PERMISSION_CART_DRAFT;
+      case MarketUiRules.ACTION_BARCODE_SCAN:
+        return MarketUiRules.PERMISSION_SCAN_TO_DESKTOP;
       case "table_order_set_status":
         String status = actionPayload.optString("status", "");
         if ("served".equals(status)) {

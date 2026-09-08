@@ -55,7 +55,8 @@ const marketPermissions = [
   "market.stock_count",
   "market.receiving",
   "market.product_draft",
-  "market.cart_draft"
+  "market.cart_draft",
+  "market.scan_to_desktop"
 ];
 const staffPermissions = [...serviceOrderPermissions, ...roomsTasksPermissions];
 const adminPermissions = [
@@ -990,6 +991,7 @@ async function runMarketOnly(baseUrl) {
   tap(centerOf(findClickableBoundsByText(xml, "Market")));
   xml = await waitForUiCondition(
     (candidate) => candidate.includes("Saha işlemleri")
+      && candidate.includes("Kasa Barkod Modu")
       && candidate.includes("Barkod Tara")
       && candidate.includes("Stok Say")
       && candidate.includes("Mal Kabul")
@@ -998,11 +1000,26 @@ async function runMarketOnly(baseUrl) {
     "Market ana ekranı açılamadı."
   );
   assertContains(xml, [
-    "MARKET", "Saha işlemleri", "Barkod Tara", "Stok Say", "Mal Kabul", "Sepet", "Yeni Ürün",
+    "MARKET", "Saha işlemleri", "Kasa Barkod Modu", "Barkod Tara", "Stok Say", "Mal Kabul", "Sepet", "Yeni Ürün",
     "Bugün", "Satış", "Kritik stok"
   ]);
   assertNotContains(xml, ["Bekleyen sipariş", "Satışı Tamamla"]);
   captureScreenshot("market-home.png");
+
+  tap(centerOf(findClickableBoundsByText(xml, "▣  Kasa Barkod Modu")));
+  xml = await waitForUiCondition(
+    (candidate) => candidate.includes("KASA BARKOD MODU")
+      && candidate.includes("Ürünleri arka arkaya okutabilirsiniz.")
+      && candidate.includes("Modu Kapat"),
+    5000,
+    "Kasa Barkod Modu ekranı açılamadı."
+  );
+  assertContains(xml, ["Son taranan", "Tarayıcı hazır", "Scanner girişi", "Modu Kapat"]);
+  assertNotContains(xml, ["Sepete Ekle", "Stok Say", "Mal Kabule Ekle"]);
+  captureScreenshot("market-cash-barcode-mode.png");
+  tap(centerOf(findClickableBoundsByText(xml, "Modu Kapat")));
+  xml = await waitForUiText("Saha işlemleri", 5000);
+
   scrollToBottom();
   xml = await waitForUiCondition(
     (candidate) => candidate.includes("Son stok hareketleri")

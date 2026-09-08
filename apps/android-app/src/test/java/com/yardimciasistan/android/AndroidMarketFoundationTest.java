@@ -33,7 +33,8 @@ public final class AndroidMarketFoundationTest {
         "market.stock_count",
         "market.receiving",
         "market.product_draft",
-        "market.cart_draft"
+        "market.cart_draft",
+        "market.scan_to_desktop"
     }) {
       data.permissions.add(permission);
       assertTrue(permission, data.hasPermission(permission));
@@ -42,6 +43,12 @@ public final class AndroidMarketFoundationTest {
     data.businessCapabilities.remove("retail.purchasing");
     assertFalse(data.hasPermission("market.receiving"));
     assertTrue(data.hasPermission("market.stock_count"));
+
+    data.businessCapabilities.remove("retail.barcode");
+    assertFalse(data.hasPermission("market.scan_to_desktop"));
+    data.businessCapabilities.add("retail.barcode");
+    data.businessCapabilities.remove("commerce.sales");
+    assertFalse(data.hasPermission("market.scan_to_desktop"));
   }
 
   private static OperationData authorizedMarketData() {

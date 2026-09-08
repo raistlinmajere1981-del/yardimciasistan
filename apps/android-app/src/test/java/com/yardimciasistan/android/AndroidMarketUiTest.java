@@ -64,6 +64,51 @@ public final class AndroidMarketUiTest {
   }
 
   @Test
+  public void cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities() {
+    OperationData data = marketData();
+    assertFalse(MarketUiRules.canScanToDesktop(data));
+
+    data.permissions.add(MarketUiRules.PERMISSION_SCAN_TO_DESKTOP);
+    assertTrue(MarketUiRules.canScanToDesktop(data));
+    assertEquals(
+        MarketUiRules.PERMISSION_SCAN_TO_DESKTOP,
+        MarketUiRules.requiredPermissionForAction(MarketUiRules.ACTION_BARCODE_SCAN)
+    );
+
+    data.businessCapabilities.remove(MarketUiRules.CAPABILITY_BARCODE);
+    assertFalse(MarketUiRules.canScanToDesktop(data));
+    data.businessCapabilities.add(MarketUiRules.CAPABILITY_BARCODE);
+    data.businessCapabilities.remove(MarketUiRules.CAPABILITY_SALES);
+    assertFalse(MarketUiRules.canScanToDesktop(data));
+    data.businessCapabilities.add(MarketUiRules.CAPABILITY_SALES);
+    data.businessCapabilities.remove(MarketUiRules.CAPABILITY_CATALOG);
+    assertFalse(MarketUiRules.canScanToDesktop(data));
+  }
+
+  @Test
+  public void continuousBarcodeCaptureCreatesActionWithoutConfirmationAndDebounces() throws Exception {
+    MarketUiRules.BarcodeScanCapture capture =
+        new MarketUiRules.BarcodeScanCapture(MarketUiRules.BARCODE_DEBOUNCE_MS);
+
+    JSONObject first = capture.capture(" 8690000000001 ", 1_000L, "2026-09-08T08:00:00.000Z");
+    assertNotNull(first);
+    assertEquals("8690000000001", first.getString("barcode"));
+    assertEquals("2026-09-08T08:00:00.000Z", first.getString("scanned_at"));
+    assertNull(capture.capture("8690000000001", 1_999L, "2026-09-08T08:00:00.999Z"));
+
+    JSONObject different = capture.capture("8690000000002", 2_000L, "2026-09-08T08:00:01.000Z");
+    assertNotNull(different);
+    JSONObject sameBarcodeAfterDifferent = capture.capture(
+        "8690000000001",
+        2_001L,
+        "2026-09-08T08:00:01.001Z"
+    );
+    assertNotNull(sameBarcodeAfterDifferent);
+    assertNull(capture.capture("8690000000001", 2_500L, "2026-09-08T08:00:01.500Z"));
+    assertNotNull(capture.capture("8690000000001", 3_001L, "2026-09-08T08:00:02.001Z"));
+  }
+
+  @Test
   public void knownAndUnknownBarcodesResolveWithoutInventingProducts() {
     OperationData data = marketDataWithProducts();
     data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_VIEW);
@@ -183,6 +228,7 @@ public final class AndroidMarketUiTest {
     assertNotNull(parsed.market);
     assertTrue(parsed.market.products.isEmpty());
     assertFalse(AndroidUiRules.canOpenTab(parsed, AndroidUiRules.TAB_MARKET));
+    assertFalse(MarketUiRules.canScanToDesktop(parsed));
     assertNull(MarketUiRules.resolveBarcode(parsed, "8690000000001"));
   }
 

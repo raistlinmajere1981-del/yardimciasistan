@@ -20,7 +20,9 @@ const checks = [
   ["node", ["scripts/smoke-market-label-printer-contract.mjs"]],
   ["node", ["scripts/smoke-market-profile-availability.mjs"]],
   ["node", ["scripts/smoke-market-android-foundation.mjs"]],
-  ["node", ["scripts/smoke-market-android-ui-contract.mjs"]]
+  ["node", ["scripts/smoke-market-android-ui-contract.mjs"]],
+  ["node", ["scripts/smoke-market-companion-desktop-inbox.mjs"]],
+  ["node", ["scripts/smoke-market-live-scanner-contract.mjs"]]
 ];
 
 for (const [command, args] of checks) {

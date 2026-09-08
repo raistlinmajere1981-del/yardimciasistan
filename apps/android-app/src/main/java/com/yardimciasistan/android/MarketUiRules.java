@@ -11,8 +11,8 @@ import java.util.Locale;
 /**
  * Pure Market companion rules shared by the Android views and JVM tests.
  *
- * <p>The phone only prepares the four M7.1 action payloads. Inventory deltas,
- * sales, payments, and purchase-order workflows remain desktop concerns.</p>
+ * <p>The phone only prepares Market action payloads. Inventory deltas, sales,
+ * payments, and purchase-order workflows remain desktop concerns.</p>
  */
 final class MarketUiRules {
   static final String CAPABILITY_CATALOG = "commerce.catalog";
@@ -28,11 +28,14 @@ final class MarketUiRules {
   static final String PERMISSION_RECEIVING = "market.receiving";
   static final String PERMISSION_PRODUCT_DRAFT = "market.product_draft";
   static final String PERMISSION_CART_DRAFT = "market.cart_draft";
+  static final String PERMISSION_SCAN_TO_DESKTOP = "market.scan_to_desktop";
 
   static final String ACTION_STOCK_COUNT = "market_stock_count";
   static final String ACTION_PURCHASE_RECEIVE = "market_purchase_receive";
   static final String ACTION_PRODUCT_DRAFT_CREATE = "market_product_draft_create";
   static final String ACTION_CART_DRAFT_CREATE = "market_cart_draft_create";
+  static final String ACTION_BARCODE_SCAN = "market_barcode_scan";
+  static final long BARCODE_DEBOUNCE_MS = 1_000L;
 
   private static final String[] MARKET_PERMISSIONS = {
       PERMISSION_SUMMARY,
@@ -40,7 +43,8 @@ final class MarketUiRules {
       PERMISSION_STOCK_COUNT,
       PERMISSION_RECEIVING,
       PERMISSION_PRODUCT_DRAFT,
-      PERMISSION_CART_DRAFT
+      PERMISSION_CART_DRAFT,
+      PERMISSION_SCAN_TO_DESKTOP
   };
 
   private MarketUiRules() {}
@@ -87,12 +91,36 @@ final class MarketUiRules {
     return canViewProducts(data) && data.hasPermission(PERMISSION_CART_DRAFT);
   }
 
+  static boolean canScanToDesktop(OperationData data) {
+    return canOpenMarket(data)
+        && data.hasPermission(PERMISSION_SCAN_TO_DESKTOP)
+        && data.hasBusinessCapability(CAPABILITY_CATALOG)
+        && data.hasBusinessCapability(CAPABILITY_SALES)
+        && data.hasBusinessCapability(CAPABILITY_BARCODE);
+  }
+
   static String requiredPermissionForAction(String actionType) {
     if (ACTION_STOCK_COUNT.equals(actionType)) return PERMISSION_STOCK_COUNT;
     if (ACTION_PURCHASE_RECEIVE.equals(actionType)) return PERMISSION_RECEIVING;
     if (ACTION_PRODUCT_DRAFT_CREATE.equals(actionType)) return PERMISSION_PRODUCT_DRAFT;
     if (ACTION_CART_DRAFT_CREATE.equals(actionType)) return PERMISSION_CART_DRAFT;
+    if (ACTION_BARCODE_SCAN.equals(actionType)) return PERMISSION_SCAN_TO_DESKTOP;
     return null;
+  }
+
+  static JSONObject barcodeScanPayload(String rawBarcode, String scannedAt)
+      throws ValidationException {
+    String barcode = limitedText(rawBarcode, 120, "Barkod");
+    if (barcode.length() < 3) throw new ValidationException("Geçerli bir barkod girin.");
+    String timestamp = limitedText(scannedAt, 80, "Tarama zamanı");
+    if (timestamp.isEmpty()) throw new ValidationException("Tarama zamanı gerekli.");
+    try {
+      return new JSONObject()
+          .put("barcode", barcode)
+          .put("scanned_at", timestamp);
+    } catch (Exception error) {
+      throw new ValidationException("Barkod taraması hazırlanamadı.");
+    }
   }
 
   static String pendingStatus(int localPendingCount, int desktopPendingCount) {
@@ -268,6 +296,44 @@ final class MarketUiRules {
   private static double round(double value, int decimals) {
     double factor = Math.pow(10, decimals);
     return Math.round((value + Math.ulp(value)) * factor) / factor;
+  }
+
+  static final class BarcodeDebouncer {
+    private final long debounceMs;
+    private String lastBarcode = "";
+    private long lastAcceptedAt = Long.MIN_VALUE;
+
+    BarcodeDebouncer(long debounceMs) {
+      this.debounceMs = Math.max(0L, debounceMs);
+    }
+
+    boolean accept(String rawBarcode, long nowMs) {
+      String barcode = text(rawBarcode);
+      if (barcode.isEmpty()) return false;
+      boolean sameWithinWindow = barcode.equals(lastBarcode)
+          && lastAcceptedAt != Long.MIN_VALUE
+          && nowMs >= lastAcceptedAt
+          && nowMs - lastAcceptedAt < debounceMs;
+      if (sameWithinWindow) return false;
+      lastBarcode = barcode;
+      lastAcceptedAt = nowMs;
+      return true;
+    }
+  }
+
+  static final class BarcodeScanCapture {
+    private final BarcodeDebouncer debouncer;
+
+    BarcodeScanCapture(long debounceMs) {
+      debouncer = new BarcodeDebouncer(debounceMs);
+    }
+
+    JSONObject capture(String rawBarcode, long nowMs, String scannedAt)
+        throws ValidationException {
+      String barcode = text(rawBarcode);
+      if (!debouncer.accept(barcode, nowMs)) return null;
+      return barcodeScanPayload(barcode, scannedAt);
+    }
   }
 
   static final class CartDraft {

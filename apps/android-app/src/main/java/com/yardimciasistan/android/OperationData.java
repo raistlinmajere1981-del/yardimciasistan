@@ -68,7 +68,8 @@ final class OperationData {
       "market.stock_count",
       "market.receiving",
       "market.product_draft",
-      "market.cart_draft"
+      "market.cart_draft",
+      "market.scan_to_desktop"
   };
   private static final String[] KNOWN_BUSINESS_CAPABILITIES = {
       "core.customers",
@@ -364,6 +365,11 @@ final class OperationData {
     if ("market.cart_draft".equals(permission)) {
       return hasBusinessCapability("commerce.catalog")
           && hasBusinessCapability("commerce.sales");
+    }
+    if ("market.scan_to_desktop".equals(permission)) {
+      return hasBusinessCapability("commerce.catalog")
+          && hasBusinessCapability("commerce.sales")
+          && hasBusinessCapability("retail.barcode");
     }
     return false;
   }

@@ -25,7 +25,8 @@ for (const [actionType, permission] of [
   ["market_stock_count", "market.stock_count"],
   ["market_purchase_receive", "market.receiving"],
   ["market_product_draft_create", "market.product_draft"],
-  ["market_cart_draft_create", "market.cart_draft"]
+  ["market_cart_draft_create", "market.cart_draft"],
+  ["market_barcode_scan", "market.scan_to_desktop"]
 ]) {
   assert.equal(rules.includes(`"${actionType}"`), true, `${actionType} UI action contract missing`);
   assert.equal(rules.includes(`"${permission}"`), true, `${permission} UI gate missing`);
@@ -40,6 +41,9 @@ assert.doesNotMatch(rules, /payload\.put\("payment/);
 
 for (const label of [
   "Barkod Tara",
+  "Kasa Barkod Modu",
+  "Telefonu barkod okuyucu olarak kullanıyorsunuz. Ürünleri arka arkaya okutabilirsiniz.",
+  "Modu Kapat",
   "Stok Say",
   "Mal Kabul",
   "Sepet",
@@ -64,6 +68,14 @@ assert.match(workspace, /summary\.recentStockAdjustments/);
 assert.match(workspace, /submissionBlocked\(\)/);
 assert.match(main, /onSubmissionQueued/);
 assert.match(main, /containsOnlyMarketActions/);
+assert.match(main, /sendMarketBarcodeScan/);
+assert.match(workspace, /setOnEditorActionListener[\s\S]*captureCashBarcode/);
+const cashModeSource = workspace.slice(
+  workspace.indexOf("private LinearLayout cashBarcodeScreen"),
+  workspace.indexOf("private LinearLayout barcodeResultScreen")
+);
+assert.ok(cashModeSource.length > 0, "cash barcode mode source missing");
+assert.doesNotMatch(cashModeSource, /Sepete Ekle|Stok Say|Mal Kabule Ekle|setPositiveButton/);
 
 for (const forbidden of [
   "Satışı Tamamla",
@@ -81,6 +93,8 @@ assert.match(gradle, /testImplementation\s+"org\.json:json:/);
 for (const coverage of [
   "pureMarketProfileOnlyExposesRelevantNavigation",
   "everyMarketCallToActionUsesItsEffectivePermission",
+  "cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities",
+  "continuousBarcodeCaptureCreatesActionWithoutConfirmationAndDebounces",
   "knownAndUnknownBarcodesResolveWithoutInventingProducts",
   "stockCountPayloadCarriesAbsoluteQuantityAndNoDelta",
   "repeatBarcodeIncrementsOneCartLineAndDraftHasNoPayment",

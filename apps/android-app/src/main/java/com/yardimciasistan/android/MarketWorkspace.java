@@ -7,6 +7,7 @@ import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -19,11 +20,14 @@ import android.widget.TextView;
 import org.json.JSONObject;
 
 import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
-/** Phone-first Market companion surface backed only by M7.1 snapshots/actions. */
+/** Phone-first Market companion surface backed only by projected snapshots/actions. */
 final class MarketWorkspace {
   interface Listener {
     boolean onSubmit(
@@ -32,6 +36,8 @@ final class MarketWorkspace {
         String acceptedMessage,
         String queuedMessage
     );
+
+    boolean onBarcodeScan(String barcode, JSONObject payload);
 
     void onRenderRequested();
   }
@@ -46,6 +52,7 @@ final class MarketWorkspace {
   private static final String SCREEN_RECEIVING = "receiving";
   private static final String SCREEN_CART = "cart";
   private static final String SCREEN_PRODUCT_DRAFT = "product_draft";
+  private static final String SCREEN_CASH_BARCODE = "cash_barcode";
 
   private static final String PURPOSE_LOOKUP = "lookup";
   private static final String PURPOSE_STOCK = "stock";
@@ -64,6 +71,8 @@ final class MarketWorkspace {
   private final Listener listener;
   private final MarketUiRules.CartDraft cart = new MarketUiRules.CartDraft();
   private final MarketUiRules.ReceivingDraft receiving = new MarketUiRules.ReceivingDraft();
+  private final MarketUiRules.BarcodeScanCapture barcodeScanCapture =
+      new MarketUiRules.BarcodeScanCapture(MarketUiRules.BARCODE_DEBOUNCE_MS);
 
   private OperationData data = new OperationData();
   private String screen = SCREEN_HOME;
@@ -86,6 +95,11 @@ final class MarketWorkspace {
   private String formError = "";
   private int localPendingCount;
   private boolean loading;
+  private String cashBarcodeLast = "";
+  private String cashBarcodeStatus = "Tarayıcı hazır";
+  private EditText cashBarcodeInputView;
+  private TextView cashBarcodeLastView;
+  private TextView cashBarcodeStatusView;
 
   MarketWorkspace(Context context, Listener listener) {
     this.context = context;
@@ -109,6 +123,8 @@ final class MarketWorkspace {
       page = productDraftScreen();
     } else if (SCREEN_BARCODE_RESULT.equals(screen)) {
       page = barcodeResultScreen();
+    } else if (SCREEN_CASH_BARCODE.equals(screen)) {
+      page = cashBarcodeScreen();
     } else {
       page = homeScreen();
     }
@@ -143,6 +159,18 @@ final class MarketWorkspace {
     visibleMessagePending = true;
   }
 
+  void onBarcodeScanAccepted(String barcode, String message) {
+    if (!barcode.equals(cashBarcodeLast)) return;
+    cashBarcodeStatus = message;
+    updateCashBarcodeViews();
+  }
+
+  void onBarcodeScanQueued(String barcode, String message) {
+    if (!barcode.equals(cashBarcodeLast)) return;
+    cashBarcodeStatus = message;
+    updateCashBarcodeViews();
+  }
+
   private void enforceVisibleScreen() {
     if (!MarketUiRules.canOpenMarket(data)) {
       screen = SCREEN_HOME;
@@ -153,6 +181,7 @@ final class MarketWorkspace {
     if (SCREEN_CART.equals(screen) && !MarketUiRules.canCreateCartDraft(data)) screen = SCREEN_HOME;
     if (SCREEN_PRODUCT_DRAFT.equals(screen) && !MarketUiRules.canCreateProductDraft(data)) screen = SCREEN_HOME;
     if (SCREEN_BARCODE_RESULT.equals(screen) && !MarketUiRules.canViewProducts(data)) screen = SCREEN_HOME;
+    if (SCREEN_CASH_BARCODE.equals(screen) && !MarketUiRules.canScanToDesktop(data)) screen = SCREEN_HOME;
   }
 
   private LinearLayout homeScreen() {
@@ -165,6 +194,14 @@ final class MarketWorkspace {
     page.addView(title);
 
     addPendingState(page);
+
+    if (MarketUiRules.canScanToDesktop(data)) {
+      Button cashBarcode = UiKit.button(context, "▣  Kasa Barkod Modu", UiKit.PRIMARY,
+          view -> openScreen(SCREEN_CASH_BARCODE));
+      cashBarcode.setContentDescription("Telefonu masaüstü kasası için sürekli barkod okuyucu olarak kullan");
+      cashBarcode.setLayoutParams(fullButtonParams(58, 0, 12));
+      page.addView(cashBarcode);
+    }
 
     if (MarketUiRules.canScanBarcode(data)) {
       Button barcode = UiKit.button(context, "▣  Barkod Tara", UiKit.PRIMARY,
@@ -315,6 +352,126 @@ final class MarketWorkspace {
     row.addView(labelView);
     row.addView(UiKit.text(context, value, 14, tone, Typeface.BOLD));
     card.addView(row);
+  }
+
+  private LinearLayout cashBarcodeScreen() {
+    LinearLayout page = UiKit.column(context);
+    page.addView(UiKit.eyebrow(context, "KASA BARKOD MODU"));
+    TextView title = UiKit.title(context, "Telefon barkod okuyucu");
+    LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(-1, -2);
+    titleParams.setMargins(0, dp(3), 0, dp(5));
+    title.setLayoutParams(titleParams);
+    page.addView(title);
+    TextView description = UiKit.text(
+        context,
+        "Telefonu barkod okuyucu olarak kullanıyorsunuz. Ürünleri arka arkaya okutabilirsiniz.",
+        13,
+        UiKit.SECONDARY,
+        Typeface.NORMAL
+    );
+    LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(-1, -2);
+    descriptionParams.setMargins(0, 0, 0, dp(12));
+    description.setLayoutParams(descriptionParams);
+    page.addView(description);
+
+    LinearLayout statusCard = UiKit.card(context);
+    statusCard.addView(UiKit.text(context, "Son taranan", 11, UiKit.MUTED, Typeface.BOLD));
+    cashBarcodeLastView = UiKit.text(
+        context,
+        cashBarcodeLast.isEmpty() ? "Henüz barkod okutulmadı" : cashBarcodeLast,
+        19,
+        UiKit.TEXT,
+        Typeface.BOLD
+    );
+    statusCard.addView(cashBarcodeLastView);
+    cashBarcodeStatusView = UiKit.text(context, cashBarcodeStatus, 13, UiKit.SUCCESS, Typeface.BOLD);
+    statusCard.addView(cashBarcodeStatusView);
+    page.addView(statusCard);
+
+    page.addView(UiKit.sectionTitle(context, "Scanner girişi"));
+    cashBarcodeInputView = UiKit.input(context, "Barkodu okutun veya elle girip Enter'a basın");
+    cashBarcodeInputView.setSingleLine(true);
+    cashBarcodeInputView.setInputType(InputType.TYPE_CLASS_TEXT);
+    cashBarcodeInputView.setLayoutParams(fieldParams(58));
+    cashBarcodeInputView.setContentDescription("Kesintisiz kasa barkod girişi");
+    cashBarcodeInputView.setOnEditorActionListener((view, actionId, event) -> {
+      captureCashBarcode(value(cashBarcodeInputView));
+      return true;
+    });
+    page.addView(cashBarcodeInputView);
+
+    TextView transport = UiKit.text(
+        context,
+        "Tarama otomatik gönderilir; ürün ve ödeme masaüstünde çözülür. Hosting aktarımı internet gerektirebilir. Çevrimdışı kalan eski taramalar masaüstündeki kısa süre sınırından sonra sepete eklenmez.",
+        11,
+        UiKit.MUTED,
+        Typeface.NORMAL
+    );
+    LinearLayout.LayoutParams transportParams = new LinearLayout.LayoutParams(-1, -2);
+    transportParams.setMargins(0, 0, 0, dp(14));
+    transport.setLayoutParams(transportParams);
+    page.addView(transport);
+
+    Button close = UiKit.outlineButton(context, "Modu Kapat", view -> {
+      screen = SCREEN_HOME;
+      formError = "";
+      listener.onRenderRequested();
+    });
+    close.setLayoutParams(fullButtonParams(50, 0, 0));
+    page.addView(close);
+
+    cashBarcodeInputView.requestFocus();
+    return page;
+  }
+
+  private void captureCashBarcode(String rawBarcode) {
+    String barcode = rawBarcode == null ? "" : rawBarcode.trim();
+    try {
+      JSONObject payload = barcodeScanCapture.capture(
+          barcode,
+          System.currentTimeMillis(),
+          isoTimestamp()
+      );
+      if (cashBarcodeInputView != null) cashBarcodeInputView.setText("");
+      if (payload == null) {
+        cashBarcodeStatus = "Aynı barkod kısa süre önce okundu.";
+        updateCashBarcodeViews();
+        refocusCashBarcodeInput();
+        return;
+      }
+      cashBarcodeLast = payload.optString("barcode", barcode);
+      cashBarcodeStatus = "Gönderiliyor";
+      updateCashBarcodeViews();
+      boolean persisted = listener.onBarcodeScan(cashBarcodeLast, payload);
+      if (!persisted) {
+        cashBarcodeStatus = "Gönderilemedi";
+        updateCashBarcodeViews();
+      } else if (cashBarcodeInputView != null) {
+        cashBarcodeInputView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+      }
+      refocusCashBarcodeInput();
+    } catch (MarketUiRules.ValidationException error) {
+      cashBarcodeStatus = error.getMessage();
+      updateCashBarcodeViews();
+      refocusCashBarcodeInput();
+    }
+  }
+
+  private void updateCashBarcodeViews() {
+    if (cashBarcodeLastView != null) {
+      cashBarcodeLastView.setText(cashBarcodeLast.isEmpty() ? "Henüz barkod okutulmadı" : cashBarcodeLast);
+    }
+    if (cashBarcodeStatusView != null) cashBarcodeStatusView.setText(cashBarcodeStatus);
+  }
+
+  private void refocusCashBarcodeInput() {
+    if (cashBarcodeInputView != null) cashBarcodeInputView.post(() -> cashBarcodeInputView.requestFocus());
+  }
+
+  private String isoTimestamp() {
+    SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ROOT);
+    format.setTimeZone(TimeZone.getTimeZone("UTC"));
+    return format.format(new Date());
   }
 
   private LinearLayout barcodeResultScreen() {
