@@ -1,6 +1,12 @@
-import { Barcode, Minus, Plus, Search, ShoppingCart, Trash2, WalletCards } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CatalogCategory, CatalogProduct, CommerceSale, CommerceUnit } from "@yardimci-asistan/shared";
+import { AlertTriangle, Barcode, Minus, Plus, Search, ShoppingCart, Smartphone, Trash2, WalletCards } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  CatalogCategory,
+  CatalogProduct,
+  CommerceSale,
+  CommerceSaleDraft,
+  CommerceUnit
+} from "@yardimci-asistan/shared";
 import {
   createBarcodeSimulatorAdapter,
   createKeyboardBarcodeInputAdapter,
@@ -9,7 +15,7 @@ import {
 import "../../market-quick-sale-ux.css";
 
 interface CartLine {
-  productId: string;
+  product: CatalogProduct;
   quantity: number;
 }
 
@@ -21,7 +27,15 @@ interface MarketQuickSaleWorkspaceProps {
   barcodeEnabled: boolean;
   busy: boolean;
   onSaleCompleted: (sale: CommerceSale) => Promise<void> | void;
-  onError: (message: string) => void;
+  onStateChange: (state: "success" | "error", message: string) => void;
+  cartDraftRequest?: CartDraftQuickSaleRequest | null;
+  onCartDraftLoaded?: (draftId: string) => Promise<void> | void;
+  onCartDraftReviewed?: (draftId: string) => Promise<void> | void;
+}
+
+export interface CartDraftQuickSaleRequest {
+  requestId: number;
+  draftId: string;
 }
 
 const unitLabels: Record<CommerceUnit, string> = {
@@ -75,7 +89,10 @@ export function MarketQuickSaleWorkspace({
   barcodeEnabled,
   busy,
   onSaleCompleted,
-  onError
+  onStateChange,
+  cartDraftRequest = null,
+  onCartDraftLoaded,
+  onCartDraftReviewed
 }: MarketQuickSaleWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
   const [search, setSearch] = useState("");
@@ -89,6 +106,15 @@ export function MarketQuickSaleWorkspace({
   const [simulatedBarcode, setSimulatedBarcode] = useState("");
   const [barcodeMessage, setBarcodeMessage] = useState("USB okuyucu hazır; barkodu okutun.");
   const [scanning, setScanning] = useState(false);
+  const [phoneBarcodeMode, setPhoneBarcodeMode] = useState(false);
+  const [lastScanDevice, setLastScanDevice] = useState("");
+  const [sourceDraft, setSourceDraft] = useState<CommerceSaleDraft | null>(null);
+  const [draftLoadWarnings, setDraftLoadWarnings] = useState<string[]>([]);
+  const [reviewRecoveryDraft, setReviewRecoveryDraft] = useState<CommerceSaleDraft | null>(null);
+  const cartRef = useRef<CartLine[]>([]);
+  const localScanInFlight = useRef(false);
+  const loadedDraftRequestId = useRef<number | null>(null);
+  const interactionBlocked = useRef(false);
 
   const simulatorAdapter = useMemo(() => createBarcodeSimulatorAdapter(), []);
   const keyboardAdapter = useMemo(() => createKeyboardBarcodeInputAdapter(), []);
@@ -96,13 +122,9 @@ export function MarketQuickSaleWorkspace({
     () => products.filter((product) => product.isActive),
     [products]
   );
-  const productById = useMemo(
-    () => new Map(activeProducts.map((product) => [product.id, product])),
-    [activeProducts]
-  );
   const cartCurrency = cart
-    .map((line) => productById.get(line.productId)?.currency)
-    .find((currency): currency is string => Boolean(currency)) ?? "";
+    .map((line) => line.product.currency)
+    .find((value): value is string => Boolean(value)) ?? "";
 
   const filteredProducts = useMemo(() => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
@@ -115,10 +137,7 @@ export function MarketQuickSaleWorkspace({
     });
   }, [activeProducts, cartCurrency, categoryId, search]);
 
-  const cartLines = cart.flatMap((line) => {
-    const product = productById.get(line.productId);
-    return product ? [{ ...line, product }] : [];
-  });
+  const cartLines = cart;
   const subtotal = roundMoney(cartLines.reduce(
     (sum, line) => sum + (line.product.salePrice * line.quantity),
     0
@@ -127,47 +146,61 @@ export function MarketQuickSaleWorkspace({
   const previewTotal = roundMoney(subtotal - discount);
   const currency = cartLines[0]?.product.currency ?? "TRY";
 
+  const replaceCart = useCallback((next: CartLine[]) => {
+    cartRef.current = next;
+    setCart(next);
+  }, []);
+
   const addProduct = useCallback((product: CatalogProduct) => {
-    if (cartCurrency && product.currency !== cartCurrency) {
-      onError("Tek satışta birden fazla para birimi kullanılamaz.");
+    const current = cartRef.current;
+    const currentCurrency = current[0]?.product.currency ?? "";
+    if (currentCurrency && product.currency !== currentCurrency) {
+      onStateChange("error", "Tek satışta birden fazla para birimi kullanılamaz.");
       return false;
     }
-    setCart((current) => {
-      const existing = current.find((line) => line.productId === product.id);
-      if (existing) {
-        return current.map((line) => line.productId === product.id
-          ? { ...line, quantity: roundQuantity(line.quantity + 1) }
-          : line);
-      }
-      return [...current, { productId: product.id, quantity: 1 }];
-    });
+    const existing = current.find((line) => line.product.id === product.id);
+    const next = existing
+      ? current.map((line) => line.product.id === product.id
+        ? { ...line, product, quantity: roundQuantity(line.quantity + 1) }
+        : line)
+      : [...current, { product, quantity: 1 }];
+    replaceCart(next);
     return true;
-  }, [cartCurrency, onError]);
+  }, [onStateChange, replaceCart]);
 
-  const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
-    if (!barcodeEnabled || !bridge || busy || submitting || scanning) return;
-    setScanning(true);
+  const resolveBarcode = useCallback(async (barcode: string, source: string) => {
+    if (!bridge) return;
     setSearch("");
-    setBarcodeMessage(`${barcodeSourceLabel(scan)}: ${scan.value} aranıyor…`);
+    setBarcodeMessage(`${source}: ${barcode} aranıyor…`);
     try {
-      const product = await bridge.findProductByBarcode(scan.value);
-      if (!product) {
-        const message = `Barkod bulunamadı: ${scan.value}`;
+      const product = await bridge.findProductByBarcode(barcode);
+      if (!product || !product.isActive) {
+        const message = `Barkod bulunamadı: ${barcode}`;
         setBarcodeMessage(message);
-        onError(message);
+        onStateChange("error", message);
         return;
       }
       if (addProduct(product)) {
-        setBarcodeMessage(`${product.name} sepete eklendi · ${barcodeSourceLabel(scan)}`);
+        setBarcodeMessage(`${product.name} sepete eklendi · ${source}`);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Barkod okunamadı.";
       setBarcodeMessage(message);
-      onError(message);
+      onStateChange("error", message);
+    }
+  }, [addProduct, bridge, onStateChange]);
+
+  const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
+    if (!barcodeEnabled || busy || submitting || localScanInFlight.current) return;
+    localScanInFlight.current = true;
+    setScanning(true);
+    try {
+      await resolveBarcode(scan.value, barcodeSourceLabel(scan));
     } finally {
+      localScanInFlight.current = false;
       setScanning(false);
     }
-  }, [addProduct, barcodeEnabled, bridge, busy, onError, scanning, submitting]);
+  }, [barcodeEnabled, busy, resolveBarcode, submitting]);
 
   useEffect(() => {
     if (!barcodeEnabled) return;
@@ -180,21 +213,106 @@ export function MarketQuickSaleWorkspace({
     });
   }, [barcodeEnabled, barcodeMode, handleBarcodeScan, keyboardAdapter, simulatorAdapter]);
 
+  useEffect(() => {
+    if (!cartDraftRequest || loadedDraftRequestId.current === cartDraftRequest.requestId || !bridge) return;
+    loadedDraftRequestId.current = cartDraftRequest.requestId;
+    let cancelled = false;
+    onStateChange("success", "Telefon sepeti güncel katalogla hazırlanıyor…");
+    void bridge.loadCartDraftForQuickSale(cartDraftRequest.draftId)
+      .then((result) => {
+        if (cancelled) return;
+        const warnings = result.skippedItems.map(
+          (item) => `${item.productName || item.productId} ürünü artık aktif olmadığı için sepete eklenmedi.`
+        );
+        replaceCart(result.items.map((item) => ({ product: item.product, quantity: item.quantity })));
+        setDiscountTotal("0");
+        setPaymentMethod("cash");
+        setSourceDraft(result.draft);
+        setDraftLoadWarnings(warnings);
+        setLastSale(null);
+        void onCartDraftLoaded?.(result.draft.id);
+        onStateChange(
+          "success",
+          warnings.length > 0
+            ? warnings.join(" ")
+            : "Telefon sepeti Hızlı Satış'a yüklendi; ödeme tamamlanana kadar taslak açık kalır."
+        );
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          onStateChange("error", error instanceof Error ? error.message : "Telefon sepeti yüklenemedi.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bridge, cartDraftRequest, onCartDraftLoaded, onStateChange, replaceCart]);
+
+  interactionBlocked.current = busy || submitting;
+
+  useEffect(() => {
+    if (!phoneBarcodeMode || !barcodeEnabled || !bridge) return;
+    const activeBridge = bridge;
+    let disposed = false;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    async function consume() {
+      if (disposed || localScanInFlight.current || interactionBlocked.current) return;
+      localScanInFlight.current = true;
+      try {
+        const events = await activeBridge.consumePendingBarcodeScans({ limit: 100 });
+        for (const event of events) {
+          setLastScanDevice(event.deviceId || "Bilinmeyen cihaz");
+          await resolveBarcode(event.barcode, `Telefon · ${event.deviceId || "Bilinmeyen cihaz"}`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Telefon barkodları alınamadı.";
+        setBarcodeMessage(message);
+        onStateChange("error", message);
+      } finally {
+        localScanInFlight.current = false;
+      }
+    }
+
+    void activeBridge.setBarcodeScanMode(true)
+      .then(() => {
+        if (disposed) return activeBridge.setBarcodeScanMode(false).then(() => undefined);
+        setBarcodeMessage("Telefon Barkod Modu açık; telefon taramaları bekleniyor.");
+        onStateChange("success", "Telefon Barkod Modu açıldı. Ödeme masaüstünde ayrıca tamamlanır.");
+        void consume();
+        intervalId = setInterval(() => void consume(), 600);
+        return undefined;
+      })
+      .catch((error) => {
+        if (disposed) return;
+        setPhoneBarcodeMode(false);
+        onStateChange("error", error instanceof Error ? error.message : "Telefon Barkod Modu açılamadı.");
+      });
+
+    return () => {
+      disposed = true;
+      if (intervalId) clearInterval(intervalId);
+      void activeBridge.setBarcodeScanMode(false).catch(() => undefined);
+    };
+  }, [barcodeEnabled, bridge, onStateChange, phoneBarcodeMode, resolveBarcode]);
+
   function setQuantity(productId: string, quantityInput: number) {
     const quantity = roundQuantity(quantityInput);
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setCart((current) => current.filter((line) => line.productId !== productId));
+      replaceCart(cartRef.current.filter((line) => line.product.id !== productId));
       return;
     }
-    setCart((current) => current.map((line) => line.productId === productId
+    replaceCart(cartRef.current.map((line) => line.product.id === productId
       ? { ...line, quantity }
       : line));
   }
 
   function clearSale() {
-    setCart([]);
+    replaceCart([]);
     setDiscountTotal("0");
     setPaymentMethod("cash");
+    setSourceDraft(null);
+    setDraftLoadWarnings([]);
   }
 
   function submitSimulatedBarcode() {
@@ -204,17 +322,19 @@ export function MarketQuickSaleWorkspace({
 
   async function completeSale() {
     if (!bridge) {
-      onError("Commerce köprüsü kullanılamıyor.");
+      onStateChange("error", "Commerce köprüsü kullanılamıyor.");
       return;
     }
     if (cartLines.length === 0) {
-      onError("Satış için sepete en az bir ürün ekleyin.");
+      onStateChange("error", "Satış için sepete en az bir ürün ekleyin.");
       return;
     }
 
+    const draftToReview = sourceDraft;
     setSubmitting(true);
+    let sale: CommerceSale;
     try {
-      const sale = await bridge.createPaidSale({
+      sale = await bridge.createPaidSale({
         items: cartLines.map((line) => ({
           productId: line.product.id,
           quantity: line.quantity
@@ -223,13 +343,42 @@ export function MarketQuickSaleWorkspace({
         paymentMethod,
         source: "desktop-market-quick-sale"
       });
-      setLastSale(sale);
-      clearSale();
-      await onSaleCompleted(sale);
     } catch (error) {
-      onError(error instanceof Error ? error.message : "Satış tamamlanamadı.");
-    } finally {
+      onStateChange("error", error instanceof Error ? error.message : "Satış tamamlanamadı.");
       setSubmitting(false);
+      return;
+    }
+
+    setLastSale(sale);
+    clearSale();
+    try {
+      await onSaleCompleted(sale);
+    } catch {
+      onStateChange("success", "Satış tamamlandı ancak katalog görünümü yenilenemedi.");
+    }
+    if (draftToReview) {
+      try {
+        await bridge.markCartDraftReviewed(draftToReview.id);
+        await onCartDraftReviewed?.(draftToReview.id);
+        setReviewRecoveryDraft(null);
+        onStateChange("success", "Satış tamamlandı ve telefon sepeti kapatıldı.");
+      } catch {
+        setReviewRecoveryDraft(draftToReview);
+        onStateChange("success", "Satış tamamlandı ancak telefon sepeti kapatılamadı.");
+      }
+    }
+    setSubmitting(false);
+  }
+
+  async function closeRecoveryDraft() {
+    if (!bridge || !reviewRecoveryDraft) return;
+    try {
+      await bridge.markCartDraftReviewed(reviewRecoveryDraft.id);
+      await onCartDraftReviewed?.(reviewRecoveryDraft.id);
+      setReviewRecoveryDraft(null);
+      onStateChange("success", "Telefon sepeti kapatıldı.");
+    } catch (error) {
+      onStateChange("error", error instanceof Error ? error.message : "Telefon sepeti kapatılamadı.");
     }
   }
 
@@ -245,32 +394,54 @@ export function MarketQuickSaleWorkspace({
         </header>
 
         {barcodeEnabled && (
-          <section className="market-barcode-panel" aria-label="Barkod girişi">
-            <div className="market-barcode-heading">
-              <span><Barcode size={17} aria-hidden="true" /><strong>Barkod Girişi</strong></span>
-              <select value={barcodeMode} onChange={(event) => setBarcodeMode(event.target.value as BarcodeMode)} disabled={disabled || scanning}>
-                <option value="keyboard-wedge">USB Klavye Okuyucu</option>
-                <option value="simulator">Simülatör</option>
-              </select>
-            </div>
-            {barcodeMode === "simulator" && (
-              <div className="market-barcode-simulator">
-                <input
-                  value={simulatedBarcode}
-                  onChange={(event) => setSimulatedBarcode(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") submitSimulatedBarcode();
-                  }}
-                  placeholder="Test barkodu"
-                  disabled={disabled || scanning}
-                />
-                <button type="button" className="market-secondary-button" onClick={submitSimulatedBarcode} disabled={disabled || scanning || !simulatedBarcode.trim()}>
-                  Barkodu Gönder
-                </button>
+          <div className="market-barcode-stack">
+            <section className={`market-phone-barcode-panel${phoneBarcodeMode ? " is-active" : ""}`} aria-label="Telefon barkod modu">
+              <div>
+                <span><Smartphone size={17} aria-hidden="true" /><strong>Telefon Barkod Modu</strong></span>
+                <small>
+                  Telefon taramalarını bu sepete aktarır; ödeme otomatik yapılmaz. Hosting aktarımı internet bağlantısı
+                  gerektirebilir ve yalnız mod açıkken geçici hızlı çekim kullanır.
+                </small>
               </div>
-            )}
-            <small className="market-barcode-status" role="status" aria-live="polite">{barcodeMessage}</small>
-          </section>
+              <button
+                type="button"
+                className={phoneBarcodeMode ? "market-danger-button" : "market-secondary-button"}
+                aria-pressed={phoneBarcodeMode}
+                onClick={() => setPhoneBarcodeMode((current) => !current)}
+                disabled={disabled}
+              >
+                {phoneBarcodeMode ? "Modu Kapat" : "Telefon Barkod Modunu Aç"}
+              </button>
+              {lastScanDevice && <small className="market-phone-device">Son cihaz: {lastScanDevice}</small>}
+            </section>
+
+            <section className="market-barcode-panel" aria-label="Barkod girişi">
+              <div className="market-barcode-heading">
+                <span><Barcode size={17} aria-hidden="true" /><strong>Yerel Barkod Girişi</strong></span>
+                <select value={barcodeMode} onChange={(event) => setBarcodeMode(event.target.value as BarcodeMode)} disabled={disabled || scanning}>
+                  <option value="keyboard-wedge">USB Klavye Okuyucu</option>
+                  <option value="simulator">Simülatör</option>
+                </select>
+              </div>
+              {barcodeMode === "simulator" && (
+                <div className="market-barcode-simulator">
+                  <input
+                    value={simulatedBarcode}
+                    onChange={(event) => setSimulatedBarcode(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") submitSimulatedBarcode();
+                    }}
+                    placeholder="Test barkodu"
+                    disabled={disabled || scanning}
+                  />
+                  <button type="button" className="market-secondary-button" onClick={submitSimulatedBarcode} disabled={disabled || scanning || !simulatedBarcode.trim()}>
+                    Barkodu Gönder
+                  </button>
+                </div>
+              )}
+              <small className="market-barcode-status" role="status" aria-live="polite">{barcodeMessage}</small>
+            </section>
+          </div>
         )}
 
         <div className="market-sale-filters">
@@ -327,6 +498,16 @@ export function MarketQuickSaleWorkspace({
             </button>
           )}
         </header>
+
+        {sourceDraft && (
+          <aside className="market-draft-reference" aria-label="Telefon sepeti kaynağı">
+            <strong>Telefon sepetinden hazırlanıyor</strong>
+            <span>{sourceDraft.createdByDevice || sourceDraft.source || "Telefon"} · {new Date(sourceDraft.createdAt).toLocaleString("tr-TR")}</span>
+            {sourceDraft.note && <p>{sourceDraft.note}</p>}
+            <small>Sepeti temizlemek veya başka taslağa geçmek bu kaydı kapatmaz. Yalnız başarılı ödeme sonrası reviewed olur.</small>
+            {draftLoadWarnings.map((warning) => <em key={warning}>{warning}</em>)}
+          </aside>
+        )}
 
         <div className="market-sale-cart-lines">
           {cartLines.map((line) => (
@@ -386,6 +567,19 @@ export function MarketQuickSaleWorkspace({
           <div className="market-sale-receipt" role="status">
             <strong>Satış tamamlandı</strong>
             <span>{money(lastSale.total, lastSale.currency)} · {paymentMethodLabel(lastSale.paymentMethod)}</span>
+          </div>
+        )}
+
+        {reviewRecoveryDraft && (
+          <div className="market-sale-review-recovery" role="status">
+            <AlertTriangle size={18} aria-hidden="true" />
+            <span>
+              <strong>Satış tamamlandı ancak telefon sepeti kapatılamadı.</strong>
+              <small>Satış geri alınmadı. Yalnız kaynak taslağı reviewed yapmak için tekrar deneyebilirsiniz.</small>
+            </span>
+            <button type="button" className="market-secondary-button" onClick={() => void closeRecoveryDraft()} disabled={disabled}>
+              Taslağı Kapat
+            </button>
           </div>
         )}
       </section>

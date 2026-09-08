@@ -1,12 +1,17 @@
 import type {
   CatalogCategory,
   CatalogProduct,
+  CatalogProductDraft,
   CommercePurchaseOrder,
   CommercePurchaseOrderDetail,
   CommerceSale,
+  CommerceSaleDraft,
+  CommerceSaleDraftDetail,
   CommerceSupplier,
   InventoryBalance,
-  InventoryMovement
+  InventoryMovement,
+  MarketBarcodeScanEvent,
+  MarketCartDraftLoadResult
 } from "@yardimci-asistan/shared";
 import type {
   DeleteCatalogCategoryResult,
@@ -29,6 +34,17 @@ import type {
   SetInventoryCountInput
 } from "./commerce-store";
 import type { InventoryCountResult } from "./commerce-runtime";
+import type {
+  ConsumePendingMarketBarcodeScansOptions,
+  ListMarketCartDraftsOptions,
+  ListMarketProductDraftsOptions
+} from "./market-companion-runtime";
+
+export interface MarketBarcodeFastPullState {
+  active: boolean;
+  intervalMs: number;
+  transport: "hosting";
+}
 
 /**
  * Renderer-facing commerce contract. This deliberately exposes the capability-
@@ -52,6 +68,15 @@ export interface DesktopCommerceBridge {
   setInventoryCount: (input: SetInventoryCountInput) => Promise<InventoryCountResult>;
 
   createPaidSale: (input: CreateCommerceSaleInput) => Promise<CommerceSale>;
+
+  listProductDrafts: (options?: ListMarketProductDraftsOptions) => Promise<CatalogProductDraft[]>;
+  markProductDraftReviewed: (draftId: string) => Promise<CatalogProductDraft>;
+  listCartDrafts: (options?: ListMarketCartDraftsOptions) => Promise<CommerceSaleDraftDetail[]>;
+  getCartDraft: (draftId: string) => Promise<CommerceSaleDraftDetail | null>;
+  loadCartDraftForQuickSale: (draftId: string) => Promise<MarketCartDraftLoadResult>;
+  markCartDraftReviewed: (draftId: string) => Promise<CommerceSaleDraft>;
+  consumePendingBarcodeScans: (options?: ConsumePendingMarketBarcodeScansOptions) => Promise<MarketBarcodeScanEvent[]>;
+  setBarcodeScanMode: (active: boolean) => Promise<MarketBarcodeFastPullState>;
 
   listSuppliers: (options?: ListCommerceSuppliersOptions) => Promise<CommerceSupplier[]>;
   saveSupplier: (input: SaveCommerceSupplierInput) => Promise<CommerceSupplier>;

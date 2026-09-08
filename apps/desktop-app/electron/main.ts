@@ -130,6 +130,7 @@ let desktopDatabase: DesktopDatabase | null = null;
 let syncCoordinator: SyncCoordinator | null = null;
 let androidActionSyncInFlight: Promise<AndroidActionProcessSummary> | null = null;
 let androidSnapshotPublishPending = true;
+const marketBarcodeFastPullSenders = new Set<number>();
 let appSessionLocked = false;
 let appLockFailureCount = 0;
 let appLockBlockedUntil = 0;
@@ -497,6 +498,27 @@ function registerIpcHandlers() {
 
   ipcMain.handle("sync:setAutoEnabled", (_event, enabled: unknown): AutomaticSyncStatus => {
     return getSyncCoordinator().setEnabled(enabled === true);
+  });
+
+  ipcMain.handle("sync:setMarketBarcodeFastPull", (event, enabled: unknown) => {
+    assertAppSessionUnlocked();
+    const shouldEnable = enabled === true;
+    const senderId = event.sender.id;
+    if (shouldEnable) {
+      assertDesktopCapability(C.CATALOG, "Telefon barkod modu için ürün kataloğu etkin olmalı.");
+      assertDesktopCapability(C.SALES, "Telefon barkod modu için satış yeteneği etkin olmalı.");
+      assertDesktopCapability(C.RETAIL_BARCODE, "Telefon barkod modu için barkod yeteneği etkin olmalı.");
+      if (!marketBarcodeFastPullSenders.has(senderId)) {
+        marketBarcodeFastPullSenders.add(senderId);
+        event.sender.once("destroyed", () => {
+          marketBarcodeFastPullSenders.delete(senderId);
+          syncCoordinator?.setMarketBarcodeFastPullEnabled(marketBarcodeFastPullSenders.size > 0);
+        });
+      }
+    } else {
+      marketBarcodeFastPullSenders.delete(senderId);
+    }
+    return getSyncCoordinator().setMarketBarcodeFastPullEnabled(marketBarcodeFastPullSenders.size > 0);
   });
 
   ipcMain.handle("sync:pullRequests", async (): Promise<PullRequestsResult> => {

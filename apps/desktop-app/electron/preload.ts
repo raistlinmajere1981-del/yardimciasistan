@@ -3,12 +3,17 @@ import type {
   BusinessCapability,
   CatalogCategory,
   CatalogProduct,
+  CatalogProductDraft,
   CommercePurchaseOrder,
   CommercePurchaseOrderDetail,
   CommerceSale,
+  CommerceSaleDraft,
+  CommerceSaleDraftDetail,
   CommerceSupplier,
   InventoryBalance,
-  InventoryMovement
+  InventoryMovement,
+  MarketBarcodeScanEvent,
+  MarketCartDraftLoadResult
 } from "@yardimci-asistan/shared";
 import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
@@ -91,6 +96,7 @@ import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-conn
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
 import type { SaveCapabilitySetupInput } from "./setup-contract";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
+import type { MarketBarcodeFastPullState } from "./commerce-ipc-contract";
 import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
 import type { CommerceStoreSnapshot } from "./commerce-store";
 import type { InventoryCountResult } from "./commerce-runtime";
@@ -295,6 +301,14 @@ const bridge: DesktopBridge = {
     applyInventoryMovement: (input) => invokeWhenUnlocked<InventoryMovement>("commerce:inventory:applyMovement", input),
     setInventoryCount: (input) => invokeWhenUnlocked<InventoryCountResult>("commerce:inventory:setCount", input),
     createPaidSale: (input) => invokeWhenUnlocked<CommerceSale>("commerce:sale:createPaid", input),
+    listProductDrafts: (options) => invokeWhenUnlocked<CatalogProductDraft[]>("commerce:productDraft:list", options),
+    markProductDraftReviewed: (draftId) => invokeWhenUnlocked<CatalogProductDraft>("commerce:productDraft:markReviewed", draftId),
+    listCartDrafts: (options) => invokeWhenUnlocked<CommerceSaleDraftDetail[]>("commerce:cartDraft:list", options),
+    getCartDraft: (draftId) => invokeWhenUnlocked<CommerceSaleDraftDetail | null>("commerce:cartDraft:get", draftId),
+    loadCartDraftForQuickSale: (draftId) => invokeWhenUnlocked<MarketCartDraftLoadResult>("commerce:cartDraft:loadForQuickSale", draftId),
+    markCartDraftReviewed: (draftId) => invokeWhenUnlocked<CommerceSaleDraft>("commerce:cartDraft:markReviewed", draftId),
+    consumePendingBarcodeScans: (options) => invokeWhenUnlocked<MarketBarcodeScanEvent[]>("commerce:barcodeScan:consumePending", options),
+    setBarcodeScanMode: (active) => invokeWhenUnlocked<MarketBarcodeFastPullState>("sync:setMarketBarcodeFastPull", active),
     listSuppliers: (options) => invokeWhenUnlocked<CommerceSupplier[]>("commerce:supplier:list", options),
     saveSupplier: (input) => invokeWhenUnlocked<CommerceSupplier>("commerce:supplier:save", input),
     listPurchaseOrders: (options) => invokeWhenUnlocked<CommercePurchaseOrder[]>("commerce:purchase:list", options),

@@ -4,6 +4,51 @@
   gap: var(--space-4);
 }
 
+.market-barcode-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.market-phone-barcode-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius:var(--radius-md);
+  background: var(--surface-1);
+}
+
+.market-phone-barcode-panel.is-active {
+  border-color: var(--primary-border);
+  background: var(--primary-bg);
+}
+
+.market-phone-barcode-panel > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.market-phone-barcode-panel > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.market-phone-barcode-panel svg {
+  color: var(--primary);
+}
+
+.market-phone-barcode-panel small {
+  color: var(--ink-muted);
+  line-height: 1.45;
+}
+
+.market-phone-device {
+  grid-column: 1 / -1;
+}
+
 .market-barcode-panel {
   display: grid;
   gap: var(--space-2);
@@ -243,6 +288,30 @@
   color: var(--ink-muted);
 }
 
+.market-sale-review-recovery {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--danger-line);
+  border-radius:var(--radius-md);
+  background: var(--danger-soft);
+}
+
+.market-sale-review-recovery > svg {
+  color: var(--status-red);
+}
+
+.market-sale-review-recovery > span {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.market-sale-review-recovery small {
+  color: var(--ink-muted);
+}
+
 @media (max-width: 1180px) {
   .market-quick-sale-layout {
     grid-template-columns: 1fr;
@@ -262,8 +331,14 @@
   .market-barcode-simulator,
   .market-sale-filters,
   .market-sale-payment,
-  .market-sale-cart-line {
+  .market-sale-cart-line,
+  .market-phone-barcode-panel,
+  .market-sale-review-recovery {
     grid-template-columns: 1fr;
+  }
+
+  .market-phone-device {
+    grid-column: auto;
   }
 
   .market-sale-quantity {

@@ -11,7 +11,8 @@ import {
   type DesktopSyncRuntimeStatus
 } from "./database";
 
-const PULL_INTERVAL_MS = 15_000;
+export const NORMAL_PULL_INTERVAL_MS = 15_000;
+export const MARKET_BARCODE_FAST_PULL_INTERVAL_MS = 1_500;
 const OUTBOX_SCAN_INTERVAL_MS = 1_000;
 const INITIAL_SYNC_DELAY_MS = 1_500;
 const DEBOUNCE_DELAY_MS = 750;
@@ -56,6 +57,7 @@ export interface SyncCoordinatorOptions {
 
 export class SyncCoordinator {
   private pullTimer: NodeJS.Timeout | null = null;
+  private marketBarcodeFastPullTimer: NodeJS.Timeout | null = null;
   private outboxTimer: NodeJS.Timeout | null = null;
   private initialTimer: NodeJS.Timeout | null = null;
   private debounceTimer: NodeJS.Timeout | null = null;
@@ -64,6 +66,7 @@ export class SyncCoordinator {
   private message = "Otomatik senkron hazır.";
   private capabilitiesTarget = "";
   private nextPassiveRunAt = 0;
+  private marketBarcodeFastPullActive = false;
 
   constructor(private readonly options: SyncCoordinatorOptions) {}
 
@@ -78,7 +81,7 @@ export class SyncCoordinator {
       if (Date.now() >= this.nextPassiveRunAt) {
         void this.run(false);
       }
-    }, PULL_INTERVAL_MS);
+    }, NORMAL_PULL_INTERVAL_MS);
     this.outboxTimer = setInterval(() => {
       const runtime = this.options.database.getSyncRuntimeStatus();
       if (runtime.enabled
@@ -93,19 +96,26 @@ export class SyncCoordinator {
 
   stop() {
     if (this.pullTimer) clearInterval(this.pullTimer);
+    if (this.marketBarcodeFastPullTimer) clearInterval(this.marketBarcodeFastPullTimer);
     if (this.outboxTimer) clearInterval(this.outboxTimer);
     if (this.initialTimer) clearTimeout(this.initialTimer);
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     this.pullTimer = null;
+    this.marketBarcodeFastPullTimer = null;
     this.outboxTimer = null;
     this.initialTimer = null;
     this.debounceTimer = null;
+    this.marketBarcodeFastPullActive = false;
   }
 
   restart() {
+    const restoreMarketBarcodeFastPull = this.marketBarcodeFastPullActive;
     this.capabilitiesTarget = "";
     this.nextPassiveRunAt = 0;
     this.start();
+    if (restoreMarketBarcodeFastPull) {
+      this.setMarketBarcodeFastPullEnabled(true);
+    }
   }
 
   scheduleSoon(delayMs = DEBOUNCE_DELAY_MS) {
@@ -130,6 +140,39 @@ export class SyncCoordinator {
       this.message = "Otomatik senkron kapalı.";
     }
     return this.emitStatus();
+  }
+
+  /**
+   * Bounded hosting fallback used only while desktop Quick Sale explicitly
+   * accepts phone scans. It shares run()'s in-flight promise and retry backoff,
+   * so it cannot create overlapping sync cycles or an uncontrolled request loop.
+   */
+  setMarketBarcodeFastPullEnabled(enabled: boolean) {
+    if (enabled === this.marketBarcodeFastPullActive) {
+      return this.marketBarcodeFastPullState();
+    }
+    this.marketBarcodeFastPullActive = enabled;
+    if (this.marketBarcodeFastPullTimer) {
+      clearInterval(this.marketBarcodeFastPullTimer);
+      this.marketBarcodeFastPullTimer = null;
+    }
+    if (enabled) {
+      this.scheduleSoon(0);
+      this.marketBarcodeFastPullTimer = setInterval(() => {
+        if (Date.now() >= this.nextPassiveRunAt) {
+          void this.run(false);
+        }
+      }, MARKET_BARCODE_FAST_PULL_INTERVAL_MS);
+    }
+    return this.marketBarcodeFastPullState();
+  }
+
+  private marketBarcodeFastPullState() {
+    return {
+      active: this.marketBarcodeFastPullActive,
+      intervalMs: MARKET_BARCODE_FAST_PULL_INTERVAL_MS,
+      transport: "hosting" as const
+    };
   }
 
   getStatus(): AutomaticSyncStatus {

@@ -1,20 +1,29 @@
-import { Archive, Boxes, ShoppingBasket, Tags, Truck, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Archive, Boxes, ShoppingBasket, Smartphone, Tags, Truck, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
   type CatalogCategory,
   type CatalogProduct,
+  type CatalogProductDraft,
+  type CommerceSaleDraftDetail,
   type CommerceSale
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../app/business-capability-context";
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
 import { MarketLabelsWorkspace } from "../components/market/MarketLabelsWorkspace";
-import { MarketProductsWorkspace } from "../components/market/MarketProductsWorkspace";
+import { MarketCompanionInboxWorkspace } from "../components/market/MarketCompanionInboxWorkspace";
+import {
+  MarketProductsWorkspace,
+  type ProductDraftFormRequest
+} from "../components/market/MarketProductsWorkspace";
 import { MarketPurchasingWorkspace } from "../components/market/MarketPurchasingWorkspace";
-import { MarketQuickSaleWorkspace } from "../components/market/MarketQuickSaleWorkspace";
+import {
+  MarketQuickSaleWorkspace,
+  type CartDraftQuickSaleRequest
+} from "../components/market/MarketQuickSaleWorkspace";
 
-type MarketTab = "quickSale" | "products" | "inventory" | "purchasing" | "labels";
+type MarketTab = "quickSale" | "products" | "phoneDrafts" | "inventory" | "purchasing" | "labels";
 type AsyncState = "idle" | "loading" | "success" | "error";
 
 interface MarketTabDefinition {
@@ -40,6 +49,7 @@ export function MarketPage() {
   const tabs = useMemo<MarketTabDefinition[]>(() => [
     { id: "quickSale", label: "Hızlı Satış", description: "Kasada hızlı ürün ekleme ve ödeme", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
     { id: "products", label: "Ürünler", description: "Ürün ve kategori yönetimi", icon: Archive, enabled: catalogEnabled },
+    { id: "phoneDrafts", label: "Telefon Taslakları", description: "Ürün önerileri ve hazır sepetler", icon: Smartphone, enabled: catalogEnabled },
     { id: "inventory", label: "Stok", description: "Fiziksel sayım ve hareket geçmişi", icon: Boxes, enabled: inventoryEnabled },
     { id: "purchasing", label: "Tedarikçiler / Alım", description: "Tedarikçi ve stok girişi", icon: Truck, enabled: suppliersEnabled || purchasingEnabled },
     { id: "labels", label: "Etiketler", description: "Ürün ve raf etiketi hazırlama", icon: Tags, enabled: labelsEnabled }
@@ -50,6 +60,9 @@ export function MarketPage() {
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<AsyncState>("idle");
   const [message, setMessage] = useState("Market verileri hazır.");
+  const [productDraftRequest, setProductDraftRequest] = useState<ProductDraftFormRequest | null>(null);
+  const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
+  const handoffRequestId = useRef(0);
 
   const handleStateChange = useCallback((state: Exclude<AsyncState, "idle">, nextMessage: string) => {
     setDataState(state);
@@ -96,6 +109,18 @@ export function MarketPage() {
     setMessage(`Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`);
   }
 
+  function openProductDraft(draft: CatalogProductDraft) {
+    handoffRequestId.current += 1;
+    setProductDraftRequest({ requestId: handoffRequestId.current, draft });
+    setActiveTab("products");
+  }
+
+  function openCartDraft(detail: CommerceSaleDraftDetail) {
+    handoffRequestId.current += 1;
+    setCartDraftRequest({ requestId: handoffRequestId.current, draftId: detail.draft.id });
+    setActiveTab("quickSale");
+  }
+
   return (
     <section className="market-page" aria-label="Market yönetimi">
       <nav className="market-tabs" aria-label="Market çalışma alanları">
@@ -120,7 +145,14 @@ export function MarketPage() {
           barcodeEnabled={barcodeEnabled}
           busy={dataState === "loading"}
           onSaleCompleted={handleSaleCompleted}
-          onError={(nextMessage) => handleStateChange("error", nextMessage)}
+          onStateChange={handleStateChange}
+          cartDraftRequest={cartDraftRequest}
+          onCartDraftLoaded={(draftId) => {
+            setCartDraftRequest((current) => current?.draftId === draftId ? null : current);
+          }}
+          onCartDraftReviewed={(draftId) => {
+            setCartDraftRequest((current) => current?.draftId === draftId ? null : current);
+          }}
         />
       ) : activeTab === "products" ? (
         <MarketProductsWorkspace
@@ -128,6 +160,22 @@ export function MarketPage() {
           categories={categories}
           busy={dataState === "loading"}
           onReload={reloadCatalog}
+          onStateChange={handleStateChange}
+          productDraftRequest={productDraftRequest}
+          onProductDraftLoaded={(draftId) => {
+            setProductDraftRequest((current) => current?.draft.id === draftId ? null : current);
+          }}
+          onProductDraftReviewed={(draftId) => {
+            setProductDraftRequest((current) => current?.draft.id === draftId ? null : current);
+          }}
+        />
+      ) : activeTab === "phoneDrafts" ? (
+        <MarketCompanionInboxWorkspace
+          catalogEnabled={catalogEnabled}
+          cartDraftsEnabled={catalogEnabled && salesEnabled}
+          busy={dataState === "loading"}
+          onOpenProductDraft={openProductDraft}
+          onOpenCartDraft={openCartDraft}
           onStateChange={handleStateChange}
         />
       ) : activeTab === "inventory" ? (

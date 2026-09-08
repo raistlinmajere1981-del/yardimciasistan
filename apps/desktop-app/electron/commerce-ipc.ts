@@ -3,17 +3,24 @@ import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
 import {
   applyRuntimeInventoryMovement,
   createRuntimePaidSale,
+  consumePendingMarketBarcodeScans,
   deleteRuntimeCatalogCategory,
   findRuntimeProductByBarcode,
   getCommerceRuntimeSnapshot,
   getRuntimeCatalogCategory,
   getRuntimeInventoryBalance,
   getRuntimePurchaseOrder,
+  getMarketCartDraft,
+  loadMarketCartDraftForQuickSale,
   listRuntimeCatalogCategories,
   listRuntimeCatalogProducts,
   listRuntimeInventoryMovements,
   listRuntimePurchaseOrders,
   listRuntimeSuppliers,
+  listMarketCartDrafts,
+  listMarketProductDrafts,
+  markMarketCartDraftReviewed,
+  markMarketProductDraftReviewed,
   receiveRuntimePurchase,
   saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct,
@@ -36,6 +43,10 @@ export function registerCommerceIpcHandlers(options: {
     const result = operation();
     options.onMutation?.();
     return result;
+  };
+  const ephemeralMutate = <T>(operation: () => T): T => {
+    options.assertUnlocked();
+    return operation();
   };
 
   ipcMain.handle("commerce:getSnapshot", () =>
@@ -80,6 +91,28 @@ export function registerCommerceIpcHandlers(options: {
 
   ipcMain.handle("commerce:sale:createPaid", (_event, input: Parameters<DesktopCommerceBridge["createPaidSale"]>[0]) =>
     mutate(() => createRuntimePaidSale(databasePath(), input))
+  );
+
+  ipcMain.handle("commerce:productDraft:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listProductDrafts"]>[0]) =>
+    read(() => listMarketProductDrafts(databasePath(), optionsArg))
+  );
+  ipcMain.handle("commerce:productDraft:markReviewed", (_event, draftId: string) =>
+    mutate(() => markMarketProductDraftReviewed(databasePath(), draftId))
+  );
+  ipcMain.handle("commerce:cartDraft:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listCartDrafts"]>[0]) =>
+    read(() => listMarketCartDrafts(databasePath(), optionsArg))
+  );
+  ipcMain.handle("commerce:cartDraft:get", (_event, draftId: string) =>
+    read(() => getMarketCartDraft(databasePath(), draftId))
+  );
+  ipcMain.handle("commerce:cartDraft:loadForQuickSale", (_event, draftId: string) =>
+    read(() => loadMarketCartDraftForQuickSale(databasePath(), draftId))
+  );
+  ipcMain.handle("commerce:cartDraft:markReviewed", (_event, draftId: string) =>
+    mutate(() => markMarketCartDraftReviewed(databasePath(), draftId))
+  );
+  ipcMain.handle("commerce:barcodeScan:consumePending", (_event, optionsArg: Parameters<DesktopCommerceBridge["consumePendingBarcodeScans"]>[0]) =>
+    ephemeralMutate(() => consumePendingMarketBarcodeScans(databasePath(), optionsArg))
   );
 
   ipcMain.handle("commerce:supplier:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listSuppliers"]>[0]) =>
