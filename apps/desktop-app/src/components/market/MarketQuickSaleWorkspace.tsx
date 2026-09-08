@@ -13,6 +13,9 @@ import {
   type BarcodeScan
 } from "../../app/barcode-input";
 import "../../market-quick-sale-ux.css";
+import type { DesktopCustomer } from "../../../electron/database";
+import { CustomerPicker } from "../customers/CustomerPicker";
+import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 
 interface CartLine {
   product: CatalogProduct;
@@ -22,6 +25,8 @@ interface CartLine {
 type BarcodeMode = "keyboard-wedge" | "simulator";
 
 interface MarketQuickSaleWorkspaceProps {
+  customers?: DesktopCustomer[];
+  customerCreditEnabled?: boolean;
   products: CatalogProduct[];
   categories: CatalogCategory[];
   barcodeEnabled: boolean;
@@ -84,6 +89,8 @@ function barcodeSourceLabel(scan: BarcodeScan) {
 }
 
 export function MarketQuickSaleWorkspace({
+  customers = [],
+  customerCreditEnabled = false,
   products,
   categories,
   barcodeEnabled,
@@ -101,6 +108,9 @@ export function MarketQuickSaleWorkspace({
   const [discountTotal, setDiscountTotal] = useState("0");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [lastSale, setLastSale] = useState<CommerceSale | null>(null);
+  const [customerId, setCustomerId] = useState("");
+  const [lastCreditCustomerName, setLastCreditCustomerName] = useState("");
+  const saleInFlight = useRef(false);
   const [submitting, setSubmitting] = useState(false);
   const [barcodeMode, setBarcodeMode] = useState<BarcodeMode>("keyboard-wedge");
   const [simulatedBarcode, setSimulatedBarcode] = useState("");
@@ -115,6 +125,15 @@ export function MarketQuickSaleWorkspace({
   const localScanInFlight = useRef(false);
   const loadedDraftRequestId = useRef<number | null>(null);
   const interactionBlocked = useRef(false);
+  const isCredit = paymentMethod === "credit";
+  const selectedCustomer = customers.find((customer) => customer.id === customerId);
+
+  useEffect(() => {
+    if (!customerCreditEnabled) {
+      setPaymentMethod((current) => current === "credit" ? "cash" : current);
+      setCustomerId("");
+    }
+  }, [customerCreditEnabled]);
 
   const simulatorAdapter = useMemo(() => createBarcodeSimulatorAdapter(), []);
   const keyboardAdapter = useMemo(() => createKeyboardBarcodeInputAdapter(), []);
@@ -215,18 +234,19 @@ export function MarketQuickSaleWorkspace({
 
   useEffect(() => {
     if (!cartDraftRequest || loadedDraftRequestId.current === cartDraftRequest.requestId || !bridge) return;
-    loadedDraftRequestId.current = cartDraftRequest.requestId;
     let cancelled = false;
     onStateChange("success", "Telefon sepeti güncel katalogla hazırlanıyor…");
     void bridge.loadCartDraftForQuickSale(cartDraftRequest.draftId)
       .then((result) => {
         if (cancelled) return;
+        loadedDraftRequestId.current = cartDraftRequest.requestId;
         const warnings = result.skippedItems.map(
           (item) => `${item.productName || item.productId} ürünü artık aktif olmadığı için sepete eklenmedi.`
         );
         replaceCart(result.items.map((item) => ({ product: item.product, quantity: item.quantity })));
         setDiscountTotal("0");
         setPaymentMethod("cash");
+        setCustomerId("");
         setSourceDraft(result.draft);
         setDraftLoadWarnings(warnings);
         setLastSale(null);
@@ -235,7 +255,7 @@ export function MarketQuickSaleWorkspace({
           "success",
           warnings.length > 0
             ? warnings.join(" ")
-            : "Telefon sepeti Hızlı Satış'a yüklendi; ödeme tamamlanana kadar taslak açık kalır."
+            : "Telefon sepeti Hızlı Satış'a yüklendi; satış kaydedilene kadar taslak açık kalır."
         );
       })
       .catch((error) => {
@@ -311,6 +331,7 @@ export function MarketQuickSaleWorkspace({
     replaceCart([]);
     setDiscountTotal("0");
     setPaymentMethod("cash");
+    setCustomerId("");
     setSourceDraft(null);
     setDraftLoadWarnings([]);
   }
@@ -321,52 +342,70 @@ export function MarketQuickSaleWorkspace({
   }
 
   async function completeSale() {
+    if (saleInFlight.current || busy) return;
     if (!bridge) {
-      onStateChange("error", "Commerce köprüsü kullanılamıyor.");
+      onStateChange("error", "Satış kaydı kullanılamıyor. Uygulamayı yeniden başlatın.");
       return;
     }
     if (cartLines.length === 0) {
       onStateChange("error", "Satış için sepete en az bir ürün ekleyin.");
       return;
     }
+    if (isCredit && (!customerCreditEnabled || !selectedCustomer)) {
+      onStateChange("error", "Veresiye kaydetmek için kayıtlı müşteri seçin.");
+      return;
+    }
 
     const draftToReview = sourceDraft;
+    saleInFlight.current = true;
     setSubmitting(true);
     let sale: CommerceSale;
     try {
-      sale = await bridge.createPaidSale({
+      const saleInput = {
         items: cartLines.map((line) => ({
           productId: line.product.id,
           quantity: line.quantity
         })),
         discountTotal: discount,
-        paymentMethod,
         source: "desktop-market-quick-sale"
-      });
+      };
+      sale = isCredit
+        ? await bridge.createCustomerCreditSale({ ...saleInput, customerId: selectedCustomer!.id })
+        : await bridge.createPaidSale({ ...saleInput, paymentMethod });
     } catch (error) {
-      onStateChange("error", error instanceof Error ? error.message : "Satış tamamlanamadı.");
+      onStateChange("error", customerCreditError(error, "Satış tamamlanamadı."));
+      saleInFlight.current = false;
       setSubmitting(false);
       return;
     }
 
     setLastSale(sale);
+    setLastCreditCustomerName(sale.status === "credit" ? selectedCustomer?.fullName ?? "" : "");
+    if (sale.status === "credit") notifyCustomerCreditChanged(customerId);
     clearSale();
     try {
       await onSaleCompleted(sale);
     } catch {
-      onStateChange("success", "Satış tamamlandı ancak katalog görünümü yenilenemedi.");
+      onStateChange("success", sale.status === "credit"
+        ? "Veresiye satış kaydedildi ancak katalog görünümü yenilenemedi."
+        : "Satış tamamlandı ancak katalog görünümü yenilenemedi.");
     }
     if (draftToReview) {
       try {
         await bridge.markCartDraftReviewed(draftToReview.id);
         await onCartDraftReviewed?.(draftToReview.id);
         setReviewRecoveryDraft(null);
-        onStateChange("success", "Satış tamamlandı ve telefon sepeti kapatıldı.");
+        onStateChange("success", sale.status === "credit"
+          ? "Veresiye satış kaydedildi ve telefon sepeti kapatıldı."
+          : "Satış tamamlandı ve telefon sepeti kapatıldı.");
       } catch {
         setReviewRecoveryDraft(draftToReview);
-        onStateChange("success", "Satış tamamlandı ancak telefon sepeti kapatılamadı.");
+        onStateChange("success", sale.status === "credit"
+          ? "Veresiye satış kaydedildi ancak telefon sepeti kapatılamadı."
+          : "Satış tamamlandı ancak telefon sepeti kapatılamadı.");
       }
     }
+    saleInFlight.current = false;
     setSubmitting(false);
   }
 
@@ -490,7 +529,7 @@ export function MarketQuickSaleWorkspace({
           <div>
             <span>Sepet</span>
             <h2>Hızlı Satış</h2>
-            <p>{cartLines.length} kalem · fiyat ve stok ödeme sırasında tekrar doğrulanır.</p>
+            <p>{cartLines.length} kalem · fiyat ve stok satış kaydedilirken tekrar doğrulanır.</p>
           </div>
           {cartLines.length > 0 && (
             <button type="button" className="market-secondary-button" onClick={clearSale} disabled={disabled}>
@@ -504,7 +543,7 @@ export function MarketQuickSaleWorkspace({
             <strong>Telefon sepetinden hazırlanıyor</strong>
             <span>{sourceDraft.createdByDevice || sourceDraft.source || "Telefon"} · {new Date(sourceDraft.createdAt).toLocaleString("tr-TR")}</span>
             {sourceDraft.note && <p>{sourceDraft.note}</p>}
-            <small>Sepeti temizlemek veya başka taslağa geçmek bu kaydı kapatmaz. Yalnız başarılı ödeme sonrası reviewed olur.</small>
+            <small>Sepeti temizlemek veya başka taslağa geçmek bu kaydı kapatmaz. Başarılı satıştan sonra kaynak sepet kapanır.</small>
             {draftLoadWarnings.map((warning) => <em key={warning}>{warning}</em>)}
           </aside>
         )}
@@ -539,11 +578,12 @@ export function MarketQuickSaleWorkspace({
         <div className="market-sale-payment">
           <label className="market-field">
             Ödeme yöntemi
-            <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} disabled={disabled}>
+            <select aria-label="Ödeme yöntemi" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} disabled={disabled}>
               <option value="cash">Nakit</option>
               <option value="card">Kart</option>
               <option value="transfer">Havale / EFT</option>
               <option value="other">Diğer</option>
+              {customerCreditEnabled && <option value="credit">Veresiye</option>}
             </select>
           </label>
           <label className="market-field">
@@ -552,21 +592,28 @@ export function MarketQuickSaleWorkspace({
           </label>
         </div>
 
+        {customerCreditEnabled && isCredit && (
+          <CustomerPicker customers={customers} value={customerId} onChange={setCustomerId} disabled={disabled} />
+        )}
+
         <div className="market-sale-totals">
           <span><small>Ara toplam</small><strong>{money(subtotal, currency)}</strong></span>
           <span><small>İndirim</small><strong>-{money(discount, currency)}</strong></span>
-          <span className="market-sale-grand-total"><small>Ödenecek</small><strong>{money(previewTotal, currency)}</strong></span>
+          <span className="market-sale-grand-total"><small>{isCredit ? "Veresiye tutarı" : "Ödenecek"}</small><strong>{money(previewTotal, currency)}</strong></span>
         </div>
 
-        <button type="button" className="market-sale-complete" onClick={() => void completeSale()} disabled={disabled || cartLines.length === 0}>
+        <button type="button" className="market-sale-complete" onClick={() => void completeSale()} disabled={disabled || cartLines.length === 0 || (isCredit && (!customerCreditEnabled || !selectedCustomer || previewTotal <= 0))}>
           <WalletCards size={18} aria-hidden="true" />
-          {submitting ? "Satış işleniyor…" : "Ödemeyi Al ve Satışı Tamamla"}
+          {submitting ? "Satış işleniyor…" : isCredit ? "Satışı Veresiye Kaydet" : "Ödemeyi Al ve Satışı Tamamla"}
         </button>
 
         {lastSale && (
           <div className="market-sale-receipt" role="status">
-            <strong>Satış tamamlandı</strong>
-            <span>{money(lastSale.total, lastSale.currency)} · {paymentMethodLabel(lastSale.paymentMethod)}</span>
+            <strong>{lastSale.status === "credit" ? "Veresiye satış kaydedildi." : "Satış tamamlandı"}</strong>
+            {lastSale.status === "credit" ? <>
+              <span>{lastCreditCustomerName}</span>
+              <span>Müşteri hesabına {money(lastSale.total, lastSale.currency)} borç işlendi.</span>
+            </> : <span>{money(lastSale.total, lastSale.currency)} · {paymentMethodLabel(lastSale.paymentMethod)}</span>}
           </div>
         )}
 
@@ -574,8 +621,8 @@ export function MarketQuickSaleWorkspace({
           <div className="market-sale-review-recovery" role="status">
             <AlertTriangle size={18} aria-hidden="true" />
             <span>
-              <strong>Satış tamamlandı ancak telefon sepeti kapatılamadı.</strong>
-              <small>Satış geri alınmadı. Yalnız kaynak taslağı reviewed yapmak için tekrar deneyebilirsiniz.</small>
+              <strong>{lastSale?.status === "credit" ? "Veresiye satış kaydedildi ancak telefon sepeti kapatılamadı." : "Satış tamamlandı ancak telefon sepeti kapatılamadı."}</strong>
+              <small>Satış kaydı korundu. Kaynak sepeti kapatmak için yeniden deneyebilirsiniz.</small>
             </span>
             <button type="button" className="market-secondary-button" onClick={() => void closeRecoveryDraft()} disabled={disabled}>
               Taslağı Kapat

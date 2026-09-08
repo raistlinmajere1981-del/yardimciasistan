@@ -132,7 +132,7 @@ export function DesktopAppView({
       customerController={customerController}
     >
       {activePage === "market" ? (
-        <MarketPage />
+        <MarketPage customers={desktopSyncController.dashboardData.customers} />
       ) : (
         <DesktopWorkspaceRouter
           activePage={activePage}

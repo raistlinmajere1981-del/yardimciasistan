@@ -247,7 +247,7 @@ try {
   assert.equal(raw.prepare("SELECT status FROM commerce_sales WHERE id = ?").get(creditSale.id).status, "credit");
   const quickSaleSource = readFileSync(join(appPath, "src/components/market/MarketQuickSaleWorkspace.tsx"), "utf8");
   assert.ok(quickSaleSource.includes("bridge.createPaidSale("));
-  assert.doesNotMatch(quickSaleSource, /createCustomerCreditSale/);
+  assert.ok(quickSaleSource.includes("bridge.createCustomerCreditSale("));
 
   assert.equal(database.deleteCustomer(customerId).ok, false);
   assert.match(database.deleteCustomer(customerId).message, /açık veresiye borcu/i);

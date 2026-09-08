@@ -27,7 +27,7 @@ assert.doesNotMatch(
   "Shared catalog capability alone must not expose the Market workspace."
 );
 assert.match(appView, /activePage === "market"/, "DesktopAppView must route the Market page.");
-assert.match(appView, /<MarketPage \/>/, "DesktopAppView must render MarketPage.");
+assert.match(appView, /<MarketPage customers=\{desktopSyncController\.dashboardData\.customers\} \/>/, "DesktopAppView must render MarketPage with the existing customer source.");
 
 for (const section of ["Hızlı Satış", "Ürünler", "Stok", "Tedarikçiler / Alım", "Etiketler"]) {
   assert.ok(marketPage.includes(section), `Market workspace is missing ${section}.`);

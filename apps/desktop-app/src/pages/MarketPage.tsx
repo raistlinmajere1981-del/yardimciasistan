@@ -9,6 +9,7 @@ import {
   type CommerceSale
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../app/capabilities";
+import type { DesktopCustomer } from "../../electron/database";
 import { useBusinessCapabilityRuntime } from "../app/business-capability-context";
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
 import { MarketLabelsWorkspace } from "../components/market/MarketLabelsWorkspace";
@@ -34,13 +35,14 @@ interface MarketTabDefinition {
   enabled: boolean;
 }
 
-export function MarketPage() {
+export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
   const { snapshot } = useBusinessCapabilityRuntime();
   const bridge = window.yardimciDesktop?.commerce;
   const C = BUSINESS_CAPABILITIES;
   const catalogEnabled = runtimeHasCapability(snapshot, C.CATALOG);
   const inventoryEnabled = runtimeHasCapability(snapshot, C.INVENTORY);
   const salesEnabled = runtimeHasCapability(snapshot, C.SALES);
+  const customerCreditEnabled = runtimeHasCapability(snapshot, C.CUSTOMER_CREDIT);
   const barcodeEnabled = runtimeHasCapability(snapshot, C.RETAIL_BARCODE);
   const purchasingEnabled = runtimeHasCapability(snapshot, C.RETAIL_PURCHASING);
   const suppliersEnabled = runtimeHasCapability(snapshot, C.RETAIL_SUPPLIERS);
@@ -67,6 +69,11 @@ export function MarketPage() {
   const handleStateChange = useCallback((state: Exclude<AsyncState, "idle">, nextMessage: string) => {
     setDataState(state);
     setMessage(nextMessage);
+  }, []);
+
+  // Keep the pending cart load alive across status-message renders.
+  const clearCartDraftRequest = useCallback((draftId: string) => {
+    setCartDraftRequest((current) => current?.draftId === draftId ? null : current);
   }, []);
 
   const reloadCatalog = useCallback(async () => {
@@ -106,7 +113,7 @@ export function MarketPage() {
   async function handleSaleCompleted(sale: CommerceSale) {
     await reloadCatalog();
     setDataState("success");
-    setMessage(`Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`);
+    setMessage(sale.status === "credit" ? "Veresiye satış kaydedildi." : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`);
   }
 
   function openProductDraft(draft: CatalogProductDraft) {
@@ -140,6 +147,8 @@ export function MarketPage() {
 
       {activeTab === "quickSale" ? (
         <MarketQuickSaleWorkspace
+          customers={customers}
+          customerCreditEnabled={customerCreditEnabled}
           products={products}
           categories={categories}
           barcodeEnabled={barcodeEnabled}
@@ -147,12 +156,8 @@ export function MarketPage() {
           onSaleCompleted={handleSaleCompleted}
           onStateChange={handleStateChange}
           cartDraftRequest={cartDraftRequest}
-          onCartDraftLoaded={(draftId) => {
-            setCartDraftRequest((current) => current?.draftId === draftId ? null : current);
-          }}
-          onCartDraftReviewed={(draftId) => {
-            setCartDraftRequest((current) => current?.draftId === draftId ? null : current);
-          }}
+          onCartDraftLoaded={clearCartDraftRequest}
+          onCartDraftReviewed={clearCartDraftRequest}
         />
       ) : activeTab === "products" ? (
         <MarketProductsWorkspace
