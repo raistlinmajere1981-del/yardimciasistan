@@ -7,9 +7,8 @@ import type { BusinessCapabilitySnapshot } from "../../electron/business-capabil
 /**
  * Renderer-facing capability seam.
  *
- * v2 no longer reconstructs runtime capabilities from business_type or the
- * historical rooms/tables/QR boolean projection. The persisted capability
- * snapshot received from Electron is authoritative.
+ * Runtime capabilities come from the persisted capability snapshot received
+ * from Electron. Profile selection is only the initial preset for that state.
  */
 function getEnabledBusinessCapabilities(
   snapshot: BusinessCapabilitySnapshot | null | undefined

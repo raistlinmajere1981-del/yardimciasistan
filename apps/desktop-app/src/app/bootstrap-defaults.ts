@@ -339,7 +339,7 @@ export const defaultSetupData: DesktopSetupData = {
   setupRequired: false,
   appPasswordConfigured: false,
   businessName: "Deniz Çiçeği Pansiyon & Kafe",
-  businessType: "pension_restaurant",
+  profileId: "pension_restaurant",
   phone: "+905321234567",
   whatsapp: "+905321234567",
   email: "merhaba@denizcicegi.example",
@@ -357,10 +357,7 @@ export const defaultSetupData: DesktopSetupData = {
   aiApiKeyConfigured: false,
   aiLastPublishedAt: "",
   aiProfiles: [],
-  modules: {
-    rooms: false,
-    tables: false,
-    qrMenu: false,
+  servicePreferences: {
     whatsapp: false,
     android: false
   },

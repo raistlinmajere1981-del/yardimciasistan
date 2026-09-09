@@ -4,7 +4,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { DesktopDatabase } from "./database";
-import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers } from "./data-maintenance";
+import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
 import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
@@ -64,11 +64,12 @@ function prepareRestoredStateForFullRepublish() {
   const restoredDatabasePath = path.join(restoredUserDataPath, "yardimci-asistan.sqlite");
   if (!fs.existsSync(restoredDatabasePath)) return;
 
-  // First migrate the restored backup to the current schema. This is important
-  // for old backups that predate automatic sync tables/columns.
+  // The restore boundary already validated the current baseline schema. Open
+  // it once so the normal startup path can rebuild any durable runtime state.
   const migrated = new DesktopDatabase({
     appPath: app.getAppPath(),
-    userDataPath: restoredUserDataPath
+    userDataPath: restoredUserDataPath,
+    backupPath: resolveProjectBackupPath()
   });
   try {
     migrated.initialize();
@@ -96,12 +97,13 @@ function prepareRestoredStateForFullRepublish() {
   }
 
   // Re-open once so DesktopDatabase generates the new client id, then queue
-  // durable publications according to the persisted capability set rather than
-  // legacy module booleans. The normal SyncCoordinator will push these on
-  // startup, making Web and Android converge to the restored SQLite state.
+  // durable publications according to the persisted capability set. The normal
+  // SyncCoordinator will push these on startup, making Web and Android converge
+  // to the restored SQLite state.
   const database = new DesktopDatabase({
     appPath: app.getAppPath(),
-    userDataPath: restoredUserDataPath
+    userDataPath: restoredUserDataPath,
+    backupPath: resolveProjectBackupPath()
   });
   try {
     database.initialize();
@@ -148,7 +150,8 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked }) => {
       // queue the tombstone that clears stale hosted data when it is disabled.
       const database = new DesktopDatabase({
         appPath: app.getAppPath(),
-        userDataPath: userDataPath()
+        userDataPath: userDataPath(),
+        backupPath: resolveProjectBackupPath()
       });
       try {
         database.initialize();

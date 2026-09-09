@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
-import type { CapabilitySetupData } from "../../app/setup-runtime";
+import type { DesktopSetupData } from "../../../electron/database";
 import {
   compareMenuRecords,
   formatCurrency,
@@ -13,7 +13,7 @@ import {
 
 interface LocalMenuPreviewProps {
   menu: DesktopDashboardData["menu"];
-  setupData: CapabilitySetupData;
+  setupData: DesktopSetupData;
   webModuleUrl: string;
   whatsappEnabled: boolean;
   qrMenuEnabled: boolean;
@@ -95,7 +95,7 @@ export function LocalMenuPreview({ menu, setupData, webModuleUrl, whatsappEnable
 
 interface MenuPreviewCanvasProps {
   menu: DesktopDashboardData["menu"];
-  setupData: CapabilitySetupData;
+  setupData: DesktopSetupData;
   webModuleUrl: string;
   whatsappEnabled: boolean;
   qrMenuEnabled: boolean;

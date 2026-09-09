@@ -43,22 +43,27 @@ try {
   assert.equal(qrOverride?.enabled, false);
   assert.equal(qrOverride?.source, "user");
 
-  // v2 no longer mirrors legacy settings booleans into capabilities. A stale
-  // compatibility write therefore cannot overwrite an explicit decision.
+  // The baseline has one capability store; the removed boolean/projection
+  // columns must not exist in a fresh database.
   const raw = new DatabaseSync(databasePath);
   try {
-    const now = new Date().toISOString();
-    raw.prepare("UPDATE settings SET qr_menu_enabled = 0, updated_at = ? WHERE deleted_at = ''").run(now);
-    raw.prepare("UPDATE settings SET qr_menu_enabled = 1, updated_at = ? WHERE deleted_at = ''").run(now);
+    const businessColumns = new Set(raw.prepare("PRAGMA table_info('business')").all().map((row) => row.name));
+    const settingsColumns = new Set(raw.prepare("PRAGMA table_info('settings')").all().map((row) => row.name));
+    assert.equal(businessColumns.has("profile_id"), true);
+    assert.equal(businessColumns.has("business_type"), false);
+    assert.equal(businessColumns.has("modules_json"), false);
+    for (const column of ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]) {
+      assert.equal(settingsColumns.has(column), false, `${column} must not be part of the current baseline`);
+    }
   } finally {
     raw.close();
   }
 
-  const afterLegacyWrite = readBusinessCapabilitySnapshot(databasePath);
-  const protectedQrOverride = afterLegacyWrite.capabilities.find((entry) => entry.capability === C.QR_MENU);
+  const afterSchemaAudit = readBusinessCapabilitySnapshot(databasePath);
+  const protectedQrOverride = afterSchemaAudit.capabilities.find((entry) => entry.capability === C.QR_MENU);
   assert.equal(protectedQrOverride?.enabled, false);
   assert.equal(protectedQrOverride?.source, "user");
-  assert.equal(afterLegacyWrite.enabledCapabilities.includes(C.FOOD_MENU), true);
+  assert.equal(afterSchemaAudit.enabledCapabilities.includes(C.FOOD_MENU), true);
 
   // Catalog is a prerequisite of inventory/sales. Disabling it while those
   // capabilities are still enabled must be rejected rather than creating an

@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ExternalLink, Plus, RefreshCw, Save, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
 import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
-import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
+import {
+  BUSINESS_CAPABILITIES,
+  getBusinessProfiles,
+  hasBusinessCapability,
+  type BusinessCapability
+} from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
 import { formatDateTime } from "../../app/record-formatters";
 import {
@@ -39,7 +44,7 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   }
 ];
 
-interface SetupWizardProps {
+interface SetupFormProps {
   form: SetupFormState;
   enabledCapabilities: BusinessCapability[];
   setupData: DesktopSetupData;
@@ -71,7 +76,7 @@ interface SetupWizardProps {
   onUiPreferencesChange: (preferences: UiPreferences) => void;
 }
 
-export function SetupWizard({
+export function SetupForm({
   form,
   enabledCapabilities,
   setupData,
@@ -101,7 +106,7 @@ export function SetupWizard({
   onSkip,
   uiPreferences,
   onUiPreferencesChange
-}: SetupWizardProps) {
+}: SetupFormProps) {
   const [showAiApiKey, setShowAiApiKey] = useState(false);
   const [showGoogleCurl, setShowGoogleCurl] = useState(false);
   const [revealedAiApiKey, setRevealedAiApiKey] = useState("");
@@ -179,6 +184,14 @@ export function SetupWizard({
     const count = Number(category.tableCount);
     return total + (Number.isFinite(count) && count > 0 ? count : 0);
   }, 0);
+  const accommodationEnabled = hasBusinessCapability(
+    enabledCapabilities,
+    BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS
+  );
+  const foodServiceEnabled = hasBusinessCapability(
+    enabledCapabilities,
+    BUSINESS_CAPABILITIES.FOOD_TABLES
+  );
 
   const googleUsesStoredApiKey = form.aiStoredApiKeyConfigured && !form.clearAiApiKey && !form.aiGoogleCurl && !form.aiApiKey;
   const genericUsesStoredApiKey = form.aiStoredApiKeyConfigured && !form.clearAiApiKey && !form.aiApiKey;
@@ -340,7 +353,7 @@ export function SetupWizard({
         <div>
           <p className="setup-eyebrow">Kurulum Sihirbazı</p>
           <h1>İşletme panelini kullanıma hazırlayın.</h1>
-          <p>Firma bilgileri, aktif modüller, WhatsApp ve web modül bağlantısı bu ekrandan ayarlanır. AI ayarı isteğe bağlıdır.</p>
+          <p>Firma profili, bağlı servisler, WhatsApp ve web modül bağlantısı bu ekrandan ayarlanır. AI ayarı isteğe bağlıdır.</p>
         </div>
         <dl className="setup-paths">
           <div>
@@ -436,12 +449,10 @@ export function SetupWizard({
             </label>
             <label>
               Sektör tipi
-              <select value={form.businessType} onChange={(event) => update("businessType", event.target.value)}>
-                <option value="pension_restaurant">Pansiyon + Restoran/Kafe</option>
-                <option value="pension">Pansiyon</option>
-                <option value="restaurant">Restoran</option>
-                <option value="cafe">Kafe</option>
-                <option value="other">Diğer</option>
+              <select value={form.profileId} onChange={(event) => update("profileId", event.target.value)}>
+                {getBusinessProfiles().map((profile) => (
+                  <option value={profile.id} key={profile.id}>{profile.label}</option>
+                ))}
               </select>
             </label>
             <label>
@@ -463,24 +474,12 @@ export function SetupWizard({
           </div>
         </div>
 
-        <div className="setup-section settings-modules-section">
+        <div className="setup-section settings-services-section">
           <div className="setup-section-title">
-            {!embedded && <p>Modüller</p>}
-            <h2>Kullanılacak Alanlar</h2>
+            {!embedded && <p>Servisler</p>}
+            <h2>Bağlı Servisler</h2>
           </div>
           <div className="setup-toggle-grid">
-            <label>
-              <input checked={form.roomsEnabled} onChange={(event) => update("roomsEnabled", event.target.checked)} type="checkbox" />
-              Odalar
-            </label>
-            <label>
-              <input checked={form.tablesEnabled} onChange={(event) => update("tablesEnabled", event.target.checked)} type="checkbox" />
-              Masalar
-            </label>
-            <label>
-              <input checked={form.qrMenuEnabled} onChange={(event) => update("qrMenuEnabled", event.target.checked)} type="checkbox" />
-              QR Menü
-            </label>
             <label>
               <input checked={form.whatsappEnabled} onChange={(event) => update("whatsappEnabled", event.target.checked)} type="checkbox" />
               WhatsApp
@@ -497,13 +496,13 @@ export function SetupWizard({
             {!embedded && <p>Kapasite ve Yardımcı</p>}
             <h2>Günlük Kullanım</h2>
           </div>
-          <div className="setup-count-row settings-room-count">
+          {accommodationEnabled && <div className="setup-count-row settings-room-count">
             <label>
               Oda sayısı
               <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" min="0" step="1" type="number" />
             </label>
-          </div>
-          <div className="table-category-editor">
+          </div>}
+          {foodServiceEnabled && <div className="table-category-editor">
             <div className="table-category-heading">
               <div>
                 <strong>Masa kategorileri</strong>
@@ -561,7 +560,7 @@ export function SetupWizard({
             <small className="table-category-note">
               Adedi azalttığınızda kullanılmayan masalar arşivlenir; aktif adisyon veya rezervasyona bağlı masalar korunur.
             </small>
-          </div>
+          </div>}
           <label className="setup-checkline settings-ai-toggle">
             <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
             AI cevap önerileri açık

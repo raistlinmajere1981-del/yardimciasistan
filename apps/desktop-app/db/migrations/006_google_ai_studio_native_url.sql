@@ -1,4 +1,0 @@
-UPDATE settings
-SET ai_base_url = 'https://generativelanguage.googleapis.com/v1beta'
-WHERE ai_service = 'gemini'
-  AND ai_base_url = 'https://generativelanguage.googleapis.com/v1beta/openai';

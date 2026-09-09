@@ -39,32 +39,12 @@ export const BUSINESS_CAPABILITIES = {
 } as const;
 
 export type BusinessCapability = typeof BUSINESS_CAPABILITIES[keyof typeof BUSINESS_CAPABILITIES];
-export type BusinessProfileAvailability = "available" | "planned";
 
 export interface BusinessProfileDefinition {
   id: BusinessType;
   label: string;
   description: string;
-  availability: BusinessProfileAvailability;
   defaultCapabilities: BusinessCapability[];
-}
-
-export interface LegacyBusinessModuleFlags {
-  rooms?: boolean;
-  tables?: boolean;
-  qrMenu?: boolean;
-  qr_menu?: boolean;
-  whatsapp?: boolean;
-  android?: boolean;
-  stock?: boolean;
-}
-
-export interface LegacyBusinessModuleDefaults {
-  roomsEnabled: boolean;
-  tablesEnabled: boolean;
-  qrMenuEnabled: boolean;
-  whatsappEnabled: boolean;
-  androidEnabled: boolean;
 }
 
 export interface BusinessCapabilityDependencyViolation {
@@ -203,7 +183,6 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
     id: "pension_restaurant",
     label: "Pansiyon + Restoran/Kafe",
     description: "Konaklama ve yiyecek-içecek operasyonları aynı işletme omurgasında çalışır.",
-    availability: "available",
     defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
@@ -215,7 +194,6 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
     id: "pension",
     label: "Pansiyon",
     description: "Konaklama, müşteri, finans, web ve saha operasyonları için hazır profil.",
-    availability: "available",
     defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
@@ -226,7 +204,6 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
     id: "restaurant",
     label: "Restoran",
     description: "Masa, sipariş, menü, stok, satış ve saha operasyonları için hazır profil.",
-    availability: "available",
     defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
@@ -237,7 +214,6 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
     id: "cafe",
     label: "Kafe",
     description: "Restoran profilinin daha hafif kullanım biçimi; aynı yiyecek-içecek yeteneklerini kullanır.",
-    availability: "available",
     defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
@@ -248,34 +224,26 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
     id: "market",
     label: "Market / Perakende",
     description: "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için hazır profil.",
-    availability: "available",
     defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
       CORE_BUSINESS_CAPABILITIES,
       STANDARD_CONNECTED_CAPABILITIES,
       RETAIL_CAPABILITIES
     ))
-  },
-  other: {
-    id: "other",
-    label: "Genel İşletme",
-    description: "Yalnız ortak işletme çekirdeğiyle başlayan, yeteneklerin sonradan eklendiği profil.",
-    availability: "planned",
-    defaultCapabilities: [...CORE_BUSINESS_CAPABILITIES]
   }
 };
 
 export function normalizeBusinessType(value: string): BusinessType {
   return Object.prototype.hasOwnProperty.call(BUSINESS_PROFILES, value)
     ? value as BusinessType
-    : "other";
+    : "pension_restaurant";
 }
 
 export function getBusinessProfile(value: string): BusinessProfileDefinition {
   return BUSINESS_PROFILES[normalizeBusinessType(value)];
 }
 
-export function getAvailableBusinessProfiles(): BusinessProfileDefinition[] {
-  return Object.values(BUSINESS_PROFILES).filter((profile) => profile.availability === "available");
+export function getBusinessProfiles(): BusinessProfileDefinition[] {
+  return Object.values(BUSINESS_PROFILES);
 }
 
 export function hasBusinessCapability(
@@ -287,51 +255,4 @@ export function hasBusinessCapability(
     if (current === capability) return true;
   }
   return false;
-}
-
-export function legacyModuleDefaultsForProfile(businessType: string): LegacyBusinessModuleDefaults {
-  const capabilities = getBusinessProfile(businessType).defaultCapabilities;
-  return {
-    roomsEnabled: hasBusinessCapability(capabilities, C.ACCOMMODATION_ROOMS),
-    tablesEnabled: hasBusinessCapability(capabilities, C.FOOD_TABLES),
-    qrMenuEnabled: hasBusinessCapability(capabilities, C.QR_MENU),
-    whatsappEnabled: hasBusinessCapability(capabilities, C.WHATSAPP),
-    androidEnabled: hasBusinessCapability(capabilities, C.ANDROID)
-  };
-}
-
-/**
- * Transitional adapter for installations that still persist rooms/tables/etc.
- * New runtime code should read business_capabilities directly. Keep this only
- * until the legacy setup/storage projection is physically removed.
- */
-export function resolveBusinessCapabilities(input: {
-  businessType: string;
-  modules?: LegacyBusinessModuleFlags;
-  aiEnabled?: boolean;
-}): BusinessCapability[] {
-  const modules = input.modules ?? {};
-  const resolved = new Set<BusinessCapability>(CORE_BUSINESS_CAPABILITIES);
-
-  if (modules.rooms) {
-    ACCOMMODATION_CAPABILITIES.forEach((capability) => resolved.add(capability));
-  }
-  if (modules.tables) {
-    [C.FOOD_TABLES, C.FOOD_RESERVATIONS, C.FOOD_ORDERS, C.SALES].forEach((capability) => resolved.add(capability));
-  }
-  if (modules.qrMenu || modules.qr_menu) {
-    [C.FOOD_MENU, C.QR_MENU, C.CATALOG, C.INVENTORY].forEach((capability) => resolved.add(capability));
-  }
-  if (modules.stock) {
-    [C.CATALOG, C.INVENTORY].forEach((capability) => resolved.add(capability));
-  }
-  if (modules.whatsapp) resolved.add(C.WHATSAPP);
-  if (modules.android) resolved.add(C.ANDROID);
-  if (input.aiEnabled) resolved.add(C.AI);
-
-  if (normalizeBusinessType(input.businessType) === "market") {
-    RETAIL_CAPABILITIES.forEach((capability) => resolved.add(capability));
-  }
-
-  return expandBusinessCapabilities(resolved);
 }

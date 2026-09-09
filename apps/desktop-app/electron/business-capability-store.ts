@@ -9,7 +9,7 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 
-export type BusinessCapabilitySource = "system" | "profile" | "legacy" | "user";
+export type BusinessCapabilitySource = "system" | "profile" | "user";
 
 export interface PersistedBusinessCapability {
   capability: BusinessCapability;
@@ -20,8 +20,6 @@ export interface PersistedBusinessCapability {
 
 export interface BusinessCapabilitySnapshot {
   businessId: string;
-  /** Transitional compatibility alias. Prefer profileId. */
-  businessType: string;
   profileId: string;
   capabilities: PersistedBusinessCapability[];
   enabledCapabilities: BusinessCapability[];
@@ -48,17 +46,16 @@ function openDatabase(databasePath: string) {
 
 function readActiveBusiness(database: DatabaseSync) {
   return database.prepare(`
-    SELECT id, business_type, profile_id
+    SELECT id, profile_id
     FROM business
     WHERE deleted_at = ''
     ORDER BY created_at ASC
     LIMIT 1
-  `).get() as { id?: unknown; business_type?: unknown; profile_id?: unknown } | undefined;
+  `).get() as { id?: unknown; profile_id?: unknown } | undefined;
 }
 
-function resolveProfileId(business: { business_type?: unknown; profile_id?: unknown } | undefined) {
-  const storedProfileId = String(business?.profile_id ?? "").trim();
-  return normalizeBusinessType(storedProfileId || String(business?.business_type ?? ""));
+function resolveProfileId(business: { profile_id?: unknown } | undefined) {
+  return normalizeBusinessType(String(business?.profile_id ?? "").trim());
 }
 
 function readEnabledCapabilities(database: DatabaseSync, businessId: string) {
@@ -88,63 +85,14 @@ function assertValidCapabilityState(database: DatabaseSync, businessId: string) 
   );
 }
 
-/**
- * Compatibility projection only.
- *
- * v2 persistence treats business_capabilities as authoritative. The historical
- * settings/module fields are still read by parts of the renderer and sync code,
- * so keep them as a materialized projection until those call sites move to the
- * capability IPC surface. No domain decision should be derived from these
- * columns in new code.
- */
-function syncLegacyProjection(database: DatabaseSync, businessId: string, now = new Date().toISOString()) {
-  const enabled = readEnabledCapabilities(database, businessId);
-  const modules = {
-    rooms: enabled.has(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS),
-    tables: enabled.has(BUSINESS_CAPABILITIES.FOOD_TABLES),
-    qr_menu: enabled.has(BUSINESS_CAPABILITIES.QR_MENU),
-    ai: enabled.has(BUSINESS_CAPABILITIES.AI),
-    whatsapp: enabled.has(BUSINESS_CAPABILITIES.WHATSAPP),
-    android: enabled.has(BUSINESS_CAPABILITIES.ANDROID)
-  };
-
-  database.prepare(`
-    UPDATE business
-    SET modules_json = ?, updated_at = ?
-    WHERE id = ? AND deleted_at = ''
-  `).run(JSON.stringify(modules), now, businessId);
-
-  database.prepare(`
-    UPDATE settings
-    SET ai_enabled = ?,
-        whatsapp_enabled = ?,
-        android_enabled = ?,
-        rooms_enabled = ?,
-        tables_enabled = ?,
-        qr_menu_enabled = ?,
-        updated_at = ?
-    WHERE business_id = ? AND deleted_at = ''
-  `).run(
-    modules.ai ? 1 : 0,
-    modules.whatsapp ? 1 : 0,
-    modules.android ? 1 : 0,
-    modules.rooms ? 1 : 0,
-    modules.tables ? 1 : 0,
-    modules.qr_menu ? 1 : 0,
-    now,
-    businessId
-  );
-}
-
 export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCapabilitySnapshot {
   const database = openDatabase(databasePath);
   try {
     const business = readActiveBusiness(database);
     const businessId = String(business?.id ?? "");
     const profileId = resolveProfileId(business);
-    const businessType = String(business?.business_type ?? profileId);
     if (!businessId) {
-      return { businessId: "", businessType, profileId, capabilities: [], enabledCapabilities: [] };
+      return { businessId: "", profileId, capabilities: [], enabledCapabilities: [] };
     }
 
     const rows = database.prepare(`
@@ -158,11 +106,8 @@ export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCa
       const capability = String(row.capability_id ?? "") as BusinessCapability;
       if (!KNOWN_CAPABILITIES.has(capability)) return [];
       const rawSource = String(row.source ?? "profile");
-      const source: BusinessCapabilitySource = rawSource === "system"
-        || rawSource === "profile"
-        || rawSource === "user"
-        ? rawSource
-        : "legacy";
+      if (rawSource !== "system" && rawSource !== "profile" && rawSource !== "user") return [];
+      const source: BusinessCapabilitySource = rawSource;
       return [{
         capability,
         enabled: Number(row.is_enabled ?? 0) === 1,
@@ -173,7 +118,6 @@ export function readBusinessCapabilitySnapshot(databasePath: string): BusinessCa
 
     return {
       businessId,
-      businessType,
       profileId,
       capabilities,
       enabledCapabilities: capabilities.filter((entry) => entry.enabled).map((entry) => entry.capability)
@@ -210,9 +154,9 @@ export function applyBusinessProfileCapabilities(
     try {
       database.prepare(`
         UPDATE business
-        SET profile_id = ?, business_type = ?, updated_at = ?
+        SET profile_id = ?, updated_at = ?
         WHERE id = ? AND deleted_at = ''
-      `).run(profileId, profileId, now, businessId);
+      `).run(profileId, now, businessId);
 
       const existingRows = database.prepare(`
         SELECT capability_id, source
@@ -248,7 +192,6 @@ export function applyBusinessProfileCapabilities(
       }
 
       assertValidCapabilityState(database, businessId);
-      syncLegacyProjection(database, businessId, now);
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");
@@ -307,7 +250,6 @@ export function setBusinessCapability(
       `).run(businessId, input.capability, input.enabled ? 1 : 0, now, now);
 
       assertValidCapabilityState(database, businessId);
-      syncLegacyProjection(database, businessId, now);
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");
@@ -353,7 +295,6 @@ export function clearBusinessCapabilityOverride(
       `).run(businessId, capability, profileDefaults.has(capability) ? 1 : 0, now, now);
 
       assertValidCapabilityState(database, businessId);
-      syncLegacyProjection(database, businessId, now);
       database.exec("COMMIT");
     } catch (error) {
       database.exec("ROLLBACK");

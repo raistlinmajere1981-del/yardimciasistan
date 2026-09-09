@@ -7,10 +7,6 @@ import {
   setBusinessCapability,
   type BusinessCapabilitySnapshot
 } from "./business-capability-store";
-import {
-  toLegacySetupSaveInput,
-  type SaveCapabilitySetupInput
-} from "./setup-contract";
 
 export function registerBusinessCapabilityIpcHandlers(options: {
   databasePath: () => string;
@@ -21,20 +17,6 @@ export function registerBusinessCapabilityIpcHandlers(options: {
     options.assertUnlocked();
     return readBusinessCapabilitySnapshot(options.databasePath());
   });
-
-  // Sandboxed preload scripts must stay dependency-light. Keep the temporary
-  // capability -> legacy setup projection in the Electron main process instead
-  // of importing application modules at runtime from preload.ts.
-  ipcMain.handle(
-    "capability:adaptSetupSave",
-    (_event, input: SaveCapabilitySetupInput) => {
-      options.assertUnlocked();
-      return toLegacySetupSaveInput(
-        input,
-        readBusinessCapabilitySnapshot(options.databasePath())
-      );
-    }
-  );
 
   ipcMain.handle(
     "capability:set",

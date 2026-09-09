@@ -11,7 +11,7 @@ import {
   Sparkles,
   UtensilsCrossed
 } from "lucide-react";
-import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
+import type { DesktopDashboardData } from "../../electron/database";
 import {
   buildDashboardView,
   formatDashboardDate,
@@ -28,7 +28,12 @@ type DashboardRequest = DesktopDashboardData["requests"][number];
 
 interface DashboardPageProps {
   data: DesktopDashboardData;
-  modules: DesktopSetupData["modules"];
+  features: {
+    rooms: boolean;
+    tables: boolean;
+    whatsapp: boolean;
+    android: boolean;
+  };
   aiEnabled: boolean;
   customersEnabled: boolean;
   tasksEnabled: boolean;
@@ -50,7 +55,7 @@ interface DashboardPageProps {
 
 export function DashboardPage({
   data,
-  modules,
+  features,
   aiEnabled,
   customersEnabled,
   tasksEnabled,
@@ -77,7 +82,7 @@ export function DashboardPage({
   const visiblePriorityItems = dashboard.priorityItems.slice(0, 6);
   const hiddenPriorityCount = Math.max(0, attentionCount - visiblePriorityItems.length);
   const visibleScheduleItems = dashboard.scheduleItems.slice(0, 4);
-  const hasCapacityMetrics = modules.rooms || modules.tables || (modules.whatsapp && customersEnabled);
+  const hasCapacityMetrics = features.rooms || features.tables || (features.whatsapp && customersEnabled);
   const capacityVisible = hasCapacityMetrics || aiEnabled;
 
   const renderPriorityItem = (item: DashboardPriorityItem, index: number) => (
@@ -107,10 +112,10 @@ export function DashboardPage({
         {item.kind === "request" ? (
           <ActionButton
             variant="secondary"
-            onClick={() => (modules.whatsapp || aiEnabled) ? onReplyRequest(item.request) : onOpenCustomerWork(item.request)}
-            aria-label={`${item.request.customer_name} talebini ${(modules.whatsapp || aiEnabled) ? "yanıtla" : "incele"}`}
+            onClick={() => (features.whatsapp || aiEnabled) ? onReplyRequest(item.request) : onOpenCustomerWork(item.request)}
+            aria-label={`${item.request.customer_name} talebini ${(features.whatsapp || aiEnabled) ? "yanıtla" : "incele"}`}
           >
-            {(modules.whatsapp || aiEnabled) ? "Yanıtla" : "İncele"}
+            {(features.whatsapp || aiEnabled) ? "Yanıtla" : "İncele"}
             <ChevronRight size={15} aria-hidden="true" />
           </ActionButton>
         ) : item.kind === "task" ? (
@@ -154,7 +159,7 @@ export function DashboardPage({
         </div>
       </section>
 
-      <SystemHealthPanel data={data} modules={modules} aiEnabled={aiEnabled} />
+      <SystemHealthPanel data={data} features={features} aiEnabled={aiEnabled} />
 
       <section className="dashboard-workspace">
         <Panel className="dashboard-priority-panel" aria-labelledby="dashboard-priority-title">
@@ -232,13 +237,13 @@ export function DashboardPage({
             </div>
             {hasCapacityMetrics && (
               <div className="dashboard-capacity-list">
-                {modules.rooms && (
+                {features.rooms && (
                   <div><BedDouble size={17} aria-hidden="true" /><span><strong>{availableRoomCount}/{data.summary.totalRooms}</strong> oda uygun</span></div>
                 )}
-                {modules.tables && (
+                {features.tables && (
                   <div><UtensilsCrossed size={17} aria-hidden="true" /><span><strong>{data.summary.availableTables}</strong> masa uygun</span></div>
                 )}
-                {modules.whatsapp && customersEnabled && (
+                {features.whatsapp && customersEnabled && (
                   <div><MessageSquareText size={17} aria-hidden="true" /><span><strong>{data.summary.preparedWhatsAppMessages}</strong> hazır cevap</span></div>
                 )}
               </div>

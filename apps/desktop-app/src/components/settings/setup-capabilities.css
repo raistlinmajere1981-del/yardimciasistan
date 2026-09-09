@@ -1,0 +1,8 @@
+/* Embedded Settings already exposes the full backup/restore manager. */
+.setup-capabilities .setup-shell.is-embedded .settings-storage-section {
+  display: none;
+}
+
+.setup-capability-editor-shell {
+  margin-top: var(--space-4);
+}

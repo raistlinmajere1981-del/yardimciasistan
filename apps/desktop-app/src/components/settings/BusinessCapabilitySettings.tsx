@@ -87,17 +87,17 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
 ];
 
 export function getEffectiveSetupCapabilities(
-  businessType: string,
+  profileId: string,
   snapshot: BusinessCapabilitySnapshot | null | undefined
 ): BusinessCapability[] {
-  if (snapshot?.businessId && snapshot.profileId === businessType) {
+  if (snapshot?.businessId && snapshot.profileId === profileId) {
     return snapshot.enabledCapabilities;
   }
-  return getBusinessProfile(businessType).defaultCapabilities;
+  return getBusinessProfile(profileId).defaultCapabilities;
 }
 
 interface BusinessCapabilityEditorProps {
-  businessType: string;
+  profileId: string;
   snapshot?: BusinessCapabilitySnapshot | null;
   state?: SyncState;
   message?: string;
@@ -106,7 +106,7 @@ interface BusinessCapabilityEditorProps {
 }
 
 export function BusinessCapabilityEditor({
-  businessType,
+  profileId,
   snapshot,
   state = "idle",
   message = "İşletme yetenekleri profil varsayımlarını kullanıyor.",
@@ -117,7 +117,7 @@ export function BusinessCapabilityEditor({
     return null;
   }
 
-  const profilePendingSave = snapshot.profileId !== businessType;
+  const profilePendingSave = snapshot.profileId !== profileId;
   const enabled = new Set(snapshot.enabledCapabilities);
   const entries = new Map(snapshot.capabilities.map((entry) => [entry.capability, entry]));
   const busy = state === "loading";

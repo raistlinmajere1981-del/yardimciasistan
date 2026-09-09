@@ -229,7 +229,7 @@ export function DesktopWorkspaceRouter({
   const surfaceSelectedWhatsAppRequest = surfaceData.requests.find(
     (request) => request.id === selectedWhatsAppRequest?.id
   );
-  const runtimeModules = {
+  const runtimeFeatures = {
     rooms: roomsEnabled,
     tables: tablesEnabled,
     qrMenu: runtimeHasCapability(businessCapabilities, C.QR_MENU),
@@ -405,7 +405,7 @@ export function DesktopWorkspaceRouter({
       {activePage === "dashboard" ? (
         <DashboardPage
           data={surfaceData}
-          modules={runtimeModules}
+          features={runtimeFeatures}
           aiEnabled={aiEnabled}
           customersEnabled={customersEnabled}
           tasksEnabled={tasksEnabled}
@@ -594,7 +594,7 @@ export function DesktopWorkspaceRouter({
       ) : activePage === "menu" ? (
         <MenuManager
           dashboardData={surfaceData}
-          qrMenuEnabled={runtimeModules.qrMenu}
+          qrMenuEnabled={runtimeFeatures.qrMenu}
           inventoryEnabled={inventoryEnabled}
           stockImageImportEnabled={aiEnabled && inventoryEnabled}
           categoryForm={categoryForm}

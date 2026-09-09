@@ -52,7 +52,7 @@ export interface DesktopRoomFolioPayment {
   paymentMethod: RoomFolioPaymentMethod;
   paidAt: string;
   note: string;
-  source: "direct" | "legacy";
+  origin: "direct" | "reservation";
   createdAt: string;
 }
 
@@ -331,7 +331,7 @@ export class DesktopRoomFolioService {
 
       const nightlyPriceMinor = safeMinor(stay.nightly_price_minor);
       const reservationTotalMinor = safeMinor(stay.reservation_total_minor);
-      const legacy = text(stay.reservation_id)
+      const reservationPayments = text(stay.reservation_id)
         ? db.prepare(`
             SELECT id, amount_minor, currency, payment_method, paid_at, note, created_at, updated_at
             FROM pension_payments
@@ -339,12 +339,12 @@ export class DesktopRoomFolioService {
             ORDER BY paid_at, created_at
           `).all(text(stay.reservation_id)) as Array<Record<string, unknown>>
         : [];
-      const legacyPaidMinor = legacy.reduce((sum, row) => sum + safeMinor(row.amount_minor), 0);
+      const reservationPaidMinor = reservationPayments.reduce((sum, row) => sum + safeMinor(row.amount_minor), 0);
       const automaticLodgingTotal = nightlyPriceMinor * nights;
       const lodgingManualOverride = reservationTotalMinor > 0 ? 1 : 0;
       const lodgingTotalMinor = Math.max(
         lodgingManualOverride ? reservationTotalMinor : automaticLodgingTotal,
-        legacyPaidMinor
+        reservationPaidMinor
       );
       const now = new Date().toISOString();
       folioId = `room_folio_${randomUUID()}`;
@@ -376,14 +376,14 @@ export class DesktopRoomFolioService {
           now
         );
 
-        for (const payment of legacy) {
+        for (const payment of reservationPayments) {
           db.prepare(`
             INSERT OR IGNORE INTO room_folio_payments (
               id, folio_id, amount_minor, currency, payment_method, paid_at, note,
-              source, source_payment_id, created_at, updated_at, deleted_at, sync_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'legacy', ?, ?, ?, '', 'local_only')
+              origin, reference_id, created_at, updated_at, deleted_at, sync_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reservation', ?, ?, ?, '', 'local_only')
           `).run(
-            `room_folio_legacy_${text(payment.id)}`,
+            `room_folio_reservation_${text(payment.id)}`,
             folioId,
             safeMinor(payment.amount_minor),
             normalizeCurrency(payment.currency),
@@ -667,7 +667,7 @@ export class DesktopRoomFolioService {
       db.prepare(`
         INSERT INTO room_folio_payments (
           id, folio_id, amount_minor, currency, payment_method, paid_at, note,
-          source, source_payment_id, created_at, updated_at, deleted_at, sync_status
+          origin, reference_id, created_at, updated_at, deleted_at, sync_status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'direct', '', ?, ?, '', 'local_only')
       `).run(
         `room_folio_payment_${randomUUID()}`,
@@ -695,12 +695,12 @@ export class DesktopRoomFolioService {
     let folioId = "";
     try {
       const payment = db.prepare(`
-        SELECT folio_id, source FROM room_folio_payments WHERE id = ? AND deleted_at = ''
+        SELECT folio_id, origin FROM room_folio_payments WHERE id = ? AND deleted_at = ''
       `).get(paymentId) as Record<string, unknown> | undefined;
       if (!payment) return { ok: false, message: "Ödeme kaydı bulunamadı." };
       folioId = text(payment.folio_id);
       if (!this.requireOpenFolio(db, folioId)) return { ok: false, message: "Çıkış yapılmış oda hesabındaki ödeme değiştirilemez." };
-      if (text(payment.source) !== "direct") return { ok: false, message: "Rezervasyondan taşınan kaporayı kaynak kayıttan düzeltin." };
+      if (text(payment.origin) !== "direct") return { ok: false, message: "Rezervasyondan taşınan kaporayı kaynak kayıttan düzeltin." };
       const now = new Date().toISOString();
       db.prepare(`
         UPDATE room_folio_payments SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?
@@ -957,7 +957,7 @@ function mapFolioPayment(row: Record<string, unknown>): DesktopRoomFolioPayment 
     paymentMethod: normalizePaymentMethod(row.payment_method),
     paidAt: text(row.paid_at),
     note: text(row.note),
-    source: text(row.source) === "legacy" ? "legacy" : "direct",
+    origin: text(row.origin) === "reservation" ? "reservation" : "direct",
     createdAt: text(row.created_at)
   };
 }

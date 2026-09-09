@@ -3,7 +3,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { app, dialog, ipcMain, session, shell } from "electron";
 
-export type DesktopBackupKind = "manual" | "safety" | "legacy";
+export type DesktopBackupKind = "manual" | "safety";
 
 export interface DesktopBackupListItem {
   id: string;
@@ -50,7 +50,6 @@ interface DataMaintenancePaths {
   userDataPath: string;
   databasePath: string;
   projectBackupPath: string;
-  legacyBackupPath: string;
   maintenancePath: string;
   markerPath: string;
   stagedRestorePath: string;
@@ -58,7 +57,8 @@ interface DataMaintenancePaths {
 
 interface BackupManifest {
   format: "yardimci-asistan-backup";
-  version: 2;
+  version: 3;
+  schema: "001_baseline.sql";
   createdAt: string;
   kind: DesktopBackupKind;
   databaseFile: string;
@@ -67,14 +67,13 @@ interface BackupManifest {
     count: number;
     files: Array<{ menuItemId: string; menuItemName: string; fileName: string; mimeType: string }>;
   };
-  migratedFrom?: string;
 }
 
 const BACKUP_DATABASE_FILE = "yardimci-asistan.sqlite";
 const BACKUP_MANIFEST_FILE = "backup.json";
 const QR_IMAGE_DIRECTORY = "qr-menu-images";
 
-function resolveProjectBackupPath() {
+export function resolveProjectBackupPath() {
   const override = process.env.YA_DESKTOP_BACKUP_DIR?.trim();
   if (override) return path.resolve(override);
 
@@ -94,7 +93,6 @@ function resolvePaths(userDataPath: string): DataMaintenancePaths {
     userDataPath,
     databasePath: path.join(userDataPath, "yardimci-asistan.sqlite"),
     projectBackupPath: resolveProjectBackupPath(),
-    legacyBackupPath: path.join(userDataPath, "backups"),
     maintenancePath,
     markerPath: path.join(maintenancePath, "pending-data-maintenance.json"),
     stagedRestorePath: path.join(maintenancePath, "restore.sqlite")
@@ -149,11 +147,36 @@ function validateYardimciDatabase(filePath: string) {
     const requiredRows = database.prepare(`
       SELECT name
       FROM sqlite_master
-      WHERE type = 'table' AND name IN ('business', 'settings', 'menu_items')
+      WHERE type = 'table' AND name IN ('business', 'settings', 'menu_items', 'business_capabilities', 'schema_migrations')
     `).all() as Array<{ name?: unknown }>;
     const requiredTables = new Set(requiredRows.map((row) => String(row.name ?? "")));
-    if (!requiredTables.has("business") || !requiredTables.has("settings") || !requiredTables.has("menu_items")) {
+    if (!["business", "settings", "menu_items", "business_capabilities", "schema_migrations"]
+      .every((table) => requiredTables.has(table))) {
       throw new Error("Seçilen dosya Yardımcı Asistan yedeği olarak doğrulanamadı.");
+    }
+
+    const migrations = database.prepare("SELECT id FROM schema_migrations ORDER BY id").all() as Array<{ id?: unknown }>;
+    if (migrations.length !== 1 || String(migrations[0]?.id ?? "") !== "001_baseline.sql") {
+      throw new Error("Yedek 001_baseline.sql güncel şemasını taşımıyor.");
+    }
+
+    const columns = (table: string) => new Set(
+      (database.prepare(`PRAGMA table_info('${table.replace(/'/g, "''")}')`).all() as Array<{ name?: unknown }>)
+        .map((row) => String(row.name ?? ""))
+    );
+    const businessColumns = columns("business");
+    const settingsColumns = columns("settings");
+    if (!businessColumns.has("profile_id")
+      || businessColumns.has("business_type")
+      || businessColumns.has("modules_json")
+      || ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]
+        .some((column) => settingsColumns.has(column))) {
+      throw new Error("Yedek eski profil veya capability alanlarını içeriyor.");
+    }
+
+    const foreignKeyViolations = database.prepare("PRAGMA foreign_key_check").all();
+    if (foreignKeyViolations.length > 0) {
+      throw new Error("Yedek veritabanında foreign key bütünlüğü bozulmuş.");
     }
   } finally {
     database.close();
@@ -239,7 +262,10 @@ function readBackupManifest(folderPath: string): BackupManifest | null {
   if (!fs.existsSync(manifestPath)) return null;
   try {
     const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as Partial<BackupManifest>;
-    if (parsed.format !== "yardimci-asistan-backup" || parsed.version !== 2) return null;
+    if (parsed.format !== "yardimci-asistan-backup"
+      || parsed.version !== 3
+      || parsed.schema !== "001_baseline.sql"
+      || parsed.databaseFile !== BACKUP_DATABASE_FILE) return null;
     return parsed as BackupManifest;
   } catch {
     return null;
@@ -255,6 +281,7 @@ function readBackupItem(folderPath: string): DesktopBackupListItem | null {
   if (!fs.existsSync(databasePath)) return null;
 
   const manifest = readBackupManifest(folderPath);
+  if (!manifest) return null;
   const databaseStat = fs.statSync(databasePath);
   const imageDirectory = path.join(folderPath, QR_IMAGE_DIRECTORY);
   const fallbackImageCount = fs.existsSync(imageDirectory)
@@ -264,7 +291,7 @@ function readBackupItem(folderPath: string): DesktopBackupListItem | null {
   return {
     id,
     createdAt: manifest?.createdAt || databaseStat.mtime.toISOString(),
-    kind: manifest?.kind || "legacy",
+    kind: manifest.kind,
     folderName: id,
     folderPath,
     databaseFileName: manifest?.databaseFile || BACKUP_DATABASE_FILE,
@@ -288,7 +315,6 @@ function createBackupPackageFromDatabase(options: {
   kind: DesktopBackupKind;
   createdAt?: string;
   folderName?: string;
-  migratedFrom?: string;
   liveDatabase?: boolean;
 }): DesktopBackupListItem {
   const createdAt = options.createdAt ?? new Date().toISOString();
@@ -323,7 +349,8 @@ function createBackupPackageFromDatabase(options: {
     const imageFiles = extractQrMenuImages(outputDatabasePath, path.join(tempFolderPath, QR_IMAGE_DIRECTORY));
     const manifest: BackupManifest = {
       format: "yardimci-asistan-backup",
-      version: 2,
+      version: 3,
+      schema: "001_baseline.sql",
       createdAt,
       kind: options.kind,
       databaseFile: BACKUP_DATABASE_FILE,
@@ -332,7 +359,6 @@ function createBackupPackageFromDatabase(options: {
         count: imageFiles.length,
         files: imageFiles
       },
-      ...(options.migratedFrom ? { migratedFrom: options.migratedFrom } : {})
     };
     fs.writeFileSync(path.join(tempFolderPath, BACKUP_MANIFEST_FILE), JSON.stringify(manifest, null, 2), "utf8");
     fs.renameSync(tempFolderPath, finalFolderPath);
@@ -346,43 +372,9 @@ function createBackupPackageFromDatabase(options: {
   }
 }
 
-function migrateLegacyBackupDirectory(paths: DataMaintenancePaths) {
-  ensureProjectBackupPath(paths);
-  const sourceDirectories = [paths.legacyBackupPath, paths.projectBackupPath];
-
-  for (const sourceDirectory of sourceDirectories) {
-    if (!fs.existsSync(sourceDirectory)) continue;
-    const files = fs.readdirSync(sourceDirectory, { withFileTypes: true })
-      .filter((entry) => entry.isFile() && /\.(?:sqlite|db)$/i.test(entry.name));
-
-    for (const entry of files) {
-      const sourcePath = path.join(sourceDirectory, entry.name);
-      try {
-        validateYardimciDatabase(sourcePath);
-        const stat = fs.statSync(sourcePath);
-        const baseName = sanitizeFileName(entry.name.replace(/\.(?:sqlite|db)$/i, ""));
-        const folderName = safeBackupId(baseName) || `yardimci-asistan-eski-${backupTimestamp(stat.mtime.toISOString())}`;
-        createBackupPackageFromDatabase({
-          paths,
-          sourceDatabasePath: sourcePath,
-          kind: "legacy",
-          createdAt: stat.mtime.toISOString(),
-          folderName,
-          migratedFrom: sourcePath,
-          liveDatabase: false
-        });
-        removeIfExists(sourcePath);
-      } catch (error) {
-        console.warn(`[data-maintenance] Eski yedek taşınamadı: ${sourcePath}`, error);
-      }
-    }
-  }
-}
-
 function createManualBackup(userDataPath: string): DesktopBackupCreateResult {
   const paths = resolvePaths(userDataPath);
   try {
-    migrateLegacyBackupDirectory(paths);
     if (!fs.existsSync(paths.databasePath)) {
       return { ok: false, message: "Yedeklenecek yerel veri bulunamadı." };
     }
@@ -407,7 +399,6 @@ function createManualBackup(userDataPath: string): DesktopBackupCreateResult {
 
 function createSafetyBackup(paths: DataMaintenancePaths): DesktopBackupListItem | undefined {
   if (!fs.existsSync(paths.databasePath)) return undefined;
-  migrateLegacyBackupDirectory(paths);
   return createBackupPackageFromDatabase({
     paths,
     sourceDatabasePath: paths.databasePath,
@@ -419,7 +410,6 @@ function createSafetyBackup(paths: DataMaintenancePaths): DesktopBackupListItem 
 function getBackups(userDataPath: string): DesktopBackupListResult {
   const paths = resolvePaths(userDataPath);
   try {
-    migrateLegacyBackupDirectory(paths);
     return { ok: true, backupDirectory: paths.projectBackupPath, backups: listBackupItems(paths) };
   } catch (error) {
     return {
@@ -434,7 +424,6 @@ function getBackups(userDataPath: string): DesktopBackupListResult {
 async function openBackupDirectory(userDataPath: string): Promise<DesktopBackupActionResult> {
   const paths = resolvePaths(userDataPath);
   try {
-    migrateLegacyBackupDirectory(paths);
     ensureProjectBackupPath(paths);
     const openError = await shell.openPath(paths.projectBackupPath);
     if (openError) return { ok: false, message: `Yedek klasörü açılamadı: ${openError}` };
@@ -449,7 +438,6 @@ async function openBackupItemDirectory(userDataPath: string, backupId: string): 
   const id = safeBackupId(backupId);
   if (!id) return { ok: false, message: "Yedek kaydı geçersiz." };
   try {
-    migrateLegacyBackupDirectory(paths);
     const folderPath = path.join(paths.projectBackupPath, id);
     if (!readBackupItem(folderPath)) return { ok: false, message: "Yedek klasörü bulunamadı." };
     const openError = await shell.openPath(folderPath);
@@ -466,7 +454,6 @@ async function deleteBackup(userDataPath: string, backupId: string): Promise<Des
   if (!id) return { ok: false, message: "Yedek kaydı geçersiz." };
 
   try {
-    migrateLegacyBackupDirectory(paths);
     const folderPath = path.join(paths.projectBackupPath, id);
     const item = readBackupItem(folderPath);
     if (!item) return { ok: false, message: "Silinecek yedek bulunamadı.", backups: listBackupItems(paths) };
@@ -580,7 +567,6 @@ async function prepareRestore(userDataPath: string, backupId: string): Promise<D
   if (!id) return { ok: false, message: "Geri yüklenecek yedek kaydı geçersiz." };
 
   try {
-    migrateLegacyBackupDirectory(paths);
     const backupFolderPath = path.join(paths.projectBackupPath, id);
     const backup = readBackupItem(backupFolderPath);
     if (!backup) return { ok: false, message: "Geri yüklenecek yedek bulunamadı." };

@@ -297,7 +297,6 @@ function formatBackupDate(value: string) {
 
 function backupKindLabel(kind: DesktopBackupListItem["kind"]) {
   if (kind === "safety") return "Güvenlik";
-  if (kind === "legacy") return "Eski yedek";
   return "Manuel";
 }
 

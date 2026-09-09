@@ -5876,7 +5876,7 @@ button {
   grid-row: 1 / span 2;
 }
 
-.setup-shell.is-embedded .settings-modules-section {
+.setup-shell.is-embedded .settings-services-section {
   grid-column: 1;
   grid-row: 2;
 }
@@ -7870,7 +7870,7 @@ button {
 
   .setup-shell.is-embedded .appearance-settings,
   .setup-shell.is-embedded .settings-identity-section,
-  .setup-shell.is-embedded .settings-modules-section,
+  .setup-shell.is-embedded .settings-services-section,
   .setup-shell.is-embedded .settings-daily-section,
   .setup-shell.is-embedded .settings-web-section,
   .setup-shell.is-embedded .setup-ai-section,

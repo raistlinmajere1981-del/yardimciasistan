@@ -1,37 +1,33 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
-import type { DesktopDashboardData } from "../../electron/database";
-import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
+import type {
+  DesktopDashboardData,
+  DesktopSetupData,
+  SaveInitialSetupInput
+} from "../../electron/database";
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import { defaultSetupData } from "./bootstrap-defaults";
 import { type SyncState } from "./runtime-state";
 import {
   createSaveAiServiceProfiles,
   toSetupForm,
-  type CapabilitySetupFormState
+  type SetupFormState
 } from "./setup-model";
-import {
-  toCapabilitySetupData,
-  type CapabilitySetupData
-} from "./setup-runtime";
 
 interface UseSetupControllerOptions {
   onInitialSetupReady?: () => void;
 }
 
-const defaultCapabilitySetupData = toCapabilitySetupData(defaultSetupData, null);
-
 export function useSetupController({ onInitialSetupReady }: UseSetupControllerOptions = {}) {
   const onInitialSetupReadyRef = useRef(onInitialSetupReady);
-  const [setupData, setSetupData] = useState<CapabilitySetupData>(defaultCapabilitySetupData);
-  const [setupForm, setSetupFormState] = useState<CapabilitySetupFormState>(() => toSetupForm(defaultCapabilitySetupData));
+  const [setupData, setSetupData] = useState<DesktopSetupData>(defaultSetupData);
+  const [setupForm, setSetupFormState] = useState<SetupFormState>(() => toSetupForm(defaultSetupData));
   const [setupMode, setSetupMode] = useState(false);
   const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
   const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
 
-  const setSetupForm = useCallback<Dispatch<SetStateAction<CapabilitySetupFormState>>>((nextState) => {
+  const setSetupForm = useCallback<Dispatch<SetStateAction<SetupFormState>>>((nextState) => {
     setSetupFormState(nextState);
   }, []);
 
@@ -47,7 +43,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
   }, [setupForm.aiService, setupForm.aiStoredApiKeyConfigured]);
 
   function applyBootstrapSetup(
-    nextSetupData: CapabilitySetupData,
+    nextSetupData: DesktopSetupData,
     firstApplicationLoad: boolean
   ) {
     setSetupData(nextSetupData);
@@ -136,9 +132,9 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       return;
     }
 
-    const input: SaveCapabilitySetupInput = {
+    const input: SaveInitialSetupInput = {
       businessName: setupForm.businessName,
-      businessType: setupForm.businessType,
+      profileId: setupForm.profileId,
       phone: setupForm.phone,
       whatsapp: setupForm.whatsapp,
       email: setupForm.email,
@@ -186,16 +182,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       return;
     }
 
-    let capabilitySnapshot: BusinessCapabilitySnapshot;
-    try {
-      capabilitySnapshot = await bridge.getBusinessCapabilitySnapshot();
-    } catch {
-      setSetupSaveState("error");
-      setSetupMessage("Ayarlar kaydedildi ancak işletme yetenekleri yeniden okunamadı. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const nextSetupData = toCapabilitySetupData(result.setupData, capabilitySnapshot);
+    const nextSetupData = result.setupData;
     setSetupData(nextSetupData);
     setDashboardData(result.dashboardData);
     setSetupFormState(toSetupForm(nextSetupData));

@@ -1,9 +1,9 @@
 import type {
   DesktopAiModelOption,
-  DesktopAiService
+  DesktopAiService,
+  DesktopSetupData,
+  SaveInitialSetupInput
 } from "../../electron/database";
-import type { SaveCapabilitySetupInput } from "../../electron/setup-contract";
-import type { CapabilitySetupData } from "./setup-runtime";
 
 export interface TableCategoryFormState {
   key: string;
@@ -24,15 +24,9 @@ export interface AiServiceFormDraft {
   timeoutSeconds: string;
 }
 
-/**
- * Historical form shape still consumed by LegacySetupWizard while that large
- * component is being split. Domain booleans in this interface are a renderer
- * compatibility projection only; CapabilitySetupFormState is the actual
- * controller-owned setup state.
- */
 export interface SetupFormState {
   businessName: string;
-  businessType: string;
+  profileId: string;
   phone: string;
   whatsapp: string;
   email: string;
@@ -53,19 +47,11 @@ export interface SetupFormState {
   clearAiApiKey: boolean;
   aiTimeoutSeconds: string;
   aiServiceDrafts: Partial<Record<DesktopAiService, AiServiceFormDraft>>;
-  roomsEnabled: boolean;
-  tablesEnabled: boolean;
-  qrMenuEnabled: boolean;
   whatsappEnabled: boolean;
   androidEnabled: boolean;
   roomCount: string;
   tableCategories: TableCategoryFormState[];
 }
-
-export type CapabilitySetupFormState = Omit<
-  SetupFormState,
-  "roomsEnabled" | "tablesEnabled" | "qrMenuEnabled"
->;
 
 export const aiServicePresets = [
   { id: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1" },
@@ -85,14 +71,14 @@ export function normalizeAiService(service: string): DesktopAiService {
     : "openai";
 }
 
-export function toSetupForm(setupData: CapabilitySetupData): CapabilitySetupFormState {
+export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
   const service = normalizeAiService(setupData.aiService);
   const aiServiceDrafts = createAiServiceFormDrafts(setupData);
   const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
 
   return {
     businessName: setupData.businessName || "Deniz Çiçeği Pansiyon & Kafe",
-    businessType: setupData.businessType || "pension_restaurant",
+    profileId: setupData.profileId || "pension_restaurant",
     phone: setupData.phone || "+905321234567",
     whatsapp: setupData.whatsapp || "+905321234567",
     email: setupData.email || "",
@@ -127,7 +113,7 @@ export function nextTableCategoryFormKey() {
   return `table-category-${tableCategoryFormSequence}`;
 }
 
-function toTableCategoryForm(setupData: CapabilitySetupData): TableCategoryFormState[] {
+function toTableCategoryForm(setupData: DesktopSetupData): TableCategoryFormState[] {
   const savedCategories = Array.isArray(setupData.tableCategories) ? setupData.tableCategories : [];
   if (savedCategories.length > 0) {
     return savedCategories.map((category) => ({
@@ -138,35 +124,35 @@ function toTableCategoryForm(setupData: CapabilitySetupData): TableCategoryFormS
     }));
   }
 
-  const legacyTableCount = Math.max(0, Number(setupData.initialCounts?.tables ?? 0));
-  return legacyTableCount > 0
+  const tableCount = Math.max(0, Number(setupData.initialCounts?.tables ?? 0));
+  return tableCount > 0
     ? [{
         key: nextTableCategoryFormKey(),
         sourceName: "Genel",
         name: "Genel",
-        tableCount: String(legacyTableCount)
+        tableCount: String(tableCount)
       }]
     : [];
 }
 
-function createAiServiceFormDrafts(setupData: CapabilitySetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {
+function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {
   const profiles = Array.isArray(setupData.aiProfiles) ? setupData.aiProfiles : [];
   return Object.fromEntries(aiServicePresets.map((preset) => {
     const profile = profiles.find((candidate) => candidate.service === preset.id);
-    const isActiveLegacyProfile = setupData.aiService === preset.id;
+    const isActiveService = setupData.aiService === preset.id;
     const draft = createDefaultAiServiceDraft(preset.id);
     return [preset.id, {
       ...draft,
-      projectName: profile?.projectName ?? (isActiveLegacyProfile ? setupData.aiProjectName : ""),
-      baseUrl: profile?.baseUrl || (isActiveLegacyProfile ? setupData.aiBaseUrl : preset.baseUrl) || "",
-      model: profile?.model ?? (isActiveLegacyProfile ? setupData.aiModel : ""),
+      projectName: profile?.projectName ?? (isActiveService ? setupData.aiProjectName : ""),
+      baseUrl: profile?.baseUrl || (isActiveService ? setupData.aiBaseUrl : preset.baseUrl) || "",
+      model: profile?.model ?? (isActiveService ? setupData.aiModel : ""),
       modelOptions: profile?.modelOptions ?? (
-        isActiveLegacyProfile && setupData.aiModel
+        isActiveService && setupData.aiModel
           ? [{ id: setupData.aiModel, label: setupData.aiModel }]
           : []
       ),
-      timeoutSeconds: String(profile?.timeoutSeconds ?? (isActiveLegacyProfile ? setupData.aiTimeoutSeconds : 30) ?? 30),
-      storedApiKeyConfigured: profile?.apiKeyConfigured ?? (isActiveLegacyProfile && setupData.aiApiKeyConfigured)
+      timeoutSeconds: String(profile?.timeoutSeconds ?? (isActiveService ? setupData.aiTimeoutSeconds : 30) ?? 30),
+      storedApiKeyConfigured: profile?.apiKeyConfigured ?? (isActiveService && setupData.aiApiKeyConfigured)
     } satisfies AiServiceFormDraft];
   })) as Partial<Record<DesktopAiService, AiServiceFormDraft>>;
 }
@@ -186,7 +172,7 @@ export function createDefaultAiServiceDraft(service: DesktopAiService): AiServic
   };
 }
 
-export function toAiServiceFormDraft(form: CapabilitySetupFormState): AiServiceFormDraft {
+export function toAiServiceFormDraft(form: SetupFormState): AiServiceFormDraft {
   return {
     projectName: form.aiProjectName,
     googleCurl: form.aiGoogleCurl,
@@ -200,13 +186,13 @@ export function toAiServiceFormDraft(form: CapabilitySetupFormState): AiServiceF
   };
 }
 
-export function isAiServiceProfileStored(form: CapabilitySetupFormState, service: DesktopAiService): boolean {
+export function isAiServiceProfileStored(form: SetupFormState, service: DesktopAiService): boolean {
   return service === form.aiService
     ? form.aiStoredApiKeyConfigured
     : Boolean(form.aiServiceDrafts[service]?.storedApiKeyConfigured);
 }
 
-export function createSaveAiServiceProfiles(form: CapabilitySetupFormState): NonNullable<SaveCapabilitySetupInput["aiProfiles"]> {
+export function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInitialSetupInput["aiProfiles"]> {
   return aiServicePresets.map((preset) => {
     const draft = preset.id === form.aiService
       ? toAiServiceFormDraft(form)

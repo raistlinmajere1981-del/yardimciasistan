@@ -106,13 +106,13 @@ export class DesktopFinanceService {
           ), 0)
           +
           COALESCE((
-            SELECT SUM(legacy.remaining_minor)
-            FROM pension_payment_totals AS legacy
-            JOIN reservations ON reservations.id = legacy.reservation_id
+            SELECT SUM(reservation_totals.remaining_minor)
+            FROM pension_payment_totals AS reservation_totals
+            JOIN reservations ON reservations.id = reservation_totals.reservation_id
             WHERE reservations.deleted_at = ''
               AND reservations.reservation_type = 'room'
               AND reservations.status NOT IN ('cancelled', 'rejected', 'no_show')
-              AND legacy.remaining_minor > 0
+              AND reservation_totals.remaining_minor > 0
               AND NOT EXISTS (
                 SELECT 1
                 FROM room_folios AS folios
@@ -238,7 +238,7 @@ export class DesktopFinanceService {
     return { ok: true, message: "Kasa hareketi kaldırıldı.", data: this.getData() };
   }
 
-  // Geriye dönük uyumluluk: yeni kullanıcı akışı bu metodu doğrudan kullanmaz.
+  // Check-in öncesi rezervasyon bedeli ve kapora akışı.
   setReservationAgreedTotal(input: SetReservationAgreedTotalInput): DesktopFinanceMutationResult {
     const reservationId = cleanText(input?.reservationId, 180);
     const amountMinor = normalizeNonNegativeAmount(input?.amountMinor);
@@ -269,7 +269,7 @@ export class DesktopFinanceService {
     return { ok: true, message: "Konaklama bedeli güncellendi.", data: this.getData() };
   }
 
-  // Geriye dönük uyumluluk: yeni tahsilatlar room_folio_payments üzerinden alınır.
+  // Oda hesabı açılmadan önce alınan rezervasyon kaporası.
   addPensionPayment(input: AddPensionPaymentInput): DesktopFinanceMutationResult {
     const reservationId = cleanText(input?.reservationId, 180);
     const amountMinor = normalizePositiveAmount(input?.amountMinor);

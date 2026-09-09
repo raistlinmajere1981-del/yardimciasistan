@@ -94,7 +94,6 @@ import type {
 } from "./app-lock";
 import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-connection-test";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
-import type { SaveCapabilitySetupInput } from "./setup-contract";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
 import type { MarketBarcodeFastPullState } from "./commerce-ipc-contract";
 import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
@@ -163,7 +162,7 @@ export interface DesktopBridge {
   setAutoSyncEnabled: (enabled: boolean) => Promise<AutomaticSyncStatus>;
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
-  saveInitialSetup: (input: SaveCapabilitySetupInput) => Promise<DesktopSetupSaveResult>;
+  saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => Promise<BusinessCapabilitySnapshot>;
@@ -279,10 +278,7 @@ const bridge: DesktopBridge = {
     return () => ipcRenderer.removeListener("sync:statusChanged", handler);
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
-  saveInitialSetup: async (input: SaveCapabilitySetupInput) => {
-    const adapted = await invokeWhenUnlocked<SaveInitialSetupInput>("capability:adaptSetupSave", input);
-    return ipcRenderer.invoke("setup:saveInitial", adapted);
-  },
+  saveInitialSetup: (input: SaveInitialSetupInput) => invokeWhenUnlocked<DesktopSetupSaveResult>("setup:saveInitial", input),
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:clearOverride", capability),

@@ -59,7 +59,6 @@ import {
   type SaveAiWorkspaceResultInput,
   type SaveAiWorkspaceResult,
   type AiWorkspaceHistoryEntry,
-  type DesktopBackupResult,
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
   type UpdateRequestStatusInput,
@@ -93,12 +92,9 @@ import {
   type GenerateDesktopReportAiResult
 } from "./database";
 import { DesktopFinanceService } from "./finance";
+import { resolveProjectBackupPath } from "./data-maintenance";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
 import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
-import {
-  applyBusinessProfileCapabilities,
-  setBusinessCapability
-} from "./business-capability-store";
 import { DesktopRoomFolioService, type DesktopRoomFolio } from "./room-folio";
 import {
   buildReportAiMessages,
@@ -360,7 +356,8 @@ if (!hasSingleInstanceLock) {
 
     desktopDatabase = new DesktopDatabase({
       appPath: app.getAppPath(),
-      userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData")
+      userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData"),
+      backupPath: resolveProjectBackupPath()
     });
     desktopDatabase.initialize();
     appSessionLocked = Boolean(desktopDatabase.getAppLockPasswordVerifier());
@@ -770,27 +767,6 @@ function registerIpcHandlers() {
       return localResult;
     }
 
-    // The selected profile is only a preset; persist its resulting capability
-    // set (while retaining explicit domain overrides) before any runtime reads
-    // setup state again. Service switches are explicit operator choices.
-    applyBusinessProfileCapabilities(getDatabase().databasePath, input.businessType, {
-      preserveUserOverrides: true
-    });
-    for (const [capability, enabled] of [
-      [C.WHATSAPP, input.modules.whatsapp],
-      [C.ANDROID, input.modules.android],
-      [C.AI, input.aiEnabled]
-    ] as const) {
-      setBusinessCapability(getDatabase().databasePath, { capability, enabled });
-    }
-    const setupCapabilities = new Set(enabledBusinessCapabilities());
-    if (setupCapabilities.has(C.QR_MENU)) {
-      getDatabase().queueSyncJob("menu_publish");
-    }
-    // The hosted module consumes this projection as its capability manifest,
-    // so service.android=false still requires a tombstone publication.
-    getDatabase().queueSyncJob("android_snapshot");
-
     const aiWebSync = await publishSavedAiSettings();
     getSyncCoordinator().restart();
     const setupData = getDatabase().getSetupData();
@@ -1186,10 +1162,6 @@ function registerIpcHandlers() {
       reservation?.tableIds
     );
     return getDatabase().updateDailyTaskStatus(input);
-  });
-
-  ipcMain.handle("backup:createManual", (): DesktopBackupResult => {
-    return getDatabase().createManualBackup();
   });
 
   ipcMain.handle("ai:createOwnerReplySuggestion", async (_event, requestId: string): Promise<RequestAiSuggestionResult> => {
@@ -2372,20 +2344,16 @@ function formatLocalDateKey(date: Date): string {
 }
 
 function createDesktopAiConfig(setup: DesktopSetupData) {
-  const legacyEnvApiKey = (process.env.YARDIMCI_ASISTAN_AI_API_KEY ?? process.env.OPENAI_API_KEY ?? "").trim();
-  const useLegacyEnvironment = !setup.aiApiKeyConfigured && legacyEnvApiKey !== "";
   const enabled = hasBusinessCapability(enabledBusinessCapabilities(), C.AI);
   const provider = (setup.aiProvider || "openai_compatible") as AIProviderName;
-  const timeoutSeconds = normalizeAiTimeoutSeconds(
-    useLegacyEnvironment ? Number(process.env.YARDIMCI_ASISTAN_AI_TIMEOUT_SECONDS ?? setup.aiTimeoutSeconds) : setup.aiTimeoutSeconds
-  );
+  const timeoutSeconds = normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds);
 
   return {
     enabled,
     provider: enabled ? provider : "disabled" as AIProviderName,
     service: setup.aiService,
-    baseUrl: useLegacyEnvironment ? process.env.YARDIMCI_ASISTAN_AI_BASE_URL || setup.aiBaseUrl : setup.aiBaseUrl,
-    model: useLegacyEnvironment ? process.env.YARDIMCI_ASISTAN_AI_MODEL || setup.aiModel : setup.aiModel,
+    baseUrl: setup.aiBaseUrl,
+    model: setup.aiModel,
     apiKey: getEffectiveAiApiKey(setup.aiService),
     authMode: setup.aiService === "gemini" ? "google_api_key" as const : "bearer" as const,
     timeoutMs: timeoutSeconds * 1000
@@ -2898,7 +2866,7 @@ function getEffectiveAiApiKey(service?: string) {
     }
   }
 
-  return (process.env.YARDIMCI_ASISTAN_AI_API_KEY ?? process.env.OPENAI_API_KEY ?? "").trim();
+  return "";
 }
 
 function normalizeAiTimeoutSeconds(value: number) {

@@ -7,7 +7,7 @@
 -- eşleştirme ve masaüstü onay akışıyla yeniden eklenir.
 
 INSERT OR IGNORE INTO business (
-  id, name, display_name, business_type, phone, whatsapp, email, address, modules_json, created_at, updated_at
+  id, name, display_name, profile_id, phone, whatsapp, email, address, created_at, updated_at
 ) VALUES (
   'business_showcase_001',
   'yardimci-asistan-tanitim',
@@ -17,30 +17,37 @@ INSERT OR IGNORE INTO business (
   '+905000000000',
   'tanitim@yardimciasistan.local',
   'Tanıtım kurulumu',
-  '{"rooms":true,"tables":true,"qr_menu":true,"ai":true,"whatsapp":true,"android":true}',
   '2026-09-01T12:00:00+03:00',
   '2026-09-01T12:00:00+03:00'
 );
 
 INSERT OR IGNORE INTO settings (
-  id, business_id, web_module_url, sync_secret, ai_enabled, whatsapp_enabled, whatsapp_mode,
-  android_enabled, rooms_enabled, tables_enabled, qr_menu_enabled, setup_completed, created_at, updated_at
+  id, business_id, web_module_url, sync_secret, auto_sync_enabled, ai_provider, ai_service,
+  whatsapp_mode, setup_completed, created_at, updated_at
 ) VALUES (
   'settings_showcase_001',
   'business_showcase_001',
   'https://yardimciasistan.alwaysdata.net/yardimci-asistan',
   '112233445566',
-  0,
   1,
+  'openai_compatible',
+  'openai',
   'webview',
-  1,
-  1,
-  1,
-  1,
   1,
   '2026-09-01T12:00:00+03:00',
   '2026-09-01T12:00:00+03:00'
 );
+
+WITH capabilities(capability_id) AS (VALUES
+  ('core.customers'), ('core.tasks'), ('core.calendar'), ('core.notifications'), ('core.finance'),
+  ('core.reports'), ('core.web'), ('core.sync'), ('core.backups'), ('core.devices'),
+  ('service.whatsapp'), ('service.ai'), ('service.android'),
+  ('accommodation.rooms'), ('accommodation.reservations'), ('accommodation.stays'), ('accommodation.folio'),
+  ('food_service.tables'), ('food_service.reservations'), ('food_service.orders'), ('food_service.menu'),
+  ('channel.qr_menu'), ('commerce.catalog'), ('commerce.inventory'), ('commerce.sales')
+)
+INSERT OR IGNORE INTO business_capabilities (business_id, capability_id, is_enabled, source, created_at, updated_at)
+SELECT 'business_showcase_001', capability_id, 1, 'profile', '2026-09-01T12:00:00+03:00', '2026-09-01T12:00:00+03:00' FROM capabilities;
 
 INSERT OR IGNORE INTO rooms (
   id, name, number, capacity, bed_info, floor, status, features_json, description, price_note,

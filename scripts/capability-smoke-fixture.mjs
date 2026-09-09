@@ -11,43 +11,20 @@ const CORE_CAPABILITIES = [
   "core.devices"
 ];
 
-export function createCapabilitySnapshotFixture(setupData, businessId = "smoke-business") {
-  const modules = setupData.modules ?? {};
-  const enabledCapabilities = new Set(CORE_CAPABILITIES);
+const { getBusinessProfile } = await import("@yardimci-asistan/shared");
 
-  if (modules.rooms) {
-    [
-      "accommodation.rooms",
-      "accommodation.reservations",
-      "accommodation.stays",
-      "accommodation.folio"
-    ].forEach((capability) => enabledCapabilities.add(capability));
-  }
-  if (modules.tables) {
-    [
-      "food_service.tables",
-      "food_service.reservations",
-      "food_service.orders",
-      "food_service.menu",
-      "commerce.catalog",
-      "commerce.sales"
-    ].forEach((capability) => enabledCapabilities.add(capability));
-  }
-  if (modules.qrMenu) {
-    enabledCapabilities.add("food_service.menu");
-    enabledCapabilities.add("channel.qr_menu");
-    enabledCapabilities.add("commerce.catalog");
-    enabledCapabilities.add("commerce.inventory");
-  }
-  if (modules.whatsapp) enabledCapabilities.add("service.whatsapp");
-  if (modules.android) enabledCapabilities.add("service.android");
+export function createCapabilitySnapshotFixture(setupData, businessId = "smoke-business") {
+  const enabledCapabilities = new Set(getBusinessProfile(setupData.profileId).defaultCapabilities);
+  for (const capability of CORE_CAPABILITIES) enabledCapabilities.add(capability);
+  if (setupData.servicePreferences?.whatsapp === false) enabledCapabilities.delete("service.whatsapp");
+  if (setupData.servicePreferences?.android === false) enabledCapabilities.delete("service.android");
   if (setupData.aiEnabled) enabledCapabilities.add("service.ai");
+  else enabledCapabilities.delete("service.ai");
 
   const enabled = [...enabledCapabilities];
   return {
     businessId,
-    businessType: setupData.businessType,
-    profileId: setupData.businessType,
+    profileId: setupData.profileId,
     capabilities: enabled.map((capability) => ({
       capability,
       enabled: true,

@@ -7,7 +7,9 @@ import { Panel } from "../ui/Panel";
 
 interface SystemHealthPanelProps {
   data: DesktopDashboardData;
-  modules: DesktopSetupData["modules"];
+  features: {
+    android: boolean;
+  };
   aiEnabled: boolean;
 }
 
@@ -22,7 +24,7 @@ interface HealthItem {
   icon: typeof Wifi;
 }
 
-export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPanelProps) {
+export function SystemHealthPanel({ data, features, aiEnabled }: SystemHealthPanelProps) {
   const [setup, setSetup] = useState<DesktopSetupData | null>(null);
   const [syncStatus, setSyncStatus] = useState<AutomaticSyncStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -55,7 +57,7 @@ export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPane
     const webItem = buildWebHealth(webUrl, setup?.autoSyncEnabled ?? syncStatus?.enabled ?? false, syncStatus);
 
     const items: HealthItem[] = [webItem];
-    if (modules.android) {
+    if (features.android) {
       items.push({
         key: "android",
         label: "Android",
@@ -100,7 +102,7 @@ export function SystemHealthPanel({ data, modules, aiEnabled }: SystemHealthPane
       }
     );
     return items;
-  }, [aiEnabled, data.androidDevices, data.backupPath, data.webModuleUrl, modules.android, setup, syncStatus]);
+  }, [aiEnabled, data.androidDevices, data.backupPath, data.webModuleUrl, features.android, setup, syncStatus]);
 
   const attentionCount = items.filter((item) => item.tone === "warn" || item.tone === "danger").length;
 

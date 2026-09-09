@@ -145,7 +145,7 @@ export function FinanceWorkspace({
     for (const balance of data.pensionBalances) {
       if (balance.remainingMinor <= 0 || folioReservationIds.has(balance.reservationId)) continue;
       rows.push({
-        id: `legacy:${balance.reservationId}`,
+        id: `reservation:${balance.reservationId}`,
         customerName: balance.customerName || balance.title || "Konaklama",
         context: balance.title || "Eski pansiyon kaydı",
         status: "Eski rezervasyon kaydı",

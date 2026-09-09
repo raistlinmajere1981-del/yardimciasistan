@@ -8,6 +8,7 @@ import {
   createId,
   getRequestReservationType,
   isRequestTypeAvailable,
+  normalizeBusinessType,
   normalizePhone,
   type BusinessCapability,
   type CustomerGender,
@@ -50,12 +51,17 @@ import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
 import { applyAndroidFinanceAction } from "./android-finance-actions.js";
 import { applyAndroidRoomFolioAction } from "./android-room-folio-actions.js";
 import { applyMarketAndroidAction } from "./market-android-actions.js";
+import {
+  applyBusinessProfileCapabilities,
+  setBusinessCapability
+} from "./business-capability-store.js";
 
 export type DesktopDemoProfile = "pension-restaurant";
 
 export interface DesktopDatabaseOptions {
   appPath: string;
   userDataPath: string;
+  backupPath?: string;
   /**
    * Production Electron starts without sample business data. Node-based smoke
    * tests keep the historical pension/restaurant fixture unless they
@@ -434,7 +440,7 @@ export interface DesktopSetupData {
   setupRequired: boolean;
   appPasswordConfigured: boolean;
   businessName: string;
-  businessType: string;
+  profileId: string;
   phone: string;
   whatsapp: string;
   email: string;
@@ -452,10 +458,7 @@ export interface DesktopSetupData {
   aiApiKeyConfigured: boolean;
   aiLastPublishedAt: string;
   aiProfiles: DesktopAiServiceProfile[];
-  modules: {
-    rooms: boolean;
-    tables: boolean;
-    qrMenu: boolean;
+  servicePreferences: {
     whatsapp: boolean;
     android: boolean;
   };
@@ -468,7 +471,7 @@ export interface DesktopSetupData {
 
 export interface SaveInitialSetupInput {
   businessName: string;
-  businessType: string;
+  profileId: string;
   phone: string;
   whatsapp: string;
   email: string;
@@ -487,10 +490,7 @@ export interface SaveInitialSetupInput {
   aiApiKey: string;
   clearAiApiKey: boolean;
   aiProfiles?: SaveAiServiceProfileInput[];
-  modules: {
-    rooms: boolean;
-    tables: boolean;
-    qrMenu: boolean;
+  servicePreferences: {
     whatsapp: boolean;
     android: boolean;
   };
@@ -815,21 +815,6 @@ export type SaveAiWorkspaceResult =
       message: string;
     };
 
-export type DesktopBackupResult =
-  | {
-      ok: true;
-      message: string;
-      backupDirectory: string;
-      backupFileName: string;
-      backupFilePath: string;
-      createdAt: string;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
 export type DesktopStatusUpdateResult =
   | {
       ok: true;
@@ -1051,7 +1036,9 @@ export class DesktopDatabase {
   constructor(private readonly options: DesktopDatabaseOptions) {
     fs.mkdirSync(options.userDataPath, { recursive: true });
     this.userDataPath = options.userDataPath;
-    this.backupPath = path.join(options.userDataPath, "backups");
+    this.backupPath = options.backupPath
+      ? path.resolve(options.backupPath)
+      : resolveBackupPath(options.appPath);
     fs.mkdirSync(this.backupPath, { recursive: true });
     this.databasePath = path.join(options.userDataPath, "yardimci-asistan.sqlite");
     this.db = new DatabaseSync(this.databasePath);
@@ -1068,7 +1055,37 @@ export class DesktopDatabase {
       );
     `);
 
-    for (const migration of this.readSqlFiles("db/migrations")) {
+    const migrations = this.readSqlFiles("db/migrations");
+    if (migrations.length !== 1 || migrations[0]?.name !== "001_baseline.sql") {
+      throw new Error("Yalnız 001_baseline.sql güncel temiz kurulum şeması olarak desteklenir.");
+    }
+
+    const appliedMigrations = this.db
+      .prepare("SELECT id FROM schema_migrations ORDER BY id")
+      .all() as Array<{ id?: unknown }>;
+    const unsupportedMigrations = appliedMigrations
+      .map((row) => String(row.id ?? ""))
+      .filter((id) => id !== "001_baseline.sql");
+    if (unsupportedMigrations.length > 0) {
+      throw new Error("Bu veritabanı güncel baseline şemasıyla oluşturulmamış; eski migration zinciri desteklenmiyor.");
+    }
+
+    const existingDomainObject = this.db
+      .prepare(`
+        SELECT 1
+        FROM sqlite_master
+        WHERE name NOT LIKE 'sqlite_%'
+          AND name <> 'schema_migrations'
+          AND type IN ('table', 'index', 'view', 'trigger')
+        LIMIT 1
+      `)
+      .get();
+    const baselineApplied = appliedMigrations.some((row) => String(row.id ?? "") === "001_baseline.sql");
+    if (!baselineApplied && existingDomainObject) {
+      throw new Error("Mevcut veritabanı baseline migration işareti taşımıyor; temiz kurulum gerekli.");
+    }
+
+    for (const migration of migrations) {
       const alreadyApplied = this.db.prepare("SELECT id FROM schema_migrations WHERE id = ?").get(migration.name);
       if (alreadyApplied) {
         continue;
@@ -3682,48 +3699,10 @@ export class DesktopDatabase {
     };
   }
 
-  createManualBackup(): DesktopBackupResult {
-    const createdAt = new Date().toISOString();
-    const backupFileName = `yardimci-asistan-${createdAt.replace(/[:.]/g, "-")}.sqlite`;
-    const backupFilePath = path.join(this.backupPath, backupFileName);
-
-    try {
-      fs.mkdirSync(this.backupPath, { recursive: true });
-      this.db.exec("PRAGMA wal_checkpoint(FULL);");
-      fs.copyFileSync(this.databasePath, backupFilePath);
-      this.insertEvent({
-        type: "system.backup_created",
-        entityType: "backup",
-        entityId: backupFileName,
-        payload: {
-          backup_file_name: backupFileName,
-          backup_path: backupFilePath
-        },
-        now: createdAt
-      });
-
-      return {
-        ok: true,
-      message: "Yerel kayıtların yedeği oluşturuldu.",
-        backupDirectory: this.backupPath,
-        backupFileName,
-        backupFilePath,
-        createdAt,
-        dashboardData: this.getDashboardData()
-      };
-    } catch (error) {
-      const message = error instanceof Error && error.message ? error.message : "Bilinmeyen hata";
-      return {
-        ok: false,
-        message: `Yedek oluşturulamadı: ${message}`
-      };
-    }
-  }
-
   getSetupData(): DesktopSetupData {
     const business = this.db.prepare("SELECT * FROM business WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
     const settings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
-    const modules = this.parseModulesJson(String(business?.modules_json ?? "{}"));
+    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
     const syncSecret = String(settings?.sync_secret ?? "");
     const businessName = String(business?.display_name ?? "");
     const aiService = normalizeStoredAiService(settings?.ai_service);
@@ -3740,7 +3719,7 @@ export class DesktopDatabase {
       setupRequired,
       appPasswordConfigured: Boolean(String(settings?.app_password_verifier ?? "").trim()),
       businessName,
-      businessType: String(business?.business_type ?? "pension_restaurant"),
+      profileId: normalizeBusinessType(String(business?.profile_id ?? "")),
       phone: String(business?.phone ?? ""),
       whatsapp: String(business?.whatsapp ?? ""),
       email: String(business?.email ?? ""),
@@ -3748,7 +3727,7 @@ export class DesktopDatabase {
       webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
       syncSecret,
       autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
-      aiEnabled: Number(settings?.ai_enabled ?? 0) === 1,
+      aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
       aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
       aiService,
       aiProjectName: activeAiProfile?.projectName ?? String(settings?.ai_project_name ?? ""),
@@ -3758,12 +3737,9 @@ export class DesktopDatabase {
       aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
       aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
       aiProfiles,
-      modules: {
-        rooms: modules.rooms,
-        tables: modules.tables,
-        qrMenu: modules.qr_menu,
-        whatsapp: Number(settings?.whatsapp_enabled ?? (modules.whatsapp ? 1 : 0)) === 1,
-        android: Number(settings?.android_enabled ?? (modules.android ? 1 : 0)) === 1
+      servicePreferences: {
+        whatsapp: enabledCapabilities.has(BUSINESS_CAPABILITIES.WHATSAPP),
+        android: enabledCapabilities.has(BUSINESS_CAPABILITIES.ANDROID)
       },
       initialCounts: {
         rooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''"),
@@ -3849,19 +3825,19 @@ export class DesktopDatabase {
 
     return AI_SERVICE_IDS.map((service) => {
       const row = rowsByService.get(service);
-      const useLegacyActiveSettings = !row && service === activeService;
-      const model = String(row?.model ?? (useLegacyActiveSettings ? settings?.ai_model : "") ?? "").trim();
-      const baseUrl = normalizeAiBaseUrl(row?.base_url ?? (useLegacyActiveSettings ? settings?.ai_base_url : ""))
+      const useActiveSettings = !row && service === activeService;
+      const model = String(row?.model ?? (useActiveSettings ? settings?.ai_model : "") ?? "").trim();
+      const baseUrl = normalizeAiBaseUrl(row?.base_url ?? (useActiveSettings ? settings?.ai_base_url : ""))
         || AI_SERVICE_DEFAULT_BASE_URLS[service];
       return {
         service,
-        projectName: String(row?.project_name ?? (useLegacyActiveSettings ? settings?.ai_project_name : "") ?? "").trim(),
+        projectName: String(row?.project_name ?? (useActiveSettings ? settings?.ai_project_name : "") ?? "").trim(),
         baseUrl,
         model,
         modelOptions: normalizeAiModelOptions(row?.model_options_json, model),
-        timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? (useLegacyActiveSettings ? settings?.ai_timeout_seconds : DEFAULT_AI_TIMEOUT_SECONDS)),
-        apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? (useLegacyActiveSettings ? settings?.ai_api_key_encrypted : "") ?? "").trim()),
-        updatedAt: normalizeStoredTimestamp(row?.updated_at ?? (useLegacyActiveSettings ? settings?.updated_at : ""))
+        timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? (useActiveSettings ? settings?.ai_timeout_seconds : DEFAULT_AI_TIMEOUT_SECONDS)),
+        apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? (useActiveSettings ? settings?.ai_api_key_encrypted : "") ?? "").trim()),
+        updatedAt: normalizeStoredTimestamp(row?.updated_at ?? (useActiveSettings ? settings?.updated_at : ""))
       };
     });
   }
@@ -4256,9 +4232,10 @@ export class DesktopDatabase {
       input.aiModelOptions === undefined ? existingAiProfile?.model_options_json : input.aiModelOptions,
       aiModel
     );
+    const aiWasEnabled = this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.AI);
     const aiSettingsChanged =
       !existingSettings ||
-      Number(existingSettings.ai_enabled ?? 0) !== (input.aiEnabled ? 1 : 0) ||
+      aiWasEnabled !== input.aiEnabled ||
       String(existingSettings.ai_provider ?? "") !== storedAiProvider ||
       String(existingSettings.ai_service ?? "") !== storedAiService ||
       String(existingSettings.ai_project_name ?? "") !== aiProjectName ||
@@ -4267,15 +4244,6 @@ export class DesktopDatabase {
       normalizeStoredAiTimeout(existingSettings.ai_timeout_seconds) !== storedAiTimeoutSeconds ||
       existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
     const aiLastPublishedAt = aiSettingsChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
-    const modules = {
-      rooms: input.modules.rooms,
-      tables: input.modules.tables,
-      qr_menu: input.modules.qrMenu,
-      ai: input.aiEnabled,
-      whatsapp: input.modules.whatsapp,
-      android: input.modules.android
-    };
-
     this.db.exec("BEGIN");
     try {
       this.db
@@ -4284,25 +4252,23 @@ export class DesktopDatabase {
             id,
             name,
             display_name,
-            business_type,
+            profile_id,
             phone,
             whatsapp,
             email,
             address,
-            modules_json,
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             display_name = excluded.display_name,
-            business_type = excluded.business_type,
+            profile_id = excluded.profile_id,
             phone = excluded.phone,
             whatsapp = excluded.whatsapp,
             email = excluded.email,
             address = excluded.address,
-            modules_json = excluded.modules_json,
             updated_at = excluded.updated_at,
             deleted_at = '',
             sync_status = 'local_only'
@@ -4311,12 +4277,11 @@ export class DesktopDatabase {
           businessId,
           slugifyBusinessName(businessName),
           businessName,
-          normalizeBusinessType(input.businessType),
+          normalizeBusinessType(input.profileId),
           input.phone.trim(),
           input.whatsapp.trim(),
           input.email.trim(),
           input.address.trim(),
-          JSON.stringify(modules),
           createdAt,
           now
         );
@@ -4329,7 +4294,6 @@ export class DesktopDatabase {
             web_module_url,
             sync_secret,
             auto_sync_enabled,
-            ai_enabled,
             ai_provider,
             ai_model,
             ai_service,
@@ -4338,23 +4302,17 @@ export class DesktopDatabase {
             ai_timeout_seconds,
             ai_api_key_encrypted,
             ai_last_published_at,
-            whatsapp_enabled,
             whatsapp_mode,
-            android_enabled,
-            rooms_enabled,
-            tables_enabled,
-            qr_menu_enabled,
             setup_completed,
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', 1, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             business_id = excluded.business_id,
             web_module_url = excluded.web_module_url,
             sync_secret = excluded.sync_secret,
             auto_sync_enabled = excluded.auto_sync_enabled,
-            ai_enabled = excluded.ai_enabled,
             ai_provider = excluded.ai_provider,
             ai_model = excluded.ai_model,
             ai_service = excluded.ai_service,
@@ -4363,11 +4321,6 @@ export class DesktopDatabase {
             ai_timeout_seconds = excluded.ai_timeout_seconds,
             ai_api_key_encrypted = excluded.ai_api_key_encrypted,
             ai_last_published_at = excluded.ai_last_published_at,
-            whatsapp_enabled = excluded.whatsapp_enabled,
-            android_enabled = excluded.android_enabled,
-            rooms_enabled = excluded.rooms_enabled,
-            tables_enabled = excluded.tables_enabled,
-            qr_menu_enabled = excluded.qr_menu_enabled,
             setup_completed = 1,
             updated_at = excluded.updated_at,
             deleted_at = '',
@@ -4379,7 +4332,6 @@ export class DesktopDatabase {
           webModuleUrl,
           syncSecret,
           input.autoSyncEnabled === false ? 0 : 1,
-          input.aiEnabled ? 1 : 0,
           storedAiProvider,
           aiModel,
           storedAiService,
@@ -4388,11 +4340,6 @@ export class DesktopDatabase {
           storedAiTimeoutSeconds,
           storedEncryptedAiApiKey,
           aiLastPublishedAt,
-          input.modules.whatsapp ? 1 : 0,
-          input.modules.android ? 1 : 0,
-          input.modules.rooms ? 1 : 0,
-          input.modules.tables ? 1 : 0,
-          input.modules.qrMenu ? 1 : 0,
           settingsCreatedAt,
           now
         );
@@ -4476,6 +4423,17 @@ export class DesktopDatabase {
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
+    }
+
+    applyBusinessProfileCapabilities(this.databasePath, input.profileId, {
+      preserveUserOverrides: true
+    });
+    for (const [capability, enabled] of [
+      [BUSINESS_CAPABILITIES.WHATSAPP, input.servicePreferences.whatsapp],
+      [BUSINESS_CAPABILITIES.ANDROID, input.servicePreferences.android],
+      [BUSINESS_CAPABILITIES.AI, input.aiEnabled]
+    ] as const) {
+      setBusinessCapability(this.databasePath, { capability, enabled });
     }
 
     const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
@@ -6615,29 +6573,6 @@ export class DesktopDatabase {
     }
   }
 
-  private parseModulesJson(value: string) {
-    try {
-      const parsed = JSON.parse(value) as Partial<Record<string, boolean>>;
-      return {
-        rooms: parsed.rooms !== false,
-        tables: parsed.tables !== false,
-        qr_menu: parsed.qr_menu !== false,
-        ai: parsed.ai === true,
-        whatsapp: parsed.whatsapp !== false,
-        android: parsed.android !== false
-      };
-    } catch {
-      return {
-        rooms: true,
-        tables: true,
-        qr_menu: true,
-        ai: false,
-        whatsapp: true,
-        android: true
-      };
-    }
-  }
-
   private ensureInitialRooms(targetCount: number, now: string) {
     const count = this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''");
     const missing = Math.max(0, targetCount - count);
@@ -7146,10 +7081,6 @@ export class DesktopDatabase {
         return this.applyAndroidTableOrderClose(action, now, "paid");
       case "table_order_cancel":
         return this.applyAndroidTableOrderClose(action, now, "cancelled");
-      case "table_order_set_status":
-        return this.applyAndroidTableOrderStatus(action, now);
-      case "table_order_close":
-        return this.applyAndroidTableOrderClose(action, now);
       case "menu_category_delete":
         return this.deleteMenuCategoryInTransaction(androidPayloadString(action.payload, "category_id"), now, action);
       case "menu_item_delete":
@@ -9127,6 +9058,12 @@ export class DesktopDatabase {
   }
 }
 
+function resolveBackupPath(appPath: string): string {
+  const override = process.env.YA_DESKTOP_BACKUP_DIR?.trim();
+  if (override) return path.resolve(override);
+  return path.resolve(appPath, "..", "..", "backup");
+}
+
 interface NormalizedTableCategoryInput {
   sourceName: string;
   sourceKey: string;
@@ -9316,8 +9253,6 @@ function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPermissio
   const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
   for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
     if (!(groupId in record)) {
-      // Older desktop and Android clients predate the additive Market group.
-      if (groupId === "market_operations") continue;
       return null;
     }
     if (typeof record[groupId] !== "boolean") return null;
@@ -10050,11 +9985,6 @@ function normalizeStatus(value: string, allowed: string[]) {
 function normalizeUrl(value: string) {
   const url = value.trim().replace(/\/+$/, "");
   return /^https?:\/\//.test(url) ? url : "";
-}
-
-function normalizeBusinessType(value: string) {
-  const supported = new Set(["pension", "restaurant", "pension_restaurant", "cafe", "market", "other"]);
-  return supported.has(value) ? value : "pension_restaurant";
 }
 
 function slugifyBusinessName(value: string) {

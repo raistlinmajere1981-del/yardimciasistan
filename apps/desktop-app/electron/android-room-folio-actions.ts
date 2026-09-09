@@ -58,13 +58,13 @@ function addPayment(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFol
   const paymentMethod = PAYMENT_METHODS.has(methodInput) ? methodInput : "cash";
   const note = cleanText(payload.note, 500);
   const paymentId = `room_folio_android_payment_${safeId(action.id)}`;
-  const sourcePaymentId = `android:${text(action.device_id)}/${safeId(action.id)}`;
+  const referenceId = `android:${text(action.device_id)}/${safeId(action.id)}`;
 
   try {
     db.prepare(`
       INSERT INTO room_folio_payments (
         id, folio_id, amount_minor, currency, payment_method, paid_at, note,
-        source, source_payment_id, created_at, updated_at, deleted_at, sync_status
+        origin, reference_id, created_at, updated_at, deleted_at, sync_status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'direct', ?, ?, ?, '', 'local_only')
     `).run(
       paymentId,
@@ -74,7 +74,7 @@ function addPayment(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFol
       paymentMethod,
       now,
       note,
-      sourcePaymentId,
+      referenceId,
       now,
       now
     );

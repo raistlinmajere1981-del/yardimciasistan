@@ -445,7 +445,7 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
                     <div className="room-folio-payment-history">
                       <strong>Tahsilatlar</strong>
                       {selectedFolio.payments.map((payment) => (
-                        <div key={payment.id}><span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.source === "legacy" ? " · Kapora" : ""}</span><b>{minorMoney(payment.amountMinor)}</b>{payment.source === "direct" && <button type="button" disabled={saving} onClick={() => requestVoidPayment(payment.id, payment.amountMinor)} aria-label="Tahsilatı geri al"><Trash2 size={13} /></button>}</div>
+                        <div key={payment.id}><span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.origin === "reservation" ? " · Kapora" : ""}</span><b>{minorMoney(payment.amountMinor)}</b>{payment.origin === "direct" && <button type="button" disabled={saving} onClick={() => requestVoidPayment(payment.id, payment.amountMinor)} aria-label="Tahsilatı geri al"><Trash2 size={13} /></button>}</div>
                       ))}
                     </div>
                   )}

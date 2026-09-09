@@ -43,7 +43,7 @@ const requestsSource = source("apps/desktop-app/src/components/customers/Request
 const customersSource = source("apps/desktop-app/src/components/customers/CustomersWorkspace.tsx");
 const routerSource = source("apps/desktop-app/src/components/app/DesktopWorkspaceRouter.tsx");
 const mainSource = source("apps/desktop-app/electron/main.ts");
-const settingsSource = source("apps/desktop-app/src/components/settings/LegacySetupWizard.tsx");
+const settingsSource = source("apps/desktop-app/src/components/settings/SetupForm.tsx");
 const navigationSource = source("apps/desktop-app/src/app/navigation.ts");
 const frameSource = source("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
 const menuManagerSource = source("apps/desktop-app/src/components/menu/MenuManager.tsx");
@@ -235,7 +235,7 @@ const contextualFoodProjection = projectAndroidOperationsSnapshot(
 assert.equal(contextualFoodProjection.reservations.some((item) => item.id === genericRoomReservation.id), false);
 assert.equal(contextualFoodProjection.reservations.some((item) => item.id === genericTableReservation.id), true);
 
-// D — Market keeps retail capabilities while old Android groups lose domain permissions.
+// D — Market keeps retail capabilities while non-retail Android groups lose domain permissions.
 const marketCapabilities = getBusinessProfile("market").defaultCapabilities;
 assert.equal(marketCapabilities.includes(C.RETAIL_BARCODE), true);
 assert.equal(marketCapabilities.includes(C.RETAIL_PURCHASING), true);
@@ -380,7 +380,7 @@ assert.match(
   "room receivable copy must stay inside the accommodation folio capability branch"
 );
 
-// F — runtime surfaces may not special-case profile/business type or legacy modules.
+// F — runtime surfaces may not special-case profile/business type or removed setup fields.
 for (const file of [
   "apps/desktop-app/src/App.tsx",
   "apps/desktop-app/src/app/navigation.ts",
@@ -400,7 +400,7 @@ for (const file of [
 ]) {
   const runtimeSource = source(file);
   assert.doesNotMatch(runtimeSource, /business(?:Type|_type)\s*(?:===|!==|==|!=)/, `${file} uses a profile runtime gate`);
-  assert.doesNotMatch(runtimeSource, /\b(?:setupData|setup)\.modules/, `${file} uses legacy modules as runtime truth`);
+  assert.doesNotMatch(runtimeSource, /\b(?:setupData|setup)\.modules/, `${file} uses removed setup modules as runtime truth`);
 }
 
 // G — admin expands role grants, then intersects them with business capabilities.
@@ -437,25 +437,24 @@ function verifyPersistedRuntimeSource() {
     const market = applyBusinessProfileCapabilities(database.databasePath, "market", { preserveUserOverrides: false });
     const expected = [...market.enabledCapabilities].sort();
 
+    assert.deepEqual(database.getEnabledBusinessCapabilities().sort(), expected);
+    const setup = database.getSetupData();
+    assert.equal(setup.profileId, "market");
+    assert.deepEqual(setup.servicePreferences, { whatsapp: true, android: true });
+
     const raw = new DatabaseSync(database.databasePath);
     try {
-      raw.prepare(`
-        UPDATE business
-        SET modules_json = '{"rooms":true,"tables":true,"qr_menu":true,"ai":true,"whatsapp":true,"android":true}'
-        WHERE deleted_at = ''
-      `).run();
-      raw.prepare(`
-        UPDATE settings
-        SET rooms_enabled = 1, tables_enabled = 1, qr_menu_enabled = 1
-        WHERE deleted_at = ''
-      `).run();
+      const businessColumns = new Set(raw.prepare("PRAGMA table_info('business')").all().map((row) => row.name));
+      const settingsColumns = new Set(raw.prepare("PRAGMA table_info('settings')").all().map((row) => row.name));
+      assert.equal(businessColumns.has("profile_id"), true);
+      assert.equal(businessColumns.has("business_type"), false);
+      assert.equal(businessColumns.has("modules_json"), false);
+      for (const column of ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]) {
+        assert.equal(settingsColumns.has(column), false, `${column} must not exist in the baseline`);
+      }
     } finally {
       raw.close();
     }
-
-    assert.deepEqual(database.getEnabledBusinessCapabilities().sort(), expected);
-    assert.equal(database.getSetupData().modules.rooms, false);
-    assert.equal(database.getSetupData().modules.tables, false);
 
     seedContextualReportTasks(database.databasePath);
     applyBusinessProfileCapabilities(database.databasePath, "restaurant", { preserveUserOverrides: false });
