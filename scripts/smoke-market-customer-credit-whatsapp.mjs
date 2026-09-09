@@ -113,6 +113,7 @@ try {
     window.yardimciDesktop = { commerce: Object.fromEntries(methods.map((method) => [method, invoke(method)])), openExternal: invoke("openExternal") };
   }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path), methods: Object.keys(channels) });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/m83-smoke`);
+  const topbarStatus = page.getByTestId("topbar-status");
   await page.getByRole("button", { name: /Ahmet Paylaşım/ }).click();
   const panel = page.getByRole("region", { name: "Veresiye hesabı", exact: true });
   const compose = page.getByRole("region", { name: "Borç durumunu paylaş", exact: true });
@@ -143,6 +144,7 @@ try {
   const edited = "Merhaba Ahmet, sizin için düzenlenmiş açıklama. ₺300,00 ve €20,00.";
   await editor.fill(edited);
   await compose.getByRole("button", { name: "Kopyala", exact: true }).click();
+  await expect(topbarStatus).toContainText("Mesaj kopyalandı.");
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), edited);
   mkdirSync(artifacts, { recursive: true });
   await compose.screenshot({ path: join(artifacts, "compose-desktop.png") });
@@ -174,22 +176,23 @@ try {
   pay(10000);
   const beforeChanged = financialState();
   await compose.getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
-  await expect(panel).toContainText("Mesaj yenilendi; lütfen tekrar kontrol edin.");
+  await expect(topbarStatus).toContainText("Mesaj yenilendi; lütfen tekrar kontrol edin.");
   await expect(editor).toHaveValue(/₺200,00/);
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺200,00");
   assert.equal(external.length, 0); assert.equal(financialState(), beforeChanged);
   await editor.fill("Yeni bakiye kontrol edildi: ₺200,00 ve €20,00.");
   mode("manual_copy");
   await compose.getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
-  await expect(panel).toContainText("Mesaj kopyalandı.");
+  await expect(topbarStatus).toContainText("Mesaj kopyalandı.");
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), "Yeni bakiye kontrol edildi: ₺200,00 ve €20,00.");
   assert.equal(external.length, 0);
   mode("official_api");
   await compose.getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
-  await expect(panel).toContainText("henüz kullanılamıyor");
+  await expect(topbarStatus).toContainText("henüz kullanılamıyor");
   mode("wa_link"); failExternal = true;
   await compose.getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
-  await expect(panel.getByRole("alert")).toContainText("Mesajı kopyalayıp elle paylaşabilirsiniz.");
+  await expect(topbarStatus).toContainText("Mesajı kopyalayıp elle paylaşabilirsiniz.");
+  await expect(panel.getByRole("alert")).toHaveCount(0);
   await compose.getByRole("button", { name: "Kopyala", exact: true }).click();
   failExternal = false;
   await compose.getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
@@ -202,7 +205,7 @@ try {
   for (const phone of ["", "123"]) {
     raw.prepare("UPDATE customers SET phone = ? WHERE id = ?").run(phone, customerId);
     const count = preparedCount(); await share();
-    await expect(panel.getByRole("alert")).toContainText("Bu müşterinin geçerli bir telefon numarası yok.");
+    await expect(topbarStatus).toContainText("Bu müşterinin geçerli bir telefon numarası yok.");
     await expect(compose).toHaveCount(0); assert.equal(preparedCount(), count);
     assert.throws(() => prepare(), /geçerli bir telefon/);
   }
@@ -211,7 +214,7 @@ try {
   pay(20000); pay(2000, "EUR");
   const beforeZero = preparedCount(), beforeZeroExternal = external.length;
   await share();
-  await expect(panel).toContainText("Bu müşterinin açık veresiye borcu kalmamış.");
+  await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu kalmamış.");
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺0,00");
   assert.equal(preparedCount(), beforeZero); assert.equal(external.length, beforeZeroExternal);
   await expect(compose).toHaveCount(0);
@@ -222,7 +225,7 @@ try {
   // A fully settled account also closes an already-open compose at final preparation.
   pay(10000);
   await compose.getByRole("button", { name: "WhatsApp'a Hazırla" }).click();
-  await expect(panel).toContainText("Bu müşterinin açık veresiye borcu kalmamış.");
+  await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu kalmamış.");
   await expect(compose).toHaveCount(0);
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺0,00");
   assert.equal(external.length, beforeZeroExternal);
@@ -274,11 +277,12 @@ try {
   assert.ok(calls.every((call) => !/markWhatsAppMessageSent|createManualRequest|saveAiWorkspaceResult|finance/i.test(call.method)));
   const shareSource = readFileSync(join(appPath, "src/components/customers/CustomerCreditWhatsAppShare.tsx"), "utf8");
   assert.doesNotMatch(shareSource, /wa\.me|window\.open|executeJavaScript|requestId/);
+  assert.doesNotMatch(shareSource, /role="alert"|setNotice\(|setError\(/);
   const preload = readFileSync(join(appPath, "electron/preload.ts"), "utf8");
   assert.match(preload, /prepareCustomerCreditWhatsApp:.*invokeWhenUnlocked\("commerce:customerCredit:prepareWhatsApp"/);
   const main = readFileSync(join(appPath, "electron/main.ts"), "utf8");
   assert.match(main, /ipcMain.handle\("shell:openExternal"[\s\S]*?isWhatsAppUrl\(url\)[\s\S]*?assertDesktopCapability\(C.WHATSAPP/);
-  console.log("market-customer-credit-whatsapp-smoke-ok: fresh balances, zero race, editable handoff, existing modes, offline copy, capability/lock guards and read-only sharing");
+  console.log("market-customer-credit-whatsapp-smoke-ok: fresh balances, zero race, editable handoff, topbar-only notices, existing modes, offline copy, capability/lock guards and read-only sharing");
 } catch (error) {
   if (page) console.error("UI at failure:", await page.locator("body").innerText());
   throw error;

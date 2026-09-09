@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { CustomerCreditAccountDetail, CustomerCreditPaymentMethod } from "@yardimci-asistan/shared";
 import { customerCreditError, customerCreditPaymentLabels, formatCreditMoney, notifyCustomerCreditChanged, parseCreditAmount } from "../../app/customer-credit-ui";
+import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
 
 export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, onSavingChange }: {
@@ -18,7 +19,6 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
   const [adjustmentType, setAdjustmentType] = useState<"adjustment_debit" | "adjustment_credit">("adjustment_debit");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const amountInput = useRef<HTMLInputElement>(null);
   const inFlight = useRef(false);
   const mounted = useRef(true);
@@ -42,11 +42,13 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
     event.preventDefault();
     if (!valid || loading || inFlight.current || account.customer.deletedAt) return;
     const bridge = window.yardimciDesktop?.commerce;
-    if (!bridge) { setError("Hesap kaydı kullanılamıyor. Uygulamayı yeniden başlatın."); return; }
+    if (!bridge) {
+      reportAppStatus("error", "Hesap kaydı kullanılamıyor. Uygulamayı yeniden başlatın.");
+      return;
+    }
     inFlight.current = true;
     setSaving(true);
     onSavingChange(true);
-    setError("");
     try {
       const input = { customerId: account.customer.id, amountMinor: amountMinor!, currency, note: note.trim(), source: "desktop-customer-credit" };
       const entry = mode === "payment"
@@ -59,7 +61,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
         : "Düzeltme kaydedildi.");
     } catch (cause) {
       if (mounted.current) {
-        setError(customerCreditError(cause, "Hareket kaydedilemedi. Yeniden deneyin."));
+        reportAppStatus("error", customerCreditError(cause, "Hareket kaydedilemedi. Yeniden deneyin."));
         notifyCustomerCreditChanged(account.customer.id);
       }
     } finally {
@@ -83,7 +85,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
         </label>}
         <div className="customer-credit-form-grid">
           <label className="customer-credit-field">Tutar
-            <input ref={amountInput} inputMode="decimal" placeholder="0,00" value={amount} onChange={(event) => { setAmount(event.target.value); setError(""); }} required />
+            <input ref={amountInput} inputMode="decimal" placeholder="0,00" value={amount} onChange={(event) => setAmount(event.target.value)} required />
           </label>
           <label className="customer-credit-field">Para birimi
             {reducingDebt ? <select aria-label="Para birimi" value={currency} onChange={(event) => setCurrency(event.target.value)} required>
@@ -101,7 +103,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
         <label className="customer-credit-field">{mode === "payment" ? "Not (isteğe bağlı)" : "Açıklama / neden (zorunlu)"}
           <textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} required={mode === "adjustment"} rows={2} />
         </label>
-        {(validation || error) && <p role="alert" className="customer-credit-error">{error || validation}</p>}
+        {validation && <p role="alert" className="customer-credit-error">{validation}</p>}
         <div className="customer-credit-actions">
           <ActionButton type="submit" disabled={!valid || saving || loading}>{saving ? "Kaydediliyor…" : mode === "payment" ? "Tahsilatı Kaydet" : "Düzeltmeyi Kaydet"}</ActionButton>
           <ActionButton variant="secondary" onClick={onClose}>Vazgeç</ActionButton>

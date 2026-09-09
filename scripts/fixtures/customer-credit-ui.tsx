@@ -1,9 +1,10 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
 import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
+import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
@@ -23,12 +24,17 @@ function Harness() {
   const [dashboardData, setDashboardData] = useState(control.__m82Initial.dashboard);
   const [snapshot, setSnapshot] = useState(control.__m82Initial.snapshot);
   const [page, setPage] = useState("market");
-  const [, setSyncState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [syncState, setSyncState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestId] = useState("");
   const customers = useCustomerController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
     selectedWhatsAppRequestId, setSelectedWhatsAppRequestId });
   control.__m82Toggle = async (enabled) => { setSnapshot(await control.__m82Call("toggleCredit", [enabled])); };
+
+  useEffect(() => subscribeAppStatus(({ state, message }) => {
+    setSyncState(state);
+    setStatusMessage(message);
+  }), []);
 
   return <BusinessCapabilityRuntimeProvider value={{ snapshot, state: "success", message: "",
     setCapability: async () => undefined, clearOverride: async () => undefined }}>
@@ -37,7 +43,7 @@ function Harness() {
         <button type="button" onClick={() => setPage("market")}>Market</button>
         <button type="button" onClick={() => setPage("customers")}>Müşteriler</button>
       </nav>
-      <p role="status">{statusMessage}</p>
+      <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "market" ? <MarketPage customers={dashboardData.customers} /> : <div className="customer-work-page">
         <div className="customer-work-content is-customers">
           <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}

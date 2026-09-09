@@ -160,23 +160,29 @@ export function useCustomerController({
   }
 
   async function handleDeleteCustomer(customer: DesktopDashboardData["customers"][number]) {
-    if (!window.yardimciDesktop || !window.confirm(`${customer.fullName} müşteri listesinden silinsin mi? Eski talep ve rezervasyon kayıtları korunur.`)) {
+    if (!window.yardimciDesktop || !window.confirm(`${customer.fullName} müşteri kaydı silinsin mi?`)) {
       return;
     }
 
     setSyncState("loading");
     setStatusMessage("Müşteri siliniyor...");
-    const result = await window.yardimciDesktop.deleteCustomer(customer.id);
-    if (!result.ok) {
-      setSyncState("error");
+    try {
+      const result = await window.yardimciDesktop.deleteCustomer(customer.id);
+      if (!result.ok) {
+        setSyncState("error");
+        setStatusMessage(result.message);
+        return;
+      }
+
+      setDashboardData(result.dashboardData);
+      setSyncState("success");
       setStatusMessage(result.message);
       return result;
+    } catch {
+      setSyncState("error");
+      setStatusMessage("Müşteri silinemedi. Yeniden deneyin.");
+      return;
     }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-    return result;
   }
 
   async function handleSaveCustomer(input: SaveCustomerInput): Promise<DesktopCustomerMutationResult> {

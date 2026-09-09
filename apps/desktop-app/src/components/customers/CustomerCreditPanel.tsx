@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { reportAppStatus } from "../../app/runtime-state";
 import { useCustomerCreditAccount } from "../../app/use-customer-credit-account";
 import { ActionButton } from "../ui/ActionButton";
 import { CustomerCreditBalances } from "./CustomerCreditBalances";
@@ -16,7 +17,6 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
   const { account, loading, error, reload } = useCustomerCreditAccount(customerId);
   const [expanded, setExpanded] = useState(false);
   const [form, setForm] = useState<"payment" | "adjustment" | null>(null);
-  const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const toggle = useRef<HTMLButtonElement>(null);
   const panelId = useId();
@@ -26,13 +26,16 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
     if (expanded && form === null && !saving) toggle.current?.focus();
   }, [expanded, form, saving]);
 
+  useEffect(() => {
+    if (error) reportAppStatus("error", error);
+  }, [error]);
+
   function closeForm() { setForm(null); }
 
   return <section className="customer-credit-panel" aria-label="Veresiye hesabı" aria-busy={loading}>
     <div className="customer-credit-heading"><h3>Veresiye</h3><span>Güncel borç</span></div>
-    {loading && <p role="status">Hesap yükleniyor…</p>}
-    {error && <div role="alert"><p>{error}</p><ActionButton variant="secondary" onClick={() => void reload()}>Hesabı Yenile</ActionButton></div>}
-    {message && <p role="status" className="customer-credit-success">{message}</p>}
+    {loading && <p>Hesap yükleniyor…</p>}
+    {error && <ActionButton variant="secondary" onClick={() => void reload()}>Hesabı Yenile</ActionButton>}
     {account && <>
       <CustomerCreditBalances balances={account.balances} />
       {!expanded && account.entries[0] && <div className="customer-credit-last">
@@ -42,12 +45,12 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
         <button ref={toggle} type="button" className="action-button action-button-secondary action-button-sm" aria-expanded={expanded} aria-controls={panelId}
           disabled={saving}
           onClick={() => { setExpanded((current) => !current); setForm(null); }}>{expanded ? "Hesabı Kapat" : "Hesabı Aç"}</button>
-        {!account.customer.deletedAt && <ActionButton disabled={loading || !debtExists || form !== null} onClick={() => { setExpanded(true); setForm("payment"); setMessage(""); }}>Tahsilat Al</ActionButton>}
+        {!account.customer.deletedAt && <ActionButton disabled={loading || !debtExists || form !== null} onClick={() => { setExpanded(true); setForm("payment"); }}>Tahsilat Al</ActionButton>}
       </div>
       {expanded && <div id={panelId} className="customer-credit-detail">
         <p><strong>{account.customer.fullName}</strong></p>
-        {!form && !account.customer.deletedAt && <ActionButton variant="ghost" size="sm" disabled={loading} onClick={() => { setForm("adjustment"); setMessage(""); }}>Düzeltme</ActionButton>}
-        {form && <CustomerCreditForm account={account} mode={form} loading={loading} onSavingChange={setSaving} onClose={closeForm} onSaved={(text) => { setMessage(text); closeForm(); }} />}
+        {!form && !account.customer.deletedAt && <ActionButton variant="ghost" size="sm" disabled={loading} onClick={() => setForm("adjustment")}>Düzeltme</ActionButton>}
+        {form && <CustomerCreditForm account={account} mode={form} loading={loading} onSavingChange={setSaving} onClose={closeForm} onSaved={(text) => { reportAppStatus("success", text); closeForm(); }} />}
         <CustomerCreditHistory account={account} />
         {whatsappEnabled && !account.customer.deletedAt && !form && <CustomerCreditWhatsAppShare account={account} disabled={loading || saving} readFresh={reload} onPrepared={onPreparedWhatsApp} />}
       </div>}

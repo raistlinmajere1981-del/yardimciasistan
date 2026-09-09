@@ -117,7 +117,9 @@ try {
     methodNames: [...Object.keys(methods), "setBarcodeScanMode", "consumePendingBarcodeScans"] });
   const port = server.httpServer.address().port;
   await page.goto(`http://127.0.0.1:${port}/m82-smoke`);
+  const topbarStatus = page.getByTestId("topbar-status");
   await expect(page.getByRole("heading", { name: "Hızlı Satış", exact: true })).toBeVisible();
+  await expect(page.locator(".market-status")).toHaveCount(0);
   // Local UI remains functional after all browser networking is unavailable.
   await context.setOffline(true);
   const quick = page.locator(".market-sale-cart");
@@ -153,7 +155,7 @@ try {
   const catalogReadsBefore = calls.filter((call) => call.method === "listProducts").length;
   failSale = true;
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
-  await expect(page.locator(".market-status")).toContainText("Yetersiz stok");
+  await expect(topbarStatus).toContainText("Yetersiz stok");
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
   assert.equal(balance(), 50000);
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
@@ -199,7 +201,8 @@ try {
   await page.evaluate(() => window.__m82Toggle(true));
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");
   await page.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "Bu müşterinin açık veresiye borcu var." })).toBeVisible();
+  await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu var.");
+  await expect(page.getByRole("alert").filter({ hasText: "Bu müşterinin açık veresiye borcu var." })).toHaveCount(0);
 
   await panel.getByRole("button", { name: "Tahsilat Al", exact: true }).click();
   let payment = panel.getByRole("form", { name: "Tahsilat", exact: true });
@@ -223,7 +226,7 @@ try {
   await expect.poll(() => Boolean(releasePayment)).toBe(true);
   delayPayment = false;
   releasePayment();
-  await expect(panel).toContainText("₺200,00 tahsilat kaydedildi.");
+  await expect(topbarStatus).toContainText("₺200,00 tahsilat kaydedildi.");
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺330,00");
   await expect(panel.getByRole("region", { name: "Hesap hareketleri" })).toContainText("Banka üzerinden");
   assert.equal(count("finance_entries"), beforePayments + 1);
@@ -237,7 +240,8 @@ try {
   runtime.recordCustomerCreditPayment(path, { customerId, amountMinor: 30000, currency: "TRY", paymentMethod: "cash" });
   await payment.getByLabel("Tutar", { exact: true }).fill("100,00");
   await payment.getByRole("button", { name: "Tahsilatı Kaydet" }).click();
-  await expect(payment.getByRole("alert")).toContainText("borcunu aşamaz");
+  await expect(topbarStatus).toContainText("borcunu aşamaz");
+  await expect(payment.getByRole("alert")).toHaveCount(0);
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺30,00");
   await payment.getByRole("button", { name: "Vazgeç" }).click();
   await expect(panel.getByRole("button", { name: "Hesabı Kapat" })).toBeFocused();
@@ -248,6 +252,7 @@ try {
   await expect(correction.getByRole("button", { name: "Düzeltmeyi Kaydet" })).toBeDisabled();
   await correction.getByLabel("Açıklama / neden (zorunlu)").fill("Önceki borç düzeltmesi");
   await correction.getByRole("button", { name: "Düzeltmeyi Kaydet" }).click();
+  await expect(topbarStatus).toContainText("Düzeltme kaydedildi.");
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺130,00");
   await panel.getByRole("button", { name: "Düzeltme", exact: true }).click();
   await correction.getByLabel("Tür", { exact: true }).selectOption("adjustment_credit");
@@ -257,6 +262,7 @@ try {
   await expect(correction.getByRole("button", { name: "Düzeltmeyi Kaydet" })).toBeDisabled();
   await correction.getByLabel("Tutar", { exact: true }).fill("50");
   await correction.getByRole("button", { name: "Düzeltmeyi Kaydet" }).click();
+  await expect(topbarStatus).toContainText("Düzeltme kaydedildi.");
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺80,00");
   await expect(panel.getByRole("region", { name: "Hesap hareketleri" })).toContainText("Alacak düzeltmesi");
 
@@ -279,8 +285,8 @@ try {
   await payment.getByLabel("Tutar", { exact: true }).fill("20,00");
   failRead = true;
   await payment.getByRole("button", { name: "Tahsilatı Kaydet" }).click();
-  await expect(panel).toContainText("€20,00 tahsilat kaydedildi.");
   await expect(panel.getByRole("form")).toHaveCount(0);
+  await expect(topbarStatus).toContainText("Hesap bilgileri alınamadı");
   await panel.getByRole("button", { name: "Hesabı Yenile" }).click();
   await expect(panel.locator(".customer-credit-balances")).toContainText("€0,00");
   assert.equal(balance("EUR"), 0);
@@ -343,7 +349,10 @@ try {
   assert.deepEqual(pageErrors, []);
   const source = readFileSync(join(appPath, "src/components/customers/CustomerCreditForm.tsx"), "utf8");
   assert.doesNotMatch(source, /saveManualFinanceEntry|updateEntry|deleteEntry/);
-  console.log("market-customer-credit-ui-contract-smoke-ok: actual React UI + SQLite, offline, capability gates, payments, corrections, M7 draft/scanner and responsive layout");
+  const customerControllerSource = readFileSync(join(appPath, "src/app/use-customer-controller.ts"), "utf8");
+  assert.match(customerControllerSource, /müşteri kaydı silinsin mi\?/);
+  assert.doesNotMatch(customerControllerSource, /Eski talep ve rezervasyon kayıtları korunur/);
+  console.log("market-customer-credit-ui-contract-smoke-ok: actual React UI + SQLite, offline, topbar-only operation notices, capability gates, payments, corrections, M7 draft/scanner and responsive layout");
 } catch (error) {
   if (page) console.error("UI at failure:", await page.locator("body").innerText());
   throw error;

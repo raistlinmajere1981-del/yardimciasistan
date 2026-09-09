@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { CustomerCreditAccountDetail } from "@yardimci-asistan/shared";
 import { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint, normalizeTRMobilePhone } from "@yardimci-asistan/whatsapp-bridge";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
+import { reportAppStatus } from "../../app/runtime-state";
 import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 import { ActionButton } from "../ui/ActionButton";
 
@@ -20,8 +21,6 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
 }) {
   const [draft, setDraft] = useState<CreditShareDraft | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
   const inFlight = useRef(false);
   const alive = useRef(true);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -32,13 +31,14 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
 
   function close() {
     if (inFlight.current) return;
-    setDraft(null); setNotice(""); setError(""); trigger.current?.focus();
+    setDraft(null); trigger.current?.focus();
   }
 
   function acceptAccount(next: CustomerCreditAccountDetail): boolean {
     if (next.customer.deletedAt) throw new Error("Silinmiş müşteri hesabı paylaşılamaz.");
     if (!next.balances.some((balance) => balance.amountMinor > 0)) {
-      setDraft(null); setNotice("Bu müşterinin açık veresiye borcu kalmamış.");
+      setDraft(null);
+      reportAppStatus("success", "Bu müşterinin açık veresiye borcu kalmamış.");
       return false;
     }
     if (!normalizeTRMobilePhone(next.customer.phone).ok) throw new Error("Bu müşterinin geçerli bir telefon numarası yok.");
@@ -47,14 +47,14 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
 
   async function share() {
     if (disabled || inFlight.current) return;
-    inFlight.current = true; setBusy(true); setNotice(""); setError("");
+    inFlight.current = true; setBusy(true);
     try {
       // Never generate from the balance currently displayed on the card.
       const next = await readFresh();
       if (!alive.current || !next) return;
       if (acceptAccount(next)) setDraft(draftFrom(next));
     } catch (cause) {
-      if (alive.current) setError(customerCreditError(cause, "Paylaşım hazırlanamadı. Yeniden deneyin."));
+      if (alive.current) reportAppStatus("error", customerCreditError(cause, "Paylaşım hazırlanamadı. Yeniden deneyin."));
     } finally { inFlight.current = false; if (alive.current) setBusy(false); }
   }
 
@@ -62,17 +62,24 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
     if (!message.trim()) return;
     try {
       await navigator.clipboard.writeText(message);
-      if (alive.current) { setError(""); setNotice("Mesaj kopyalandı. Gönderim sizin kontrolünüzde."); }
+      if (alive.current) reportAppStatus("success", "Mesaj kopyalandı. Gönderim sizin kontrolünüzde.");
     } catch {
-      if (alive.current) { setError("Panoya kopyalanamadı. Metni seçip elle kopyalayabilirsiniz."); editor.current?.focus(); editor.current?.select(); }
+      if (alive.current) {
+        reportAppStatus("error", "Panoya kopyalanamadı. Metni seçip elle kopyalayabilirsiniz.");
+        editor.current?.focus();
+        editor.current?.select();
+      }
     }
   }
 
   async function prepare() {
     if (!draft?.message.trim() || disabled || inFlight.current) return;
     const bridge = window.yardimciDesktop?.commerce;
-    if (!bridge) return;
-    inFlight.current = true; setBusy(true); setNotice(""); setError("");
+    if (!bridge) {
+      reportAppStatus("error", "WhatsApp hazırlığı kullanılamıyor. Uygulamayı yeniden başlatın.");
+      return;
+    }
+    inFlight.current = true; setBusy(true);
     try {
       const result = await bridge.prepareCustomerCreditWhatsApp({
         customerId: draft.account.customer.id, message: draft.message,
@@ -83,14 +90,14 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
         notifyCustomerCreditChanged(account.customer.id);
         if (!acceptAccount(result.account)) return;
         setDraft(draftFrom(result.account));
-        setNotice("Güncel borç veya müşteri bilgileri değişti. Mesaj yenilendi; lütfen tekrar kontrol edin.");
+        reportAppStatus("success", "Güncel borç veya müşteri bilgileri değişti. Mesaj yenilendi; lütfen tekrar kontrol edin.");
         editor.current?.focus();
         return;
       }
       const action = result.action;
       if (!action.ok) {
         if (action.mode === "official_api_future" && "fallback" in action) {
-          setNotice("Bu WhatsApp yöntemi henüz kullanılamıyor. Mesajı kopyalayıp elle paylaşabilirsiniz.");
+          reportAppStatus("error", "Bu WhatsApp yöntemi henüz kullanılamıyor. Mesajı kopyalayıp elle paylaşabilirsiniz.");
           return;
         }
         throw new Error(action.message);
@@ -99,13 +106,13 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
       if (action.mode === "webview") {
         if (!onPrepared) throw new Error("WhatsApp alanı açılamadı. Mesajı kopyalayarak devam edebilirsiniz.");
         onPrepared({ source: "customer_credit", customerId: result.account.customer.id, customerName: result.account.customer.fullName, phone: result.account.customer.phone, message: action.message });
-        setNotice("Mesaj WhatsApp'a hazırlandı. Gönderim sizin kontrolünüzde.");
+        reportAppStatus("success", "Mesaj WhatsApp'a hazırlandı. Gönderim sizin kontrolünüzde.");
         return;
       }
       if (!await window.yardimciDesktop?.openExternal(action.url)) throw new Error("WhatsApp açılamadı. Mesajı kopyalayıp elle paylaşabilirsiniz.");
-      if (alive.current) setNotice("WhatsApp taslağı açıldı. Gönderim sizin kontrolünüzde.");
+      if (alive.current) reportAppStatus("success", "WhatsApp taslağı açıldı. Gönderim sizin kontrolünüzde.");
     } catch (cause) {
-      if (alive.current) setError(customerCreditError(cause, "WhatsApp açılamadı. Mesajı kopyalayıp elle paylaşabilirsiniz."));
+      if (alive.current) reportAppStatus("error", customerCreditError(cause, "WhatsApp açılamadı. Mesajı kopyalayıp elle paylaşabilirsiniz."));
     } finally { inFlight.current = false; if (alive.current) setBusy(false); }
   }
 
@@ -116,7 +123,7 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
       <h4>Borç durumunu paylaş</h4>
       <p><strong>{draft.account.customer.fullName || "Müşteri"}</strong><br />{phone && phone.ok ? phone.display : draft.account.customer.phone}</p>
       <label className="customer-credit-field">Mesaj
-        <textarea ref={editor} aria-label="Veresiye paylaşım mesajı" rows={8} value={draft.message} disabled={busy} onChange={(event) => { setDraft({ ...draft, message: event.target.value }); setError(""); setNotice(""); }} />
+        <textarea ref={editor} aria-label="Veresiye paylaşım mesajı" rows={8} value={draft.message} disabled={busy} onChange={(event) => setDraft({ ...draft, message: event.target.value })} />
       </label>
       <p>Mesaj otomatik gönderilmez. WhatsApp açıldığında son kontrol ve gönderim sizde kalır.</p>
       <div className="customer-credit-actions">
@@ -125,7 +132,5 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
         <ActionButton variant="ghost" disabled={busy} onClick={close}>Vazgeç</ActionButton>
       </div>
     </div>}
-    {notice && <p role="status">{notice}</p>}
-    {error && <p role="alert" className="customer-credit-error">{error}</p>}
   </section>;
 }

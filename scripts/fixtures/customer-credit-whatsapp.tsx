@@ -1,9 +1,10 @@
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
 import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
+import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import { useMessagingController } from "../../apps/desktop-app/src/app/use-messaging-controller";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
@@ -26,7 +27,7 @@ function Harness() {
   const [dashboardData, setDashboardData] = useState(control.__m83Initial.dashboard);
   const [snapshot, setSnapshot] = useState(control.__m83Initial.snapshot);
   const [page, setPage] = useState("customers");
-  const [, setSyncState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [syncState, setSyncState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const whatsappEnabled = snapshot.enabledCapabilities.includes(C.WHATSAPP);
   const customerCreditEnabled = snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT);
@@ -36,6 +37,11 @@ function Harness() {
   const customers = useCustomerController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
     selectedWhatsAppRequestId: messaging.selectedWhatsAppRequestId, setSelectedWhatsAppRequestId: messaging.setSelectedWhatsAppRequestId });
   control.__m83Toggle = async (capability, enabled) => setSnapshot(await control.__m83Call("toggle", [capability, enabled]));
+
+  useEffect(() => subscribeAppStatus(({ state, message }) => {
+    setSyncState(state);
+    setStatusMessage(message);
+  }), []);
 
   const workspace = (view: "safe" | "web", onReturnToSafe?: () => void) => <WhatsAppWorkspace view={view}
     preparedMessage={messaging.preparedWhatsAppMessage} requests={dashboardData.requests}
@@ -49,7 +55,7 @@ function Harness() {
   return <BusinessCapabilityRuntimeProvider value={{ snapshot, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <main className="smoke-shell">
       <nav aria-label="Çalışma alanı">{["customers", "market", "messages"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Mesajlar"}</button>)}</nav>
-      <p role="status">{statusMessage}</p>
+      <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
         <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}
           reservations={dashboardData.reservations} rooms={dashboardData.rooms} stays={dashboardData.customerRoomStays}

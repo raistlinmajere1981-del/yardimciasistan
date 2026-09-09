@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { BusinessCapabilityRuntimeProvider } from "./app/business-capability-context";
 import { runtimeHasCapability } from "./app/capabilities";
 import { buildDesktopNotifications } from "./app/notifications";
 import type { DesktopPage } from "./app/navigation";
-import type { SyncState } from "./app/runtime-state";
+import { subscribeAppStatus, type SyncState } from "./app/runtime-state";
 import { useAppLock } from "./app/use-app-lock";
 import { useCustomerController } from "./app/use-customer-controller";
 import { useDesktopSync } from "./app/use-desktop-sync";
@@ -19,6 +19,11 @@ function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
+
+  useEffect(() => subscribeAppStatus(({ state, message }) => {
+    setSyncState(state);
+    setStatusMessage(message);
+  }), []);
 
   const setupController = useSetupController({
     onInitialSetupReady: () => setActivePage("dashboard")

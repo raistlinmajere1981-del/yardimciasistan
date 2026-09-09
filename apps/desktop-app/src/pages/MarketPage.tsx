@@ -9,6 +9,7 @@ import {
   type CommerceSale
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../app/capabilities";
+import { reportAppStatus } from "../app/runtime-state";
 import type { DesktopCustomer } from "../../electron/database";
 import { useBusinessCapabilityRuntime } from "../app/business-capability-context";
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
@@ -61,14 +62,13 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<AsyncState>("idle");
-  const [message, setMessage] = useState("Market verileri hazır.");
   const [productDraftRequest, setProductDraftRequest] = useState<ProductDraftFormRequest | null>(null);
   const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
   const handoffRequestId = useRef(0);
 
   const handleStateChange = useCallback((state: Exclude<AsyncState, "idle">, nextMessage: string) => {
     setDataState(state);
-    setMessage(nextMessage);
+    reportAppStatus(state, nextMessage);
   }, []);
 
   // Keep the pending cart load alive across status-message renders.
@@ -102,18 +102,18 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
     void reloadCatalog()
       .then(() => {
         setDataState("success");
-        setMessage("Market verileri güncel.");
+        reportAppStatus("success", "Market verileri güncel.");
       })
       .catch((error) => {
         setDataState("error");
-        setMessage(error instanceof Error ? error.message : "Market verileri yüklenemedi.");
+        reportAppStatus("error", error instanceof Error ? error.message : "Market verileri yüklenemedi.");
       });
   }, [catalogEnabled, reloadCatalog]);
 
   async function handleSaleCompleted(sale: CommerceSale) {
     await reloadCatalog();
     setDataState("success");
-    setMessage(sale.status === "credit" ? "Veresiye satış kaydedildi." : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`);
+    reportAppStatus("success", sale.status === "credit" ? "Veresiye satış kaydedildi." : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`);
   }
 
   function openProductDraft(draft: CatalogProductDraft) {
@@ -142,8 +142,6 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
           );
         })}
       </nav>
-
-      <div className={`market-status market-status-${dataState}`} role="status" aria-live="polite">{message}</div>
 
       {activeTab === "quickSale" ? (
         <MarketQuickSaleWorkspace
