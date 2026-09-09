@@ -303,6 +303,7 @@ const bridge: DesktopBridge = {
     createPaidSale: (input) => invokeWhenUnlocked<CommerceSale>("commerce:sale:createPaid", input),
     listCustomerCreditAccounts: (input) => invokeWhenUnlocked("commerce:customerCredit:list", input),
     getCustomerCreditAccount: (customerId) => invokeWhenUnlocked("commerce:customerCredit:get", customerId),
+    prepareCustomerCreditWhatsApp: (input) => invokeWhenUnlocked("commerce:customerCredit:prepareWhatsApp", input),
     listCustomerCreditEntries: (customerId, input) => invokeWhenUnlocked("commerce:customerCredit:entries", customerId, input),
     createCustomerCreditSale: (input) => invokeWhenUnlocked("commerce:customerCredit:sale", input),
     recordCustomerCreditPayment: (input) => invokeWhenUnlocked("commerce:customerCredit:payment", input),

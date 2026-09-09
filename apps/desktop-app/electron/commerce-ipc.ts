@@ -1,4 +1,5 @@
 import { ipcMain } from "electron";
+import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
 import {
   addCustomerCreditAdjustment,
@@ -104,6 +105,9 @@ export function registerCommerceIpcHandlers(options: {
   );
   ipcMain.handle("commerce:customerCredit:get", (_event, customerId: string) =>
     read(() => getCustomerCreditAccount(databasePath(), customerId))
+  );
+  ipcMain.handle("commerce:customerCredit:prepareWhatsApp", (_event, input: Parameters<DesktopCommerceBridge["prepareCustomerCreditWhatsApp"]>[0]) =>
+    read(() => prepareCustomerCreditWhatsApp(databasePath(), input))
   );
   ipcMain.handle("commerce:customerCredit:entries", (_event, customerId: string, input: Parameters<DesktopCommerceBridge["listCustomerCreditEntries"]>[1]) =>
     read(() => listCustomerCreditEntries(databasePath(), customerId, input))

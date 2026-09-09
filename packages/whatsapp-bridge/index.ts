@@ -1,3 +1,5 @@
+export { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint } from "./customer-credit.js";
+
 export type WhatsAppMode = "wa_link" | "manual_copy" | "webview" | "official_api";
 
 export type WhatsAppBridgeMode = WhatsAppMode | "official_api_future";

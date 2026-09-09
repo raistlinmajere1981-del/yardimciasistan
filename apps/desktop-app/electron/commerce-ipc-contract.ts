@@ -1,3 +1,4 @@
+import type { CustomerCreditWhatsAppPreparation, PrepareCustomerCreditWhatsAppInput } from "./customer-credit-whatsapp";
 import type {
   AddCustomerCreditAdjustmentInput,
   CreateCustomerCreditSaleInput,
@@ -78,6 +79,7 @@ export interface DesktopCommerceBridge {
   createPaidSale: (input: CreateCommerceSaleInput) => Promise<CommerceSale>;
   listCustomerCreditAccounts: (options?: ListCustomerCreditAccountsOptions) => Promise<CustomerCreditAccountSummary[]>;
   getCustomerCreditAccount: (customerId: string) => Promise<CustomerCreditAccountDetail>;
+  prepareCustomerCreditWhatsApp: (input: PrepareCustomerCreditWhatsAppInput) => Promise<CustomerCreditWhatsAppPreparation>;
   listCustomerCreditEntries: (customerId: string, options?: ListCustomerCreditEntriesOptions) => Promise<CustomerCreditEntry[]>;
   createCustomerCreditSale: (input: CreateCustomerCreditSaleInput) => Promise<CommerceSale>;
   recordCustomerCreditPayment: (input: RecordCustomerCreditPaymentInput) => Promise<CustomerCreditEntry>;
