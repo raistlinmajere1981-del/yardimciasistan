@@ -9,9 +9,7 @@ import process from "node:process";
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-web-module-"));
 const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
-const menuFile = join(webModuleRoot, "data", "menu.json");
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
-const requestsFile = join(webModuleRoot, "data", "requests.json");
 const aiSettingsFile = join(webModuleRoot, "data", "ai-settings.local.php");
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
@@ -24,7 +22,6 @@ if (existsSync(aiSettingsFile)) {
   unlinkSync(aiSettingsFile);
 }
 writeFileSync(conversationsFile, "[]\n");
-writeFileSync(requestsFile, "[]\n");
 const mockAiApiKey = "smoke-ai-key-do-not-log";
 const mockAiModel = "smoke-model-001";
 const mockAiRequests = [];

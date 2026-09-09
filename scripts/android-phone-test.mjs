@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import http from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -13,12 +13,6 @@ const businessConfig = JSON.parse(readFileSync(join(webModuleRoot, "config", "bu
 const syncSecret = String(businessConfig.sync_secret ?? "").trim();
 const outputApk = join(repoRoot, "apps", "android-app", "build", "outputs", "apk", "debug", "yardimci-asistan-debug.apk");
 const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "connection", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
-const requestsFile = join(webModuleRoot, "data", "requests.json");
-const syncStateFile = join(webModuleRoot, "data", "sync-state.json");
-const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
-const androidSnapshotFile = join(webModuleRoot, "data", "android-snapshot.json");
-const androidActionsFile = join(webModuleRoot, "data", "android-actions.json");
-const demoRequestsFile = join(repoRoot, "demo-data", "web-module-requests.json");
 const demoAndroidSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
 const verificationDeviceId = "android-phone-smoke";
 const defaultPhonePermissions = [
@@ -43,16 +37,11 @@ const defaultPhonePermissions = [
 const runtimeFiles = [
   "yardimci-asistan.sqlite",
   "yardimci-asistan.sqlite-wal",
-  "yardimci-asistan.sqlite-shm",
-  "requests.json.legacy-backup-v1",
-  "menu.json.legacy-backup-v1",
-  "android-actions.json.legacy-backup-v1",
-  "android-snapshot.json.legacy-backup-v1",
-  "sync-state.json.legacy-backup-v1"
+  "yardimci-asistan.sqlite-shm"
 ].map((file) => join(webModuleRoot, "data", file));
 
 const options = parseArgs(process.argv.slice(2));
-const managedFiles = [requestsFile, syncStateFile, conversationsFile, androidSnapshotFile, androidActionsFile, ...runtimeFiles];
+const managedFiles = [...runtimeFiles];
 const backups = new Map(managedFiles.filter((path) => existsSync(path)).map((path) => [path, readFileSync(path)]));
 
 let phpServer = null;
@@ -79,8 +68,6 @@ async function main() {
   const connectedDevice = options.noAdb ? null : getAdbDevices()[0] ?? null;
   const installedDeviceId = connectedDevice ? readInstalledDeviceId(connectedDevice.serial) : "";
 
-  seedDemoData([verificationDeviceId, installedDeviceId].filter(Boolean));
-
   if (!options.noBuild) {
     run("npm", ["run", "build:android"]);
   }
@@ -97,6 +84,7 @@ async function main() {
   phpServer.stderr.on("data", collectPhpOutput);
 
   await waitForServer(localBaseUrl);
+  await seedDemoData([verificationDeviceId, installedDeviceId].filter(Boolean), localBaseUrl);
   await verifyAndroidSummary(localBaseUrl, verificationDeviceId);
 
   const adbResult = options.noAdb ? { state: "skipped" } : installAndLaunchWithAdb(port, primaryLanUrl);
@@ -170,11 +158,10 @@ function parseArgs(args) {
   return parsed;
 }
 
-function seedDemoData(approvedDeviceIds) {
+async function seedDemoData(approvedDeviceIds, baseUrl) {
   for (const path of runtimeFiles) {
     rmSync(path, { force: true });
   }
-  const requests = JSON.parse(readFileSync(demoRequestsFile, "utf8"));
   const androidSnapshot = JSON.parse(readFileSync(demoAndroidSnapshotFile, "utf8"));
   androidSnapshot.androidPermissions = Object.fromEntries(approvedDeviceIds.map((deviceId) => [
     deviceId,
@@ -184,19 +171,24 @@ function seedDemoData(approvedDeviceIds) {
       permissions: defaultPhonePermissions
     }
   ]));
-  writeJson(requestsFile, requests);
-  writeJson(conversationsFile, []);
-  writeJson(androidSnapshotFile, androidSnapshot);
-  writeJson(androidActionsFile, []);
-  writeJson(syncStateFile, {
-    demo_seeded_at: new Date().toISOString(),
-    last_request_pull_at: "",
-    last_request_mark_at: "",
-    last_android_summary_at: "",
-    last_request_status_update_at: "",
-    last_menu_publish_at: "",
-    updated_at: new Date().toISOString()
+  const response = await fetch(`${baseUrl}/api/sync.php`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-YA-Sync-Secret": syncSecret
+    },
+    body: JSON.stringify({
+      action: "publish_android_snapshot",
+      client_id: "android-phone-test",
+      source_revision: 1,
+      idempotency_key: "android-phone-test:1",
+      snapshot: androidSnapshot
+    })
   });
+  const result = await response.json();
+  if (!response.ok || !result.ok) {
+    throw new Error(result.message ?? "Demo Android snapshot yayınlanamadı.");
+  }
 }
 
 function installAndLaunchWithAdb(port, primaryLanUrl) {

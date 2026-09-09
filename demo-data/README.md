@@ -1,23 +1,21 @@
 # Demo Veri Seti
 
-Bu klasor satis, test ve duman testi akislarinda kullanilan ornek verileri tutar.
+Bu klasör, test ve duman testi akışlarında kullanılan örnek girdileri tutar.
 
-`web-module-requests.json` dosyasi firma web modulunde bekleyen talep listesini
-temsil eder. Kayitlar gercek kisi bilgisi icermez; telefonlar ve adlar demo
-amaciyla uretilmistir. `smoke:demo-flow` bu kayitlara ek olarak calisan
-`api/chat.php` endpointinden bir `source=web_ai` talebi uretir ve PC SQLite'a
-cekildigini dogrular.
+`android-operations-snapshot.json`, Android companion ve hosting smoke'larında
+yayınlanan güncel snapshot başlangıcıdır. Web talepleri ve senkron metadata'sı
+artık ayrı JSON dosyalarında tutulmaz; web modülü bunları kendi güncel SQLite
+veritabanında oluşturur.
 
 `fatura-ornekleri/` klasörü, `AI ile Stok Ekle` akışında kullanılabilecek iki
 yapay PNG fatura ve bunların beklenen adet/gram sonuçlarını içerir.
 
-Kullanim:
+Kullanım:
 
 ```bash
-npm run demo:data:apply
-npm run demo:data:clear
 npm run smoke:demo-flow
+npm run android:phone-test -- --once --no-adb
 ```
 
-`smoke:demo-flow` kendi yedegini alir ve test sonunda web modulundeki talep,
-AI konusma, Android snapshot ve sync state JSON dosyalarini eski haline getirir.
+Her smoke kendi geçici SQLite/web modülünü kullanır ve kaynak template'e
+çalışma verisi yazmaz.

@@ -27,11 +27,6 @@ const enabledCapabilities = [
   "commerce.catalog",
   "commerce.inventory"
 ];
-const initialSnapshotPath = join(webRoot, "data", "android-snapshot.json");
-const initialSnapshot = JSON.parse(readFileSync(initialSnapshotPath, "utf8"));
-initialSnapshot.business_capabilities = enabledCapabilities;
-writeFileSync(initialSnapshotPath, `${JSON.stringify(initialSnapshot, null, 2)}\n`);
-
 const providerPort = await freePort();
 const providerRequests = [];
 const providerRequestUrls = [];

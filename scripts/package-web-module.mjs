@@ -38,12 +38,7 @@ const requiredFiles = [
   "config/ai.php",
   "config/business.json",
   "data/.htaccess",
-  "data/requests.json",
-  "data/menu.json",
   "data/ai-conversations.json",
-  "data/sync-state.json",
-  "data/android-snapshot.json",
-  "data/android-actions.json",
   "knowledge/.htaccess",
   "knowledge/firma.md",
   "knowledge/odalar.md",
@@ -111,12 +106,7 @@ function validateSource() {
   }
 
   assertJsonObject("config/business.json");
-  assertJsonArray("data/requests.json");
-  assertJsonObject("data/menu.json");
   assertJsonArray("data/ai-conversations.json");
-  assertJsonObject("data/sync-state.json");
-  assertJsonObject("data/android-snapshot.json");
-  assertJsonArray("data/android-actions.json");
 
   const business = JSON.parse(readFileSync(join(sourceRoot, "config", "business.json"), "utf8"));
   validateBusinessConfig(business, "kaynak config/business.json");
@@ -256,8 +246,7 @@ function shouldCopySourcePath(sourcePath) {
   }
 
   if (relativePath === "data/yardimci-asistan.sqlite"
-      || relativePath.startsWith("data/yardimci-asistan.sqlite-")
-      || relativePath.endsWith(".legacy-backup-v1")) {
+      || relativePath.startsWith("data/yardimci-asistan.sqlite-")) {
     return false;
   }
 

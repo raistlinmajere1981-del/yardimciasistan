@@ -29,7 +29,7 @@ ya_business_response(200, [
         'id' => ya_business_string($config['id'] ?? ''),
         'name' => ya_business_string($config['name'] ?? ''),
         'display_name' => $displayName !== '' ? $displayName : 'Yardımcı Asistan İşletmesi',
-        'business_type' => ya_business_string($config['business_type'] ?? ''),
+        'profile_id' => ya_business_string($config['profile_id'] ?? ''),
         'phone' => ya_business_string($config['phone'] ?? ''),
         'whatsapp' => $whatsapp,
         'email' => ya_business_string($config['email'] ?? ''),

@@ -132,7 +132,8 @@ function validatePackage(files) {
     `${webModulePrefix}/api/sync.php`,
     `${webModulePrefix}/api/chat.php`,
     `${webModulePrefix}/config/business.json`,
-    `${webModulePrefix}/data/requests.json`
+    `${webModulePrefix}/data/.htaccess`,
+    `${webModulePrefix}/data/ai-conversations.json`
   ];
 
   for (const file of requiredFiles) {

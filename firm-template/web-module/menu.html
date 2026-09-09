@@ -431,7 +431,7 @@
         if (isHexColor(business.accent_color)) document.documentElement.style.setProperty("--accent", business.accent_color);
 
         heroMeta.replaceChildren(metaChip("Güncel fiyatlar"), metaChip("Masaüstünden canlı yayın"));
-        if (business.business_type) heroMeta.append(metaChip(formatBusinessType(business.business_type)));
+        if (business.profile_id) heroMeta.append(metaChip(formatProfileId(business.profile_id)));
 
         const whatsapp = String(business.whatsapp || "").replace(/\D/g, "");
         if (whatsapp) {
@@ -567,7 +567,7 @@
         return span;
       }
 
-      function formatBusinessType(value) {
+      function formatProfileId(value) {
         const labels = {
           pension_restaurant: "Pansiyon + Restoran",
           pension: "Pansiyon",

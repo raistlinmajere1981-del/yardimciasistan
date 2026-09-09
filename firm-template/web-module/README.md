@@ -24,7 +24,7 @@ data/
   yardimci-asistan.sqlite (çalışırken oluşur)
   ai-conversations.json
   ai-settings.local.php (masaüstünden yayınlanınca oluşur)
-  *.json.legacy-backup-v1 (eski kurulum içe aktarılırsa oluşur)
+  (JSON çalışma deposu yok; current SQLite storage kullanılır)
 lib/
   storage.php
   stock-image-analysis.php
@@ -49,8 +49,8 @@ data/yardimci-asistan.sqlite: uygulama tarafından 600
 ```
 
 PHP'de `PDO` ve `pdo_sqlite` zorunludur. SQLite dosyası çalışma anında `0600`
-izinle oluşturulur. Eski JSON çalışma dosyaları varsa ilk açılışta yedeklenerek
-bir kez içe aktarılır; sonraki talep, action ve yayın yazımları SQLite'a gider.
+izinle oluşturulur. Güncel storage eski JSON çalışma dosyalarını içe aktarmaz;
+talep, action ve yayın yazımları SQLite'a gider.
 
 `config/`, `data/` ve `knowledge/` klasörlerinde Apache için doğrudan tarayıcı erişimini kapatan `.htaccess` dosyaları bulunur. Nginx kullanılan hostinglerde aynı kural sunucu panelinden eklenmelidir.
 
@@ -302,8 +302,8 @@ Müşteriye açık QR menü sayfası:
 menu.html
 ```
 
-Sayfa menü verisini sadece `api/menu.php` üzerinden okur. İlk örnek menü eski
-`data/menu.json` dosyasından SQLite'a aktarılır; güncel yayın SQLite'tan okunur.
+Sayfa menü verisini sadece `api/menu.php` üzerinden okur. Menü yayını current
+SQLite storage'dan okunur; eski JSON menü dosyası içe aktarılmaz.
 Pasif kategoriler ve mevcut olmayan ürünler API cevabına dahil edilmez. Sayfa
 görünürken ETag ile yaklaşık 15 saniyede bir güncelliği kontrol eder.
 

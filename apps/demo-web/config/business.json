@@ -2,7 +2,7 @@
   "id": "business_demo_001",
   "name": "deniz-cicegi",
   "display_name": "Deniz Çiçeği Pansiyon & Kafe",
-  "business_type": "pension_restaurant",
+  "profile_id": "pension_restaurant",
   "logo_url": "",
   "colors": {
     "primary": "#2F6F5E",
@@ -21,14 +21,6 @@
     "Kahvaltı 08:30 - 11:30",
     "Akşam servis 18:00 - 22:30"
   ],
-  "modules": {
-    "rooms": true,
-    "tables": true,
-    "qr_menu": true,
-    "ai": true,
-    "whatsapp": true,
-    "android": true
-  },
   "hero": {
     "image_url": "/assets/demo-hero.webp",
     "eyebrow": "Pansiyon • Restoran • Kafe",

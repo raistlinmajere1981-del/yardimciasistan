@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,7 +9,6 @@ import process from "node:process";
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-web-form-"));
 const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
-const requestsFile = join(webModuleRoot, "data", "requests.json");
 for (const runtimeFile of [
   "yardimci-asistan.sqlite",
   "yardimci-asistan.sqlite-wal",
@@ -17,7 +16,6 @@ for (const runtimeFile of [
 ]) {
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
 }
-writeFileSync(requestsFile, "[]\n");
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {

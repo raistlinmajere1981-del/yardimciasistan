@@ -9,26 +9,14 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webModuleRoot = join(repoRoot, "firm-template", "web-module");
 const demoWebRoot = join(repoRoot, "apps", "demo-web");
 const syncSecret = "change-this-secret";
-const dataFiles = [
-  join(webModuleRoot, "data", "requests.json"),
-  join(webModuleRoot, "data", "sync-state.json"),
-  join(webModuleRoot, "data", "ai-conversations.json"),
-  join(webModuleRoot, "data", "android-snapshot.json"),
-  join(webModuleRoot, "data", "android-actions.json")
-];
 const runtimeFiles = [
   "yardimci-asistan.sqlite",
   "yardimci-asistan.sqlite-wal",
-  "yardimci-asistan.sqlite-shm",
-  "requests.json.legacy-backup-v1",
-  "menu.json.legacy-backup-v1",
-  "android-actions.json.legacy-backup-v1",
-  "android-snapshot.json.legacy-backup-v1",
-  "sync-state.json.legacy-backup-v1"
+  "yardimci-asistan.sqlite-shm"
 ].map((file) => join(webModuleRoot, "data", file));
 
 const options = parseArgs(process.argv.slice(2));
-const managedFiles = [...dataFiles, ...runtimeFiles];
+const managedFiles = [...runtimeFiles];
 const backups = new Map(managedFiles.filter((path) => existsSync(path)).map((path) => [path, readFileSync(path)]));
 const processes = [];
 let cleaned = false;
@@ -52,7 +40,9 @@ async function main() {
   const lanUrls = getLanUrls(phpPort);
 
   if (!options.noSeed) {
-    await runNpm(["run", "demo:data:apply"]);
+    for (const path of runtimeFiles) {
+      rmSync(path, { force: true });
+    }
   }
 
   const phpServer = startProcess("php", ["-S", `${options.host}:${phpPort}`, "-t", webModuleRoot], {
@@ -236,25 +226,6 @@ function printReady({ webModuleUrl, demoWebUrl, lanUrls, demoEnabled }) {
   if (!options.once) {
     console.log("Sunucular açık. Bitirmek için Ctrl+C kullanın.");
   }
-}
-
-function runNpm(args) {
-  return new Promise((resolve, reject) => {
-    const child = spawn("npm", args, {
-      cwd: repoRoot,
-      stdio: "inherit",
-      shell: process.platform === "win32"
-    });
-
-    child.once("exit", (code) => {
-      if (code === 0) {
-        resolve();
-        return;
-      }
-
-      reject(new Error(`npm ${args.join(" ")} başarısız oldu.`));
-    });
-  });
 }
 
 function waitUntilStopped() {

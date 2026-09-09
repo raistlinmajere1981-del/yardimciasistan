@@ -589,7 +589,7 @@ async function callSync(payload: Record<string, unknown>) {
       "Content-Type": "application/json",
       "X-YA-Sync-Secret": SYNC_SECRET
     },
-    body: JSON.stringify({ ...payload, sync_secret: SYNC_SECRET })
+    body: JSON.stringify(payload)
   });
   const result = await response.json().catch(() => null) as Record<string, any> | null;
   if (!response.ok || !result) throw new Error(`sync_${response.status}`);

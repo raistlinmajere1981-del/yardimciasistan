@@ -26,7 +26,7 @@ checkFile("docs/WEB_MODULE_INSTALLATION.md", true);
 checkFile("docs/DEMO_SITE_CUSTOMIZATION.md", true);
 checkFile("docs/dev/DESKTOP_INSTALLER_PLAN.md", true);
 checkFile("docs/dev/END_TO_END_DEMO_FLOW.md", true);
-checkFile("demo-data/web-module-requests.json", true);
+checkFile("demo-data/android-operations-snapshot.json", true);
 checkFile("apps/demo-web/package.json", true);
 checkFile("apps/android-app/package.json", true);
 checkFile("packages/shared/package.json", true);
@@ -40,12 +40,9 @@ checkFile("firm-template/web-module/menu.html", true);
 
 checkJson("package.json", true);
 checkJson("apps/demo-web/config/business.json", true);
-checkJson("demo-data/web-module-requests.json", true);
+checkJson("demo-data/android-operations-snapshot.json", true);
 checkJson("firm-template/web-module/config/business.json", true);
-checkJson("firm-template/web-module/data/requests.json", true);
-checkJson("firm-template/web-module/data/menu.json", true);
 checkJson("firm-template/web-module/data/ai-conversations.json", true);
-checkJson("firm-template/web-module/data/android-snapshot.json", true);
 
 checkPlaywrightBrowser();
 checkAndroidSdk();

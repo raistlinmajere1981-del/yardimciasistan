@@ -25,8 +25,6 @@ cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recu
 for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
 }
-writeFileSync(join(webModuleRoot, "data", "requests.json"), "[]\n");
-writeFileSync(join(webModuleRoot, "data", "android-actions.json"), "[]\n");
 const businessFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessFile, "utf8"));
 businessConfig.sync_secret = syncSecret;
@@ -89,7 +87,7 @@ try {
   }), true);
   const setupResult = database.saveInitialSetup({
     businessName: "Otomatik Senkron Smoke",
-    businessType: "pension_restaurant",
+    profileId: "pension_restaurant",
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "sync-smoke@example.test",
@@ -106,7 +104,8 @@ try {
     aiTimeoutSeconds: 30,
     aiApiKey: "",
     clearAiApiKey: false,
-    modules: { rooms: true, tables: true, qrMenu: true, whatsapp: true, android: true },
+    aiModelOptions: [],
+    servicePreferences: { whatsapp: true, android: true },
     initialCounts: { rooms: 2, tables: 2 }
   }, { mode: "keep" });
   assert.equal(setupResult.ok, true);
@@ -959,9 +958,8 @@ return [
   assert.equal(staleRoomPermissionResponse.status, 403);
   assert.equal((await staleRoomPermissionResponse.json()).code, "android_action_capability_disabled");
 
-  assert.equal(readFileSync(join(webModuleRoot, "data", "requests.json"), "utf8"), "[]\n");
+  assert.equal(existsSync(join(webModuleRoot, "data", "requests.json")), false);
   assert.equal(existsSync(join(webModuleRoot, "data", "yardimci-asistan.sqlite")), true);
-  assert.equal(existsSync(join(webModuleRoot, "data", "requests.json.legacy-backup-v1")), true);
   console.log(`automatic-sync-ok: cursor ${database.getSyncRuntimeStatus().requestCursor}, ${firstCycle.publishedJobs} initial publications`);
 } catch (error) {
   if (serverOutput.trim()) {

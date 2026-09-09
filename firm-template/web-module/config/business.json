@@ -2,7 +2,7 @@
   "id": "business_showcase_001",
   "name": "yardimci-asistan-tanitim",
   "display_name": "Yardımcı Asistan Tanıtım İşletmesi",
-  "business_type": "pension_restaurant",
+  "profile_id": "pension_restaurant",
   "phone": "+90 531 696 9334",
   "whatsapp": "+90 531 696 9334",
   "email": "tanitim@yardimciasistan.local",
@@ -16,13 +16,5 @@
     "https://yardimciasistan.alwaysdata.net",
     "http://127.0.0.1:5173",
     "http://localhost:5173"
-  ],
-  "modules": {
-    "rooms": true,
-    "tables": true,
-    "qr_menu": true,
-    "ai": false,
-    "whatsapp": true,
-    "android": true
-  }
+  ]
 }

@@ -27,9 +27,7 @@ if ($action === 'publish_ai_settings' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 
     ]);
 }
 
-$isAuthorized = $action === 'publish_ai_settings'
-    ? ya_sync_is_header_authorized($businessConfig)
-    : ya_sync_is_authorized($businessConfig, $payload);
+$isAuthorized = ya_sync_is_header_authorized($businessConfig);
 
 if (!$isAuthorized) {
     ya_sync_response(401, [
@@ -731,6 +729,7 @@ function ya_sync_publish_menu(array $payload): void
         ]);
     }
 
+    $clientId = ya_sync_require_client_id($payload);
     $now = date(DATE_ATOM);
     $categories = ya_sync_sanitize_menu_categories($menu['categories'] ?? [], $now);
     $categoryIds = array_map(static function (array $category): string {
@@ -747,7 +746,7 @@ function ya_sync_publish_menu(array $payload): void
     $publication = ya_storage_publish(
         'menu',
         $publishedMenu,
-        ya_sync_string($payload['client_id'] ?? 'legacy-desktop'),
+        $clientId,
         array_key_exists('source_revision', $payload) ? ya_sync_int($payload['source_revision'], 0) : null,
         ya_sync_string($payload['idempotency_key'] ?? ''),
         $now
@@ -779,12 +778,13 @@ function ya_sync_publish_android_snapshot(array $payload): void
         ]);
     }
 
+    $clientId = ya_sync_require_client_id($payload);
     $now = date(DATE_ATOM);
     $publishedSnapshot = ya_sync_sanitize_android_snapshot($snapshot, $now);
     $publication = ya_storage_publish(
         'android_snapshot',
         $publishedSnapshot,
-        ya_sync_string($payload['client_id'] ?? 'legacy-desktop'),
+        $clientId,
         array_key_exists('source_revision', $payload) ? ya_sync_int($payload['source_revision'], 0) : null,
         ya_sync_string($payload['idempotency_key'] ?? ''),
         $now
@@ -1026,8 +1026,6 @@ function ya_sync_android_action_types(): array
         'table_order_set_payment_waiting',
         'table_order_close_paid',
         'table_order_cancel',
-        'table_order_set_status',
-        'table_order_close',
         'menu_stock_add',
         'menu_stock_set',
         'menu_stock_adjust',
@@ -1110,21 +1108,6 @@ function ya_sync_android_action_permission(string $actionType, array $payload): 
     ];
     if (isset($permissions[$actionType])) {
         return $permissions[$actionType];
-    }
-    if ($actionType === 'table_order_set_status') {
-        return match (ya_sync_string($payload['status'] ?? '')) {
-            'preparing' => 'table_order.set_preparing',
-            'served' => 'table_order.set_served',
-            'payment' => 'table_order.set_payment_waiting',
-            default => ''
-        };
-    }
-    if ($actionType === 'table_order_close') {
-        return match (ya_sync_string($payload['status'] ?? '')) {
-            'paid' => 'table_order.close_paid',
-            'cancelled' => 'table_order.cancel',
-            default => ''
-        };
     }
     return '';
 }
@@ -1215,8 +1198,6 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
         'table_order_set_payment_waiting' => ['food_service.orders'],
         'table_order_close_paid' => ['food_service.orders'],
         'table_order_cancel' => ['food_service.orders'],
-        'table_order_set_status' => ['food_service.orders'],
-        'table_order_close' => ['food_service.orders'],
         'menu_category_delete' => ['food_service.menu'],
         'menu_item_delete' => ['food_service.menu'],
         'menu_stock_add' => ['food_service.menu', 'commerce.inventory'],
@@ -1410,7 +1391,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
     $summary = is_array($snapshot['summary'] ?? null) ? $snapshot['summary'] : [];
     $tasks = is_array($snapshot['daily_tasks'] ?? null) ? $snapshot['daily_tasks'] : [];
     $menu = is_array($snapshot['menu'] ?? null) ? $snapshot['menu'] : [];
-    $adminMenu = is_array($snapshot['admin_menu'] ?? null) ? $snapshot['admin_menu'] : $menu;
+    $adminMenu = is_array($snapshot['admin_menu'] ?? null) ? $snapshot['admin_menu'] : [];
     $updatedAt = ya_sync_string($snapshot['updated_at'] ?? $fallbackTimestamp);
     $categories = ya_sync_sanitize_menu_categories($menu['categories'] ?? [], $updatedAt);
     $categoryIds = array_map(static function (array $category): string {
@@ -2560,25 +2541,6 @@ function ya_sync_sanitize_deleted_request_ids(mixed $ids): array
     return array_keys($result);
 }
 
-function ya_sync_is_authorized(array $businessConfig, array $payload): bool
-{
-    $configuredSecret = ya_sync_string($businessConfig['sync_secret'] ?? '');
-    if ($configuredSecret === '') {
-        return false;
-    }
-
-    // Body authentication remains for one compatibility release. Query-string
-    // secrets are deliberately rejected because URLs can be logged by proxies.
-    $providedSecret = ya_sync_string($payload['sync_secret'] ?? '');
-    $headerSecret = ya_sync_header('HTTP_X_YA_SYNC_SECRET');
-
-    if ($providedSecret === '' && $headerSecret !== '') {
-        $providedSecret = $headerSecret;
-    }
-
-    return $providedSecret !== '' && hash_equals($configuredSecret, $providedSecret);
-}
-
 function ya_sync_is_header_authorized(array $businessConfig): bool
 {
     $configuredSecret = ya_sync_string($businessConfig['sync_secret'] ?? '');
@@ -2587,6 +2549,18 @@ function ya_sync_is_header_authorized(array $businessConfig): bool
     return $configuredSecret !== ''
         && $headerSecret !== ''
         && hash_equals($configuredSecret, $headerSecret);
+}
+
+function ya_sync_require_client_id(array $payload): string
+{
+    $clientId = ya_storage_normalize_client_id(ya_sync_string($payload['client_id'] ?? ''));
+    if ($clientId === '' || preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $clientId) !== 1) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Senkronizasyon istemci kimliği geçersiz.'
+        ]);
+    }
+    return $clientId;
 }
 
 function ya_sync_apply_cors(array $businessConfig): void

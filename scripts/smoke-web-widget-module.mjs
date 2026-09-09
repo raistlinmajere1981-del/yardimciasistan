@@ -10,12 +10,10 @@ const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-widget-module-"));
 const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
-const requestsFile = join(webModuleRoot, "data", "requests.json");
 for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
 }
 writeFileSync(conversationsFile, "[]\n");
-writeFileSync(requestsFile, "[]\n");
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 const YA_STORAGE_BASE_DIR = __DIR__ . '/..';
 const YA_STORAGE_DATA_DIR = YA_STORAGE_BASE_DIR . '/data';
 const YA_STORAGE_DATABASE_FILE = YA_STORAGE_DATA_DIR . '/yardimci-asistan.sqlite';
-const YA_STORAGE_SCHEMA_VERSION = 2;
+const YA_STORAGE_SCHEMA_VERSION = 3;
 
 /**
  * Opens and migrates the hosting-side SQLite store.
@@ -40,8 +40,11 @@ function ya_storage_open(): PDO
         if ($journalMode !== 'wal') {
             $database->exec('PRAGMA journal_mode = DELETE');
         }
+        $storedSchemaVersion = ya_storage_existing_schema_version($database);
+        if ($storedSchemaVersion !== 0 && $storedSchemaVersion !== YA_STORAGE_SCHEMA_VERSION) {
+            throw new RuntimeException('unsupported_storage_schema');
+        }
         ya_storage_create_schema($database);
-        ya_storage_import_legacy_json($database);
         if (is_file(YA_STORAGE_DATABASE_FILE)) {
             @chmod(YA_STORAGE_DATABASE_FILE, 0600);
         }
@@ -553,6 +556,20 @@ function ya_storage_update_state(array $changes): void
     }
 }
 
+function ya_storage_existing_schema_version(PDO $database): int
+{
+    $hasMetaTable = (int) $database
+        ->query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sync_meta'")
+        ->fetchColumn();
+    if ($hasMetaTable === 0) {
+        return 0;
+    }
+
+    $statement = $database->prepare("SELECT value FROM sync_meta WHERE key = 'schema_version'");
+    $statement->execute();
+    return (int) ($statement->fetchColumn() ?: 0);
+}
+
 function ya_storage_create_schema(PDO $database): void
 {
     $database->exec(<<<'SQL'
@@ -625,143 +642,6 @@ function ya_storage_create_schema(PDO $database): void
         INSERT INTO sync_meta (key, value) VALUES ('schema_version', :version)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
     SQL)->execute([':version' => (string) YA_STORAGE_SCHEMA_VERSION]);
-}
-
-function ya_storage_import_legacy_json(PDO $database): void
-{
-    $marker = $database->prepare("SELECT value FROM sync_meta WHERE key = 'legacy_json_import_v1'");
-    $marker->execute();
-    if ($marker->fetchColumn() === 'complete') {
-        return;
-    }
-
-    $legacyFiles = [
-        'requests' => YA_STORAGE_DATA_DIR . '/requests.json',
-        'android_actions' => YA_STORAGE_DATA_DIR . '/android-actions.json',
-        'menu' => YA_STORAGE_DATA_DIR . '/menu.json',
-        'android_snapshot' => YA_STORAGE_DATA_DIR . '/android-snapshot.json',
-        'sync_state' => YA_STORAGE_DATA_DIR . '/sync-state.json'
-    ];
-    foreach ($legacyFiles as $path) {
-        if (is_file($path)) {
-            $backupPath = $path . '.legacy-backup-v1';
-            if (!is_file($backupPath) && !copy($path, $backupPath)) {
-                throw new RuntimeException('legacy_backup_failed');
-            }
-        }
-    }
-
-    $database->exec('BEGIN IMMEDIATE');
-    try {
-        if ((int) $database->query('SELECT COUNT(*) FROM web_requests')->fetchColumn() === 0) {
-            $records = ya_storage_load_legacy_json($legacyFiles['requests'], []);
-            foreach (is_array($records) ? $records : [] as $record) {
-                if (!is_array($record) || ya_storage_string($record['id'] ?? '') === '') {
-                    continue;
-                }
-                ya_storage_import_request($database, $record);
-            }
-        }
-        if ((int) $database->query('SELECT COUNT(*) FROM android_actions')->fetchColumn() === 0) {
-            $actions = ya_storage_load_legacy_json($legacyFiles['android_actions'], []);
-            foreach (is_array($actions) ? $actions : [] as $action) {
-                if (!is_array($action) || ya_storage_string($action['id'] ?? '') === '') {
-                    continue;
-                }
-                ya_storage_import_android_action($database, $action);
-            }
-        }
-        if ((int) $database->query('SELECT COUNT(*) FROM publications')->fetchColumn() === 0) {
-            $menu = ya_storage_load_legacy_json($legacyFiles['menu'], []);
-            if (is_array($menu) && $menu !== []) {
-                ya_storage_import_publication($database, 'menu', $menu);
-            }
-            $snapshot = ya_storage_load_legacy_json($legacyFiles['android_snapshot'], []);
-            if (is_array($snapshot) && $snapshot !== []) {
-                ya_storage_import_publication($database, 'android_snapshot', $snapshot);
-            }
-        }
-        $state = ya_storage_load_legacy_json($legacyFiles['sync_state'], []);
-        if (is_array($state)) {
-            $statement = $database->prepare(
-                'INSERT INTO sync_meta (key, value) VALUES (:key, :value) ON CONFLICT(key) DO NOTHING'
-            );
-            foreach ($state as $key => $value) {
-                $statement->execute([
-                    ':key' => 'state:' . ya_storage_string($key),
-                    ':value' => is_scalar($value) || $value === null ? (string) ($value ?? '') : ya_storage_encode($value)
-                ]);
-            }
-        }
-        $database->prepare(
-            "INSERT INTO sync_meta (key, value) VALUES ('legacy_json_import_v1', 'complete') "
-            . "ON CONFLICT(key) DO UPDATE SET value = 'complete'"
-        )->execute();
-        if (ya_storage_meta_int($database, 'server_revision') === 0) {
-            ya_storage_set_meta($database, 'server_revision', '1');
-        }
-        $database->exec('COMMIT');
-    } catch (Throwable $error) {
-        $database->exec('ROLLBACK');
-        throw $error;
-    }
-}
-
-function ya_storage_import_request(PDO $database, array $request): void
-{
-    $statement = $database->prepare(<<<'SQL'
-        INSERT OR IGNORE INTO web_requests (
-          id, payload_json, status, sync_status, created_at, updated_at, imported_at
-        ) VALUES (
-          :id, :payload_json, :status, :sync_status, :created_at, :updated_at, :imported_at
-        )
-    SQL);
-    $statement->execute([
-        ':id' => ya_storage_string($request['id'] ?? ''),
-        ':payload_json' => ya_storage_encode($request),
-        ':status' => ya_storage_string($request['status'] ?? '') ?: 'new',
-        ':sync_status' => ya_storage_string($request['sync_status'] ?? '') ?: 'pending',
-        ':created_at' => ya_storage_string($request['created_at'] ?? '') ?: date(DATE_ATOM),
-        ':updated_at' => ya_storage_string($request['updated_at'] ?? '') ?: date(DATE_ATOM),
-        ':imported_at' => ya_storage_string($request['synced_at'] ?? '')
-    ]);
-}
-
-function ya_storage_import_android_action(PDO $database, array $action): void
-{
-    $statement = $database->prepare(<<<'SQL'
-        INSERT OR IGNORE INTO android_actions (
-          id, action_type, payload_json, device_id, status, error_message, created_at, processed_at
-        ) VALUES (
-          :id, :action_type, :payload_json, :device_id, :status, :error_message, :created_at, :processed_at
-        )
-    SQL);
-    $statement->execute([
-        ':id' => ya_storage_string($action['id'] ?? ''),
-        ':action_type' => ya_storage_string($action['action_type'] ?? ''),
-        ':payload_json' => ya_storage_encode($action['payload'] ?? []),
-        ':device_id' => ya_storage_string($action['device_id'] ?? ''),
-        ':status' => ya_storage_string($action['status'] ?? '') ?: 'pending',
-        ':error_message' => ya_storage_string($action['error_message'] ?? ''),
-        ':created_at' => ya_storage_string($action['created_at'] ?? '') ?: date(DATE_ATOM),
-        ':processed_at' => ya_storage_string($action['processed_at'] ?? '')
-    ]);
-}
-
-function ya_storage_import_publication(PDO $database, string $name, array $payload): void
-{
-    $statement = $database->prepare(<<<'SQL'
-        INSERT OR IGNORE INTO publications (
-          name, source_client_id, source_revision, server_revision, payload_json, updated_at
-        ) VALUES (
-          :name, 'legacy', 1, 1, :payload_json, :updated_at
-        )
-    SQL);
-    $statement->execute([
-        ':name' => $name,
-        ':payload_json' => ya_storage_encode($payload),
-        ':updated_at' => ya_storage_string($payload['updated_at'] ?? '') ?: date(DATE_ATOM)
-    ]);
 }
 
 function ya_storage_mark_request_row_synced(PDO $database, string $requestId, string $now): int
@@ -871,16 +751,7 @@ function ya_storage_set_meta(PDO $database, string $key, string $value): void
 function ya_storage_normalize_client_id(string $clientId): string
 {
     $normalized = preg_replace('/[^A-Za-z0-9._:-]/', '', trim($clientId)) ?: '';
-    return strlen($normalized) >= 6 ? substr($normalized, 0, 120) : 'legacy-desktop';
-}
-
-function ya_storage_load_legacy_json(string $path, mixed $fallback): mixed
-{
-    if (!is_file($path)) {
-        return $fallback;
-    }
-    $decoded = json_decode(file_get_contents($path) ?: '', true);
-    return $decoded === null && json_last_error() !== JSON_ERROR_NONE ? $fallback : $decoded;
+    return strlen($normalized) >= 6 ? substr($normalized, 0, 120) : '';
 }
 
 function ya_storage_encode(mixed $value): string

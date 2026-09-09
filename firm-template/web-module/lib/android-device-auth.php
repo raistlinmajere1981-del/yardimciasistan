@@ -127,7 +127,7 @@ function ya_android_auth_validate_token(string $deviceId, string $token): bool
 /**
  * Android requests prefer their per-device token. Once a token has been issued
  * for a device, the shared sync secret is no longer accepted for that device.
- * Devices that have not yet upgraded remain compatible with the old header.
+ * Devices that have not yet received a personal token remain in bootstrap mode.
  */
 function ya_android_auth_request_authorized(array $businessConfig, string $deviceId): bool
 {
