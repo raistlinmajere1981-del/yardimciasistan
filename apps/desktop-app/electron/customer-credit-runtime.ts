@@ -12,6 +12,8 @@ import {
   type CustomerCreditBalance,
   type CustomerCreditCustomer,
   type CustomerCreditEntry,
+  type CustomerCreditHistoryEntry,
+  type CustomerCreditSaleDetail,
   type ListCustomerCreditAccountsOptions,
   type ListCustomerCreditEntriesOptions,
   type RecordCustomerCreditPaymentInput
@@ -111,15 +113,40 @@ function pagination(value: number | undefined, fallback: number, maximum: number
   return Math.min(value, maximum);
 }
 
-function readEntries(db: DatabaseSync, businessId: string, customerId: string, options: ListCustomerCreditEntriesOptions) {
+function readEntries(db: DatabaseSync, businessId: string, customerId: string, options: ListCustomerCreditEntriesOptions): CustomerCreditHistoryEntry[] {
   const params: Array<string | number> = [businessId, customerId];
   if (options.currency !== undefined) params.push(currencyCode(options.currency));
   params.push(pagination(options.limit, 200, 500), pagination(options.offset, 0, Number.MAX_SAFE_INTEGER));
-  return (db.prepare(`
+  const entries = (db.prepare(`
     SELECT * FROM customer_credit_entries WHERE business_id = ? AND customer_id = ?
       ${options.currency !== undefined ? "AND currency = ?" : ""}
     ORDER BY occurred_at DESC, created_at DESC, id DESC LIMIT ? OFFSET ?
   `).all(...params) as Row[]).map(mapEntry);
+  // At most 500 ledger rows per page, one batched snapshot read, no catalog join.
+  const saleIds = [...new Set(entries.filter((entry) => entry.entryType === "credit_sale" && entry.saleId !== null)
+    .map((entry) => entry.saleId!))];
+  if (!saleIds.length) return entries;
+  const details = new Map<string, CustomerCreditSaleDetail>();
+  const rows = db.prepare(`
+    SELECT s.id AS sale_id, s.subtotal, s.discount_total, s.total, s.currency,
+      i.id AS item_id, i.product_id, i.product_name, i.quantity, i.unit_price, i.line_total
+    FROM commerce_sales s JOIN commerce_sale_items i ON i.sale_id = s.id
+    WHERE s.business_id = ? AND s.id IN (${saleIds.map(() => "?").join(",")})
+    ORDER BY s.id, i.created_at, i.rowid
+  `).all(businessId, ...saleIds) as Row[];
+  for (const row of rows) {
+    const saleId = String(row.sale_id);
+    let detail = details.get(saleId);
+    if (!detail) {
+      detail = { items: [], subtotal: Number(row.subtotal), discountTotal: Number(row.discount_total),
+        total: Number(row.total), currency: String(row.currency) };
+      details.set(saleId, detail);
+    }
+    detail.items.push({ id: String(row.item_id), productId: String(row.product_id), productName: String(row.product_name),
+      quantity: Number(row.quantity), unitPrice: Number(row.unit_price), lineTotal: Number(row.line_total), currency: detail.currency });
+  }
+  return entries.map((entry) => entry.entryType === "credit_sale" && entry.saleId !== null
+    ? { ...entry, saleDetail: details.get(entry.saleId) ?? null } : entry);
 }
 
 export function getCustomerCreditAccount(databasePath: string, customerId: string): CustomerCreditAccountDetail {
@@ -131,7 +158,7 @@ export function getCustomerCreditAccount(databasePath: string, customerId: strin
 
 export function listCustomerCreditEntries(
   databasePath: string, customerId: string, options: ListCustomerCreditEntriesOptions = {}
-): CustomerCreditEntry[] {
+): CustomerCreditHistoryEntry[] {
   return withCreditDatabase(databasePath, false, (db, businessId) => {
     const customer = requireCustomer(db, businessId, customerId, false);
     return readEntries(db, businessId, customer.id, options);

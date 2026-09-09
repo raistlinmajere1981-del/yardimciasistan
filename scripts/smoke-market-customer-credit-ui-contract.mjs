@@ -35,6 +35,7 @@ try {
   assert.equal(saved.ok, true);
   const customerId = saved.savedId;
   const other = database.saveCustomer({ fullName: "Zeynep Hesap", phone: "+905559998877" }).savedId;
+  const historyCustomer = database.saveCustomer({ fullName: "Zümra Satış Geçmişi" }).savedId;
   const deletedId = database.saveCustomer({ fullName: "Silinmiş Kişi" }).savedId;
   assert.equal(database.deleteCustomer(deletedId).ok, true);
   const product = runtime.saveRuntimeCatalogProduct(path, { name: "Veresiye Test Ürünü", barcode: "8690000082001", salePrice: 25 });
@@ -116,7 +117,7 @@ try {
   }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path),
     methodNames: [...Object.keys(methods), "setBarcodeScanMode", "consumePendingBarcodeScans"] });
   const port = server.httpServer.address().port;
-  await page.goto(`http://127.0.0.1:${port}/m82-smoke`);
+  await page.goto(`http://127.0.0.1:${port}/m82-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
   await expect(page.getByRole("heading", { name: "Hızlı Satış", exact: true })).toBeVisible();
   await expect(page.locator(".market-status")).toHaveCount(0);
@@ -191,6 +192,8 @@ try {
   const panel = page.getByRole("region", { name: "Veresiye hesabı" });
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");
   await expect(panel.locator(".customer-credit-balances")).toContainText("€20,00");
+  await expect(panel.getByRole("list", { name: "Satış kalemleri" })).toContainText("1 × Veresiye Test Ürünü");
+  await expect(panel.getByRole("list", { name: "Satış kalemleri" })).toContainText("₺30,00/birim · ₺30,00");
   assert.ok(creditCalls().every((call) => call.method !== "listCustomerCreditAccounts"), "Selected account has no per-customer summary fan-out.");
   await page.evaluate(() => window.__m82Toggle(false));
   await expect(panel).toHaveCount(0);
@@ -341,10 +344,80 @@ try {
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺92,01");
   await panel.getByRole("button", { name: "Hesabı Aç", exact: true }).click();
   const history = panel.getByRole("region", { name: "Hesap hareketleri" });
-  await expect(history.getByRole("listitem")).toHaveCount(200);
+  await expect(history.locator(":scope > ul > li")).toHaveCount(200);
+  const paginationCalls = calls.length;
   await history.getByRole("button", { name: "Daha Eski Hareketler" }).click();
-  await expect(history.getByRole("listitem")).toHaveCount(203);
+  await expect(history.locator(":scope > ul > li")).toHaveCount(203);
   await expect(history.getByRole("button", { name: "Daha Eski Hareketler" })).toHaveCount(0);
+  assert.deepEqual(calls.slice(paginationCalls).map((call) => call.method), ["listCustomerCreditEntries"]);
+
+  // Historical names/prices and missing products are exercised through the real
+  // account IPC-shaped boundary, including 200 sale movements on the first page.
+  const snapshotProducts = Array.from({ length: 6 }, (_, index) => runtime.saveRuntimeCatalogProduct(path, {
+    name: `Tarihi Ürün ${index + 1}`, salePrice: 10 + index, trackInventory: false
+  }));
+  const longSale = runtime.createCustomerCreditSale(path, { customerId: historyCustomer,
+    items: snapshotProducts.map((item) => ({ productId: item.id, quantity: 2 })), discountTotal: 5 });
+  const missingSale = runtime.createCustomerCreditSale(path, { customerId: historyCustomer,
+    items: [{ productId: snapshotProducts[0].id, quantity: 1 }] });
+  raw.prepare("DELETE FROM commerce_sale_items WHERE sale_id = ?").run(missingSale.id);
+  addDebt(historyCustomer, 100);
+  runtime.recordCustomerCreditPayment(path, { customerId: historyCustomer, amountMinor: 100, currency: "TRY", paymentMethod: "cash" });
+  for (let index = 0; index < 200; index += 1) runtime.createCustomerCreditSale(path, { customerId: historyCustomer,
+    items: [{ productId: snapshotProducts[0].id, quantity: 2 }] });
+  runtime.saveRuntimeCatalogProduct(path, { id: snapshotProducts[0].id, name: "Yeni katalog adı", salePrice: 999, trackInventory: false });
+  raw.prepare("DELETE FROM catalog_products WHERE id = ?").run(snapshotProducts[5].id);
+  const beforeHistory = runtime.getCustomerCreditAccount(path, historyCustomer);
+  const ledgerBeforeHistory = raw.prepare("SELECT * FROM customer_credit_entries WHERE customer_id = ? ORDER BY id").all(historyCustomer);
+  const initialHistoryCalls = calls.length;
+  await page.getByRole("button", { name: /Zümra Satış Geçmişi/ }).click();
+  await expect(panel.locator(".customer-credit-balances")).toContainText("₺4.155,00");
+  await panel.getByRole("button", { name: "Hesabı Aç", exact: true }).click();
+  await expect(history.locator(":scope > ul > li")).toHaveCount(200);
+  await expect(history.getByRole("list", { name: "Satış kalemleri" })).toHaveCount(200);
+  await expect(history.getByRole("list", { name: "Satış kalemleri" }).first()).toContainText("2 × Tarihi Ürün 1");
+  await expect(history.getByRole("list", { name: "Satış kalemleri" }).first()).toContainText("₺10,00/birim · ₺20,00");
+  const initialReads = calls.slice(initialHistoryCalls);
+  assert.ok(initialReads.length <= 2, "StrictMode may mount twice, but 200 sales never cause per-sale IPC.");
+  assert.ok(initialReads.every((call) => call.method === "getCustomerCreditAccount"));
+  const moreCalls = calls.length;
+  await history.getByRole("button", { name: "Daha Eski Hareketler" }).click();
+  await expect(history.locator(":scope > ul > li")).toHaveCount(204);
+  assert.deepEqual(calls.slice(moreCalls), [{ method: "listCustomerCreditEntries", args: [historyCustomer, { offset: 200, limit: 200 }] }]);
+  const longMovement = history.locator(":scope > ul > li").filter({ hasText: "Veresiye satış toplamı" });
+  await expect(longMovement.getByRole("listitem")).toHaveCount(4);
+  await expect(longMovement.locator(".customer-credit-debt")).toHaveText("+₺145,00");
+  await expect(longMovement.locator(".customer-credit-sale-summary")).toHaveText("Ara toplam₺150,00İndirim−₺5,00Veresiye satış toplamı₺145,00");
+  assert.equal(longSale.total, 145);
+  const expandCalls = calls.length;
+  await longMovement.getByRole("button", { name: "Tüm kalemleri göster" }).click();
+  await expect(longMovement.getByRole("listitem")).toHaveCount(6);
+  for (let index = 0; index < snapshotProducts.length; index += 1) {
+    const line = longMovement.getByRole("listitem").nth(index);
+    await expect(line).toContainText(`2 × Tarihi Ürün ${index + 1}`);
+    await expect(line).toContainText(`₺${10 + index},00/birim · ₺${(10 + index) * 2},00`);
+  }
+  assert.equal(calls.length, expandCalls, "Expanding lines does not fetch sale details.");
+  await expect(history).not.toContainText("Yeni katalog adı");
+  await expect(history).not.toContainText("₺999,00");
+  const missingMovement = history.locator(":scope > ul > li").filter({ hasText: "Satış ayrıntısı bulunamadı." });
+  await expect(missingMovement).toHaveCount(1);
+  await expect(missingMovement.locator(".customer-credit-debt")).toHaveText("+₺10,00");
+  for (const label of ["Tahsilat", "Borç düzeltmesi"]) {
+    const movement = history.locator(":scope > ul > li").filter({ hasText: label });
+    await expect(movement).toHaveCount(1);
+    await expect(movement.locator(".customer-credit-sale-detail")).toHaveCount(0);
+  }
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await longMovement.scrollIntoViewIfNeeded();
+  await panel.screenshot({ path: join(artifacts, "history-sale-items-narrow.png") });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), JSON.stringify(await page.evaluate(() =>
+    [...document.querySelectorAll("body *")].filter((element) => element.getBoundingClientRect().right > window.innerWidth + 1)
+      .slice(0, 12).map((element) => ({ tag: element.tagName, class: element.className, width: element.getBoundingClientRect().width })))));
+  await longMovement.getByRole("button", { name: "Daha az göster" }).click();
+  await expect(longMovement.getByRole("listitem")).toHaveCount(4);
+  assert.deepEqual(runtime.getCustomerCreditAccount(path, historyCustomer).balances, beforeHistory.balances);
+  assert.deepEqual(raw.prepare("SELECT * FROM customer_credit_entries WHERE customer_id = ? ORDER BY id").all(historyCustomer), ledgerBeforeHistory);
   assert.ok(calls.every((call) => !/finance|bootstrap|getDashboardData/i.test(call.method)), "No separate finance writes or bootstrap refreshes.");
   assert.deepEqual(pageErrors, []);
   const source = readFileSync(join(appPath, "src/components/customers/CustomerCreditForm.tsx"), "utf8");

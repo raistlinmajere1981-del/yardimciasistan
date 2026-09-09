@@ -324,11 +324,77 @@ try {
   } finally { restored.close(); }
   assert.equal(raw.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
   assert.deepEqual(raw.prepare("PRAGMA foreign_key_check").all(), []);
+  verifyHistorySnapshots(databasePath, raw, customer("M84 Geçmiş Kalemleri"));
   console.log("market-customer-credit-foundation-smoke-ok");
 } finally {
   raw?.close();
   database.close();
   rmSync(dataDir, { recursive: true, force: true });
+}
+
+function verifyHistorySnapshots(path, raw, customerId) {
+  const first = runtime.saveRuntimeCatalogProduct(path, { name: "Satış anındaki ürün", salePrice: 12.5, trackInventory: false });
+  const second = runtime.saveRuntimeCatalogProduct(path, { name: "Silinecek ürün", salePrice: 7.25, trackInventory: false });
+  const createSale = (items, discountTotal = 0) => runtime.createCustomerCreditSale(path, { customerId, items, discountTotal });
+  const multi = createSale([{ productId: first.id, quantity: 2 }, { productId: second.id, quantity: 0.5 }], 1.25);
+  const missing = createSale([{ productId: first.id, quantity: 1 }]);
+  for (let index = 0; index < 201; index += 1) createSale([{ productId: first.id, quantity: 2 }]);
+  runtime.addCustomerCreditAdjustment(path, { customerId, amountMinor: 100, currency: "TRY", entryType: "adjustment_debit", note: "Test", source: "smoke" });
+  runtime.recordCustomerCreditPayment(path, { customerId, amountMinor: 100, currency: "TRY", paymentMethod: "cash" });
+  runtime.saveRuntimeCatalogProduct(path, { id: first.id, name: "Yeni ad", salePrice: 999, trackInventory: false });
+  raw.prepare("DELETE FROM catalog_products WHERE id = ?").run(second.id);
+  const ledger = () => raw.prepare("SELECT * FROM customer_credit_entries WHERE customer_id = ? ORDER BY id").all(customerId);
+  const beforeLedger = ledger();
+  const beforeBalances = raw.prepare("SELECT * FROM customer_credit_balances WHERE customer_id = ?").all(customerId);
+
+  const queries = [];
+  const prepare = DatabaseSync.prototype.prepare;
+  let page;
+  try {
+    DatabaseSync.prototype.prepare = function (sql) { queries.push(sql); return prepare.call(this, sql); };
+    page = runtime.getCustomerCreditAccount(path, customerId);
+  } finally { DatabaseSync.prototype.prepare = prepare; }
+  assert.equal(page.entries.length, 200);
+  assert.equal(queries.filter((sql) => /FROM commerce_sales/.test(sql)).length, 1, "One sale snapshot query for the entire page.");
+  assert.ok(queries.length <= 6, "Query count is bounded independently of movement count.");
+  assert.ok(queries.every((sql) => !/catalog_products/.test(sql)), "History never resolves the current catalog.");
+  const rest = runtime.listCustomerCreditEntries(path, customerId, { offset: 200, limit: 200 });
+  assert.equal(rest.length, 5);
+  const entries = [...page.entries, ...rest];
+  assert.equal(new Set(entries.map((entry) => entry.id)).size, 205);
+  for (const entry of entries) {
+    if (entry.entryType !== "credit_sale") { assert.equal(entry.saleDetail, undefined); continue; }
+    assert.equal(moneyToMinor(entry.saleDetail.total), entry.amountMinor);
+    assert.equal(entry.saleDetail.items[0].productName, first.name);
+    assert.equal(entry.saleDetail.items[0].unitPrice, 12.5);
+  }
+  const detail = entries.find((entry) => entry.saleId === multi.id).saleDetail;
+  assert.deepEqual(detail.items.map(({ productId, productName, quantity, unitPrice, lineTotal, currency }) =>
+    ({ productId, productName, quantity, unitPrice, lineTotal, currency })), [
+    { productId: first.id, productName: first.name, quantity: 2, unitPrice: 12.5, lineTotal: 25, currency: "TRY" },
+    { productId: second.id, productName: second.name, quantity: 0.5, unitPrice: 7.25, lineTotal: 3.63, currency: "TRY" }
+  ]);
+  assert.equal(detail.subtotal, 28.63);
+  assert.equal(detail.discountTotal, 1.25);
+  assert.equal(detail.total, 27.38);
+  assert.deepEqual(runtime.listCustomerCreditEntries(path, customerId, { limit: 0 }), []);
+
+  // Simulate an incomplete historical import without changing the ledger.
+  raw.prepare("DELETE FROM commerce_sale_items WHERE sale_id = ?").run(missing.id);
+  assert.equal(runtime.listCustomerCreditEntries(path, customerId, { limit: 500 }).find((entry) => entry.saleId === missing.id).saleDetail, null);
+  const saleRow = raw.prepare("SELECT * FROM commerce_sales WHERE id = ?").get(missing.id);
+  raw.exec("PRAGMA foreign_keys = OFF");
+  try {
+    raw.prepare("DELETE FROM commerce_sales WHERE id = ?").run(missing.id);
+    const preserved = runtime.listCustomerCreditEntries(path, customerId, { limit: 500 }).find((entry) => entry.saleId === missing.id);
+    assert.equal(preserved.saleDetail, null);
+    assert.equal(preserved.amountMinor, 1250);
+  } finally {
+    raw.prepare(`INSERT INTO commerce_sales (${Object.keys(saleRow).join(",")}) VALUES (${Object.keys(saleRow).map(() => "?").join(",")})`).run(...Object.values(saleRow));
+    raw.exec("PRAGMA foreign_keys = ON");
+  }
+  assert.deepEqual(ledger(), beforeLedger, "History reads never rewrite historical ledger rows.");
+  assert.deepEqual(raw.prepare("SELECT * FROM customer_credit_balances WHERE customer_id = ?").all(customerId), beforeBalances);
 }
 
 function verifyIpc(databasePath, customerId, cart, account, raw) {

@@ -5,6 +5,7 @@ import type {
   CustomerCreditAccountDetail,
   CustomerCreditAccountSummary,
   CustomerCreditEntry,
+  CustomerCreditHistoryEntry,
   ListCustomerCreditAccountsOptions,
   ListCustomerCreditEntriesOptions,
   RecordCustomerCreditPaymentInput,
@@ -80,7 +81,7 @@ export interface DesktopCommerceBridge {
   listCustomerCreditAccounts: (options?: ListCustomerCreditAccountsOptions) => Promise<CustomerCreditAccountSummary[]>;
   getCustomerCreditAccount: (customerId: string) => Promise<CustomerCreditAccountDetail>;
   prepareCustomerCreditWhatsApp: (input: PrepareCustomerCreditWhatsAppInput) => Promise<CustomerCreditWhatsAppPreparation>;
-  listCustomerCreditEntries: (customerId: string, options?: ListCustomerCreditEntriesOptions) => Promise<CustomerCreditEntry[]>;
+  listCustomerCreditEntries: (customerId: string, options?: ListCustomerCreditEntriesOptions) => Promise<CustomerCreditHistoryEntry[]>;
   createCustomerCreditSale: (input: CreateCustomerCreditSaleInput) => Promise<CommerceSale>;
   recordCustomerCreditPayment: (input: RecordCustomerCreditPaymentInput) => Promise<CustomerCreditEntry>;
   addCustomerCreditAdjustment: (input: AddCustomerCreditAdjustmentInput) => Promise<CustomerCreditEntry>;

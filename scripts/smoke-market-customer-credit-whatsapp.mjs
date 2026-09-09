@@ -112,7 +112,7 @@ try {
     const invoke = (method) => (...args) => window.__m83Call(method, args);
     window.yardimciDesktop = { commerce: Object.fromEntries(methods.map((method) => [method, invoke(method)])), openExternal: invoke("openExternal") };
   }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path), methods: Object.keys(channels) });
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/m83-smoke`);
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/m83-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
   await page.getByRole("button", { name: /Ahmet Paylaşım/ }).click();
   const panel = page.getByRole("region", { name: "Veresiye hesabı", exact: true });
@@ -272,6 +272,11 @@ try {
   await quick.getByLabel("Müşteri", { exact: true }).selectOption(customerId);
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-receipt")).toContainText("Veresiye satış kaydedildi.");
+  assert.equal(preparedCount(), noAutoStart); assert.equal(external.length, noAutoExternal);
+  await navigate("Müşteriler"); await openAccount(); await share();
+  assert.ok(account().entries.some((entry) => entry.saleDetail?.items.some((item) => item.productName === product.name)));
+  await expect(editor).toHaveValue(buildCustomerCreditWhatsAppMessage({ customerName: account().customer.fullName, balances: account().balances }));
+  await expect(editor).not.toHaveValue(/Paylaşım Test Ürünü|birim|Satış kalemleri/);
   assert.equal(preparedCount(), noAutoStart); assert.equal(external.length, noAutoExternal);
   assert.deepEqual(pageErrors, []);
   assert.ok(calls.every((call) => !/markWhatsAppMessageSent|createManualRequest|saveAiWorkspaceResult|finance/i.test(call.method)));

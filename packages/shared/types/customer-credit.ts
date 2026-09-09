@@ -25,6 +25,31 @@ export interface CustomerCreditBalance {
   amountMinor: number;
 }
 
+/** Read-only commerce snapshots; monetary values use sale-model major units. */
+export interface CustomerCreditSaleLineItem {
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  currency: string;
+}
+
+export interface CustomerCreditSaleDetail {
+  items: CustomerCreditSaleLineItem[];
+  subtotal: number;
+  discountTotal: number;
+  total: number;
+  currency: string;
+}
+
+/** History projection only: never persisted into the debt/payment ledger. */
+export interface CustomerCreditHistoryEntry extends CustomerCreditEntry {
+  /** Absent for non-sale movements; null when the linked snapshot is missing. */
+  saleDetail?: CustomerCreditSaleDetail | null;
+}
+
 export interface CustomerCreditCustomer {
   id: string;
   businessId: string;
@@ -46,7 +71,7 @@ export interface CustomerCreditAccountDetail {
   /** Includes currencies whose balance has reached zero. */
   balances: CustomerCreditBalance[];
   /** Latest 200 entries. Use listCustomerCreditEntries for additional pages. */
-  entries: CustomerCreditEntry[];
+  entries: CustomerCreditHistoryEntry[];
 }
 
 export interface CreateCustomerCreditSaleInput {
