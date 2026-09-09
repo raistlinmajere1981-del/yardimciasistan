@@ -181,6 +181,7 @@ export function projectAndroidOperationsSnapshot(
   };
 }
 
+/** @compiledSmoke Used via dist-electron by scripts/smoke-market-android-foundation.mjs. */
 export function projectAndroidMarketSnapshot(
   source: AndroidMarketSnapshot,
   enabled: ReadonlySet<BusinessCapability>,

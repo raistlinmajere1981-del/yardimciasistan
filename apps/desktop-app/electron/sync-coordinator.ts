@@ -21,6 +21,7 @@ const SYNC_HTTP_TIMEOUT_MS = 15_000;
 const RETRY_DELAYS_SECONDS = [5, 15, 30, 60, 300] as const;
 const REQUIRED_ANDROID_SYNC_FEATURES = ["android_device_sightings", "android_device_permissions"] as const;
 
+/** @compiledSmoke Used via dist-electron by scripts/smoke-automatic-sync.mjs. */
 export function supportsAndroidDevicePermissionSync(
   capabilities: Pick<SyncCapabilitiesSuccess, "schema_version" | "features">
 ): boolean {
@@ -491,6 +492,7 @@ export class SyncCoordinator {
   }
 }
 
+/** @compiledSmoke Used via dist-electron by scripts/smoke-sync-timeout.mjs. */
 export function createSyncFetchWithTimeout(fetchImpl: typeof fetch, timeoutMs = SYNC_HTTP_TIMEOUT_MS): typeof fetch {
   const boundedTimeoutMs = Math.max(1, Math.trunc(timeoutMs));
   return async (input, init = {}) => {

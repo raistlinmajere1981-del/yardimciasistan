@@ -11,10 +11,12 @@ import { createServer } from "vite";
 import { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint, prepareWhatsAppAction } from "@yardimci-asistan/whatsapp-bridge";
 
 const appPath = join(process.cwd(), "apps/desktop-app");
-const require = createRequire(join(appPath, "dist-electron/commerce-ipc.js"));
-const { DesktopDatabase } = require("./database.js");
-const runtime = require("./commerce-runtime.js");
-const { applyBusinessProfileCapabilities, readBusinessCapabilitySnapshot, setBusinessCapability } = require("./business-capability-store.js");
+const require = createRequire(import.meta.url);
+// Keep testing compiled artifacts; the VM's relative imports resolve beside commerce-ipc.js.
+const commerceRequire = createRequire(join(appPath, "dist-electron/commerce-ipc.js"));
+const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const runtime = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
+const { applyBusinessProfileCapabilities, readBusinessCapabilitySnapshot, setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-m83-"));
 const database = new DesktopDatabase({ appPath, userDataPath: dataDir });
 const artifacts = join(process.cwd(), "artifacts/screenshots/m83-credit-whatsapp");
@@ -43,7 +45,7 @@ try {
   const exports = {};
   let locked = false, mutationNotifications = 0;
   runInNewContext(readFileSync(join(appPath, "dist-electron/commerce-ipc.js"), "utf8"), {
-    exports, require: (id) => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } } : require(id)
+    exports, require: (id) => id === "electron" ? { ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) } } : commerceRequire(id)
   });
   exports.registerCommerceIpcHandlers({ databasePath: () => path, assertUnlocked: () => { if (locked) throw new Error("Uygulama kilitli."); }, onMutation: () => { mutationNotifications += 1; } });
   const invoke = (channel, ...args) => handlers.get(channel)({}, ...args);
