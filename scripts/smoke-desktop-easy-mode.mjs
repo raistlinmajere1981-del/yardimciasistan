@@ -40,8 +40,8 @@ async function runSmoke() {
 
     await verifyFreshSetup(browser, baseUrl);
     await verifyEmbeddedSettings(browser, baseUrl);
-    await verifyLegacyPreferenceMigration(browser, baseUrl);
-    await verifyMalformedPreferenceMigration(browser, baseUrl);
+    await verifyPartialPreferenceRecord(browser, baseUrl);
+    await verifyMalformedPreferenceRecord(browser, baseUrl);
 
     console.log(`desktop-easy-mode-ok: ${baseUrl}`);
   } catch (error) {
@@ -140,7 +140,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
       const businessNameControl = document.querySelector(".settings-identity-section input");
       const businessNameLabel = businessNameControl?.closest("label");
       const appearanceHelper = document.querySelector(".appearance-controls small");
-      const moduleToggle = document.querySelector(".settings-modules-section .setup-toggle-grid label");
+      const serviceToggle = document.querySelector(".settings-services-section .setup-toggle-grid label");
       const categoryLabel = document.querySelector(".table-category-row label");
       const categoryControl = document.querySelector(".table-category-row input");
       const settingsLevelControl = document.querySelector(".settings-level-tabs button");
@@ -150,7 +150,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
         || !(businessNameControl instanceof HTMLElement)
         || !(businessNameLabel instanceof HTMLElement)
         || !(appearanceHelper instanceof HTMLElement)
-        || !(moduleToggle instanceof HTMLElement)
+        || !(serviceToggle instanceof HTMLElement)
         || !(categoryLabel instanceof HTMLElement)
         || !(categoryControl instanceof HTMLElement)
         || !(settingsLevelControl instanceof HTMLElement)
@@ -164,7 +164,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
         businessNameControlHeight: businessNameControl.getBoundingClientRect().height,
         businessNameLabelFontSize: Number.parseFloat(getComputedStyle(businessNameLabel).fontSize),
         helperFontSize: Number.parseFloat(getComputedStyle(appearanceHelper).fontSize),
-        moduleToggleHeight: moduleToggle.getBoundingClientRect().height,
+        serviceToggleHeight: serviceToggle.getBoundingClientRect().height,
         categoryLabelFontSize: Number.parseFloat(getComputedStyle(categoryLabel).fontSize),
         categoryControlHeight: categoryControl.getBoundingClientRect().height,
         settingsLevelControlHeight: settingsLevelControl.getBoundingClientRect().height,
@@ -181,7 +181,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     expect(easyMeasurements.businessNameControlHeight).toBeGreaterThanOrEqual(44);
     expect(easyMeasurements.businessNameLabelFontSize).toBeGreaterThanOrEqual(17);
     expect(easyMeasurements.helperFontSize).toBeGreaterThanOrEqual(15);
-    expect(easyMeasurements.moduleToggleHeight).toBeGreaterThanOrEqual(44);
+    expect(easyMeasurements.serviceToggleHeight).toBeGreaterThanOrEqual(44);
     expect(easyMeasurements.categoryLabelFontSize).toBeGreaterThanOrEqual(13.5);
     expect(easyMeasurements.categoryControlHeight).toBeGreaterThanOrEqual(44);
     expect(easyMeasurements.settingsLevelControlHeight).toBeGreaterThanOrEqual(44);
@@ -276,16 +276,16 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
   }
 }
 
-async function verifyLegacyPreferenceMigration(activeBrowser, rendererUrl) {
-  const legacyPreferences = { theme: "dark", scale: 1.1 };
-  const context = await createIsolatedContext(activeBrowser, legacyPreferences);
+async function verifyPartialPreferenceRecord(activeBrowser, rendererUrl) {
+  const partialPreferences = { theme: "dark", scale: 1.1 };
+  const context = await createIsolatedContext(activeBrowser, partialPreferences);
   const page = await context.newPage();
   const pageErrors = trackPageErrors(page);
 
   try {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
-    expect(JSON.parse(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord))).toEqual(legacyPreferences);
+    expect(JSON.parse(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord))).toEqual(partialPreferences);
     await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -300,14 +300,14 @@ async function verifyLegacyPreferenceMigration(activeBrowser, rendererUrl) {
     });
     expect(pageErrors).toEqual([]);
   } catch (error) {
-    await reportScenarioFailure("legacy preferences", page, pageErrors);
+    await reportScenarioFailure("partial preferences", page, pageErrors);
     throw error;
   } finally {
     await context.close();
   }
 }
 
-async function verifyMalformedPreferenceMigration(activeBrowser, rendererUrl) {
+async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
   const malformedPreferences = "{not-valid-json";
   const context = await createIsolatedContext(activeBrowser, malformedPreferences);
   const page = await context.newPage();
@@ -401,7 +401,7 @@ function createSetupFixture(setupRequired = true) {
     setupRequired,
     appPasswordConfigured: false,
     businessName: "Deniz Çiçeği Pansiyon & Kafe",
-    businessType: "pension_restaurant",
+    profileId: "pension_restaurant",
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "smoke@example.test",
@@ -419,10 +419,7 @@ function createSetupFixture(setupRequired = true) {
     aiApiKeyConfigured: false,
     aiLastPublishedAt: "",
     aiProfiles: [],
-    modules: {
-      rooms: true,
-      tables: true,
-      qrMenu: true,
+    servicePreferences: {
       whatsapp: true,
       android: true
     },

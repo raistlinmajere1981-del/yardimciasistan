@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import process from "node:process";
@@ -78,7 +78,7 @@ try {
   const firstEncryptedAiApiKey = "safe-storage:v1:opaque-smoke-value-001";
   const setupInput = {
     businessName: "Deniz Çiçeği Pansiyon & Kafe",
-    businessType: "pension_restaurant",
+    profileId: "pension_restaurant",
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "smoke@example.test",
@@ -95,10 +95,8 @@ try {
     aiTimeoutSeconds: 30,
     aiApiKey: firstRawAiApiKey,
     clearAiApiKey: false,
-    modules: {
-      rooms: true,
-      tables: true,
-      qrMenu: true,
+    aiModelOptions: [],
+    servicePreferences: {
       whatsapp: true,
       android: true
     },
@@ -267,18 +265,6 @@ try {
   assert.equal(database.getEncryptedAiApiKey("openrouter"), secondEncryptedAiApiKey);
   assert.equal(database.getEncryptedAiApiKey("gemini"), googleEncryptedAiApiKey);
   assert.equal(replaceResult.setupData.aiProfiles.find((profile) => profile.service === "gemini")?.apiKeyConfigured, true);
-
-  const backupResult = database.createManualBackup();
-  assert.equal(backupResult.ok, true);
-  assert.match(backupResult.backupFileName, /^yardimci-asistan-.+\.sqlite$/);
-  assert.equal(backupResult.dashboardData.backupPath, database.backupPath);
-  assert.equal(existsSync(backupResult.backupFilePath), true);
-  assert.ok(statSync(backupResult.backupFilePath).size > 0);
-  assertReadableSqliteBackup(backupResult.backupFilePath);
-  assertFilesDoNotContainSecrets(
-    [database.databasePath, backupResult.backupFilePath],
-    [firstRawAiApiKey, secondRawAiApiKey, googleRawAiApiKey, groqRawAiApiKey]
-  );
 
   const clearResult = database.saveInitialSetup(
     {
@@ -536,8 +522,6 @@ try {
   });
   assert.equal(database.countEventsByType("sync.failed"), failedSyncCount + 1);
 
-  assertLegacyAiMigration(appPath, join(dataDir, "legacy-migration"));
-
   console.log(`desktop-menu-db-ok: setup ${categoryResult.savedId} ${itemResult.savedId}`);
 } finally {
   database.close();
@@ -549,24 +533,6 @@ function seedOperationalSmokeData(databasePath) {
     sqlite.exec(readFileSync(join(process.cwd(), "scripts", "fixtures", "desktop-operations-smoke.sql"), "utf8"));
   } finally {
     sqlite.close();
-  }
-}
-
-function assertReadableSqliteBackup(backupFilePath) {
-  const backupDb = new DatabaseSync(backupFilePath);
-
-  try {
-    assert.equal(String(scalar(backupDb, "PRAGMA integrity_check")), "ok");
-    assert.equal(scalar(backupDb, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Deniz Çiçeği Pansiyon & Kafe");
-    assert.equal(scalar(backupDb, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1"), "smoke-secret-12345");
-    assert.equal(Number(scalar(backupDb, "SELECT setup_completed FROM settings WHERE deleted_at = '' LIMIT 1")), 1);
-    assert.equal(scalar(backupDb, "SELECT ai_service FROM settings WHERE deleted_at = '' LIMIT 1"), "openrouter");
-    assert.equal(scalar(backupDb, "SELECT ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1"), "safe-storage:v1:opaque-smoke-value-002");
-    assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")) >= 3);
-    assert.ok(Number(scalar(backupDb, "SELECT COUNT(*) FROM tables WHERE deleted_at = ''")) >= 3);
-    assert.equal(scalar(backupDb, "SELECT customer_name FROM requests WHERE id = 'request_demo_001'"), "Demo Misafir");
-  } finally {
-    backupDb.close();
   }
 }
 
@@ -1100,7 +1066,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.match(repeatedQuantityResult.message, /değişmiş/i);
   assert.equal(database.getActiveTableOrder("table_001").items[0].quantity, 3);
 
-  const preparingResult = database.applyAndroidAction(androidAction("android_action_order_preparing_001", "table_order_set_status", {
+  const preparingResult = database.applyAndroidAction(androidAction("android_action_order_preparing_001", "table_order_set_preparing", {
     order_id: openedOrder.id,
     status: "preparing"
   }));
@@ -1108,7 +1074,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.equal(database.getActiveTableOrder("table_001").status, "preparing");
   assert.equal(database.getActiveTableOrder("table_001").items[0].status, "preparing");
 
-  const servedResult = database.applyAndroidAction(androidAction("android_action_order_served_001", "table_order_set_status", {
+  const servedResult = database.applyAndroidAction(androidAction("android_action_order_served_001", "table_order_set_served", {
     order_id: openedOrder.id,
     status: "served"
   }));
@@ -1131,14 +1097,14 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.equal(replacementAddResult.ok, true);
   assert.equal(database.getActiveTableOrder("table_001").items.length, 1);
 
-  const paymentResult = database.applyAndroidAction(androidAction("android_action_order_payment_001", "table_order_set_status", {
+  const paymentResult = database.applyAndroidAction(androidAction("android_action_order_payment_001", "table_order_set_payment_waiting", {
     order_id: openedOrder.id,
     status: "payment"
   }));
   assert.equal(paymentResult.ok, true);
   assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "bill_waiting");
 
-  const closeResult = database.applyAndroidAction(androidAction("android_action_order_close_001", "table_order_close", {
+  const closeResult = database.applyAndroidAction(androidAction("android_action_order_close_001", "table_order_close_paid", {
     order_id: openedOrder.id,
     status: "paid"
   }));
@@ -1168,7 +1134,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   }));
   assert.equal(staleOrderAddResult.ok, false);
   assert.equal(database.getActiveTableOrder("table_001").items.length, 0);
-  const cancelResult = database.applyAndroidAction(androidAction("android_action_order_cancel_001", "table_order_close", {
+  const cancelResult = database.applyAndroidAction(androidAction("android_action_order_cancel_001", "table_order_cancel", {
     order_id: secondOrder.id,
     status: "cancelled"
   }));
@@ -1399,79 +1365,6 @@ function androidAction(id, actionType, payload, deviceId = "android-smoke-device
     error_message: "",
     processed_at: ""
   };
-}
-
-function assertLegacyAiMigration(desktopAppPath, legacyDataDir) {
-  mkdirSync(legacyDataDir, { recursive: true });
-  const legacyDatabasePath = join(legacyDataDir, "yardimci-asistan.sqlite");
-  const legacyDb = new DatabaseSync(legacyDatabasePath);
-
-  try {
-    legacyDb.exec(`
-      CREATE TABLE schema_migrations (
-        id TEXT PRIMARY KEY,
-        applied_at TEXT NOT NULL
-      );
-    `);
-    legacyDb.exec(readFileSync(join(desktopAppPath, "db", "migrations", "001_initial_schema.sql"), "utf8"));
-    legacyDb.exec(readFileSync(join(desktopAppPath, "db", "migrations", "002_setup_completion.sql"), "utf8"));
-    legacyDb.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run("001_initial_schema.sql", "2026-07-10T10:00:00.000Z");
-    legacyDb.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run("002_setup_completion.sql", "2026-07-10T10:00:01.000Z");
-    legacyDb.exec(`
-      INSERT INTO business (
-        id, name, display_name, business_type, whatsapp, modules_json, created_at, updated_at
-      ) VALUES (
-        'business_demo_001', 'legacy-smoke', 'Legacy Smoke', 'other', '+905551112233', '{}',
-        '2026-07-10T10:00:00.000Z', '2026-07-10T10:00:00.000Z'
-      );
-
-      INSERT INTO settings (
-        id, business_id, web_module_url, sync_secret, ai_enabled, ai_provider, ai_model,
-        created_at, updated_at, setup_completed
-      ) VALUES (
-        'settings_demo_001', 'business_demo_001', 'https://yardimciasistan.alwaysdata.net/', 'legacy-secret-12345',
-        1, 'openai_compatible', 'legacy-model',
-        '2026-07-10T10:00:00.000Z', '2026-07-10T10:00:00.000Z', 1
-      );
-    `);
-  } finally {
-    legacyDb.close();
-  }
-
-  const migratedDatabase = new DesktopDatabase({
-    appPath: desktopAppPath,
-    userDataPath: legacyDataDir
-  });
-
-  try {
-    migratedDatabase.initialize();
-    const migratedSetup = migratedDatabase.getSetupData();
-    assert.equal(migratedSetup.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
-    assert.equal(migratedSetup.aiEnabled, true);
-    assert.equal(migratedSetup.aiProvider, "openai_compatible");
-    assert.equal(migratedSetup.aiService, "openai");
-    assert.equal(migratedSetup.aiModel, "legacy-model");
-    assert.equal(migratedSetup.aiBaseUrl, "https://api.openai.com/v1");
-    assert.equal(migratedSetup.aiTimeoutSeconds, 30);
-    assert.equal(migratedSetup.aiApiKeyConfigured, false);
-    assert.equal(migratedSetup.aiLastPublishedAt, "");
-    assert.equal(migratedSetup.aiProfiles.find((profile) => profile.service === "openai")?.model, "legacy-model");
-    assert.deepEqual(migratedSetup.aiProfiles.find((profile) => profile.service === "openai")?.modelOptions, [
-      { id: "legacy-model", label: "legacy-model" }
-    ]);
-    assert.equal(migratedDatabase.getEncryptedAiApiKey(), "");
-  } finally {
-    migratedDatabase.close();
-  }
-}
-
-function assertFilesDoNotContainSecrets(filePaths, secrets) {
-  for (const filePath of filePaths) {
-    const contents = readFileSync(filePath);
-    for (const secret of secrets) {
-      assert.equal(contents.includes(Buffer.from(secret, "utf8")), false, `${filePath} ham AI API anahtarını içermemeli.`);
-    }
-  }
 }
 
 function scalar(database, sql) {

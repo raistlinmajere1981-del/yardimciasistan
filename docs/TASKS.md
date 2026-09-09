@@ -12,7 +12,7 @@ Bu belge Yardımcı Asistan'ın güncel çalışma sırasını tanımlar. Ayrın
 - Android doğrudan Desktop SQLite'a bağlanmaz; action/snapshot sözleşmesini kullanır.
 - İşletme profili yalnız ilk preset'tir.
 - **Persisted business capabilities runtime source of truth'tur.**
-- Yeni feature gate'leri `businessType === ...` üzerinden yazılmaz.
+- Yeni feature gate'leri profil kimliği üzerinden yazılmaz.
 - Hibrit işletmeler yeni business type kombinasyonlarıyla değil capability ekleme/çıkarma ile oluşur.
 - Renderer SQLite/store import etmez; Electron erişimi preload/IPC üzerinden yapılır.
 - Sandboxed preload dependency-light kalır.
@@ -42,22 +42,15 @@ build:packages
 desktop build
 quality:strict
 business capabilities smoke
-capability runtime v2 smoke
-setup capability contract smoke
+capability runtime smoke
+setup profile contract smoke
 commerce foundation smoke
 commerce runtime smoke
 ```
 
-Aşağıdaki eski alanlar bazı backend compatibility yollarında fiziksel olarak kalabilir ancak yeni kod tarafından source of truth olarak kullanılmaz:
-
-```text
-business.modules_json
-settings.rooms_enabled
-settings.tables_enabled
-settings.qr_menu_enabled
-```
-
-Bunların fiziksel silinmesi, büyük setup/database persistence kodu daha küçük repository/service katmanlarına ayrılırken yapılacak bakım işidir; Market mimarisini bloke etmez.
+Temiz kurulum yalnız `apps/desktop-app/db/migrations/001_baseline.sql` kullanır. Eski
+profil/module sütunları ve migration yükseltme yolları desteklenmez; backup/restore
+current-baseline manifesti ve SQLite şemasıyla doğrulanır.
 
 ---
 
@@ -145,15 +138,16 @@ Gerçek saha yazıcısı belli olduğunda adapter:
 - TSPL
 - gerekirse Windows printer adapter
 
-## M1.7 — Market profilini aç
+## M1.7 — Market profilini aç — TAMAMLANDI
 
-Market workspace'in minimum günlük akışı ve smoke testleri tamamlandıktan sonra shared registry'de:
+Market workspace'in minimum günlük akışı ve smoke testleri tamamlandı; shared registry'de
+beş desteklenen profil arasında yer alır. Profil seçicisi:
 
 ```text
-market.availability = available
+market
 ```
 
-olur ve setup selector'a eklenir.
+değerini doğrudan registry'den gösterir; ayrı availability/profil listesi yoktur.
 
 ---
 

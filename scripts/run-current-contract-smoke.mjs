@@ -20,7 +20,7 @@ const syncStatusStub = `      getSyncStatus: async () => ({
       }),
       onSyncStatusChanged: () => () => {},`;
 const capabilitySnapshotStub = `      getBusinessCapabilitySnapshot: async () => {
-        const enabledCapabilities = [
+        const coreCapabilities = [
           "core.customers",
           "core.tasks",
           "core.calendar",
@@ -30,30 +30,23 @@ const capabilitySnapshotStub = `      getBusinessCapabilitySnapshot: async () =>
           "core.web",
           "core.sync",
           "core.backups",
-          "core.devices",
-          ...(setupData.modules.rooms ? [
-            "accommodation.rooms",
-            "accommodation.reservations",
-            "accommodation.stays",
-            "accommodation.folio"
-          ] : []),
-          ...(setupData.modules.tables ? [
-            "food_service.tables",
-            "food_service.reservations",
-            "food_service.orders",
-            "food_service.menu",
-            "commerce.catalog",
-            "commerce.sales"
-          ] : []),
-          ...(setupData.modules.qrMenu ? ["channel.qr_menu", "commerce.inventory"] : []),
-          ...(setupData.modules.whatsapp ? ["service.whatsapp"] : []),
-          ...(setupData.aiEnabled ? ["service.ai"] : []),
-          ...(setupData.modules.android ? ["service.android"] : [])
+          "core.devices"
         ];
+        const profileCapabilities = {
+          pension_restaurant: ["service.whatsapp", "service.android", "accommodation.rooms", "accommodation.reservations", "accommodation.stays", "accommodation.folio", "food_service.tables", "food_service.reservations", "food_service.orders", "food_service.menu", "channel.qr_menu", "commerce.catalog", "commerce.inventory", "commerce.sales"],
+          pension: ["service.whatsapp", "service.android", "accommodation.rooms", "accommodation.reservations", "accommodation.stays", "accommodation.folio"],
+          restaurant: ["service.whatsapp", "service.android", "food_service.tables", "food_service.reservations", "food_service.orders", "food_service.menu", "channel.qr_menu", "commerce.catalog", "commerce.inventory", "commerce.sales"],
+          cafe: ["service.whatsapp", "service.android", "food_service.tables", "food_service.reservations", "food_service.orders", "food_service.menu", "channel.qr_menu", "commerce.catalog", "commerce.inventory", "commerce.sales"],
+          market: ["service.whatsapp", "service.android", "commerce.catalog", "commerce.inventory", "commerce.sales", "commerce.customer_credit", "retail.barcode", "retail.purchasing", "retail.suppliers", "retail.labels"]
+        };
+        const enabledSet = new Set([...coreCapabilities, ...(profileCapabilities[setupData.profileId] || [])]);
+        if (setupData.servicePreferences?.whatsapp === false) enabledSet.delete("service.whatsapp");
+        if (setupData.servicePreferences?.android === false) enabledSet.delete("service.android");
+        if (setupData.aiEnabled) enabledSet.add("service.ai");
+        const enabledCapabilities = [...enabledSet];
         return {
           businessId: "renderer-smoke-business",
-          businessType: setupData.businessType,
-          profileId: setupData.businessType,
+          profileId: setupData.profileId,
           capabilities: enabledCapabilities.map((capability) => ({
             capability,
             enabled: true,

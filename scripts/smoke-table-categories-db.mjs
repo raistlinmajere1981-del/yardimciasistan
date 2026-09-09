@@ -28,7 +28,7 @@ try {
 
   const setupInput = {
     businessName: "Kategori Smoke Restoranı",
-    businessType: "restaurant",
+    profileId: "restaurant",
     phone: "+905551112233",
     whatsapp: "+905551112233",
     email: "kategori@example.test",
@@ -46,10 +46,7 @@ try {
     aiTimeoutSeconds: 30,
     aiApiKey: "",
     clearAiApiKey: false,
-    modules: {
-      rooms: false,
-      tables: true,
-      qrMenu: false,
+    servicePreferences: {
       whatsapp: false,
       android: false
     },

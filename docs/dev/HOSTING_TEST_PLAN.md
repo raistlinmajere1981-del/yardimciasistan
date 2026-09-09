@@ -89,18 +89,16 @@ Yükleme seçenekleri:
 
 ## İzinler
 
-PHP şu dosyalara yazabilmelidir:
+PHP yalnız güncel SQLite runtime dosyasına ve AI konuşma dosyasına yazabilmelidir:
 
 ```text
-yardimci-asistan/data/requests.json
+yardimci-asistan/data/yardimci-asistan.sqlite
 yardimci-asistan/data/ai-conversations.json
-yardimci-asistan/data/menu.json
-yardimci-asistan/data/android-snapshot.json
-yardimci-asistan/data/sync-state.json
 ```
 
-Başlangıç için `data/` klasörü `755`, JSON dosyaları `664` denenir. Yazma
-hatası görülürse hosting kullanıcısına göre `775` / `666` gerekebilir.
+Başlangıç için `data/` klasörü `755`, SQLite ve AI konuşma dosyası sahibi için
+yazılabilir denenir. Yazma hatası görülürse hosting kullanıcısına göre klasör
+izinleri düzeltilir; eski JSON veri dosyaları oluşturulmaz.
 
 ## Canlı Kontrol
 

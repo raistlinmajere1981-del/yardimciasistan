@@ -1,6 +1,6 @@
 # Yardımcı Asistan — Modüler İşletme Temeli ve Market Handoff
 
-> Güncellik: 2026-09-08
+> Güncellik: 2026-09-09
 > Amaç: Pansiyon/restoran odaklı ilk üründen, farklı küçük işletme türlerinin aynı çekirdeği paylaşabildiği capability-first mimariye geçişte alınan kararların tek referansı olmak.
 
 ## 1. Ürün yönü
@@ -64,7 +64,7 @@ Canonical capability registry:
 
 - `packages/shared/types/business-capabilities.ts`
 
-Yeni workspace veya servis görünürlüğü için `businessType` kontrolü eklenmemelidir. Runtime kararında persisted capability kullanılmalıdır.
+Yeni workspace veya servis görünürlüğü için profil kimliği kontrolü eklenmemelidir. Runtime kararında persisted capability kullanılmalıdır.
 
 ## 3. Mevcut profiller
 
@@ -76,11 +76,7 @@ Yeni workspace veya servis görünürlüğü için `businessType` kontrolü ekle
 - `cafe`
 - `market`
 
-### Planlı
-
-- `other`
-
-`market` minimum günlük perakende akışı tamamlandığı için normal kurulum seçicisinde kullanılabilir durumdadır. Kurulum seçicisi authoritative `getAvailableBusinessProfiles()` registry çıktısını kullanır; yeni profil açılışları ikinci bir hardcoded sektör listesine bağlanmamalıdır.
+`market` minimum günlük perakende akışı tamamlandığı için normal kurulum seçicisinde kullanılabilir durumdadır. Kurulum seçicisi `getBusinessProfiles()` registry çıktısını kullanır; yeni profil açılışları ikinci bir hardcoded sektör listesine bağlanmamalıdır.
 
 Market varsayımları:
 
@@ -143,7 +139,7 @@ profile → seçilen profil varsayımı
 user    → açık kullanıcı override'ı
 ```
 
-Eski `legacy` kaynak ve eski module alanları yalnız geçiş uyumluluğu içindir; yeni kod bunları runtime karar kaynağı olarak kullanmamalıdır.
+Capability kaynağı yalnız `system`, `profile` veya `user` olabilir; eski module alanları ve eski profil projeksiyonları güncel baseline'da yoktur.
 
 Ana servisler:
 
@@ -170,9 +166,9 @@ Temel Ayarlar'da yalnız doğrudan kullanıcı tercihi olan bağlı servis kontr
 
 Domain yetenekleri `Ayarlar → Özel Yetenekler` alanından yönetilir. Burada Konaklama, Yiyecek & İçecek, Ticaret Çekirdeği ve Perakende grupları ayrı görünür; böylece Market + Pansiyon gibi hibritler profil çoğaltmadan kullanıcı override'larıyla kurulabilir.
 
-Eski büyük `LegacySetupWizard` henüz tamamen parçalanmadığı için setup save yolunda Electron-side geçici compatibility adapter vardır. Görsel sektör seçicisinin statik legacy seçenekleri de capability-first `SetupWizard` boundary'sinde `getAvailableBusinessProfiles()` çıktısıyla senkronlanır. Bu projection yeni source of truth değildir; authoritative kaynak shared profile registry'dir.
+Kurulum formu doğrudan shared profile registry'sini kullanır ve tek `profileId + servicePreferences` sözleşmesini Electron'a gönderir. Ayrı bir kaldırılmış wizard, DOM projection'ı veya setup save adapter'ı yoktur.
 
-**Kural:** Yeni renderer kodu `DesktopSetupData.modules` okumamalı ve yeni setup alanı eski `modules` sözleşmesine eklenmemelidir.
+**Kural:** Yeni renderer kodu profil kimliğini runtime feature gate olarak kullanmamalı; capability snapshot'ını okumalıdır.
 
 ## 7. Commerce foundation
 
@@ -319,8 +315,8 @@ Runner'ın kritik smoke zinciri:
 
 ```text
 business-capabilities-smoke-ok
-capability-runtime-v2-smoke-ok
-setup-capability-contract-smoke-ok
+capability-runtime-smoke-ok
+setup-profile-contract-smoke-ok
 commerce-foundation-smoke-ok
 commerce-runtime-smoke-ok
 commerce-ipc-contract-smoke-ok
@@ -329,7 +325,7 @@ market-quick-sale-contract-smoke-ok
 market-sale-runtime-smoke-ok
 market-barcode-input-contract-smoke-ok
 market-label-printer-contract-smoke-ok
-market-profile-availability-smoke-ok
+market-profile-registry-smoke-ok
 market-android-foundation-smoke-ok
 ```
 
@@ -342,22 +338,13 @@ market-android-foundation-smoke-ok
 
 Market kodu bu kuralları gevşetmemelidir.
 
-## 11. Bilinçli olarak kalan geçiş borcu
+## 11. Baseline cleanup sonucu
 
-Aşağıdaki eski alanlar bazı backend/setup compatibility yollarında hâlâ fiziksel olarak bulunabilir:
+Güncel temiz kurulum şeması yalnız `apps/desktop-app/db/migrations/001_baseline.sql` dosyasından oluşur. `business` tablosunda profil kimliği dışında module projeksiyonu bulunmaz; capability runtime yalnız `business_capabilities` tablosundan okunur.
 
-```text
-business.modules_json
-settings.rooms_enabled
-settings.tables_enabled
-settings.qr_menu_enabled
-```
+Eski kurulum wizard'ı, setup contract/runtime adapter'ları, profil availability katmanı ve Android masa-sipariş alias'ları kaldırılmıştır. Güncel capability IPC kanalı korunur; renderer yalnız persisted capability snapshot'ını kullanır. Eski veritabanı migration zinciri ve cleanup öncesi backup'lar bilinçli olarak desteklenmez.
 
-Bunlar **runtime source of truth değildir**. Capability tablosu authoritative'dir.
-
-Bu alanları fiziksel olarak kaldırmak, çok büyük `database.ts` setup persistence metodunu daha küçük repository/service parçalarına ayırma işiyle birlikte yapılmalıdır. Market workspace'i bunlara bağlanmadığı sürece bu temizlik Market mimarisini bloke etmez.
-
-Aynı şekilde `LegacySetupWizard` ismi ve compatibility form shape'i yeni özellik geliştirme yüzeyi değildir. Statik sektör `<option>` listesinin registry projection'ı da geçici bir compatibility katmanıdır; wizard parçalandığında normal React profile selector doğrudan shared registry'yi kullanmalıdır.
+Baseline nesne eşdeğerliği ve kabul edilen farklar `artifacts/baseline-cleanup/schema-equivalence.md` içindedir. Current database, backup manifest ve restore doğrulaması `001_baseline.sql` kimliğini zorunlu kılar.
 
 ## 12. Market MVP tamamlanma durumu
 
@@ -384,7 +371,7 @@ Tedarikçiler / Alım
 Etiketler
 ```
 
-Workspace `businessType` ile değil persisted capabilities ile açılır.
+Workspace profil kimliğiyle değil persisted capabilities ile açılır.
 
 ### M3 — Hızlı Satış — CLOSED
 
@@ -412,12 +399,11 @@ Workspace `businessType` ile değil persisted capabilities ile açılır.
 - Code 128-B
 - ZPL / TSPL / system printer extension points reserved
 
-### M6 — Market profile availability — CLOSED (foundation gate sonrası)
+### M6 — Market profile registry — CLOSED
 
-- `market.availability = available`
 - normal setup selector registry üzerinden Market'i gösterir
 - Perakende capability override grubu hibrit işletmeler için görünür
-- `other` planlı kalır
+- selectable profil listesi yalnız beş desteklenen profilden oluşur
 
 ### M7.1 — Android Market Companion foundation — CLOSED
 
@@ -539,7 +525,7 @@ MVP'nin amacı ileri ERP/muhasebe değildir. Küçük işletmede ürün bulma, s
 
 ## 14. Geri dönülmemesi gereken kararlar
 
-1. `businessType` runtime feature gate değildir.
+1. Profil kimliği runtime feature gate değildir.
 2. Profil yalnız preset'tir; capability gerçek yetkidir.
 3. Core capability'ler her işletmede açık kalır.
 4. Hibrit işletme capability kombinasyonlarıyla oluşur.
@@ -549,7 +535,7 @@ MVP'nin amacı ileri ERP/muhasebe değildir. Küçük işletmede ürün bulma, s
 8. Stok ve satış mutation'ları transaction + audit movement üretir.
 9. Donanım adapter arkasında kalır.
 10. Market MVP sade günlük kullanım ürünüdür; ERP kapsamına genişlemez.
-11. Normal setup profil listesi shared `availability` registry'sinden türetilir.
+11. Normal setup profil listesi shared `getBusinessProfiles()` registry'sinden türetilir.
 
 ## 15. Sonraki session başlangıç kontrolü
 
@@ -567,8 +553,8 @@ M8.3 isteğe bağlı WhatsApp entegrasyonu ayrı iştir.
 
 Capability `commerce.customer_credit`; structural dependencies `core.customers`,
 `commerce.sales`, `core.finance`. Market profilinde varsayılan açıktır. Diğer
-profiller capability üzerinden hibrit olarak açabilir; business_type runtime gate
-yoktur. WhatsApp, Android ve sync coordinator bu runtime'ın bağımlılığı değildir.
+profiller capability üzerinden hibrit olarak açabilir; profil kimliği runtime gate
+değildir. WhatsApp, Android ve sync coordinator bu runtime'ın bağımlılığı değildir.
 
 Model: `customer_credit_entries` immutable ledger; bakiye tablosu/kolonu yoktur.
 Tutar pozitif integer minor units, işaret `debit|credit` yönüdür. Bakiye işletme,
@@ -595,8 +581,8 @@ income aynı transaction'da oluşur. `source_type=customer_credit_payment`,
 `cash|card|bank|other`. Kasa TRY özetleri yalnız TRY hareketlerini toplar; diğer
 currency hareketleri kendi currency bilgisiyle hareket listesinde korunur.
 
-`039_customer_credit_ledger.sql` müşteri sahipliğini de ekler: eski tek işletmeli
-müşteriler aktif işletmeye bağlanır, eski insert yolları aynı kuralı izler.
+Baseline müşteri sahipliğini doğrudan taşır: her müşteri aktif işletmeye bağlıdır ve
+yeni insert yolları aynı kuralı izler.
 Ledger müşteri/satış foreign key'leriyle korunur. Açık pozitif borç müşteri
 soft-delete işlemini engeller; sıfır borçlu silinmiş müşterinin geçmişi okunabilir,
 yeni hareketi reddedilir. Ledger UPDATE/DELETE endpoint'i yoktur.
@@ -625,7 +611,7 @@ currency bazında pozitif borçlar, son hareket zamanı ve son tahsilat bilgisin
 - `npm run android:debug`: `BUILD SUCCESSFUL`; Android source değişmedi.
 - Ek record-deletions, customer-room-management, app-lock, finance-db,
   finance-service ve reports-db smoke'ları geçti.
-- Targeted smoke; 038→039 migration, mevcut kullanıcı override'ları, authoritative
+- Targeted smoke; güncel baseline, mevcut kullanıcı override'ları, authoritative
   fiyat, currency ayrımı, duplicate debit, tam rollback, fazla tahsilat, iki ayrı
   süreçten eşzamanlı ödeme, hibrit profil, kilitli IPC, müşteri silme ve yedekten
   yeniden açma/integrity/foreign-key kontrollerini kapsar.
@@ -642,7 +628,7 @@ görünür. Küçük `CustomerPicker`, mevcut dashboard'ın aktif kayıtlı mü�
 kullanır; ad/telefon arama, seçme ve temizleme sağlar. Ayrı müşteri deposu veya
 yönetim ekranı yoktur. Seçilen müşterinin mevcut borcu hesap API'sinden okunur.
 Capability kapalıyken picker/hesap paneli mount edilmez, gizli hesap read'i yapılmaz.
-`business_type`, WhatsApp ve Android görünürlüğe karar vermez.
+Profil kimliği, WhatsApp ve Android görünürlüğe karar vermez.
 
 Normal yöntemler `createPaidSale`, veresiye `createCustomerCreditSale` çağırır.
 Renderer yalnız müşteri/ürün kimlikleri, miktarlar, indirim ve source gönderir;
@@ -717,7 +703,7 @@ nakit+veresiye, PDF ve raporlar da kapsam dışıdır.
 
 Müşteri hesabının açık detayında ikinci plandaki `WhatsApp'ta Paylaş` aksiyonu
 yalnız `commerce.customer_credit` + `service.whatsapp` kesişiminde görünür.
-Pozitif borç yoksa pasiftir; `business_type` gate yoktur. WhatsApp kapalıyken
+Pozitif borç yoksa pasiftir; profil kimliği gate değildir. WhatsApp kapalıyken
 veresiye satış, tahsilat, düzeltme ve geçmiş kullanılmaya devam eder. Credit
 kapalıyken hesap/paylaşım mount edilmez; gizli balance read'i yapılmaz.
 

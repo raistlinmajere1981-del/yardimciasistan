@@ -13,7 +13,6 @@ const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(repoRoot, "firm-template", "web-module"), webModuleRoot, { recursive: true });
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
-const requestsFile = join(webModuleRoot, "data", "requests.json");
 const originalBusinessConfigJson = readFileSync(businessConfigFile, "utf8");
 for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
@@ -31,7 +30,6 @@ let browser;
 
 try {
   writeFileSync(conversationsFile, "[]\n");
-  writeFileSync(requestsFile, "[]\n");
   allowDemoOrigin(demoWebUrl);
 
   const phpServer = startProcess("php", ["-S", `127.0.0.1:${phpPort}`, "-t", webModuleRoot], repoRoot);

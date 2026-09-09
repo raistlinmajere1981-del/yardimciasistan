@@ -153,7 +153,7 @@ Firma bilgilerini temsil eder.
   "id": "business_001",
   "name": "Örnek Pansiyon",
   "display_name": "Örnek Pansiyon & Restoran",
-  "business_type": "pension_restaurant",
+  "profile_id": "pension_restaurant",
   "logo_url": "/assets/logo.png",
   "primary_color": "#2F6F5E",
   "accent_color": "#F29D52",
@@ -165,36 +165,23 @@ Firma bilgilerini temsil eder.
   "map_url": "https://maps.google.com/...",
   "description": "Kısa firma açıklaması",
   "working_hours": [],
-  "modules": {},
   "created_at": "2026-01-01T10:00:00+03:00",
   "updated_at": "2026-01-01T10:00:00+03:00"
 }
 ```
 
-## business_type Değerleri
+## profile_id Değerleri
 
 ```text
+pension_restaurant
 pension
 restaurant
-pension_restaurant
 cafe
-other
+market
 ```
 
-## modules Örneği
-
-```json
-{
-  "rooms": true,
-  "tables": true,
-  "qr_menu": true,
-  "ai": true,
-  "whatsapp": true,
-  "android": true,
-  "stock": false,
-  "camera": false
-}
-```
+profile_id yalnız ilk capability preset'ini ve provenance bilgisini taşır. Çalışma
+alanı, servis ve cihaz görünürlüğü business_capabilities üzerinden belirlenir.
 
 ---
 
@@ -926,7 +913,6 @@ Firma kurulum ayarlarını temsil eder.
   "sync_secret": "change-this-secret",
   "app_password_verifier": "<salted-scrypt-verifier>",
   "app_password_updated_at": "2026-07-23T10:00:00+03:00",
-  "ai_enabled": true,
   "ai_provider": "openai_compatible",
   "ai_service": "openrouter",
   "ai_base_url": "https://openrouter.ai/api/v1",
@@ -934,12 +920,7 @@ Firma kurulum ayarlarını temsil eder.
   "ai_api_key_encrypted": "<opaque-encrypted-value>",
   "ai_timeout_seconds": 30,
   "ai_last_published_at": "2026-01-01T10:00:00+03:00",
-  "whatsapp_enabled": true,
   "whatsapp_mode": "webview",
-  "android_enabled": true,
-  "rooms_enabled": true,
-  "tables_enabled": true,
-  "qr_menu_enabled": true,
   "created_at": "2026-01-01T10:00:00+03:00",
   "updated_at": "2026-01-01T10:00:00+03:00"
 }
@@ -1054,7 +1035,8 @@ sync_clients
 kaynak istemci/revision ile sunucu revision'ını tutar. `publication_receipts`
 idempotency anahtarlarının sonucunu, `sync_clients` masaüstü acknowledgement cursor'unu
 tutar. Eski JSON dosyaları yalnız ilk açılıştaki migration girdisi ve
-`.legacy-backup-v1` güvenlik kopyasıdır; güncel çalışma deposu değildir.
+SQLite schema_version = 3 güncel hosting storage sözleşmesidir; eski JSON çalışma
+dosyaları otomatik içe aktarılmaz.
 
 AI konuşma geçmişi `ai-conversations.json`, sunucu AI anahtarı ise doğrudan webden
 erişimi engellenmiş `ai-settings.local.php` içinde kalır.

@@ -41,7 +41,7 @@ npm run dev:demo-web:lan
 ```json
 {
   "display_name": "Firma Adı",
-  "business_type": "pension_restaurant",
+  "profile_id": "pension_restaurant",
   "phone": "+90 532 123 45 67",
   "whatsapp": "+90 532 123 45 67",
   "email": "info@firma.com",
@@ -53,14 +53,14 @@ npm run dev:demo-web:lan
 
 `display_name` sitede başlık, menü ve footer alanlarında görünür.
 
-`business_type` örnek değerleri:
+`profile_id` örnek değerleri:
 
 ```text
+pension_restaurant
 pension
 restaurant
-pension_restaurant
 cafe
-other
+market
 ```
 
 ## 3. Logo ve Marka Alanı

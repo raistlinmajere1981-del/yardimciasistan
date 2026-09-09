@@ -70,7 +70,10 @@ Yeni akış:
 6. Cihaz tokenı genel masaüstü senkron anahtarı değildir; yalnız Android summary/action ve ilgili yetkili mobil rapor/görsel akışlarında kullanılabilir.
 7. Header cihaz kimliği ile payload/form cihaz kimliği eşleşmek zorundadır.
 
-Eski hosting paketleriyle geçiş uyumu korunur: token endpoint'i bulunmayan eski kurulumlarda mevcut bağlantı yeni hosting paketi yüklenene kadar çalışmaya devam eder.
+Token endpoint'i olmayan hostinglerde bootstrap anahtarıyla ilk eşleştirme,
+kişisel cihaz tokenı alınana kadar çalışır. Bu yalnız Android cihaz eşleştirme
+geçişidir; eski veritabanı, snapshot, migration veya genel sync protokolü
+uyumluluğu değildir.
 
 ### 6. Release APK içinde firma anahtarı yok
 

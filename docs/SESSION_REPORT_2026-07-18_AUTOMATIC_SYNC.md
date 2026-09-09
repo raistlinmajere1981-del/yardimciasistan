@@ -8,6 +8,11 @@ dönüştürülmesi.
 **Sonuç:** Geliştirme, test ve Alwaysdata canlı geliştirme ortamına dağıtım
 tamamlandı.
 
+> **Baseline cleanup notu (2026-09-09):** Bu tarihsel raporun ilk bölümleri
+> JSON tabanlı hosting ve çoklu migration dönemi için yazılmıştır. Güncel
+> uygulama `001_baseline.sql` ile temiz SQLite kurar; eski JSON çalışma verisi,
+> eski migration zinciri ve gövde içi sync kimlik doğrulaması desteklenmez.
+
 ## 1. Yönetici Özeti
 
 Oturum başında web taleplerini çekme, QR menüyü yayınlama ve Android operasyon
@@ -76,10 +81,8 @@ eklendi. Yeni API protokolü şu yetenekleri sunar:
 - Android tarafında `known_server_revision` ile değişmeyen cevabı kısaltma.
 - QR menü için ETag ve `304 Not Modified` desteği.
 
-Eski `requests.json`, `android-actions.json`, `menu.json`, `android-snapshot.json`
-ve `sync-state.json` dosyaları ilk açılışta bir kez SQLite'a aktarılır. Aktarım
-öncesinde `.legacy-backup-v1` kopyaları alınır. Sonraki güncel çalışma verisi
-yalnız SQLite'a yazılır.
+Güncel paket yalnız current SQLite storage kullanır. Eski JSON çalışma dosyaları
+otomatik içe aktarılmaz; sonraki çalışma verisi yalnız SQLite'a yazılır.
 
 ### 3.2 Ortak Taşıma Katmanı
 
@@ -88,10 +91,8 @@ arayüzü ve mevcut PHP sunucusu için `PhpHostingSyncTransport` eklendi. Arayü
 capability sorgulama, talep cursor/ack, Android action ve sürümlü yayın
 işlemlerini kapsar.
 
-Yeni istemciler senkron anahtarını yalnız `X-YA-Sync-Secret` başlığında
-gönderir. Anahtar URL query parametresine yazılmaz. Sunucu, AI ayarları dışındaki
-eski istemciler için bir uyumluluk süresi boyunca body authentication desteğini
-korur; AI ayarlarında yalnız header kabul edilir.
+İstemciler senkron anahtarını yalnız `X-YA-Sync-Secret` başlığında gönderir. Anahtar
+URL query parametresine veya request body'ye yazılmaz.
 
 ### 3.3 Masaüstü Uygulaması
 
@@ -237,10 +238,8 @@ npm run smoke:automatic-sync
 - `firm-template/web-module/api/sync.php`: protokol v2 API uç noktası.
 - `apps/desktop-app/electron/sync-coordinator.ts`: masaüstü otomatik senkron
   koordinatörü.
-- `apps/desktop-app/db/migrations/010_automatic_sync.sql`: runtime/outbox ve
-  otomatik kuyruk trigger'ları.
-- `apps/desktop-app/db/migrations/011_persistent_sync_revisions.sql`: kalıcı
-  yayın revision sayacı.
+- `apps/desktop-app/db/migrations/001_baseline.sql`: güncel runtime/outbox,
+  otomatik kuyruk trigger'ları ve kalıcı yayın revision şeması.
 - `packages/sync-core/index.ts`: taşıma arayüzü ve PHP adaptörü.
 - `apps/android-app/src/main/java/com/yardimciasistan/android/OperationCache.java`:
   Android offline cache.
@@ -265,10 +264,8 @@ artifacts/web-module-deploy/yardimci-asistan.tar.gz
   ve arka plan politikaları gecikmeye neden olabilir.
 - Üretim kullanımından önce hosting SQLite için periyodik yedekleme, saklama
   politikası, disk kotası izlemesi ve capability/health alarmı eklenmesi önerilir.
-- Geliştirme tamamlandığında sync anahtarı döndürülmeli, yalnız HTTPS
-  kullanılmalı ve eski body authentication uyumluluğu kaldırılmalıdır.
-- Bu oturumda Git commit veya pull request oluşturulmadı; değişiklikler mevcut
-  çalışma ağacındadır.
+- Üretimde yalnız HTTPS kullanılmalı ve sync anahtarı düzenli döndürülmelidir.
+- Eski body authentication uyumluluğu güncel baseline cleanup ile kaldırılmıştır.
 
 ## 9. Nihai Durum
 

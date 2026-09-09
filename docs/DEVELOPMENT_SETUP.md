@@ -159,13 +159,14 @@ koda veya paketlere gömülmez.
 Desktop app ilk SQLite şema dosyaları:
 
 ```text
-apps/desktop-app/db/migrations/001_initial_schema.sql
-apps/desktop-app/db/seeds/001_demo.sql
+apps/desktop-app/db/migrations/001_baseline.sql
+apps/desktop-app/db/demo-profiles/pension-restaurant.sql
 ```
 
 Uygulama açılışında SQLite dosyası otomatik oluşturulur. Testlerde gerçek kullanıcı klasörüne yazmamak için `YA_DESKTOP_DATA_DIR` ortam değişkeni kullanılabilir.
 
-İlk açılışta migration dosyaları uygulanır, demo seed verileri boş veritabanına eklenir ve ana ekrandaki talep/oda/masa/rezervasyon özetleri local SQLite üzerinden okunur.
+İlk açılışta tek current baseline migration uygulanır. Üretim kurulumu boş başlar;
+demo verisi yalnız açıkça demo profili seçildiğinde eklenir.
 
 Linux'ta Electron pencere açılışını sanal ekranla kontrol etmek için:
 

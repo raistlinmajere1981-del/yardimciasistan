@@ -75,10 +75,9 @@ Android cihaz görülme kayıtlarını, istemci cursor'larını ve sunucu revisi
 `data/` PHP kullanıcısı tarafından
 yazılabilir olmalıdır ve tarayıcıdan doğrudan erişime kapatılmalıdır.
 
-Güncel paket ilk açılışta eski `requests.json`, `android-actions.json`, `menu.json`,
-`android-snapshot.json` ve `sync-state.json` verilerini tek seferlik içe aktarır. İçe
-aktarmadan önce her dosyanın `.legacy-backup-v1` kopyasını oluşturur. Sonraki çalışma
-verileri yalnız SQLite'a yazılır; bu yedekleri doğrulama tamamlanana kadar silmeyin.
+Güncel paket yalnız current SQLite storage ile başlar; eski JSON çalışma dosyaları
+otomatik içe aktarılmaz. İlk açılışta storage şeması doğrulanır ve sonraki çalışma
+verileri yalnız SQLite'a yazılır.
 
 Kurulum kontrolü:
 
@@ -89,7 +88,7 @@ curl -X POST 'https://firma.example/yardimci-asistan/api/sync.php' \
   --data '{"action":"capabilities"}'
 ```
 
-Başarılı cevapta `protocol_version: 2`, `storage: "sqlite"`, `schema_version: 2` ve
+Başarılı cevapta `protocol_version: 2`, `storage: "sqlite"`, `schema_version: 3` ve
 `features` içinde `android_device_sightings` ile `android_device_permissions` bulunmalıdır.
 Masaüstü Android modülü açıkken bu capability'ler eksikse senkronu başarılı saymaz. Canlı
 hostingde HTTPS kullanın; sync anahtarını URL query parametresine veya loglara yazmayın.

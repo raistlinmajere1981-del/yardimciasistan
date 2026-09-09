@@ -327,7 +327,7 @@ test("createGoogleModelsUrl accepts the configured OpenAI-compatible Gemini endp
   );
 });
 
-test("rankGoogleAiStudioModels prefers current stable text models over quota-closed legacy variants", () => {
+test("rankGoogleAiStudioModels prefers current stable text models over quota-closed discontinued variants", () => {
   const ranked = rankGoogleAiStudioModels([
     "gemini-2.0-flash-lite",
     "gemini-3.1-flash-image-preview",

@@ -453,13 +453,13 @@ font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
 ```
 src/components/layout/
   AppShell.tsx        → desktop-shell grid wrapper, tema provider
-  Sidebar.tsx         → nav items, logo, firma adı, module visibility
+  Sidebar.tsx         → nav items, logo, firma adı, capability visibility
   PageHeader.tsx      → h1 + description + right CTA slot (props)
 ```
 
 **AppShell.tsx:** `desktop-shell` CSS grid (200px | 1fr). Tema class'ını (`data-theme`) yönetir. `uiPreferences` prop alır.
 
-**Sidebar.tsx:** `navigationItems` prop'u ile render. `activeId` ve `onNavigate` callback. `setupData.modules` ile koşullu item'lar. Logo + firma adı alt blok.
+**Sidebar.tsx:** `navigationItems` prop'u ile render. `activeId` ve `onNavigate` callback. Persisted `businessCapabilities` ile koşullu item'lar. Logo + firma adı alt blok.
 
 **PageHeader.tsx:** `title`, `description`, `action?: ReactNode` prop. 56px yükseklik. Sağda `action` slot → sync pill yerini alır.
 
@@ -619,7 +619,7 @@ src/pages/
 | **Electron webview** | WhatsApp Web modu `<webview>` tag'ı içeriyor. CSS değişiklikleri webview içini etkilemez. | Webview wrapper div'in dışını değiştir, içini dokunma. |
 | **WhatsApp güvenli mod** | `prepareWhatsAppAction`, `createWhatsAppUrl`, mesaj gönderim state'leri `App.tsx`'te. | Component extract'te sadece JSX taşı, handler'ları prop olarak geçir. |
 | **AI taslak aksiyonları** | `handleGenerateAiWorkspace`, `handleSaveAiWorkspace` gibi handler'lar `App.tsx`'te tanımlı. | Extract sonrası bu handler'lar `App.tsx`'te kalır, sayfa component'lerine prop geçilir. |
-| **setupData.modules** | `buildNavigation(setupData)` ve tüm conditional rendering buna bağlı. | `modules` nesnesi hiç değişmez; sadece görsel sunum değişir. |
+| **businessCapabilities** | `buildNavigation` ve conditional rendering capability snapshot'ına bağlı. | Profil yalnız başlangıç preset'idir; runtime görünürlük persisted capability'lerden okunur. |
 | **Form state'leri** | `categoryForm`, `itemForm`, `setupForm` gibi state'ler `App.tsx`'de tanımlı. | Extract sırasında state'ler `App.tsx`'te kalır, handler prop'ları ile sayfa bileşenine geçilir. |
 | **Scroll davranışı** | `contentRef.current?.scrollTo()` page değişiminde scroll'u sıfırlıyor. | `AppShell` → `PageContent` ref yapısı korunmalı. contentRef'i yeni component'e prop olarak geç. |
 | **Build/typecheck** | `App.tsx` extract sırasında `import` yolları değişir. | Her aşama sonrası `npm run build` çalıştır. TypeScript strict mode'da tip hatası olmadığını doğrula. |
@@ -662,7 +662,7 @@ Backend, Electron IPC, veritabanı ve senkronizasyon mantığına dokunma.
 - window.yardimciDesktop IPC çağrıları (pullRequests, getDashboardData, vb.)
 - WhatsApp URL oluşturma (createWhatsAppUrl, createWhatsAppWebUrl)
 - AI workspace handler'ları (generate, save, copy, whatsapp)
-- setupData.modules ile koşullu nav ve sayfa görünürlüğü
+- businessCapabilities ile koşullu nav ve sayfa görünürlüğü
 - --ui-scale zoom sistemi (ui-preferences.ts)
 - Tüm form state'leri (categoryForm, itemForm, setupForm, manualRequestForm)
 - Electron webview wrapper (WhatsApp Web modu)
@@ -694,7 +694,7 @@ npm run dev            # Renderer geliştirme
 - [ ] Web talebi çekme butonu çalışıyor
 - [ ] WhatsApp güvenli mod çalışıyor
 - [ ] AI taslak oluşturma çalışıyor
-- [ ] setupData.modules.rooms false iken Pansiyon menüde yok
+- [ ] `accommodation.rooms` kapalı iken Pansiyon menüde yok
 - [ ] Menü yayınlama butonu çalışıyor
 - [ ] Ayarlar kaydediliyor
 ```

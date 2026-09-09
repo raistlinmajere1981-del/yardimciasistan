@@ -7,7 +7,7 @@ Bu belge ilk gerçek işletme tanıtımından önce uygulanacak kısa ama sert s
 Repo kökünde önce temel pilot kontrolü çalıştırılır:
 
 ```bash
-node scripts/pilot-check.mjs
+node scripts/pilot-check-v2.mjs
 ```
 
 Bu mod Android SDK, fiziksel telefon ve Playwright tarayıcı kurulumunu zorunlu tutmadan ürün omurgasını tarar. Sonuç ayrıca `artifacts/pilot-check/latest.json` dosyasına yazılır.
@@ -15,7 +15,7 @@ Bu mod Android SDK, fiziksel telefon ve Playwright tarayıcı kurulumunu zorunlu
 Daha geniş tur için:
 
 ```bash
-node scripts/pilot-check.mjs --full
+node scripts/pilot-check-v2.mjs --full
 ```
 
 `--full` modunda uygun platformda Electron/Xvfb, Android debug build ve Playwright e2e de devreye girer.

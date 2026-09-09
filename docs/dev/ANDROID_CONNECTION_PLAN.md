@@ -56,7 +56,7 @@ günceller.
 
 PC uygulaması ana paneldeki `Android'e Yayınla` komutuyla local SQLite
 dashboard özetinden bir Android snapshot oluşturur ve `publish_android_snapshot`
-aksiyonuna gönderir. Web modülü bu veriyi `data/android-snapshot.json` içinde
+aksiyonuna gönderir. Web modülü bu veriyi güncel SQLite senkron tablolarında
 tutar; Android `android_summary` cevabındaki `operations` ve `daily_tasks`
 alanlarından bugünkü işler, boş oda/masa ve bekleyen onay bilgisini okur.
 

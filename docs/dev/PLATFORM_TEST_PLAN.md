@@ -13,8 +13,8 @@ Bu plan Yardımcı Asistan'ın Linux'ta rahat geliştirilebilmesi, Android telef
 - `sync-core` ile mini API talep çekme akışı test edilir.
 - Desktop sync akışında `sync.completed`, `sync.failed`, QR menü yayında `menu.published` ve Android snapshot yayınında sync event kayıtları kontrol edilir.
 - QR menü sayfası PHP server üzerinden mobil viewport ile denenir.
-- Web AI `chat.php` endpointi AI kapalıyken güvenli fallback cevapla denenir; yeterli müşteri bilgisi geldiğinde `source=web_ai` talebinin `requests.json` içine yazıldığı doğrulanır.
-- Web widget gerçek PHP server'dan yüklenir; `data-logo-url` görseli, rezervasyon formunun `api/request.php` ile `requests.json` kaydı, WhatsApp taslak linki, bilgi paneli AI kısa soru formu, `api/chat.php` fallback cevabı ve `ai-conversations.json` kaydı doğrulanır.
+- Web AI `chat.php` endpointi AI kapalıyken güvenli fallback cevapla denenir; yeterli müşteri bilgisi geldiğinde `source=web_ai` talebinin hosting SQLite'ına yazıldığı doğrulanır.
+- Web widget gerçek PHP server'dan yüklenir; `data-logo-url` görseli, rezervasyon formunun `api/request.php` ile SQLite kaydı, WhatsApp taslak linki, bilgi paneli AI kısa soru formu, `api/chat.php` fallback cevabı ve `ai-conversations.json` kaydı doğrulanır.
 - Demo web sitesi `VITE_YA_WEB_MODULE_URL` ile açıldığında gerçek `widget.js` dosyasını gömer; widget'ın demo sayfa içinden web modülüne talep ve AI konuşma kaydı yazdığı doğrulanır.
 - Desktop app Electron ile Linux üzerinde çalıştırılır.
 - Desktop app ana paneli, web talebi çekme butonu ve local-first uyarı metinleri kontrol edilir.
@@ -126,5 +126,5 @@ Mini API AI chat akışı için:
 3. AI kapalıysa güvenli fallback cevap döner.
 4. AI açıksa OpenAI uyumlu /chat/completions endpointine sunucu tarafından istek atar.
 5. Konuşma ai-conversations.json içine kaydedilir.
-6. Ad, geçerli telefon ve talep niyeti varsa source=web_ai talep requests.json içine pending olarak yazılır.
+6. Ad, geçerli telefon ve talep niyeti varsa source=web_ai talep hosting SQLite'ına pending olarak yazılır.
 ```

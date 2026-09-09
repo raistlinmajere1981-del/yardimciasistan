@@ -1400,7 +1400,7 @@ try {
     setupData: {
       ...createSetupFixture(),
       setupRequired: false,
-      modules: { ...createSetupFixture().modules, whatsapp: false }
+      servicePreferences: { ...createSetupFixture().servicePreferences, whatsapp: false }
     },
     dashboardData: createCompactUiFixture()
   });
@@ -1989,7 +1989,7 @@ try {
             ...setupData,
             setupRequired: false,
             businessName: input.businessName,
-            businessType: input.businessType,
+            profileId: input.profileId,
             phone: input.phone,
             whatsapp: input.whatsapp,
             email: input.email,
@@ -2006,7 +2006,7 @@ try {
             aiApiKeyConfigured: Boolean(input.aiApiKey) || setupData.aiApiKeyConfigured,
             aiLastPublishedAt: "2026-07-12T10:00:00.000Z",
             aiProfiles: savedProfiles,
-            modules: input.modules,
+            servicePreferences: input.servicePreferences,
             initialCounts: input.initialCounts
           },
           dashboardData: {
@@ -2287,7 +2287,7 @@ function createSetupFixture() {
     setupRequired: true,
     appPasswordConfigured: false,
     businessName: "Deniz Çiçeği Pansiyon & Kafe",
-    businessType: "pension_restaurant",
+    profileId: "pension_restaurant",
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "merhaba@denizcicegi.example",
@@ -2303,10 +2303,7 @@ function createSetupFixture() {
     aiTimeoutSeconds: 30,
     aiApiKeyConfigured: true,
     aiLastPublishedAt: "",
-    modules: {
-      rooms: true,
-      tables: true,
-      qrMenu: true,
+    servicePreferences: {
       whatsapp: true,
       android: true
     },

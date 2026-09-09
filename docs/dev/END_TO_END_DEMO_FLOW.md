@@ -24,7 +24,7 @@ npm run smoke:demo-flow
 
 `smoke:demo-flow` komutu:
 
-- Web modülünün geçici bir kopyasını oluşturur ve `demo-data/web-module-requests.json` örneklerini ilk SQLite migration girdisi olarak yükler.
+- Web modülünün geçici bir kopyasını oluşturur ve güncel `001_baseline.sql` ile boş hosting SQLite'ı başlatır.
 - PHP web modülünü geçici portta çalıştırır.
 - `request.php` üzerinden demo sırasında yeni bir `source=web_form` talebi oluşturur.
 - Web AI sohbet endpointiyle ek bir `source=web_ai` talep oluşturur.
@@ -45,10 +45,10 @@ Web modülü için ayrı duman testi `npm run smoke:web-module` komutudur. Bu te
 
 ## Manuel Demo
 
-1. Demo verisini web modülüne yükle:
+1. Yerel demo laboratuvarını güncel SQLite ile başlat:
 
 ```bash
-npm run demo:data:apply
+npm run dev:local
 ```
 
 2. Web modülünü aç:
@@ -95,22 +95,14 @@ Komut PHP web modülünü LAN'da açık tutar, demo taleplerini yükler ve adb c
 bağlıysa Android uygulamasını doğru URL/anahtarla başlatır. Terminalde görünen
 LAN adresi adb yokken uygulamaya elle girilebilir.
 
-Demo sonunda template verisini temizlemek için:
-
-```bash
-npm run demo:data:clear
-```
+Smoke akışları geçici SQLite/web modülü kullandığı için kaynak template'te
+temizlenecek demo JSON verisi bırakmaz.
 
 ## Demo Veri Seti
 
-Web modülü için örnek talep kaynağı:
-
-```text
-demo-data/web-module-requests.json
-```
-
-Bu dosya pansiyon rezervasyonu, masa rezervasyonu ve kahvaltı talebini birlikte
-gösterir. Kayıtlar gerçek kişi bilgisi içermez.
+Web talepleri demo sırasında `api/request.php` ve `api/chat.php` üzerinden
+oluşturulur; hosting SQLite'ında tutulur. Android başlangıç snapshot'ı için
+`demo-data/android-operations-snapshot.json` kullanılır.
 
 Desktop tarafındaki oda, masa, menü, rezervasyon, günlük iş ve WhatsApp örnekleri
 `apps/desktop-app/db/seeds/001_demo.sql` içinde tutulur.

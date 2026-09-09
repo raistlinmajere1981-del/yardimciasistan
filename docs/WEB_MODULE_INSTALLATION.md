@@ -281,7 +281,7 @@ config/*.json ve config/*.php: 644
 knowledge/*.md: 644
 data/ klasörü: 755
 data/yardimci-asistan.sqlite: uygulama tarafından 600
-data/*.json: yalnız konuşma ve eski veri içe aktarma dosyaları için 664
+data/*.json: yalnız AI konuşma geçmişi için 664
 data/ai-settings.local.php: uygulama tarafından 600
 ```
 
@@ -292,10 +292,9 @@ yapmayın. SQLite dosyasını önceden elle oluşturmanız gerekmez.
 
 Apache hostinglerde `config/`, `data/` ve `knowledge/` klasörlerinde gelen `.htaccess` dosyaları doğrudan tarayıcı erişimini kapatır. Nginx veya özel panel kullanılan hostinglerde aynı engelleme sunucu ayarından yapılmalıdır.
 
-Eski JSON tabanlı kurulum güncellendiğinde ilk API çağrısı `requests.json`,
-`android-actions.json`, `menu.json`, `android-snapshot.json` ve `sync-state.json`
-verilerini SQLite'a bir kez aktarır. Her kaynak dosyanın `.legacy-backup-v1` kopyası
-önce oluşturulur. Canlı veriyi ve menüyü kontrol edene kadar bu yedekleri saklayın.
+Güncel web modülü eski JSON çalışma dosyalarını içe aktarmaz. İlk API çağrısı current
+SQLite storage'ı `schema_version = 3` ile oluşturur; kurulumdan önce eski veriler
+gerekiyorsa ayrı bir dışa aktarma/temiz veri hazırlama işlemi yapılmalıdır.
 
 ## 8. Hızlı Test
 

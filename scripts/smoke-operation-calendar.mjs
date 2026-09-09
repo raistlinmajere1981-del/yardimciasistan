@@ -8,7 +8,8 @@ const router = read("apps/desktop-app/src/components/app/DesktopWorkspaceRouter.
 const page = read("apps/desktop-app/src/pages/OperationCalendarPage.tsx");
 
 assert.match(navigation, /id: "calendar", label: "Takvim"/);
-assert.match(navigation, /setup\.modules\.rooms \|\| setup\.modules\.tables/);
+assert.match(navigation, /runtimeHasCapability\(capabilities, C\.ACCOMMODATION_ROOMS\)/);
+assert.match(navigation, /runtimeHasCapability\(capabilities, C\.FOOD_TABLES\)/);
 assert.match(router, /activePage === "calendar"/);
 assert.match(router, /<OperationCalendarPage/);
 assert.match(page, /viewMode === "day"/);

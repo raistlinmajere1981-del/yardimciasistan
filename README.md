@@ -1,6 +1,6 @@
 # Yardımcı Asistan
 
-Yardımcı Asistan; **tek lokasyonlu küçük fiziksel işletmeler** için tasarlanan modüler, local-first bir işletme sistemidir. İlk çalışan ürün pansiyon/restoran/kafe akışlarıyla olgunlaştı; mimari artık sektör tipine değil persisted **business capability** setine göre çalışma alanlarını açar. Market/perakende, bu ortak çekirdek üzerine eklenecek sıradaki sektördür.
+Yardımcı Asistan; **tek lokasyonlu küçük fiziksel işletmeler** için tasarlanan modüler, local-first bir işletme sistemidir. İlk çalışan ürün pansiyon/restoran/kafe akışlarıyla olgunlaştı; mimari artık sektör tipine değil persisted **business capability** setine göre çalışma alanlarını açar. Market/perakende de aynı capability-first temel üzerinde desteklenen profiller arasındadır.
 
 Sistem; web sitesi veya gömülebilir web widget, firma hostinginde çalışan mini API, PC masaüstü uygulaması, Android companion, AI araçları, WhatsApp destek akışları ve sektör çalışma alanlarından oluşur. Merkezi bir cloud servisi zorunlu değildir; her firma kendi hostingi, kendi PC uygulaması ve kendi verisiyle bağımsız çalışabilir.
 
@@ -18,7 +18,7 @@ Persisted Capabilities = runtime source of truth
 Workspaces / Services / Devices
 ```
 
-Profil bir sınıf değildir. Hibrit işletmeler yeni `businessType` kombinasyonları üreterek değil capability ekleyip çıkararak oluşur.
+Profil bir sınıf değildir. Hibrit işletmeler yeni profil kombinasyonları üreterek değil capability ekleyip çıkararak oluşur.
 
 Ortak çekirdek; müşteri, görev/takvim, bildirim, finans, rapor, web, senkron, yedekleme ve cihaz yönetimini taşır. Sektör domain'leri bunun üzerine eklenir:
 
@@ -96,11 +96,11 @@ retail.suppliers
 retail.labels
 ```
 
-`businessType` yalnız profil/preset bilgisidir; yeni runtime feature gate'leri `businessType === ...` şeklinde yazılmamalıdır.
+`profile_id` yalnız profil/preset bilgisidir; yeni runtime feature gate'leri profil kimliği karşılaştırarak yazılmamalıdır. Runtime kararı persisted `business_capabilities` snapshot'ından verilir.
 
 ## Commerce / Market Temeli
 
-Market UI henüz normal ürün akışına açılmamıştır; ancak sektör bağımsız commerce omurgası hazırdır:
+Market UI ve sektör bağımsız commerce omurgası hazırdır:
 
 ```text
 catalog_categories
@@ -254,4 +254,4 @@ Pansiyon/restoran showcase omurgası ve capability-first modüler altyapı oluş
 
 Market geliştirmesi başlamadan önce `node scripts/check-modular-foundation.mjs` yeşil olmalıdır. Market için planlanan sıra, veri modeli, capability kararları, barkod/etiket cihaz abstraction'ı ve MVP sınırı [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) içinde kayıtlıdır.
 
-Eski `modules_json`, `rooms_enabled`, `tables_enabled`, `qr_menu_enabled` gibi alanlar bazı backend compatibility yollarında geçici olarak bulunabilir; yeni kod bunları source of truth kabul etmez. Fiziksel kaldırma işi, büyük setup persistence katmanı daha küçük servislere ayrılırken yapılacaktır ve yeni Market kodu bu alanlara bağlanmayacaktır.
+Güncel baseline yalnız `profile_id` ve `business_capabilities` sözleşmesini taşır. Eski profil alanları, module projection'ları ve geçiş migration'ları desteklenmez; temiz kurulum `001_baseline.sql` ile başlar. Eski bir veritabanı veya backup açılmaya çalışılırsa runner/backup doğrulaması açık hata verir.

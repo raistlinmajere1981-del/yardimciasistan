@@ -105,8 +105,8 @@ Görevleri:
 
 Güncel ilk sürümde PHP `PDO_SQLITE` zorunludur. Talepler, Android action kuyruğu,
 menü/Android yayınları, cursor'lar, revision ve idempotency receipt kayıtları hosting
-SQLite'ında tutulur. Eski JSON çalışma verileri ilk açılışta yedeklenerek tek seferlik
-içe aktarılır.
+SQLite'ında tutulur. Temiz kurulum `001_baseline.sql` ile başlar; eski JSON çalışma
+verileri veya eski migration zinciri içe aktarılmaz.
 
 Müşteriye açık `request.php` ve `chat.php` uçlarında ayrıca sessiz sunucu tarafı kötüye
 kullanım koruması vardır. Koruma ham IP adresini saklamaz; istemci adresini firmanın

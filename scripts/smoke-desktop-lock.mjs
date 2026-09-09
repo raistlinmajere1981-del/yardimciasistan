@@ -230,7 +230,7 @@ function createSetupData() {
     setupRequired: false,
     appPasswordConfigured: true,
     businessName: "Kilit Smoke İşletmesi",
-    businessType: "other",
+    profileId: "market",
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "",
@@ -248,10 +248,7 @@ function createSetupData() {
     aiApiKeyConfigured: false,
     aiLastPublishedAt: "",
     aiProfiles: [],
-    modules: {
-      rooms: false,
-      tables: false,
-      qrMenu: false,
+    servicePreferences: {
       whatsapp: false,
       android: false
     },

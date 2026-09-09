@@ -128,8 +128,8 @@ Bu komut desktop build alır, `dist/desktop/linux-unpacked` paket dizinini üret
 - `dist-electron/preload.js`
 - `dist-electron/database.js`
 - `dist-renderer/index.html`
-- `db/migrations/001_initial_schema.sql`
-- `db/seeds/001_demo.sql`
+- `db/migrations/001_baseline.sql`
+- `db/demo-profiles/pension-restaurant.sql`
 
 Windows installer üretim komutu:
 
