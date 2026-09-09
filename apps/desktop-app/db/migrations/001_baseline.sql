@@ -732,6 +732,12 @@ CREATE TABLE sync_runtime (
   updated_at TEXT NOT NULL
 );
 
+-- Local database identity, independent of business/setup data. Populated by initialize().
+CREATE TABLE desktop_sync_identity (
+  id TEXT PRIMARY KEY CHECK (id = 'primary'),
+  client_id TEXT NOT NULL UNIQUE CHECK (length(trim(client_id)) > 0)
+);
+
 CREATE TABLE table_order_items (
   id TEXT PRIMARY KEY,
   order_id TEXT NOT NULL,

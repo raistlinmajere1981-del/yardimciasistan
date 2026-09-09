@@ -1042,9 +1042,9 @@ export class DesktopDatabase {
     fs.mkdirSync(this.backupPath, { recursive: true });
     this.databasePath = path.join(options.userDataPath, "yardimci-asistan.sqlite");
     this.db = new DatabaseSync(this.databasePath);
+    this.db.exec("PRAGMA busy_timeout = 5000;");
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec("PRAGMA foreign_keys = ON;");
-    this.db.exec("PRAGMA busy_timeout = 5000;");
   }
 
   initialize() {
@@ -1060,54 +1060,55 @@ export class DesktopDatabase {
       throw new Error("Yalnız 001_baseline.sql güncel temiz kurulum şeması olarak desteklenir.");
     }
 
-    const appliedMigrations = this.db
-      .prepare("SELECT id FROM schema_migrations ORDER BY id")
-      .all() as Array<{ id?: unknown }>;
-    const unsupportedMigrations = appliedMigrations
-      .map((row) => String(row.id ?? ""))
-      .filter((id) => id !== "001_baseline.sql");
-    if (unsupportedMigrations.length > 0) {
-      throw new Error("Bu veritabanı güncel baseline şemasıyla oluşturulmamış; eski migration zinciri desteklenmiyor.");
-    }
-
-    const existingDomainObject = this.db
-      .prepare(`
-        SELECT 1
-        FROM sqlite_master
-        WHERE name NOT LIKE 'sqlite_%'
-          AND name <> 'schema_migrations'
-          AND type IN ('table', 'index', 'view', 'trigger')
-        LIMIT 1
-      `)
-      .get();
-    const baselineApplied = appliedMigrations.some((row) => String(row.id ?? "") === "001_baseline.sql");
-    if (!baselineApplied && existingDomainObject) {
-      throw new Error("Mevcut veritabanı baseline migration işareti taşımıyor; temiz kurulum gerekli.");
-    }
-
-    for (const migration of migrations) {
-      const alreadyApplied = this.db.prepare("SELECT id FROM schema_migrations WHERE id = ?").get(migration.name);
-      if (alreadyApplied) {
-        continue;
+    // Serialize baseline checks, demo seeding and local identity creation across connections.
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const appliedMigrations = this.db
+        .prepare("SELECT id FROM schema_migrations ORDER BY id")
+        .all() as Array<{ id?: unknown }>;
+      const unsupportedMigrations = appliedMigrations
+        .map((row) => String(row.id ?? ""))
+        .filter((id) => id !== "001_baseline.sql");
+      if (unsupportedMigrations.length > 0) {
+        throw new Error("Bu veritabanı güncel baseline şemasıyla oluşturulmamış; eski migration zinciri desteklenmiyor.");
       }
 
-      this.db.exec("BEGIN");
-      try {
+      const existingDomainObject = this.db
+        .prepare(`
+          SELECT 1
+          FROM sqlite_master
+          WHERE name NOT LIKE 'sqlite_%'
+            AND name <> 'schema_migrations'
+            AND type IN ('table', 'index', 'view', 'trigger')
+          LIMIT 1
+        `)
+        .get();
+      const baselineApplied = appliedMigrations.some((row) => String(row.id ?? "") === "001_baseline.sql");
+      if (!baselineApplied && existingDomainObject) {
+        throw new Error("Mevcut veritabanı baseline migration işareti taşımıyor; temiz kurulum gerekli.");
+      }
+
+      for (const migration of migrations) {
+        const alreadyApplied = this.db.prepare("SELECT id FROM schema_migrations WHERE id = ?").get(migration.name);
+        if (alreadyApplied) {
+          continue;
+        }
+
         this.db.exec(migration.sql);
         this.db.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run(migration.name, new Date().toISOString());
-        this.db.exec("COMMIT");
-      } catch (error) {
-        this.db.exec("ROLLBACK");
-        throw error;
       }
-    }
 
-    const demoProfile = this.resolveDemoProfile();
-    if (demoProfile && this.getCount("business") === 0) {
-      this.db.exec(this.readDemoProfileSql(demoProfile));
-    }
+      const demoProfile = this.resolveDemoProfile();
+      if (demoProfile && this.getCount("business") === 0) {
+        this.db.exec(this.readDemoProfileSql(demoProfile));
+      }
 
-    this.ensureSyncClientId();
+      this.ensureSyncClientId();
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   getEnabledBusinessCapabilities(): BusinessCapability[] {
@@ -3852,8 +3853,11 @@ export class DesktopDatabase {
 
   getSyncRuntimeStatus(): DesktopSyncRuntimeStatus {
     const settings = this.db
-      .prepare("SELECT auto_sync_enabled, sync_client_id FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as { auto_sync_enabled?: number; sync_client_id?: string } | undefined;
+      .prepare("SELECT auto_sync_enabled FROM settings WHERE deleted_at = '' LIMIT 1")
+      .get() as { auto_sync_enabled?: number } | undefined;
+    const identity = this.db
+      .prepare("SELECT client_id FROM desktop_sync_identity WHERE id = 'primary'")
+      .get() as { client_id?: string } | undefined;
     const runtime = this.db
       .prepare("SELECT * FROM sync_runtime WHERE id = 'primary'")
       .get() as Record<string, unknown> | undefined;
@@ -3862,7 +3866,7 @@ export class DesktopDatabase {
       .get() as { count?: number; next_retry_at?: string } | undefined;
     return {
       enabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
-      clientId: String(settings?.sync_client_id ?? ""),
+      clientId: String(identity?.client_id ?? ""),
       requestCursor: Number(runtime?.request_cursor ?? 0),
       acknowledgedCursor: Number(runtime?.acknowledged_cursor ?? 0),
       lastAttemptAt: String(runtime?.last_attempt_at ?? ""),
@@ -9002,16 +9006,24 @@ export class DesktopDatabase {
   }
 
   private ensureSyncClientId() {
-    const settings = this.db
-      .prepare("SELECT id, sync_client_id FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as { id?: string; sync_client_id?: string } | undefined;
-    if (!settings?.id || String(settings.sync_client_id ?? "").trim()) {
-      return;
-    }
-    const clientId = `desktop-${randomUUID()}`;
+    // Also initialize this local metadata for databases already marked 001_baseline.sql.
+    // Retain any identity issued by that baseline's settings-based initialization.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS desktop_sync_identity (
+        id TEXT PRIMARY KEY CHECK (id = 'primary'),
+        client_id TEXT NOT NULL UNIQUE CHECK (length(trim(client_id)) > 0)
+      );
+    `);
     this.db
-      .prepare("UPDATE settings SET sync_client_id = ?, updated_at = ? WHERE id = ?")
-      .run(clientId, new Date().toISOString(), settings.id);
+      .prepare(`
+        INSERT INTO desktop_sync_identity (id, client_id)
+        VALUES ('primary', COALESCE(
+          (SELECT NULLIF(trim(sync_client_id), '') FROM settings WHERE deleted_at = '' LIMIT 1),
+          ?
+        ))
+        ON CONFLICT(id) DO NOTHING
+      `)
+      .run(`desktop-${randomUUID()}`);
   }
 
   private resolveDemoProfile(): DesktopDemoProfile | null {
