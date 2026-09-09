@@ -19,6 +19,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
   const [adjustmentType, setAdjustmentType] = useState<"adjustment_debit" | "adjustment_credit">("adjustment_debit");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [runtimeNoticeActive, setRuntimeNoticeActive] = useState(false);
   const amountInput = useRef<HTMLInputElement>(null);
   const inFlight = useRef(false);
   const mounted = useRef(true);
@@ -43,11 +44,13 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
     if (!valid || loading || inFlight.current || account.customer.deletedAt) return;
     const bridge = window.yardimciDesktop?.commerce;
     if (!bridge) {
+      setRuntimeNoticeActive(true);
       reportAppStatus("error", "Hesap kaydı kullanılamıyor. Uygulamayı yeniden başlatın.");
       return;
     }
     inFlight.current = true;
     setSaving(true);
+    setRuntimeNoticeActive(false);
     onSavingChange(true);
     try {
       const input = { customerId: account.customer.id, amountMinor: amountMinor!, currency, note: note.trim(), source: "desktop-customer-credit" };
@@ -61,6 +64,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
         : "Düzeltme kaydedildi.");
     } catch (cause) {
       if (mounted.current) {
+        setRuntimeNoticeActive(true);
         reportAppStatus("error", customerCreditError(cause, "Hareket kaydedilemedi. Yeniden deneyin."));
         notifyCustomerCreditChanged(account.customer.id);
       }
@@ -103,7 +107,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
         <label className="customer-credit-field">{mode === "payment" ? "Not (isteğe bağlı)" : "Açıklama / neden (zorunlu)"}
           <textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} required={mode === "adjustment"} rows={2} />
         </label>
-        {validation && <p role="alert" className="customer-credit-error">{validation}</p>}
+        {validation && !runtimeNoticeActive && <p role="alert" className="customer-credit-error">{validation}</p>}
         <div className="customer-credit-actions">
           <ActionButton type="submit" disabled={!valid || saving || loading}>{saving ? "Kaydediliyor…" : mode === "payment" ? "Tahsilatı Kaydet" : "Düzeltmeyi Kaydet"}</ActionButton>
           <ActionButton variant="secondary" onClick={onClose}>Vazgeç</ActionButton>
