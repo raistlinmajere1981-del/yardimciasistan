@@ -1,5 +1,5 @@
 import { Minus, Plus, ReceiptText, Search, Trash2, UtensilsCrossed, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import type { PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import type {
   DesktopDashboardData,
@@ -110,6 +110,10 @@ export function TableOrdersWorkspace({
       .sort(compareMenuRecords);
   }, [activeCategories, categoryNames, menu.items, menuEnabled, searchQuery, selectedCategoryId]);
 
+  const closeDrawerOnEscape = useEffectEvent(() => {
+    void requestCloseDrawer();
+  });
+
   useEffect(() => {
     if (!drawerOpen) {
       return;
@@ -117,7 +121,7 @@ export function TableOrdersWorkspace({
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        void requestCloseDrawer();
+        closeDrawerOnEscape();
       }
     };
     window.addEventListener("keydown", handleKeyDown);

@@ -14,7 +14,6 @@ assert.match(barcodeInput, /createBarcodeSimulatorAdapter/, "Simulator barcode a
 assert.match(barcodeInput, /createKeyboardBarcodeInputAdapter/, "USB keyboard-wedge adapter is missing.");
 assert.match(barcodeInput, /maxInterKeyMs/, "Keyboard barcode adapter must distinguish scanner timing from normal typing.");
 assert.match(barcodeInput, /event\.key === "Enter"/, "Keyboard barcode adapter must support scanner terminator input.");
-assert.match(barcodeInput, /CAMERA_ANDROID_BARCODE_SOURCE/, "Camera/Android extension point must be reserved without becoming an MVP dependency.");
 assert.doesNotMatch(barcodeInput, /getUserMedia|MediaDevices|androidBridge|adb/i, "M4 must not implement camera/Android barcode capture yet.");
 
 assert.match(marketPage, /C\.RETAIL_BARCODE/, "Market page must derive barcode availability from persisted capability state.");

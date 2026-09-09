@@ -1,6 +1,6 @@
 export type LabelPrinterId = "preview" | "png" | "pdf" | "zpl" | "tspl" | "system";
-export type LabelPrinterAvailability = "available" | "planned";
-export type LabelPrinterOutput = "preview" | "file" | "device";
+type LabelPrinterAvailability = "available" | "planned";
+type LabelPrinterOutput = "preview" | "file" | "device";
 
 export interface LabelSizePreset {
   id: "58x40" | "50x30" | "40x30";
@@ -9,7 +9,7 @@ export interface LabelSizePreset {
   heightMm: number;
 }
 
-export interface LabelProductSnapshot {
+interface LabelProductSnapshot {
   name: string;
   sku: string;
   barcode: string;
@@ -85,7 +85,7 @@ const MM_PER_INCH = 25.4;
 const PDF_POINTS_PER_INCH = 72;
 const textEncoder = new TextEncoder();
 
-export interface Code128Encoding {
+interface Code128Encoding {
   value: string;
   codes: number[];
   patterns: string[];
@@ -99,7 +99,7 @@ export function canEncodeCode128B(value: string) {
   });
 }
 
-export function encodeCode128B(valueInput: string): Code128Encoding | null {
+function encodeCode128B(valueInput: string): Code128Encoding | null {
   const value = valueInput.trim();
   if (!canEncodeCode128B(value)) return null;
 
@@ -217,7 +217,7 @@ function drawCode128(
   }
 }
 
-export function renderLabelCanvas(jobInput: LabelPrintJob, dpi = DEFAULT_DPI) {
+function renderLabelCanvas(jobInput: LabelPrintJob, dpi = DEFAULT_DPI) {
   const job = normalizedJob(jobInput);
   const canvas = document.createElement("canvas");
   canvas.width = pxFromMm(job.size.widthMm, dpi);

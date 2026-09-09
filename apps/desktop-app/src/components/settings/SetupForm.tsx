@@ -971,7 +971,7 @@ function AndroidDevicesSection({
   );
 }
 
-export function compactAndroidDeviceId(deviceId: string): string {
+function compactAndroidDeviceId(deviceId: string): string {
   return deviceId.length > 22
     ? `${deviceId.slice(0, 12)}…${deviceId.slice(-6)}`
     : deviceId;

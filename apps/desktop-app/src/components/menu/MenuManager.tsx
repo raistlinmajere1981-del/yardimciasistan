@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
@@ -94,10 +94,15 @@ export function MenuManager({
   const previewSource = resolveMenuPreviewImageUrl(itemForm.image_url, dashboardData.webModuleUrl);
   const visiblePreviewSource = previewSource && previewSource !== failedPreviewSource ? previewSource : "";
 
-  useEffect(() => {
+  // Reset on item selection, preserving the uploaded filename when only its URL changes.
+  const resetSelectedImage = useEffectEvent(() => {
     setImageLabel(describeImageValue(itemForm.image_url));
     setImageError("");
     setFailedPreviewSource("");
+  });
+
+  useEffect(() => {
+    resetSelectedImage();
   }, [itemForm.id, selectedItemId]);
 
   useEffect(() => {

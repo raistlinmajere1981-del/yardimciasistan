@@ -17,8 +17,8 @@ const COMMERCE_UNITS = new Set<CommerceUnit>([
 ]);
 const DRAFT_STATUSES = new Set<MarketDraftStatus>(["pending", "reviewed"]);
 
-export const MARKET_BARCODE_SCAN_TTL_MS = 60_000;
-export const MARKET_BARCODE_SCAN_FUTURE_TOLERANCE_MS = 30_000;
+const MARKET_BARCODE_SCAN_TTL_MS = 60_000;
+const MARKET_BARCODE_SCAN_FUTURE_TOLERANCE_MS = 30_000;
 
 export interface CreateMarketProductDraftInput {
   barcode: string;

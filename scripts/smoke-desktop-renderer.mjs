@@ -2,7 +2,6 @@ import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import http from "node:http";
-import process from "node:process";
 
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;

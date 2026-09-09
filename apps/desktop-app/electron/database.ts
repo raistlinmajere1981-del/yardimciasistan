@@ -70,7 +70,7 @@ export interface DesktopDatabaseOptions {
   demoProfile?: DesktopDemoProfile | null;
 }
 
-export interface DashboardSummary {
+interface DashboardSummary {
   newRequests: number;
   waitingRequests: number;
   pendingDailyTasks: number;
@@ -120,7 +120,7 @@ export interface DesktopTableCategory {
   tableCount: number;
 }
 
-export interface SaveTableCategoryInput {
+interface SaveTableCategoryInput {
   sourceName?: string;
   name: string;
   tableCount: number;
@@ -284,19 +284,19 @@ export interface DesktopReportPeriod {
   endDate: string;
 }
 
-export interface DesktopReportTopItem {
+interface DesktopReportTopItem {
   name: string;
   quantity: number;
   revenue: number;
 }
 
-export interface DesktopReportDailyRevenue {
+interface DesktopReportDailyRevenue {
   date: string;
   revenue: number;
   closedOrders: number;
 }
 
-export interface DesktopReportStockConsumption {
+interface DesktopReportStockConsumption {
   menuItemId: string;
   name: string;
   quantity: number;
@@ -317,7 +317,7 @@ export interface DesktopReportStockMovement {
   createdAt: string;
 }
 
-export type DesktopReportAttentionKind =
+type DesktopReportAttentionKind =
   | "pending_request"
   | "pending_reservation"
   | "payment_waiting"
@@ -326,7 +326,7 @@ export type DesktopReportAttentionKind =
   | "out_of_stock"
   | "low_stock";
 
-export interface DesktopReportAttentionItem {
+interface DesktopReportAttentionItem {
   kind: DesktopReportAttentionKind;
   title: string;
   detail: string;
@@ -842,7 +842,7 @@ export interface UpdateTableStatusInput {
 }
 
 export type TableOrderStatus = "open" | "preparing" | "served" | "payment" | "paid" | "cancelled";
-export type TableOrderItemStatus = "open" | "preparing" | "served" | "cancelled";
+type TableOrderItemStatus = "open" | "preparing" | "served" | "cancelled";
 
 export interface DesktopTableOrderItem {
   id: string;
@@ -8098,7 +8098,7 @@ export class DesktopDatabase {
         ORDER BY created_at DESC LIMIT 1
       `)
       .get(orderId, menuItemId, productName, unitPrice, currency) as { id?: string; quantity?: number; updated_at?: string } | undefined;
-    let itemId = existingItem?.id || createAndroidEntityId("table_order_item_", action.id);
+    const itemId = existingItem?.id || createAndroidEntityId("table_order_item_", action.id);
     if (existingItem?.id) {
       const nextQuantity = Number(existingItem.quantity ?? 0) + quantity;
       if (nextQuantity > 999) {

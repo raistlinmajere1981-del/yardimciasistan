@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 
 export type RoomFolioPaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
-export type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
+type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
 
-export interface DesktopRoomPrice {
+interface DesktopRoomPrice {
   id: string;
   name: string;
   number: string;
@@ -13,12 +13,12 @@ export interface DesktopRoomPrice {
   currency: string;
 }
 
-export interface DesktopRoomFolioMenuCategory {
+interface DesktopRoomFolioMenuCategory {
   id: string;
   name: string;
 }
 
-export interface DesktopRoomFolioMenuItem {
+interface DesktopRoomFolioMenuItem {
   id: string;
   categoryId: string;
   categoryName: string;
@@ -44,7 +44,7 @@ export interface DesktopRoomFolioItem {
   createdAt: string;
 }
 
-export interface DesktopRoomFolioPayment {
+interface DesktopRoomFolioPayment {
   id: string;
   folioId: string;
   amountMinor: number;

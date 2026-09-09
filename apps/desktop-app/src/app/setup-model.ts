@@ -5,7 +5,7 @@ import type {
   SaveInitialSetupInput
 } from "../../electron/database";
 
-export interface TableCategoryFormState {
+interface TableCategoryFormState {
   key: string;
   sourceName: string;
   name: string;

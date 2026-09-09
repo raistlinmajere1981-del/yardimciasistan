@@ -22,7 +22,7 @@ function reservationDateRank(reservation: DesktopReservation, today: string) {
   return 2;
 }
 
-export function findActiveRoomReservation(roomId: string, reservations: DesktopReservation[]) {
+function findActiveRoomReservation(roomId: string, reservations: DesktopReservation[]) {
   const today = localDateKey();
   return reservations
     .filter((reservation) => activeReservationStatuses.has(reservation.status) && reservation.roomIds.includes(roomId))
@@ -83,23 +83,4 @@ export function isRestaurantTask(task: DesktopDailyTask, reservations: DesktopRe
 export function isAccommodationTask(task: DesktopDailyTask, reservations: DesktopReservation[]) {
   const domain = getDesktopTaskDomain(task, reservations);
   return domain === "accommodation" || domain === "mixed";
-}
-
-export function formatTableStatus(value: string) {
-  const labels: Record<string, string> = {
-    available: "Boş",
-    reserved: "Rezerve",
-    occupied: "Dolu",
-    bill_waiting: "Hesap bekliyor",
-    waiting_bill: "Hesap bekliyor",
-    checkout: "Hesap bekliyor",
-    payment: "Hesap bekliyor",
-    cleaning: "Temizlik"
-  };
-  return labels[value] ?? "Boş";
-}
-
-export function getTableStatusAction(value: string) {
-  if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) return "bill_waiting";
-  return ["available", "occupied", "reserved"].includes(value) ? value : "";
 }

@@ -1,4 +1,4 @@
-export type UiTheme = "light" | "dark";
+type UiTheme = "light" | "dark";
 export type UiMode = "easy" | "pro";
 
 export interface UiPreferences {

@@ -19,7 +19,7 @@ export interface DesktopFinanceEntry {
   createdAt: string;
 }
 
-export interface DesktopPensionBalance {
+interface DesktopPensionBalance {
   reservationId: string;
   title: string;
   customerName: string;

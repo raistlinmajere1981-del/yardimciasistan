@@ -27,7 +27,7 @@ const baseItems: NavigationItem[] = [
   { id: "dashboard", label: "Ana Ekran", icon: Home }
 ];
 
-export function hasRetailWorkspaceCapability(
+function hasRetailWorkspaceCapability(
   capabilities: BusinessCapabilitySnapshot | null | undefined
 ): boolean {
   const C = BUSINESS_CAPABILITIES;

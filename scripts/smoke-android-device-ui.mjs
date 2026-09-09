@@ -461,7 +461,7 @@ async function main() {
     "Kasa / Hesap profili Android arayüzüne uygulanmadı."
   );
   scrollToTop();
-  let cashierTopXml = dumpUi("cashier-top.xml");
+  const cashierTopXml = dumpUi("cashier-top.xml");
   tap(centerOf(findClickableBoundsByText(cashierTopXml, "Restoran")));
   await delay(500);
   const cashierRestaurantXml = dumpUi("cashier-restaurant.xml");

@@ -411,7 +411,7 @@ interface CustomerEditorDrawerProps {
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
 }
 
-export function CustomerEditorDrawer({
+function CustomerEditorDrawer({
   open,
   customer,
   aiEnabled,

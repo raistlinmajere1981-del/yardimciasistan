@@ -9,9 +9,9 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 
-export type BusinessCapabilitySource = "system" | "profile" | "user";
+type BusinessCapabilitySource = "system" | "profile" | "user";
 
-export interface PersistedBusinessCapability {
+interface PersistedBusinessCapability {
   capability: BusinessCapability;
   enabled: boolean;
   source: BusinessCapabilitySource;

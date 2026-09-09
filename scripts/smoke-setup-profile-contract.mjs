@@ -36,6 +36,11 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+  // Remove initialization publications so this assertion exercises setup itself.
+  for (const job of database.getPendingSyncJobs()) {
+    database.completeSyncJob(job.jobKey, job.sourceRevision);
+  }
+  assert.equal(database.getPendingSyncJobs().length, 0);
   const result = database.saveInitialSetup({
     businessName: "Temiz Kurulum İşletmesi",
     profileId: "market",
@@ -70,6 +75,14 @@ try {
   assert.equal(capabilities.enabledCapabilities.includes("retail.barcode"), true);
   assert.equal(capabilities.enabledCapabilities.includes("food_service.tables"), false);
   assert.equal(capabilities.enabledCapabilities.includes("accommodation.rooms"), false);
+  assert.equal(capabilities.enabledCapabilities.includes("service.android"), false);
+  assert.equal(capabilities.enabledCapabilities.includes("service.whatsapp"), true);
+  assert.equal(capabilities.enabledCapabilities.includes("service.ai"), false);
+  assert.equal(
+    database.getPendingSyncJobs().some((job) => job.jobType === "android_snapshot"),
+    true,
+    "setup must queue the capability manifest even when Android is disabled"
+  );
   console.log("setup-profile-contract-smoke-ok");
 } finally {
   database.close();

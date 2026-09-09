@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 
-export type ActionButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "whatsapp";
-export type ActionButtonSize = "sm" | "md";
+type ActionButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "whatsapp";
+type ActionButtonSize = "sm" | "md";
 
 interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ActionButtonVariant;

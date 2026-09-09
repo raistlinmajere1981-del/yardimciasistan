@@ -1,4 +1,4 @@
-export type BarcodeInputSource = "simulator" | "keyboard-wedge" | "camera-android";
+type BarcodeInputSource = "simulator" | "keyboard-wedge" | "camera-android";
 
 export interface BarcodeScan {
   value: string;
@@ -24,7 +24,7 @@ export interface KeyboardBarcodeInputOptions {
   maxLength?: number;
 }
 
-export function normalizeBarcodeValue(value: unknown, maxLength = 80) {
+function normalizeBarcodeValue(value: unknown, maxLength = 80) {
   return String(value ?? "")
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .trim()
@@ -130,9 +130,3 @@ export function createKeyboardBarcodeInputAdapter(
     }
   };
 }
-
-/**
- * Camera/Android intentionally has no implementation in the desktop MVP.
- * The source value is reserved so a later adapter can emit the same BarcodeScan contract.
- */
-export const CAMERA_ANDROID_BARCODE_SOURCE: BarcodeInputSource = "camera-android";

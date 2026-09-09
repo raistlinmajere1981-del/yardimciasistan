@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-export type PanelPadding = "compact" | "default";
+type PanelPadding = "compact" | "default";
 
 interface PanelProps extends HTMLAttributes<HTMLElement> {
   padding?: PanelPadding;

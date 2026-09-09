@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -480,10 +480,6 @@ function embeddedConnectionIsLocked() {
 function stopAndExit(code) {
   cleanup();
   process.exit(code);
-}
-
-function writeJson(path, value) {
-  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function delay(ms) {

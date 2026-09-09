@@ -11,8 +11,8 @@ import {
   type DesktopSyncRuntimeStatus
 } from "./database";
 
-export const NORMAL_PULL_INTERVAL_MS = 15_000;
-export const MARKET_BARCODE_FAST_PULL_INTERVAL_MS = 1_500;
+const NORMAL_PULL_INTERVAL_MS = 15_000;
+const MARKET_BARCODE_FAST_PULL_INTERVAL_MS = 1_500;
 const OUTBOX_SCAN_INTERVAL_MS = 1_000;
 const INITIAL_SYNC_DELAY_MS = 1_500;
 const DEBOUNCE_DELAY_MS = 750;

@@ -116,7 +116,7 @@ export function buildDashboardView(
   };
 }
 
-export function getDateUrgency(value: string, today = getLocalIsoDate()): DashboardDateUrgency {
+function getDateUrgency(value: string, today = getLocalIsoDate()): DashboardDateUrgency {
   if (!value) {
     return "undated";
   }

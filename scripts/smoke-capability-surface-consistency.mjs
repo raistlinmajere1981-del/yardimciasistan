@@ -30,13 +30,6 @@ const {
   projectAndroidOperationsSnapshot
 } = require("../apps/desktop-app/dist-electron/android-capability-projection.js");
 
-const allGroups = {
-  service_orders: true,
-  cashier: true,
-  rooms_tasks: true,
-  customer_reservation: true,
-  market_operations: false
-};
 const androidCore = [C.ANDROID, C.CUSTOMERS, C.TASKS, C.FINANCE, C.REPORTS, C.DEVICES];
 
 const requestsSource = source("apps/desktop-app/src/components/customers/RequestsWorkspace.tsx");
@@ -125,8 +118,8 @@ assert.match(
 );
 assert.match(
   handlerSource(mainSource, "setup:saveInitial", 3_500),
-  /applyBusinessProfileCapabilities\([\s\S]*setBusinessCapability\([\s\S]*queueSyncJob\("android_snapshot"\)/,
-  "setup save must persist the selected profile and publish its capability manifest"
+  /getDatabase\(\)\.saveInitialSetup\([\s\S]*if \(!localResult\.ok\)/,
+  "setup IPC must delegate persistence to DesktopDatabase and propagate failure; smoke-setup-profile-contract verifies capabilities and publication"
 );
 assert.match(
   handlerSource(mainSource, "dailyTask:save"),

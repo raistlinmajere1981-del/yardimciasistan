@@ -13,8 +13,6 @@ export interface AndroidReservationActionContext {
   insertEvent: (type: string, entityId: string, payload: Record<string, unknown>) => void;
 }
 
-type ReservationKind = "room" | "table";
-
 export function applyAndroidReservationAction(
   context: AndroidReservationActionContext
 ): AndroidReservationMutationResult {

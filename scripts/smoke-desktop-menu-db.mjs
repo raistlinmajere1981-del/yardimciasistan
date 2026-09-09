@@ -1366,9 +1366,3 @@ function androidAction(id, actionType, payload, deviceId = "android-smoke-device
     processed_at: ""
   };
 }
-
-function scalar(database, sql) {
-  const row = database.prepare(sql).get();
-  assert.ok(row, `Sorgu sonuç döndürmedi: ${sql}`);
-  return Object.values(row)[0];
-}

@@ -100,7 +100,7 @@ import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
 import type { CommerceStoreSnapshot } from "./commerce-store";
 import type { InventoryCountResult } from "./commerce-runtime";
 
-export interface AiConnectionTestInput {
+interface AiConnectionTestInput {
   provider: string;
   service: string;
   projectName: string;
@@ -111,11 +111,11 @@ export interface AiConnectionTestInput {
   timeoutSeconds: number;
 }
 
-export type AiConnectionTestResult =
+type AiConnectionTestResult =
   | { ok: true; message: string; model: string; models: Array<{ id: string; label: string }> }
   | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string }> };
 
-export type AiApiKeyRevealResult =
+type AiApiKeyRevealResult =
   | { ok: true; apiKey: string }
   | { ok: false; message: string };
 

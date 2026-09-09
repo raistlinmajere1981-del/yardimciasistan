@@ -235,7 +235,7 @@ function assertSourceContracts() {
   const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
   const hosting = read("firm-template/web-module/api/sync.php");
 
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS market_barcode_scan_events/);
+  assert.match(migration, /CREATE TABLE market_barcode_scan_events/);
   assert.match(migration, /UNIQUE \(android_action_id\)/);
   assert.match(androidAction, /createMarketBarcodeScanEventInTransaction/);
   assert.doesNotMatch(androidAction, /createRuntimePaidSale|createPaidCommerceSale|applyInventoryMovement|createMarketCartDraftInTransaction[\s\S]{0,120}applyBarcodeScan/);

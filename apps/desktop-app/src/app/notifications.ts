@@ -13,8 +13,8 @@ import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
 import type { DesktopPage } from "./navigation";
 import { getDesktopTaskDomain, isAccommodationTask, isRestaurantTask } from "./operations";
 
-export type DesktopNotificationPriority = "high" | "medium" | "low";
-export type DesktopNotificationKind = "request" | "reservation" | "table" | "task" | "sync" | "action";
+type DesktopNotificationPriority = "high" | "medium" | "low";
+type DesktopNotificationKind = "request" | "reservation" | "table" | "task" | "sync" | "action";
 
 export interface DesktopNotificationItem {
   key: string;

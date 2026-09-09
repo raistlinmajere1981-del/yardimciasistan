@@ -118,7 +118,8 @@ try {
     service_orders: false,
     cashier: false,
     rooms_tasks: false,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   });
   assert.equal(initialGroupResult.ok, true, initialGroupResult.message);
   assert.equal(

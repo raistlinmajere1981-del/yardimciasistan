@@ -3,7 +3,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { app, dialog, ipcMain, session, shell } from "electron";
 
-export type DesktopBackupKind = "manual" | "safety";
+type DesktopBackupKind = "manual" | "safety";
 
 export interface DesktopBackupListItem {
   id: string;
