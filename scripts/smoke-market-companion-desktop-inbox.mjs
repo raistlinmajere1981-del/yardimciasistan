@@ -183,8 +183,7 @@ try {
     assert.equal(markMarketCartDraftReviewed(databasePath, cartDraft.draft.id).status, "reviewed");
     assert.equal(markMarketCartDraftReviewed(databasePath, cartDraft.draft.id).status, "reviewed");
 
-    // UI/runtime availability follows persisted capabilities, not legacy business_type.
-    sqlite.prepare("UPDATE business SET business_type = 'pension_restaurant'").run();
+    // UI/runtime availability follows the persisted capability snapshot.
     assert.equal(listMarketProductDrafts(databasePath, { status: "pending" }).length, 1);
     assert.equal(listMarketCartDrafts(databasePath, { status: "reviewed" }).length, 1);
   } finally {

@@ -186,8 +186,8 @@ final class OperationData {
       }
     }
 
-    // A snapshot without the persisted capability manifest is legacy/unknown and
-    // must not repopulate operational data. A manifest that revokes Android is a
+    // A snapshot without the persisted capability manifest is invalid and must
+    // not repopulate operational data. A manifest that revokes Android is a
     // terminal tombstone even if a malformed payload still carries stale arrays.
     if (!data.capabilitiesResolved) {
       return data;
@@ -259,7 +259,7 @@ final class OperationData {
     addRecords(array(menu, "items"), data.menuItems, MenuItem::fromJson);
     JSONObject adminMenu = root.optJSONObject("admin_menu");
     if (adminMenu == null) {
-      adminMenu = menu;
+      adminMenu = new JSONObject();
     }
     addRecords(array(adminMenu, "categories"), data.adminCategories, MenuCategory::fromJson);
     addRecords(array(adminMenu, "items"), data.adminMenuItems, MenuItem::fromJson);

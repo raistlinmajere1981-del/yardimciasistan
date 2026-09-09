@@ -114,15 +114,15 @@ try {
     last_seen_at: new Date().toISOString()
   }]);
   assert.equal(database.setAndroidDeviceActive(DEVICE_ID, true).ok, true);
-  const legacyGroupResult = database.setAndroidDevicePermissionGroups(DEVICE_ID, {
+  const initialGroupResult = database.setAndroidDevicePermissionGroups(DEVICE_ID, {
     service_orders: false,
     cashier: false,
     rooms_tasks: false,
     customer_reservation: false
   });
-  assert.equal(legacyGroupResult.ok, true, legacyGroupResult.message);
+  assert.equal(initialGroupResult.ok, true, initialGroupResult.message);
   assert.equal(
-    legacyGroupResult.devices.find((device) => device.deviceId === DEVICE_ID)
+    initialGroupResult.devices.find((device) => device.deviceId === DEVICE_ID)
       ?.permissionGroups.market_operations,
     false
   );
@@ -453,7 +453,7 @@ try {
     assert.equal(tableCount(sqlite, "purchase_orders"), purchasesBeforeDeniedAdmin);
     assert.equal(receiptById(sqlite, "market-admin-closed-capability"), 0);
 
-    assertNoLegacyMarketGate();
+    assertCurrentMarketGate();
     assertMirroredTransportContracts();
     assert.equal(String(sqlite.prepare("PRAGMA integrity_check").get().integrity_check), "ok");
   } finally {
@@ -512,14 +512,14 @@ function capabilitySetWithout(...removed) {
   return new Set(marketCapabilities.filter((capability) => !blocked.has(capability)));
 }
 
-function assertNoLegacyMarketGate() {
+function assertCurrentMarketGate() {
   const forbidden = /business(?:Type|_type)|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/;
   for (const relativePath of [
     "apps/desktop-app/electron/market-android-actions.ts",
     "apps/desktop-app/electron/market-android-snapshot.ts",
     "apps/desktop-app/electron/market-companion-runtime.ts",
     "apps/desktop-app/electron/market-companion-store.ts",
-    "apps/desktop-app/db/migrations/037_market_android_companion.sql"
+    "apps/desktop-app/db/migrations/001_baseline.sql"
   ]) {
     assert.doesNotMatch(readFileSync(join(process.cwd(), relativePath), "utf8"), forbidden, relativePath);
   }

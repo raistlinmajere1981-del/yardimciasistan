@@ -74,14 +74,14 @@ try {
   });
   assert.equal(publication.status, 200);
 
-  const legacySummary = await postAndroid({
+  const bootstrapSummary = await postAndroid({
     action: "android_summary",
     device_id: deviceId,
     device_name: "Token Smoke Telefon",
     app_version: "0.1.1-smoke"
   }, { "X-YA-Sync-Secret": syncSecret });
-  assert.equal(legacySummary.status, 200, "Token üretilmeden Android kapısı bootstrap secret kabul etmeli.");
-  assert.equal((await legacySummary.json()).approval_required, false);
+  assert.equal(bootstrapSummary.status, 200, "Token üretilmeden Android kapısı bootstrap secret kabul etmeli.");
+  assert.equal((await bootstrapSummary.json()).approval_required, false);
 
   const firstClaim = await claimToken();
   assert.equal(firstClaim.status, 201);

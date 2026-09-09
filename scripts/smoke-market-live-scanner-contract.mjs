@@ -166,8 +166,8 @@ try {
     );
 
     const unauthorized = database.applyAndroidAction({
-      ...scanAction("live-scan-legacy-device", product.barcode, new Date().toISOString()),
-      device_id: "unregistered-legacy-device"
+      ...scanAction("live-scan-unregistered-device", product.barcode, new Date().toISOString()),
+      device_id: "unregistered-device"
     });
     assert.equal(unauthorized.ok, false);
   } finally {
@@ -227,7 +227,7 @@ function scalar(sqlite, sql, ...parameters) {
 
 function assertSourceContracts() {
   const read = (relativePath) => readFileSync(join(process.cwd(), relativePath), "utf8");
-  const migration = read("apps/desktop-app/db/migrations/038_market_live_barcode_scans.sql");
+  const migration = read("apps/desktop-app/db/migrations/001_baseline.sql");
   const androidAction = read("apps/desktop-app/electron/market-android-actions.ts");
   const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
   const androidRules = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketUiRules.java");

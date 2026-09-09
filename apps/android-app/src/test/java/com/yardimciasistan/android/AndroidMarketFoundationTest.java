@@ -10,8 +10,8 @@ import org.junit.Test;
 
 public final class AndroidMarketFoundationTest {
   @Test
-  public void legacySnapshotWithoutMarketUsesSafeEmptyModel() {
-    OperationData data = OperationData.fromJson(new LegacyMarketlessSnapshot());
+  public void missingMarketSnapshotUsesSafeEmptyModel() {
+    OperationData data = OperationData.fromJson(new MissingMarketSnapshot());
 
     assertTrue(data.capabilitiesResolved);
     assertTrue(data.market.products.isEmpty());
@@ -66,7 +66,7 @@ public final class AndroidMarketFoundationTest {
     return data;
   }
 
-  private static final class LegacyMarketlessSnapshot extends JSONObject {
+  private static final class MissingMarketSnapshot extends JSONObject {
     @Override
     public long optLong(String name, long fallback) {
       return fallback;

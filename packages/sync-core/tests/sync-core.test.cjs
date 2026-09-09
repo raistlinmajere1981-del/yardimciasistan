@@ -519,7 +519,7 @@ test("Android role presets and action permission mapping stay explicit", () => {
   assert.equal(resolveAndroidActionPermission("table_order_set_payment_waiting"), "table_order.set_payment_waiting");
   assert.equal(resolveAndroidActionPermission("table_order_close_paid"), "table_order.close_paid");
   assert.equal(resolveAndroidActionPermission("table_order_cancel"), "table_order.cancel");
-  assert.equal(resolveAndroidActionPermission("table_order_close", { status: "paid" }), "table_order.close_paid");
+  assert.equal(resolveAndroidActionPermission("table_order_close"), null);
   assert.equal(resolveAndroidActionPermission("menu_stock_add"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("menu_stock_set"), "menu.stock_update");
   assert.equal(resolveAndroidActionPermission("menu_stock_adjust"), "menu.stock_update");

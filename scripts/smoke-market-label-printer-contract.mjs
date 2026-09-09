@@ -44,7 +44,7 @@ assert.match(labelsWorkspace, /exportLabel\("png"\)/, "Labels workspace must exp
 assert.match(labelsWorkspace, /exportLabel\("pdf"\)/, "Labels workspace must expose PDF output.");
 assert.match(labelsWorkspace, /downloadLabelResult/, "File outputs must use the shared LabelPrinter download result.");
 assert.match(labelsWorkspace, /LABEL_PRINTER_CATALOG/, "Labels workspace must expose adapter readiness.");
-assert.doesNotMatch(labelsWorkspace, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/, "Labels workspace must not bind to legacy business/profile flags.");
+assert.doesNotMatch(labelsWorkspace, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/, "Labels workspace must not bind to removed profile flags.");
 
 assert.match(marketPage, /C\.RETAIL_LABELS/, "Market page must derive label availability from persisted capability state.");
 assert.match(marketPage, /<MarketLabelsWorkspace/, "Market page must render the labels workspace.");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -31,7 +31,7 @@ try {
   assert.equal(C.CUSTOMER_CREDIT, "commerce.customer_credit");
   assert.deepEqual(getBusinessCapabilityDependencies(C.CUSTOMER_CREDIT), [C.CUSTOMERS, C.SALES, C.FINANCE]);
   assert.ok(getBusinessProfile("market").defaultCapabilities.includes(C.CUSTOMER_CREDIT));
-  for (const profile of ["pension", "restaurant", "cafe", "pension_restaurant", "other"]) {
+  for (const profile of ["pension", "restaurant", "cafe", "pension_restaurant"]) {
     assert.ok(!getBusinessProfile(profile).defaultCapabilities.includes(C.CUSTOMER_CREDIT));
   }
   applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
@@ -50,9 +50,9 @@ try {
   const deletedId = customer("M81 Silinmiş Müşteri");
   assert.equal(database.deleteCustomer(deletedId).ok, true);
   const foreignId = customer("M81 Başka İşletme");
-  raw.prepare(`INSERT INTO business (id, name, display_name, business_type, profile_id, created_at, updated_at)
-    VALUES ('m81_other', 'Diğer', 'Diğer', 'other', 'other', '2099-01-01', '2099-01-01')`).run();
-  raw.prepare("UPDATE customers SET business_id = 'm81_other' WHERE id = ?").run(foreignId);
+  raw.prepare(`INSERT INTO business (id, name, display_name, profile_id, created_at, updated_at)
+    VALUES ('m81_secondary', 'İkinci İşletme', 'İkinci İşletme', 'market', '2099-01-01', '2099-01-01')`).run();
+  raw.prepare("UPDATE customers SET business_id = 'm81_secondary' WHERE id = ?").run(foreignId);
 
   const product = runtime.saveRuntimeCatalogProduct(databasePath, { name: "M81 Güncel Fiyat", salePrice: 19.99 });
   runtime.applyRuntimeInventoryMovement(databasePath, { productId: product.id, type: "purchase", quantityDelta: 20 });
@@ -290,18 +290,23 @@ try {
   assert.throws(() => account(), /etkin değil/i);
   setBusinessCapability(databasePath, { capability: C.CUSTOMER_CREDIT, enabled: true });
   adjustment(customerId, 1);
-  assert.equal(debt(), 10001, "Hybrid cafe works through capability, without a market business_type gate.");
+  assert.equal(debt(), 10001, "Hybrid cafe works through capability, without a profile gate.");
   runtime.createCustomerCreditSale(databasePath, cart);
   pay(1, { customerId });
 
   // Execute actual compiled IPC handlers against a mocked Electron boundary.
   verifyIpc(databasePath, customerId, cart, account, raw);
 
-  const backup = database.createManualBackup();
-  assert.equal(backup.ok, true, backup.message);
+  const backupFilePath = join(dataDir, "current-baseline.sqlite");
+  const backupSource = new DatabaseSync(databasePath);
+  try {
+    backupSource.exec(`VACUUM INTO '${backupFilePath.replace(/'/g, "''")}'`);
+  } finally {
+    backupSource.close();
+  }
   const restoreDir = join(dataDir, "restore");
   mkdirSync(restoreDir);
-  copyFileSync(backup.backupFilePath, join(restoreDir, "yardimci-asistan.sqlite"));
+  copyFileSync(backupFilePath, join(restoreDir, "yardimci-asistan.sqlite"));
   const restored = new DesktopDatabase({ appPath, userDataPath: restoreDir });
   try {
     restored.initialize();
@@ -319,7 +324,6 @@ try {
   } finally { restored.close(); }
   assert.equal(raw.prepare("PRAGMA integrity_check").get().integrity_check, "ok");
   assert.deepEqual(raw.prepare("PRAGMA foreign_key_check").all(), []);
-  verifyUpgrade();
   console.log("market-customer-credit-foundation-smoke-ok");
 } finally {
   raw?.close();
@@ -371,41 +375,4 @@ function verifyIpc(databasePath, customerId, cart, account, raw) {
   assert.equal(mutations, 3);
   raw.prepare("UPDATE business_capabilities SET is_enabled = 1 WHERE business_id = ? AND capability_id = ?").run(businessId, C.CUSTOMER_CREDIT);
   assert.deepEqual(account(), preserved);
-}
-
-function verifyUpgrade() {
-  const upgrade = new DatabaseSync(":memory:");
-  try {
-    upgrade.exec("PRAGMA foreign_keys = ON");
-    const migrations = join(appPath, "db/migrations");
-    for (const file of readdirSync(migrations).filter((name) => name.endsWith(".sql") && name < "039").sort()) {
-      upgrade.exec(readFileSync(join(migrations, file), "utf8"));
-    }
-    upgrade.exec(`INSERT INTO business (id, name, display_name, business_type, profile_id, created_at, updated_at)
-      VALUES ('upgrade', 'Market', 'Market', 'market', 'market', '2020', '2020');
-      INSERT INTO customers (id, full_name, phone, created_at, updated_at) VALUES ('legacy', 'Eski müşteri', '', '2020', '2020');`);
-    for (const capability of [C.CUSTOMERS, C.SALES, C.FINANCE, C.CATALOG]) {
-      upgrade.prepare(`INSERT INTO business_capabilities (business_id, capability_id, is_enabled, source, created_at, updated_at)
-        VALUES ('upgrade', ?, 1, 'profile', '2020', '2020') ON CONFLICT DO UPDATE SET is_enabled = 1`).run(capability);
-    }
-    for (const [id, profile] of [["disabled", "market"], ["sales_off", "market"], ["cafe", "cafe"]]) {
-      upgrade.prepare(`INSERT INTO business (id, name, display_name, business_type, profile_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, '2021', '2021')`).run(id, id, id, profile, profile);
-      for (const capability of [C.CUSTOMERS, C.SALES, C.FINANCE, C.CATALOG]) {
-        upgrade.prepare(`INSERT INTO business_capabilities (business_id, capability_id, is_enabled, source, created_at, updated_at)
-          VALUES (?, ?, ?, 'user', '2021', '2021') ON CONFLICT DO UPDATE SET is_enabled = excluded.is_enabled`)
-          .run(id, capability, id === "sales_off" && capability === C.SALES ? 0 : 1);
-      }
-    }
-    upgrade.prepare(`INSERT INTO business_capabilities (business_id, capability_id, is_enabled, source, created_at, updated_at)
-      VALUES ('disabled', ?, 0, 'user', '2021', '2021')`).run(C.CUSTOMER_CREDIT);
-    upgrade.exec(readFileSync(join(migrations, "039_customer_credit_ledger.sql"), "utf8"));
-    assert.equal(upgrade.prepare("SELECT business_id FROM customers WHERE id = 'legacy'").get().business_id, "upgrade");
-    assert.equal(upgrade.prepare("SELECT is_enabled FROM business_capabilities WHERE business_id = 'upgrade' AND capability_id = ?").get(C.CUSTOMER_CREDIT).is_enabled, 1);
-    assert.equal(upgrade.prepare("SELECT is_enabled FROM business_capabilities WHERE business_id = 'disabled' AND capability_id = ?").get(C.CUSTOMER_CREDIT).is_enabled, 0);
-    for (const id of ["sales_off", "cafe"]) {
-      assert.equal(upgrade.prepare("SELECT is_enabled FROM business_capabilities WHERE business_id = ? AND capability_id = ?").get(id, C.CUSTOMER_CREDIT), undefined);
-    }
-    assert.deepEqual(upgrade.prepare("PRAGMA foreign_key_check").all(), []);
-  } finally { upgrade.close(); }
 }

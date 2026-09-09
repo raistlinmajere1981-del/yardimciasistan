@@ -5,13 +5,13 @@ import java.security.MessageDigest;
 import java.util.Locale;
 
 final class StableDeviceId {
-  private static final String BROKEN_LEGACY_ANDROID_ID = "9774d56d682e549c";
+  private static final String KNOWN_BROKEN_ANDROID_ID = "9774d56d682e549c";
 
   private StableDeviceId() {}
 
   static String from(String packageName, String androidId) {
     String normalizedAndroidId = androidId == null ? "" : androidId.trim().toLowerCase(Locale.ROOT);
-    if (normalizedAndroidId.isEmpty() || BROKEN_LEGACY_ANDROID_ID.equals(normalizedAndroidId)) {
+    if (normalizedAndroidId.isEmpty() || KNOWN_BROKEN_ANDROID_ID.equals(normalizedAndroidId)) {
       return "";
     }
     String normalizedPackageName = packageName == null ? "" : packageName.trim();

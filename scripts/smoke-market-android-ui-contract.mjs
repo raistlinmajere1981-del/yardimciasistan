@@ -100,7 +100,7 @@ for (const coverage of [
   "repeatBarcodeIncrementsOneCartLineAndDraftHasNoPayment",
   "receivingBuildsMultipleLinesAndRejectsInvalidNumbers",
   "offlineActionPersistsAndPendingStateIsVisible",
-  "oldSnapshotWithoutMarketRemainsSafeForUi"
+  "missingMarketCapabilitiesRemainSafeForUi"
 ]) {
   assert.equal(tests.includes(coverage), true, `Android Market JVM coverage missing: ${coverage}`);
 }

@@ -531,7 +531,7 @@ const ANDROID_MARKET_CAPABILITIES = [
   C.RETAIL_SUPPLIERS
 ] as const;
 
-const ANDROID_LEGACY_OPERATION_CAPABILITIES = [
+const ANDROID_ACCOMMODATION_FOOD_CAPABILITIES = [
   C.ACCOMMODATION_ROOMS,
   C.ACCOMMODATION_RESERVATIONS,
   C.ACCOMMODATION_STAYS,
@@ -657,7 +657,7 @@ export function androidAvailablePermissionGroupIds(
 
   const hasMarketOperations = ANDROID_MARKET_CAPABILITIES.some((capability) => enabled.has(capability));
   const isRetailOnly = hasMarketOperations
-    && !ANDROID_LEGACY_OPERATION_CAPABILITIES.some((capability) => enabled.has(capability));
+    && !ANDROID_ACCOMMODATION_FOOD_CAPABILITIES.some((capability) => enabled.has(capability));
 
   return ANDROID_PERMISSION_GROUP_IDS.filter((groupId) => {
     if (isRetailOnly && groupId !== "market_operations") return false;
@@ -981,8 +981,6 @@ export const ANDROID_ACTION_TYPES = [
   "table_order_set_payment_waiting",
   "table_order_close_paid",
   "table_order_cancel",
-  "table_order_set_status",
-  "table_order_close",
   "menu_category_delete",
   "menu_item_delete",
   "message_delete",
@@ -1131,22 +1129,11 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
 
 export function resolveAndroidActionPermission(
   actionType: string,
-  payload: Record<string, unknown> = {}
+  _payload: Record<string, unknown> = {}
 ): AndroidPermission | null {
   const mapped = ANDROID_ACTION_PERMISSION_MAP[actionType as AndroidActionType];
   if (mapped) {
     return mapped;
-  }
-  if (actionType === "table_order_set_status") {
-    const status = String(payload.status ?? "").trim();
-    if (status === "preparing") return "table_order.set_preparing";
-    if (status === "served") return "table_order.set_served";
-    if (status === "payment") return "table_order.set_payment_waiting";
-  }
-  if (actionType === "table_order_close") {
-    const status = String(payload.status ?? "").trim();
-    if (status === "paid") return "table_order.close_paid";
-    if (status === "cancelled") return "table_order.cancel";
   }
   return null;
 }

@@ -216,14 +216,14 @@ public final class AndroidMarketUiTest {
   }
 
   @Test
-  public void oldSnapshotWithoutMarketRemainsSafeForUi() throws Exception {
+  public void missingMarketCapabilitiesRemainSafeForUi() throws Exception {
     JSONObject snapshot = new JSONObject();
     snapshot.put("business_capabilities", new JSONArray()
         .put(AndroidUiRules.CAPABILITY_ANDROID)
         .put(MarketUiRules.CAPABILITY_CATALOG));
     snapshot.put("androidPermissions", new JSONObject().put("devices", new JSONObject()));
 
-    OperationData parsed = OperationData.fromJson(snapshot, "device-old");
+    OperationData parsed = OperationData.fromJson(snapshot, "device-missing-market");
 
     assertNotNull(parsed.market);
     assertTrue(parsed.market.products.isEmpty());

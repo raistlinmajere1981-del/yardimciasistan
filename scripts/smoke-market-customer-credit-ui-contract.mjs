@@ -24,7 +24,7 @@ let page;
 try {
   database.initialize();
   const path = database.databasePath;
-  // A cafe with explicit retail capabilities proves there is no business_type gate.
+  // A cafe with explicit retail capabilities proves there is no profile gate.
   applyBusinessProfileCapabilities(path, "cafe", { preserveUserOverrides: false });
   setBusinessCapability(path, { capability: "commerce.customer_credit", enabled: true });
   setBusinessCapability(path, { capability: "retail.barcode", enabled: true });

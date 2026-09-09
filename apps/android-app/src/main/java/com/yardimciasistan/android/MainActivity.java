@@ -5300,19 +5300,6 @@ public final class MainActivity extends ComponentActivity {
         return MarketUiRules.PERMISSION_CART_DRAFT;
       case MarketUiRules.ACTION_BARCODE_SCAN:
         return MarketUiRules.PERMISSION_SCAN_TO_DESKTOP;
-      case "table_order_set_status":
-        String status = actionPayload.optString("status", "");
-        if ("served".equals(status)) {
-          return "table_order.set_served";
-        }
-        if ("payment".equals(status)) {
-          return "table_order.set_payment_waiting";
-        }
-        return "table_order.set_preparing";
-      case "table_order_close":
-        return "paid".equals(actionPayload.optString("status", ""))
-            ? "table_order.close_paid"
-            : "table_order.cancel";
       default:
         return null;
     }

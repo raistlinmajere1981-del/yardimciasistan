@@ -384,9 +384,8 @@ final class HostingSyncClient {
         throw new SyncException("Telefonun kişisel bağlantı anahtarı kaydedilemedi.");
       }
     } catch (SyncException ignored) {
-      // Compatibility path: an older hosting module may not yet expose the token
-      // endpoint. The current shared-secret connection remains usable until the
-      // hosting package is upgraded.
+      // Token issuance is opportunistic; bootstrap authentication remains usable
+      // when the token endpoint is unavailable during the pairing step.
     }
   }
 
