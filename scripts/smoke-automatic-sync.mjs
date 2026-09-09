@@ -495,7 +495,8 @@ try {
     service_orders: true,
     cashier: true,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   });
   assert.equal(cashierResult.ok, true);
   const cashierProfilePublishCycle = await coordinator.runNow();
@@ -798,6 +799,10 @@ return [
   const inactiveSummary = await inactiveSummaryResponse.json();
   assert.equal(inactiveSummary.approval_required, true);
   assert.deepEqual(inactiveSummary.actions, [], "Pasif cihaz eski action sonuçlarını görmemeli.");
+  const pendingAfterInactiveResponse = await syncApi({ action: "pull_android_actions", limit: 50 });
+  assert.equal(pendingAfterInactiveResponse.status, 200);
+  const pendingAfterInactive = await pendingAfterInactiveResponse.json();
+  assert.equal(pendingAfterInactive.actions.some((candidate) => candidate.id === inactiveActionId), false);
   const reactivateResult = database.setAndroidDeviceActive("android-auto-smoke", true);
   assert.equal(reactivateResult.ok, true);
   await coordinator.runNow();
@@ -1146,7 +1151,7 @@ function assertCapabilitiesShape() {
     message: "Senkron özellikleri alındı.",
     protocol_version: 2,
     storage: "sqlite",
-    schema_version: 2,
+    schema_version: 3,
     features: [
       "request_cursor",
       "request_acknowledgement",

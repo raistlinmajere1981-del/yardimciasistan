@@ -60,20 +60,8 @@ const capabilitySnapshotStub = `      getBusinessCapabilitySnapshot: async () =>
 const definitions = {
   "automatic-sync": {
     source: "smoke-automatic-sync.mjs",
-    replacements: [{
-      before: `  const inactiveAction = await getAndroidAction(inactiveActionId);
-  assert.equal(inactiveAction.status, "failed");
-  assert.equal(inactiveAction.error_message, "Cihaz masaüstünde pasifleştirilmiş.");`,
-      after: `  const inactiveSummaryResponse = await syncApi({ action: "android_summary", device_id: "android-auto-smoke" });
-  assert.equal(inactiveSummaryResponse.status, 200);
-  const inactiveSummary = await inactiveSummaryResponse.json();
-  assert.equal(inactiveSummary.approval_required, true);
-  assert.deepEqual(inactiveSummary.actions, []);
-  const pendingAfterInactiveResponse = await syncApi({ action: "pull_android_actions", limit: 50 });
-  assert.equal(pendingAfterInactiveResponse.status, 200);
-  const pendingAfterInactive = await pendingAfterInactiveResponse.json();
-  assert.equal(pendingAfterInactive.actions.some((candidate) => candidate.id === inactiveActionId), false);`
-    }]
+    // The source smoke covers inactive-device visibility and reactivation directly.
+    replacements: []
   },
   renderer: {
     source: "smoke-desktop-renderer.mjs",
