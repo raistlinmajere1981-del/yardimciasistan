@@ -4,9 +4,15 @@ import { ActionButton } from "../ui/ActionButton";
 import { CustomerCreditBalances } from "./CustomerCreditBalances";
 import { CustomerCreditForm } from "./CustomerCreditForm";
 import { CustomerCreditHistory, CustomerCreditMovement } from "./CustomerCreditHistory";
+import { CustomerCreditWhatsAppShare } from "./CustomerCreditWhatsAppShare";
+import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 import "../../customer-credit-ux.css";
 
-export function CustomerCreditPanel({ customerId }: { customerId: string }) {
+export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPreparedWhatsApp }: {
+  customerId: string;
+  whatsappEnabled?: boolean;
+  onPreparedWhatsApp?: (message: PreparedWhatsAppMessage) => void;
+}) {
   const { account, loading, error, reload } = useCustomerCreditAccount(customerId);
   const [expanded, setExpanded] = useState(false);
   const [form, setForm] = useState<"payment" | "adjustment" | null>(null);
@@ -43,6 +49,7 @@ export function CustomerCreditPanel({ customerId }: { customerId: string }) {
         {!form && !account.customer.deletedAt && <ActionButton variant="ghost" size="sm" disabled={loading} onClick={() => { setForm("adjustment"); setMessage(""); }}>Düzeltme</ActionButton>}
         {form && <CustomerCreditForm account={account} mode={form} loading={loading} onSavingChange={setSaving} onClose={closeForm} onSaved={(text) => { setMessage(text); closeForm(); }} />}
         <CustomerCreditHistory account={account} />
+        {whatsappEnabled && !account.customer.deletedAt && !form && <CustomerCreditWhatsAppShare account={account} disabled={loading || saving} readFresh={reload} onPrepared={onPreparedWhatsApp} />}
       </div>}
     </>}
   </section>;

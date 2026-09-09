@@ -334,10 +334,11 @@ export function DesktopWorkspaceRouter({
       safeMode={(
         <WhatsAppWorkspace
           view="safe"
+          preparedMessage={messagingController.preparedWhatsAppMessage}
           requests={surfaceData.requests}
           selectedRequest={surfaceSelectedWhatsAppRequest}
-          selectedMessage={surfaceSelectedWhatsAppRequest ? selectedWhatsAppMessage : ""}
-          selectedUrl={surfaceSelectedWhatsAppRequest ? selectedWhatsAppUrl : ""}
+          selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+          selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
           aiEnabled={aiEnabled}
           aiState={aiState}
           aiMessage={aiMessage}
@@ -353,10 +354,11 @@ export function DesktopWorkspaceRouter({
       webMode={(onReturnToSafe) => (
         <WhatsAppWorkspace
           view="web"
+          preparedMessage={messagingController.preparedWhatsAppMessage}
           requests={surfaceData.requests}
           selectedRequest={surfaceSelectedWhatsAppRequest}
-          selectedMessage={surfaceSelectedWhatsAppRequest ? selectedWhatsAppMessage : ""}
-          selectedUrl={surfaceSelectedWhatsAppRequest ? selectedWhatsAppUrl : ""}
+          selectedMessage={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppMessage : ""}
+          selectedUrl={surfaceSelectedWhatsAppRequest || messagingController.preparedWhatsAppMessage ? selectedWhatsAppUrl : ""}
           aiEnabled={aiEnabled}
           aiState={aiState}
           aiMessage={aiMessage}
@@ -469,6 +471,7 @@ export function DesktopWorkspaceRouter({
               reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
               staysEnabled={accommodationStaysEnabled}
               customerCreditEnabled={runtimeHasCapability(businessCapabilities, C.CUSTOMER_CREDIT)}
+              onPreparedCreditWhatsApp={messagingController.openPreparedCreditWhatsApp}
               onCall={callCustomerRecord}
               onWhatsApp={openCustomerWhatsApp}
               onSummarize={(requestId) => openAiTools("summary", requestId)}

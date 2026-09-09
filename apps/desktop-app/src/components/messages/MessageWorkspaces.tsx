@@ -9,6 +9,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { CompactList } from "../ui/CompactList";
 import { CompactListButton } from "../ui/CompactListItem";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
+import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
@@ -236,6 +237,7 @@ export function AiWorkspace({
 }
 
 interface WhatsAppWorkspaceProps {
+  preparedMessage?: PreparedWhatsAppMessage | null;
   view: "safe" | "web";
   requests: SyncedCustomerRequest[];
   selectedRequest: SyncedCustomerRequest | undefined;
@@ -417,21 +419,23 @@ function createWhatsAppSendScript(expectedMessage: string, expectedChatTitle: st
   })()`;
 }
 
-export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent, onDeleteMessage }: WhatsAppWorkspaceProps) {
+export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
   const [sendState, setSendState] = useState<SyncState>("idle");
   const [sendMessage, setSendMessage] = useState("");
   const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
+  const recipientPhone = preparedMessage?.phone ?? selectedRequest?.customer_phone;
+  const recipientName = preparedMessage?.customerName || selectedRequest?.customer_name || (preparedMessage ? "Müşteri" : "Talep seçin");
   const webViewAction = useMemo(
-    () => (selectedRequest ? prepareWhatsAppAction({ phone: selectedRequest.customer_phone, message: selectedMessage, preferredMode: "webview" }) : null),
-    [selectedMessage, selectedRequest]
+    () => (recipientPhone ? prepareWhatsAppAction({ phone: recipientPhone, message: selectedMessage, preferredMode: "webview" }) : null),
+    [selectedMessage, recipientPhone]
   );
   const webViewPayload = webViewAction?.ok && webViewAction.mode === "webview" ? webViewAction : null;
-  const phoneDisplay = webViewPayload?.phoneDisplay ?? selectedRequest?.customer_phone ?? "-";
+  const phoneDisplay = webViewPayload?.phoneDisplay ?? recipientPhone ?? "-";
 
   useEffect(() => {
-    if (!selectedRequest) {
+    if (!selectedRequest && !preparedMessage) {
       setCopyMessage("Hazır mesaj bekliyor.");
       setSendState("idle");
       setSendMessage("Gönderim için talep seçin.");
@@ -451,7 +455,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
     setSendState("idle");
     setSendMessage("");
     setWebViewUrl(webViewPayload.homeUrl);
-  }, [selectedRequest, webViewAction, webViewPayload]);
+  }, [selectedRequest, webViewAction, webViewPayload, preparedMessage]);
 
   async function copyPreparedMessage() {
     if (!selectedMessage) {
@@ -478,6 +482,8 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   }
 
   async function approveAndSendMessage() {
+    // Generic credit shares are prepared only; the operator sends in WhatsApp itself.
+    if (preparedMessage) return;
     const webView = webViewRef.current;
     if (!selectedRequest || !selectedMessage.trim() || !webView?.executeJavaScript) {
       setSendState("error");
@@ -549,6 +555,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   return (
     <section className={`whatsapp-workspace whatsapp-view-${view}`} aria-label={view === "safe" ? "Güvenli mesaj alanı" : "WhatsApp Web alanı"}>
       <aside className="panel whatsapp-request-panel">
+        {preparedMessage && <div className="panel-heading compact"><div><strong>{recipientName}</strong><p>Veresiye hesabı · mesaj hazırlandı</p><small>Gönderim WhatsApp içinde sizin kontrolünüzde.</small></div></div>}
         <div className="panel-heading compact">
           <h2>Talepler</h2>
           <StatusBadge tone="info">{requests.length} kayıt</StatusBadge>
@@ -589,7 +596,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           <div className="whatsapp-web-recipient">
             <div>
               <span>WhatsApp Web</span>
-              <h2>{selectedRequest?.customer_name ?? "Talep seçin"}</h2>
+              <h2>{recipientName}</h2>
               <small>{phoneDisplay}</small>
             </div>
             <StatusBadge tone={selectedMessage ? "ok" : "neutral"}>{selectedMessage ? "Hazır mesaj var" : "Hazır mesaj yok"}</StatusBadge>
@@ -616,10 +623,10 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               <ShieldCheck size={15} aria-hidden="true" />
               Güvenli Moda Dön
             </ActionButton>
-            <ActionButton className="whatsapp-approved-send" size="sm" type="button" onClick={approveAndSendMessage} disabled={!webViewPayload || sendState === "loading"}>
+            {!preparedMessage && <ActionButton className="whatsapp-approved-send" size="sm" type="button" onClick={approveAndSendMessage} disabled={!webViewPayload || sendState === "loading"}>
               <Send size={15} aria-hidden="true" />
               {sendState === "loading" ? "Doğrulanıyor" : "Onayla ve Gönder"}
-            </ActionButton>
+            </ActionButton>}
           </div>
 
           <div className="whatsapp-web-feedback">
@@ -651,9 +658,9 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
         <div className="panel-heading compact">
           <div className="detail-title-group">
             <span className="detail-category-label">Hazır yanıt</span>
-            <h2>{selectedRequest?.customer_name ?? "Talep seçin"}</h2>
+            <h2>{recipientName}</h2>
           </div>
-          {selectedRequest && <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>{formatRequestStatus(selectedRequest.status)}</StatusBadge>}
+          {!preparedMessage && selectedRequest && <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>{formatRequestStatus(selectedRequest.status)}</StatusBadge>}
         </div>
 
         <dl className="info-list compact-detail-meta message-recipient-meta">
@@ -662,12 +669,12 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
             <dd>{phoneDisplay}</dd>
           </div>
           <div>
-            <dt>Talep türü</dt>
-            <dd>{selectedRequest ? formatRequestType(selectedRequest.request_type) : "-"}</dd>
+            <dt>{preparedMessage ? "İşlem" : "Talep türü"}</dt>
+            <dd>{preparedMessage ? "Veresiye hesabı" : selectedRequest ? formatRequestType(selectedRequest.request_type) : "-"}</dd>
           </div>
           <div>
             <dt>Kaynak</dt>
-            <dd>{selectedRequest ? formatCustomerSource(selectedRequest.source) : "-"}</dd>
+            <dd>{preparedMessage ? "Müşteri kartı" : selectedRequest ? formatCustomerSource(selectedRequest.source) : "-"}</dd>
           </div>
         </dl>
 
@@ -690,12 +697,12 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
             <Phone size={16} aria-hidden="true" />
             Müşteriyi Ara
           </ActionButton>
-          <ActionButton variant="danger" size="sm" type="button" onClick={() => selectedRequest && onDeleteMessage(selectedRequest)} disabled={!selectedRequest || !selectedMessage}>
+          {!preparedMessage && <ActionButton variant="danger" size="sm" type="button" onClick={() => selectedRequest && onDeleteMessage(selectedRequest)} disabled={!selectedRequest || !selectedMessage}>
             <Trash2 size={16} aria-hidden="true" />
             Mesajı Sil
-          </ActionButton>
+          </ActionButton>}
         </div>
-        {aiEnabled && (
+        {aiEnabled && !preparedMessage && (
           <div className="message-ai-actions">
             <strong>AI ile mesajı düzenle</strong>
             <div>

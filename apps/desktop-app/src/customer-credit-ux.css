@@ -28,6 +28,16 @@
 
 .customer-credit-detail > .action-button { justify-self: start; }
 
+.customer-credit-share,
+.customer-credit-compose {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.customer-credit-share > .action-button { justify-self: start; }
+.customer-credit-compose { padding-block: var(--space-3); border-block: 1px solid var(--border); }
+
 .customer-credit-balances {
   display: flex;
   flex-wrap: wrap;

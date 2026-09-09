@@ -17,7 +17,7 @@ export function useCustomerCreditAccount(customerId: string) {
     try {
       if (!bridge) throw new Error("Müşteri hesabı kullanılamıyor. Uygulamayı yeniden başlatın.");
       const next = await bridge.getCustomerCreditAccount(customerId);
-      if (current === request.current) setAccount(next);
+      if (current === request.current) { setAccount(next); return next; }
     } catch (cause) {
       if (current === request.current) {
         setAccount(null);

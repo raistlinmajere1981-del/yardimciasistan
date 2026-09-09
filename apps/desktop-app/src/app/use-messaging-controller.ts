@@ -12,6 +12,7 @@ import type {
 } from "../../electron/database";
 import { buildReservationWhatsAppMessage } from "./reservation-messaging";
 import type { SyncState } from "./runtime-state";
+import type { PreparedWhatsAppMessage } from "./whatsapp-handoff";
 
 interface UseMessagingControllerOptions {
   dashboardData: DesktopDashboardData;
@@ -22,6 +23,7 @@ interface UseMessagingControllerOptions {
   aiEnabled: boolean;
   customersEnabled: boolean;
   whatsappEnabled: boolean;
+  customerCreditEnabled?: boolean;
   onOpenMessages: () => void;
 }
 
@@ -34,9 +36,27 @@ export function useMessagingController({
   aiEnabled,
   customersEnabled,
   whatsappEnabled,
+  customerCreditEnabled = false,
   onOpenMessages
 }: UseMessagingControllerOptions) {
-  const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestId] = useState(dashboardData.requests[0]?.id ?? "");
+  const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestIdState] = useState(dashboardData.requests[0]?.id ?? "");
+  const [preparedWhatsAppMessage, setPreparedWhatsAppMessage] = useState<PreparedWhatsAppMessage | null>(null);
+  const surfacePreparedWhatsAppMessage = whatsappEnabled && customerCreditEnabled ? preparedWhatsAppMessage : null;
+  useEffect(() => {
+    if (!whatsappEnabled || !customerCreditEnabled) setPreparedWhatsAppMessage(null);
+  }, [whatsappEnabled, customerCreditEnabled]);
+
+  function setSelectedWhatsAppRequestId(value: SetStateAction<string>) {
+    setPreparedWhatsAppMessage(null);
+    setSelectedWhatsAppRequestIdState(value);
+  }
+
+  function openPreparedCreditWhatsApp(message: PreparedWhatsAppMessage) {
+    if (!whatsappEnabled || !customerCreditEnabled) throw new Error("Veresiye WhatsApp paylaşımı şu anda etkin değil.");
+    setPreparedWhatsAppMessage(message);
+    setSelectedWhatsAppRequestIdState("");
+    onOpenMessages();
+  }
   const [suggestingRequestId, setSuggestingRequestId] = useState("");
   const [aiState, setAiState] = useState<SyncState>("idle");
   const [aiMessage, setAiMessage] = useState("AI cevap taslağı hazır.");
@@ -72,25 +92,25 @@ export function useMessagingController({
   }, [aiWorkspaceRequestId, dashboardData.requests]);
 
   const selectedWhatsAppRequest = useMemo(
-    () => dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId) ?? dashboardData.requests[0],
-    [dashboardData.requests, selectedWhatsAppRequestId]
+    () => surfacePreparedWhatsAppMessage ? undefined : dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId) ?? dashboardData.requests[0],
+    [dashboardData.requests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
   );
 
   const selectedWhatsAppMessage = useMemo(
-    () => whatsappEnabled && selectedWhatsAppRequest
+    () => surfacePreparedWhatsAppMessage ? surfacePreparedWhatsAppMessage.message : whatsappEnabled && selectedWhatsAppRequest
       ? buildOwnerReplyWhatsAppMessage(
           (aiEnabled ? selectedWhatsAppRequest.ai_suggested_reply : "")
           || selectedWhatsAppRequest.whatsapp_message
         )
       : "",
-    [aiEnabled, selectedWhatsAppRequest, whatsappEnabled]
+    [aiEnabled, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
   );
 
   const selectedWhatsAppUrl = useMemo(
-    () => whatsappEnabled && selectedWhatsAppRequest
+    () => surfacePreparedWhatsAppMessage ? createWhatsAppWebUrl(surfacePreparedWhatsAppMessage.phone, surfacePreparedWhatsAppMessage.message) : whatsappEnabled && selectedWhatsAppRequest
       ? createWhatsAppWebUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage)
       : "",
-    [selectedWhatsAppMessage, selectedWhatsAppRequest, whatsappEnabled]
+    [selectedWhatsAppMessage, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
   );
 
   function openWhatsApp(request: SyncedCustomerRequest) {
@@ -152,6 +172,7 @@ export function useMessagingController({
   }
 
   async function handleWhatsAppMessageSent(requestId: string, message: string) {
+    if (preparedWhatsAppMessage) return { ok: false as const, message: "Veresiye paylaşımı için gönderim kaydı tutulmaz." };
     if (!whatsappEnabled) {
       return { ok: false as const, message: "WhatsApp bu işletmede etkin değil." };
     }
@@ -420,6 +441,8 @@ export function useMessagingController({
   }
 
   return {
+    preparedWhatsAppMessage: surfacePreparedWhatsAppMessage,
+    openPreparedCreditWhatsApp,
     selectedWhatsAppRequestId,
     setSelectedWhatsAppRequestId,
     selectedWhatsAppRequest,

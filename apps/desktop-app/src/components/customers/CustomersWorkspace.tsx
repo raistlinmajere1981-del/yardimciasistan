@@ -38,6 +38,7 @@ import { CompactListButton } from "../ui/CompactListItem";
 import { StatusBadge } from "../ui/StatusBadge";
 import { CustomerCreditPanel } from "./CustomerCreditPanel";
 import { customerCreditError } from "../../app/customer-credit-ui";
+import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
@@ -52,6 +53,7 @@ interface CustomersWorkspaceProps {
   reservationsEnabled: boolean;
   staysEnabled: boolean;
   customerCreditEnabled?: boolean;
+  onPreparedCreditWhatsApp?: (message: PreparedWhatsAppMessage) => void;
   onCall: (customer: DesktopDashboardData["customers"][number]) => void;
   onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
   onSummarize: (requestId: string) => void;
@@ -76,6 +78,7 @@ export function CustomersWorkspace({
   reservationsEnabled,
   staysEnabled,
   customerCreditEnabled = false,
+  onPreparedCreditWhatsApp,
   onCall,
   onWhatsApp,
   onSummarize,
@@ -304,7 +307,7 @@ export function CustomersWorkspace({
               </ActionButton>
             </div>
             {deleteError?.customerId === selectedCustomer.id && <p role="alert">{deleteError.message}</p>}
-            {customerCreditEnabled && <CustomerCreditPanel key={selectedCustomer.id} customerId={selectedCustomer.id} />}
+            {customerCreditEnabled && <CustomerCreditPanel key={selectedCustomer.id} customerId={selectedCustomer.id} whatsappEnabled={whatsappEnabled} onPreparedWhatsApp={onPreparedCreditWhatsApp} />}
             <div className="customer-history-grid">
               <section>
                 <h3>Son Talepler</h3>
