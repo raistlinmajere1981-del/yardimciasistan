@@ -1,0 +1,69 @@
+import { StrictMode, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { BUSINESS_CAPABILITIES as C, type BusinessCapability } from "@yardimci-asistan/shared";
+import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
+import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
+import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
+import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
+import { useMessagingController } from "../../apps/desktop-app/src/app/use-messaging-controller";
+import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
+import { WhatsAppWorkspace } from "../../apps/desktop-app/src/components/messages/MessageWorkspaces";
+import { MessagesPage } from "../../apps/desktop-app/src/pages/MessagesPage";
+import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
+import "../../apps/desktop-app/src/styles.css";
+import "../../apps/desktop-app/src/friendly-overrides.css";
+import "../../apps/desktop-app/src/friendly-workflow-ux.css";
+import "../../apps/desktop-app/src/customer-work-ux.css";
+import "../../apps/desktop-app/src/market-workspace-ux.css";
+
+const control = window as typeof window & {
+  __m83Initial: { dashboard: DesktopDashboardData; snapshot: BusinessCapabilitySnapshot };
+  __m83Toggle: (capability: BusinessCapability, enabled: boolean) => Promise<void>;
+  __m83Call: (method: string, args: unknown[]) => Promise<BusinessCapabilitySnapshot>;
+};
+
+function Harness() {
+  const [dashboardData, setDashboardData] = useState(control.__m83Initial.dashboard);
+  const [snapshot, setSnapshot] = useState(control.__m83Initial.snapshot);
+  const [page, setPage] = useState("customers");
+  const [, setSyncState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [statusMessage, setStatusMessage] = useState("");
+  const whatsappEnabled = snapshot.enabledCapabilities.includes(C.WHATSAPP);
+  const customerCreditEnabled = snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT);
+  const messaging = useMessagingController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
+    messagesActive: page === "messages", aiEnabled: false, customersEnabled: true, whatsappEnabled, customerCreditEnabled,
+    onOpenMessages: () => setPage("messages") });
+  const customers = useCustomerController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
+    selectedWhatsAppRequestId: messaging.selectedWhatsAppRequestId, setSelectedWhatsAppRequestId: messaging.setSelectedWhatsAppRequestId });
+  control.__m83Toggle = async (capability, enabled) => setSnapshot(await control.__m83Call("toggle", [capability, enabled]));
+
+  const workspace = (view: "safe" | "web", onReturnToSafe?: () => void) => <WhatsAppWorkspace view={view}
+    preparedMessage={messaging.preparedWhatsAppMessage} requests={dashboardData.requests}
+    selectedRequest={messaging.selectedWhatsAppRequest} selectedMessage={messaging.selectedWhatsAppMessage}
+    selectedUrl={messaging.selectedWhatsAppUrl} aiEnabled={false} aiState="idle" aiMessage=""
+    getRequestStatusTone={() => "neutral"} onSelectRequest={messaging.setSelectedWhatsAppRequestId}
+    onOpenExternal={messaging.openSelectedWhatsAppExternal} onReturnToSafe={onReturnToSafe}
+    onRewrite={messaging.handleRewriteWhatsAppMessage} onMessageSent={messaging.handleWhatsAppMessageSent}
+    onDeleteMessage={messaging.handleDeleteWhatsAppMessage} />;
+
+  return <BusinessCapabilityRuntimeProvider value={{ snapshot, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
+    <main className="smoke-shell">
+      <nav aria-label="Çalışma alanı">{["customers", "market", "messages"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Mesajlar"}</button>)}</nav>
+      <p role="status">{statusMessage}</p>
+      {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
+        <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}
+          reservations={dashboardData.reservations} rooms={dashboardData.rooms} stays={dashboardData.customerRoomStays}
+          aiEnabled={false} whatsappEnabled={whatsappEnabled} reservationsEnabled={false} staysEnabled={false}
+          customerCreditEnabled={customerCreditEnabled} onPreparedCreditWhatsApp={messaging.openPreparedCreditWhatsApp}
+          onCall={messaging.callCustomerRecord} onWhatsApp={messaging.openCustomerWhatsApp} onSummarize={() => undefined}
+          onSave={customers.handleSaveCustomer} onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
+          onAssignRoom={customers.handleAssignCustomerToRoom} onUpdateStayStatus={customers.handleUpdateCustomerRoomStayStatus}
+          onDelete={customers.handleDeleteCustomer} />
+      </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} />
+        : <MessagesPage safeMode={workspace("safe")} webMode={(onReturn) => workspace("web", onReturn)} aiTools={null}
+          aiEnabled={false} whatsappEnabled={whatsappEnabled} aiOpen={false} active />}
+    </main>
+  </BusinessCapabilityRuntimeProvider>;
+}
+
+createRoot(document.getElementById("root")!).render(<StrictMode><Harness /></StrictMode>);

@@ -18,6 +18,7 @@ const checks = [
   ["node", ["scripts/smoke-market-sale-runtime.mjs"]],
   ["node", ["scripts/smoke-market-customer-credit-foundation.mjs"]],
   ["node", ["scripts/smoke-market-customer-credit-ui-contract.mjs"]],
+  ["node", ["scripts/smoke-market-customer-credit-whatsapp.mjs"]],
   ["node", ["scripts/smoke-market-barcode-input-contract.mjs"]],
   ["node", ["scripts/smoke-market-label-printer-contract.mjs"]],
   ["node", ["scripts/smoke-market-profile-availability.mjs"]],

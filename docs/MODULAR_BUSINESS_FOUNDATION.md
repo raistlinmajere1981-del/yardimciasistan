@@ -712,3 +712,84 @@ M8.3'e bırakılan: isteğe bağlı borç durumunu WhatsApp'tan gönderme aksiyo
 formatter/bridge. M8.2'de buton, şablon, mesaj oluşturma veya otomatik hatırlatma
 yoktur. Android veresiye UI, faiz/vade/taksit/limit, avans/negatif bakiye, parçalı
 nakit+veresiye, PDF ve raporlar da kapsam dışıdır.
+
+## 18. M8.3 — Customer Credit WhatsApp Paylaşımı — CLOSED
+
+Müşteri hesabının açık detayında ikinci plandaki `WhatsApp'ta Paylaş` aksiyonu
+yalnız `commerce.customer_credit` + `service.whatsapp` kesişiminde görünür.
+Pozitif borç yoksa pasiftir; `business_type` gate yoktur. WhatsApp kapalıyken
+veresiye satış, tahsilat, düzeltme ve geçmiş kullanılmaya devam eder. Credit
+kapalıyken hesap/paylaşım mount edilmez; gizli balance read'i yapılmaz.
+
+Paylaş tıklaması `getCustomerCreditAccount` ile güncel, ledger-derived hesabı
+yeniden okur. Panel cache'i veya `sale.status` mesaj kaynağı değildir. Pure
+`buildCustomerCreditWhatsAppMessage` helper'ı yalnız pozitif bakiyeleri currency
+başına ayrı biçimler; farklı paraları toplamaz. Ad yoksa `Merhaba,` kullanır;
+cinsiyet eki, AI, teknik kimlik veya hesap geçmişi eklemez. İşletme adı helper'da
+isteğe bağlıdır; bunun için yeni global state eklenmedi.
+
+Satır içi compose; kayıtlı ad/telefon, düzenlenebilir textarea, `Kopyala`,
+`WhatsApp'a Hazırla` ve `Vazgeç` içerir. İlk taslak gösterildikten sonra kullanıcı
+düzenlemesi korunur; hazırlamaya textarea'nın güncel metni verilir. Mevcut bridge
+baştaki/sondaki boşlukları temizler; boş metin hazırlanmaz. Telefon kaynağı güncel
+customer kaydıdır; mevcut `normalizeTRMobilePhone` kullanılır. Eksik/geçersiz
+telefon açık hata verir; yeni telefon alanı veya URL builder yoktur. Compose
+odak alır; Escape/Vazgeç odağı paylaşım düğmesine döndürür. Dar desktop düzeninde
+mevcut alan/buton stilleri kullanılır.
+
+Yeni salt-okuma `commerce:customerCredit:prepareWhatsApp` IPC'si mevcut kilit
+kontrolünü ve persisted WhatsApp/credit capability guard'larını kullanır. Son
+hazırlamada hesap yeniden okunur; ad, telefon ve pozitif currency/balance
+fingerprint'i değişmişse taslak yenilenir, panel güncellenir ve kullanıcıdan
+tekrar inceleme istenir. O adımda WhatsApp açılmaz. Borç sıfırlanmışsa compose
+kapanır ve `Bu müşterinin açık veresiye borcu kalmamış.` gösterilir. Bu kontrol
+ilk tıklama ve son hazırlama anlarını kapsar; WhatsApp'a aktarıldıktan sonraki
+değişiklikler için arka plan izleyicisi veya teslim garantisi değildir.
+
+`prepareWhatsAppAction` mevcut kayıtlı `settings.whatsapp_mode` tercihiyle
+kullanılır: `manual_copy` kopyalar; `wa_link` mevcut preload/main `openExternal`
+hattına gider; `webview` mevcut güvenli WhatsApp çalışma alanına aktarır.
+Desteklenmeyen resmi API modu elle paylaşma açıklamasını korur. Ham `window.open`,
+telefon/URL birleştirme veya yeni WebView DOM/gönderim otomasyonu yoktur.
+
+Request odaklı controller'a küçük, ephemeral `PreparedWhatsAppMessage` handoff'u
+eklendi: customer phone + düzenlenmiş message taşır. Fake request/requestId veya
+message-log tablosu üretilmez. Veresiye kaynağında request silme/AI yeniden yazma/
+`Onayla ve Gönder` kontrolleri kullanılmaz; mesaj yalnız **hazırlandı** kabul edilir.
+Gerçek gönderim WhatsApp içinde kullanıcıya aittir; sent/delivery/read bilgisi
+uydurulmaz. Mevcut request/AI kaynakları kendi doğrulamalı akışlarını korur.
+Capability kapanınca compose unmount edilir, bekleyen hazırlama yanıtı aktarılmaz
+ve controller'daki veresiye handoff'u temizlenir.
+
+Paylaşım ledger, finance, satış, stok, müşteri veya request değiştirmez. Mount,
+tahsilat, düzeltme ve satış başarısı otomatik paylaşım başlatmaz. Hesap okuma,
+taslak ve kopyalama çevrimdışı çalışır; yalnız WhatsApp'ın dış bağlantısı internet
+gerektirebilir. Açma/kopyalama hatasında metin ve telefon elle paylaşım için kalır;
+clipboard erişimi başarısızsa textarea seçilebilir. Yeni dependency, migration,
+gönderim kuyruğu, reminder/scheduler, toplu mesaj, Business API, SMS/email, PDF,
+ödeme linki veya Android entegrasyonu yoktur. Android source değiştirilmedi.
+
+`scripts/smoke-market-customer-credit-whatsapp.mjs` foundation zincirindedir.
+Gerçek React controller/workspaces + Strict Mode + geçici SQLite kullanır;
+yalnız Electron transport ve dış WhatsApp açılışı test adaptörüdür. Tarayıcı ağı
+kapatılarak fresh 500→300, farklı currency'ler, düzenlenen metin, normal request'e
+dönüş, tüm mevcut modlar, telefon hataları, iki sıfır-borç yarışı, final freshness,
+capability kapanışı, kilitli IPC ve finansal tabloların paylaşım öncesi/sonrası
+tam eşitliği doğrulanır. Formatter'ın pure/deterministic davranışı bridge birim
+testlerindedir. Test logları `artifacts/test-results/m83/`, 1440px/900px compose
+görselleri `artifacts/screenshots/m83-credit-whatsapp/` altındadır (git dışında).
+
+2026-09-09 doğrulaması:
+
+- `npm run build:packages` ve desktop build geçti.
+- `npm run test`: 91 Node testi (12 WhatsApp bridge testi dahil) ve 30 Android
+  testi, sıfır hata.
+- `node scripts/check-modular-foundation.mjs`: `modular-foundation-check-ok`;
+  strict kalite kapıları ve tüm M7/M8 smoke'ları geçti.
+- M8.1, M8.2 ve yeni M8.3 targeted smoke'ları ayrıca geçti.
+- `npm run smoke:desktop-renderer`: `desktop-renderer-ok`; mevcut request/AI
+  WhatsApp aktarımı, safe/WebView düzeni ve onaylı gönderim kontrolleri korundu.
+  Test dış WhatsApp servisine gerçek mesaj göndermez.
+- `npm run android:debug`: `BUILD SUCCESSFUL`; Android source değişmedi.
+- Ek finance-db, finance-service ve record-deletions smoke'ları geçti.
+- Mevcut Vite büyük bundle uyarısı sürer; derleme hatası değildir.
