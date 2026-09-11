@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, type SaveRoomPublicDetailsInput } from "@yardimci-asistan/shared";
+import type { DesktopDashboardData } from "../../../electron/database";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { runtimeHasCapability } from "../../app/capabilities";
+import { reportAppStatus } from "../../app/runtime-state";
+import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 
 interface RoomDraftData {
   id: string;
@@ -33,6 +36,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [editingRoom, setEditingRoom] = useState<DesktopDashboardData["rooms"][number] | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -41,6 +45,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
       setLoading(false);
       setSaveState("idle");
       setMessage("");
+      setEditingRoom(null);
       return () => { active = false; };
     }
 
@@ -119,6 +124,74 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
     }
   };
 
+  const openRoomDetails = async (roomId: string) => {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.getDashboardData) {
+      reportAppStatus("error", "Oda detayları bu ortamda kullanılamıyor.");
+      return;
+    }
+
+    try {
+      const dashboard = await bridge.getDashboardData();
+      const room = dashboard.rooms.find((item) => item.id === roomId) ?? null;
+      if (!room) {
+        reportAppStatus("error", "Oda bulunamadı.");
+        return;
+      }
+      setEditingRoom(room);
+    } catch {
+      reportAppStatus("error", "Oda detayları yüklenemedi.");
+    }
+  };
+
+  const saveRoomPublicDetails = async (input: SaveRoomPublicDetailsInput) => {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.setRoomNightlyPrice || !bridge.getRoomFolioData) {
+      const result = { ok: false, message: "Oda bilgileri bu ortamda kullanılamıyor." };
+      reportAppStatus("error", result.message);
+      return result;
+    }
+
+    reportAppStatus("loading", "Oda bilgileri kaydediliyor...");
+    try {
+      const fresh = await bridge.getRoomFolioData();
+      const profile = fresh.rooms.find((room) => room.id === input.roomId);
+      if (!profile) {
+        const result = { ok: false, message: "Oda bulunamadı." };
+        reportAppStatus("error", result.message);
+        return result;
+      }
+
+      const result = await bridge.setRoomNightlyPrice({
+        roomId: input.roomId,
+        amountMinor: profile.nightlyPriceMinor,
+        currency: profile.currency,
+        name: input.name,
+        publicDetails: input
+      } as Parameters<typeof bridge.setRoomNightlyPrice>[0] & {
+        name: string;
+        publicDetails: SaveRoomPublicDetailsInput;
+      });
+
+      if (!result.ok) {
+        reportAppStatus("error", result.message);
+        return { ok: false, message: result.message };
+      }
+
+      setRooms((current) => current.map((room) => room.id === input.roomId
+        ? { ...room, name: input.name, number: input.number }
+        : room));
+      reportAppStatus("success", result.message);
+      return { ok: true, message: result.message };
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : "Oda bilgileri kaydedilemedi.";
+      reportAppStatus("error", message);
+      return { ok: false, message };
+    }
+  };
+
   if (!roomsEnabled) {
     return null;
   }
@@ -148,7 +221,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
           </span>
         </div>
       </div>
-      <p className="setup-section-description">Oda adlarını ve yeni konaklamalarda kullanılacak gecelik fiyatları tek yerden yönetin.</p>
+      <p className="setup-section-description">Oda adlarını, gecelik fiyatları ve müşteriye açık oda özelliklerini tek yerden yönetin.</p>
 
       <div className="room-management-list" aria-label="Oda adı ve fiyatları">
         {loading ? (
@@ -160,7 +233,16 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
             <div className="room-management-list-head"><span>Oda</span><span>Oda adı</span><span>Gecelik fiyat</span></div>
             {rooms.map((room) => (
               <div className="room-management-row" key={room.id}>
-                <div className="room-management-identity"><strong>{room.number ? `Oda ${room.number}` : "Oda"}</strong></div>
+                <div className="room-management-identity">
+                  <strong>{room.number ? `Oda ${room.number}` : "Oda"}</strong>
+                  <button
+                    className="room-management-details-button"
+                    type="button"
+                    onClick={() => void openRoomDetails(room.id)}
+                  >
+                    Detaylar
+                  </button>
+                </div>
                 <input
                   className="room-management-name"
                   value={room.name}
@@ -192,6 +274,13 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
           {saveState === "saving" ? "Kaydediliyor" : "Oda Bilgilerini Kaydet"}
         </button>
       </div>
+
+      <RoomPublicDetailsEditor
+        open={Boolean(editingRoom)}
+        room={editingRoom}
+        onClose={() => setEditingRoom(null)}
+        onSave={saveRoomPublicDetails}
+      />
     </section>
   );
 }
