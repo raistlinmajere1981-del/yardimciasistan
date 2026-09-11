@@ -3,6 +3,18 @@
   display: none;
 }
 
+/*
+ * Özel Yetenekler is an advanced-only surface. The capability editor lives
+ * beside SetupForm so it can keep using the persisted capability runtime, but
+ * it should not leak below both tab views. SetupForm mounts
+ * .settings-advanced-grid only while Gelişmiş Ayarlar is selected, so use that
+ * as the visibility boundary without duplicating capability state.
+ */
 .setup-capability-editor-shell {
+  display: none;
   margin-top: var(--space-4);
+}
+
+.setup-capabilities:has(.settings-advanced-grid) .setup-capability-editor-shell {
+  display: block;
 }
