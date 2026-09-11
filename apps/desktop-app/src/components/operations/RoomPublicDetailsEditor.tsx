@@ -59,13 +59,11 @@ function toggleFeature(features: RoomPublicFeatureId[], featureId: RoomPublicFea
 export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPublicDetailsEditorProps) {
   const [form, setForm] = useState<RoomPublicDetailsFormState>(() => toForm(room));
   const [state, setState] = useState<EditorState>("idle");
-  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setForm(toForm(room));
     setState("idle");
-    setMessage("");
   }, [open, room]);
 
   const capacity = useMemo(() => Number.parseInt(form.capacity, 10), [form.capacity]);
@@ -107,7 +105,6 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
             if (!canSave) return;
 
             setState("loading");
-            setMessage("Oda bilgileri kaydediliyor...");
             const result = await onSave({
               roomId: room.id,
               name: form.name.trim(),
@@ -122,7 +119,6 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
 
             if (!result.ok) {
               setState("error");
-              setMessage(result.message);
               return;
             }
 
@@ -222,7 +218,6 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
           </div>
 
           {!validCapacity && <p className="form-status sync-error">Kapasite 1 ile 100 arasında olmalı.</p>}
-          {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
           <div className="manual-request-actions">
             <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
