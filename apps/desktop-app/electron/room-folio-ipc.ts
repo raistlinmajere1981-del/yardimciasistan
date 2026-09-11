@@ -1,5 +1,5 @@
 import { ipcMain } from "electron";
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, type SaveRoomPublicDetailsInput } from "@yardimci-asistan/shared";
 import {
   DesktopRoomFolioService,
   type AddRoomFolioManualItemInput,
@@ -21,6 +21,11 @@ import {
 
 type RoomFolioManualItemIpcInput = AddRoomFolioManualItemInput & {
   sourceTableOrderId?: string;
+};
+
+type RoomProfileIpcInput = SetRoomNightlyPriceInput & {
+  name?: string;
+  publicDetails?: SaveRoomPublicDetailsInput;
 };
 
 export function registerRoomFolioIpcHandlers(options: {
@@ -84,16 +89,18 @@ export function registerRoomFolioIpcHandlers(options: {
     return folioData();
   });
 
-  ipcMain.handle("roomFolio:setRoomNightlyPrice", (_event, input: SetRoomNightlyPriceInput & { name?: string }): DesktopRoomFolioMutationResult => {
+  ipcMain.handle("roomFolio:setRoomNightlyPrice", (_event, input: RoomProfileIpcInput): DesktopRoomFolioMutationResult => {
     assertRoomAccess();
 
     const currentRoom = listRoomProfiles(options.databasePath()).find((room) => room.id === String(input?.roomId ?? "").trim());
-    const roomName = typeof input?.name === "string" ? input.name : currentRoom?.name ?? "";
+    const roomName = input?.publicDetails?.name
+      ?? (typeof input?.name === "string" ? input.name : currentRoom?.name ?? "");
     const result = saveRoomProfile(options.databasePath(), {
       roomId: input?.roomId,
       name: roomName,
       amountMinor: input?.amountMinor,
-      currency: input?.currency
+      currency: input?.currency,
+      publicDetails: input?.publicDetails
     });
     if (!result.ok) {
       return result;
