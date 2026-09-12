@@ -63,6 +63,7 @@ export async function generateGoogleAiStudioChat(
     return {
       ok: false,
       provider: "openai_compatible",
+      service: "gemini",
       message: "Google AI Studio bağlantı adresi geçersiz.",
       fallbackAnswer: ""
     };
@@ -88,6 +89,7 @@ export async function generateGoogleAiStudioChat(
       return {
         ok: false,
         provider: "openai_compatible",
+        service: "gemini",
         status: response.status,
         message: payload?.error?.message || "Google AI Studio cevabı alınamadı.",
         fallbackAnswer: ""
@@ -102,6 +104,7 @@ export async function generateGoogleAiStudioChat(
       return {
         ok: false,
         provider: "openai_compatible",
+        service: "gemini",
         message: "Google AI Studio cevabı boş döndü.",
         fallbackAnswer: ""
       };
@@ -110,6 +113,7 @@ export async function generateGoogleAiStudioChat(
     return {
       ok: true,
       provider: "openai_compatible",
+      service: "gemini",
       model: options.model,
       answer
     };
@@ -118,6 +122,7 @@ export async function generateGoogleAiStudioChat(
     return {
       ok: false,
       provider: "openai_compatible",
+      service: "gemini",
       message: timedOut ? "Google AI Studio yanıtı zaman aşımına uğradı." : "Google AI Studio bağlantısı sırasında sorun oldu.",
       error: error instanceof Error ? error.message : String(error),
       fallbackAnswer: ""
@@ -177,6 +182,7 @@ export async function verifyGoogleAiStudioVisionModel(
     return {
       ok: false,
       provider: "openai_compatible",
+      service: "gemini",
       message: "Google AI Studio model bilgisi geçersiz.",
       fallbackAnswer: ""
     };
@@ -185,6 +191,7 @@ export async function verifyGoogleAiStudioVisionModel(
     return {
       ok: false,
       provider: "openai_compatible",
+      service: "gemini",
       message: "Google AI Studio API anahtarı gerekli.",
       fallbackAnswer: ""
     };
@@ -208,6 +215,7 @@ export async function verifyGoogleAiStudioVisionModel(
       return {
         ok: false,
         provider: "openai_compatible",
+        service: "gemini",
         status: response.status,
         message: payload?.error?.message || "Google AI Studio görsel girişi kabul etmedi.",
         fallbackAnswer: ""
@@ -222,6 +230,7 @@ export async function verifyGoogleAiStudioVisionModel(
       return {
         ok: false,
         provider: "openai_compatible",
+        service: "gemini",
         message: "Google AI Studio görsel kontrolüne boş yanıt verdi.",
         fallbackAnswer: ""
       };
@@ -230,6 +239,7 @@ export async function verifyGoogleAiStudioVisionModel(
     return {
       ok: true,
       provider: "openai_compatible",
+      service: "gemini",
       model,
       answer
     };
@@ -238,6 +248,7 @@ export async function verifyGoogleAiStudioVisionModel(
     return {
       ok: false,
       provider: "openai_compatible",
+      service: "gemini",
       message: timedOut
         ? "Google AI Studio görsel kontrolü zaman aşımına uğradı."
         : "Google AI Studio görsel kontrolü sırasında bağlantı sorunu oldu.",
@@ -289,13 +300,13 @@ export function isGoogleAiStudioVisionModel(model: Pick<GoogleAiStudioModel, "id
     return false;
   }
 
-  if (/^gemini-(?:1(?:\.\d+)?|2(?:\.\d+)?)(?:-|$)/.test(id)
-      || /^gemini-(?:pro|ultra)(?:-|$)/.test(id)
-      || !/^gemini-3\.(?:1|5|6)-(?:flash|flash-lite)(?:-|$)/.test(id)) {
+  const generalFlashFamily = id.match(/^gemini-(\d+)(?:\.(\d+))?-(?:flash-lite|flash)(?:-|$)/);
+  if (!generalFlashFamily) {
     return false;
   }
 
-  return true;
+  const majorVersion = Number(generalFlashFamily[1]);
+  return Number.isFinite(majorVersion) && majorVersion >= 3;
 }
 
 export async function listGoogleAiStudioModels(
@@ -421,13 +432,13 @@ function scoreGoogleAiStudioModel(model: string): number {
 
 function validateGoogleChatOptions(options: GoogleAiStudioChatOptions): AICompletionFailure | null {
   if (!options.model.trim()) {
-    return { ok: false, provider: "openai_compatible", message: "AI model adı gerekli.", fallbackAnswer: "" };
+    return { ok: false, provider: "openai_compatible", service: "gemini", message: "AI model adı gerekli.", fallbackAnswer: "" };
   }
   if (!options.apiKey.trim()) {
-    return { ok: false, provider: "openai_compatible", message: "Google AI Studio API anahtarı gerekli.", fallbackAnswer: "" };
+    return { ok: false, provider: "openai_compatible", service: "gemini", message: "Google AI Studio API anahtarı gerekli.", fallbackAnswer: "" };
   }
   if (options.messages.length === 0) {
-    return { ok: false, provider: "openai_compatible", message: "AI mesaj listesi boş.", fallbackAnswer: "" };
+    return { ok: false, provider: "openai_compatible", service: "gemini", message: "AI mesaj listesi boş.", fallbackAnswer: "" };
   }
   return null;
 }
