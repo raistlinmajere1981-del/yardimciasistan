@@ -34,6 +34,7 @@ export interface AICompletionSuccess {
   ok: true;
   answer: string;
   provider: AIProviderName;
+  service?: string;
   model?: string;
   fallback?: boolean;
 }
@@ -42,6 +43,7 @@ export interface AICompletionFailure {
   ok: false;
   message: string;
   provider: AIProviderName;
+  service?: string;
   status?: number;
   error?: string;
   fallbackAnswer: string;
