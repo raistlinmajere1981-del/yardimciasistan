@@ -64,8 +64,8 @@ if ($message !== '') {
 }
 
 try {
-    $snapshot = ya_storage_get_publication('android_snapshot', []);
-    $result = ya_public_room_availability_query($snapshot, $startDate, $endDate, $guestCount);
+    $publication = ya_storage_get_publication('public_room_availability', []);
+    $result = ya_public_room_availability_query($publication, $startDate, $endDate, $guestCount);
     $status = (int) ($result['http_status'] ?? (($result['ok'] ?? false) ? 200 : 409));
     unset($result['http_status']);
     $result['handled'] = true;
