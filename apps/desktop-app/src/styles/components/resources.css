@@ -1,0 +1,121 @@
+.task-filters {
+  grid-template-columns: minmax(180px, 1fr) auto;
+}
+
+.compact-resource-grid {
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+  max-height: min(520px, calc(100vh - 245px));
+  padding-right: 2px;
+  overflow-y: auto;
+}
+
+.resource-compact-card {
+  display: grid;
+  gap: 7px;
+  padding: 11px var(--space-3);
+}
+
+.resource-compact-card .resource-card-heading {
+  align-items: center;
+}
+
+.resource-compact-card .resource-card-heading h2 {
+  overflow: hidden;
+  font-size: var(--text-md);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compact-reservation-line,
+.resource-description {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.compact-reservation-line strong {
+  color: var(--color-text);
+}
+
+.resource-note {
+  min-height: 48px;
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--color-text-muted);
+  background: var(--color-bg-field);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  line-height: 1.45;
+}
+
+.compact-resource-grid .resource-compact-card {
+  position: relative;
+}
+
+.compact-resource-grid .resource-compact-card > button {
+  margin-top: var(--space-2);
+}
+
+.compact-resource-grid .resource-compact-card .compact-status-actions {
+  max-height: 0;
+  margin-top: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition: max-height 140ms ease, opacity 120ms ease, transform 120ms ease, margin-top 120ms ease;
+}
+
+.compact-resource-grid .resource-compact-card .compact-status-actions:not(:has(button:not(:disabled))) {
+  display: none;
+}
+
+.compact-resource-grid .resource-compact-card:has(.compact-status-actions button:not(:disabled))::after {
+  content: "•••  Durumu değiştir";
+  display: block;
+  width: fit-content;
+  margin: var(--space-1) 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.compact-resource-grid .resource-compact-card:hover::after,
+.compact-resource-grid .resource-compact-card:focus-within::after {
+  display: none;
+}
+
+.compact-resource-grid .resource-compact-card:hover .compact-status-actions,
+.compact-resource-grid .resource-compact-card:focus-within .compact-status-actions {
+  max-height: calc(var(--control-height-sm) + var(--space-3));
+  margin-top: var(--space-1);
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.compact-resource-grid .resource-compact-card .compact-status-actions button {
+  min-height: var(--control-height-sm);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 900px) {
+
+  .compact-resource-grid .resource-compact-card .compact-status-actions {
+    max-height: none;
+    margin-top: var(--space-1);
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+
+  .compact-resource-grid .resource-compact-card:has(.compact-status-actions button:not(:disabled))::after {
+    display: none;
+  }
+}

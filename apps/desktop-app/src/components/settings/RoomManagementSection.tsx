@@ -270,7 +270,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
 
       <div className="room-management-footer">
         <span>Oda sayısı değişikliği üstteki “Ayarları Kaydet” düğmesiyle uygulanır. Fiyat değişikliği açık oda adisyonlarını etkilemez.</span>
-        <button className="setup-primary room-management-save" type="button" onClick={() => void saveRooms()} disabled={loading || saveState === "saving"}>
+        <button className="setup-primary room-management-save action-button action-button-primary" type="button" onClick={() => void saveRooms()} disabled={loading || saveState === "saving"}>
           {saveState === "saving" ? "Kaydediliyor" : "Oda Bilgilerini Kaydet"}
         </button>
       </div>

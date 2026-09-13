@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import "./business-location-map-picker.css";
 
 interface MapPoint {
   latitude: number;

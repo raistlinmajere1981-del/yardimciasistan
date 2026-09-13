@@ -13,7 +13,6 @@ import type { DesktopDashboardData } from "../../electron/database";
 import { getReservationDomain } from "@yardimci-asistan/shared";
 import { ActionButton } from "../components/ui/ActionButton";
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
-import "../operation-calendar.css";
 
 type CalendarViewMode = "day" | "week";
 type ReservationRecord = DesktopDashboardData["reservations"][number];

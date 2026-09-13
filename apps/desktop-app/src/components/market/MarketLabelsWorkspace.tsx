@@ -11,7 +11,6 @@ import {
   type LabelPrinterId,
   type LabelSizePreset
 } from "../../app/label-printer";
-import "../../market-label-ux.css";
 
 interface MarketLabelsWorkspaceProps {
   products: CatalogProduct[];

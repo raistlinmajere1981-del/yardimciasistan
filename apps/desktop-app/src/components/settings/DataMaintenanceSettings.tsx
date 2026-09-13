@@ -205,23 +205,23 @@ export function DataMaintenanceSettings() {
   }
 
   return (
-    <div id="settings-maintenance" className="setup-section settings-data-maintenance-section backup-manager" style={{ gridColumn: "1 / -1" }}>
+    <div id="settings-maintenance" className="setup-section settings-data-maintenance-section backup-manager">
       <div className="setup-section-title backup-manager-title">
         <div><h2>Bakım</h2></div>
         {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
       </div>
       <p className="setup-section-description">Bilgilerinizi yedekleyin veya önceki bir yedeği geri yükleyin.</p>
 
-      <div className="backup-manager-toolbar">
-        <button className="setup-secondary" type="button" onClick={() => void createBackup()} disabled={busy}>
+      <div className="form-actions backup-manager-toolbar">
+        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void createBackup()} disabled={busy}>
           <Save size={16} aria-hidden="true" />
           {action === "backup" ? "Yedekleniyor" : "Yedek Al"}
         </button>
-        <button className="setup-secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy}>
+        <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy}>
           <FolderOpen size={16} aria-hidden="true" />
           {action === "open-root" ? "Açılıyor" : "Yedek Klasörünü Aç"}
         </button>
-        <button className="setup-secondary password-remove-button" type="button" onClick={() => void resetLocalData()} disabled={busy}>
+        <button className="setup-secondary password-remove-button action-button action-button-danger" type="button" onClick={() => void resetLocalData()} disabled={busy}>
           <Trash2 size={16} aria-hidden="true" />
           {action === "reset" ? "Sıfırlanıyor" : "Verileri Sıfırla"}
         </button>
@@ -250,16 +250,16 @@ export function DataMaintenanceSettings() {
                   <span>{backup.imageCount > 0 ? `${backup.imageCount} menü görseli` : "Menü görseli yok"}</span>
                 </div>
               </div>
-              <div className="backup-row-actions">
-                <button type="button" onClick={() => void openBackupItem(backup.id)} disabled={busy}>
+              <div className="form-actions backup-row-actions">
+                <button className="action-button action-button-ghost action-button-sm" type="button" onClick={() => void openBackupItem(backup.id)} disabled={busy}>
                   <FolderOpen size={15} aria-hidden="true" />
                   {rowBusy && action === "open-item" ? "Açılıyor" : "Klasörü Aç"}
                 </button>
-                <button className="backup-restore-button" type="button" onClick={() => void restoreBackup(backup.id)} disabled={busy}>
+                <button className="action-button action-button-secondary action-button-sm backup-restore-button" type="button" onClick={() => void restoreBackup(backup.id)} disabled={busy}>
                   <RotateCcw size={15} aria-hidden="true" />
                   {rowBusy && action === "restore" ? "Hazırlanıyor" : "Geri Yükle"}
                 </button>
-                <button className="backup-delete-button" type="button" onClick={() => void deleteBackup(backup.id)} disabled={busy} aria-label={`${formatBackupDate(backup.createdAt)} yedeğini sil`}>
+                <button className="action-button action-button-danger action-button-sm backup-delete-button" type="button" onClick={() => void deleteBackup(backup.id)} disabled={busy} aria-label={`${formatBackupDate(backup.createdAt)} yedeğini sil`}>
                   <Trash2 size={15} aria-hidden="true" />
                   {rowBusy && action === "delete" ? "Siliniyor" : "Sil"}
                 </button>

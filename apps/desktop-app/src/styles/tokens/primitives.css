@@ -1,0 +1,54 @@
+:root {
+  --neutral-0: #ffffff;
+  --neutral-50: #faf8f5;
+  --neutral-100: #f3f0eb;
+  --neutral-200: #e3ded6;
+  --neutral-300: #c5bdb2;
+  --neutral-500: #746b61;
+  --neutral-700: #463f38;
+  --neutral-900: #292521;
+  --slate-50: #eef1f5;
+  --slate-300: #b0bdcc;
+  --slate-500: #718096;
+  --slate-700: #344156;
+  --slate-800: #222e40;
+  --slate-900: #192332;
+  --slate-950: #111925;
+  --coral-400: #f4a07a;
+  --coral-600: #b9502b;
+  --coral-700: #9b4020;
+  --green-400: #7cc8a3;
+  --green-700: #26724b;
+  --amber-400: #e8be69;
+  --amber-700: #8a6016;
+  --red-400: #f19389;
+  --red-700: #b23830;
+  --blue-400: #89b8ec;
+  --blue-700: #356a9c;
+
+  /* One stable 4px scale, shared by both density modes. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 4%);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 8%);
+  --shadow-lg: 0 8px 24px rgb(0 0 0 / 12%);
+  --shadow-xl: 0 16px 48px rgb(0 0 0 / 16%);
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-dropdown: 20;
+  --z-overlay: 30;
+  --z-dialog: 40;
+  --z-toast: 50;
+}

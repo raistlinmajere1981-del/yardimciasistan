@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ExternalLink, Plus, RefreshCw, Save, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
 import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import {
@@ -19,6 +19,7 @@ import {
   type SetupFormState
 } from "../../app/setup-model";
 import { UI_SCALE_OPTIONS, type UiMode, type UiPreferences } from "../../ui-preferences";
+import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
 import { PasswordSettings } from "../security/PasswordSettings";
 import { RoomManagementSection } from "./RoomManagementSection";
 
@@ -50,6 +51,7 @@ interface SetupFormProps {
   setupData: DesktopSetupData;
   dashboardData?: DesktopDashboardData;
   embedded?: boolean;
+  publicProfile?: ReactNode;
   saveState: SyncState;
   message: string;
   backupState?: SyncState;
@@ -82,6 +84,7 @@ export function SetupForm({
   setupData,
   dashboardData,
   embedded = false,
+  publicProfile,
   saveState,
   message,
   backupState = "idle",
@@ -330,7 +333,7 @@ export function SetupForm({
 
   const renderAiConnectionActions = (inline: boolean) => (
     <div className={`setup-ai-actions${inline ? " is-inline" : ""} sync-${aiConnectionTestState}`}>
-      <button className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
+      <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
         <RefreshCw size={16} aria-hidden="true" />
         {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
       </button>
@@ -374,7 +377,321 @@ export function SetupForm({
           <a href="#settings-application">Uygulama</a>
           <a href="#settings-maintenance">Bakım</a>
         </nav>}
-        <div className="settings-section-grid settings-basic-grid">
+
+        <div id="settings-business" className="setup-section settings-identity-section">
+          <div className="setup-section-title">
+            {!embedded && <p>Firma Bilgileri</p>}
+            <h2>İşletmem</h2>
+          </div>
+          <div className="form-row">
+            <label className="form-field form-field--medium">
+              Firma adı
+              <input value={form.businessName} onChange={(event) => update("businessName", event.target.value)} placeholder="Deniz Çiçeği Pansiyon & Kafe" />
+            </label>
+            <label className="form-field form-field--medium">
+              Sektör tipi
+              <select value={form.profileId} onChange={(event) => update("profileId", event.target.value)}>
+                {getBusinessProfiles().map((profile) => (
+                  <option value={profile.id} key={profile.id}>{profile.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="form-row">
+            <label className="form-field form-field--short">
+              Telefon
+              <input value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx xxx xx xx" />
+            </label>
+            <label className="form-field form-field--short">
+              WhatsApp
+              <input value={form.whatsapp} onChange={(event) => update("whatsapp", event.target.value)} placeholder="+90 5xx xxx xx xx" />
+            </label>
+            <label className="form-field form-field--medium">
+              E-posta
+              <input value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="info@firma.com" />
+            </label>
+          </div>
+          <div className="form-row">
+            <label className="form-field form-field--long">
+              Adres
+              <input value={form.address} onChange={(event) => update("address", event.target.value)} placeholder="Kısa işletme adresi" />
+            </label>
+          </div>
+        </div>
+
+        {publicProfile}
+
+        <div id="settings-operations" className="setup-section settings-daily-section">
+          <div className="setup-section-title">
+            {!embedded && <p>Kapasite ve Yardımcı</p>}
+            <h2>İşletme Düzeni</h2>
+          </div>
+          {accommodationEnabled && <div className="setup-count-row settings-room-count">
+            <label className="form-field form-field--xs">
+              Oda sayısı
+              <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" min="0" step="1" type="number" />
+            </label>
+          </div>}
+          {foodServiceEnabled && <div className="table-category-editor">
+            <div className="table-category-heading">
+              <div>
+                <strong>Masa kategorileri</strong>
+                <small>Restoran alanlarını adlandırın ve her alandaki masa sayısını belirleyin.</small>
+              </div>
+              <span>{tableCountTotal} masa</span>
+            </div>
+            {form.tableCategories.length === 0 ? (
+              <div className="table-category-empty">
+                <span>Henüz masa kategorisi yok.</span>
+                <small>Masa kullanacaksanız ilk kategoriyi ekleyin.</small>
+              </div>
+            ) : (
+              <div className="table-category-list">
+                {form.tableCategories.map((category, index) => (
+                  <div className="table-category-row" key={category.key}>
+                    <label className="form-field form-field--medium">
+                      <span>Kategori adı</span>
+                      <input
+                        value={category.name}
+                        onChange={(event) => updateTableCategory(category.key, "name", event.target.value)}
+                        placeholder={index === 0 ? "Örn. Salon" : "Örn. Bahçe"}
+                        maxLength={50}
+                      />
+                    </label>
+                    <label className="form-field form-field--xs table-category-count">
+                      <span>Masa</span>
+                      <input
+                        value={category.tableCount}
+                        onChange={(event) => updateTableCategory(category.key, "tableCount", event.target.value)}
+                        inputMode="numeric"
+                        min="1"
+                        max="200"
+                        step="1"
+                        type="number"
+                      />
+                    </label>
+                    <button
+                      className="action-button action-button-ghost table-category-remove"
+                      type="button"
+                      onClick={() => removeTableCategory(category.key)}
+                      aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
+                      title="Kategoriyi kaldır"
+                    >
+                      <Trash2 size={15} aria-hidden="true" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="action-button action-button-secondary table-category-add" type="button" onClick={addTableCategory}>
+              <Plus size={15} aria-hidden="true" />
+              Kategori Ekle
+            </button>
+            <small className="table-category-note">
+              Adedi azalttığınızda kullanılmayan masalar arşivlenir; aktif adisyon veya rezervasyona bağlı masalar korunur.
+            </small>
+          </div>}
+        </div>
+        {embedded && (
+          <RoomManagementSection
+            roomCount={form.roomCount}
+            dashboardRoomCount={dashboardData?.rooms.length ?? 0}
+            onRoomCountChange={(value) => update("roomCount", value)}
+          />
+        )}
+        <div id="settings-connections" className="setup-section settings-services-section">
+          <div className="setup-section-title">
+            {!embedded && <p>Servisler</p>}
+            <h2>Bağlı Servisler</h2>
+          </div>
+          <div className="setup-toggle-grid">
+            <label>
+              <input checked={form.whatsappEnabled} onChange={(event) => update("whatsappEnabled", event.target.checked)} type="checkbox" />
+              WhatsApp
+            </label>
+            <label>
+              <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
+              Android
+            </label>
+            <label>
+              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
+              AI Yardımcı
+            </label>
+          </div>
+        </div>
+
+<div className="setup-section settings-web-section">
+          <div className="setup-section-title settings-web-title">
+            {!embedded && <p>Web Bağlantısı</p>}
+            <h2>Web Bağlantısı</h2>
+            <label className="form-check setup-checkline settings-auto-sync-toggle">
+              <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
+              Otomatik eşitle
+            </label>
+          </div>
+          <div className="form-grid">
+            <label className="form-field form-field--long form-field--span setup-field">
+              Web eşitleme adresi
+              <input value={form.webModuleUrl} onChange={(event) => update("webModuleUrl", event.target.value)} placeholder="https://yardimciasistan.alwaysdata.net/yardimci-asistan" />
+            </label>
+            <label className="form-field form-field--medium">
+              Web güvenlik anahtarı
+              <input
+                value={form.syncSecret}
+                onChange={(event) => update("syncSecret", event.target.value)}
+                placeholder="uzun-gizli-anahtar"
+                type="password"
+                autoComplete="new-password"
+                spellCheck={false}
+              />
+            </label>
+          </div>
+          <div className={`setup-ai-actions is-inline setup-web-actions sync-${webConnectionTestState}`}>
+            <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void testWebConnection()} disabled={webConnectionTestState === "loading"}>
+              <RefreshCw size={16} aria-hidden="true" />
+              {webConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Web Bağlantısını Dene"}
+            </button>
+            <span role="status" aria-live="polite">{webConnectionTestMessage}</span>
+            <small>Bu kontrol yalnız bağlantıyı doğrular; talep çekmez veya veri yayınlamaz.</small>
+          </div>
+        </div>
+
+        <div className="setup-section setup-ai-section">
+          <div className="setup-section-title">
+            {!embedded && <p>AI Bağlantısı</p>}
+            <h2>AI Servisi ve Model</h2>
+          </div>
+          <div className="form-grid">
+            <label className="form-field form-field--medium setup-ai-service-field">
+              Servis sağlayıcı
+              <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
+                {aiServicePresets.map((preset) => (
+                  <option value={preset.id} key={preset.id}>
+                    {preset.label}{isAiServiceProfileStored(form, preset.id) ? " · kayıtlı" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {form.aiService === "gemini" ? (
+              <>
+                <div className="setup-field setup-ai-studio-help">
+                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
+                    <ExternalLink size={16} aria-hidden="true" />
+                    Google AI Studio'yu Aç
+                  </button>
+                  <small>Bağlantı anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
+                </div>
+                <div className="form-field form-field--long form-field--span setup-ai-curl-field">
+                  <span>Google AI Studio cURL bağlantısı</span>
+                  <div className="field-control-group setup-secret-input">
+                    <input
+                      aria-label="Google AI Studio cURL bağlantısı"
+                      value={googleSecretValue}
+                      onChange={(event) => replaceGoogleSecret(event.target.value)}
+                      onFocus={(event) => {
+                        if (googleUsesStoredApiKey) event.currentTarget.select();
+                      }}
+                      type={showGoogleCurl || googleUsesStoredApiKey ? "text" : "password"}
+                      placeholder={form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantıyı değiştirmek için yeni cURL yapıştırın" : "Copy cURL quickstart çıktısını buraya yapıştırın"}
+                      disabled={!form.aiEnabled || form.clearAiApiKey}
+                      autoComplete="off"
+                      spellCheck={false}
+                    />
+                    <button className="action-button action-button-secondary" type="button" onClick={() => void toggleAiApiKeyVisibility("google")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showGoogleCurl}>
+                      {aiApiKeyRevealState === "loading" ? "Açılıyor" : showGoogleCurl ? "Gizle" : "Göster"}
+                    </button>
+                  </div>
+                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz." : "Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır."}</small>
+                  {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
+                </div>
+                {renderAiConnectionActions(true)}
+              </>
+            ) : (
+              <label className="form-field form-field--long form-field--span">
+                Bağlantı adresi
+                <input value={form.aiBaseUrl} onChange={(event) => update("aiBaseUrl", event.target.value)} placeholder="https://servis.example/v1" disabled={!form.aiEnabled} spellCheck={false} />
+              </label>
+            )}
+            <label className="form-field form-field--medium">
+              Model adı
+              {form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
+                <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
+                  {form.aiModelOptions.map((model) => (
+                    <option value={model.id} key={model.id}>{model.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} placeholder={form.aiService === "gemini" ? "Bağlantı kontrolünden sonra listelenir" : "Serviste görünen model adı"} disabled={!form.aiEnabled || form.aiService === "gemini"} spellCheck={false} />
+              )}
+              {form.aiService === "gemini" && (
+                <small>{form.aiModelOptions.length > 0
+                  ? form.aiStoredApiKeyConfigured
+                    ? `${form.aiModelOptions.length} görsel ve metin modeli bu sağlayıcı altında kayıtlı.`
+                    : `${form.aiModelOptions.length} görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.`
+                  : "Bağlantıyı Dene ile görsel destekli, güncel modeller otomatik alınır."}</small>
+              )}
+            </label>
+            <label className="form-field form-field--short">
+              Yanıt bekleme süresi (saniye)
+              <input value={form.aiTimeoutSeconds} onChange={(event) => update("aiTimeoutSeconds", event.target.value)} inputMode="numeric" min="5" max="120" disabled={!form.aiEnabled} />
+            </label>
+            {form.aiService !== "gemini" && <div className="form-field form-field--long form-field--span">
+              <span>AI güvenlik anahtarı</span>
+              <div className="field-control-group setup-secret-input">
+                <input
+                  aria-label="AI güvenlik anahtarı"
+                  value={genericSecretValue}
+                  onChange={(event) => replaceGenericSecret(event.target.value)}
+                  onFocus={(event) => {
+                    if (genericUsesStoredApiKey) event.currentTarget.select();
+                  }}
+                  type={showAiApiKey || genericUsesStoredApiKey ? "text" : "password"}
+                  placeholder={form.aiStoredApiKeyConfigured ? "Yeni anahtar girmezseniz bu sağlayıcının kayıtlı anahtarı korunur" : "Servis erişim anahtarını girin"}
+                  disabled={!form.aiEnabled || form.clearAiApiKey}
+                  autoComplete="new-password"
+                  spellCheck={false}
+                />
+                <button className="action-button action-button-secondary" type="button" onClick={() => void toggleAiApiKeyVisibility("generic")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showAiApiKey}>
+                  {aiApiKeyRevealState === "loading" ? "Açılıyor" : showAiApiKey ? "Gizle" : "Göster"}
+                </button>
+              </div>
+              <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
+              {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
+            </div>}
+            {form.aiStoredApiKeyConfigured && (
+              <label className="form-check setup-checkline form-field--span setup-danger-checkline">
+                <input
+                  checked={form.clearAiApiKey}
+                  onChange={(event) => onFormChange({
+                    ...form,
+                    clearAiApiKey: event.target.checked,
+                    aiEnabled: event.target.checked ? false : form.aiEnabled
+                  })}
+                  type="checkbox"
+                />
+                Bu sağlayıcının kayıtlı anahtarını sil ve AI yardımcıyı kapat
+              </label>
+            )}
+          </div>
+          {form.aiService !== "gemini" && renderAiConnectionActions(false)}
+        </div>
+
+        {embedded && form.androidEnabled && (
+          <AndroidDevicesSection
+            devices={dashboardData?.androidDevices ?? []}
+            enabledCapabilities={enabledCapabilities}
+            state={androidDeviceState}
+            message={androidDeviceMessage}
+            publishState={androidPublishState}
+            publishMessage={androidPublishMessage}
+            onPublish={onPublishAndroid}
+            onSetRole={onSetAndroidDeviceRole}
+            onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
+            onSetActive={onSetAndroidDeviceActive}
+            onResetPermissions={onResetAndroidDevicePermissions}
+            onRevoke={onRevokeAndroidDevice}
+          />
+        )}
         <div id="settings-application" className="setup-section appearance-settings">
           <div className="setup-section-title">
             <h2>Uygulama Görünümü</h2>
@@ -412,8 +729,8 @@ export function SetupForm({
               <small>Daha çok bilgiyi ekrana sığdırır; açık veya karanlık tema seçmenizi sağlar.</small>
             </button>
           </div>
-          <div className={`setup-grid appearance-controls${uiPreferences.mode === "pro" ? " two" : ""}`}>
-            <label>
+          <div className="form-grid appearance-controls">
+            <label className="form-field form-field--short">
               Arayüz ölçeği
               <select
                 value={String(uiPreferences.scale)}
@@ -427,7 +744,7 @@ export function SetupForm({
             </label>
             {uiPreferences.mode === "pro" && <div className="setup-field">
               <span>Tema</span>
-              <label className="setup-checkline appearance-theme-toggle">
+              <label className="form-check setup-checkline appearance-theme-toggle">
                 <input
                   checked={uiPreferences.theme === "dark"}
                   onChange={(event) => onUiPreferencesChange({ ...uiPreferences, theme: event.target.checked ? "dark" : "light" })}
@@ -439,321 +756,13 @@ export function SetupForm({
             </div>}
           </div>
         </div>
-        <div id="settings-business" className="setup-section settings-identity-section">
-          <div className="setup-section-title">
-            {!embedded && <p>Firma Bilgileri</p>}
-            <h2>İşletmem</h2>
-          </div>
-          <div className="setup-grid two">
-            <label>
-              Firma adı
-              <input value={form.businessName} onChange={(event) => update("businessName", event.target.value)} placeholder="Deniz Çiçeği Pansiyon & Kafe" />
-            </label>
-            <label>
-              Sektör tipi
-              <select value={form.profileId} onChange={(event) => update("profileId", event.target.value)}>
-                {getBusinessProfiles().map((profile) => (
-                  <option value={profile.id} key={profile.id}>{profile.label}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Telefon
-              <input value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx xxx xx xx" />
-            </label>
-            <label>
-              WhatsApp
-              <input value={form.whatsapp} onChange={(event) => update("whatsapp", event.target.value)} placeholder="+90 5xx xxx xx xx" />
-            </label>
-            <label>
-              E-posta
-              <input value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="info@firma.com" />
-            </label>
-            <label>
-              Adres
-              <input value={form.address} onChange={(event) => update("address", event.target.value)} placeholder="Kısa işletme adresi" />
-            </label>
-          </div>
-        </div>
-
-        <div id="settings-connections" className="setup-section settings-services-section">
-          <div className="setup-section-title">
-            {!embedded && <p>Servisler</p>}
-            <h2>Bağlı Servisler</h2>
-          </div>
-          <div className="setup-toggle-grid">
-            <label>
-              <input checked={form.whatsappEnabled} onChange={(event) => update("whatsappEnabled", event.target.checked)} type="checkbox" />
-              WhatsApp
-            </label>
-            <label>
-              <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
-              Android
-            </label>
-            <label>
-              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
-              AI Yardımcı
-            </label>
-          </div>
-        </div>
-
-        <div id="settings-operations" className="setup-section settings-daily-section">
-          <div className="setup-section-title">
-            {!embedded && <p>Kapasite ve Yardımcı</p>}
-            <h2>İşletme Düzeni</h2>
-          </div>
-          {accommodationEnabled && <div className="setup-count-row settings-room-count">
-            <label>
-              Oda sayısı
-              <input value={form.roomCount} onChange={(event) => update("roomCount", event.target.value)} inputMode="numeric" min="0" step="1" type="number" />
-            </label>
-          </div>}
-          {foodServiceEnabled && <div className="table-category-editor">
-            <div className="table-category-heading">
-              <div>
-                <strong>Masa kategorileri</strong>
-                <small>Restoran alanlarını adlandırın ve her alandaki masa sayısını belirleyin.</small>
-              </div>
-              <span>{tableCountTotal} masa</span>
-            </div>
-            {form.tableCategories.length === 0 ? (
-              <div className="table-category-empty">
-                <span>Henüz masa kategorisi yok.</span>
-                <small>Masa kullanacaksanız ilk kategoriyi ekleyin.</small>
-              </div>
-            ) : (
-              <div className="table-category-list">
-                {form.tableCategories.map((category, index) => (
-                  <div className="table-category-row" key={category.key}>
-                    <label>
-                      <span>Kategori adı</span>
-                      <input
-                        value={category.name}
-                        onChange={(event) => updateTableCategory(category.key, "name", event.target.value)}
-                        placeholder={index === 0 ? "Örn. Salon" : "Örn. Bahçe"}
-                        maxLength={50}
-                      />
-                    </label>
-                    <label className="table-category-count">
-                      <span>Masa</span>
-                      <input
-                        value={category.tableCount}
-                        onChange={(event) => updateTableCategory(category.key, "tableCount", event.target.value)}
-                        inputMode="numeric"
-                        min="1"
-                        max="200"
-                        step="1"
-                        type="number"
-                      />
-                    </label>
-                    <button
-                      className="table-category-remove"
-                      type="button"
-                      onClick={() => removeTableCategory(category.key)}
-                      aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
-                      title="Kategoriyi kaldır"
-                    >
-                      <Trash2 size={15} aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button className="table-category-add" type="button" onClick={addTableCategory}>
-              <Plus size={15} aria-hidden="true" />
-              Kategori Ekle
-            </button>
-            <small className="table-category-note">
-              Adedi azalttığınızda kullanılmayan masalar arşivlenir; aktif adisyon veya rezervasyona bağlı masalar korunur.
-            </small>
-          </div>}
-        </div>
-        {embedded && (
-          <RoomManagementSection
-            roomCount={form.roomCount}
-            dashboardRoomCount={dashboardData?.rooms.length ?? 0}
-            onRoomCountChange={(value) => update("roomCount", value)}
-          />
-        )}
         {embedded && (
           <PasswordSettings
             configured={setupData.appPasswordConfigured}
             onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
           />
         )}
-        {embedded && form.androidEnabled && (
-          <AndroidDevicesSection
-            devices={dashboardData?.androidDevices ?? []}
-            enabledCapabilities={enabledCapabilities}
-            state={androidDeviceState}
-            message={androidDeviceMessage}
-            publishState={androidPublishState}
-            publishMessage={androidPublishMessage}
-            onPublish={onPublishAndroid}
-            onSetRole={onSetAndroidDeviceRole}
-            onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
-            onSetActive={onSetAndroidDeviceActive}
-            onResetPermissions={onResetAndroidDevicePermissions}
-            onRevoke={onRevokeAndroidDevice}
-          />
-        )}
-        </div>
-
-        <div className="settings-section-grid settings-advanced-grid"><div className="setup-section settings-web-section">
-          <div className="setup-section-title settings-web-title">
-            {!embedded && <p>Web Bağlantısı</p>}
-            <h2>Web Bağlantısı</h2>
-            <label className="setup-checkline settings-auto-sync-toggle">
-              <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
-              Otomatik eşitle
-            </label>
-          </div>
-          <div className="setup-grid two">
-            <label className="setup-field">
-              Web eşitleme adresi
-              <input value={form.webModuleUrl} onChange={(event) => update("webModuleUrl", event.target.value)} placeholder="https://yardimciasistan.alwaysdata.net/yardimci-asistan" />
-            </label>
-            <label>
-              Web güvenlik anahtarı
-              <input
-                value={form.syncSecret}
-                onChange={(event) => update("syncSecret", event.target.value)}
-                placeholder="uzun-gizli-anahtar"
-                type="password"
-                autoComplete="new-password"
-                spellCheck={false}
-              />
-            </label>
-          </div>
-          <div className={`setup-ai-actions is-inline setup-web-actions sync-${webConnectionTestState}`}>
-            <button className="setup-secondary" type="button" onClick={() => void testWebConnection()} disabled={webConnectionTestState === "loading"}>
-              <RefreshCw size={16} aria-hidden="true" />
-              {webConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Web Bağlantısını Dene"}
-            </button>
-            <span role="status" aria-live="polite">{webConnectionTestMessage}</span>
-            <small>Bu kontrol yalnız bağlantıyı doğrular; talep çekmez veya veri yayınlamaz.</small>
-          </div>
-        </div>
-
-        <div className="setup-section setup-ai-section">
-          <div className="setup-section-title">
-            {!embedded && <p>AI Bağlantısı</p>}
-            <h2>AI Servisi ve Model</h2>
-          </div>
-          <div className="setup-grid two">
-            <label className="setup-ai-service-field">
-              Servis sağlayıcı
-              <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
-                {aiServicePresets.map((preset) => (
-                  <option value={preset.id} key={preset.id}>
-                    {preset.label}{isAiServiceProfileStored(form, preset.id) ? " · kayıtlı" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {form.aiService === "gemini" ? (
-              <>
-                <div className="setup-field setup-ai-studio-help">
-                  <button className="setup-secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
-                    <ExternalLink size={16} aria-hidden="true" />
-                    Google AI Studio'yu Aç
-                  </button>
-                  <small>Bağlantı anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
-                </div>
-                <div className="setup-field setup-ai-curl-field">
-                  <span>Google AI Studio cURL bağlantısı</span>
-                  <div className="setup-secret-input">
-                    <input
-                      aria-label="Google AI Studio cURL bağlantısı"
-                      value={googleSecretValue}
-                      onChange={(event) => replaceGoogleSecret(event.target.value)}
-                      onFocus={(event) => {
-                        if (googleUsesStoredApiKey) event.currentTarget.select();
-                      }}
-                      type={showGoogleCurl || googleUsesStoredApiKey ? "text" : "password"}
-                      placeholder={form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantıyı değiştirmek için yeni cURL yapıştırın" : "Copy cURL quickstart çıktısını buraya yapıştırın"}
-                      disabled={!form.aiEnabled || form.clearAiApiKey}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    <button type="button" onClick={() => void toggleAiApiKeyVisibility("google")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showGoogleCurl}>
-                      {aiApiKeyRevealState === "loading" ? "Açılıyor" : showGoogleCurl ? "Gizle" : "Göster"}
-                    </button>
-                  </div>
-                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz." : "Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır."}</small>
-                  {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
-                </div>
-                {renderAiConnectionActions(true)}
-              </>
-            ) : (
-              <label className="setup-grid-wide">
-                Bağlantı adresi
-                <input value={form.aiBaseUrl} onChange={(event) => update("aiBaseUrl", event.target.value)} placeholder="https://servis.example/v1" disabled={!form.aiEnabled} spellCheck={false} />
-              </label>
-            )}
-            <label>
-              Model adı
-              {form.aiService === "gemini" && form.aiModelOptions.length > 0 ? (
-                <select value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} disabled={!form.aiEnabled}>
-                  {form.aiModelOptions.map((model) => (
-                    <option value={model.id} key={model.id}>{model.label}</option>
-                  ))}
-                </select>
-              ) : (
-                <input value={form.aiModel} onChange={(event) => update("aiModel", event.target.value)} placeholder={form.aiService === "gemini" ? "Bağlantı kontrolünden sonra listelenir" : "Serviste görünen model adı"} disabled={!form.aiEnabled || form.aiService === "gemini"} spellCheck={false} />
-              )}
-              {form.aiService === "gemini" && (
-                <small>{form.aiModelOptions.length > 0
-                  ? form.aiStoredApiKeyConfigured
-                    ? `${form.aiModelOptions.length} görsel ve metin modeli bu sağlayıcı altında kayıtlı.`
-                    : `${form.aiModelOptions.length} görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.`
-                  : "Bağlantıyı Dene ile görsel destekli, güncel modeller otomatik alınır."}</small>
-              )}
-            </label>
-            <label>
-              Yanıt bekleme süresi (saniye)
-              <input value={form.aiTimeoutSeconds} onChange={(event) => update("aiTimeoutSeconds", event.target.value)} inputMode="numeric" min="5" max="120" disabled={!form.aiEnabled} />
-            </label>
-            {form.aiService !== "gemini" && <div className="setup-field setup-grid-wide">
-              <span>AI güvenlik anahtarı</span>
-              <div className="setup-secret-input">
-                <input
-                  aria-label="AI güvenlik anahtarı"
-                  value={genericSecretValue}
-                  onChange={(event) => replaceGenericSecret(event.target.value)}
-                  onFocus={(event) => {
-                    if (genericUsesStoredApiKey) event.currentTarget.select();
-                  }}
-                  type={showAiApiKey || genericUsesStoredApiKey ? "text" : "password"}
-                  placeholder={form.aiStoredApiKeyConfigured ? "Yeni anahtar girmezseniz bu sağlayıcının kayıtlı anahtarı korunur" : "Servis erişim anahtarını girin"}
-                  disabled={!form.aiEnabled || form.clearAiApiKey}
-                  autoComplete="new-password"
-                  spellCheck={false}
-                />
-                <button type="button" onClick={() => void toggleAiApiKeyVisibility("generic")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showAiApiKey}>
-                  {aiApiKeyRevealState === "loading" ? "Açılıyor" : showAiApiKey ? "Gizle" : "Göster"}
-                </button>
-              </div>
-              <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
-              {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
-            </div>}
-            {form.aiStoredApiKeyConfigured && (
-              <label className="setup-checkline setup-grid-wide setup-danger-checkline">
-                <input
-                  checked={form.clearAiApiKey}
-                  onChange={(event) => onFormChange({
-                    ...form,
-                    clearAiApiKey: event.target.checked,
-                    aiEnabled: event.target.checked ? false : form.aiEnabled
-                  })}
-                  type="checkbox"
-                />
-                Bu sağlayıcının kayıtlı anahtarını sil ve AI yardımcıyı kapat
-              </label>
-            )}
-          </div>
-          {form.aiService !== "gemini" && renderAiConnectionActions(false)}
-        </div>
+        {embedded && <DataMaintenanceSettings />}
 
         <div className="setup-section settings-storage-section">
           <div className="setup-section-title">{!embedded && <p>Bu Bilgisayar</p>}<h2>Kayıt ve Yedekleme</h2></div>
@@ -761,24 +770,23 @@ export function SetupForm({
             <div><dt>Yerel kayıt dosyası</dt><dd>{dashboardData?.databasePath ?? "İlk kayıt sonrası oluşur"}</dd></div>
             <div><dt>Yedek klasörü</dt><dd>{dashboardData?.backupPath ?? "İlk kayıt sonrası oluşur"}</dd></div>
           </dl>
-          <div className="settings-action-row">
-            <button className="setup-secondary" type="button" onClick={onCreateBackup} disabled={!onCreateBackup || backupState === "loading"}><Save size={16} aria-hidden="true" />{backupState === "loading" ? "Yedekleniyor" : "Yedek Al"}</button>
-            {form.androidEnabled && <button className="setup-secondary" type="button" onClick={onPublishAndroid} disabled={!onPublishAndroid || androidPublishState === "loading"}><UploadCloud size={16} aria-hidden="true" />{androidPublishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}</button>}
+          <div className="form-actions settings-action-row">
+            <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onCreateBackup} disabled={!onCreateBackup || backupState === "loading"}><Save size={16} aria-hidden="true" />{backupState === "loading" ? "Yedekleniyor" : "Yedek Al"}</button>
+            {form.androidEnabled && <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onPublishAndroid} disabled={!onPublishAndroid || androidPublishState === "loading"}><UploadCloud size={16} aria-hidden="true" />{androidPublishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}</button>}
           </div>
           <p className={`menu-status sync-${backupState}`}>{backupMessage}</p>
           {form.androidEnabled && <p className={`menu-status sync-${androidPublishState}`}>{androidPublishMessage}</p>}
-        </div>
         </div>
 
         {!embedded && <footer className={`setup-footer sync-${saveState}`}>
           <span>{message}</span>
           <div>
             {!setupData.setupRequired && (
-              <button className="setup-secondary" type="button" onClick={onSkip}>
+              <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onSkip}>
                 Panele Dön
               </button>
             )}
-            <button className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
+            <button className="setup-primary action-button action-button-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
               <Save size={16} aria-hidden="true" />
               {setupData.setupRequired ? "Kurulumu Kaydet" : "Ayarları Kaydet"}
             </button>
@@ -845,7 +853,7 @@ function AndroidDevicesSection({
         <div className="android-devices-heading-actions">
           <span>{availableDevices.length} cihaz</span>
           <button
-            className="setup-secondary"
+            className="setup-secondary action-button action-button-secondary"
             type="button"
             onClick={onPublish}
             disabled={!onPublish || publishState === "loading"}
@@ -922,13 +930,13 @@ function AndroidDevicesSection({
                   </fieldset>
                 )}
                 <div className="android-device-actions">
-                  <button className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "admin")} disabled={busy || device.role === "admin"}>
+                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "admin")} disabled={busy || device.role === "admin"}>
                     <ShieldCheck size={15} aria-hidden="true" /> Yönetici Yap
                   </button>
-                  <button className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "staff")} disabled={busy || device.role === "staff"}>Personel Yap</button>
-                  <button className="setup-secondary" type="button" onClick={() => onSetActive?.(device.deviceId, !device.isActive)} disabled={busy}>{device.isActive ? "Pasifleştir" : "Aktif Et"}</button>
-                  <button className="setup-secondary" type="button" onClick={() => onResetPermissions?.(device.deviceId)} disabled={busy}>Yetkileri Sıfırla</button>
-                  <button className="setup-secondary android-device-remove" type="button" onClick={() => onRevoke?.(device)} disabled={busy}>Kaldır</button>
+                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "staff")} disabled={busy || device.role === "staff"}>Personel Yap</button>
+                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onSetActive?.(device.deviceId, !device.isActive)} disabled={busy}>{device.isActive ? "Pasifleştir" : "Aktif Et"}</button>
+                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onResetPermissions?.(device.deviceId)} disabled={busy}>Yetkileri Sıfırla</button>
+                  <button className="setup-secondary android-device-remove action-button action-button-secondary" type="button" onClick={() => onRevoke?.(device)} disabled={busy}>Kaldır</button>
                 </div>
               </article>
             );
@@ -955,7 +963,7 @@ function AndroidDevicesSection({
                 <span>{device.revokedAt ? `${formatDateTime(device.revokedAt)} tarihinde kaldırıldı` : "Erişimi kapalı"}</span>
                 <button
                   aria-label={`${device.deviceName || "Android Telefon"} (${compactAndroidDeviceId(device.deviceId)}) cihazını geri yükle`}
-                  className="setup-secondary"
+                  className="setup-secondary action-button action-button-secondary"
                   type="button"
                   onClick={() => restoreDevice(device)}
                   disabled={busy || !onSetActive}

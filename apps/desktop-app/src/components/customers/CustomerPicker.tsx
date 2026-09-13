@@ -3,7 +3,6 @@ import type { DesktopCustomer } from "../../../electron/database";
 import { useCustomerCreditAccount } from "../../app/use-customer-credit-account";
 import { ActionButton } from "../ui/ActionButton";
 import { CustomerCreditBalances } from "./CustomerCreditBalances";
-import "../../customer-credit-ux.css";
 
 export function CustomerPicker({ customers, value, onChange, disabled }: {
   customers: DesktopCustomer[];

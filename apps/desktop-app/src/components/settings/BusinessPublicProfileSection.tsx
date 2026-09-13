@@ -9,7 +9,6 @@ import {
 import type { BusinessLocationGeocodeCandidate } from "../../../electron/business-location-geocode";
 import { reportAppStatus } from "../../app/runtime-state";
 import { BusinessLocationMapPicker } from "./BusinessLocationMapPicker";
-import "./business-public-profile.css";
 
 interface BusinessPublicProfileDraft {
   description: string;
@@ -217,7 +216,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
         <div>
           <h2>Müşteriye Gösterilen Bilgiler</h2>
         </div>
-        <button className="setup-primary" type="button" disabled={loading || saving} onClick={() => void save()}>
+        <button className="setup-primary action-button action-button-primary" type="button" disabled={loading || saving} onClick={() => void save()}>
           {saving ? "Kaydediliyor" : "Bilgileri Kaydet"}
         </button>
       </div>
@@ -227,7 +226,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
         <div className="business-public-profile-loading">İşletme bilgileri yükleniyor...</div>
       ) : (
         <div className="business-public-profile-body">
-          <label className="setup-grid-wide">
+          <label className="form-field form-field--fluid form-field--span">
             İşletme açıklaması
             <textarea
               value={draft.description}
@@ -242,7 +241,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
             <legend>Sunulan özellikler</legend>
             <div className="business-public-profile-feature-grid">
               {BUSINESS_PUBLIC_FEATURE_CATALOG.map((feature) => (
-                <label className="setup-checkline" key={feature.id}>
+                <label className="form-check setup-checkline" key={feature.id}>
                   <input
                     type="checkbox"
                     checked={selectedFeatures.has(feature.id)}
@@ -254,26 +253,26 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
             </div>
           </fieldset>
 
-          <div className="setup-grid two business-public-profile-times">
-            <label>
+          <div className="form-row business-public-profile-times">
+            <label className="form-field form-field--short">
               Giriş saati
               <input type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
             </label>
-            <label>
+            <label className="form-field form-field--short">
               Çıkış saati
               <input type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
             </label>
-            <label>
+            <label className="form-field form-field--short">
               Kahvaltı başlangıcı
               <input type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
             </label>
-            <label>
+            <label className="form-field form-field--short">
               Kahvaltı bitişi
               <input type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
             </label>
           </div>
 
-          <label className="setup-grid-wide">
+          <label className="form-field form-field--fluid form-field--span">
             Ulaşım tarifi
             <textarea
               value={draft.directionsNote}
@@ -294,7 +293,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
                 </small>
               </div>
               <button
-                className="setup-secondary"
+                className="setup-secondary action-button action-button-secondary"
                 type="button"
                 disabled={addressLookupState === "loading" || !normalizedBusinessAddress}
                 onClick={() => void lookupBusinessAddress()}
@@ -330,8 +329,8 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
               onSelect={selectMapPoint}
             />
 
-            <div className="setup-grid two">
-              <label>
+            <div className="form-grid">
+              <label className="form-field form-field--short">
                 Enlem
                 <input
                   type="number"
@@ -344,7 +343,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
                   placeholder="36.8123"
                 />
               </label>
-              <label>
+              <label className="form-field form-field--short">
                 Boylam
                 <input
                   type="number"
@@ -362,8 +361,8 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
             {coordinateError && <small className="business-public-profile-field-error" role="status">{coordinateError}</small>}
           </div>
 
-          <div className="setup-grid two business-public-profile-notes">
-            <label>
+          <div className="form-grid business-public-profile-notes">
+            <label className="form-field form-field--fluid">
               Genel politika notu
               <textarea
                 value={draft.policyNote}
@@ -373,7 +372,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
                 rows={4}
               />
             </label>
-            <label>
+            <label className="form-field form-field--fluid">
               Ödeme notu
               <textarea
                 value={draft.paymentNote}
@@ -385,7 +384,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
             </label>
           </div>
 
-          <label className="setup-grid-wide">
+          <label className="form-field form-field--medium form-field--span">
             Konuşulan diller
             <input
               value={draft.languages}

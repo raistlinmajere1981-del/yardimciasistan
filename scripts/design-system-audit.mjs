@@ -3,7 +3,8 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const BASELINE_PATH = path.join(ROOT, "quality", "design-audit-baseline.json");
-const TOKEN_FILE = "apps/desktop-app/src/styles.css";
+const STYLE_ROOT = "apps/desktop-app/src/styles";
+const TOKEN_FILES = ["tokens/primitives.css", "tokens/semantic.css", "tokens/typography.css", "tokens/dimensions.css"].map((file) => `${STYLE_ROOT}/${file}`);
 const SCAN_ROOTS = [
   "apps/desktop-app/src",
   "apps/demo-web/src",
@@ -45,17 +46,17 @@ function countMatches(text, regex) {
 }
 
 function cssMetrics(file, text) {
-  const isTokenFile = file === TOKEN_FILE;
+  const isTokenFile = TOKEN_FILES.includes(file) || file.startsWith(`${STYLE_ROOT}/themes/`);
   return {
     rawColor: isTokenFile
       ? 0
       : countMatches(text, /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\s*\(/g),
     hardcodedRadius: isTokenFile
       ? 0
-      : countMatches(text, /border-radius\s*:\s*(?!var\()[^;}{]+/g),
+      : countMatches(text, /border-radius\s*:\s*(?!\s*(?:var\(|none\b|0\s*;))[^;}{]+/g),
     hardcodedShadow: isTokenFile
       ? 0
-      : countMatches(text, /box-shadow\s*:\s*(?!var\()[^;}{]+/g),
+      : countMatches(text, /box-shadow\s*:\s*(?!\s*(?:var\(|none\b|0\s*;))[^;}{]+/g),
     hardcodedFontSize: isTokenFile
       ? 0
       : countMatches(text, /font-size\s*:\s*(?!var\()[0-9.]+(?:px|rem|em)\b/g),
@@ -85,23 +86,29 @@ function readMetrics() {
 }
 
 function assertTokenContract() {
-  const absolute = path.join(ROOT, TOKEN_FILE);
-  if (!fs.existsSync(absolute)) {
-    throw new Error(`Tasarım token dosyası bulunamadı: ${TOKEN_FILE}`);
-  }
-  const text = fs.readFileSync(absolute, "utf8");
+  const text = TOKEN_FILES.map((file) => fs.readFileSync(path.join(ROOT, file), "utf8")).join("\n");
   const requiredTokens = [
-    "--bg",
-    "--surface-1",
-    "--ink",
-    "--primary",
-    "--status-green",
-    "--text-base",
-    "--space-1",
-    "--radius-sm",
-    "--shadow-sm",
-    "--control-height"
+    "--color-bg-app", "--color-bg-surface", "--color-bg-panel", "--color-bg-field",
+    "--color-bg-hover", "--color-text", "--color-text-muted", "--color-border",
+    "--color-border-strong", "--color-focus", "--color-accent", "--color-accent-hover",
+    "--color-danger", "--color-warning", "--color-success", "--text-base", "--space-1",
+    "--radius-control", "--radius-panel", "--radius-dialog", "--radius-pill",
+    "--control-height-sm", "--control-height-md", "--control-height-lg",
+    "--field-width-xs", "--field-width-sm", "--field-width-md", "--field-width-lg",
+    "--page-max-width", "--reading-max-width", "--sidebar-width", "--header-height"
   ];
+  const css = walk("apps/desktop-app/src").filter((file) => file.endsWith(".css"))
+    .map((file) => fs.readFileSync(path.join(ROOT, file), "utf8")).join("\n");
+  if (/--override-/.test(css)) throw new Error("Historical override tokens are forbidden.");
+  const definitions = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map((match) => match[1]));
+  const undefinedTokens = [...new Set([...css.matchAll(/var\((--[\w-]+)\)/g)].map((match) => match[1]))].filter((name) => !definitions.has(name));
+  if (undefinedTokens.length) throw new Error(`Undefined CSS tokens: ${undefinedTokens.join(", ")}`);
+  const main = fs.readFileSync(path.join(ROOT, "apps/desktop-app/src/main.tsx"), "utf8");
+  const appImports = [...main.matchAll(/import "(\.\/[^"\n]+\.css)"/g)].map((match) => match[1]);
+  if (appImports.join() !== "./styles/index.css") throw new Error("main.tsx must import only styles/index.css for application CSS.");
+  const index = fs.readFileSync(path.join(ROOT, STYLE_ROOT, "index.css"), "utf8");
+  if (!index.includes("@layer reset, tokens, foundation, components, layout, pages, utilities;")) throw new Error("Explicit cascade contract is missing.");
+  if (/^@import[^;]+(?<!\))\s*;/m.test(index)) throw new Error("Every stylesheet import must declare its layer.");
   const missing = requiredTokens.filter((token) => !text.includes(`${token}:`));
   if (missing.length > 0) {
     throw new Error(`Tasarım token sözleşmesi eksik: ${missing.join(", ")}`);

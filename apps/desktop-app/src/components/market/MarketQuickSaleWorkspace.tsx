@@ -12,7 +12,6 @@ import {
   createKeyboardBarcodeInputAdapter,
   type BarcodeScan
 } from "../../app/barcode-input";
-import "../../market-quick-sale-ux.css";
 import type { DesktopCustomer } from "../../../electron/database";
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";

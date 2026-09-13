@@ -1,0 +1,528 @@
+.setup-capabilities {
+  width: 100%;
+  max-width: var(--page-max-width);
+  margin-inline: auto;
+  min-width: 0;
+}
+
+.setup-shell.is-embedded {
+  display: block;
+}
+
+.setup-form-surface {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+}
+
+.setup-public-profile-shell {
+  min-width: 0;
+}
+
+.settings-section-nav {
+  position: sticky;
+  top: var(--header-height);
+  z-index: var(--z-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-section-nav a {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+
+.settings-section-nav a:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.setup-capabilities :where([id^="settings-"]) {
+  scroll-margin-top: calc(var(--header-height) + var(--space-16) + var(--space-4));
+}
+
+.setup-section :where(.form-grid, .form-row) + :where(.form-grid, .form-row) {
+  margin-top: var(--space-4);
+}
+
+.setup-section > .form-grid,
+.password-settings-grid {
+  max-width: calc(var(--field-width-md) * 2 + var(--space-6));
+}
+
+.setup-toggle-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.setup-toggle-grid label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-md);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: var(--text-sm);
+}
+
+.setup-toggle-grid label:has(:checked) {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
+}
+
+.setup-field {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.setup-field small {
+  color: var(--color-text-muted);
+}
+
+.setup-danger-checkline {
+  color: var(--color-danger);
+}
+
+.setup-ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.setup-ai-actions small {
+  flex-basis: 100%;
+  color: var(--color-text-muted);
+}
+
+.setup-ai-actions span {
+  font-size: var(--text-sm);
+}
+
+.setup-ai-actions.is-inline {
+  align-self: end;
+}
+
+.setup-ai-studio-help {
+  align-self: end;
+}
+
+.setup-count-row {
+  margin-bottom: var(--space-4);
+}
+
+.setup-shell.is-embedded .settings-room-count {
+  display: none;
+}
+
+.setup-capabilities .settings-storage-section {
+  display: none;
+}
+
+.settings-technical-info dd {
+  overflow-wrap: anywhere;
+}
+
+.settings-advanced-details {
+  margin-top: var(--space-5);
+}
+
+.settings-advanced-details .setup-section {
+  border: 0;
+  padding: var(--space-3) 0;
+}
+
+.settings-section-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.table-category-editor,
+.table-category-list {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.table-category-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.table-category-heading > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.table-category-heading small,
+.table-category-note,
+.table-category-empty {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.table-category-row {
+  display: grid;
+  grid-template-columns: minmax(0, var(--field-width-md)) var(--field-width-xs) auto;
+  justify-content: start;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.room-management-heading {
+  align-items: start;
+}
+
+.room-management-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.room-management-count-control {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+}
+
+.room-management-count-input {
+  width: var(--field-width-xs);
+}
+
+.room-management-save-state {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.room-management-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.room-management-list-head,
+.room-management-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.room-management-list-head {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.room-management-row {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.room-management-row input {
+  width: 100%;
+}
+
+.room-management-identity {
+  min-width: 0;
+  display: grid;
+}
+
+.room-management-identity strong {
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+
+.room-management-details-button {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--text-xs);
+}
+
+.room-management-price-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.room-management-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.room-management-footer > span {
+  max-width: var(--reading-max-width);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.business-public-profile-body {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.business-public-profile-features {
+  margin: 0;
+  padding: var(--space-3) 0;
+  border: 0;
+  border-block: 1px solid var(--color-border);
+}
+
+.business-public-profile-features legend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-2);
+}
+
+.business-public-profile-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-1) var(--space-4);
+}
+
+.business-public-profile-times {
+  gap: var(--space-4);
+}
+
+.business-public-profile-times > .form-field {
+  flex: 1 1 0;
+  max-width: var(--field-width-sm);
+}
+
+.business-public-profile-map-point {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.business-public-profile-address-lookup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.business-public-profile-address-lookup > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.business-public-profile-address-lookup span,
+.business-public-profile-map-point > small {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.business-public-profile-address-results {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 12rem;
+  overflow: auto;
+}
+
+.business-public-profile-address-result {
+  text-align: left;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-field);
+  color: var(--color-text);
+}
+
+.business-public-profile-field-error,
+.setup-secret-error {
+  color: var(--color-danger);
+}
+
+.appearance-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  max-width: var(--reading-max-width);
+  margin-bottom: var(--space-4);
+}
+
+.appearance-mode-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: left;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  background: var(--color-bg-panel);
+}
+
+.appearance-mode-card strong {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.appearance-mode-card small,
+.appearance-mode-card strong span {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-normal);
+}
+
+.appearance-mode-card.is-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.appearance-controls {
+  max-width: var(--reading-max-width);
+}
+
+.password-settings-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.password-settings-recovery {
+  margin-top: var(--space-4);
+}
+
+.password-settings-recovery form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.password-settings-message {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.password-settings-message.is-error,
+.room-management-save-state.is-error {
+  color: var(--color-danger);
+}
+
+.password-settings-message.is-success,
+.room-management-save-state.is-success {
+  color: var(--color-success);
+}
+
+.backup-list-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-block: var(--space-5) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.backup-list-heading span {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.backup-list {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.backup-empty {
+  margin: 0;
+  padding: var(--space-6);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.backup-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
+.backup-row-title,
+.backup-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.backup-row-meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+}
+
+@media (max-width: 1100px) {
+
+  .business-public-profile-feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+
+  .settings-section-nav {
+    position: static;
+  }
+
+  .setup-capabilities [id^="settings-"] {
+    scroll-margin-top: calc(var(--header-height) + var(--space-4));
+  }
+
+  .settings-identity-section .form-grid,
+.appearance-mode-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .business-public-profile-times > .form-field {
+    flex: auto;
+    max-width: none;
+  }
+
+  .table-category-row {
+    grid-template-columns: minmax(0, 1fr) var(--field-width-xs) auto;
+  }
+
+  .room-management-list-head {
+    display: none;
+  }
+
+  .room-management-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

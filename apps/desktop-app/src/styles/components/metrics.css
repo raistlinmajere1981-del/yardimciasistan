@@ -1,0 +1,120 @@
+.metric-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-panel);
+  box-shadow: var(--shadow-md);
+}
+
+.metric-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 82px;
+  padding: 10px var(--space-3);
+  overflow: hidden;
+}
+
+.metric-card-compact {
+  gap: var(--space-2);
+  min-height: 68px;
+  padding: var(--space-2) 10px;
+}
+
+.metric-card.metric-card-compact > div:not(.metric-icon) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "title value"
+    "detail detail";
+  align-items: center;
+  gap: 0 var(--space-2);
+}
+
+.metric-card-compact .metric-icon {
+  width: 30px;
+  height: 30px;
+}
+
+.metric-card.metric-card-compact strong {
+  font-size: var(--text-xl);
+}
+
+.metric-card > div:not(.metric-icon) {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "title"
+    "value"
+    "detail";
+  align-content: center;
+  gap: 0;
+  min-width: 0;
+}
+
+.metric-icon {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: var(--radius-md);
+}
+
+.tone-info .metric-icon {
+  color: var(--color-info);
+  background: var(--color-info-soft);
+}
+
+.tone-ok .metric-icon {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+}
+
+.tone-wait .metric-icon {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.tone-neutral .metric-icon {
+  color: var(--color-text-muted);
+  background: var(--color-bg-hover);
+}
+
+.metric-card span {
+  grid-area: title;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-card strong {
+  display: block;
+  grid-area: value;
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-xl);
+  line-height: 1.1;
+}
+
+.metric-card p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.metric-card p {
+  grid-area: detail;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1400px) {
+
+  .metric-card {
+    min-height: 80px;
+    padding: var(--space-2) 10px;
+  }
+}

@@ -7,7 +7,6 @@ import { CustomerCreditForm } from "./CustomerCreditForm";
 import { CustomerCreditHistory, CustomerCreditMovement } from "./CustomerCreditHistory";
 import { CustomerCreditWhatsAppShare } from "./CustomerCreditWhatsAppShare";
 import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
-import "../../customer-credit-ux.css";
 
 export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPreparedWhatsApp }: {
   customerId: string;

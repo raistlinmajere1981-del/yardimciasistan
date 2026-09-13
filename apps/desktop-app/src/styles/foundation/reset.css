@@ -1,0 +1,37 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button,
+input,
+select,
+textarea,
+fieldset {
+  min-width: 0;
+}
+
+button {
+  cursor: pointer;
+}
+
+img,
+svg {
+  vertical-align: middle;
+}
+
+[hidden] {
+  display: none;
+}

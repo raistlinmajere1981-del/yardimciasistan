@@ -1,0 +1,17 @@
+:root {
+  --control-height-sm: 32px;
+  --control-height-md: 36px;
+  --control-height-lg: 44px;
+  --field-width-xs: 6rem;
+  --field-width-sm: 12rem;
+  --field-width-md: 20rem;
+  --field-width-lg: 36rem;
+  --page-max-width: 1200px;
+  --reading-max-width: 72ch;
+  --sidebar-width: 208px;
+  --sidebar-collapsed-width: 64px;
+  --header-height: 64px;
+  --page-padding: var(--space-6);
+  --panel-padding: var(--space-5);
+  --ui-scale: 1;
+}

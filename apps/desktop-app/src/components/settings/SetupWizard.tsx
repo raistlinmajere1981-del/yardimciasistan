@@ -7,7 +7,6 @@ import {
 } from "./BusinessCapabilitySettings";
 import { BusinessPublicProfileSection } from "./BusinessPublicProfileSection";
 import { SetupForm } from "./SetupForm";
-import "./setup-capabilities.css";
 
 type SetupFormProps = ComponentProps<typeof SetupForm>;
 type SetupWizardProps = Omit<SetupFormProps, "form" | "onFormChange" | "enabledCapabilities"> & {
@@ -33,18 +32,19 @@ export function SetupWizard(props: SetupWizardProps) {
       <SetupForm
         {...props}
         enabledCapabilities={deviceRuntimeCapabilities}
+        publicProfile={props.embedded && capabilityRuntime.snapshot?.businessId ? (
+          <div id="settings-public" className="setup-public-profile-shell">
+            <BusinessPublicProfileSection businessAddress={props.form.address} />
+          </div>
+        ) : null}
       />
 
-      {props.embedded && capabilityRuntime.snapshot?.businessId && (
-        <div id="settings-public" className="setup-public-profile-shell">
-          <BusinessPublicProfileSection businessAddress={props.form.address} />
-        </div>
-      )}
+
 
       {props.embedded && capabilityRuntime.snapshot?.businessId && (
-        <details className="setup-capability-editor-shell settings-advanced-details">
+        <details className="setup-capability-editor-shell settings-advanced-details disclosure">
           <summary>Gelişmiş işletme özellikleri</summary>
-          <div className="settings-advanced-details-body">
+          <div className="settings-advanced-details-body disclosure-body">
           <BusinessCapabilityEditor
             profileId={props.form.profileId}
             snapshot={capabilityRuntime.snapshot}

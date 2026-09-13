@@ -1,0 +1,23 @@
+/* The renderer also works in a narrow desktop window. Sidebar collapse remains
+   the user's existing control; responsive layout does not mutate preferences. */
+
+@media (max-width: 760px) {
+
+  :root {
+    --page-padding: var(--space-3);
+    --panel-padding: var(--space-4);
+  }
+
+  .page-header {
+    gap: var(--space-2);
+  }
+
+  .page-header-eyebrow,
+.page-header-copy > p {
+    display: none;
+  }
+
+  .page-header-title-row {
+    flex-wrap: wrap;
+  }
+}

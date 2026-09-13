@@ -1,0 +1,21 @@
+:root[data-theme="dark"]:not([data-mode="easy"]) {
+  color-scheme: dark;
+  --color-bg-app: var(--slate-950);
+  --color-bg-surface: var(--slate-900);
+  --color-bg-panel: var(--slate-900);
+  --color-bg-field: var(--slate-950);
+  --color-bg-hover: var(--slate-800);
+  --color-bg-disabled: var(--slate-800);
+  --color-text: var(--slate-50);
+  --color-text-muted: var(--slate-300);
+  --color-border: var(--slate-700);
+  --color-border-strong: var(--slate-500);
+  --color-focus: var(--coral-400);
+  --color-accent: var(--coral-400);
+  --color-accent-hover: var(--coral-400);
+  --color-on-accent: var(--slate-950);
+  --color-danger: var(--red-400);
+  --color-warning: var(--amber-400);
+  --color-success: var(--green-400);
+  --color-info: var(--blue-400);
+}

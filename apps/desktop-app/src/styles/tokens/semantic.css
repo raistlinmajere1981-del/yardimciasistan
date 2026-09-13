@@ -1,0 +1,32 @@
+:root {
+  --color-bg-app: var(--neutral-100);
+  --color-bg-surface: var(--neutral-50);
+  --color-bg-panel: var(--neutral-0);
+  --color-bg-field: var(--neutral-0);
+  --color-bg-hover: var(--neutral-100);
+  --color-bg-disabled: var(--neutral-200);
+  --color-text: var(--neutral-900);
+  --color-text-muted: var(--neutral-500);
+  --color-border: var(--neutral-200);
+  --color-border-strong: var(--neutral-300);
+  --color-focus: var(--coral-600);
+  --color-accent: var(--coral-600);
+  --color-accent-hover: var(--coral-700);
+  --color-on-accent: var(--neutral-0);
+  --color-danger: var(--red-700);
+  --color-warning: var(--amber-700);
+  --color-success: var(--green-700);
+  --color-info: var(--blue-700);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 9%, var(--color-bg-panel));
+  --color-accent-border: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  --color-danger-soft: color-mix(in srgb, var(--color-danger) 9%, var(--color-bg-panel));
+  --color-danger-border: color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
+  --color-warning-soft: color-mix(in srgb, var(--color-warning) 9%, var(--color-bg-panel));
+  --color-warning-border: color-mix(in srgb, var(--color-warning) 30%, var(--color-border));
+  --color-success-soft: color-mix(in srgb, var(--color-success) 9%, var(--color-bg-panel));
+  --color-info-soft: color-mix(in srgb, var(--color-info) 9%, var(--color-bg-panel));
+  --radius-control: var(--radius-md);
+  --radius-panel: var(--radius-lg);
+  --radius-dialog: var(--radius-xl);
+  --radius-pill: 999px;
+}

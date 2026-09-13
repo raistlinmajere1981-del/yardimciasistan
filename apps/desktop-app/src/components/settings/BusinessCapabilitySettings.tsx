@@ -140,7 +140,7 @@ export function BusinessCapabilityEditor({
           <fieldset className="setup-section" key={group.title} disabled={busy || profilePendingSave}>
             <legend>{group.title}</legend>
             <small>{group.description}</small>
-            <div className="setup-grid two">
+            <div className="form-grid">
               {group.capabilities.map((capability) => {
                 const entry = entries.get(capability);
                 const checked = enabled.has(capability);
@@ -156,7 +156,7 @@ export function BusinessCapabilityEditor({
 
                 return (
                   <div className="setup-field" key={capability}>
-                    <label className="setup-checkline">
+                    <label className="form-check">
                       <input
                         type="checkbox"
                         checked={checked}
@@ -168,7 +168,7 @@ export function BusinessCapabilityEditor({
                     {(blockedReason || capability === C.CUSTOMER_CREDIT) && <small>{blockedReason || "Kayıtlı müşterilerin veresiye satış ve tahsilat hareketlerini takip eder."}</small>}
                     {entry?.source === "user" && (
                       <button
-                        className="setup-secondary"
+                        className="action-button action-button-secondary"
                         type="button"
                         disabled={busy || profilePendingSave || !onClearOverride}
                         onClick={() => onClearOverride?.(capability)}

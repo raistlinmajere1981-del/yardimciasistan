@@ -53,7 +53,8 @@ const core = [
   js("room-folio", "Oda hesabı/tahsilat/çıkış", "smoke-room-folio-service.mjs"),
   js("room-transfer", "Restoran hesabını oda hesabına aktarma", "smoke-room-folio-table-order-transfer.mjs"),
   js("demo-flow", "Web → masaüstü → onaylı Android uçtan uca akış", "smoke-demo-flow-v2.mjs"),
-  current("renderer", "Masaüstü renderer browser smoke", "renderer", true)
+  current("renderer", "Masaüstü renderer browser smoke", "renderer", true),
+  jsb("design-system", "Desktop tasarım sistemi ve responsive Ayarlar", "smoke-desktop-design-system.mjs")
 ];
 const extra = [];
 if (ui && process.platform === "linux") extra.push(js("desktop-xvfb", "Electron Xvfb açılış smoke", "smoke-desktop-xvfb.mjs"));

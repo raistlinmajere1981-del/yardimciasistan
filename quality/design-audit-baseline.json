@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-02T20:37:40.048Z",
+  "generatedAt": "2026-09-13T19:54:50.021Z",
   "files": {
     "apps/demo-web/src/App.tsx": {
       "rawColor": 0,
@@ -18,26 +18,10 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/demo-web/src/pages/ProductGuidePage.tsx": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 2
-    },
-    "apps/demo-web/src/pages/product-guide.css": {
-      "rawColor": 49,
-      "hardcodedRadius": 21,
-      "hardcodedShadow": 7,
-      "hardcodedFontSize": 18,
-      "important": 4,
-      "inlineStyle": 0
-    },
     "apps/demo-web/src/styles.css": {
       "rawColor": 78,
       "hardcodedRadius": 24,
-      "hardcodedShadow": 10,
+      "hardcodedShadow": 8,
       "hardcodedFontSize": 40,
       "important": 0,
       "inlineStyle": 0
@@ -50,20 +34,12 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/backup-manager-ux.css": {
-      "rawColor": 30,
-      "hardcodedRadius": 6,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 8,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/cash-page-ux.css": {
+    "apps/desktop-app/src/app/business-capability-context.tsx": {
       "rawColor": 0,
-      "hardcodedRadius": 1,
+      "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
-      "important": 2,
+      "important": 0,
       "inlineStyle": 0
     },
     "apps/desktop-app/src/components/app/DesktopAppFrame.tsx": {
@@ -83,6 +59,54 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/components/app/DesktopWorkspaceRouter.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/CustomerCreditBalances.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/CustomerCreditForm.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/CustomerCreditHistory.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/CustomerCreditPanel.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/CustomerCreditWhatsAppShare.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/customers/CustomerPicker.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -139,6 +163,54 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/components/layout/Sidebar.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/market/MarketCompanionInboxWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/market/MarketInventoryWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/market/MarketLabelsWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/market/MarketPurchasingWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -226,6 +298,14 @@
       "important": 0,
       "inlineStyle": 0
     },
+    "apps/desktop-app/src/components/operations/RoomPublicDetailsEditor.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
     "apps/desktop-app/src/components/pension/RoomFolioWorkspace.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
@@ -274,15 +354,47 @@
       "important": 0,
       "inlineStyle": 0
     },
+    "apps/desktop-app/src/components/settings/BusinessCapabilitySettings.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/settings/BusinessLocationMapPicker.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 2
+    },
+    "apps/desktop-app/src/components/settings/BusinessPublicProfileSection.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
     "apps/desktop-app/src/components/settings/DataMaintenanceSettings.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
-      "inlineStyle": 1
+      "inlineStyle": 0
     },
     "apps/desktop-app/src/components/settings/RoomManagementSection.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/settings/SetupForm.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -293,6 +405,14 @@
     "apps/desktop-app/src/components/settings/SetupWizard.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/settings/business-location-map-picker.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 2,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
@@ -354,67 +474,11 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/customer-work-ux.css": {
-      "rawColor": 1,
-      "hardcodedRadius": 3,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/dashboard-simple-ux.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 2,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/finance-ux.css": {
-      "rawColor": 1,
-      "hardcodedRadius": 8,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/friendly-overrides.css": {
-      "rawColor": 2,
-      "hardcodedRadius": 11,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 5,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/friendly-workflow-ux.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 10,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
     "apps/desktop-app/src/main.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/menu-image-preview-ux.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 1,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/operation-calendar.css": {
-      "rawColor": 1,
-      "hardcodedRadius": 5,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 12,
       "important": 0,
       "inlineStyle": 0
     },
@@ -427,6 +491,14 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/pages/DashboardPage.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/pages/MarketPage.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -474,15 +546,7 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/restaurant-room-transfer-ux.css": {
-      "rawColor": 11,
-      "hardcodedRadius": 3,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/room-card-ux.css": {
+    "apps/desktop-app/src/styles/components/badges.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -490,49 +554,369 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/room-folio-ux.css": {
-      "rawColor": 1,
-      "hardcodedRadius": 4,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/room-folio.css": {
-      "rawColor": 1,
-      "hardcodedRadius": 10,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/room-management-ux.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 2,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 7,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/secondary-pages-ux.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 2,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 1,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/styles.css": {
+    "apps/desktop-app/src/styles/components/buttons.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
-      "important": 21,
+      "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/system-health-ux.css": {
+    "apps/desktop-app/src/styles/components/dialogs.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/disclosures.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/feedback.css": {
+      "rawColor": 2,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 2,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/forms.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/metrics.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/motion.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/operations.css": {
+      "rawColor": 3,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/panels.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/records.css": {
+      "rawColor": 4,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/resources.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/segmented-control.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/foundation/base.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/foundation/focus.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/foundation/reset.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/foundation/typography.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/index.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/layout/app-shell.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/layout/page.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/layout/responsive.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/ai.css": {
+      "rawColor": 4,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 2,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/calendar.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/customers.css": {
+      "rawColor": 3,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/dashboard.css": {
       "rawColor": 14,
       "hardcodedRadius": 3,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/devices.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/finance.css": {
+      "rawColor": 2,
+      "hardcodedRadius": 1,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/lock.css": {
+      "rawColor": 50,
+      "hardcodedRadius": 1,
+      "hardcodedShadow": 3,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/market.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/menu-preview.css": {
+      "rawColor": 46,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 3,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/menu.css": {
+      "rawColor": 9,
+      "hardcodedRadius": 1,
+      "hardcodedShadow": 3,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/messages.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 3,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/pension.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/reports.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/requests.css": {
+      "rawColor": 1,
+      "hardcodedRadius": 1,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/restaurant.css": {
+      "rawColor": 14,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 1,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/room-folio.css": {
+      "rawColor": 2,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/settings.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/pages/setup.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/themes/dark.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/themes/easy.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/themes/light.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/tokens/dimensions.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/tokens/primitives.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/tokens/semantic.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/tokens/typography.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/utilities.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,

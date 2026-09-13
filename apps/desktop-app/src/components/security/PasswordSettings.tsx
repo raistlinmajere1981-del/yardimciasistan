@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
 import { KeyRound, LockKeyhole, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
-import { DataMaintenanceSettings } from "../settings/DataMaintenanceSettings";
 
 interface PasswordSettingsProps {
   configured: boolean;
@@ -164,9 +163,9 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
 
         <form className="password-settings-form" onSubmit={savePassword}>
           {configured && (
-            <label>
+            <label className="form-field form-field--medium">
               Mevcut şifre
-              <span className="password-settings-input">
+              <span className="field-control-group password-settings-input">
                 <KeyRound size={16} aria-hidden="true" />
                 <input
                   value={currentPassword}
@@ -179,8 +178,8 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
               </span>
             </label>
           )}
-          <div className="password-settings-grid">
-            <label>
+          <div className="form-grid password-settings-grid">
+            <label className="form-field form-field--medium">
               {configured ? "Yeni şifre" : "Şifre belirleyin"}
               <input
                 value={newPassword}
@@ -191,7 +190,7 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
                 disabled={Boolean(busyAction)}
               />
             </label>
-            <label>
+            <label className="form-field form-field--medium">
               Yeni şifre tekrar
               <input
                 value={passwordConfirmation}
@@ -203,8 +202,8 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
               />
             </label>
           </div>
-          <div className="password-settings-actions">
-            <button className="setup-primary" type="submit" disabled={Boolean(busyAction)}>
+          <div className="form-actions password-settings-actions">
+            <button className="setup-primary action-button action-button-primary" type="submit" disabled={Boolean(busyAction)}>
               <LockKeyhole size={16} aria-hidden="true" />
               {busyAction === "save"
                 ? "Kaydediliyor"
@@ -213,7 +212,7 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
                   : "Şifreyi Belirle"}
             </button>
             {configured && (
-              <button className="setup-secondary password-remove-button" type="button" onClick={removePassword} disabled={Boolean(busyAction)}>
+              <button className="setup-secondary password-remove-button action-button action-button-danger" type="button" onClick={removePassword} disabled={Boolean(busyAction)}>
                 <Trash2 size={16} aria-hidden="true" />
                 {busyAction === "remove" ? "Kaldırılıyor" : "Şifreyi Kaldır"}
               </button>
@@ -224,7 +223,7 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
         {configured && (
           <div className="password-settings-recovery">
             <button
-              className="password-settings-link"
+              className="action-button action-button-ghost password-settings-link"
               type="button"
               aria-expanded={recoveryOpen}
               onClick={() => setRecoveryOpen((current) => !current)}
@@ -235,7 +234,7 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
             </button>
             {recoveryOpen && (
               <form onSubmit={resetPassword}>
-                <label>
+                <label className="form-field form-field--medium">
                   Web güvenlik anahtarı
                   <input
                     value={webSecurityKey}
@@ -246,7 +245,7 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
                     disabled={Boolean(busyAction)}
                   />
                 </label>
-                <button type="submit" disabled={Boolean(busyAction)}>
+                <button className="action-button action-button-secondary" type="submit" disabled={Boolean(busyAction)}>
                   {busyAction === "reset" ? "Kontrol ediliyor" : "Şifreyi Sıfırla"}
                 </button>
               </form>
@@ -258,7 +257,6 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
           {message}
         </p>
       </div>
-      <DataMaintenanceSettings />
     </>
   );
 }

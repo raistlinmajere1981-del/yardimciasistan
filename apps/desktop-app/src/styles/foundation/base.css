@@ -1,0 +1,40 @@
+:root {
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg-app);
+  zoom: var(--ui-scale);
+}
+
+body {
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+*::before,
+*::after {
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}
