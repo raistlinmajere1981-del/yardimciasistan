@@ -5,8 +5,10 @@ function ya_public_room_availability_extract_intent(string $message, ?DateTimeIm
 {
     $message = trim($message);
     $normalized = ya_public_room_availability_normalize_text($message);
-    $roomIntent = preg_match('/\b(oda|otel|pansiyon|konaklama)\b/u', $normalized) === 1;
-    $availabilityIntent = preg_match('/(müsait|musait|boş|bos|yer\s+var|oda\s+var|rezervasyon)/u', $normalized) === 1;
+    $roomTermPattern = '(?:oda(?:lar)?|otel|pansiyon|konaklama)(?:mız|miz|muz|müz|ımız|imiz|umuz|ümüz|nız|niz|nuz|nüz|ınız|iniz|unuz|ünüz)?(?:da|de|ta|te|dan|den|tan|ten|ya|ye|yı|yi|yu|yü|nın|nin|nun|nün)?';
+    $roomIntent = preg_match('/\b' . $roomTermPattern . '\b/u', $normalized) === 1;
+    $availabilityIntent = preg_match('/(müsait|musait|boş|bos|yer\s+var|rezervasyon)/u', $normalized) === 1
+        || preg_match('/\b' . $roomTermPattern . '\s+var(?:\s*m[ıiuü])?\b/u', $normalized) === 1;
     if (!$roomIntent || !$availabilityIntent) {
         return ['applicable' => false, 'complete' => false, 'missing' => []];
     }
