@@ -5,7 +5,7 @@ const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 const YA_AVAILABILITY_SYNC_MAX_BODY_BYTES = 2_000_000;
 
-require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/public-room-availability-storage.php';
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST');
@@ -56,12 +56,9 @@ $publication = ya_availability_sync_sanitize_publication(
 
 try {
     $publishedAt = date(DATE_ATOM);
-    $result = ya_storage_publish(
-        'public_room_availability',
+    $result = ya_public_room_availability_store_publication(
         $publication,
         $clientId,
-        null,
-        '',
         $publishedAt
     );
     ya_availability_sync_response(200, [
