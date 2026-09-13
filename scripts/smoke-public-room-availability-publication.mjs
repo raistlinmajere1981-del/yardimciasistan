@@ -28,6 +28,14 @@ const dashboard = {
       isActive: true
     },
     {
+      id: "room-3",
+      name: "Tutarsız Dolu Oda",
+      number: "3",
+      capacity: 2,
+      status: "occupied",
+      isActive: true
+    },
+    {
       id: "room-inactive",
       name: "Eski Oda",
       number: "99",
@@ -94,7 +102,8 @@ assert.equal(publication.enabled, true);
 assert.equal(publication.generated_at, now.toISOString());
 assert.deepEqual(publication.rooms, [
   { id: "room-1", name: "Bahçe Oda", number: "1", capacity: 2, status: "available" },
-  { id: "room-2", name: "Aile Oda", number: "2", capacity: 4, status: "out_of_service" }
+  { id: "room-2", name: "Aile Oda", number: "2", capacity: 4, status: "out_of_service" },
+  { id: "room-3", name: "Tutarsız Dolu Oda", number: "3", capacity: 2, status: "out_of_service" }
 ]);
 assert.deepEqual(publication.blocks, [
   { room_id: "room-1", start_date: "2026-09-20", end_date: "2026-09-24" }
