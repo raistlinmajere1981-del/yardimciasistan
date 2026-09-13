@@ -22,7 +22,8 @@ $snapshot = [
     'rooms' => [
         ['id' => 'room-1', 'name' => 'Bahçe Oda', 'number' => '1', 'capacity' => 2, 'status' => 'available'],
         ['id' => 'room-2', 'name' => 'Aile Oda', 'number' => '2', 'capacity' => 4, 'status' => 'available'],
-        ['id' => 'room-3', 'name' => 'Bakım Oda', 'number' => '3', 'capacity' => 4, 'status' => 'maintenance']
+        ['id' => 'room-3', 'name' => 'Bakım Oda', 'number' => '3', 'capacity' => 4, 'status' => 'maintenance'],
+        ['id' => 'room-4', 'name' => 'Temizlik Oda', 'number' => '4', 'capacity' => 4, 'status' => 'cleaning']
     ],
     'reservations' => [
         [
@@ -54,12 +55,13 @@ $snapshot = [
 
 $blocked = ya_public_room_availability_query($snapshot, '2026-09-20', '2026-09-21', 2, $now);
 assert_true($blocked['ok'] === true && $blocked['live'] === true, 'fresh query should be live');
-assert_true($blocked['available_room_count'] === 1, 'approved overlap should block room-1 and maintenance should block room-3');
+assert_true($blocked['available_room_count'] === 1, 'overlap and operational room states should leave only room-2');
 assert_true(($blocked['available_rooms'][0]['number'] ?? '') === '2', 'cancelled reservation must not block room-2');
 $publicJson = json_encode($blocked, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 assert_true(!str_contains((string) $publicJson, 'Gizli'), 'customer names must never leak');
 assert_true(!str_contains((string) $publicJson, '+90555'), 'customer phones must never leak');
 assert_true(!str_contains((string) $publicJson, 'reservation-secret'), 'reservation ids must never leak');
+assert_true(!str_contains((string) $publicJson, 'Temizlik Oda'), 'cleaning rooms must never be offered');
 
 $checkoutBoundary = ya_public_room_availability_query($snapshot, '2026-09-22', '2026-09-23', 2, $now);
 assert_true($checkoutBoundary['available_room_count'] === 2, 'checkout day must be available for a new stay');

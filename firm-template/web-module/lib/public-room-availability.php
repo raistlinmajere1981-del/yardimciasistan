@@ -43,7 +43,7 @@ function ya_public_room_availability_query(array $snapshot, string $startDate, s
         $roomId = ya_public_room_availability_string($room['id'] ?? '');
         $capacity = max(0, (int) ($room['capacity'] ?? 0));
         $status = ya_public_room_availability_string($room['status'] ?? 'available');
-        if ($roomId === '' || $status === 'maintenance' || $capacity < $guestCount) continue;
+        if ($roomId === '' || in_array($status, ['cleaning', 'maintenance', 'out_of_service'], true) || $capacity < $guestCount) continue;
         $eligibleRoomCount++;
         if (ya_public_room_availability_room_is_blocked($roomId, $startDate, $endDate, $reservations, $stays)) continue;
         $availableRooms[] = [
