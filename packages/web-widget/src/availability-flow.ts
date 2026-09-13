@@ -185,8 +185,9 @@ function setAvailabilityFormBusy(form: HTMLFormElement, busy: boolean) {
 
 function looksLikeRoomAvailabilityQuestion(message: string): boolean {
   const normalized = message.toLocaleLowerCase("tr-TR");
-  const roomIntent = /\b(oda|otel|pansiyon|konaklama)\b/u.test(normalized);
-  const availabilityIntent = /(müsait|musait|boş|bos|yer\s+var|oda\s+var|rezervasyon)/u.test(normalized);
+  const roomIntent = /\b(?:oda(?:lar)?|otel|pansiyon|konaklama)(?:mız|miz|muz|müz|ımız|imiz|umuz|ümüz|nız|niz|nuz|nüz|ınız|iniz|unuz|ünüz)?(?:da|de|ta|te|dan|den|tan|ten|ya|ye|yı|yi|yu|yü|nın|nin|nun|nün)?\b/u.test(normalized);
+  const availabilityIntent = /(müsait|musait|boş|bos|yer\s+var|rezervasyon)/u.test(normalized)
+    || /\b(?:oda(?:lar)?|otel|pansiyon|konaklama)(?:mız|miz|muz|müz|ımız|imiz|umuz|ümüz|nız|niz|nuz|nüz|ınız|iniz|unuz|ünüz)?(?:da|de|ta|te|dan|den|tan|ten|ya|ye|yı|yi|yu|yü|nın|nin|nun|nün)?\s+var(?:\s*m[ıiuü])?\b/u.test(normalized);
   return roomIntent && availabilityIntent;
 }
 
