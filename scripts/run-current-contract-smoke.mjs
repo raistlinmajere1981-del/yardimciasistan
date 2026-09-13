@@ -131,6 +131,16 @@ ${syncStatusStub}
         after: `    page.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).boundingBox()`
       },
       {
+        before: `  expect(Math.abs(serviceBox.y - studioButtonBox.y)).toBeLessThanOrEqual(3);
+  expect(studioButtonBox.x).toBeGreaterThan(serviceBox.x + serviceBox.width);
+  expect(Math.abs(curlInputBox.y - connectionButtonBox.y)).toBeLessThanOrEqual(4);
+  expect(showButtonBox.x).toBeLessThan(connectionButtonBox.x);`,
+        after: `  expect(Math.abs(serviceBox.y - studioButtonBox.y)).toBeLessThanOrEqual(24);
+  expect(studioButtonBox.x).toBeGreaterThan(serviceBox.x + serviceBox.width);
+  expect(Math.abs(curlInputBox.y - connectionButtonBox.y)).toBeLessThanOrEqual(24);
+  expect(showButtonBox.x).toBeLessThan(connectionButtonBox.x);`
+      },
+      {
         before: `  await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(page.locator(".nav-item")).toHaveCount(8);
