@@ -13,6 +13,7 @@ const DEFAULT_GEOCODER_BASE_URL = "https://nominatim.openstreetmap.org";
 const GEOCODER_REQUEST_INTERVAL_MS = 1_100;
 const GEOCODER_REQUEST_TIMEOUT_MS = 8_000;
 const GEOCODER_CACHE_LIMIT = 50;
+const MAX_QUERY_VARIANTS = 4;
 const GEOCODER_USER_AGENT = "YardimciAsistanDesktop/0.1.2 (+https://github.com/raistlinmajere1981-del/yardimciasistan)";
 
 const cache = new Map<string, BusinessLocationGeocodeCandidate[]>();
@@ -32,31 +33,11 @@ export async function geocodeBusinessAddress(address: string): Promise<BusinessL
   }
 
   try {
-    const results = await enqueueGeocoderRequest(async () => {
-      const endpoint = buildBusinessLocationSearchUrl(query);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), GEOCODER_REQUEST_TIMEOUT_MS);
-      try {
-        const response = await fetch(endpoint, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-            "Accept-Language": "tr,en;q=0.8",
-            "User-Agent": GEOCODER_USER_AGENT
-          },
-          signal: controller.signal
-        });
-
-        if (!response.ok) {
-          throw new Error(`Geocoding request failed with ${response.status}.`);
-        }
-
-        const payload = await response.json() as unknown;
-        return parseGeocoderPayload(payload);
-      } finally {
-        clearTimeout(timeout);
-      }
-    });
+    let results: BusinessLocationGeocodeCandidate[] = [];
+    for (const queryVariant of buildBusinessLocationQueryVariants(query)) {
+      results = await searchBusinessLocationVariant(queryVariant);
+      if (results.length > 0) break;
+    }
 
     cacheResult(cacheKey, results);
     return { ok: true, results };
@@ -66,6 +47,40 @@ export async function geocodeBusinessAddress(address: string): Promise<BusinessL
       : "Adres haritada aranamadı. İnternet bağlantısını kontrol edin veya noktayı elle seçin.";
     return { ok: false, message };
   }
+}
+
+/**
+ * Turkish postal addresses often contain details that OpenStreetMap does not
+ * have at building level (No:, apartment, block, floor, etc.). Search the most
+ * specific form first, then progressively relax it. The first non-empty result
+ * wins, so a precise building match is never replaced by a broader street or
+ * neighbourhood match.
+ */
+export function buildBusinessLocationQueryVariants(address: string): string[] {
+  const original = normalizeQuery(address);
+  if (!original) return [];
+
+  const variants: string[] = [];
+  const pushVariant = (value: string) => {
+    const normalized = normalizeQuery(value);
+    if (normalized.length < 3) return;
+    const key = normalized.toLocaleLowerCase("tr-TR");
+    if (variants.some((candidate) => candidate.toLocaleLowerCase("tr-TR") === key)) return;
+    variants.push(normalized);
+  };
+
+  pushVariant(original);
+
+  const searchFriendly = normalizeTurkishAddressSyntax(removeCountryName(original));
+  pushVariant(searchFriendly);
+
+  const streetLevel = removeSecondaryAddressDetails(searchFriendly);
+  pushVariant(streetLevel);
+
+  const localityLevel = removeStreetSegment(streetLevel);
+  pushVariant(localityLevel);
+
+  return variants.slice(0, MAX_QUERY_VARIANTS);
 }
 
 export function buildBusinessLocationSearchUrl(address: string): string {
@@ -82,8 +97,72 @@ export function buildBusinessLocationSearchUrl(address: string): string {
   return endpoint.toString();
 }
 
+async function searchBusinessLocationVariant(query: string): Promise<BusinessLocationGeocodeCandidate[]> {
+  return enqueueGeocoderRequest(async () => {
+    const endpoint = buildBusinessLocationSearchUrl(query);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GEOCODER_REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Accept-Language": "tr,en;q=0.8",
+          "User-Agent": GEOCODER_USER_AGENT
+        },
+        signal: controller.signal
+      });
+
+      if (!response.ok) {
+        throw new Error(`Geocoding request failed with ${response.status}.`);
+      }
+
+      const payload = await response.json() as unknown;
+      return parseGeocoderPayload(payload);
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
+}
+
 function normalizeQuery(value: string): string {
-  return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, 500);
+  return String(value ?? "")
+    .trim()
+    .replace(/[;,]+/g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 500);
+}
+
+function removeCountryName(value: string): string {
+  return normalizeQuery(value.replace(/(?:^|\s)(?:türkiye|turkiye|turkey)(?=\s|$)/giu, " "));
+}
+
+function normalizeTurkishAddressSyntax(value: string): string {
+  return normalizeQuery(value
+    .replace(/\b(?:cd|cad)\.?\b/giu, "Caddesi")
+    .replace(/\b(?:sk|sok)\.?\b/giu, "Sokak")
+    .replace(/\bblv\.?\b/giu, "Bulvarı")
+    .replace(
+      /\b(?:kapı\s*no|kapi\s*no|bina\s*no|no|numara)\s*[:.#-]?\s*(\d+[a-zA-ZçğıöşüÇĞİÖŞÜ]?(?:[/-]\d+[a-zA-ZçğıöşüÇĞİÖŞÜ]?)?)\b/giu,
+      "$1"
+    ));
+}
+
+function removeSecondaryAddressDetails(value: string): string {
+  return normalizeQuery(value
+    .replace(
+      /\b(?:daire|kat|blok|apt|apartman(?:ı|i)?|sitesi|site)\s*[:.#-]?\s*[a-zA-Z0-9çğıöşüÇĞİÖŞÜ/-]+\b/giu,
+      " "
+    )
+    .replace(
+      /\b(caddesi|cadde|sokağı|sokak|bulvarı|bulvar)\s+\d+[a-zA-ZçğıöşüÇĞİÖŞÜ]?(?:[/-]\d+[a-zA-ZçğıöşüÇĞİÖŞÜ]?)?\b/giu,
+      "$1"
+    ));
+}
+
+function removeStreetSegment(value: string): string {
+  const match = value.match(/^.*?\b(?:caddesi|cadde|sokağı|sokak|bulvarı|bulvar)\b\s+(.+)$/iu);
+  return match ? normalizeQuery(match[1]) : "";
 }
 
 function parseGeocoderPayload(payload: unknown): BusinessLocationGeocodeCandidate[] {
