@@ -6,6 +6,8 @@ import { join } from "node:path";
 import process from "node:process";
 
 const require = createRequire(import.meta.url);
+const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
+const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const {
   buildReportAiMessages,
@@ -29,7 +31,8 @@ try {
   const yesterday = shiftDate(today, -1);
   seedReportData(database.databasePath, today);
 
-  assert.equal(database.getSetupData().aiEnabled, false, "AI is disabled in a fresh local database.");
+  setBusinessCapability(database.databasePath, { capability: C.AI, enabled: false });
+  assert.equal(database.getSetupData().aiEnabled, false, "Reports must work with AI explicitly disabled.");
 
   const todayReport = database.getReportData(range("today", today, today));
   assert.equal(todayReport.summary.restaurantRevenue, 1000, "Only today's paid order contributes to revenue.");

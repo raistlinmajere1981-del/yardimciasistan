@@ -15,7 +15,7 @@ const appPath = join(process.cwd(), "apps", "desktop-app");
 const dataDir = join(process.cwd(), "artifacts", "room-folio-service-smoke", String(Date.now()));
 mkdirSync(dataDir, { recursive: true });
 
-const database = new DesktopDatabase({ appPath, userDataPath: dataDir });
+let database = new DesktopDatabase({ appPath, userDataPath: dataDir });
 
 try {
   database.initialize();
@@ -46,6 +46,20 @@ try {
       deleted_at, sync_status
     ) VALUES (?, ?, ?, '', 'planned', ?, ?, 2, '', 'manual', '', '', ?, ?, '', 'local_only')
   `).run("room_folio_smoke_stay", "room_folio_smoke_customer", room.id, today, checkout, now, now);
+  const depositAmount = 10000;
+  sqlite.prepare(`
+    INSERT INTO reservations (
+      id, customer_id, reservation_type, status, title, start_date, end_date,
+      agreed_total_minor, created_at, updated_at
+    ) VALUES ('folio_smoke_reservation', 'room_folio_smoke_customer', 'room', 'approved',
+      'Kaporalı konaklama', ?, ?, 450000, ?, ?)
+  `).run(today, checkout, now, now);
+  sqlite.prepare(`UPDATE customer_room_stays SET reservation_id = 'folio_smoke_reservation' WHERE id = ?`)
+    .run("room_folio_smoke_stay");
+  sqlite.prepare(`
+    INSERT INTO pension_payments (id, reservation_id, amount_minor, payment_method, paid_at, note, created_at, updated_at)
+    VALUES ('folio_smoke_deposit', 'folio_smoke_reservation', ?, 'bank', ?, 'Rezervasyon kaporası', ?, ?)
+  `).run(depositAmount, now, now, now);
   sqlite.close();
 
   const profileName = "Smoke Test Oda";
@@ -76,6 +90,12 @@ try {
   assert.equal(folio.nights, 3);
   assert.equal(folio.nightlyPriceMinor, 150000);
   assert.equal(folio.lodgingTotalMinor, 450000);
+  const deposit = folio.payments.find((payment) => payment.origin === "reservation");
+  assert.ok(deposit, "Imported reservation payment must retain its origin for the UI and void guard.");
+  assert.equal(deposit.amountMinor, depositAmount);
+  assert.equal(deposit.note, "Rezervasyon kaporası");
+  assert.equal(service.voidPayment(deposit.id).ok, false, "Reservation deposits cannot be voided as direct payments.");
+  assert.equal(service.openFolio("room_folio_smoke_stay").data.folios.find((item) => item.id === folio.id).payments.length, 1);
 
   const sqliteCheckIn = new DatabaseSync(database.databasePath);
   const checkedIn = sqliteCheckIn.prepare(`SELECT status FROM customer_room_stays WHERE id = ?`).get("room_folio_smoke_stay");
@@ -145,7 +165,15 @@ try {
   assert.equal(partial.ok, true);
   folio = partial.data.folios.find((item) => item.id === opened.folioId);
   assert.ok(folio);
-  assert.equal(folio.paidTotalMinor, partialAmount);
+  assert.equal(folio.paidTotalMinor, partialAmount + depositAmount);
+  assert.equal(folio.payments.find((payment) => payment.note === "Smoke tahsilat")?.origin, "direct");
+  const persistedPayments = folio.payments;
+  database.close();
+  database = new DesktopDatabase({ appPath, userDataPath: dataDir });
+  database.initialize();
+  database.initialize();
+  const restored = new DesktopRoomFolioService(database.databasePath).getData().folios.find((item) => item.id === folio.id);
+  assert.deepEqual(restored.payments, persistedPayments, "Reinitializing an existing baseline must preserve both payment origins and values.");
   assert.ok(folio.remainingMinor > 0);
 
   const financeAfter = finance.getData();

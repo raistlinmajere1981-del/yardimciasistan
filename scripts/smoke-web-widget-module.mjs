@@ -9,11 +9,17 @@ import process from "node:process";
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-widget-module-"));
 const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+const syncSecret = "pilot-web-smoke-secret";
+const businessConfigFile = join(webModuleRoot, "config", "business.json");
+const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
+businessConfig.sync_secret = syncSecret;
+writeFileSync(businessConfigFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
 for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
 }
 writeFileSync(conversationsFile, "[]\n");
+writeFileSync(join(webModuleRoot, "data", "ai-settings.local.php"), "<?php return ['enabled' => false];\n");
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", webModuleRoot], {
@@ -32,6 +38,20 @@ server.stderr.on("data", (chunk) => {
 
 try {
   await waitForUrl(`${baseUrl}/widget.js`);
+
+  const capabilityPublication = await fetch(`${baseUrl}/api/sync.php`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
+    body: JSON.stringify({
+      action: "publish_android_snapshot",
+      client_id: "desktop-widget-module-smoke",
+      source_revision: 1,
+      idempotency_key: "widget-ai-capability-1",
+      snapshot: { business_capabilities: ["service.ai"] }
+    })
+  });
+  expect(capabilityPublication.status).toBe(200);
+  expect((await capabilityPublication.json()).ok).toBe(true);
 
   browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -144,7 +164,7 @@ async function pullRequests() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-YA-Sync-Secret": "change-this-secret"
+      "X-YA-Sync-Secret": syncSecret
     },
     body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 20 })
   });

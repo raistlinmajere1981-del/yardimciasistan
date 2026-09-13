@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -9,6 +9,11 @@ import process from "node:process";
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-web-form-"));
 const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+const syncSecret = "pilot-web-smoke-secret";
+const businessConfigFile = join(webModuleRoot, "config", "business.json");
+const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
+businessConfig.sync_secret = syncSecret;
+writeFileSync(businessConfigFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
 for (const runtimeFile of [
   "yardimci-asistan.sqlite",
   "yardimci-asistan.sqlite-wal",
@@ -108,7 +113,7 @@ try {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-YA-Sync-Secret": "change-this-secret"
+      "X-YA-Sync-Secret": syncSecret
     },
     body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 10 })
   });

@@ -169,6 +169,8 @@ try {
   const androidAction = action("android_stock_import_action_001", adminDeviceId, androidImportId, androidHash, [
     { menu_item_id: first.id, quantity: 2, raw_text: `${firstName} 2 AD`, confidence: "high" }
   ]);
+  setBusinessCapability(database.databasePath, { capability: C.AI, enabled: false });
+  assert.equal(database.getSetupData().aiEnabled, false);
   const aiDisabledResult = database.applyAndroidAction(androidAction);
   assert.equal(aiDisabledResult.ok, false);
   assert.match(aiDisabledResult.message, /etkin yeteneklerinde kullanılamıyor/i);
