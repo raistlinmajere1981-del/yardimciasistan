@@ -78,6 +78,15 @@
 .setup-capabilities .business-public-profile-address-results { max-height: 190px; overflow: auto; }
 .setup-capabilities .settings-technical-info { display: none; }
 
+/* Settings controls should reflect the amount of information they contain, not
+ * simply stretch to the full panel width. Long URLs, addresses and notes still
+ * get room; phone, time, numeric and action controls stay intentionally compact. */
+.setup-capabilities .setup-primary,
+.setup-capabilities .setup-secondary {
+  width: fit-content;
+  max-width: 100%;
+}
+
 .settings-advanced-details {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -88,6 +97,65 @@
 .settings-advanced-details > summary { padding: var(--space-3) var(--space-4); cursor: pointer; font-weight: 800; }
 .settings-advanced-details-body { padding: 0 var(--space-3) var(--space-3); }
 .settings-advanced-details-body > .setup-section { margin: 0; }
+
+@media (min-width: 1181px) {
+  .setup-capabilities .settings-identity-section .setup-grid.two {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .setup-capabilities .settings-identity-section .setup-grid.two > label:nth-child(1) { grid-column: span 5; }
+  .setup-capabilities .settings-identity-section .setup-grid.two > label:nth-child(2) { grid-column: span 3; }
+  .setup-capabilities .settings-identity-section .setup-grid.two > label:nth-child(3) { grid-column: span 2; }
+  .setup-capabilities .settings-identity-section .setup-grid.two > label:nth-child(4) { grid-column: span 2; }
+  .setup-capabilities .settings-identity-section .setup-grid.two > label:nth-child(5) { grid-column: span 4; }
+  .setup-capabilities .settings-identity-section .setup-grid.two > label:nth-child(6) { grid-column: span 8; }
+
+  .setup-capabilities .business-public-profile-times {
+    grid-template-columns: repeat(4, minmax(150px, 220px));
+    justify-content: start;
+  }
+
+  .setup-capabilities .business-public-profile-map-point > .setup-grid.two {
+    grid-template-columns: repeat(2, minmax(180px, 260px));
+    justify-content: start;
+  }
+
+  .setup-capabilities .business-public-profile-body > label.setup-grid-wide:last-child {
+    max-width: 560px;
+  }
+
+  .setup-capabilities .appearance-controls {
+    grid-template-columns: repeat(2, minmax(180px, 260px));
+    justify-content: start;
+  }
+
+  .setup-capabilities .setup-ai-service-field {
+    max-width: 460px;
+  }
+
+  .setup-capabilities .setup-ai-section label:has(input[inputmode="numeric"]) {
+    max-width: 260px;
+  }
+
+  .setup-capabilities .settings-password-section .password-settings-form > label {
+    max-width: 320px;
+  }
+
+  .setup-capabilities .settings-password-section .password-settings-grid {
+    grid-template-columns: repeat(2, minmax(170px, 240px));
+    justify-content: start;
+  }
+
+  .setup-capabilities .settings-password-section .password-settings-actions {
+    justify-content: flex-start;
+  }
+
+  .setup-capabilities .settings-password-section .password-settings-actions button {
+    width: fit-content;
+    min-width: 0;
+  }
+}
 
 @media (max-width: 1180px) {
   .setup-capabilities:has(> .setup-shell.is-embedded) .settings-services-section,
