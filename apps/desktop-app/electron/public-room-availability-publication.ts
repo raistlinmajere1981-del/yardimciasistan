@@ -89,12 +89,27 @@ export function createPublicRoomAvailabilityPublication(
     blocks.push({ room_id: stay.roomId, start_date: startDate, end_date: endDate });
   }
 
+  const mergedBlocks = mergeAvailabilityBlocks(blocks);
+  const today = localDateKey(now);
+  const roomsWithCurrentOrFutureBlock = new Set(
+    mergedBlocks
+      .filter((block) => block.end_date > today)
+      .map((block) => block.room_id)
+  );
+  const safeRooms = rooms.map((room) => {
+    if (["reserved", "occupied"].includes(room.status)
+        && !roomsWithCurrentOrFutureBlock.has(room.id)) {
+      return { ...room, status: "out_of_service" };
+    }
+    return room;
+  });
+
   return {
     schema_version: 1,
     enabled: true,
     generated_at: generatedAt,
-    rooms,
-    blocks: mergeAvailabilityBlocks(blocks)
+    rooms: safeRooms,
+    blocks: mergedBlocks
   };
 }
 
@@ -117,6 +132,13 @@ function normalizeDate(value: string): string {
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
   return candidate;
+}
+
+function localDateKey(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function isUsableRange(startDate: string, endDate: string): boolean {
