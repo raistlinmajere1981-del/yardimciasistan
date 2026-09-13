@@ -5,7 +5,9 @@ const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 
 require_once YA_BASE_DIR . '/lib/storage.php';
+require_once YA_BASE_DIR . '/lib/public-request-guard.php';
 require_once YA_BASE_DIR . '/lib/public-room-availability.php';
+require_once YA_BASE_DIR . '/lib/public-room-availability-intent.php';
 
 $businessConfig = ya_availability_load_json(YA_CONFIG_FILE, []);
 ya_availability_apply_cors($businessConfig);
@@ -15,35 +17,74 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     exit;
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
-    header('Allow: GET, OPTIONS');
+if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+    header('Allow: POST, OPTIONS');
     ya_availability_response(405, [
         'ok' => false,
+        'handled' => true,
         'live' => false,
         'code' => 'method_not_allowed',
-        'message' => 'Müsaitlik sorgusu yalnız okunur GET isteği kabul eder.'
+        'message' => 'Müsaitlik sorgusu yalnız okunur POST isteği kabul eder.'
     ]);
 }
 
-$startDate = ya_availability_string($_GET['start_date'] ?? $_GET['startDate'] ?? '');
-$endDate = ya_availability_string($_GET['end_date'] ?? $_GET['endDate'] ?? '');
-$guestCount = ya_availability_int($_GET['guest_count'] ?? $_GET['guestCount'] ?? 1, 1);
+ya_public_guard_enforce('chat');
+$payload = ya_availability_read_json_body();
+$message = ya_availability_string($payload['message'] ?? '');
+
+if ($message !== '') {
+    $intent = ya_public_room_availability_extract_intent($message);
+    if (($intent['applicable'] ?? false) !== true) {
+        ya_availability_response(200, [
+            'ok' => false,
+            'handled' => false,
+            'live' => false,
+            'code' => 'availability_not_applicable'
+        ]);
+    }
+    if (($intent['complete'] ?? false) !== true) {
+        $missing = is_array($intent['missing'] ?? null) ? $intent['missing'] : [];
+        ya_availability_response(200, [
+            'ok' => false,
+            'handled' => true,
+            'live' => false,
+            'complete' => false,
+            'code' => 'availability_query_incomplete',
+            'missing' => $missing,
+            'answer' => ya_public_room_availability_incomplete_answer($missing)
+        ]);
+    }
+    $startDate = ya_availability_string($intent['start_date'] ?? '');
+    $endDate = ya_availability_string($intent['end_date'] ?? '');
+    $guestCount = (int) ($intent['guest_count'] ?? 0);
+} else {
+    $startDate = ya_availability_string($payload['start_date'] ?? $payload['startDate'] ?? '');
+    $endDate = ya_availability_string($payload['end_date'] ?? $payload['endDate'] ?? '');
+    $guestCount = ya_availability_int($payload['guest_count'] ?? $payload['guestCount'] ?? 1, 1);
+}
 
 try {
     $snapshot = ya_storage_get_publication('android_snapshot', []);
     $result = ya_public_room_availability_query($snapshot, $startDate, $endDate, $guestCount);
     $status = (int) ($result['http_status'] ?? (($result['ok'] ?? false) ? 200 : 409));
     unset($result['http_status']);
+    $result['handled'] = true;
+    $result['complete'] = true;
+    $result['answer'] = ya_public_room_availability_answer($result);
     ya_availability_response($status, $result);
 } catch (Throwable $error) {
     $storageUnavailable = $error->getMessage() === 'pdo_sqlite_missing';
+    $message = $storageUnavailable
+        ? 'Canlı müsaitlik verisi şu anda okunamıyor.'
+        : 'Müsaitlik sorgusu tamamlanamadı.';
     ya_availability_response($storageUnavailable ? 503 : 500, [
         'ok' => false,
+        'handled' => true,
         'live' => false,
+        'complete' => true,
         'code' => $storageUnavailable ? 'storage_unavailable' : 'availability_query_failed',
-        'message' => $storageUnavailable
-            ? 'Canlı müsaitlik verisi şu anda okunamıyor.'
-            : 'Müsaitlik sorgusu tamamlanamadı.'
+        'message' => $message,
+        'answer' => $message
     ]);
 }
 
@@ -59,9 +100,26 @@ function ya_availability_apply_cors(array $businessConfig): void
             header('Vary: Origin');
         }
     }
-    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Allow-Methods: POST, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
     header('Access-Control-Max-Age: 86400');
+}
+
+function ya_availability_read_json_body(): array
+{
+    $raw = (string) file_get_contents('php://input');
+    if ($raw === '') return [];
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        ya_availability_response(400, [
+            'ok' => false,
+            'handled' => true,
+            'live' => false,
+            'code' => 'invalid_json',
+            'message' => 'Geçerli bir JSON gövdesi gerekli.'
+        ]);
+    }
+    return $decoded;
 }
 
 function ya_availability_load_json(string $path, mixed $fallback): mixed
