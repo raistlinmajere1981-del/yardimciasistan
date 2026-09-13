@@ -5,11 +5,16 @@ import {
   type SyncFailure,
   type SyncTransport
 } from "@yardimci-asistan/sync-core";
-import { BUSINESS_CAPABILITIES, hasBusinessCapability } from "@yardimci-asistan/shared";
+import {
+  BUSINESS_CAPABILITIES,
+  hasBusinessCapability,
+  type BusinessCapability
+} from "@yardimci-asistan/shared";
 import {
   DesktopDatabase,
   type DesktopSyncRuntimeStatus
 } from "./database";
+import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
 
 const NORMAL_PULL_INTERVAL_MS = 15_000;
 const MARKET_BARCODE_FAST_PULL_INTERVAL_MS = 1_500;
@@ -56,6 +61,11 @@ export interface SyncCoordinatorOptions {
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
 
+interface AvailabilityHeartbeatResponse {
+  ok?: boolean;
+  message?: string;
+}
+
 export class SyncCoordinator {
   private pullTimer: NodeJS.Timeout | null = null;
   private marketBarcodeFastPullTimer: NodeJS.Timeout | null = null;
@@ -68,6 +78,7 @@ export class SyncCoordinator {
   private capabilitiesTarget = "";
   private nextPassiveRunAt = 0;
   private marketBarcodeFastPullActive = false;
+  private availabilityHeartbeatSupported: boolean | null = null;
 
   constructor(private readonly options: SyncCoordinatorOptions) {}
 
@@ -112,6 +123,7 @@ export class SyncCoordinator {
   restart() {
     const restoreMarketBarcodeFastPull = this.marketBarcodeFastPullActive;
     this.capabilitiesTarget = "";
+    this.availabilityHeartbeatSupported = null;
     this.nextPassiveRunAt = 0;
     this.start();
     if (restoreMarketBarcodeFastPull) {
@@ -304,6 +316,11 @@ export class SyncCoordinator {
       errors.push(acknowledgementError);
     }
 
+    const availabilityError = await this.publishAvailabilityHeartbeat(config, clientId, enabledCapabilities);
+    if (availabilityError) {
+      errors.push(availabilityError);
+    }
+
     const publicationResult = await this.publishOutbox(transport);
     counts.publishedJobs = publicationResult.published;
     errors.push(...publicationResult.errors);
@@ -419,6 +436,55 @@ export class SyncCoordinator {
       message: `${applied} telefon işlemi uygulandı, ${failed} işlem reddedildi.`
     });
     return { pulled: pulled.count, applied, failed, devicesChanged, error: "" };
+  }
+
+  private async publishAvailabilityHeartbeat(
+    config: { baseUrl: string; syncSecret: string },
+    clientId: string,
+    enabledCapabilities: readonly BusinessCapability[]
+  ): Promise<string> {
+    if (this.availabilityHeartbeatSupported === false) {
+      return "";
+    }
+
+    const runtimeFetch = globalThis.fetch;
+    if (!runtimeFetch) {
+      return "Canlı müsaitlik yayını için ağ istemcisi kullanılamıyor.";
+    }
+
+    const endpoint = `${config.baseUrl.trim().replace(/\/$/, "")}/api/availability-sync.php`;
+    const availability = createPublicRoomAvailabilityPublication(
+      this.options.database.getDashboardData(),
+      enabledCapabilities
+    );
+
+    try {
+      const response = await createSyncFetchWithTimeout(runtimeFetch)(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-YA-Sync-Secret": config.syncSecret
+        },
+        body: JSON.stringify({ client_id: clientId, availability })
+      });
+
+      if (response.status === 404) {
+        // Older hosting packages do not have the availability endpoint. Keep
+        // existing sync healthy until the web module is upgraded.
+        this.availabilityHeartbeatSupported = false;
+        return "";
+      }
+
+      const result = (await response.json().catch(() => null)) as AvailabilityHeartbeatResponse | null;
+      if (!response.ok || result?.ok !== true) {
+        return String(result?.message || `Canlı müsaitlik yayını tamamlanamadı (HTTP ${response.status}).`);
+      }
+
+      this.availabilityHeartbeatSupported = true;
+      return "";
+    } catch {
+      return "Canlı müsaitlik yayını sırasında web modülüne ulaşılamadı.";
+    }
   }
 
   private async publishOutbox(transport: SyncTransport): Promise<{ published: number; errors: string[] }> {
