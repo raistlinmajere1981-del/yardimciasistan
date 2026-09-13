@@ -7,7 +7,7 @@ const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
 
 const navigation = read("apps/desktop-app/src/app/navigation.ts");
-const appView = read("apps/desktop-app/src/components/app/DesktopAppView.tsx");
+const workspaceRouter = read("apps/desktop-app/src/components/app/DesktopWorkspaceRouter.tsx");
 const marketPage = read("apps/desktop-app/src/pages/MarketPage.tsx");
 const marketProducts = read("apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx");
 const marketInventory = read("apps/desktop-app/src/components/market/MarketInventoryWorkspace.tsx");
@@ -26,8 +26,8 @@ assert.doesNotMatch(
   /if \(runtimeHasCapability\(capabilities, C\.CATALOG\)\)[\s\S]{0,120}id: "market"/,
   "Shared catalog capability alone must not expose the Market workspace."
 );
-assert.match(appView, /activePage === "market"/, "DesktopAppView must route the Market page.");
-assert.match(appView, /<MarketPage customers=\{desktopSyncController\.dashboardData\.customers\} \/>/, "DesktopAppView must render MarketPage with the existing customer source.");
+assert.match(workspaceRouter, /activePage === "market"/, "DesktopWorkspaceRouter must route the Market page.");
+assert.match(workspaceRouter, /<MarketPage customers=\{dashboardData\.customers\} \/>/, "DesktopWorkspaceRouter must render MarketPage with the existing customer source.");
 
 for (const section of ["Hızlı Satış", "Ürünler", "Stok", "Tedarikçiler / Alım", "Etiketler"]) {
   assert.ok(marketPage.includes(section), `Market workspace is missing ${section}.`);

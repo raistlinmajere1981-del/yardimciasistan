@@ -775,7 +775,7 @@ export class DesktopRoomFolioService {
       ORDER BY created_at, id
     `).all(folioId) as Array<Record<string, unknown>>;
     const payments = db.prepare(`
-      SELECT id, folio_id, amount_minor, currency, payment_method, paid_at, note, source, created_at
+      SELECT id, folio_id, amount_minor, currency, payment_method, paid_at, note, origin, created_at
       FROM room_folio_payments
       WHERE folio_id = ? AND deleted_at = ''
       ORDER BY paid_at, created_at

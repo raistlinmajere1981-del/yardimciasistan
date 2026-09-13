@@ -42,6 +42,7 @@ import {
 import { SetupWizard } from "../settings/SetupWizard";
 import { CustomerWorkPage } from "../../pages/CustomerWorkPage";
 import { DashboardPage } from "../../pages/DashboardPage";
+import { MarketPage } from "../../pages/MarketPage";
 import { MessagesPage } from "../../pages/MessagesPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
 import { PensionPage } from "../../pages/PensionPage";
@@ -323,6 +324,10 @@ export function DesktopWorkspaceRouter({
   async function handleSaveSetup() {
     await saveSetup(setDashboardData);
     await loadBusinessCapabilities();
+  }
+
+  if (activePage === "market") {
+    return <MarketPage customers={dashboardData.customers} />;
   }
 
   const persistentMessagesPage = (

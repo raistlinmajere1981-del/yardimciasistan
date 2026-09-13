@@ -83,6 +83,43 @@ try {
 
   await page.goto(`${baseUrl}/menu.html`);
   await expect(page.getByRole("heading", { name: `${businessConfig.display_name} Menü` })).toBeVisible();
+  const emptyResponse = await page.request.get(`${baseUrl}/api/menu.php`);
+  expect(emptyResponse.status()).toBe(200);
+  expect(await emptyResponse.json()).toMatchObject({ ok: true, categories: [], items: [], source_revision: 0 });
+  await expect(page.locator(".empty-state")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kahvaltı" })).toHaveCount(0);
+
+  const fixturePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_menu",
+      sync_secret: businessConfig.sync_secret,
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 1,
+      idempotency_key: "web-menu-fixture-1",
+      menu: {
+        categories: [
+          { id: "cat_breakfast", name: "Kahvaltı", is_active: true, sort_order: 1 },
+          { id: "cat_drinks", name: "İçecekler", is_active: true, sort_order: 2 },
+          { id: "cat_hidden", name: "Gizli Kategori", is_active: false }
+        ],
+        items: [
+          { id: "item_breakfast", category_id: "cat_breakfast", name: "Serpme Kahvaltı (2 Kişilik)", price: 500,
+            image_url: "assets/menu-breakfast-spread.webp", is_available: true },
+          { id: "item_coffee", category_id: "cat_drinks", name: "Türk Kahvesi", price: 80, is_available: true },
+          { id: "item_unavailable_sahlep", category_id: "cat_drinks", name: "Sahlep", price: 90, is_available: false }
+        ]
+      }
+    }
+  });
+  expect(fixturePublish.status()).toBe(200);
+  expect(await fixturePublish.json()).toMatchObject({ ok: true, item_count: 3, source_revision: 1 });
+  const firstMenuResponse = await page.request.get(`${baseUrl}/api/menu.php`, {
+    headers: { "If-None-Match": emptyResponse.headers().etag }
+  });
+  expect(firstMenuResponse.status()).toBe(200);
+  expect(firstMenuResponse.headers().etag).not.toBe(emptyResponse.headers().etag);
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(page.getByRole("button", { name: "Kahvaltı" })).toBeVisible();
   await expect(page.getByText("Serpme Kahvaltı")).toBeVisible();
   await expect(page.getByRole("img", { name: "Serpme Kahvaltı (2 Kişilik)" })).toBeVisible();
@@ -106,9 +143,13 @@ try {
   expect(menu.categories.some((category) => category.id === "cat_hidden")).toBe(false);
 
   const publishResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_menu",
       sync_secret: "change-this-secret",
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 2,
+      idempotency_key: "web-menu-stock-2",
       menu: {
         categories: [
           {
@@ -254,14 +295,19 @@ try {
     updated_at: "2026-07-18T10:00:00+03:00"
   };
   const androidStockSnapshotResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_android_snapshot",
-      sync_secret: "change-this-secret",
+      sync_secret: businessConfig.sync_secret,
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 1,
+      idempotency_key: "web-menu-android-1",
       snapshot: androidStockSnapshot
     }
   });
   expect(androidStockSnapshotResponse.ok()).toBe(true);
   const androidStockSummaryResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "android_summary",
       sync_secret: "change-this-secret",
@@ -292,6 +338,7 @@ try {
 
   for (const [index, actionType] of ["menu_stock_add", "menu_stock_set", "menu_stock_adjust"].entries()) {
     const enqueueStockAction = await page.request.post(`${baseUrl}/api/sync.php`, {
+      headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
       data: {
         action: "enqueue_android_action",
         sync_secret: "change-this-secret",
@@ -305,6 +352,7 @@ try {
   }
 
   const disabledAiStockImport = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "enqueue_android_action",
       sync_secret: "change-this-secret",
@@ -340,9 +388,13 @@ try {
   });
 
   const aiEnabledSnapshotResponse = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "publish_android_snapshot",
-      sync_secret: "change-this-secret",
+      sync_secret: businessConfig.sync_secret,
+      client_id: "desktop-web-menu-smoke",
+      source_revision: 2,
+      idempotency_key: "web-menu-android-2",
       snapshot: {
         ...androidStockSnapshot,
         business_capabilities: [...androidStockSnapshot.business_capabilities, "service.ai"],
@@ -353,6 +405,7 @@ try {
   expect(aiEnabledSnapshotResponse.ok()).toBe(true);
 
   const enabledAiStockImport = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
     data: {
       action: "enqueue_android_action",
       sync_secret: "change-this-secret",

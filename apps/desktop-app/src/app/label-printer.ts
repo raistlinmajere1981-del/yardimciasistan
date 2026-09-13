@@ -459,9 +459,6 @@ export function downloadLabelResult(result: LabelPrintResult) {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = result.fileName;
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
   anchor.click();
-  anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

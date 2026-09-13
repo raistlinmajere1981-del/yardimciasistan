@@ -94,7 +94,11 @@ try {
 
   let dashboard = database.getDashboardData();
   const initialSnapshot = snapshotFromDashboard(database, dashboard);
-  const initialPublish = await pushAndroidSnapshot({ baseUrl, syncSecret, snapshot: initialSnapshot });
+  const clientId = database.getSyncRuntimeStatus().clientId;
+  const initialPublish = await pushAndroidSnapshot({
+    baseUrl, syncSecret, clientId, sourceRevision: 1,
+    idempotencyKey: "demo-flow-snapshot-1", snapshot: initialSnapshot
+  });
   assert.equal(initialPublish.ok, true, initialPublish.message);
 
   const initialSummary = await androidSummary(baseUrl, deviceId);
@@ -157,6 +161,9 @@ try {
   const republish = await pushAndroidSnapshot({
     baseUrl,
     syncSecret,
+    clientId,
+    sourceRevision: 2,
+    idempotencyKey: "demo-flow-snapshot-2",
     snapshot: snapshotFromDashboard(database, dashboard)
   });
   assert.equal(republish.ok, true, republish.message);
