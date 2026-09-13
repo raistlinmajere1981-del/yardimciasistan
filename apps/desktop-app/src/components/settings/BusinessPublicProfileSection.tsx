@@ -132,7 +132,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
     }
     if (!normalizedBusinessAddress) {
       setAddressLookupState("error");
-      setAddressLookupMessage("Önce Temel Tanım bölümündeki Adres alanını doldurun.");
+      setAddressLookupMessage("Önce İşletmem bölümündeki Adres alanını doldurun.");
       return;
     }
 
@@ -215,17 +215,13 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
     <section className="setup-section business-public-profile-section" aria-busy={loading || saving}>
       <div className="setup-section-title business-public-profile-heading">
         <div>
-          <p>Müşteriye Açık Profil</p>
-          <h2>İşletme Bilgileri</h2>
+          <h2>Müşteriye Gösterilen Bilgiler</h2>
         </div>
         <button className="setup-primary" type="button" disabled={loading || saving} onClick={() => void save()}>
           {saving ? "Kaydediliyor" : "Bilgileri Kaydet"}
         </button>
       </div>
-      <p className="setup-section-description">
-        Buradaki bilgiler müşterilere gösterilecek ve ileride web AI yardımcısının güvenli bilgi kaynağına dahil edilecek.
-        Şimdilik yalnız bu bilgisayarda saklanır; web AI yayını sonraki aşamada bağlanacak.
-      </p>
+      <p className="setup-section-description">Müşterilerin işletmeniz hakkında görmesini istediğiniz bilgileri düzenleyin.</p>
 
       {loading ? (
         <div className="business-public-profile-loading">İşletme bilgileri yükleniyor...</div>
@@ -292,7 +288,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
             <div className="business-public-profile-address-lookup">
               <div>
                 <strong>Adrese göre haritada bul</strong>
-                <span>{normalizedBusinessAddress || "Temel Tanım bölümünde henüz adres girilmedi."}</span>
+                <span>{normalizedBusinessAddress || "İşletmem bölümünde henüz adres girilmedi."}</span>
                 <small>
                   Arama yalnız siz butona bastığınızda yapılır ve Türkiye ile sınırlandırılır. Sonuç kesin konum sayılmaz; pini haritada düzeltebilirsiniz.
                 </small>
@@ -325,9 +321,6 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
                     <small>{candidate.latitude}, {candidate.longitude}</small>
                   </button>
                 ))}
-                <small>
-                  Adres araması OpenStreetMap Nominatim kullanır. İşletme adresi yalnız bu manuel arama sırasında hizmete gönderilir.
-                </small>
               </div>
             )}
 

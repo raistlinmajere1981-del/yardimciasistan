@@ -219,6 +219,35 @@ try {
   await notificationCenter.locator(".notification-item", { hasText: "Yeni müşteri talebi" }).getByRole("button", { name: /ilgili sayfaya git/ }).click();
   await expect(page.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Ayarlar" }).click();
+  const settings = page.locator(".setup-capabilities");
+  const sectionNav = settings.getByRole("navigation", { name: "Ayar bölümleri" });
+  await expect(sectionNav.getByRole("link")).toHaveCount(6);
+  for (const [name, target] of [
+    ["İşletmem", "settings-business"],
+    ["Müşteri bilgileri", "settings-public"],
+    ["İşletme düzeni", "settings-operations"],
+    ["Bağlantılar", "settings-connections"],
+    ["Uygulama", "settings-application"],
+    ["Bakım", "settings-maintenance"]
+  ]) {
+    await expect(sectionNav.getByRole("link", { name })).toHaveAttribute("href", `#${target}`);
+    await expect(settings.locator(`#${target}`)).toBeVisible();
+  }
+  await expect(settings.getByRole("tab", { name: /Temel Ayarlar|Gelişmiş Ayarlar/ })).toHaveCount(0);
+  await expect(settings.getByRole("heading", { name: "İşletmem" })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "Müşteriye Gösterilen Bilgiler" })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "İşletme Düzeni" })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "Web Bağlantısı" })).toBeVisible();
+  await expect(settings.getByRole("heading", { name: "AI Servisi ve Model" })).toBeVisible();
+  await expect(settings.locator(".settings-advanced-details")).not.toHaveAttribute("open");
+  await settings.locator(".settings-advanced-details > summary").click();
+  await expect(settings.getByRole("checkbox", { name: "Odalar", exact: true })).toBeVisible();
+  await expect(settings.getByRole("checkbox", { name: "Stok", exact: true })).toBeVisible();
+  await expect(settings.getByRole("checkbox", { name: "Barkod", exact: true })).toBeVisible();
+  await expect(settings.locator(".settings-advanced-details")).toHaveAttribute("open");
+  await settings.locator(".settings-advanced-details > summary").click();
+  await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode/)).toHaveCount(0);
+  expect(await settings.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   const tableCategoryEditor = page.locator(".table-category-editor");
   await expect(tableCategoryEditor.getByText("Masa kategorileri", { exact: true })).toBeVisible();
   await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
@@ -305,16 +334,26 @@ try {
   await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
   await page.screenshot({ path: "artifacts/screenshots/desktop-settings-dark.png", fullPage: true });
   await page.getByLabel("Arayüz ölçeği").selectOption("1");
-  await page.getByLabel("Karanlık tema").uncheck();
+  await page.locator("label.appearance-theme-toggle").click();
+  await expect(page.getByLabel("Karanlık tema")).not.toBeChecked();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "light", scale: 1, mode: "pro" });
+  await page.locator("label.appearance-theme-toggle").click();
+  await expect(page.getByLabel("Karanlık tema")).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.locator("label.appearance-theme-toggle").click();
+  await expect(page.getByLabel("Karanlık tema")).not.toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
   await page.getByRole("button", { name: "Ayarlar" }).click();
-  await page.getByLabel("AI cevap önerileri açık").check();
-  await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
+  await page.getByLabel("AI Yardımcı").check();
+  await expect(page.getByLabel("Servis sağlayıcı")).toBeEnabled();
+  await page.getByLabel("AI Yardımcı").uncheck();
+  await expect(page.getByLabel("Servis sağlayıcı")).toBeDisabled();
+  await page.getByLabel("AI Yardımcı").check();
   await expect(page.locator(".settings-web-section .setup-section-title > p")).toHaveCount(0);
   await expect(page.getByText("AI Bağlantısı", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Bu Bilgisayar", { exact: true })).toHaveCount(0);
@@ -327,22 +366,9 @@ try {
   await expect(page.getByLabel("Model adı")).toHaveAttribute("placeholder", "Bağlantı kontrolünden sonra listelenir");
   await expect(page.getByLabel("Model adı")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeDisabled();
-  const [serviceBox, studioButtonBox, curlInputBox, showButtonBox, connectionButtonBox] = await Promise.all([
-    page.locator(".setup-ai-service-field select").boundingBox(),
-    page.locator(".setup-ai-studio-help button").boundingBox(),
-    page.locator(".setup-ai-curl-field input").boundingBox(),
-    page.locator(".setup-ai-curl-field button").boundingBox(),
-    page.locator(".setup-ai-actions.is-inline > button").boundingBox()
-  ]);
-  expect(serviceBox).not.toBeNull();
-  expect(studioButtonBox).not.toBeNull();
-  expect(curlInputBox).not.toBeNull();
-  expect(showButtonBox).not.toBeNull();
-  expect(connectionButtonBox).not.toBeNull();
-  expect(Math.abs(serviceBox.y - studioButtonBox.y)).toBeLessThanOrEqual(3);
-  expect(studioButtonBox.x).toBeGreaterThan(serviceBox.x + serviceBox.width);
-  expect(Math.abs(curlInputBox.y - connectionButtonBox.y)).toBeLessThanOrEqual(4);
-  expect(showButtonBox.x).toBeLessThan(connectionButtonBox.x);
+  await expect(page.locator(".setup-ai-section").getByRole("button", { name: "Google AI Studio'yu Aç" })).toBeEnabled();
+  await expect(page.locator(".setup-ai-section").getByRole("button", { name: "Göster" })).toBeEnabled();
+  await expect(page.locator(".setup-ai-section").getByRole("button", { name: "Bağlantıyı Dene" })).toBeDisabled();
   await page.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
   await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
@@ -977,10 +1003,12 @@ try {
   await conversionPage.getByRole("button", { name: "Ayarlar" }).click();
   await expect(conversionPage.getByRole("button", { name: "Yedek Al" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Yedek Al" }).click();
-  await expect(conversionPage.getByText("yardimci-asistan-smoke", { exact: true })).toBeVisible();
+  await expect(conversionPage.locator(".settings-data-maintenance-section .backup-row")).toHaveCount(1);
+  await expect(conversionPage.locator(".settings-data-maintenance-section").getByText("Yerel veritabanı yedeği oluşturuldu.")).toBeVisible();
+  await expect(conversionPage.locator(".settings-data-maintenance-section").getByText("yardimci-asistan-smoke", { exact: true })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Android'e Yayınla" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Android'e Yayınla" }).click();
-  await expect(conversionPage.getByText("2 günlük iş ile Android özeti yayınlandı.")).toBeVisible();
+  await expect(conversionPage.locator(".settings-android-devices-section").getByText("2 günlük iş ile Android özeti yayınlandı.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
@@ -1816,35 +1844,26 @@ try {
   expect(await compactPage.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(compactPage.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(compactPage.locator(".setup-footer")).toHaveCount(0);
-  const basicSettingsBoxes = await compactPage.locator(".settings-basic-grid > .setup-section").evaluateAll((sections) => sections.map((section) => {
-    const box = section.getBoundingClientRect();
-    return { x: box.x, y: box.y, width: box.width, height: box.height };
-  }));
-  expect(basicSettingsBoxes).toHaveLength(8);
-  expect(new Set(basicSettingsBoxes.map((box) => Math.round(box.x))).size).toBe(2);
-  expect(basicSettingsBoxes.filter((box) => box.y < 768).length).toBeGreaterThanOrEqual(5);
+  await expect(compactPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(6);
+  await expect(compactPage.getByRole("heading", { name: "İşletmem" })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "Müşteriye Gösterilen Bilgiler" })).toBeVisible();
+  await expect(compactPage.getByRole("heading", { name: "İşletme Düzeni" })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
-  await compactPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
-  await compactPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
   await expect(compactPage.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
+  expect(await compactPage.locator(".setup-capabilities").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-settings-1366x768.png" });
-  await compactPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await expect(compactPage.getByRole("heading", { name: "Web Bağlantısı", exact: true })).toBeVisible();
   await expect(compactPage.getByLabel("Web eşitleme adresi")).toBeVisible();
   await expect(compactPage.getByLabel("Web güvenlik anahtarı")).toBeVisible();
   await expect(compactPage.getByLabel("Servis sağlayıcı")).toBeVisible();
-  const advancedSettingsBoxes = await compactPage.locator(".settings-advanced-grid > .setup-section").evaluateAll((sections) => sections.map((section) => {
-    const box = section.getBoundingClientRect();
-    return { x: box.x, y: box.y, width: box.width, height: box.height };
-  }));
-  expect(advancedSettingsBoxes).toHaveLength(3);
-  const advancedSettingsContentBottom = await compactPage.locator(".content").evaluate((content) => {
-    const box = content.getBoundingClientRect();
-    return box.y + content.scrollHeight;
-  });
-  expect(advancedSettingsBoxes.every((box) => box.y + box.height <= advancedSettingsContentBottom + 1)).toBe(true);
+  expect(await compactPage.locator(".content").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-settings-advanced-1366x768.png" });
+  await compactPage.setViewportSize({ width: 900, height: 768 });
+  await compactPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link", { name: "Bakım" }).click();
+  await expect(compactPage.locator("#settings-maintenance")).toBeInViewport();
+  expect(await compactPage.locator(".content").evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await compactPage.screenshot({ path: "artifacts/screenshots/desktop-settings-900x768.png" });
   await compactPage.close();
 
   const pullPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -2075,7 +2094,6 @@ try {
   await expect(setupPage.locator("html")).toHaveAttribute("data-mode", "pro");
   await expect(setupPage.getByRole("heading", { name: "İşletme panelini kullanıma hazırlayın." })).toBeVisible();
   await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Deniz Çiçeği Pansiyon & Kafe");
-  await setupPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   const storedOpenAiKeyInput = setupPage.getByLabel("AI güvenlik anahtarı");
   await expect(storedOpenAiKeyInput).toHaveValue("********************");
   await expect(setupPage.getByText("Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz.")).toBeVisible();
@@ -2107,12 +2125,10 @@ try {
   await expect(setupPage.getByText("2 görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.")).toBeVisible();
   await setupPage.screenshot({ path: "artifacts/screenshots/desktop-setup-wizard.png", fullPage: true });
   await setupPage.getByLabel("Web eşitleme adresi").fill("https://yardimciasistan.alwaysdata.net/yardimci-asistan");
-  await setupPage.getByRole("tab", { name: "Temel Ayarlar" }).click();
   await setupPage.getByLabel("Firma adı").fill("Smoke Pansiyon");
   await setupPage.getByRole("button", { name: "Kurulumu Kaydet" }).click();
   await expect(setupPage.getByRole("heading", { name: "Bugün ne var?" })).toBeVisible();
   await setupPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
-  await setupPage.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();
   await expect(setupPage.getByLabel("Servis sağlayıcı")).toHaveValue("gemini");
   await expect(setupPage.getByLabel("Model adı")).toHaveValue("gemini-3.1-flash-lite");
   await expect(setupPage.getByText("2 görsel ve metin modeli bu sağlayıcı altında kayıtlı.")).toBeVisible();

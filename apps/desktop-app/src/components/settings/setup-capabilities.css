@@ -1,34 +1,105 @@
-/* Embedded Settings already exposes the full backup/restore manager. */
-.setup-capabilities .setup-shell.is-embedded .settings-storage-section {
-  display: none;
+.setup-capabilities { min-width: 0; }
+
+.setup-capabilities:has(> .setup-shell.is-embedded) {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: start;
 }
 
-/*
- * Müşteriye açık işletme profili temel ayarlara aittir. The section lives
- * beside SetupForm so it can own its independent read/write lifecycle without
- * bloating setup form state; visibility follows the mounted basic-grid tab.
- */
-.setup-public-profile-shell {
-  display: none;
-  margin-top: var(--space-4);
+.setup-capabilities > .setup-shell.is-embedded,
+.setup-capabilities > .setup-shell.is-embedded > .setup-form-surface,
+.setup-capabilities > .setup-shell.is-embedded .settings-basic-grid,
+.setup-capabilities > .setup-shell.is-embedded .settings-advanced-grid {
+  display: contents;
 }
 
-.setup-capabilities:has(.settings-basic-grid) .setup-public-profile-shell {
-  display: block;
+.settings-section-nav {
+  order: 0;
+  grid-column: 1 / -1;
+  position: sticky;
+  top: var(--page-header-height);
+  z-index: 8;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  width: fit-content;
+  max-width: 100%;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
 }
 
-/*
- * Özel Yetenekler is an advanced-only surface. The capability editor lives
- * beside SetupForm so it can keep using the persisted capability runtime, but
- * it should not leak below both tab views. SetupForm mounts
- * .settings-advanced-grid only while Gelişmiş Ayarlar is selected, so use that
- * as the visibility boundary without duplicating capability state.
- */
-.setup-capability-editor-shell {
-  display: none;
-  margin-top: var(--space-4);
+.settings-section-nav a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  padding: 6px 11px;
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 750;
+  text-decoration: none;
 }
 
-.setup-capabilities:has(.settings-advanced-grid) .setup-capability-editor-shell {
-  display: block;
+.settings-section-nav a:hover,
+.settings-section-nav a:focus-visible {
+  color: var(--primary);
+  background: var(--primary-soft);
+  outline: none;
+}
+
+.setup-capabilities .setup-section { min-width: 0; scroll-margin-top: 112px; }
+.setup-capabilities > .setup-shell.is-embedded .settings-basic-grid > .setup-section,
+.setup-capabilities > .setup-shell.is-embedded .settings-advanced-grid > .setup-section {
+  grid-row: auto;
+}
+
+.setup-capabilities:has(> .setup-shell.is-embedded) .settings-identity-section { order: 10; grid-column: 1 / -1; }
+.setup-capabilities .setup-public-profile-shell { order: 20; grid-column: 1 / -1; scroll-margin-top: 112px; }
+.setup-capabilities:has(> .setup-shell.is-embedded) .settings-daily-section { order: 30; grid-column: 1 / -1; }
+.setup-capabilities .room-management-settings { order: 31; grid-column: 1 / -1; }
+.setup-capabilities:has(> .setup-shell.is-embedded) .settings-services-section { order: 40; grid-column: span 5; }
+.setup-capabilities:has(> .setup-shell.is-embedded) .settings-web-section { order: 41; grid-column: span 7; }
+.setup-capabilities:has(> .setup-shell.is-embedded) .setup-ai-section { order: 42; grid-column: 1 / -1; }
+.setup-capabilities:has(> .setup-shell.is-embedded) .settings-android-devices-section { order: 43; grid-column: 1 / -1; }
+.setup-capabilities:has(> .setup-shell.is-embedded) .appearance-settings { order: 50; grid-column: span 7; }
+.setup-capabilities:has(> .setup-shell.is-embedded) .settings-password-section { order: 51; grid-column: span 5; }
+.setup-capabilities .settings-data-maintenance-section { order: 60; grid-column: 1 / -1; }
+.setup-capabilities .setup-capability-editor-shell { order: 61; grid-column: 1 / -1; scroll-margin-top: 112px; }
+.setup-capabilities .settings-storage-section { display: none; }
+.setup-capabilities:has(.room-management-settings) .settings-daily-section .settings-room-count { display: none; }
+.setup-capabilities .settings-services-section .setup-toggle-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.setup-capabilities .business-public-profile-feature-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.setup-capabilities .business-public-profile-heading { display: flex; flex-wrap: wrap; align-items: center; }
+.setup-capabilities .business-public-profile-address-results { max-height: 190px; overflow: auto; }
+.setup-capabilities .settings-technical-info { display: none; }
+
+.settings-advanced-details {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+.settings-advanced-details > summary { padding: var(--space-3) var(--space-4); cursor: pointer; font-weight: 800; }
+.settings-advanced-details-body { padding: 0 var(--space-3) var(--space-3); }
+.settings-advanced-details-body > .setup-section { margin: 0; }
+
+@media (max-width: 1180px) {
+  .setup-capabilities:has(> .setup-shell.is-embedded) .settings-services-section,
+  .setup-capabilities:has(> .setup-shell.is-embedded) .settings-web-section,
+  .setup-capabilities:has(> .setup-shell.is-embedded) .appearance-settings,
+  .setup-capabilities:has(> .setup-shell.is-embedded) .settings-password-section { grid-column: 1 / -1; }
+  .setup-capabilities .business-public-profile-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .settings-section-nav { width: 100%; }
+  .settings-section-nav a { flex: 1 1 auto; justify-content: center; }
+  .setup-capabilities .settings-services-section .setup-toggle-grid,
+  .setup-capabilities .business-public-profile-feature-grid { grid-template-columns: 1fr; }
 }

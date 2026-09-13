@@ -10,7 +10,6 @@ export function DataMaintenanceSettings() {
   const [action, setAction] = useState<MaintenanceAction>("load");
   const [activeBackupId, setActiveBackupId] = useState("");
   const [backups, setBackups] = useState<DesktopBackupListItem[]>([]);
-  const [backupDirectory, setBackupDirectory] = useState("");
   const [message, setMessage] = useState("Yedekler okunuyor...");
 
   const busy = action !== null;
@@ -31,7 +30,6 @@ export function DataMaintenanceSettings() {
     setAction("load");
     try {
       const result = await bridge.listLocalBackups();
-      setBackupDirectory(result.backupDirectory);
       setBackups(result.backups);
       if (!result.ok) {
         setState("error");
@@ -71,9 +69,8 @@ export function DataMaintenanceSettings() {
         return;
       }
       setBackups(result.backups);
-      setBackupDirectory(result.backupDirectory);
       setState("success");
-      setMessage(`${result.message} ${result.backup.folderName}`);
+      setMessage(result.message);
     } catch {
       setState("error");
       setMessage("Yedek oluşturulamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
@@ -208,17 +205,12 @@ export function DataMaintenanceSettings() {
   }
 
   return (
-    <div className="setup-section settings-data-maintenance-section backup-manager" style={{ gridColumn: "1 / -1" }}>
+    <div id="settings-maintenance" className="setup-section settings-data-maintenance-section backup-manager" style={{ gridColumn: "1 / -1" }}>
       <div className="setup-section-title backup-manager-title">
-        <div>
-          <p>Yerel Veri</p>
-          <h2>Yedekleme ve Kurtarma</h2>
-        </div>
+        <div><h2>Bakım</h2></div>
         {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
       </div>
-      <p className="setup-section-description">
-        Her yedek proje klasöründeki <strong>backup</strong> dizininde ayrı bir klasör olarak tutulur. Veritabanının yanında menü görselleri de okunabilir dosyalar halinde saklanır.
-      </p>
+      <p className="setup-section-description">Bilgilerinizi yedekleyin veya önceki bir yedeği geri yükleyin.</p>
 
       <div className="backup-manager-toolbar">
         <button className="setup-secondary" type="button" onClick={() => void createBackup()} disabled={busy}>
@@ -227,7 +219,7 @@ export function DataMaintenanceSettings() {
         </button>
         <button className="setup-secondary" type="button" onClick={() => void openBackupDirectory()} disabled={busy}>
           <FolderOpen size={16} aria-hidden="true" />
-          {action === "open-root" ? "Açılıyor" : "Backup Klasörünü Aç"}
+          {action === "open-root" ? "Açılıyor" : "Yedek Klasörünü Aç"}
         </button>
         <button className="setup-secondary password-remove-button" type="button" onClick={() => void resetLocalData()} disabled={busy}>
           <Trash2 size={16} aria-hidden="true" />
@@ -235,7 +227,6 @@ export function DataMaintenanceSettings() {
         </button>
       </div>
 
-      {backupDirectory && <p className="backup-path" title={backupDirectory}>{backupDirectory}</p>}
 
       <div className="backup-list-heading">
         <strong>Mevcut Yedekler</strong>
@@ -257,7 +248,6 @@ export function DataMaintenanceSettings() {
                 <div className="backup-row-meta">
                   <span>{formatBytes(backup.sizeBytes)}</span>
                   <span>{backup.imageCount > 0 ? `${backup.imageCount} menü görseli` : "Menü görseli yok"}</span>
-                  <span className="backup-folder-name" title={backup.folderName}>{backup.folderName}</span>
                 </div>
               </div>
               <div className="backup-row-actions">

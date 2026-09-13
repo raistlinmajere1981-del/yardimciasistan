@@ -27,7 +27,7 @@ assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.ACCOMMODATI
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.FOOD_TABLES), false);
 assert.match(setupForm, /getBusinessProfiles\(\)\.map/);
 assert.match(setupForm, /value=\{form\.profileId\}/);
-assert.match(capabilitySettings, /title:\s*"Perakende"/);
+assert.match(capabilitySettings, /title:\s*"Market"/);
 for (const capability of ["RETAIL_BARCODE", "RETAIL_PURCHASING", "RETAIL_SUPPLIERS", "RETAIL_LABELS"]) {
   assert.match(capabilitySettings, new RegExp(`C\\.${capability}`));
 }

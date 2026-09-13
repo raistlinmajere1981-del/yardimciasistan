@@ -36,13 +36,15 @@ export function SetupWizard(props: SetupWizardProps) {
       />
 
       {props.embedded && capabilityRuntime.snapshot?.businessId && (
-        <div className="setup-public-profile-shell">
+        <div id="settings-public" className="setup-public-profile-shell">
           <BusinessPublicProfileSection businessAddress={props.form.address} />
         </div>
       )}
 
       {props.embedded && capabilityRuntime.snapshot?.businessId && (
-        <div className="setup-capability-editor-shell">
+        <details className="setup-capability-editor-shell settings-advanced-details">
+          <summary>Gelişmiş işletme özellikleri</summary>
+          <div className="settings-advanced-details-body">
           <BusinessCapabilityEditor
             profileId={props.form.profileId}
             snapshot={capabilityRuntime.snapshot}
@@ -55,7 +57,8 @@ export function SetupWizard(props: SetupWizardProps) {
               void capabilityRuntime.clearOverride(capability);
             }}
           />
-        </div>
+          </div>
+        </details>
       )}
     </div>
   );

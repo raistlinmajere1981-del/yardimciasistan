@@ -114,7 +114,6 @@ export function SetupForm({
   const [aiApiKeyRevealMessage, setAiApiKeyRevealMessage] = useState("");
   const selectedAiServiceRef = useRef(form.aiService);
   const appearanceModeRefs = useRef<Record<UiMode, HTMLButtonElement | null>>({ easy: null, pro: null });
-  const [settingsLevel, setSettingsLevel] = useState<"basic" | "advanced">("basic");
   const [webConnectionTestState, setWebConnectionTestState] = useState<SyncState>("idle");
   const [webConnectionTestMessage, setWebConnectionTestMessage] = useState("Web bağlantısı henüz denenmedi.");
 
@@ -336,7 +335,6 @@ export function SetupForm({
         {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
       </button>
       <span>{aiConnectionTestMessage}</span>
-      <small>{setupData.aiLastPublishedAt ? `Web ayarı son yayın: ${formatDateTime(setupData.aiLastPublishedAt)}` : "Web ayarı henüz bu cihazdan yayınlanmadı."}</small>
     </div>
   );
 
@@ -368,12 +366,16 @@ export function SetupForm({
       </section>}
 
       <section className="setup-form-surface">
-        <div className="settings-level-tabs" role="tablist" aria-label="Ayar düzeyi">
-          <button className={settingsLevel === "basic" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "basic"} onClick={() => setSettingsLevel("basic")}>Temel Ayarlar</button>
-          <button className={settingsLevel === "advanced" ? "is-active" : ""} type="button" role="tab" aria-selected={settingsLevel === "advanced"} onClick={() => setSettingsLevel("advanced")}>Gelişmiş Ayarlar</button>
-        </div>
-        {settingsLevel === "basic" && <div className="settings-section-grid settings-basic-grid">
-        <div className="setup-section appearance-settings">
+        {embedded && <nav className="settings-section-nav" aria-label="Ayar bölümleri">
+          <a href="#settings-business">İşletmem</a>
+          <a href="#settings-public">Müşteri bilgileri</a>
+          <a href="#settings-operations">İşletme düzeni</a>
+          <a href="#settings-connections">Bağlantılar</a>
+          <a href="#settings-application">Uygulama</a>
+          <a href="#settings-maintenance">Bakım</a>
+        </nav>}
+        <div className="settings-section-grid settings-basic-grid">
+        <div id="settings-application" className="setup-section appearance-settings">
           <div className="setup-section-title">
             <h2>Uygulama Görünümü</h2>
           </div>
@@ -437,10 +439,10 @@ export function SetupForm({
             </div>}
           </div>
         </div>
-        <div className="setup-section settings-identity-section">
+        <div id="settings-business" className="setup-section settings-identity-section">
           <div className="setup-section-title">
             {!embedded && <p>Firma Bilgileri</p>}
-            <h2>Temel Tanım</h2>
+            <h2>İşletmem</h2>
           </div>
           <div className="setup-grid two">
             <label>
@@ -474,7 +476,7 @@ export function SetupForm({
           </div>
         </div>
 
-        <div className="setup-section settings-services-section">
+        <div id="settings-connections" className="setup-section settings-services-section">
           <div className="setup-section-title">
             {!embedded && <p>Servisler</p>}
             <h2>Bağlı Servisler</h2>
@@ -488,13 +490,17 @@ export function SetupForm({
               <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
               Android
             </label>
+            <label>
+              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
+              AI Yardımcı
+            </label>
           </div>
         </div>
 
-        <div className="setup-section settings-daily-section">
+        <div id="settings-operations" className="setup-section settings-daily-section">
           <div className="setup-section-title">
             {!embedded && <p>Kapasite ve Yardımcı</p>}
-            <h2>Günlük Kullanım</h2>
+            <h2>İşletme Düzeni</h2>
           </div>
           {accommodationEnabled && <div className="setup-count-row settings-room-count">
             <label>
@@ -561,10 +567,6 @@ export function SetupForm({
               Adedi azalttığınızda kullanılmayan masalar arşivlenir; aktif adisyon veya rezervasyona bağlı masalar korunur.
             </small>
           </div>}
-          <label className="setup-checkline settings-ai-toggle">
-            <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
-            AI cevap önerileri açık
-          </label>
         </div>
         {embedded && (
           <RoomManagementSection
@@ -595,9 +597,9 @@ export function SetupForm({
             onRevoke={onRevokeAndroidDevice}
           />
         )}
-        </div>}
+        </div>
 
-        {settingsLevel === "advanced" && <div className="settings-section-grid settings-advanced-grid"><div className="setup-section settings-web-section">
+        <div className="settings-section-grid settings-advanced-grid"><div className="setup-section settings-web-section">
           <div className="setup-section-title settings-web-title">
             {!embedded && <p>Web Bağlantısı</p>}
             <h2>Web Bağlantısı</h2>
@@ -766,7 +768,7 @@ export function SetupForm({
           <p className={`menu-status sync-${backupState}`}>{backupMessage}</p>
           {form.androidEnabled && <p className={`menu-status sync-${androidPublishState}`}>{androidPublishMessage}</p>}
         </div>
-        </div>}
+        </div>
 
         {!embedded && <footer className={`setup-footer sync-${saveState}`}>
           <span>{message}</span>

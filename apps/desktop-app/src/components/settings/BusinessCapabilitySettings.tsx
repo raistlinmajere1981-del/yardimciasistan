@@ -50,7 +50,7 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
 }> = [
   {
     title: "Konaklama",
-    description: "Oda, rezervasyon, konaklama ve oda hesabı akışını ayrı ayrı açabilirsiniz.",
+    description: "Oda ve konaklama işlerinde kullandığınız alanları seçin.",
     capabilities: [
       C.ACCOMMODATION_ROOMS,
       C.ACCOMMODATION_RESERVATIONS,
@@ -59,8 +59,8 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
     ]
   },
   {
-    title: "Yiyecek & İçecek",
-    description: "Masa, rezervasyon, menü, adisyon ve QR yayın alanları.",
+    title: "Restoran / Kafe",
+    description: "Masa, rezervasyon, menü ve adisyon alanlarını seçin.",
     capabilities: [
       C.FOOD_TABLES,
       C.FOOD_RESERVATIONS,
@@ -70,13 +70,13 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
     ]
   },
   {
-    title: "Ticaret Çekirdeği",
-    description: "Restoran ve Market çalışma alanlarının ortak katalog, stok ve satış omurgası.",
+    title: "Satış ve Stok",
+    description: "Ürün, stok, satış ve müşteri hesabı alanlarını seçin.",
     capabilities: [C.CATALOG, C.INVENTORY, C.SALES, C.CUSTOMER_CREDIT]
   },
   {
-    title: "Perakende",
-    description: "Market çalışma alanını açan barkod, satın alma, tedarikçi ve etiket yetenekleri.",
+    title: "Market",
+    description: "Barkod, satın alma, tedarikçi ve etiket alanlarını seçin.",
     capabilities: [
       C.RETAIL_BARCODE,
       C.RETAIL_PURCHASING,
@@ -109,7 +109,7 @@ export function BusinessCapabilityEditor({
   profileId,
   snapshot,
   state = "idle",
-  message = "İşletme yetenekleri profil varsayımlarını kullanıyor.",
+  message = "",
   onSetCapability,
   onClearOverride
 }: BusinessCapabilityEditorProps) {
@@ -125,14 +125,14 @@ export function BusinessCapabilityEditor({
   return (
     <div className="setup-section settings-capabilities-section">
       <div className="setup-section-title">
-        <h2>Özel Yetenekler</h2>
+        <h2>İşletme Özellikleri</h2>
       </div>
       <p className="setup-section-description">
-        Çekirdek müşteri, takvim, kasa, rapor, web, senkron, yedek ve cihaz yetenekleri sürekli açıktır. Burada yalnız domain çalışma alanlarını profile ekleyebilir veya profilden çıkarabilirsiniz.
+        Seçtiğiniz sektör için önerilen özellikler otomatik gelir. Yalnız ihtiyacınız olan ek alanları buradan açıp kapatın.
       </p>
       {profilePendingSave && (
         <p className="menu-status sync-error" role="status">
-          Profil seçimi değişti. Özel yetenekleri düzenlemeden önce Ayarları Kaydet ile yeni profili uygulayın.
+          Önce üst bölümdeki sektör değişikliğini kaydedin.
         </p>
       )}
       <div className="settings-section-grid">
@@ -165,9 +165,7 @@ export function BusinessCapabilityEditor({
                       />
                       {capabilityLabel(capability)}
                     </label>
-                    <small>{blockedReason || (capability === C.CUSTOMER_CREDIT
-                      ? "Kayıtlı müşterilerin veresiye satış ve tahsilat hareketlerini takip eder."
-                      : capability)}</small>
+                    {(blockedReason || capability === C.CUSTOMER_CREDIT) && <small>{blockedReason || "Kayıtlı müşterilerin veresiye satış ve tahsilat hareketlerini takip eder."}</small>}
                     {entry?.source === "user" && (
                       <button
                         className="setup-secondary"
@@ -175,7 +173,7 @@ export function BusinessCapabilityEditor({
                         disabled={busy || profilePendingSave || !onClearOverride}
                         onClick={() => onClearOverride?.(capability)}
                       >
-                        Profil Varsayımına Dön
+                        Önerilen Ayara Dön
                       </button>
                     )}
                   </div>
@@ -185,7 +183,7 @@ export function BusinessCapabilityEditor({
           </fieldset>
         ))}
       </div>
-      <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>
+      {state !== "idle" && message && <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>}
     </div>
   );
 }
