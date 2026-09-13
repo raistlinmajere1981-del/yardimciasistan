@@ -117,6 +117,16 @@ ${syncStatusStub}
         replaceAll: true
       },
       {
+        before: `  await page.getByLabel("Karanlık tema").uncheck();`,
+        after: `  await page.locator("label.appearance-theme-toggle").click();`
+      },
+      {
+        before: `  await page.getByLabel("AI cevap önerileri açık").check();
+  await page.getByRole("tab", { name: "Gelişmiş Ayarlar" }).click();`,
+        after: `  await page.getByLabel("AI Yardımcı").check();
+  await expect(page.locator(".settings-web-section")).toBeVisible();`
+      },
+      {
         before: `    page.locator(".setup-ai-actions.is-inline > button").boundingBox()`,
         after: `    page.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).boundingBox()`
       },
