@@ -13,47 +13,53 @@ function assert_true(bool $condition, string $message): void
 }
 
 $now = strtotime('2026-09-13T12:00:00+03:00');
-$snapshot = [
+$publication = [
     '_publication' => ['updated_at' => '2026-09-13T11:58:00+03:00'],
-    'business_capabilities' => ['accommodation.rooms','accommodation.reservations','accommodation.stays'],
+    'schema_version' => 1,
+    'enabled' => true,
+    'generated_at' => '2026-09-13T11:58:00+03:00',
     'rooms' => [
         ['id' => 'room-1', 'name' => 'Bahçe Oda', 'number' => '1', 'capacity' => 2, 'status' => 'available'],
         ['id' => 'room-2', 'name' => 'Aile Oda', 'number' => '2', 'capacity' => 4, 'status' => 'available'],
         ['id' => 'room-3', 'name' => 'Bakım Oda', 'number' => '3', 'capacity' => 4, 'status' => 'maintenance'],
         ['id' => 'room-4', 'name' => 'Temizlik Oda', 'number' => '4', 'capacity' => 4, 'status' => 'cleaning']
     ],
-    'reservations' => [
-        ['id' => 'reservation-secret','customer_name' => 'Gizli Müşteri','customer_phone' => '+905551112233','status' => 'approved','start_date' => '2026-09-20','end_date' => '2026-09-22','room_ids' => ['room-1']],
-        ['status' => 'cancelled','start_date' => '2026-09-20','end_date' => '2026-09-25','room_ids' => ['room-2']]
-    ],
-    'customer_room_stays' => [
-        ['customer_name' => 'Başka Gizli Müşteri','status' => 'planned','room_id' => 'room-2','check_in_date' => '2026-09-25','check_out_date' => '2026-09-27']
+    'blocks' => [
+        ['room_id' => 'room-1', 'start_date' => '2026-09-20', 'end_date' => '2026-09-22'],
+        ['room_id' => 'room-2', 'start_date' => '2026-09-25', 'end_date' => '2026-09-27']
     ]
 ];
 
-$blocked = ya_public_room_availability_query($snapshot, '2026-09-20', '2026-09-21', 2, $now);
+$blocked = ya_public_room_availability_query($publication, '2026-09-20', '2026-09-21', 2, $now);
 assert_true($blocked['ok'] === true && $blocked['live'] === true, 'fresh query should be live');
 assert_true($blocked['available_room_count'] === 1, 'overlap and operational room states should leave only room-2');
-assert_true(($blocked['available_rooms'][0]['number'] ?? '') === '2', 'cancelled reservation must not block room-2');
+assert_true(($blocked['available_rooms'][0]['number'] ?? '') === '2', 'room-2 should remain available outside its own block');
 $publicJson = json_encode($blocked, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-assert_true(!str_contains((string) $publicJson, 'Gizli'), 'customer names must never leak');
-assert_true(!str_contains((string) $publicJson, '+90555'), 'customer phones must never leak');
-assert_true(!str_contains((string) $publicJson, 'reservation-secret'), 'reservation ids must never leak');
 assert_true(!str_contains((string) $publicJson, 'Temizlik Oda'), 'cleaning rooms must never be offered');
 
-$checkoutBoundary = ya_public_room_availability_query($snapshot, '2026-09-22', '2026-09-23', 2, $now);
+$checkoutBoundary = ya_public_room_availability_query($publication, '2026-09-22', '2026-09-23', 2, $now);
 assert_true($checkoutBoundary['available_room_count'] === 2, 'checkout day must be available for a new stay');
 
-$stayBlocked = ya_public_room_availability_query($snapshot, '2026-09-25', '2026-09-26', 3, $now);
-assert_true($stayBlocked['available_room_count'] === 0, 'planned stay must block room-2 and room-1 is below capacity');
+$stayBlocked = ya_public_room_availability_query($publication, '2026-09-25', '2026-09-26', 3, $now);
+assert_true($stayBlocked['available_room_count'] === 0, 'room-2 block should apply and room-1 is below capacity');
 
-$staleSnapshot = $snapshot;
-$staleSnapshot['_publication']['updated_at'] = '2026-09-13T10:00:00+03:00';
-$stale = ya_public_room_availability_query($staleSnapshot, '2026-09-20', '2026-09-21', 2, $now);
-assert_true($stale['ok'] === false && $stale['code'] === 'availability_stale', 'stale source must not confirm availability');
+$stalePublication = $publication;
+$stalePublication['_publication']['updated_at'] = '2026-09-13T10:00:00+03:00';
+$stale = ya_public_room_availability_query($stalePublication, '2026-09-20', '2026-09-21', 2, $now);
+assert_true($stale['ok'] === false && $stale['code'] === 'availability_stale', 'stale stored publication must not confirm availability');
 assert_true(!array_key_exists('available_rooms', $stale), 'stale result must not expose stale room claims');
 
-$invalid = ya_public_room_availability_query($snapshot, '2026-09-21', '2026-09-20', 2, $now);
+$staleGenerated = $publication;
+$staleGenerated['generated_at'] = '2026-09-13T10:00:00+03:00';
+$generatedStale = ya_public_room_availability_query($staleGenerated, '2026-09-20', '2026-09-21', 2, $now);
+assert_true($generatedStale['ok'] === false && $generatedStale['code'] === 'availability_stale', 'stale desktop generation time must not confirm availability');
+
+$disabled = $publication;
+$disabled['enabled'] = false;
+$disabledResult = ya_public_room_availability_query($disabled, '2026-09-20', '2026-09-21', 2, $now);
+assert_true($disabledResult['ok'] === false && $disabledResult['code'] === 'availability_not_supported', 'disabled capability tombstone must stop live availability');
+
+$invalid = ya_public_room_availability_query($publication, '2026-09-21', '2026-09-20', 2, $now);
 assert_true($invalid['ok'] === false && $invalid['code'] === 'invalid_date_range', 'reversed range must be rejected');
 
 $intentNow = new DateTimeImmutable('2026-09-13T12:00:00+03:00');
