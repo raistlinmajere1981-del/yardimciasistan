@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webFrame } from "electron";
 import type {
   BusinessCapability,
+  BusinessPublicProfile,
   CatalogCategory,
   CatalogProduct,
   CatalogProductDraft,
@@ -13,7 +14,8 @@ import type {
   InventoryBalance,
   InventoryMovement,
   MarketBarcodeScanEvent,
-  MarketCartDraftLoadResult
+  MarketCartDraftLoadResult,
+  SaveBusinessPublicProfileInput
 } from "@yardimci-asistan/shared";
 import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
 import type {
@@ -94,6 +96,8 @@ import type {
 } from "./app-lock";
 import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-connection-test";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
+import type { BusinessPublicProfileSaveResult } from "./business-public-profile";
+import type { BusinessLocationGeocodeResponse } from "./business-location-geocode";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
 import type { MarketBarcodeFastPullState } from "./commerce-ipc-contract";
 import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
@@ -163,6 +167,9 @@ export interface DesktopBridge {
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
+  getBusinessPublicProfile: () => Promise<BusinessPublicProfile>;
+  saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => Promise<BusinessPublicProfileSaveResult>;
+  geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
   getBusinessCapabilitySnapshot: () => Promise<BusinessCapabilitySnapshot>;
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => Promise<BusinessCapabilitySnapshot>;
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => Promise<BusinessCapabilitySnapshot>;
@@ -279,6 +286,9 @@ const bridge: DesktopBridge = {
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => invokeWhenUnlocked<DesktopSetupSaveResult>("setup:saveInitial", input),
+  getBusinessPublicProfile: () => invokeWhenUnlocked<BusinessPublicProfile>("businessPublicProfile:get"),
+  saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => invokeWhenUnlocked<BusinessPublicProfileSaveResult>("businessPublicProfile:save", input),
+  geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),
   getBusinessCapabilitySnapshot: () => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:getSnapshot"),
   setBusinessCapability: (capability: BusinessCapability, enabled: boolean) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:set", capability, enabled),
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => invokeWhenUnlocked<BusinessCapabilitySnapshot>("capability:clearOverride", capability),

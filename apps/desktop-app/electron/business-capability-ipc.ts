@@ -7,6 +7,8 @@ import {
   setBusinessCapability,
   type BusinessCapabilitySnapshot
 } from "./business-capability-store";
+import { registerBusinessLocationGeocodeIpcHandlers } from "./business-location-geocode-ipc";
+import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 
 export function registerBusinessCapabilityIpcHandlers(options: {
   databasePath: () => string;
@@ -52,4 +54,16 @@ export function registerBusinessCapabilityIpcHandlers(options: {
       return snapshot;
     }
   );
+
+  // Public profile and map location are part of the same settings surface.
+  // Register their IPC contracts alongside the business settings handlers so
+  // the current main-entry stays independent from the older public-context
+  // coordinator that existed on the historical feature branch.
+  registerBusinessPublicProfileIpcHandlers({
+    databasePath: options.databasePath,
+    assertUnlocked: options.assertUnlocked
+  });
+  registerBusinessLocationGeocodeIpcHandlers({
+    assertUnlocked: options.assertUnlocked
+  });
 }

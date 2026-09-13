@@ -5,6 +5,7 @@ import {
   BusinessCapabilityEditor,
   getEffectiveSetupCapabilities
 } from "./BusinessCapabilitySettings";
+import { BusinessPublicProfileSection } from "./BusinessPublicProfileSection";
 import { SetupForm } from "./SetupForm";
 import "./setup-capabilities.css";
 
@@ -33,6 +34,12 @@ export function SetupWizard(props: SetupWizardProps) {
         {...props}
         enabledCapabilities={deviceRuntimeCapabilities}
       />
+
+      {props.embedded && capabilityRuntime.snapshot?.businessId && (
+        <div className="setup-public-profile-shell">
+          <BusinessPublicProfileSection businessAddress={props.form.address} />
+        </div>
+      )}
 
       {props.embedded && capabilityRuntime.snapshot?.businessId && (
         <div className="setup-capability-editor-shell">

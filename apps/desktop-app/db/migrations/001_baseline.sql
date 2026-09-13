@@ -67,6 +67,32 @@ CREATE TABLE business (
   sync_status TEXT NOT NULL DEFAULT 'local_only'
 );
 
+CREATE TABLE business_public_profile (
+  business_id TEXT PRIMARY KEY,
+  description TEXT NOT NULL DEFAULT '',
+  latitude REAL NULL
+    CHECK (latitude IS NULL OR (latitude >= -90 AND latitude <= 90)),
+  longitude REAL NULL
+    CHECK (longitude IS NULL OR (longitude >= -180 AND longitude <= 180)),
+  directions_note TEXT NOT NULL DEFAULT '',
+  check_in_time TEXT NOT NULL DEFAULT '',
+  check_out_time TEXT NOT NULL DEFAULT '',
+  breakfast_start_time TEXT NOT NULL DEFAULT '',
+  breakfast_end_time TEXT NOT NULL DEFAULT '',
+  features_json TEXT NOT NULL DEFAULT '[]',
+  policy_note TEXT NOT NULL DEFAULT '',
+  payment_note TEXT NOT NULL DEFAULT '',
+  languages_json TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  sync_status TEXT NOT NULL DEFAULT 'local_only',
+  CHECK (
+    (latitude IS NULL AND longitude IS NULL)
+    OR (latitude IS NOT NULL AND longitude IS NOT NULL)
+  ),
+  FOREIGN KEY (business_id) REFERENCES business(id) ON DELETE CASCADE
+);
+
 CREATE TABLE business_capabilities (
   business_id TEXT NOT NULL,
   capability_id TEXT NOT NULL,

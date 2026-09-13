@@ -4,6 +4,20 @@
 }
 
 /*
+ * Müşteriye açık işletme profili temel ayarlara aittir. The section lives
+ * beside SetupForm so it can own its independent read/write lifecycle without
+ * bloating setup form state; visibility follows the mounted basic-grid tab.
+ */
+.setup-public-profile-shell {
+  display: none;
+  margin-top: var(--space-4);
+}
+
+.setup-capabilities:has(.settings-basic-grid) .setup-public-profile-shell {
+  display: block;
+}
+
+/*
  * Özel Yetenekler is an advanced-only surface. The capability editor lives
  * beside SetupForm so it can keep using the persisted capability runtime, but
  * it should not leak below both tab views. SetupForm mounts
