@@ -73,6 +73,16 @@ $relativeIntent = ya_public_room_availability_extract_intent('Yarın 3 kişi iç
 assert_true(($relativeIntent['start_date'] ?? '') === '2026-09-14', 'tomorrow should resolve in Istanbul time');
 assert_true(($relativeIntent['end_date'] ?? '') === '2026-09-15', 'single-night relative query should resolve checkout');
 
+$possessiveIntent = ya_public_room_availability_extract_intent('yarın için 2 kişilik müsait odanız varmı', $intentNow);
+assert_true(($possessiveIntent['applicable'] ?? false) === true, 'possessive room wording should enter availability');
+assert_true(($possessiveIntent['complete'] ?? false) === true, 'possessive room wording should resolve completely');
+assert_true(($possessiveIntent['start_date'] ?? '') === '2026-09-14', 'possessive wording should resolve tomorrow');
+assert_true(($possessiveIntent['guest_count'] ?? 0) === 2, 'possessive wording should resolve guest count');
+
+$plainPossessiveIntent = ya_public_room_availability_extract_intent('Yarın 2 kişilik odanız var mı?', $intentNow);
+assert_true(($plainPossessiveIntent['applicable'] ?? false) === true, 'room possessive plus var mı should be recognized without müsait keyword');
+assert_true(($plainPossessiveIntent['complete'] ?? false) === true, 'room possessive plus var mı should resolve completely');
+
 $tableIntent = ya_public_room_availability_extract_intent('Bu akşam 4 kişilik masa var mı?', $intentNow);
 assert_true(($tableIntent['applicable'] ?? true) === false, 'restaurant/table question must not enter room availability');
 
