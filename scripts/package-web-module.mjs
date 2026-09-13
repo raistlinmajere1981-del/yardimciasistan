@@ -20,6 +20,8 @@ const requiredFiles = [
   "api/sync.php",
   "api/menu.php",
   "api/chat.php",
+  "api/availability.php",
+  "api/availability-sync.php",
   "api/stock-image-analysis.php",
   "api/identity-image-analysis.php",
   "api/android.php",
@@ -29,6 +31,9 @@ const requiredFiles = [
   "api/android-identity-image-analysis.php",
   "lib/storage.php",
   "lib/public-request-guard.php",
+  "lib/public-room-availability.php",
+  "lib/public-room-availability-intent.php",
+  "lib/public-room-availability-storage.php",
   "lib/android-device-auth.php",
   "lib/stock-image-analysis.php",
   "lib/identity-image-analysis.php",
@@ -123,6 +128,14 @@ function validateSource() {
   assert.ok(publicGuard.includes("hash_hmac('sha256'"), "Public guard ham istemci adresi yerine HMAC özeti kullanmalı.");
   assert.ok(publicGuard.includes("public_request_guard_events"), "Public guard kalıcı hız sınırı sayacını içermeli.");
   assert.ok(publicGuard.includes("CONTENT_LENGTH") && publicGuard.includes("429"), "Public guard gövde boyutu ve rate-limit koruması uygulamalı.");
+
+  const availabilityEndpoint = readFileSync(join(sourceRoot, "api", "availability.php"), "utf8");
+  assert.ok(availabilityEndpoint.includes("public_room_availability"), "Public availability endpoint yalnız ayrılmış public publication kaynağını okumalı.");
+  assert.ok(availabilityEndpoint.includes("ya_public_guard_enforce('chat')"), "Public availability endpoint chat hız sınırını yeniden kullanmalı.");
+
+  const availabilitySyncEndpoint = readFileSync(join(sourceRoot, "api", "availability-sync.php"), "utf8");
+  assert.ok(availabilitySyncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "Availability heartbeat sync_secret header doğrulaması uygulamalı.");
+  assert.ok(availabilitySyncEndpoint.includes("ya_storage_publish_public_room_availability"), "Availability heartbeat global operasyon revision'ını artırmayan ayrı publication yazımını kullanmalı.");
 
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
