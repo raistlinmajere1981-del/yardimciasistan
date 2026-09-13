@@ -13,6 +13,8 @@ assets/
 api/
   request.php
   chat.php
+  availability.php
+  availability-sync.php
   stock-image-analysis.php
   identity-image-analysis.php
   menu.php
@@ -27,6 +29,9 @@ data/
   (JSON çalışma deposu yok; current SQLite storage kullanılır)
 lib/
   storage.php
+  public-room-availability.php
+  public-room-availability-intent.php
+  public-room-availability-storage.php
   stock-image-analysis.php
   identity-image-analysis.php
 knowledge/
@@ -80,6 +85,39 @@ YARDIMCI_ASISTAN_AI_API_KEY=...
 ```
 
 Knowledge dosyaları `knowledge/*.md` altından okunur. AI promptu kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı vermeyecek şekilde sınırlandırılır.
+
+## Canlı Oda Müsaitliği
+
+Web widget'ı oda müsaitliği sorularını genel AI cevabına bırakmadan önce salt-okunur
+canlı availability hattında kontrol eder:
+
+```text
+api/availability.php
+api/availability-sync.php
+```
+
+Masaüstü otomatik senkron döngüsü, yalnız oda kimliği/adı/numarası/kapasitesi/durumu ile
+anonim tarih bloklarını içeren `public_room_availability` publication'ını yayınlar.
+Müşteri adı, telefon, not, rezervasyon kimliği, konaklama kimliği ve diğer operasyonel
+PII bu payload'a dahil edilmez. Bu heartbeat Android snapshot'ından ayrıdır ve global
+operasyon `server_revision` değerini artırmaz.
+
+`api/availability.php` yalnız `POST` kabul eder ve public chat hız sınırını kullanır.
+Doğal dilde tarih aralığı ve kişi sayısı deterministik olarak çözümlenir; eksik alanlar
+tahmin edilmez, kullanıcıdan istenir. Tarih çakışmaları yarı açık aralık mantığıyla
+hesaplanır; çıkış günü yeni giriş günü olabilir.
+
+Masaüstü otomatik senkron açıkken heartbeat normal senkron döngüsünde yenilenir.
+Publication veya masaüstünde üretilen veri 15 dakikadan eskiyse endpoint fail-closed
+davranır ve kesin müsaitlik iddiası üretmez. Bu yol rezervasyon oluşturmaz, güncellemez
+ve silmez; yalnız güncel müsaitliği okur.
+
+Odaklı sözleşme testleri Pilot Core içinde şu smoke'larla çalışır:
+
+```text
+scripts/smoke-public-room-availability.php
+scripts/smoke-public-room-availability-publication.mjs
+```
 
 ## Stok Görseli Analiz Endpoint'i
 

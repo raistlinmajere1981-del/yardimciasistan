@@ -28,6 +28,8 @@ const core = [
   js("web-form", "Web talebi + public abuse guard", "smoke-web-form-api.mjs"),
   jsb("web-menu", "Web modülü menü yayını", "smoke-web-module-menu.mjs"),
   jsb("web-widget", "Web widget + gerçek PHP modülü", "smoke-web-widget-module.mjs"),
+  command("room-availability", "Read-only canlı oda müsaitlik sorgusu", "php", [join("scripts", "smoke-public-room-availability.php")]),
+  js("availability-publication", "PII içermeyen oda müsaitlik yayını", "smoke-public-room-availability-publication.mjs"),
   js("sync-timeout", "Senkron HTTP zaman aşımı sınırı", "smoke-sync-timeout.mjs"),
   js("web-connection", "Masaüstü web bağlantı testi", "smoke-web-connection-test.mjs"),
   current("automatic-sync", "Otomatik senkron ve geri dönüş", "automatic-sync"),
@@ -114,6 +116,7 @@ function run(check) {
   return row(check.id, check.label, status, typeof out.status === "number" ? out.status : 1, out.error?.message ?? "");
 }
 function row(id, label, status, exitCode, error) { return { id, label, status, duration_ms: 0, exit_code: exitCode, error }; }
+function command(id, label, cmd, args) { return { id, label, cmd, args, browser: false }; }
 function n(id, label, script) { return npmArgs(id, label, ["run", script]); }
 function nb(id, label, script) { return { ...n(id, label, script), browser: true }; }
 function npmArgs(id, label, npmArgsValue) { return { id, label, cmd: npm, args: npmArgsValue, browser: false }; }
