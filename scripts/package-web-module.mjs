@@ -135,7 +135,7 @@ function validateSource() {
 
   const availabilitySyncEndpoint = readFileSync(join(sourceRoot, "api", "availability-sync.php"), "utf8");
   assert.ok(availabilitySyncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "Availability heartbeat sync_secret header doğrulaması uygulamalı.");
-  assert.ok(availabilitySyncEndpoint.includes("ya_storage_publish_public_room_availability"), "Availability heartbeat global operasyon revision'ını artırmayan ayrı publication yazımını kullanmalı.");
+  assert.ok(availabilitySyncEndpoint.includes("ya_public_room_availability_store_publication"), "Availability heartbeat global operasyon revision'ını artırmayan ayrı publication yazımını kullanmalı.");
 
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
