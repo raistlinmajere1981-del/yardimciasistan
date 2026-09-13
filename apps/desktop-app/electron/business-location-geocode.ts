@@ -139,9 +139,9 @@ function removeCountryName(value: string): string {
 
 function normalizeTurkishAddressSyntax(value: string): string {
   return normalizeQuery(value
-    .replace(/\b(?:cd|cad)\.?\b/giu, "Caddesi")
-    .replace(/\b(?:sk|sok)\.?\b/giu, "Sokak")
-    .replace(/\bblv\.?\b/giu, "Bulvarı")
+    .replace(/\b(?:cd|cad)\.?(?=\s|$)/giu, "Caddesi")
+    .replace(/\b(?:sk|sok)\.?(?=\s|$)/giu, "Sokak")
+    .replace(/\bblv\.?(?=\s|$)/giu, "Bulvarı")
     .replace(
       /\b(?:kapı\s*no|kapi\s*no|bina\s*no|no|numara)\s*[:.#-]?\s*(\d+[a-zA-ZçğıöşüÇĞİÖŞÜ]?(?:[/-]\d+[a-zA-ZçğıöşüÇĞİÖŞÜ]?)?)\b/giu,
       "$1"
