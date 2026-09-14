@@ -337,7 +337,7 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
       </Panel>
 
       <section className="room-folio-stays-section">
-        <div className="room-folio-section-heading">
+        <div className="room-folio-section-heading page-toolbar">
           <div><h3>Aktif ve Planlanan Konaklamalar</h3><p>Odaya girişte adisyonu açın; çıkış işlemini aynı hesaptan tamamlayın.</p></div>
           <span>{data.activeStays.length} kayıt</span>
         </div>
@@ -353,21 +353,21 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
         )}
       </section>
 
-      {message && <p className="room-folio-message" role="status">{message}</p>}
+      {message && <p className="room-folio-message status-message" role="status">{message}</p>}
 
       {selectedFolio && selectedFolio.status === "open" && (
-        <div className="room-folio-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedFolioId(""); }}>
-          <section className="room-folio-drawer" role="dialog" aria-modal="true" aria-label={`${selectedFolio.roomName} oda adisyonu`}>
-            <header className="room-folio-drawer-header">
+        <div className="room-folio-overlay overlay overlay--drawer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedFolioId(""); }}>
+          <section className="room-folio-drawer drawer drawer--wide" role="dialog" aria-modal="true" aria-label={`${selectedFolio.roomName} oda adisyonu`}>
+            <header className="room-folio-drawer-header overlay-header">
               <div>
                 <p className="panel-eyebrow">Oda adisyonu</p>
                 <h2>{selectedFolio.roomName} — {selectedFolio.customerName}</h2>
                 <span>{selectedFolio.guestCount} kişi · {formatDateRange(selectedFolio.checkInDate, selectedFolio.plannedCheckOutDate)}</span>
               </div>
-              <button className="room-folio-close" type="button" aria-label="Kapat" onClick={() => setSelectedFolioId("")}><X size={19} /></button>
+              <button className="room-folio-close overlay-close" type="button" aria-label="Kapat" onClick={() => setSelectedFolioId("")}><X size={19} /></button>
             </header>
 
-            <div className="room-folio-drawer-body">
+            <div className="room-folio-drawer-body overlay-body">
               <section className="room-folio-details-card">
                 <div className="room-folio-subheading"><h3>Konaklama</h3><span>{selectedFolio.nights} gece</span></div>
                 <div className="room-folio-details-grid">
@@ -462,7 +462,7 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
                   ) : selectedFolio.remainingMinor > 0 ? (
                     <button className="room-folio-payment-button" type="button" disabled={saving} onClick={() => { setPaymentAmount(minorToInput(selectedFolio.remainingMinor)); setShowPayment(true); }}><Banknote size={16} /> Ödeme Al</button>
                   ) : (
-                    <div className="room-folio-payment-complete" role="status">
+                    <div className="room-folio-payment-complete status-message status-message--success" role="status">
                       <CheckCircle2 size={18} aria-hidden="true" />
                       <div><strong>Ödeme tamamlandı</strong><span>Oda hesabının tamamı tahsil edildi.</span></div>
                     </div>
@@ -471,14 +471,14 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
               </div>
             </div>
 
-            <footer className="room-folio-drawer-footer">
+            <footer className="room-folio-drawer-footer overlay-footer">
               <span>{selectedFolio.remainingMinor > 0 ? `${minorMoney(selectedFolio.remainingMinor)} ödeme bekliyor` : "Hesap tamamlandı"}</span>
               <button className="room-folio-checkout-button" type="button" disabled={saving} onClick={requestCheckout}>Çıkış Yap</button>
             </footer>
 
             {confirmationAction && (
-              <div className="room-folio-confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmationAction(null); }}>
-                <section className="room-folio-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="room-folio-confirm-title">
+              <div className="room-folio-confirm-overlay overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmationAction(null); }}>
+                <section className="room-folio-confirm-dialog dialog dialog--compact" role="alertdialog" aria-modal="true" aria-labelledby="room-folio-confirm-title">
                   {confirmationAction.kind === "checkout" ? (
                     <>
                       <div className="room-folio-confirm-copy">

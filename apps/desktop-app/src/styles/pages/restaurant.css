@@ -38,10 +38,6 @@
   grid-template-columns: 1fr;
 }
 
-.restaurant-layout .reservation-toolbar {
-  grid-template-columns: 1fr;
-}
-
 .restaurant-page .combined-section {
   gap: 6px;
 }
@@ -56,11 +52,6 @@
 }
 
 .restaurant-page .reservations-workspace {
-  gap: 6px;
-}
-
-.restaurant-page .reservation-toolbar {
-  grid-template-columns: 1fr;
   gap: 6px;
 }
 
@@ -197,7 +188,7 @@
   align-items: start;
 }
 
-.restaurant-layout > .operation-group-panel {
+.restaurant-layout > .operation-group-panel  {
   height: auto;
 }
 
@@ -392,39 +383,11 @@
   border: 0;
 }
 
-.table-order-backdrop {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  display: flex;
-  justify-content: flex-end;
-  background: rgba(3, 8, 17, 0.72);
-  backdrop-filter: blur(3px);
-}
-
 .table-order-drawer {
   display: flex;
-  width: min(1040px, calc(100vw - 24px));
-  min-width: 760px;
-  height: 100%;
+
   flex-direction: column;
   overflow: hidden;
-  color: var(--color-text);
-  background: var(--color-bg-panel);
-  border-left: 1px solid var(--color-border-strong);
-  box-shadow: var(--shadow-xl);
-}
-
-.table-order-drawer-header {
-  display: flex;
-  min-height: 66px;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: 10px 14px;
-  background: color-mix(in srgb, var(--color-bg-panel) 94%, transparent);
-  border-bottom: 1px solid var(--color-border);
-  backdrop-filter: blur(8px);
 }
 
 .table-order-drawer-header > div:first-child {
@@ -800,14 +763,8 @@
 }
 
 .table-order-drawer-footer {
-  display: grid;
-  min-height: 78px;
   grid-template-columns: minmax(0, 1fr);
   align-content: center;
-  gap: 6px;
-  padding: 9px 14px;
-  background: var(--color-bg-panel);
-  border-top: 1px solid var(--color-border);
 }
 
 .table-order-drawer-footer > p {
@@ -832,29 +789,18 @@
 }
 
 @media (max-width: 1080px) {
-
-  .table-order-drawer {
-    width: calc(100vw - 12px);
-    min-width: 0;
-  }
-}
-
-@media (max-width: 1080px) {
-
   .table-order-drawer-body {
     grid-template-columns: minmax(320px, 0.82fr) minmax(420px, 1.18fr);
   }
 }
 
 @media (max-width: 1080px) {
-
   .table-order-drawer-footer {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 1080px) {
-
   .table-order-drawer-footer > p {
     display: none;
   }
@@ -872,7 +818,6 @@
 }
 
 @media (max-width: 1180px) {
-
   .restaurant-layout {
     grid-template-columns: 1fr;
   }
@@ -971,21 +916,18 @@
 }
 
 @media (max-width: 1100px) {
-
   .restaurant-page .operations-grid.compact-resource-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-
   .restaurant-page .operations-grid.compact-resource-grid {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 760px) {
-
   .restaurant-page .table-order-footer-actions,
 .restaurant-page .table-order-footer-action-group.is-flow,
 .restaurant-page .table-order-footer-action-group.is-close {
@@ -994,7 +936,6 @@
 }
 
 @media (max-width: 760px) {
-
   .restaurant-page .table-order-footer-actions .action-button {
     flex: 1 1 auto;
   }
@@ -1092,14 +1033,12 @@
 }
 
 @media (max-width: 980px) {
-
   .restaurant-service-actions {
     flex-wrap: wrap;
   }
 }
 
 @media (max-width: 980px) {
-
   .restaurant-service-actions .table-order-status-select {
     width: calc(var(--space-10) + var(--space-10) + var(--space-10) + var(--space-10) + var(--space-5));
   }
@@ -1191,14 +1130,12 @@
 }
 
 @media (max-width: 760px) {
-
   .restaurant-reservation-details > summary {
     align-items: flex-start;
   }
 }
 
 @media (max-width: 760px) {
-
   .restaurant-reservation-summary-copy small {
     white-space: normal;
   }
@@ -1291,14 +1228,12 @@
 }
 
 @media (max-width: 980px) {
-
   .restaurant-room-transfer {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 980px) {
-
   .restaurant-room-transfer-message {
     grid-column: 1;
     margin-top: 0;
@@ -1306,7 +1241,6 @@
 }
 
 @media (max-width: 680px) {
-
   .restaurant-room-transfer-controls {
     grid-template-columns: 1fr;
   }

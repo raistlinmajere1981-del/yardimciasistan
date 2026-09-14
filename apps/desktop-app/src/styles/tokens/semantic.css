@@ -1,4 +1,5 @@
 :root {
+  --color-backdrop: color-mix(in srgb, var(--neutral-900) 64%, transparent);
   --color-bg-app: var(--neutral-100);
   --color-bg-surface: var(--neutral-50);
   --color-bg-panel: var(--neutral-0);

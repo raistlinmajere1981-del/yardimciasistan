@@ -118,7 +118,7 @@ export function RestaurantRoomTransferPanel({
 
   return (
     <section className="restaurant-room-transfer" aria-labelledby="restaurant-room-transfer-title">
-      <div className="restaurant-room-transfer-heading">
+      <div className="restaurant-room-transfer-heading page-toolbar">
         <span className="restaurant-room-transfer-icon" aria-hidden="true"><BedDouble size={18} /></span>
         <div>
           <span className="operation-panel-eyebrow">Pansiyon + Restoran</span>

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { desktopStyleAudit } from "./lib/desktop-style-audit.mjs";
 
 const ROOT = process.cwd();
 const BASELINE_PATH = path.join(ROOT, "quality", "design-audit-baseline.json");
@@ -143,6 +144,16 @@ function printSummary(metrics) {
   }
 }
 
+const desktopAudit = desktopStyleAudit(walk("apps/desktop-app/src"));
+console.log("desktop-style-inventory", JSON.stringify(desktopAudit.totals));
+for (const issue of desktopAudit.violations) console.log(`  ${issue.kind}: ${issue.file}:${issue.line} ${issue.detail}`);
+if (args.has("--json")) {
+  fs.mkdirSync("artifacts/design-system/stage1", { recursive: true });
+  fs.writeFileSync("artifacts/design-system/stage1/audit.json", JSON.stringify(desktopAudit, null, 2) + "\n");
+}
+const sharedFiles = /\/styles\/(?:layout\/|components\/(?:navigation|header|notifications|panels|toolbars|status|dialogs)\.css$)/;
+const coreViolations = desktopAudit.violations.filter(issue => sharedFiles.test(issue.file));
+if (coreViolations.length) throw new Error(`Shared shell must have zero violations: ${coreViolations.length}`);
 assertTokenContract();
 const current = readMetrics();
 printSummary(current);

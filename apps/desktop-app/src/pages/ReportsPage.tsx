@@ -230,7 +230,7 @@ export function ReportsPage({
             <p className="panel-eyebrow">Ortak tarih filtresi</p>
             <h2>{formatReportPeriod(report.period)}</h2>
           </div>
-          {loading && <span className="report-loading" role="status">Rapor hazırlanıyor…</span>}
+          {loading && <span className="report-loading loading-state" role="status">Rapor hazırlanıyor…</span>}
         </div>
         <div className="report-date-presets" role="group" aria-label="Rapor tarih aralığı">
           {REPORT_PRESETS.map((option) => (

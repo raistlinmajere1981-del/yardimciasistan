@@ -1,34 +1,8 @@
-.local-menu-preview-overlay {
-  position: fixed;
-  z-index: 1000;
-  inset: 0;
-  display: grid;
-  padding: var(--space-5);
-  background: rgba(9, 14, 22, 0.78);
-  place-items: center;
-}
-
 .local-menu-preview-dialog {
   display: grid;
-  width: min(1180px, calc(100vw - 40px));
-  height: min(900px, calc(100vh - 40px));
+
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  background: var(--color-bg-panel);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
-}
-
-.local-menu-preview-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  min-height: 68px;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-panel);
 }
 
 .local-menu-preview-toolbar > div {
@@ -48,21 +22,6 @@
   font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.local-menu-preview-toolbar button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  min-height: 40px;
-  padding: var(--space-2) var(--space-3);
-  color: var(--color-text);
-  background: var(--color-bg-hover);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-  font-weight: 800;
 }
 
 .local-menu-preview-viewport {
@@ -330,29 +289,12 @@
 }
 
 @media (max-width: 780px) {
-
-  .local-menu-preview-overlay {
-    padding: var(--space-2);
-  }
-}
-
-@media (max-width: 780px) {
-
-  .local-menu-preview-dialog {
-    width: calc(100vw - 16px);
-    height: calc(100vh - 16px);
-  }
-}
-
-@media (max-width: 780px) {
-
   .local-menu-preview-toolbar span {
     display: none;
   }
 }
 
 @media (max-width: 780px) {
-
   .local-menu-preview-page {
     width: calc(100% - 16px);
     margin: var(--space-2) auto;
@@ -360,7 +302,6 @@
 }
 
 @media (max-width: 780px) {
-
   .local-menu-hero {
     min-height: 280px;
     padding: 22px 18px;
@@ -368,7 +309,6 @@
 }
 
 @media (max-width: 780px) {
-
   .local-menu-preview-categories,
 .local-menu-preview-footer {
     display: grid;
@@ -377,14 +317,12 @@
 }
 
 @media (max-width: 780px) {
-
   .local-menu-preview-categories > p {
     white-space: normal;
   }
 }
 
 @media (max-width: 780px) {
-
   .local-menu-preview-grid {
     grid-template-columns: 1fr;
   }

@@ -141,7 +141,7 @@ export function MenuManager({
         <section className="panel menu-list-panel category-panel">
           <div className="panel-heading compact">
             <h2>Kategoriler</h2>
-            <div className="menu-heading-actions">
+            <div className="menu-heading-actions page-toolbar__actions">
               <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
               <button className="icon-command" type="button" onClick={onNewCategory} aria-label="Kategori ekle" title="Kategori ekle">
                 <Plus size={18} aria-hidden="true" />
@@ -202,7 +202,7 @@ export function MenuManager({
                 />
               </label>
             </div>
-            <div className="menu-form-actions">
+            <div className="menu-form-actions action-row">
               {categoryForm.id && (
                 <ActionButton variant="danger" size="sm" type="button" onClick={onDeleteCategory} disabled={menuEditState === "loading"}>
                   <Trash2 size={16} aria-hidden="true" />
@@ -223,7 +223,7 @@ export function MenuManager({
               <h2>Ürünler</h2>
               <span>{selectedCategoryName}</span>
             </div>
-            <div className="menu-heading-actions">
+            <div className="menu-heading-actions page-toolbar__actions">
               {stockImageImportEnabled && (
                 <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
               )}
@@ -420,7 +420,7 @@ export function MenuManager({
 
             <div className="menu-editor-footer">
               <p className={`menu-status sync-${menuEditState}`} role="status" aria-live="polite">{menuEditMessage}</p>
-              <div className="menu-editor-actions">
+              <div className="menu-editor-actions action-row">
                 {itemForm.id && (
                   <ActionButton variant="danger" size="sm" type="button" onClick={onDeleteItem} disabled={menuEditState === "loading"}>
                     <Trash2 size={16} aria-hidden="true" />

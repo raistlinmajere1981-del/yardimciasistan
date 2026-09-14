@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-export type StatusTone = "info" | "wait" | "ok" | "danger" | "neutral";
+export type StatusTone = "info" | "wait" | "ok" | "danger" | "neutral" | "success" | "warning";
 
 interface StatusBadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: StatusTone;

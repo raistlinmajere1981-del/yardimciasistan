@@ -92,7 +92,7 @@ export function OperationCalendarPage({
 
   return (
     <section className="operation-calendar-page" aria-label="Operasyon takvimi">
-      <div className="operation-calendar-toolbar panel">
+      <div className="operation-calendar-toolbar page-toolbar panel">
         <div className="operation-calendar-title-block">
           <div className="operation-calendar-title-icon" aria-hidden="true">
             <CalendarDays size={22} />

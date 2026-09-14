@@ -33,7 +33,7 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
 
   return <section className="customer-credit-panel" aria-label="Veresiye hesabı" aria-busy={loading}>
     <div className="customer-credit-heading"><h3>Veresiye</h3><span>Güncel borç</span></div>
-    {loading && <p>Hesap yükleniyor…</p>}
+    {loading && <p className="loading-state" role="status">Hesap yükleniyor…</p>}
     {error && <ActionButton variant="secondary" onClick={() => void reload()}>Hesabı Yenile</ActionButton>}
     {account && <>
       <CustomerCreditBalances balances={account.balances} />

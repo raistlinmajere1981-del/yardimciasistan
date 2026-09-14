@@ -76,13 +76,13 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
 
   return (
     <div
-      className="manual-request-backdrop"
+      className="manual-request-backdrop overlay overlay--drawer"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="manual-request-drawer" role="dialog" aria-modal="true" aria-labelledby="room-public-details-editor-title">
-        <header className="manual-request-drawer-header">
+      <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="room-public-details-editor-title">
+        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
           <div className="manual-request-heading">
             <p>Müşteriye açık oda bilgileri</p>
             <h2 id="room-public-details-editor-title">Oda bilgilerini düzenle</h2>

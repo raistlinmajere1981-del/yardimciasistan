@@ -277,7 +277,7 @@ export function FinanceWorkspace({
 
       {outstandingRows.length > 0 && (
         <Panel className="finance-outstanding-panel" padding="compact">
-          <div className="finance-section-heading">
+          <div className="finance-section-heading page-toolbar">
             <div>
               <h3>Bekleyen Alacaklar</h3>
               <p>Kimin ne kadar borcu kaldığını burada görün; tahsilatı oda adisyonundan yapın.</p>
@@ -305,7 +305,7 @@ export function FinanceWorkspace({
 
       {entryMode && (
         <Panel className="finance-entry-panel" padding="compact">
-          <div className="finance-form-heading">
+          <div className="finance-form-heading page-toolbar">
             <div>
               <strong>{entryMode === "income" ? "Gelir Ekle" : "Gider Ekle"}</strong>
               <span>Nakit ve bugünün tarihi varsayılan gelir; gerekiyorsa değiştirebilirsiniz.</span>
@@ -357,7 +357,7 @@ export function FinanceWorkspace({
       )}
 
       <Panel className="finance-recent-panel">
-        <div className="finance-section-heading">
+        <div className="finance-section-heading page-toolbar">
           <div>
             <h3>Son Hareketler</h3>
             <p>
@@ -365,7 +365,7 @@ export function FinanceWorkspace({
               {hasOlderEntries && !showAllEntries ? ` · son ${RECENT_ENTRY_PREVIEW_COUNT} kayıt` : ""}
             </p>
           </div>
-          {loading && <span>Yükleniyor…</span>}
+          {loading && <span className="loading-state" role="status">Yükleniyor…</span>}
         </div>
         {data.recentEntries.length === 0 ? (
           <p className="finance-empty">Henüz kasa hareketi yok.</p>
@@ -399,12 +399,12 @@ export function FinanceWorkspace({
         )}
       </Panel>
 
-      {message && <p className="finance-feedback" role="status">{message}</p>}
+      {message && <p className="finance-feedback status-message" role="status">{message}</p>}
 
       {pendingDelete && (
-        <div className="finance-confirm-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setPendingDelete(null); }}>
-          <section className="finance-confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="finance-delete-title">
-            <button className="finance-confirm-close" type="button" aria-label="Kapat" disabled={saving} onClick={() => setPendingDelete(null)}><X size={18} /></button>
+        <div className="finance-confirm-overlay overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setPendingDelete(null); }}>
+          <section className="finance-confirm-dialog dialog dialog--compact" role="dialog" aria-modal="true" aria-labelledby="finance-delete-title">
+            <button className="finance-confirm-close overlay-close" type="button" aria-label="Kapat" disabled={saving} onClick={() => setPendingDelete(null)}><X size={18} /></button>
             <p className="panel-eyebrow">Kasa kaydı</p>
             <h3 id="finance-delete-title">Bu hareket kaldırılsın mı?</h3>
             <p><strong>{pendingDelete.description || categoryLabel(pendingDelete.category)}</strong> · {minorMoney(pendingDelete.amountMinor)}</p>

@@ -16,7 +16,7 @@
     "architecture:audit": "node scripts/architecture-audit.mjs",
     "design:audit": "node scripts/design-system-audit.mjs",
     "design:audit:baseline": "node scripts/design-system-audit.mjs --write-baseline",
-    "design:audit:strict": "node scripts/design-system-audit.mjs --strict",
+    "design:audit:strict": "node --test scripts/test-desktop-style-audit.mjs && node scripts/design-system-audit.mjs --strict",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint \"apps/**/*.{js,mjs,cjs,ts,tsx}\" \"packages/**/*.{js,mjs,cjs,ts,tsx}\" \"scripts/**/*.{js,mjs,cjs,ts}\" \"tests/**/*.{js,mjs,cjs,ts,tsx}\"",
     "lint:strict": "npm run lint -- --quiet",
     "lint:fix": "npm run lint -- --fix",
@@ -53,7 +53,7 @@
     "e2e": "playwright test",
     "lint:php": "node scripts/php-lint.mjs",
     "screenshots:demo-web": "node scripts/capture-demo-web.mjs",
-    "smoke:desktop-renderer": "node scripts/run-current-contract-smoke.mjs renderer && npm run smoke:desktop-design-system",
+    "smoke:desktop-renderer": "node scripts/run-current-contract-smoke.mjs renderer && npm run smoke:desktop-design-system && npm run smoke:desktop-shell",
     "smoke:desktop-design-system": "node scripts/smoke-desktop-design-system.mjs",
     "smoke:desktop-easy-mode": "node scripts/smoke-desktop-easy-mode.mjs",
     "smoke:table-categories": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-table-categories-db.mjs",
@@ -100,7 +100,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "smoke:desktop-clean-startup": "npm run build:packages && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-clean-startup.mjs",
-    "smoke:database-baseline": "npm run build:packages && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-database-baseline.mjs"
+    "smoke:database-baseline": "npm run build:packages && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-database-baseline.mjs",
+    "smoke:desktop-shell": "node scripts/smoke-desktop-shell.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

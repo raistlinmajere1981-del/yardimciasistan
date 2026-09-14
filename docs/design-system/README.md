@@ -189,3 +189,16 @@ Token/tema dışında **157 ham renk literal'i** ve **1598 px/rem literal'i** ka
 - `git diff --check`: temiz.
 
 Pilot build sırasında yeniden üretilen `firm-template/web-module/widget.js` başlangıç hâline geri alındı; nihai değişiklik kapsamında değildir. Commit kapsamı design-system kaynakları, gerekli renderer değişiklikleri, smoke/audit scriptleri, sürüm kontrollü audit baseline ve bu README ile sınırlıdır. Artifact, screenshot ve üretilmiş raporlar kapsam dışıdır.
+
+## Yeni feature nasıl stil yazmalı? (Aşama 1)
+
+Güncel envanter ve migration sırası: [Desktop UI Migration](DESKTOP_UI_MIGRATION.md). Yukarıdaki sayısal sonuçlar ilk foundation/Settings refactoruna aittir; Aşama 1'in güncel ölçümleri envanter belgesindedir.
+
+1. Mevcut AppShell/PageHeader'ı kullanın. Feature CSS'inde sidebar, topbar, content viewport veya page padding tanımlamayın. Sayfalar fluid; sınırlı okuma alanı için `page-content--bounded` / reading token tercih edin.
+2. Bölümleri `page-section`, `page-section__header/body`; panelleri `Panel` / `panel`; yalnız dış kart yüzeyini `surface` ile kurun. Normal panel padding'i token, compact görünüm açık varyanttır.
+3. Filtre/aksiyon satırları `page-toolbar`, `page-toolbar__start`, `page-toolbar__actions`; kısa aksiyon grupları `action-row` kullanır. Kontrolleri büyüterek boşluk doldurmayın.
+4. Native label/input ve `form-field--xs/short/medium/long/fluid` kullanın. Butonlar ActionButton varyantlarını izler; full-width açık tercih olmalıdır.
+5. Mesajlar `status-message` ve `--info/success/warning/danger`; empty-state başlık/açıklama/opsiyonel action; loading-state inline veya `--panel/--page`. Dinamik sonuçlarda uygun role=status/alert ekleyin; statik açıklamaları live region yapmayın.
+6. Modal/drawer dış yüzeyi `overlay`, `dialog`/`drawer`, `overlay-header/body/footer/close` sözleşmesini kullanır. Feature yalnız gövdeyi biçimlendirir; focus ve kapatma davranışını mevcut component yönetir.
+7. Global/shared CSS yalnız styles/index.css üzerinden açık layer ile import edilir. Gerçek feature kuralları feature stylesheet'inde kalır. Token/theme dışında ham renk, `--override-*`, `!important` ve primitive'i ezen global selector eklemeyin.
+8. `npm run design:audit:strict` ve `npm run smoke:desktop-shell` çalıştırın. Yeni shell smoke renderer/pilot zincirine dahildir; screenshot ve raporlar artifacts altında kalır.

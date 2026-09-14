@@ -291,11 +291,11 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
         <Sparkles size={16} aria-hidden="true" /> AI ile Stok Ekle
       </button>
       {open && (
-        <div className="stock-image-overlay" role="presentation">
-          <section className="stock-image-dialog" role="dialog" aria-modal="true" aria-labelledby="stock-image-title">
-            <header className="stock-image-header">
+        <div className="stock-image-overlay overlay" role="presentation">
+          <section className="stock-image-dialog dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="stock-image-title">
+            <header className="stock-image-header overlay-header">
               <div><span>Güvenli stok taslağı</span><h2 id="stock-image-title">AI ile Stok Ekle</h2></div>
-              <button type="button" onClick={closeWorkspace} aria-label="Stok görseli ekranını kapat"><X size={20} /></button>
+              <button className="overlay-close" type="button" onClick={closeWorkspace} aria-label="Stok görseli ekranını kapat"><X size={20} /></button>
             </header>
             <div className="stock-image-steps" aria-label="İçe aktarma aşamaları">
               <span className={stage === "image" ? "is-active" : "is-done"}>1 · Görsel</span>
@@ -315,7 +315,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
                 {cameraStream && <button className="primary-command stock-camera-capture" type="button" onClick={() => void captureCameraFrame()}>Fotoğrafı Çek</button>}
                 {selectedFile && <div className="stock-image-preview-actions"><button type="button" onClick={() => setRotation((current) => (current + 90) % 360)}><RotateCw size={16} /> 90° döndür</button><button type="button" onClick={() => void startCamera()}><Camera size={16} /> Yeniden çek</button><button type="button" onClick={() => fileInputRef.current?.click()}><FileImage size={16} /> Başka görsel seç</button></div>}
                 <p className="stock-image-privacy">Görsel, analiz için işletmenizin yapılandırdığı AI sağlayıcısına gönderilir; uygulama görseli kalıcı saklamaz.</p>
-                {error && <p className="stock-image-error" role="alert">{error}</p>}
+                {error && <p className="stock-image-error status-message status-message--danger" role="alert">{error}</p>}
                 <footer className="stock-image-footer"><button type="button" onClick={closeWorkspace}>Manuel stok ekranına dön</button><button className="primary-command" type="button" disabled={!selectedFile} onClick={() => void analyzeImage()}>Analiz Et</button></footer>
               </div>
             )}
@@ -323,7 +323,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
             {stage === "review" && (
               <div className="stock-image-review">
                 <div className="stock-image-document"><div><span>Tedarikçi</span><strong>{analysis?.document.supplier_name || "Okunamadı"}</strong></div><div><span>Belge no</span><strong>{analysis?.document.invoice_number || "Okunamadı"}</strong></div><div><span>Tarih</span><strong>{analysis?.document.invoice_date || "Okunamadı"}</strong></div></div>
-                {message && <p className="stock-image-info" role="status">{message}</p>}
+                {message && <p className="stock-image-info status-message status-message--info" role="status">{message}</p>}
                 {duplicateWarning && <label className="stock-image-duplicate-warning"><input type="checkbox" checked={duplicateAcknowledged} onChange={(event) => setDuplicateAcknowledged(event.target.checked)} /><span><strong>Bu görsel daha önce stok girişinde kullanılmış olabilir.</strong> Yönetici olarak yine de uygulamak istediğimi onaylıyorum.</span></label>}
                 <div className="stock-image-table" role="table" aria-label="AI stok eşleştirme taslağı">
                   <div className="stock-image-table-head" role="row"><span>Faturada okunan</span><span>Menü karşılığı</span><span>Eklenecek miktar</span><span>Güven</span><span>İşlem</span></div>
@@ -331,7 +331,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
                   {reviewLines.length === 0 && <p className="stock-image-no-lines">Eşleşen satır bulunamadı. Manuel bir satır ekleyebilirsiniz.</p>}
                 </div>
                 <button className="stock-image-add-line" type="button" onClick={addManualLine}><Plus size={16} /> Manuel satır ekle</button>
-                {error && <p className="stock-image-error" role="alert">{error}</p>}
+                {error && <p className="stock-image-error status-message status-message--danger" role="alert">{error}</p>}
                 <footer className="stock-image-review-footer"><div><strong>{applicableLines.length}</strong><span>uygulanacak satır</span></div><div><strong>{totalQuantitySummary}</strong><span>toplam miktar</span></div><div><strong>{needsReviewCount}</strong><span>kontrol gerekli</span></div><button type="button" onClick={returnToImage}>Görsele dön</button><button className="primary-command" type="button" disabled={applicableLines.length === 0 || (duplicateWarning && !duplicateAcknowledged)} onClick={() => void applyImport()}>Stokları Güncelle</button></footer>
               </div>
             )}

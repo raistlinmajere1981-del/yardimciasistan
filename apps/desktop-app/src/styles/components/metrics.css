@@ -1,11 +1,4 @@
 .metric-card {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-panel);
-  box-shadow: var(--shadow-md);
-}
-
-.metric-card {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -112,7 +105,6 @@
 }
 
 @media (max-width: 1400px) {
-
   .metric-card {
     min-height: 80px;
     padding: var(--space-2) 10px;

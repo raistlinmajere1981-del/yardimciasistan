@@ -13,7 +13,7 @@ export interface MetricCardProps {
 
 export function MetricCard({ title, value, detail, tone, icon: Icon, compact = false }: MetricCardProps) {
   return (
-    <article className={`metric-card tone-${tone}${compact ? " metric-card-compact" : ""}`}>
+    <article className={`surface metric-card tone-${tone}${compact ? " metric-card-compact" : ""}`}>
       <div className="metric-icon">
         <Icon size={19} aria-hidden="true" />
       </div>

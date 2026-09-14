@@ -96,13 +96,13 @@ export function ManualReservationEditor({
 
   return (
     <div
-      className="manual-request-backdrop"
+      className="manual-request-backdrop overlay overlay--drawer"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="manual-request-drawer" role="dialog" aria-modal="true" aria-labelledby="manual-reservation-editor-title">
-        <header className="manual-request-drawer-header">
+      <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-reservation-editor-title">
+        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
           <div className="manual-request-heading">
             <p>Pansiyon rezervasyonları</p>
             <h2 id="manual-reservation-editor-title">{isEditing ? "Rezervasyonu düzenle" : "Yeni rezervasyon ekle"}</h2>

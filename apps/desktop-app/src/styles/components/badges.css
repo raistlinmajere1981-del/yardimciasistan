@@ -15,6 +15,7 @@
   white-space: nowrap;
 }
 
+.status-badge.success,
 .status-badge.ok,
 .status-badge.tone-ok,
 .status-badge.is-success,
@@ -24,6 +25,7 @@
   background: var(--color-success-soft);
 }
 
+.status-badge.warning,
 .status-badge.wait,
 .status-badge.tone-wait,
 .backup-kind.is-safety {

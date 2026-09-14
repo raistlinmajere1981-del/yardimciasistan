@@ -15,7 +15,12 @@
 @import "./foundation/focus.css" layer(foundation);
 @import "./components/badges.css" layer(components.primitives);
 @import "./components/buttons.css" layer(components.primitives);
-@import "./components/dialogs.css" layer(components.legacy);
+@import "./components/dialogs.css" layer(components.primitives);
+@import "./components/navigation.css" layer(components.primitives);
+@import "./components/header.css" layer(components.primitives);
+@import "./components/notifications.css" layer(components.primitives);
+@import "./components/toolbars.css" layer(components.primitives);
+@import "./components/status.css" layer(components.primitives);
 @import "./components/disclosures.css" layer(components.primitives);
 @import "./components/feedback.css" layer(components.legacy);
 @import "./components/forms.css" layer(components.primitives);
@@ -25,7 +30,7 @@
 @import "./components/panels.css" layer(components.primitives);
 @import "./components/records.css" layer(components.legacy);
 @import "./components/resources.css" layer(components.legacy);
-@import "./components/segmented-control.css" layer(components.legacy);
+
 @import "./layout/app-shell.css" layer(layout);
 @import "./layout/page.css" layer(layout);
 @import "./layout/responsive.css" layer(layout);

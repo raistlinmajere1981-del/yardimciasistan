@@ -142,7 +142,7 @@ export function DashboardPage({
   );
 
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page page-section">
       <section className="dashboard-briefing" aria-labelledby="dashboard-briefing-title">
         <div className="dashboard-day-card">
           <p className="dashboard-date"><Clock3 size={15} aria-hidden="true" />{formatLongTurkishDate(dashboard.today)}</p>
@@ -163,7 +163,7 @@ export function DashboardPage({
 
       <section className="dashboard-workspace">
         <Panel className="dashboard-priority-panel" aria-labelledby="dashboard-priority-title">
-          <div className="dashboard-section-heading">
+          <div className="dashboard-section-heading page-toolbar">
             <div>
               <p>Öncelik sırası</p>
               <h2 id="dashboard-priority-title">Şimdi yapılacaklar</h2>
@@ -194,7 +194,7 @@ export function DashboardPage({
 
         {(calendarEnabled || capacityVisible) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
           {calendarEnabled && <Panel className="dashboard-timeline-panel" padding="compact">
-            <div className="dashboard-section-heading compact">
+            <div className="dashboard-section-heading page-toolbar compact">
               <div>
                 <p>Takvim</p>
                 <h2>Sıradaki zamanlar</h2>
@@ -229,7 +229,7 @@ export function DashboardPage({
           </Panel>}
 
           {capacityVisible && <Panel className="dashboard-capacity-panel" padding="compact">
-            <div className="dashboard-section-heading compact">
+            <div className="dashboard-section-heading page-toolbar compact">
               <div>
                 <p>{hasCapacityMetrics ? "Anlık durum" : "AI Yardımcı"}</p>
                 <h2>{hasCapacityMetrics ? "İşletme kapasitesi" : "Günlük değerlendirme"}</h2>

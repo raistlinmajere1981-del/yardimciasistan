@@ -62,13 +62,13 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
 
   return (
     <div
-      className="manual-request-backdrop"
+      className="manual-request-backdrop overlay overlay--drawer"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="manual-request-drawer" role="dialog" aria-modal="true" aria-labelledby="daily-task-editor-title">
-        <header className="manual-request-drawer-header">
+      <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="daily-task-editor-title">
+        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
           <div className="manual-request-heading">
             <p>{areaLabel} günlük işleri</p>
             <h2 id="daily-task-editor-title">{task ? "Günlük işi düzenle" : "Yeni günlük iş ekle"}</h2>

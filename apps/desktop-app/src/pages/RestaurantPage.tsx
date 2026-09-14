@@ -116,7 +116,7 @@ export function RestaurantPage({
 
   return (
     <section className="combined-page restaurant-page" aria-label="Restoran yönetimi">
-      <section className="operation-group-panel operation-summary-panel restaurant-summary-panel" aria-labelledby="restaurant-summary-title">
+      <section className="panel operation-group-panel operation-summary-panel restaurant-summary-panel" aria-labelledby="restaurant-summary-title">
         <header className="operation-panel-heading">
           <span className="operation-panel-eyebrow">Servis</span>
           <h2 id="restaurant-summary-title">Bugün</h2>
@@ -136,7 +136,7 @@ export function RestaurantPage({
           </span>
           <span className="restaurant-reservation-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
         </summary>
-        <section className="operation-group-panel restaurant-reservations-section" aria-labelledby="restaurant-reservations-title">
+        <section className="panel operation-group-panel restaurant-reservations-section" aria-labelledby="restaurant-reservations-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Rezervasyon</span>
             <h2 id="restaurant-reservations-title">Masa Rezervasyonları</h2>
@@ -155,7 +155,7 @@ export function RestaurantPage({
       )}
 
       <div className="restaurant-layout">
-        <section className="operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
+        <section className="panel operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Servis</span>
             <h2 id="restaurant-tables-title">Masalar</h2>
@@ -175,7 +175,7 @@ export function RestaurantPage({
             />
           </div>
         </section>
-        {tasksEnabled && <section className="operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
+        {tasksEnabled && <section className="panel operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Günlük İşler</span>
             <h2 id="restaurant-tasks-title">Yapılacak İşler</h2>

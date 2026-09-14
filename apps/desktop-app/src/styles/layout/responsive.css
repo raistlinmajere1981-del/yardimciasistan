@@ -1,23 +1,17 @@
-/* The renderer also works in a narrow desktop window. Sidebar collapse remains
-   the user's existing control; responsive layout does not mutate preferences. */
-
+/* Contract: wide >1440, desktop 1101–1440, compact 761–1100, narrow <=760.
+   Media queries use literal boundaries: CSS custom properties cannot be used here. */
+@media (max-width: 1100px) {
+  :root { --page-padding: var(--space-4); }
+  .page-header-tools .sync-pill > span { display: none; }
+}
 @media (max-width: 760px) {
-
-  :root {
-    --page-padding: var(--space-3);
-    --panel-padding: var(--space-4);
-  }
-
-  .page-header {
-    gap: var(--space-2);
-  }
-
-  .page-header-eyebrow,
-.page-header-copy > p {
-    display: none;
-  }
-
-  .page-header-title-row {
-    flex-wrap: wrap;
-  }
+  :root { --page-padding: var(--space-3); --panel-padding: var(--space-4); }
+  .page-header { flex-wrap: wrap; gap: var(--space-2); }
+  .page-header-copy { flex: 1 1 100%; }
+  .page-header__actions { width: 100%; }
+  .page-header-tools { justify-content: flex-start; }
+  .page-header-eyebrow, .page-header__subtitle { display: none; }
+  .page-header-title-row { flex-wrap: wrap; }
+  .page-toolbar { align-items: stretch; flex-direction: column; }
+  .page-toolbar__actions { margin-inline-start: 0; justify-content: flex-start; }
 }

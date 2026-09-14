@@ -184,7 +184,7 @@ export function CustomersWorkspace({
                 <span className="detail-category-label">{formatCustomerSource(selectedCustomer.source)}</span>
                 <h2>{selectedCustomer.fullName}</h2>
               </div>
-              <div className="customer-heading-actions">
+              <div className="customer-heading-actions page-toolbar__actions">
                 {staysEnabled && <StatusBadge tone="info">{selectedCustomer.stayCount} konaklama</StatusBadge>}
                 <ActionButton
                   variant="secondary"
@@ -498,11 +498,11 @@ function CustomerEditorDrawer({
   };
 
   return (
-    <div className="manual-request-backdrop customer-editor-backdrop" onMouseDown={(event) => {
+    <div className="manual-request-backdrop overlay overlay--drawer customer-editor-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <aside className="manual-request-drawer customer-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title">
-        <header className="manual-request-drawer-header">
+      <aside className="manual-request-drawer drawer drawer--scroll customer-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title">
+        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
           <div className="manual-request-heading">
             <p>Müşteri kartı</p>
             <h2 id="customer-editor-title">{customer ? "Müşteri bilgilerini düzenle" : "Yeni müşteri ekle"}</h2>
@@ -580,7 +580,7 @@ function CustomerEditorDrawer({
               <label className="manual-request-note-field">Adres<textarea value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
             </div>
           </section>
-          <div className="manual-request-drawer-footer">
+          <div className="manual-request-drawer-footer overlay-footer overlay-footer--inset">
             <p className={`menu-status sync-${state}`} role="status">{message}</p>
             <div>
               <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>
@@ -630,11 +630,11 @@ export function RoomAssignmentDrawer({
   if (!open) return null;
 
   return (
-    <div className="manual-request-backdrop room-assignment-backdrop" onMouseDown={(event) => {
+    <div className="manual-request-backdrop overlay overlay--drawer room-assignment-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <aside className="manual-request-drawer room-assignment-drawer" role="dialog" aria-modal="true" aria-labelledby="room-assignment-title">
-        <header className="manual-request-drawer-header">
+      <aside className="manual-request-drawer drawer drawer--scroll room-assignment-drawer" role="dialog" aria-modal="true" aria-labelledby="room-assignment-title">
+        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
           <div className="manual-request-heading"><p>Müşteri · Oda</p><h2 id="room-assignment-title">Odaya müşteri ata</h2></div>
           <button className="drawer-close-button" type="button" aria-label="Oda atama formunu kapat" onClick={onClose}><X size={18} aria-hidden="true" /></button>
         </header>
@@ -676,7 +676,7 @@ export function RoomAssignmentDrawer({
             </select></label>
             <label className="manual-request-note-field">Konaklama notu<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
           </div>
-          <div className="manual-request-drawer-footer">
+          <div className="manual-request-drawer-footer overlay-footer overlay-footer--inset">
             <p className={`menu-status sync-${state}`} role="status">{message}</p>
             <div>
               <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>

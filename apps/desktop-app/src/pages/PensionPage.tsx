@@ -96,7 +96,7 @@ export function PensionPage({
 
   return (
     <section className="combined-page pension-page" aria-label="Pansiyon yönetimi">
-      <section className="pension-today-strip" aria-labelledby="pension-summary-title">
+      <section className="panel pension-today-strip" aria-labelledby="pension-summary-title">
         <div className="pension-today-copy">
           <span className="operation-panel-eyebrow">Bugün</span>
           <h2 id="pension-summary-title">{reservationsEnabled || staysEnabled ? "Konaklama durumu" : "Oda durumu"}</h2>
@@ -117,7 +117,7 @@ export function PensionPage({
 
       <div className="pension-layout pension-primary-layout">
         {reservationsEnabled && (
-          <section className="operation-group-panel pension-reservations-section" aria-labelledby="pension-reservations-title">
+          <section className="panel operation-group-panel pension-reservations-section" aria-labelledby="pension-reservations-title">
             <header className="operation-panel-heading">
               <span className="operation-panel-eyebrow">Konaklama</span>
               <h2 id="pension-reservations-title">Rezervasyon Takibi</h2>
@@ -126,7 +126,7 @@ export function PensionPage({
             <div className="operation-panel-content">{reservations}</div>
           </section>
         )}
-        <aside className="operation-group-panel pension-rooms-section" aria-labelledby="pension-rooms-title">
+        <aside className="panel operation-group-panel pension-rooms-section" aria-labelledby="pension-rooms-title">
           <header className="operation-panel-heading pension-room-heading">
             <div className="pension-room-heading-copy">
               <span className="operation-panel-eyebrow">Odalar</span>
@@ -147,7 +147,7 @@ export function PensionPage({
           </header>
           <div className="operation-panel-content">{rooms}</div>
         </aside>
-        {tasksEnabled && <section className="operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
+        {tasksEnabled && <section className="panel operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Günlük İşler</span>
             <h2 id="pension-tasks-title">Günlük Konaklama İşleri</h2>
@@ -184,7 +184,7 @@ export function PensionPage({
           </span>
           <span className="pension-archive-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
         </summary>
-        <section className="operation-group-panel pension-stays-section" aria-labelledby="pension-stays-title">
+        <section className="panel operation-group-panel pension-stays-section" aria-labelledby="pension-stays-title">
           <header className="operation-panel-heading">
             <span className="operation-panel-eyebrow">Müşteri · Oda</span>
             <h2 id="pension-stays-title">Konaklama Arşivi</h2>

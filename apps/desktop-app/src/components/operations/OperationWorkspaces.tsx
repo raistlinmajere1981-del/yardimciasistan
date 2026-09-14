@@ -118,7 +118,7 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
 
   return (
     <section className="reservations-workspace" aria-label="Günlük işler">
-      <div className="reservation-toolbar">
+      <div className="reservation-toolbar page-toolbar">
         <div className="operation-filter-summary" aria-label="Günlük iş özeti">
           <StatusBadge tone="wait">{tasks.filter((task) => task.status === "pending").length} bekleyen</StatusBadge>
           <StatusBadge tone="ok">{tasks.filter((task) => task.status === "done").length} tamamlanan</StatusBadge>
@@ -282,7 +282,7 @@ export function ReservationsWorkspace({
 
   return (
     <section className="reservations-workspace" aria-label="Rezervasyon yönetimi">
-      <div className="reservation-toolbar">
+      <div className="reservation-toolbar page-toolbar">
         <div className="operation-filter-summary" aria-label="Rezervasyon özeti">
           <StatusBadge tone="info">{filteredReservations.length} görünen kayıt</StatusBadge>
           <StatusBadge tone="wait">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
@@ -558,7 +558,7 @@ export function CustomerRoomStaysWorkspace({
   );
   return (
     <section className="customer-room-stays-workspace" aria-label="Konaklama arşivi">
-      <div className="reservation-toolbar">
+      <div className="reservation-toolbar page-toolbar">
         <div className="operation-filter-summary">
           <StatusBadge tone="info">{stays.filter((stay) => stay.status === "checked_in").length} içeride</StatusBadge>
           <StatusBadge tone="wait">{stays.filter((stay) => stay.status === "planned").length} planlı</StatusBadge>

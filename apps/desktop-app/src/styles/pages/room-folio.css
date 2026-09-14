@@ -7,9 +7,7 @@
 .room-folio-stays-section {
   min-width: 0;
 }
-
 .room-folio-title-row,
-.room-folio-section-heading,
 .room-folio-subheading,
 .room-folio-stay-heading,
 .room-folio-drawer-header,
@@ -56,7 +54,6 @@
   font-weight: 700;
   cursor: pointer;
 }
-
 .room-folio-section-heading {
   margin: 2px 2px 10px;
 }
@@ -138,48 +135,11 @@
   margin: 0;
 }
 
-.room-folio-message {
-  padding: 9px var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
-  color: var(--color-text);
-}
-
-.room-folio-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 220;
-  display: flex;
-  justify-content: flex-end;
-  background: rgba(0, 0, 0, 0.52);
-}
-
 .room-folio-drawer {
-  width: min(1120px, calc(100vw - 110px));
-  height: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  background: var(--color-bg-app);
-  border-left: 1px solid var(--color-border-strong);
-  box-shadow: var(--shadow-xl);
 }
 
-.room-folio-drawer-header,
-.room-folio-drawer-footer {
-  padding: 14px var(--space-4);
-  background: var(--color-bg-panel);
-}
-
-.room-folio-drawer-header {
-  border-bottom: 1px solid var(--color-border);
-}
-
-.room-folio-drawer-footer {
-  border-top: 1px solid var(--color-border);
-}
-
-.room-folio-close,
 .room-folio-line-remove,
 .room-folio-quantity button {
   display: inline-grid;
@@ -196,7 +156,6 @@
 .room-folio-drawer-body {
   min-height: 0;
   overflow: auto;
-  padding: 14px;
 }
 
 .room-folio-details-card,
@@ -467,7 +426,6 @@
 }
 
 @media (max-width: 1100px) {
-
   .room-folio-account-layout,
 .room-folio-stay-grid {
     grid-template-columns: 1fr;
@@ -475,14 +433,12 @@
 }
 
 @media (max-width: 1100px) {
-
   .room-folio-details-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-
   .room-folio-summary-grid,
 .room-folio-totals,
 .room-folio-details-grid,
@@ -493,20 +449,12 @@
 }
 
 @media (max-width: 760px) {
-
-  .room-folio-drawer {
-    width: 100%;
-  }
-}
-
-@media (max-width: 760px) {
-
-  .room-folio-title-row,
-.room-folio-section-heading,
+.room-folio-title-row,
 .room-folio-drawer-footer {
     align-items: stretch;
     flex-direction: column;
   }
+
 }
 
 .room-folio-details-actions {
@@ -562,25 +510,6 @@
   font-size: var(--text-xs);
 }
 
-.room-folio-confirm-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 260;
-  display: grid;
-  place-items: center;
-  padding: var(--space-5);
-  background: rgba(0, 0, 0, 0.58);
-}
-
-.room-folio-confirm-dialog {
-  width: min(480px, calc(100vw - 40px));
-  padding: var(--space-4);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-xl);
-  background: var(--color-bg-panel);
-  box-shadow: var(--shadow-xl);
-}
-
 .room-folio-confirm-copy h3,
 .room-folio-confirm-copy p {
   margin: 0;
@@ -634,7 +563,6 @@
 }
 
 @media (max-width: 720px) {
-
   .room-folio-details-actions {
     align-items: stretch;
     flex-direction: column;
@@ -642,21 +570,18 @@
 }
 
 @media (max-width: 720px) {
-
   .room-folio-details-actions .room-folio-secondary-button {
     width: 100%;
   }
 }
 
 @media (max-width: 720px) {
-
   .room-folio-confirm-actions {
     flex-direction: column-reverse;
   }
 }
 
 @media (max-width: 720px) {
-
   .room-folio-confirm-actions button {
     width: 100%;
   }

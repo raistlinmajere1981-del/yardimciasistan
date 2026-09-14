@@ -466,21 +466,18 @@
 }
 
 @media (max-width: 1180px) {
-
   .whatsapp-workspace {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 1180px) {
-
   .message-mode-switch {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 1180px) {
-
   .whatsapp-workspace {
     grid-template-areas: "requests"
       "copy"
@@ -489,14 +486,12 @@
 }
 
 @media (max-width: 1180px) {
-
   .messages-page .compact-detail-meta {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 1180px) {
-
   .whatsapp-view-safe .whatsapp-request-panel,
 .whatsapp-view-safe .whatsapp-copy-panel {
     height: auto;
@@ -505,21 +500,18 @@
 }
 
 @media (max-width: 1180px) {
-
   .whatsapp-view-web {
     height: auto;
   }
 }
 
 @media (max-width: 1180px) {
-
   .whatsapp-view-web .whatsapp-request-panel {
     height: 280px;
   }
 }
 
 @media (max-width: 1180px) {
-
   .whatsapp-view-web .whatsapp-live-panel {
     height: 600px;
   }
@@ -542,4 +534,8 @@
 .messages-page .message-mode-switch > button {
   min-height: var(--control-height-md);
   padding-inline: var(--space-3);
+}
+
+.persistent-messages-page.is-hidden {
+  display: none;
 }

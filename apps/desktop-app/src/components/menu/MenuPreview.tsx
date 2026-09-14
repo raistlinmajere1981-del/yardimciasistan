@@ -66,20 +66,20 @@ export function LocalMenuPreview({ menu, setupData, webModuleUrl, whatsappEnable
 
   return (
     <div
-      className="local-menu-preview-overlay"
+      className="local-menu-preview-overlay overlay"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <section ref={dialogRef} className="local-menu-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="local-menu-preview-title">
-        <header className="local-menu-preview-toolbar">
+      <section ref={dialogRef} className="local-menu-preview-dialog dialog dialog--wide dialog--preview" role="dialog" aria-modal="true" aria-labelledby="local-menu-preview-title">
+        <header className="local-menu-preview-toolbar overlay-header">
           <div>
             <strong id="local-menu-preview-title">Yerel Menü Önizlemesi</strong>
             <span>{qrMenuEnabled ? "Düzenleme alanındaki canlı taslak gösteriliyor; kaydetmeden web yayını etkilenmez." : "Düzenleme alanındaki yerel menü taslağı gösteriliyor."}</span>
           </div>
-          <button ref={closeButtonRef} type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
+          <button className="overlay-close" ref={closeButtonRef} type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
             <X size={18} aria-hidden="true" />
             Kapat
           </button>

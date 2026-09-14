@@ -160,12 +160,12 @@ export function DesktopAppFrame({
                   <span role="status" aria-live="polite">
                     {qrMenuEnabled ? menuStatusMessage : "Menü içeriği yerel olarak düzenleniyor."}
                   </span>
-                  <button className="secondary-sync-action" type="button" onClick={openMenuPreview}>
+                  <button className="action-button action-button-secondary action-button-sm secondary-sync-action" type="button" onClick={openMenuPreview}>
                     <Eye size={16} aria-hidden="true" />
                     Önizle
                   </button>
                   {qrMenuEnabled && (
-                    <button type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
+                    <button className="action-button action-button-sm" type="button" onClick={handlePublishMenu} disabled={menuPublishState === "loading"}>
                       <UploadCloud size={16} aria-hidden="true" />
                       Web'e Yayınla
                     </button>
@@ -180,7 +180,7 @@ export function DesktopAppFrame({
               ) : activePage === "settings" ? (
                 <div className={`sync-pill sync-${setupSaveState}`}>
                   <span>{setupMessage}</span>
-                  <button type="button" onClick={handleSaveSetup} disabled={setupSaveState === "loading"}>
+                  <button className="action-button action-button-sm" type="button" onClick={handleSaveSetup} disabled={setupSaveState === "loading"}>
                     <Save size={16} aria-hidden="true" />
                     Ayarları Kaydet
                   </button>
@@ -192,6 +192,7 @@ export function DesktopAppFrame({
                     {automaticSyncStatus.pendingJobs > 0 ? ` · ${automaticSyncStatus.pendingJobs} eşitleme bekliyor` : ""}
                   </span>
                   <button
+                    className="action-button action-button-sm"
                     type="button"
                     title={automaticSyncStatus.message}
                     onClick={handlePullRequests}

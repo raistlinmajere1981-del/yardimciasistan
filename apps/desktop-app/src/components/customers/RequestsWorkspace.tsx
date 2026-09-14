@@ -316,15 +316,15 @@ export function RequestsWorkspace({
 
       {showManualForm && manualFormOpen && (
         <div
-          className="manual-request-backdrop"
+          className="manual-request-backdrop overlay overlay--drawer"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) {
               setManualFormOpen(false);
             }
           }}
         >
-          <aside className="manual-request-drawer" role="dialog" aria-modal="true" aria-labelledby="manual-request-title">
-            <header className="manual-request-drawer-header">
+          <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-request-title">
+            <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
               <div className="manual-request-heading">
                 <p>Manuel kayıt</p>
                 <h2 id="manual-request-title">Yeni talep ekle</h2>
@@ -397,7 +397,7 @@ export function RequestsWorkspace({
                   </label>
                 </div>
               </details>
-              <div className="manual-request-drawer-footer">
+              <div className="manual-request-drawer-footer overlay-footer overlay-footer--inset">
                 <p className={`menu-status sync-${manualRequestState}`} role="status">{manualRequestMessage}</p>
                 <div>
                   <ActionButton variant="secondary" type="button" onClick={() => setManualFormOpen(false)}>Vazgeç</ActionButton>

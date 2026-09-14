@@ -13,7 +13,7 @@ export function AppShell({ sidebar, sidebarCollapsed = false, header, children, 
   return (
     <div className={sidebarCollapsed ? "desktop-shell is-sidebar-collapsed" : "desktop-shell"}>
       {sidebar}
-      <main className="content" ref={contentRef}>
+      <main className="content page" ref={contentRef}>
         {header}
         <div className="page-content">{children}</div>
       </main>

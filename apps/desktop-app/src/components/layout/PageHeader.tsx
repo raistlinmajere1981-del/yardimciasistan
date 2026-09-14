@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 
 interface PageHeaderProps {
   title: string;
@@ -8,16 +8,27 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, eyebrow, description, action }: PageHeaderProps) {
+  const headerRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    const viewport = header?.parentElement;
+    if (!header || !viewport) return;
+    const update = () => viewport.style.setProperty("--sticky-header-offset", `${header.offsetHeight}px`);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    return () => { observer.disconnect(); viewport.style.removeProperty("--sticky-header-offset"); };
+  }, []);
   return (
-    <header className="topbar page-header">
+    <header ref={headerRef} className="page-header">
       <div className="page-header-copy">
         <div className="page-header-title-row">
           {eyebrow && <span className="page-header-eyebrow">{eyebrow}</span>}
-          <h1>{title}</h1>
+          <h1 className="page-header__title">{title}</h1>
         </div>
-        {description && <p>{description}</p>}
+        {description && <p className="page-header__subtitle">{description}</p>}
       </div>
-      {action && <div className="page-header-action">{action}</div>}
+      {action && <div className="page-header__actions">{action}</div>}
     </header>
   );
 }

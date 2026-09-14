@@ -79,7 +79,7 @@ export function RestaurantReservationsWorkspace({
 
   return (
     <section className="restaurant-reservations-workspace" aria-label="Restoran rezervasyonları">
-      <div className="reservation-toolbar">
+      <div className="reservation-toolbar page-toolbar">
         <div className="operation-filter-summary" aria-label="Restoran rezervasyon özeti">
           <StatusBadge tone="info">{activeReservations.length} aktif rezervasyon</StatusBadge>
           <StatusBadge tone="wait">{activeReservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>

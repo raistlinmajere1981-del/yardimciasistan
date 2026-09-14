@@ -4,14 +4,6 @@
   min-width: 0;
 }
 
-.operation-calendar-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: 14px var(--space-4);
-}
-
 .operation-calendar-title-block {
   display: flex;
   align-items: center;
@@ -259,15 +251,6 @@
 }
 
 @media (max-width: 1180px) {
-
-  .operation-calendar-toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
-@media (max-width: 1180px) {
-
   .operation-calendar-controls {
     justify-content: flex-start;
     width: 100%;
@@ -275,7 +258,6 @@
 }
 
 @media (max-width: 760px) {
-
   .operation-calendar-controls,
 .operation-calendar-range-controls {
     align-items: stretch;
@@ -285,28 +267,24 @@
 }
 
 @media (max-width: 760px) {
-
   .operation-calendar-view-switch {
     width: 100%;
   }
 }
 
 @media (max-width: 760px) {
-
   .operation-calendar-view-switch button {
     flex: 1;
   }
 }
 
 @media (max-width: 760px) {
-
   .operation-calendar-date-picker {
     justify-content: space-between;
   }
 }
 
 @media (max-width: 760px) {
-
   .operation-calendar-date-picker input {
     max-width: none;
     flex: 1;
@@ -314,7 +292,6 @@
 }
 
 @media (max-width: 760px) {
-
   .operation-calendar-grid.is-week {
     grid-template-columns: repeat(7, minmax(210px, 1fr));
   }

@@ -13,5 +13,8 @@
   --header-height: 64px;
   --page-padding: var(--space-6);
   --panel-padding: var(--space-5);
+  --dialog-width-sm: 28rem;
+  --dialog-width-md: 40rem;
+  --dialog-width-lg: 72rem;
   --ui-scale: 1;
 }

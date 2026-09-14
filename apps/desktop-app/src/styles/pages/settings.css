@@ -21,7 +21,7 @@
 
 .settings-section-nav {
   position: sticky;
-  top: var(--header-height);
+  top: var(--sticky-header-offset, var(--header-height));
   z-index: var(--z-sticky);
   display: flex;
   flex-wrap: wrap;
@@ -49,7 +49,7 @@
 }
 
 .setup-capabilities :where([id^="settings-"]) {
-  scroll-margin-top: calc(var(--header-height) + var(--space-16) + var(--space-4));
+  scroll-margin-top: calc(var(--sticky-header-offset, var(--header-height)) + var(--space-16) + var(--space-4));
 }
 
 .setup-section :where(.form-grid, .form-row) + :where(.form-grid, .form-row) {
@@ -488,20 +488,18 @@
 }
 
 @media (max-width: 1100px) {
-
   .business-public-profile-feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-
   .settings-section-nav {
     position: static;
   }
 
   .setup-capabilities [id^="settings-"] {
-    scroll-margin-top: calc(var(--header-height) + var(--space-4));
+    scroll-margin-top: calc(var(--sticky-header-offset, var(--header-height)) + var(--space-4));
   }
 
   .settings-identity-section .form-grid,

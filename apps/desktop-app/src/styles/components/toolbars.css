@@ -1,0 +1,18 @@
+.page-toolbar, .action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+  min-width: 0;
+}
+.page-toolbar > *, .action-row > * { min-width: 0; max-width: 100%; }
+.page-toolbar__start, .page-toolbar__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.page-toolbar__actions { margin-inline-start: auto; justify-content: flex-end; }
+.page-toolbar h2, .page-toolbar h3 { margin: 0; }

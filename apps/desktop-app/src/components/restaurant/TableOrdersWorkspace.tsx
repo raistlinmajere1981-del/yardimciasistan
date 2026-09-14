@@ -658,13 +658,13 @@ export function TableOrdersWorkspace({
       <span className="table-order-live-feedback" role="status" aria-live="polite">{cardFeedback}</span>
 
       {ordersEnabled && drawerOpen && selectedTable && (
-        <div className="table-order-backdrop" role="presentation" onClick={(event) => {
+        <div className="table-order-backdrop overlay overlay--drawer" role="presentation" onClick={(event) => {
           if (event.target === event.currentTarget) {
             void requestCloseDrawer();
           }
         }}>
-          <section className="table-order-drawer" role="dialog" aria-modal="true" aria-labelledby="table-order-drawer-title">
-            <header className="table-order-drawer-header">
+          <section className="table-order-drawer drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="table-order-drawer-title">
+            <header className="table-order-drawer-header overlay-header">
               <div>
                 <span className="operation-panel-eyebrow">Yerel adisyon</span>
                 <h2 id="table-order-drawer-title">Masa Siparişi — {selectedTable.name}</h2>
@@ -787,7 +787,7 @@ export function TableOrdersWorkspace({
               </section>
             </div>
 
-            <footer className="table-order-drawer-footer">
+            <footer className="table-order-drawer-footer overlay-footer">
               <p className={feedback.includes("edilemedi") || feedback.includes("değil") ? "is-error" : ""} aria-live="polite">{busyAction ? "İşlem kaydediliyor..." : feedback}</p>
               <div className="table-order-footer-actions restaurant-service-actions">
                 <label className="table-order-status-select">

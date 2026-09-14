@@ -223,7 +223,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
       <p className="setup-section-description">Müşterilerin işletmeniz hakkında görmesini istediğiniz bilgileri düzenleyin.</p>
 
       {loading ? (
-        <div className="business-public-profile-loading">İşletme bilgileri yükleniyor...</div>
+        <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
       ) : (
         <div className="business-public-profile-body">
           <label className="form-field form-field--fluid form-field--span">
