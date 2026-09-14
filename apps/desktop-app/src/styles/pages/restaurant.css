@@ -1245,3 +1245,129 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Reservation filters used by restaurant reservations. */
+.reservation-filters {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.9fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+  padding: var(--space-2) 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-bg-panel);
+}
+
+.reservation-filters label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: 800;
+}
+
+.reservation-filter-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.reservation-filters select,
+.reservation-filters input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 9px;
+  color: var(--color-text);
+  background: var(--color-bg-field);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font: inherit;
+}
+
+.reservation-filters button {
+  min-height: 34px;
+  padding: 6px 10px;
+  color: var(--color-text);
+  background: var(--color-bg-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+
+/* Legacy restaurant editor; migrate in Stage 2B. */
+.restaurant-reservation-form {
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.restaurant-reservation-heading {
+  display: grid;
+  gap: 3px;
+}
+
+.restaurant-reservation-heading p,
+.restaurant-reservation-heading h3 {
+  margin: 0;
+}
+
+.restaurant-reservation-heading p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.restaurant-reservation-heading h3 {
+  color: var(--color-text);
+  font-size: var(--text-lg);
+}
+
+.restaurant-reservation-heading h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.restaurant-reservation-drawer .restaurant-reservation-form {
+  gap: var(--space-3);
+  padding: 14px var(--space-4) var(--space-4);
+  border: 0;
+}
+
+.restaurant-reservation-core-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.restaurant-reservation-note-field {
+  grid-column: 1 / -1;
+}
+
+.restaurant-reservation-drawer .form-details {
+  padding: 9px 10px;
+}
+
+.restaurant-reservation-drawer-footer {
+  padding-top: var(--space-2);
+}
+
+.restaurant-reservation-drawer-footer > p {
+  min-height: 20px;
+  margin: 0;
+}
+
+.restaurant-reservation-drawer-footer > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.reservations-workspace { display: grid; gap: var(--space-3); }

@@ -31,7 +31,7 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
 
   function closeForm() { setForm(null); }
 
-  return <section className="customer-credit-panel" aria-label="Veresiye hesabı" aria-busy={loading}>
+  return <section className="panel record-stack customer-credit-panel" aria-label="Veresiye hesabı" aria-busy={loading}>
     <div className="customer-credit-heading"><h3>Veresiye</h3><span>Güncel borç</span></div>
     {loading && <p className="loading-state" role="status">Hesap yükleniyor…</p>}
     {error && <ActionButton variant="secondary" onClick={() => void reload()}>Hesabı Yenile</ActionButton>}
@@ -40,7 +40,7 @@ export function CustomerCreditPanel({ customerId, whatsappEnabled = false, onPre
       {!expanded && account.entries[0] && <div className="customer-credit-last">
         <small>Son hareket</small><div><CustomerCreditMovement entry={account.entries[0]} /></div>
       </div>}
-      <div className="customer-credit-actions">
+      <div className="action-row">
         <button ref={toggle} type="button" className="action-button action-button-secondary action-button-sm" aria-expanded={expanded} aria-controls={panelId}
           disabled={saving}
           onClick={() => { setExpanded((current) => !current); setForm(null); }}>{expanded ? "Hesabı Kapat" : "Hesabı Aç"}</button>

@@ -1,6 +1,8 @@
-# Desktop UI migration — Aşama 1
+# Desktop UI migration — Aşama 2A
 
-Başlangıç: temiz `main`, `25ad66e88c700fe883e6ca01b50b8b7e6e279c2f`. Bu aşama ortak renderer kabuğu ve yüzey sözleşmesini taşır. Database, IPC, sync, AI, availability, capability kararları ve feature iş akışları değiştirilmez. `firm-template/web-module/widget.js` kapsam dışıdır. Commit/push yapılmaz.
+Aşama 1 başlangıcı: temiz `main`, `25ad66e88c700fe883e6ca01b50b8b7e6e279c2f`. Bu aşama ortak renderer kabuğu ve yüzey sözleşmesini taşır. Database, IPC, sync, AI, availability, capability kararları ve feature iş akışları değiştirilmez. `firm-template/web-module/widget.js` kapsam dışıdır. Commit/push yapılmaz.
+
+Aşama 2A başlangıcı: temiz `main`, `c3fac0d1e3ce76b7f53ee8c7d7fb9c1258932c05`. Müşteri İşleri, Pansiyon ve doğrudan kullandıkları editör/oda hesabı yüzeyleri taşındı. Bu belgedeki ekran envanteri günceldir; aşağıdaki Aşama 1 ölçümleri tarihsel karşılaştırma için korunur.
 
 ## Durumun anlamı
 
@@ -15,16 +17,16 @@ Her ana ekran aynı `DesktopAppFrame → AppShell → PageHeader + page-content`
 | Ekran / durum | React dosyaları | Stylesheet ve ortak primitive kullanımı | Kalan bağımlılıklar / responsive / tema |
 | --- | --- | --- | --- |
 | Ana Ekran — **partial** | `pages/DashboardPage.tsx`, `components/dashboard/SystemHealthPanel.tsx`, `components/ui/MetricCard.tsx` | `pages/dashboard.css`, `components/metrics.css`, `feedback.css`; AppShell, Panel, surface, MetricCard, StatusBadge, ActionButton, page-toolbar | Öncelik listesi, health kartları, timeline ve capacity kartları özel selector'lara bağlı. Raw status/gölge kararları kalır. Geniş çok kolon → dar tek kolon; uzun açıklamalar ellipsis. Kabuk light/dark/easy destekler; feature detayları tema audit borcu taşır. |
-| Müşteri İşleri — **partial** | `pages/CustomerWorkPage.tsx`, `components/customers/{RequestsWorkspace,CustomersWorkspace,CustomerPicker,CustomerCreditPanel,CustomerCreditBalances,CustomerCreditHistory,CustomerCreditForm,CustomerCreditWhatsAppShare}.tsx` | `pages/customers.css`, `pages/requests.css`, `components/records.css`; Panel, CompactList/Item, ActionButton, StatusBadge, ortak drawer, loading-state | Talepler, müşteri seçimi, veresiye, oda atama ve mesaj hazırlama akışları korunur. Record detay/form selector'ları farklı dosyalarda. Dar genişlikte liste/detay stack; form alanları henüz Settings varyantlarına tamamen bağlı değil. Kabuk üç görünümü destekler; müşteri durum tonlarında ham renk borcu var. |
+| Müşteri İşleri — **migrated** | `pages/CustomerWorkPage.tsx`, `components/customers/{RequestsWorkspace,CustomersWorkspace,CustomerPicker,CustomerCreditPanel,CustomerCreditBalances,CustomerCreditHistory,CustomerCreditForm,CustomerCreditWhatsAppShare}.tsx` | `pages/customers.css`, `components/{cards,data-list,forms,buttons,panels,dialogs,status,navigation}.css`; DataList/Item/Button, data-list, Panel, ActionButton, StatusBadge, form-grid, drawer--form | Liste/detay, arama, Talepler/Müşteriler/Yanıt Bekleyen, kimlik editörü, veresiye ve oda atama korunur. Manager-form/manager-row/operation layout bağımlılığı kaldırıldı. <=760px stack; üç tema doğrulandı. Hedef CSS audit ihlali sıfır. |
 | Takvim — **partial** | `pages/OperationCalendarPage.tsx` | `pages/calendar.css`; ortak panel/page-toolbar, StatusBadge | Gün/hafta seçimi ve tarih gezinmesi korunur. Hafta sütunları kendi yatay scroll alanında; bu **sayfa overflow'u değildir**. Gün içeriği ve takvim badge'leri feature'a ait. Light/dark/easy kabuk; bir ham renk fallback'i kalır. |
-| Pansiyon — **partial** | `pages/PensionPage.tsx`, `components/operations/{OperationWorkspaces,ManualReservationEditor,DailyTaskEditor,RoomPublicDetailsEditor,QuickCustomerCreator}.tsx` | `pages/pension.css`, `components/operations.css`, `resources.css`, `records.css`, `pages/requests.css`; Panel, surface/MetricCard, StatusBadge, page-toolbar, ortak drawer | Rezervasyon, oda, görev ve konaklama listeleri ile arşiv disclosure'ları korunur. Rezervasyon kontrol stillerini Restoran da kullanır; bu sonraki ortak operation primitive çalışmasının adayıdır. Compact ekranda paneller stack, filtreler sarılır. Renkler semantik; yoğun record/form geometrisi legacy. |
-| Restoran — **partial** | `pages/RestaurantPage.tsx`, `components/operations/{RestaurantReservationsWorkspace,ManualRestaurantReservationEditor}.tsx`, `components/restaurant/{TableOrdersWorkspace,RestaurantRoomTransferPanel}.tsx` | `pages/restaurant.css`, `pension.css`, `components/operations.css`, `resources.css`, `records.css`; Panel, MetricCard, ActionButton, page-toolbar, ortak geniş drawer | Masa kategorileri, durum seçimi, sipariş, ödeme, odaya aktarım ve görev davranışı aynı. Adisyon gövdesinin iki panesi ve restoran transfer alanı özel CSS kullanır. Drawer kabuğu viewport'a sığar; gövdenin daha dar ekran uyarlaması Aşama 2. Ham color fallback'leri ve legacy specificity borcu var. |
+| Pansiyon — **migrated** | `pages/PensionPage.tsx`, `components/operations/{OperationWorkspaces,ManualReservationEditor,DailyTaskEditor,RoomPublicDetailsEditor,QuickCustomerCreator}.tsx` | `pages/pension.css`, `components/{cards,data-list,forms,buttons,panels,dialogs,status}.css`; card, DataListItem, form-field varyantları, page-toolbar/action-row, disclosure | Rezervasyonlar, oda kartları, görevler ve konaklama arşivi ortak primitive kullanır. Oda durum değerleri ve aksiyon koşulları aynı; data-status yalnız renk sunumunu belirler. <=1100px ana paneller stack, <=760px formlar full width. Light/dark/easy doğrulandı. |
+| Restoran — **partial** | `pages/RestaurantPage.tsx`, `components/operations/{RestaurantReservationsWorkspace,ManualRestaurantReservationEditor}.tsx`, `components/restaurant/{TableOrdersWorkspace,RestaurantRoomTransferPanel}.tsx` | `pages/restaurant.css`, `components/operations.css`, `resources.css`, `records.css`; Panel, MetricCard, ActionButton, page-toolbar, ortak geniş drawer | Masa kategorileri, durum seçimi, sipariş, ödeme, odaya aktarım ve görev davranışı aynı. Adisyon gövdesinin iki panesi ve restoran transfer alanı özel CSS kullanır. Drawer kabuğu viewport'a sığar; gövdenin daha dar ekran uyarlaması Aşama 2. Ham color fallback'leri ve legacy specificity borcu var. |
 | Menü — **partial** | `components/menu/MenuManager.tsx`, `components/restaurant/StockImageImportWorkspace.tsx` | `pages/menu.css`; Panel, ActionButton, StatusBadge, action-row, page-toolbar__actions, ortak modal | Gizli önizlemenin bıraktığı boş grid kolonları kaldırıldı; yalnız dış panel yerleşimi 3/2/1 kolon sözleşmesine bağlandı. Kategori/ürün seçimi, stok ve görsel analiz akışı aynı. Form ve ürün detay genişlikleri legacy. Açık/koyu kabuk destekli; menü palette ve raw CSS borcu kalır. |
 | Kasa / Raporlar — **partial** | `pages/ReportsPage.tsx`, `components/finance/FinanceWorkspace.tsx` | `pages/finance.css`, `reports.css`, `components/metrics.css`; Panel, MetricCard, page-toolbar, status-message, loading-state, ortak confirmation dialog | Capability'ye göre Kasa veya Raporlar navigasyonu korunur. Gelir/gider, alacaklar, kayıtlar, dönem filtreleri ve rapor workspace'i aynı. İç tablo/kart/form kontrolleri legacy; compact stack mevcut. Finance'da ham renk fallback'i, raporda px geometri borcu sürer. |
 | Market — **partial** | `pages/MarketPage.tsx`, `components/market/{MarketQuickSaleWorkspace,MarketProductsWorkspace,MarketInventoryWorkspace,MarketPurchasingWorkspace,MarketCompanionInboxWorkspace,MarketLabelsWorkspace}.tsx` | `pages/market.css`, `pages/customers.css`; ortak kabuk, ActionButton/StatusBadge ve form foundation | Hızlı Satış, Ürünler, Telefon Taslakları, Stok, Tedarikçiler/Alım, Etiketler sekmeleri. Sepet, ürün tablosu, müşteri/veresiye ve etiket önizlemesi özel yerleşim kullanır. Semantik renkler; fazla px ve tekrarlı selector borcu. Responsive feature grid kuralları korunur. Kabuk light/dark/easy. |
 | Ayarlar — **migrated** | `components/settings/{SetupForm,BusinessPublicProfileSection,BusinessLocationMapPicker,RoomManagementSection,BusinessCapabilitySettings,DataMaintenanceSettings}.tsx`, `components/security/PasswordSettings.tsx` | `pages/settings.css`, `forms.css`, `buttons.css`, `panels.css`, `badges.css`, `disclosures.css`; lokal `components/settings/business-location-map-picker.css` | Önceki referans migration korunur. İşletmem/Müşteri bilgileri/İşletme düzeni/Bağlantılar/Uygulama/Bakım tek sayfa. Nav gerçek header yüksekliğini izler. 760px altında form stack. Light/dark/easy. Harita tile/pin pikselleri protokol geometrisi; migration borcu olarak tokenlaştırılmaz. |
 | Mesajlar / AI — **partial** | `pages/MessagesPage.tsx`, `components/messages/MessageWorkspaces.tsx` | `pages/messages.css`, `ai.css`; Panel, ActionButton, ortak header | WhatsApp webview, hazır yanıt, AI araçları persistent mount davranışı korunur. `.persistent-messages-page.is-hidden` artık messages.css içinde. Webview'in üçüncü taraf içeriği tema sisteminin dışındadır; AI kartları raw renk/ölçü borcu taşır. |
-| Oda adisyonu / konaklama çalışma alanı — **partial** | `components/pension/RoomFolioWorkspace.tsx` | `pages/room-folio.css`; Panel, ortak geniş drawer, overlay header/body/footer, confirmation dialog, status-message | Konaklama, hesap kalemleri, ödeme, aktarım ve nested confirmation davranışı aynı. İç kolonlar, ödeme formu ve satır aksiyonları feature'a ait; scroll gövdede. Renkler semantik; iç form/toolbar ölçüleri migration bekler. |
+| Oda adisyonu / konaklama çalışma alanı — **migrated** | `components/pension/RoomFolioWorkspace.tsx` | `pages/room-folio.css`; Panel/card, StatusBadge, form-row/field, action-button, drawer--wide, overlay header/body/footer ve compact confirmation dialog | Gecelik fiyat, konaklama tarihleri, ürün/kalem, tahsilat ve çıkış yüzeyleri ortak kontroller kullanır. Etiketler, nested modal focus ve scroll doğrulandı. Hesaplama, ödeme ve çıkış handler/payload’ları değişmedi. |
 | Yerel menü önizlemesi — dış yüzey **migrated**, canvas **legacy** | `components/menu/MenuPreview.tsx` | `components/dialogs.css` + `pages/menu-preview.css` | Modal genişliği/backdrop/header/close ortak. Müşteriye görünen menü canvas'ının kendi açık kağıt palette'i ve düzeni korunur; masaüstü dark moduna zorlanmaz. Canvas içindeki shadow/raw renkler Aşama 3'te ayrı ürün kararıdır. |
 | İlk kurulum — **legacy** | `components/settings/SetupWizard.tsx`, `SetupForm.tsx` | `pages/setup.css`, forms/buttons foundation | Wizard dış kabuğu uygulama sidebar kabuğundan bağımsız. Adımlar ve ilk kayıt davranışı değiştirilmez. Ortak form temelinden yararlanır; wizard yerleşim/section detayları Aşama 3. |
 | Uygulama kilidi — **legacy** | `components/security/AppLockScreen.tsx` | `pages/lock.css` | Kilit overlay'i güvenlik yaşam döngüsü, reset ve unlock animasyonlarıyla ayrı kalır. Header'daki kilit butonu **header.css**'e taşındı. Ekranın sabit koyu palette/gradient'i ve yüksek z-index'i Aşama 3 borcu; normal modal z-index'i ile değiştirilmedi. |
@@ -53,8 +55,8 @@ Her ana ekran aynı `DesktopAppFrame → AppShell → PageHeader + page-content`
 - `.drawer`: 28rem; `--wide`: 72rem; `--scroll`: bütün drawer içinde scroll. Dar ekranda yüzde 100 genişlik. Grid/flex body davranışı feature'a ait kalır.
 - `.overlay-header`, `--sticky`, `.overlay-body`, `.overlay-footer`, `--inset`, `.overlay-close`; ortak border/padding/radius/focus. Mevcut `drawer-close-button` accessible isimleri ve Kapat metni korunur.
 - Requests, Customers (müşteri/oda atama), ManualReservation/RestaurantReservation, DailyTask ve RoomPublicDetails drawer'ları bu yüzeye bağlıdır. Restoran siparişi ve oda adisyonu geniş drawer; finans/folio confirmation compact dialog; stok analizi ve yerel önizleme geniş dialog kullanır.
-- DOM, role, aria-modal, focus ref'leri, Escape/backdrop handler'ları ve kapatma guard'ları korunur. Bu aşama yeni ortak modal controller/focus trap uygulamaz. Mevcut focus yönetimi farklılıkları Aşama 3 erişilebilirlik audit adaylarıdır.
-- Bildirim merkezi **non-modal popover**, AppLockScreen **ayrı kilit yüzeyi** olarak kalır. Sipariş/folio gövdesinin yoğun iki kolon/form düzeni ve nested action bar'ları Aşama 2 borcudur.
+- DOM, role, aria-modal, focus ref'leri, Escape/backdrop handler'ları ve kapatma guard'ları korunur. Aşama 2A hedefleri `useDialogFocus` ile Tab/Shift+Tab, Escape ve çağıran kontrole dönüş sağlar. Diğer dialogların focus yönetimi farklılıkları Aşama 3 adaylarıdır.
+- Bildirim merkezi **non-modal popover**, AppLockScreen **ayrı kilit yüzeyi** olarak kalır. Sipariş drawer gövdesi Aşama 2B borcudur; folio gövdesi Aşama 2A’da taşındı.
 
 ## Import, cascade ve token audit
 
@@ -65,7 +67,7 @@ reset → tokens → foundation → components → layout → pages → utilitie
 components.legacy → components.primitives
 ```
 
-Sidebar geometri/scroll yalnız layout'ta; nav ve header kontrollerinin görsel sorumluluğu component katmanındadır. Shell feature selector'ıyla düzeltilmez. Raw renk, important, override token, legacy import, orphan stylesheet ve duplicate shared primitive kontrolleri `scripts/design-system-audit.mjs` / `scripts/lib/desktop-style-audit.mjs` içindedir. `--json` ayrıntılı inventory ve ihlalleri `artifacts/design-system/stage1/audit.json` dosyasına yazar.
+Sidebar geometri/scroll yalnız layout'ta; nav ve header kontrollerinin görsel sorumluluğu component katmanındadır. Shell feature selector'ıyla düzeltilmez. Raw renk, important, override token, legacy import, orphan stylesheet ve duplicate shared primitive kontrolleri `scripts/design-system-audit.mjs` / `scripts/lib/desktop-style-audit.mjs` içindedir. `--json` ayrıntılı inventory ve ihlalleri `artifacts/design-system/audit/audit.json` dosyasına yazar.
 
 Duplicate shared primitive kontrolü aynı scope'ta aynı property tekrarını veya farklı dosyalardaki sahipliği raporlar; aynı dosyada ortak surface grubu + yalnız ek padding tanımı yanlışlıkla ihlal sayılmaz. Media scope ayrıdır. Duplicate selector envanteri ise tekrarlanan tüm selector bloklarını sayar; bunların hepsi hata değildir. Yeni ortak shell/component dosyalarında mimari ihlal fatal ve hedef sıfırdır; feature borcunu mevcut strict baseline sınırlar. Baseline yükseltilmedi.
 
@@ -73,11 +75,11 @@ Silinen ortak dosya: `styles/components/segmented-control.css` (navigation.css'e
 
 ### Kalan cascade borcu
 
-Somut tekrar örnekleri: menu.css içinde `.menu-manager`, `.menu-list-panel, .item-editor-panel`, `.manager-row`; restaurant.css içinde `.restaurant-layout`, `.restaurant-page .table-compact-card`, `.active-table-order-actions`; pension.css içinde `.pension-layout`, `.pension-page .reservation-filters`, `.room-price-panel`. Bunlar aynı media scope'ta tekrarlanan bloklardır; bazıları farklı property ekler, bazıları önceki değeri ezer. Tam listeyi sadeleştirmek Aşama 2 feature migration'ına aittir.
+Somut tekrar örnekleri: menu.css içinde `.menu-manager`, `.menu-list-panel, .item-editor-panel`, `.manager-row`; restaurant.css içinde `.restaurant-layout`, `.restaurant-page .table-compact-card`, `.active-table-order-actions`. Bunlar aynı media scope'ta tekrarlanan bloklardır; bazıları farklı property ekler, bazıları önceki değeri ezer. Tam listeyi sadeleştirmek Aşama 2 feature migration'ına aittir.
 
 - `pension.css` içindeki reservation kontrol kurallarını Restoran da kullanır; `requests.css` manual-request-form kurallarını operasyon drawer'ları kullanır. Ortak dış yüzey artık bunlara bağlı değildir; **iç form recipe** hâlâ ortaktır.
 - `components/operations.css`, `records.css`, `resources.css` isim olarak ortak olsa da operation domain selector'ları içerir. Aşama 2'de feature recipe / gerçek primitive ayrımı yapılmalı.
-- `pages` katmanı `components` sonrasında gelir. `.menu-manager .manager-row`, `.pension-page .operation-*`, `.restaurant-page .operation-*` gibi eski scoped düzenler primitive varyantlarını hâlâ etkileyebilir. İçerik migration'ında asıl kural kaldırılmalı; yeni override eklenmemeli.
+- `pages` katmanı `components` sonrasında gelir. `.menu-manager .manager-row`, `.restaurant-page .operation-*` gibi eski scoped düzenler primitive varyantlarını hâlâ etkileyebilir. İçerik migration'ında asıl kural kaldırılmalı; yeni override eklenmemeli.
 - `.tone-* .metric-icon`, `.panel-heading h2`, legacy `manager-form` ve `setup-*` selector'ları kapsam audit adaylarıdır. Ortak status/heading kullanımıyla yeni feature'larda çoğaltılmamalı.
 - Eski alias ve override token katmanı yoktur. Menü preview palette'i ile lock palette'i farklı ürün yüzeylerini temsil eder; bunlar körlemesine aynı renge çevrilmemelidir.
 
@@ -96,11 +98,11 @@ Light sıcak nötr/mercan, dark slate/mercan semantik tokenları kullanır. Easy
 
 ## Sonraki aşamalar
 
-**Aşama 2 önerilen sıra:** Müşteri İşleri → Pansiyon → Restoran/masa adisyonu → Menü → Kasa/oda adisyonu → Market → Ana Ekran → Takvim/Raporlar. İlk üç ekran ortak record, form, resource ve action-row borcunun çoğunu paylaşır; buradan çıkan primitive'ler sonraki ekranları sadeleştirir. Her feature'da iş akışı korunarak içerik türüne göre field boyutları ve tablo/list recipe'leri taşınmalı.
+**Aşama 2B önerilen sıra:** Restoran/masa adisyonu → Menü → Kasa → Market → Ana Ekran → Takvim/Raporlar. Müşteri İşleri/Pansiyon tamamlandı; çıkan card/list/form primitive’leri sonraki ekranlarda kullanılabilir. Her feature'da iş akışı korunarak içerik türüne göre field boyutları ve tablo/list recipe'leri taşınmalı.
 
 **Aşama 3:** Mesajlar/AI ve webview sınırları; ilk kurulum; kilit ekranı; menü preview canvas; dialog focus/keyboard tutarlılığı; tüm feature'larda dark/easy kontrast ve dar ekran incelemesi. Eski status alias prop isimleri ancak tüketiciler taşındığında kaldırılmalı.
 
-## Ölçüm ve doğrulama
+## Aşama 1 ölçüm ve doğrulama (tarihsel)
 
 Aşağıdaki sayılar yalnız desktop CSS içindir. Token/theme dosyalarındaki palette ve ölçek tanımları raw debt'e dahil edilmez. Raw px sayısı border, breakpoint ve harita geometrisini de içerir; tümü gereksiz spacing değildir. Raw spacing sütunu yalnız padding/margin/gap declaration'larını sayar. Component TSX içindeki görsel hesaplamalar ayrı mevcut inline-style auditinde raporlanır.
 
@@ -171,3 +173,76 @@ Mevcut Settings design-system smoke ayrıca 760/600px form stack, dört kısa sa
 - `git diff --check`: temiz. Çalışma main üzerinde, değişiklikler unstaged; commit/push yok. Artifactler ignored, widget.js geri alındı.
 
 Nihai pilot: **36 geçti, 0 hata, 0 atlandı**. Rapor: `artifacts/pilot-check/2026-09-14T08-08-34-653Z.json`. Pilot sırasında üretilen `firm-template/web-module/widget.js` başlangıç hâline geri alındı; nihai diff içinde değildir. HEAD başlangıçtaki `25ad66e88c700fe883e6ca01b50b8b7e6e279c2f` olarak kaldı.
+
+## Aşama 2A: başlangıç audit’i ve yapılan migration
+
+| Yüzey | Önceki sorumluluk / sorun | Yeni sözleşme |
+| --- | --- | --- |
+| Müşteri ve talep listesi | Customers/RequestsWorkspace; `manager-row`, `operation-list-item`, records/operations + customers.css cascade’i; farklı dar ekran gridleri | `DataList`, `DataListButton`, `.record-workspace` ve `__list/__detail/__items`. Liste seçimi, arama ve request geçişleri aynı. |
+| Müşteri detay/geçmiş/veresiye | `info-list`, `compact-detail-meta`, nth-child özel geometrisi, kopyalanmış input/panel kuralları | `.data-list`, `.record-note`, panel, form-stack/field, action-row; tarihçe yalnız feature kompozisyonu içerir. Kimlik ve finans değerleri korunur. |
+| Müşteri/talep/oda atama editörleri | `manager-form` dolayısıyla menu.css bağımlılığı; manual-request-form ve sabit drawer iç boşlukları | `.drawer--form`, `.overlay-heading`, `.overlay-form`, `.form-grid`, açık field size ve sticky footer. Ortak klavye focus kapsamı. |
+| Pansiyon rezervasyon/görev/arşiv | OperationWorkspaces + pension.css/records.css/operations.css; aynı selector üzerinde art arda override’lar, rastgele yükseklikler | `.record-stack`, `.data-records`, `DataListItem`, `.filter-row`, `.record-disclosure`, page-toolbar/action-row. |
+| Odalar | `compact-resource-grid`, `resource-compact-card`; kapasite/tarih/not ve aksiyonlar için ayrı compact kurallar | `.room-grid`, `.card`, `__header/__meta/__actions`. available→success; occupied→info; reserved/cleaning→warning; maintenance/out_of_service→danger. Select seçenekleri ve engelleme koşulları değişmedi. |
+| Rezervasyon, oda ve görev formları | ManualReservationEditor, RoomPublicDetailsEditor, DailyTaskEditor, QuickCustomerCreator; farklı custom form/layout kuralları | xs sayı/kapasite; short tarih/saat/telefon/oda numarası/fiyat; medium ad/select; long oda/müşteri seçimi/yatak bilgisi; fluid not/açıklama. <=760px doğal stack. |
+| Oda hesabı | RoomFolioWorkspace; custom button/input/payment/confirm stilleri, CSS pseudo metinleri, farklı padding/radius | Panel/card/StatusBadge; açık form size; içerik genişliğinde action-button; drawer header/body/footer; nested dialog ve focus. Gecelik fiyat grubu bir field-control-group. Native işlem metni artık CSS ile gizlenmez. |
+
+Başlangıç dosyaları (satır sayısı terminal newline dahil): customers.css **823**, pension.css **939**, room-folio.css **615**, requests.css **168**. İlk üçünde sırasıyla **3/0/0** hex/rgb/hsl literal’i, **30/36/36** raw px spacing declaration’ı vardı. Üç dosya feature kompozisyonuna indirildi; sırasıyla **297/164/254** satır. Hedef feature CSS’inde raw spacing declaration’ı da sıfırdır. 1px border ve responsive breakpoint sabitleri tasarım borcu olarak tokenlaştırılmaz.
+
+### Dosya sahipliği ve silmeler
+
+- **Silindi:** `styles/pages/requests.css`. Tarih gösterim helper’ı forms.css’e, hazırlanmış WhatsApp mesajı messages.css’e taşındı. Kalan restoran editör kuralları restaurant.css’te `restaurant-reservation-*` olarak açık biçimde sahiplenildi; kullanılmayan eski talep kartı/toggle/override blokları kaldırıldı.
+- **Yeniden yazıldı:** customers.css, pension.css, room-folio.css. Menü formu ve legacy compact resource/list sözleşmeleri bu iki feature’dan çıkarıldı.
+- **Eklendi:** `components/cards.css`, `components/data-list.css`, `components/ui/DataList.tsx`, `components/ui/useDialogFocus.ts`.
+- **Ortak düzeltmeler:** forms.css alan boyutları/tarih helper’ı; dialogs.css form drawer/header/footer; disclosures.css form-grid gövdesi; toolbars.css action-row hizası/başlık açıklaması; index.css deterministik import.
+- Restoran iş akışı/tasarımı taşınmadı. Ortak DailyTasks/QuickCustomerCreator yeni primitive’leri kullanır; yalnız Restoran’a ait eski filtre/editör CSS’i artık kendi dosyasında kalır. Market, ortak CustomerPicker/veresiye primitive değişikliklerini kullanır; Market ekran yerleşimi değişmez.
+
+### Audit sonucu ve sınırları
+
+`npm run design:audit:strict` artık cards/data-list/forms + customers/pension/room-folio kapsamını ayrıca sıfır ihlal ve sıfır duplicate selector ile denetler. Ortak primitive sahipliği listesine card/list/form sözleşmeleri eklendi; baseline yükseltilmedi. Mevcut shell guard’ı devam eder.
+
+| Ölçüm | Aşama 2A hedef CSS | Desktop toplamı |
+| --- | ---: | ---: |
+| Raw hex/rgb/hsl renk | 0 | 143 |
+| `!important` | 0 | 0 |
+| `--override-*` | 0 | 0 |
+| Eski alias | 0 | 0 |
+| Duplicate selector | 0 | 195 |
+| Raw px spacing declaration | 0 | 334 |
+| Raw px literal (border/breakpoint dahil) | 23 | 1156 |
+| Feature içinde shell/sidebar/header selector | 0 | Audit raporuna dahil |
+
+Repo genelindeki sürüm kontrolüne aday **47 kaynak CSS dosyası** (token/tema hariç) **221 raw hex/rgb/hsl renk** içerir; bu sayı mevcut desktop + demo-web + web-widget audit kapsamıyla aynıdır. Bu, generated/vendor dosyaları içeren sınırsız grep sayısı değildir. Named CSS renkleri bu metrikte sayılmaz; hedef yeni dosyalarda named raw renk de eklenmedi.
+
+Büyük kalan feature borcu: restaurant.css **1374** satır / 13 raw renk; menu.css **1284** / 8; market.css **1066** / 0; dashboard.css **854** / 14; finance.css **641** / 1; reports.css **619** / 0. Restoran dosyasındaki büyüme, önceden Pansiyon/Requests içinde tutulan Restoran kurallarının kendi sahibine taşınmasıdır. Legacy records/operations/resources dosyaları diğer tüketiciler için kalır; bunları küresel kaldırmak Aşama 2B akışlarını riske atar.
+
+### Görsel doğrulama ve erişilebilirlik
+
+`smoke-desktop-customer-pension.mjs` lokal Vite renderer + gerçek React bileşenleri + deterministik bridge fixture kullanır. Gerçek database veya uzak servis değiştirilmez. Çıktılar `artifacts/design-system/stage2a/{pass1,pass2,final}/`; sürüm kontrolüne alınmaz.
+
+İlk turda masaüstü viewportları geçti; ek 600px kontrolde column flex-basis nedeniyle not alanı taşması bulundu. İkinci turda form-grid, başlık/açıklama hizası, filtre genişliği ve küçük kontrol boyutları düzeltildi. Son genişletilmiş tur 113 yüzeyi kapsar: liste/detay/kimlik, arama boş state’i, bekleyen talepler, veresiye form/hata, oda atama, rezervasyon yeni/düzenle/boş filtre, hızlı müşteri, günlük iş, oda kartları/detay editörü, folio/ödeme/nested confirmation.
+
+| Viewport | Sonuç / yerleşim |
+| --- | --- |
+| 1440×1000 | Müşteri liste/detay ve Pansiyon ana panelleri iki sütun; kısa telefon/tarih/numeric alanlar sınırlı, butonlar content width. |
+| 1366×768 | Aynı desktop düzeni; drawer gövdesi kayar, header/footer erişilebilir. |
+| 1024×768 | Pansiyon panelleri tek sütuna iner; müşteri master list daralır; filtre/aksiyonlar wrap eder. |
+| 900×768 | Ortak shell ile overlap yok; oda kartları doğal küçülür; drawer viewport’a sığar. |
+| 600×800 (ek) | Formlar ve liste/detay stack; alanlar full width; column flex-basis taşması giderildi. |
+
+Tüm ölçülen yüzeylerde document/content/panel/toolbar/form/dialog yatay taşması sıfır. Light/pro, dark/pro, light/easy gerçek Ayarlar kontrolleri üzerinden değiştirildi. Label-control ilişkisi, kısa alan genişliği, Tab/Shift+Tab ve Escape, focus restoration, engelli web kaynaklı rezervasyon tarih alanı ve veresiye tutar hatası doğrulanır. Müşteri ve rezervasyon submit payload’ları gerçek renderer handler’ları üzerinden kontrol edilir. Kapama butonlarının loading guard’ları korunur; nested confirmation yalnız mevcut cancel handler’ını çağırır.
+
+### Aşama 2B riskleri
+
+Restoran rezervasyonları ve sipariş drawer’ı hâlâ legacy compact row/form kurallarına bağlıdır. Yeni DataList/Card/Form primitive’lerine geçerken masa/adisyon, stok ve oda hesabına aktarım handler’ları korunmalı. Menü’nün manager-form/manager-row ve yüksek specificity kuralları öncelikli temizlik adayıdır. Market veresiye bileşenleri ortak olsa da ürün/sepet/checkout yüzeyleri henüz migrated değildir. Oda hesabının finans davranışı bu aşamada değiştirilmedi; Kasa migration’ı kendi finans testleriyle doğrulanmalıdır. Hizmet dışı oda için formatter’ın eski “Boş” fallback’i, yalnız kullanıcıya görünen etiket olarak “Hizmet dışı” ile düzeltildi. Oda status value ve uygunluk koşulları aynı kalır. Hedef dışı dialog focus farklılıkları Aşama 3’te kalır.
+
+
+### Aşama 2A test sonuçları
+
+- `npm run build -w @yardimci-asistan/desktop-app`: geçti; mevcut Vite chunk boyutu uyarısı sürer.
+- `npm run typecheck`: geçti.
+- `npm run smoke:desktop-renderer`: geçti (ana renderer akışları, Settings, dokuz ekranlı shell ve müşteri/Pansiyon testi).
+- `smoke-customer-room-management-db.mjs`, `smoke-room-folio-service.mjs`, `smoke-daily-task-management.mjs`: geçti. Günlük iş testindeki eski CSS kaynak-string beklentisi kaldırıldı; Pansiyon/Restoran’da boş liste ve Yeni İş erişimi gerçek renderer’a taşındı.
+- `npm run design:audit:strict`: geçti; 3 audit testi ve hedef mimari guard’ları dahil.
+- Değişen TS/TSX/MJS dosyalarında ESLint: 0 hata / 0 uyarı.
+- `npm run pilot:check`: **37 geçti, 0 hata, 0 atlandı**. Rapor: `artifacts/pilot-check/2026-09-14T18-25-45-568Z.json`.
+- `git diff --check`: temiz. Çalışma `main` üzerinde; kaynak değişiklikleri commit edilmedi, push yapılmadı. Generated widget başlangıç hâline döndürüldü; artifact ve screenshot’lar commit kapsamında değil.

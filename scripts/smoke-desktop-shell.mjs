@@ -82,7 +82,7 @@ try {
       };
       if (name === 'Müşteri İşleri') {
         await page.getByRole('button', { name: 'Elle Talep Ekle', exact: true }).click();
-        const dialog = page.locator('.manual-request-drawer');
+        const dialog = page.getByRole('dialog', { name: 'Yeni talep ekle', exact: true });
         await checkOverlay(dialog, 'request-drawer');
         await dialog.getByRole('button', { name: 'Elle talep formunu kapat', exact: true }).click();
         await expect(dialog).toHaveCount(0);

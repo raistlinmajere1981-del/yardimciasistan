@@ -1044,7 +1044,7 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
   await expect(conversionPage.getByRole("button", { name: "Talebi Sil" })).toBeVisible();
-  await expect(conversionPage.locator(".request-detail-actions .action-button")).toHaveCount(4);
+  await expect(conversionPage.locator(".request-primary-actions .action-button")).toHaveCount(4);
   await conversionPage.getByRole("button", { name: "Yeniden Aç" }).click();
   await conversionPage.getByRole("button", { name: "Cevaplandı İşaretle" }).click();
   await expect(conversionPage.getByText("Talep durumu güncellendi.")).toBeVisible();
@@ -1073,22 +1073,20 @@ try {
   await conversionPage.getByRole("button", { name: "Pansiyon" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toBeVisible();
-  const roomCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Balkonlu Oda" });
+  const roomCard = conversionPage.getByLabel("Oda yönetimi").locator(".room-card").filter({ hasText: "Smoke Balkonlu Oda" });
   await expect(roomCard.locator(".status-badge")).toHaveText("Rezerve");
-  await expect(roomCard.locator(".compact-reservation-line")).toContainText("Smoke Misafir - 2 gece");
-  await expect(roomCard.locator(".compact-status-actions .is-active")).toHaveCount(0);
+  await expect(roomCard).toContainText("Smoke Misafir - 2 gece");
   const smokeRoomStatus = roomCard.getByRole("combobox", { name: "Smoke Balkonlu Oda durumunu değiştir" });
   await expect(smokeRoomStatus).toHaveValue("reserved");
-  const roomWithoutReservationCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Aile Odası" });
+  const roomWithoutReservationCard = conversionPage.getByLabel("Oda yönetimi").locator(".room-card").filter({ hasText: "Smoke Aile Odası" });
   await expect(roomWithoutReservationCard.locator(".status-badge")).toHaveText("Rezerve");
-  await expect(roomWithoutReservationCard.locator(".compact-reservation-line")).toContainText("Manuel rezerve");
-  await expect(roomWithoutReservationCard.locator(".compact-status-actions .is-active")).toHaveCount(0);
+  await expect(roomWithoutReservationCard).toContainText("Manuel rezerve");
   await smokeRoomStatus.selectOption("occupied");
   await expect(conversionPage.getByText("Oda durumu güncellendi.")).toBeVisible();
   await expect(smokeRoomStatus).toHaveValue("occupied");
   const reservationWorkspace = conversionPage.getByLabel("Rezervasyon yönetimi");
   await expect(reservationWorkspace.getByLabel("Durum")).toBeVisible();
-  await expect(conversionPage.locator(".reservation-filters").getByText("Gün / Ay / Yıl", { exact: true })).toBeVisible();
+  await expect(reservationWorkspace.getByText("Gün / Ay / Yıl", { exact: true })).toBeVisible();
   await expect(reservationWorkspace.locator(".localized-date-display")).toHaveText("Tarih seç");
   await reservationWorkspace.getByLabel("Tarih").fill("2026-07-18");
   await expect(reservationWorkspace.locator(".localized-date-display")).toHaveText("18.07.2026");
@@ -1121,7 +1119,7 @@ try {
   await expect.poll(() => conversionPage.evaluate(() => window.__identityAnalysisCalls.length)).toBe(1);
 
   await conversionPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
-  const assignableRoomCard = conversionPage.getByLabel("Oda yönetimi").locator(".resource-compact-card").filter({ hasText: "Smoke Aile Odası" });
+  const assignableRoomCard = conversionPage.getByLabel("Oda yönetimi").locator(".room-card").filter({ hasText: "Smoke Aile Odası" });
   await assignableRoomCard.getByRole("button", { name: "Müşteri Ata" }).click();
   const assignmentDrawer = conversionPage.getByRole("dialog", { name: "Odaya müşteri ata" });
   await assignmentDrawer.getByLabel("Müşteri").selectOption("customer_manual_card_smoke_001");
@@ -1374,17 +1372,17 @@ try {
 
   await compactPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
   await compactPage.getByRole("button", { name: /Kompakt Misafir 4/ }).click();
-  const customerRequestRows = compactPage.locator(".requests-workspace .manager-row");
+  const customerRequestRows = compactPage.locator(".requests-workspace .list-row--button");
   await expect(customerRequestRows).toHaveCount(8);
   await compactPage.locator(".request-detail-panel").getByText("Diğer işlemler", { exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
   await expect(compactPage.getByRole("button", { name: "Talebi Sil" })).toBeVisible();
-  await expect(compactPage.locator(".request-detail-actions .action-button")).toHaveCount(4);
+  await expect(compactPage.locator(".request-primary-actions .action-button")).toHaveCount(4);
   await expect(compactPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
 
   await compactPage.getByRole("tab", { name: "Müşteriler" }).click();
-  const compactCustomerRows = compactPage.locator(".customers-workspace .manager-row");
+  const compactCustomerRows = compactPage.locator(".customers-workspace .list-row--button");
   await expect(compactCustomerRows).toHaveCount(8);
 
   await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
@@ -1394,19 +1392,19 @@ try {
   await expect(compactPage.getByRole("heading", { name: "Günlük Konaklama İşleri" })).toBeVisible();
   const reservationRows = compactPage.locator(".reservation-record-row");
   await expect(reservationRows).toHaveCount(3);
-  await expect(reservationRows.first().locator(".compact-action-bar > button")).toHaveCount(2);
+  await expect(reservationRows.first().locator(".list-row__actions > button")).toHaveCount(2);
   await reservationRows.first().locator("summary").click();
   await expect(reservationRows.first().getByRole("button", { name: "Reddet" })).toBeVisible();
   await expect(reservationRows.first().getByRole("button", { name: "İptal Et" })).toBeVisible();
   await reservationRows.first().locator("summary").click();
-  const compactRoomCards = compactPage.getByLabel("Oda yönetimi").locator(".resource-compact-card");
-  await expect(compactRoomCards.first().locator(".compact-status-actions .is-active")).toHaveCount(0);
+  const compactRoomCards = compactPage.getByLabel("Oda yönetimi").locator(".room-card");
+  await expect(compactRoomCards.first().getByRole("combobox")).toHaveAccessibleName(/durumunu değiştir/);
   await expect(compactRoomCards.first().getByRole("combobox")).not.toHaveValue("available");
   await expect(compactRoomCards.nth(3).getByRole("combobox")).toHaveValue("cleaning");
   const pensionTaskRows = compactPage.locator(".pension-tasks-section .task-record-row");
   await expect(pensionTaskRows).toHaveCount(2);
   await expect(compactPage.locator(".pension-archive-details").last()).not.toHaveAttribute("open", "");
-  expect(await compactPage.locator(".pension-reservations-section").evaluate((panel) => getComputedStyle(panel).borderTopWidth)).toBe("1px");
+  await expect(compactPage.getByRole("heading", { name: "Rezervasyon Takibi", exact: true })).toBeVisible();
   await compactPage.waitForTimeout(50);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-pension-1366x768.png" });
 
@@ -1426,7 +1424,7 @@ try {
     const tableCard = compactTableCards.filter({ hasText: tableName });
     await expect(tableCard.getByRole("combobox", { name: `${tableName} durumunu değiştir` })).toHaveValue(status);
   }
-  await expect(compactPage.locator(".task-record-row").first().locator(".compact-action-bar > button")).toHaveCount(1);
+  await expect(compactPage.locator(".task-record-row").first().locator(".list-row__actions > button")).toHaveCount(1);
   await compactPage.locator(".task-record-row").first().locator("summary").click();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
   await compactPage.locator(".task-record-row").first().locator("summary").click();

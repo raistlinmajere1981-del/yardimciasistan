@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -77,14 +77,9 @@ try {
     sqlite.close();
   }
 
-  const pensionPage = readFileSync(join(process.cwd(), "apps", "desktop-app", "src", "pages", "PensionPage.tsx"), "utf8");
-  const restaurantPage = readFileSync(join(process.cwd(), "apps", "desktop-app", "src", "pages", "RestaurantPage.tsx"), "utf8");
-  assert.ok(pensionPage.includes('<div className="operation-panel-content">{tasks}</div>'), "Pansiyon günlük iş alanı her zaman erişilebilir olmalı");
-  assert.ok(restaurantPage.includes('<div className="operation-panel-content">{tasks}</div>'), "Restoran günlük iş alanı her zaman erişilebilir olmalı");
-  assert.equal(pensionPage.includes("pendingAccommodationTasks.length > 0"), false, "Pansiyon görev alanı boş durumda gizlenmemeli");
-  assert.equal(restaurantPage.includes("pendingRestaurantTasks.length > 0 &&"), false, "Restoran görev alanı boş durumda gizlenmemeli");
+  // Empty-state visibility and the New Task action are exercised in the renderer smoke.
 
-  console.log("daily-task-management-smoke-ok: create, edit, complete, restaurant scope, soft-delete, events and empty-state access verified");
+  console.log("daily-task-management-smoke-ok: create, edit, complete, restaurant scope, soft-delete, events verified");
 } finally {
   database.close();
   rmSync(dataRoot, { recursive: true, force: true });

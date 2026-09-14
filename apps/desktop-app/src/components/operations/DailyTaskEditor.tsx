@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useState } from "react";
 import { Save, X } from "lucide-react";
 import type {
@@ -53,6 +54,8 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
     setMessage("");
   }, [open, task]);
 
+  const dialogRef = useDialogFocus(open);
+
   if (!open) {
     return null;
   }
@@ -67,9 +70,9 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="daily-task-editor-title">
-        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
-          <div className="manual-request-heading">
+      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="daily-task-editor-title">
+        <header className="overlay-header overlay-header--sticky">
+          <div className="overlay-heading">
             <p>{areaLabel} günlük işleri</p>
             <h2 id="daily-task-editor-title">{task ? "Günlük işi düzenle" : "Yeni günlük iş ekle"}</h2>
           </div>
@@ -85,7 +88,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
         </header>
 
         <form
-          className="manager-form manual-request-form"
+          className="form-stack overlay-form"
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
@@ -106,8 +109,8 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
             onClose();
           }}
         >
-          <div className="manual-request-core-grid">
-            <label className="manual-request-note-field">
+          <div className="form-grid">
+            <label className="form-field--span form-field form-field--medium">
               İş / not başlığı
               <input
                 autoFocus
@@ -118,7 +121,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
                 placeholder={scope === "pension" ? "Örn. Oda 4 klimayı kontrol et" : "Örn. Akşam servisi için masa düzenini hazırla"}
               />
             </label>
-            <label>
+            <label className="form-field form-field--short">
               Tarih
               <input
                 type="date"
@@ -127,7 +130,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
                 onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
               />
             </label>
-            <label>
+            <label className="form-field form-field--short">
               Saat
               <input
                 type="time"
@@ -135,7 +138,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
                 onChange={(event) => setForm((current) => ({ ...current, dueTime: event.target.value }))}
               />
             </label>
-            <label className="manual-request-note-field">
+            <label className="form-field--span form-field form-field--fluid">
               Not
               <textarea
                 maxLength={1000}
@@ -148,7 +151,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
 
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
-          <div className="manual-request-actions">
+          <div className="overlay-footer overlay-footer--inset form-actions">
             <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
               Vazgeç
             </ActionButton>

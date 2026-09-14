@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useMemo, useState } from "react";
 import { Save, X } from "lucide-react";
 import {
@@ -70,6 +71,8 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
   const validCapacity = Number.isInteger(capacity) && capacity > 0 && capacity <= 100;
   const canSave = Boolean(room && form.name.trim() && validCapacity && state !== "loading");
 
+  const dialogRef = useDialogFocus(open);
+
   if (!open || !room) {
     return null;
   }
@@ -81,9 +84,9 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="room-public-details-editor-title">
-        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
-          <div className="manual-request-heading">
+      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="room-public-details-editor-title">
+        <header className="overlay-header overlay-header--sticky">
+          <div className="overlay-heading">
             <p>Müşteriye açık oda bilgileri</p>
             <h2 id="room-public-details-editor-title">Oda bilgilerini düzenle</h2>
           </div>
@@ -99,7 +102,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
         </header>
 
         <form
-          className="manager-form manual-request-form"
+          className="form-stack overlay-form"
           onSubmit={async (event) => {
             event.preventDefault();
             if (!canSave) return;
@@ -125,8 +128,8 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
             onClose();
           }}
         >
-          <div className="manual-request-core-grid">
-            <label>
+          <div className="form-grid">
+            <label className="form-field form-field--medium">
               Oda adı
               <input
                 autoFocus
@@ -137,7 +140,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                 placeholder="Örn. Deniz Manzaralı Oda"
               />
             </label>
-            <label>
+            <label className="form-field form-field--short">
               Oda numarası
               <input
                 maxLength={ROOM_PUBLIC_DETAIL_LIMITS.number}
@@ -146,18 +149,20 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                 placeholder="Örn. 4"
               />
             </label>
-            <label>
+            <label className="form-field form-field--xs">
               Kapasite
               <input
                 type="number"
                 min={1}
                 max={100}
                 required
+                aria-invalid={!validCapacity}
+                aria-describedby={!validCapacity ? "room-capacity-error" : undefined}
                 value={form.capacity}
                 onChange={(event) => setForm((current) => ({ ...current, capacity: event.target.value }))}
               />
             </label>
-            <label>
+            <label className="form-field form-field--short">
               Kat / konum
               <input
                 maxLength={ROOM_PUBLIC_DETAIL_LIMITS.floor}
@@ -166,7 +171,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                 placeholder="Örn. 1. kat"
               />
             </label>
-            <label className="manual-request-note-field">
+            <label className="form-field--span form-field form-field--long">
               Yatak bilgisi
               <input
                 maxLength={ROOM_PUBLIC_DETAIL_LIMITS.bedInfo}
@@ -177,11 +182,11 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
             </label>
           </div>
 
-          <fieldset className="manual-request-note-field">
+          <fieldset className="form-field--span">
             <legend>Oda özellikleri</legend>
-            <div className="operation-filter-summary">
+            <div className="page-toolbar__start">
               {ROOM_PUBLIC_FEATURE_CATALOG.map((feature) => (
-                <label key={feature.id}>
+                <label className="form-check" key={feature.id}>
                   <input
                     type="checkbox"
                     checked={form.features.includes(feature.id)}
@@ -196,8 +201,8 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
             </div>
           </fieldset>
 
-          <div className="manual-request-core-grid">
-            <label className="manual-request-note-field">
+          <div className="form-grid">
+            <label className="form-field--span form-field form-field--fluid">
               Açıklama
               <textarea
                 maxLength={ROOM_PUBLIC_DETAIL_LIMITS.description}
@@ -206,7 +211,7 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
                 placeholder="Müşteriye gösterilebilecek kısa oda açıklaması."
               />
             </label>
-            <label className="manual-request-note-field">
+            <label className="form-field--span form-field form-field--fluid">
               Fiyat notu
               <textarea
                 maxLength={ROOM_PUBLIC_DETAIL_LIMITS.priceNote}
@@ -217,9 +222,9 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
             </label>
           </div>
 
-          {!validCapacity && <p className="form-status sync-error">Kapasite 1 ile 100 arasında olmalı.</p>}
+          {!validCapacity && <p id="room-capacity-error" role="alert" className="form-status sync-error">Kapasite 1 ile 100 arasında olmalı.</p>}
 
-          <div className="manual-request-actions">
+          <div className="overlay-footer overlay-footer--inset form-actions">
             <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
               Vazgeç
             </ActionButton>

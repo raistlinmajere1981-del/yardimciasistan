@@ -53,7 +53,7 @@
     "e2e": "playwright test",
     "lint:php": "node scripts/php-lint.mjs",
     "screenshots:demo-web": "node scripts/capture-demo-web.mjs",
-    "smoke:desktop-renderer": "node scripts/run-current-contract-smoke.mjs renderer && npm run smoke:desktop-design-system && npm run smoke:desktop-shell",
+    "smoke:desktop-renderer": "node scripts/run-current-contract-smoke.mjs renderer && npm run smoke:desktop-design-system && npm run smoke:desktop-shell && npm run smoke:desktop-customer-pension",
     "smoke:desktop-design-system": "node scripts/smoke-desktop-design-system.mjs",
     "smoke:desktop-easy-mode": "node scripts/smoke-desktop-easy-mode.mjs",
     "smoke:table-categories": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-table-categories-db.mjs",
@@ -101,7 +101,8 @@
     "test": "npm run test --workspaces --if-present",
     "smoke:desktop-clean-startup": "npm run build:packages && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-desktop-clean-startup.mjs",
     "smoke:database-baseline": "npm run build:packages && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-database-baseline.mjs",
-    "smoke:desktop-shell": "node scripts/smoke-desktop-shell.mjs"
+    "smoke:desktop-shell": "node scripts/smoke-desktop-shell.mjs",
+    "smoke:desktop-customer-pension": "node scripts/smoke-desktop-customer-pension.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

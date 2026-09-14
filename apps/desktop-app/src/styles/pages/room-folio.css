@@ -1,138 +1,94 @@
+/* Room account workflow layout. Controls, surfaces and dialogs use primitives. */
+
 .room-folio-workspace {
   display: grid;
-  gap: 14px;
-}
-
-.room-folio-overview-panel,
-.room-folio-stays-section {
+  gap: var(--space-4);
   min-width: 0;
 }
-.room-folio-title-row,
-.room-folio-subheading,
-.room-folio-stay-heading,
-.room-folio-drawer-header,
-.room-folio-drawer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
 
-.room-folio-title-row h2,
-.room-folio-section-heading h3,
-.room-folio-subheading h3,
-.room-folio-drawer-header h2 {
-  margin: 0;
-}
-
-.room-folio-title-row p,
-.room-folio-section-heading p,
-.room-folio-drawer-header span {
-  margin: var(--space-1) 0 0;
-  color: var(--color-text-muted);
-}
-
-.room-folio-summary-grid {
+.room-folio-summary-grid, .room-folio-totals {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.room-folio-stay-card > button,
-.room-folio-secondary-button,
-.room-folio-payment-button,
-.room-folio-checkout-button,
-.room-folio-manual-item-form button,
-.room-folio-payment-form button,
-.room-folio-menu-list button {
-  min-height: 38px;
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  font-weight: 700;
-  cursor: pointer;
-}
-.room-folio-section-heading {
-  margin: 2px 2px 10px;
-}
-
-.room-folio-section-heading > span,
-.room-folio-subheading > span {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  gap: var(--space-3);
+  margin-top: var(--space-3);
 }
 
 .room-folio-stay-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-md)), 1fr));
+  gap: var(--space-3);
 }
 
 .room-folio-stay-card {
   display: grid;
-  gap: 10px;
+  align-content: start;
+  gap: var(--space-3);
 }
 
 .room-folio-stay-card.is-occupied {
   border-color: var(--color-accent-border);
 }
 
-.room-folio-stay-heading > div {
+.room-folio-stay-card > button {
+  justify-self: start;
+}
+
+.room-folio-stay-card .card__header > div {
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
-.room-folio-stay-heading span,
-.room-folio-stay-meta,
-.room-folio-stay-price {
-  color: var(--color-text-muted);
+.room-folio-stay-card .card__header > b {
+  color: var(--color-info);
   font-size: var(--text-sm);
-}
-
-.room-folio-stay-heading > b {
-  padding: 3px var(--space-2);
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  font-size: var(--text-xs);
-}
-
-.room-folio-stay-meta,
-.room-folio-stay-money {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) 14px;
 }
 
 .room-folio-stay-meta span {
   display: inline-flex;
+  gap: var(--space-1);
   align-items: center;
-  gap: 5px;
 }
 
 .room-folio-stay-money {
-  padding: var(--space-2) 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-2);
   border-block: 1px solid var(--color-border);
+}
+
+.room-folio-stay-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 .room-folio-stay-money span {
   display: grid;
-  gap: 2px;
-  min-width: 88px;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
+}
+
+.room-folio-stay-price {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.room-price-help {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.room-price-card small {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 .room-folio-stay-money strong {
   color: var(--color-text);
-  font-size: var(--text-sm);
-}
-
-.room-folio-empty,
-.room-folio-message {
-  margin: 0;
 }
 
 .room-folio-drawer {
@@ -140,225 +96,91 @@
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-.room-folio-line-remove,
-.room-folio-quantity button {
-  display: inline-grid;
-  place-items: center;
-  min-width: 34px;
-  min-height: 34px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-field);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.room-folio-drawer-body {
-  min-height: 0;
-  overflow: auto;
-}
-
-.room-folio-details-card,
-.room-folio-menu-panel,
-.room-folio-account-panel {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-bg-panel);
-}
-
-.room-folio-details-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--space-2);
-  margin-top: 10px;
-}
-
-.room-folio-details-grid label,
-.room-folio-total-input {
-  display: grid;
-  gap: 5px;
+.room-folio-drawer-header span {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-}
-
-.room-folio-details-grid label svg {
-  display: none;
-}
-
-.room-folio-details-grid input,
-.room-folio-total-input input,
-.room-folio-menu-search,
-.room-folio-manual-item-form input,
-.room-folio-manual-item-form select,
-.room-folio-payment-form input,
-.room-folio-payment-form select {
-  min-height: 38px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-field);
-  color: var(--color-text);
-  padding: 0 9px;
-}
-
-.room-folio-manual-total-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  margin: 10px 0;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.room-folio-total-input {
-  max-width: 220px;
-  margin-bottom: 10px;
-}
-
-.room-folio-secondary-button {
-  padding-inline: var(--space-3);
 }
 
 .room-folio-account-layout {
   display: grid;
-  grid-template-columns: minmax(320px, 0.8fr) minmax(420px, 1.2fr);
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-}
-
-.room-folio-menu-panel,
-.room-folio-account-panel {
-  min-height: 0;
-}
-
-.room-folio-menu-search {
-  width: 100%;
-  margin-top: 9px;
-  box-sizing: border-box;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: var(--space-4);
+  margin-top: var(--space-4);
 }
 
 .room-folio-category-tabs {
   display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding: var(--space-2) 0;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-.room-folio-category-tabs button {
-  min-height: 32px;
-  flex: 0 0 auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-field);
-  color: var(--color-text-muted);
-  padding: 0 10px;
-  cursor: pointer;
-}
-
-.room-folio-category-tabs button.is-active {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent-soft);
+.room-folio-category-tabs .is-active {
   color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-border);
 }
 
-.room-folio-menu-list,
-.room-folio-line-list {
+.room-folio-menu-list, .room-folio-line-list {
   display: grid;
-  gap: 6px;
-  max-height: 370px;
+  align-content: start;
+  gap: var(--space-2);
+  max-height: 50dvh;
   overflow: auto;
 }
 
-.room-folio-menu-list article,
-.room-folio-line-list article {
+.room-folio-menu-list article, .room-folio-line-list article {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
-  padding: 9px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-field);
+  padding-block: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.room-folio-menu-list article > div:first-child,
-.room-folio-line-list article > div:first-child {
-  min-width: 0;
-  flex: 1;
+.room-folio-menu-list article > div:first-child, .room-folio-line-list article > div:first-child {
   display: grid;
-  gap: 2px;
+  gap: var(--space-1);
+  flex: 1 1 var(--field-width-xs);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .room-folio-menu-list article > div:last-child {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
 
-.room-folio-menu-list span,
-.room-folio-line-list span {
+.room-folio-menu-list span, .room-folio-line-list span {
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
 }
 
-.room-folio-menu-list button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding-inline: 9px;
-}
-
-.room-folio-line-list article.is-lodging {
-  border-color: var(--color-accent-border);
-}
-
-.room-folio-line-list article.is-discount > b {
+.room-folio-line-list .is-discount > b {
   color: var(--color-success);
 }
 
 .room-folio-quantity {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--space-1);
-}
-
-.room-folio-quantity span {
-  min-width: 22px;
-  text-align: center;
-  color: var(--color-text);
-}
-
-.room-folio-manual-item-form {
-  display: grid;
-  grid-template-columns: 110px minmax(120px, 1fr) 100px auto;
-  gap: 6px;
-  margin-top: 9px;
-}
-
-.room-folio-manual-item-form button,
-.room-folio-payment-form button {
-  padding-inline: 10px;
-}
-
-.room-folio-totals {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
-  margin-top: var(--space-3);
 }
 
 .room-folio-totals > span {
   display: grid;
   gap: var(--space-1);
-  padding: 10px;
+  padding: var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-panel);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
 
 .room-folio-totals strong {
   color: var(--color-text);
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
 }
 
 .room-folio-totals .is-waiting {
@@ -367,132 +189,32 @@
 }
 
 .room-folio-totals .is-paid {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent-soft);
+  color: var(--color-success);
+  background: var(--color-success-soft);
 }
 
 .room-folio-payment-history {
   display: grid;
-  gap: 5px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--color-border);
+  gap: var(--space-2);
 }
 
 .room-folio-payment-history > div {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
 }
 
-.room-folio-payment-history > div span {
-  flex: 1;
+.room-folio-payment-history > div > span {
+  flex: 1 1 var(--field-width-sm);
   color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
-.room-folio-payment-form {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) 120px auto auto;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.room-folio-payment-form .is-secondary {
-  border-color: var(--color-border);
-  background: var(--color-bg-field);
-  color: var(--color-text);
-}
-
-.room-folio-payment-button {
-  width: 100%;
-  margin-top: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-
-.room-folio-checkout-button {
-  min-width: 140px;
-  padding-inline: 18px;
-  background: var(--color-accent);
-  color: white;
-}
-
-.room-folio-workspace button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-@media (max-width: 1100px) {
-  .room-folio-account-layout,
-.room-folio-stay-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 1100px) {
-  .room-folio-details-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 760px) {
-  .room-folio-summary-grid,
-.room-folio-totals,
-.room-folio-details-grid,
-.room-folio-manual-item-form,
-.room-folio-payment-form {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-.room-folio-title-row,
-.room-folio-drawer-footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-}
-
-.room-folio-details-actions {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.room-folio-details-actions > div {
-  min-width: 0;
-  flex: 1;
-}
-
-.room-folio-details-actions .room-folio-manual-total-toggle {
-  margin: 0;
-}
-
-.room-folio-details-actions .room-folio-total-input {
-  margin: var(--space-2) 0 0;
-}
-
-.room-folio-details-actions .room-folio-secondary-button {
-  flex: 0 0 auto;
-  min-width: calc(var(--space-10) + var(--space-10) + var(--space-10) + var(--space-4));
+  font-size: var(--text-sm);
 }
 
 .room-folio-payment-complete {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-accent-border);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
 }
 
 .room-folio-payment-complete > div {
@@ -500,115 +222,32 @@
   gap: var(--space-1);
 }
 
-.room-folio-payment-complete strong {
-  color: var(--color-text);
-  font-size: var(--text-sm);
-}
-
-.room-folio-payment-complete span {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-}
-
-.room-folio-confirm-copy h3,
-.room-folio-confirm-copy p {
-  margin: 0;
+.room-folio-confirm-copy {
+  margin-bottom: var(--space-4);
 }
 
 .room-folio-confirm-copy h3 {
-  margin-top: var(--space-1);
-  color: var(--color-text);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
 }
 
-.room-folio-confirm-copy > p:last-child {
-  margin-top: var(--space-2);
+.room-folio-confirm-copy p {
   color: var(--color-text-muted);
-  line-height: 1.5;
 }
 
-.room-folio-confirm-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
+.room-price-card .field-control-group > button {
+  flex: 0 0 auto;
 }
 
-.room-folio-confirm-actions button {
-  min-height: var(--control-height-lg);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-field);
-  color: var(--color-text);
-  font-weight: 700;
-  cursor: pointer;
-}
+@media (max-width: 1100px) {
 
-.room-folio-confirm-actions button.is-primary {
-  border-color: var(--color-accent-border);
-  background: var(--color-accent);
-  color: white;
-}
-
-.room-folio-confirm-actions button.is-warning {
-  border-color: var(--color-warning-border);
-  background: var(--color-warning-soft);
-  color: var(--color-text);
-}
-
-.room-folio-confirm-actions button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-@media (max-width: 720px) {
-  .room-folio-details-actions {
-    align-items: stretch;
-    flex-direction: column;
+  .room-folio-account-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
-@media (max-width: 720px) {
-  .room-folio-details-actions .room-folio-secondary-button {
-    width: 100%;
+@media (max-width: 760px) {
+
+  .room-folio-summary-grid, .room-folio-totals {
+    grid-template-columns: minmax(0, 1fr);
   }
-}
-
-@media (max-width: 720px) {
-  .room-folio-confirm-actions {
-    flex-direction: column-reverse;
-  }
-}
-
-@media (max-width: 720px) {
-  .room-folio-confirm-actions button {
-    width: 100%;
-  }
-}
-
-.room-folio-close {
-  width: auto;
-  min-width: calc(var(--space-10) + var(--space-6));
-  padding-inline: var(--space-3);
-  font-size: var(--text-xs);
-  font-weight: 700;
-}
-
-.room-folio-close svg {
-  display: none;
-}
-
-.room-folio-close::after {
-  content: "Kapat";
-}
-
-.room-folio-checkout-button {
-  font-size: 0;
-}
-
-.room-folio-checkout-button::after {
-  content: "Konaklamayı Bitir";
-  font-size: var(--text-sm);
-  font-weight: 750;
 }

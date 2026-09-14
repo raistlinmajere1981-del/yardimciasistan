@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, Save, X } from "lucide-react";
 import type {
@@ -92,6 +93,8 @@ export function ManualReservationEditor({
     setMessage("");
   }, [customers, open, reservation]);
 
+  const dialogRef = useDialogFocus(open);
+
   if (!open) return null;
 
   return (
@@ -101,9 +104,9 @@ export function ManualReservationEditor({
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-reservation-editor-title">
-        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
-          <div className="manual-request-heading">
+      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-reservation-editor-title">
+        <header className="overlay-header overlay-header--sticky">
+          <div className="overlay-heading">
             <p>Pansiyon rezervasyonları</p>
             <h2 id="manual-reservation-editor-title">{isEditing ? "Rezervasyonu düzenle" : "Yeni rezervasyon ekle"}</h2>
           </div>
@@ -119,7 +122,7 @@ export function ManualReservationEditor({
         </header>
 
         <form
-          className="manager-form manual-request-form"
+          className="form-stack overlay-form"
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
@@ -141,8 +144,8 @@ export function ManualReservationEditor({
             onClose();
           }}
         >
-          <div className="manual-request-core-grid">
-            <label className="manual-request-note-field">
+          <div className="form-grid">
+            <label className="form-field--span form-field form-field--long">
               Müşteri
               <select
                 autoFocus={!isEditing}
@@ -171,7 +174,7 @@ export function ManualReservationEditor({
             </label>
 
             {!isEditing && (
-              <div className="manual-request-note-field">
+              <div className="form-field--span">
                 <QuickCustomerCreator
                   disabled={state === "loading"}
                   onSave={onSaveCustomer}
@@ -180,7 +183,7 @@ export function ManualReservationEditor({
               </div>
             )}
 
-            <label>
+            <label className="form-field form-field--short">
               Giriş tarihi
               <input
                 type="date"
@@ -192,7 +195,7 @@ export function ManualReservationEditor({
               />
             </label>
 
-            <label>
+            <label className="form-field form-field--short">
               Çıkış tarihi
               <input
                 type="date"
@@ -205,7 +208,7 @@ export function ManualReservationEditor({
               />
             </label>
 
-            <label>
+            <label className="form-field form-field--xs">
               Kişi sayısı
               <input
                 type="number"
@@ -218,7 +221,7 @@ export function ManualReservationEditor({
               />
             </label>
 
-            <label className="manual-request-note-field">
+            <label className="form-field--span form-field form-field--long">
               Oda
               <select
                 autoFocus={isEditing}
@@ -235,7 +238,7 @@ export function ManualReservationEditor({
               <small>Oda değişikliğinde kapasite, aktif konaklama ve tarih çakışmaları yeniden kontrol edilir.</small>
             </label>
 
-            <label className="manual-request-note-field">
+            <label className="form-field--span form-field form-field--fluid">
               Not
               <textarea
                 maxLength={2000}
@@ -256,7 +259,7 @@ export function ManualReservationEditor({
           )}
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
-          <div className="manual-request-actions">
+          <div className="overlay-footer overlay-footer--inset form-actions">
             <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
               Vazgeç
             </ActionButton>

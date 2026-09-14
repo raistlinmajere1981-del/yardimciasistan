@@ -76,7 +76,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
 
   return (
     <section className="reservation-quick-customer" aria-label="Hızlı müşteri ekleme">
-      <div className="reservation-quick-customer-heading">
+      <div className="page-toolbar">
         <div>
           <strong>Yeni müşteri</strong>
           <small>Rezervasyondan çıkmadan temel müşteri kaydını oluşturun.</small>
@@ -92,8 +92,8 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
         </button>
       </div>
 
-      <div className="reservation-quick-customer-fields">
-        <label>
+      <div className="form-row">
+        <label className="form-field form-field--medium">
           Ad soyad
           <input
             autoFocus
@@ -104,7 +104,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
             placeholder="Müşteri adı soyadı"
           />
         </label>
-        <label>
+        <label className="form-field form-field--short">
           Telefon
           <input
             type="tel"
@@ -119,7 +119,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
 
       {message && state === "error" && <p className="form-status sync-error">{message}</p>}
 
-      <div className="reservation-quick-customer-actions">
+      <div className="form-actions">
         <ActionButton variant="secondary" size="sm" type="button" disabled={state === "loading"} onClick={closeEditor}>
           Vazgeç
         </ActionButton>

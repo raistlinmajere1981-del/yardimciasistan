@@ -40,3 +40,25 @@ test('shared ownership regressions are detected without treating complementary r
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('feature CSS cannot redefine card/list/form primitive ownership', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'desktop-record-audit-'));
+  try {
+    const fixture = {
+      'styles/index.css': '@import "./components/data-list.css" layer(components); @import "./pages/customer.css" layer(pages);',
+      'styles/components/data-list.css': '.card { padding: var(--space-4); } .list-row { gap: var(--space-3); } .form-field { display: flex; }',
+      'styles/pages/customer.css': '.card { padding: 9px; } .list-row { gap: 7px; } .form-field { display: grid; }'
+    };
+    const files = Object.entries(fixture).map(([name, text]) => {
+      const file = path.join(root, name);
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, text);
+      return file;
+    });
+    const report = desktopStyleAudit(files);
+    assert.equal(report.violations.filter(issue => issue.kind === 'duplicateSharedPrimitive').length, 3);
+    assert(!report.violations.some(issue => issue.file.endsWith('/components/data-list.css')));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

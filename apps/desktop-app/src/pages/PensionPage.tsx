@@ -98,7 +98,7 @@ export function PensionPage({
     <section className="combined-page pension-page" aria-label="Pansiyon yönetimi">
       <section className="panel pension-today-strip" aria-labelledby="pension-summary-title">
         <div className="pension-today-copy">
-          <span className="operation-panel-eyebrow">Bugün</span>
+          <span className="panel-eyebrow">Bugün</span>
           <h2 id="pension-summary-title">{reservationsEnabled || staysEnabled ? "Konaklama durumu" : "Oda durumu"}</h2>
         </div>
         <div className="pension-today-stats">
@@ -117,25 +117,25 @@ export function PensionPage({
 
       <div className="pension-layout pension-primary-layout">
         {reservationsEnabled && (
-          <section className="panel operation-group-panel pension-reservations-section" aria-labelledby="pension-reservations-title">
-            <header className="operation-panel-heading">
-              <span className="operation-panel-eyebrow">Konaklama</span>
+          <section className="panel record-stack pension-reservations-section" aria-labelledby="pension-reservations-title">
+            <header className="pension-section-heading">
+              <span className="panel-eyebrow">Konaklama</span>
               <h2 id="pension-reservations-title">Rezervasyon Takibi</h2>
               <p>Onay bekleyen ve yaklaşan konaklamalar</p>
             </header>
-            <div className="operation-panel-content">{reservations}</div>
+            <div className="page-section__body">{reservations}</div>
           </section>
         )}
-        <aside className="panel operation-group-panel pension-rooms-section" aria-labelledby="pension-rooms-title">
-          <header className="operation-panel-heading pension-room-heading">
+        <aside className="panel record-stack pension-rooms-section" aria-labelledby="pension-rooms-title">
+          <header className="pension-section-heading pension-room-heading">
             <div className="pension-room-heading-copy">
-              <span className="operation-panel-eyebrow">Odalar</span>
+              <span className="panel-eyebrow">Odalar</span>
               <h2 id="pension-rooms-title">Anlık Oda Durumu</h2>
               <p>Odaların güncel kullanım durumu</p>
             </div>
             {folioEnabled && (
               <button
-                className="pension-folio-shortcut"
+                className="action-button action-button-secondary action-button-sm"
                 type="button"
                 aria-controls="pension-room-folio"
                 onClick={openRoomFolio}
@@ -145,28 +145,28 @@ export function PensionPage({
               </button>
             )}
           </header>
-          <div className="operation-panel-content">{rooms}</div>
+          <div className="page-section__body">{rooms}</div>
         </aside>
-        {tasksEnabled && <section className="panel operation-group-panel pension-tasks-section" aria-labelledby="pension-tasks-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Günlük İşler</span>
+        {tasksEnabled && <section className="panel record-stack pension-tasks-section" aria-labelledby="pension-tasks-title">
+          <header className="pension-section-heading">
+            <span className="panel-eyebrow">Günlük İşler</span>
             <h2 id="pension-tasks-title">Günlük Konaklama İşleri</h2>
             <p>{reservationsEnabled || staysEnabled
               ? "Giriş, çıkış, temizlik, bakım ve kendi eklediğiniz işler"
               : "Temizlik, bakım ve kendi eklediğiniz işler"}</p>
           </header>
-          <div className="operation-panel-content">{tasks}</div>
+          <div className="page-section__body">{tasks}</div>
         </section>}
       </div>
 
       {folioEnabled && <details
-        className="pension-archive-details pension-folio-details"
+        className="disclosure pension-archive-details pension-folio-details"
         id="pension-room-folio"
         ref={roomFolioDetailsRef}
       >
         <summary>
           <span className="pension-archive-summary-copy">
-            <span className="operation-panel-eyebrow">Oda hesabı</span>
+            <span className="panel-eyebrow">Oda hesabı</span>
             <strong>Oda Hesabı ve Tahsilat</strong>
             <small>Konaklama tutarı, ek harcamalar ve ödeme işlemleri</small>
           </span>
@@ -175,22 +175,22 @@ export function PensionPage({
         <RoomFolioWorkspace refreshKey={roomFolioRefreshKey} menuEnabled={menuEnabled} />
       </details>}
 
-      {staysEnabled && <details className="pension-archive-details">
+      {staysEnabled && <details className="disclosure pension-archive-details">
         <summary>
           <span className="pension-archive-summary-copy">
-            <span className="operation-panel-eyebrow">Geçmiş kayıtlar</span>
+            <span className="panel-eyebrow">Geçmiş kayıtlar</span>
             <strong>Konaklama Geçmişini Göster</strong>
             <small>Planlanan, devam eden ve tamamlanan eski oda kayıtları</small>
           </span>
           <span className="pension-archive-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
         </summary>
-        <section className="panel operation-group-panel pension-stays-section" aria-labelledby="pension-stays-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Müşteri · Oda</span>
+        <section className="panel record-stack pension-stays-section" aria-labelledby="pension-stays-title">
+          <header className="pension-section-heading">
+            <span className="panel-eyebrow">Müşteri · Oda</span>
             <h2 id="pension-stays-title">Konaklama Arşivi</h2>
             <p>Planlanan, devam eden ve tamamlanan oda ilişkileri</p>
           </header>
-          <div className="operation-panel-content">{stays}</div>
+          <div className="page-section__body">{stays}</div>
         </section>
       </details>}
     </section>

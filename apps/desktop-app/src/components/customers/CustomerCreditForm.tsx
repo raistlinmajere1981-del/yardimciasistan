@@ -76,22 +76,22 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
   }
 
   return (
-    <form className="customer-credit-form" aria-label={mode === "payment" ? "Tahsilat" : "Hesap düzeltmesi"} onSubmit={(event) => void submit(event)} noValidate
+    <form className="form-stack customer-credit-form" aria-label={mode === "payment" ? "Tahsilat" : "Hesap düzeltmesi"} onSubmit={(event) => void submit(event)} noValidate
       onKeyDown={(event) => { if (event.key === "Escape" && !saving) { event.preventDefault(); onClose(); } }}>
       <h4>{mode === "payment" ? "Tahsilat al" : "Düzeltme"}</h4>
       {mode === "adjustment" && <p>Bu işlem mevcut kaydı silmez; yeni bir düzeltme hareketi oluşturur.</p>}
-      <fieldset disabled={saving || loading}>
+      <fieldset className="form-stack" disabled={saving || loading}>
         <legend>{mode === "payment" ? "Tahsilat bilgileri" : "Düzeltme bilgileri"}</legend>
-        {mode === "adjustment" && <label className="customer-credit-field">Tür
+        {mode === "adjustment" && <label className="form-field form-field--medium">Tür
           <select aria-label="Tür" value={adjustmentType} onChange={(event) => setAdjustmentType(event.target.value as typeof adjustmentType)}>
             <option value="adjustment_debit">Borcu artır</option><option value="adjustment_credit">Borcu azalt</option>
           </select>
         </label>}
-        <div className="customer-credit-form-grid">
-          <label className="customer-credit-field">Tutar
+        <div className="form-row">
+          <label className="form-field form-field--short">Tutar
             <input ref={amountInput} inputMode="decimal" placeholder="0,00" value={amount} onChange={(event) => setAmount(event.target.value)} required />
           </label>
-          <label className="customer-credit-field">Para birimi
+          <label className="form-field form-field--medium">Para birimi
             {reducingDebt ? <select aria-label="Para birimi" value={currency} onChange={(event) => setCurrency(event.target.value)} required>
               {!account.balances.some((balance) => balance.currency === currency && balance.amountMinor > 0) && <option value={currency}>{currency}</option>}
               {account.balances.filter((balance) => balance.amountMinor > 0).map((balance) => <option key={balance.currency} value={balance.currency}>{balance.currency}</option>)}
@@ -99,16 +99,16 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
           </label>
         </div>
         <p>Güncel borç: {formatCreditMoney(availableDebt, /^[A-Z]{3}$/.test(currency) ? currency : "TRY")}</p>
-        {mode === "payment" && <label className="customer-credit-field">Ödeme yöntemi
+        {mode === "payment" && <label className="form-field form-field--medium">Ödeme yöntemi
           <select aria-label="Ödeme yöntemi" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as CustomerCreditPaymentMethod)}>
             {Object.entries(customerCreditPaymentLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
           </select>
         </label>}
-        <label className="customer-credit-field">{mode === "payment" ? "Not (isteğe bağlı)" : "Açıklama / neden (zorunlu)"}
+        <label className="form-field form-field--fluid">{mode === "payment" ? "Not (isteğe bağlı)" : "Açıklama / neden (zorunlu)"}
           <textarea value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} required={mode === "adjustment"} rows={2} />
         </label>
         {validation && !runtimeNoticeActive && <p role="alert" className="customer-credit-error">{validation}</p>}
-        <div className="customer-credit-actions">
+        <div className="action-row">
           <ActionButton type="submit" disabled={!valid || saving || loading}>{saving ? "Kaydediliyor…" : mode === "payment" ? "Tahsilatı Kaydet" : "Düzeltmeyi Kaydet"}</ActionButton>
           <ActionButton variant="secondary" onClick={onClose}>Vazgeç</ActionButton>
         </div>

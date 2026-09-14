@@ -15,6 +15,8 @@
 @import "./foundation/focus.css" layer(foundation);
 @import "./components/badges.css" layer(components.primitives);
 @import "./components/buttons.css" layer(components.primitives);
+@import "./components/cards.css" layer(components.primitives);
+@import "./components/data-list.css" layer(components.primitives);
 @import "./components/dialogs.css" layer(components.primitives);
 @import "./components/navigation.css" layer(components.primitives);
 @import "./components/header.css" layer(components.primitives);
@@ -52,5 +54,4 @@
 @import "./pages/setup.css" layer(pages);
 @import "../components/settings/business-location-map-picker.css" layer(pages);
 @import "./pages/menu-preview.css" layer(pages);
-@import "./pages/requests.css" layer(pages);
 @import "./utilities.css" layer(utilities);

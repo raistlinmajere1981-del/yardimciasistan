@@ -202,3 +202,14 @@ Güncel envanter ve migration sırası: [Desktop UI Migration](DESKTOP_UI_MIGRAT
 6. Modal/drawer dış yüzeyi `overlay`, `dialog`/`drawer`, `overlay-header/body/footer/close` sözleşmesini kullanır. Feature yalnız gövdeyi biçimlendirir; focus ve kapatma davranışını mevcut component yönetir.
 7. Global/shared CSS yalnız styles/index.css üzerinden açık layer ile import edilir. Gerçek feature kuralları feature stylesheet'inde kalır. Token/theme dışında ham renk, `--override-*`, `!important` ve primitive'i ezen global selector eklemeyin.
 8. `npm run design:audit:strict` ve `npm run smoke:desktop-shell` çalıştırın. Yeni shell smoke renderer/pilot zincirine dahildir; screenshot ve raporlar artifacts altında kalır.
+
+
+## Müşteri/Pansiyon referansı (Aşama 2A)
+
+Müşteri İşleri ve Pansiyon, doğrudan kullandıkları oda hesabı/editörleriyle migrated durumundadır. Güncel audit ve test sonuçları [migration envanterinin Aşama 2A bölümündedir](DESKTOP_UI_MIGRATION.md#aşama-2a-başlangıç-auditi-ve-yapılan-migration); önceki bölümdeki sayılar tarihsel foundation sonuçlarıdır.
+
+- Seçilebilir listelerde `DataListButton`, aksiyonlu kayıtlarda `DataListItem`; yerleşimde `record-workspace` / `record-stack`, detaylarda `data-list` kullanın. Legacy manager-row/operation selector’larını kopyalamayın.
+- Kartlar `card` ve `card__header/meta/actions`; filtreler `form-row filter-row`, bölüm eylemleri `page-toolbar` / `action-row` kullanır.
+- Editörler `drawer--form`, `overlay-form`, `form-grid`, açık `form-field--…` boyutları ve `overlay-footer` kullanır. 760px altı stack sözleşmesini feature’dan override etmeyin.
+- Modal klavye odağı için `useDialogFocus(open)` ref’ini dialog yüzeyine bağlayın. Kapatma kontrolü `drawer-close-button`, `overlay-close` veya `data-dialog-close` ile tanımlanır; hook mevcut click handler ve disabled durumunu kullanır.
+- `npm run smoke:desktop-customer-pension` kayıt payload’larını, erişilebilirliği ve beş viewportu test eder. Renderer/pilot zincirine dahildir; ekran çıktıları yalnız artifacts altında tutulur.

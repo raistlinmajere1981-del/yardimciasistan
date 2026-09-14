@@ -34,7 +34,7 @@ import { CustomerRoomStayActions, RoomAssignmentDrawer } from "../customers/Cust
 import { DailyTaskEditor, type DailyTaskScope } from "./DailyTaskEditor";
 import { ManualReservationEditor } from "./ManualReservationEditor";
 import { ActionButton } from "../ui/ActionButton";
-import { CompactListItem } from "../ui/CompactListItem";
+import { DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
 function getCustomerRoomStayTone(value: string): StatusTone {
@@ -79,8 +79,8 @@ function formatTaskRelation(task: DesktopDashboardData["dailyTasks"][number]) {
 
 function getResourceStatusTone(value: string): StatusTone {
   if (value === "available") return "ok";
-  if (["reserved", "bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) return "wait";
-  if (value === "maintenance") return "danger";
+  if (["reserved", "cleaning", "bill_waiting", "waiting_bill", "checkout", "payment"].includes(value)) return "wait";
+  if (["maintenance", "out_of_service"].includes(value)) return "danger";
   return "info";
 }
 
@@ -117,9 +117,9 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
   );
 
   return (
-    <section className="reservations-workspace" aria-label="Günlük işler">
-      <div className="reservation-toolbar page-toolbar">
-        <div className="operation-filter-summary" aria-label="Günlük iş özeti">
+    <section className="record-stack" aria-label="Günlük işler">
+      <div className="page-toolbar">
+        <div className="page-toolbar__start" aria-label="Günlük iş özeti">
           <StatusBadge tone="wait">{tasks.filter((task) => task.status === "pending").length} bekleyen</StatusBadge>
           <StatusBadge tone="ok">{tasks.filter((task) => task.status === "done").length} tamamlanan</StatusBadge>
           <ActionButton
@@ -134,8 +134,8 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
             Yeni İş
           </ActionButton>
         </div>
-        <div className="reservation-filters task-filters">
-          <label>
+        <div className="form-row filter-row">
+          <label className="form-field form-field--medium">
             Durum
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="pending">Bekleyen</option>
@@ -150,7 +150,7 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
         </div>
       </div>
 
-      <section className="operations-grid compact-record-list" aria-label="Günlük iş listesi">
+      <section className="data-records" aria-label="Günlük iş listesi">
         {tasks.length === 0 ? (
           <div className="panel empty-state">
             <ClipboardList size={28} aria-hidden="true" />
@@ -165,8 +165,8 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
           </div>
         ) : (
           filteredTasks.map((task) => (
-            <CompactListItem
-              className="operation-record-row task-record-row"
+            <DataListItem
+              className="task-record-row"
               key={task.id}
               leading={(
                 <StatusBadge tone={task.status === "done" ? "ok" : task.status === "pending" ? "wait" : "info"}>
@@ -187,10 +187,10 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
                     <CheckCircle2 size={15} aria-hidden="true" />
                     Tamamla
                   </ActionButton>
-                  <details className="expandable-details compact-action-details">
+                  <details className="record-disclosure">
                     <summary>Diğer işlemler</summary>
-                    <div className="expanded-record-content compact-secondary-menu">
-                      <div className="secondary-detail-actions">
+                    <div className="record-disclosure__body action-row">
+                      <div className="action-row">
                         {task.taskType.startsWith("manual_") && (
                           <>
                             <ActionButton
@@ -281,9 +281,9 @@ export function ReservationsWorkspace({
   );
 
   return (
-    <section className="reservations-workspace" aria-label="Rezervasyon yönetimi">
-      <div className="reservation-toolbar page-toolbar">
-        <div className="operation-filter-summary" aria-label="Rezervasyon özeti">
+    <section className="record-stack" aria-label="Rezervasyon yönetimi">
+      <div className="page-toolbar">
+        <div className="page-toolbar__start" aria-label="Rezervasyon özeti">
           <StatusBadge tone="info">{filteredReservations.length} görünen kayıt</StatusBadge>
           <StatusBadge tone="wait">{reservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
           <ActionButton
@@ -298,8 +298,8 @@ export function ReservationsWorkspace({
             Yeni Rezervasyon
           </ActionButton>
         </div>
-        <div className="reservation-filters">
-          <label className="reservation-status-filter">
+        <div className="form-row filter-row">
+          <label className="reservation-status-filter form-field form-field--short">
             <span className="reservation-control-label">Durum</span>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="all">Tümü</option>
@@ -310,7 +310,7 @@ export function ReservationsWorkspace({
               <option value="completed">Tamamlandı</option>
             </select>
           </label>
-          <label className="reservation-date-filter">
+          <label className="reservation-date-filter form-field form-field--short">
             <span className="reservation-filter-label">
               <span>Tarih</span>
               <small className="date-field-hint" id="reservation-date-hint">Gün / Ay / Yıl</small>
@@ -341,7 +341,7 @@ export function ReservationsWorkspace({
         </div>
       </div>
 
-      <section className="operations-grid compact-record-list" aria-label="Rezervasyon listesi">
+      <section className="data-records" aria-label="Rezervasyon listesi">
         {reservations.length === 0 ? (
           <div className="panel empty-state">
             <CalendarCheck size={28} aria-hidden="true" />
@@ -356,8 +356,8 @@ export function ReservationsWorkspace({
           </div>
         ) : (
           filteredReservations.map((reservation) => (
-            <CompactListItem
-              className="operation-record-row reservation-record-row"
+            <DataListItem
+              className="reservation-record-row"
               key={reservation.id}
               leading={<StatusBadge tone={getReservationStatusTone(reservation.status)}>{formatReservationStatus(reservation.status)}</StatusBadge>}
               title={reservation.title || reservation.customerName || "Misafir"}
@@ -381,11 +381,11 @@ export function ReservationsWorkspace({
                       WhatsApp
                     </ActionButton>
                   )}
-                  <details className="expandable-details compact-action-details">
+                  <details className="record-disclosure">
                     <summary>Detay</summary>
-                    <div className="expanded-record-content compact-secondary-menu">
+                    <div className="record-disclosure__body action-row">
                       <p>{reservation.notes || reservation.priceNote || "Rezervasyon notu yok."}</p>
-                      <div className="secondary-detail-actions">
+                      <div className="action-row">
                         {reservation.reservationType === "room"
                           && ["pending", "approved"].includes(reservation.status)
                           && reservation.roomIds.length <= 1 && (
@@ -458,7 +458,7 @@ export function RoomsWorkspace({
   const [assignmentRoomId, setAssignmentRoomId] = useState("");
   return (
     <>
-      <section className="operations-grid compact-resource-grid" aria-label="Oda yönetimi">
+      <section className="room-grid" aria-label="Oda yönetimi">
         {rooms.length === 0 && (
           <div className="panel empty-state"><BedDouble size={28} aria-hidden="true" /><strong>Oda kaydı yok.</strong><p>Oda sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
         )}
@@ -466,14 +466,14 @@ export function RoomsWorkspace({
           const displayInfo = getRoomDisplayInfo(room, reservations);
           const activeStay = stays.find((stay) => stay.roomId === room.id && ["planned", "checked_in"].includes(stay.status));
           const knownRoomStatuses = ["available", "occupied", "cleaning", "maintenance"];
-          return <article className="compact-card resource-compact-card" key={room.id}>
-            <div className="resource-card-heading">
+          return <article className="card room-card" data-status={displayInfo.status} key={room.id}>
+            <div className="card__header">
               <div>
                 <h2>{room.number ? `Oda ${room.number} — ${room.name}` : room.name}</h2>
               </div>
               <StatusBadge tone={getResourceStatusTone(displayInfo.status)}>{formatRoomStatus(displayInfo.status)}</StatusBadge>
             </div>
-            <div className="compact-meta-row">
+            <div className="list-row__meta">
               <span>{room.capacity} kişi</span>
               <span>{room.floor || "Kat bilgisi yok"}</span>
               <span>{room.bedInfo || "Yatak bilgisi yok"}</span>
@@ -485,10 +485,10 @@ export function RoomsWorkspace({
                 <CustomerRoomStayActions stay={activeStay} onUpdateStatus={onUpdateStayStatus} />
               </div>
             ) : reservationsEnabled ? (
-              <p className="compact-reservation-line line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
+              <p className="card__meta line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
             ) : null}
-            {(room.description || room.features.length > 0) && <p className="resource-description line-clamp-1">{room.description || room.features.join(", ")}</p>}
-            <div className="room-card-actions">
+            {(room.description || room.features.length > 0) && <p className="card__meta line-clamp-1">{room.description || room.features.join(", ")}</p>}
+            <div className="card__actions">
               {staysEnabled && !activeStay && (
                 <ActionButton
                   size="sm"
@@ -500,7 +500,7 @@ export function RoomsWorkspace({
                   Müşteri Ata
                 </ActionButton>
               )}
-              <label className="room-status-select">
+              <label className="form-field form-field--medium">
                 <span>Durum</span>
                 <select
                   aria-label={`${room.name} durumunu değiştir`}
@@ -557,13 +557,13 @@ export function CustomerRoomStaysWorkspace({
       || stay.status === filter
   );
   return (
-    <section className="customer-room-stays-workspace" aria-label="Konaklama arşivi">
-      <div className="reservation-toolbar page-toolbar">
-        <div className="operation-filter-summary">
+    <section className="record-stack" aria-label="Konaklama arşivi">
+      <div className="page-toolbar">
+        <div className="page-toolbar__start">
           <StatusBadge tone="info">{stays.filter((stay) => stay.status === "checked_in").length} içeride</StatusBadge>
           <StatusBadge tone="wait">{stays.filter((stay) => stay.status === "planned").length} planlı</StatusBadge>
         </div>
-        <label>Durum<select value={filter} onChange={(event) => setFilter(event.target.value)}>
+        <label className="form-field form-field--medium">Durum<select value={filter} onChange={(event) => setFilter(event.target.value)}>
           <option value="active">Aktif kayıtlar</option>
           <option value="checked_in">Giriş yaptı</option>
           <option value="planned">Planlandı</option>
@@ -572,12 +572,12 @@ export function CustomerRoomStaysWorkspace({
           <option value="all">Tüm arşiv</option>
         </select></label>
       </div>
-      <div className="compact-record-list customer-stay-list">
+      <div className="data-records">
         {visible.length === 0 ? (
-          <div className="empty-state compact-empty"><BedDouble size={24} aria-hidden="true" /><strong>Konaklama kaydı yok.</strong><p>Oda kartından veya müşteri kartından atama yapabilirsiniz.</p></div>
+          <div className="empty-state"><BedDouble size={24} aria-hidden="true" /><strong>Konaklama kaydı yok.</strong><p>Oda kartından veya müşteri kartından atama yapabilirsiniz.</p></div>
         ) : visible.map((stay) => (
-          <CompactListItem
-            className="operation-record-row customer-stay-row"
+          <DataListItem
+            className="customer-stay-row"
             key={stay.id}
             leading={<StatusBadge tone={getCustomerRoomStayTone(stay.status)}>{formatCustomerRoomStayStatus(stay.status)}</StatusBadge>}
             title={`${stay.customerName} · ${stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}`}

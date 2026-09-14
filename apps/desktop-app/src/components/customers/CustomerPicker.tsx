@@ -22,12 +22,12 @@ export function CustomerPicker({ customers, value, onChange, disabled }: {
   const selected = customers.find((customer) => customer.id === value);
 
   return (
-    <section className="customer-credit-picker" aria-labelledby={labelId}>
+    <section className="panel record-stack customer-credit-picker" aria-labelledby={labelId}>
       <h3 id={labelId}>Veresiye müşterisi</h3>
-      <label className="customer-credit-field">Müşteri ara
+      <label className="form-field form-field--medium">Müşteri ara
         <input type="search" placeholder="Ad veya telefon" value={search} onChange={(event) => setSearch(event.target.value)} disabled={disabled} />
       </label>
-      <label className="customer-credit-field">Müşteri
+      <label className="form-field form-field--medium">Müşteri
         <select aria-label="Müşteri" value={selected?.id ?? ""} onChange={(event) => onChange(event.target.value)} disabled={disabled} required>
           <option value="">Kayıtlı müşteri seçin</option>
           {options.map((customer) => <option key={customer.id} value={customer.id}>{customer.fullName}{customer.phone ? ` · ${customer.phone}` : ""}</option>)}
@@ -35,7 +35,7 @@ export function CustomerPicker({ customers, value, onChange, disabled }: {
       </label>
       {!options.length && <p>Bu aramaya uygun müşteri yok. Yeni kayıt için Müşteriler ekranını kullanın.</p>}
       {selected ? <>
-        <div className="customer-credit-actions"><strong>{selected.fullName}</strong>
+        <div className="action-row"><strong>{selected.fullName}</strong>
           <ActionButton variant="ghost" size="sm" onClick={() => onChange("")} disabled={disabled}>Seçimi Temizle</ActionButton>
         </div>
         <SelectedCustomerDebt key={selected.id} customerId={selected.id} />

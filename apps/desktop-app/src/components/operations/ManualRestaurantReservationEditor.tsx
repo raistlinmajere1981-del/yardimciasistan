@@ -72,14 +72,14 @@ export function ManualRestaurantReservationEditor({
 
   return (
     <div
-      className="manual-request-backdrop overlay overlay--drawer"
+      className="restaurant-reservation-backdrop overlay overlay--drawer"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-restaurant-reservation-title">
-        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
-          <div className="manual-request-heading">
+      <aside className="restaurant-reservation-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-restaurant-reservation-title">
+        <header className="restaurant-reservation-drawer-header overlay-header overlay-header--sticky">
+          <div className="restaurant-reservation-heading">
             <p>Restoran rezervasyonları</p>
             <h2 id="manual-restaurant-reservation-title">Yeni masa rezervasyonu</h2>
           </div>
@@ -95,7 +95,7 @@ export function ManualRestaurantReservationEditor({
         </header>
 
         <form
-          className="manager-form manual-request-form"
+          className="manager-form restaurant-reservation-form"
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
@@ -116,8 +116,8 @@ export function ManualRestaurantReservationEditor({
             onClose();
           }}
         >
-          <div className="manual-request-core-grid">
-            <label className="manual-request-note-field">
+          <div className="restaurant-reservation-core-grid">
+            <label className="restaurant-reservation-note-field">
               Müşteri
               <select
                 autoFocus
@@ -138,7 +138,7 @@ export function ManualRestaurantReservationEditor({
               <small>{selectedCustomer ? "Kayıtlı müşteri seçildi." : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}</small>
             </label>
 
-            <div className="manual-request-note-field">
+            <div className="restaurant-reservation-note-field">
               <QuickCustomerCreator
                 disabled={state === "loading"}
                 onSave={onSaveCustomer}
@@ -179,7 +179,7 @@ export function ManualRestaurantReservationEditor({
               />
             </label>
 
-            <label className="manual-request-note-field">
+            <label className="restaurant-reservation-note-field">
               Masa
               <select
                 value={form.tableId}
@@ -195,7 +195,7 @@ export function ManualRestaurantReservationEditor({
               <small>Masa seçilirse kapasite ile aynı tarih ve saatteki rezervasyon çakışması kontrol edilir.</small>
             </label>
 
-            <label className="manual-request-note-field">
+            <label className="restaurant-reservation-note-field">
               Not
               <textarea
                 maxLength={2000}
@@ -211,7 +211,7 @@ export function ManualRestaurantReservationEditor({
           )}
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
-          <div className="manual-request-actions">
+          <div className="restaurant-reservation-actions">
             <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
               Vazgeç
             </ActionButton>

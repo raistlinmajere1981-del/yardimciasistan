@@ -50,7 +50,8 @@ export function formatRoomStatus(value: string) {
     reserved: "Rezerve",
     occupied: "Dolu",
     cleaning: "Temizlik",
-    maintenance: "Bakım"
+    maintenance: "Bakım",
+    out_of_service: "Hizmet dışı"
   };
 
   return labels[value] ?? "Boş";

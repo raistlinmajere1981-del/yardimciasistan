@@ -2,7 +2,6 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3) var(--space-4);
   min-width: 0;
 }
@@ -16,3 +15,9 @@
 }
 .page-toolbar__actions { margin-inline-start: auto; justify-content: flex-end; }
 .page-toolbar h2, .page-toolbar h3 { margin: 0; }
+
+.page-toolbar { justify-content: space-between; }
+.action-row { justify-content: flex-start; }
+
+.page-toolbar__copy { display: grid; gap: var(--space-1); }
+.page-toolbar__copy small { color: var(--color-text-muted); font-size: var(--text-xs); }

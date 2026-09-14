@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useDialogFocus } from "../ui/useDialogFocus";
+import { useState } from "react";
 import {
   Bell,
   CalendarCheck,
@@ -28,8 +29,7 @@ import {
   formatShortDate
 } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
-import { CompactList } from "../ui/CompactList";
-import { CompactListButton } from "../ui/CompactListItem";
+import { DataList, DataListButton } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
 type SyncState = "idle" | "loading" | "success" | "error";
@@ -128,7 +128,7 @@ export function RequestsWorkspace({
   onDelete
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
-  const manualDrawerCloseRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useDialogFocus(showManualForm && manualFormOpen);
   const selectedActionMode = selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
   const selectedRequestSupportsReservation = selectedRequest
     ? canConvertRequestToReservation(enabledCapabilities, selectedRequest.request_type)
@@ -140,41 +140,27 @@ export function RequestsWorkspace({
     onManualRequestFormChange({ ...manualRequestForm, [key]: value });
   };
 
-  useEffect(() => {
-    if (!manualFormOpen) {
-      return;
-    }
-
-    manualDrawerCloseRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setManualFormOpen(false);
-      }
-    };
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [manualFormOpen]);
 
   return (
-    <section className="operations-workspace requests-workspace" aria-label="Talep yönetimi">
-      <aside className="panel operations-list-panel">
-        <div className="panel-heading compact">
+    <section className="record-workspace requests-workspace" aria-label="Talep yönetimi">
+      <aside className="panel record-workspace__list">
+        <div className="card__header">
           <div>
             <p>Talepler</p>
             <h2>{requests.length} kayıt</h2>
           </div>
         </div>
-        <CompactList className="manager-list operation-compact-list operations-list">
+        <DataList className="record-workspace__items">
           {requests.length === 0 ? (
-            <div className="empty-state compact-empty">
+            <div className="empty-state">
               <Bell size={24} aria-hidden="true" />
               <strong>Talep yok.</strong>
               <p>Web{aiEnabled ? ", AI" : ""} ve manuel kayıtlar burada listelenir.</p>
             </div>
           ) : (
             requests.map((request) => (
-              <CompactListButton
-                className="manager-row operation-list-item customer-request-row"
+              <DataListButton
+                className="customer-request-row"
                 key={request.id}
                 title={request.customer_name}
                 leading={<span className={`status-dot tone-${getRequestStatusTone(request.status)}`} aria-hidden="true" />}
@@ -186,11 +172,10 @@ export function RequestsWorkspace({
               />
             ))
           )}
-        </CompactList>
+        </DataList>
 
         {showManualForm && (
           <ActionButton
-            className="manual-request-toggle"
             variant="ghost"
             type="button"
             aria-expanded={manualFormOpen}
@@ -207,19 +192,19 @@ export function RequestsWorkspace({
         )}
       </aside>
 
-      <section className="panel operations-detail-panel request-detail-panel">
+      <section className="panel record-workspace__detail request-detail-panel">
         {selectedRequest ? (
           <>
-            <div className="panel-heading compact">
-              <div className="detail-title-group">
-                <span className="detail-category-label">{formatRequestType(selectedRequest.request_type)}</span>
+            <div className="card__header">
+              <div className="page-toolbar__copy">
+                <span className="status-badge info">{formatRequestType(selectedRequest.request_type)}</span>
                 <h2>{selectedRequest.customer_name}</h2>
               </div>
               <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>
                 {formatRequestStatus(selectedRequest.status)}
               </StatusBadge>
             </div>
-            <dl className="info-list detail-info-grid compact-detail-meta">
+            <dl className="data-list">
               <div>
                 <dt>Telefon</dt>
                 <dd>{selectedRequest.customer_phone}</dd>
@@ -237,17 +222,17 @@ export function RequestsWorkspace({
                 <dd>{formatCustomerSource(selectedRequest.source)}</dd>
               </div>
             </dl>
-            <div className="compact-detail-copy">
+            <div className="record-note">
               <span>Not</span>
-              <p className="detail-scroll-copy">{selectedRequest.message || "Talep notu yok."}</p>
+              <p className="record-note__body">{selectedRequest.message || "Talep notu yok."}</p>
             </div>
             {aiEnabled && (
-              <div className="compact-detail-copy soft-suggestion">
+              <div className="record-note">
                 <span>AI özeti</span>
-                <p className="detail-scroll-copy">{selectedRequest.ai_summary || "Bu talep için henüz AI özeti hazırlanmadı."}</p>
+                <p className="record-note__body">{selectedRequest.ai_summary || "Bu talep için henüz AI özeti hazırlanmadı."}</p>
               </div>
             )}
-            <div className="operations-command-grid request-detail-actions request-primary-actions">
+            <div className="action-row request-primary-actions">
               <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(selectedRequest)}>
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
@@ -323,25 +308,25 @@ export function RequestsWorkspace({
             }
           }}
         >
-          <aside className="manual-request-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-request-title">
-            <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
-              <div className="manual-request-heading">
+          <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-request-title">
+            <header className="overlay-header overlay-header--sticky">
+              <div className="overlay-heading">
                 <p>Manuel kayıt</p>
                 <h2 id="manual-request-title">Yeni talep ekle</h2>
               </div>
-              <button ref={manualDrawerCloseRef} className="drawer-close-button" type="button" aria-label="Elle talep formunu kapat" onClick={() => setManualFormOpen(false)}>
+              <button className="drawer-close-button" type="button" aria-label="Elle talep formunu kapat" onClick={() => setManualFormOpen(false)}>
                 <X size={18} aria-hidden="true" />
               </button>
             </header>
             <form
-              className="manager-form manual-request-form"
+              className="form-stack overlay-form"
               onSubmit={(event) => {
                 event.preventDefault();
                 onCreateManualRequest();
               }}
             >
-              <div className="manual-request-core-grid">
-                <label>
+              <div className="form-grid">
+                <label className="form-field form-field--medium">
                   Talep türü
                   <select value={manualRequestForm.requestType} onChange={(event) => updateManualRequestForm("requestType", event.target.value)}>
                     {availableManualRequestTypes.map((requestType) => (
@@ -349,47 +334,47 @@ export function RequestsWorkspace({
                     ))}
                   </select>
                 </label>
-                <label>
+                <label className="form-field form-field--medium">
                   Ad soyad
                   <input value={manualRequestForm.customerName} onChange={(event) => updateManualRequestForm("customerName", event.target.value)} placeholder="Müşteri adı" />
                 </label>
-                <label>
+                <label className="form-field form-field--short">
                   Telefon
                   <input value={manualRequestForm.customerPhone} onChange={(event) => updateManualRequestForm("customerPhone", event.target.value)} placeholder="05xx xxx xx xx" />
                 </label>
-                <label>
+                <label className="form-field form-field--medium">
                   Tarih notu
                   <input value={manualRequestForm.dateText} onChange={(event) => updateManualRequestForm("dateText", event.target.value)} placeholder="12-14 Temmuz veya bugün" />
                 </label>
-                <label>
+                <label className="form-field form-field--xs">
                   Kişi sayısı
                   <input min="1" type="number" value={manualRequestForm.guestCount} onChange={(event) => updateManualRequestForm("guestCount", event.target.value)} />
                 </label>
-                <label className="manual-request-note-field">
+                <label className="form-field--span form-field form-field--fluid">
                   Not
                   <textarea value={manualRequestForm.message} onChange={(event) => updateManualRequestForm("message", event.target.value)} placeholder="Talep detayı" />
                 </label>
               </div>
               <details className="form-details">
                 <summary>Detaylı bilgi</summary>
-                <div className="form-row">
-                  <label>
+                <div className="form-grid">
+                  <label className="form-field form-field--short">
                     Giriş tarihi
                     <input lang="tr" type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
                     <small className="date-field-hint">Gün / Ay / Yıl</small>
                   </label>
-                  <label>
+                  <label className="form-field form-field--short">
                     Çıkış tarihi
                     <input lang="tr" type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
                     <small className="date-field-hint">Gün / Ay / Yıl</small>
                   </label>
                 </div>
-                <div className="form-row">
-                  <label>
+                <div className="form-grid">
+                  <label className="form-field form-field--short">
                     Saat
                     <input type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
                   </label>
-                  <label>
+                  <label className="form-field form-field--medium">
                     Öncelik
                     <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
                       {manualPriorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -397,8 +382,8 @@ export function RequestsWorkspace({
                   </label>
                 </div>
               </details>
-              <div className="manual-request-drawer-footer overlay-footer overlay-footer--inset">
-                <p className={`menu-status sync-${manualRequestState}`} role="status">{manualRequestMessage}</p>
+              <div className="overlay-footer overlay-footer--inset">
+                <p className={`form-status sync-${manualRequestState}`} role="status">{manualRequestMessage}</p>
                 <div>
                   <ActionButton variant="secondary" type="button" onClick={() => setManualFormOpen(false)}>Vazgeç</ActionButton>
                   <ActionButton type="submit" disabled={manualRequestState === "loading"}>

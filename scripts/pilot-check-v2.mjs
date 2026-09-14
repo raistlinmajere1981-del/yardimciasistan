@@ -54,6 +54,7 @@ const core = [
   js("room-transfer", "Restoran hesabını oda hesabına aktarma", "smoke-room-folio-table-order-transfer.mjs"),
   js("demo-flow", "Web → masaüstü → onaylı Android uçtan uca akış", "smoke-demo-flow-v2.mjs"),
   current("renderer", "Masaüstü renderer browser smoke", "renderer", true),
+  jsb("customer-pension-ui", "Müşteri/Pansiyon formları, oda hesabı ve responsive UI", "smoke-desktop-customer-pension.mjs"),
   jsb("design-system", "Desktop tasarım sistemi ve responsive Ayarlar", "smoke-desktop-design-system.mjs")
 ];
 const extra = [];

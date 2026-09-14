@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BedDouble, CreditCard, MessageCircle, Pencil, Phone, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
@@ -33,8 +34,7 @@ import {
   formatShortDate
 } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
-import { CompactList } from "../ui/CompactList";
-import { CompactListButton } from "../ui/CompactListItem";
+import { DataList, DataListButton } from "../ui/DataList";
 import { StatusBadge } from "../ui/StatusBadge";
 import { CustomerCreditPanel } from "./CustomerCreditPanel";
 import { customerCreditError } from "../../app/customer-credit-ui";
@@ -124,9 +124,9 @@ export function CustomersWorkspace({
   }, [customers, selectedCustomerId]);
 
   return (
-    <section className="operations-workspace customers-workspace" aria-label="Müşteri yönetimi">
-      <aside className="panel operations-list-panel">
-        <div className="panel-heading compact">
+    <section className="record-workspace customers-workspace" aria-label="Müşteri yönetimi">
+      <aside className="panel record-workspace__list">
+        <div className="card__header">
           <div>
             <p>Müşteriler</p>
             <h2>{customers.length} kayıt</h2>
@@ -143,7 +143,7 @@ export function CustomersWorkspace({
             Yeni Müşteri
           </ActionButton>
         </div>
-        <label className="customer-search">
+        <label className="customer-search form-field form-field--medium">
           <span>Ara</span>
           <input
             value={searchText}
@@ -151,17 +151,17 @@ export function CustomersWorkspace({
             placeholder={staysEnabled ? "Ad, telefon, kimlik, etiket veya oda" : "Ad, telefon, kimlik veya etiket"}
           />
         </label>
-        <CompactList className="manager-list operation-compact-list operations-list">
+        <DataList className="record-workspace__items">
           {filteredCustomers.length === 0 ? (
-            <div className="empty-state compact-empty">
+            <div className="empty-state">
               <Users size={24} aria-hidden="true" />
               <strong>Müşteri bulunamadı.</strong>
               <p>Arama metnini değiştirin.</p>
             </div>
           ) : (
             filteredCustomers.map((customer) => (
-              <CompactListButton
-                className="manager-row operation-list-item customer-record-row"
+              <DataListButton
+                className="customer-record-row"
                 key={customer.id}
                 title={customer.fullName}
                 leading={<span className={`status-dot ${customer.requestCount > 0 ? "tone-info" : "tone-neutral"}`} aria-hidden="true" />}
@@ -173,18 +173,18 @@ export function CustomersWorkspace({
               />
             ))
           )}
-        </CompactList>
+        </DataList>
       </aside>
 
-      <section className="panel operations-detail-panel">
+      <section className="panel record-workspace__detail">
         {selectedCustomer ? (
           <>
-            <div className="panel-heading compact">
-              <div className="detail-title-group">
-                <span className="detail-category-label">{formatCustomerSource(selectedCustomer.source)}</span>
+            <div className="card__header">
+              <div className="page-toolbar__copy">
+                <span className="status-badge info">{formatCustomerSource(selectedCustomer.source)}</span>
                 <h2>{selectedCustomer.fullName}</h2>
               </div>
-              <div className="customer-heading-actions page-toolbar__actions">
+              <div className="page-toolbar__actions">
                 {staysEnabled && <StatusBadge tone="info">{selectedCustomer.stayCount} konaklama</StatusBadge>}
                 <ActionButton
                   variant="secondary"
@@ -200,7 +200,7 @@ export function CustomersWorkspace({
                 </ActionButton>
               </div>
             </div>
-            <dl className="info-list detail-info-grid compact-detail-meta">
+            <dl className="data-list">
               <div>
                 <dt>Telefon</dt>
                 <dd>{selectedCustomer.phone || "-"}</dd>
@@ -237,12 +237,12 @@ export function CustomersWorkspace({
               </div>
             </dl>
             {hasCustomerIdentityDetails(selectedCustomer) && (
-              <details className="customer-identity-details">
+              <details className="disclosure customer-identity-details">
                 <summary>
                   <CreditCard size={16} aria-hidden="true" />
                   Kimlik kartı alanları
                 </summary>
-                <dl className="info-list detail-info-grid compact-detail-meta">
+                <dl className="data-list">
                   <div><dt>Cinsiyet</dt><dd>{formatCustomerGender(selectedCustomer.gender)}</dd></div>
                   <div><dt>Seri / belge no</dt><dd>{selectedCustomer.documentSerialNumber || "-"}</dd></div>
                   <div><dt>Son geçerlilik</dt><dd>{formatDateForDisplay(selectedCustomer.documentExpiryDate) || "-"}</dd></div>
@@ -254,18 +254,18 @@ export function CustomersWorkspace({
                 </dl>
               </details>
             )}
-            <div className="compact-detail-copy customer-detail-note">
+            <div className="record-note customer-detail-note">
               <span>Not</span>
-              <p className="detail-scroll-copy">{selectedCustomer.notes || "Müşteri notu yok."}</p>
+              <p className="record-note__body">{selectedCustomer.notes || "Müşteri notu yok."}</p>
             </div>
             {selectedCustomer.tags.length > 0 && (
-              <div className="tag-row">
+              <div className="page-toolbar__start">
                 {selectedCustomer.tags.map((tag) => (
-                  <span key={tag}>{tag}</span>
+                  <StatusBadge tone="neutral" key={tag}>{tag}</StatusBadge>
                 ))}
               </div>
             )}
-            <div className="operations-command-grid customer-detail-actions">
+            <div className="action-row customer-detail-actions">
               <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(selectedCustomer)} disabled={!selectedCustomer.phone}>
                 <Phone size={16} aria-hidden="true" />
                 Müşteriyi Ara
@@ -432,6 +432,8 @@ function CustomerEditorDrawer({
     }
   }, [customer, open]);
 
+  const dialogRef = useDialogFocus(open);
+
   if (!open) {
     return null;
   }
@@ -501,9 +503,9 @@ function CustomerEditorDrawer({
     <div className="manual-request-backdrop overlay overlay--drawer customer-editor-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <aside className="manual-request-drawer drawer drawer--scroll customer-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title">
-        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
-          <div className="manual-request-heading">
+      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll customer-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title">
+        <header className="overlay-header overlay-header--sticky">
+          <div className="overlay-heading">
             <p>Müşteri kartı</p>
             <h2 id="customer-editor-title">{customer ? "Müşteri bilgilerini düzenle" : "Yeni müşteri ekle"}</h2>
           </div>
@@ -511,7 +513,7 @@ function CustomerEditorDrawer({
             <X size={18} aria-hidden="true" />
           </button>
         </header>
-        <form className="manager-form manual-request-form customer-editor-form" onSubmit={async (event) => {
+        <form className="form-stack overlay-form customer-editor-form" onSubmit={async (event) => {
           event.preventDefault();
           setState("loading");
           setMessage("Müşteri kartı kaydediliyor...");
@@ -519,22 +521,22 @@ function CustomerEditorDrawer({
           setState(result.ok ? "success" : "error");
           setMessage(result.message);
         }}>
-          <section className="customer-form-section">
-            <div className="customer-form-section-heading">
-              <div><strong>Temel bilgiler</strong><small>İletişim ve kart görünümü</small></div>
+          <section className="panel form-stack">
+            <div className="page-toolbar">
+              <div className="page-toolbar__copy"><strong>Temel bilgiler</strong><small>İletişim ve kart görünümü</small></div>
             </div>
-            <div className="manual-request-core-grid">
-              <label>Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
-              <label>Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="05xx xxx xx xx" /></label>
-              <label>E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
-              <label>Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
-              <label className="manual-request-note-field">Not<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+            <div className="form-grid">
+              <label className="form-field form-field--medium">Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
+              <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="05xx xxx xx xx" /></label>
+              <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
+              <label className="form-field--span form-field form-field--fluid">Not<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
             </div>
           </section>
-          <section className="customer-form-section identity-form-section">
-            <div className="customer-form-section-heading">
-              <div><strong>Kimlik kartı bilgileri</strong><small>Görsel yalnız analiz edilir; kimlik fotoğrafı saklanmaz.</small></div>
-              <div className="identity-image-action">
+          <section className="panel form-stack identity-form-section">
+            <div className="page-toolbar">
+              <div className="page-toolbar__copy"><strong>Kimlik kartı bilgileri</strong><small>Görsel yalnız analiz edilir; kimlik fotoğrafı saklanmaz.</small></div>
+              <div className="action-row">
                 <input
                   ref={identityFileRef}
                   hidden
@@ -555,33 +557,33 @@ function CustomerEditorDrawer({
               </div>
             </div>
             {!aiEnabled && <p className="identity-ai-note">Kimlik görseli analizi için Ayarlar bölümünden AI bağlantısını etkinleştirin.</p>}
-            <div className="manual-request-core-grid identity-form-grid">
-              <label>Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
+            <div className="form-grid">
+              <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
                 <option value="">Seçilmedi</option>
                 <option value="tc_identity_card">T.C. Kimlik Kartı</option>
                 <option value="passport">Pasaport</option>
                 <option value="other">Diğer</option>
               </select></label>
-              <label>Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
-              <label>Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
-              <label>Doğum tarihi<input lang="tr" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
-              <label>Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
+              <label className="form-field form-field--medium">Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
+              <label className="form-field form-field--short">Doğum tarihi<input lang="tr" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
                 <option value="">Seçilmedi</option>
                 <option value="female">Kadın</option>
                 <option value="male">Erkek</option>
                 <option value="unspecified">Belirtilmemiş</option>
               </select></label>
-              <label>Seri / belge no<input value={form.documentSerialNumber} onChange={(event) => update("documentSerialNumber", event.target.value)} /></label>
-              <label>Son geçerlilik<input lang="tr" type="date" value={form.documentExpiryDate} onChange={(event) => update("documentExpiryDate", event.target.value)} /></label>
-              <label>Doğum yeri<input value={form.birthPlace} onChange={(event) => update("birthPlace", event.target.value)} /></label>
-              <label>Anne adı<input value={form.motherName} onChange={(event) => update("motherName", event.target.value)} /></label>
-              <label>Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
-              <label>Veren makam<input value={form.issuingAuthority} onChange={(event) => update("issuingAuthority", event.target.value)} /></label>
-              <label className="manual-request-note-field">Adres<textarea value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Seri / belge no<input value={form.documentSerialNumber} onChange={(event) => update("documentSerialNumber", event.target.value)} /></label>
+              <label className="form-field form-field--short">Son geçerlilik<input lang="tr" type="date" value={form.documentExpiryDate} onChange={(event) => update("documentExpiryDate", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Doğum yeri<input value={form.birthPlace} onChange={(event) => update("birthPlace", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Anne adı<input value={form.motherName} onChange={(event) => update("motherName", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
+              <label className="form-field form-field--medium">Veren makam<input value={form.issuingAuthority} onChange={(event) => update("issuingAuthority", event.target.value)} /></label>
+              <label className="form-field--span form-field form-field--fluid">Adres<textarea value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
             </div>
           </section>
-          <div className="manual-request-drawer-footer overlay-footer overlay-footer--inset">
-            <p className={`menu-status sync-${state}`} role="status">{message}</p>
+          <div className="overlay-footer overlay-footer--inset">
+            <p className={`form-status sync-${state}`} role="status">{message}</p>
             <div>
               <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>
               <ActionButton type="submit" disabled={state === "loading"}>
@@ -627,18 +629,20 @@ export function RoomAssignmentDrawer({
     }
   }, [customers, initialCustomerId, initialRoomId, open, rooms]);
 
+  const dialogRef = useDialogFocus(open);
+
   if (!open) return null;
 
   return (
     <div className="manual-request-backdrop overlay overlay--drawer room-assignment-backdrop" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <aside className="manual-request-drawer drawer drawer--scroll room-assignment-drawer" role="dialog" aria-modal="true" aria-labelledby="room-assignment-title">
-        <header className="manual-request-drawer-header overlay-header overlay-header--sticky">
-          <div className="manual-request-heading"><p>Müşteri · Oda</p><h2 id="room-assignment-title">Odaya müşteri ata</h2></div>
+      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll room-assignment-drawer" role="dialog" aria-modal="true" aria-labelledby="room-assignment-title">
+        <header className="overlay-header overlay-header--sticky">
+          <div className="overlay-heading"><p>Müşteri · Oda</p><h2 id="room-assignment-title">Odaya müşteri ata</h2></div>
           <button className="drawer-close-button" type="button" aria-label="Oda atama formunu kapat" onClick={onClose}><X size={18} aria-hidden="true" /></button>
         </header>
-        <form className="manager-form manual-request-form" onSubmit={async (event) => {
+        <form className="form-stack overlay-form" onSubmit={async (event) => {
           event.preventDefault();
           setState("loading");
           setMessage("Oda ataması kaydediliyor...");
@@ -654,12 +658,12 @@ export function RoomAssignmentDrawer({
           setState(result.ok ? "success" : "error");
           setMessage(result.message);
         }}>
-          <div className="manual-request-core-grid">
-            <label>Müşteri<select required value={form.customerId} onChange={(event) => setForm({ ...form, customerId: event.target.value })}>
+          <div className="form-grid">
+            <label className="form-field form-field--long">Müşteri<select required value={form.customerId} onChange={(event) => setForm({ ...form, customerId: event.target.value })}>
               <option value="">Müşteri seçin</option>
               {customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.fullName}{customer.phone ? ` · ${customer.phone}` : ""}</option>)}
             </select></label>
-            <label>Oda<select required value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })}>
+            <label className="form-field form-field--long">Oda<select required value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })}>
               <option value="">Oda seçin</option>
               {rooms.filter((room) => room.isActive).map((room) => (
                 <option value={room.id} key={room.id}>
@@ -667,17 +671,17 @@ export function RoomAssignmentDrawer({
                 </option>
               ))}
             </select></label>
-            <label>Giriş tarihi<input required lang="tr" type="date" value={form.checkInDate} onChange={(event) => setForm({ ...form, checkInDate: event.target.value })} /></label>
-            <label>Çıkış tarihi<input lang="tr" type="date" value={form.checkOutDate} onChange={(event) => setForm({ ...form, checkOutDate: event.target.value })} /></label>
-            <label>Kişi sayısı<input min="1" max="50" type="number" value={form.guestCount} onChange={(event) => setForm({ ...form, guestCount: event.target.value })} /></label>
-            <label>Başlangıç durumu<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RoomAssignmentFormState["status"] })}>
+            <label className="form-field form-field--short">Giriş tarihi<input required lang="tr" type="date" value={form.checkInDate} onChange={(event) => setForm({ ...form, checkInDate: event.target.value })} /></label>
+            <label className="form-field form-field--short">Çıkış tarihi<input lang="tr" type="date" value={form.checkOutDate} onChange={(event) => setForm({ ...form, checkOutDate: event.target.value })} /></label>
+            <label className="form-field form-field--xs">Kişi sayısı<input min="1" max="50" type="number" value={form.guestCount} onChange={(event) => setForm({ ...form, guestCount: event.target.value })} /></label>
+            <label className="form-field form-field--medium">Başlangıç durumu<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RoomAssignmentFormState["status"] })}>
               <option value="planned">Planlandı / Rezerve</option>
               <option value="checked_in">Giriş yaptı / Dolu</option>
             </select></label>
-            <label className="manual-request-note-field">Konaklama notu<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+            <label className="form-field--span form-field form-field--fluid">Konaklama notu<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
           </div>
-          <div className="manual-request-drawer-footer overlay-footer overlay-footer--inset">
-            <p className={`menu-status sync-${state}`} role="status">{message}</p>
+          <div className="overlay-footer overlay-footer--inset">
+            <p className={`form-status sync-${state}`} role="status">{message}</p>
             <div>
               <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>
               <ActionButton type="submit" disabled={state === "loading" || customers.length === 0 || rooms.length === 0}>
@@ -704,7 +708,7 @@ export function CustomerRoomStayActions({
 }) {
   if (stay.status === "checked_out") return null;
   return (
-    <div className="stay-inline-actions">
+    <div className="action-row">
       {stay.status === "planned" && <ActionButton size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "checked_in")}>Giriş Yap</ActionButton>}
       {stay.status === "checked_in" && <ActionButton size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "checked_out")}>Çıkış Yap</ActionButton>}
       {stay.status === "cancelled" && <ActionButton variant="secondary" size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "planned")}>Yeniden Planla</ActionButton>}

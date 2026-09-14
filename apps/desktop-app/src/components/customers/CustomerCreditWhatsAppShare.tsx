@@ -117,16 +117,16 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
   }
 
   const phone = draft && normalizeTRMobilePhone(draft.account.customer.phone);
-  return <section className="customer-credit-share" aria-label="Veresiye WhatsApp paylaşımı">
+  return <section className="form-stack customer-credit-share" aria-label="Veresiye WhatsApp paylaşımı">
     <button ref={trigger} type="button" className="action-button action-button-ghost action-button-sm" disabled={disabled || busy || !account.balances.some((balance) => balance.amountMinor > 0)} onClick={() => void share()}>WhatsApp'ta Paylaş</button>
-    {draft && <div className="customer-credit-compose" role="region" aria-label="Borç durumunu paylaş" onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); close(); } }}>
+    {draft && <div className="form-stack customer-credit-compose" role="region" aria-label="Borç durumunu paylaş" onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); close(); } }}>
       <h4>Borç durumunu paylaş</h4>
       <p><strong>{draft.account.customer.fullName || "Müşteri"}</strong><br />{phone && phone.ok ? phone.display : draft.account.customer.phone}</p>
-      <label className="customer-credit-field">Mesaj
+      <label className="form-field form-field--fluid">Mesaj
         <textarea ref={editor} aria-label="Veresiye paylaşım mesajı" rows={8} value={draft.message} disabled={busy} onChange={(event) => setDraft({ ...draft, message: event.target.value })} />
       </label>
       <p>Mesaj otomatik gönderilmez. WhatsApp açıldığında son kontrol ve gönderim sizde kalır.</p>
-      <div className="customer-credit-actions">
+      <div className="action-row">
         <ActionButton variant="secondary" disabled={busy || !draft.message.trim()} onClick={() => void copy()}>Kopyala</ActionButton>
         <ActionButton variant="secondary" disabled={disabled || busy || !draft.message.trim()} onClick={() => void prepare()}>{busy ? "Hazırlanıyor…" : "WhatsApp'a Hazırla"}</ActionButton>
         <ActionButton variant="ghost" disabled={busy} onClick={close}>Vazgeç</ActionButton>

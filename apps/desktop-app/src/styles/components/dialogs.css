@@ -82,3 +82,11 @@
   .dialog--preview { height: calc(100dvh - var(--space-4)); }
   .overlay-footer { align-items: stretch; }
 }
+
+.drawer--form { width: min(var(--dialog-width-md), 100%); }
+.overlay-form { padding: var(--panel-padding); }
+.overlay-heading { display: grid; gap: var(--space-1); }
+.overlay-heading p { margin: 0; color: var(--color-text-muted); font-size: var(--text-xs); }
+.overlay-form > .overlay-footer { position: sticky; bottom: calc(-1 * var(--panel-padding)); z-index: var(--z-sticky); margin: 0 calc(-1 * var(--panel-padding)) calc(-1 * var(--panel-padding)); padding: var(--space-3) var(--panel-padding); }
+.overlay-footer > p { margin: 0; font-size: var(--text-sm); }
+.overlay-footer > div { display: flex; flex-wrap: wrap; gap: var(--space-2); }

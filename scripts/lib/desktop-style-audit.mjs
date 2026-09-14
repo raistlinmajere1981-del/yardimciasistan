@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 
-const sharedNames = new Set(['.desktop-shell', '.content', '.sidebar', '.page-header', '.page-content', '.page-toolbar', '.page-toolbar__actions', '.panel', '.surface', '.empty-state', '.status-message', '.dialog', '.drawer', '.nav-item', '.page-header__title']);
+const sharedNames = new Set(['.desktop-shell', '.content', '.sidebar', '.page-header', '.page-content', '.page-toolbar', '.page-toolbar__actions', '.panel', '.surface', '.empty-state', '.status-message', '.dialog', '.drawer', '.nav-item', '.page-header__title', '.card', '.card__header', '.card__actions', '.data-records', '.data-list', '.list-row', '.list-row__actions', '.form-grid', '.form-row', '.form-field', '.record-workspace']);
 const legacyImport = /(?:friendly[^/]*|[^/]+-ux|styles|setup-capabilities|segmented-control)\.css$/;
 
 // Walk CSS blocks, preserving media/layer scope. Strings and comments do not open blocks.

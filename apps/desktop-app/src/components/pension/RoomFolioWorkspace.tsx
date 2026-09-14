@@ -1,3 +1,4 @@
+import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useMemo, useState } from "react";
 import { Banknote, BedDouble, CalendarDays, CheckCircle2, Minus, Plus, ReceiptText, Trash2, Users, X } from "lucide-react";
 import type {
@@ -8,7 +9,7 @@ import type {
   DesktopRoomFolioStay,
   RoomFolioPaymentMethod
 } from "../../../electron/room-folio";
-import { MetricCard } from "../ui/MetricCard";
+import { StatusBadge } from "../ui/StatusBadge";
 import { Panel } from "../ui/Panel";
 
 const EMPTY_DATA: DesktopRoomFolioData = {
@@ -294,21 +295,24 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
     if (result?.ok) setSelectedFolioId("");
   }
 
+  const dialogRef = useDialogFocus(Boolean(selectedFolio));
+  const confirmationRef = useDialogFocus(Boolean(selectedFolio && confirmationAction));
+
   return (
     <section className="room-folio-workspace" aria-label="Oda adisyonları">
       <Panel className="room-folio-overview-panel">
-        <div className="room-folio-title-row">
+        <div className="page-toolbar">
           <div>
             <p className="panel-eyebrow">Oda hesabı</p>
             <h2>Konaklama ve Oda Adisyonları</h2>
             <p>Girişten çıkışa kadar konaklama, restoran ürünleri ve tahsilat tek hesapta.</p>
           </div>
-          {loading && <span>Hazırlanıyor…</span>}
+          {loading && <span className="loading-state" role="status">Hazırlanıyor…</span>}
         </div>
         <div className="room-folio-summary-grid">
-          <MetricCard compact title="Odada kalan" value={String(checkedInCount)} detail="Aktif konaklama" tone="info" icon={BedDouble} />
-          <MetricCard compact title="Açık adisyon" value={String(openFolios.length)} detail="Çıkış yapılmamış" tone="neutral" icon={ReceiptText} />
-          <MetricCard compact title="Bekleyen ödeme" value={minorMoney(openBalance)} detail="Açık oda hesapları" tone={openBalance > 0 ? "wait" : "ok"} icon={Banknote} />
+          <article className="card"><div className="card__header"><span><BedDouble size={16} aria-hidden="true" /> Odada kalan</span><StatusBadge tone="info">{String(checkedInCount)}</StatusBadge></div><p className="card__meta">Aktif konaklama</p></article>
+          <article className="card"><div className="card__header"><span><ReceiptText size={16} aria-hidden="true" /> Açık adisyon</span><StatusBadge tone="neutral">{String(openFolios.length)}</StatusBadge></div><p className="card__meta">Çıkış yapılmamış</p></article>
+          <article className="card"><div className="card__header"><span><Banknote size={16} aria-hidden="true" /> Bekleyen ödeme</span><StatusBadge tone={openBalance > 0 ? "wait" : "ok"}>{minorMoney(openBalance)}</StatusBadge></div><p className="card__meta">Açık oda hesapları</p></article>
         </div>
       </Panel>
 
@@ -316,11 +320,11 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
         <details>
           <summary>Oda gecelik fiyatlarını düzenle</summary>
           <p className="room-price-help">Bu fiyat yeni açılan oda adisyonuna başlangıç fiyatı olarak alınır. Açık adisyonlar sonradan etkilenmez.</p>
-          <div className="room-price-grid">
+          <div className="form-row">
             {data.rooms.map((room) => (
-              <label className="room-price-card" key={room.id}>
+              <label className="form-field form-field--medium room-price-card" key={room.id}>
                 <span><strong>{room.name}</strong>{room.number && <small>No {room.number}</small>}</span>
-                <span className="room-price-editor">
+                <span className="field-control-group">
                   <input
                     inputMode="decimal"
                     aria-label={`${room.name} gecelik fiyatı`}
@@ -328,7 +332,7 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
                     onChange={(event) => setRoomPriceDrafts((current) => ({ ...current, [room.id]: event.target.value }))}
                   />
                   <span>₺ / gece</span>
-                  <button type="button" disabled={saving} onClick={() => void saveRoomPrice(room.id, room.nightlyPriceMinor)}>Kaydet</button>
+                  <button className="action-button action-button-secondary action-button-sm" type="button" disabled={saving} onClick={() => void saveRoomPrice(room.id, room.nightlyPriceMinor)}>Kaydet</button>
                 </span>
               </label>
             ))}
@@ -342,7 +346,7 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
           <span>{data.activeStays.length} kayıt</span>
         </div>
         {data.activeStays.length === 0 ? (
-          <Panel><p className="room-folio-empty">Aktif veya planlanan konaklama yok.</p></Panel>
+          <Panel><p className="empty-state">Aktif veya planlanan konaklama yok.</p></Panel>
         ) : (
           <div className="room-folio-stay-grid">
             {data.activeStays.map((stay) => {
@@ -357,59 +361,59 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
 
       {selectedFolio && selectedFolio.status === "open" && (
         <div className="room-folio-overlay overlay overlay--drawer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedFolioId(""); }}>
-          <section className="room-folio-drawer drawer drawer--wide" role="dialog" aria-modal="true" aria-label={`${selectedFolio.roomName} oda adisyonu`}>
+          <section ref={dialogRef} className="room-folio-drawer drawer drawer--wide" role="dialog" aria-modal="true" aria-label={`${selectedFolio.roomName} oda adisyonu`}>
             <header className="room-folio-drawer-header overlay-header">
               <div>
                 <p className="panel-eyebrow">Oda adisyonu</p>
                 <h2>{selectedFolio.roomName} — {selectedFolio.customerName}</h2>
                 <span>{selectedFolio.guestCount} kişi · {formatDateRange(selectedFolio.checkInDate, selectedFolio.plannedCheckOutDate)}</span>
               </div>
-              <button className="room-folio-close overlay-close" type="button" aria-label="Kapat" onClick={() => setSelectedFolioId("")}><X size={19} /></button>
+              <button className="drawer-close-button" type="button" aria-label="Kapat" onClick={() => setSelectedFolioId("")}><X size={19} /></button>
             </header>
 
             <div className="room-folio-drawer-body overlay-body">
-              <section className="room-folio-details-card">
-                <div className="room-folio-subheading"><h3>Konaklama</h3><span>{selectedFolio.nights} gece</span></div>
-                <div className="room-folio-details-grid">
-                  <label><Users size={15} /> Kişi sayısı<input type="number" min={1} max={50} value={guestDraft} onChange={(e) => setGuestDraft(e.target.value)} /></label>
-                  <label><CalendarDays size={15} /> Giriş<input type="text" inputMode="numeric" maxLength={10} placeholder="GG.AA.YYYY" value={checkInDraft} onChange={(e) => setCheckInDraft(normalizeTurkishDateDraft(e.target.value))} /></label>
-                  <label><CalendarDays size={15} /> Çıkış<input type="text" inputMode="numeric" maxLength={10} placeholder="GG.AA.YYYY" value={checkOutDraft} onChange={(e) => setCheckOutDraft(normalizeTurkishDateDraft(e.target.value))} /></label>
-                  <label>Gecelik fiyat<input inputMode="decimal" value={nightlyDraft} onChange={(e) => setNightlyDraft(e.target.value)} /></label>
+              <section className="panel record-stack">
+                <div className="card__header"><h3>Konaklama</h3><span>{selectedFolio.nights} gece</span></div>
+                <div className="form-row">
+                  <label className="form-field form-field--xs">Kişi sayısı<input type="number" min={1} max={50} value={guestDraft} onChange={(e) => setGuestDraft(e.target.value)} /></label>
+                  <label className="form-field form-field--short">Giriş<input type="text" inputMode="numeric" maxLength={10} placeholder="GG.AA.YYYY" value={checkInDraft} onChange={(e) => setCheckInDraft(normalizeTurkishDateDraft(e.target.value))} /></label>
+                  <label className="form-field form-field--short">Çıkış<input type="text" inputMode="numeric" maxLength={10} placeholder="GG.AA.YYYY" value={checkOutDraft} onChange={(e) => setCheckOutDraft(normalizeTurkishDateDraft(e.target.value))} /></label>
+                  <label className="form-field form-field--short">Gecelik fiyat<input inputMode="decimal" value={nightlyDraft} onChange={(e) => setNightlyDraft(e.target.value)} /></label>
                 </div>
-                <div className="room-folio-details-actions">
+                <div className="page-toolbar">
                   <div>
-                    <label className="room-folio-manual-total-toggle">
+                    <label className="form-check">
                       <input type="checkbox" checked={manualLodging} onChange={(e) => setManualLodging(e.target.checked)} />
                       Konaklama toplamını elle belirle
                     </label>
-                    {manualLodging && <label className="room-folio-total-input">Konaklama toplamı<input inputMode="decimal" value={lodgingTotalDraft} onChange={(e) => setLodgingTotalDraft(e.target.value)} /></label>}
+                    {manualLodging && <label className="form-field form-field--short room-folio-total-input">Konaklama toplamı<input inputMode="decimal" value={lodgingTotalDraft} onChange={(e) => setLodgingTotalDraft(e.target.value)} /></label>}
                   </div>
-                  <button className="room-folio-secondary-button" type="button" disabled={saving} onClick={() => void saveFolioDetails()}>Bilgileri Kaydet</button>
+                  <button className="action-button action-button-secondary action-button-sm" type="button" disabled={saving} onClick={() => void saveFolioDetails()}>Bilgileri Kaydet</button>
                 </div>
               </section>
 
               <div className="room-folio-account-layout">
-                {menuEnabled && <section className="room-folio-menu-panel">
-                  <div className="room-folio-subheading"><h3>Restoran Menüsünden Ekle</h3><span>{filteredMenu.length} ürün</span></div>
-                  <input className="room-folio-menu-search" value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} placeholder="Ürün ara" />
+                {menuEnabled && <section className="panel record-stack">
+                  <div className="card__header"><h3>Restoran Menüsünden Ekle</h3><span>{filteredMenu.length} ürün</span></div>
+                  <label className="form-field form-field--long">Ürün ara<input className="room-folio-menu-search" value={menuSearch} onChange={(e) => setMenuSearch(e.target.value)} placeholder="Ürün ara" /></label>
                   <div className="room-folio-category-tabs">
-                    <button className={menuCategory === "all" ? "is-active" : ""} type="button" onClick={() => setMenuCategory("all")}>Tümü</button>
+                    <button className={"action-button action-button-secondary action-button-sm" + (menuCategory === "all" ? "is-active" : "")} type="button" onClick={() => setMenuCategory("all")}>Tümü</button>
                     {data.menuCategories.map((category) => (
-                      <button className={menuCategory === category.id ? "is-active" : ""} type="button" onClick={() => setMenuCategory(category.id)} key={category.id}>{category.name}</button>
+                      <button className={"action-button action-button-secondary action-button-sm" + (menuCategory === category.id ? "is-active" : "")} type="button" onClick={() => setMenuCategory(category.id)} key={category.id}>{category.name}</button>
                     ))}
                   </div>
                   <div className="room-folio-menu-list">
                     {filteredMenu.map((item) => (
                       <article key={item.id}>
                         <div><strong>{item.name}</strong><span>{item.categoryName}</span></div>
-                        <div><b>{minorMoney(item.priceMinor)}</b><button type="button" disabled={saving || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)} onClick={() => void addMenuItem(item.id)}><Plus size={15} /> Ekle</button></div>
+                        <div><b>{minorMoney(item.priceMinor)}</b><button className="action-button action-button-secondary action-button-sm" type="button" disabled={saving || (item.stockQuantity !== null && item.stockQuantity < item.stockConsumptionQuantity)} onClick={() => void addMenuItem(item.id)}><Plus size={15} /> Ekle</button></div>
                       </article>
                     ))}
                   </div>
                 </section>}
 
-                <section className="room-folio-account-panel">
-                  <div className="room-folio-subheading"><h3>Hesap</h3><span>{selectedFolio.items.length + 1} kalem</span></div>
+                <section className="panel record-stack">
+                  <div className="card__header"><h3>Hesap</h3><span>{selectedFolio.items.length + 1} kalem</span></div>
                   <div className="room-folio-line-list">
                     <article className="is-lodging">
                       <div><strong>Konaklama · {selectedFolio.nights} gece</strong><span>{minorMoney(selectedFolio.nightlyPriceMinor)} / gece</span></div>
@@ -418,21 +422,21 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
                     {selectedFolio.items.map((item) => (
                       <article className={item.kind === "discount" ? "is-discount" : ""} key={item.id}>
                         <div><strong>{item.label}</strong><span>{item.kind === "menu" ? `${item.quantity} adet · ${minorMoney(item.unitPriceMinor)}` : item.kind === "discount" ? "İndirim" : "Ek ücret"}</span></div>
-                        {item.kind === "menu" && <div className="room-folio-quantity"><button type="button" disabled={saving} onClick={() => void changeItemQuantity(item, -1)}><Minus size={14} /></button><span>{item.quantity}</span><button type="button" disabled={saving} onClick={() => void changeItemQuantity(item, 1)}><Plus size={14} /></button></div>}
+                        {item.kind === "menu" && <div className="room-folio-quantity"><button className="action-button action-button-secondary action-button-sm" type="button" disabled={saving} aria-label={`${item.label} miktarını azalt`} onClick={() => void changeItemQuantity(item, -1)}><Minus size={14} /></button><span>{item.quantity}</span><button className="action-button action-button-secondary action-button-sm" type="button" disabled={saving} aria-label={`${item.label} miktarını artır`} onClick={() => void changeItemQuantity(item, 1)}><Plus size={14} /></button></div>}
                         <b>{item.lineTotalMinor < 0 ? "−" : ""}{minorMoney(Math.abs(item.lineTotalMinor))}</b>
-                        <button className="room-folio-line-remove" type="button" disabled={saving} aria-label={`${item.label} kalemini çıkar`} onClick={() => void removeItem(item.id)}><Trash2 size={14} /></button>
+                        <button className="action-button action-button-danger action-button-sm room-folio-line-remove" type="button" disabled={saving} aria-label={`${item.label} kalemini çıkar`} onClick={() => void removeItem(item.id)}><Trash2 size={14} /></button>
                       </article>
                     ))}
                   </div>
 
-                  <div className="room-folio-manual-item-form">
-                    <select value={manualKind} onChange={(e) => setManualKind(e.target.value as "manual_charge" | "discount")}>
+                  <div className="room-folio-manual-item-form form-row filter-row">
+                    <label className="form-field form-field--short">Kalem türü<select value={manualKind} onChange={(e) => setManualKind(e.target.value as "manual_charge" | "discount")}>
                       <option value="manual_charge">Ek ücret</option>
                       <option value="discount">İndirim</option>
-                    </select>
-                    <input value={manualLabel} onChange={(e) => setManualLabel(e.target.value)} placeholder="Örn. ek yatak" />
-                    <input inputMode="decimal" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} placeholder="0,00" />
-                    <button type="button" disabled={saving} onClick={() => void addManualItem()}>Ekle</button>
+                    </select></label>
+                    <label className="form-field form-field--medium">Açıklama<input value={manualLabel} onChange={(e) => setManualLabel(e.target.value)} placeholder="Örn. ek yatak" /></label>
+                    <label className="form-field form-field--short">Tutar<input inputMode="decimal" value={manualAmount} onChange={(e) => setManualAmount(e.target.value)} placeholder="0,00" /></label>
+                    <button className="action-button action-button-secondary action-button-sm" type="button" disabled={saving} onClick={() => void addManualItem()}>Ekle</button>
                   </div>
 
                   <div className="room-folio-totals">
@@ -445,22 +449,22 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
                     <div className="room-folio-payment-history">
                       <strong>Tahsilatlar</strong>
                       {selectedFolio.payments.map((payment) => (
-                        <div key={payment.id}><span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.origin === "reservation" ? " · Kapora" : ""}</span><b>{minorMoney(payment.amountMinor)}</b>{payment.origin === "direct" && <button type="button" disabled={saving} onClick={() => requestVoidPayment(payment.id, payment.amountMinor)} aria-label="Tahsilatı geri al"><Trash2 size={13} /></button>}</div>
+                        <div key={payment.id}><span>{paymentMethodLabel(payment.paymentMethod)} · {formatDateTime(payment.paidAt)}{payment.origin === "reservation" ? " · Kapora" : ""}</span><b>{minorMoney(payment.amountMinor)}</b>{payment.origin === "direct" && <button className="action-button action-button-danger action-button-sm" type="button" disabled={saving} onClick={() => requestVoidPayment(payment.id, payment.amountMinor)} aria-label="Tahsilatı geri al"><Trash2 size={13} /></button>}</div>
                       ))}
                     </div>
                   )}
 
                   {showPayment ? (
-                    <div className="room-folio-payment-form">
-                      <input inputMode="decimal" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="Tutar" autoFocus />
-                      <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as RoomFolioPaymentMethod)}>
+                    <div className="room-folio-payment-form form-row filter-row">
+                      <label className="form-field form-field--short">Ödeme tutarı<input inputMode="decimal" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} placeholder="Tutar" autoFocus /></label>
+                      <label className="form-field form-field--medium">Ödeme yöntemi<select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value as RoomFolioPaymentMethod)}>
                         <option value="cash">Nakit</option><option value="card">Kart</option><option value="bank">Banka</option><option value="other">Diğer</option>
-                      </select>
-                      <button type="button" disabled={saving} onClick={() => void addPayment()}>Ödemeyi Kaydet</button>
-                      <button className="is-secondary" type="button" onClick={() => setShowPayment(false)}>Vazgeç</button>
+                      </select></label>
+                      <button className="action-button action-button-primary action-button-sm" type="button" disabled={saving} onClick={() => void addPayment()}>Ödemeyi Kaydet</button>
+                      <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => setShowPayment(false)}>Vazgeç</button>
                     </div>
                   ) : selectedFolio.remainingMinor > 0 ? (
-                    <button className="room-folio-payment-button" type="button" disabled={saving} onClick={() => { setPaymentAmount(minorToInput(selectedFolio.remainingMinor)); setShowPayment(true); }}><Banknote size={16} /> Ödeme Al</button>
+                    <button className="action-button action-button-secondary action-button-sm" type="button" disabled={saving} onClick={() => { setPaymentAmount(minorToInput(selectedFolio.remainingMinor)); setShowPayment(true); }}><Banknote size={16} /> Ödeme Al</button>
                   ) : (
                     <div className="room-folio-payment-complete status-message status-message--success" role="status">
                       <CheckCircle2 size={18} aria-hidden="true" />
@@ -473,12 +477,12 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
 
             <footer className="room-folio-drawer-footer overlay-footer">
               <span>{selectedFolio.remainingMinor > 0 ? `${minorMoney(selectedFolio.remainingMinor)} ödeme bekliyor` : "Hesap tamamlandı"}</span>
-              <button className="room-folio-checkout-button" type="button" disabled={saving} onClick={requestCheckout}>Çıkış Yap</button>
+              <button className="action-button action-button-primary action-button-sm" type="button" disabled={saving} onClick={requestCheckout}>Çıkış Yap</button>
             </footer>
 
             {confirmationAction && (
               <div className="room-folio-confirm-overlay overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmationAction(null); }}>
-                <section className="room-folio-confirm-dialog dialog dialog--compact" role="alertdialog" aria-modal="true" aria-labelledby="room-folio-confirm-title">
+                <section ref={confirmationRef} className="room-folio-confirm-dialog dialog dialog--compact" role="alertdialog" aria-modal="true" aria-labelledby="room-folio-confirm-title">
                   {confirmationAction.kind === "checkout" ? (
                     <>
                       <div className="room-folio-confirm-copy">
@@ -492,9 +496,9 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
                             : "Misafirin çıkışı tamamlanacak ve oda adisyonu kapatılacak."}
                         </p>
                       </div>
-                      <div className="room-folio-confirm-actions">
-                        <button className="is-secondary" type="button" onClick={() => setConfirmationAction(null)}>Vazgeç</button>
-                        <button className={selectedFolio.remainingMinor > 0 ? "is-warning" : "is-primary"} type="button" disabled={saving} onClick={() => void confirmAction()}>
+                      <div className="form-actions">
+                        <button className="action-button action-button-secondary action-button-sm" type="button" data-dialog-close onClick={() => setConfirmationAction(null)}>Vazgeç</button>
+                        <button className={"action-button action-button-danger action-button-sm" + (selectedFolio.remainingMinor > 0 ? "is-warning" : "is-primary")} type="button" disabled={saving} onClick={() => void confirmAction()}>
                           {selectedFolio.remainingMinor > 0 ? "Alacak Bırak ve Çıkış Yap" : "Çıkışı Tamamla"}
                         </button>
                       </div>
@@ -506,9 +510,9 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
                         <h3 id="room-folio-confirm-title">{minorMoney(confirmationAction.amountMinor)} tahsilatı geri alınsın mı?</h3>
                         <p>Bu ödeme oda hesabından ve kasa kayıtlarından geri alınacak.</p>
                       </div>
-                      <div className="room-folio-confirm-actions">
-                        <button className="is-secondary" type="button" onClick={() => setConfirmationAction(null)}>Vazgeç</button>
-                        <button className="is-warning" type="button" disabled={saving} onClick={() => void confirmAction()}>Tahsilatı Geri Al</button>
+                      <div className="form-actions">
+                        <button className="action-button action-button-secondary action-button-sm" type="button" data-dialog-close onClick={() => setConfirmationAction(null)}>Vazgeç</button>
+                        <button className="action-button action-button-danger action-button-sm" type="button" disabled={saving} onClick={() => void confirmAction()}>Tahsilatı Geri Al</button>
                       </div>
                     </>
                   )}
@@ -525,7 +529,7 @@ export function RoomFolioWorkspace({ refreshKey, menuEnabled }: RoomFolioWorkspa
 function StayCard({ stay, folio, onOpen }: { stay: DesktopRoomFolioStay; folio?: DesktopRoomFolio; onOpen: () => void }) {
   return (
     <Panel className={`room-folio-stay-card ${stay.status === "checked_in" ? "is-occupied" : ""}`} padding="compact">
-      <div className="room-folio-stay-heading">
+      <div className="card__header">
         <div><strong>{stay.roomName}</strong><span>{stay.customerName}</span></div>
         <b>{stay.status === "checked_in" ? "Odada" : "Planlandı"}</b>
       </div>
@@ -535,7 +539,7 @@ function StayCard({ stay, folio, onOpen }: { stay: DesktopRoomFolioStay; folio?:
       ) : (
         <p className="room-folio-stay-price">Gecelik: <strong>{stay.nightlyPriceMinor > 0 ? minorMoney(stay.nightlyPriceMinor) : "Fiyat girilmemiş"}</strong></p>
       )}
-      <button type="button" onClick={onOpen}>{folio ? "Oda Adisyonunu Aç" : stay.status === "checked_in" ? "Adisyon Aç" : "Giriş Yap / Adisyon Aç"}</button>
+      <button className="action-button action-button-primary action-button-sm" type="button" onClick={onOpen}>{folio ? "Oda Adisyonunu Aç" : stay.status === "checked_in" ? "Adisyon Aç" : "Giriş Yap / Adisyon Aç"}</button>
     </Panel>
   );
 }
