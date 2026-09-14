@@ -8,11 +8,8 @@ import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
-import "../../apps/desktop-app/src/styles.css";
-import "../../apps/desktop-app/src/friendly-overrides.css";
-import "../../apps/desktop-app/src/friendly-workflow-ux.css";
-import "../../apps/desktop-app/src/customer-work-ux.css";
-import "../../apps/desktop-app/src/market-workspace-ux.css";
+import "../../apps/desktop-app/src/styles/index.css";
+
 
 const control = window as typeof window & {
   __m82Initial: { dashboard: DesktopDashboardData; snapshot: BusinessCapabilitySnapshot };

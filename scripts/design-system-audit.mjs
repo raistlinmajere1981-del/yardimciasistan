@@ -154,7 +154,7 @@ if (args.has("--json")) {
 const sharedFiles = /\/styles\/(?:layout\/|components\/(?:navigation|header|notifications|panels|toolbars|status|dialogs)\.css$)/;
 const coreViolations = desktopAudit.violations.filter(issue => sharedFiles.test(issue.file));
 if (coreViolations.length) throw new Error(`Shared shell must have zero violations: ${coreViolations.length}`);
-const migratedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu)|components\/(?:cards|data-list|forms))\.css$/;
+const migratedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports)|components\/(?:cards|data-list|forms))\.css$/;
 const migrationViolations = desktopAudit.violations.filter(issue => migratedDesktop.test(issue.file));
 const targetInventory = desktopAudit.inventory.filter(item => migratedDesktop.test(item.file));
 console.log("desktop-migrated-inventory", JSON.stringify(targetInventory));

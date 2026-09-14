@@ -10,6 +10,7 @@ import {
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
+import { StatusBadge } from "../ui/StatusBadge";
 
 interface ProductFormState {
   id: string;
@@ -344,7 +345,7 @@ export function MarketProductsWorkspace({
             {categories.map((category) => (
               <button type="button" className="market-list-row" key={category.id} onClick={() => editCategory(category)}>
                 <span><strong>{category.name}</strong><small>{category.code || "Kod yok"}{category.parentId ? " · alt kategori" : " · ana kategori"}</small></span>
-                <span className={category.isActive ? "market-badge" : "market-badge is-muted"}>{category.isActive ? "Aktif" : "Pasif"}</span>
+                <StatusBadge tone={category.isActive ? "success" : "neutral"}>{category.isActive ? "Aktif" : "Pasif"}</StatusBadge>
               </button>
             ))}
           </div>

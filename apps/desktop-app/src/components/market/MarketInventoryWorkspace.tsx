@@ -1,6 +1,7 @@
 import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { CatalogProduct, CommerceUnit, InventoryBalance, InventoryMovement } from "@yardimci-asistan/shared";
+import { StatusBadge } from "../ui/StatusBadge";
 
 interface MarketInventoryWorkspaceProps {
   products: CatalogProduct[];
@@ -118,6 +119,25 @@ export function MarketInventoryWorkspace({ products, busy, onStateChange }: Mark
             <span>{selectedProduct.name}</span>
             <strong>{balance?.quantity ?? "—"} {unitLabels[selectedProduct.unit]}</strong>
             <small>Minimum: {balance?.minimumQuantity ?? 0}</small>
+            {balance && (
+              <div className="market-stock-badge-row">
+                <StatusBadge
+                  tone={
+                    balance.quantity <= 0
+                      ? "danger"
+                      : balance.quantity <= balance.minimumQuantity
+                      ? "warning"
+                      : "success"
+                  }
+                >
+                  {balance.quantity <= 0
+                    ? "Stok yok"
+                    : balance.quantity <= balance.minimumQuantity
+                    ? "Düşük stok"
+                    : "Normal stok"}
+                </StatusBadge>
+              </div>
+            )}
           </div>
         )}
         <label className="market-field">Sayılan miktar<input type="number" min="0" step="0.0001" value={countedQuantity} onChange={(event) => setCountedQuantity(event.target.value)} /></label>

@@ -7,8 +7,11 @@ import type {
   FinancePaymentMethod
 } from "../../../electron/finance";
 import type { DesktopRoomFolioData } from "../../../electron/room-folio";
+import { ActionButton } from "../ui/ActionButton";
 import { MetricCard } from "../ui/MetricCard";
 import { Panel } from "../ui/Panel";
+import { StatusBadge } from "../ui/StatusBadge";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 const RECENT_ENTRY_PREVIEW_COUNT = 12;
 
@@ -82,6 +85,8 @@ export function FinanceWorkspace({
   const [pendingDelete, setPendingDelete] = useState<DesktopFinanceEntry | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
 
+  const deleteDialogRef = useDialogFocus(Boolean(pendingDelete));
+
   useEffect(() => {
     let active = true;
     const bridge = window.yardimciDesktop;
@@ -118,6 +123,7 @@ export function FinanceWorkspace({
     if (categoryOptions.some(([value]) => value === entryCategory)) return;
     setEntryCategory(entryMode === "income" ? "other_income" : "other_expense");
   }, [categoryOptions, entryCategory, entryMode]);
+
   const visibleRecentEntries = showAllEntries
     ? data.recentEntries
     : data.recentEntries.slice(0, RECENT_ENTRY_PREVIEW_COUNT);
@@ -252,19 +258,19 @@ export function FinanceWorkspace({
 
   return (
     <section className="finance-workspace" aria-labelledby="finance-title">
-      <div className="finance-title-row">
+      <div className="finance-title-row page-toolbar">
         <div>
           <p className="panel-eyebrow">Günlük kasa</p>
           <h2 id="finance-title">Kasa</h2>
           <p>{accommodationFolioEnabled ? "Bugünün para hareketlerini ve bekleyen oda alacaklarını tek bakışta görün." : "Bugünün para hareketlerini tek bakışta görün."}</p>
         </div>
-        <div className="finance-primary-actions">
-          <button className="finance-income-button" type="button" onClick={() => openEntry("income")}>
-            <Plus size={17} aria-hidden="true" /> Gelir Ekle
-          </button>
-          <button className="finance-expense-button" type="button" onClick={() => openEntry("expense")}>
-            <Minus size={17} aria-hidden="true" /> Gider Ekle
-          </button>
+        <div className="finance-primary-actions action-row">
+          <ActionButton variant="primary" onClick={() => openEntry("income")}>
+            <Plus size={16} aria-hidden="true" /> Gelir Ekle
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={() => openEntry("expense")}>
+            <Minus size={16} aria-hidden="true" /> Gider Ekle
+          </ActionButton>
         </div>
       </div>
 
@@ -286,18 +292,18 @@ export function FinanceWorkspace({
           </div>
           <div className="finance-outstanding-list">
             {outstandingRows.map((item) => (
-              <article key={item.id}>
-                <div>
+              <article key={item.id} className="finance-outstanding-item">
+                <div className="finance-outstanding-item__main">
                   <strong>{item.customerName}</strong>
                   <span>{item.context}{item.dateText ? ` · ${item.dateText}` : ""}</span>
                 </div>
-                <span className="finance-outstanding-status">{item.status}</span>
-                <b>{minorMoney(item.remainingMinor)}</b>
+                <StatusBadge tone="warning" className="finance-outstanding-status">{item.status}</StatusBadge>
+                <b className="finance-outstanding-item__amount">{minorMoney(item.remainingMinor)}</b>
               </article>
             ))}
           </div>
           <div className="finance-room-note">
-            <BedDouble size={17} aria-hidden="true" />
+            <BedDouble size={16} aria-hidden="true" />
             <span>Oda tahsilatları <strong>Pansiyon → Oda Adisyonu</strong> içinden alınır; para kasaya otomatik işlenir.</span>
           </div>
         </Panel>
@@ -310,38 +316,42 @@ export function FinanceWorkspace({
               <strong>{entryMode === "income" ? "Gelir Ekle" : "Gider Ekle"}</strong>
               <span>Nakit ve bugünün tarihi varsayılan gelir; gerekiyorsa değiştirebilirsiniz.</span>
             </div>
-            <button type="button" onClick={() => setEntryMode(null)}>Vazgeç</button>
+            <ActionButton variant="ghost" size="sm" onClick={() => setEntryMode(null)}>
+              Vazgeç
+            </ActionButton>
           </div>
-          <div className="finance-entry-form finance-entry-form-v2 finance-entry-form-v3">
-            <label>
-              Tutar
+          <div className="finance-entry-form">
+            <label className="form-field form-field--short">
+              <span>Tutar</span>
               <input inputMode="decimal" value={entryAmount} onChange={(event) => setEntryAmount(event.target.value)} placeholder="0,00" autoFocus />
             </label>
-            <label>
-              Tür
+            <label className="form-field form-field--medium">
+              <span>Tür</span>
               <select value={entryCategory} onChange={(event) => setEntryCategory(event.target.value)}>
                 {categoryOptions.map(([value, label]) => <option value={value} key={value}>{label}</option>)}
               </select>
             </label>
-            <label className="finance-description-field">
-              Açıklama
+            <label className="form-field form-field--fluid finance-description-field">
+              <span>Açıklama</span>
               <input value={entryDescription} onChange={(event) => setEntryDescription(event.target.value)} placeholder="Örn. mutfak alışverişi" maxLength={160} />
             </label>
-            <button className="finance-save-button" type="button" onClick={() => void saveEntry()} disabled={saving}>
-              {saving ? "Kaydediliyor…" : "Kaydet"}
-            </button>
+            <div className="finance-entry-form__submit">
+              <ActionButton variant="primary" onClick={() => void saveEntry()} disabled={saving}>
+                {saving ? "Kaydediliyor…" : "Kaydet"}
+              </ActionButton>
+            </div>
             <details className="finance-entry-more">
               <summary>
                 <span>Ödeme şekli ve tarih</span>
                 <small>{paymentMethodLabel(entryPaymentMethod)} · {entryDate}</small>
               </summary>
               <div className="finance-entry-more-grid">
-                <label>
-                  Ödeme şekli
+                <label className="form-field form-field--medium">
+                  <span>Ödeme şekli</span>
                   <PaymentMethodSelect value={entryPaymentMethod} onChange={setEntryPaymentMethod} />
                 </label>
-                <label>
-                  İşlem tarihi
+                <label className="form-field form-field--short">
+                  <span>İşlem tarihi</span>
                   <input
                     inputMode="numeric"
                     value={entryDate}
@@ -368,32 +378,48 @@ export function FinanceWorkspace({
           {loading && <span className="loading-state" role="status">Yükleniyor…</span>}
         </div>
         {data.recentEntries.length === 0 ? (
-          <p className="finance-empty">Henüz kasa hareketi yok.</p>
+          <p className="empty-state">Henüz kasa hareketi yok.</p>
         ) : (
           <>
-            <div className="finance-entry-list finance-entry-list-v2">
+            <div className="finance-entry-list">
               {visibleRecentEntries.map((entry) => (
-                <article key={entry.id}>
-                  <span className={`finance-direction-icon is-${entry.direction}`}>{entry.direction === "income" ? "+" : "−"}</span>
-                  <div>
+                <article key={entry.id} className="finance-entry-item">
+                  <span className={`finance-direction-icon is-${entry.direction}`} aria-hidden="true">
+                    {entry.direction === "income" ? "+" : "−"}
+                  </span>
+                  <div className="finance-entry-item__main">
                     <strong>{entry.description || categoryLabel(entry.category)}</strong>
                     <span>{entrySourceLabel(entry)} · {paymentMethodLabel(entry.paymentMethod)} · {formatDateTime(entry.occurredAt)}</span>
                   </div>
-                  <b className={entry.direction === "income" ? "is-income" : "is-expense"}>
+                  <b className={`finance-entry-item__amount ${entry.direction === "income" ? "is-income" : "is-expense"}`}>
                     {entry.direction === "income" ? "+" : "−"}{minorMoney(entry.amountMinor)}
                   </b>
-                  {entry.sourceType === "manual" && (
-                    <button className="finance-delete-entry" type="button" aria-label="Kasa hareketini kaldır" onClick={() => setPendingDelete(entry)} disabled={saving}>
+                  {entry.sourceType === "manual" ? (
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      className="finance-delete-entry"
+                      aria-label="Kasa hareketini kaldır"
+                      onClick={() => setPendingDelete(entry)}
+                      disabled={saving}
+                    >
                       <Trash2 size={15} aria-hidden="true" />
-                    </button>
+                    </ActionButton>
+                  ) : (
+                    <span className="finance-delete-placeholder" aria-hidden="true" />
                   )}
                 </article>
               ))}
             </div>
             {hasOlderEntries && (
-              <button className="finance-history-toggle" type="button" onClick={() => setShowAllEntries((current) => !current)}>
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                className="finance-history-toggle"
+                onClick={() => setShowAllEntries((current) => !current)}
+              >
                 {showAllEntries ? `Son ${RECENT_ENTRY_PREVIEW_COUNT} Kaydı Göster` : `Tüm Hareketleri Göster (${data.recentEntries.length})`}
-              </button>
+              </ActionButton>
             )}
           </>
         )}
@@ -402,16 +428,42 @@ export function FinanceWorkspace({
       {message && <p className="finance-feedback status-message" role="status">{message}</p>}
 
       {pendingDelete && (
-        <div className="finance-confirm-overlay overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setPendingDelete(null); }}>
-          <section className="finance-confirm-dialog dialog dialog--compact" role="dialog" aria-modal="true" aria-labelledby="finance-delete-title">
-            <button className="finance-confirm-close overlay-close" type="button" aria-label="Kapat" disabled={saving} onClick={() => setPendingDelete(null)}><X size={18} /></button>
+        <div
+          className="finance-confirm-overlay overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !saving) setPendingDelete(null);
+          }}
+        >
+          <section
+            ref={deleteDialogRef}
+            className="finance-confirm-dialog dialog dialog--compact"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finance-delete-title"
+          >
+            <button
+              className="finance-confirm-close overlay-close"
+              type="button"
+              aria-label="Kapat"
+              disabled={saving}
+              onClick={() => setPendingDelete(null)}
+            >
+              <X size={18} />
+            </button>
             <p className="panel-eyebrow">Kasa kaydı</p>
             <h3 id="finance-delete-title">Bu hareket kaldırılsın mı?</h3>
-            <p><strong>{pendingDelete.description || categoryLabel(pendingDelete.category)}</strong> · {minorMoney(pendingDelete.amountMinor)}</p>
-            <span>Yalnız elle eklenen kasa kayıtları bu şekilde kaldırılabilir.</span>
-            <div className="finance-confirm-actions">
-              <button type="button" disabled={saving} onClick={() => setPendingDelete(null)}>Vazgeç</button>
-              <button className="is-danger" type="button" disabled={saving} onClick={() => void confirmDeleteEntry()}>{saving ? "Kaldırılıyor…" : "Kaydı Kaldır"}</button>
+            <p className="finance-confirm-item">
+              <strong>{pendingDelete.description || categoryLabel(pendingDelete.category)}</strong> · {minorMoney(pendingDelete.amountMinor)}
+            </p>
+            <span className="finance-confirm-hint">Yalnız elle eklenen kasa kayıtları bu şekilde kaldırılabilir.</span>
+            <div className="finance-confirm-actions action-row">
+              <ActionButton variant="secondary" disabled={saving} onClick={() => setPendingDelete(null)}>
+                Vazgeç
+              </ActionButton>
+              <ActionButton variant="danger" disabled={saving} onClick={() => void confirmDeleteEntry()}>
+                {saving ? "Kaldırılıyor…" : "Kaydı Kaldır"}
+              </ActionButton>
             </div>
           </section>
         </div>

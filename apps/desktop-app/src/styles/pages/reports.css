@@ -1,30 +1,4 @@
-.reports-workspace {
-  display: grid;
-  gap: var(--space-4);
-}
-
-.report-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.report-panel {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.report-summary-panel .info-list {
-  align-content: start;
-}
-
-@media (max-width: 1180px) {
-
-  .report-grid {
-    grid-template-columns: 1fr;
-  }
-}
+/* Reports workspace & page styles */
 
 .reports-page {
   display: grid;
@@ -48,26 +22,29 @@
   min-width: 0;
 }
 
-.report-filter-heading p,
-.report-filter-heading h2,
-.report-section-title p,
-.report-section-title h2,
-.report-subheading h3 {
+.report-filter-heading p {
   margin: 0;
 }
 
 .report-filter-heading h2,
 .report-section-title h2 {
+  margin: 0;
   color: var(--color-text);
   font-size: var(--text-lg);
 }
 
 .report-section-title p {
-  margin-bottom: 2px;
+  margin: 0 0 var(--space-1);
   color: var(--color-accent);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   text-transform: uppercase;
+}
+
+.report-subheading h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
 }
 
 .report-section-title > span,
@@ -76,6 +53,8 @@
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
+
+/* Date presets & filter controls */
 
 .report-date-presets,
 .report-ai-actions {
@@ -86,8 +65,8 @@
 
 .report-date-presets button,
 .report-ai-actions button {
-  min-height: 34px;
-  padding: 6px var(--space-3);
+  min-height: var(--control-height-sm);
+  padding: var(--space-1) var(--space-3);
   color: var(--color-text);
   background: var(--color-bg-field);
   border: 1px solid var(--color-border);
@@ -95,6 +74,7 @@
   cursor: pointer;
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
+  transition: all var(--motion-fast, 150ms ease);
 }
 
 .report-date-presets button:hover,
@@ -119,7 +99,7 @@
 
 .report-custom-dates label {
   display: grid;
-  gap: 5px;
+  gap: var(--space-1);
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
@@ -132,10 +112,11 @@
 
 .report-custom-dates input {
   width: 100%;
-  min-height: 36px;
-  padding: 6px var(--space-10) 6px 9px;
+  min-height: var(--control-height-md);
+  padding: var(--space-1) var(--space-10) var(--space-1) var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  background: var(--color-bg-field);
   color: transparent;
 }
 
@@ -145,7 +126,7 @@
 
 .report-date-control > span {
   position: absolute;
-  inset: 0 38px 0 10px;
+  inset: 0 var(--space-10) 0 var(--space-3);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -171,6 +152,8 @@
   font-size: var(--text-sm);
 }
 
+/* Metric summary grids */
+
 .report-summary-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -191,9 +174,9 @@
 .report-restaurant-metrics > div,
 .report-compact-counters > div {
   display: grid;
-  gap: 3px;
+  gap: var(--space-1);
   min-width: 0;
-  padding: 9px 10px;
+  padding: var(--space-2) var(--space-3);
   border-right: 1px solid var(--color-border);
 }
 
@@ -222,6 +205,8 @@
   color: var(--color-warning);
 }
 
+/* Restaurant sales & charts */
+
 .report-sales-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
@@ -229,8 +214,7 @@
 }
 
 .report-chart-card,
-.report-table-card,
-.report-recent-movements {
+.report-table-card {
   min-width: 0;
   padding: var(--space-3);
   border: 1px solid var(--color-border);
@@ -238,10 +222,49 @@
   background: var(--color-bg-field);
 }
 
-.report-subheading h3,
-.report-operation-grid h3 {
-  color: var(--color-text);
-  font-size: var(--text-sm);
+.daily-revenue-chart {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+  min-height: 210px;
+  margin-top: var(--space-3);
+  padding: var(--space-1) var(--space-1) 0;
+  overflow-x: auto;
+}
+
+.daily-revenue-column {
+  display: grid;
+  flex: 1 0 28px;
+  grid-template-rows: 22px 1fr 20px;
+  gap: var(--space-1);
+  min-width: 28px;
+  text-align: center;
+}
+
+.daily-revenue-value,
+.daily-revenue-column small {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-revenue-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 150px;
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(to top, var(--color-bg-panel), transparent);
+}
+
+.daily-revenue-track > span {
+  display: block;
+  width: min(72%, 24px);
+  min-height: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 1px 1px;
+  background: var(--color-accent);
 }
 
 .report-table-scroll {
@@ -255,23 +278,23 @@
   font-size: var(--text-sm);
 }
 
-.report-table th,
-.report-table td {
-  padding: var(--space-2) 9px;
+.report-table th {
+  padding: var(--space-2) var(--space-2);
   border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
   text-align: left;
   white-space: nowrap;
 }
 
-.report-table th {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
-  font-weight: var(--weight-semibold);
-}
-
 .report-table td {
+  padding: var(--space-2) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .report-table th:not(:first-child),
@@ -282,6 +305,8 @@
 .report-table tbody tr:last-child td {
   border-bottom: 0;
 }
+
+/* Operations grid */
 
 .report-operation-grid {
   display: grid;
@@ -297,11 +322,15 @@
 
 .report-operation-grid h3 {
   margin: 0;
+  color: var(--color-text);
+  font-size: var(--text-sm);
 }
 
 .report-operation-grid .report-compact-counters {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+
+/* Stock grid & ranked lists */
 
 .report-stock-grid {
   display: grid;
@@ -318,13 +347,22 @@
   list-style: none;
 }
 
-.report-ranked-list li,
-.report-movement-list li {
+.report-ranked-list li {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 38px;
-  padding: 6px 0;
+  min-height: var(--control-height-md);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.report-movement-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-height-md);
+  padding: var(--space-1) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -364,10 +402,6 @@
   white-space: nowrap;
 }
 
-.report-movement-list li {
-  justify-content: space-between;
-}
-
 .report-movement-list li > div {
   display: grid;
   min-width: 0;
@@ -390,12 +424,18 @@
 }
 
 .report-recent-movements {
+  min-width: 0;
   padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-field);
 }
 
 .report-recent-movements .report-subheading {
   padding: var(--space-3) var(--space-3) 0;
 }
+
+/* Attention panel */
 
 .report-attention-panel {
   border-color: var(--color-warning-border);
@@ -417,9 +457,9 @@
 .report-attention-list article {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: var(--space-2);
   min-width: 0;
-  padding: 9px 10px;
+  padding: var(--space-2) var(--space-3);
   background: var(--color-bg-field);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -427,25 +467,23 @@
 
 .report-attention-list svg {
   flex: 0 0 auto;
-  margin-top: 2px;
+  margin-top: calc(var(--space-1) / 2);
   color: var(--color-warning);
 }
 
-.report-attention-list strong,
-.report-attention-list p {
-  margin: 0;
-}
-
 .report-attention-list strong {
+  margin: 0;
   color: var(--color-text);
   font-size: var(--text-sm);
 }
 
 .report-attention-list p {
-  margin-top: 2px;
+  margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
+
+/* AI Insights panel */
 
 .report-ai-panel {
   border-color: var(--color-accent-border);
@@ -471,6 +509,8 @@
   white-space: pre-wrap;
 }
 
+/* Empty state */
+
 .report-empty {
   display: flex;
   align-items: center;
@@ -483,52 +523,7 @@
   font-size: var(--text-sm);
 }
 
-@media (max-width: 1180px) {
-
-  .report-summary-metrics,
-.report-stock-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 1180px) {
-
-  .report-sales-grid,
-.report-operation-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 980px) {
-
-  .report-summary-metrics,
-.report-stock-grid,
-.report-attention-list {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 980px) {
-
-  .report-custom-dates {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 980px) {
-
-  .report-restaurant-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 980px) {
-
-  .report-restaurant-metrics > div,
-.report-compact-counters > div {
-    border-bottom: 1px solid var(--color-border);
-  }
-}
+/* Cash details toggle */
 
 .reports-page.reports-details-collapsed .reports-detail-divider ~ * {
   display: none;
@@ -547,6 +542,7 @@
   background: var(--color-bg-surface);
   cursor: pointer;
   user-select: none;
+  transition: all var(--motion-fast, 150ms ease);
 }
 
 .reports-page .cash-details-toggle::before,
@@ -610,8 +606,42 @@
   background: var(--color-accent-soft);
 }
 
-@media (max-width: 760px) {
+/* Responsive queries */
 
+@media (max-width: 1180px) {
+  .report-summary-metrics,
+  .report-stock-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-sales-grid,
+  .report-operation-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .report-summary-metrics,
+  .report-stock-grid,
+  .report-attention-list {
+    grid-template-columns: 1fr;
+  }
+
+  .report-custom-dates {
+    grid-template-columns: 1fr;
+  }
+
+  .report-restaurant-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .report-restaurant-metrics > div,
+  .report-compact-counters > div {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+@media (max-width: 760px) {
   .reports-page .cash-details-toggle {
     padding-right: var(--space-10);
   }
