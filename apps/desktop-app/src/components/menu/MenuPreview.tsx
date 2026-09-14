@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import type { PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
@@ -10,6 +10,7 @@ import {
   isQrHiddenByStock,
   resolveMenuPreviewImageUrl
 } from "./menu-model";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 interface LocalMenuPreviewProps {
   menu: DesktopDashboardData["menu"];
@@ -22,47 +23,7 @@ interface LocalMenuPreviewProps {
 }
 
 export function LocalMenuPreview({ menu, setupData, webModuleUrl, whatsappEnabled, qrMenuEnabled, inventoryEnabled, onClose }: LocalMenuPreviewProps) {
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    closeButtonRef.current?.focus();
-
-    function handleDialogKeydown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        onClose();
-        return;
-      }
-
-      if (event.key !== "Tab" || !dialogRef.current) {
-        return;
-      }
-
-      const focusableElements = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
-      ));
-      const firstFocusable = focusableElements[0];
-      const lastFocusable = focusableElements.at(-1);
-      if (!firstFocusable || !lastFocusable) {
-        event.preventDefault();
-        return;
-      }
-      if (event.shiftKey && document.activeElement === firstFocusable) {
-        event.preventDefault();
-        lastFocusable.focus();
-      } else if (!event.shiftKey && document.activeElement === lastFocusable) {
-        event.preventDefault();
-        firstFocusable.focus();
-      }
-    }
-
-    window.addEventListener("keydown", handleDialogKeydown);
-    return () => {
-      window.removeEventListener("keydown", handleDialogKeydown);
-      previouslyFocused?.focus();
-    };
-  }, [onClose]);
+  const dialogRef = useDialogFocus(true);
 
   return (
     <div
@@ -79,7 +40,7 @@ export function LocalMenuPreview({ menu, setupData, webModuleUrl, whatsappEnable
             <strong id="local-menu-preview-title">Yerel Menü Önizlemesi</strong>
             <span>{qrMenuEnabled ? "Düzenleme alanındaki canlı taslak gösteriliyor; kaydetmeden web yayını etkilenmez." : "Düzenleme alanındaki yerel menü taslağı gösteriliyor."}</span>
           </div>
-          <button className="overlay-close" ref={closeButtonRef} type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
+          <button className="overlay-close" data-dialog-close type="button" onClick={onClose} aria-label="Önizlemeyi kapat">
             <X size={18} aria-hidden="true" />
             Kapat
           </button>

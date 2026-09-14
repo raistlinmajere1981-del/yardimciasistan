@@ -11,7 +11,7 @@ import type {
 import { formatDateForDisplay, formatReservationStatus } from "../../app/record-formatters";
 import { ManualRestaurantReservationEditor } from "./ManualRestaurantReservationEditor";
 import { ActionButton } from "../ui/ActionButton";
-import { CompactListItem } from "../ui/CompactListItem";
+import { DataList, DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
 interface RestaurantReservationsWorkspaceProps {
@@ -28,8 +28,8 @@ interface RestaurantReservationsWorkspaceProps {
 
 function reservationTone(status: string): StatusTone {
   if (["cancelled", "rejected"].includes(status)) return "danger";
-  if (status === "pending") return "wait";
-  if (["approved", "completed"].includes(status)) return "ok";
+  if (status === "pending") return "warning";
+  if (["approved", "completed"].includes(status)) return "success";
   return "info";
 }
 
@@ -82,7 +82,7 @@ export function RestaurantReservationsWorkspace({
       <div className="reservation-toolbar page-toolbar">
         <div className="operation-filter-summary" aria-label="Restoran rezervasyon özeti">
           <StatusBadge tone="info">{activeReservations.length} aktif rezervasyon</StatusBadge>
-          <StatusBadge tone="wait">{activeReservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
+          <StatusBadge tone="warning">{activeReservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
           <ActionButton size="sm" type="button" onClick={() => setEditorOpen(true)}>
             <Plus size={15} aria-hidden="true" />
             Yeni Rezervasyon
@@ -93,7 +93,7 @@ export function RestaurantReservationsWorkspace({
         </ActionButton>
       </div>
 
-      <section className="operations-grid compact-record-list" aria-label="Restoran rezervasyon listesi">
+      <DataList className="restaurant-reservation-list" aria-label="Restoran rezervasyon listesi">
         {visibleReservations.length === 0 ? (
           <div className="panel empty-state compact-empty">
             <CalendarCheck size={24} aria-hidden="true" />
@@ -102,8 +102,8 @@ export function RestaurantReservationsWorkspace({
           </div>
         ) : (
           visibleReservations.map((reservation) => (
-            <CompactListItem
-              className="operation-record-row reservation-record-row"
+            <DataListItem
+              className="restaurant-reservation-record"
               key={reservation.id}
               leading={<StatusBadge tone={reservationTone(reservation.status)}>{formatReservationStatus(reservation.status)}</StatusBadge>}
               title={reservation.title || reservation.customerName || "Misafir"}
@@ -145,7 +145,7 @@ export function RestaurantReservationsWorkspace({
             />
           ))
         )}
-      </section>
+      </DataList>
 
       <ManualRestaurantReservationEditor
         open={editorOpen}

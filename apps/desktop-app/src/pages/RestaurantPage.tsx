@@ -74,8 +74,8 @@ export function RestaurantPage({
     return ids;
   }, [data.tables, paymentTableIds]);
   const metrics: MetricCardProps[] = [
-    { title: "Boş masalar", value: String(data.tables.filter((table) => table.status === "available" && !activeOrderTableIds.has(table.id)).length), tone: "ok", icon: UtensilsCrossed, compact: true },
-    ...(reservationsEnabled ? [{ title: "Rezerve", value: String(data.tables.filter((table) => table.status === "reserved").length), tone: "wait" as const, icon: CalendarCheck, compact: true }] : []),
+    { title: "Boş masalar", value: String(data.tables.filter((table) => table.status === "available" && !activeOrderTableIds.has(table.id)).length), tone: "success", icon: UtensilsCrossed, compact: true },
+    ...(reservationsEnabled ? [{ title: "Rezerve", value: String(data.tables.filter((table) => table.status === "reserved").length), tone: "warning" as const, icon: CalendarCheck, compact: true }] : []),
     ...(ordersEnabled ? [{ title: "Hesap bekleyen", value: String(billWaitingTableIds.size), tone: "info" as const, icon: ReceiptText, compact: true }] : []),
     ...(tasksEnabled ? [{ title: "Yapılacak işler", value: String(pendingRestaurantTasks.length), tone: "neutral" as const, icon: ClipboardList, compact: true }] : [])
   ];
@@ -116,33 +116,33 @@ export function RestaurantPage({
 
   return (
     <section className="combined-page restaurant-page" aria-label="Restoran yönetimi">
-      <section className="panel operation-group-panel operation-summary-panel restaurant-summary-panel" aria-labelledby="restaurant-summary-title">
-        <header className="operation-panel-heading">
-          <span className="operation-panel-eyebrow">Servis</span>
+      <section className="panel restaurant-overview" aria-labelledby="restaurant-summary-title">
+        <header className="restaurant-section-heading">
+          <span className="panel-eyebrow">Servis</span>
           <h2 id="restaurant-summary-title">Bugün</h2>
           <p>Masaların durumunu tek bakışta görün.</p>
         </header>
-        <div className="operation-summary-grid">
+        <div className="restaurant-summary-grid">
           {metrics.map((metric) => <MetricCard {...metric} key={metric.title} />)}
         </div>
       </section>
 
-      {reservationsEnabled && <details className={`restaurant-reservation-details${pendingReservationCount > 0 ? " has-pending" : ""}`}>
+      {reservationsEnabled && <details className={`disclosure restaurant-reservation-details${pendingReservationCount > 0 ? " has-pending" : ""}`}>
         <summary>
           <span className="restaurant-reservation-summary-copy">
-            <span className="operation-panel-eyebrow">Rezervasyon</span>
+            <span className="panel-eyebrow">Rezervasyon</span>
             <strong>Masa Rezervasyonları</strong>
             <small>{todayReservationCount} bugün · {pendingReservationCount} onay bekleyen · {activeRestaurantReservations.length} aktif</small>
           </span>
           <span className="restaurant-reservation-summary-action">Aç <ChevronDown size={16} aria-hidden="true" /></span>
         </summary>
-        <section className="panel operation-group-panel restaurant-reservations-section" aria-labelledby="restaurant-reservations-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Rezervasyon</span>
+        <section className="panel restaurant-reservations-section" aria-labelledby="restaurant-reservations-title">
+          <header className="restaurant-section-heading">
+            <span className="panel-eyebrow">Rezervasyon</span>
             <h2 id="restaurant-reservations-title">Masa Rezervasyonları</h2>
             <p>Telefonla, yüz yüze veya web üzerinden gelen restoran rezervasyonlarını takip edin.</p>
           </header>
-          <div className="operation-panel-content">{reservations}</div>
+          <div className="page-section__body">{reservations}</div>
         </section>
       </details>}
 
@@ -155,13 +155,13 @@ export function RestaurantPage({
       )}
 
       <div className="restaurant-layout">
-        <section className="panel operation-group-panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Servis</span>
+        <section className="panel restaurant-tables-section" aria-labelledby="restaurant-tables-title">
+          <header className="restaurant-section-heading">
+            <span className="panel-eyebrow">Servis</span>
             <h2 id="restaurant-tables-title">Masalar</h2>
             <p>{ordersEnabled ? "Masaya dokunun; sipariş ve hesap işlemleri seçtiğiniz masa üzerinden açılır." : "Masaların güncel kullanım durumunu yönetin."}</p>
           </header>
-          <div className="operation-panel-content">
+          <div className="page-section__body">
             <TableOrdersWorkspace
               tables={data.tables}
               menu={data.menu}
@@ -175,13 +175,13 @@ export function RestaurantPage({
             />
           </div>
         </section>
-        {tasksEnabled && <section className="panel operation-group-panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
-          <header className="operation-panel-heading">
-            <span className="operation-panel-eyebrow">Günlük İşler</span>
+        {tasksEnabled && <section className="panel restaurant-tasks-section" aria-labelledby="restaurant-tasks-title">
+          <header className="restaurant-section-heading">
+            <span className="panel-eyebrow">Günlük İşler</span>
             <h2 id="restaurant-tasks-title">Yapılacak İşler</h2>
             <p>Servis işleri ve kendi eklediğiniz günlük notlar</p>
           </header>
-          <div className="operation-panel-content">{tasks}</div>
+          <div className="page-section__body">{tasks}</div>
         </section>}
       </div>
     </section>

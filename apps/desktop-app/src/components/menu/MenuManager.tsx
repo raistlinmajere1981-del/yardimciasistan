@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
-import { Plus, Save, Star, Trash2 } from "lucide-react";
+import { Plus, Save, Star, Trash2, X } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
@@ -16,7 +16,9 @@ import {
   type ItemFormState
 } from "./menu-model";
 import { ActionButton } from "../ui/ActionButton";
+import { DataList, DataListButton } from "../ui/DataList";
 import { StatusBadge } from "../ui/StatusBadge";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
@@ -39,8 +41,8 @@ interface MenuManagerProps {
   onNewItem: () => void;
   onSaveCategory: () => void;
   onSaveItem: () => void;
-  onDeleteCategory: () => void;
-  onDeleteItem: () => void;
+  onDeleteCategory: (confirmed?: boolean) => void;
+  onDeleteItem: (confirmed?: boolean) => void;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
 
@@ -77,6 +79,7 @@ export function MenuManager({
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
   const [failedPreviewSource, setFailedPreviewSource] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<"category" | "item" | null>(null);
 
   const sortedCategories = useMemo(
     () => [...dashboardData.menu.categories].sort(compareMenuRecords),
@@ -91,8 +94,12 @@ export function MenuManager({
   const selectedCategoryName = selectedCategoryId
     ? findMenuCategoryName(selectedCategoryId, dashboardData.menu.categories)
     : "Tüm kategoriler";
+  const relatedProductCount = categoryForm.id
+    ? dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length
+    : 0;
   const previewSource = resolveMenuPreviewImageUrl(itemForm.image_url, dashboardData.webModuleUrl);
   const visiblePreviewSource = previewSource && previewSource !== failedPreviewSource ? previewSource : "";
+  const deleteDialogRef = useDialogFocus(Boolean(pendingDelete));
 
   // Reset on item selection, preserving the uploaded filename when only its URL changes.
   const resetSelectedImage = useEffectEvent(() => {
@@ -135,40 +142,64 @@ export function MenuManager({
     setImageError("");
   }
 
+  function confirmDeletion() {
+    if (!pendingDelete) return;
+    const deleteAction = pendingDelete === "category" ? onDeleteCategory : onDeleteItem;
+    setPendingDelete(null);
+    deleteAction(true);
+  }
+
   return (
     <section className="menu-manager" aria-label={qrMenuEnabled ? "QR menü yönetimi" : "Menü yönetimi"}>
+      <div className="page-toolbar menu-manager__toolbar">
+        <div className="page-toolbar__start">
+          <StatusBadge tone="info">{selectedCategoryName}</StatusBadge>
+          <StatusBadge tone="neutral">{dashboardData.menu.items.length} ürün</StatusBadge>
+        </div>
+        <div className="page-toolbar__actions">
+          {stockImageImportEnabled && (
+            <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
+          )}
+          <ActionButton variant="primary" size="sm" onClick={onNewItem}>
+            <Plus size={16} aria-hidden="true" />
+            Ürün ekle
+          </ActionButton>
+        </div>
+      </div>
+
       <div className="menu-management-grid">
-        <section className="panel menu-list-panel category-panel">
-          <div className="panel-heading compact">
-            <h2>Kategoriler</h2>
-            <div className="menu-heading-actions page-toolbar__actions">
+        <section className="panel menu-category-panel">
+          <div className="panel-heading menu-panel-heading">
+            <div>
+              <h2>Kategoriler</h2>
+              <p>Menüdeki ürün gruplarını yönetin.</p>
+            </div>
+            <div className="page-toolbar__actions">
               <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
-              <button className="icon-command" type="button" onClick={onNewCategory} aria-label="Kategori ekle" title="Kategori ekle">
-                <Plus size={18} aria-hidden="true" />
-              </button>
+              <ActionButton variant="secondary" size="sm" onClick={onNewCategory}>
+                <Plus size={16} aria-hidden="true" />
+                Kategori ekle
+              </ActionButton>
             </div>
           </div>
 
-          <div className="manager-list">
+          <DataList className="menu-record-list menu-category-list">
             {sortedCategories.map((category) => (
-              <button
-                className={selectedCategoryId === category.id ? "manager-row is-active" : "manager-row"}
+              <DataListButton
+                className="menu-record"
                 key={category.id}
-                type="button"
                 onClick={() => selectManagerCategory(category)}
                 aria-pressed={selectedCategoryId === category.id}
-              >
-                <span>
-                  <strong>{category.name}</strong>
-                  <small>{dashboardData.menu.items.filter((item) => item.category_id === category.id).length} ürün · {category.is_active ? (qrMenuEnabled ? "Yayında" : "Aktif") : (qrMenuEnabled ? "Gizli" : "Pasif")}</small>
-                </span>
-                <span className={category.is_active ? "dot is-on" : "dot"} aria-hidden="true" />
-              </button>
+                selected={selectedCategoryId === category.id}
+                title={category.name}
+                meta={`${dashboardData.menu.items.filter((item) => item.category_id === category.id).length} ürün`}
+                trailing={<StatusBadge tone={category.is_active ? "success" : "neutral"}>{category.is_active ? (qrMenuEnabled ? "Yayında" : "Aktif") : (qrMenuEnabled ? "Gizli" : "Pasif")}</StatusBadge>}
+              />
             ))}
-          </div>
+          </DataList>
 
-          <div className="manager-form">
-            <label>
+          <div className="form-stack menu-category-form">
+            <label className="form-field form-field--long">
               Kategori adı
               <input
                 value={categoryForm.name}
@@ -176,7 +207,7 @@ export function MenuManager({
                 placeholder="Kahvaltı"
               />
             </label>
-            <label>
+            <label className="form-field form-field--fluid">
               Açıklama
               <textarea
                 value={categoryForm.description}
@@ -184,7 +215,7 @@ export function MenuManager({
                 placeholder="Kısa kategori açıklaması"
               />
             </label>
-            <label className="toggle-label">
+            <label className="form-check">
               <input
                 checked={categoryForm.is_active}
                 onChange={(event) => onCategoryFormChange({ ...categoryForm, is_active: event.target.checked })}
@@ -192,8 +223,8 @@ export function MenuManager({
               />
               {qrMenuEnabled ? "Yayında göster" : "Menüde etkin"}
             </label>
-            <div className="form-details category-details menu-always-open-details">
-              <label>
+            <div className="form-row">
+              <label className="form-field form-field--xs">
                 Sıra
                 <input
                   value={categoryForm.sort_order}
@@ -202,105 +233,95 @@ export function MenuManager({
                 />
               </label>
             </div>
-            <div className="menu-form-actions action-row">
+            <div className="form-actions menu-form-actions">
               {categoryForm.id && (
-                <ActionButton variant="danger" size="sm" type="button" onClick={onDeleteCategory} disabled={menuEditState === "loading"}>
+                <ActionButton variant="danger" size="sm" onClick={() => setPendingDelete("category")} disabled={menuEditState === "loading"}>
                   <Trash2 size={16} aria-hidden="true" />
                   Kategoriyi Sil
                 </ActionButton>
               )}
-              <button className="primary-command" type="button" onClick={onSaveCategory} disabled={menuEditState === "loading"}>
+              <ActionButton variant="primary" size="sm" onClick={onSaveCategory} disabled={menuEditState === "loading"}>
                 <Save size={16} aria-hidden="true" />
                 Kategoriyi Kaydet
-              </button>
+              </ActionButton>
             </div>
           </div>
         </section>
 
-        <section className="panel menu-list-panel product-panel">
-          <div className="panel-heading compact">
+        <section className="panel menu-product-panel">
+          <div className="panel-heading menu-panel-heading">
             <div className="menu-heading-copy">
               <h2>Ürünler</h2>
               <span>{selectedCategoryName}</span>
             </div>
-            <div className="menu-heading-actions page-toolbar__actions">
-              {stockImageImportEnabled && (
-                <StockImageImportWorkspace menu={dashboardData.menu} onApplied={onDashboardDataChanged} />
-              )}
-              <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
-              <button className="icon-command" type="button" onClick={onNewItem} aria-label="Ürün ekle" title="Ürün ekle">
-                <Plus size={18} aria-hidden="true" />
-              </button>
-            </div>
+            <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
           </div>
 
-          <div className="manager-list product-list">
-            {visibleItems.length === 0 && <p className="manager-list-empty">Bu kategoride henüz ürün yok.</p>}
+          <DataList className="menu-record-list menu-product-list">
+            {visibleItems.length === 0 && <p className="empty-state">Bu kategoride henüz ürün yok.</p>}
             {visibleItems.map((item) => {
               const stockBadge = getMenuStockBadge(item);
               return (
-                <button
-                  className={selectedItemId === item.id ? "manager-row is-active" : "manager-row"}
+                <DataListButton
+                  className="menu-record"
                   key={item.id}
-                  type="button"
                   onClick={() => onSelectItem(item)}
                   aria-pressed={selectedItemId === item.id}
-                >
-                  <span>
-                    <strong>{item.name}</strong>
-                    <small>{formatCurrency(item.price, item.currency)} · {item.is_available ? "Mevcut" : "Kapalı"}{item.is_featured ? " · Öne çıkan" : ""}</small>
-                  </span>
-                  <span className="menu-stock-badges">
+                  selected={selectedItemId === item.id}
+                  title={item.name}
+                  meta={`${formatCurrency(item.price, item.currency)} · ${item.is_available ? "Mevcut" : "Kapalı"}${item.is_featured ? " · Öne çıkan" : ""}`}
+                  trailing={<span className="menu-product-row__trailing">
                     {inventoryEnabled && stockBadge && <StatusBadge tone={stockBadge.tone}>{stockBadge.label}</StatusBadge>}
                     {inventoryEnabled && qrMenuEnabled && isQrHiddenByStock(item) && <StatusBadge tone="neutral">QR menüde gizli</StatusBadge>}
-                    {item.is_featured
-                      ? <Star className="manager-row-star" size={14} aria-hidden="true" />
-                      : <span className={item.is_available ? "dot is-on dot" : "dot"} aria-hidden="true" />}
-                  </span>
-                </button>
+                    {item.is_featured && <Star className="menu-product-row__star" size={16} aria-hidden="true" />}
+                    {!item.is_featured && <StatusBadge tone={item.is_available ? "success" : "neutral"}>{item.is_available ? "Açık" : "Kapalı"}</StatusBadge>}
+                  </span>}
+                />
               );
             })}
-          </div>
+          </DataList>
         </section>
 
-        <section className="panel item-editor-panel">
-          <div className="panel-heading compact">
+        <section className="panel menu-item-editor">
+          <div className="panel-heading menu-panel-heading">
             <h2>Ürün Detayı</h2>
-            <StatusBadge tone={itemForm.is_available ? "ok" : "neutral"}>{itemForm.id ? "Seçili" : "Yeni"}</StatusBadge>
+            <StatusBadge tone={itemForm.is_available ? "success" : "neutral"}>{itemForm.id ? "Seçili" : "Yeni"}</StatusBadge>
           </div>
 
-          <div className="manager-form item-form">
-            <label className="item-name-field">
-              Ürün adı
-              <input value={itemForm.name} onChange={(event) => onItemFormChange({ ...itemForm, name: event.target.value })} placeholder="Serpme Kahvaltı" />
-            </label>
-            <label className="item-category-field">
-              Kategori
-              <select value={itemForm.category_id} onChange={(event) => onItemFormChange({ ...itemForm, category_id: event.target.value })}>
-                {dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
-            </label>
-            <label className="item-price-field">
-              Fiyat
-              <input value={itemForm.price} onChange={(event) => onItemFormChange({ ...itemForm, price: event.target.value })} inputMode="decimal" />
-            </label>
-            <label className="item-description-field">
-              Açıklama
-              <textarea
-                value={itemForm.description}
-                onChange={(event) => onItemFormChange({ ...itemForm, description: event.target.value })}
-                placeholder="Ürün açıklaması"
-              />
-            </label>
-            <div className="form-row">
-              <label className="toggle-label">
-                <input checked={itemForm.is_available} onChange={(event) => onItemFormChange({ ...itemForm, is_available: event.target.checked })} type="checkbox" />
-                Mevcut
+          <div className="form-stack menu-item-form">
+            <div className="form-grid">
+              <label className="form-field form-field--long form-field--span">
+                Ürün adı
+                <input value={itemForm.name} onChange={(event) => onItemFormChange({ ...itemForm, name: event.target.value })} placeholder="Serpme Kahvaltı" />
               </label>
-              <label className="toggle-label">
-                <input checked={itemForm.is_featured} onChange={(event) => onItemFormChange({ ...itemForm, is_featured: event.target.checked })} type="checkbox" />
-                Öne çıkar
+              <label className="form-field form-field--medium">
+                Kategori
+                <select value={itemForm.category_id} onChange={(event) => onItemFormChange({ ...itemForm, category_id: event.target.value })}>
+                  {dashboardData.menu.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
               </label>
+              <label className="form-field form-field--short">
+                Fiyat
+                <input value={itemForm.price} onChange={(event) => onItemFormChange({ ...itemForm, price: event.target.value })} inputMode="decimal" />
+              </label>
+              <label className="form-field form-field--fluid form-field--span">
+                Açıklama
+                <textarea
+                  value={itemForm.description}
+                  onChange={(event) => onItemFormChange({ ...itemForm, description: event.target.value })}
+                  placeholder="Ürün açıklaması"
+                />
+              </label>
+              <div className="form-row form-field--span">
+                <label className="form-check">
+                  <input checked={itemForm.is_available} onChange={(event) => onItemFormChange({ ...itemForm, is_available: event.target.checked })} type="checkbox" />
+                  Mevcut
+                </label>
+                <label className="form-check">
+                  <input checked={itemForm.is_featured} onChange={(event) => onItemFormChange({ ...itemForm, is_featured: event.target.checked })} type="checkbox" />
+                  Öne çıkar
+                </label>
+              </div>
             </div>
 
             {inventoryEnabled && <details className="menu-stock-editor" key={itemForm.id || "new-menu-item"}>
@@ -315,11 +336,11 @@ export function MenuManager({
               </summary>
               <div className="menu-stock-editor-body">
                 <div className="form-row">
-                  <label>
+                  <label className="form-field form-field--short">
                     Stok miktarı
                     <input value={itemForm.stock_quantity} onChange={(event) => onItemFormChange({ ...itemForm, stock_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Takip edilmiyor" />
                   </label>
-                  <label>
+                  <label className="form-field form-field--medium">
                     Stok birimi
                     <select value={itemForm.stock_unit} onChange={(event) => onItemFormChange({ ...itemForm, stock_unit: event.target.value === "gram" ? "gram" : "piece" })}>
                       <option value="piece">Adet</option>
@@ -328,32 +349,32 @@ export function MenuManager({
                   </label>
                 </div>
                 <div className="form-row">
-                  <label>
+                  <label className="form-field form-field--short">
                     Minimum stok uyarısı ({stockUnitShortLabel(itemForm.stock_unit)})
                     <input value={itemForm.stock_min_quantity} onChange={(event) => onItemFormChange({ ...itemForm, stock_min_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Örn. 5" />
                   </label>
-                  <label>
+                  <label className="form-field form-field--short">
                     Bir satışta düşülecek ({stockUnitShortLabel(itemForm.stock_unit)})
                     <input value={itemForm.stock_consumption_quantity} onChange={(event) => onItemFormChange({ ...itemForm, stock_consumption_quantity: event.target.value })} inputMode="decimal" type="number" min="0.001" step="any" placeholder="Örn. 1" />
                   </label>
                 </div>
                 {qrMenuEnabled && (
-                  <label className="toggle-label">
+                  <label className="form-check">
                     <input checked={itemForm.hide_when_out_of_stock} onChange={(event) => onItemFormChange({ ...itemForm, hide_when_out_of_stock: event.target.checked })} type="checkbox" />
                     Stok bitince QR menüden gizle
                   </label>
                 )}
-                <label>
+                <label className="form-field form-field--fluid">
                   Stok notu
                   <textarea value={itemForm.stock_note} onChange={(event) => onItemFormChange({ ...itemForm, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" />
                 </label>
                 {itemForm.stock_quantity !== "" && (
-                  <button className="stock-stop-action" type="button" onClick={() => onItemFormChange({ ...itemForm, stock_quantity: "" })}>Stok takibini bırak</button>
+                  <ActionButton variant="ghost" size="sm" onClick={() => onItemFormChange({ ...itemForm, stock_quantity: "" })}>Stok takibini bırak</ActionButton>
                 )}
               </div>
             </details>}
 
-            <div className="form-details item-details has-menu-image-preview menu-always-open-details">
+            <div className="menu-item-details">
               <div className="menu-image-picker-label">
                 <span className="menu-image-field-title">Görsel</span>
                 <button
@@ -385,11 +406,11 @@ export function MenuManager({
                 {imageError && <small className="menu-image-error" role="status">{imageError}</small>}
               </div>
               <div className="form-row">
-                <label>
+                <label className="form-field form-field--xs">
                   Sıra
                   <input value={itemForm.sort_order} onChange={(event) => onItemFormChange({ ...itemForm, sort_order: event.target.value })} inputMode="numeric" />
                 </label>
-                <label>
+                <label className="form-field form-field--short">
                   Para birimi
                   <select value={itemForm.currency} onChange={(event) => onItemFormChange({ ...itemForm, currency: event.target.value })}>
                     <option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option>
@@ -397,11 +418,11 @@ export function MenuManager({
                 </label>
               </div>
               <div className="form-row">
-                <label>
+                <label className="form-field form-field--medium">
                   Etiketler
                   <input value={itemForm.tags} onChange={(event) => onItemFormChange({ ...itemForm, tags: event.target.value })} placeholder="popüler, kahvaltı" />
                 </label>
-                <label>
+                <label className="form-field form-field--medium">
                   Alerjenler
                   <input value={itemForm.allergens} onChange={(event) => onItemFormChange({ ...itemForm, allergens: event.target.value })} placeholder="gluten, süt" />
                 </label>
@@ -419,23 +440,51 @@ export function MenuManager({
             </div>
 
             <div className="menu-editor-footer">
-              <p className={`menu-status sync-${menuEditState}`} role="status" aria-live="polite">{menuEditMessage}</p>
-              <div className="menu-editor-actions action-row">
+              <p className={`form-status sync-${menuEditState}`} role="status" aria-live="polite">{menuEditMessage}</p>
+              <div className="form-actions menu-editor-actions">
                 {itemForm.id && (
-                  <ActionButton variant="danger" size="sm" type="button" onClick={onDeleteItem} disabled={menuEditState === "loading"}>
+                  <ActionButton variant="danger" size="sm" onClick={() => setPendingDelete("item")} disabled={menuEditState === "loading"}>
                     <Trash2 size={16} aria-hidden="true" />
                     Ürünü Sil
                   </ActionButton>
                 )}
-                <button className="primary-command" type="button" onClick={onSaveItem} disabled={menuEditState === "loading"}>
+                <ActionButton variant="primary" size="sm" onClick={onSaveItem} disabled={menuEditState === "loading"}>
                   <Save size={16} aria-hidden="true" />
                   Ürünü Kaydet
-                </button>
+                </ActionButton>
               </div>
             </div>
           </div>
         </section>
       </div>
+
+      {pendingDelete && (
+        <div className="overlay" role="presentation">
+          <section ref={deleteDialogRef} className="dialog dialog--compact menu-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="menu-delete-title" aria-describedby="menu-delete-description">
+            <div className="menu-delete-dialog__header">
+              <div className="overlay-heading">
+                <h2 id="menu-delete-title">{pendingDelete === "category" ? "Kategoriyi sil" : "Ürünü sil"}</h2>
+                <p id="menu-delete-description">{pendingDelete === "category"
+                  ? `“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinecek.`
+                  : `“${itemForm.name}” ürünü menüden silinecek.`}</p>
+              </div>
+              <button className="overlay-close" type="button" data-dialog-close onClick={() => setPendingDelete(null)} disabled={menuEditState === "loading"} aria-label="Silme onayını kapat">
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="menu-delete-dialog__notice">
+              <StatusBadge tone="danger">Bu işlem geri alınamaz.</StatusBadge>
+            </div>
+            <div className="form-actions">
+              <ActionButton variant="secondary" size="sm" data-dialog-close onClick={() => setPendingDelete(null)} disabled={menuEditState === "loading"}>Vazgeç</ActionButton>
+              <ActionButton variant="danger" size="sm" onClick={confirmDeletion} disabled={menuEditState === "loading"}>
+                <Trash2 size={16} aria-hidden="true" />
+                {pendingDelete === "category" ? "Kategoriyi sil" : "Ürünü sil"}
+              </ActionButton>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

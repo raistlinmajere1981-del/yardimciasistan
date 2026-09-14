@@ -225,14 +225,16 @@ export function useMenuController({
     markMenuDirty();
   }
 
-  async function deleteCategory() {
+  async function deleteCategory(confirmed = false) {
     const bridge = window.yardimciDesktop;
     if (!categoryForm.id || !bridge) {
       return;
     }
-    const relatedProductCount = dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length;
-    if (!window.confirm(`“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`)) {
-      return;
+    if (!confirmed) {
+      const relatedProductCount = dashboardData.menu.items.filter((item) => item.category_id === categoryForm.id).length;
+      if (!window.confirm(`“${categoryForm.name}” kategorisi ve bağlı ${relatedProductCount} ürün silinsin mi?`)) {
+        return;
+      }
     }
 
     setMenuEditState("loading");
@@ -258,12 +260,12 @@ export function useMenuController({
     markMenuDirty();
   }
 
-  async function deleteItem() {
+  async function deleteItem(confirmed = false) {
     const bridge = window.yardimciDesktop;
     if (!itemForm.id || !bridge) {
       return;
     }
-    if (!window.confirm(`“${itemForm.name}” ürünü menüden silinsin mi?`)) {
+    if (!confirmed && !window.confirm(`“${itemForm.name}” ürünü menüden silinsin mi?`)) {
       return;
     }
 

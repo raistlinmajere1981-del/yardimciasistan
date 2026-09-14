@@ -2,6 +2,9 @@ import { Camera, FileImage, Plus, RotateCw, Sparkles, Undo2, X } from "lucide-re
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { StockImageAnalysis, StockImageConfidence } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../../electron/database";
+import { ActionButton } from "../ui/ActionButton";
+import { StatusBadge } from "../ui/StatusBadge";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -43,6 +46,7 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisAttemptRef = useRef(0);
   const trackedItems = useMemo(() => menu.items.filter((item) => item.stock_quantity !== null), [menu.items]);
+  const dialogRef = useDialogFocus(open);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -287,12 +291,12 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
 
   return (
     <>
-      <button className="stock-image-import-trigger" type="button" onClick={() => { resetWorkspace(); setOpen(true); }}>
+      <ActionButton className="stock-image-import-trigger" variant="secondary" size="sm" onClick={() => { resetWorkspace(); setOpen(true); }}>
         <Sparkles size={16} aria-hidden="true" /> AI ile Stok Ekle
-      </button>
+      </ActionButton>
       {open && (
         <div className="stock-image-overlay overlay" role="presentation">
-          <section className="stock-image-dialog dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="stock-image-title">
+          <section ref={dialogRef} className="stock-image-dialog dialog dialog--wide" role="dialog" aria-modal="true" aria-labelledby="stock-image-title">
             <header className="stock-image-header overlay-header">
               <div><span>Güvenli stok taslağı</span><h2 id="stock-image-title">AI ile Stok Ekle</h2></div>
               <button className="overlay-close" type="button" onClick={closeWorkspace} aria-label="Stok görseli ekranını kapat"><X size={20} /></button>
@@ -305,21 +309,21 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
             {stage === "image" && (
               <div className="stock-image-content">
                 <div className="stock-image-source-actions">
-                  <button className="primary-command" type="button" onClick={() => void startCamera()}><Camera size={17} /> Web kameradan çek</button>
-                  <button type="button" onClick={() => fileInputRef.current?.click()}><FileImage size={17} /> Bilgisayardan seç</button>
+                  <ActionButton size="sm" onClick={() => void startCamera()}><Camera size={17} /> Web kameradan çek</ActionButton>
+                  <ActionButton variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}><FileImage size={17} /> Bilgisayardan seç</ActionButton>
                   <input ref={fileInputRef} className="stock-image-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }} />
                 </div>
                 <div className="stock-image-preview">
                   {cameraStream ? <video ref={videoRef} muted playsInline aria-label="Web kamera önizlemesi" /> : previewUrl ? <img src={previewUrl} alt="Seçilen fatura veya fiş önizlemesi" style={{ transform: `rotate(${rotation}deg)` }} /> : <div className="stock-image-empty"><FileImage size={44} /><strong>Fatura veya fiş görseli seçin</strong><span>JPG, PNG veya WebP · en fazla 10 MB</span></div>}
                 </div>
-                {cameraStream && <button className="primary-command stock-camera-capture" type="button" onClick={() => void captureCameraFrame()}>Fotoğrafı Çek</button>}
-                {selectedFile && <div className="stock-image-preview-actions"><button type="button" onClick={() => setRotation((current) => (current + 90) % 360)}><RotateCw size={16} /> 90° döndür</button><button type="button" onClick={() => void startCamera()}><Camera size={16} /> Yeniden çek</button><button type="button" onClick={() => fileInputRef.current?.click()}><FileImage size={16} /> Başka görsel seç</button></div>}
+                {cameraStream && <ActionButton className="stock-camera-capture" size="sm" onClick={() => void captureCameraFrame()}>Fotoğrafı Çek</ActionButton>}
+                {selectedFile && <div className="stock-image-preview-actions"><ActionButton variant="secondary" size="sm" onClick={() => setRotation((current) => (current + 90) % 360)}><RotateCw size={16} /> 90° döndür</ActionButton><ActionButton variant="secondary" size="sm" onClick={() => void startCamera()}><Camera size={16} /> Yeniden çek</ActionButton><ActionButton variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}><FileImage size={16} /> Başka görsel seç</ActionButton></div>}
                 <p className="stock-image-privacy">Görsel, analiz için işletmenizin yapılandırdığı AI sağlayıcısına gönderilir; uygulama görseli kalıcı saklamaz.</p>
                 {error && <p className="stock-image-error status-message status-message--danger" role="alert">{error}</p>}
-                <footer className="stock-image-footer"><button type="button" onClick={closeWorkspace}>Manuel stok ekranına dön</button><button className="primary-command" type="button" disabled={!selectedFile} onClick={() => void analyzeImage()}>Analiz Et</button></footer>
+                <footer className="stock-image-footer"><ActionButton variant="secondary" size="sm" onClick={closeWorkspace}>Manuel stok ekranına dön</ActionButton><ActionButton size="sm" disabled={!selectedFile} onClick={() => void analyzeImage()}>Analiz Et</ActionButton></footer>
               </div>
             )}
-            {stage === "analyzing" && <div className="stock-image-analyzing"><span className="stock-image-spinner" aria-hidden="true" /><h3>Görsel analiz ediliyor</h3><p>{message}</p><p>Bu aşamada stoklarınız değişmez.</p><button type="button" onClick={cancelAnalysis}>İptal</button></div>}
+            {stage === "analyzing" && <div className="stock-image-analyzing"><span className="stock-image-spinner" aria-hidden="true" /><h3>Görsel analiz ediliyor</h3><p>{message}</p><p>Bu aşamada stoklarınız değişmez.</p><ActionButton variant="secondary" size="sm" onClick={cancelAnalysis}>İptal</ActionButton></div>}
             {stage === "review" && (
               <div className="stock-image-review">
                 <div className="stock-image-document"><div><span>Tedarikçi</span><strong>{analysis?.document.supplier_name || "Okunamadı"}</strong></div><div><span>Belge no</span><strong>{analysis?.document.invoice_number || "Okunamadı"}</strong></div><div><span>Tarih</span><strong>{analysis?.document.invoice_date || "Okunamadı"}</strong></div></div>
@@ -327,15 +331,15 @@ export function StockImageImportWorkspace({ menu, onApplied }: StockImageImportW
                 {duplicateWarning && <label className="stock-image-duplicate-warning"><input type="checkbox" checked={duplicateAcknowledged} onChange={(event) => setDuplicateAcknowledged(event.target.checked)} /><span><strong>Bu görsel daha önce stok girişinde kullanılmış olabilir.</strong> Yönetici olarak yine de uygulamak istediğimi onaylıyorum.</span></label>}
                 <div className="stock-image-table" role="table" aria-label="AI stok eşleştirme taslağı">
                   <div className="stock-image-table-head" role="row"><span>Faturada okunan</span><span>Menü karşılığı</span><span>Eklenecek miktar</span><span>Güven</span><span>İşlem</span></div>
-                  {reviewLines.map((line) => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}><div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div><label><span className="stock-image-mobile-label">Menü karşılığı</span><select disabled={line.ignored} value={line.menuItemId} onChange={(event) => updateLine(line.id, { menuItemId: event.target.value })}><option value="">Eşleşme yok</option>{trackedItems.map((item) => <option value={item.id} key={item.id}>{item.name} ({stockUnitLabel(item.stock_unit)})</option>)}</select></label><label><span className="stock-image-mobile-label">Eklenecek miktar</span><input aria-label={`Eklenecek miktar (${stockUnitLabel(trackedItems.find((item) => item.id === line.menuItemId)?.stock_unit ?? "piece")})`} disabled={line.ignored} type="number" min="1" step="1" inputMode="numeric" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: event.target.value })} placeholder="Boş" /></label><span className={`stock-confidence is-${line.confidence}`}>{confidenceLabel(line.confidence)}</span><button type="button" onClick={() => updateLine(line.id, { ignored: !line.ignored })}>{line.ignored ? <><Undo2 size={15} /> Geri al</> : "Yok say"}</button></div>)}
+                  {reviewLines.map((line) => <div className={`stock-image-row${line.ignored ? " is-ignored" : ""}`} role="row" key={line.id}><div><strong>{line.rawText}</strong>{line.reason && <small>{line.reason}</small>}</div><label><span className="stock-image-mobile-label">Menü karşılığı</span><select disabled={line.ignored} value={line.menuItemId} onChange={(event) => updateLine(line.id, { menuItemId: event.target.value })}><option value="">Eşleşme yok</option>{trackedItems.map((item) => <option value={item.id} key={item.id}>{item.name} ({stockUnitLabel(item.stock_unit)})</option>)}</select></label><label><span className="stock-image-mobile-label">Eklenecek miktar</span><input aria-label={`Eklenecek miktar (${stockUnitLabel(trackedItems.find((item) => item.id === line.menuItemId)?.stock_unit ?? "piece")})`} disabled={line.ignored} type="number" min="1" step="1" inputMode="numeric" value={line.quantity} onChange={(event) => updateLine(line.id, { quantity: event.target.value })} placeholder="Boş" /></label><StatusBadge className="stock-confidence" tone={stockConfidenceTone(line.confidence)}>{confidenceLabel(line.confidence)}</StatusBadge><ActionButton variant="ghost" size="sm" onClick={() => updateLine(line.id, { ignored: !line.ignored })}>{line.ignored ? <><Undo2 size={15} /> Geri al</> : "Yok say"}</ActionButton></div>)}
                   {reviewLines.length === 0 && <p className="stock-image-no-lines">Eşleşen satır bulunamadı. Manuel bir satır ekleyebilirsiniz.</p>}
                 </div>
-                <button className="stock-image-add-line" type="button" onClick={addManualLine}><Plus size={16} /> Manuel satır ekle</button>
+                <ActionButton className="stock-image-add-line" variant="secondary" size="sm" onClick={addManualLine}><Plus size={16} /> Manuel satır ekle</ActionButton>
                 {error && <p className="stock-image-error status-message status-message--danger" role="alert">{error}</p>}
-                <footer className="stock-image-review-footer"><div><strong>{applicableLines.length}</strong><span>uygulanacak satır</span></div><div><strong>{totalQuantitySummary}</strong><span>toplam miktar</span></div><div><strong>{needsReviewCount}</strong><span>kontrol gerekli</span></div><button type="button" onClick={returnToImage}>Görsele dön</button><button className="primary-command" type="button" disabled={applicableLines.length === 0 || (duplicateWarning && !duplicateAcknowledged)} onClick={() => void applyImport()}>Stokları Güncelle</button></footer>
+                <footer className="stock-image-review-footer"><div><strong>{applicableLines.length}</strong><span>uygulanacak satır</span></div><div><strong>{totalQuantitySummary}</strong><span>toplam miktar</span></div><div><strong>{needsReviewCount}</strong><span>kontrol gerekli</span></div><ActionButton variant="secondary" size="sm" onClick={returnToImage}>Görsele dön</ActionButton><ActionButton size="sm" disabled={applicableLines.length === 0 || (duplicateWarning && !duplicateAcknowledged)} onClick={() => void applyImport()}>Stokları Güncelle</ActionButton></footer>
               </div>
             )}
-            {stage === "success" && <div className="stock-image-success"><Sparkles size={42} /><h3>Stok girişi tamamlandı</h3><p>{successSummary}</p><button className="primary-command" type="button" onClick={closeWorkspace}>Kapat</button></div>}
+            {stage === "success" && <div className="stock-image-success"><Sparkles size={42} /><h3>Stok girişi tamamlandı</h3><p>{successSummary}</p><ActionButton onClick={closeWorkspace}>Kapat</ActionButton></div>}
           </section>
         </div>
       )}
@@ -352,6 +356,12 @@ function confidenceLabel(confidence: StockImageConfidence): string {
   if (confidence === "high") return "Yüksek";
   if (confidence === "medium") return "Orta";
   return "Düşük";
+}
+
+function stockConfidenceTone(confidence: StockImageConfidence) {
+  if (confidence === "high") return "success" as const;
+  if (confidence === "medium") return "warning" as const;
+  return "danger" as const;
 }
 
 function stockUnitLabel(unit: "piece" | "gram"): string {

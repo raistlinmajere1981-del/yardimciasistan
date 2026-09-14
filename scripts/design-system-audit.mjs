@@ -154,12 +154,12 @@ if (args.has("--json")) {
 const sharedFiles = /\/styles\/(?:layout\/|components\/(?:navigation|header|notifications|panels|toolbars|status|dialogs)\.css$)/;
 const coreViolations = desktopAudit.violations.filter(issue => sharedFiles.test(issue.file));
 if (coreViolations.length) throw new Error(`Shared shell must have zero violations: ${coreViolations.length}`);
-const migrated2A = /\/styles\/(?:pages\/(?:customers|pension|room-folio)|components\/(?:cards|data-list|forms))\.css$/;
-const migrationViolations = desktopAudit.violations.filter(issue => migrated2A.test(issue.file));
-const targetInventory = desktopAudit.inventory.filter(item => migrated2A.test(item.file));
-console.log("desktop-stage2a-inventory", JSON.stringify(targetInventory));
+const migratedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu)|components\/(?:cards|data-list|forms))\.css$/;
+const migrationViolations = desktopAudit.violations.filter(issue => migratedDesktop.test(issue.file));
+const targetInventory = desktopAudit.inventory.filter(item => migratedDesktop.test(item.file));
+console.log("desktop-migrated-inventory", JSON.stringify(targetInventory));
 if (migrationViolations.length || targetInventory.some(item => item.duplicateSelectors)) {
-  throw new Error(`Migrated customer/pension styles must have zero violations: ${JSON.stringify(migrationViolations)}`);
+  throw new Error(`Migrated desktop styles must have zero violations: ${JSON.stringify(migrationViolations)}`);
 }
 assertTokenContract();
 const current = readMetrics();

@@ -88,9 +88,9 @@ try {
         await expect(dialog).toHaveCount(0);
       }
       if (name === 'Restoran') {
-        const card = page.locator('.table-compact-card').filter({ hasText: 'Bahçe Masası 1' });
+        const card = page.locator('.restaurant-table-card').filter({ hasText: 'Bahçe Masası 1' });
         await card.getByRole('button', { name: 'Sipariş Aç', exact: true }).click();
-        const dialog = page.locator('.table-order-drawer');
+        const dialog = page.locator('.restaurant-order-drawer');
         await checkOverlay(dialog, 'order-drawer');
         await dialog.getByRole('button', { name: "Sipariş drawer'ını kapat", exact: true }).click();
         await expect(dialog).toHaveCount(0);

@@ -1,8 +1,10 @@
-import { BedDouble, ReceiptText } from "lucide-react";
+import { BedDouble, ReceiptText, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { DesktopDashboardData, DesktopTableOrder } from "../../../electron/database";
 import type { DesktopRoomFolioData } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
+import { StatusBadge } from "../ui/StatusBadge";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 interface RestaurantRoomTransferPanelProps {
   orders: DesktopTableOrder[];
@@ -22,6 +24,8 @@ export function RestaurantRoomTransferPanel({
   const [selectedFolioId, setSelectedFolioId] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [confirmationOpen, setConfirmationOpen] = useState(false);
+  const confirmationRef = useDialogFocus(confirmationOpen);
 
   const openFolios = useMemo(
     () => folioData?.folios.filter((folio) => folio.status === "open") ?? [],
@@ -72,18 +76,14 @@ export function RestaurantRoomTransferPanel({
   const selectedOrder = paymentOrders.find((order) => order.id === selectedOrderId) ?? paymentOrders[0];
   const selectedFolio = openFolios.find((folio) => folio.id === selectedFolioId) ?? null;
 
+  function openTransferConfirmation() {
+    if (!selectedOrder || !selectedFolio || loading) return;
+    setConfirmationOpen(true);
+  }
+
   async function transferToRoom() {
     const bridge = window.yardimciDesktop;
     if (!bridge || !selectedOrder || !selectedFolio || loading) return;
-
-    const roomLabel = selectedFolio.roomNumber ? `Oda ${selectedFolio.roomNumber}` : selectedFolio.roomName;
-    const customerLabel = selectedFolio.customerName || "Misafir";
-    const orderLabel = selectedOrder.tableName || "Masa";
-    const totalLabel = formatMoney(selectedOrder.total, selectedOrder.items[0]?.currency || "TRY");
-    const confirmed = window.confirm(
-      `${orderLabel} hesabındaki ${totalLabel}, ${roomLabel} · ${customerLabel} oda hesabına aktarılsın mı?\n\nAktarım sonrası masa kapanır ve tutar oda hesabında tahsil edilmeyi bekler.`
-    );
-    if (!confirmed) return;
 
     setLoading(true);
     setMessage("Restoran adisyonu oda hesabına aktarılıyor...");
@@ -109,6 +109,7 @@ export function RestaurantRoomTransferPanel({
       if (transferredOrder) onOrderChanged(transferredOrder);
       onDashboardDataChanged(nextDashboard);
       setSelectedOrderId("");
+      setConfirmationOpen(false);
     } catch {
       setMessage("Restoran adisyonu oda hesabına aktarılamadı.");
     } finally {
@@ -117,18 +118,27 @@ export function RestaurantRoomTransferPanel({
   }
 
   return (
-    <section className="restaurant-room-transfer" aria-labelledby="restaurant-room-transfer-title">
-      <div className="restaurant-room-transfer-heading page-toolbar">
-        <span className="restaurant-room-transfer-icon" aria-hidden="true"><BedDouble size={18} /></span>
-        <div>
-          <span className="operation-panel-eyebrow">Pansiyon + Restoran</span>
+    <section className="panel restaurant-room-transfer" aria-labelledby="restaurant-room-transfer-title">
+      <header className="restaurant-room-transfer__heading">
+        <span className="restaurant-room-transfer__icon" aria-hidden="true"><BedDouble size={18} /></span>
+        <div className="restaurant-room-transfer__copy">
+          <span className="panel-eyebrow">Pansiyon + Restoran</span>
           <h3 id="restaurant-room-transfer-title">Hesabı odaya yaz</h3>
           <p>Hesap bekleyen masa adisyonunu açık bir oda hesabına tek seferde aktarın.</p>
         </div>
-      </div>
-      <div className="restaurant-room-transfer-controls">
-        <label>
-          <span>Masa hesabı</span>
+        <StatusBadge tone="warning">{paymentOrders.length} hesap bekliyor</StatusBadge>
+      </header>
+      <div className="restaurant-room-transfer__body">
+        {selectedOrder && (
+          <dl className="restaurant-room-transfer__summary" aria-label="Aktarılacak adisyon özeti">
+            <div><dt>Kaynak</dt><dd>{selectedOrder.tableName || "Masa"}</dd></div>
+            <div><dt>Tutar</dt><dd>{formatMoney(selectedOrder.total, selectedOrder.items[0]?.currency || "TRY")}</dd></div>
+            <div><dt>Durum</dt><dd>Hesap bekliyor</dd></div>
+          </dl>
+        )}
+        <div className="restaurant-room-transfer__controls">
+          <label className="form-field form-field--medium">
+            <span>Masa hesabı</span>
           <select value={selectedOrder?.id ?? ""} onChange={(event) => setSelectedOrderId(event.target.value)} disabled={loading}>
             {paymentOrders.map((order) => (
               <option value={order.id} key={order.id}>
@@ -136,9 +146,9 @@ export function RestaurantRoomTransferPanel({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          <span>Oda hesabı</span>
+          </label>
+          <label className="form-field form-field--medium">
+            <span>Oda hesabı</span>
           <select value={selectedFolio?.id ?? ""} onChange={(event) => setSelectedFolioId(event.target.value)} disabled={loading || openFolios.length === 0}>
             {openFolios.length === 0 ? (
               <option value="">Açık oda hesabı yok</option>
@@ -148,17 +158,48 @@ export function RestaurantRoomTransferPanel({
               </option>
             ))}
           </select>
-        </label>
-        <ActionButton onClick={() => void transferToRoom()} disabled={loading || !selectedFolio || !selectedOrder}>
-          <ReceiptText size={15} aria-hidden="true" />
-          {loading ? "Aktarılıyor" : "Odaya Yaz"}
-        </ActionButton>
+          </label>
+          <ActionButton onClick={openTransferConfirmation} disabled={loading || !selectedFolio || !selectedOrder}>
+            <ReceiptText size={15} aria-hidden="true" />
+            {loading ? "Aktarılıyor" : "Odaya Yaz"}
+          </ActionButton>
+        </div>
       </div>
-      <p className={message.includes("aktarılamadı") || message.includes("bulunamadı") ? "restaurant-room-transfer-message is-error" : "restaurant-room-transfer-message"} role="status" aria-live="polite">
+      <p className={message.includes("aktarılamadı") || message.includes("bulunamadı") ? "status-message status-message--danger" : "restaurant-room-transfer__message"} role="status" aria-live="polite">
         {message || (openFolios.length === 0
           ? "Önce Pansiyon > Oda Hesabı bölümünden misafirin oda hesabını açın."
           : "Aktarım masayı kapatır; tahsilat oda çıkışında kasaya işlenir.")}
       </p>
+      {confirmationOpen && selectedOrder && selectedFolio && (
+        <div className="overlay" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !loading) setConfirmationOpen(false);
+        }}>
+          <section ref={confirmationRef} className="dialog dialog--compact restaurant-room-transfer__dialog" role="dialog" aria-modal="true" aria-labelledby="restaurant-room-transfer-confirm-title" aria-describedby="restaurant-room-transfer-confirm-description">
+            <header className="overlay-header">
+              <div>
+                <span className="panel-eyebrow">Oda hesabına aktar</span>
+                <h2 id="restaurant-room-transfer-confirm-title">Aktarımı onaylayın</h2>
+              </div>
+              <button className="overlay-close" type="button" data-dialog-close onClick={() => setConfirmationOpen(false)} disabled={loading} aria-label="Oda hesabına aktarım onayını kapat">
+                <X size={16} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="overlay-body">
+              <p id="restaurant-room-transfer-confirm-description">Bu aktarım masa adisyonunu kapatır; tahsilat oda hesabı kapatılırken kasaya işlenir.</p>
+              <dl className="restaurant-room-transfer__confirmation">
+                <div><dt>Kaynak</dt><dd>{selectedOrder.tableName || "Masa"}</dd></div>
+                <div><dt>Hedef</dt><dd>{selectedFolio.roomNumber ? `Oda ${selectedFolio.roomNumber}` : selectedFolio.roomName} · {selectedFolio.customerName || "Misafir"}</dd></div>
+                <div><dt>Tutar</dt><dd>{formatMoney(selectedOrder.total, selectedOrder.items[0]?.currency || "TRY")}</dd></div>
+              </dl>
+              {message && <p className={message.includes("aktarılamadı") || message.includes("bulunamadı") ? "status-message status-message--danger" : "restaurant-room-transfer__dialog-message"} role="status">{message}</p>}
+            </div>
+            <footer className="overlay-footer">
+              <ActionButton variant="secondary" data-dialog-close onClick={() => setConfirmationOpen(false)} disabled={loading}>Vazgeç</ActionButton>
+              <ActionButton onClick={() => void transferToRoom()} disabled={loading}>{loading ? "Aktarılıyor" : "Aktarımı Onayla"}</ActionButton>
+            </footer>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

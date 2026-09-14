@@ -8,6 +8,7 @@ import type {
   SaveManualRestaurantReservationInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { useDialogFocus } from "../ui/useDialogFocus";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
 
 type EditorState = "idle" | "loading" | "error";
@@ -68,6 +69,8 @@ export function ManualRestaurantReservationEditor({
     setMessage("");
   }, [customers, open]);
 
+  const dialogRef = useDialogFocus(open);
+
   if (!open) return null;
 
   return (
@@ -77,7 +80,7 @@ export function ManualRestaurantReservationEditor({
         if (event.target === event.currentTarget && state !== "loading") onClose();
       }}
     >
-      <aside className="restaurant-reservation-drawer drawer drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-restaurant-reservation-title">
+      <aside ref={dialogRef} className="restaurant-reservation-drawer drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-restaurant-reservation-title">
         <header className="restaurant-reservation-drawer-header overlay-header overlay-header--sticky">
           <div className="restaurant-reservation-heading">
             <p>Restoran rezervasyonları</p>
@@ -95,7 +98,7 @@ export function ManualRestaurantReservationEditor({
         </header>
 
         <form
-          className="manager-form restaurant-reservation-form"
+          className="form-stack overlay-form restaurant-reservation-form"
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
@@ -116,8 +119,8 @@ export function ManualRestaurantReservationEditor({
             onClose();
           }}
         >
-          <div className="restaurant-reservation-core-grid">
-            <label className="restaurant-reservation-note-field">
+          <div className="form-grid restaurant-reservation-form-grid">
+            <label className="form-field form-field--long form-field--span">
               Müşteri
               <select
                 autoFocus
@@ -138,7 +141,7 @@ export function ManualRestaurantReservationEditor({
               <small>{selectedCustomer ? "Kayıtlı müşteri seçildi." : "Listede yoksa aşağıdan yeni müşteri ekleyebilirsiniz."}</small>
             </label>
 
-            <div className="restaurant-reservation-note-field">
+            <div className="form-field--span">
               <QuickCustomerCreator
                 disabled={state === "loading"}
                 onSave={onSaveCustomer}
@@ -146,7 +149,7 @@ export function ManualRestaurantReservationEditor({
               />
             </div>
 
-            <label>
+            <label className="form-field form-field--short">
               Tarih
               <input
                 type="date"
@@ -157,7 +160,7 @@ export function ManualRestaurantReservationEditor({
               />
             </label>
 
-            <label>
+            <label className="form-field form-field--xs">
               Saat
               <input
                 type="time"
@@ -167,7 +170,7 @@ export function ManualRestaurantReservationEditor({
               />
             </label>
 
-            <label>
+            <label className="form-field form-field--xs">
               Kişi sayısı
               <input
                 type="number"
@@ -179,7 +182,7 @@ export function ManualRestaurantReservationEditor({
               />
             </label>
 
-            <label className="restaurant-reservation-note-field">
+            <label className="form-field form-field--medium form-field--span">
               Masa
               <select
                 value={form.tableId}
@@ -195,7 +198,7 @@ export function ManualRestaurantReservationEditor({
               <small>Masa seçilirse kapasite ile aynı tarih ve saatteki rezervasyon çakışması kontrol edilir.</small>
             </label>
 
-            <label className="restaurant-reservation-note-field">
+            <label className="form-field form-field--fluid form-field--span">
               Not
               <textarea
                 maxLength={2000}
@@ -209,9 +212,9 @@ export function ManualRestaurantReservationEditor({
           {customers.length === 0 && (
             <p className="form-status">Müşteri listeniz boş. Yeni Müşteri Ekle ile ilk kaydı oluşturabilirsiniz.</p>
           )}
-          {message && <p className={`form-status sync-${state}`}>{message}</p>}
+          {message && <p className={state === "error" ? "status-message status-message--danger" : "form-status"} role="status">{message}</p>}
 
-          <div className="restaurant-reservation-actions">
+          <footer className="overlay-footer overlay-footer--inset restaurant-reservation-actions">
             <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
               Vazgeç
             </ActionButton>
@@ -222,7 +225,7 @@ export function ManualRestaurantReservationEditor({
               {state === "loading" ? <UtensilsCrossed size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
               {state === "loading" ? "Kaydediliyor" : "Rezervasyonu Kaydet"}
             </ActionButton>
-          </div>
+          </footer>
         </form>
       </aside>
     </div>

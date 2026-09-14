@@ -1,5 +1,5 @@
 import { Minus, Plus, ReceiptText, Search, Trash2, UtensilsCrossed, X } from "lucide-react";
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import type {
   DesktopDashboardData,
@@ -8,7 +8,9 @@ import type {
   TableOrderStatus
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { SegmentedControl } from "../ui/SegmentedControl";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
+import { useDialogFocus } from "../ui/useDialogFocus";
 
 const ACTIVE_ORDER_STATUSES: TableOrderStatus[] = ["open", "preparing", "served", "payment"];
 
@@ -55,6 +57,7 @@ export function TableOrdersWorkspace({
   const noteDraftsRef = useRef<Record<string, string>>({});
   const dirtyNoteIdsRef = useRef(new Set<string>());
   const noteSavePromisesRef = useRef(new Map<string, Promise<boolean>>());
+  const drawerRef = useDialogFocus(drawerOpen && Boolean(selectedTable));
 
   const activeOrdersByTable = useMemo(() => {
     const activeOrders = new Map<string, DesktopTableOrder>();
@@ -109,24 +112,6 @@ export function TableOrdersWorkspace({
       })
       .sort(compareMenuRecords);
   }, [activeCategories, categoryNames, menu.items, menuEnabled, searchQuery, selectedCategoryId]);
-
-  const closeDrawerOnEscape = useEffectEvent(() => {
-    void requestCloseDrawer();
-  });
-
-  useEffect(() => {
-    if (!drawerOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeDrawerOnEscape();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [drawerOpen]);
 
   async function openOrderDrawer(table: DesktopDashboardData["tables"][number]) {
     const knownOrder = activeOrdersByTable.get(table.id) ?? null;
@@ -567,21 +552,23 @@ export function TableOrdersWorkspace({
     const orderBadge = activeOrder ? getOrderBadge(activeOrder.status) : null;
     const knownManualStatuses = ["available", "occupied", "reserved", "bill_waiting"];
     return (
-      <article className="compact-card resource-compact-card table-compact-card" key={table.id}>
-        <div className="resource-card-heading">
-          <div><h2>{table.name}</h2></div>
+      <article className="card restaurant-table-card" data-status={manualTableStatus} key={table.id}>
+        <header className="card__header restaurant-table-card__header">
+          <div>
+            <span className="restaurant-table-card__area">{table.area || "Genel"}</span>
+            <h2>{table.name}</h2>
+          </div>
           <StatusBadge tone={getResourceStatusTone(table.status)}>
             {tableStatusLabel}
           </StatusBadge>
-        </div>
+        </header>
         {activeOrder && orderBadge && (
-          <div className="table-order-state-summary">
-            <span>Masa: <strong>{tableStatusLabel}</strong></span>
-            <span aria-hidden="true">·</span>
-            <span>Adisyon: <strong className={`is-${orderBadge.tone}`}>{orderBadge.label}</strong></span>
+          <div className="restaurant-table-card__order-state">
+            <span>Aktif adisyon</span>
+            <StatusBadge tone={orderBadge.tone}>{orderBadge.label}</StatusBadge>
           </div>
         )}
-        <div className="compact-meta-row table-order-summary">
+        <div className="restaurant-table-card__summary">
           {activeOrder ? (
             <>
               <span>{activeOrder.itemCount} ürün</span>
@@ -595,23 +582,24 @@ export function TableOrdersWorkspace({
             </>
           )}
         </div>
-        <div className={`table-card-actions${activeOrder ? " has-active-order" : ""}`}>
+        <div className="restaurant-table-card__actions">
           {ordersEnabled && (
-            <button className="table-order-open-button" type="button" onClick={() => void openOrderDrawer(table)} disabled={Boolean(busyAction)}>
+            <ActionButton size="sm" onClick={() => void openOrderDrawer(table)} disabled={Boolean(busyAction)}>
               <ReceiptText size={13} aria-hidden="true" />
               {activeOrder ? "Siparişi Aç" : "Sipariş Aç"}
-            </button>
+            </ActionButton>
           )}
           {activeOrder ? (
-            <div className="active-table-order-actions" aria-label={`${table.name} aktif adisyon işlemleri`}>
-              {activeOrder.status === "payment" ? (
-                <button className="is-close" type="button" onClick={() => void runCardOrderAction(activeOrder, "paid")} disabled={Boolean(busyAction)}>Ödendi / Kapat</button>
-              ) : (
-                <button type="button" onClick={() => void runCardOrderAction(activeOrder, "payment")} disabled={Boolean(busyAction)}>Hesap İste</button>
-              )}
-            </div>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              onClick={() => void runCardOrderAction(activeOrder, activeOrder.status === "payment" ? "paid" : "payment")}
+              disabled={Boolean(busyAction)}
+            >
+              {activeOrder.status === "payment" ? "Ödendi / Kapat" : "Hesap İste"}
+            </ActionButton>
           ) : (
-            <label className="table-status-select">
+            <label className="form-field form-field--short restaurant-table-card__status">
               <span>Durum</span>
               <select
                 aria-label={`${table.name} durumunu değiştir`}
@@ -635,9 +623,9 @@ export function TableOrdersWorkspace({
 
   return (
     <>
-      <section className="table-area-list" aria-label="Masa yönetimi">
+      <section className="restaurant-table-area-list" aria-label="Masa yönetimi">
         {tables.length === 0 && (
-          <div className="panel empty-state">
+          <div className="empty-state">
             <UtensilsCrossed size={28} aria-hidden="true" />
             <strong>Masa kaydı yok.</strong>
             <p>Masa kategorilerini Temel Ayarlar bölümünden belirleyebilirsiniz.</p>
@@ -649,28 +637,28 @@ export function TableOrdersWorkspace({
               <h3>{group.name}</h3>
               <span>{group.tables.length} masa</span>
             </header>
-            <div className="operations-grid compact-resource-grid">
+            <div className="restaurant-table-grid">
               {group.tables.map(renderTableCard)}
             </div>
           </section>
         ))}
       </section>
-      <span className="table-order-live-feedback" role="status" aria-live="polite">{cardFeedback}</span>
+      <span className="restaurant-order-live-feedback" role="status" aria-live="polite">{cardFeedback}</span>
 
       {ordersEnabled && drawerOpen && selectedTable && (
-        <div className="table-order-backdrop overlay overlay--drawer" role="presentation" onClick={(event) => {
+        <div className="restaurant-order-overlay overlay overlay--drawer" role="presentation" onClick={(event) => {
           if (event.target === event.currentTarget) {
             void requestCloseDrawer();
           }
         }}>
-          <section className="table-order-drawer drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="table-order-drawer-title">
-            <header className="table-order-drawer-header overlay-header">
+          <section ref={drawerRef} className="restaurant-order-drawer drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="table-order-drawer-title">
+            <header className="restaurant-order-header overlay-header">
               <div>
-                <span className="operation-panel-eyebrow">Yerel adisyon</span>
+                <span className="panel-eyebrow">Yerel adisyon</span>
                 <h2 id="table-order-drawer-title">Masa Siparişi — {selectedTable.name}</h2>
                 <p>{selectedTable.area || "Genel"} • {selectedTable.capacity} kişi</p>
               </div>
-              <div className="table-order-header-actions">
+              <div className="restaurant-order-header__actions">
                 {selectedOrder && (
                   <StatusBadge tone={getOrderBadge(selectedOrder.status).tone}>{getOrderBadge(selectedOrder.status).label}</StatusBadge>
                 )}
@@ -680,73 +668,78 @@ export function TableOrdersWorkspace({
               </div>
             </header>
 
-            <div className="table-order-drawer-body">
-              {menuEnabled && <section className="table-order-menu-pane" aria-labelledby="table-order-menu-title">
-                <div className="table-order-pane-heading">
+            <div className={`restaurant-order-workspace${menuEnabled ? "" : " is-ticket-only"}`}>
+              {menuEnabled && <section className="restaurant-order-menu-panel" aria-labelledby="table-order-menu-title">
+                <div className="restaurant-order-panel-heading">
                   <div>
                     <h3 id="table-order-menu-title">Menüden Ekle</h3>
                     <span>{availableItems.length} aktif ürün</span>
                   </div>
-                  <label className="table-order-search">
+                  <label className="form-field form-field--medium restaurant-order-search">
                     <Search size={15} aria-hidden="true" />
                     <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Ürün ara" aria-label="Sipariş için ürün ara" />
                   </label>
                 </div>
-                <div className="table-order-category-tabs" aria-label="Menü kategorileri">
-                  <button className={selectedCategoryId === "all" ? "is-active" : undefined} type="button" onClick={() => setSelectedCategoryId("all")} aria-pressed={selectedCategoryId === "all"}>Tümü</button>
-                  {activeCategories.map((category) => (
-                    <button className={selectedCategoryId === category.id ? "is-active" : undefined} key={category.id} type="button" onClick={() => setSelectedCategoryId(category.id)} aria-pressed={selectedCategoryId === category.id}>{category.name}</button>
-                  ))}
-                </div>
-                <div className="table-order-product-list">
-                  {availableItems.length === 0 && <p className="table-order-empty">Aramanıza uyan aktif ve mevcut ürün bulunamadı.</p>}
+                <SegmentedControl
+                  className="restaurant-order-category-tabs"
+                  value={selectedCategoryId}
+                  ariaLabel="Menü kategorileri"
+                  onChange={setSelectedCategoryId}
+                  options={[
+                    { id: "all", label: "Tümü" },
+                    ...activeCategories.map((category) => ({ id: category.id, label: category.name }))
+                  ]}
+                />
+                <div className="restaurant-order-product-list">
+                  {availableItems.length === 0 && <p className="restaurant-order-empty">Aramanıza uyan aktif ve mevcut ürün bulunamadı.</p>}
                   {availableItems.map((item) => (
-                    <article className="table-order-product-row" key={item.id}>
+                    <article className="restaurant-order-product" key={item.id}>
                       <div>
                         <span>{categoryNames.get(item.category_id) ?? "Menü"}</span>
                         <strong>{item.name}</strong>
                         {item.description && <small>{item.description}</small>}
                       </div>
-                      <div className="table-order-product-action">
+                      <div className="restaurant-order-product__action">
                         <strong>{formatMoney(item.price, item.currency || "TRY")}</strong>
                         <span>{formatOrderMenuStock(item.stock_quantity, item.stock_unit)}</span>
-                        <button
-                          type="button"
+                        <ActionButton
+                          variant="secondary"
+                          size="sm"
                           onClick={() => void addMenuItem(item.id)}
                           disabled={!selectedOrder || Boolean(busyAction) || (item.stock_quantity !== null && item.stock_quantity < menuStockConsumption(item.stock_consumption_quantity))}
                           aria-label={`${item.name} ürününü siparişe ekle`}
                         >
                           <Plus size={15} aria-hidden="true" /> Ekle
-                        </button>
+                        </ActionButton>
                       </div>
                     </article>
                   ))}
                 </div>
               </section>}
 
-              <section className="table-order-ticket-pane" aria-labelledby="table-order-ticket-title">
-                <div className="table-order-pane-heading ticket-heading">
+              <section className="restaurant-order-ticket-panel" aria-labelledby="table-order-ticket-title">
+                <div className="restaurant-order-panel-heading restaurant-order-ticket-heading">
                   <div>
                     <h3 id="table-order-ticket-title">Aktif Adisyon</h3>
                     <span>{selectedOrder?.itemCount ?? 0} ürün</span>
                   </div>
                   {selectedOrder && <small>{formatOpenedAt(selectedOrder.openedAt)} açıldı</small>}
                 </div>
-                <div className="table-order-item-list">
-                  {!selectedOrder && <p className="table-order-empty">Adisyon hazırlanıyor...</p>}
+                <div className="restaurant-order-line-list">
+                  {!selectedOrder && <p className="restaurant-order-empty">Adisyon hazırlanıyor...</p>}
                   {selectedOrder && selectedOrder.items.length === 0 && (
-                    <p className="table-order-empty">{menuEnabled
+                    <p className="restaurant-order-empty">{menuEnabled
                       ? "Henüz ürün eklenmedi. Soldaki aktif menüden ürün seçin."
                       : "Bu adisyonda henüz ürün yok."}</p>
                   )}
                   {selectedOrder?.items.map((item) => (
-                    <article className="table-order-item-row" key={item.id}>
-                      <div className="table-order-item-main">
+                    <article className="restaurant-order-line" key={item.id}>
+                      <div className="restaurant-order-line__main">
                         <strong>{item.productName}</strong>
                         <span>{formatMoney(item.unitPrice, item.currency)} • {formatOrderItemStatus(item.status)}</span>
                       </div>
-                      <strong className="table-order-line-total">{formatMoney(item.lineTotal, item.currency)}</strong>
-                      <div className="table-order-quantity" aria-label={`${item.productName} adedi`}>
+                      <strong className="restaurant-order-line__total">{formatMoney(item.lineTotal, item.currency)}</strong>
+                      <div className="restaurant-quantity-control" role="group" aria-label={`${item.productName} adedi`}>
                         <button type="button" onClick={() => void changeItemQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1 || Boolean(busyAction)} aria-label={`${item.productName} adetini azalt`}><Minus size={14} aria-hidden="true" /></button>
                         <output>{item.quantity}</output>
                         <button
@@ -757,7 +750,7 @@ export function TableOrdersWorkspace({
                         ><Plus size={14} aria-hidden="true" /></button>
                       </div>
                       <input
-                        className="table-order-item-note"
+                        className="restaurant-order-line__note"
                         value={noteDrafts[item.id] ?? ""}
                         onChange={(event) => {
                           const nextDrafts = { ...noteDraftsRef.current, [item.id]: event.target.value };
@@ -775,22 +768,22 @@ export function TableOrdersWorkspace({
                         aria-label={`${item.productName} notu`}
                         maxLength={500}
                       />
-                      <button className="table-order-remove-item" type="button" onClick={() => void removeItem(item.id)} disabled={Boolean(busyAction)} aria-label={`${item.productName} satırını sil`}><Trash2 size={15} aria-hidden="true" /></button>
+                      <ActionButton className="restaurant-order-line__remove" variant="danger" size="sm" onClick={() => void removeItem(item.id)} disabled={Boolean(busyAction)} aria-label={`${item.productName} satırını sil`}><Trash2 size={15} aria-hidden="true" /></ActionButton>
                     </article>
                   ))}
                 </div>
-                <div className="table-order-total-box">
-                  <div><span>Ara toplam</span><strong>{formatMoney(selectedOrder?.subtotal ?? 0, selectedOrder ? getOrderCurrency(selectedOrder) : "TRY")}</strong></div>
-                  {(selectedOrder?.discountTotal ?? 0) > 0 && <div><span>İndirim</span><strong>-{formatMoney(selectedOrder?.discountTotal ?? 0, selectedOrder ? getOrderCurrency(selectedOrder) : "TRY")}</strong></div>}
-                  <div className="table-order-grand-total"><span>Toplam</span><strong>{formatMoney(selectedOrder?.total ?? 0, selectedOrder ? getOrderCurrency(selectedOrder) : "TRY")}</strong></div>
-                </div>
+                <dl className="restaurant-order-totals">
+                  <div><dt>Ara toplam</dt><dd>{formatMoney(selectedOrder?.subtotal ?? 0, selectedOrder ? getOrderCurrency(selectedOrder) : "TRY")}</dd></div>
+                  {(selectedOrder?.discountTotal ?? 0) > 0 && <div><dt>İndirim</dt><dd>-{formatMoney(selectedOrder?.discountTotal ?? 0, selectedOrder ? getOrderCurrency(selectedOrder) : "TRY")}</dd></div>}
+                  <div className="restaurant-order-totals__grand"><dt>Toplam</dt><dd>{formatMoney(selectedOrder?.total ?? 0, selectedOrder ? getOrderCurrency(selectedOrder) : "TRY")}</dd></div>
+                </dl>
               </section>
             </div>
 
-            <footer className="table-order-drawer-footer overlay-footer">
-              <p className={feedback.includes("edilemedi") || feedback.includes("değil") ? "is-error" : ""} aria-live="polite">{busyAction ? "İşlem kaydediliyor..." : feedback}</p>
-              <div className="table-order-footer-actions restaurant-service-actions">
-                <label className="table-order-status-select">
+            <footer className="restaurant-order-footer overlay-footer">
+              <p className={feedback.includes("edilemedi") || feedback.includes("değil") ? "status-message status-message--danger" : "restaurant-order-feedback"} role="status" aria-live="polite">{busyAction ? "İşlem kaydediliyor..." : feedback}</p>
+              <div className="restaurant-order-footer__actions">
+                <label className="form-field form-field--medium">
                   <span>Sipariş durumu</span>
                   <select
                     value={selectedOrder?.status ?? "open"}
@@ -808,8 +801,8 @@ export function TableOrdersWorkspace({
                     <option value="payment">Hesap Bekliyor</option>
                   </select>
                 </label>
-                <ActionButton size="sm" onClick={() => void closeOrder("paid")} disabled={!selectedOrder || Boolean(busyAction)}>Ödendi / Kapat</ActionButton>
-                <details className="table-order-more-actions">
+                <ActionButton onClick={() => void closeOrder("paid")} disabled={!selectedOrder || Boolean(busyAction)}>Ödendi / Kapat</ActionButton>
+                <details className="restaurant-order-more-actions">
                   <summary>Diğer</summary>
                   <div>
                     <ActionButton variant="danger" size="sm" onClick={() => void closeOrder("cancelled")} disabled={!selectedOrder || Boolean(busyAction)}>Adisyonu İptal Et</ActionButton>
@@ -870,10 +863,10 @@ function compareMenuRecords(a: { sort_order: number; name: string }, b: { sort_o
 function getOrderBadge(status: TableOrderStatus): { label: string; tone: StatusTone } {
   const badges: Record<TableOrderStatus, { label: string; tone: StatusTone }> = {
     open: { label: "Açık", tone: "info" },
-    preparing: { label: "Hazırlanıyor", tone: "wait" },
-    served: { label: "Servis edildi", tone: "ok" },
-    payment: { label: "Hesap bekliyor", tone: "wait" },
-    paid: { label: "Ödendi", tone: "ok" },
+    preparing: { label: "Hazırlanıyor", tone: "warning" },
+    served: { label: "Servis edildi", tone: "success" },
+    payment: { label: "Hesap bekliyor", tone: "warning" },
+    paid: { label: "Ödendi", tone: "success" },
     cancelled: { label: "İptal", tone: "danger" }
   };
   return badges[status];
@@ -916,8 +909,8 @@ function formatTableStatus(status: string) {
 }
 
 function getResourceStatusTone(status: string): StatusTone {
-  if (["available", "empty", "vacant", "ready", "completed", "done"].includes(status)) return "ok";
-  if (["reserved", "pending", "waiting", "bill_waiting", "waiting_bill", "checkout", "payment"].includes(status)) return "wait";
+  if (["available", "empty", "vacant", "ready", "completed", "done"].includes(status)) return "success";
+  if (["reserved", "pending", "waiting", "bill_waiting", "waiting_bill", "checkout", "payment"].includes(status)) return "warning";
   if (["occupied", "busy", "full", "in_progress", "preparing"].includes(status)) return "info";
   if (["cancelled", "rejected", "maintenance", "out_of_service"].includes(status)) return "danger";
   return "neutral";

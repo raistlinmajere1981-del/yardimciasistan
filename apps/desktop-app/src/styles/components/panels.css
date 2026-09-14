@@ -57,3 +57,12 @@
 .page-section__header p { margin: var(--space-1) 0 0; color: var(--color-text-muted); max-width: var(--reading-max-width); }
 
 .panel-heading > *, .page-section__header > * { min-width: 0; max-width: 100%; }
+
+.panel-eyebrow {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

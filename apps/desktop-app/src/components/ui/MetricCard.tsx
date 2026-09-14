@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
-type MetricTone = "info" | "ok" | "wait" | "neutral";
+type MetricTone = "info" | "success" | "warning" | "neutral" | "ok" | "wait";
 
 export interface MetricCardProps {
   title: string;
