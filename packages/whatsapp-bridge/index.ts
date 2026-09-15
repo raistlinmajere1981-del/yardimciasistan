@@ -1,4 +1,10 @@
 export { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint } from "./customer-credit.js";
+export {
+  createWhatsAppFillMessageScript,
+  createWhatsAppInspectionScript,
+  createWhatsAppSendScript,
+  type WhatsAppDomResult
+} from "./webview.js";
 
 export type WhatsAppMode = "wa_link" | "manual_copy" | "webview" | "official_api";
 

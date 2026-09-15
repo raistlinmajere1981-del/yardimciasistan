@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { CheckCircle2, Copy, ExternalLink, MessageCircle, Phone, Save, Send, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
-import { prepareWhatsAppAction, WHATSAPP_WEB_HOME_URL } from "@yardimci-asistan/whatsapp-bridge";
+import {
+  createWhatsAppInspectionScript,
+  createWhatsAppSendScript,
+  prepareWhatsAppAction,
+  WHATSAPP_WEB_HOME_URL,
+  type WhatsAppDomResult
+} from "@yardimci-asistan/whatsapp-bridge";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type { AiWorkspaceHistoryEntry, AiWorkspaceMode, DesktopDashboardData } from "../../../electron/database";
 import { formatCustomerSource } from "../../app/customer-model";
@@ -285,16 +291,9 @@ interface WhatsAppWorkspaceProps {
 type WhatsAppWebViewElement = HTMLElement & {
   reload?: () => void;
   getURL?: () => string;
+  getWebContentsId?: () => number;
   executeJavaScript?: (code: string, userGesture?: boolean) => Promise<unknown>;
 };
-
-interface WhatsAppDomResult {
-  ok: boolean;
-  code: string;
-  message: string;
-  chatTitle?: string;
-  composerText?: string;
-}
 
 function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
   if (!value || typeof value !== "object") {
@@ -315,136 +314,6 @@ function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
   };
 }
 
-function createWhatsAppInspectionScript(expectedMessage: string) {
-  return `(() => {
-    const expectedMessage = ${JSON.stringify(expectedMessage.trim())};
-    const clean = (value) => String(value || "")
-      .replace(/\\r\\n/g, "\\n")
-      .replace(/\\u00a0/g, " ")
-      .replace(/\\u200b/g, "")
-      .split("\\n")
-      .map((line) => line.trimEnd())
-      .join("\\n")
-      .trim();
-    const visible = (element) => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
-    const firstVisible = (root, selectors) => {
-      for (const selector of selectors) {
-        const match = Array.from(root.querySelectorAll(selector)).find(visible);
-        if (match) return match;
-      }
-      return null;
-    };
-    if (location.origin !== "https://web.whatsapp.com") {
-      return { ok: false, code: "wrong_origin", message: "Güvenlik kontrolü: açık sayfa WhatsApp Web değil." };
-    }
-    const root = document.querySelector("#main");
-    if (!root) {
-      return { ok: false, code: "chat_missing", message: "Açık bir WhatsApp sohbeti bulunamadı. Önce Müşteri Numarasına Git düğmesini kullanın." };
-    }
-    const composer = firstVisible(root, [
-      'footer [contenteditable="true"][role="textbox"]',
-      'footer [contenteditable="true"][data-tab]',
-      '[contenteditable="true"][role="textbox"]'
-    ]);
-    if (!composer) {
-      return { ok: false, code: "composer_missing", message: "WhatsApp mesaj kutusu bulunamadı. Oturumun açık ve sohbetin yüklenmiş olduğunu kontrol edin." };
-    }
-    const composerText = clean(composer.innerText || composer.textContent);
-    if (composerText !== clean(expectedMessage)) {
-      return { ok: false, code: "message_mismatch", message: "Güvenlik kontrolü: WhatsApp mesaj kutusundaki metin onaylanacak AI taslağıyla birebir eşleşmiyor.", composerText };
-    }
-    const titleNode = firstVisible(root, [
-      'header [data-testid="conversation-info-header-chat-title"]',
-      'header span[title]',
-      'header [role="button"] span[dir="auto"]'
-    ]);
-    const chatTitle = clean(titleNode && (titleNode.getAttribute("title") || titleNode.textContent));
-    if (!chatTitle) {
-      return { ok: false, code: "recipient_missing", message: "Açık sohbetin alıcı bilgisi okunamadı; gönderim güvenlik nedeniyle durduruldu." };
-    }
-    const sendIcon = firstVisible(root, ['footer span[data-icon="send"]', 'footer [data-testid="compose-btn-send"]']);
-    const sendControl = firstVisible(root, [
-      'footer button[aria-label="Send"]',
-      'footer button[aria-label="Gönder"]',
-      'footer [role="button"][aria-label="Send"]',
-      'footer [role="button"][aria-label="Gönder"]'
-    ]) || (sendIcon && sendIcon.closest('button, [role="button"]'));
-    if (!sendControl || sendControl.hasAttribute("disabled") || sendControl.getAttribute("aria-disabled") === "true") {
-      return { ok: false, code: "send_missing", message: "WhatsApp Gönder düğmesi hazır değil. Sohbet ve mesaj kutusunu kontrol edin." };
-    }
-    return { ok: true, code: "ready", message: "Sohbet ve mesaj doğrulandı.", chatTitle, composerText };
-  })()`;
-}
-
-function createWhatsAppSendScript(expectedMessage: string, expectedChatTitle: string) {
-  return `(() => {
-    const expectedMessage = ${JSON.stringify(expectedMessage.trim())};
-    const expectedChatTitle = ${JSON.stringify(expectedChatTitle.trim())};
-    const clean = (value) => String(value || "")
-      .replace(/\\r\\n/g, "\\n")
-      .replace(/\\u00a0/g, " ")
-      .replace(/\\u200b/g, "")
-      .split("\\n")
-      .map((line) => line.trimEnd())
-      .join("\\n")
-      .trim();
-    const visible = (element) => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
-    const firstVisible = (root, selectors) => {
-      for (const selector of selectors) {
-        const match = Array.from(root.querySelectorAll(selector)).find(visible);
-        if (match) return match;
-      }
-      return null;
-    };
-    if (location.origin !== "https://web.whatsapp.com") {
-      return { ok: false, code: "wrong_origin", message: "Güvenlik kontrolü: açık sayfa WhatsApp Web değil." };
-    }
-    const root = document.querySelector("#main");
-    if (!root) {
-      return { ok: false, code: "chat_changed", message: "Sohbet onaydan sonra değişti; mesaj gönderilmedi." };
-    }
-    const composer = firstVisible(root, [
-      'footer [contenteditable="true"][role="textbox"]',
-      'footer [contenteditable="true"][data-tab]',
-      '[contenteditable="true"][role="textbox"]'
-    ]);
-    const titleNode = firstVisible(root, [
-      'header [data-testid="conversation-info-header-chat-title"]',
-      'header span[title]',
-      'header [role="button"] span[dir="auto"]'
-    ]);
-    const chatTitle = clean(titleNode && (titleNode.getAttribute("title") || titleNode.textContent));
-    const composerText = clean(composer && (composer.innerText || composer.textContent));
-    if (!composer || composerText !== clean(expectedMessage) || chatTitle !== clean(expectedChatTitle)) {
-      return { ok: false, code: "approval_changed", message: "Sohbet veya mesaj onaydan sonra değişti; mesaj gönderilmedi." };
-    }
-    const sendIcon = firstVisible(root, ['footer span[data-icon="send"]', 'footer [data-testid="compose-btn-send"]']);
-    const sendControl = firstVisible(root, [
-      'footer button[aria-label="Send"]',
-      'footer button[aria-label="Gönder"]',
-      'footer [role="button"][aria-label="Send"]',
-      'footer [role="button"][aria-label="Gönder"]'
-    ]) || (sendIcon && sendIcon.closest('button, [role="button"]'));
-    if (!sendControl || sendControl.hasAttribute("disabled") || sendControl.getAttribute("aria-disabled") === "true") {
-      return { ok: false, code: "send_missing", message: "WhatsApp Gönder düğmesi onaydan sonra kullanılamaz oldu; mesaj gönderilmedi." };
-    }
-    sendControl.click();
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const currentComposer = firstVisible(root, [
-          'footer [contenteditable="true"][role="textbox"]',
-          'footer [contenteditable="true"][data-tab]',
-          '[contenteditable="true"][role="textbox"]'
-        ]);
-        const remainingText = clean(currentComposer && (currentComposer.innerText || currentComposer.textContent));
-        resolve(remainingText === ""
-          ? { ok: true, code: "sent", message: "WhatsApp Web mesaj kutusu temizlendi; gönderim tamamlandı.", chatTitle }
-          : { ok: false, code: "send_unconfirmed", message: "Gönderim sonucu kesin doğrulanamadı. Yinelenen mesajı önlemek için tekrar göndermeden önce sohbeti kontrol edin.", chatTitle, composerText: remainingText });
-      }, 1200);
-    });
-  })()`;
-}
-
 export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
@@ -460,6 +329,36 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   );
   const webViewPayload = webViewAction?.ok && webViewAction.mode === "webview" ? webViewAction : null;
   const phoneDisplay = webViewPayload?.phoneDisplay ?? recipientPhone ?? "-";
+
+  useEffect(() => {
+    if (view !== "web") return;
+    const webView = webViewRef.current;
+    if (!webView) return;
+
+    const registerWebview = () => {
+      const id = webView.getWebContentsId?.();
+      if (Number.isInteger(id) && id && window.yardimciDesktop?.registerWhatsAppWebview) {
+        window.yardimciDesktop.registerWhatsAppWebview(id);
+      }
+    };
+    const unregisterWebview = () => {
+      const id = webView.getWebContentsId?.();
+      if (Number.isInteger(id) && id && window.yardimciDesktop?.unregisterWhatsAppWebview) {
+        window.yardimciDesktop.unregisterWhatsAppWebview(id);
+      }
+    };
+
+    webView.addEventListener("did-attach", registerWebview);
+    webView.addEventListener("dom-ready", registerWebview);
+    webView.addEventListener("did-detach", unregisterWebview);
+    registerWebview();
+    return () => {
+      webView.removeEventListener("did-attach", registerWebview);
+      webView.removeEventListener("dom-ready", registerWebview);
+      webView.removeEventListener("did-detach", unregisterWebview);
+      unregisterWebview();
+    };
+  }, [view, webViewUrl]);
 
   useEffect(() => {
     if (!selectedRequest && !preparedMessage) {

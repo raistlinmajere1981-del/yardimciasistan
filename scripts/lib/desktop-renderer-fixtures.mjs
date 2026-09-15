@@ -366,7 +366,9 @@ function createDashboardFixture() {
       dueCount: 0,
       preparedCount: 0,
       sentCount: 0,
-      invalidPhoneCount: 0
+      invalidPhoneCount: 0,
+      waitingCount: 0,
+      failedCount: 0
     }
   };
 }

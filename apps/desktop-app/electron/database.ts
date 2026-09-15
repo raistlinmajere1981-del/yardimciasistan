@@ -59,8 +59,18 @@ import {
   setBusinessCapability
 } from "./business-capability-store.js";
 import {
+  claimAutomaticBirthdayDelivery,
+  getAutomaticBirthdayCandidates,
   getBirthdayOverview as readBirthdayOverview,
+  markBirthdayDeliveryFailed,
+  markBirthdayDeliveryPrepared,
+  markBirthdayDeliverySkipped,
+  markBirthdayDeliverySent,
+  markBirthdayDeliveryWaiting,
   prepareBirthdayWhatsApp as prepareBirthdayWhatsAppMessage,
+  revalidateAutomaticBirthdayDelivery,
+  type BirthdayAutomaticClaimResult,
+  type DesktopBirthdayDelivery,
   type DesktopBirthdayOverview,
   type DesktopBirthdayPrepareResult
 } from "./birthday-service.js";
@@ -1195,12 +1205,57 @@ export class DesktopDatabase {
     };
   }
 
-  getBirthdayOverview(): DesktopBirthdayOverview {
-    return readBirthdayOverview(this.db);
+  getBirthdayOverview(now = new Date()): DesktopBirthdayOverview {
+    return readBirthdayOverview(this.db, now);
   }
 
-  prepareBirthdayWhatsApp(customerId: string): DesktopBirthdayPrepareResult {
-    return prepareBirthdayWhatsAppMessage(this.db, String(customerId ?? ""));
+  prepareBirthdayWhatsApp(customerId: string, now = new Date()): DesktopBirthdayPrepareResult {
+    return prepareBirthdayWhatsAppMessage(this.db, String(customerId ?? ""), now);
+  }
+
+  getAutomaticBirthdayCandidates(now = new Date()) {
+    return getAutomaticBirthdayCandidates(this.db, now);
+  }
+
+  claimAutomaticBirthdayDelivery(customerId: string, now = new Date()): BirthdayAutomaticClaimResult {
+    return claimAutomaticBirthdayDelivery(this.db, customerId, now);
+  }
+
+  revalidateAutomaticBirthdayDelivery(
+    customerId: string,
+    expectedMessage: string,
+    expectedPhone: string,
+    now = new Date()
+  ) {
+    return revalidateAutomaticBirthdayDelivery(this.db, customerId, expectedMessage, expectedPhone, now);
+  }
+
+  markBirthdayDeliveryPrepared(customerId: string, birthdayYear: number, message: string, now = new Date()): DesktopBirthdayDelivery | null {
+    return markBirthdayDeliveryPrepared(this.db, customerId, birthdayYear, message, now);
+  }
+
+  markBirthdayDeliverySent(customerId: string, birthdayYear: number, now = new Date()): DesktopBirthdayDelivery | null {
+    return markBirthdayDeliverySent(this.db, customerId, birthdayYear, now);
+  }
+
+  markBirthdayDeliveryFailed(customerId: string, birthdayYear: number, error: string, retryable: boolean, now = new Date()): DesktopBirthdayDelivery | null {
+    return markBirthdayDeliveryFailed(this.db, customerId, birthdayYear, error, retryable, now);
+  }
+
+  markBirthdayDeliveryWaiting(
+    customerId: string,
+    birthdayYear: number,
+    birthdayDate: string,
+    mode: "manual" | "automatic",
+    message: string,
+    error: string,
+    now = new Date()
+  ): DesktopBirthdayDelivery | null {
+    return markBirthdayDeliveryWaiting(this.db, customerId, birthdayYear, birthdayDate, mode, message, error, now);
+  }
+
+  markBirthdayDeliverySkipped(customerId: string, birthdayYear: number, error: string, now = new Date()): DesktopBirthdayDelivery | null {
+    return markBirthdayDeliverySkipped(this.db, customerId, birthdayYear, error, now);
   }
 
   getReportData(input: DesktopReportRangeInput): DesktopReportData {

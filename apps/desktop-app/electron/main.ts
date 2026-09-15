@@ -117,6 +117,10 @@ import {
   type AppLockStatus,
   type UpdateAppPasswordInput
 } from "./app-lock";
+import { BirthdayDeliveryService } from "./birthday-delivery-service.js";
+import { BirthdayScheduler } from "./birthday-scheduler.js";
+import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
+import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -131,6 +135,10 @@ const marketBarcodeFastPullSenders = new Set<number>();
 let appSessionLocked = false;
 let appLockFailureCount = 0;
 let appLockBlockedUntil = 0;
+let birthdayScheduler: BirthdayScheduler | null = null;
+const birthdayWebviewDriver = new WhatsAppWebviewDriver();
+const whatsappDeliveryLock = new WhatsAppDeliveryLock();
+const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
 const stockImageAnalysisControllers = new Map<string, AbortController>();
 const STOCK_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const APP_LOCK_FAILURE_LIMIT = 5;
@@ -369,9 +377,21 @@ if (!hasSingleInstanceLock) {
       onDashboardChanged: () => notifyDesktopDashboardChanged(getDatabase().getDashboardData()),
       onStatusChanged: notifySyncStatusChanged
     });
+    const birthdayDeliveryService = new BirthdayDeliveryService(desktopDatabase, birthdayDeliveryAdapter);
+    birthdayScheduler = new BirthdayScheduler({
+      database: desktopDatabase,
+      deliveryService: birthdayDeliveryService,
+      isWhatsAppEnabled: () => {
+        if (appSessionLocked) return false;
+        const capabilities = enabledBusinessCapabilities();
+        return hasBusinessCapability(capabilities, C.CUSTOMERS) && hasBusinessCapability(capabilities, C.WHATSAPP);
+      },
+      onDashboardChanged: () => notifyDesktopDashboardChanged(getDatabase().getDashboardData())
+    });
     registerIpcHandlers();
     createMainWindow();
     syncCoordinator.start();
+    birthdayScheduler.start();
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -435,6 +455,7 @@ function createChromeUserAgent() {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     syncCoordinator?.stop();
+    birthdayScheduler?.stop();
     desktopDatabase?.close();
     app.quit();
   }
@@ -442,6 +463,7 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   syncCoordinator?.stop();
+  birthdayScheduler?.stop();
 });
 
 function registerIpcHandlers() {
@@ -770,6 +792,7 @@ function registerIpcHandlers() {
 
     const aiWebSync = await publishSavedAiSettings();
     getSyncCoordinator().restart();
+    void birthdayScheduler?.evaluateNow();
     const setupData = getDatabase().getSetupData();
     const dashboardData = getDatabase().getDashboardData();
 
@@ -962,6 +985,27 @@ function registerIpcHandlers() {
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
     assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     return finalizeDesktopCustomerMutation(getDatabase().saveCustomer(input));
+  });
+
+  ipcMain.on("whatsapp:registerWebview", (event, webContentsId: unknown) => {
+    if (!isTrustedDesktopRendererUrl(event.sender.getURL())) return;
+    const id = Number(webContentsId);
+    if (!Number.isInteger(id) || id <= 0) return;
+    if (birthdayWebviewDriver.attach(id)) {
+      void birthdayScheduler?.evaluateNow();
+    }
+  });
+
+  ipcMain.on("whatsapp:unregisterWebview", (event, webContentsId: unknown) => {
+    if (!isTrustedDesktopRendererUrl(event.sender.getURL())) return;
+    const id = Number(webContentsId);
+    if (Number.isInteger(id) && id > 0) birthdayWebviewDriver.detach(id);
+  });
+
+  ipcMain.on("whatsapp:userActivity", (event, active: unknown) => {
+    if (!isTrustedDesktopRendererUrl(event.sender.getURL())) return;
+    whatsappDeliveryLock.setUserBusy(active === true);
+    if (active !== true) void birthdayScheduler?.evaluateNow();
   });
 
   ipcMain.handle("birthday:prepareWhatsApp", (_event, customerId: unknown): DesktopBirthdayPrepareResult => {
@@ -1278,6 +1322,7 @@ function registerAppLockIpcHandlers() {
     if (!verifier) {
       resetAppLockFailures();
       appSessionLocked = false;
+      void birthdayScheduler?.evaluateNow();
       return {
         ok: true,
         message: "Kilit açıldı.",
@@ -1298,6 +1343,7 @@ function registerAppLockIpcHandlers() {
 
     resetAppLockFailures();
     appSessionLocked = false;
+    void birthdayScheduler?.evaluateNow();
     return {
       ok: true,
       message: "Kilit açıldı.",
@@ -1399,6 +1445,7 @@ function registerAppLockIpcHandlers() {
       getDatabase().setAppLockPasswordVerifier("");
       resetAppLockFailures();
       appSessionLocked = false;
+      void birthdayScheduler?.evaluateNow();
       return {
         ok: true,
         message: "Uygulama şifresi sıfırlandı ve kilit açıldı.",

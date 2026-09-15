@@ -336,14 +336,11 @@ export function DesktopWorkspaceRouter({
     return result;
   }
 
-  if (activePage === "market") {
-    return <MarketPage customers={dashboardData.customers} />;
-  }
-
   const persistentMessagesPage = (
     <MessagesPage
       aiEnabled={aiEnabled}
       whatsappEnabled={customerMessagingEnabled}
+      automaticWebviewRequired={setupData.birthdaySettings.enabled && setupData.birthdaySettings.mode === "automatic" && customerMessagingEnabled}
       aiOpen={messagesAiOpen}
       active={activePage === "messages"}
       safeMode={(
@@ -648,6 +645,8 @@ export function DesktopWorkspaceRouter({
           foodMenuEnabled={foodMenuEnabled}
           inventoryEnabled={inventoryEnabled}
         />
+      ) : activePage === "market" ? (
+        <MarketPage customers={dashboardData.customers} />
       ) : activePage === "messages" ? null : (
         <SetupWizard
           embedded

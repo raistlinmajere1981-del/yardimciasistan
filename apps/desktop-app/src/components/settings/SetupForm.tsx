@@ -680,7 +680,7 @@ export function SetupForm({
               </label>
             </div>
             <small className="setup-birthday-note">
-              Otomatik modda uygulama ve WhatsApp oturumu açık olduğunda mesajlar belirtilen saatte gönderilir. Bu aşamada otomatik gönderim henüz başlatılmaz.
+              Otomatik modda uygulama ve WhatsApp oturumu açık olduğunda, doğum günü mesajları seçtiğiniz saatten itibaren aynı gün otomatik gönderilir.
             </small>
           </div>
         </div>

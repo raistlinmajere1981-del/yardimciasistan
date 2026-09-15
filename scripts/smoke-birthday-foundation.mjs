@@ -36,7 +36,7 @@ try {
       assert.ok(settingsColumns.includes(column), `missing settings column: ${column}`);
     }
     const deliveryColumns = raw.prepare("PRAGMA table_info(birthday_message_deliveries)").all().map((row) => row.name);
-    for (const column of ["customer_id", "birthday_year", "birthday_date", "mode", "message", "status", "prepared_at", "sent_at", "failed_at", "error"]) {
+    for (const column of ["customer_id", "birthday_year", "birthday_date", "mode", "message", "status", "attempt_count", "last_attempted_at", "next_attempt_at", "prepared_at", "sent_at", "failed_at", "error"]) {
       assert.ok(deliveryColumns.includes(column), `missing delivery column: ${column}`);
     }
     assert.equal(String(raw.prepare("PRAGMA integrity_check").get().integrity_check), "ok");

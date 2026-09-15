@@ -9,7 +9,9 @@ export type BirthdayEligibilityStatus =
   | "excluded"
   | "invalid_phone"
   | "invalid_birth_date"
-  | "not_birthday";
+  | "not_birthday"
+  | "waiting"
+  | "failed";
 
 export interface BirthdaySettings {
   enabled: boolean;
@@ -31,6 +33,10 @@ export interface BirthdayDeliveryLike {
   customerId: string;
   birthdayYear: number;
   status: BirthdayDeliveryStatus;
+  attemptCount?: number;
+  lastAttemptedAt?: string;
+  nextAttemptAt?: string;
+  error?: string;
 }
 
 export const DEFAULT_BIRTHDAY_MESSAGE_TEMPLATE =

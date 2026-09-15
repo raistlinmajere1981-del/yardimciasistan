@@ -85,7 +85,7 @@ export function DashboardPage({
   const pendingReservationCount = data.summary.pendingReservations;
   const birthdayOverview = data.birthdayOverview;
   const birthdayAttentionCount = customersEnabled && birthdayOverview.enabled
-    ? birthdayOverview.dueCount + birthdayOverview.invalidPhoneCount
+    ? birthdayOverview.dueCount + birthdayOverview.invalidPhoneCount + birthdayOverview.waitingCount + birthdayOverview.failedCount
     : 0;
   const attentionCount = waitingRequestCount + openTaskCount + pendingReservationCount + birthdayAttentionCount;
   const visiblePriorityItems = dashboard.priorityItems.slice(0, 6);
@@ -277,7 +277,16 @@ export function DashboardPage({
                 </div>
                 <Cake size={19} aria-hidden="true" />
               </div>
-              <p className="dashboard-birthday-summary">Bugün doğum günü olan müşterileri kontrol edip WhatsApp mesajını hazırlayın.</p>
+              {birthdayOverview.mode === "automatic" ? (
+                <>
+                  {birthdayOverview.sentCount > 0 && <p className="dashboard-birthday-summary">Bugün {birthdayOverview.sentCount} mesaj gönderildi.</p>}
+                  {birthdayOverview.waitingCount > 0 && <p className="dashboard-birthday-summary">{birthdayOverview.waitingCount} mesaj bekliyor.</p>}
+                  {birthdayOverview.failedCount > 0 && <p className="dashboard-birthday-summary is-unavailable">{birthdayOverview.failedCount} gönderim başarısız.</p>}
+                  {birthdayOverview.sentCount === 0 && birthdayOverview.waitingCount === 0 && birthdayOverview.failedCount === 0 && <p className="dashboard-birthday-summary">Mesajlar seçtiğiniz saatten itibaren aynı gün otomatik gönderilir.</p>}
+                </>
+              ) : (
+                <p className="dashboard-birthday-summary">Bugün doğum günü olan müşterileri kontrol edip WhatsApp mesajını hazırlayın.</p>
+              )}
               {!features.whatsapp && <p className="dashboard-birthday-summary is-unavailable">WhatsApp etkin değil</p>}
               <ul className="dashboard-birthday-list">
                 {birthdayOverview.candidates.slice(0, 6).map((candidate) => (
@@ -288,7 +297,7 @@ export function DashboardPage({
                     </div>
                     <div className="dashboard-birthday-actions">
                       <StatusBadge tone={birthdayStatusTone(candidate.eligibility)}>{birthdayStatusLabel(candidate.eligibility)}</StatusBadge>
-                      {features.whatsapp && (candidate.eligibility === "due" || candidate.eligibility === "prepared") && (
+                      {features.whatsapp && birthdayOverview.mode === "manual" && (candidate.eligibility === "due" || candidate.eligibility === "prepared") && (
                         <ActionButton
                           variant="secondary"
                           size="sm"
@@ -412,6 +421,8 @@ function birthdayStatusLabel(status: string) {
   if (status === "already_sent") return "Bu yıl gönderildi";
   if (status === "prepared") return "Hazırlandı";
   if (status === "invalid_phone") return "Telefon geçersiz";
+  if (status === "waiting") return "Bekliyor";
+  if (status === "failed") return "Gönderim başarısız";
   return "Hazır";
 }
 
@@ -419,5 +430,7 @@ function birthdayStatusTone(status: string): StatusTone {
   if (status === "already_sent") return "success";
   if (status === "prepared") return "info";
   if (status === "invalid_phone") return "danger";
+  if (status === "failed") return "danger";
+  if (status === "waiting") return "wait";
   return "wait";
 }

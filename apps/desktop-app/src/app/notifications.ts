@@ -127,7 +127,10 @@ export function buildDesktopNotifications(
 
   if (hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.CUSTOMERS)
       && data.birthdayOverview.enabled
-      && data.birthdayOverview.dueCount + data.birthdayOverview.invalidPhoneCount > 0) {
+      && data.birthdayOverview.dueCount
+        + data.birthdayOverview.invalidPhoneCount
+        + data.birthdayOverview.waitingCount
+        + data.birthdayOverview.failedCount > 0) {
     notifications.push({
       key: `birthday:${data.birthdayOverview.today}`,
       kind: "birthday",

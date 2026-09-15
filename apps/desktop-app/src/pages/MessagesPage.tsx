@@ -10,19 +10,29 @@ interface MessagesPageProps {
   aiTools: ReactNode;
   aiEnabled: boolean;
   whatsappEnabled: boolean;
+  automaticWebviewRequired?: boolean;
   aiOpen: boolean;
   active: boolean;
 }
 
-export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEnabled, aiOpen, active }: MessagesPageProps) {
+export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEnabled, automaticWebviewRequired = false, aiOpen, active }: MessagesPageProps) {
   const [mode, setMode] = useState<MessageMode>("safe");
-  const [webModeActivated, setWebModeActivated] = useState(false);
+  const [webModeActivated, setWebModeActivated] = useState(automaticWebviewRequired);
+
+  useEffect(() => {
+    if (automaticWebviewRequired) setWebModeActivated(true);
+  }, [automaticWebviewRequired]);
 
   useEffect(() => {
     if (active && aiOpen) {
       setMode("safe");
     }
   }, [active, aiOpen]);
+
+  useEffect(() => {
+    window.yardimciDesktop?.setWhatsAppUserActivity?.(active && mode === "web");
+    return () => window.yardimciDesktop?.setWhatsAppUserActivity?.(false);
+  }, [active, mode]);
 
   const selectMode = (nextMode: MessageMode) => {
     setMode(nextMode);
