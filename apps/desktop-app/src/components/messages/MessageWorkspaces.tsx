@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { CheckCircle2, Copy, ExternalLink, MessageCircle, Phone, Save, Send, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { prepareWhatsAppAction, WHATSAPP_WEB_HOME_URL } from "@yardimci-asistan/whatsapp-bridge";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
@@ -6,8 +6,8 @@ import type { AiWorkspaceHistoryEntry, AiWorkspaceMode, DesktopDashboardData } f
 import { formatCustomerSource } from "../../app/customer-model";
 import { formatDateTime, formatRequestStatus, formatRequestType } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
-import { CompactList } from "../ui/CompactList";
-import { CompactListButton } from "../ui/CompactListItem";
+import { DataList, DataListButton } from "../ui/DataList";
+import { Panel } from "../ui/Panel";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
 
@@ -20,6 +20,20 @@ function getAiWorkspaceModeLabel(mode: AiWorkspaceMode) {
     daily: "Günlük değerlendirme"
   };
   return labels[mode];
+}
+
+function getAiStatusTone(state: SyncState, fallback = false): StatusTone {
+  if (state === "loading") return "info";
+  if (state === "error") return "danger";
+  if (state === "success") return fallback ? "warning" : "success";
+  return "neutral";
+}
+
+function getAiStatusMessageClass(state: SyncState) {
+  if (state === "loading") return "status-message status-message--info";
+  if (state === "error") return "status-message status-message--danger";
+  if (state === "success") return "status-message status-message--success";
+  return "status-message";
 }
 
 interface AiWorkspaceProps {
@@ -80,24 +94,34 @@ export function AiWorkspace({
       ]
     : [["daily", "Günü değerlendir", "Etkin işletme alanlarını ve öncelikleri sırala"]];
 
+  const handleModeKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, currentMode: AiWorkspaceMode) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowLeft") {
+      return;
+    }
+    event.preventDefault();
+    const currentIndex = modes.findIndex(([value]) => value === currentMode);
+    const direction = event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1;
+    onModeChange(modes[(currentIndex + direction + modes.length) % modes.length][0]);
+  };
+
   return (
     <section className="ai-workspace" aria-label="AI Yardımcı çalışma alanı">
       <div className="ai-status-grid">
-        <article className="ai-status-card">
+        <Panel className="ai-status-card" padding="compact">
           <span>AI önerileri</span>
-          <strong className={aiEnabled ? "is-online" : "is-offline"}>{aiEnabled ? "Kullanıma hazır" : "Kapalı"}</strong>
+          <StatusBadge tone={aiEnabled ? "success" : "danger"}>{aiEnabled ? "Kullanıma hazır" : "Kapalı"}</StatusBadge>
           <small>{customersEnabled ? "Hazır mesaj ve özetler" : "Günlük işletme değerlendirmesi"}</small>
-        </article>
-        <article className="ai-status-card">
+        </Panel>
+        <Panel className="ai-status-card" padding="compact">
           <span>Son çalışmalar</span>
           <strong>{history.length} kayıt</strong>
           <small>Bu bilgisayarda saklanır</small>
-        </article>
-        <article className="ai-status-card">
+        </Panel>
+        <Panel className="ai-status-card" padding="compact">
           <span>Gönderim kontrolü</span>
           <strong>Her zaman sizde</strong>
           <small>Metinler otomatik gönderilmez</small>
-        </article>
+        </Panel>
       </div>
 
       <div className="ai-workspace-grid">
@@ -115,6 +139,8 @@ export function AiWorkspace({
                 type="button"
                 role="tab"
                 aria-selected={mode === value}
+                tabIndex={mode === value ? 0 : -1}
+                onKeyDown={(event) => handleModeKeyDown(event, value)}
                 onClick={() => onModeChange(value)}
                 key={value}
               >
@@ -124,7 +150,7 @@ export function AiWorkspace({
             ))}
           </div>
 
-          {customersEnabled && <label className="ai-field">
+          {customersEnabled && <label className="form-field form-field--fluid ai-field">
             Talep / müşteri
             <select value={selectedRequestId} onChange={(event) => onRequestChange(event.target.value)} disabled={!needsRequest}>
               {dashboardData.requests.length === 0 && <option value="">Talep bulunmuyor</option>}
@@ -140,7 +166,7 @@ export function AiWorkspace({
               <p>{selectedRequest.message || "Talep notu bulunmuyor."}</p>
             </div>
           )}
-          <label className="ai-field">
+          <label className="form-field form-field--fluid ai-field">
             Ek talimat <small>isteğe bağlı</small>
             <textarea
               value={instructions}
@@ -150,10 +176,10 @@ export function AiWorkspace({
             />
             <small>{instructions.length}/800</small>
           </label>
-          <button className="primary-command ai-generate-button" type="button" onClick={onGenerate} disabled={generateDisabled}>
+          <ActionButton className="ai-generate-button" type="button" onClick={onGenerate} disabled={generateDisabled}>
             <Sparkles size={17} aria-hidden="true" />
             {state === "loading" ? "Hazırlanıyor" : "AI Sonucunu Hazırla"}
-          </button>
+          </ActionButton>
         </aside>
 
         <article className="panel ai-result-panel">
@@ -162,9 +188,9 @@ export function AiWorkspace({
               <p>Düzenlenebilir Sonuç</p>
               <h2>{entry ? getAiWorkspaceModeLabel(entry.mode) : "Henüz sonuç yok"}</h2>
             </div>
-            <span className={`status-badge ${state === "success" ? "ok" : state === "error" ? "wait" : "info"}`}>
+            <StatusBadge tone={getAiStatusTone(state, Boolean(entry?.fallback))}>
               {state === "loading" ? "Çalışıyor" : entry?.fallback ? "Yerel güvenli" : entry ? "AI hazır" : "Bekliyor"}
-            </span>
+            </StatusBadge>
           </div>
 
           {entry ? (
@@ -175,7 +201,7 @@ export function AiWorkspace({
                 <span>{formatDateTime(entry.createdAt)}</span>
               </div>
               {entry.missingFields.length > 0 && (
-                <div className="ai-missing-fields"><strong>Eksik bilgiler:</strong> {entry.missingFields.join(", ")}</div>
+                <div className="status-message status-message--warning ai-missing-fields"><strong>Eksik bilgiler:</strong> {entry.missingFields.join(", ")}</div>
               )}
               <textarea
                 className="ai-result-editor"
@@ -185,14 +211,14 @@ export function AiWorkspace({
                 rows={16}
               />
               <div className="ai-result-actions">
-                <button type="button" onClick={onCopy}><Copy size={16} aria-hidden="true" />Kopyala</button>
+                <ActionButton variant="secondary" size="sm" type="button" onClick={onCopy}><Copy size={16} aria-hidden="true" />Kopyala</ActionButton>
                 {customersEnabled && entry.mode !== "daily" && (
-                  <button type="button" onClick={onSave}><Save size={16} aria-hidden="true" />Talebe Kaydet</button>
+                  <ActionButton variant="secondary" size="sm" type="button" onClick={onSave}><Save size={16} aria-hidden="true" />Talebe Kaydet</ActionButton>
                 )}
                 {whatsappEnabled && (
-                  <button className="whatsapp-action" type="button" onClick={onWhatsApp} disabled={entry.mode !== "reply"}>
+                  <ActionButton variant="whatsapp" size="sm" type="button" onClick={onWhatsApp} disabled={entry.mode !== "reply"}>
                     <MessageCircle size={16} aria-hidden="true" />WhatsApp'a Hazırla
-                  </button>
+                  </ActionButton>
                 )}
               </div>
             </>
@@ -205,18 +231,18 @@ export function AiWorkspace({
                 : "Günlük işletme değerlendirmesini hazırlayın. Üretilen metin kullanılmadan önce mutlaka sizin kontrolünüzden geçer."}</p>
             </div>
           )}
-          <p className={`ai-workspace-message sync-${state}`}>{message}</p>
-          <div className="ai-guardrail-note">
+          <p className={`${getAiStatusMessageClass(state)} ai-workspace-message`} role={state === "error" ? "alert" : "status"} aria-live="polite">{message}</p>
+          <div className="status-message status-message--info ai-guardrail-note">
             <CheckCircle2 size={18} aria-hidden="true" />
             <span>AI kesin işlem, müsaitlik veya fiyat onayı vermez. Son karar ve gönderim her zaman işletme sahibindedir.</span>
           </div>
         </article>
       </div>
 
-      <article className="panel ai-history-panel">
+      <Panel className="ai-history-panel" padding="compact">
         <div className="panel-heading compact">
           <div><p>Yerel Geçmiş</p><h2>Son çalışmalar</h2></div>
-          <span className="status-badge info">{history.length} kayıt</span>
+          <StatusBadge tone="info">{history.length} kayıt</StatusBadge>
         </div>
         {history.length === 0 ? (
           <div className="empty-state compact-empty"><strong>Henüz geçmiş yok.</strong><p>Hazırlanan sonuçlar yalnız bu bilgisayarda saklanır.</p></div>
@@ -231,7 +257,7 @@ export function AiWorkspace({
             ))}
           </div>
         )}
-      </article>
+      </Panel>
     </section>
   );
 }
@@ -561,7 +587,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           <StatusBadge tone="info">{requests.length} kayıt</StatusBadge>
         </div>
 
-        <CompactList className="manager-list operation-compact-list whatsapp-request-list">
+        <DataList className="whatsapp-request-list">
           {requests.length === 0 ? (
             <div className="empty-state compact-empty">
               <MessageCircle size={24} aria-hidden="true" />
@@ -570,8 +596,8 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
             </div>
           ) : (
             requests.map((request) => (
-              <CompactListButton
-                className="manager-row operation-list-item message-request-row"
+              <DataListButton
+                className="manager-row message-request-row"
                 key={request.id}
                 title={request.customer_name}
                 leading={<span className={`status-dot tone-${getRequestStatusTone(request.status)}`} aria-hidden="true" />}
@@ -588,7 +614,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               />
             ))
           )}
-        </CompactList>
+        </DataList>
       </aside>
 
       {view === "web" && <section className="panel whatsapp-live-panel">
@@ -599,7 +625,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               <h2>{recipientName}</h2>
               <small>{phoneDisplay}</small>
             </div>
-            <StatusBadge tone={selectedMessage ? "ok" : "neutral"}>{selectedMessage ? "Hazır mesaj var" : "Hazır mesaj yok"}</StatusBadge>
+            <StatusBadge tone={selectedMessage ? "success" : "neutral"}>{selectedMessage ? "Hazır mesaj var" : "Hazır mesaj yok"}</StatusBadge>
           </div>
 
           <p className="whatsapp-web-message-preview">
@@ -630,8 +656,8 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           </div>
 
           <div className="whatsapp-web-feedback">
-            <span className={copyMessage.includes("kopyalandı") ? "sync-success" : ""} role="status">{copyMessage}</span>
-            {sendMessage && <span className={`whatsapp-send-status sync-${sendState}`} role="status">{sendMessage}</span>}
+            <StatusBadge tone={copyMessage.includes("kopyalandı") ? "success" : "neutral"} role="status" aria-live="polite">{copyMessage}</StatusBadge>
+            {sendMessage && <StatusBadge className="whatsapp-send-status" tone={getAiStatusTone(sendState)} role="status" aria-live="polite">{sendMessage}</StatusBadge>}
           </div>
         </div>
 
@@ -678,11 +704,11 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           </div>
         </dl>
 
-        <label className="prepared-message-field">
+        <label className="form-field form-field--fluid prepared-message-field">
           <span>Mesaj</span>
           <textarea className="prepared-whatsapp-message" readOnly value={selectedMessage} aria-label="Hazır WhatsApp mesajı" />
         </label>
-        <p className={`menu-status whatsapp-copy-status ${copyMessage.includes("kopyalandı") ? "sync-success" : ""}`}>{copyMessage}</p>
+        <p className={`status-message whatsapp-copy-status ${copyMessage.includes("kopyalandı") ? "status-message--success" : ""}`} role="status" aria-live="polite">{copyMessage}</p>
 
         <div className="message-primary-actions">
           <ActionButton size="sm" type="button" onClick={copyPreparedMessage} disabled={!selectedMessage}>
@@ -711,7 +737,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı daha resmi ve ölçülü yaz.")} disabled={aiState === "loading"}>Daha Resmi</ActionButton>
               <ActionButton variant="ghost" size="sm" type="button" onClick={() => onRewrite("Mesajı mevcut talep bilgilerine göre yeniden hazırla.")} disabled={aiState === "loading"}>AI ile Yenile</ActionButton>
             </div>
-            <p className={`menu-status sync-${aiState}`}>{aiMessage}</p>
+            <p className={`${getAiStatusMessageClass(aiState)} ai-message-status`} role={aiState === "error" ? "alert" : "status"} aria-live="polite">{aiMessage}</p>
           </div>
         )}
       </aside>}

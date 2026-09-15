@@ -34,22 +34,24 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
   return (
     <section className="combined-page messages-page" aria-label="Mesajlar">
       {whatsappEnabled && (
-        <>
-          <SegmentedControl
-            className="message-mode-switch"
-            value={mode}
-            ariaLabel="Mesaj çalışma şekli"
-            onChange={selectMode}
-            options={[
-              { id: "safe", label: "Mesaj Hazırla", icon: <ShieldCheck size={16} aria-hidden="true" /> },
-              { id: "web", label: "WhatsApp", icon: <MessageCircle size={16} aria-hidden="true" /> }
-            ]}
-          />
-          <p className="message-mode-intro">
-            <strong>{mode === "safe" ? "Mesajı burada hazırlayın." : "WhatsApp burada açılır."}</strong>
-            <span>{mode === "safe" ? "Göndermeden önce son kontrol sizde kalır." : "Gönderme işlemini yine siz tamamlarsınız."}</span>
-          </p>
-        </>
+        <div className="page-toolbar message-toolbar">
+          <div className="page-toolbar__start">
+            <SegmentedControl
+              className="message-mode-switch"
+              value={mode}
+              ariaLabel="Mesaj çalışma şekli"
+              onChange={selectMode}
+              options={[
+                { id: "safe", label: "Mesaj Hazırla", icon: <ShieldCheck size={16} aria-hidden="true" /> },
+                { id: "web", label: "WhatsApp", icon: <MessageCircle size={16} aria-hidden="true" /> }
+              ]}
+            />
+            <p className="message-mode-intro">
+              <strong>{mode === "safe" ? "Mesajı burada hazırlayın." : "WhatsApp burada açılır."}</strong>
+              <span>{mode === "safe" ? "Göndermeden önce son kontrol sizde kalır." : "Gönderme işlemini yine siz tamamlarsınız."}</span>
+            </p>
+          </div>
+        </div>
       )}
 
       {whatsappEnabled && <div className={mode === "safe" ? "message-mode-content" : "message-mode-content is-hidden"}>{safeMode}</div>}

@@ -1,10 +1,12 @@
-# Desktop UI migration — Aşama 2B
+# Desktop UI migration — Aşama 3A
 
 Aşama 1 başlangıcı: temiz `main`, `25ad66e88c700fe883e6ca01b50b8b7e6e279c2f`. Bu aşama ortak renderer kabuğu ve yüzey sözleşmesini taşır. Database, IPC, sync, AI, availability, capability kararları ve feature iş akışları değiştirilmez. `firm-template/web-module/widget.js` kapsam dışıdır. Commit/push yapılmaz.
 
 Aşama 2A başlangıcı: temiz `main`, `c3fac0d1e3ce76b7f53ee8c7d7fb9c1258932c05`. Müşteri İşleri, Pansiyon ve doğrudan kullandıkları editör/oda hesabı yüzeyleri taşındı. Bu belgedeki ekran envanteri günceldir; aşağıdaki Aşama 1 ölçümleri tarihsel karşılaştırma için korunur.
 
 Aşama 2B başlangıcı: temiz `main`, `2e4e4ab7ee94ace592f7643e1d75fe5c9eeae355`. Restoran/Adisyon ve Menü yönetimi ortak desktop tasarım sistemiyle taşındı. Database, IPC, sync, AI, availability, stok, ödeme, oda aktarımı ve sipariş state geçişleri korunur.
+
+Aşama 3A başlangıcı: temiz `main`, `472c9b2c0bc7d2c43d6ba98f2227531f9257fd3c`. Mesajlar/AI ve İlk Kurulum yüzeyleri mevcut design-system sözleşmelerine taşındı. Database, IPC, sync, AI provider/model, message lifecycle, webview lifecycle, setup persistence, capability ve güvenlik davranışları değiştirilmedi. Commit/push yapılmaz.
 
 ## Durumun anlamı
 
@@ -27,11 +29,11 @@ Her ana ekran aynı `DesktopAppFrame → AppShell → PageHeader + page-content`
 | Kasa / Raporlar — **migrated** | `pages/ReportsPage.tsx`, `components/finance/FinanceWorkspace.tsx` | `pages/finance.css`, `reports.css`, `components/metrics.css`; Panel, MetricCard, page-toolbar, StatusBadge, ActionButton, loading-state, useDialogFocus | Kasa: ActionButton, StatusBadge, useDialogFocus, silme onayı, responsive grid, 0 raw renk, 0 duplicate selector. Raporlar: tablo sayısal sağa hizalama, tabular-nums, kısa date inputları, kompakt preset butonları, daily revenue chart tokenları, 0 raw renk, 0 duplicate selector. |
 | Market — **migrated** | `pages/MarketPage.tsx`, `components/market/{MarketQuickSaleWorkspace,MarketProductsWorkspace,MarketInventoryWorkspace,MarketPurchasingWorkspace,MarketCompanionInboxWorkspace,MarketLabelsWorkspace}.tsx` | `pages/market.css`, `pages/customers.css`; ActionButton, StatusBadge, form foundation | Hızlı Satış, Ürünler, Telefon Taslakları, Stok, Tedarikçiler/Alım, Etiketler sekmeleri. StatusBadge ile aktif/pasif ve stok seviyesi (danger/warning/success) sunumu. Tekrarlı selector'lar ve dağınık media query'ler birleştirildi. 0 raw renk, 0 duplicate selector. |
 | Ayarlar — **migrated** | `components/settings/{SetupForm,BusinessPublicProfileSection,BusinessLocationMapPicker,RoomManagementSection,BusinessCapabilitySettings,DataMaintenanceSettings}.tsx`, `components/security/PasswordSettings.tsx` | `pages/settings.css`, `forms.css`, `buttons.css`, `panels.css`, `badges.css`, `disclosures.css`; lokal `components/settings/business-location-map-picker.css` | Önceki referans migration korunur. İşletmem/Müşteri bilgileri/İşletme düzeni/Bağlantılar/Uygulama/Bakım tek sayfa. Nav gerçek header yüksekliğini izler. 760px altında form stack. Light/dark/easy. Harita tile/pin pikselleri protokol geometrisi; migration borcu olarak tokenlaştırılmaz. |
-| Mesajlar / AI — **partial** | `pages/MessagesPage.tsx`, `components/messages/MessageWorkspaces.tsx` | `pages/messages.css`, `ai.css`; Panel, ActionButton, ortak header | WhatsApp webview, hazır yanıt, AI araçları persistent mount davranışı korunur. `.persistent-messages-page.is-hidden` artık messages.css içinde. Webview'in üçüncü taraf içeriği tema sisteminin dışındadır; AI kartları raw renk/ölçü borcu taşır. |
+| Mesajlar / AI — **migrated** | `pages/MessagesPage.tsx`, `components/messages/MessageWorkspaces.tsx` | `pages/messages.css`, `ai.css`; PageHeader, page-toolbar, Panel, DataList/Button, ActionButton, StatusBadge, form-field, status/empty | Güvenli mesaj hazırlama, hazır yanıtlar, AI araçları ve WhatsApp çevre kabuğu ortak yüzey sözleşmesini kullanır. Persistent webview mount, gizli workspace, tab seçimi, draft/state ve AI/provider akışı korunur. Üçüncü taraf webview içeriği kapsam dışıdır. `messages.css`/`ai.css`: 0 raw renk, 0 duplicate selector, 0 important/override/legacy alias. |
 | Oda adisyonu / konaklama çalışma alanı — **migrated** | `components/pension/RoomFolioWorkspace.tsx` | `pages/room-folio.css`; Panel/card, StatusBadge, form-row/field, action-button, drawer--wide, overlay header/body/footer ve compact confirmation dialog | Gecelik fiyat, konaklama tarihleri, ürün/kalem, tahsilat ve çıkış yüzeyleri ortak kontroller kullanır. Etiketler, nested modal focus ve scroll doğrulandı. Hesaplama, ödeme ve çıkış handler/payload’ları değişmedi. |
 | Yerel menü önizlemesi — dış yüzey **migrated**, özel renderer debt'i | `components/menu/MenuPreview.tsx` | `components/dialogs.css` + `pages/menu-preview.css` | Modal genişliği/backdrop/header/close/focus ortak. Müşteriye görünen özel önizleme palette'i ve düzeni korunur; desktop dark moduna zorlanmaz. `menu-preview.css` içindeki 44 raw renk literal'i bu özel renderer'a aittir; normal Menü DOM UI’da raw renk yoktur. |
-| İlk kurulum — **legacy** | `components/settings/SetupWizard.tsx`, `SetupForm.tsx` | `pages/setup.css`, forms/buttons foundation | Wizard dış kabuğu uygulama sidebar kabuğundan bağımsız. Adımlar ve ilk kayıt davranışı değiştirilmez. Ortak form temelinden yararlanır; wizard yerleşim/section detayları Aşama 3. |
-| Uygulama kilidi — **legacy** | `components/security/AppLockScreen.tsx` | `pages/lock.css` | Kilit overlay'i güvenlik yaşam döngüsü, reset ve unlock animasyonlarıyla ayrı kalır. Header'daki kilit butonu **header.css**'e taşındı. Ekranın sabit koyu palette/gradient'i ve yüksek z-index'i Aşama 3 borcu; normal modal z-index'i ile değiştirilmedi. |
+| İlk kurulum — **migrated** | `components/settings/SetupWizard.tsx`, `SetupForm.tsx` | `pages/setup.css`, `pages/settings.css`, forms/buttons foundation; onboarding shell, progress, Panel/surface, ActionButton, StatusBadge/status, form-field boyutları | Wizard sidebar shell'inden bağımsız onboarding surface olarak kaldı. İşletme, düzen, bağlantı, AI ve görünüm bölümleri; progress/current state, footer/action hiyerarşisi ve responsive form sözleşmesi ortak tokenlarla standardize edildi. Settings embedded tüketimi korunur. `setup.css`: 0 raw renk, 0 duplicate selector, 0 important/override/legacy alias. |
+| Uygulama kilidi — **legacy** | `components/security/AppLockScreen.tsx` | `pages/lock.css` | Kilit overlay'i güvenlik yaşam döngüsü, reset ve unlock animasyonlarıyla ayrı kalır. Header'daki kilit butonu **header.css**'e taşındı. Ekranın sabit koyu palette/gradient'i ve yüksek z-index'i Stage 3B borcudur; normal modal z-index'i ile değiştirilmedi. |
 
 ## Ortak yüzey envanteri ve sahiplik
 
@@ -147,9 +149,35 @@ Aşama 2C başlangıcı: temiz `main`, `2c89d8a1c17d409775d9c8eec912663b2342ee0a
   - 43 yüzey kontrolü, 0 document overflow, 0 content overflow, 0 surface overflow.
   - Ekran görüntüleri: `artifacts/design-system/stage2c/final/` altında kaydedildi.
 
+## Aşama 3A sonucu: Mesajlar / AI + İlk Kurulum
+
+| Yüzey | Sonuç |
+| --- | --- |
+| Mesajlar / AI | **migrated** — Mesaj çalışma modu için ortak `page-toolbar`/segmented control; talepler için `DataList`; içerik ve AI alanları için `Panel`, `ActionButton`, `StatusBadge`, `status-message` ve form-field sözleşmeleri kullanıldı. Webview yalnız dış container/chrome olarak token sistemine bağlandı. |
+| İlk Kurulum | **migrated** — Sidebar'dan bağımsız bounded onboarding surface, hero, anchor tabanlı progress, section surface, semantic status/error ve ActionButton footer oluşturuldu. `SetupForm` Settings embedded görünümü ve bölüm navigasyonuyla geriye uyumlu kaldı. |
+
+### Aşama 3A audit ve doğrulama
+
+- **Desktop Style Audit:** `messages.css`, `ai.css`, `setup.css` strict migrated inventory'ye alındı. Üç dosyada da `rawColor: 0`, `duplicateSelectors: 0`, `important: 0`, `override: 0`, `oldAlias: 0`.
+- **Desktop toplamı:** Stage 2C sonrası 106 raw renkten **102**'ye; duplicate selector 91'den **68**'e indi. Kalan desktop raw renkler yalnız Stage 3B kapsamındaki `lock.css` (50), `menu-preview.css` (44), `records.css` (4), `operations.css` (3), `motion.css` (1) dosyalarındadır.
+- **Global design audit:** global raw renk sayısı **180** olarak raporlanır; desktop dışı/demo ve özel renderer yüzeyleri bu toplamın içindedir. Bu turda diğer dosyalara yalnız sayıyı düşürmek için dokunulmadı.
+- **Yeni smoke:** `scripts/smoke-stage3a-messages-setup.mjs` / `npm run smoke:desktop-stage3a`; 1440×1000, 1366×768, 1024×768, 900×768 ve 600×800; light/pro, dark/pro, light/easy. Mesajlar, AI common surface/status kullanımı, persistent webview marker'ı, Setup onboarding surface/form size/action hiyerarşisi ve embedded Settings overflow'u semantik olarak doğrulanır. Pixel-coordinate assertion kullanılmaz. Screenshot çıktıları `artifacts/design-system/stage3a/` altında ignored olarak tutulur.
+- **Business logic review:** Mesaj ID/selected conversation, persistent mount/visibility, webview `src`/partition, effect akışı, AI request/provider/model/response parsing ve Setup save/validation/persistence/capability payload'ları değişmedi.
+
+## Stage 3B için kesin kalan kapsam
+
+- `AppLockScreen` ve `pages/lock.css` özel güvenlik yüzeyi
+- `components/records.css`
+- `components/operations.css`
+- `components/motion.css`
+- `MenuPreview` özel renderer ve `pages/menu-preview.css` palette/canvas sınırı
+- secondary/shared surfaces ve kalan ortak tüketiciler
+- kalan duplicate selector'lar
+- kalan desktop raw renkler
+
 ## Sonraki aşamalar
 
-**Aşama 3:** Mesajlar/AI ve webview sınırları; ilk kurulum; kilit ekranı; menü preview canvas; dialog focus/keyboard tutarlılığı; tüm feature'larda dark/easy kontrast ve dar ekran incelemesi. Eski status alias prop isimleri ancak tüketiciler taşındığında kaldırılmalı.
+Stage 3B'de yukarıdaki kesin kapsam ele alınacaktır. Eski status alias prop isimleri ancak tüketiciler taşındığında kaldırılmalı; AppLockScreen ve özel renderer'lar UI migration sırasında güvenlik/renderer sözleşmelerini korumalıdır.
 
 ## Aşama 1 ölçüm ve doğrulama (tarihsel)
 

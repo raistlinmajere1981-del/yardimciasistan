@@ -22,10 +22,16 @@ import { UI_SCALE_OPTIONS, type UiMode, type UiPreferences } from "../../ui-pref
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
 import { PasswordSettings } from "../security/PasswordSettings";
 import { RoomManagementSection } from "./RoomManagementSection";
+import { ActionButton } from "../ui/ActionButton";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
+
+function setupStatusClass(state: SyncState) {
+  const tone = state === "error" ? "danger" : state === "success" ? "success" : state === "loading" ? "info" : "";
+  return `status-message setup-status-message${tone ? ` status-message--${tone}` : ""}`;
+}
 
 const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   id: AndroidPermissionGroupId;
@@ -333,16 +339,16 @@ export function SetupForm({
 
   const renderAiConnectionActions = (inline: boolean) => (
     <div className={`setup-ai-actions${inline ? " is-inline" : ""} sync-${aiConnectionTestState}`}>
-      <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
+      <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onTestAiConnection} disabled={!form.aiEnabled || aiConnectionTestState === "loading" || (form.aiService === "gemini" && !form.aiGoogleCurl.trim() && !form.aiApiKey.trim() && !form.aiStoredApiKeyConfigured)}>
         <RefreshCw size={16} aria-hidden="true" />
         {aiConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Bağlantıyı Dene"}
-      </button>
-      <span>{aiConnectionTestMessage}</span>
+      </ActionButton>
+      <span className="setup-connection-message" role="status" aria-live="polite">{aiConnectionTestMessage}</span>
     </div>
   );
 
   return (
-    <main className={embedded ? "setup-shell is-embedded" : "setup-shell"}>
+    <main className={embedded ? "setup-shell is-embedded" : "setup-shell setup-shell--onboarding"} aria-labelledby={!embedded ? "setup-title" : undefined}>
       {!embedded && <section className="setup-hero" aria-label="İlk kurulum">
         <div className="setup-brand">
           <img className="setup-brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
@@ -351,9 +357,9 @@ export function SetupForm({
             <small>{setupData.setupRequired ? "İlk Kurulum" : "Ayarlar"}</small>
           </div>
         </div>
-        <div>
+        <div className="setup-hero-copy">
           <p className="setup-eyebrow">Kurulum Sihirbazı</p>
-          <h1>İşletme panelini kullanıma hazırlayın.</h1>
+          <h1 id="setup-title">İşletme panelini kullanıma hazırlayın.</h1>
           <p>Firma profili, bağlı servisler, WhatsApp ve web modül bağlantısı bu ekrandan ayarlanır. AI ayarı isteğe bağlıdır.</p>
         </div>
         <dl className="setup-paths">
@@ -366,6 +372,22 @@ export function SetupForm({
             <dd>Uygulama veri klasöründe backups klasörü ayrıldı</dd>
           </div>
         </dl>
+        <nav className="setup-progress" aria-label="Kurulum bölümleri">
+          <ol>
+            <li className="is-current">
+              <a href="#settings-business" aria-current="step"><span>01</span><span><strong>İşletme</strong><small>Temel firma bilgileri</small></span></a>
+            </li>
+            <li>
+              <a href="#settings-operations"><span>02</span><span><strong>Düzen</strong><small>Oda ve masa kapasitesi</small></span></a>
+            </li>
+            <li>
+              <a href="#settings-connections"><span>03</span><span><strong>Bağlantılar</strong><small>Web, WhatsApp ve AI</small></span></a>
+            </li>
+            <li>
+              <a href="#settings-application"><span>04</span><span><strong>Son adım</strong><small>Görünüm ve kayıt</small></span></a>
+            </li>
+          </ol>
+        </nav>
       </section>}
 
       <section className="setup-form-surface">
@@ -384,7 +406,7 @@ export function SetupForm({
             <h2>İşletmem</h2>
           </div>
           <div className="form-row">
-            <label className="form-field form-field--medium">
+            <label className="form-field form-field--long">
               Firma adı
               <input value={form.businessName} onChange={(event) => update("businessName", event.target.value)} placeholder="Deniz Çiçeği Pansiyon & Kafe" />
             </label>
@@ -470,23 +492,25 @@ export function SetupForm({
                         type="number"
                       />
                     </label>
-                    <button
-                      className="action-button action-button-ghost table-category-remove"
+                    <ActionButton
+                      variant="ghost"
+                      size="sm"
+                      className="table-category-remove"
                       type="button"
                       onClick={() => removeTableCategory(category.key)}
                       aria-label={`${category.name || `${index + 1}. kategori`} satırını kaldır`}
                       title="Kategoriyi kaldır"
                     >
                       <Trash2 size={15} aria-hidden="true" />
-                    </button>
+                    </ActionButton>
                   </div>
                 ))}
               </div>
             )}
-            <button className="action-button action-button-secondary table-category-add" type="button" onClick={addTableCategory}>
+            <ActionButton variant="secondary" size="sm" className="table-category-add" type="button" onClick={addTableCategory}>
               <Plus size={15} aria-hidden="true" />
               Kategori Ekle
-            </button>
+            </ActionButton>
             <small className="table-category-note">
               Adedi azalttığınızda kullanılmayan masalar arşivlenir; aktif adisyon veya rezervasyona bağlı masalar korunur.
             </small>
@@ -547,11 +571,11 @@ export function SetupForm({
             </label>
           </div>
           <div className={`setup-ai-actions is-inline setup-web-actions sync-${webConnectionTestState}`}>
-            <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void testWebConnection()} disabled={webConnectionTestState === "loading"}>
+            <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={() => void testWebConnection()} disabled={webConnectionTestState === "loading"}>
               <RefreshCw size={16} aria-hidden="true" />
               {webConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Web Bağlantısını Dene"}
-            </button>
-            <span role="status" aria-live="polite">{webConnectionTestMessage}</span>
+            </ActionButton>
+            <span className="setup-connection-message" role="status" aria-live="polite">{webConnectionTestMessage}</span>
             <small>Bu kontrol yalnız bağlantıyı doğrular; talep çekmez veya veri yayınlamaz.</small>
           </div>
         </div>
@@ -575,10 +599,10 @@ export function SetupForm({
             {form.aiService === "gemini" ? (
               <>
                 <div className="setup-field setup-ai-studio-help">
-                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
+                  <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={() => void window.yardimciDesktop?.openExternal("https://aistudio.google.com/apikey")} disabled={!form.aiEnabled}>
                     <ExternalLink size={16} aria-hidden="true" />
                     Google AI Studio'yu Aç
-                  </button>
+                  </ActionButton>
                   <small>Bağlantı anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
                 </div>
                 <div className="form-field form-field--long form-field--span setup-ai-curl-field">
@@ -597,9 +621,9 @@ export function SetupForm({
                       autoComplete="off"
                       spellCheck={false}
                     />
-                    <button className="action-button action-button-secondary" type="button" onClick={() => void toggleAiApiKeyVisibility("google")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showGoogleCurl}>
+                    <ActionButton variant="secondary" size="sm" type="button" onClick={() => void toggleAiApiKeyVisibility("google")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showGoogleCurl}>
                       {aiApiKeyRevealState === "loading" ? "Açılıyor" : showGoogleCurl ? "Gizle" : "Göster"}
-                    </button>
+                    </ActionButton>
                   </div>
                   <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz." : "Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır."}</small>
                   {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
@@ -651,9 +675,9 @@ export function SetupForm({
                   autoComplete="new-password"
                   spellCheck={false}
                 />
-                <button className="action-button action-button-secondary" type="button" onClick={() => void toggleAiApiKeyVisibility("generic")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showAiApiKey}>
+                <ActionButton variant="secondary" size="sm" type="button" onClick={() => void toggleAiApiKeyVisibility("generic")} disabled={!form.aiEnabled || form.clearAiApiKey || aiApiKeyRevealState === "loading"} aria-pressed={showAiApiKey}>
                   {aiApiKeyRevealState === "loading" ? "Açılıyor" : showAiApiKey ? "Gizle" : "Göster"}
-                </button>
+                </ActionButton>
               </div>
               <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
               {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
@@ -771,25 +795,25 @@ export function SetupForm({
             <div><dt>Yedek klasörü</dt><dd>{dashboardData?.backupPath ?? "İlk kayıt sonrası oluşur"}</dd></div>
           </dl>
           <div className="form-actions settings-action-row">
-            <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onCreateBackup} disabled={!onCreateBackup || backupState === "loading"}><Save size={16} aria-hidden="true" />{backupState === "loading" ? "Yedekleniyor" : "Yedek Al"}</button>
-            {form.androidEnabled && <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onPublishAndroid} disabled={!onPublishAndroid || androidPublishState === "loading"}><UploadCloud size={16} aria-hidden="true" />{androidPublishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}</button>}
+            <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onCreateBackup} disabled={!onCreateBackup || backupState === "loading"}><Save size={16} aria-hidden="true" />{backupState === "loading" ? "Yedekleniyor" : "Yedek Al"}</ActionButton>
+            {form.androidEnabled && <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onPublishAndroid} disabled={!onPublishAndroid || androidPublishState === "loading"}><UploadCloud size={16} aria-hidden="true" />{androidPublishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}</ActionButton>}
           </div>
-          <p className={`menu-status sync-${backupState}`}>{backupMessage}</p>
-          {form.androidEnabled && <p className={`menu-status sync-${androidPublishState}`}>{androidPublishMessage}</p>}
+          <p className={setupStatusClass(backupState)} role="status" aria-live="polite">{backupMessage}</p>
+          {form.androidEnabled && <p className={setupStatusClass(androidPublishState)} role="status" aria-live="polite">{androidPublishMessage}</p>}
         </div>
 
-        {!embedded && <footer className={`setup-footer sync-${saveState}`}>
-          <span>{message}</span>
+        {!embedded && <footer className="setup-footer">
+          <span className={setupStatusClass(saveState)} role={saveState === "error" ? "alert" : "status"} aria-live="polite">{message}</span>
           <div>
             {!setupData.setupRequired && (
-              <button className="setup-secondary action-button action-button-secondary" type="button" onClick={onSkip}>
+              <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onSkip}>
                 Panele Dön
-              </button>
+              </ActionButton>
             )}
-            <button className="setup-primary action-button action-button-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
+            <ActionButton className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
               <Save size={16} aria-hidden="true" />
               {setupData.setupRequired ? "Kurulumu Kaydet" : "Ayarları Kaydet"}
-            </button>
+            </ActionButton>
           </div>
         </footer>}
       </section>
@@ -852,15 +876,16 @@ function AndroidDevicesSection({
         </div>
         <div className="android-devices-heading-actions">
           <span>{availableDevices.length} cihaz</span>
-          <button
-            className="setup-secondary action-button action-button-secondary"
+          <ActionButton
+            variant="secondary"
+            className="setup-secondary"
             type="button"
             onClick={onPublish}
             disabled={!onPublish || publishState === "loading"}
           >
             <UploadCloud size={15} aria-hidden="true" />
             {publishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}
-          </button>
+          </ActionButton>
         </div>
       </div>
       <p className="setup-section-description">Rol ve görev alanları yalnız bu bilgisayardan değiştirilebilir. Kaldırılan cihazlar ana listeden çıkarılır ve erişimleri kapalı kalır.</p>
@@ -930,13 +955,13 @@ function AndroidDevicesSection({
                   </fieldset>
                 )}
                 <div className="android-device-actions">
-                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "admin")} disabled={busy || device.role === "admin"}>
+                  <ActionButton variant="secondary" size="sm" className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "admin")} disabled={busy || device.role === "admin"}>
                     <ShieldCheck size={15} aria-hidden="true" /> Yönetici Yap
-                  </button>
-                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "staff")} disabled={busy || device.role === "staff"}>Personel Yap</button>
-                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onSetActive?.(device.deviceId, !device.isActive)} disabled={busy}>{device.isActive ? "Pasifleştir" : "Aktif Et"}</button>
-                  <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => onResetPermissions?.(device.deviceId)} disabled={busy}>Yetkileri Sıfırla</button>
-                  <button className="setup-secondary android-device-remove action-button action-button-secondary" type="button" onClick={() => onRevoke?.(device)} disabled={busy}>Kaldır</button>
+                  </ActionButton>
+                  <ActionButton variant="secondary" size="sm" className="setup-secondary" type="button" onClick={() => onSetRole?.(device.deviceId, "staff")} disabled={busy || device.role === "staff"}>Personel Yap</ActionButton>
+                  <ActionButton variant="secondary" size="sm" className="setup-secondary" type="button" onClick={() => onSetActive?.(device.deviceId, !device.isActive)} disabled={busy}>{device.isActive ? "Pasifleştir" : "Aktif Et"}</ActionButton>
+                  <ActionButton variant="secondary" size="sm" className="setup-secondary" type="button" onClick={() => onResetPermissions?.(device.deviceId)} disabled={busy}>Yetkileri Sıfırla</ActionButton>
+                  <ActionButton variant="secondary" size="sm" className="setup-secondary android-device-remove" type="button" onClick={() => onRevoke?.(device)} disabled={busy}>Kaldır</ActionButton>
                 </div>
               </article>
             );
@@ -961,15 +986,17 @@ function AndroidDevicesSection({
                   <span className={`device-role role-${device.role}`}>{device.role === "admin" ? "Yönetici" : "Personel"}</span>
                 </div>
                 <span>{device.revokedAt ? `${formatDateTime(device.revokedAt)} tarihinde kaldırıldı` : "Erişimi kapalı"}</span>
-                <button
+                <ActionButton
+                  variant="secondary"
+                  size="sm"
                   aria-label={`${device.deviceName || "Android Telefon"} (${compactAndroidDeviceId(device.deviceId)}) cihazını geri yükle`}
-                  className="setup-secondary action-button action-button-secondary"
+                  className="setup-secondary"
                   type="button"
                   onClick={() => restoreDevice(device)}
                   disabled={busy || !onSetActive}
                 >
                   Geri Yükle
-                </button>
+                </ActionButton>
               </article>
             ))}
           </div>

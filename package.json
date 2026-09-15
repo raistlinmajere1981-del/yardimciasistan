@@ -54,6 +54,7 @@
     "lint:php": "node scripts/php-lint.mjs",
     "screenshots:demo-web": "node scripts/capture-demo-web.mjs",
     "smoke:desktop-renderer": "node scripts/run-current-contract-smoke.mjs renderer && npm run smoke:desktop-design-system && npm run smoke:desktop-shell && npm run smoke:desktop-customer-pension",
+    "smoke:desktop-stage3a": "node scripts/smoke-stage3a-messages-setup.mjs",
     "smoke:desktop-design-system": "node scripts/smoke-desktop-design-system.mjs",
     "smoke:desktop-easy-mode": "node scripts/smoke-desktop-easy-mode.mjs",
     "smoke:table-categories": "npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-table-categories-db.mjs",
