@@ -489,7 +489,7 @@ export function SetupForm({
           <div className="form-row">
             <label className="form-field form-field--long">
               Firma adı
-              <input value={form.businessName} onChange={(event) => update("businessName", event.target.value)} placeholder="Deniz Çiçeği Pansiyon & Kafe" />
+            <input value={form.businessName} onChange={(event) => update("businessName", event.target.value)} placeholder="İşletme adı" />
             </label>
             <label className="form-field form-field--medium">
               Sektör tipi
@@ -517,7 +517,7 @@ export function SetupForm({
           <div className="form-row">
             <label className="form-field form-field--long">
               Adres
-              <input value={form.address} onChange={(event) => update("address", event.target.value)} placeholder="Kısa işletme adresi" />
+            <input value={form.address} onChange={(event) => update("address", event.target.value)} placeholder="İşletme adresi" />
             </label>
           </div>
         </div>
@@ -663,6 +663,7 @@ export function SetupForm({
                 Gönderim saati
                 <input
                   type="time"
+                  lang="tr-TR"
                   value={form.birthdaySettings.sendTime}
                   onChange={(event) => updateBirthday("sendTime", event.target.value)}
                   disabled={!form.birthdaySettings.enabled}

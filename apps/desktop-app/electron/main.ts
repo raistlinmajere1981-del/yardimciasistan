@@ -248,6 +248,14 @@ if (process.env.YA_DESKTOP_DATA_DIR) {
   app.setPath("userData", path.resolve(process.env.YA_DESKTOP_DATA_DIR));
 }
 
+// Linux Chromium native date/time popovers take their action labels from the
+// process locale. Keep them Turkish alongside the renderer lang switch.
+if (process.platform === "linux") {
+  process.env.LANG = "tr_TR.UTF-8";
+  process.env.LC_ALL = "tr_TR.UTF-8";
+}
+app.commandLine.appendSwitch("lang", "tr-TR");
+
 // Some Wayland compositors advertise color-management-v1 without every sRGB
 // capability Chromium expects, which otherwise produces repeated startup errors.
 if (process.platform === "linux" && process.env.XDG_SESSION_TYPE?.toLowerCase() === "wayland") {

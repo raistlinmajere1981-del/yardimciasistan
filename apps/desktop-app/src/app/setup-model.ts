@@ -79,10 +79,10 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
   const activeAiDraft = aiServiceDrafts[service] ?? createDefaultAiServiceDraft(service);
 
   return {
-    businessName: setupData.businessName || "Deniz Çiçeği Pansiyon & Kafe",
+    businessName: setupData.businessName || "",
     profileId: setupData.profileId || "pension_restaurant",
-    phone: setupData.phone || "+905321234567",
-    whatsapp: setupData.whatsapp || "+905321234567",
+    phone: setupData.phone || "",
+    whatsapp: setupData.whatsapp || "",
     email: setupData.email || "",
     address: setupData.address || "",
     webModuleUrl: setupData.webModuleUrl || "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
