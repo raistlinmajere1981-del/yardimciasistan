@@ -88,7 +88,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
       return Boolean(modes && businessIdentitySection && (businessIdentitySection.compareDocumentPosition(modes) & Node.DOCUMENT_POSITION_FOLLOWING));
     })).toBe(true);
 
-    await expect(page.getByLabel("Karanlık tema")).toHaveCount(0);
+    await expect(page.getByLabel("Karanlık tema")).toBeVisible();
     await expect(page.getByLabel("Arayüz ölçeği")).toBeVisible();
 
     await easyCard.focus();
@@ -108,21 +108,33 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await proCard.press("Home");
     await expect(easyCard).toBeFocused();
     await expect(easyCard).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByLabel("Karanlık tema")).toHaveCount(0);
+    await expect(page.getByLabel("Karanlık tema")).toBeVisible();
 
-    const actualTokens = await readRootTokens(page, EASY_THEME_INVARIANT_TOKENS);
+    const actualTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
     expect(Object.values(actualTokens).every((value) => value.trim().length > 0)).toBe(true);
 
-    const lightThemeEasyTokens = await readRootTokens(page, EASY_THEME_INVARIANT_TOKENS);
-    await page.evaluate(() => {
-      document.documentElement.dataset.theme = "dark";
+    const lightThemeEasyTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
+    await page.getByLabel("Karanlık tema").check();
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "easy");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    expect(await page.evaluate(() => ({
+      inline: document.documentElement.style.colorScheme,
+      computed: getComputedStyle(document.documentElement).colorScheme
+    }))).toEqual({ inline: "dark", computed: "dark" });
+    const darkThemeEasyTokens = await readRootTokens(page, THEME_SEMANTIC_TOKENS);
+    expect(normalizeTokenMap(darkThemeEasyTokens)).not.toEqual(normalizeTokenMap(lightThemeEasyTokens));
+    expect(darkThemeEasyTokens["--color-bg-surface"]).not.toBe(lightThemeEasyTokens["--color-bg-surface"]);
+    expect(darkThemeEasyTokens["--color-text"]).not.toBe(lightThemeEasyTokens["--color-text"]);
+    await expect.poll(() => readStoredPreferences(page)).toEqual({
+      theme: "dark",
+      scale: 1,
+      mode: "easy"
     });
-    const darkThemeEasyTokens = await readRootTokens(page, EASY_THEME_INVARIANT_TOKENS);
-    expect(normalizeTokenMap(darkThemeEasyTokens)).toEqual(normalizeTokenMap(lightThemeEasyTokens));
+
+    await page.getByLabel("Karanlık tema").uncheck();
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "easy");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
-    await page.evaluate(() => {
-      document.documentElement.dataset.theme = "light";
-    });
 
     await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: /Büyük ve Sade Görünüm/ })).toBeChecked();
@@ -144,8 +156,20 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await expect(proCard).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Arayüz ölçeği")).toBeVisible();
     await expect(page.getByLabel("Karanlık tema")).toBeVisible();
+    await expect(page.getByLabel("Karanlık tema")).not.toBeChecked();
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
     await expect.poll(() => readStoredPreferences(page)).toEqual({
       theme: "light",
+      scale: 1,
+      mode: "pro"
+    });
+
+    await page.getByLabel("Karanlık tema").check();
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
+    await expect.poll(() => readStoredPreferences(page)).toEqual({
+      theme: "dark",
       scale: 1,
       mode: "pro"
     });
@@ -153,10 +177,12 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("radio", { name: /Kompakt ve Gelişmiş Görünüm/ })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1");
-    await expect(page.getByLabel("Karanlık tema")).not.toBeChecked();
-    expect(await readStoredPreferences(page)).toEqual({ theme: "light", scale: 1, mode: "pro" });
+    await expect(page.getByLabel("Karanlık tema")).toBeChecked();
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
+    expect(await readStoredPreferences(page)).toEqual({ theme: "dark", scale: 1, mode: "pro" });
     expect(pageErrors).toEqual([]);
   } catch (error) {
     await reportScenarioFailure("fresh setup", page, pageErrors);
@@ -181,7 +207,7 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
     await expect(page.getByRole("button", { name: "Ayarlar", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-mode", "easy");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
     expect(await page.locator(".page-content").evaluate((element) => Number.parseFloat(getComputedStyle(element).paddingTop))).toBeGreaterThanOrEqual(24);
     await expect(page.locator(".system-health-item.tone-ok").first()).toBeVisible();
 
@@ -190,7 +216,8 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
     await expect(page.locator(".setup-shell.is-embedded")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
     await expect(page.getByRole("radio", { name: /Büyük ve Sade Görünüm/ })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByLabel("Karanlık tema")).toHaveCount(0);
+    await expect(page.getByLabel("Karanlık tema")).toBeVisible();
+    await expect(page.getByLabel("Karanlık tema")).toBeChecked();
 
     await expect(page.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(6);
     await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
@@ -450,9 +477,8 @@ async function waitForUrl(url) {
   throw new Error(`Desktop renderer did not become ready: ${url}`);
 }
 
-// Easy remains a light appearance regardless of the stored pro theme.
-// Verify semantic decisions, without freezing palette hex codes or old pixels.
-const EASY_THEME_INVARIANT_TOKENS = [
+// Verify semantic theme decisions without freezing palette hex codes or old pixels.
+const THEME_SEMANTIC_TOKENS = [
   "--color-bg-app", "--color-bg-surface", "--color-bg-panel", "--color-bg-field",
   "--color-text", "--color-text-muted", "--color-accent", "--color-focus",
   "--color-border", "--color-danger", "--color-warning", "--color-success",

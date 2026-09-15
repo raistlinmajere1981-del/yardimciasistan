@@ -735,7 +735,7 @@ export function SetupForm({
               onKeyDown={(event) => handleAppearanceModeKeyDown(event, "easy")}
             >
               <strong>Büyük ve Sade Görünüm <span>(Önerilen)</span></strong>
-              <small>Daha büyük yazılar, ferah alanlar ve sıcak bir görünüm sunar.</small>
+              <small>Daha büyük yazılar, ferah alanlar ve açık veya karanlık temayla rahat bir görünüm sunar.</small>
             </button>
             <button
               className={`appearance-mode-card${uiPreferences.mode === "pro" ? " is-selected" : ""}`}
@@ -750,7 +750,7 @@ export function SetupForm({
               onKeyDown={(event) => handleAppearanceModeKeyDown(event, "pro")}
             >
               <strong>Kompakt ve Gelişmiş Görünüm</strong>
-              <small>Daha çok bilgiyi ekrana sığdırır; açık veya karanlık tema seçmenizi sağlar.</small>
+              <small>Daha çok bilgiyi ekrana sığdırır; yoğun ve gelişmiş çalışma için uygundur.</small>
             </button>
           </div>
           <div className="form-grid appearance-controls">
@@ -766,7 +766,7 @@ export function SetupForm({
               </select>
               <small>Metinler, menüler ve içerik alanları birlikte ölçeklenir.</small>
             </label>
-            {uiPreferences.mode === "pro" && <div className="setup-field">
+            <div className="setup-field">
               <span>Tema</span>
               <label className="form-check setup-checkline appearance-theme-toggle">
                 <input
@@ -777,7 +777,7 @@ export function SetupForm({
                 Karanlık tema
               </label>
               <small>Az ışıklı ortamlarda daha rahat bir görünüm sağlar.</small>
-            </div>}
+            </div>
           </div>
         </div>
         {embedded && (

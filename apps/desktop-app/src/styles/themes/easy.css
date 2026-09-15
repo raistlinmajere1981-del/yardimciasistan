@@ -1,7 +1,6 @@
 /* Easy changes legibility and target size, never the spacing or palette scale. */
 
 :root[data-mode="easy"] {
-  color-scheme: light;
   --text-sm: 0.9375rem;
   --text-base: 1rem;
   --control-height-sm: 36px;

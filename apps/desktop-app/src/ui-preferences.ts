@@ -46,7 +46,7 @@ export function readUiPreferences(): UiPreferences {
 export function applyUiPreferences(preferences: UiPreferences) {
   document.documentElement.dataset.theme = preferences.theme;
   document.documentElement.dataset.mode = preferences.mode;
-  document.documentElement.style.colorScheme = preferences.mode === "easy" ? "light" : preferences.theme;
+  document.documentElement.style.colorScheme = preferences.theme;
 
   if (window.yardimciDesktop?.setUiScale) {
     document.documentElement.style.setProperty("--ui-scale", "1");

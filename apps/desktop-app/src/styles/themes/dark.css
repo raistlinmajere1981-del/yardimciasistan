@@ -1,4 +1,4 @@
-:root[data-theme="dark"]:not([data-mode="easy"]) {
+:root[data-theme="dark"] {
   color-scheme: dark;
   --color-bg-app: var(--slate-950);
   --color-bg-surface: var(--slate-900);
