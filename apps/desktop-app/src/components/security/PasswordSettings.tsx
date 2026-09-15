@@ -1,12 +1,14 @@
-import { useState, type FormEvent } from "react";
-import { KeyRound, LockKeyhole, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import { useCallback, useImperativeHandle, useRef, useState, type FormEvent, type MutableRefObject } from "react";
+import { KeyRound, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
+import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
 
 interface PasswordSettingsProps {
   configured: boolean;
   onConfiguredChange: (configured: boolean) => void;
+  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
 }
 
-export function PasswordSettings({ configured, onConfiguredChange }: PasswordSettingsProps) {
+export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef }: PasswordSettingsProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -19,36 +21,80 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
       : "İsterseniz uygulamayı şifresiz kullanabilirsiniz."
   );
   const [messageTone, setMessageTone] = useState<"idle" | "error" | "success">("idle");
+  const sectionRef = useRef<HTMLDivElement>(null);
+  const currentPasswordRef = useRef<HTMLInputElement>(null);
+  const newPasswordRef = useRef<HTMLInputElement>(null);
 
-  async function savePassword(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busyAction) return;
+  const clearPasswordFields = useCallback(() => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setPasswordConfirmation("");
+  }, []);
+
+  const showError = useCallback((errorMessage: string) => {
+    setMessage(errorMessage);
+    setMessageTone("error");
+  }, []);
+
+  const hasPasswordDraft = Boolean(currentPassword || newPassword || passwordConfirmation);
+
+  const validatePasswordDraft = useCallback(() => {
+    if (busyAction) return "Şifre işlemi devam ediyor.";
+    if (!hasPasswordDraft) return null;
+    if (configured && !currentPassword) {
+      const message = "Mevcut şifre gerekli.";
+      showError(message);
+      return message;
+    }
     if (newPassword.length < 6) {
-      showError("Yeni şifre en az 6 karakter olmalı.");
-      return;
+      const message = "Yeni şifre en az 6 karakter olmalı.";
+      showError(message);
+      return message;
     }
     if (newPassword !== passwordConfirmation) {
-      showError("Yeni şifreler birbiriyle eşleşmiyor.");
-      return;
+      const message = "Yeni şifreler birbiriyle eşleşmiyor.";
+      showError(message);
+      return message;
     }
     if (!window.yardimciDesktop?.updateAppPassword) {
-      showError("Şifre işlemleri hazır değil. Uygulamayı yeniden başlatın.");
-      return;
+      const message = "Şifre işlemleri hazır değil. Uygulamayı yeniden başlatın.";
+      showError(message);
+      return message;
     }
+    return null;
+  }, [busyAction, configured, currentPassword, hasPasswordDraft, newPassword, passwordConfirmation, showError]);
+
+  const focus = useCallback(() => {
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (configured ? currentPasswordRef : newPasswordRef).current?.focus();
+  }, [configured]);
+
+  const savePasswordDraft = useCallback(async (): Promise<SettingsOperationResult> => {
+    const validationMessage = validatePasswordDraft();
+    if (validationMessage) return { ok: false, message: validationMessage };
+    if (!hasPasswordDraft) return { ok: true, changed: false };
 
     setBusyAction("save");
     setMessage("Uygulama şifresi güvenli biçimde kaydediliyor...");
     setMessageTone("idle");
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.updateAppPassword) {
+      const message = "Şifre işlemleri hazır değil. Uygulamayı yeniden başlatın.";
+      showError(message);
+      setBusyAction("");
+      return { ok: false, message };
+    }
     let result;
     try {
-      result = await window.yardimciDesktop.updateAppPassword({
+      result = await bridge.updateAppPassword({
         currentPassword,
         newPassword
       });
     } catch {
       setBusyAction("");
-      showError("Uygulama şifresi kaydedilemedi. Uygulamayı yeniden başlatıp tekrar deneyin.");
-      return;
+      const message = "Uygulama şifresi kaydedilemedi. Uygulamayı yeniden başlatıp tekrar deneyin.";
+      showError(message);
+      return { ok: false, message };
     }
     setBusyAction("");
     setMessage(result.message);
@@ -57,7 +103,16 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
       onConfiguredChange(result.status.passwordConfigured);
       clearPasswordFields();
     }
-  }
+    return result.ok
+      ? { ok: true, changed: true, message: result.message }
+      : { ok: false, message: result.message };
+  }, [clearPasswordFields, currentPassword, hasPasswordDraft, newPassword, onConfiguredChange, showError, validatePasswordDraft]);
+
+  useImperativeHandle(saveHandleRef, () => ({
+    validate: validatePasswordDraft,
+    save: savePasswordDraft,
+    focus
+  }), [focus, savePasswordDraft, validatePasswordDraft]);
 
   async function removePassword() {
     if (busyAction || !configured) return;
@@ -133,20 +188,9 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
     }
   }
 
-  function clearPasswordFields() {
-    setCurrentPassword("");
-    setNewPassword("");
-    setPasswordConfirmation("");
-  }
-
-  function showError(errorMessage: string) {
-    setMessage(errorMessage);
-    setMessageTone("error");
-  }
-
   return (
     <>
-      <div className="setup-section settings-password-section">
+      <div ref={sectionRef} className="setup-section settings-password-section">
         <div className="setup-section-title settings-password-title">
           <div>
             <p>Gizlilik</p>
@@ -158,16 +202,17 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
           </span>
         </div>
         <p className="setup-section-description">
-          Uygulama açılışını ve üst bardaki ekran kilidini korur. Şifreniz düz metin olarak saklanmaz.
+          Uygulama açılışını ve üst bardaki ekran kilidini korur. Alanları doldurduktan sonra sağ üstteki Ayarları Kaydet düğmesine basın; şifreniz düz metin olarak saklanmaz.
         </p>
 
-        <form className="password-settings-form" onSubmit={savePassword}>
+        <form className="password-settings-form" onSubmit={(event) => event.preventDefault()}>
           {configured && (
             <label className="form-field form-field--medium">
               Mevcut şifre
               <span className="field-control-group password-settings-input">
                 <KeyRound size={16} aria-hidden="true" />
                 <input
+                  ref={currentPasswordRef}
                   value={currentPassword}
                   onChange={(event) => setCurrentPassword(event.target.value)}
                   type="password"
@@ -182,6 +227,7 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
             <label className="form-field form-field--medium">
               {configured ? "Yeni şifre" : "Şifre belirleyin"}
               <input
+                ref={newPasswordRef}
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
                 type="password"
@@ -202,22 +248,12 @@ export function PasswordSettings({ configured, onConfiguredChange }: PasswordSet
               />
             </label>
           </div>
-          <div className="form-actions password-settings-actions">
-            <button className="setup-primary action-button action-button-primary" type="submit" disabled={Boolean(busyAction)}>
-              <LockKeyhole size={16} aria-hidden="true" />
-              {busyAction === "save"
-                ? "Kaydediliyor"
-                : configured
-                  ? "Şifreyi Değiştir"
-                  : "Şifreyi Belirle"}
-            </button>
-            {configured && (
+          {configured && <div className="form-actions password-settings-actions">
               <button className="setup-secondary password-remove-button action-button action-button-danger" type="button" onClick={removePassword} disabled={Boolean(busyAction)}>
                 <Trash2 size={16} aria-hidden="true" />
                 {busyAction === "remove" ? "Kaldırılıyor" : "Şifreyi Kaldır"}
               </button>
-            )}
-          </div>
+          </div>}
         </form>
 
         {configured && (

@@ -33,6 +33,20 @@ try {
     let passwordConfigured = true;
     let password = "başlangıç-şifresi";
     const webSecurityKey = "web-security-key-123";
+    let publicProfile = {
+      description: "Kilit smoke işletmesi",
+      latitude: 37.05,
+      longitude: 28.32,
+      directionsNote: "",
+      checkInTime: "14:00",
+      checkOutTime: "11:00",
+      breakfastStartTime: "08:00",
+      breakfastEndTime: "10:00",
+      features: [],
+      policyNote: "",
+      paymentNote: "",
+      languages: ["Türkçe"]
+    };
     const status = () => ({
       locked,
       passwordConfigured,
@@ -106,6 +120,11 @@ try {
         };
       },
       getDashboardData: async () => dashboardData,
+      getBusinessPublicProfile: async () => publicProfile,
+      saveBusinessPublicProfile: async (input) => {
+        publicProfile = input;
+        return { ok: true, message: "Bilgiler kaydedildi.", profile: publicProfile };
+      },
       getSyncStatus: async () => ({
         enabled: true,
         clientId: "lock-smoke",
@@ -170,9 +189,12 @@ try {
 
   await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Bilgileri Kaydet", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Oda Bilgilerini Kaydet", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Şifreyi (Belirle|Değiştir)/, exact: true })).toHaveCount(0);
   await page.getByLabel("Şifre belirleyin").fill("yeni-şifre-42");
   await page.getByLabel("Yeni şifre tekrar").fill("yeni-şifre-42");
-  await page.getByRole("button", { name: "Şifreyi Belirle" }).click();
+  await page.getByRole("button", { name: "Ayarları Kaydet", exact: true }).click();
   await expect(page.getByText("Uygulama açılış şifresi belirlendi.", { exact: true })).toBeVisible();
   await expect(page.getByText("Şifre açık", { exact: true })).toBeVisible();
 
@@ -194,7 +216,7 @@ try {
   await page.getByLabel("Mevcut şifre").fill("yeni-şifre-42");
   await page.getByLabel("Yeni şifre", { exact: true }).fill("değişen-şifre-84");
   await page.getByLabel("Yeni şifre tekrar").fill("değişen-şifre-84");
-  await page.getByRole("button", { name: "Şifreyi Değiştir" }).click();
+  await page.getByRole("button", { name: "Ayarları Kaydet", exact: true }).click();
   await expect(page.getByText("Uygulama açılış şifresi değiştirildi.", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Uygulamayı kilitle" }).click();

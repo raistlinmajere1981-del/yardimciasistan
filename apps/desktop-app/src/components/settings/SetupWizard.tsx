@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import type { ComponentProps } from "react";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import type { SetupFormState } from "../../app/setup-model";
@@ -7,14 +8,16 @@ import {
 } from "./BusinessCapabilitySettings";
 import { BusinessPublicProfileSection } from "./BusinessPublicProfileSection";
 import { SetupForm } from "./SetupForm";
+import type { SettingsSaveSectionHandle } from "../../app/settings-save";
 
 type SetupFormProps = ComponentProps<typeof SetupForm>;
-type SetupWizardProps = Omit<SetupFormProps, "form" | "onFormChange" | "enabledCapabilities"> & {
+type SetupWizardProps = Omit<SetupFormProps, "form" | "onFormChange" | "enabledCapabilities" | "publicProfile" | "publicProfileSaveRef"> & {
   form: SetupFormState;
   onFormChange: (form: SetupFormState) => void;
 };
 
 export function SetupWizard(props: SetupWizardProps) {
+  const publicProfileSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
   const capabilityRuntime = useBusinessCapabilityRuntime();
   const effectiveCapabilities = getEffectiveSetupCapabilities(
     props.form.profileId,
@@ -32,9 +35,10 @@ export function SetupWizard(props: SetupWizardProps) {
       <SetupForm
         {...props}
         enabledCapabilities={deviceRuntimeCapabilities}
+        publicProfileSaveRef={publicProfileSaveRef}
         publicProfile={props.embedded && capabilityRuntime.snapshot?.businessId ? (
           <div id="settings-public" className="setup-public-profile-shell">
-            <BusinessPublicProfileSection businessAddress={props.form.address} />
+            <BusinessPublicProfileSection businessAddress={props.form.address} saveHandleRef={publicProfileSaveRef} />
           </div>
         ) : null}
       />

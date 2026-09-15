@@ -22,6 +22,10 @@ try {
     localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ theme: 'light', mode: 'easy', scale: 1 }));
     const enabledCapabilities = ['core.customers','core.requests','core.business_profile','accommodation.rooms','accommodation.reservations','food_service.tables','food_service.menu','food_service.orders','service.whatsapp','service.android','service.ai'];
     let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'] };
+    let rooms = [
+      { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', nightlyPriceMinor: 240000 },
+      { id: 'room_design_102', name: 'Smoke Aile Odası', number: '102', nightlyPriceMinor: 320000 }
+    ];
     window.__designCalls = [];
     window.yardimciDesktop = {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
@@ -30,9 +34,28 @@ try {
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
-      getRoomFolioData: async () => ({ rooms: [], activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
+      getRoomFolioData: async () => ({ rooms, activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
+      setRoomNightlyPrice: async input => {
+        rooms = rooms.map(room => room.id === input.roomId ? { ...room, name: input.name, nightlyPriceMinor: input.amountMinor } : room);
+        window.__designCalls.push({ kind: 'room', input });
+        return { ok: true, message: 'Oda bilgileri kaydedildi.' };
+      },
       listLocalBackups: async () => ({ ok: true, backups: [{ id: 'design-backup', createdAt: '2026-09-13T09:00:00Z', kind: 'manual', sizeBytes: 2048000, imageCount: 3 }] }),
       updateAppPassword: async input => { window.__designCalls.push({ kind: 'password', input }); return { ok: true, message: 'Şifre kaydedildi.', status: { passwordConfigured: true } }; },
+      saveInitialSetup: async input => {
+        Object.assign(setup, {
+          businessName: input.businessName,
+          profileId: input.profileId,
+          phone: input.phone,
+          whatsapp: input.whatsapp,
+          email: input.email,
+          address: input.address,
+          initialCounts: input.initialCounts,
+          setupRequired: false
+        });
+        window.__designCalls.push({ kind: 'setup', input });
+        return { ok: true, message: 'Ayarlar kaydedildi.', setupData: { ...setup }, dashboardData: dashboard };
+      },
       testWebConnection: async () => ({ ok: true, message: 'Bağlantı başarılı.' }),
       getSyncStatus: async () => ({ enabled: false, phase: 'idle', pendingJobs: 0, consecutiveFailures: 0, message: '', lastError: '' }),
       onSyncStatusChanged: () => () => {},
@@ -53,7 +76,7 @@ try {
     const metrics = await page.evaluate(() => {
       const box = selector => { const e = document.querySelector(selector); const b = e.getBoundingClientRect(); return { width: b.width, height: b.height }; };
       const overflows = [...document.querySelectorAll('.content, .setup-capabilities, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className);
-      return { overflows, documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, phone: box('.settings-identity-section .form-field--short input'), time: box('input[type="time"]'), map: box('.business-location-map-viewport'), button: box('.business-public-profile-heading button'), timeRows: new Set([...document.querySelectorAll('input[type="time"]')].map(el => Math.round(el.getBoundingClientRect().top))).size };
+      return { overflows, documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, phone: box('.settings-identity-section .form-field--short input'), time: box('input[type="time"]'), map: box('.business-location-map-viewport'), button: box('.page-header-tools button'), timeRows: new Set([...document.querySelectorAll('input[type="time"]')].map(el => Math.round(el.getBoundingClientRect().top))).size };
     });
     observations.push({ width, height, ...metrics });
     expect(metrics.documentOverflow, `Document overflow at ${width}`).toBe(false);
@@ -78,14 +101,49 @@ try {
   await page.getByLabel('Boylam', { exact: true }).fill('28.33');
   // Test actual form semantics and unchanged bridge payloads.
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect(page.getByRole('button', { name: 'Ayarları Kaydet', exact: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Bilgileri Kaydet', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Oda Bilgilerini Kaydet', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Şifreyi (Belirle|Değiştir)/, exact: true })).toHaveCount(0);
   await page.getByLabel('İşletme açıklaması').fill('Güncellenen açıklama');
-  await page.getByRole('button', { name: 'Bilgileri Kaydet', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
-  expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
+  await page.getByLabel('Firma adı', { exact: true }).fill('Güncellenen Smoke İşletmesi');
+  await page.getByLabel('Oda 101 adı', { exact: true }).fill('Güncellenen Oda');
+  await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
   await page.getByLabel('Şifre belirleyin', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('design-test-password');
-  await page.getByRole('button', { name: 'Şifreyi Belirle', exact: true }).click();
+  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
+  expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
+  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'room')?.input.name)).toBe('Güncellenen Oda');
+  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
+  const saveOrder = await page.evaluate(() => window.__designCalls.map(call => call.kind));
+  expect(saveOrder.slice(0, 2)).toEqual(['setup', 'public']);
+  expect(saveOrder.at(-1)).toBe('password');
+  expect(saveOrder.filter(kind => kind === 'room').length).toBe(2);
   await expect(page.getByText('Şifre kaydedildi.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Ayarlar kaydedildi.', { exact: true })).toBeVisible();
+  const callCountAfterSave = await page.evaluate(() => window.__designCalls.length);
+  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
+
+  await page.getByLabel('Enlem', { exact: true }).fill('91');
+  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
+  await expect(page.getByText(/Müşteri bilgileri:/, { exact: false })).toBeVisible();
+  expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
+  await page.getByLabel('Enlem', { exact: true }).fill('37.06');
+
+  await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('-1');
+  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
+  await expect(page.getByText(/Oda yönetimi:/, { exact: false })).toBeVisible();
+  expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
+  await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
+
+  await page.getByLabel('Mevcut şifre', { exact: true }).fill('design-test-password');
+  await page.getByLabel('Yeni şifre', { exact: true }).fill('short');
+  await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('short');
+  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
+  await expect(page.getByText(/Uygulama şifresi:/, { exact: false })).toBeVisible();
+  expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
   for (const theme of ['light','dark']) {
     await page.getByRole('radio', { name: /Kompakt ve Gelişmiş/ }).click();
     await page.getByLabel('Karanlık tema').setChecked(theme === 'dark');

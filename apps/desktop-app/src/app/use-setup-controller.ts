@@ -7,6 +7,7 @@ import type {
 import { parseGoogleAiStudioCurl } from "../google-ai-studio";
 import { defaultSetupData } from "./bootstrap-defaults";
 import { type SyncState } from "./runtime-state";
+import type { SettingsOperationResult } from "./settings-save";
 import {
   createSaveAiServiceProfiles,
   toSetupForm,
@@ -24,10 +25,12 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
   const [setupMode, setSetupMode] = useState(false);
   const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
+  const [setupDirty, setSetupDirty] = useState(false);
   const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
 
   const setSetupForm = useCallback<Dispatch<SetStateAction<SetupFormState>>>((nextState) => {
+    setSetupDirty(true);
     setSetupFormState(nextState);
   }, []);
 
@@ -48,6 +51,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
   ) {
     setSetupData(nextSetupData);
     setSetupFormState(toSetupForm(nextSetupData));
+    setSetupDirty(false);
     setSetupMode(nextSetupData.setupRequired);
     if (!nextSetupData.setupRequired && firstApplicationLoad) {
       onInitialSetupReadyRef.current?.();
@@ -121,7 +125,11 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     }
   }
 
-  async function saveSetup(setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>) {
+  async function saveSetup(setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>): Promise<SettingsOperationResult> {
+    if (!setupData.setupRequired && !setupDirty) {
+      return { ok: true, changed: false, message: "Ayarlar zaten güncel." };
+    }
+
     setSetupSaveState("loading");
     setSetupMessage("Kurulum ayarları kaydediliyor...");
 
@@ -129,7 +137,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     if (!bridge) {
       setSetupSaveState("error");
       setSetupMessage("Ayarlar kaydedilemedi. Masaüstü uygulamasını yeniden başlatın.");
-      return;
+      return { ok: false, message: "Ayarlar kaydedilemedi. Masaüstü uygulamasını yeniden başlatın." };
     }
 
     const input: SaveInitialSetupInput = {
@@ -173,25 +181,30 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
       result = await bridge.saveInitialSetup(input);
     } catch (error) {
       setSetupSaveState("error");
-      setSetupMessage(error instanceof Error ? error.message : "Ayarlar kaydedilemedi.");
-      return;
+      const message = error instanceof Error ? error.message : "Ayarlar kaydedilemedi.";
+      setSetupMessage(message);
+      return { ok: false, message };
     }
     if (!result.ok) {
       setSetupSaveState("error");
       setSetupMessage(result.message);
-      return;
+      return { ok: false, message: result.message };
     }
 
     const nextSetupData = result.setupData;
     setSetupData(nextSetupData);
     setDashboardData(result.dashboardData);
     setSetupFormState(toSetupForm(nextSetupData));
+    setSetupDirty(false);
     const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
     setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
     setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
     if (!aiConnectionCouldNotBePublished) {
       setSetupMode(false);
     }
+    return aiConnectionCouldNotBePublished
+      ? { ok: false, message: result.message }
+      : { ok: true, changed: true, message: "Ayarlar kaydedildi." };
   }
 
   function setPasswordConfigured(configured: boolean) {

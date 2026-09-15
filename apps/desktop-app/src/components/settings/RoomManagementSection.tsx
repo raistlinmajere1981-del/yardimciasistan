@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { BUSINESS_CAPABILITIES, type SaveRoomPublicDetailsInput } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { reportAppStatus } from "../../app/runtime-state";
+import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
 import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 
 interface RoomDraftData {
@@ -24,9 +25,17 @@ interface RoomManagementSectionProps {
   roomCount: string;
   dashboardRoomCount: number;
   onRoomCountChange: (value: string) => void;
+  onDashboardRefresh?: () => Promise<unknown>;
+  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
 }
 
-export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCountChange }: RoomManagementSectionProps) {
+export function RoomManagementSection({
+  roomCount,
+  dashboardRoomCount,
+  onRoomCountChange,
+  onDashboardRefresh,
+  saveHandleRef
+}: RoomManagementSectionProps) {
   const capabilityRuntime = useBusinessCapabilityRuntime();
   const roomsEnabled = runtimeHasCapability(
     capabilityRuntime.snapshot,
@@ -37,10 +46,38 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [editingRoom, setEditingRoom] = useState<DesktopDashboardData["rooms"][number] | null>(null);
+  const savedRoomsRef = useRef<RoomDraftState[]>([]);
+  const roomDraftRef = useRef<RoomDraftState[]>([]);
+  const roomsLoadedRef = useRef(false);
+  const roomLoadPromiseRef = useRef<Promise<void> | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const firstRoomNameRef = useRef<HTMLInputElement>(null);
+
+  const applyServerRooms = useCallback((serverRooms: RoomDraftState[], preservePendingDrafts = true) => {
+    const pendingDrafts = preservePendingDrafts
+      ? new Map(
+          roomDraftRef.current
+            .filter((draft) => {
+              const saved = savedRoomsRef.current.find((room) => room.id === draft.id);
+              return saved && JSON.stringify(saved) !== JSON.stringify(draft);
+            })
+            .map((draft) => [draft.id, draft] as const)
+        )
+      : new Map<string, RoomDraftState>();
+    const nextRooms = serverRooms.map((room) => pendingDrafts.get(room.id) ?? room);
+    savedRoomsRef.current = serverRooms;
+    roomDraftRef.current = nextRooms;
+    setRooms(nextRooms);
+    return nextRooms;
+  }, []);
 
   useEffect(() => {
     let active = true;
     if (!roomsEnabled) {
+      roomsLoadedRef.current = true;
+      roomLoadPromiseRef.current = null;
+      savedRoomsRef.current = [];
+      roomDraftRef.current = [];
       setRooms([]);
       setLoading(false);
       setSaveState("idle");
@@ -60,10 +97,12 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
         return;
       }
       setLoading(true);
+      roomsLoadedRef.current = false;
       try {
         const data = await bridge.getRoomFolioData();
         if (!active) return;
-        setRooms(data.rooms.map(toDraft));
+        const serverRooms = data.rooms.map(toDraft);
+        applyServerRooms(serverRooms);
         setSaveState("idle");
         setMessage("");
       } catch {
@@ -71,40 +110,89 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
         setSaveState("error");
         setMessage("Oda bilgileri yüklenemedi.");
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          roomsLoadedRef.current = true;
+          setLoading(false);
+        }
       }
     };
-    void load();
+    roomLoadPromiseRef.current = load();
+    void roomLoadPromiseRef.current;
     return () => { active = false; };
-  }, [dashboardRoomCount, roomsEnabled]);
+  }, [applyServerRooms, dashboardRoomCount, roomsEnabled]);
 
   const invalidMessage = useMemo(() => {
-    const invalid = rooms.find((room) => !room.id || !room.name.trim() || parseMoneyToMinor(room.price) < 0);
-    if (!invalid) return "";
-    return !invalid.name.trim() ? "Oda adı boş bırakılamaz." : "Fiyatları kontrol edin.";
+    return getInvalidRoomMessage(rooms);
   }, [rooms]);
 
   const updateRoom = (id: string, patch: Partial<Pick<RoomDraftState, "name" | "price">>) => {
-    setRooms((current) => current.map((room) => room.id === id ? { ...room, ...patch } : room));
+    setRooms((current) => {
+      const nextRooms = current.map((room) => room.id === id ? { ...room, ...patch } : room);
+      roomDraftRef.current = nextRooms;
+      return nextRooms;
+    });
     if (saveState !== "idle") {
       setSaveState("idle");
       setMessage("");
     }
   };
 
-  const saveRooms = async () => {
+  const validateRooms = useCallback(() => {
+    if (loading) return "Oda bilgileri yükleniyor.";
+    return invalidMessage || null;
+  }, [invalidMessage, loading]);
+
+  const focus = useCallback(() => {
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    firstRoomNameRef.current?.focus();
+  }, []);
+
+  const saveRooms = useCallback(async (): Promise<SettingsOperationResult> => {
     const bridge = window.yardimciDesktop;
-    if (!roomsEnabled || !bridge?.setRoomNightlyPrice || !bridge.getRoomFolioData) return;
-    if (invalidMessage) {
+    if (!roomsEnabled) return { ok: true, changed: false };
+
+    if (roomLoadPromiseRef.current && !roomsLoadedRef.current) {
+      await roomLoadPromiseRef.current;
+    }
+    if (Number(roomCount) !== dashboardRoomCount) {
+      if (!bridge?.getRoomFolioData) {
+        const message = "Oda bilgileri bu ortamda kullanılamıyor.";
+        setSaveState("error");
+        setMessage(message);
+        return { ok: false, message };
+      }
+      try {
+        const data = await bridge.getRoomFolioData();
+        applyServerRooms(data.rooms.map(toDraft));
+      } catch {
+        const message = "Oda bilgileri yüklenemedi.";
+        setSaveState("error");
+        setMessage(message);
+        return { ok: false, message };
+      }
+    }
+    const currentRooms = roomDraftRef.current;
+    const validationMessage = roomsLoadedRef.current
+      ? getInvalidRoomMessage(currentRooms) || null
+      : validateRooms();
+    if (validationMessage) {
       setSaveState("error");
-      setMessage(invalidMessage);
-      return;
+      setMessage(validationMessage);
+      return { ok: false, message: validationMessage };
+    }
+    const hasCurrentRoomChanges = JSON.stringify(savedRoomsRef.current) !== JSON.stringify(currentRooms);
+    if (!hasCurrentRoomChanges) return { ok: true, changed: false };
+    if (!bridge?.setRoomNightlyPrice || !bridge.getRoomFolioData) {
+      const message = "Oda bilgileri bu ortamda kullanılamıyor.";
+      setSaveState("error");
+      setMessage(message);
+      return { ok: false, message };
     }
 
     setSaveState("saving");
     setMessage("Kaydediliyor…");
     try {
-      for (const room of rooms) {
+      for (const room of currentRooms) {
         const input = {
           roomId: room.id,
           amountMinor: parseMoneyToMinor(room.price),
@@ -115,14 +203,20 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
         if (!result.ok) throw new Error(result.message);
       }
       const fresh = await bridge.getRoomFolioData();
-      setRooms(fresh.rooms.map(toDraft));
+      applyServerRooms(fresh.rooms.map(toDraft), false);
+      await onDashboardRefresh?.();
       setSaveState("success");
       setMessage("Oda bilgileri kaydedildi.");
+      return { ok: true, changed: true, message: "Oda bilgileri kaydedildi." };
     } catch (error) {
+      const message = error instanceof Error && error.message ? error.message : "Oda bilgileri kaydedilemedi.";
       setSaveState("error");
-      setMessage(error instanceof Error && error.message ? error.message : "Oda bilgileri kaydedilemedi.");
+      setMessage(message);
+      return { ok: false, message };
     }
-  };
+  }, [applyServerRooms, dashboardRoomCount, onDashboardRefresh, roomCount, roomsEnabled, validateRooms]);
+
+  useImperativeHandle(saveHandleRef, () => ({ validate: validateRooms, save: saveRooms, focus }), [focus, saveRooms, validateRooms]);
 
   const openRoomDetails = async (roomId: string) => {
     const bridge = window.yardimciDesktop;
@@ -178,9 +272,14 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
         return { ok: false, message: result.message };
       }
 
-      setRooms((current) => current.map((room) => room.id === input.roomId
+      const nextRooms = rooms.map((room) => room.id === input.roomId
         ? { ...room, name: input.name, number: input.number }
-        : room));
+        : room);
+      savedRoomsRef.current = savedRoomsRef.current.map((room) => room.id === input.roomId
+        ? { ...room, name: input.name, number: input.number }
+        : room);
+      roomDraftRef.current = nextRooms;
+      setRooms(nextRooms);
       reportAppStatus("success", result.message);
       return { ok: true, message: result.message };
     } catch (error) {
@@ -197,7 +296,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
   }
 
   return (
-    <section className="setup-section room-management-settings">
+    <section ref={sectionRef} className="setup-section room-management-settings">
       <div className="setup-section-title room-management-heading">
         <div>
           <p>Pansiyon</p>
@@ -231,7 +330,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
         ) : (
           <>
             <div className="room-management-list-head"><span>Oda</span><span>Oda adı</span><span>Gecelik fiyat</span></div>
-            {rooms.map((room) => (
+            {rooms.map((room, index) => (
               <div className="room-management-row" key={room.id}>
                 <div className="room-management-identity">
                   <strong>{room.number ? `Oda ${room.number}` : "Oda"}</strong>
@@ -244,6 +343,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
                   </button>
                 </div>
                 <input
+                  ref={index === 0 ? firstRoomNameRef : undefined}
                   className="room-management-name"
                   value={room.name}
                   maxLength={120}
@@ -269,10 +369,7 @@ export function RoomManagementSection({ roomCount, dashboardRoomCount, onRoomCou
       </div>
 
       <div className="room-management-footer">
-        <span>Oda sayısı değişikliği üstteki “Ayarları Kaydet” düğmesiyle uygulanır. Fiyat değişikliği açık oda adisyonlarını etkilemez.</span>
-        <button className="setup-primary room-management-save action-button action-button-primary" type="button" onClick={() => void saveRooms()} disabled={loading || saveState === "saving"}>
-          {saveState === "saving" ? "Kaydediliyor" : "Oda Bilgilerini Kaydet"}
-        </button>
+        <span>Oda sayısı, ad ve fiyat değişiklikleri üstteki “Ayarları Kaydet” düğmesiyle uygulanır. Fiyat değişikliği açık oda adisyonlarını etkilemez.</span>
       </div>
 
       <RoomPublicDetailsEditor
@@ -292,6 +389,12 @@ function toDraft(room: RoomDraftData): RoomDraftState {
     number: room.number,
     price: minorToInput(room.nightlyPriceMinor)
   };
+}
+
+function getInvalidRoomMessage(roomList: RoomDraftState[]) {
+  const invalid = roomList.find((room) => !room.id || !room.name.trim() || parseMoneyToMinor(room.price) < 0);
+  if (!invalid) return "";
+  return !invalid.name.trim() ? "Oda adı boş bırakılamaz." : "Fiyatları kontrol edin.";
 }
 
 function minorToInput(value: number) {

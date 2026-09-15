@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type MutableRefObject } from "react";
 import {
   BUSINESS_PUBLIC_FEATURE_CATALOG,
   BUSINESS_PUBLIC_PROFILE_LIMITS,
@@ -8,6 +8,7 @@ import {
 } from "@yardimci-asistan/shared";
 import type { BusinessLocationGeocodeCandidate } from "../../../electron/business-location-geocode";
 import { reportAppStatus } from "../../app/runtime-state";
+import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
 import { BusinessLocationMapPicker } from "./BusinessLocationMapPicker";
 
 interface BusinessPublicProfileDraft {
@@ -27,6 +28,7 @@ interface BusinessPublicProfileDraft {
 
 interface BusinessPublicProfileSectionProps {
   businessAddress: string;
+  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
 }
 
 type AddressLookupState = "idle" | "loading" | "success" | "error";
@@ -46,7 +48,7 @@ const EMPTY_DRAFT: BusinessPublicProfileDraft = {
   languages: ""
 };
 
-export function BusinessPublicProfileSection({ businessAddress }: BusinessPublicProfileSectionProps) {
+export function BusinessPublicProfileSection({ businessAddress, saveHandleRef }: BusinessPublicProfileSectionProps) {
   const [draft, setDraft] = useState<BusinessPublicProfileDraft>(EMPTY_DRAFT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,6 +56,9 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
   const [addressLookupState, setAddressLookupState] = useState<AddressLookupState>("idle");
   const [addressLookupMessage, setAddressLookupMessage] = useState("");
   const [addressCandidates, setAddressCandidates] = useState<BusinessLocationGeocodeCandidate[]>([]);
+  const initialDraftRef = useRef<BusinessPublicProfileDraft | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const latitudeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -69,7 +74,9 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
       try {
         const profile = await bridge.getBusinessPublicProfile();
         if (!active) return;
-        setDraft(toDraft(profile));
+        const nextDraft = toDraft(profile);
+        setDraft(nextDraft);
+        initialDraftRef.current = nextDraft;
       } catch {
         if (active) {
           reportAppStatus("error", "Müşteriye açık işletme bilgileri yüklenemedi.");
@@ -162,65 +169,102 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
   const selectAddressCandidate = (candidate: BusinessLocationGeocodeCandidate) => {
     selectMapPoint(candidate.latitude, candidate.longitude);
     setAddressLookupState("success");
-    setAddressLookupMessage("Seçilen adres haritada işaretlendi. Gerekirse pini elle düzeltip Bilgileri Kaydet'e basın.");
+    setAddressLookupMessage("Seçilen adres haritada işaretlendi. Gerekirse pini elle düzeltip sağ üstteki Ayarları Kaydet düğmesine basın.");
   };
 
-  const save = async () => {
+  const buildInput = useCallback((): { ok: true; input: SaveBusinessPublicProfileInput } | { ok: false; message: string } => {
+    const coordinates = parseCoordinates(draft.latitude, draft.longitude);
+    if (!coordinates.ok) return coordinates;
+
+    return {
+      ok: true,
+      input: {
+        description: draft.description,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+        directionsNote: draft.directionsNote,
+        checkInTime: draft.checkInTime,
+        checkOutTime: draft.checkOutTime,
+        breakfastStartTime: draft.breakfastStartTime,
+        breakfastEndTime: draft.breakfastEndTime,
+        features: draft.features,
+        policyNote: draft.policyNote,
+        paymentNote: draft.paymentNote,
+        languages: splitLanguages(draft.languages)
+      }
+    };
+  }, [draft]);
+
+  const validateDraft = useCallback(() => {
+    if (loading) return "Müşteriye açık işletme bilgileri yükleniyor.";
+    if (!initialDraftRef.current) return "Müşteriye açık işletme bilgileri henüz yüklenmedi.";
+
+    const result = buildInput();
+    if (!result.ok) {
+      setCoordinateError(result.message);
+      return result.message;
+    }
+    setCoordinateError("");
+    return null;
+  }, [buildInput, loading]);
+
+  const hasDraftChanges = useCallback(() => (
+    initialDraftRef.current !== null
+      && JSON.stringify(initialDraftRef.current) !== JSON.stringify(draft)
+  ), [draft]);
+
+  const focus = useCallback(() => {
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    latitudeInputRef.current?.focus();
+  }, []);
+
+  const save = useCallback(async (): Promise<SettingsOperationResult> => {
+    const validationMessage = validateDraft();
+    if (validationMessage) return { ok: false, message: validationMessage };
+    if (!hasDraftChanges()) return { ok: true, changed: false };
+
     const bridge = window.yardimciDesktop;
     if (!bridge?.saveBusinessPublicProfile) {
-      reportAppStatus("error", "Müşteriye açık işletme bilgileri kaydedilemiyor. Uygulamayı yeniden başlatın.");
-      return;
+      const message = "Müşteriye açık işletme bilgileri kaydedilemiyor. Uygulamayı yeniden başlatın.";
+      reportAppStatus("error", message);
+      return { ok: false, message };
     }
 
-    const coordinates = parseCoordinates(draft.latitude, draft.longitude);
-    if (!coordinates.ok) {
-      setCoordinateError(coordinates.message);
-      return;
-    }
-
-    const input: SaveBusinessPublicProfileInput = {
-      description: draft.description,
-      latitude: coordinates.latitude,
-      longitude: coordinates.longitude,
-      directionsNote: draft.directionsNote,
-      checkInTime: draft.checkInTime,
-      checkOutTime: draft.checkOutTime,
-      breakfastStartTime: draft.breakfastStartTime,
-      breakfastEndTime: draft.breakfastEndTime,
-      features: draft.features,
-      policyNote: draft.policyNote,
-      paymentNote: draft.paymentNote,
-      languages: splitLanguages(draft.languages)
-    };
+    const inputResult = buildInput();
+    if (!inputResult.ok) return { ok: false, message: inputResult.message };
 
     setSaving(true);
     try {
-      const result = await bridge.saveBusinessPublicProfile(input);
+      const result = await bridge.saveBusinessPublicProfile(inputResult.input);
       if (!result.ok) {
         reportAppStatus("error", result.message);
-        return;
+        return { ok: false, message: result.message };
       }
-      setDraft(toDraft(result.profile));
+      const nextDraft = toDraft(result.profile);
+      setDraft(nextDraft);
+      initialDraftRef.current = nextDraft;
       setCoordinateError("");
       reportAppStatus("success", result.message);
+      return { ok: true, changed: true, message: result.message };
     } catch {
-      reportAppStatus("error", "Müşteriye açık işletme bilgileri kaydedilemedi.");
+      const message = "Müşteriye açık işletme bilgileri kaydedilemedi.";
+      reportAppStatus("error", message);
+      return { ok: false, message };
     } finally {
       setSaving(false);
     }
-  };
+  }, [buildInput, hasDraftChanges, validateDraft]);
+
+  useImperativeHandle(saveHandleRef, () => ({ validate: validateDraft, save, focus }), [focus, save, validateDraft]);
 
   return (
-    <section className="setup-section business-public-profile-section" aria-busy={loading || saving}>
+    <section ref={sectionRef} className="setup-section business-public-profile-section" aria-busy={loading || saving}>
       <div className="setup-section-title business-public-profile-heading">
         <div>
           <h2>Müşteriye Gösterilen Bilgiler</h2>
         </div>
-        <button className="setup-primary action-button action-button-primary" type="button" disabled={loading || saving} onClick={() => void save()}>
-          {saving ? "Kaydediliyor" : "Bilgileri Kaydet"}
-        </button>
       </div>
-      <p className="setup-section-description">Müşterilerin işletmeniz hakkında görmesini istediğiniz bilgileri düzenleyin.</p>
+      <p className="setup-section-description">Müşterilerin işletmeniz hakkında görmesini istediğiniz bilgileri düzenleyin. Değişiklikleri sağ üstteki Ayarları Kaydet düğmesiyle kaydedin.</p>
 
       {loading ? (
         <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
@@ -333,6 +377,7 @@ export function BusinessPublicProfileSection({ businessAddress }: BusinessPublic
               <label className="form-field form-field--short">
                 Enlem
                 <input
+                  ref={latitudeInputRef}
                   type="number"
                   inputMode="decimal"
                   step="any"

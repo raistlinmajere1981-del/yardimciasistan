@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type MutableRefObject, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { ExternalLink, Plus, RefreshCw, Save, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
 import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import {
@@ -19,6 +19,12 @@ import {
   type SetupFormState
 } from "../../app/setup-model";
 import { UI_SCALE_OPTIONS, type UiMode, type UiPreferences } from "../../ui-preferences";
+import type {
+  SettingsOperationResult,
+  SettingsSaveHandle,
+  SettingsSaveSectionHandle,
+  SettingsSaveState
+} from "../../app/settings-save";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
 import { PasswordSettings } from "../security/PasswordSettings";
 import { RoomManagementSection } from "./RoomManagementSection";
@@ -58,6 +64,10 @@ interface SetupFormProps {
   dashboardData?: DesktopDashboardData;
   embedded?: boolean;
   publicProfile?: ReactNode;
+  publicProfileSaveRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
+  settingsSaveRef?: MutableRefObject<SettingsSaveHandle | null>;
+  onSettingsSaveStateChange?: (state: SettingsSaveState, message: string) => void;
+  onDashboardRefresh?: () => Promise<unknown>;
   saveState: SyncState;
   message: string;
   backupState?: SyncState;
@@ -78,7 +88,7 @@ interface SetupFormProps {
   onResetAndroidDevicePermissions?: (deviceId: string) => void;
   onRevokeAndroidDevice?: (device: DesktopAndroidDevice) => void;
   onAppPasswordConfiguredChange?: (configured: boolean) => void;
-  onSave: () => void;
+  onSave: () => Promise<SettingsOperationResult>;
   onSkip: () => void;
   uiPreferences: UiPreferences;
   onUiPreferencesChange: (preferences: UiPreferences) => void;
@@ -91,6 +101,10 @@ export function SetupForm({
   dashboardData,
   embedded = false,
   publicProfile,
+  publicProfileSaveRef,
+  settingsSaveRef,
+  onSettingsSaveStateChange,
+  onDashboardRefresh,
   saveState,
   message,
   backupState = "idle",
@@ -123,6 +137,9 @@ export function SetupForm({
   const [aiApiKeyRevealMessage, setAiApiKeyRevealMessage] = useState("");
   const selectedAiServiceRef = useRef(form.aiService);
   const appearanceModeRefs = useRef<Record<UiMode, HTMLButtonElement | null>>({ easy: null, pro: null });
+  const roomSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
+  const passwordSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
+  const settingsSaveInFlightRef = useRef(false);
   const [webConnectionTestState, setWebConnectionTestState] = useState<SyncState>("idle");
   const [webConnectionTestMessage, setWebConnectionTestMessage] = useState("Web bağlantısı henüz denenmedi.");
 
@@ -347,6 +364,63 @@ export function SetupForm({
     </div>
   );
 
+  const saveSettings = useCallback(async () => {
+    if (!embedded || settingsSaveInFlightRef.current) return false;
+
+    settingsSaveInFlightRef.current = true;
+    onSettingsSaveStateChange?.("loading", "Kaydediliyor...");
+    const getSections = () => [
+      { label: "Müşteri bilgileri", handle: publicProfileSaveRef?.current },
+      { label: "Oda yönetimi", handle: roomSaveRef.current },
+      { label: "Uygulama şifresi", handle: passwordSaveRef.current }
+    ].filter(
+      (section): section is { label: string; handle: SettingsSaveSectionHandle } => Boolean(section.handle)
+    );
+
+    try {
+      for (const section of getSections()) {
+        const validationMessage = section.handle.validate();
+        if (validationMessage) {
+          onSettingsSaveStateChange?.("error", `${section.label}: ${validationMessage}`);
+          section.handle.focus();
+          return false;
+        }
+      }
+
+      const setupResult = await onSave();
+      if (!setupResult.ok) {
+        onSettingsSaveStateChange?.("error", setupResult.message);
+        return false;
+      }
+
+      for (const section of getSections()) {
+        const result = await section.handle.save();
+        if (!result.ok) {
+          onSettingsSaveStateChange?.("error", `${section.label}: ${result.message}`);
+          section.handle.focus();
+          return false;
+        }
+      }
+
+      onSettingsSaveStateChange?.("success", "Ayarlar kaydedildi.");
+      return true;
+    } catch (error) {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : "Ayarlar kaydedilemedi.";
+      onSettingsSaveStateChange?.("error", message);
+      return false;
+    } finally {
+      settingsSaveInFlightRef.current = false;
+    }
+  }, [embedded, onSave, onSettingsSaveStateChange, publicProfileSaveRef]);
+
+  useImperativeHandle(settingsSaveRef, () => ({ save: saveSettings }), [saveSettings]);
+
+  useEffect(() => {
+    if (embedded) onSettingsSaveStateChange?.("idle", "Ayarlar düzenlenebilir.");
+  }, [embedded, onSettingsSaveStateChange]);
+
   return (
     <main className={embedded ? "setup-shell is-embedded" : "setup-shell setup-shell--onboarding"} aria-labelledby={!embedded ? "setup-title" : undefined}>
       {!embedded && <section className="setup-hero" aria-label="İlk kurulum">
@@ -521,6 +595,8 @@ export function SetupForm({
             roomCount={form.roomCount}
             dashboardRoomCount={dashboardData?.rooms.length ?? 0}
             onRoomCountChange={(value) => update("roomCount", value)}
+            onDashboardRefresh={onDashboardRefresh}
+            saveHandleRef={roomSaveRef}
           />
         )}
         <div id="settings-connections" className="setup-section settings-services-section">
@@ -784,6 +860,7 @@ export function SetupForm({
           <PasswordSettings
             configured={setupData.appPasswordConfigured}
             onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
+            saveHandleRef={passwordSaveRef}
           />
         )}
         {embedded && <DataMaintenanceSettings />}

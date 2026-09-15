@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from "react";
 import { Eye, LockKeyhole, RefreshCw, Save, UploadCloud } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
@@ -19,6 +19,7 @@ import type {
   MessagingController,
   SetupController
 } from "../../app/controller-types";
+import type { SettingsSaveHandle, SettingsSaveState } from "../../app/settings-save";
 import { AppShell } from "../layout/AppShell";
 import { PageHeader } from "../layout/PageHeader";
 import { Sidebar } from "../layout/Sidebar";
@@ -31,6 +32,9 @@ interface DesktopAppFrameProps {
   syncState: SyncState;
   statusMessage: string;
   setupController: SetupController;
+  settingsSaveRef: MutableRefObject<SettingsSaveHandle | null>;
+  settingsSaveState: SettingsSaveState;
+  settingsSaveMessage: string;
   appLockController: AppLockController;
   desktopSyncController: DesktopSyncController;
   menuController: MenuController;
@@ -47,6 +51,9 @@ export function DesktopAppFrame({
   syncState,
   statusMessage,
   setupController,
+  settingsSaveRef,
+  settingsSaveState,
+  settingsSaveMessage,
   appLockController,
   desktopSyncController,
   menuController,
@@ -56,13 +63,11 @@ export function DesktopAppFrame({
 }: DesktopAppFrameProps) {
   const contentRef = useRef<HTMLElement>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
-  const { setupData, setupSaveState, setupMessage, saveSetup } = setupController;
+  const { setupData } = setupController;
   const { lockApp } = appLockController;
   const {
     dashboardData,
-    setDashboardData,
     businessCapabilities,
-    loadBusinessCapabilities,
     automaticSyncStatus,
     pullRequests: handlePullRequests
   } = desktopSyncController;
@@ -129,9 +134,8 @@ export function DesktopAppFrame({
     setActivePage(destination);
   }
 
-  async function handleSaveSetup() {
-    await saveSetup(setDashboardData);
-    await loadBusinessCapabilities();
+  async function handleSaveSettings() {
+    await settingsSaveRef.current?.save();
   }
 
   return (
@@ -178,11 +182,11 @@ export function DesktopAppFrame({
                     : (aiEnabled ? "AI araçları kullanıma hazır." : "Mesaj araçları bu işletmede etkin değil.")}</span>
                 </div>
               ) : activePage === "settings" ? (
-                <div className={`sync-pill sync-${setupSaveState}`}>
-                  <span>{setupMessage}</span>
-                  <button className="action-button action-button-sm" type="button" onClick={handleSaveSetup} disabled={setupSaveState === "loading"}>
+                <div className={`sync-pill sync-${settingsSaveState}`}>
+                  <span role="status" aria-live="polite">{settingsSaveMessage}</span>
+                  <button className="action-button action-button-sm" type="button" onClick={() => void handleSaveSettings()} disabled={settingsSaveState === "loading"}>
                     <Save size={16} aria-hidden="true" />
-                    Ayarları Kaydet
+                    {settingsSaveState === "loading" ? "Kaydediliyor..." : "Ayarları Kaydet"}
                   </button>
                 </div>
               ) : (
