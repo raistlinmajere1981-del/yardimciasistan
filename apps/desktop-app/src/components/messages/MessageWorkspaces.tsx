@@ -453,6 +453,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
   const recipientPhone = preparedMessage?.phone ?? selectedRequest?.customer_phone;
   const recipientName = preparedMessage?.customerName || selectedRequest?.customer_name || (preparedMessage ? "Müşteri" : "Talep seçin");
+  const preparedMessageLabel = preparedMessage?.source === "birthday" ? "Doğum günü mesajı" : "Veresiye hesabı";
   const webViewAction = useMemo(
     () => (recipientPhone ? prepareWhatsAppAction({ phone: recipientPhone, message: selectedMessage, preferredMode: "webview" }) : null),
     [selectedMessage, recipientPhone]
@@ -581,7 +582,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   return (
     <section className={`whatsapp-workspace whatsapp-view-${view}`} aria-label={view === "safe" ? "Güvenli mesaj alanı" : "WhatsApp Web alanı"}>
       <aside className="panel whatsapp-request-panel">
-        {preparedMessage && <div className="panel-heading compact"><div><strong>{recipientName}</strong><p>Veresiye hesabı · mesaj hazırlandı</p><small>Gönderim WhatsApp içinde sizin kontrolünüzde.</small></div></div>}
+        {preparedMessage && <div className="panel-heading compact"><div><strong>{recipientName}</strong><p>{preparedMessageLabel} · mesaj hazırlandı</p><small>Gönderim WhatsApp içinde sizin kontrolünüzde.</small></div></div>}
         <div className="panel-heading compact">
           <h2>Talepler</h2>
           <StatusBadge tone="info">{requests.length} kayıt</StatusBadge>
@@ -696,7 +697,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           </div>
           <div>
             <dt>{preparedMessage ? "İşlem" : "Talep türü"}</dt>
-            <dd>{preparedMessage ? "Veresiye hesabı" : selectedRequest ? formatRequestType(selectedRequest.request_type) : "-"}</dd>
+            <dd>{preparedMessage ? preparedMessageLabel : selectedRequest ? formatRequestType(selectedRequest.request_type) : "-"}</dd>
           </div>
           <div>
             <dt>Kaynak</dt>

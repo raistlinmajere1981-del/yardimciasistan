@@ -286,7 +286,7 @@ CREATE TABLE customers (
   updated_at TEXT NOT NULL,
   deleted_at TEXT NOT NULL DEFAULT '',
   sync_status TEXT NOT NULL DEFAULT 'local_only'
-, identity_type TEXT NOT NULL DEFAULT ''
+, birthday_message_enabled INTEGER NOT NULL DEFAULT 1 CHECK (birthday_message_enabled IN (0, 1)), identity_type TEXT NOT NULL DEFAULT ''
   CHECK (identity_type IN ('', 'tc_identity_card', 'passport', 'other')), identity_number TEXT NOT NULL DEFAULT '', nationality TEXT NOT NULL DEFAULT '', birth_date TEXT NOT NULL DEFAULT '', gender TEXT NOT NULL DEFAULT ''
   CHECK (gender IN ('', 'female', 'male', 'unspecified')), document_serial_number TEXT NOT NULL DEFAULT '', document_expiry_date TEXT NOT NULL DEFAULT '', birth_place TEXT NOT NULL DEFAULT '', mother_name TEXT NOT NULL DEFAULT '', father_name TEXT NOT NULL DEFAULT '', issuing_authority TEXT NOT NULL DEFAULT '', address TEXT NOT NULL DEFAULT '', business_id TEXT REFERENCES business(id));
 
@@ -670,6 +670,10 @@ CREATE TABLE settings (
   ai_api_key_encrypted TEXT NOT NULL DEFAULT '',
   ai_last_published_at TEXT NOT NULL DEFAULT '',
   whatsapp_mode TEXT NOT NULL DEFAULT 'webview',
+  birthday_enabled INTEGER NOT NULL DEFAULT 1 CHECK (birthday_enabled IN (0, 1)),
+  birthday_mode TEXT NOT NULL DEFAULT 'manual' CHECK (birthday_mode IN ('manual', 'automatic')),
+  birthday_send_time TEXT NOT NULL DEFAULT '10:00',
+  birthday_message_template TEXT NOT NULL DEFAULT 'Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.',
   setup_completed INTEGER NOT NULL DEFAULT 0 CHECK (setup_completed IN (0, 1)),
   sync_client_id TEXT NOT NULL DEFAULT '',
   app_password_verifier TEXT NOT NULL DEFAULT '',
@@ -828,6 +832,24 @@ CREATE TABLE whatsapp_messages (
   updated_at TEXT NOT NULL,
   deleted_at TEXT NOT NULL DEFAULT '',
   sync_status TEXT NOT NULL DEFAULT 'local_only'
+);
+
+CREATE TABLE birthday_message_deliveries (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL,
+  birthday_year INTEGER NOT NULL CHECK (birthday_year > 0),
+  birthday_date TEXT NOT NULL,
+  mode TEXT NOT NULL CHECK (mode IN ('manual', 'automatic')),
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'prepared', 'sent', 'skipped', 'failed')),
+  prepared_at TEXT NOT NULL DEFAULT '',
+  sent_at TEXT NOT NULL DEFAULT '',
+  failed_at TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (customer_id, birthday_year),
+  FOREIGN KEY (customer_id) REFERENCES customers(id)
 );
 
 -- Current runtime seeds.

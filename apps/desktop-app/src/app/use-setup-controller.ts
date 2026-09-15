@@ -173,7 +173,8 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
         sourceName: category.sourceName,
         name: category.name,
         tableCount: Number(category.tableCount)
-      }))
+      })),
+      birthdaySettings: setupForm.birthdaySettings
     };
 
     let result;

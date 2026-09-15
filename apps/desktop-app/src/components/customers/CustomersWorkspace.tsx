@@ -532,6 +532,17 @@ function CustomerEditorDrawer({
               <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
               <label className="form-field--span form-field form-field--fluid">Not<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
             </div>
+            <label className="form-check customer-birthday-toggle">
+              <input
+                checked={form.birthdayMessageEnabled}
+                onChange={(event) => update("birthdayMessageEnabled", event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                <strong>Doğum günü mesajı gönder</strong>
+                <small>Kapattığınız müşteriler doğum günü mesajlarına dahil edilmez.</small>
+              </span>
+            </label>
           </section>
           <section className="panel form-stack identity-form-section">
             <div className="page-toolbar">

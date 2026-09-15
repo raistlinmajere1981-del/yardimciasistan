@@ -14,7 +14,7 @@ import type { DesktopPage } from "./navigation";
 import { getDesktopTaskDomain, isAccommodationTask, isRestaurantTask } from "./operations";
 
 type DesktopNotificationPriority = "high" | "medium" | "low";
-type DesktopNotificationKind = "request" | "reservation" | "table" | "task" | "sync" | "action";
+type DesktopNotificationKind = "request" | "reservation" | "table" | "task" | "birthday" | "sync" | "action";
 
 export interface DesktopNotificationItem {
   key: string;
@@ -122,6 +122,21 @@ export function buildDesktopNotifications(
         : taskDomain === "accommodation" || taskDomain === "mixed" ? "pension"
           : "dashboard",
       relatedId: task.id
+    });
+  }
+
+  if (hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.CUSTOMERS)
+      && data.birthdayOverview.enabled
+      && data.birthdayOverview.dueCount + data.birthdayOverview.invalidPhoneCount > 0) {
+    notifications.push({
+      key: `birthday:${data.birthdayOverview.today}`,
+      kind: "birthday",
+      priority: "medium",
+      title: "Bugünün doğum günü mesajları",
+      message: `Bugün ${data.birthdayOverview.candidates.length} müşterinin doğum günü var.`,
+      occurredAt: `${data.birthdayOverview.today}T09:00:00`,
+      destination: "dashboard",
+      relatedId: ""
     });
   }
 

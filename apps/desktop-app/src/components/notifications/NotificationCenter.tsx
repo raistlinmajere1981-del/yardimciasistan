@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Bell,
+  Cake,
   CalendarClock,
   ChevronRight,
   ClipboardList,
@@ -101,6 +102,7 @@ function notificationIcon(item: DesktopNotificationItem) {
   if (item.kind === "reservation") return CalendarClock;
   if (item.kind === "table") return UtensilsCrossed;
   if (item.kind === "task") return ClipboardList;
+  if (item.kind === "birthday") return Cake;
   if (item.kind === "sync") return RefreshCw;
   return AlertTriangle;
 }

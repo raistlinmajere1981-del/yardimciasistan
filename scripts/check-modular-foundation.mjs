@@ -5,6 +5,7 @@ const checks = [
   ["npm", ["run", "build:packages"]],
   ["npm", ["run", "build", "-w", "@yardimci-asistan/desktop-app"]],
   ["node", ["scripts/smoke-database-baseline.mjs"]],
+  ["node", ["scripts/smoke-birthday-foundation.mjs"]],
   ["npm", ["run", "quality:strict"]],
   ["node", ["scripts/smoke-business-capabilities.mjs"]],
   ["node", ["scripts/smoke-capability-runtime.mjs"]],

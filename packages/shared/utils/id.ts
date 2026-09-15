@@ -30,7 +30,8 @@ export type IdPrefix =
   | "task_"
   | "sync_"
   | "settings_"
-  | "event_";
+  | "event_"
+  | "birthday_delivery_";
 
 export const ID_PREFIXES: readonly IdPrefix[] = [
   "business_",
@@ -64,7 +65,8 @@ export const ID_PREFIXES: readonly IdPrefix[] = [
   "task_",
   "sync_",
   "settings_",
-  "event_"
+  "event_",
+  "birthday_delivery_"
 ] as const;
 
 export interface CreateIdOptions {

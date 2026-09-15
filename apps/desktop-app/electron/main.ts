@@ -85,6 +85,7 @@ import {
   type AssignCustomerRoomInput,
   type UpdateCustomerRoomStayStatusInput,
   type DesktopCustomerMutationResult,
+  type DesktopBirthdayPrepareResult,
   type DesktopIdentityImageAnalyzeInput,
   type DesktopIdentityImageAnalyzeResult,
   type DesktopReportQueryResult,
@@ -961,6 +962,12 @@ function registerIpcHandlers() {
   ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
     assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     return finalizeDesktopCustomerMutation(getDatabase().saveCustomer(input));
+  });
+
+  ipcMain.handle("birthday:prepareWhatsApp", (_event, customerId: unknown): DesktopBirthdayPrepareResult => {
+    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
+    return getDatabase().prepareBirthdayWhatsApp(String(customerId ?? ""));
   });
 
   ipcMain.handle("customer:assignRoom", (_event, input: AssignCustomerRoomInput): DesktopCustomerMutationResult => {

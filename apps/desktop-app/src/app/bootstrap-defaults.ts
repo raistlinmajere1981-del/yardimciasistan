@@ -315,6 +315,7 @@ export const defaultDashboardData: DesktopDashboardData = {
       identityNumber: "",
       nationality: "",
       birthDate: "",
+      birthdayMessageEnabled: true,
       gender: "",
       documentSerialNumber: "",
       documentExpiryDate: "",
@@ -332,7 +333,17 @@ export const defaultDashboardData: DesktopDashboardData = {
   customerRoomStays: [],
   androidDevices: [],
   paymentWaitingTableOrders: [],
-  androidActionFailures: []
+  androidActionFailures: [],
+  birthdayOverview: {
+    enabled: true,
+    mode: "manual",
+    today: "2026-07-10",
+    candidates: [],
+    dueCount: 0,
+    preparedCount: 0,
+    sentCount: 0,
+    invalidPhoneCount: 0
+  }
 };
 
 export const defaultSetupData: DesktopSetupData = {
@@ -368,5 +379,11 @@ export const defaultSetupData: DesktopSetupData = {
   tableCategories: [
     { name: "Bahçe", tableCount: 1 },
     { name: "Salon", tableCount: 1 }
-  ]
+  ],
+  birthdaySettings: {
+    enabled: true,
+    mode: "manual",
+    sendTime: "10:00",
+    messageTemplate: "Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz."
+  }
 };

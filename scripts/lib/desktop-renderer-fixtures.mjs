@@ -133,7 +133,13 @@ function createSetupFixture() {
     tableCategories: [
       { name: "Bahçe", tableCount: 1 },
       { name: "Salon", tableCount: 1 }
-    ]
+    ],
+    birthdaySettings: {
+      enabled: true,
+      mode: "manual",
+      sendTime: "10:00",
+      messageTemplate: "Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz."
+    }
   };
 }
 
@@ -257,6 +263,7 @@ function createDashboardFixture() {
         identityNumber: "",
         nationality: "",
         birthDate: "",
+        birthdayMessageEnabled: true,
         gender: "",
         documentSerialNumber: "",
         documentExpiryDate: "",
@@ -350,6 +357,16 @@ function createDashboardFixture() {
       preparedWhatsAppMessages: 0,
       activeMenuCategories: 0,
       availableMenuItems: 0
+    },
+    birthdayOverview: {
+      enabled: true,
+      mode: "manual",
+      today: "2026-07-18",
+      candidates: [],
+      dueCount: 0,
+      preparedCount: 0,
+      sentCount: 0,
+      invalidPhoneCount: 0
     }
   };
 }
@@ -600,6 +617,7 @@ function createCompactUiFixture() {
       source: request.source,
       notes: request.message,
       tags: ["kompakt", index % 2 === 0 ? "pansiyon" : "restoran"],
+      birthdayMessageEnabled: true,
       lastContactAt: request.updated_at,
       requestCount: 1,
       reservationCount: index < reservations.length ? 1 : 0,

@@ -537,6 +537,62 @@
   font-size: var(--text-xs);
 }
 
+.dashboard-birthday-summary {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.dashboard-birthday-summary.is-unavailable {
+  color: var(--color-warning);
+}
+
+.dashboard-birthday-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dashboard-birthday-list li {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.dashboard-birthday-customer {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-birthday-customer strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.dashboard-birthday-customer span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.dashboard-birthday-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .dashboard-capacity-list {
   display: grid;
   gap: var(--space-2);

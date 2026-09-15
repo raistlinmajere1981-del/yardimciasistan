@@ -4,6 +4,7 @@ import type {
   DesktopSetupData,
   SaveInitialSetupInput
 } from "../../electron/database";
+import { normalizeBirthdaySettings, type BirthdaySettings } from "@yardimci-asistan/shared";
 
 interface TableCategoryFormState {
   key: string;
@@ -51,6 +52,7 @@ export interface SetupFormState {
   androidEnabled: boolean;
   roomCount: string;
   tableCategories: TableCategoryFormState[];
+  birthdaySettings: BirthdaySettings;
 }
 
 export const aiServicePresets = [
@@ -102,7 +104,8 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
-    tableCategories: toTableCategoryForm(setupData)
+    tableCategories: toTableCategoryForm(setupData),
+    birthdaySettings: normalizeBirthdaySettings(setupData.birthdaySettings)
   };
 }
 

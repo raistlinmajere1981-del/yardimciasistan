@@ -70,6 +70,21 @@
   color: var(--color-text-muted);
 }
 
+.customer-birthday-toggle {
+  align-items: flex-start;
+  padding-top: var(--space-1);
+}
+
+.customer-birthday-toggle > span {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.customer-birthday-toggle small {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
 .request-more-actions-menu {
   display: flex;
   flex-wrap: wrap;

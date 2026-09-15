@@ -11,6 +11,7 @@ export interface CustomerFormState {
   identityNumber: string;
   nationality: string;
   birthDate: string;
+  birthdayMessageEnabled: boolean;
   gender: string;
   documentSerialNumber: string;
   documentExpiryDate: string;
@@ -46,6 +47,7 @@ export function toCustomerForm(customer: CustomerRecord | null): CustomerFormSta
     identityNumber: customer?.identityNumber ?? "",
     nationality: customer?.nationality ?? "",
     birthDate: customer?.birthDate ?? "",
+    birthdayMessageEnabled: customer?.birthdayMessageEnabled ?? true,
     gender: customer?.gender ?? "",
     documentSerialNumber: customer?.documentSerialNumber ?? "",
     documentExpiryDate: customer?.documentExpiryDate ?? "",
@@ -69,6 +71,7 @@ export function customerFormToInput(form: CustomerFormState): SaveCustomerInput 
     identityNumber: form.identityNumber,
     nationality: form.nationality,
     birthDate: form.birthDate,
+    birthdayMessageEnabled: form.birthdayMessageEnabled,
     gender: form.gender,
     documentSerialNumber: form.documentSerialNumber,
     documentExpiryDate: form.documentExpiryDate,

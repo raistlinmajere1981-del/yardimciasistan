@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from
 import {
   buildOwnerReplyWhatsAppMessage,
   createWhatsAppUrl,
-  createWhatsAppWebUrl
+  createWhatsAppWebUrl,
+  type WhatsAppAction
 } from "@yardimci-asistan/whatsapp-bridge";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type {
@@ -41,21 +42,131 @@ export function useMessagingController({
 }: UseMessagingControllerOptions) {
   const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestIdState] = useState(dashboardData.requests[0]?.id ?? "");
   const [preparedWhatsAppMessage, setPreparedWhatsAppMessage] = useState<PreparedWhatsAppMessage | null>(null);
-  const surfacePreparedWhatsAppMessage = whatsappEnabled && customerCreditEnabled ? preparedWhatsAppMessage : null;
+  const [birthdayPreparingId, setBirthdayPreparingId] = useState("");
+  const surfacePreparedWhatsAppMessage = whatsappEnabled
+    && (preparedWhatsAppMessage?.source === "birthday" || customerCreditEnabled)
+    ? preparedWhatsAppMessage
+    : null;
   useEffect(() => {
-    if (!whatsappEnabled || !customerCreditEnabled) setPreparedWhatsAppMessage(null);
-  }, [whatsappEnabled, customerCreditEnabled]);
+    if (!whatsappEnabled || (preparedWhatsAppMessage?.source === "customer_credit" && !customerCreditEnabled)) {
+      setPreparedWhatsAppMessage(null);
+    }
+  }, [customerCreditEnabled, preparedWhatsAppMessage?.source, whatsappEnabled]);
 
   function setSelectedWhatsAppRequestId(value: SetStateAction<string>) {
     setPreparedWhatsAppMessage(null);
     setSelectedWhatsAppRequestIdState(value);
   }
 
-  function openPreparedCreditWhatsApp(message: PreparedWhatsAppMessage) {
-    if (!whatsappEnabled || !customerCreditEnabled) throw new Error("Veresiye WhatsApp paylaşımı şu anda etkin değil.");
+  function openPreparedWhatsApp(message: PreparedWhatsAppMessage) {
+    if (!whatsappEnabled) throw new Error("WhatsApp bu işletmede etkin değil.");
     setPreparedWhatsAppMessage(message);
     setSelectedWhatsAppRequestIdState("");
     onOpenMessages();
+  }
+
+  function openPreparedCreditWhatsApp(message: PreparedWhatsAppMessage) {
+    if (!customerCreditEnabled) throw new Error("Veresiye WhatsApp paylaşımı şu anda etkin değil.");
+    openPreparedWhatsApp(message);
+  }
+
+  async function prepareBirthdayWhatsApp(customerId: string) {
+    if (!whatsappEnabled) {
+      setStatusMessage("WhatsApp bu işletmede etkin değil.");
+      return;
+    }
+    setBirthdayPreparingId(customerId);
+    try {
+      await prepareBirthdayWhatsAppInternal(customerId);
+    } finally {
+      setBirthdayPreparingId("");
+    }
+  }
+
+  async function prepareBirthdayWhatsAppInternal(customerId: string) {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.prepareBirthdayWhatsApp) {
+      setSyncState("error");
+      setStatusMessage("Doğum günü WhatsApp hazırlığı hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    setSyncState("loading");
+    setStatusMessage("Doğum günü mesajı hazırlanıyor...");
+    let result;
+    try {
+      result = await bridge.prepareBirthdayWhatsApp(customerId);
+    } catch (error) {
+      setSyncState("error");
+      setStatusMessage(error instanceof Error ? error.message : "Doğum günü mesajı hazırlanamadı.");
+      return;
+    }
+    if (!result.ok) {
+      setSyncState("error");
+      setStatusMessage(result.message);
+      return;
+    }
+
+    let nextDashboardData: DesktopDashboardData;
+    try {
+      nextDashboardData = await bridge.getDashboardData();
+    } catch {
+      setSyncState("error");
+      setStatusMessage("Mesaj hazırlandı ancak ekran yenilenemedi. Doğum günü listesini yenileyip tekrar deneyin.");
+      return;
+    }
+    setDashboardData(nextDashboardData);
+    if (!result.action.ok) {
+      setSyncState("error");
+      setStatusMessage(result.action.message);
+      return;
+    }
+
+    await handleBirthdayAction(result.action, result.candidate);
+    setSyncState("success");
+  }
+
+  async function handleBirthdayAction(
+    action: Extract<WhatsAppAction, { ok: true }>,
+    candidate: { customerId: string; customerName: string; phone: string; message: string }
+  ) {
+    if (action.mode === "webview") {
+      openPreparedWhatsApp({
+        source: "birthday",
+        customerId: candidate.customerId,
+        customerName: candidate.customerName,
+        phone: candidate.phone,
+        message: candidate.message
+      });
+      setStatusMessage("Mesaj WhatsApp’a hazırlandı; gönderim sizin kontrolünüzde.");
+      return;
+    }
+
+    if (action.mode === "manual_copy") {
+      try {
+        await navigator.clipboard.writeText(action.message);
+        setStatusMessage("Mesaj hazırlandı ve panoya kopyalandı; gönderim sizin kontrolünüzde.");
+      } catch {
+        openPreparedWhatsApp({
+          source: "birthday",
+          customerId: candidate.customerId,
+          customerName: candidate.customerName,
+          phone: candidate.phone,
+          message: candidate.message
+        });
+        setStatusMessage("Mesaj hazırlandı ancak panoya kopyalanamadı. WhatsApp alanında metni elle kopyalayabilirsiniz.");
+      }
+      return;
+    }
+
+    if (action.mode === "wa_link") {
+      const opened = await window.yardimciDesktop?.openExternal(action.url);
+      if (opened === false) {
+        setStatusMessage("WhatsApp açılamadı. Mesajı kopyalayıp elle paylaşabilirsiniz.");
+        return;
+      }
+      setStatusMessage("WhatsApp bağlantısı açıldı; gönderim sizin kontrolünüzde.");
+    }
   }
   const [suggestingRequestId, setSuggestingRequestId] = useState("");
   const [aiState, setAiState] = useState<SyncState>("idle");
@@ -443,6 +554,8 @@ export function useMessagingController({
   return {
     preparedWhatsAppMessage: surfacePreparedWhatsAppMessage,
     openPreparedCreditWhatsApp,
+    prepareBirthdayWhatsApp,
+    birthdayPreparingId,
     selectedWhatsAppRequestId,
     setSelectedWhatsAppRequestId,
     selectedWhatsAppRequest,

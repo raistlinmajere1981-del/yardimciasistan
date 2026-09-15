@@ -66,6 +66,12 @@ try {
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Ayarlar', exact: true }).click();
   await expect(page.getByLabel('Giriş saati')).toHaveValue('14:00');
+  const birthdaySettings = page.locator('.setup-birthday-settings');
+  await expect(birthdaySettings.getByRole('heading', { name: 'Doğum Günü Mesajları', exact: true })).toBeVisible();
+  await expect(birthdaySettings.getByLabel('Doğum günü mesajlarını kullan')).toBeChecked();
+  await expect(birthdaySettings.getByLabel('Gönderim saati')).toHaveValue('10:00');
+  await expect(birthdaySettings.getByLabel('Manuel')).toBeChecked();
+  await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
   const observations = [];
   await expect(page.getByLabel('Telefon', { exact: true })).toHaveValue('+905321234567');
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[600,800]]) {
@@ -76,7 +82,7 @@ try {
     const metrics = await page.evaluate(() => {
       const box = selector => { const e = document.querySelector(selector); const b = e.getBoundingClientRect(); return { width: b.width, height: b.height }; };
       const overflows = [...document.querySelectorAll('.content, .setup-capabilities, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className);
-      return { overflows, documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, phone: box('.settings-identity-section .form-field--short input'), time: box('input[type="time"]'), map: box('.business-location-map-viewport'), button: box('.page-header-tools button'), timeRows: new Set([...document.querySelectorAll('input[type="time"]')].map(el => Math.round(el.getBoundingClientRect().top))).size };
+      return { overflows, documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, phone: box('.settings-identity-section .form-field--short input'), time: box('#settings-public input[type="time"]'), map: box('.business-location-map-viewport'), button: box('.page-header-tools button'), timeRows: new Set([...document.querySelectorAll('#settings-public input[type="time"]')].map(el => Math.round(el.getBoundingClientRect().top))).size };
     });
     observations.push({ width, height, ...metrics });
     expect(metrics.documentOverflow, `Document overflow at ${width}`).toBe(false);
@@ -107,6 +113,8 @@ try {
   await expect(page.getByRole('button', { name: /Şifreyi (Belirle|Değiştir)/, exact: true })).toHaveCount(0);
   await page.getByLabel('İşletme açıklaması').fill('Güncellenen açıklama');
   await page.getByLabel('Firma adı', { exact: true }).fill('Güncellenen Smoke İşletmesi');
+  await birthdaySettings.getByLabel('Gönderim saati').fill('09:30');
+  await birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' }).fill('İyi ki doğdun {ad}! {işletme}');
   await page.getByLabel('Oda 101 adı', { exact: true }).fill('Güncellenen Oda');
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
   await page.getByLabel('Şifre belirleyin', { exact: true }).fill('design-test-password');
@@ -114,6 +122,12 @@ try {
   await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
   expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
+  expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup').input.birthdaySettings)).toEqual({
+    enabled: true,
+    mode: 'manual',
+    sendTime: '09:30',
+    messageTemplate: 'İyi ki doğdun {ad}! {işletme}'
+  });
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'room')?.input.name)).toBe('Güncellenen Oda');
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
   const saveOrder = await page.evaluate(() => window.__designCalls.map(call => call.kind));

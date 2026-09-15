@@ -1,5 +1,6 @@
 import {
   BedDouble,
+  Cake,
   CalendarCheck2,
   Check,
   CheckCircle2,
@@ -45,6 +46,8 @@ interface DashboardPageProps {
   onOpenReservation: (reservation: DesktopDashboardData["reservations"][number]) => void;
   onCompleteTask: (taskId: string) => void;
   onOpenDailyAi: () => void;
+  onPrepareBirthday: (customerId: string) => void;
+  birthdayPreparingId?: string;
   formatRequestType: (value: string) => string;
   formatRequestStatus: (value: string) => string;
   getRequestStatusTone: (status: string) => StatusTone;
@@ -67,6 +70,8 @@ export function DashboardPage({
   onOpenReservation,
   onCompleteTask,
   onOpenDailyAi,
+  onPrepareBirthday,
+  birthdayPreparingId = "",
   formatRequestType,
   formatRequestStatus,
   getRequestStatusTone,
@@ -78,7 +83,11 @@ export function DashboardPage({
   const waitingRequestCount = data.summary.waitingRequests;
   const openTaskCount = data.summary.pendingDailyTasks;
   const pendingReservationCount = data.summary.pendingReservations;
-  const attentionCount = waitingRequestCount + openTaskCount + pendingReservationCount;
+  const birthdayOverview = data.birthdayOverview;
+  const birthdayAttentionCount = customersEnabled && birthdayOverview.enabled
+    ? birthdayOverview.dueCount + birthdayOverview.invalidPhoneCount
+    : 0;
+  const attentionCount = waitingRequestCount + openTaskCount + pendingReservationCount + birthdayAttentionCount;
   const visiblePriorityItems = dashboard.priorityItems.slice(0, 6);
   const hiddenPriorityCount = Math.max(0, attentionCount - visiblePriorityItems.length);
   const visibleScheduleItems = dashboard.scheduleItems.slice(0, 4);
@@ -156,6 +165,9 @@ export function DashboardPage({
           {customersEnabled && <AttentionCard tone="info" icon={MessageCircle} value={waitingRequestCount} label="müşteri yanıt bekliyor" />}
           {tasksEnabled && <AttentionCard tone="wait" icon={ClipboardCheck} value={openTaskCount} label="açık iş bulunuyor" />}
           {reservationsEnabled && <AttentionCard tone="wait" icon={CalendarCheck2} value={pendingReservationCount} label="rezervasyon onay bekliyor" />}
+          {customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0 && (
+            <AttentionCard tone="info" icon={Cake} value={birthdayOverview.candidates.length} label="müşterinin doğum günü var" />
+          )}
         </div>
       </section>
 
@@ -192,7 +204,7 @@ export function DashboardPage({
           )}
         </Panel>
 
-        {(calendarEnabled || capacityVisible) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
+        {(calendarEnabled || capacityVisible || (customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0)) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
           {calendarEnabled && <Panel className="dashboard-timeline-panel" padding="compact">
             <div className="dashboard-section-heading page-toolbar compact">
               <div>
@@ -255,6 +267,44 @@ export function DashboardPage({
               </ActionButton>
             )}
           </Panel>}
+
+          {customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0 && (
+            <Panel className="dashboard-birthday-panel" padding="compact">
+              <div className="dashboard-section-heading page-toolbar compact">
+                <div>
+                  <p>Doğum Günü Mesajları</p>
+                  <h2>Bugün {birthdayOverview.candidates.length} müşteri</h2>
+                </div>
+                <Cake size={19} aria-hidden="true" />
+              </div>
+              <p className="dashboard-birthday-summary">Bugün doğum günü olan müşterileri kontrol edip WhatsApp mesajını hazırlayın.</p>
+              {!features.whatsapp && <p className="dashboard-birthday-summary is-unavailable">WhatsApp etkin değil</p>}
+              <ul className="dashboard-birthday-list">
+                {birthdayOverview.candidates.slice(0, 6).map((candidate) => (
+                  <li key={candidate.customerId}>
+                    <div className="dashboard-birthday-customer">
+                      <strong>{candidate.customerName || "Müşterimiz"}</strong>
+                      <span>{candidate.phone || "Telefon yok"}</span>
+                    </div>
+                    <div className="dashboard-birthday-actions">
+                      <StatusBadge tone={birthdayStatusTone(candidate.eligibility)}>{birthdayStatusLabel(candidate.eligibility)}</StatusBadge>
+                      {features.whatsapp && (candidate.eligibility === "due" || candidate.eligibility === "prepared") && (
+                        <ActionButton
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onPrepareBirthday(candidate.customerId)}
+                          disabled={birthdayPreparingId === candidate.customerId}
+                        >
+                          {birthdayPreparingId === candidate.customerId ? "Hazırlanıyor" : candidate.eligibility === "prepared" ? "Tekrar hazırla" : "WhatsApp’a Hazırla"}
+                        </ActionButton>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {birthdayOverview.candidates.length > 6 && <p className="dashboard-side-note">{birthdayOverview.candidates.length - 6} müşteri daha var.</p>}
+            </Panel>
+          )}
         </aside>}
       </section>
     </div>
@@ -356,4 +406,18 @@ function formatUrgency(urgency: DashboardDateUrgency) {
     undated: "Tarih yok"
   };
   return labels[urgency];
+}
+
+function birthdayStatusLabel(status: string) {
+  if (status === "already_sent") return "Bu yıl gönderildi";
+  if (status === "prepared") return "Hazırlandı";
+  if (status === "invalid_phone") return "Telefon geçersiz";
+  return "Hazır";
+}
+
+function birthdayStatusTone(status: string): StatusTone {
+  if (status === "already_sent") return "success";
+  if (status === "prepared") return "info";
+  if (status === "invalid_phone") return "danger";
+  return "wait";
 }

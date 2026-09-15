@@ -57,6 +57,7 @@ import type {
   AssignCustomerRoomInput,
   UpdateCustomerRoomStayStatusInput,
   DesktopCustomerMutationResult,
+  DesktopBirthdayPrepareResult,
   DesktopIdentityImageAnalyzeInput,
   DesktopIdentityImageAnalyzeResult,
   DesktopReportRangeInput,
@@ -186,6 +187,7 @@ export interface DesktopBridge {
   deleteRequest: (requestId: string) => Promise<DesktopStatusUpdateResult>;
   deleteCustomer: (customerId: string) => Promise<DesktopStatusUpdateResult>;
   saveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
+  prepareBirthdayWhatsApp: (customerId: string) => Promise<DesktopBirthdayPrepareResult>;
   assignCustomerRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => Promise<DesktopCustomerMutationResult>;
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => Promise<DesktopIdentityImageAnalyzeResult>;
@@ -339,6 +341,7 @@ const bridge: DesktopBridge = {
   deleteRequest: (requestId: string) => ipcRenderer.invoke("request:delete", requestId),
   deleteCustomer: (customerId: string) => ipcRenderer.invoke("customer:delete", customerId),
   saveCustomer: (input: SaveCustomerInput) => ipcRenderer.invoke("customer:save", input),
+  prepareBirthdayWhatsApp: (customerId: string) => ipcRenderer.invoke("birthday:prepareWhatsApp", customerId),
   assignCustomerRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => ipcRenderer.invoke("customer:updateRoomStayStatus", input),
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => ipcRenderer.invoke("customer:analyzeIdentityImage", input),

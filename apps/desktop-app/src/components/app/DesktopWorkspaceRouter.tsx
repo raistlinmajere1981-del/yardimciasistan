@@ -149,6 +149,8 @@ export function DesktopWorkspaceRouter({
     callCustomerRecord,
     openCustomerWhatsApp,
     openReservationWhatsApp,
+    prepareBirthdayWhatsApp,
+    birthdayPreparingId,
     openSelectedWhatsAppExternal,
     handleWhatsAppMessageSent,
     handleDeleteWhatsAppMessage,
@@ -430,6 +432,8 @@ export function DesktopWorkspaceRouter({
           onOpenReservation={openDashboardReservation}
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
           onOpenDailyAi={() => openAiTools("daily")}
+          onPrepareBirthday={prepareBirthdayWhatsApp}
+          birthdayPreparingId={birthdayPreparingId}
           formatRequestType={formatRequestType}
           formatRequestStatus={formatRequestStatus}
           getRequestStatusTone={getRequestStatusTone}

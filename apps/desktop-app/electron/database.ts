@@ -6,11 +6,14 @@ import {
   BUSINESS_CAPABILITIES,
   canConvertRequestToReservation,
   createId,
+  normalizeBirthdaySettings,
   getRequestReservationType,
   isRequestTypeAvailable,
   normalizeBusinessType,
   normalizePhone,
+  validateBirthdaySettings,
   type BusinessCapability,
+  type BirthdaySettings,
   type CustomerGender,
   type CustomerIdentityType,
   type IdentityImageAnalysis,
@@ -55,6 +58,14 @@ import {
   applyBusinessProfileCapabilities,
   setBusinessCapability
 } from "./business-capability-store.js";
+import {
+  getBirthdayOverview as readBirthdayOverview,
+  prepareBirthdayWhatsApp as prepareBirthdayWhatsAppMessage,
+  type DesktopBirthdayOverview,
+  type DesktopBirthdayPrepareResult
+} from "./birthday-service.js";
+
+export type { DesktopBirthdayCandidate, DesktopBirthdayDelivery, DesktopBirthdayOverview, DesktopBirthdayPrepareResult } from "./birthday-service.js";
 
 export type DesktopDemoProfile = "pension-restaurant";
 
@@ -175,6 +186,7 @@ export interface DesktopCustomer {
   identityNumber: string;
   nationality: string;
   birthDate: string;
+  birthdayMessageEnabled: boolean;
   gender: CustomerGender;
   documentSerialNumber: string;
   documentExpiryDate: string;
@@ -266,6 +278,7 @@ export interface DesktopDashboardData {
   androidActionFailures: DesktopAndroidActionFailure[];
   menu: PublishedQrMenu;
   summary: DashboardSummary;
+  birthdayOverview: DesktopBirthdayOverview;
 }
 
 export type DesktopReportPreset = "today" | "yesterday" | "last7" | "last30" | "custom";
@@ -467,6 +480,7 @@ export interface DesktopSetupData {
     tables: number;
   };
   tableCategories: DesktopTableCategory[];
+  birthdaySettings: BirthdaySettings;
 }
 
 export interface SaveInitialSetupInput {
@@ -499,6 +513,7 @@ export interface SaveInitialSetupInput {
     tables: number;
   };
   tableCategories?: SaveTableCategoryInput[];
+  birthdaySettings?: BirthdaySettings;
 }
 
 export type DesktopSetupSaveResult =
@@ -645,6 +660,7 @@ export interface SaveCustomerInput {
   identityNumber: string;
   nationality: string;
   birthDate: string;
+  birthdayMessageEnabled?: boolean;
   gender: string;
   documentSerialNumber: string;
   documentExpiryDate: string;
@@ -1143,6 +1159,7 @@ export class DesktopDatabase {
       androidDevices: this.getAndroidDevices(),
       paymentWaitingTableOrders: this.listPaymentWaitingTableOrders(),
       androidActionFailures: this.getAndroidActionFailures(),
+      birthdayOverview: readBirthdayOverview(this.db),
       summary: {
         newRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status = 'new' AND deleted_at = ''"),
         waitingRequests: this.getScalarCount("SELECT COUNT(*) as count FROM requests WHERE status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND deleted_at = ''"),
@@ -1176,6 +1193,14 @@ export class DesktopDatabase {
       },
       menu: this.getPublishedMenu()
     };
+  }
+
+  getBirthdayOverview(): DesktopBirthdayOverview {
+    return readBirthdayOverview(this.db);
+  }
+
+  prepareBirthdayWhatsApp(customerId: string): DesktopBirthdayPrepareResult {
+    return prepareBirthdayWhatsAppMessage(this.db, String(customerId ?? ""));
   }
 
   getReportData(input: DesktopReportRangeInput): DesktopReportData {
@@ -2108,7 +2133,7 @@ export class DesktopDatabase {
 
     const requestedId = String(input?.id ?? "").trim();
     const existing = requestedId
-      ? this.db.prepare("SELECT id, source, created_at FROM customers WHERE id = ? AND deleted_at = ''").get(requestedId) as Record<string, unknown> | undefined
+      ? this.db.prepare("SELECT id, source, created_at, birthday_message_enabled FROM customers WHERE id = ? AND deleted_at = ''").get(requestedId) as Record<string, unknown> | undefined
       : undefined;
     if (requestedId && !existing) {
       return { ok: false, message: "Düzenlenecek müşteri bulunamadı." };
@@ -2136,6 +2161,9 @@ export class DesktopDatabase {
     const source = String(existing?.source ?? "manual") || "manual";
     const createdAt = String(existing?.created_at ?? now) || now;
     const customer = normalized.customer;
+    const birthdayMessageEnabled = input.birthdayMessageEnabled === undefined
+      ? normalizeBoolean(existing?.birthday_message_enabled, true)
+      : normalizeBoolean(input.birthdayMessageEnabled, true);
 
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -2144,12 +2172,14 @@ export class DesktopDatabase {
           INSERT INTO customers (
             id, full_name, phone, email, source, notes, tags_json, last_contact_at,
             identity_type, identity_number, nationality, birth_date, gender,
+            birthday_message_enabled,
             document_serial_number, document_expiry_date, birth_place, mother_name,
             father_name, issuing_authority, address, created_at, updated_at,
             deleted_at, sync_status
           ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, '',
             ?, ?, ?, ?, ?,
+            ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?,
             '', 'local_only'
@@ -2165,6 +2195,7 @@ export class DesktopDatabase {
             nationality = excluded.nationality,
             birth_date = excluded.birth_date,
             gender = excluded.gender,
+            birthday_message_enabled = excluded.birthday_message_enabled,
             document_serial_number = excluded.document_serial_number,
             document_expiry_date = excluded.document_expiry_date,
             birth_place = excluded.birth_place,
@@ -2189,6 +2220,7 @@ export class DesktopDatabase {
           customer.nationality,
           customer.birthDate,
           customer.gender,
+          birthdayMessageEnabled ? 1 : 0,
           customer.documentSerialNumber,
           customer.documentExpiryDate,
           customer.birthPlace,
@@ -3746,7 +3778,13 @@ export class DesktopDatabase {
         rooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''"),
         tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
       },
-      tableCategories: this.getTableCategories()
+      tableCategories: this.getTableCategories(),
+      birthdaySettings: normalizeBirthdaySettings({
+        enabled: normalizeBoolean(settings?.birthday_enabled, true),
+        mode: settings?.birthday_mode === "automatic" ? "automatic" : "manual",
+        sendTime: String(settings?.birthday_send_time ?? "10:00"),
+        messageTemplate: String(settings?.birthday_message_template ?? "")
+      })
     };
   }
 
@@ -4032,6 +4070,12 @@ export class DesktopDatabase {
     const tableCategoryResolution = normalizeTableCategoryInputs(input.tableCategories);
     const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
     const existingSettings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+    const birthdaySettings = normalizeBirthdaySettings(input.birthdaySettings ?? {
+      enabled: normalizeBoolean(existingSettings?.birthday_enabled, true),
+      mode: existingSettings?.birthday_mode === "automatic" ? "automatic" : "manual",
+      sendTime: String(existingSettings?.birthday_send_time ?? "10:00"),
+      messageTemplate: String(existingSettings?.birthday_message_template ?? "")
+    });
     const profileService = aiService ?? normalizeStoredAiService(existingSettings?.ai_service);
     const existingAiProfile = this.db
       .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
@@ -4057,6 +4101,13 @@ export class DesktopDatabase {
 
     if (!tableCategoryResolution.ok) {
       return tableCategoryResolution;
+    }
+
+    if (input.birthdaySettings) {
+      const birthdaySettingsError = validateBirthdaySettings(input.birthdaySettings);
+      if (birthdaySettingsError) {
+        return { ok: false, message: birthdaySettingsError };
+      }
     }
 
     if (
@@ -4307,11 +4358,15 @@ export class DesktopDatabase {
             ai_api_key_encrypted,
             ai_last_published_at,
             whatsapp_mode,
+            birthday_enabled,
+            birthday_mode,
+            birthday_send_time,
+            birthday_message_template,
             setup_completed,
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', 1, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             business_id = excluded.business_id,
             web_module_url = excluded.web_module_url,
@@ -4325,6 +4380,10 @@ export class DesktopDatabase {
             ai_timeout_seconds = excluded.ai_timeout_seconds,
             ai_api_key_encrypted = excluded.ai_api_key_encrypted,
             ai_last_published_at = excluded.ai_last_published_at,
+            birthday_enabled = excluded.birthday_enabled,
+            birthday_mode = excluded.birthday_mode,
+            birthday_send_time = excluded.birthday_send_time,
+            birthday_message_template = excluded.birthday_message_template,
             setup_completed = 1,
             updated_at = excluded.updated_at,
             deleted_at = '',
@@ -4344,6 +4403,10 @@ export class DesktopDatabase {
           storedAiTimeoutSeconds,
           storedEncryptedAiApiKey,
           aiLastPublishedAt,
+          birthdaySettings.enabled ? 1 : 0,
+          birthdaySettings.mode,
+          birthdaySettings.sendTime,
+          birthdaySettings.messageTemplate,
           settingsCreatedAt,
           now
         );
@@ -5848,6 +5911,7 @@ export class DesktopDatabase {
           customers.nationality,
           customers.birth_date,
           customers.gender,
+          customers.birthday_message_enabled,
           customers.document_serial_number,
           customers.document_expiry_date,
           customers.birth_place,
@@ -5886,6 +5950,7 @@ export class DesktopDatabase {
       nationality: String(row.nationality ?? ""),
       birthDate: String(row.birth_date ?? ""),
       gender: normalizeCustomerGender(row.gender),
+      birthdayMessageEnabled: normalizeBoolean(row.birthday_message_enabled, true),
       documentSerialNumber: String(row.document_serial_number ?? ""),
       documentExpiryDate: String(row.document_expiry_date ?? ""),
       birthPlace: String(row.birth_place ?? ""),
@@ -9433,6 +9498,12 @@ function resolveEncryptedAiApiKey(input: {
 
 function normalizeInteger(value: number) {
   return Number.isFinite(value) ? Math.trunc(value) : 0;
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === true || value === 1 || value === "1" || value === "true") return true;
+  if (value === false || value === 0 || value === "0" || value === "false") return false;
+  return fallback;
 }
 
 interface NormalizedCustomerInput {

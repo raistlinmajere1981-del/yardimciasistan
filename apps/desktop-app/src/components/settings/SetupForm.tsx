@@ -161,6 +161,13 @@ export function SetupForm({
     onFormChange({ ...form, [key]: value });
   };
 
+  const updateBirthday = <Key extends keyof SetupFormState["birthdaySettings"],>(
+    key: Key,
+    value: SetupFormState["birthdaySettings"][Key]
+  ) => {
+    update("birthdaySettings", { ...form.birthdaySettings, [key]: value });
+  };
+
   const handleAppearanceModeKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, currentMode: UiMode) => {
     const modes: UiMode[] = ["easy", "pro"];
     const currentIndex = modes.indexOf(currentMode);
@@ -617,6 +624,64 @@ export function SetupForm({
               <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
               AI Yardımcı
             </label>
+          </div>
+          <div className="setup-birthday-settings form-stack">
+            <div className="setup-section-title setup-section-title--subsection">
+              <h3>Doğum Günü Mesajları</h3>
+            </div>
+            <label className="form-check setup-checkline">
+              <input
+                checked={form.birthdaySettings.enabled}
+                onChange={(event) => updateBirthday("enabled", event.target.checked)}
+                type="checkbox"
+              />
+              Doğum günü mesajlarını kullan
+            </label>
+            <div className="form-grid">
+              <fieldset className="form-stack birthday-mode-fieldset">
+                <legend>Gönderim:</legend>
+                <label className="form-check">
+                  <input
+                    checked={form.birthdaySettings.mode === "manual"}
+                    onChange={() => updateBirthday("mode", "manual")}
+                    name="birthday-mode"
+                    type="radio"
+                  />
+                  Manuel
+                </label>
+                <label className="form-check">
+                  <input
+                    checked={form.birthdaySettings.mode === "automatic"}
+                    onChange={() => updateBirthday("mode", "automatic")}
+                    name="birthday-mode"
+                    type="radio"
+                  />
+                  Otomatik
+                </label>
+              </fieldset>
+              <label className="form-field form-field--short">
+                Gönderim saati
+                <input
+                  type="time"
+                  value={form.birthdaySettings.sendTime}
+                  onChange={(event) => updateBirthday("sendTime", event.target.value)}
+                  disabled={!form.birthdaySettings.enabled}
+                />
+              </label>
+              <label className="form-field form-field--span form-field--fluid">
+                Mesaj
+                <textarea
+                  value={form.birthdaySettings.messageTemplate}
+                  onChange={(event) => updateBirthday("messageTemplate", event.target.value)}
+                  maxLength={4000}
+                  disabled={!form.birthdaySettings.enabled}
+                />
+                <small>{"{ad}"} ve {"{işletme}"} yer tutucuları desteklenir.</small>
+              </label>
+            </div>
+            <small className="setup-birthday-note">
+              Otomatik modda uygulama ve WhatsApp oturumu açık olduğunda mesajlar belirtilen saatte gönderilir. Bu aşamada otomatik gönderim henüz başlatılmaz.
+            </small>
           </div>
         </div>
 
