@@ -74,7 +74,7 @@
   cursor: pointer;
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
-  transition: all var(--motion-fast, 150ms ease);
+  transition: all var(--motion-fast) var(--ease-standard);
 }
 
 .report-date-presets button:hover,
@@ -542,7 +542,7 @@
   background: var(--color-bg-surface);
   cursor: pointer;
   user-select: none;
-  transition: all var(--motion-fast, 150ms ease);
+  transition: all var(--motion-fast) var(--ease-standard);
 }
 
 .reports-page .cash-details-toggle::before,

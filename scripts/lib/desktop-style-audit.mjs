@@ -2,6 +2,7 @@ import fs from 'node:fs';
 
 const sharedNames = new Set(['.desktop-shell', '.content', '.sidebar', '.page-header', '.page-content', '.page-toolbar', '.page-toolbar__actions', '.panel', '.surface', '.empty-state', '.status-message', '.dialog', '.drawer', '.nav-item', '.page-header__title', '.card', '.card__header', '.card__actions', '.data-records', '.data-list', '.list-row', '.list-row__actions', '.form-grid', '.form-row', '.form-field', '.record-workspace']);
 const legacyImport = /(?:friendly[^/]*|[^/]+-ux|styles|setup-capabilities|segmented-control)\.css$/;
+const intentionalRenderer = /\/styles\/pages\/menu-preview\.css$/;
 
 // Walk CSS blocks, preserving media/layer scope. Strings and comments do not open blocks.
 export function cssRules(source) {
@@ -42,11 +43,16 @@ export function desktopStyleAudit(files) {
     if (!file.endsWith('.css')) continue;
     const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
     const isToken = /\/styles\/(tokens|themes)\//.test(file);
+    const rawColor = isToken ? 0 : [...clean.matchAll(/#[\da-f]{3,8}\b|\b(?:rgba?|hsla?)\s*\(/gi)].length;
+    const rawPx = isToken ? 0 : [...clean.matchAll(/\b\d+(?:\.\d+)?px\b/g)].length;
+    const rawSpacing = isToken ? 0 : [...clean.matchAll(/(?:padding|margin|gap)(?:-[\w-]+)?\s*:[^;{}]*\dpx\b/g)].length;
     const values = {
       file, lines: text.split('\n').length,
-      rawColor: isToken ? 0 : [...clean.matchAll(/#[\da-f]{3,8}\b|\b(?:rgba?|hsla?)\s*\(/gi)].length,
-      rawPx: isToken ? 0 : [...clean.matchAll(/\b\d+(?:\.\d+)?px\b/g)].length,
-      rawSpacing: isToken ? 0 : [...clean.matchAll(/(?:padding|margin|gap)(?:-[\w-]+)?\s*:[^;{}]*\dpx\b/g)].length,
+      rawColor,
+      intentionalRendererRawColor: intentionalRenderer.test(file) ? rawColor : 0,
+      rawPx,
+      geometryPx: Math.max(0, rawPx - rawSpacing),
+      rawSpacing,
       important: [...clean.matchAll(/!important\b/g)].length,
       override: [...clean.matchAll(/--override-[\w-]+/g)].length,
       oldAlias: [...clean.matchAll(/var\(--(?:ink(?:-muted)?|muted|text-muted|border|line(?:-soft)?|paper|surface(?:-elevated)?)\b/g)].length,
@@ -78,5 +84,8 @@ export function desktopStyleAudit(files) {
     const relative = './' + file.split('/styles/')[1];
     if (!imported.has(relative)) add('orphanStylesheet', file, relative);
   }
-  return { totals: Object.fromEntries(['rawColor','rawPx','rawSpacing','important','override','oldAlias','duplicateSelectors'].map(k => [k, inventory.reduce((n,f) => n + f[k],0)])), inventory, violations };
+  const totals = Object.fromEntries(['rawColor', 'intentionalRendererRawColor', 'rawPx', 'geometryPx', 'rawSpacing', 'important', 'override', 'oldAlias', 'duplicateSelectors'].map(k => [k, inventory.reduce((n, f) => n + f[k], 0)]));
+  totals.normalDomRawColor = totals.rawColor - totals.intentionalRendererRawColor;
+  const violationTotals = Object.fromEntries([...new Set(violations.map((issue) => issue.kind))].sort().map((kind) => [kind, violations.filter((issue) => issue.kind === kind).length]));
+  return { totals, violationTotals, inventory, violations };
 }

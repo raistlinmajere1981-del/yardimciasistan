@@ -1,4 +1,4 @@
-# Desktop UI migration — Aşama 3A
+# Desktop UI migration — Final desktop baseline (Stage 3B)
 
 Aşama 1 başlangıcı: temiz `main`, `25ad66e88c700fe883e6ca01b50b8b7e6e279c2f`. Bu aşama ortak renderer kabuğu ve yüzey sözleşmesini taşır. Database, IPC, sync, AI, availability, capability kararları ve feature iş akışları değiştirilmez. `firm-template/web-module/widget.js` kapsam dışıdır. Commit/push yapılmaz.
 
@@ -7,6 +7,8 @@ Aşama 2A başlangıcı: temiz `main`, `c3fac0d1e3ce76b7f53ee8c7d7fb9c1258932c05
 Aşama 2B başlangıcı: temiz `main`, `2e4e4ab7ee94ace592f7643e1d75fe5c9eeae355`. Restoran/Adisyon ve Menü yönetimi ortak desktop tasarım sistemiyle taşındı. Database, IPC, sync, AI, availability, stok, ödeme, oda aktarımı ve sipariş state geçişleri korunur.
 
 Aşama 3A başlangıcı: temiz `main`, `472c9b2c0bc7d2c43d6ba98f2227531f9257fd3c`. Mesajlar/AI ve İlk Kurulum yüzeyleri mevcut design-system sözleşmelerine taşındı. Database, IPC, sync, AI provider/model, message lifecycle, webview lifecycle, setup persistence, capability ve güvenlik davranışları değiştirilmedi. Commit/push yapılmaz.
+
+Stage 3B başlangıcı: temiz `main`, `c8ee15ef12a7778a0c3a9a844a4fc775b5faafc1`. App Lock, yaşayan secondary/shared yüzeyler, motion ve final legacy stylesheet temizliği tamamlandı. Database, IPC, sync, AI, availability, security lifecycle, payment, stock, reservation, task ve persistence davranışları değiştirilmedi. `firm-template/web-module/widget.js` kapsam dışıdır.
 
 ## Durumun anlamı
 
@@ -33,7 +35,7 @@ Her ana ekran aynı `DesktopAppFrame → AppShell → PageHeader + page-content`
 | Oda adisyonu / konaklama çalışma alanı — **migrated** | `components/pension/RoomFolioWorkspace.tsx` | `pages/room-folio.css`; Panel/card, StatusBadge, form-row/field, action-button, drawer--wide, overlay header/body/footer ve compact confirmation dialog | Gecelik fiyat, konaklama tarihleri, ürün/kalem, tahsilat ve çıkış yüzeyleri ortak kontroller kullanır. Etiketler, nested modal focus ve scroll doğrulandı. Hesaplama, ödeme ve çıkış handler/payload’ları değişmedi. |
 | Yerel menü önizlemesi — dış yüzey **migrated**, özel renderer debt'i | `components/menu/MenuPreview.tsx` | `components/dialogs.css` + `pages/menu-preview.css` | Modal genişliği/backdrop/header/close/focus ortak. Müşteriye görünen özel önizleme palette'i ve düzeni korunur; desktop dark moduna zorlanmaz. `menu-preview.css` içindeki 44 raw renk literal'i bu özel renderer'a aittir; normal Menü DOM UI’da raw renk yoktur. |
 | İlk kurulum — **migrated** | `components/settings/SetupWizard.tsx`, `SetupForm.tsx` | `pages/setup.css`, `pages/settings.css`, forms/buttons foundation; onboarding shell, progress, Panel/surface, ActionButton, StatusBadge/status, form-field boyutları | Wizard sidebar shell'inden bağımsız onboarding surface olarak kaldı. İşletme, düzen, bağlantı, AI ve görünüm bölümleri; progress/current state, footer/action hiyerarşisi ve responsive form sözleşmesi ortak tokenlarla standardize edildi. Settings embedded tüketimi korunur. `setup.css`: 0 raw renk, 0 duplicate selector, 0 important/override/legacy alias. |
-| Uygulama kilidi — **legacy** | `components/security/AppLockScreen.tsx` | `pages/lock.css` | Kilit overlay'i güvenlik yaşam döngüsü, reset ve unlock animasyonlarıyla ayrı kalır. Header'daki kilit butonu **header.css**'e taşındı. Ekranın sabit koyu palette/gradient'i ve yüksek z-index'i Stage 3B borcudur; normal modal z-index'i ile değiştirilmedi. |
+| Uygulama kilidi — **migrated** | `components/security/AppLockScreen.tsx` | `pages/lock.css`, security semantic tokens, motion tokens | Kilit overlay'i ayrı tam ekran güvenlik yüzeyi olarak kaldı; unlock/reset lifecycle, yüksek z-index, focus ve animasyon sözleşmeleri korunur. Palette ve chrome security tokenlarına taşındı; header'daki kilit butonu `header.css`'te kalır. |
 
 ## Ortak yüzey envanteri ve sahiplik
 
@@ -48,7 +50,7 @@ Her ana ekran aynı `DesktopAppFrame → AppShell → PageHeader + page-content`
 | Badges/chips, tabs/segmented controls | `StatusBadge.tsx`, `SegmentedControl.tsx`; `badges.css`, `navigation.css` | **migrated temel / partial tüketiciler**. Success/warning isimleri eklendi; ok/wait prop uyumluluğu korunur. page-tabs ve segmented-control aynı temel. Market sekmeleri ve özel status chip'leri legacy. |
 | Status/banner/toast | `components/status.css`, `notifications/NotificationCenter.tsx`, `components/notifications.css` | **migrated ortak status/popover**, özel banner'lar **partial**. Neutral/info/success/warning/danger. Finance/folio mesajları, stok error/info ortak sınıfları kullanır. App status mesajı header'da, bildirim listesi popover'da; ayrı global toast kuyruğu yok. |
 | Empty / loading | `components/status.css` | **migrated temel / partial tüketiciler**. empty-state başlık/açıklama/opsiyonel action; loading-state inline/panel/page. Settings public profile, finance, reports, customer credit loading bağlandı. Kısa mesajlar role=status; mevcut alert/aria-live anlamı korunur. Özel calendar/market empty içerikleri Aşama 2. |
-| Tables / lists / pagination | `CompactList.tsx`, `CompactListItem.tsx`, `DataList.tsx`; `records.css`, feature CSS | **partial**. Restoran rezervasyonları ve Menü kategori/ürün listeleri DataList sözleşmesindedir. Finans/market tabloları ve operasyon kayıtları farklı kalır. Global paginator yoktur. |
+| Tables / lists / pagination | `DataList.tsx`; feature CSS | **migrated temel / feature tüketicileri partial**. `records.css` içindeki kullanılmayan CompactList recipe'i kaldırıldı; yaşayan kayıt yüzeyleri `DataList`/`record-workspace` sözleşmelerini kullanır. Finans/market tabloları ve operasyon kayıtları kendi feature CSS'lerinde kalır. Global paginator yoktur. |
 | Forms | `forms.css`, native label/input + ActionButton | **migrated temel**, feature tüketicileri **partial**. xs/short/medium/long/fluid. Restoran rezervasyonları ve Menü kategori/ürün/stok formu bu boyutları kullanır; Market ve bazı operasyon formları sonraki aşamadadır. |
 | Disclosure / danger confirmation | `disclosures.css`, `dialogs.css` | **migrated dış yüzey**, içerik **partial**. Menü silme ve Restoran oda aktarımı common compact dialog kullanır; pending/saving/close guard'ları korunur. |
 
@@ -77,7 +79,9 @@ Duplicate shared primitive kontrolü aynı scope'ta aynı property tekrarını v
 
 Silinen ortak dosya: `styles/components/segmented-control.css` (navigation.css'e birleştirildi). app-shell.css içindeki navigasyon/header/bildirim blokları ayrıldı; lock.css içindeki header kilit butonu taşındı. requests/restaurant/room-folio/finance/menu/menu-preview dosyalarından ortak overlay exterior kuralları silindi. feedback.css içindeki müşteri identity, persistent message ve pension anchor kuralları ait oldukları feature'a taşındı. İlk refactorda silinmiş `friendly-*`, `*-ux.css`, eski `styles.css` dosyaları geri getirilmedi.
 
-### Kalan cascade borcu
+### Kalan cascade borcu (tarihsel snapshot)
+
+Aşağıdaki maddeler Stage 2C / Stage 3A kapanışındaki ara envanterdir. Stage 3B sonucu ve güncel sahiplik için [Aşama 3B sonucu](#aşama-3b-sonucu-final-legacy-surface-cleanup) ile final inventory tablosu geçerlidir.
 
 Restoran ve Menü stylesheet'leri bu aşamada yeniden yazıldı; hedef dosyalarda duplicate selector, `!important`, override token, eski alias ve raw DOM rengi kalmadı. Diğer feature'larda bulunan `manager-row`, operation ve record tarifleri ortak tüketiciler nedeniyle korunur; bunları küresel kaldırmak kapsam dışıdır.
 
@@ -159,25 +163,44 @@ Aşama 2C başlangıcı: temiz `main`, `2c89d8a1c17d409775d9c8eec912663b2342ee0a
 ### Aşama 3A audit ve doğrulama
 
 - **Desktop Style Audit:** `messages.css`, `ai.css`, `setup.css` strict migrated inventory'ye alındı. Üç dosyada da `rawColor: 0`, `duplicateSelectors: 0`, `important: 0`, `override: 0`, `oldAlias: 0`.
-- **Desktop toplamı:** Stage 2C sonrası 106 raw renkten **102**'ye; duplicate selector 91'den **68**'e indi. Kalan desktop raw renkler yalnız Stage 3B kapsamındaki `lock.css` (50), `menu-preview.css` (44), `records.css` (4), `operations.css` (3), `motion.css` (1) dosyalarındadır.
+- **Desktop toplamı (Stage 3A kapanışı):** Stage 2C sonrası 106 raw renkten **102**'ye; duplicate selector 91'den **68**'e indi. Kalan desktop raw renkler yalnız Stage 3B kapsamındaki `lock.css` (50), `menu-preview.css` (44), `records.css` (4), `operations.css` (3), `motion.css` (1) dosyalarındadır.
 - **Global design audit:** global raw renk sayısı **180** olarak raporlanır; desktop dışı/demo ve özel renderer yüzeyleri bu toplamın içindedir. Bu turda diğer dosyalara yalnız sayıyı düşürmek için dokunulmadı.
 - **Yeni smoke:** `scripts/smoke-stage3a-messages-setup.mjs` / `npm run smoke:desktop-stage3a`; 1440×1000, 1366×768, 1024×768, 900×768 ve 600×800; light/pro, dark/pro, light/easy. Mesajlar, AI common surface/status kullanımı, persistent webview marker'ı, Setup onboarding surface/form size/action hiyerarşisi ve embedded Settings overflow'u semantik olarak doğrulanır. Pixel-coordinate assertion kullanılmaz. Screenshot çıktıları `artifacts/design-system/stage3a/` altında ignored olarak tutulur.
 - **Business logic review:** Mesaj ID/selected conversation, persistent mount/visibility, webview `src`/partition, effect akışı, AI request/provider/model/response parsing ve Setup save/validation/persistence/capability payload'ları değişmedi.
 
-## Stage 3B için kesin kalan kapsam
+## Aşama 3B sonucu: Final legacy surface cleanup
 
-- `AppLockScreen` ve `pages/lock.css` özel güvenlik yüzeyi
-- `components/records.css`
-- `components/operations.css`
-- `components/motion.css`
-- `MenuPreview` özel renderer ve `pages/menu-preview.css` palette/canvas sınırı
-- secondary/shared surfaces ve kalan ortak tüketiciler
-- kalan duplicate selector'lar
-- kalan desktop raw renkler
+| Alan | Sonuç |
+| --- | --- |
+| App Lock Screen | **migrated** — Tam ekran security surface korundu; lifecycle, reset/unlock handler'ları, password validation, yüksek z-index, focus ve reduced-motion davranışı değişmedi. `lock.css` security semantic tokenlarına geçti. |
+| Records / shared lists | **migrated temel** — Kullanılmayan `records.css` kaldırıldı. Yaşayan kayıt yüzeyleri `DataList`, `record-workspace`, `record-note` ve feature sahipliğini kullanır; kullanılmayan legacy sınıflar taşınmadı. |
+| Operations | **migrated temel** — Kullanılmayan `operations.css` silindi; yaşayan restoran rezervasyon özeti `restaurant.css` sahipliğine taşındı. Reservation/task/operation handler'ları değişmedi. |
+| Motion | **migrated** — `motion.css` redundant pulse ve duplicate keyframe'den arındırıldı; fast/normal/slow duration, standard easing ve reduced-motion sözleşmesi kullanılır. |
+| MenuPreview | **desktop chrome migrated / special renderer intentional exception** — Dialog/backdrop/header/close/focus ortak primitive'lerde. Müşteriye görünen renderer palette'i ve canvas düzeni bilinçli olarak literal kalır. |
 
-## Sonraki aşamalar
+### Aşama 3B audit ve doğrulama
 
-Stage 3B'de yukarıdaki kesin kapsam ele alınacaktır. Eski status alias prop isimleri ancak tüketiciler taşındığında kaldırılmalı; AppLockScreen ve özel renderer'lar UI migration sırasında güvenlik/renderer sözleşmelerini korumalıdır.
+- **Desktop normal DOM raw color:** Stage 3A **102** → **0**. `lock.css`, `motion.css` ve yaşayan feature yüzeylerinde raw color yoktur.
+- **Intentional renderer raw color:** `menu-preview.css` içinde **44** literal. Bunlar özel müşteri menüsü renderer palette'idir; desktop token borcu olarak sayılmaz ve audit'te ayrı sınıflandırılır.
+- **Duplicate selector:** Stage 3A **68** → **49**. `records.css`/`operations.css` borcu ve lock/motion içi güvenli tekrarlar temizlendi. Kalanlar çoğunlukla foundation/shared complementary veya responsive/state varyantlarıdır; cascade davranışını bozacak kör birleştirme yapılmadı.
+- **`!important` / override / legacy alias:** **0 / 0 / 0**.
+- **Audit raporu:** `normalDomRawColor`, `intentionalRendererRawColor`, `rawSpacing`, `geometryPx` ve violation türleri `design-system-audit.mjs` çıktısında ayrı raporlanır. Orphan stylesheet ve legacy import ihlali yoktur.
+
+### Aşama 3B smoke ve görsel doğrulama
+
+- Yeni smoke: `scripts/smoke-stage3b-final-legacy-surfaces.mjs` / `npm run smoke:desktop-stage3b`.
+- App Lock semantic contract, wrong-password/reset lifecycle için mevcut lock smoke, shared/secondary yüzeyler ve MenuPreview chrome için shell smoke birlikte doğrulanır.
+- Viewportlar: 1440×1000, 1366×768, 1024×768, 900×768, 760×800, 600×800. Lock yüzeyinde document/surface overflow yoktur.
+- Temalar: light/pro, dark/pro, light/easy. Reduced-motion altında lock giriş/recovery animasyonları devre dışıdır.
+- Screenshot ve `observations.json` çıktıları yalnız `artifacts/design-system/stage3b/` altında tutulur; source/commit kapsamına alınmaz.
+
+## Desktop migration final inventory
+
+- **migrated:** shell, Settings, Customer Work, Pension, Restaurant, Menu, Finance, Market, Dashboard, Calendar, Reports, Messages/AI, Setup, App Lock; ortak panel/list/form/status/dialog/motion primitive'leri.
+- **partial:** bazı büyük feature stylesheet'lerinde feature-specific nested records, tablo/pagination ve özel operasyon içerikleri; bunlar artık ortak shell/primitive sahipliğini ezmez.
+- **intentional exception:** `pages/menu-preview.css` özel renderer palette/canvas; harita tile/pin geometry; gerçek canvas/protocol geometry.
+- **external/third-party:** WhatsApp/webview iç UI'sı ve `firm-template/web-module/widget.js`.
+- **remaining legacy:** migration envanterinde desktop shell/normal DOM için legacy stylesheet kalmadı; kalan partial/exception yüzeyler yukarıdaki sınırlı listeyle belgelenmiştir.
 
 ## Aşama 1 ölçüm ve doğrulama (tarihsel)
 
@@ -290,7 +313,7 @@ Başlangıç dosyaları (satır sayısı terminal newline dahil): customers.css 
 
 Repo genelindeki sürüm kontrolüne aday **47 kaynak CSS dosyası** (token/tema hariç) **221 raw hex/rgb/hsl renk** içerir; bu sayı mevcut desktop + demo-web + web-widget audit kapsamıyla aynıdır. Bu, generated/vendor dosyaları içeren sınırsız grep sayısı değildir. Named CSS renkleri bu metrikte sayılmaz; hedef yeni dosyalarda named raw renk de eklenmedi.
 
-Büyük kalan feature borcu 2B hedeflerinin dışındadır: `market.css`, `dashboard.css`, `finance.css`, `reports.css`, `lock.css`, `ai.css` ve `menu-preview.css` özel/legacy kurallar taşır. `records.css`, `operations.css` ve `resources.css` diğer ekranların ortak tüketicileri nedeniyle korunur; bunları küresel kaldırmak iş akışlarını riske atar. Restoran/Menü hedef dosyalarının güncel ölçümleri Aşama 2B sonucu bölümündedir.
+Büyük kalan feature borcu 2B hedeflerinin dışındadır: `market.css`, `dashboard.css`, `finance.css`, `reports.css`, `lock.css`, `ai.css` ve `menu-preview.css` özel/legacy kurallar taşır. Bu tarihsel Aşama 2A notunda `records.css` ve `operations.css` korunuyordu; Stage 3B final cleanup'ta iki dosya ve bunların kullanılmayan recipe'leri kaldırıldı. Restoran/Menü hedef dosyalarının güncel ölçümleri Aşama 2B sonucu bölümündedir.
 
 ### Görsel doğrulama ve erişilebilirlik
 

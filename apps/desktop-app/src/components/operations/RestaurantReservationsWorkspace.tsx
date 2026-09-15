@@ -80,7 +80,7 @@ export function RestaurantReservationsWorkspace({
   return (
     <section className="restaurant-reservations-workspace" aria-label="Restoran rezervasyonları">
       <div className="reservation-toolbar page-toolbar">
-        <div className="operation-filter-summary" aria-label="Restoran rezervasyon özeti">
+        <div className="restaurant-reservation-summary" aria-label="Restoran rezervasyon özeti">
           <StatusBadge tone="info">{activeReservations.length} aktif rezervasyon</StatusBadge>
           <StatusBadge tone="warning">{activeReservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
           <ActionButton size="sm" type="button" onClick={() => setEditorOpen(true)}>
@@ -95,7 +95,7 @@ export function RestaurantReservationsWorkspace({
 
       <DataList className="restaurant-reservation-list" aria-label="Restoran rezervasyon listesi">
         {visibleReservations.length === 0 ? (
-          <div className="panel empty-state compact-empty">
+          <div className="panel empty-state empty-state--compact">
             <CalendarCheck size={24} aria-hidden="true" />
             <strong>Restoran rezervasyonu yok.</strong>
             <p>Telefonla veya yüz yüze gelen rezervasyonu Yeni Rezervasyon ile ekleyebilirsiniz.</p>

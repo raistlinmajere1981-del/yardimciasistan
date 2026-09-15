@@ -169,7 +169,7 @@ try {
   assert.equal(financialState(), beforeShare);
 
   // Existing request source remains selectable; request send control stays available.
-  await page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-list .manager-row").first().click();
+  await page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-list .message-request-row").first().click();
   await expect(page.getByRole("button", { name: "Onayla ve Gönder", exact: true })).toHaveCount(1);
   await navigate("Müşteriler"); await page.getByRole("button", { name: /Ahmet Paylaşım/ }).click(); await openAccount();
   await share(); await editor.fill("Kullanıcı düzenledi.");

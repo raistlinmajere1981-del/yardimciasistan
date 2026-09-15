@@ -501,7 +501,7 @@ try {
   await expect(page.locator(".whatsapp-request-panel .panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
   await expect(page.locator(".whatsapp-request-panel .panel-heading p")).toHaveCount(0);
   await expect(page.locator(".whatsapp-copy-panel").getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
-  await expect(page.locator(".whatsapp-copy-panel .detail-category-label")).toHaveText("Hazır yanıt");
+  await expect(page.locator(".whatsapp-copy-panel .message-detail-category-label")).toHaveText("Hazır yanıt");
   await expect(page.locator(".whatsapp-copy-panel .panel-heading p")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Hazır Mesajı Kopyala" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Mesajı Sil" })).toBeVisible();
@@ -1562,7 +1562,7 @@ try {
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-menu-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Mesajlar", exact: true }).click();
-  const compactMessageRows = compactPage.locator(".whatsapp-request-list .manager-row");
+  const compactMessageRows = compactPage.locator(".whatsapp-request-list .message-request-row");
   await expect(compactMessageRows).toHaveCount(8);
   await expect(compactPage.locator(".whatsapp-copy-panel").getByRole("heading", { name: "Kompakt Misafir 1" })).toBeVisible();
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-messages-1366x768.png" });

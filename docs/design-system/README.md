@@ -31,8 +31,6 @@ apps/desktop-app/src/styles/
     feedback.css
     metrics.css
     motion.css
-    operations.css
-    records.css
     resources.css
     segmented-control.css
   layout/
@@ -175,6 +173,17 @@ Foundation ve Settings taşındı; diğer feature'ların tüm markup/layout'ı y
 Token/tema dışında **157 ham renk literal'i** ve **1598 px/rem literal'i** kalır; border, breakpoint ve harita geometrisi bu sayılara dahildir. Yeni forms/buttons/panels/settings dosyaları ham renk içermez. Haritanın 256px tile ölçüsü ve pin geometrisi protokol/görsel geometridir; bunlardan yeni tasarım tokenları türetilmedi.
 
 `design-system-audit.mjs` yeni token sözleşmesini, tanımsız tokenları, tek ana importu, explicit layer sırasını ve override yasağını doğrular. Eski auditin tüm `styles.css` dosyasını token dosyası sayarak borcu gizleme davranışı kaldırıldı. Radius/shadow regex'inin `var()` değerlerini yanlışlıkla ham değer sayması düzeltildi. Baseline yeni dosya yolları ve doğru ölçüm yöntemiyle yenilendi; bundan sonraki borç artışları strict audit ile engellenir.
+
+## Final desktop kuralları (Stage 3B)
+
+Yeni desktop feature'lar:
+
+- semantic token kullanır.
+- Mevcut primitive'i first tercih eder; yeni primitive yalnız tekrar eden bir ihtiyaç için eklenir.
+- Raw color, `!important` ve `--override-*` kullanmaz.
+- Form kontrollerinde açık size contract (`xs`, `short`, `medium`, `long`, `fluid`) belirtir.
+- Feature stylesheet'inde yalnız feature-specific layout/presentation bırakır; ortak yüzeyleri global/shared primitive'lere bırakır.
+- Renderer/canvas/protocol geometrisi veya özel palette istisnasını audit ve dokümantasyonda açıkça belirtir.
 
 ## Son doğrulama
 

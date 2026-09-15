@@ -96,7 +96,13 @@ function assertTokenContract() {
     "--radius-control", "--radius-panel", "--radius-dialog", "--radius-pill",
     "--control-height-sm", "--control-height-md", "--control-height-lg",
     "--field-width-xs", "--field-width-sm", "--field-width-md", "--field-width-lg",
-    "--page-max-width", "--reading-max-width", "--sidebar-width", "--header-height"
+    "--page-max-width", "--reading-max-width", "--sidebar-width", "--header-height",
+    "--motion-fast", "--motion-normal", "--motion-slow", "--ease-standard",
+    "--color-security-backdrop", "--color-security-surface", "--color-security-surface-raised",
+    "--color-security-field", "--color-security-text", "--color-security-text-muted",
+    "--color-security-border", "--color-security-accent", "--color-security-accent-hover",
+    "--color-security-on-accent", "--color-security-warning", "--color-security-danger",
+    "--color-security-success", "--color-security-focus", "--shadow-security", "--z-security"
   ];
   const css = walk("apps/desktop-app/src").filter((file) => file.endsWith(".css"))
     .map((file) => fs.readFileSync(path.join(ROOT, file), "utf8")).join("\n");
@@ -146,6 +152,13 @@ function printSummary(metrics) {
 
 const desktopAudit = desktopStyleAudit(walk("apps/desktop-app/src"));
 console.log("desktop-style-inventory", JSON.stringify(desktopAudit.totals));
+console.log("desktop-style-classification", JSON.stringify({
+  normalDomRawColor: desktopAudit.totals.normalDomRawColor,
+  intentionalRendererRawColor: desktopAudit.totals.intentionalRendererRawColor,
+  rawSpacing: desktopAudit.totals.rawSpacing,
+  geometryPx: desktopAudit.totals.geometryPx
+}));
+console.log("desktop-style-violations", JSON.stringify(desktopAudit.violationTotals));
 for (const issue of desktopAudit.violations) console.log(`  ${issue.kind}: ${issue.file}:${issue.line} ${issue.detail}`);
 if (args.has("--json")) {
   fs.mkdirSync("artifacts/design-system/audit", { recursive: true });
@@ -154,7 +167,7 @@ if (args.has("--json")) {
 const sharedFiles = /\/styles\/(?:layout\/|components\/(?:navigation|header|notifications|panels|toolbars|status|dialogs)\.css$)/;
 const coreViolations = desktopAudit.violations.filter(issue => sharedFiles.test(issue.file));
 if (coreViolations.length) throw new Error(`Shared shell must have zero violations: ${coreViolations.length}`);
-const migratedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup)|components\/(?:cards|data-list|forms))\.css$/;
+const migratedDesktop = /\/styles\/(?:pages\/(?:customers|pension|room-folio|restaurant|menu|finance|market|dashboard|calendar|reports|messages|ai|setup|lock)|components\/(?:cards|data-list|forms|motion))\.css$/;
 const migrationViolations = desktopAudit.violations.filter(issue => migratedDesktop.test(issue.file));
 const targetInventory = desktopAudit.inventory.filter(item => migratedDesktop.test(item.file));
 console.log("desktop-migrated-inventory", JSON.stringify(targetInventory));

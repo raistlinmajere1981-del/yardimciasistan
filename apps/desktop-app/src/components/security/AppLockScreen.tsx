@@ -98,8 +98,6 @@ export function AppLockScreen({
       aria-modal={phase === "checking" ? undefined : true}
       aria-label="Yardımcı Asistan kilit ekranı"
     >
-      <div className="app-lock-ambient app-lock-ambient-one" aria-hidden="true" />
-      <div className="app-lock-ambient app-lock-ambient-two" aria-hidden="true" />
       <section className="app-lock-card">
         <img
           className="app-lock-logo"

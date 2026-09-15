@@ -1,63 +1,44 @@
 .app-lock-screen {
   position: fixed;
-  z-index: 10000;
+  z-index: var(--z-security);
   inset: 0;
   display: grid;
-  min-width: 100vw;
+  min-width: 0;
   min-height: 100vh;
   place-items: center;
   overflow: auto;
-  padding: clamp(var(--space-5), 5vw, 56px);
-  color: #eef7f5;
-  background: radial-gradient(circle at 15% 10%, rgba(62, 207, 168, 0.15), transparent 34%),
-    radial-gradient(circle at 88% 86%, rgba(79, 163, 232, 0.12), transparent 32%),
-    #09111d;
+  overflow-x: hidden;
+  padding: clamp(var(--space-5), 5vw, var(--space-8));
+  color: var(--color-security-text);
+  background:
+    radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--color-security-accent) 15%, transparent), transparent 34%),
+    radial-gradient(circle at 88% 86%, color-mix(in srgb, var(--color-info) 12%, transparent), transparent 32%),
+    var(--color-security-backdrop);
   isolation: isolate;
-  animation: app-lock-enter 180ms ease-out both;
+  animation: app-lock-enter var(--motion-normal) var(--ease-standard) both;
 }
 
 .app-lock-screen.is-unlocking {
   pointer-events: none;
-  animation: app-lock-exit 170ms ease-in both;
-}
-
-.app-lock-ambient {
-  position: fixed;
-  z-index: -1;
-  width: min(38vw, 520px);
-  aspect-ratio: 1;
-  opacity: 0.35;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(62, 207, 168, 0.1), transparent 68%);
-}
-
-.app-lock-ambient-one {
-  top: -16vw;
-  left: -10vw;
-}
-
-.app-lock-ambient-two {
-  right: -12vw;
-  bottom: -18vw;
+  animation: app-lock-exit var(--motion-fast) var(--ease-standard) both;
 }
 
 .app-lock-card {
   display: grid;
   width: min(100%, 440px);
-  gap: 18px;
-  padding: clamp(var(--space-6), 4vw, 36px);
-  background: #111b2a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  gap: var(--space-4);
+  padding: clamp(var(--space-6), 4vw, var(--space-8));
+  background: var(--color-security-surface);
+  border: 1px solid var(--color-security-border);
   border-radius: var(--radius-dialog);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  box-shadow: var(--shadow-security);
 }
 
 .app-lock-logo {
   display: block;
   width: min(100%, 330px);
   height: auto;
-  margin: 0 auto 2px;
+  margin: 0 auto var(--space-1);
 }
 
 .app-lock-title {
@@ -72,39 +53,35 @@
   width: 42px;
   height: 42px;
   place-items: center;
-  color: #3ecfa8;
-  background: rgba(62, 207, 168, 0.1);
-  border: 1px solid rgba(62, 207, 168, 0.24);
+  color: var(--color-security-accent);
+  background: color-mix(in srgb, var(--color-security-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-security-accent) 24%, transparent);
   border-radius: var(--radius-panel);
 }
 
-.app-lock-title p,
-.app-lock-title h1 {
-  margin: 0;
-}
-
 .app-lock-title p {
-  color: #3ecfa8;
+  margin: 0;
+  color: var(--color-security-accent);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .app-lock-title h1 {
-  margin-top: 2px;
-  color: #f4f8fb;
+  margin: var(--space-1) 0 0;
+  color: var(--color-security-text);
   font-size: var(--text-xl);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .app-lock-notification {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 10px var(--space-3);
-  background: #172436;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-security-surface-raised);
+  border: 1px solid var(--color-security-border);
   border-radius: var(--radius-panel);
 }
 
@@ -113,8 +90,8 @@
   width: 34px;
   height: 34px;
   place-items: center;
-  color: #e6a817;
-  background: rgba(230, 168, 23, 0.11);
+  color: var(--color-security-warning);
+  background: color-mix(in srgb, var(--color-security-warning) 11%, transparent);
   border-radius: var(--radius-panel);
 }
 
@@ -127,9 +104,9 @@
 }
 
 .app-lock-notification small {
-  color: #9aabc1;
+  color: var(--color-security-text-muted);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .app-lock-notification strong {
@@ -137,35 +114,34 @@
   min-width: 30px;
   height: 30px;
   place-items: center;
-  padding: 0 7px;
-  color: #ffffff;
-  background: #d95749;
+  padding: 0 var(--space-2);
+  color: var(--color-security-text);
+  background: var(--color-security-danger);
   border-radius: var(--radius-pill);
   font-size: var(--text-sm);
 }
 
-.app-lock-form,
-.app-lock-form label,
-.app-lock-recovery-form,
-.app-lock-recovery-form label {
+.app-lock-form {
   display: grid;
-  gap: 7px;
+  gap: var(--space-2);
 }
 
 .app-lock-form label,
 .app-lock-recovery-form label {
-  color: #dfe9f1;
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-security-text);
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
 }
 
 .app-lock-input {
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
   align-items: center;
-  color: #8fa3ba;
-  background: #0c1522;
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  color: var(--color-security-text-muted);
+  background: var(--color-security-field);
+  border: 1px solid var(--color-security-border);
   border-radius: var(--radius-panel);
 }
 
@@ -174,18 +150,18 @@
 }
 
 .app-lock-input:focus-within {
-  color: #3ecfa8;
-  border-color: rgba(62, 207, 168, 0.7);
-  box-shadow: 0 0 0 3px rgba(62, 207, 168, 0.1);
+  color: var(--color-security-accent);
+  border-color: var(--color-security-accent);
+  box-shadow: 0 0 0 3px var(--color-security-focus);
 }
 
 .app-lock-input input,
-.app-lock-recovery-form input {
+.app-lock-recovery-form :where(input) {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: 9px 11px;
-  color: #f4f8fb;
+  min-height: var(--control-height-lg);
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-security-text);
   background: transparent;
   border: 0;
   outline: 0;
@@ -193,36 +169,36 @@
 }
 
 .app-lock-recovery-form input {
-  background: #0c1522;
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: var(--color-security-field);
+  border: 1px solid var(--color-security-border);
   border-radius: var(--radius-panel);
 }
 
-.app-lock-recovery-form input:focus {
-  border-color: rgba(62, 207, 168, 0.7);
-  box-shadow: 0 0 0 3px rgba(62, 207, 168, 0.1);
+.app-lock-recovery-form input:focus-visible {
+  border-color: var(--color-security-accent);
+  box-shadow: 0 0 0 3px var(--color-security-focus);
 }
 
 .app-lock-primary,
 .app-lock-recovery-form > button {
   display: inline-flex;
-  min-height: 44px;
+  min-height: var(--control-height-lg);
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  padding: 9px 14px;
-  color: #06130f;
-  background: #3ecfa8;
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-security-on-accent);
+  background: var(--color-security-accent);
   border: 0;
   border-radius: var(--radius-panel);
   cursor: pointer;
   font: inherit;
-  font-weight: 800;
+  font-weight: var(--weight-bold);
 }
 
-.app-lock-primary:hover,
-.app-lock-recovery-form > button:hover {
-  background: #55d7b5;
+.app-lock-primary:hover:not(:disabled),
+.app-lock-recovery-form > button:hover:not(:disabled) {
+  background: var(--color-security-accent-hover);
 }
 
 .app-lock-primary:disabled,
@@ -234,106 +210,107 @@
 
 .app-lock-no-password {
   margin: 0;
-  color: #9aabc1;
+  color: var(--color-security-text-muted);
   font-size: var(--text-sm);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .app-lock-recovery {
   display: grid;
-  gap: 10px;
+  gap: var(--space-3);
   justify-items: center;
 }
 
 .app-lock-link {
-  padding: 2px 5px;
-  color: #9eb1c5;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-security-text-muted);
   background: transparent;
   border: 0;
   cursor: pointer;
   font: inherit;
   font-size: var(--text-sm);
-  font-weight: 700;
+  font-weight: var(--weight-bold);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.app-lock-link:hover {
-  color: #ffffff;
+.app-lock-link:hover:not(:disabled) {
+  color: var(--color-security-text);
 }
 
 .app-lock-recovery-form {
+  display: grid;
+  gap: var(--space-2);
   width: 100%;
-  padding: 14px;
-  background: #0c1522;
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  padding: var(--space-3);
+  background: var(--color-security-field);
+  border: 1px solid var(--color-security-border);
   border-radius: var(--radius-panel);
-  animation: app-lock-recovery-enter 140ms ease-out both;
+  animation: app-lock-recovery-enter var(--motion-fast) var(--ease-standard) both;
 }
 
 .app-lock-recovery-title {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: var(--space-2);
 }
 
 .app-lock-recovery-title > svg {
   flex: 0 0 auto;
-  margin-top: 2px;
-  color: #e6a817;
+  margin-top: var(--space-1);
+  color: var(--color-security-warning);
 }
 
-.app-lock-recovery-title strong,
-.app-lock-recovery-title span {
+.app-lock-recovery-title :where(strong, span) {
   display: block;
 }
 
 .app-lock-recovery-title strong {
-  color: #eef5fa;
+  color: var(--color-security-text);
   font-size: var(--text-base);
 }
 
 .app-lock-recovery-title span,
 .app-lock-recovery-form > small {
-  margin-top: 2px;
-  color: #8fa3ba;
+  margin-top: var(--space-1);
+  color: var(--color-security-text-muted);
   font-size: var(--text-xs);
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 .app-lock-message {
   min-height: 19px;
-  margin: -2px 0 0;
-  color: #8fa3ba;
+  margin: calc(-1 * var(--space-1)) 0 0;
+  color: var(--color-security-text-muted);
   font-size: var(--text-sm);
-  line-height: 1.4;
+  line-height: var(--leading-normal);
   text-align: center;
 }
 
 .app-lock-message.is-error {
-  color: #ff9183;
+  color: var(--color-security-danger);
 }
 
 .app-lock-message.is-success {
-  color: #63dfbd;
+  color: var(--color-security-success);
 }
 
 .app-lock-checking {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  padding: 18px 0 var(--space-1);
-  color: #9aabc1;
+  gap: var(--space-2);
+  padding: var(--space-4) 0 var(--space-1);
+  color: var(--color-security-text-muted);
   text-align: center;
 }
 
 .app-lock-checking > svg {
   margin-bottom: var(--space-1);
-  color: #3ecfa8;
+  color: var(--color-security-accent);
 }
 
 .app-lock-checking strong {
-  color: #f4f8fb;
+  color: var(--color-security-text);
 }
 
 .app-lock-checking span {
@@ -343,14 +320,19 @@
 @media (max-width: 620px) {
   .app-lock-screen {
     align-items: start;
-    padding: 14px;
+    padding: var(--space-3);
+  }
+
+  .app-lock-card {
+    width: 100%;
+    margin: var(--space-3) 0;
+    padding: var(--space-5) var(--space-4);
   }
 }
 
-@media (max-width: 620px) {
-  .app-lock-card {
-    margin: var(--space-3) 0;
-    padding: 22px 18px;
-    border-radius: var(--radius-dialog);
+@media (prefers-reduced-motion: reduce) {
+  .app-lock-screen,
+  .app-lock-recovery-form {
+    animation: none;
   }
 }

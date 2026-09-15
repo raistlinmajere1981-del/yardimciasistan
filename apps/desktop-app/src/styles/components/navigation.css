@@ -88,7 +88,7 @@
   cursor: pointer;
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
-  transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+  transition: color var(--motion-fast) var(--ease-standard), background-color var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
 }
 
 .nav-item span {

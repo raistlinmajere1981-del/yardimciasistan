@@ -427,7 +427,7 @@
   border: var(--space-1) solid var(--color-border);
   border-top-color: var(--color-accent);
   border-radius: var(--radius-pill);
-  animation: stock-image-spin 0.8s linear infinite;
+  animation: stock-image-spin var(--motion-slow) linear infinite;
 }
 
 .stock-image-success > svg {
@@ -590,12 +590,6 @@
 
 .stock-image-review-footer > .action-button:first-of-type {
   margin-inline-start: auto;
-}
-
-@keyframes stock-image-spin {
-  to {
-    transform: rotate(1turn);
-  }
 }
 
 @media (max-width: 1200px) {

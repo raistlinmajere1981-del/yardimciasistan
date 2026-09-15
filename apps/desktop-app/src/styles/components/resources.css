@@ -65,7 +65,7 @@
   opacity: 0;
   pointer-events: none;
   transform: translateY(-3px);
-  transition: max-height 140ms ease, opacity 120ms ease, transform 120ms ease, margin-top 120ms ease;
+  transition: max-height var(--motion-fast) var(--ease-standard), opacity var(--motion-fast) var(--ease-standard), transform var(--motion-fast) var(--ease-standard), margin-top var(--motion-fast) var(--ease-standard);
 }
 
 .compact-resource-grid .resource-compact-card .compact-status-actions:not(:has(button:not(:disabled))) {

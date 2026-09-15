@@ -12,5 +12,5 @@
 }
 
 .is-spinning {
-  animation: ya-health-spin 0.8s linear infinite;
+  animation: ya-health-spin var(--motion-slow) linear infinite;
 }

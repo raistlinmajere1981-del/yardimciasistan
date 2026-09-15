@@ -245,7 +245,7 @@ export function AiWorkspace({
           <StatusBadge tone="info">{history.length} kayıt</StatusBadge>
         </div>
         {history.length === 0 ? (
-          <div className="empty-state compact-empty"><strong>Henüz geçmiş yok.</strong><p>Hazırlanan sonuçlar yalnız bu bilgisayarda saklanır.</p></div>
+          <div className="empty-state empty-state--compact"><strong>Henüz geçmiş yok.</strong><p>Hazırlanan sonuçlar yalnız bu bilgisayarda saklanır.</p></div>
         ) : (
           <div className="ai-history-list">
             {history.map((historyEntry) => (
@@ -589,7 +589,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
 
         <DataList className="whatsapp-request-list">
           {requests.length === 0 ? (
-            <div className="empty-state compact-empty">
+            <div className="empty-state empty-state--compact">
               <MessageCircle size={24} aria-hidden="true" />
               <strong>Hazır talep yok.</strong>
               <p>Web talepleri çekildiğinde burada görünür.</p>
@@ -597,7 +597,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
           ) : (
             requests.map((request) => (
               <DataListButton
-                className="manager-row message-request-row"
+                className="message-request-row"
                 key={request.id}
                 title={request.customer_name}
                 leading={<span className={`status-dot tone-${getRequestStatusTone(request.status)}`} aria-hidden="true" />}
@@ -672,7 +672,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
               webpreferences="contextIsolation=yes,nodeIntegration=no"
             />
           ) : (
-            <div className="empty-state compact-empty">
+            <div className="empty-state empty-state--compact">
               <MessageCircle size={24} aria-hidden="true" />
               <strong>WhatsApp bağlantısı hazır değil.</strong>
             </div>
@@ -682,14 +682,14 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
 
       {view === "safe" && <aside className="panel whatsapp-copy-panel">
         <div className="panel-heading compact">
-          <div className="detail-title-group">
-            <span className="detail-category-label">Hazır yanıt</span>
+          <div className="message-detail-title-group">
+            <span className="message-detail-category-label">Hazır yanıt</span>
             <h2>{recipientName}</h2>
           </div>
           {!preparedMessage && selectedRequest && <StatusBadge tone={getRequestStatusTone(selectedRequest.status)}>{formatRequestStatus(selectedRequest.status)}</StatusBadge>}
         </div>
 
-        <dl className="info-list compact-detail-meta message-recipient-meta">
+        <dl className="info-list message-recipient-meta">
           <div>
             <dt>Telefon</dt>
             <dd>{phoneDisplay}</dd>

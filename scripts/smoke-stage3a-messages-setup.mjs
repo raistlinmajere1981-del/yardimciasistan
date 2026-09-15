@@ -80,7 +80,7 @@ try {
   await expect(messagesPage.locator(".message-toolbar")).toBeVisible();
   await expect(messagesPage.locator(".whatsapp-request-panel")).toBeVisible();
   await expect(messagesPage.locator(".whatsapp-copy-panel")).toBeVisible();
-  await expect(messagesPage.locator(".whatsapp-request-list .manager-row")).toHaveCount(1);
+  await expect(messagesPage.locator(".whatsapp-request-list .message-request-row")).toHaveCount(1);
   await expect(messagesPage.locator(".whatsapp-request-panel .status-badge")).toBeVisible();
   for (const action of ["Hazır Mesajı Kopyala", "WhatsApp Linkini Aç", "Müşteriyi Ara", "Mesajı Sil", "AI ile Yenile"]) {
     await expect(messagesPage.getByRole("button", { name: action, exact: true })).toBeVisible();

@@ -17,4 +17,8 @@
   --dialog-width-md: 40rem;
   --dialog-width-lg: 72rem;
   --ui-scale: 1;
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
+  --motion-slow: 800ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }

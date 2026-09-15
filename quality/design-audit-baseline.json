@@ -426,22 +426,6 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/components/ui/CompactList.tsx": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/components/ui/CompactListItem.tsx": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
     "apps/desktop-app/src/components/ui/MetricCard.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,

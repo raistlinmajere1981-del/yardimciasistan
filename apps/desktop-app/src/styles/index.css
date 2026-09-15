@@ -28,9 +28,7 @@
 @import "./components/forms.css" layer(components.primitives);
 @import "./components/metrics.css" layer(components.legacy);
 @import "./components/motion.css" layer(components.legacy);
-@import "./components/operations.css" layer(components.legacy);
 @import "./components/panels.css" layer(components.primitives);
-@import "./components/records.css" layer(components.legacy);
 @import "./components/resources.css" layer(components.legacy);
 
 @import "./layout/app-shell.css" layer(layout);
