@@ -187,7 +187,15 @@ export function projectAndroidMarketSnapshot(
   enabled: ReadonlySet<BusinessCapability>,
   androidEnabled = enabled.has(C.ANDROID)
 ): AndroidMarketSnapshot {
-  if (!androidEnabled) return emptyAndroidMarketSnapshot(source.summary.currency || "TRY");
+  const retailWorkspaceEnabled = [
+    C.RETAIL_BARCODE,
+    C.RETAIL_PURCHASING,
+    C.RETAIL_SUPPLIERS,
+    C.RETAIL_LABELS
+  ].some((capability) => enabled.has(capability));
+  if (!androidEnabled || !retailWorkspaceEnabled) {
+    return emptyAndroidMarketSnapshot(source.summary.currency || "TRY");
+  }
 
   const catalogEnabled = enabled.has(C.CATALOG);
   const inventoryEnabled = enabled.has(C.INVENTORY);

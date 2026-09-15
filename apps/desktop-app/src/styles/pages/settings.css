@@ -147,7 +147,9 @@
 }
 
 .setup-ai-actions.is-inline {
-  align-self: end;
+  grid-column: 1 / -1;
+  order: 1;
+  align-self: auto;
 }
 
 .setup-ai-studio-help {

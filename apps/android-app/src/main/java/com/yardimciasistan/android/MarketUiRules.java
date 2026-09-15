@@ -21,6 +21,7 @@ final class MarketUiRules {
   static final String CAPABILITY_BARCODE = "retail.barcode";
   static final String CAPABILITY_PURCHASING = "retail.purchasing";
   static final String CAPABILITY_SUPPLIERS = "retail.suppliers";
+  static final String CAPABILITY_LABELS = "retail.labels";
 
   static final String PERMISSION_SUMMARY = "market.summary.view";
   static final String PERMISSION_PRODUCT_VIEW = "market.product.view";
@@ -49,10 +50,19 @@ final class MarketUiRules {
 
   private MarketUiRules() {}
 
+  static boolean hasRetailWorkspaceCapability(OperationData data) {
+    return data != null && (
+        data.hasBusinessCapability(CAPABILITY_BARCODE)
+            || data.hasBusinessCapability(CAPABILITY_PURCHASING)
+            || data.hasBusinessCapability(CAPABILITY_SUPPLIERS)
+            || data.hasBusinessCapability(CAPABILITY_LABELS)
+    );
+  }
+
   static boolean canOpenMarket(OperationData data) {
     if (data == null
         || !data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID)
-        || !data.hasAnyMarketCapability()) {
+        || !hasRetailWorkspaceCapability(data)) {
       return false;
     }
     for (String permission : MARKET_PERMISSIONS) {

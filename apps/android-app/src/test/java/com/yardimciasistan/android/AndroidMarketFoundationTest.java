@@ -25,6 +25,36 @@ public final class AndroidMarketFoundationTest {
   }
 
   @Test
+  public void genericCommerceCapabilitiesDoNotOpenRetailWorkspace() {
+    OperationData data = new OperationData();
+    data.capabilitiesResolved = true;
+    data.permissionsResolved = true;
+    data.deviceActive = true;
+    data.businessCapabilities.add("service.android");
+    data.businessCapabilities.add("commerce.catalog");
+    data.businessCapabilities.add("commerce.inventory");
+    data.businessCapabilities.add("commerce.sales");
+    for (String permission : new String[] {
+        "market.summary.view",
+        "market.product.view",
+        "market.stock_count",
+        "market.product_draft",
+        "market.cart_draft"
+    }) {
+      data.permissions.add(permission);
+    }
+
+    assertFalse(MarketUiRules.hasRetailWorkspaceCapability(data));
+    assertFalse(MarketUiRules.canOpenMarket(data));
+    assertFalse(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_MARKET));
+
+    data.businessCapabilities.add("retail.labels");
+    assertTrue(MarketUiRules.hasRetailWorkspaceCapability(data));
+    assertTrue(MarketUiRules.canOpenMarket(data));
+    assertTrue(AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_MARKET));
+  }
+
+  @Test
   public void marketPermissionsRemainBoundedByBusinessCapabilities() {
     OperationData data = authorizedMarketData();
     for (String permission : new String[] {
