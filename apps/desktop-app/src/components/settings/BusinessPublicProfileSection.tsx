@@ -300,19 +300,19 @@ export function BusinessPublicProfileSection({ businessAddress, saveHandleRef }:
           <div className="form-row business-public-profile-times">
             <label className="form-field form-field--short">
               Giriş saati
-              <input type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
+              <input lang="tr-TR" type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
             </label>
             <label className="form-field form-field--short">
               Çıkış saati
-              <input type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
+              <input lang="tr-TR" type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
             </label>
             <label className="form-field form-field--short">
               Kahvaltı başlangıcı
-              <input type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
+              <input lang="tr-TR" type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
             </label>
             <label className="form-field form-field--short">
               Kahvaltı bitişi
-              <input type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
+              <input lang="tr-TR" type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
             </label>
           </div>
 

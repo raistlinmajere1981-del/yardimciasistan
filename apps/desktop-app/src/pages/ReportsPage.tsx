@@ -257,33 +257,27 @@ export function ReportsPage({
           <div className="report-custom-dates">
             <label>
               Başlangıç tarihi
-              <span className="report-date-control">
-                <input
-                  aria-label="Başlangıç tarihi"
-                  lang="tr-TR"
-                  type="date"
-                  value={customStart}
-                  max={customEnd || undefined}
-                  onChange={(event) => updateCustomRange(event.target.value, customEnd)}
-                />
-                <span aria-hidden="true">{isIsoDate(customStart) ? longDate(customStart) : "Tarih seçin"}</span>
-              </span>
-              <small>Gün / Ay / Yıl</small>
+              <input
+                aria-label="Başlangıç tarihi"
+                lang="tr-TR"
+                type="date"
+                value={customStart}
+                max={customEnd || undefined}
+                onChange={(event) => updateCustomRange(event.target.value, customEnd)}
+              />
+              <small>GG.AA.YYYY</small>
             </label>
             <label>
               Bitiş tarihi
-              <span className="report-date-control">
-                <input
-                  aria-label="Bitiş tarihi"
-                  lang="tr-TR"
-                  type="date"
-                  value={customEnd}
-                  min={customStart || undefined}
-                  onChange={(event) => updateCustomRange(customStart, event.target.value)}
-                />
-                <span aria-hidden="true">{isIsoDate(customEnd) ? longDate(customEnd) : "Tarih seçin"}</span>
-              </span>
-              <small>Gün / Ay / Yıl</small>
+              <input
+                aria-label="Bitiş tarihi"
+                lang="tr-TR"
+                type="date"
+                value={customEnd}
+                min={customStart || undefined}
+                onChange={(event) => updateCustomRange(customStart, event.target.value)}
+              />
+              <small>GG.AA.YYYY</small>
             </label>
           </div>
         )}

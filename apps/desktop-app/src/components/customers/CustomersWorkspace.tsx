@@ -577,7 +577,7 @@ function CustomerEditorDrawer({
               </select></label>
               <label className="form-field form-field--medium">Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
               <label className="form-field form-field--medium">Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
-              <label className="form-field form-field--short">Doğum tarihi<input lang="tr" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
+              <label className="form-field form-field--short">Doğum tarihi<input lang="tr-TR" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
               <label className="form-field form-field--medium">Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
                 <option value="">Seçilmedi</option>
                 <option value="female">Kadın</option>
@@ -585,7 +585,7 @@ function CustomerEditorDrawer({
                 <option value="unspecified">Belirtilmemiş</option>
               </select></label>
               <label className="form-field form-field--medium">Seri / belge no<input value={form.documentSerialNumber} onChange={(event) => update("documentSerialNumber", event.target.value)} /></label>
-              <label className="form-field form-field--short">Son geçerlilik<input lang="tr" type="date" value={form.documentExpiryDate} onChange={(event) => update("documentExpiryDate", event.target.value)} /></label>
+              <label className="form-field form-field--short">Son geçerlilik<input lang="tr-TR" type="date" value={form.documentExpiryDate} onChange={(event) => update("documentExpiryDate", event.target.value)} /></label>
               <label className="form-field form-field--medium">Doğum yeri<input value={form.birthPlace} onChange={(event) => update("birthPlace", event.target.value)} /></label>
               <label className="form-field form-field--medium">Anne adı<input value={form.motherName} onChange={(event) => update("motherName", event.target.value)} /></label>
               <label className="form-field form-field--medium">Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
@@ -682,8 +682,8 @@ export function RoomAssignmentDrawer({
                 </option>
               ))}
             </select></label>
-            <label className="form-field form-field--short">Giriş tarihi<input required lang="tr" type="date" value={form.checkInDate} onChange={(event) => setForm({ ...form, checkInDate: event.target.value })} /></label>
-            <label className="form-field form-field--short">Çıkış tarihi<input lang="tr" type="date" value={form.checkOutDate} onChange={(event) => setForm({ ...form, checkOutDate: event.target.value })} /></label>
+            <label className="form-field form-field--short">Giriş tarihi<input required lang="tr-TR" type="date" value={form.checkInDate} onChange={(event) => setForm({ ...form, checkInDate: event.target.value })} /></label>
+            <label className="form-field form-field--short">Çıkış tarihi<input lang="tr-TR" type="date" value={form.checkOutDate} onChange={(event) => setForm({ ...form, checkOutDate: event.target.value })} /></label>
             <label className="form-field form-field--xs">Kişi sayısı<input min="1" max="50" type="number" value={form.guestCount} onChange={(event) => setForm({ ...form, guestCount: event.target.value })} /></label>
             <label className="form-field form-field--medium">Başlangıç durumu<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RoomAssignmentFormState["status"] })}>
               <option value="planned">Planlandı / Rezerve</option>

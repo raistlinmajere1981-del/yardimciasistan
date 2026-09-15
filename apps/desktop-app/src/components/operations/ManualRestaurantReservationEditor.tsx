@@ -153,7 +153,7 @@ export function ManualRestaurantReservationEditor({
               Tarih
               <input
                 type="date"
-                lang="tr"
+                lang="tr-TR"
                 required
                 value={form.date}
                 onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
@@ -164,6 +164,7 @@ export function ManualRestaurantReservationEditor({
               Saat
               <input
                 type="time"
+                lang="tr-TR"
                 required
                 value={form.time}
                 onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))}

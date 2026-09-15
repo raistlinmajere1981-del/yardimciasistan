@@ -187,7 +187,7 @@ export function ManualReservationEditor({
               Giriş tarihi
               <input
                 type="date"
-                lang="tr"
+                lang="tr-TR"
                 required
                 disabled={!detailsEditable}
                 value={form.startDate}
@@ -199,7 +199,7 @@ export function ManualReservationEditor({
               Çıkış tarihi
               <input
                 type="date"
-                lang="tr"
+                lang="tr-TR"
                 required
                 disabled={!detailsEditable}
                 min={form.startDate || undefined}

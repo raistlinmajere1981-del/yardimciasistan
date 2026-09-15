@@ -1093,10 +1093,10 @@ try {
   await expect(smokeRoomStatus).toHaveValue("occupied");
   const reservationWorkspace = conversionPage.getByLabel("Rezervasyon yönetimi");
   await expect(reservationWorkspace.getByLabel("Durum")).toBeVisible();
-  await expect(reservationWorkspace.getByText("Gün / Ay / Yıl", { exact: true })).toBeVisible();
-  await expect(reservationWorkspace.locator(".localized-date-display")).toHaveText("Tarih seç");
+  await expect(reservationWorkspace.getByText("GG.AA.YYYY", { exact: true })).toBeVisible();
+  await expect(reservationWorkspace.locator(".localized-date-display")).toHaveCount(0);
   await reservationWorkspace.getByLabel("Tarih").fill("2026-07-18");
-  await expect(reservationWorkspace.locator(".localized-date-display")).toHaveText("18.07.2026");
+  await expect(reservationWorkspace.getByLabel("Tarih")).toHaveValue("2026-07-18");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
   await reservationWorkspace.getByLabel("Durum").selectOption("pending");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();

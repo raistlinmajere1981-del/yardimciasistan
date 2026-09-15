@@ -160,7 +160,14 @@ try {
   const setupPage = await browser.newPage({ locale: "tr-TR", viewport: { width: 1440, height: 1000 } });
   setupPage.on("pageerror", (error) => pageErrors.push(error.message));
   await installBridge(setupPage, {
-    setupData: { ...createSetupFixture(), setupRequired: true },
+    setupData: {
+      ...createSetupFixture(),
+      setupRequired: true,
+      businessName: "",
+      phone: "",
+      whatsapp: "",
+      address: ""
+    },
     dashboardData: dashboard,
     enabledCapabilities
   });
@@ -175,6 +182,13 @@ try {
   await expect(setupPage.locator(".setup-footer .action-button-primary")).toHaveCount(1);
   await expect(setupPage.locator(".setup-footer .action-button-secondary")).toHaveCount(0);
   await expect(setupPage.getByRole("button", { name: "Kurulumu Kaydet", exact: true })).toBeVisible();
+  await expect(setupPage.getByRole("textbox", { name: "Firma adı", exact: true })).toHaveValue("");
+  await expect(setupPage.getByRole("textbox", { name: "Firma adı", exact: true })).toHaveAttribute("placeholder", "İşletme adı");
+  await expect(setupPage.getByRole("textbox", { name: "Telefon", exact: true })).toHaveValue("");
+  await expect(setupPage.getByRole("textbox", { name: "Telefon", exact: true })).toHaveAttribute("placeholder", "+90 5xx xxx xx xx");
+  await expect(setupPage.getByRole("textbox", { name: "WhatsApp", exact: true })).toHaveValue("");
+  await expect(setupPage.getByRole("textbox", { name: "WhatsApp", exact: true })).toHaveAttribute("placeholder", "+90 5xx xxx xx xx");
+  await expect(setupPage.getByLabel("Adres", { exact: true })).toHaveAttribute("placeholder", "İşletme adresi");
   await assertFormSizeContract(setupPage, "setup");
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).first().click();
   await expect(setupPage.getByText("OpenAI bağlantısı çalışıyor.", { exact: true })).toBeVisible();

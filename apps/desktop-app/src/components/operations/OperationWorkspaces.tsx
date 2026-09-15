@@ -313,21 +313,16 @@ export function ReservationsWorkspace({
           <label className="reservation-date-filter form-field form-field--short">
             <span className="reservation-filter-label">
               <span>Tarih</span>
-              <small className="date-field-hint" id="reservation-date-hint">Gün / Ay / Yıl</small>
-            </span>
-            <div className="localized-date-input">
-              <input
-                lang="tr"
-                type="date"
-                value={dateFilter}
-                aria-label="Tarih"
-                aria-describedby="reservation-date-hint"
-                onChange={(event) => setDateFilter(event.target.value)}
-              />
-              <span className={dateFilter ? "localized-date-display has-value" : "localized-date-display"} aria-hidden="true">
-                {dateFilter ? formatDateForDisplay(dateFilter) : "Tarih seç"}
-              </span>
-            </div>
+            <small className="date-field-hint" id="reservation-date-hint">GG.AA.YYYY</small>
+          </span>
+            <input
+              lang="tr-TR"
+              type="date"
+              value={dateFilter}
+              aria-label="Tarih"
+              aria-describedby="reservation-date-hint"
+              onChange={(event) => setDateFilter(event.target.value)}
+            />
           </label>
           <ActionButton
             variant="ghost"

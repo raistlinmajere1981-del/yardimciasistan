@@ -138,7 +138,7 @@ export function OperationCalendarPage({
             </ActionButton>
             <label className="operation-calendar-date-picker">
               <span>Tarih</span>
-              <input type="date" lang="tr" value={selectedDate} onChange={(event) => event.target.value && setSelectedDate(event.target.value)} />
+              <input type="date" lang="tr-TR" value={selectedDate} onChange={(event) => event.target.value && setSelectedDate(event.target.value)} />
             </label>
           </div>
         </div>

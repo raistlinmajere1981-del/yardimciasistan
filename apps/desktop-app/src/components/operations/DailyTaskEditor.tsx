@@ -125,7 +125,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
               Tarih
               <input
                 type="date"
-                lang="tr"
+                lang="tr-TR"
                 value={form.dueDate}
                 onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
               />
@@ -134,6 +134,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
               Saat
               <input
                 type="time"
+                lang="tr-TR"
                 value={form.dueTime}
                 onChange={(event) => setForm((current) => ({ ...current, dueTime: event.target.value }))}
               />

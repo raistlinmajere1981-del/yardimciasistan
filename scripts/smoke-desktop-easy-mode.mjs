@@ -382,7 +382,13 @@ function createSetupFixture(setupRequired = true) {
     tableCategories: [
       { name: "Bahçe", tableCount: 1 },
       { name: "Salon", tableCount: 1 }
-    ]
+    ],
+    birthdaySettings: {
+      enabled: true,
+      mode: "manual",
+      sendTime: "10:00",
+      messageTemplate: "Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz."
+    }
   };
 }
 
@@ -413,6 +419,18 @@ function createEmptyDashboardFixture() {
       preparedWhatsAppMessages: 0,
       activeMenuCategories: 0,
       availableMenuItems: 0
+    },
+    birthdayOverview: {
+      enabled: true,
+      mode: "manual",
+      today: "2026-07-18",
+      candidates: [],
+      dueCount: 0,
+      preparedCount: 0,
+      sentCount: 0,
+      invalidPhoneCount: 0,
+      waitingCount: 0,
+      failedCount: 0
     }
   };
 }

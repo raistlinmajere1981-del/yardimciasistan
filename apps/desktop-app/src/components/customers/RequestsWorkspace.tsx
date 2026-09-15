@@ -360,19 +360,19 @@ export function RequestsWorkspace({
                 <div className="form-grid">
                   <label className="form-field form-field--short">
                     Giriş tarihi
-                    <input lang="tr" type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
-                    <small className="date-field-hint">Gün / Ay / Yıl</small>
+                    <input lang="tr-TR" type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
+                    <small className="date-field-hint">GG.AA.YYYY</small>
                   </label>
                   <label className="form-field form-field--short">
                     Çıkış tarihi
-                    <input lang="tr" type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
-                    <small className="date-field-hint">Gün / Ay / Yıl</small>
+                    <input lang="tr-TR" type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
+                    <small className="date-field-hint">GG.AA.YYYY</small>
                   </label>
                 </div>
                 <div className="form-grid">
                   <label className="form-field form-field--short">
                     Saat
-                    <input type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
+                    <input lang="tr-TR" type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
                   </label>
                   <label className="form-field form-field--medium">
                     Öncelik
