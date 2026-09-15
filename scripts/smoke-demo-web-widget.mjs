@@ -14,6 +14,7 @@ cpSync(join(repoRoot, "firm-template", "web-module"), webModuleRoot, { recursive
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
 const originalBusinessConfigJson = readFileSync(businessConfigFile, "utf8");
+const syncSecret = String(JSON.parse(originalBusinessConfigJson).sync_secret ?? "");
 for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
   rmSync(join(webModuleRoot, "data", runtimeFile), { force: true });
 }
@@ -74,7 +75,8 @@ try {
   await page.locator('.ya-widget-form button[type="submit"]').click();
   const requestResponse = await requestResponsePromise;
   expect(requestResponse.status()).toBe(201);
-  await expect(page.locator(".ya-widget-status")).toContainText("WhatsApp mesajı hazırlandı");
+  await expect(page.locator(".ya-widget-request-success")).toContainText("Talebiniz kaydedildi.");
+  await page.getByRole("button", { name: "WhatsApp'tan da yaz", exact: true }).click();
 
   const openedUrl = await page.evaluate(() => window.__yardimciAsistanLastOpenedUrl ?? "");
   expect(openedUrl).toContain("https://wa.me/905316969334");
@@ -94,15 +96,12 @@ try {
   const chatResponsePromise = page.waitForResponse((response) => response.url() === `${webModuleUrl}/api/chat.php` && response.request().method() === "POST");
   await page.locator('.ya-widget-ai button[type="submit"]').click();
   const chatResponse = await chatResponsePromise;
-  expect(chatResponse.status()).toBe(200);
-  await expect(page.locator(".ya-widget-ai-answer")).toContainText("işletme sahibi");
-  await expect(page.locator(".ya-widget-status")).toContainText("AI bağlantısı işletme ayarlarında kapalı");
-  await expect(page.locator(".ya-widget-status")).toContainText("ai_disabled");
+  expect(chatResponse.status()).toBe(403);
+  expect((await chatResponse.json()).code).toBe("ai_capability_disabled");
+  await expect(page.locator(".ya-widget-status")).toContainText("AI bu işletmede etkin değil");
 
   const conversations = JSON.parse(readFileSync(conversationsFile, "utf8"));
-  expect(conversations).toHaveLength(1);
-  expect(conversations[0].source).toBe("web_ai");
-  expect(conversations[0].status).toBe("fallback");
+  expect(conversations).toHaveLength(0);
 
   await page.locator('[data-ya-view="home"]').click();
   await page.locator('[data-ya-view="whatsapp"]').click();
@@ -137,7 +136,7 @@ async function pullRequests() {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-YA-Sync-Secret": "change-this-secret"
+      "X-YA-Sync-Secret": syncSecret
     },
     body: JSON.stringify({ action: "pull_requests", after_seq: 0, limit: 20 })
   });

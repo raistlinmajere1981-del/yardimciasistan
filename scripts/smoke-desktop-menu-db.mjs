@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import process from "node:process";
 
 const require = createRequire(import.meta.url);
@@ -31,7 +31,7 @@ try {
   assert.equal(initialSetup.setupRequired, true);
   assert.equal(initialSetup.autoSyncEnabled, true);
   assert.equal(initialSetup.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
-  assert.equal(initialSetup.aiEnabled, false);
+  assert.equal(initialSetup.aiEnabled, true, "The hybrid demo profile enables the service.ai capability.");
   assert.equal(initialSetup.aiService, "openai");
   assert.equal(initialSetup.aiProjectName, "");
   assert.equal(initialSetup.aiBaseUrl, "https://api.openai.com/v1");
@@ -40,7 +40,7 @@ try {
   assert.equal(initialSetup.aiLastPublishedAt, "");
   assert.equal(initialSetup.aiProfiles.length, 5);
   assert.equal(initialSetup.aiProfiles.every((profile) => profile.apiKeyConfigured === false), true);
-  assert.ok(database.backupPath.endsWith("backups"));
+  assert.equal(basename(database.backupPath), "backup");
 
   const initialSyncRuntime = database.getSyncRuntimeStatus();
   assert.equal(initialSyncRuntime.enabled, true);
@@ -123,7 +123,7 @@ try {
   assert.equal(database.getEncryptedAiApiKey("openrouter"), firstEncryptedAiApiKey);
   assert.equal(setupResult.setupData.aiProfiles.find((profile) => profile.service === "openrouter")?.model, "smoke-model-v1");
   assert.equal(setupResult.dashboardData.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
-  assert.ok(setupResult.dashboardData.backupPath.endsWith("backups"));
+  assert.equal(basename(setupResult.dashboardData.backupPath), "backup");
 
   const publishedAt = "2026-07-12T09:30:00.000Z";
   const publishedSetup = database.markAiSettingsPublished(publishedAt);
@@ -230,6 +230,10 @@ try {
       aiProjectName: "",
       aiBaseUrl: "https://generativelanguage.googleapis.com/v1beta",
       aiModel: "gemini-smoke",
+      aiModelOptions: [
+        { id: "gemini-smoke", label: "Gemini Smoke" },
+        { id: "gemini-smoke-lite", label: "Gemini Smoke Lite" }
+      ],
       aiApiKey: ""
     },
     { mode: "keep" }
@@ -709,7 +713,10 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
     expected_updated_at: requestBeforeAnswer.updated_at
   }));
   assert.equal(deniedStaffAnswer.ok, false);
-  assert.match(deniedStaffAnswer.message, /yetkisi yok/i);
+  assert.match(deniedStaffAnswer.message, /pasifleştirilmiş/i);
+  assert.equal(database.getAndroidDevices().find((device) => device.deviceId === "android-smoke-device")?.isActive, false);
+  const approvalResult = database.setAndroidDeviceActive("android-smoke-device", true);
+  assert.equal(approvalResult.ok, true);
   const automaticallyRegisteredDevice = database.getAndroidDevices().find((device) => device.deviceId === "android-smoke-device");
   assert.ok(automaticallyRegisteredDevice);
   assert.equal(automaticallyRegisteredDevice.role, "staff");
@@ -740,7 +747,8 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
     service_orders: true,
     cashier: true,
     rooms_tasks: true,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   };
   const cashierResult = database.setAndroidDevicePermissionGroups("android-smoke-device", cashierGroups);
   assert.equal(cashierResult.ok, true);
@@ -755,7 +763,8 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
     service_orders: true,
     cashier: false,
     rooms_tasks: false,
-    customer_reservation: false
+    customer_reservation: false,
+    market_operations: false
   };
   assert.equal(database.setAndroidDevicePermissionGroups("android-smoke-device", serviceOnlyGroups).ok, true);
   const roomBeforePackageToggle = database.getDashboardData().rooms[0];
@@ -948,9 +957,8 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   const taskCancelResult = database.applyAndroidAction(androidAction("android_action_task_cancel_001", "daily_task_cancel", {
     task_id: "task_demo_001"
   }));
-  assert.equal(taskCancelResult.ok, false);
-  assert.match(taskCancelResult.message, /desteklenmiyor/i);
-  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "done");
+  assert.equal(taskCancelResult.ok, true);
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "cancelled");
 
   const taskReopenResult = database.applyAndroidAction(androidAction("android_action_task_reopen_001", "daily_task_reopen", {
     task_id: "task_demo_001"
@@ -1282,7 +1290,16 @@ function assertStockTrackingFlow(database, categoryId) {
     "android-stock-smoke"
   ));
   assert.equal(deniedManual.ok, false);
-  assert.match(deniedManual.message, /yetkisi yok/i);
+  assert.match(deniedManual.message, /pasifleştirilmiş/i);
+  assert.equal(database.setAndroidDeviceActive("android-stock-smoke", true).ok, true);
+  const deniedManualAfterApproval = database.applyAndroidAction(androidAction(
+    "android_stock_denied_001",
+    "menu_stock_add",
+    { menu_item_id: itemId, quantity: 1, note: "Yetkisiz deneme" },
+    "android-stock-smoke"
+  ));
+  assert.equal(deniedManualAfterApproval.ok, false);
+  assert.match(deniedManualAfterApproval.message, /yetkisi yok/i);
   const stockViewer = database.getAndroidDevices().find((device) => device.deviceId === "android-stock-smoke");
   assert.equal(stockViewer?.permissions.includes("menu.stock_view"), true);
   assert.equal(stockViewer?.permissions.includes("menu.stock_update"), false);

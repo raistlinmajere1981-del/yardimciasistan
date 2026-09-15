@@ -13,8 +13,8 @@ Stage 3B başlangıcı: temiz `main`, `c8ee15ef12a7778a0c3a9a844a4fc775b5faafc1`
 ## Durumun anlamı
 
 - **migrated:** belirtilen yüzey ortak token/primitive sözleşmesini kullanır; kendi eski kabuk stili yoktur.
-- **partial:** ortak kabuk taşınmıştır; iç listeler, formlar, workspace yerleşimi veya özel durum stilleri migration bekler.
-- **legacy:** kendi görsel sistemi vardır; bu aşamada yalnız varsa dış dialog yüzeyi taşınmıştır.
+- **partial:** ortak kabuk taşınmıştır; iç listeler, formlar, workspace yerleşimi veya özel durum stilleri feature-specific olarak kalabilir.
+- **legacy:** final normal desktop DOM envanterinde ayrı bir legacy design-system yüzeyi yoktur; üçüncü taraf ve bilinçli renderer istisnaları ayrıca belirtilir.
 
 Her ana ekran aynı `DesktopAppFrame → AppShell → PageHeader + page-content` zincirini kullanır. Ekranın `partial` olması sidebar/header migration'ının eksik olduğu anlamına gelmez. Aşağıdaki yollar `apps/desktop-app/src/` köküne göredir. CSS yollarında `pages/` ve `components/` önekleri `styles/` altındadır; React yolları gerçek kaynak klasörleridir.
 
@@ -45,9 +45,9 @@ Her ana ekran aynı `DesktopAppFrame → AppShell → PageHeader + page-content`
 | Sidebar, nav item, active/collapsed | `components/layout/Sidebar.tsx`; geometri app-shell.css, kontroller `components/navigation.css` | **migrated**. 208/64px tokenları, aria-current ve collapse accessible isimleri korunur. Feature CSS shell selector'ı içermez. |
 | Top/page header | `components/layout/PageHeader.tsx`, `components/app/DesktopAppFrame.tsx`; `components/header.css`, `layout/app-shell.css` | **migrated**. `.page-header__title/subtitle/actions`. Eylemler mevcut ActionButton CSS sözleşmesini kullanır. `ResizeObserver`, yalnız layout için `--sticky-header-offset` üretir; işletme state'i değiştirmez. |
 | Page padding / width / sections | `layout/page.css`, `layout/responsive.css` | **migrated**. `.page`, `.page-content`, `.page-content--bounded`, `.page-section`, `.page-section__body`, `.page-grid`. Varsayılan fluid; bounded 1200px, okuma alanı 72ch. Settings kendi mevcut bounded kapsayıcısını korur. |
-| Section heading / panels / cards | `components/ui/Panel.tsx`, `MetricCard.tsx`; `components/panels.css` | **migrated temel / partial tüketiciler**. `.surface` yalnız dış yüzey; `.panel` padding ekler. `.panel-eyebrow`, mevcut `.panel-heading`, compact Panel ve MetricCard semantik `success`/`warning` tonları Restoran/Menü’de kullanılır. Feature iç kart renkleri ve nested record kartları ayrı borç. |
+| Section heading / panels / cards | `components/ui/Panel.tsx`, `MetricCard.tsx`; `components/panels.css` | **migrated temel / partial tüketiciler**. `.surface` yalnız dış yüzey; `.panel` padding ekler. `.panel-eyebrow`, mevcut `.panel-heading`, compact Panel ve MetricCard semantik `success`/`warning` tonları Restoran/Menü’de kullanılır. Feature iç kart renkleri ve nested record kartları feature-specific layout olarak kalabilir. |
 | Toolbars / action bars | `components/toolbars.css` | **migrated temel / partial tüketiciler**. `.page-toolbar`, `__start`, `__actions`, `.action-row`; wrap, min-width:0, dar ekranda stack. Menü toolbarı ve adisyon footer aksiyonları content-width ActionButton hiyerarşisi kullanır. |
-| Badges/chips, tabs/segmented controls | `StatusBadge.tsx`, `SegmentedControl.tsx`; `badges.css`, `navigation.css` | **migrated temel / partial tüketiciler**. Success/warning isimleri eklendi; ok/wait prop uyumluluğu korunur. page-tabs ve segmented-control aynı temel. Market sekmeleri ve özel status chip'leri legacy. |
+| Badges/chips, tabs/segmented controls | `StatusBadge.tsx`, `SegmentedControl.tsx`; `badges.css`, `navigation.css` | **migrated temel / partial tüketiciler**. Success/warning isimleri eklendi; ok/wait prop uyumluluğu korunur. page-tabs ve segmented-control aynı temel. Market sekmeleri ve özel status chip'leri feature-specific composition'dır; legacy design-system değildir. |
 | Status/banner/toast | `components/status.css`, `notifications/NotificationCenter.tsx`, `components/notifications.css` | **migrated ortak status/popover**, özel banner'lar **partial**. Neutral/info/success/warning/danger. Finance/folio mesajları, stok error/info ortak sınıfları kullanır. App status mesajı header'da, bildirim listesi popover'da; ayrı global toast kuyruğu yok. |
 | Empty / loading | `components/status.css` | **migrated temel / partial tüketiciler**. empty-state başlık/açıklama/opsiyonel action; loading-state inline/panel/page. Settings public profile, finance, reports, customer credit loading bağlandı. Kısa mesajlar role=status; mevcut alert/aria-live anlamı korunur. Özel calendar/market empty içerikleri Aşama 2. |
 | Tables / lists / pagination | `DataList.tsx`; feature CSS | **migrated temel / feature tüketicileri partial**. `records.css` içindeki kullanılmayan CompactList recipe'i kaldırıldı; yaşayan kayıt yüzeyleri `DataList`/`record-workspace` sözleşmelerini kullanır. Finans/market tabloları ve operasyon kayıtları kendi feature CSS'lerinde kalır. Global paginator yoktur. |
@@ -83,13 +83,11 @@ Silinen ortak dosya: `styles/components/segmented-control.css` (navigation.css'e
 
 Aşağıdaki maddeler Stage 2C / Stage 3A kapanışındaki ara envanterdir. Stage 3B sonucu ve güncel sahiplik için [Aşama 3B sonucu](#aşama-3b-sonucu-final-legacy-surface-cleanup) ile final inventory tablosu geçerlidir.
 
-Restoran ve Menü stylesheet'leri bu aşamada yeniden yazıldı; hedef dosyalarda duplicate selector, `!important`, override token, eski alias ve raw DOM rengi kalmadı. Diğer feature'larda bulunan `manager-row`, operation ve record tarifleri ortak tüketiciler nedeniyle korunur; bunları küresel kaldırmak kapsam dışıdır.
+Restoran ve Menü stylesheet'leri bu aşamada yeniden yazıldı; hedef dosyalarda duplicate selector, `!important`, override token, eski alias ve raw DOM rengi kalmadı. Aşama 3B sonrasında `records.css` ve `operations.css` ile `CompactList` recipe'leri silindi; yaşayan kayıt/operasyon düzenleri ilgili feature CSS'lerinde ve ortak primitive'lerde sahiplenilir. `requests.css` de önceki aşamada silinmiştir. Bu bölümdeki “korunur” ve “adaydır” ifadeleri yalnız tarihsel ara durumu anlatır.
 
-- `pension.css` içindeki reservation kontrol kuralları ve `requests.css` iç form tarifleri başka operasyon tüketicileri için kalır. Restoran dış yüzeyi artık bunlara bağlı değildir.
-- `components/operations.css`, `records.css`, `resources.css` isim olarak ortak olsa da operation domain selector'ları içerir. Aşama 2'de feature recipe / gerçek primitive ayrımı yapılmalı.
-- `pages` katmanı `components` sonrasında gelir. Diğer feature'larda `.restaurant-page .operation-*` gibi scoped düzenler primitive varyantlarını etkileyebilir. Aşama 2C'de feature CSS sahipliği gözden geçirilmelidir; yeni override eklenmemeli.
-- `.tone-* .metric-icon`, `.panel-heading h2`, legacy `manager-form` ve `setup-*` selector'ları kapsam audit adaylarıdır. Ortak status/heading kullanımıyla yeni feature'larda çoğaltılmamalı.
-- Eski alias ve override token katmanı yoktur. Menü preview palette'i ile lock palette'i farklı ürün yüzeylerini temsil eder; bunlar körlemesine aynı renge çevrilmemelidir.
+- Güncel sahiplik: `DataList`/`record-workspace` ortak liste kabuğunu sağlar; finans, market ve operasyon iç tablo/list/pagination düzenleri feature-specific layout olarak kalır.
+- `pages` katmanı `components` sonrasında gelir; yeni ortak kontrol kuralları feature CSS'e eklenmez.
+- Eski alias ve override token katmanı yoktur. Menü preview palette'i, harita/canvas/protocol geometrisi ve üçüncü taraf webview içeriği bilinçli istisnalardır; bunlar körlemesine desktop tokenlarına çevrilmez.
 
 ## Responsive ve tema notları
 
@@ -197,10 +195,24 @@ Aşama 2C başlangıcı: temiz `main`, `2c89d8a1c17d409775d9c8eec912663b2342ee0a
 ## Desktop migration final inventory
 
 - **migrated:** shell, Settings, Customer Work, Pension, Restaurant, Menu, Finance, Market, Dashboard, Calendar, Reports, Messages/AI, Setup, App Lock; ortak panel/list/form/status/dialog/motion primitive'leri.
-- **partial:** bazı büyük feature stylesheet'lerinde feature-specific nested records, tablo/pagination ve özel operasyon içerikleri; bunlar artık ortak shell/primitive sahipliğini ezmez.
+- **partial:** bazı büyük feature stylesheet'lerinde feature-specific nested records, tablo/pagination ve özel operasyon içerikleri; bunlar legacy design-system değil, feature-specific layout'tır ve ortak shell/primitive sahipliğini ezmez.
 - **intentional exception:** `pages/menu-preview.css` özel renderer palette/canvas; harita tile/pin geometry; gerçek canvas/protocol geometry.
 - **external/third-party:** WhatsApp/webview iç UI'sı ve `firm-template/web-module/widget.js`.
 - **remaining legacy:** migration envanterinde desktop shell/normal DOM için legacy stylesheet kalmadı; kalan partial/exception yüzeyler yukarıdaki sınırlı listeyle belgelenmiştir.
+
+## Final migration summary
+
+- **Foundation:** semantic token, theme, layer ve ortak primitive sözleşmesi oluşturuldu.
+- **Shell:** AppShell, PageHeader, toolbar, panel, dialog, form, list ve status yüzeyleri ortaklaştırıldı.
+- **Stage 2A:** Customer Work, Pension ve oda/record çalışma yüzeyleri taşındı.
+- **Stage 2B:** Restaurant, Menu ve MenuPreview desktop chrome taşındı.
+- **Stage 2C:** Finance, Market, Dashboard, Calendar ve Reports taşındı.
+- **Stage 3A:** Messages/AI ve Setup taşındı; persistent webview ve setup business flow korundu.
+- **Stage 3B:** AppLock, motion, records/operations legacy yüzeyleri ve final audit temizliği tamamlandı.
+
+Final kural: normal desktop DOM semantic token ve mevcut primitive kullanır; MenuPreview özel renderer palette'i, map/canvas/protocol geometry ve üçüncü taraf webview içeriği açıkça belgelenmiş intentional exception olarak kalır.
+
+Güncel strict audit snapshot'ı: normal desktop DOM raw color **0**, intentional renderer raw color **44**, duplicate selector **49**, raw spacing **90**, geometry px **415**, `!important` **0**, `--override-*` **0**, legacy alias **0**. Global audit raw color sayısı **122**'dir; demo-web ve diğer kapsam dışı yüzeyler bu toplamda kalır. `records.css`, `operations.css`, `CompactList.tsx` ve `CompactListItem.tsx` repo ağacında değildir; mevcut desktop stylesheet importlarında orphan/missing CSS import bulunmamıştır.
 
 ## Aşama 1 ölçüm ve doğrulama (tarihsel)
 

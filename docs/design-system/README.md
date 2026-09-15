@@ -32,7 +32,6 @@ apps/desktop-app/src/styles/
     metrics.css
     motion.css
     resources.css
-    segmented-control.css
   layout/
     app-shell.css
     page.css
@@ -53,7 +52,6 @@ apps/desktop-app/src/styles/
     messages.css
     pension.css
     reports.css
-    requests.css
     restaurant.css
     room-folio.css
   utilities.css
@@ -68,7 +66,7 @@ Haritanın tile/pin geometrisi component yanında `components/settings/business-
 
 Eski ortak operasyon bileşenleri `components.legacy` içindedir. Yeni form/button/panel kuralları `components.primitives` ile bunların üzerinde tanımlıdır. Feature dosyaları alan düzenlerini sahiplenir; yeni global kontrol kurallarını içermez. Tema dosyaları yalnız token değerlerini değiştirir. Yerel CSS de katmansız import edilmez.
 
-## Başlangıç auditi ve taşıma haritası
+## Başlangıç auditi ve taşıma haritası (tarihsel)
 
 Dosya başına üretilen ölçümler ve tekrar eden selector listeleri yerel `artifacts/design-system/css-audit.json` çıktısında saklanır ve commit kapsamına alınmaz. Kalıcı audit özeti aşağıdaki tablo ve bulgulardadır. Selector tekrar sayıları medya/state varyantlarını da içerir; her tekrar otomatik olarak hata değildir.
 
@@ -166,7 +164,9 @@ Servis seçimleri compact; URL/endpoint ve anahtar alanları içerik türüne g�
 
 760 ve 600px ek kontrollerinde alanlar full-width stack olur. Altı bölüm bağlantısı her viewportta kontrol edilir; desktop'ta bölüm başlığı sticky nav altında kalmaz. Açık/koyu pro temaları, easy modu, label ilişkisi, klavye focus, açıklama/koordinat kaydetme payload'ı ve şifre form etkileşimi de doğrulanır. Screenshot'lar `artifacts/design-system/`, ölçümler `artifacts/design-system/viewports.json` içinde üretilir.
 
-## Kalan borç ve audit politikası
+## Kalan borç ve audit politikası (tarihsel foundation snapshot)
+
+Bu bölüm önceki foundation/Settings turunun tarihsel ölçümlerini korur. Güncel final desktop sınıflandırması ve Stage 2A–3B özeti için [Desktop UI Migration](DESKTOP_UI_MIGRATION.md) belgesindeki final inventory geçerlidir.
 
 Foundation ve Settings taşındı; diğer feature'ların tüm markup/layout'ı yeniden tasarlanmadı. Özellikle menu, restaurant, market, pension dosyaları hâlâ büyük feature stylesheet'leridir. Menü önizlemesi ve lock ekranında eski ham renk/gölge/gradient kararları, diğer operasyon sayfalarında feature'a özel px geometrisi ve bazı çapraz selector specificity ilişkileri kalır. Bunlar merkezi override dosyasında saklanmaz; ait oldukları dosyalardadır.
 
@@ -174,16 +174,18 @@ Token/tema dışında **157 ham renk literal'i** ve **1598 px/rem literal'i** ka
 
 `design-system-audit.mjs` yeni token sözleşmesini, tanımsız tokenları, tek ana importu, explicit layer sırasını ve override yasağını doğrular. Eski auditin tüm `styles.css` dosyasını token dosyası sayarak borcu gizleme davranışı kaldırıldı. Radius/shadow regex'inin `var()` değerlerini yanlışlıkla ham değer sayması düzeltildi. Baseline yeni dosya yolları ve doğru ölçüm yöntemiyle yenilendi; bundan sonraki borç artışları strict audit ile engellenir.
 
-## Final desktop kuralları (Stage 3B)
+## Final desktop kuralları (Stage 3B ve hardening)
 
 Yeni desktop feature'lar:
 
 - semantic token kullanır.
-- Mevcut primitive'i first tercih eder; yeni primitive yalnız tekrar eden bir ihtiyaç için eklenir.
+- Mevcut primitive'i önce tercih eder; yeni primitive yalnız tekrar eden bir ihtiyaç için eklenir.
 - Raw color, `!important` ve `--override-*` kullanmaz.
 - Form kontrollerinde açık size contract (`xs`, `short`, `medium`, `long`, `fluid`) belirtir.
 - Feature stylesheet'inde yalnız feature-specific layout/presentation bırakır; ortak yüzeyleri global/shared primitive'lere bırakır.
 - Renderer/canvas/protocol geometrisi veya özel palette istisnasını audit ve dokümantasyonda açıkça belirtir.
+
+Güncel final audit snapshot'ı: normal desktop DOM raw color **0**, bilinçli MenuPreview renderer raw color **44**, duplicate selector **49**, raw spacing **90**, geometry px **415**, `!important` / `--override-*` / legacy alias **0**. Global raw color sayısı **122**'dir; demo-web, üçüncü taraf/renderer ve diğer kapsam dışı yüzeyleri de içerir.
 
 ## Son doğrulama
 
@@ -192,9 +194,13 @@ Yeni desktop feature'lar:
 - Desktop renderer smoke: geçti. Eski piksel/geometri sabitlemeleri çıkarıldı; mevcut kullanıcı etkileşimleri ve navigation kontrolleri korundu.
 - Desktop design-system smoke: geçti; altı viewport, tema, focus, form payload ve şifre etkileşimleri.
 - Desktop easy-mode smoke: geçti; native radio klavye davranışı, tercihler ve light/easy tema bağımsızlığı korunur.
+- `npm test`: geçti; tüm workspace testleri yeşil.
+- Full lint: geçti; web-widget'teki iki `no-useless-escape` borcu kapatıldı.
 - Değişen renderer/test dosyaları ESLint: sıfır hata ve uyarı.
 - Design audit strict: geçti; yeni token/import sözleşmesi doğrulandı.
-- Pilot check: **36 geçti, 0 hata, 0 atlandı**. Rapor: `artifacts/pilot-check/2026-09-13T19-54-50-458Z.json`.
+- Modular foundation check: geçti.
+- Stage 2A/2B/2C ve Stage 3A/3B smoke'ları: geçti.
+- Pilot check: **37 geçti, 0 hata, 0 atlandı**. Rapor: `artifacts/pilot-check/2026-09-15T09-58-21-536Z.json`.
 - `git diff --check`: temiz.
 
 Pilot build sırasında yeniden üretilen `firm-template/web-module/widget.js` başlangıç hâline geri alındı; nihai değişiklik kapsamında değildir. Commit kapsamı design-system kaynakları, gerekli renderer değişiklikleri, smoke/audit scriptleri, sürüm kontrollü audit baseline ve bu README ile sınırlıdır. Artifact, screenshot ve üretilmiş raporlar kapsam dışıdır.

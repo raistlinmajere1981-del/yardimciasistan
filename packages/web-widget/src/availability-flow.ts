@@ -198,7 +198,7 @@ function looksLikeAvailabilityContinuation(message: string, missing: string[]): 
     return true;
   }
   if (missing.includes("date_range") && (/\b20\d{2}-\d{2}-\d{2}\b/.test(normalized)
-      || /\b\d{1,2}[.\/]\d{1,2}(?:[.\/]20\d{2})?\b/.test(normalized)
+      || /\b\d{1,2}[./]\d{1,2}(?:[./]20\d{2})?\b/.test(normalized)
       || /\b\d{1,2}\s*(?:-|–|—|ile)\s*\d{1,2}\b/u.test(normalized)
       || /\b(ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik|bugün|bugun|yarın|yarin)\b/u.test(normalized))) {
     return true;

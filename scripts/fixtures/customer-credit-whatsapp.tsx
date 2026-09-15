@@ -11,11 +11,7 @@ import { CustomersWorkspace } from "../../apps/desktop-app/src/components/custom
 import { WhatsAppWorkspace } from "../../apps/desktop-app/src/components/messages/MessageWorkspaces";
 import { MessagesPage } from "../../apps/desktop-app/src/pages/MessagesPage";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
-import "../../apps/desktop-app/src/styles.css";
-import "../../apps/desktop-app/src/friendly-overrides.css";
-import "../../apps/desktop-app/src/friendly-workflow-ux.css";
-import "../../apps/desktop-app/src/customer-work-ux.css";
-import "../../apps/desktop-app/src/market-workspace-ux.css";
+import "../../apps/desktop-app/src/styles/index.css";
 
 const control = window as typeof window & {
   __m83Initial: { dashboard: DesktopDashboardData; snapshot: BusinessCapabilitySnapshot };

@@ -98,8 +98,18 @@ assert.match(frameSource, /qrMenuEnabled\s*&&[\s\S]{0,300}Web'e Yayınla/);
 assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
 assert.match(menuManagerSource, /inventoryEnabled\s*&&\s*<details className="menu-stock-editor"/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
-assert.match(roomFolioSource, /menuEnabled\s*&&\s*<section className="room-folio-menu-panel"/);
-assert.match(tableOrdersSource, /menuEnabled\s*&&\s*<section className="table-order-menu-pane"/);
+const normalizedRoomFolioSource = roomFolioSource.replace(/\s+/g, " ");
+assert.match(
+  normalizedRoomFolioSource,
+  /menuEnabled\s*&&\s*<section className="panel record-stack"/,
+  "Room folio menu surface must remain gated by the food menu capability"
+);
+const normalizedTableOrdersSource = tableOrdersSource.replace(/\s+/g, " ");
+assert.match(
+  normalizedTableOrdersSource,
+  /menuEnabled\s*&&\s*<section className="restaurant-order-menu-panel"/,
+  "Restaurant order menu surface must remain gated by the food menu capability"
+);
 assert.match(roomFolioIpcSource, /options\.assertMenuCapability\?\.\(\)/);
 assert.match(financeIpcSource, /finance:setReservationTotal[\s\S]{0,300}assertAccommodationReservationCapability/);
 assert.match(financeIpcSource, /finance:addPensionPayment[\s\S]{0,300}assertAccommodationFolioCapability/);
@@ -322,7 +332,12 @@ assert.match(
   "prepared WhatsApp counts require both customer and WhatsApp capabilities"
 );
 assert.match(aiWorkspaceSource, /const modes:[\s\S]{0,120}= customersEnabled[\s\S]{0,300}\["daily"/);
-assert.match(aiWorkspaceSource, /customersEnabled\s*&&\s*<label className="ai-field"/);
+const normalizedAiWorkspaceSource = aiWorkspaceSource.replace(/\s+/g, " ");
+assert.match(
+  normalizedAiWorkspaceSource,
+  /customersEnabled\s*&&\s*<label className="form-field form-field--fluid ai-field"/,
+  "AI customer controls must remain gated by the customer capability"
+);
 assert.match(
   messagingControllerSource,
   /surfaceAiWorkspaceMode:\s*AiWorkspaceMode\s*=\s*customersEnabled\s*\?\s*aiWorkspaceMode\s*:\s*"daily"/,
