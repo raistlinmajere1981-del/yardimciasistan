@@ -22,7 +22,7 @@ files:
   - "!vite*.ts"
 
 extraMetadata:
-  main: dist-electron/main.js
+  main: dist-electron/main-entry.js
   name: yardimci-asistan-desktop
   version: 0.1.2
 
