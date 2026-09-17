@@ -277,6 +277,13 @@ function createSetupData() {
     initialCounts: {
       rooms: 0,
       tables: 0
+    },
+    tableCategories: [],
+    birthdaySettings: {
+      enabled: true,
+      mode: "manual",
+      sendTime: "10:00",
+      messageTemplate: "Doğum gününüz kutlu olsun {ad}! {işletme}"
     }
   };
 }
@@ -292,9 +299,22 @@ function createDashboardData() {
     reservations: [],
     dailyTasks: [],
     customers: [],
+    customerRoomStays: [],
     androidDevices: [],
     paymentWaitingTableOrders: [],
     androidActionFailures: [],
+    birthdayOverview: {
+      enabled: true,
+      mode: "manual",
+      today: "2026-07-23",
+      candidates: [],
+      dueCount: 0,
+      preparedCount: 0,
+      sentCount: 0,
+      invalidPhoneCount: 0,
+      waitingCount: 0,
+      failedCount: 0
+    },
     menu: {
       categories: [],
       items: [],
