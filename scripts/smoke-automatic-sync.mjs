@@ -129,7 +129,36 @@ try {
   const staffApproval = database.setAndroidDeviceActive("android-auto-smoke", true);
   assert.equal(staffApproval.ok, true, staffApproval.message);
 
-  const trackedMenuItemBefore = database.getDashboardData().menu.items.find((item) => item.is_available);
+  const categoryResult = database.saveMenuCategory({
+    name: "Otomatik Senkron Test",
+    description: "Automatic sync smoke fixture",
+    is_active: true,
+    sort_order: 1
+  });
+  assert.equal(categoryResult.ok, true, categoryResult.message);
+
+  const itemResult = database.saveMenuItem({
+    category_id: categoryResult.savedId,
+    name: "Senkron Stok Ürünü",
+    description: "Automatic sync smoke fixture",
+    price: 100,
+    currency: "TRY",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["smoke"],
+    stock_quantity: null,
+    stock_min_quantity: null,
+    stock_unit: "piece",
+    stock_consumption_quantity: 1,
+    hide_when_out_of_stock: false,
+    stock_note: "",
+    sort_order: 1
+  });
+  assert.equal(itemResult.ok, true, itemResult.message);
+
+  const trackedMenuItemBefore = database.getDashboardData().menu.items.find((item) => item.id === itemResult.savedId);
   assert.ok(trackedMenuItemBefore);
   const trackedMenuSave = database.saveMenuItem({
     id: trackedMenuItemBefore.id,
