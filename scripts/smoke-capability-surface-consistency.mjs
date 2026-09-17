@@ -442,6 +442,31 @@ function verifyPersistedRuntimeSource() {
   });
   try {
     database.initialize();
+    const setupResult = database.saveInitialSetup({
+      businessName: "Capability Test İşletmesi",
+      profileId: "market",
+      phone: "+905550000600",
+      whatsapp: "+905550000600",
+      email: "",
+      address: "",
+      webModuleUrl: "https://example.test/yardimci-asistan",
+      syncSecret: "capability-test-secret-123",
+      autoSyncEnabled: false,
+      aiEnabled: false,
+      aiProvider: "openai_compatible",
+      aiService: "openai",
+      aiProjectName: "",
+      aiModel: "",
+      aiModelOptions: [],
+      aiBaseUrl: "https://api.openai.com/v1",
+      aiTimeoutSeconds: 30,
+      aiApiKey: "",
+      clearAiApiKey: false,
+      servicePreferences: { whatsapp: true, android: true },
+      initialCounts: { rooms: 0, tables: 0 },
+      tableCategories: []
+    });
+    assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
     const market = applyBusinessProfileCapabilities(database.databasePath, "market", { preserveUserOverrides: false });
     const expected = [...market.enabledCapabilities].sort();
 
@@ -588,7 +613,7 @@ function manualRequest(requestType) {
 }
 
 function fixtureSnapshot() {
-  const fixture = JSON.parse(source("demo-data/android-operations-snapshot.json"));
+  const fixture = JSON.parse(source("scripts/fixtures/android-operations-snapshot.json"));
   fixture.reservations.push({
     ...fixture.reservations[0],
     id: "reservation_android_demo_table",

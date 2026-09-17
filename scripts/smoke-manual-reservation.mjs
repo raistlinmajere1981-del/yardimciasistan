@@ -15,6 +15,30 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup({
+    businessName: "Manuel Rezervasyon Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550002021",
+    whatsapp: "+905550002021",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "manual-reservation-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: true },
+    initialCounts: { rooms: 3, tables: 0 }
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const quickCustomer = database.saveCustomer({
     fullName: "Hızlı Rezervasyon Müşterisi",
     phone: "+905551112233",

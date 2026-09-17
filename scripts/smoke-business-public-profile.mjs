@@ -31,6 +31,31 @@ try {
   }
 
   assert.deepEqual(getBusinessPublicProfile(database.databasePath), EMPTY_BUSINESS_PUBLIC_PROFILE);
+  const setupResult = database.saveInitialSetup({
+    businessName: "Profil Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550002018",
+    whatsapp: "+905550002018",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "public-profile-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: true },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
 
   const saved = saveBusinessPublicProfile(database.databasePath, {
     description: "  Sahile yakın, sakin aile işletmesi.  ",

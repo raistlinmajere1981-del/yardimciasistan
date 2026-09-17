@@ -38,7 +38,6 @@ const requiredFiles = [
   "lib/stock-image-analysis.php",
   "lib/identity-image-analysis.php",
   "assets/yardimci-asistan-symbol.png",
-  "assets/menu-breakfast.webp",
   "config/.htaccess",
   "config/ai.php",
   "config/business.json",
@@ -50,6 +49,15 @@ const requiredFiles = [
   "knowledge/restoran.md",
   "knowledge/menu.md",
   "knowledge/sik-sorulan-sorular.md"
+];
+const FORBIDDEN_PACKAGE_STRINGS = [
+  "business_showcase_001",
+  "Yardımcı Asistan Tanıtım İşletmesi",
+  "Deniz Çiçeği",
+  "531 696 9334",
+  "tanitim@yardimciasistan.local",
+  "112233445566",
+  "local-development-only"
 ];
 const businessOverrideFields = [
   ["display_name", "YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME"],
@@ -73,6 +81,7 @@ cpSync(sourceRoot, packageRoot, {
   filter: shouldCopySourcePath
 });
 
+zeroPackageBusinessConfig();
 const appliedOverrides = applyPackageOverrides();
 const packageFiles = listFiles(packageRoot);
 const businessConfig = JSON.parse(readFileSync(join(packageRoot, "config", "business.json"), "utf8"));
@@ -98,7 +107,7 @@ const manifest = {
 };
 
 writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-validatePackage(manifest);
+validatePackage(manifest, businessConfig);
 
 const archiveSummary = archives.filter((archive) => archive.status === "created").map((archive) => archive.path).join(", ") || "arşiv yok";
 console.log(`web-module-package-ok: ${relative(repoRoot, packageRoot)} (${manifest.file_count} dosya, ${archiveSummary})`);
@@ -218,11 +227,13 @@ function applyPackageOverrides() {
   return applied;
 }
 
-function validatePackage(manifest) {
+function validatePackage(manifest, businessConfig) {
   const manifestFiles = new Set(manifest.files.map((file) => file.path));
   for (const file of requiredFiles) {
     assert.ok(manifestFiles.has(file), `Paket manifestinde eksik dosya: ${file}`);
   }
+
+  assertPackageFreeOfDemoData(manifest, businessConfig);
 
   for (const secretFile of ["config/ai.local.php", "data/ai-settings.local.php"]) {
     assert.equal(manifestFiles.has(secretFile), false, `Paket gizli runtime ayarı içermemeli: ${secretFile}`);
@@ -235,6 +246,34 @@ function validatePackage(manifest) {
 
   const manifestOnDisk = JSON.parse(readFileSync(manifestPath, "utf8"));
   assert.equal(manifestOnDisk.file_count, manifest.files.length);
+
+  function assertPackageFreeOfDemoData(manifestValue, packageBusinessConfig) {
+    if (manifestValue.applied_overrides.length === 0) {
+      assert.equal(packageBusinessConfig.display_name, "", "Varsayılan deploy paketi işletme adı içermemeli.");
+      assert.equal(packageBusinessConfig.sync_secret, "", "Varsayılan deploy paketi sync secret içermemeli.");
+      assert.deepEqual(packageBusinessConfig.allowed_origins, [], "Varsayılan deploy paketi origin içermemeli.");
+    }
+
+    for (const file of manifestValue.files) {
+      const absolutePath = join(packageRoot, file.path);
+      let contents = "";
+      try {
+        contents = readFileSync(absolutePath, "utf8");
+      } catch {
+        continue;
+      }
+      if (contents.includes("\uFFFD")) {
+        continue;
+      }
+      for (const forbidden of FORBIDDEN_PACKAGE_STRINGS) {
+        assert.equal(
+          contents.includes(forbidden),
+          false,
+          `Paket demo/tanıtım verisi içermemeli: ${forbidden} (${file.path})`
+        );
+      }
+    }
+  }
 
   for (const archive of manifest.archives) {
     if (archive.status !== "created") {
@@ -266,11 +305,17 @@ function shouldCopySourcePath(sourcePath) {
   return !relativePath.startsWith("data/.ai-settings.");
 }
 
+function zeroPackageBusinessConfig() {
+  const businessConfigPath = join(packageRoot, "config", "business.json");
+  const business = JSON.parse(readFileSync(businessConfigPath, "utf8"));
+  business.sync_secret = "";
+  business.allowed_origins = [];
+  writeFileSync(businessConfigPath, `${JSON.stringify(business, null, 2)}\n`);
+}
+
 function validateBusinessConfig(business, label) {
   assert.equal(typeof business.display_name, "string", `${label} display_name string olmalı.`);
-  assert.ok(business.display_name.trim().length > 0, `${label} display_name boş olmamalı.`);
   assert.equal(typeof business.sync_secret, "string", `${label} sync_secret string olmalı.`);
-  assert.ok(business.sync_secret.trim().length > 0, `${label} sync_secret boş olmamalı.`);
   assert.ok(Array.isArray(business.allowed_origins), `${label} allowed_origins dizi olmalı.`);
 }
 
@@ -336,6 +381,20 @@ function createDeploymentWarnings(business) {
   const warnings = [];
   const syncSecret = String(business.sync_secret ?? "");
   const allowedOrigins = Array.isArray(business.allowed_origins) ? business.allowed_origins.map(String) : [];
+
+  if (!String(business.display_name ?? "").trim()) {
+    warnings.push({
+      code: "missing_display_name",
+      message: "config/business.json içindeki display_name henüz yapılandırılmadı."
+    });
+  }
+
+  if (!syncSecret) {
+    warnings.push({
+      code: "missing_sync_secret",
+      message: "config/business.json içindeki sync_secret henüz yapılandırılmadı; canlı kurulumdan önce gerçek bir değerle değiştirilmelidir."
+    });
+  }
 
   if (syncSecret === "change-this-secret") {
     warnings.push({

@@ -27,6 +27,39 @@ try {
   assert.equal(Number.isInteger(database.getAppLockNotificationCount()), true);
   assert.equal(database.getAppLockNotificationCount() >= 0, true);
 
+  const setupResult = database.saveInitialSetup({
+    businessName: "App Lock Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550000001",
+    whatsapp: "+905550000001",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "app-lock-test-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: false },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: [],
+    birthdaySettings: {
+      enabled: true,
+      mode: "manual",
+      sendTime: "10:00",
+      messageTemplate: "Doğum gününüz kutlu olsun {ad}! {işletme}"
+    }
+  });
+
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
   assert.match(validateAppPassword("123"), /en az 6 karakter/i);
   assert.equal(validateAppPassword("güvenli-şifre"), null);
 

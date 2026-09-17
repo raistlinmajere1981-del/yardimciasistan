@@ -126,7 +126,7 @@ try {
 }
 
 run("desktop-lock", process.execPath, ["scripts/smoke-desktop-lock.mjs"]);
-run("desktop-shell", process.platform === "win32" ? "npm.cmd" : "npm", ["run", "smoke:desktop-shell"]);
+run("desktop-shell", process.execPath, ["scripts/smoke-desktop-shell.mjs"]);
 console.log("stage3b-final-legacy-surfaces-ok", JSON.stringify({
   lockViewports: viewports.length,
   themes: themes.length,

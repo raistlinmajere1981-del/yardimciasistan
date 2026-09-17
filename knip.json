@@ -5,12 +5,10 @@
   "workspaces": {
     ".": {
       "entry": [
-        "scripts/**/*.{js,mjs,cjs,ts}",
-        "tests/**/*.{js,mjs,cjs,ts}"
+        "scripts/**/*.{js,mjs,cjs,ts}"
       ],
       "project": [
-        "scripts/**/*.{js,mjs,cjs,ts}",
-        "tests/**/*.{js,mjs,cjs,ts}"
+        "scripts/**/*.{js,mjs,cjs,ts}"
       ]
     },
     "apps/desktop-app": {
@@ -26,9 +24,6 @@
         "scripts/**/*.{js,mjs,cjs,ts}",
         "*.config.ts"
       ]
-    },
-    "apps/demo-web": {
-      "project": ["src/**/*.{ts,tsx}", "*.config.ts"]
     },
     "packages/shared": {
       "project": ["**/*.ts"]

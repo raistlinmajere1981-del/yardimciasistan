@@ -17,11 +17,77 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
-  const [first, second] = database.getDashboardData().menu.items;
-  const gramItem = database.getDashboardData().menu.items.find((item) => item.id === "item_main_006");
+
+  const setupResult = database.saveInitialSetup({
+    businessName: "Stock Image Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550000200",
+    whatsapp: "+905550000200",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "stock-image-test-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: true },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
+  const categoryResult = database.saveMenuCategory({
+    name: "Stok Smoke Kategorisi",
+    description: "Stok smoke testi",
+    is_active: true,
+    sort_order: 10
+  });
+  assert.equal(categoryResult.ok, true);
+  const stockCategoryId = categoryResult.savedId;
+
+  function createStockItem(name, unit, consumption) {
+    const result = database.saveMenuItem({
+      category_id: stockCategoryId,
+      name,
+      description: "Stok smoke ürünü",
+      price: 100,
+      currency: "TRY",
+      image_url: "",
+      is_available: true,
+      is_featured: false,
+      allergens: [],
+      tags: ["smoke"],
+      stock_quantity: null,
+      stock_min_quantity: null,
+      stock_unit: unit,
+      stock_consumption_quantity: consumption,
+      hide_when_out_of_stock: false,
+      stock_note: null,
+      sort_order: 10
+    });
+    assert.equal(result.ok, true);
+    return result.savedId;
+  }
+
+  const firstId = createStockItem("Stok Adet Ürünü", "piece", 1);
+  const secondId = createStockItem("Stok Adet Ürünü 2", "piece", 1);
+  const gramId = createStockItem("Stok Gram Ürünü", "gram", 200);
+  const menuById = new Map(database.getDashboardData().menu.items.map((item) => [item.id, item]));
+  const first = menuById.get(firstId);
+  const second = menuById.get(secondId);
+  const gramItem = menuById.get(gramId);
   assert.ok(first && second && gramItem);
   assert.equal(database.saveMenuItem(trackedInput(first, 0, true)).ok, true);
   assert.equal(database.saveMenuItem(trackedInput(second, 5, false)).ok, true);
+  assert.equal(database.saveMenuItem(trackedInput(gramItem, 1000, false)).ok, true);
   const firstName = first.name;
   const secondName = second.name;
   const hash = "a".repeat(64);

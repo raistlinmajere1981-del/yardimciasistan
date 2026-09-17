@@ -19,6 +19,55 @@ let database = new DesktopDatabase({ appPath, userDataPath: dataDir });
 
 try {
   database.initialize();
+
+  const setupResult = database.saveInitialSetup({
+    businessName: "Room Folio Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550000400",
+    whatsapp: "+905550000400",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "room-folio-test-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: false },
+    initialCounts: { rooms: 1, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
+  const folioCategory = database.saveMenuCategory({
+    name: "Folio Test Kategorisi",
+    description: "Folio smoke testi",
+    is_active: true,
+    sort_order: 10
+  });
+  assert.equal(folioCategory.ok, true);
+  const folioItem = database.saveMenuItem({
+    category_id: folioCategory.savedId,
+    name: "Folio Test Ürünü",
+    description: "Folio smoke ürünü",
+    price: 120,
+    currency: "TRY",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["smoke"],
+    sort_order: 10
+  });
+  assert.equal(folioItem.ok, true);
+
   const service = new DesktopRoomFolioService(database.databasePath);
   const finance = new DesktopFinanceService(database.databasePath);
   const sqlite = new DatabaseSync(database.databasePath);

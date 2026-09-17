@@ -18,6 +18,32 @@ const deviceId = "android-permission-smoke";
 try {
   database.initialize();
 
+  const setupResult = database.saveInitialSetup({
+    businessName: "Permission Matrix Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550009900",
+    whatsapp: "+905550009900",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "permission-matrix-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: true },
+    initialCounts: { rooms: 1, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
   const room = database.getDashboardData().rooms.find((item) => item.isActive);
   assert.ok(room, "Permission smoke needs an active room.");
 

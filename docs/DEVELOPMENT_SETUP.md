@@ -56,28 +56,6 @@ npm run build
 npm test
 ```
 
-## Demo Web Tasarım Döngüsü
-
-Lokal tarayıcıda:
-
-```bash
-npm run dev:demo-web
-```
-
-Adres:
-
-```text
-http://127.0.0.1:5173/
-```
-
-Aynı Wi-Fi ağındaki telefondan veya başka cihazdan bakmak için:
-
-```bash
-npm run dev:demo-web:lan
-```
-
-Bu komuttan sonra terminalde görünen yerel ağ IP adresi telefonda açılabilir.
-
 ## Görsel Kontrol
 
 Playwright ile temel web akışı:
@@ -85,17 +63,6 @@ Playwright ile temel web akışı:
 ```bash
 npm run e2e
 ```
-
-Masaüstü ve mobil ekran görüntüsü almak için:
-
-```bash
-npm run screenshots:demo-web
-```
-
-Bu komut demo web sunucusunu geçici olarak açar, masaüstü ve mobil ekran
-görüntülerini alır, sonra sunucuyu kapatır. Zaten çalışan bir sunucuyu kullanmak
-isterseniz `DEMO_WEB_URL=http://127.0.0.1:5173 npm run screenshots:demo-web`
-şeklinde adres verebilirsiniz.
 
 Ekran görüntüleri `artifacts/screenshots/` altına yazılır. Bu klasör repoya dahil edilmez.
 
@@ -152,21 +119,19 @@ Varsayılan web modül adresi:
 https://yardimciasistan.alwaysdata.net/yardimci-asistan
 ```
 
-Normal geliştirme akışında masaüstü ve demo web bu HTTPS kurulumuyla haberleşir.
+Normal geliştirme akışında masaüstü bu HTTPS kurulumuyla haberleşir.
 Hostingdeki `sync_secret` masaüstü Ayarlar ekranına girilmelidir; bu değer kaynak
 koda veya paketlere gömülmez.
 
-Desktop app ilk SQLite şema dosyaları:
+Desktop app SQLite şema dosyası:
 
 ```text
 apps/desktop-app/db/migrations/001_baseline.sql
-apps/desktop-app/db/demo-profiles/pension-restaurant.sql
 ```
 
 Uygulama açılışında SQLite dosyası otomatik oluşturulur. Testlerde gerçek kullanıcı klasörüne yazmamak için `YA_DESKTOP_DATA_DIR` ortam değişkeni kullanılabilir.
 
-İlk açılışta tek current baseline migration uygulanır. Üretim kurulumu boş başlar;
-demo verisi yalnız açıkça demo profili seçildiğinde eklenir.
+İlk açılışta tek current baseline migration uygulanır. Temiz kurulumda gerçek kullanıcı verisi olmadan başlar; hazır demo işletme/veri yüklenmez.
 
 Linux'ta Electron pencere açılışını sanal ekranla kontrol etmek için:
 
@@ -194,24 +159,6 @@ dosyasını ve sistem destekliyorsa yükleme arşivlerini üretir.
 Canlı firma değerleri sadece deploy paketine yazılacaksa `YARDIMCI_ASISTAN_DEPLOY_*`
 ortam değişkenleri kullanılabilir; kaynak template dosyaları değişmez.
 
-Demo siteyi ve web modülünü tek hosting kökü için birlikte paketlemek gerekirse:
-
-```bash
-YARDIMCI_ASISTAN_HOSTING_ORIGIN="https://demo-domain.com" \
-YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME="Demo İşletme" \
-YARDIMCI_ASISTAN_DEPLOY_WHATSAPP="+90 532 123 45 67" \
-YARDIMCI_ASISTAN_DEPLOY_PHONE="+90 532 123 45 67" \
-YARDIMCI_ASISTAN_DEPLOY_SYNC_SECRET="uzun-ve-tahmin-edilemeyen-bir-anahtar" \
-npm run pack:hosting-demo
-```
-
-Bu komut `artifacts/hosting-demo-deploy/public_html/` klasörünü üretir. Kökünde
-demo site, `/yardimci-asistan` altında PHP web modülü bulunur. Detaylı canlı
-prova akışı `docs/dev/HOSTING_TEST_PLAN.md` içindedir.
-Canlı AI testi için `YARDIMCI_ASISTAN_DEPLOY_AI_*` ortam değişkenleri verilebilir;
-bu durumda API anahtarı sadece ignored `artifacts/` deploy çıktısındaki
-`config/ai.local.php` dosyasına yazılır.
-
 QR menü sayfasını PHP server ve mobil Chromium viewport ile kontrol etmek için:
 
 ```bash
@@ -219,12 +166,11 @@ npm run smoke:web-module
 npm run smoke:automatic-sync
 npm run smoke:web-widget-branding
 npm run smoke:web-widget-module
-npm run smoke:demo-web-widget
 ```
 
-`smoke:web-module` QR menü yayınını, AI kapalı fallback'ini, yetkili `publish_ai_settings` akışını ve yayınlanan ayarla mock OpenAI uyumlu servise giden model/Authorization bilgisini birlikte kontrol eder. `smoke:automatic-sync` geçici PHP/SQLite hostingi ile masaüstü SQLite'ı birlikte çalıştırarak cursor/ack, Android action, kalıcı outbox, revision ve idempotency akışlarını doğrular. `smoke:web-widget-branding` widget bundle çıktısında logosuz `YA` fallback'ini, `data-logo-url`/`logoUrl` ile görsel marka kullanımını ve bilgi panelindeki AI cevap alanını mock API ile Playwright üzerinden doğrular. `smoke:web-widget-module` ise build edilmiş `firm-template/web-module/widget.js` dosyasını gerçek PHP server'dan yükler; widget rezervasyon formunun `api/request.php` üzerinden hosting SQLite'ında kayıt açtığını, WhatsApp taslak linkini hazırladığını, AI kısa soru formunun `api/chat.php` fallback cevabını gösterdiğini ve `ai-conversations.json` içine kayıt açtığını kontrol eder. `smoke:demo-web-widget` demo web sitesini `VITE_YA_WEB_MODULE_URL` ile açar ve gerçek gömülü widget'ın aynı PHP modülüne talep/AI kayıtlarını yazabildiğini doğrular.
+`smoke:web-module` QR menü yayınını, AI kapalı fallback'ini, yetkili `publish_ai_settings` akışını ve yayınlanan ayarla mock OpenAI uyumlu servise giden model/Authorization bilgisini birlikte kontrol eder. `smoke:automatic-sync` geçici PHP/SQLite hostingi ile masaüstü SQLite'ı birlikte çalıştırarak cursor/ack, Android action, kalıcı outbox, revision ve idempotency akışlarını doğrular. `smoke:web-widget-branding` widget bundle çıktısında logosuz `YA` fallback'ini, `data-logo-url`/`logoUrl` ile görsel marka kullanımını ve bilgi panelindeki AI cevap alanını mock API ile Playwright üzerinden doğrular. `smoke:web-widget-module` ise build edilmiş `firm-template/web-module/widget.js` dosyasını gerçek PHP server'dan yükler; widget rezervasyon formunun `api/request.php` üzerinden hosting SQLite'ında kayıt açtığını, WhatsApp taslak linkini hazırladığını, AI kısa soru formunun `api/chat.php` fallback cevabını gösterdiğini ve `ai-conversations.json` içine kayıt açtığını kontrol eder.
 
-WhatsApp linkleri, manuel kopyalama ve ilerideki resmi API geçişi için ortak mantık `packages/whatsapp-bridge` içindedir. Web widget, demo web ve desktop app aynı paketi kullanır; paket testleri Türkiye cep telefonu normalizasyonunu, boş mesaj/telefon hatalarını ve WebView fallback aksiyonunu kontrol eder. Web widget `data-logo-url` ile firma veya Yardımcı Asistan marka sembolünü gösterebilir. Desktop app içinde WhatsApp sayfası WebView alanını, bağlantı durumunu ve manuel kopyalama alternatifini birlikte sunar.
+WhatsApp linkleri, manuel kopyalama ve ilerideki resmi API geçişi için ortak mantık `packages/whatsapp-bridge` içindedir. Web widget ve desktop app aynı paketi kullanır; paket testleri Türkiye cep telefonu normalizasyonunu, boş mesaj/telefon hatalarını ve WebView fallback aksiyonunu kontrol eder. Web widget `data-logo-url` ile firma veya Yardımcı Asistan marka sembolünü gösterebilir. Desktop app içinde WhatsApp sayfası WebView alanını, bağlantı durumunu ve manuel kopyalama alternatifini birlikte sunar.
 
 AI endpointini gerçek OpenAI uyumlu provider ile denemek için PHP server açılmadan önce şu ortam değişkenleri verilebilir:
 

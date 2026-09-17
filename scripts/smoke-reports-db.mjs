@@ -27,9 +27,72 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+
+  const setupResult = database.saveInitialSetup({
+    businessName: "Reports Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550000300",
+    whatsapp: "+905550000300",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "reports-test-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: false },
+    initialCounts: { rooms: 0, tables: 3 },
+    tableCategories: [{ name: "Rapor Salonu", tableCount: 3 }]
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+  const reportTables = setupResult.dashboardData.tables;
+  assert.equal(reportTables.length, 3);
+
+  const reportCategory = database.saveMenuCategory({
+    name: "Rapor İçecekleri",
+    description: "Rapor smoke testi",
+    is_active: true,
+    sort_order: 10
+  });
+  assert.equal(reportCategory.ok, true);
+  const reportCategoryId = reportCategory.savedId;
+
+  function createReportItem(name, price) {
+    const result = database.saveMenuItem({
+      category_id: reportCategoryId,
+      name,
+      description: "Rapor smoke ürünü",
+      price,
+      currency: "TRY",
+      image_url: "",
+      is_available: true,
+      is_featured: false,
+      allergens: [],
+      tags: ["smoke"],
+      sort_order: 10
+    });
+    assert.equal(result.ok, true);
+    return result.savedId;
+  }
+
+  const reportItemIds = [
+    createReportItem("Rapor Kahvesi", 150),
+    createReportItem("Rapor Limonatası", 125),
+    createReportItem("Rapor İptal Ürünü", 10)
+  ];
+  const reportTableIds = reportTables.map((table) => table.id);
+
   const today = localDateKey(new Date());
   const yesterday = shiftDate(today, -1);
-  seedReportData(database.databasePath, today);
+  seedReportData(database.databasePath, today, { tableIds: reportTableIds, itemIds: reportItemIds });
 
   setBusinessCapability(database.databasePath, { capability: C.AI, enabled: false });
   assert.equal(database.getSetupData().aiEnabled, false, "Reports must work with AI explicitly disabled.");
@@ -165,7 +228,9 @@ function range(preset, startDate, endDate) {
   };
 }
 
-function seedReportData(databasePath, today) {
+function seedReportData(databasePath, today, ids) {
+  const [tableA, tableB, tableC] = ids.tableIds;
+  const [itemA, itemB, itemC] = ids.itemIds;
   const sqlite = new DatabaseSync(databasePath);
   try {
     sqlite.exec("PRAGMA foreign_keys = ON");
@@ -184,81 +249,81 @@ function seedReportData(databasePath, today) {
 
     insertOrder(sqlite, {
       id: "report_paid_today",
-      tableId: "table_001",
+      tableId: tableA,
       status: "paid",
       total: 1000,
       date: today
     }, [
-      ["report_line_today_coffee", "item_drink_001", "Snapshot Türk Kahvesi", 150, 5, 750, "served"],
-      ["report_line_today_lemonade", "item_drink_002", "Snapshot Limonata", 125, 2, 250, "served"],
-      ["report_line_today_cancelled", "item_drink_003", "İptal Satır", 10, 50, 500, "cancelled"]
+      ["report_line_today_coffee", itemA, "Snapshot Türk Kahvesi", 150, 5, 750, "served"],
+      ["report_line_today_lemonade", itemB, "Snapshot Limonata", 125, 2, 250, "served"],
+      ["report_line_today_cancelled", itemC, "İptal Satır", 10, 50, 500, "cancelled"]
     ]);
     insertOrder(sqlite, {
       id: "report_paid_yesterday",
-      tableId: "table_001",
+      tableId: tableA,
       status: "paid",
       total: 500,
       date: shiftDate(today, -1)
     }, [
-      ["report_line_yesterday_coffee", "item_drink_001", "Snapshot Türk Kahvesi", 500, 1, 500, "served"]
+      ["report_line_yesterday_coffee", itemA, "Snapshot Türk Kahvesi", 500, 1, 500, "served"]
     ]);
     insertOrder(sqlite, {
       id: "report_paid_five_days",
-      tableId: "table_001",
+      tableId: tableA,
       status: "paid",
       total: 300,
       date: shiftDate(today, -5)
     }, [
-      ["report_line_five_days", "item_drink_002", "Snapshot Limonata", 100, 3, 300, "served"]
+      ["report_line_five_days", itemB, "Snapshot Limonata", 100, 3, 300, "served"]
     ]);
     insertOrder(sqlite, {
       id: "report_paid_twenty_days",
-      tableId: "table_001",
+      tableId: tableA,
       status: "paid",
       total: 200,
       date: shiftDate(today, -20)
     }, [
-      ["report_line_twenty_days", "item_drink_001", "Snapshot Türk Kahvesi", 100, 2, 200, "served"]
+      ["report_line_twenty_days", itemA, "Snapshot Türk Kahvesi", 100, 2, 200, "served"]
     ]);
     insertOrder(sqlite, {
       id: "report_paid_outside",
-      tableId: "table_001",
+      tableId: tableA,
       status: "paid",
       total: 100,
       date: shiftDate(today, -40)
     }, [
-      ["report_line_outside", "item_drink_001", "Snapshot Türk Kahvesi", 100, 1, 100, "served"]
+      ["report_line_outside", itemA, "Snapshot Türk Kahvesi", 100, 1, 100, "served"]
     ]);
     insertOrder(sqlite, {
       id: "report_cancelled_today",
-      tableId: "table_001",
+      tableId: tableA,
       status: "cancelled",
       total: 777,
       date: today
     }, [
-      ["report_line_cancelled_order", "item_drink_001", "Snapshot Türk Kahvesi", 777, 100, 777, "served"]
+      ["report_line_cancelled_order", itemA, "Snapshot Türk Kahvesi", 777, 100, 777, "served"]
     ]);
     insertOrder(sqlite, {
       id: "report_open_today",
-      tableId: "table_003",
+      tableId: tableC,
       status: "open",
       total: 999,
       date: today
     }, [
-      ["report_line_open", "item_drink_001", "Snapshot Türk Kahvesi", 999, 100, 999, "open"]
+      ["report_line_open", itemA, "Snapshot Türk Kahvesi", 999, 100, 999, "open"]
     ]);
     insertOrder(sqlite, {
       id: "report_payment_today",
-      tableId: "table_002",
+      tableId: tableB,
       status: "payment",
       total: 888,
       date: today
     }, [
-      ["report_line_payment", "item_drink_002", "Snapshot Limonata", 888, 100, 888, "served"]
+      ["report_line_payment", itemB, "Snapshot Limonata", 888, 100, 888, "served"]
     ]);
-    sqlite.prepare("UPDATE tables SET status = 'bill_waiting' WHERE id = ?").run("table_002");
+    sqlite.prepare("UPDATE tables SET status = 'bill_waiting' WHERE id = ?").run(tableB);
     sqlite.prepare("UPDATE menu_items SET name = ?, price = ? WHERE id = ?")
-      .run("Sonradan Değişen Kahve", 999, "item_drink_001");
+      .run("Sonradan Değişen Kahve", 999, itemA);
 
     insertReservation(sqlite, "report_res_approved", "approved", "room", today, shiftDate(today, 2), shiftDate(today, 5));
     insertReservation(sqlite, "report_res_completed", "completed", "room", today, shiftDate(today, -10), shiftDate(today, -8));
@@ -281,15 +346,15 @@ function seedReportData(databasePath, today) {
       UPDATE menu_items
       SET stock_quantity = ?, stock_min_quantity = ?, stock_consumption_quantity = ?, stock_unit = 'piece'
       WHERE id = ?
-    `).run(0, 2, 1, "item_drink_001");
+    `).run(0, 2, 1, itemA);
     sqlite.prepare(`
       UPDATE menu_items
       SET stock_quantity = ?, stock_min_quantity = ?, stock_consumption_quantity = ?, stock_unit = 'piece'
       WHERE id = ?
-    `).run(2, 3, 1, "item_drink_002");
-    insertMovement(sqlite, "report_stock_remove", "item_drink_001", "remove", -5, 5, 0, "desktop", today);
-    insertMovement(sqlite, "report_stock_image", "item_drink_002", "image_import_add", 10, 0, 10, "stock_image_import", today);
-    insertMovement(sqlite, "report_stock_android", "item_drink_002", "add", 3, 10, 13, "android", today);
+    `).run(2, 3, 1, itemB);
+    insertMovement(sqlite, "report_stock_remove", itemA, "remove", -5, 5, 0, "desktop", today);
+    insertMovement(sqlite, "report_stock_image", itemB, "image_import_add", 10, 0, 10, "stock_image_import", today);
+    insertMovement(sqlite, "report_stock_android", itemB, "add", 3, 10, 13, "android", today);
 
     sqlite.exec("COMMIT");
   } catch (error) {

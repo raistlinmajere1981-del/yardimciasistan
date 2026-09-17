@@ -52,7 +52,6 @@ AI, WhatsApp veya internet bağlantısı sistemin tamamı için tek hata noktas�
 
 ## Ana Bileşenler
 
-- `apps/demo-web`: Web sitesi olmayan firmalar için özelleştirilebilir demo site.
 - `apps/desktop-app`: İşletmenin ana yönetim merkezi olan Electron + React uygulaması.
 - `apps/android-app`: Hızlı takip ve yetkili saha işlemleri için native Android companion.
 - `packages/shared`: Ortak tipler, capability registry ve domain sözleşmeleri.
@@ -223,14 +222,6 @@ npm run smoke:android-device-ui
 npm run android:mirror
 ```
 
-Showcase runtime:
-
-```bash
-npm run showcase:data:prepare
-npm run showcase:data:reset
-YA_DESKTOP_DATA_DIR="$PWD/.demo-runtime/pension-restaurant" npm run dev:desktop
-```
-
 ## Dokümanlar
 
 - [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md)
@@ -245,7 +236,6 @@ YA_DESKTOP_DATA_DIR="$PWD/.demo-runtime/pension-restaurant" npm run dev:desktop
 - [Codex Çalışma Kuralları](docs/CODEX_RULES.md)
 - [Geliştirme Kurulumu](docs/DEVELOPMENT_SETUP.md)
 - [Firma Web Modülü Kurulumu](docs/WEB_MODULE_INSTALLATION.md)
-- [Demo Site Özelleştirme](docs/DEMO_SITE_CUSTOMIZATION.md)
 - [Android Dağıtımı](docs/ANDROID_DISTRIBUTION.md)
 
 ## Güncel Geliştirme Aşaması

@@ -19,6 +19,55 @@ const database = new DesktopDatabase({ appPath, userDataPath: dataDir });
 
 try {
   database.initialize();
+
+  const setupResult = database.saveInitialSetup({
+    businessName: "Transfer Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550000500",
+    whatsapp: "+905550000500",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "transfer-test-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: false },
+    initialCounts: { rooms: 1, tables: 1 },
+    tableCategories: [{ name: "Transfer Salonu", tableCount: 1 }]
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
+  const transferCategory = database.saveMenuCategory({
+    name: "Transfer Test Kategorisi",
+    description: "Transfer smoke testi",
+    is_active: true,
+    sort_order: 10
+  });
+  assert.equal(transferCategory.ok, true);
+  const transferItem = database.saveMenuItem({
+    category_id: transferCategory.savedId,
+    name: "Transfer Test Ürünü",
+    description: "Transfer smoke ürünü",
+    price: 100,
+    currency: "TRY",
+    image_url: "",
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    tags: ["smoke"],
+    sort_order: 10
+  });
+  assert.equal(transferItem.ok, true);
+
   const folioService = new DesktopRoomFolioService(database.databasePath);
   const finance = new DesktopFinanceService(database.databasePath);
   const sqlite = new DatabaseSync(database.databasePath);
