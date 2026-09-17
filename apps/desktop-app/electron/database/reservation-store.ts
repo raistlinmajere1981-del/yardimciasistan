@@ -1,0 +1,225 @@
+import type { DatabaseSync } from "node:sqlite";
+import { createId } from "@yardimci-asistan/shared";
+import type {
+  DesktopReservation,
+  SaveManualRestaurantReservationInput
+} from "../database-types.js";
+import { insertDatabaseEvent } from "./event-store.js";
+import { normalizeLimitedText } from "./customer-utils.js";
+import {
+  normalizeDateInput,
+  normalizeInteger,
+  normalizeTimeInput
+} from "./request-utils.js";
+
+export function getReservations(db: DatabaseSync): DesktopReservation[] {
+  const rows = db
+    .prepare(`
+        SELECT
+          reservations.id,
+          reservations.request_id,
+          reservations.customer_id,
+          customers.full_name AS customer_name,
+          customers.phone AS customer_phone,
+          reservations.reservation_type,
+          reservations.status,
+          reservations.title,
+          reservations.start_date,
+          reservations.end_date,
+          reservations.time,
+          reservations.guest_count,
+          reservations.adult_count,
+          reservations.child_count,
+          reservations.room_ids_json,
+          reservations.table_ids_json,
+          reservations.notes,
+          reservations.price_note,
+          reservations.payment_status,
+          reservations.updated_at
+        FROM reservations
+        LEFT JOIN customers ON customers.id = reservations.customer_id AND customers.deleted_at = ''
+        WHERE reservations.deleted_at = ''
+        ORDER BY reservations.start_date ASC, reservations.time ASC, reservations.created_at DESC
+        LIMIT 80
+      `)
+    .all() as Array<Record<string, unknown>>;
+
+  return rows.map((row) => mapReservationRow(row));
+}
+
+export function getActiveResourceReservationTitles(db: DatabaseSync, resourceType: "room" | "table"): Map<string, string> {
+  const map = new Map<string, string>();
+  const rows = db
+    .prepare(`
+        SELECT id, title, room_ids_json, table_ids_json
+        FROM reservations
+        WHERE deleted_at = ''
+          AND status IN ('pending', 'approved')
+        ORDER BY start_date ASC, time ASC, created_at DESC
+      `)
+    .all() as Array<Record<string, unknown>>;
+
+  for (const row of rows) {
+    const ids = parseReservationStringArray(resourceType === "room" ? row.room_ids_json : row.table_ids_json);
+    for (const id of ids) {
+      if (!map.has(id)) {
+        map.set(id, String(row.title ?? ""));
+      }
+    }
+  }
+
+  return map;
+}
+
+export function mapReservationRow(row: Record<string, unknown>): DesktopReservation {
+  return {
+    id: String(row.id ?? ""),
+    requestId: String(row.request_id ?? ""),
+    customerId: String(row.customer_id ?? ""),
+    customerName: String(row.customer_name ?? ""),
+    customerPhone: String(row.customer_phone ?? ""),
+    reservationType: String(row.reservation_type ?? ""),
+    status: String(row.status ?? "pending"),
+    title: String(row.title ?? ""),
+    startDate: String(row.start_date ?? ""),
+    endDate: String(row.end_date ?? ""),
+    time: String(row.time ?? ""),
+    guestCount: Number(row.guest_count ?? 0),
+    adultCount: Number(row.adult_count ?? 0),
+    childCount: Number(row.child_count ?? 0),
+    roomIds: parseReservationStringArray(row.room_ids_json),
+    tableIds: parseReservationStringArray(row.table_ids_json),
+    notes: String(row.notes ?? ""),
+    priceNote: String(row.price_note ?? ""),
+    paymentStatus: String(row.payment_status ?? "not_required"),
+    updatedAt: String(row.updated_at ?? "")
+  };
+}
+
+export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveManualRestaurantReservationInput): { ok: true; message: string } | { ok: false; message: string } {
+  const customerId = String(input?.customerId ?? "").trim();
+  const tableId = String(input?.tableId ?? "").trim();
+  const date = normalizeDateInput(String(input?.date ?? ""));
+  const time = normalizeTimeInput(String(input?.time ?? ""));
+  const guestCount = normalizeInteger(input?.guestCount);
+  const notes = normalizeLimitedText(input?.notes, 2000);
+
+  if (!customerId || !date || !time || guestCount < 1 || guestCount > 99) {
+    return { ok: false, message: "Müşteri, tarih, saat ve geçerli kişi sayısı zorunludur." };
+  }
+
+  const customer = db
+    .prepare("SELECT id, full_name, phone FROM customers WHERE id = ? AND deleted_at = ''")
+    .get(customerId) as { id?: string; full_name?: string; phone?: string } | undefined;
+  if (!customer) {
+    return { ok: false, message: "Rezervasyon için seçilen müşteri bulunamadı." };
+  }
+
+  if (tableId) {
+    const table = db
+      .prepare("SELECT id, name, capacity, status, is_active FROM tables WHERE id = ? AND deleted_at = ''")
+      .get(tableId) as Record<string, unknown> | undefined;
+    if (!table || Number(table.is_active ?? 0) !== 1) {
+      return { ok: false, message: "Seçilen masa aktif değil veya bulunamadı." };
+    }
+    if (String(table.status ?? "") === "maintenance") {
+      return { ok: false, message: "Bakım durumundaki masaya rezervasyon atanamaz." };
+    }
+    const capacity = Math.max(0, Number(table.capacity ?? 0));
+    if (capacity > 0 && guestCount > capacity) {
+      return { ok: false, message: `${String(table.name ?? "Masa")} en fazla ${capacity} kişi kapasitelidir.` };
+    }
+
+    const sameSlotRows = db
+      .prepare(`
+          SELECT id, title, table_ids_json
+          FROM reservations
+          WHERE reservation_type IN ('table', 'breakfast')
+            AND status IN ('pending', 'approved')
+            AND start_date = ?
+            AND time = ?
+            AND deleted_at = ''
+        `)
+      .all(date, time) as Array<{ id?: string; title?: string; table_ids_json?: string }>;
+    const conflict = sameSlotRows.find((row) => parseReservationStringArray(row.table_ids_json).includes(tableId));
+    if (conflict) {
+      return {
+        ok: false,
+        message: `Seçilen masada ${date} ${time} için aktif rezervasyon var${conflict.title ? `: ${conflict.title}` : "."}`
+      };
+    }
+  }
+
+  const now = new Date().toISOString();
+  const reservationId = createId("reservation_");
+  const customerName = String(customer.full_name ?? "").trim() || "Misafir";
+  const tableIds = tableId ? [tableId] : [];
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db
+      .prepare(`
+          INSERT INTO reservations (
+            id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
+            guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+            payment_status, created_at, updated_at, deleted_at, sync_status
+          ) VALUES (?, ?, ?, 'table', 'approved', ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, '',
+            'not_required', ?, ?, '', 'local_only')
+        `)
+      .run(
+        reservationId,
+        `manual:${reservationId}`,
+        customerId,
+        `${customerName} - restoran rezervasyonu`,
+        date,
+        date,
+        time,
+        guestCount,
+        guestCount,
+        JSON.stringify(tableIds),
+        notes,
+        now,
+        now
+      );
+
+    insertDatabaseEvent(db, {
+      type: "reservation.created",
+      entityType: "reservation",
+      entityId: reservationId,
+      payload: {
+        source: "manual_desktop",
+        customer_id: customerId,
+        reservation_type: "table",
+        table_ids: tableIds,
+        date,
+        time,
+        guest_count: guestCount
+      },
+      now
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return {
+    ok: true,
+    message: tableId
+      ? "Restoran rezervasyonu oluşturuldu ve masa planlandı."
+      : "Restoran rezervasyonu oluşturuldu. Masayı daha sonra atayabilirsiniz."
+  };
+}
+
+function parseReservationStringArray(value: unknown): string[] {
+  try {
+    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.map((item) => String(item).trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
