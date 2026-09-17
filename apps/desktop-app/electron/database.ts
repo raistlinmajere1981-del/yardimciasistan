@@ -1870,7 +1870,7 @@ export class DesktopDatabase {
     const syncSecret = String(settings?.sync_secret ?? "");
     const businessName = String(business?.display_name ?? "");
     const aiService = normalizeStoredAiService(settings?.ai_service);
-    const aiProfiles = this.getAiServiceProfiles();
+    const aiProfiles = getStoredAiServiceProfiles(this.db);
     const activeAiProfile = aiProfiles.find((profile) => profile.service === aiService);
     const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
     const setupRequired =
@@ -1977,39 +1977,7 @@ export class DesktopDatabase {
   }
 
   getAiServiceProfiles(): DesktopAiServiceProfile[] {
-    const settings = this.db
-      .prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as Record<string, unknown> | undefined;
-    const activeService = normalizeStoredAiService(settings?.ai_service);
-    const rows = this.db
-      .prepare("SELECT * FROM ai_service_profiles ORDER BY service")
-      .all() as Array<Record<string, unknown>>;
-    const rowsByService = new Map<DesktopAiService, Record<string, unknown>>();
-
-    for (const row of rows) {
-      const service = normalizeAiService(row.service);
-      if (service) {
-        rowsByService.set(service, row);
-      }
-    }
-
-    return AI_SERVICE_IDS.map((service) => {
-      const row = rowsByService.get(service);
-      const useActiveSettings = !row && service === activeService;
-      const model = String(row?.model ?? (useActiveSettings ? settings?.ai_model : "") ?? "").trim();
-      const baseUrl = normalizeAiBaseUrl(row?.base_url ?? (useActiveSettings ? settings?.ai_base_url : ""))
-        || AI_SERVICE_DEFAULT_BASE_URLS[service];
-      return {
-        service,
-        projectName: String(row?.project_name ?? (useActiveSettings ? settings?.ai_project_name : "") ?? "").trim(),
-        baseUrl,
-        model,
-        modelOptions: normalizeAiModelOptions(row?.model_options_json, model),
-        timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? (useActiveSettings ? settings?.ai_timeout_seconds : DEFAULT_AI_TIMEOUT_SECONDS)),
-        apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? (useActiveSettings ? settings?.ai_api_key_encrypted : "") ?? "").trim()),
-        updatedAt: normalizeStoredTimestamp(row?.updated_at ?? (useActiveSettings ? settings?.updated_at : ""))
-      };
-    });
+    return getStoredAiServiceProfiles(this.db);
   }
 
   setAutoSyncEnabled(enabled: boolean): DesktopSyncRuntimeStatus {
@@ -2053,46 +2021,11 @@ export class DesktopDatabase {
   }
 
   getEncryptedAiApiKey(service?: DesktopAiService | string): string {
-    const settings = this.db
-      .prepare("SELECT ai_service, ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as { ai_service?: string; ai_api_key_encrypted?: string } | undefined;
-    const requestedService = service === undefined ? normalizeStoredAiService(settings?.ai_service) : normalizeAiService(service);
-
-    if (!requestedService) {
-      return "";
-    }
-
-    const profile = this.db
-      .prepare("SELECT api_key_encrypted FROM ai_service_profiles WHERE service = ? LIMIT 1")
-      .get(requestedService) as { api_key_encrypted?: string } | undefined;
-    if (profile) {
-      return String(profile.api_key_encrypted ?? "").trim();
-    }
-
-    return normalizeStoredAiService(settings?.ai_service) === requestedService
-      ? String(settings?.ai_api_key_encrypted ?? "").trim()
-      : "";
+    return getStoredEncryptedAiApiKey(this.db, service);
   }
 
   markAiSettingsPublished(timestamp: string): DesktopSetupData {
-    const publishedAt = normalizePublishedTimestamp(timestamp);
-    if (!publishedAt) {
-      throw new Error("AI ayarları için geçerli yayın zamanı gerekli.");
-    }
-
-    const result = this.db
-      .prepare(`
-        UPDATE settings
-        SET ai_last_published_at = ?,
-            updated_at = ?
-        WHERE deleted_at = ''
-      `)
-      .run(publishedAt, new Date().toISOString());
-
-    if (Number(result.changes) === 0) {
-      throw new Error("Yayınlandı olarak işaretlenecek AI ayarı bulunamadı.");
-    }
-
+    markStoredAiSettingsPublished(this.db, timestamp);
     return this.getSetupData();
   }
 
@@ -2454,73 +2387,30 @@ export class DesktopDatabase {
           now
         );
 
-      this.db
-        .prepare(`
-          INSERT INTO ai_service_profiles (
-            service,
-            project_name,
-            base_url,
-            model,
-            model_options_json,
-            timeout_seconds,
-            api_key_encrypted,
-            created_at,
-            updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(service) DO UPDATE SET
-            project_name = excluded.project_name,
-            base_url = excluded.base_url,
-            model = excluded.model,
-            model_options_json = excluded.model_options_json,
-            timeout_seconds = excluded.timeout_seconds,
-            api_key_encrypted = excluded.api_key_encrypted,
-            updated_at = excluded.updated_at
-        `)
-        .run(
-          storedAiService,
-          aiProjectName,
-          storedAiBaseUrl,
-          aiModel,
-          JSON.stringify(storedAiModelOptions),
-          storedAiTimeoutSeconds,
-          storedEncryptedAiApiKey,
-          String(existingAiProfile?.created_at ?? "") || now,
-          now
-        );
+      upsertStoredAiServiceProfileInTransaction(this.db, {
+        service: storedAiService,
+        projectName: aiProjectName,
+        baseUrl: storedAiBaseUrl,
+        model: aiModel,
+        modelOptionsJson: JSON.stringify(storedAiModelOptions),
+        timeoutSeconds: storedAiTimeoutSeconds,
+        apiKeyEncrypted: storedEncryptedAiApiKey,
+        createdAt: String(existingAiProfile?.created_at ?? "") || now,
+        now
+      });
 
-      const saveAiProfile = this.db.prepare(`
-        INSERT INTO ai_service_profiles (
-          service,
-          project_name,
-          base_url,
-          model,
-          model_options_json,
-          timeout_seconds,
-          api_key_encrypted,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(service) DO UPDATE SET
-          project_name = excluded.project_name,
-          base_url = excluded.base_url,
-          model = excluded.model,
-          model_options_json = excluded.model_options_json,
-          timeout_seconds = excluded.timeout_seconds,
-          api_key_encrypted = excluded.api_key_encrypted,
-          updated_at = excluded.updated_at
-      `);
       for (const profile of additionalAiProfiles) {
-        saveAiProfile.run(
-          profile.service,
-          profile.projectName,
-          profile.baseUrl,
-          profile.model,
-          JSON.stringify(profile.modelOptions),
-          profile.timeoutSeconds,
-          profile.encryptedApiKey,
-          profile.createdAt || now,
+        upsertStoredAiServiceProfileInTransaction(this.db, {
+          service: profile.service,
+          projectName: profile.projectName,
+          baseUrl: profile.baseUrl,
+          model: profile.model,
+          modelOptionsJson: JSON.stringify(profile.modelOptions),
+          timeoutSeconds: profile.timeoutSeconds,
+          apiKeyEncrypted: profile.encryptedApiKey,
+          createdAt: profile.createdAt || now,
           now
-        );
+        });
       }
 
       this.ensureInitialRooms(normalizeInteger(input.initialCounts.rooms), now);
@@ -3083,77 +2973,11 @@ export class DesktopDatabase {
   }
 
   saveAiWorkspaceHistory(input: Omit<AiWorkspaceHistoryEntry, "id" | "createdAt">): AiWorkspaceHistoryEntry {
-    const id = createId("ai_conv_");
-    const createdAt = new Date().toISOString();
-    const entry: AiWorkspaceHistoryEntry = {
-      ...input,
-      id,
-      createdAt,
-      instructions: input.instructions.trim().slice(0, 800),
-      content: input.content.trim().slice(0, 6000),
-      summary: input.summary.trim().slice(0, 1600),
-      missingFields: input.missingFields.map((field) => field.trim()).filter(Boolean).slice(0, 8)
-    };
-
-    this.db
-      .prepare(`
-        INSERT INTO ai_conversations (
-          id, source, request_id, status, messages_json, summary,
-          created_at, updated_at, sync_status
-        ) VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, 'local_only')
-      `)
-      .run(
-        entry.id,
-        `desktop_workspace:${entry.mode}`,
-        entry.requestId,
-        JSON.stringify({
-          instructions: entry.instructions,
-          content: entry.content,
-          missing_fields: entry.missingFields,
-          provider: entry.provider,
-          model: entry.model,
-          fallback: entry.fallback,
-          request_label: entry.requestLabel
-        }),
-        entry.summary,
-        entry.createdAt,
-        entry.createdAt
-      );
-
-    return entry;
+    return saveStoredAiWorkspaceHistory(this.db, input);
   }
 
   getAiWorkspaceHistory(limit = 12): AiWorkspaceHistoryEntry[] {
-    const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit) || 12));
-    const rows = this.db
-      .prepare(`
-        SELECT id, source, request_id, messages_json, summary, created_at
-        FROM ai_conversations
-        WHERE source LIKE 'desktop_workspace:%' AND deleted_at = ''
-        ORDER BY created_at DESC
-        LIMIT ?
-      `)
-      .all(safeLimit) as Record<string, unknown>[];
-
-    return rows.map((row) => {
-      const payload = parseAiWorkspacePayload(row.messages_json);
-      const modeCandidate = String(row.source ?? "").replace("desktop_workspace:", "");
-      const mode: AiWorkspaceMode = modeCandidate === "summary" || modeCandidate === "daily" ? modeCandidate : "reply";
-      return {
-        id: String(row.id ?? ""),
-        mode,
-        requestId: String(row.request_id ?? ""),
-        requestLabel: String(payload.request_label ?? ""),
-        instructions: String(payload.instructions ?? ""),
-        content: String(payload.content ?? ""),
-        summary: String(row.summary ?? ""),
-        missingFields: Array.isArray(payload.missing_fields) ? payload.missing_fields.map(String).filter(Boolean) : [],
-        provider: String(payload.provider ?? "disabled"),
-        model: String(payload.model ?? ""),
-        fallback: Boolean(payload.fallback),
-        createdAt: String(row.created_at ?? "")
-      };
-    });
+    return getStoredAiWorkspaceHistory(this.db, limit);
   }
 
   saveAiWorkspaceResult(input: SaveAiWorkspaceResultInput): SaveAiWorkspaceResult {
@@ -5767,3 +5591,15 @@ import {
   getCustomerRoomStays as getStoredCustomerRoomStays,
   hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay,
 } from "./database/customer-room-stay-store.js";
+
+import {
+  getAiServiceProfiles as getStoredAiServiceProfiles,
+  getEncryptedAiApiKey as getStoredEncryptedAiApiKey,
+  markAiSettingsPublished as markStoredAiSettingsPublished,
+  upsertAiServiceProfileInTransaction as upsertStoredAiServiceProfileInTransaction,
+} from "./database/ai-profile-store.js";
+
+import {
+  saveAiWorkspaceHistory as saveStoredAiWorkspaceHistory,
+  getAiWorkspaceHistory as getStoredAiWorkspaceHistory,
+} from "./database/ai-workspace-store.js";
