@@ -1,10 +1,15 @@
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
 import type { PublishedQrMenu } from "@yardimci-asistan/sync-core";
+import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import type {
   SaveMenuCategoryInput
 } from "../database-types.js";
 import { normalizeInteger } from "./request-utils.js";
+import type { AndroidActionMutationResult } from "./android-utils.js";
+import { getAndroidVersionConflict, nextMutationTimestamp } from "./android-utils.js";
+import { insertDeletionEvent } from "./deletion-store.js";
+import type { DeletionAndroidEventSink } from "./deletion-store.js";
 import {
   normalizeMenuStockUnit,
   normalizePositiveStockNumber,
@@ -157,4 +162,84 @@ export function saveMenuCategory(db: DatabaseSync, input: SaveMenuCategoryInput)
     message: "Kategori kaydedildi.",
     savedId: id
   };
+}
+
+export function deleteMenuCategoryInTransaction(
+  db: DatabaseSync,
+  categoryId: string,
+  now: string,
+  androidAction?: AndroidSyncAction,
+  insertAndroidEvent?: DeletionAndroidEventSink
+): AndroidActionMutationResult {
+  if (!categoryId) {
+    return { ok: false, message: "Silinecek menü kategorisi seçilmemiş." };
+  }
+  const category = db
+    .prepare("SELECT name, updated_at FROM menu_categories WHERE id = ? AND deleted_at = ''")
+    .get(categoryId) as { name?: string; updated_at?: string } | undefined;
+  if (!category) {
+    return { ok: false, message: "Menü kategorisi masaüstü kayıtlarında bulunamadı." };
+  }
+  const versionConflict = androidAction
+    ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", category.updated_at, "Menü kategorisi")
+    : null;
+  if (versionConflict) {
+    return versionConflict;
+  }
+
+  const updatedAt = nextMutationTimestamp(category.updated_at, now);
+  const itemResult = db
+    .prepare(`
+        UPDATE menu_items
+        SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
+        WHERE category_id = ? AND deleted_at = ''
+      `)
+    .run(updatedAt, updatedAt, categoryId);
+  db
+    .prepare("UPDATE menu_categories SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
+    .run(updatedAt, updatedAt, categoryId);
+  insertDeletionEvent(db, androidAction, insertAndroidEvent, "menu.category_deleted", "menu_category", categoryId, {
+    name: String(category.name ?? ""),
+    deleted_item_count: Number(itemResult.changes ?? 0)
+  }, now);
+  return {
+    ok: true,
+    message: Number(itemResult.changes ?? 0) > 0
+      ? `${Number(itemResult.changes ?? 0)} ürünle birlikte kategori silindi.`
+      : "Kategori silindi."
+  };
+}
+
+export function deleteMenuItemInTransaction(
+  db: DatabaseSync,
+  itemId: string,
+  now: string,
+  androidAction?: AndroidSyncAction,
+  insertAndroidEvent?: DeletionAndroidEventSink
+): AndroidActionMutationResult {
+  if (!itemId) {
+    return { ok: false, message: "Silinecek menü ürünü seçilmemiş." };
+  }
+  const item = db
+    .prepare("SELECT name, category_id, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
+    .get(itemId) as { name?: string; category_id?: string; updated_at?: string } | undefined;
+  if (!item) {
+    return { ok: false, message: "Menü ürünü masaüstü kayıtlarında bulunamadı." };
+  }
+  const versionConflict = androidAction
+    ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", item.updated_at, "Menü ürünü")
+    : null;
+  if (versionConflict) {
+    return versionConflict;
+  }
+
+  const updatedAt = nextMutationTimestamp(item.updated_at, now);
+  db
+    .prepare("UPDATE menu_items SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
+    .run(updatedAt, updatedAt, itemId);
+  insertDeletionEvent(db, androidAction, insertAndroidEvent, "menu.item_deleted", "menu_item", itemId, {
+    name: String(item.name ?? ""),
+    category_id: String(item.category_id ?? "")
+  }, now);
+  return { ok: true, message: androidAction ? "Menü ürünü telefondan silindi." : "Ürün silindi." };
 }

@@ -1,10 +1,15 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import type {
   DesktopPreparedMessage,
   MarkWhatsAppMessageSentInput
 } from "../database-types.js";
 import { insertDatabaseEvent } from "./event-store.js";
+import type { AndroidActionMutationResult } from "./android-utils.js";
+import { getAndroidVersionConflict, nextMutationTimestamp } from "./android-utils.js";
+import { insertDeletionEvent } from "./deletion-store.js";
+import type { DeletionAndroidEventSink } from "./deletion-store.js";
 
 export function getAndroidPreparedMessages(db: DatabaseSync, requests: SyncedCustomerRequest[]): DesktopPreparedMessage[] {
   const rows = db
@@ -165,4 +170,73 @@ export function markPreparedWhatsAppMessagesSentInTransaction(db: DatabaseSync, 
           AND deleted_at = ''
       `)
     .run(now, now, requestId);
+}
+
+export function deleteMessageInTransaction(
+  db: DatabaseSync,
+  messageId: string,
+  requestIdInput: string,
+  now: string,
+  androidAction?: AndroidSyncAction,
+  insertAndroidEvent?: DeletionAndroidEventSink
+): AndroidActionMutationResult {
+  if (!messageId && !requestIdInput) {
+    return { ok: false, message: "Silinecek hazır mesaj seçilmemiş." };
+  }
+  const message = messageId
+    ? db
+      .prepare("SELECT id, request_id, updated_at FROM whatsapp_messages WHERE id = ? AND deleted_at = ''")
+      .get(messageId) as { id?: string; request_id?: string; updated_at?: string } | undefined
+    : undefined;
+  if (message && requestIdInput && String(message.request_id ?? "") !== requestIdInput) {
+    return { ok: false, message: "Mesaj ile talep bilgisi eşleşmiyor." };
+  }
+  const requestId = requestIdInput || String(message?.request_id ?? "");
+  const request = requestId
+    ? db
+      .prepare("SELECT ai_suggested_reply, whatsapp_message, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
+      .get(requestId) as { ai_suggested_reply?: string; whatsapp_message?: string; updated_at?: string } | undefined
+    : undefined;
+  const hasRequestDraft = Boolean(String(request?.ai_suggested_reply ?? "").trim() || String(request?.whatsapp_message ?? "").trim());
+  if (!message && !hasRequestDraft) {
+    return { ok: false, message: "Hazır mesaj masaüstü kayıtlarında bulunamadı." };
+  }
+  const actualUpdatedAt = message?.updated_at || request?.updated_at;
+  const versionConflict = androidAction
+    ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", actualUpdatedAt, "Hazır mesaj")
+    : null;
+  if (versionConflict) {
+    return versionConflict;
+  }
+
+  const updatedAt = nextMutationTimestamp(actualUpdatedAt, now);
+  let deletedCount = 0;
+  if (requestId) {
+    const result = db
+      .prepare(`
+          UPDATE whatsapp_messages
+          SET deleted_at = ?, updated_at = ?, sync_status = 'local_only'
+          WHERE request_id = ? AND direction = 'outgoing' AND status = 'prepared' AND deleted_at = ''
+        `)
+      .run(updatedAt, updatedAt, requestId);
+    deletedCount = Number(result.changes ?? 0);
+    db
+      .prepare(`
+          UPDATE requests
+          SET ai_suggested_reply = '', whatsapp_message = '', updated_at = ?, sync_status = 'local_only'
+          WHERE id = ? AND deleted_at = ''
+        `)
+      .run(updatedAt, requestId);
+  } else if (message?.id) {
+    const result = db
+      .prepare("UPDATE whatsapp_messages SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+      .run(updatedAt, updatedAt, message.id);
+    deletedCount = Number(result.changes ?? 0);
+  }
+  const eventId = String(message?.id ?? (messageId || `message_${requestId}`));
+  insertDeletionEvent(db, androidAction, insertAndroidEvent, "whatsapp.message_deleted", "whatsapp_message", eventId, {
+    request_id: requestId,
+    deleted_record_count: deletedCount
+  }, now);
+  return { ok: true, message: androidAction ? "Hazır mesaj telefondan silindi." : "Hazır mesaj silindi." };
 }

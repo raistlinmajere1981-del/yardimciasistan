@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
+import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import type {
   SaveRequestAiSuggestionInput,
   UpdateRequestStatusInput
@@ -8,6 +9,10 @@ import type {
 import { insertDatabaseEvent } from "./event-store.js";
 import { markPreparedWhatsAppMessagesSentInTransaction } from "./prepared-message-store.js";
 import { normalizeStatus } from "./request-utils.js";
+import type { AndroidActionMutationResult } from "./android-utils.js";
+import { getAndroidVersionConflict, nextMutationTimestamp } from "./android-utils.js";
+import { insertDeletionEvent } from "./deletion-store.js";
+import type { DeletionAndroidEventSink } from "./deletion-store.js";
 
 export function updateRequestStatus(db: DatabaseSync, input: UpdateRequestStatusInput): { ok: true; message: string } | { ok: false; message: string } {
   const requestId = input.requestId.trim();
@@ -280,4 +285,48 @@ function mapRequestRow(row: Record<string, unknown>): SyncedCustomerRequest {
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? "")
   };
+}
+
+export function deleteRequestInTransaction(
+  db: DatabaseSync,
+  requestId: string,
+  now: string,
+  androidAction?: AndroidSyncAction,
+  insertAndroidEvent?: DeletionAndroidEventSink
+): AndroidActionMutationResult {
+  if (!requestId) {
+    return { ok: false, message: "Silinecek talep seçilmemiş." };
+  }
+  const request = db
+    .prepare("SELECT customer_name, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
+    .get(requestId) as { customer_name?: string; updated_at?: string } | undefined;
+  if (!request) {
+    return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
+  }
+  const versionConflict = androidAction
+    ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", request.updated_at, "Talep")
+    : null;
+  if (versionConflict) {
+    return versionConflict;
+  }
+
+  const updatedAt = nextMutationTimestamp(request.updated_at, now);
+  const messageResult = db
+    .prepare(`
+        UPDATE whatsapp_messages
+        SET deleted_at = ?, updated_at = ?, sync_status = 'local_only'
+        WHERE request_id = ? AND deleted_at = ''
+      `)
+    .run(updatedAt, updatedAt, requestId);
+  db
+    .prepare("UPDATE notifications SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE related_type = 'request' AND related_id = ? AND deleted_at = ''")
+    .run(updatedAt, updatedAt, requestId);
+  db
+    .prepare("UPDATE requests SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+    .run(updatedAt, updatedAt, requestId);
+  insertDeletionEvent(db, androidAction, insertAndroidEvent, "request.deleted", "request", requestId, {
+    customer_name: String(request.customer_name ?? ""),
+    deleted_message_count: Number(messageResult.changes ?? 0)
+  }, now);
+  return { ok: true, message: androidAction ? "Talep telefondan silindi." : "Talep silindi." };
 }

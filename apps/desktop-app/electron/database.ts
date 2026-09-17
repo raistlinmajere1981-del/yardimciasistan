@@ -599,10 +599,15 @@ export class DesktopDatabase {
     if (!requestId) {
       return { ok: false, message: "Silinecek talep seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteRequestInTransaction(requestId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredRequestInTransaction(this.db, requestId, new Date().toISOString()),
       "Talep silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteCustomer(customerIdInput: string): DesktopStatusUpdateResult {
@@ -610,10 +615,15 @@ export class DesktopDatabase {
     if (!customerId) {
       return { ok: false, message: "Silinecek müşteri seçilmeli." };
     }
-    return this.runDesktopDeletion(
+    const result = runStoredDesktopDeletion(
+      this.db,
       () => this.deleteCustomerInTransaction(customerId, new Date().toISOString()),
       "Müşteri silindi; talep ve rezervasyon geçmişi korundu."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   saveCustomer(input: SaveCustomerInput): DesktopCustomerMutationResult {
@@ -951,10 +961,15 @@ export class DesktopDatabase {
     if (!categoryId) {
       return { ok: false, message: "Silinecek kategori seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteMenuCategoryInTransaction(categoryId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredMenuCategoryInTransaction(this.db, categoryId, new Date().toISOString()),
       "Kategori ve içindeki ürünler silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteMenuItem(itemIdInput: string): DesktopStatusUpdateResult {
@@ -962,10 +977,15 @@ export class DesktopDatabase {
     if (!itemId) {
       return { ok: false, message: "Silinecek ürün seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteMenuItemInTransaction(itemId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredMenuItemInTransaction(this.db, itemId, new Date().toISOString()),
       "Ürün silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteWhatsAppMessage(input: DeleteWhatsAppMessageInput): DesktopStatusUpdateResult {
@@ -974,10 +994,15 @@ export class DesktopDatabase {
     if (!messageId && !requestId) {
       return { ok: false, message: "Silinecek mesaj seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteMessageInTransaction(messageId, requestId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredMessageInTransaction(this.db, messageId, requestId, new Date().toISOString()),
       "Hazır mesaj silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   markWhatsAppMessageSent(input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult {
@@ -4366,7 +4391,14 @@ export class DesktopDatabase {
       case "customer_request_convert_to_reservation":
         return this.applyAndroidRequestConversion(action, now);
       case "customer_request_delete":
-        return this.deleteRequestInTransaction(androidPayloadString(action.payload, "request_id"), now, action);
+        return deleteStoredRequestInTransaction(
+          this.db,
+          androidPayloadString(action.payload, "request_id"),
+          now,
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
+        );
       case "customer_create":
         return this.applyAndroidCustomerSave(action, now, false);
       case "customer_update":
@@ -4450,15 +4482,32 @@ export class DesktopDatabase {
       case "table_order_cancel":
         return this.applyAndroidTableOrderClose(action, now, "cancelled");
       case "menu_category_delete":
-        return this.deleteMenuCategoryInTransaction(androidPayloadString(action.payload, "category_id"), now, action);
+        return deleteStoredMenuCategoryInTransaction(
+          this.db,
+          androidPayloadString(action.payload, "category_id"),
+          now,
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
+        );
       case "menu_item_delete":
-        return this.deleteMenuItemInTransaction(androidPayloadString(action.payload, "menu_item_id"), now, action);
+        return deleteStoredMenuItemInTransaction(
+          this.db,
+          androidPayloadString(action.payload, "menu_item_id"),
+          now,
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
+        );
       case "message_delete":
-        return this.deleteMessageInTransaction(
+        return deleteStoredMessageInTransaction(
+          this.db,
           androidPayloadString(action.payload, "message_id"),
           androidPayloadString(action.payload, "request_id"),
           now,
-          action
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
         );
       case "menu_stock_add":
         return this.applyAndroidMenuStockAction(action, "add", now);
@@ -4484,81 +4533,6 @@ export class DesktopDatabase {
       default:
         return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
     }
-  }
-
-  private runDesktopDeletion(
-    operation: () => AndroidActionMutationResult,
-    successMessage: string
-  ): DesktopStatusUpdateResult {
-    let transactionStarted = false;
-    try {
-      this.db.exec("BEGIN IMMEDIATE");
-      transactionStarted = true;
-      const result = operation();
-      if (!result.ok) {
-        this.db.exec("ROLLBACK");
-        transactionStarted = false;
-        return result;
-      }
-      this.db.exec("COMMIT");
-      transactionStarted = false;
-      return {
-        ok: true,
-        message: result.message || successMessage,
-        dashboardData: this.getDashboardData()
-      };
-    } catch {
-      if (transactionStarted) {
-        try {
-          this.db.exec("ROLLBACK");
-        } catch {
-          // SQLite işlemi zaten sonlandıysa kullanıcı dostu hata sonucunu koru.
-        }
-      }
-      return { ok: false, message: "Kayıt silinemedi. Yerel kayıtları kontrol edip tekrar deneyin." };
-    }
-  }
-
-  private deleteRequestInTransaction(
-    requestId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!requestId) {
-      return { ok: false, message: "Silinecek talep seçilmemiş." };
-    }
-    const request = this.db
-      .prepare("SELECT customer_name, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
-      .get(requestId) as { customer_name?: string; updated_at?: string } | undefined;
-    if (!request) {
-      return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", request.updated_at, "Talep")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(request.updated_at, now);
-    const messageResult = this.db
-      .prepare(`
-        UPDATE whatsapp_messages
-        SET deleted_at = ?, updated_at = ?, sync_status = 'local_only'
-        WHERE request_id = ? AND deleted_at = ''
-      `)
-      .run(updatedAt, updatedAt, requestId);
-    this.db
-      .prepare("UPDATE notifications SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE related_type = 'request' AND related_id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, requestId);
-    this.db
-      .prepare("UPDATE requests SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, requestId);
-    this.insertDeletionEvent(androidAction, "request.deleted", "request", requestId, {
-      customer_name: String(request.customer_name ?? ""),
-      deleted_message_count: Number(messageResult.changes ?? 0)
-    }, now);
-    return { ok: true, message: androidAction ? "Talep telefondan silindi." : "Talep silindi." };
   }
 
   private deleteCustomerInTransaction(
@@ -4622,7 +4596,8 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE customers SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
       .run(updatedAt, updatedAt, customerId);
-    this.insertDeletionEvent(androidAction, "customer.deleted", "customer", customerId, {
+    insertStoredDeletionEvent(this.db, androidAction, (sinkAction, type, entityType, entityId, payload, eventNow) =>
+      this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow), "customer.deleted", "customer", customerId, {
       full_name: String(customer.full_name ?? ""),
       preserved_request_count: Number(requestResult.changes ?? 0),
       preserved_reservation_count: Number(reservationResult.changes ?? 0)
@@ -4633,164 +4608,6 @@ export class DesktopDatabase {
         ? "Müşteri telefondan silindi; talep ve rezervasyon geçmişi korundu."
         : "Müşteri silindi; talep ve rezervasyon geçmişi korundu."
     };
-  }
-
-  private deleteMenuCategoryInTransaction(
-    categoryId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!categoryId) {
-      return { ok: false, message: "Silinecek menü kategorisi seçilmemiş." };
-    }
-    const category = this.db
-      .prepare("SELECT name, updated_at FROM menu_categories WHERE id = ? AND deleted_at = ''")
-      .get(categoryId) as { name?: string; updated_at?: string } | undefined;
-    if (!category) {
-      return { ok: false, message: "Menü kategorisi masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", category.updated_at, "Menü kategorisi")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(category.updated_at, now);
-    const itemResult = this.db
-      .prepare(`
-        UPDATE menu_items
-        SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
-        WHERE category_id = ? AND deleted_at = ''
-      `)
-      .run(updatedAt, updatedAt, categoryId);
-    this.db
-      .prepare("UPDATE menu_categories SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, categoryId);
-    this.insertDeletionEvent(androidAction, "menu.category_deleted", "menu_category", categoryId, {
-      name: String(category.name ?? ""),
-      deleted_item_count: Number(itemResult.changes ?? 0)
-    }, now);
-    return {
-      ok: true,
-      message: Number(itemResult.changes ?? 0) > 0
-        ? `${Number(itemResult.changes ?? 0)} ürünle birlikte kategori silindi.`
-        : "Kategori silindi."
-    };
-  }
-
-  private deleteMenuItemInTransaction(
-    itemId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!itemId) {
-      return { ok: false, message: "Silinecek menü ürünü seçilmemiş." };
-    }
-    const item = this.db
-      .prepare("SELECT name, category_id, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
-      .get(itemId) as { name?: string; category_id?: string; updated_at?: string } | undefined;
-    if (!item) {
-      return { ok: false, message: "Menü ürünü masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", item.updated_at, "Menü ürünü")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(item.updated_at, now);
-    this.db
-      .prepare("UPDATE menu_items SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, itemId);
-    this.insertDeletionEvent(androidAction, "menu.item_deleted", "menu_item", itemId, {
-      name: String(item.name ?? ""),
-      category_id: String(item.category_id ?? "")
-    }, now);
-    return { ok: true, message: androidAction ? "Menü ürünü telefondan silindi." : "Ürün silindi." };
-  }
-
-  private deleteMessageInTransaction(
-    messageId: string,
-    requestIdInput: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!messageId && !requestIdInput) {
-      return { ok: false, message: "Silinecek hazır mesaj seçilmemiş." };
-    }
-    const message = messageId
-      ? this.db
-        .prepare("SELECT id, request_id, updated_at FROM whatsapp_messages WHERE id = ? AND deleted_at = ''")
-        .get(messageId) as { id?: string; request_id?: string; updated_at?: string } | undefined
-      : undefined;
-    if (message && requestIdInput && String(message.request_id ?? "") !== requestIdInput) {
-      return { ok: false, message: "Mesaj ile talep bilgisi eşleşmiyor." };
-    }
-    const requestId = requestIdInput || String(message?.request_id ?? "");
-    const request = requestId
-      ? this.db
-        .prepare("SELECT ai_suggested_reply, whatsapp_message, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
-        .get(requestId) as { ai_suggested_reply?: string; whatsapp_message?: string; updated_at?: string } | undefined
-      : undefined;
-    const hasRequestDraft = Boolean(String(request?.ai_suggested_reply ?? "").trim() || String(request?.whatsapp_message ?? "").trim());
-    if (!message && !hasRequestDraft) {
-      return { ok: false, message: "Hazır mesaj masaüstü kayıtlarında bulunamadı." };
-    }
-    const actualUpdatedAt = message?.updated_at || request?.updated_at;
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", actualUpdatedAt, "Hazır mesaj")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(actualUpdatedAt, now);
-    let deletedCount = 0;
-    if (requestId) {
-      const result = this.db
-        .prepare(`
-          UPDATE whatsapp_messages
-          SET deleted_at = ?, updated_at = ?, sync_status = 'local_only'
-          WHERE request_id = ? AND direction = 'outgoing' AND status = 'prepared' AND deleted_at = ''
-        `)
-        .run(updatedAt, updatedAt, requestId);
-      deletedCount = Number(result.changes ?? 0);
-      this.db
-        .prepare(`
-          UPDATE requests
-          SET ai_suggested_reply = '', whatsapp_message = '', updated_at = ?, sync_status = 'local_only'
-          WHERE id = ? AND deleted_at = ''
-        `)
-        .run(updatedAt, requestId);
-    } else if (message?.id) {
-      const result = this.db
-        .prepare("UPDATE whatsapp_messages SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-        .run(updatedAt, updatedAt, message.id);
-      deletedCount = Number(result.changes ?? 0);
-    }
-    const eventId = String(message?.id ?? (messageId || `message_${requestId}`));
-    this.insertDeletionEvent(androidAction, "whatsapp.message_deleted", "whatsapp_message", eventId, {
-      request_id: requestId,
-      deleted_record_count: deletedCount
-    }, now);
-    return { ok: true, message: androidAction ? "Hazır mesaj telefondan silindi." : "Hazır mesaj silindi." };
-  }
-
-  private insertDeletionEvent(
-    androidAction: AndroidSyncAction | undefined,
-    type: string,
-    entityType: string,
-    entityId: string,
-    payload: Record<string, unknown>,
-    now: string
-  ) {
-    if (androidAction) {
-      this.insertAndroidActionEvent(androidAction, type, entityType, entityId, payload, now);
-      return;
-    }
-    insertDatabaseEvent(this.db, { type, entityType, entityId, payload, now });
   }
 
   private applyAndroidRequestStatus(action: AndroidSyncAction, status: string, now: string): AndroidActionMutationResult {
@@ -6158,6 +5975,8 @@ import {
   getPublishedMenu as getStoredPublishedMenu,
   getQrMenuPublication as getStoredQrMenuPublication,
   saveMenuCategory as saveStoredMenuCategory,
+  deleteMenuCategoryInTransaction as deleteStoredMenuCategoryInTransaction,
+  deleteMenuItemInTransaction as deleteStoredMenuItemInTransaction,
 } from "./database/menu-store.js";
 
 import {
@@ -6190,12 +6009,14 @@ import {
   getRequestById as getStoredRequestById,
   updateRequestStatus as updateStoredRequestStatus,
   saveRequestAiSuggestion as saveStoredRequestAiSuggestion,
+  deleteRequestInTransaction as deleteStoredRequestInTransaction,
 } from "./database/request-store.js";
 
 import {
   markPreparedWhatsAppMessagesSentInTransaction,
   markWhatsAppMessageSent as markStoredWhatsAppMessageSent,
   getAndroidPreparedMessages as getStoredAndroidPreparedMessages,
+  deleteMessageInTransaction as deleteStoredMessageInTransaction,
 } from "./database/prepared-message-store.js";
 
 import {
@@ -6210,3 +6031,8 @@ import {
   getActiveResourceReservationTitles as getStoredActiveResourceReservationTitles,
   saveManualRestaurantReservation as saveStoredManualRestaurantReservation,
 } from "./database/reservation-store.js";
+
+import {
+  runDesktopDeletion as runStoredDesktopDeletion,
+  insertDeletionEvent as insertStoredDeletionEvent,
+} from "./database/deletion-store.js";
