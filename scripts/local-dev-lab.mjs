@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webModuleRoot = join(repoRoot, "firm-template", "web-module");
-const syncSecret = "change-this-secret";
 const runtimeFiles = [
   "yardimci-asistan.sqlite",
   "yardimci-asistan.sqlite-wal",
@@ -31,7 +30,18 @@ try {
   process.exit(1);
 }
 
+function loadSyncSecret() {
+  const businessConfigPath = join(webModuleRoot, "config", "business.json");
+  const businessConfig = JSON.parse(readFileSync(businessConfigPath, "utf8"));
+  const syncSecret = String(businessConfig.sync_secret ?? "").trim();
+  if (!syncSecret) {
+    throw new Error("Web modülü sync_secret ayarı boş.");
+  }
+  return syncSecret;
+}
+
 async function main() {
+  const syncSecret = loadSyncSecret();
   const phpPort = await getAvailablePort(options.phpPort, options.host);
   const webModuleUrl = `http://127.0.0.1:${phpPort}`;
   const lanUrls = getLanUrls(phpPort);
@@ -48,9 +58,9 @@ async function main() {
   });
 
   await waitForHttp(`${webModuleUrl}/api/menu.php`, phpServer);
-  await verifyAndroidSummary(webModuleUrl);
+  await verifySyncEndpoint(webModuleUrl, syncSecret);
 
-  printReady({ webModuleUrl, lanUrls });
+  printReady({ webModuleUrl, lanUrls, syncSecret });
 
   if (options.once) {
     cleanup();
@@ -161,7 +171,7 @@ async function waitForHttp(url, child) {
   throw new Error(`${child.name} hazır olmadı.\n${child.output.trim()}`);
 }
 
-async function verifyAndroidSummary(baseUrl) {
+async function verifySyncEndpoint(baseUrl, syncSecret) {
   const response = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: {
@@ -169,18 +179,17 @@ async function verifyAndroidSummary(baseUrl) {
       "X-YA-Sync-Secret": syncSecret
     },
     body: JSON.stringify({
-      action: "android_summary",
-      limit: 10
+      action: "capabilities"
     })
   });
 
   const json = await response.json();
   if (!response.ok || !json.ok) {
-    throw new Error(json.message ?? "Android özeti doğrulanamadı.");
+    throw new Error(json.message ?? "Sync endpoint doğrulanamadı.");
   }
 }
 
-function printReady({ webModuleUrl, lanUrls }) {
+function printReady({ webModuleUrl, lanUrls, syncSecret }) {
   console.log("local-dev-lab-ready");
   console.log(`PHP web modülü: ${webModuleUrl}`);
   console.log(`Sync anahtarı: ${syncSecret}`);
