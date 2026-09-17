@@ -13,7 +13,7 @@ const businessConfig = JSON.parse(readFileSync(join(webModuleRoot, "config", "bu
 const syncSecret = String(businessConfig.sync_secret ?? "").trim();
 const outputApk = join(repoRoot, "apps", "android-app", "build", "outputs", "apk", "debug", "yardimci-asistan-debug.apk");
 const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "connection", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
-const demoAndroidSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
+const androidSnapshotFixtureFile = join(repoRoot, "scripts", "fixtures", "android-operations-snapshot.json");
 const verificationDeviceId = "android-phone-smoke";
 const defaultPhonePermissions = [
   "room.view",
@@ -84,7 +84,7 @@ async function main() {
   phpServer.stderr.on("data", collectPhpOutput);
 
   await waitForServer(localBaseUrl);
-  await seedDemoData([verificationDeviceId, installedDeviceId].filter(Boolean), localBaseUrl);
+  await seedAndroidFixture([verificationDeviceId, installedDeviceId].filter(Boolean), localBaseUrl);
   await verifyAndroidSummary(localBaseUrl, verificationDeviceId);
 
   const adbResult = options.noAdb ? { state: "skipped" } : installAndLaunchWithAdb(port, primaryLanUrl);
@@ -158,11 +158,11 @@ function parseArgs(args) {
   return parsed;
 }
 
-async function seedDemoData(approvedDeviceIds, baseUrl) {
+async function seedAndroidFixture(approvedDeviceIds, baseUrl) {
   for (const path of runtimeFiles) {
     rmSync(path, { force: true });
   }
-  const androidSnapshot = JSON.parse(readFileSync(demoAndroidSnapshotFile, "utf8"));
+  const androidSnapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
   androidSnapshot.androidPermissions = Object.fromEntries(approvedDeviceIds.map((deviceId) => [
     deviceId,
     {
@@ -187,7 +187,7 @@ async function seedDemoData(approvedDeviceIds, baseUrl) {
   });
   const result = await response.json();
   if (!response.ok || !result.ok) {
-    throw new Error(result.message ?? "Demo Android snapshot yayınlanamadı.");
+    throw new Error(result.message ?? "Android test snapshot'ı yayınlanamadı.");
   }
 }
 
@@ -296,7 +296,7 @@ function printReady({ port, localBaseUrl, lanUrls, adbResult }) {
   console.log(`PHP sunucusu: ${options.host}:${port}`);
   console.log(`Yerel kontrol: ${localBaseUrl}/api/sync.php`);
   console.log(`Sync anahtarı: ${syncSecret ? `yapılandırıldı (${syncSecret.length} karakter)` : "eksik"}`);
-  console.log(`Demo kayıt: 3 web talebi`);
+  console.log(`Test fixture: 3 web talebi`);
 
   if (lanUrls.length > 0) {
     console.log("Telefon LAN adresleri:");

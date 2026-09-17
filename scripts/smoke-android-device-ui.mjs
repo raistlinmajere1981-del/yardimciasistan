@@ -10,7 +10,7 @@ const packageName = "com.yardimciasistan.android";
 const activityName = ".MainActivity";
 const businessConfig = JSON.parse(readFileSync(join(repoRoot, "firm-template", "web-module", "config", "business.json"), "utf8"));
 const syncSecret = String(businessConfig.sync_secret ?? "").trim();
-const demoSnapshotFile = join(repoRoot, "demo-data", "android-operations-snapshot.json");
+const androidSnapshotFixtureFile = join(repoRoot, "scripts", "fixtures", "android-operations-snapshot.json");
 const stockGalleryFixture = join(repoRoot, "firm-template", "web-module", "assets", "yardimci-asistan-symbol.png");
 const stockGalleryDeviceFile = "/sdcard/Download/yardimci-stock-image-smoke.png";
 const generatedConnectionDefaultsFile = join(repoRoot, "apps", "android-app", "build", "generated", "source", "connection", "com", "yardimciasistan", "android", "ConnectionDefaults.java");
@@ -892,7 +892,7 @@ function parseArgs(args) {
 
 async function runMarketOnly(baseUrl) {
   const deviceId = readDeviceId();
-  const snapshot = JSON.parse(readFileSync(demoSnapshotFile, "utf8"));
+  const snapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
   snapshot.business_capabilities = [
     "service.android",
     "commerce.catalog",
@@ -1726,7 +1726,7 @@ async function publishMissingDeviceProfile(baseUrl) {
 }
 
 async function publishNotificationRequest(baseUrl, deviceId, permissions, requestId, customerName, status) {
-  const snapshot = JSON.parse(readFileSync(demoSnapshotFile, "utf8"));
+  const snapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
   snapshot.requests = [
     {
       id: requestId,
@@ -1761,7 +1761,7 @@ async function publishNotificationRequest(baseUrl, deviceId, permissions, reques
 }
 
 async function publishDeviceProfiles(baseUrl, profiles, label) {
-  const snapshot = JSON.parse(readFileSync(demoSnapshotFile, "utf8"));
+  const snapshot = JSON.parse(readFileSync(androidSnapshotFixtureFile, "utf8"));
   snapshot.androidPermissions = profiles;
   snapshot.reports = createReportFixtures();
   await publishSnapshot(baseUrl, snapshot, label);

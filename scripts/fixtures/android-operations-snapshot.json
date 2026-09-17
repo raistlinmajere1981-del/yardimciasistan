@@ -1,0 +1,378 @@
+{
+  "business_capabilities": [
+    "core.customers",
+    "core.tasks",
+    "core.calendar",
+    "core.notifications",
+    "core.finance",
+    "core.reports",
+    "core.web",
+    "core.sync",
+    "core.backups",
+    "core.devices",
+    "service.whatsapp",
+    "service.ai",
+    "service.android",
+    "accommodation.rooms",
+    "accommodation.reservations",
+    "accommodation.stays",
+    "accommodation.folio",
+    "food_service.tables",
+    "food_service.reservations",
+    "food_service.orders",
+    "food_service.menu",
+    "commerce.catalog",
+    "commerce.inventory",
+    "commerce.sales"
+  ],
+  "summary": {
+    "pending_daily_tasks": 2,
+    "today_tasks": 2,
+    "available_rooms": 1,
+    "total_rooms": 2,
+    "available_tables": 1,
+    "occupied_tables": 1,
+    "bill_waiting_tables": 0,
+    "active_table_orders": 1,
+    "pending_reservations": 1,
+    "prepared_whatsapp_messages": 1,
+    "waiting_responses": 2,
+    "active_menu_categories": 2,
+    "available_menu_items": 3,
+    "customer_count": 2
+  },
+  "daily_tasks": [
+    {
+      "id": "task_android_demo_001",
+      "title": "Oda 101 giriş hazırlığı",
+      "description": "Nevresim ve karşılama notu kontrol edilecek.",
+      "task_type": "check_in",
+      "status": "pending",
+      "due_date": "2026-07-17",
+      "due_time": "14:00",
+      "related_type": "reservation",
+      "related_id": "reservation_android_demo_001",
+      "updated_at": "2026-07-17T09:00:00+03:00"
+    },
+    {
+      "id": "task_android_demo_002",
+      "title": "Bahçe servis kontrolü",
+      "description": "Akşam servisi öncesi masa düzeni kontrol edilecek.",
+      "task_type": "table_service",
+      "status": "pending",
+      "due_date": "2026-07-17",
+      "due_time": "18:00",
+      "related_type": "table",
+      "related_id": "table_001",
+      "updated_at": "2026-07-17T09:00:00+03:00"
+    }
+  ],
+  "requests": [
+    {
+      "id": "request_demo_web_001",
+      "customer_id": "customer_android_demo_001",
+      "request_type": "pension_reservation",
+      "status": "new",
+      "customer_name": "Demo Aile",
+      "customer_phone": "+905551112233",
+      "date_text": "18-20 Temmuz",
+      "start_date": "2026-07-18",
+      "end_date": "2026-07-20",
+      "time": "",
+      "guest_count": 3,
+      "message": "Balkonlu oda ve çocuk için ek yatak uygun mu?",
+      "ai_summary": "İki yetişkin ve bir çocuk için balkonlu oda soruluyor.",
+      "ai_suggested_reply": "Merhaba, talebinizi aldık. Oda uygunluğunu kontrol edip kısa süre içinde size dönüş yapacağız.",
+      "whatsapp_message": "",
+      "priority": "high",
+      "created_at": "2026-07-17T08:30:00+03:00",
+      "updated_at": "2026-07-17T08:30:00+03:00"
+    },
+    {
+      "id": "request_demo_web_002",
+      "customer_id": "customer_android_demo_002",
+      "request_type": "restaurant_reservation",
+      "status": "waiting_owner",
+      "customer_name": "Demo Masa",
+      "customer_phone": "+905551112244",
+      "date_text": "Bu akşam",
+      "start_date": "2026-07-17",
+      "end_date": "",
+      "time": "20:00",
+      "guest_count": 4,
+      "message": "Bahçede masa rica ediyoruz.",
+      "ai_summary": "Dört kişilik bahçe masası isteniyor.",
+      "ai_suggested_reply": "Merhaba, masa talebinizi aldık. Uygunluğu kontrol edip size dönüş yapacağız.",
+      "whatsapp_message": "",
+      "priority": "normal",
+      "created_at": "2026-07-17T08:20:00+03:00",
+      "updated_at": "2026-07-17T08:20:00+03:00"
+    },
+    {
+      "id": "request_demo_web_003",
+      "customer_id": "customer_android_demo_002",
+      "request_type": "breakfast_request",
+      "status": "answered",
+      "customer_name": "Demo Kahvaltı",
+      "customer_phone": "+905551112255",
+      "date_text": "Pazar sabahı",
+      "start_date": "2026-07-19",
+      "end_date": "",
+      "time": "09:30",
+      "guest_count": 2,
+      "message": "İki kişilik kahvaltı için bilgi alabilir miyim?",
+      "ai_summary": "İki kişilik pazar kahvaltısı soruluyor.",
+      "ai_suggested_reply": "Merhaba, kahvaltı talebiniz için teşekkür ederiz.",
+      "whatsapp_message": "",
+      "priority": "normal",
+      "created_at": "2026-07-17T08:10:00+03:00",
+      "updated_at": "2026-07-17T08:10:00+03:00"
+    }
+  ],
+  "customers": [
+    {
+      "id": "customer_android_demo_001",
+      "full_name": "Demo Aile",
+      "phone": "+905551112233",
+      "email": "",
+      "notes": "Balkonlu oda tercih ediyor.",
+      "tags": ["pansiyon", "aile"],
+      "request_count": 1,
+      "reservation_count": 1,
+      "updated_at": "2026-07-17T08:30:00+03:00"
+    },
+    {
+      "id": "customer_android_demo_002",
+      "full_name": "Demo Masa",
+      "phone": "+905551112244",
+      "email": "",
+      "notes": "Bahçe masası tercih ediyor.",
+      "tags": ["restoran"],
+      "request_count": 2,
+      "reservation_count": 0,
+      "updated_at": "2026-07-17T08:20:00+03:00"
+    }
+  ],
+  "reservations": [
+    {
+      "id": "reservation_android_demo_001",
+      "request_id": "request_demo_web_001",
+      "customer_id": "customer_android_demo_001",
+      "customer_name": "Demo Aile",
+      "customer_phone": "+905551112233",
+      "reservation_type": "room",
+      "status": "pending",
+      "title": "Demo Aile - 2 gece",
+      "start_date": "2026-07-18",
+      "end_date": "2026-07-20",
+      "time": "14:00",
+      "guest_count": 3,
+      "room_ids": ["room_101"],
+      "table_ids": [],
+      "notes": "Balkonlu oda istedi.",
+      "payment_status": "not_required",
+      "updated_at": "2026-07-17T08:40:00+03:00"
+    }
+  ],
+  "rooms": [
+    {
+      "id": "room_101",
+      "name": "Balkonlu Oda",
+      "number": "101",
+      "capacity": 3,
+      "status": "available",
+      "active_reservation_title": "",
+      "updated_at": "2026-07-17T09:00:00+03:00"
+    },
+    {
+      "id": "room_102",
+      "name": "Aile Odası",
+      "number": "102",
+      "capacity": 4,
+      "status": "cleaning",
+      "active_reservation_title": "Bugünkü çıkış sonrası temizlik",
+      "updated_at": "2026-07-17T09:00:00+03:00"
+    }
+  ],
+  "tables": [
+    {
+      "id": "table_001",
+      "name": "Bahçe Masası 1",
+      "area": "Bahçe",
+      "capacity": 4,
+      "status": "available",
+      "active_reservation_title": "",
+      "updated_at": "2026-07-17T09:00:00+03:00"
+    },
+    {
+      "id": "table_002",
+      "name": "Salon Masası 1",
+      "area": "Salon",
+      "capacity": 4,
+      "status": "occupied",
+      "active_reservation_title": "",
+      "updated_at": "2026-07-17T09:00:00+03:00"
+    }
+  ],
+  "menu": {
+    "categories": [
+      {
+        "id": "cat_breakfast",
+        "name": "Kahvaltı",
+        "description": "Sabah servisi",
+        "is_active": true,
+        "sort_order": 10,
+        "created_at": "2026-07-10T10:00:00+03:00",
+        "updated_at": "2026-07-17T09:00:00+03:00"
+      },
+      {
+        "id": "cat_drinks",
+        "name": "İçecekler",
+        "description": "Sıcak ve soğuk içecekler",
+        "is_active": true,
+        "sort_order": 20,
+        "created_at": "2026-07-10T10:00:00+03:00",
+        "updated_at": "2026-07-17T09:00:00+03:00"
+      }
+    ],
+    "items": [
+      {
+        "id": "item_breakfast_001",
+        "category_id": "cat_breakfast",
+        "name": "Serpme Kahvaltı",
+        "description": "İki kişilik serpme kahvaltı",
+        "price": 450,
+        "currency": "TRY",
+        "image_url": "",
+        "is_available": true,
+        "is_featured": true,
+        "allergens": [],
+        "tags": [],
+        "stock_quantity": 5,
+        "stock_min_quantity": 2,
+        "hide_when_out_of_stock": true,
+        "stock_note": "Kahvaltı hazırlık sayımı",
+        "sort_order": 10,
+        "created_at": "2026-07-10T10:00:00+03:00",
+        "updated_at": "2026-07-17T09:00:00+03:00"
+      },
+      {
+        "id": "item_drink_001",
+        "category_id": "cat_drinks",
+        "name": "Türk Kahvesi",
+        "description": "Lokum ile servis edilir",
+        "price": 90,
+        "currency": "TRY",
+        "image_url": "",
+        "is_available": true,
+        "is_featured": false,
+        "allergens": [],
+        "tags": [],
+        "stock_quantity": null,
+        "stock_min_quantity": null,
+        "hide_when_out_of_stock": false,
+        "stock_note": null,
+        "sort_order": 10,
+        "created_at": "2026-07-10T10:00:00+03:00",
+        "updated_at": "2026-07-17T09:00:00+03:00"
+      },
+      {
+        "id": "item_drink_002",
+        "category_id": "cat_drinks",
+        "name": "Ev Limonatası",
+        "description": "Taze naneli",
+        "price": 120,
+        "currency": "TRY",
+        "image_url": "",
+        "is_available": true,
+        "is_featured": false,
+        "allergens": [],
+        "tags": [],
+        "stock_quantity": 0,
+        "stock_min_quantity": 3,
+        "hide_when_out_of_stock": false,
+        "stock_note": "Yeni hazırlık bekleniyor",
+        "sort_order": 20,
+        "created_at": "2026-07-10T10:00:00+03:00",
+        "updated_at": "2026-07-17T09:00:00+03:00"
+      }
+    ],
+    "updated_at": "2026-07-17T09:00:00+03:00"
+  },
+  "trackedStockItems": [
+    {
+      "menu_item_id": "item_breakfast_001",
+      "name": "Serpme Kahvaltı",
+      "category": "Kahvaltı",
+      "price": 450,
+      "stock_quantity": 5,
+      "stock_min_quantity": 2,
+      "hide_when_out_of_stock": true,
+      "stock_status": "in_stock"
+    },
+    {
+      "menu_item_id": "item_drink_002",
+      "name": "Ev Limonatası",
+      "category": "İçecekler",
+      "price": 120,
+      "stock_quantity": 0,
+      "stock_min_quantity": 3,
+      "hide_when_out_of_stock": false,
+      "stock_status": "out_of_stock"
+    }
+  ],
+  "appliedStockImageHashes": [],
+  "table_orders": [
+    {
+      "id": "table_order_android_demo_001",
+      "table_id": "table_002",
+      "table_name": "Salon Masası 1",
+      "status": "open",
+      "opened_at": "2026-07-17T09:15:00+03:00",
+      "total": 900,
+      "item_count": 2,
+      "items": [
+        {
+          "id": "table_order_item_android_demo_001",
+          "order_id": "table_order_android_demo_001",
+          "menu_item_id": "item_breakfast_001",
+          "product_name": "Serpme Kahvaltı",
+          "unit_price": 450,
+          "currency": "TRY",
+          "quantity": 2,
+          "line_total": 900,
+          "status": "open",
+          "updated_at": "2026-07-17T09:16:00+03:00"
+        }
+      ],
+      "updated_at": "2026-07-17T09:16:00+03:00"
+    }
+  ],
+  "messages": [
+    {
+      "id": "message_android_demo_001",
+      "request_id": "request_demo_web_001",
+      "customer_name": "Demo Aile",
+      "customer_phone": "+905551112233",
+      "message": "Merhaba, talebinizi aldık. Oda uygunluğunu kontrol edip kısa süre içinde size dönüş yapacağız.",
+      "status": "prepared",
+      "updated_at": "2026-07-17T08:35:00+03:00"
+    }
+  ],
+  "market": {
+    "summary": {
+      "today_sale_count": 0,
+      "today_sales_total": 0,
+      "currency": "TRY",
+      "critical_stock_count": 0,
+      "recent_stock_adjustments": [],
+      "recent_receiving_count": 0
+    },
+    "products": [],
+    "suppliers": [],
+    "recent_purchases": [],
+    "product_drafts": [],
+    "cart_drafts": []
+  },
+  "updated_at": "2026-07-17T09:20:00+03:00"
+}
