@@ -17,7 +17,19 @@ import type {
 import { insertDatabaseEvent } from "./database/event-store.js";
 import { markPreparedWhatsAppMessagesSentInTransaction } from "./database/prepared-message-store.js";
 import { mutateMenuStockInTransaction as mutateStoredMenuStock } from "./database/menu-stock-store.js";
-import { normalizeCustomerInput } from "./database/customer-utils.js";
+import { hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay } from "./database/customer-room-stay-store.js";
+import { findConflictingRoomReservation as findStoredConflictingRoomReservation } from "./database/reservation-store.js";
+import { findActiveOrderForTables } from "./database/table-order-store.js";
+import {
+  enforceActiveStayRoomStatus as enforceStoredActiveStayRoomStatus,
+  refreshRoomStatusFromStays as refreshStoredRoomStatusFromStays
+} from "./stay-reservation-service.js";
+import { normalizeCustomerInput, normalizeLimitedText } from "./database/customer-utils.js";
+import {
+  normalizeDateInput,
+  normalizeInteger,
+  normalizeStatus
+} from "./database/request-utils.js";
 import {
   normalizeNullableStockNumber,
   normalizePositiveStockNumber,
@@ -512,4 +524,272 @@ function parseStringArray(value: unknown): string[] {
   } catch {
     return [];
   }
+}
+
+export function applyAndroidCustomerRoomAssignment(
+  db: DatabaseSync,
+  action: AndroidSyncAction,
+  now: string
+): AndroidActionMutationResult {
+  const customerId = androidPayloadString(action.payload, "customer_id");
+  const roomId = androidPayloadString(action.payload, "room_id");
+  const checkInDate = normalizeDateInput(androidPayloadString(action.payload, "check_in_date"));
+  const checkOutDate = normalizeDateInput(androidPayloadString(action.payload, "check_out_date"));
+  const guestCount = normalizeInteger(Number(action.payload.guest_count ?? 1));
+  const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["planned", "checked_in"]);
+  const notes = normalizeLimitedText(action.payload.notes, 2000);
+  if (!customerId || !roomId || !checkInDate || !status) {
+    return { ok: false, message: "Müşteri, oda, giriş tarihi ve konaklama durumu seçilmeli." };
+  }
+  if (checkOutDate && checkOutDate < checkInDate) {
+    return { ok: false, message: "Çıkış tarihi giriş tarihinden önce olamaz." };
+  }
+  if (guestCount < 1 || guestCount > 50) {
+    return { ok: false, message: "Konaklayan kişi sayısı 1 ile 50 arasında olmalı." };
+  }
+  const customer = db
+    .prepare("SELECT full_name FROM customers WHERE id = ? AND deleted_at = ''")
+    .get(customerId) as { full_name?: string } | undefined;
+  const room = db
+    .prepare("SELECT name, capacity, status, is_active FROM rooms WHERE id = ? AND deleted_at = ''")
+    .get(roomId) as Record<string, unknown> | undefined;
+  if (!customer || !room || Number(room.is_active ?? 0) !== 1) {
+    return { ok: false, message: "Müşteri veya aktif oda masaüstü kayıtlarında bulunamadı." };
+  }
+  if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
+    return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
+  }
+  if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
+    return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
+  }
+  if (hasStoredOverlappingCustomerRoomStay(db, roomId, checkInDate, checkOutDate)) {
+    return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
+  }
+  const reservationConflict = findStoredConflictingRoomReservation(db, roomId, customerId, checkInDate, checkOutDate);
+  if (reservationConflict) {
+    return { ok: false, message: `Oda bu tarihlerde ${reservationConflict} rezervasyonuna bağlı.` };
+  }
+
+  const stayId = createAndroidEntityId("stay_", action.id);
+  db
+    .prepare(`
+        INSERT INTO customer_room_stays (
+          id, customer_id, room_id, reservation_id, status, check_in_date,
+          check_out_date, guest_count, notes, source, checked_in_at,
+          checked_out_at, created_at, updated_at, deleted_at, sync_status
+        ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, 'android', ?, '', ?, ?, '', 'local_only')
+      `)
+    .run(
+      stayId,
+      customerId,
+      roomId,
+      status,
+      checkInDate,
+      checkOutDate,
+      guestCount,
+      notes,
+      status === "checked_in" ? now : "",
+      now,
+      now
+    );
+  db
+    .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+    .run(status === "checked_in" ? "occupied" : "reserved", now, roomId);
+  insertAndroidActionEvent(db, action, "customer.room_assigned", "customer_room_stay", stayId, {
+    customer_id: customerId,
+    room_id: roomId,
+    status,
+    check_in_date: checkInDate,
+    check_out_date: checkOutDate
+  }, now);
+  return { ok: true, message: "Müşteri telefondan odaya atandı." };
+}
+
+export function applyAndroidCustomerRoomStayStatus(
+  db: DatabaseSync,
+  action: AndroidSyncAction,
+  now: string
+): AndroidActionMutationResult {
+  const stayId = androidPayloadString(action.payload, "stay_id");
+  const status = normalizeStatus(
+    androidPayloadString(action.payload, "status"),
+    ["planned", "checked_in", "checked_out", "cancelled"]
+  );
+  if (!stayId || !status) {
+    return { ok: false, message: "Konaklama kaydı ve yeni durum seçilmeli." };
+  }
+  const stay = db
+    .prepare("SELECT * FROM customer_room_stays WHERE id = ? AND deleted_at = ''")
+    .get(stayId) as Record<string, unknown> | undefined;
+  if (!stay) {
+    return { ok: false, message: "Konaklama kaydı masaüstünde bulunamadı." };
+  }
+  const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", stay.updated_at, "Konaklama");
+  if (versionConflict) {
+    return versionConflict;
+  }
+  const previousStatus = String(stay.status ?? "");
+  const allowedTransitions: Record<string, string[]> = {
+    planned: ["checked_in", "cancelled"],
+    checked_in: ["checked_out", "cancelled"],
+    cancelled: ["planned"],
+    checked_out: []
+  };
+  if (!(allowedTransitions[previousStatus] ?? []).includes(status)) {
+    return { ok: false, message: "Bu konaklama kaydı seçilen duruma geçirilemez." };
+  }
+  if (
+    ["planned", "checked_in"].includes(status)
+    && hasStoredOverlappingCustomerRoomStay(db,
+      String(stay.room_id ?? ""),
+      String(stay.check_in_date ?? ""),
+      String(stay.check_out_date ?? ""),
+      stayId
+    )
+  ) {
+    return { ok: false, message: "Odanın aynı tarihlerde başka bir aktif müşteri kaydı var." };
+  }
+  const updatedAt = nextMutationTimestamp(stay.updated_at, now);
+  db
+    .prepare(`
+        UPDATE customer_room_stays
+        SET status = ?,
+            checked_in_at = CASE WHEN ? = 'checked_in' THEN ? ELSE checked_in_at END,
+            checked_out_at = CASE WHEN ? = 'checked_out' THEN ? ELSE checked_out_at END,
+            updated_at = ?,
+            sync_status = 'local_only'
+        WHERE id = ?
+      `)
+    .run(status, status, updatedAt, status, updatedAt, updatedAt, stayId);
+  refreshStoredRoomStatusFromStays(db, String(stay.room_id ?? ""), updatedAt, status === "checked_out");
+  insertAndroidActionEvent(db, action, "customer.room_stay_status_changed", "customer_room_stay", stayId, {
+    customer_id: String(stay.customer_id ?? ""),
+    room_id: String(stay.room_id ?? ""),
+    previous_status: previousStatus,
+    status
+  }, now);
+  return { ok: true, message: "Konaklama durumu telefondan güncellendi." };
+}
+
+export function applyAndroidReservationStatus(
+  db: DatabaseSync,
+  action: AndroidSyncAction,
+  status: "approved" | "rejected" | "cancelled",
+  now: string
+): AndroidActionMutationResult {
+  const reservationId = androidPayloadString(action.payload, "reservation_id");
+  if (!reservationId) {
+    return { ok: false, message: "Güncellenecek rezervasyon seçilmemiş." };
+  }
+  const reservation = db
+    .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
+    .get(reservationId) as Record<string, unknown> | undefined;
+  if (!reservation) {
+    return { ok: false, message: "Rezervasyon masaüstü kayıtlarında bulunamadı." };
+  }
+  const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", reservation.updated_at, "Rezervasyon");
+  if (versionConflict) {
+    return versionConflict;
+  }
+
+  const roomIds = parseStringArray(reservation.room_ids_json);
+  const tableIds = parseStringArray(reservation.table_ids_json);
+  const activeOrder = findActiveOrderForTables(db, tableIds);
+  if (activeOrder) {
+    return { ok: false, message: "Aktif adisyonu olan masaya bağlı rezervasyon değiştirilemez. Önce adisyonu kapatın." };
+  }
+  const updatedAt = nextMutationTimestamp(reservation.updated_at, now);
+  db
+    .prepare("UPDATE reservations SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+    .run(status, updatedAt, reservationId);
+  if (status === "approved") {
+    for (const roomId of roomIds) {
+      db
+        .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+        .run(updatedAt, roomId);
+    }
+    for (const tableId of tableIds) {
+      db
+        .prepare("UPDATE tables SET status = 'reserved', current_reservation_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+        .run(reservationId, updatedAt, tableId);
+    }
+  } else {
+    for (const roomId of roomIds) {
+      db
+        .prepare("UPDATE rooms SET status = 'available', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status = 'reserved' AND deleted_at = ''")
+        .run(updatedAt, roomId);
+    }
+    for (const tableId of tableIds) {
+      db
+        .prepare(`
+            UPDATE tables
+            SET status = 'available', current_reservation_id = '', updated_at = ?, sync_status = 'local_only'
+            WHERE id = ? AND current_reservation_id = ? AND deleted_at = ''
+          `)
+        .run(updatedAt, tableId, reservationId);
+    }
+  }
+  for (const roomId of roomIds) {
+    enforceStoredActiveStayRoomStatus(db, roomId, updatedAt);
+  }
+  insertAndroidActionEvent(db, action, "reservation.status_changed", "reservation", reservationId, {
+    previous_status: String(reservation.status ?? ""),
+    status,
+    room_ids: roomIds,
+    table_ids: tableIds
+  }, now);
+  return { ok: true, message: "Rezervasyon durumu telefondan güncellendi." };
+}
+
+export function applyAndroidRoomStatus(
+  db: DatabaseSync,
+  action: AndroidSyncAction,
+  now: string
+): AndroidActionMutationResult {
+  const roomId = androidPayloadString(action.payload, "room_id");
+  const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["available", "reserved", "occupied", "cleaning", "maintenance"]);
+  if (!roomId || !status) {
+    return { ok: false, message: "Oda veya yeni oda durumu geçersiz." };
+  }
+  const room = db
+    .prepare("SELECT status, updated_at FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
+    .get(roomId) as { status?: string; updated_at?: string } | undefined;
+  if (!room) {
+    return { ok: false, message: "Oda masaüstü kayıtlarında bulunamadı." };
+  }
+  const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", room.updated_at, "Oda");
+  if (versionConflict) {
+    return versionConflict;
+  }
+  const activeStay = db
+    .prepare(`
+        SELECT status
+        FROM customer_room_stays
+        WHERE room_id = ?
+          AND status IN ('checked_in', 'planned')
+          AND deleted_at = ''
+        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END
+        LIMIT 1
+      `)
+    .get(roomId) as { status?: string } | undefined;
+  const expectedStatus = activeStay?.status === "checked_in"
+    ? "occupied"
+    : activeStay?.status === "planned"
+      ? "reserved"
+      : "";
+  if (expectedStatus && status !== expectedStatus) {
+    return {
+      ok: false,
+      message: "Odanın aktif müşteri kaydı var. Durumu konaklama kartından değiştirin."
+    };
+  }
+  const updatedAt = nextMutationTimestamp(room.updated_at, now);
+  db
+    .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+    .run(status, updatedAt, roomId);
+  insertAndroidActionEvent(db, action, "room.status_changed", "room", roomId, {
+    old_status: String(room.status ?? ""),
+    new_status: status
+  }, now);
+  return { ok: true, message: "Oda durumu telefondan güncellendi." };
 }
