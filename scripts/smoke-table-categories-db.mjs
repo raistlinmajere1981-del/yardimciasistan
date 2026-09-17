@@ -19,6 +19,44 @@ const database = new DesktopDatabase({
 try {
   database.initialize();
 
+  assert.deepEqual(database.getSetupData().tableCategories, []);
+
+  const seedSave = database.saveInitialSetup({
+    businessName: "Kategori Smoke Restoranı",
+    profileId: "restaurant",
+    phone: "+905551112233",
+    whatsapp: "+905551112233",
+    email: "kategori@example.test",
+    address: "Test adresi",
+    webModuleUrl: "https://yardimciasistan.example.test",
+    syncSecret: "kategori-smoke-secret",
+    autoSyncEnabled: true,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: {
+      whatsapp: false,
+      android: false
+    },
+    initialCounts: {
+      rooms: 0,
+      tables: 14
+    },
+    tableCategories: [
+      { name: "Bahçe", tableCount: 5 },
+      { name: "Salon", tableCount: 4 },
+      { name: "Teras", tableCount: 3 },
+      { name: "Avlu", tableCount: 2 }
+    ]
+  });
+  assert.equal(seedSave.ok, true, seedSave.ok ? "" : seedSave.message);
   assert.deepEqual(database.getSetupData().tableCategories, [
     { name: "Bahçe", tableCount: 5 },
     { name: "Salon", tableCount: 4 },

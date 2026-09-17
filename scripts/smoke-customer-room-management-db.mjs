@@ -16,6 +16,32 @@ const database = new DesktopDatabase({
 try {
   database.initialize();
 
+  const setupResult = database.saveInitialSetup({
+    businessName: "Customer Room Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550001000",
+    whatsapp: "+905550001000",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "customer-room-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: false, android: true },
+    initialCounts: { rooms: 2, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
   const migrationCheck = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
     const customerColumns = migrationCheck.prepare("PRAGMA table_info(customers)").all().map((row) => row.name);
