@@ -223,3 +223,28 @@ function parseReservationStringArray(value: unknown): string[] {
     return [];
   }
 }
+
+export function findConflictingRoomReservation(
+  db: DatabaseSync,
+  roomId: string,
+  customerId: string,
+  checkInDate: string,
+  checkOutDate: string
+): string {
+  const candidateEnd = checkOutDate || "9999-12-31";
+  for (const reservation of getReservations(db)) {
+    if (
+      reservation.customerId === customerId
+      || !reservation.roomIds.includes(roomId)
+      || !["pending", "approved"].includes(reservation.status)
+    ) {
+      continue;
+    }
+    const reservationStart = reservation.startDate;
+    const reservationEnd = reservation.endDate || "9999-12-31";
+    if (reservationStart < candidateEnd && checkInDate < reservationEnd) {
+      return reservation.customerName || reservation.title || "başka bir müşteri";
+    }
+  }
+  return "";
+}
