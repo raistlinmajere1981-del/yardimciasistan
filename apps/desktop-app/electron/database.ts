@@ -337,8 +337,8 @@ export class DesktopDatabase {
       backupPath: this.backupPath,
       webModuleUrl: settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
       requests: getRequests(this.db),
-      rooms: this.getRooms(),
-      tables: this.getTables(),
+      rooms: getStoredRooms(this.db, getStoredActiveResourceReservationTitles(this.db, "room")),
+      tables: getStoredTables(this.db, getStoredActiveResourceReservationTitles(this.db, "table")),
       reservations: getStoredReservations(this.db),
       dailyTasks: getStoredDailyTasks(this.db),
       customers: getStoredCustomers(this.db),
@@ -931,24 +931,7 @@ export class DesktopDatabase {
     }
 
     const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, roomId);
-      insertDatabaseEvent(this.db, {
-        type: "room.status_changed",
-        entityType: "room",
-        entityId: roomId,
-        payload: {
-          old_status: String(room.status ?? ""),
-          new_status: status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    updateStoredRoomStatus(this.db, roomId, status, String(room.status ?? ""), now);
 
     return {
       ok: true,
@@ -958,48 +941,11 @@ export class DesktopDatabase {
   }
 
   updateTableStatus(input: UpdateTableStatusInput): DesktopStatusUpdateResult {
-    const tableId = input.tableId.trim();
-    const status = normalizeStatus(input.status, ["available", "reserved", "occupied", "bill_waiting", "cleaning"]);
-    if (!tableId || !status) {
-      return {
-        ok: false,
-        message: "Masa durumu için geçerli kayıt ve durum seçilmeli."
-      };
+    const result = updateStoredTableStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const table = this.db.prepare("SELECT status FROM tables WHERE id = ? AND deleted_at = ''").get(tableId) as { status?: string } | undefined;
-    if (!table) {
-      return {
-        ok: false,
-        message: "Masa bulunamadı."
-      };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE tables SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, tableId);
-      insertDatabaseEvent(this.db, {
-        type: "table.status_changed",
-        entityType: "table",
-        entityId: tableId,
-        payload: {
-          old_status: String(table.status ?? ""),
-          new_status: status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Masa durumu güncellendi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   listTableOrders(): DesktopTableOrder[] {
@@ -1909,7 +1855,7 @@ export class DesktopDatabase {
         rooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''"),
         tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
       },
-      tableCategories: this.getTableCategories(),
+      tableCategories: getStoredTableCategories(this.db),
       birthdaySettings: normalizeBirthdaySettings({
         enabled: normalizeBoolean(settings?.birthday_enabled, true),
         mode: settings?.birthday_mode === "automatic" ? "automatic" : "manual",
@@ -3386,111 +3332,6 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
       .run(active.status === "checked_in" ? "occupied" : "reserved", now, roomId);
-  }
-
-  private getRooms(): DesktopRoom[] {
-    const reservationTitles = getStoredActiveResourceReservationTitles(this.db, "room");
-    const rows = this.db
-      .prepare(`
-        SELECT
-          id,
-          name,
-          number,
-          capacity,
-          bed_info,
-          floor,
-          status,
-          features_json,
-          description,
-          price_note,
-          is_active,
-          sort_order,
-          updated_at
-        FROM rooms
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, number ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      number: String(row.number ?? ""),
-      capacity: Number(row.capacity ?? 0),
-      bedInfo: String(row.bed_info ?? ""),
-      floor: String(row.floor ?? ""),
-      status: String(row.status ?? "available"),
-      features: this.parseStringArray(row.features_json),
-      description: String(row.description ?? ""),
-      priceNote: String(row.price_note ?? ""),
-      isActive: Number(row.is_active ?? 0) === 1,
-      sortOrder: Number(row.sort_order ?? 0),
-      activeReservationTitle: reservationTitles.get(String(row.id ?? "")) ?? "",
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getTables(): DesktopTable[] {
-    const reservationTitles = getStoredActiveResourceReservationTitles(this.db, "table");
-    const rows = this.db
-      .prepare(`
-        SELECT
-          id,
-          name,
-          area,
-          capacity,
-          status,
-          current_customer_id,
-          current_reservation_id,
-          notes,
-          is_active,
-          sort_order,
-          updated_at
-        FROM tables
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, area ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      area: String(row.area ?? ""),
-      capacity: Number(row.capacity ?? 0),
-      status: String(row.status ?? "available"),
-      currentCustomerId: String(row.current_customer_id ?? ""),
-      currentReservationId: String(row.current_reservation_id ?? ""),
-      activeReservationTitle: reservationTitles.get(String(row.id ?? "")) ?? "",
-      notes: String(row.notes ?? ""),
-      isActive: Number(row.is_active ?? 0) === 1,
-      sortOrder: Number(row.sort_order ?? 0),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getTableCategories(): DesktopTableCategory[] {
-    const rows = this.db
-      .prepare(`
-        SELECT area, sort_order
-        FROM tables
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const categories = new Map<string, DesktopTableCategory>();
-
-    for (const row of rows) {
-      const name = normalizeTableCategoryName(row.area);
-      const key = tableCategoryKey(name);
-      const existing = categories.get(key);
-      if (existing) {
-        existing.tableCount += 1;
-      } else {
-        categories.set(key, { name, tableCount: 1 });
-      }
-    }
-
-    return [...categories.values()];
   }
 
   private getScalarCount(sql: string, ...params: Array<string | number | null>): number {
@@ -5603,3 +5444,14 @@ import {
   saveAiWorkspaceHistory as saveStoredAiWorkspaceHistory,
   getAiWorkspaceHistory as getStoredAiWorkspaceHistory,
 } from "./database/ai-workspace-store.js";
+
+import {
+  getRooms as getStoredRooms,
+  updateRoomStatus as updateStoredRoomStatus,
+} from "./database/room-store.js";
+
+import {
+  getTables as getStoredTables,
+  getTableCategories as getStoredTableCategories,
+  updateTableStatus as updateStoredTableStatus,
+} from "./database/table-store.js";
