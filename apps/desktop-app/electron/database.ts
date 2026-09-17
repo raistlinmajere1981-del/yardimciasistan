@@ -678,7 +678,7 @@ export class DesktopDatabase {
           ) VALUES (?, ?, ?, ?, 'pending', ?, ?, '', '', ?, ?, '', 'local_only')
         `).run(taskId, title, description, taskType, dueDate, dueTime, now, now);
       }
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: existing ? "task.updated" : "task.created",
         entityType: "daily_task",
         entityId: taskId,
@@ -718,7 +718,7 @@ export class DesktopDatabase {
     this.db.exec("BEGIN");
     try {
       this.db.prepare("UPDATE daily_tasks SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(now, now, taskId);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "task.deleted",
         entityType: "daily_task",
         entityId: taskId,
@@ -760,7 +760,7 @@ export class DesktopDatabase {
     this.db.exec("BEGIN");
     try {
       this.db.prepare("UPDATE daily_tasks SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, taskId);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: eventType,
         entityType: "daily_task",
         entityId: taskId,
@@ -808,7 +808,7 @@ export class DesktopDatabase {
       if (status === "answered") {
         this.markPreparedWhatsAppMessagesSentInTransaction(requestId, now);
       }
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "request.status_changed",
         entityType: "request",
         entityId: requestId,
@@ -959,7 +959,7 @@ export class DesktopDatabase {
           createdAt,
           now
         );
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: requestedId ? "customer.updated" : "customer.created",
         entityType: "customer",
         entityId: id,
@@ -1056,7 +1056,7 @@ export class DesktopDatabase {
       this.db
         .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
         .run(status === "checked_in" ? "occupied" : "reserved", now, roomId);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "customer.room_assigned",
         entityType: "customer_room_stay",
         entityId: id,
@@ -1151,7 +1151,7 @@ export class DesktopDatabase {
         now,
         status === "checked_out"
       );
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "customer.room_stay_status_changed",
         entityType: "customer_room_stay",
         entityId: stayId,
@@ -1276,7 +1276,7 @@ export class DesktopDatabase {
         `)
         .run(now, now, preparedMessage.id);
 
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "whatsapp.message_sent",
         entityType: "whatsapp_message",
         entityId: preparedMessage.id,
@@ -1344,7 +1344,7 @@ export class DesktopDatabase {
     this.db.exec("BEGIN");
     try {
       this.db.prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, roomId);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "room.status_changed",
         entityType: "room",
         entityId: roomId,
@@ -1389,7 +1389,7 @@ export class DesktopDatabase {
     this.db.exec("BEGIN");
     try {
       this.db.prepare("UPDATE tables SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, tableId);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table.status_changed",
         entityType: "table",
         entityId: tableId,
@@ -1476,7 +1476,7 @@ export class DesktopDatabase {
         `)
         .run(id, normalizedTableId, now, now, now);
       this.updateTableStatusForOrderInTransaction(normalizedTableId, "occupied", id, now);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table_order.opened",
         entityType: "table_order",
         entityId: id,
@@ -1645,7 +1645,7 @@ export class DesktopDatabase {
           );
       }
       recalculateTableOrderTotalInTransaction(this.db, orderId, now);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table_order.item_added",
         entityType: "table_order",
         entityId: orderId,
@@ -1705,7 +1705,7 @@ export class DesktopDatabase {
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
         .run(quantity, lineTotal, updatedAt, itemId);
       recalculateTableOrderTotalInTransaction(this.db, orderId, now);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table_order.item_quantity_changed",
         entityType: "table_order",
         entityId: orderId,
@@ -1741,7 +1741,7 @@ export class DesktopDatabase {
       const updatedAt = nextMutationTimestamp(item.updated_at, now);
       this.db.prepare("UPDATE table_order_items SET note = ?, updated_at = ? WHERE id = ?").run(note, updatedAt, itemId);
       this.db.prepare("UPDATE table_orders SET updated_at = ? WHERE id = ?").run(now, orderId);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table_order.item_note_changed",
         entityType: "table_order",
         entityId: orderId,
@@ -1785,7 +1785,7 @@ export class DesktopDatabase {
       const updatedAt = nextMutationTimestamp(item.updated_at, now);
       this.db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(updatedAt, normalizedItemId);
       recalculateTableOrderTotalInTransaction(this.db, orderId, now);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table_order.item_removed",
         entityType: "table_order",
         entityId: orderId,
@@ -1849,7 +1849,7 @@ export class DesktopDatabase {
         orderId,
         now
       );
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table_order.status_changed",
         entityType: "table_order",
         entityId: orderId,
@@ -1907,7 +1907,7 @@ export class DesktopDatabase {
         return { ok: false, message: "Adisyon başka bir işlem tarafından kapatıldı; yeniden yükleyin." };
       }
       this.updateTableStatusForOrderInTransaction(String(current.table_id ?? ""), "available", orderId, now);
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: status === "paid" ? "table_order.paid" : "table_order.cancelled",
         entityType: "table_order",
         entityId: orderId,
@@ -2021,7 +2021,7 @@ export class DesktopDatabase {
           now
         );
 
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "reservation.created",
         entityType: "reservation",
         entityId: reservationId,
@@ -2251,7 +2251,7 @@ export class DesktopDatabase {
           .run(now, roomId);
       }
 
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: isEditing ? "reservation.updated" : "reservation.created",
         entityType: "reservation",
         entityId: savedReservationId,
@@ -2356,7 +2356,7 @@ export class DesktopDatabase {
         this.enforceActiveStayRoomStatus(roomId, now);
       }
 
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "reservation.status_changed",
         entityType: "reservation",
         entityId: reservationId,
@@ -3562,7 +3562,7 @@ export class DesktopDatabase {
           request.sync_status
         );
 
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "request.created",
         entityType: "request",
         entityId: request.id,
@@ -3712,7 +3712,7 @@ export class DesktopDatabase {
           now
         );
 
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "ai.reply_suggested",
         entityType: "request",
         entityId: requestId,
@@ -3849,7 +3849,7 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE requests SET ai_summary = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
       .run(content.slice(0, 1600), now, requestId);
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: "ai.request_summarized",
       entityType: "request",
       entityId: requestId,
@@ -3971,7 +3971,7 @@ export class DesktopDatabase {
         `)
         .run(customerId, now, id);
 
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "request.converted_to_reservation",
         entityType: "request",
         entityId: id,
@@ -3982,7 +3982,7 @@ export class DesktopDatabase {
         },
         now
       });
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "reservation.approved",
         entityType: "reservation",
         entityId: reservationId,
@@ -4012,7 +4012,7 @@ export class DesktopDatabase {
     const now = new Date().toISOString();
     this.db.prepare("UPDATE menu_categories SET sync_status = 'synced', updated_at = ? WHERE deleted_at = ''").run(now);
     this.db.prepare("UPDATE menu_items SET sync_status = 'synced', updated_at = ? WHERE deleted_at = ''").run(now);
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: "menu.published",
       entityType: "menu",
       entityId: "qr_menu",
@@ -4026,7 +4026,7 @@ export class DesktopDatabase {
 
   recordSyncEvent(input: RecordSyncEventInput) {
     const now = new Date().toISOString();
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: input.ok ? "sync.completed" : "sync.failed",
       entityType: "sync",
       entityId: `${input.direction}:${input.entityType}`,
@@ -4074,7 +4074,7 @@ export class DesktopDatabase {
     if (existing) {
       return;
     }
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: "android.action_failed",
       actorType: "android",
       actorId: deviceId,
@@ -5546,7 +5546,7 @@ export class DesktopDatabase {
       this.insertAndroidActionEvent(androidAction, type, entityType, entityId, payload, now);
       return;
     }
-    this.insertEvent({ type, entityType, entityId, payload, now });
+    insertDatabaseEvent(this.db, { type, entityType, entityId, payload, now });
   }
 
   private applyAndroidRequestStatus(action: AndroidSyncAction, status: string, now: string): AndroidActionMutationResult {
@@ -6633,7 +6633,7 @@ export class DesktopDatabase {
     if (Number(update.changes) !== 1) {
       return { ok: false, message: "Görsel stok taslağı uygulanmış olarak kaydedilemedi." };
     }
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: "stock.image_import_applied",
       actorType: input.source,
       actorId: input.actorDeviceId,
@@ -6669,7 +6669,7 @@ export class DesktopDatabase {
     payload: Record<string, unknown>,
     now: string
   ) {
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type,
       entityType,
       entityId,
@@ -6747,7 +6747,7 @@ export class DesktopDatabase {
     if (androidAction) {
       this.insertAndroidActionEvent(androidAction, "table.status_changed", "table", tableId, payload, now);
     } else {
-      this.insertEvent({
+      insertDatabaseEvent(this.db, {
         type: "table.status_changed",
         entityType: "table",
         entityId: tableId,
@@ -6759,42 +6759,6 @@ export class DesktopDatabase {
 
 
 
-  private insertEvent(input: {
-    type: string;
-    entityType: string;
-    entityId: string;
-    payload: Record<string, unknown>;
-    now: string;
-    actorType?: "desktop" | "android";
-    actorId?: string;
-  }) {
-    this.db
-      .prepare(`
-        INSERT INTO events (
-          id,
-          type,
-          actor_type,
-          actor_id,
-          entity_type,
-          entity_id,
-          payload_json,
-          created_at,
-          updated_at,
-          sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
-      `)
-      .run(
-        createId("event_"),
-        input.type,
-        input.actorType ?? "desktop",
-        input.actorId ?? "",
-        input.entityType,
-        input.entityId,
-        JSON.stringify(input.payload),
-        input.now,
-        input.now
-      );
-  }
 
   private ensureSyncClientId() {
     // Also initialize this local metadata for databases already marked 001_baseline.sql.
@@ -6990,3 +6954,5 @@ import {
   restoreCancelledOrderStockInTransaction,
   resolveAndroidActiveOrderId,
 } from "./database/table-order-store.js";
+
+import { insertDatabaseEvent } from "./database/event-store.js";
