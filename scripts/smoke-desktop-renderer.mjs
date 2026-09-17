@@ -1835,7 +1835,7 @@ try {
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(setupPage.locator("html")).toHaveAttribute("data-mode", "pro");
   await expect(setupPage.getByRole("heading", { name: "İşletme panelini kullanıma hazırlayın." })).toBeVisible();
-  await expect(setupPage.getByLabel("Firma adı")).toHaveValue("Deniz Çiçeği Pansiyon & Kafe");
+  await expect(setupPage.getByLabel("Firma adı")).toHaveValue("");
   const storedOpenAiKeyInput = setupPage.getByLabel("AI güvenlik anahtarı");
   await expect(storedOpenAiKeyInput).toHaveValue("********************");
   await expect(setupPage.getByText("Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz.")).toBeVisible();
