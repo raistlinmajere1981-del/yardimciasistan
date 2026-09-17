@@ -341,8 +341,8 @@ export class DesktopDatabase {
       tables: this.getTables(),
       reservations: getStoredReservations(this.db),
       dailyTasks: getStoredDailyTasks(this.db),
-      customers: this.getCustomers(),
-      customerRoomStays: this.getCustomerRoomStays(),
+      customers: getStoredCustomers(this.db),
+      customerRoomStays: getStoredCustomerRoomStays(this.db),
       androidDevices: this.getAndroidDevices(),
       paymentWaitingTableOrders: listPaymentWaitingTableOrders(this.db),
       androidActionFailures: this.getAndroidActionFailures(),
@@ -627,134 +627,11 @@ export class DesktopDatabase {
   }
 
   saveCustomer(input: SaveCustomerInput): DesktopCustomerMutationResult {
-    const normalized = normalizeCustomerInput(input);
-    if (!normalized.ok) {
-      return normalized;
+    const result = saveStoredCustomer(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const requestedId = String(input?.id ?? "").trim();
-    const existing = requestedId
-      ? this.db.prepare("SELECT id, source, created_at, birthday_message_enabled FROM customers WHERE id = ? AND deleted_at = ''").get(requestedId) as Record<string, unknown> | undefined
-      : undefined;
-    if (requestedId && !existing) {
-      return { ok: false, message: "Düzenlenecek müşteri bulunamadı." };
-    }
-
-    const duplicateIdentity = normalized.customer.identityNumber
-      ? this.db
-          .prepare("SELECT id FROM customers WHERE identity_number = ? AND id != ? AND deleted_at = '' LIMIT 1")
-          .get(normalized.customer.identityNumber, requestedId)
-      : undefined;
-    if (duplicateIdentity) {
-      return { ok: false, message: "Bu kimlik numarası başka bir müşteri kartında kayıtlı." };
-    }
-    const duplicatePhone = normalized.customer.phone
-      ? this.db
-          .prepare("SELECT id FROM customers WHERE phone = ? AND id != ? AND deleted_at = '' LIMIT 1")
-          .get(normalized.customer.phone, requestedId)
-      : undefined;
-    if (duplicatePhone) {
-      return { ok: false, message: "Bu telefon numarasıyla kayıtlı bir müşteri zaten var." };
-    }
-
-    const id = requestedId || createId("customer_");
-    const now = new Date().toISOString();
-    const source = String(existing?.source ?? "manual") || "manual";
-    const createdAt = String(existing?.created_at ?? now) || now;
-    const customer = normalized.customer;
-    const birthdayMessageEnabled = input.birthdayMessageEnabled === undefined
-      ? normalizeBoolean(existing?.birthday_message_enabled, true)
-      : normalizeBoolean(input.birthdayMessageEnabled, true);
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .prepare(`
-          INSERT INTO customers (
-            id, full_name, phone, email, source, notes, tags_json, last_contact_at,
-            identity_type, identity_number, nationality, birth_date, gender,
-            birthday_message_enabled,
-            document_serial_number, document_expiry_date, birth_place, mother_name,
-            father_name, issuing_authority, address, created_at, updated_at,
-            deleted_at, sync_status
-          ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, '',
-            ?, ?, ?, ?, ?,
-            ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?,
-            '', 'local_only'
-          )
-          ON CONFLICT(id) DO UPDATE SET
-            full_name = excluded.full_name,
-            phone = excluded.phone,
-            email = excluded.email,
-            notes = excluded.notes,
-            tags_json = excluded.tags_json,
-            identity_type = excluded.identity_type,
-            identity_number = excluded.identity_number,
-            nationality = excluded.nationality,
-            birth_date = excluded.birth_date,
-            gender = excluded.gender,
-            birthday_message_enabled = excluded.birthday_message_enabled,
-            document_serial_number = excluded.document_serial_number,
-            document_expiry_date = excluded.document_expiry_date,
-            birth_place = excluded.birth_place,
-            mother_name = excluded.mother_name,
-            father_name = excluded.father_name,
-            issuing_authority = excluded.issuing_authority,
-            address = excluded.address,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          id,
-          customer.fullName,
-          customer.phone,
-          customer.email,
-          source,
-          customer.notes,
-          JSON.stringify(customer.tags),
-          customer.identityType,
-          customer.identityNumber,
-          customer.nationality,
-          customer.birthDate,
-          customer.gender,
-          birthdayMessageEnabled ? 1 : 0,
-          customer.documentSerialNumber,
-          customer.documentExpiryDate,
-          customer.birthPlace,
-          customer.motherName,
-          customer.fatherName,
-          customer.issuingAuthority,
-          customer.address,
-          createdAt,
-          now
-        );
-      insertDatabaseEvent(this.db, {
-        type: requestedId ? "customer.updated" : "customer.created",
-        entityType: "customer",
-        entityId: id,
-        payload: {
-          source: requestedId ? "desktop_edit" : "desktop_manual",
-          identity_type: customer.identityType,
-          has_identity_number: Boolean(customer.identityNumber)
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      return { ok: false, message: "Müşteri kartı kaydedilemedi. Kimlik ve iletişim alanlarını kontrol edin." };
-    }
-
-    return {
-      ok: true,
-      message: requestedId ? "Müşteri kartı güncellendi." : "Müşteri kartı oluşturuldu.",
-      savedId: id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   assignCustomerToRoom(input: AssignCustomerRoomInput): DesktopCustomerMutationResult {
@@ -793,7 +670,7 @@ export class DesktopDatabase {
     if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
       return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
     }
-    if (this.hasOverlappingCustomerRoomStay(roomId, checkInDate, checkOutDate)) {
+    if (hasStoredOverlappingCustomerRoomStay(this.db, roomId, checkInDate, checkOutDate)) {
       return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
     }
     const reservationConflict = this.findConflictingRoomReservation(roomId, customerId, checkInDate, checkOutDate);
@@ -895,7 +772,7 @@ export class DesktopDatabase {
     }
     if (
       ["planned", "checked_in"].includes(status)
-      && this.hasOverlappingCustomerRoomStay(
+      && hasStoredOverlappingCustomerRoomStay(this.db,
         String(stay.room_id ?? ""),
         String(stay.check_in_date ?? ""),
         String(stay.check_out_date ?? ""),
@@ -1744,7 +1621,7 @@ export class DesktopDatabase {
       if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity)) {
         return { ok: false, message: `${String(room.name ?? "Oda")} en fazla ${Number(room.capacity)} kişi kapasitelidir.` };
       }
-      if (this.hasOverlappingCustomerRoomStay(roomId, startDate, endDate)) {
+      if (hasStoredOverlappingCustomerRoomStay(this.db, roomId, startDate, endDate)) {
         return { ok: false, message: `${String(room.name ?? "Seçilen oda")} bu tarihlerde aktif bir konaklama kaydına bağlı.` };
       }
 
@@ -3607,162 +3484,6 @@ export class DesktopDatabase {
     this.db.close();
   }
 
-  private getCustomers(): DesktopCustomer[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          customers.id,
-          customers.full_name,
-          customers.phone,
-          customers.email,
-          customers.source,
-          customers.notes,
-          customers.tags_json,
-          customers.last_contact_at,
-          customers.identity_type,
-          customers.identity_number,
-          customers.nationality,
-          customers.birth_date,
-          customers.gender,
-          customers.birthday_message_enabled,
-          customers.document_serial_number,
-          customers.document_expiry_date,
-          customers.birth_place,
-          customers.mother_name,
-          customers.father_name,
-          customers.issuing_authority,
-          customers.address,
-          customers.updated_at,
-          COUNT(DISTINCT requests.id) AS request_count,
-          COUNT(DISTINCT reservations.id) AS reservation_count,
-          COUNT(DISTINCT customer_room_stays.id) AS stay_count
-        FROM customers
-        LEFT JOIN requests ON requests.customer_id = customers.id AND requests.deleted_at = ''
-        LEFT JOIN reservations ON reservations.customer_id = customers.id AND reservations.deleted_at = ''
-        LEFT JOIN customer_room_stays ON customer_room_stays.customer_id = customers.id AND customer_room_stays.deleted_at = ''
-        WHERE customers.deleted_at = ''
-        GROUP BY customers.id
-        ORDER BY
-          COALESCE(NULLIF(customers.last_contact_at, ''), customers.updated_at) DESC,
-          customers.full_name ASC
-        LIMIT 500
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      fullName: String(row.full_name ?? ""),
-      phone: String(row.phone ?? ""),
-      email: String(row.email ?? ""),
-      source: String(row.source ?? "manual"),
-      notes: String(row.notes ?? ""),
-      tags: this.parseStringArray(row.tags_json),
-      lastContactAt: String(row.last_contact_at ?? ""),
-      identityType: normalizeCustomerIdentityType(row.identity_type),
-      identityNumber: String(row.identity_number ?? ""),
-      nationality: String(row.nationality ?? ""),
-      birthDate: String(row.birth_date ?? ""),
-      gender: normalizeCustomerGender(row.gender),
-      birthdayMessageEnabled: normalizeBoolean(row.birthday_message_enabled, true),
-      documentSerialNumber: String(row.document_serial_number ?? ""),
-      documentExpiryDate: String(row.document_expiry_date ?? ""),
-      birthPlace: String(row.birth_place ?? ""),
-      motherName: String(row.mother_name ?? ""),
-      fatherName: String(row.father_name ?? ""),
-      issuingAuthority: String(row.issuing_authority ?? ""),
-      address: String(row.address ?? ""),
-      requestCount: Number(row.request_count ?? 0),
-      reservationCount: Number(row.reservation_count ?? 0),
-      stayCount: Number(row.stay_count ?? 0),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getCustomerRoomStays(): DesktopCustomerRoomStay[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          customer_room_stays.id,
-          customer_room_stays.customer_id,
-          customers.full_name AS customer_name,
-          customers.phone AS customer_phone,
-          customer_room_stays.room_id,
-          rooms.name AS room_name,
-          rooms.number AS room_number,
-          customer_room_stays.reservation_id,
-          customer_room_stays.status,
-          customer_room_stays.check_in_date,
-          customer_room_stays.check_out_date,
-          customer_room_stays.guest_count,
-          customer_room_stays.notes,
-          customer_room_stays.source,
-          customer_room_stays.checked_in_at,
-          customer_room_stays.checked_out_at,
-          customer_room_stays.created_at,
-          customer_room_stays.updated_at
-        FROM customer_room_stays
-        JOIN customers ON customers.id = customer_room_stays.customer_id
-        JOIN rooms ON rooms.id = customer_room_stays.room_id
-        WHERE customer_room_stays.deleted_at = ''
-        ORDER BY
-          CASE customer_room_stays.status
-            WHEN 'checked_in' THEN 0
-            WHEN 'planned' THEN 1
-            WHEN 'checked_out' THEN 2
-            ELSE 3
-          END,
-          customer_room_stays.check_in_date DESC,
-          customer_room_stays.created_at DESC
-        LIMIT 500
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      customerId: String(row.customer_id ?? ""),
-      customerName: String(row.customer_name ?? ""),
-      customerPhone: String(row.customer_phone ?? ""),
-      roomId: String(row.room_id ?? ""),
-      roomName: String(row.room_name ?? ""),
-      roomNumber: String(row.room_number ?? ""),
-      reservationId: String(row.reservation_id ?? ""),
-      status: String(row.status ?? "planned"),
-      checkInDate: String(row.check_in_date ?? ""),
-      checkOutDate: String(row.check_out_date ?? ""),
-      guestCount: Number(row.guest_count ?? 1),
-      notes: String(row.notes ?? ""),
-      source: String(row.source ?? "manual"),
-      checkedInAt: String(row.checked_in_at ?? ""),
-      checkedOutAt: String(row.checked_out_at ?? ""),
-      createdAt: String(row.created_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private hasOverlappingCustomerRoomStay(
-    roomId: string,
-    checkInDate: string,
-    checkOutDate: string,
-    excludedStayId = ""
-  ): boolean {
-    const rows = this.db
-      .prepare(`
-        SELECT id, check_in_date, check_out_date
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND id != ?
-          AND status IN ('planned', 'checked_in')
-          AND deleted_at = ''
-      `)
-      .all(roomId, excludedStayId) as Array<Record<string, unknown>>;
-    const candidateEnd = checkOutDate || "9999-12-31";
-    return rows.some((row) => {
-      const existingStart = String(row.check_in_date ?? "");
-      const existingEnd = String(row.check_out_date ?? "") || "9999-12-31";
-      return existingStart < candidateEnd && checkInDate < existingEnd;
-    });
-  }
-
   private findConflictingRoomReservation(
     roomId: string,
     customerId: string,
@@ -4900,7 +4621,7 @@ export class DesktopDatabase {
     if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
       return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
     }
-    if (this.hasOverlappingCustomerRoomStay(roomId, checkInDate, checkOutDate)) {
+    if (hasStoredOverlappingCustomerRoomStay(this.db, roomId, checkInDate, checkOutDate)) {
       return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
     }
     const reservationConflict = this.findConflictingRoomReservation(roomId, customerId, checkInDate, checkOutDate);
@@ -4974,7 +4695,7 @@ export class DesktopDatabase {
     }
     if (
       ["planned", "checked_in"].includes(status)
-      && this.hasOverlappingCustomerRoomStay(
+      && hasStoredOverlappingCustomerRoomStay(this.db,
         String(stay.room_id ?? ""),
         String(stay.check_in_date ?? ""),
         String(stay.check_out_date ?? ""),
@@ -6036,3 +5757,13 @@ import {
   runDesktopDeletion as runStoredDesktopDeletion,
   insertDeletionEvent as insertStoredDeletionEvent,
 } from "./database/deletion-store.js";
+
+import {
+  getCustomers as getStoredCustomers,
+  saveCustomer as saveStoredCustomer,
+} from "./database/customer-store.js";
+
+import {
+  getCustomerRoomStays as getStoredCustomerRoomStays,
+  hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay,
+} from "./database/customer-room-stay-store.js";
