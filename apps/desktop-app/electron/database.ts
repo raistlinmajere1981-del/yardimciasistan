@@ -336,7 +336,7 @@ export class DesktopDatabase {
       databasePath: this.databasePath,
       backupPath: this.backupPath,
       webModuleUrl: settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
-      requests: this.getRequests(),
+      requests: getRequests(this.db),
       rooms: this.getRooms(),
       tables: this.getTables(),
       reservations: this.getReservations(),
@@ -475,66 +475,7 @@ export class DesktopDatabase {
     return revokeStoredAndroidDevice(this.db, deviceIdInput, new Set(this.getEnabledBusinessCapabilities()));
   }
   getAndroidPreparedMessages(): DesktopPreparedMessage[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          whatsapp_messages.id,
-          whatsapp_messages.request_id,
-          COALESCE(NULLIF(customers.full_name, ''), NULLIF(requests.customer_name, ''), 'Misafir') AS customer_name,
-          COALESCE(NULLIF(whatsapp_messages.phone, ''), NULLIF(customers.phone, ''), requests.customer_phone, '') AS customer_phone,
-          whatsapp_messages.message,
-          whatsapp_messages.status,
-          whatsapp_messages.updated_at
-        FROM whatsapp_messages
-        LEFT JOIN requests ON requests.id = whatsapp_messages.request_id AND requests.deleted_at = ''
-        LEFT JOIN customers ON customers.id = whatsapp_messages.customer_id AND customers.deleted_at = ''
-        WHERE whatsapp_messages.direction = 'outgoing'
-          AND whatsapp_messages.status = 'prepared'
-          AND whatsapp_messages.deleted_at = ''
-          AND (
-            requests.id IS NULL
-            OR requests.status NOT IN ('answered', 'rejected', 'cancelled', 'archived', 'converted_to_reservation')
-          )
-        ORDER BY whatsapp_messages.updated_at DESC, whatsapp_messages.created_at DESC
-        LIMIT 300
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const messages: DesktopPreparedMessage[] = rows.map((row) => ({
-      id: String(row.id ?? ""),
-      requestId: String(row.request_id ?? ""),
-      customerName: String(row.customer_name ?? "Misafir"),
-      customerPhone: String(row.customer_phone ?? ""),
-      message: String(row.message ?? ""),
-      status: String(row.status ?? "prepared"),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-
-    const requestIdsWithMessage = new Set(
-      (this.db
-        .prepare("SELECT request_id FROM whatsapp_messages WHERE direction = 'outgoing' AND request_id != '' AND deleted_at = ''")
-        .all() as Array<{ request_id?: string }>)
-        .map((row) => String(row.request_id ?? ""))
-    );
-    for (const request of this.getRequests()) {
-      if (messages.length >= 300 || requestIdsWithMessage.has(request.id)
-          || ["answered", "rejected", "cancelled", "archived", "converted_to_reservation"].includes(request.status)) {
-        continue;
-      }
-      const message = String(request.ai_suggested_reply || request.whatsapp_message || "").trim();
-      if (!message) {
-        continue;
-      }
-      messages.push({
-        id: `message_${request.id}`,
-        requestId: request.id,
-        customerName: request.customer_name,
-        customerPhone: request.customer_phone,
-        message,
-        status: "prepared",
-        updatedAt: request.updated_at
-      });
-    }
-    return messages;
+    return getStoredAndroidPreparedMessages(this.db, getRequests(this.db));
   }
 
   applyAndroidAction(action: AndroidSyncAction): ApplyAndroidActionResult {
@@ -784,51 +725,11 @@ export class DesktopDatabase {
   }
 
   updateRequestStatus(input: UpdateRequestStatusInput): DesktopStatusUpdateResult {
-    const requestId = input.requestId.trim();
-    const status = normalizeStatus(input.status, ["new", "seen", "waiting_owner", "waiting_customer", "approved", "rejected", "answered", "cancelled", "archived"]);
-    if (!requestId || !status) {
-      return {
-        ok: false,
-        message: "Talep durumu için geçerli kayıt ve durum seçilmeli."
-      };
+    const result = updateStoredRequestStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const request = this.db.prepare("SELECT status FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string } | undefined;
-    if (!request) {
-      return {
-        ok: false,
-        message: "Talep bulunamadı."
-      };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, requestId);
-      if (status === "answered") {
-        this.markPreparedWhatsAppMessagesSentInTransaction(requestId, now);
-      }
-      insertDatabaseEvent(this.db, {
-        type: "request.status_changed",
-        entityType: "request",
-        entityId: requestId,
-        payload: {
-          previous_status: String(request.status ?? ""),
-          status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Talep durumu güncellendi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteRequest(requestIdInput: string): DesktopStatusUpdateResult {
@@ -1218,86 +1119,11 @@ export class DesktopDatabase {
   }
 
   markWhatsAppMessageSent(input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult {
-    const requestId = input.requestId.trim();
-    const message = input.message.trim();
-    if (!requestId || !message) {
-      return {
-        ok: false,
-        message: "Gönderilen WhatsApp mesajı için talep ve metin bilgisi gerekli."
-      };
+    const result = markStoredWhatsAppMessageSent(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const preparedMessage = this.db
-      .prepare(`
-        SELECT id, message, status
-        FROM whatsapp_messages
-        WHERE request_id = ?
-          AND direction = 'outgoing'
-          AND deleted_at = ''
-        ORDER BY updated_at DESC
-        LIMIT 1
-      `)
-      .get(requestId) as { id?: string; message?: string; status?: string } | undefined;
-
-    if (!preparedMessage?.id) {
-      return {
-        ok: false,
-        message: "Talebe ait hazır WhatsApp mesajı bulunamadı."
-      };
-    }
-
-    if (String(preparedMessage.message ?? "").trim() !== message) {
-      return {
-        ok: false,
-        message: "Gönderilen metin yerel AI taslağıyla eşleşmediği için kayıt güncellenmedi."
-      };
-    }
-
-    if (preparedMessage.status === "sent") {
-      return {
-        ok: true,
-        message: "WhatsApp mesajı daha önce gönderildi olarak kaydedilmiş.",
-        dashboardData: this.getDashboardData()
-      };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db
-        .prepare(`
-          UPDATE whatsapp_messages
-          SET mode = 'webview',
-              status = 'sent',
-              sent_at = ?,
-              updated_at = ?,
-              sync_status = 'local_only'
-          WHERE id = ?
-        `)
-        .run(now, now, preparedMessage.id);
-
-      insertDatabaseEvent(this.db, {
-        type: "whatsapp.message_sent",
-        entityType: "whatsapp_message",
-        entityId: preparedMessage.id,
-        payload: {
-          request_id: requestId,
-          mode: "webview",
-          user_approved: true
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "WhatsApp mesajı gönderildi olarak kaydedildi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateRoomStatus(input: UpdateRoomStatusInput): DesktopStatusUpdateResult {
@@ -3589,156 +3415,15 @@ export class DesktopDatabase {
   }
 
   getRequestById(requestId: string): SyncedCustomerRequest | null {
-    const id = requestId.trim();
-    if (!id) {
-      return null;
-    }
-
-    const row = this.db
-      .prepare(`
-        SELECT
-          id,
-          customer_id,
-          source,
-          request_type,
-          status,
-          customer_name,
-          customer_phone,
-          date_text,
-          start_date,
-          end_date,
-          time,
-          guest_count,
-          adult_count,
-          child_count,
-          message,
-          ai_summary,
-          ai_suggested_reply,
-          whatsapp_message,
-          assigned_to,
-          priority,
-          sync_status,
-          created_at,
-          updated_at
-        FROM requests
-        WHERE id = ? AND deleted_at = ''
-        LIMIT 1
-      `)
-      .get(id) as Record<string, unknown> | undefined;
-
-    return row ? this.mapRequestRow(row) : null;
+    return getStoredRequestById(this.db, requestId);
   }
 
   saveRequestAiSuggestion(input: SaveRequestAiSuggestionInput): RequestAiSuggestionResult {
-    const requestId = input.requestId.trim();
-    const summary = input.summary.trim();
-    const suggestedReply = input.suggestedReply.trim();
-
-    if (!requestId) {
-      return {
-        ok: false,
-        message: "AI taslağı için talep seçilmeli."
-      };
+    const result = saveStoredRequestAiSuggestion(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    if (!suggestedReply) {
-      return {
-        ok: false,
-        message: "AI cevap taslağı boş olamaz."
-      };
-    }
-
-    const request = this.db.prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as Record<string, unknown> | undefined;
-    if (!request) {
-      return {
-        ok: false,
-        message: "Talep bulunamadı."
-      };
-    }
-
-    const now = new Date().toISOString();
-    const existingMessage = this.db
-      .prepare("SELECT id FROM whatsapp_messages WHERE request_id = ? AND direction = 'outgoing' AND deleted_at = '' LIMIT 1")
-      .get(requestId) as { id?: string } | undefined;
-    const messageId = existingMessage?.id || createId("wa_msg_");
-    const missingFields = input.missingFields.map((field) => field.trim()).filter(Boolean);
-
-    this.db.exec("BEGIN");
-    try {
-      this.db
-        .prepare(`
-          UPDATE requests
-          SET ai_summary = ?,
-              ai_suggested_reply = ?,
-              updated_at = ?,
-              sync_status = 'local_only'
-          WHERE id = ?
-        `)
-        .run(summary, suggestedReply, now, requestId);
-
-      this.db
-        .prepare(`
-          INSERT INTO whatsapp_messages (
-            id,
-            request_id,
-            customer_id,
-            phone,
-            direction,
-            mode,
-            status,
-            message,
-            prepared_by_ai,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, 'outgoing', 'manual_copy', 'prepared', ?, 1, ?, ?, 'local_only')
-          ON CONFLICT(id) DO UPDATE SET
-            customer_id = excluded.customer_id,
-            phone = excluded.phone,
-            status = 'prepared',
-            message = excluded.message,
-            prepared_by_ai = 1,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          messageId,
-          requestId,
-          String(request.customer_id ?? ""),
-          String(request.customer_phone ?? ""),
-          suggestedReply,
-          now,
-          now
-        );
-
-      insertDatabaseEvent(this.db, {
-        type: "ai.reply_suggested",
-        entityType: "request",
-        entityId: requestId,
-        payload: {
-          summary,
-          missing_fields: missingFields,
-          whatsapp_message_id: messageId
-        },
-        now
-      });
-
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "AI cevap taslağı yenilendi.",
-      requestId,
-      summary,
-      suggestedReply,
-      missingFields,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   saveAiWorkspaceHistory(input: Omit<AiWorkspaceHistoryEntry, "id" | "createdAt">): AiWorkspaceHistoryEntry {
@@ -4603,79 +4288,7 @@ export class DesktopDatabase {
     return map;
   }
 
-  private getRequests(): SyncedCustomerRequest[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          id,
-          customer_id,
-          source,
-          request_type,
-          status,
-          customer_name,
-          customer_phone,
-          date_text,
-          start_date,
-          end_date,
-          time,
-          guest_count,
-          adult_count,
-          child_count,
-          message,
-          ai_summary,
-          ai_suggested_reply,
-          whatsapp_message,
-          assigned_to,
-          priority,
-          sync_status,
-          created_at,
-          updated_at
-        FROM requests
-        WHERE deleted_at = ''
-        ORDER BY
-          CASE
-            WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND priority = 'urgent' THEN 0
-            WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND priority = 'high' THEN 1
-            WHEN status = 'new' THEN 2
-            WHEN status IN ('seen', 'waiting_owner', 'pending', 'in_progress') AND priority <> 'low' THEN 3
-            WHEN status IN ('seen', 'waiting_owner', 'pending', 'in_progress') THEN 4
-            ELSE 5
-          END,
-          created_at DESC
-        LIMIT 80
-      `)
-      .all() as Array<Record<string, unknown>>;
 
-    return rows.map((row) => this.mapRequestRow(row));
-  }
-
-  private mapRequestRow(row: Record<string, unknown>): SyncedCustomerRequest {
-    return {
-      id: String(row.id ?? ""),
-      customer_id: String(row.customer_id ?? ""),
-      source: row.source as SyncedCustomerRequest["source"],
-      request_type: row.request_type as SyncedCustomerRequest["request_type"],
-      status: row.status as SyncedCustomerRequest["status"],
-      customer_name: String(row.customer_name ?? ""),
-      customer_phone: String(row.customer_phone ?? ""),
-      date_text: String(row.date_text ?? ""),
-      start_date: String(row.start_date ?? ""),
-      end_date: String(row.end_date ?? ""),
-      time: String(row.time ?? ""),
-      guest_count: Number(row.guest_count ?? 0),
-      adult_count: Number(row.adult_count ?? 0),
-      child_count: Number(row.child_count ?? 0),
-      message: String(row.message ?? ""),
-      ai_summary: String(row.ai_summary ?? ""),
-      ai_suggested_reply: String(row.ai_suggested_reply ?? ""),
-      whatsapp_message: String(row.whatsapp_message ?? ""),
-      assigned_to: String(row.assigned_to ?? ""),
-      priority: row.priority as SyncedCustomerRequest["priority"],
-      sync_status: row.sync_status as SyncedCustomerRequest["sync_status"],
-      created_at: String(row.created_at ?? ""),
-      updated_at: String(row.updated_at ?? "")
-    };
-  }
 
 
 
@@ -5570,7 +5183,7 @@ export class DesktopDatabase {
       .prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
       .run(status, updatedAt, requestId);
     if (status === "answered" && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.WHATSAPP)) {
-      this.markPreparedWhatsAppMessagesSentInTransaction(requestId, updatedAt);
+      markPreparedWhatsAppMessagesSentInTransaction(this.db, requestId, updatedAt);
     }
     this.insertAndroidActionEvent(action, "request.status_changed", "request", requestId, {
       previous_status: String(request.status ?? ""),
@@ -6685,22 +6298,6 @@ export class DesktopDatabase {
 
 
 
-  private markPreparedWhatsAppMessagesSentInTransaction(requestId: string, now: string) {
-    this.db
-      .prepare(`
-        UPDATE whatsapp_messages
-        SET mode = 'manual_copy',
-            status = 'sent',
-            sent_at = CASE WHEN sent_at = '' THEN ? ELSE sent_at END,
-            updated_at = ?,
-            sync_status = 'local_only'
-        WHERE request_id = ?
-          AND direction = 'outgoing'
-          AND status = 'prepared'
-          AND deleted_at = ''
-      `)
-      .run(now, now, requestId);
-  }
 
 
   private updateTableStatusForOrderInTransaction(
@@ -6956,3 +6553,16 @@ import {
 } from "./database/table-order-store.js";
 
 import { insertDatabaseEvent } from "./database/event-store.js";
+
+import {
+  getRequests,
+  getRequestById as getStoredRequestById,
+  updateRequestStatus as updateStoredRequestStatus,
+  saveRequestAiSuggestion as saveStoredRequestAiSuggestion,
+} from "./database/request-store.js";
+
+import {
+  markPreparedWhatsAppMessagesSentInTransaction,
+  markWhatsAppMessageSent as markStoredWhatsAppMessageSent,
+  getAndroidPreparedMessages as getStoredAndroidPreparedMessages,
+} from "./database/prepared-message-store.js";
