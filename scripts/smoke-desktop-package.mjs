@@ -23,12 +23,15 @@ const requiredEntries = [
   "/dist-electron/database.js",
   "/dist-electron/app-lock.js",
   "/dist-renderer/index.html",
-  "/db/migrations/001_baseline.sql",
-  "/db/demo-profiles/pension-restaurant.sql"
+  "/db/migrations/001_baseline.sql"
 ];
 
 for (const entry of requiredEntries) {
   assert.ok(entries.has(entry), `Paket içinde eksik dosya: ${entry}`);
+}
+
+for (const entry of entries) {
+  assert.equal(entry.startsWith("/db/demo-profiles/"), false, `Paket demo profili içermemeli: ${entry}`);
 }
 
 await smokePackagedRuntime(packageExecutable);
@@ -102,10 +105,11 @@ function assertPackagedDatabase(databasePath) {
     assert.equal(String(scalar(database, "PRAGMA integrity_check")), "ok");
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM schema_migrations")), 1);
     assert.equal(scalar(database, "SELECT id FROM schema_migrations"), "001_baseline.sql");
-    assert.equal(scalar(database, "SELECT display_name FROM business WHERE deleted_at = '' LIMIT 1"), "Deniz Çiçeği Pansiyon & Kafe");
-    assert.equal(scalar(database, "SELECT sync_secret FROM settings WHERE deleted_at = '' LIMIT 1"), "change-this-secret");
-    assert.equal(scalar(database, "SELECT app_password_verifier FROM settings WHERE deleted_at = '' LIMIT 1"), "");
-    assert.equal(Number(scalar(database, "SELECT setup_completed FROM settings WHERE deleted_at = '' LIMIT 1")), 0);
+    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM business WHERE deleted_at = ''")), 0);
+    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM settings WHERE deleted_at = ''")), 0);
+    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")), 0);
+    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM tables WHERE deleted_at = ''")), 0);
+    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM menu_items WHERE deleted_at = ''")), 0);
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM requests WHERE deleted_at = ''")), 0);
   } finally {
     database.close();

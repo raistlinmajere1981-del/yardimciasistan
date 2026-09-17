@@ -30,8 +30,7 @@ assert.doesNotMatch(setupForm, /business_type|modules_json|rooms_enabled|tables_
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-setup-profile-"));
 const database = new DesktopDatabase({
   appPath: join(root, "apps", "desktop-app"),
-  userDataPath: dataDir,
-  demoProfile: null
+  userDataPath: dataDir
 });
 
 try {

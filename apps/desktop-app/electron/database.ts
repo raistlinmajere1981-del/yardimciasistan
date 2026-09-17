@@ -77,18 +77,10 @@ import {
 
 export type { DesktopBirthdayCandidate, DesktopBirthdayDelivery, DesktopBirthdayOverview, DesktopBirthdayPrepareResult } from "./birthday-service.js";
 
-export type DesktopDemoProfile = "pension-restaurant";
-
 export interface DesktopDatabaseOptions {
   appPath: string;
   userDataPath: string;
   backupPath?: string;
-  /**
-   * Production Electron starts without sample business data. Node-based smoke
-   * tests keep the historical pension/restaurant fixture unless they
-   * explicitly pass null.
-   */
-  demoProfile?: DesktopDemoProfile | null;
 }
 
 interface DashboardSummary {
@@ -1086,7 +1078,7 @@ export class DesktopDatabase {
       throw new Error("Yalnız 001_baseline.sql güncel temiz kurulum şeması olarak desteklenir.");
     }
 
-    // Serialize baseline checks, demo seeding and local identity creation across connections.
+    // Serialize baseline checks and local identity creation across connections.
     this.db.exec("BEGIN IMMEDIATE");
     try {
       const appliedMigrations = this.db
@@ -1122,11 +1114,6 @@ export class DesktopDatabase {
 
         this.db.exec(migration.sql);
         this.db.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run(migration.name, new Date().toISOString());
-      }
-
-      const demoProfile = this.resolveDemoProfile();
-      if (demoProfile && this.getCount("business") === 0) {
-        this.db.exec(this.readDemoProfileSql(demoProfile));
       }
 
       this.ensureSyncClientId();
@@ -6675,10 +6662,6 @@ export class DesktopDatabase {
     };
   }
 
-  private getCount(table: string): number {
-    return this.getScalarCount(`SELECT COUNT(*) as count FROM ${table}`);
-  }
-
   private getScalarCount(sql: string, ...params: Array<string | number | null>): number {
     const row = this.db.prepare(sql).get(...params) as { count?: number } | undefined;
     return Number(row?.count ?? 0);
@@ -9144,33 +9127,6 @@ export class DesktopDatabase {
         ON CONFLICT(id) DO NOTHING
       `)
       .run(`desktop-${randomUUID()}`);
-  }
-
-  private resolveDemoProfile(): DesktopDemoProfile | null {
-    if (this.options.demoProfile !== undefined) {
-      return this.options.demoProfile;
-    }
-
-    const requestedProfile = String(process.env.YA_DESKTOP_DEMO_PROFILE ?? "").trim();
-    if (requestedProfile) {
-      if (requestedProfile === "pension-restaurant") {
-        return requestedProfile;
-      }
-      throw new Error(`Desteklenmeyen masaüstü demo profili: ${requestedProfile}`);
-    }
-
-    // Existing database smoke tests run under Node and intentionally exercise
-    // the realistic hybrid-business fixture. Electron (development and
-    // packaged production) must always start from an empty operational store.
-    return process.versions.electron ? null : "pension-restaurant";
-  }
-
-  private readDemoProfileSql(profile: DesktopDemoProfile) {
-    const profilePath = path.join(this.options.appPath, "db", "demo-profiles", `${profile}.sql`);
-    if (!fs.existsSync(profilePath)) {
-      throw new Error(`Masaüstü demo profili bulunamadı: ${profile}`);
-    }
-    return fs.readFileSync(profilePath, "utf8");
   }
 
   private readSqlFiles(relativeDir: string) {

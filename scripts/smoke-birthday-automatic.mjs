@@ -320,18 +320,42 @@ function createFixture({
   const dataDir = mkdtempSync(join(tmpdir(), "yardimci-birthday-automatic-"));
   const database = new DesktopDatabase({
     appPath: join(root, "apps", "desktop-app"),
-    userDataPath: dataDir,
-    demoProfile: "pension-restaurant"
+    userDataPath: dataDir
   });
   database.initialize();
+  const setupResult = database.saveInitialSetup({
+    businessName,
+    profileId: "pension_restaurant",
+    phone: "+905321234567",
+    whatsapp: "+905321234567",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "birthday-automatic-secret-123",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: false },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: [],
+    birthdaySettings: {
+      enabled,
+      mode,
+      sendTime,
+      messageTemplate: template
+    }
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const raw = new DatabaseSync(database.databasePath);
   raw.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
-  raw.prepare("UPDATE business SET name = ?, display_name = ?, updated_at = ? WHERE deleted_at = ''").run(businessName, businessName, now.toISOString());
-  raw.prepare(`
-    UPDATE settings
-    SET birthday_enabled = ?, birthday_mode = ?, birthday_send_time = ?, birthday_message_template = ?, updated_at = ?
-    WHERE deleted_at = ''
-  `).run(enabled ? 1 : 0, mode, sendTime, template, now.toISOString());
 
   return {
     database,

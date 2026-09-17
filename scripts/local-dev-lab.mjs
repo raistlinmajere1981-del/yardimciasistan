@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const webModuleRoot = join(repoRoot, "firm-template", "web-module");
-const demoWebRoot = join(repoRoot, "apps", "demo-web");
 const syncSecret = "change-this-secret";
 const runtimeFiles = [
   "yardimci-asistan.sqlite",
@@ -34,9 +33,7 @@ try {
 
 async function main() {
   const phpPort = await getAvailablePort(options.phpPort, options.host);
-  const demoPort = await getAvailablePort(options.demoPort, options.host);
   const webModuleUrl = `http://127.0.0.1:${phpPort}`;
-  const demoWebUrl = `http://127.0.0.1:${demoPort}`;
   const lanUrls = getLanUrls(phpPort);
 
   if (!options.noSeed) {
@@ -53,20 +50,7 @@ async function main() {
   await waitForHttp(`${webModuleUrl}/api/menu.php`, phpServer);
   await verifyAndroidSummary(webModuleUrl);
 
-  let demoServer = null;
-  if (!options.noDemoWeb) {
-    demoServer = startProcess("npx", ["vite", "--host", options.host, "--port", String(demoPort), "--strictPort"], {
-      cwd: demoWebRoot,
-      name: "demo-web",
-      env: {
-        VITE_YA_WEB_MODULE_URL: webModuleUrl
-      }
-    });
-
-    await waitForHttp(demoWebUrl, demoServer);
-  }
-
-  printReady({ webModuleUrl, demoWebUrl, lanUrls, demoEnabled: !options.noDemoWeb });
+  printReady({ webModuleUrl, lanUrls });
 
   if (options.once) {
     cleanup();
@@ -80,8 +64,6 @@ function parseArgs(args) {
   const parsed = {
     host: "127.0.0.1",
     phpPort: 8080,
-    demoPort: 5173,
-    noDemoWeb: false,
     noSeed: false,
     keepData: false,
     once: false
@@ -101,13 +83,8 @@ function parseArgs(args) {
     } else if (arg === "--php-port") {
       parsed.phpPort = Number(args[index + 1]);
       index += 1;
-    } else if (arg.startsWith("--demo-port=")) {
-      parsed.demoPort = Number(arg.slice("--demo-port=".length));
-    } else if (arg === "--demo-port") {
-      parsed.demoPort = Number(args[index + 1]);
-      index += 1;
-    } else if (arg === "--no-demo-web") {
-      parsed.noDemoWeb = true;
+    } else if (arg === "--demo-port" || arg.startsWith("--demo-port=") || arg === "--no-demo-web") {
+      throw new Error("Demo web kaldırıldı; --demo-port/--no-demo-web artık desteklenmiyor.");
     } else if (arg === "--no-seed") {
       parsed.noSeed = true;
     } else if (arg === "--keep-data") {
@@ -119,7 +96,7 @@ function parseArgs(args) {
     }
   }
 
-  if (!isValidPort(parsed.phpPort) || !isValidPort(parsed.demoPort)) {
+  if (!isValidPort(parsed.phpPort)) {
     throw new Error("Portlar 1-65535 arasında sayısal olmalı.");
   }
 
@@ -203,12 +180,9 @@ async function verifyAndroidSummary(baseUrl) {
   }
 }
 
-function printReady({ webModuleUrl, demoWebUrl, lanUrls, demoEnabled }) {
+function printReady({ webModuleUrl, lanUrls }) {
   console.log("local-dev-lab-ready");
   console.log(`PHP web modülü: ${webModuleUrl}`);
-  if (demoEnabled) {
-    console.log(`Demo web: ${demoWebUrl}`);
-  }
   console.log(`Sync anahtarı: ${syncSecret}`);
 
   if (lanUrls.length > 0) {

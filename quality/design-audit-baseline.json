@@ -2,30 +2,6 @@
   "version": 1,
   "generatedAt": "2026-09-13T19:54:50.021Z",
   "files": {
-    "apps/demo-web/src/App.tsx": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/demo-web/src/main.tsx": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/demo-web/src/styles.css": {
-      "rawColor": 78,
-      "hardcodedRadius": 24,
-      "hardcodedShadow": 8,
-      "hardcodedFontSize": 40,
-      "important": 0,
-      "inlineStyle": 0
-    },
     "apps/desktop-app/src/App.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,

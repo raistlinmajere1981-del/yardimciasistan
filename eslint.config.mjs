@@ -68,7 +68,6 @@ export default tseslint.config(
   {
     files: [
       "apps/desktop-app/src/**/*.{ts,tsx}",
-      "apps/demo-web/src/**/*.{ts,tsx}",
       "packages/web-widget/**/*.{ts,tsx}"
     ],
     plugins: {

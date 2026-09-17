@@ -52,7 +52,6 @@ const core = [
   js("finance-service", "Finans servis sözleşmesi", "smoke-finance-service.mjs"),
   js("room-folio", "Oda hesabı/tahsilat/çıkış", "smoke-room-folio-service.mjs"),
   js("room-transfer", "Restoran hesabını oda hesabına aktarma", "smoke-room-folio-table-order-transfer.mjs"),
-  js("demo-flow", "Web → masaüstü → onaylı Android uçtan uca akış", "smoke-demo-flow-v2.mjs"),
   current("renderer", "Masaüstü renderer browser smoke", "renderer", true),
   jsb("customer-pension-ui", "Müşteri/Pansiyon formları, oda hesabı ve responsive UI", "smoke-desktop-customer-pension.mjs"),
   jsb("design-system", "Desktop tasarım sistemi ve responsive Ayarlar", "smoke-desktop-design-system.mjs")
@@ -61,7 +60,6 @@ const extra = [];
 if (ui && process.platform === "linux") extra.push(js("desktop-xvfb", "Electron Xvfb açılış smoke", "smoke-desktop-xvfb.mjs"));
 if (android) extra.push(n("android-build", "Android birim testleri + debug APK", "smoke:android:build"));
 if (full) {
-  extra.push(nb("demo-web-widget", "Demo web + gerçek widget browser smoke", "smoke:demo-web-widget"));
   extra.push(nb("e2e", "Playwright uçtan uca testleri", "e2e"));
 }
 

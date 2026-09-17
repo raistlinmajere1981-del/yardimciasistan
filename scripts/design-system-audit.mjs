@@ -8,7 +8,6 @@ const STYLE_ROOT = "apps/desktop-app/src/styles";
 const TOKEN_FILES = ["tokens/primitives.css", "tokens/semantic.css", "tokens/typography.css", "tokens/dimensions.css"].map((file) => `${STYLE_ROOT}/${file}`);
 const SCAN_ROOTS = [
   "apps/desktop-app/src",
-  "apps/demo-web/src",
   "packages/web-widget/src"
 ];
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", "coverage", ".git"]);

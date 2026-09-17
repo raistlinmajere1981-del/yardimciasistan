@@ -27,9 +27,6 @@
         "*.config.ts"
       ]
     },
-    "apps/demo-web": {
-      "project": ["src/**/*.{ts,tsx}", "*.config.ts"]
-    },
     "packages/shared": {
       "project": ["**/*.ts"]
     },

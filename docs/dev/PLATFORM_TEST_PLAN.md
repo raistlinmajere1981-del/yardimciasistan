@@ -73,7 +73,6 @@ npm run smoke:local-lab
 npm run smoke:web-module
 npm run smoke:web-widget-branding
 npm run smoke:web-widget-module
-npm run smoke:demo-web-widget
 ```
 
 Android gerçek cihaz hazırlığı için:
@@ -82,7 +81,6 @@ Android gerçek cihaz hazırlığı için:
 npm run smoke:android-hosting
 npm run android:phone-test
 npm run smoke:android-device-ui
-npm run smoke:local-demo
 ```
 
 Linux tam zincir:

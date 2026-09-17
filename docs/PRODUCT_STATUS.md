@@ -173,16 +173,12 @@ Masaüstü senkron bağlantısının kod tarafındaki temel hata toleransı gü�
 - Mevcut retry/backoff, offline sınıflandırma, cursor, idempotency ve outbox iş kuralları korunur.
 - HTTP timeout davranışı ayrı smoke testiyle CI zincirinde doğrulanır.
 
-## Temiz kurulum ve tanıtım verisi ayrımı
+## Temiz kurulum
 
-Masaüstü uygulamasındaki örnek pansiyon-restoran verisi üretim başlangıcından ayrılmıştır.
-
-- Electron geliştirme ve paketli üretim başlangıcı yalnız veritabanı şemasını oluşturur.
+- Electron geliştirme ve paketli üretim başlangıcı yalnız baseline migration ve gerçek runtime metadata initialization yapar.
 - İlk kurulum işletme, oda, masa, menü, stok veya operasyon kaydı eklemeden kurulum sihirbazını açar.
-- `Verileri Sıfırla` sonrasında demo içeriği yeniden oluşmaz.
-- Tarihsel hibrit işletme örnekleri `pension-restaurant` adlı açıkça seçilen demo profilinde korunur.
-- Node tabanlı mevcut veritabanı smoke testleri geçiş döneminde bu profili kullanmaya devam eder.
-- Ayrı temiz başlangıç smoke testi hem boş üretim durumunu hem opt-in demo profilini doğrular.
+- `Verileri Sıfırla` sonrasında hazır içerik yeniden oluşmaz.
+- Temiz başlangıç smoke testi boş üretim durumunu doğrular: işletme/telefon/WhatsApp boş, oda/masa/menü kayıtları sıfırdır.
 
 ## Sıradaki Ürün Öncelikleri
 

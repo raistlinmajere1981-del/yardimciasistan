@@ -15,8 +15,7 @@ const root = process.cwd();
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-birthday-foundation-"));
 const database = new DesktopDatabase({
   appPath: join(root, "apps", "desktop-app"),
-  userDataPath: dataDir,
-  demoProfile: "pension-restaurant"
+  userDataPath: dataDir
 });
 
 try {

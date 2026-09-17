@@ -141,8 +141,7 @@ function openDatabase(userDataPath, backupPath) {
   return new DesktopDatabase({
     appPath,
     userDataPath,
-    backupPath,
-    demoProfile: null
+    backupPath
   });
 }
 
@@ -226,7 +225,7 @@ function assertAlreadyInitializedBaseline(sourcePath, storedClientId, expectedCl
 async function initializeConcurrently(userDataPath) {
   const workers = Array.from({ length: 3 }, () => new Worker(
     new URL("./fixtures/initialize-desktop-database.mjs", import.meta.url),
-    { workerData: { appPath, userDataPath, backupPath: cleanBackupPath, demoProfile: null } }
+    { workerData: { appPath, userDataPath, backupPath: cleanBackupPath } }
   ));
   try {
     await Promise.all(workers.map((worker) => once(worker, "message")));
