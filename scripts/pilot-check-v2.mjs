@@ -38,10 +38,16 @@ const core = [
   js("android-secret", "Release Android bağlantısında ortak anahtar sızıntısı", "smoke-android-release-connection.mjs"),
   js("android-permissions", "Android onay ve izin matrisi", "smoke-android-permission-matrix.mjs"),
   js("architecture", "Masaüstü frontend mimari sınırları", "smoke-desktop-frontend-architecture.mjs"),
+  js("locale", "Masaüstü tr-TR yerelleştirme sözleşmesi", "smoke-desktop-locale.mjs"),
+  js("location-geocode", "İşletme adresi arama varyantları", "smoke-business-location-geocode.mjs"),
+  js("birthday-automatic", "Doğum günü otomatik zamanlayıcı ve teslimat", "smoke-birthday-automatic.mjs"),
   js("app-lock", "Masaüstü uygulama kilidi", "smoke-app-lock.mjs"),
   js("table-categories", "Masa kategori veri akışı", "smoke-table-categories-db.mjs"),
+  js("menu-db", "Menü veri modeli ve stok akışı", "smoke-desktop-menu-db.mjs"),
   js("deletions", "Kayıt silme ve arşivleme sınırları", "smoke-record-deletions.mjs"),
   js("customer-room", "Müşteri ve oda yönetimi", "smoke-customer-room-management-db.mjs"),
+  js("business-profile", "İşletme profili normalizasyonu", "smoke-business-public-profile.mjs"),
+  js("room-details", "Oda genel detayları ve allow-list", "smoke-room-public-details.mjs"),
   js("daily-tasks", "Günlük iş yönetimi", "smoke-daily-task-management.mjs"),
   js("pension-reservation", "Doğrudan pansiyon rezervasyonu", "smoke-manual-reservation.mjs"),
   js("restaurant-reservation", "Doğrudan restoran rezervasyonu", "smoke-manual-restaurant-reservation.mjs"),
@@ -54,7 +60,12 @@ const core = [
   js("room-transfer", "Restoran hesabını oda hesabına aktarma", "smoke-room-folio-table-order-transfer.mjs"),
   current("renderer", "Masaüstü renderer browser smoke", "renderer", true),
   jsb("customer-pension-ui", "Müşteri/Pansiyon formları, oda hesabı ve responsive UI", "smoke-desktop-customer-pension.mjs"),
-  jsb("design-system", "Desktop tasarım sistemi ve responsive Ayarlar", "smoke-desktop-design-system.mjs")
+  jsb("design-system", "Desktop tasarım sistemi ve responsive Ayarlar", "smoke-desktop-design-system.mjs"),
+  jsb("stage2b", "Restoran menü ve transfer yüzeyleri", "smoke-stage2b-restaurant-menu.mjs"),
+  jsb("stage2c", "Çekirdek çalışma alanları yüzeyleri", "smoke-stage2c-core-workspaces.mjs"),
+  jsb("stage3a", "Mesajlar ve kurulum yüzeyleri", "smoke-stage3a-messages-setup.mjs"),
+  jsb("stage3b", "Kilit ve legacy yüzey migration guard", "smoke-stage3b-final-legacy-surfaces.mjs"),
+  js("modular-foundation", "Modüler commerce/capability sözleşmeleri", "check-modular-foundation.mjs")
 ];
 const extra = [];
 if (ui && process.platform === "linux") extra.push(js("desktop-xvfb", "Electron Xvfb açılış smoke", "smoke-desktop-xvfb.mjs"));

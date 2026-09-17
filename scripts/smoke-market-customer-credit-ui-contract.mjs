@@ -23,6 +23,31 @@ let page;
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup({
+    businessName: "Veresiye UI Test İşletmesi",
+    profileId: "market",
+    phone: "+905550002013",
+    whatsapp: "+905550002013",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "credit-ui-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: true },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const path = database.databasePath;
   // A cafe with explicit retail capabilities proves there is no profile gate.
   applyBusinessProfileCapabilities(path, "cafe", { preserveUserOverrides: false });

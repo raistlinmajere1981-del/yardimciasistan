@@ -28,6 +28,31 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup({
+    businessName: "Çalışma Zamanı Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550002002",
+    whatsapp: "+905550002002",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "capability-runtime-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: true },
+    initialCounts: { rooms: 1, tables: 1 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const databasePath = database.databasePath;
   const initial = readBusinessCapabilitySnapshot(databasePath);
   assert.equal(initial.profileId, "pension_restaurant");

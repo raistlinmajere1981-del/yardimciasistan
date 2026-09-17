@@ -36,6 +36,31 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup({
+    businessName: "Market Refakat Test İşletmesi",
+    profileId: "market",
+    phone: "+905550002016",
+    whatsapp: "+905550002016",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "companion-inbox-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: true },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const databasePath = database.databasePath;
   applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
   const sqlite = new DatabaseSync(databasePath);

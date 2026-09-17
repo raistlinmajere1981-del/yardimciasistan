@@ -57,6 +57,31 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup({
+    businessName: "Market Tarayıcı Test İşletmesi",
+    profileId: "market",
+    phone: "+905550002017",
+    whatsapp: "+905550002017",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "live-scanner-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: true },
+    initialCounts: { rooms: 0, tables: 0 },
+    tableCategories: []
+  });
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   applyBusinessProfileCapabilities(database.databasePath, "market", { preserveUserOverrides: false });
   database.upsertAndroidDeviceSightings([{
     device_id: DEVICE_ID,

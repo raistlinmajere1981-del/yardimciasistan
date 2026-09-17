@@ -19,52 +19,88 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
+  const initialSetupResult = database.saveInitialSetup({
+    businessName: "Menü Test İşletmesi",
+    profileId: "pension_restaurant",
+    phone: "+905550002020",
+    whatsapp: "+905550002020",
+    email: "",
+    address: "",
+    webModuleUrl: "https://example.test/yardimci-asistan",
+    syncSecret: "menu-smoke-secret",
+    autoSyncEnabled: false,
+    aiEnabled: false,
+    aiProvider: "openai_compatible",
+    aiService: "openai",
+    aiProjectName: "",
+    aiModel: "",
+    aiModelOptions: [],
+    aiBaseUrl: "https://api.openai.com/v1",
+    aiTimeoutSeconds: 30,
+    aiApiKey: "",
+    clearAiApiKey: false,
+    servicePreferences: { whatsapp: true, android: true },
+    initialCounts: { rooms: 3, tables: 3 }
+  });
+  assert.equal(initialSetupResult.ok, true, initialSetupResult.ok ? "" : initialSetupResult.message);
+  // Test-only fixture: give the created rooms/tables stable smoke IDs so the
+  // status-transition flows below can address them without demo seed data.
+  {
+    const seedDb = new DatabaseSync(database.databasePath);
+    try {
+      const firstRoom = seedDb.prepare("SELECT id FROM rooms WHERE deleted_at = '' ORDER BY sort_order, created_at LIMIT 1").get();
+      assert.ok(firstRoom?.id, "Test setup should create at least one room");
+      seedDb.prepare("UPDATE rooms SET id = 'room_101' WHERE id = ?").run(firstRoom.id);
+      const createdTables = seedDb.prepare("SELECT id FROM tables WHERE deleted_at = '' ORDER BY sort_order, created_at LIMIT 2").all();
+      assert.ok(createdTables.length >= 2, "Test setup should create at least two tables");
+      seedDb.prepare("UPDATE tables SET id = 'table_001' WHERE id = ?").run(createdTables[0].id);
+      seedDb.prepare("UPDATE tables SET id = 'table_002' WHERE id = ?").run(createdTables[1].id);
+    } finally {
+      seedDb.close();
+    }
+  }
   seedOperationalSmokeData(database.databasePath);
+  seedSmokeMenu(database);
 
   assert.ok(database.getDashboardData().menu.items.length > 0);
   const initialTrackedItems = database.getDashboardData().menu.items.filter((item) => item.stock_quantity !== null);
-  assert.equal(initialTrackedItems.length, 10, "The demo menu must expose ten stock-tracked fish, meatball and drink items.");
+  assert.equal(initialTrackedItems.length, 10, "The smoke menu must expose ten stock-tracked test items.");
   assert.equal(initialTrackedItems.filter((item) => item.stock_unit === "gram").length, 2);
-  assert.equal(initialTrackedItems.find((item) => item.id === "item_main_006")?.stock_consumption_quantity, 200);
+  assert.equal(initialTrackedItems.find((item) => item.id === "smoke_item_006")?.stock_consumption_quantity, 200);
 
   const initialSetup = database.getSetupData();
-  assert.equal(initialSetup.setupRequired, true);
-  assert.equal(initialSetup.autoSyncEnabled, true);
-  assert.equal(initialSetup.webModuleUrl, "https://yardimciasistan.alwaysdata.net/yardimci-asistan");
-  assert.equal(initialSetup.aiEnabled, true, "The hybrid demo profile enables the service.ai capability.");
+  assert.equal(initialSetup.setupRequired, false);
+  assert.equal(initialSetup.autoSyncEnabled, false);
+  assert.equal(initialSetup.webModuleUrl, "https://example.test/yardimci-asistan");
+  assert.equal(initialSetup.aiEnabled, false);
   assert.equal(initialSetup.aiService, "openai");
   assert.equal(initialSetup.aiProjectName, "");
   assert.equal(initialSetup.aiBaseUrl, "https://api.openai.com/v1");
   assert.equal(initialSetup.aiTimeoutSeconds, 30);
   assert.equal(initialSetup.aiApiKeyConfigured, false);
   assert.equal(initialSetup.aiLastPublishedAt, "");
-  assert.equal(initialSetup.aiProfiles.length, 5);
-  assert.equal(initialSetup.aiProfiles.every((profile) => profile.apiKeyConfigured === false), true);
   assert.equal(basename(database.backupPath), "backup");
 
   const initialSyncRuntime = database.getSyncRuntimeStatus();
-  assert.equal(initialSyncRuntime.enabled, true);
+  assert.equal(initialSyncRuntime.enabled, false);
   assert.match(initialSyncRuntime.clientId, /^desktop-[0-9a-f-]{36}$/);
-  assert.equal(initialSyncRuntime.pendingJobs, 2);
-  assert.deepEqual(
-    database.getPendingSyncJobs().map((job) => job.jobType).sort(),
-    ["android_snapshot", "menu_publish"]
-  );
+  database.setAutoSyncEnabled(true);
+  assert.equal(database.getSyncRuntimeStatus().enabled, true);
   database.setAutoSyncEnabled(false);
   assert.equal(database.getSyncRuntimeStatus().enabled, false);
-  database.setAutoSyncEnabled(true);
-  const initialJobRevisions = new Map(
-    database.getPendingSyncJobs().map((job) => [job.jobKey, job.sourceRevision])
-  );
   for (const job of database.getPendingSyncJobs()) {
     database.completeSyncJob(job.jobKey, job.sourceRevision);
   }
   assert.equal(database.getSyncRuntimeStatus().pendingJobs, 0);
 
   database.queueSyncJob("menu_publish");
+  const firstPublishJob = database.getPendingSyncJobs().find((job) => job.jobType === "menu_publish");
+  assert.ok(firstPublishJob);
+  database.completeSyncJob(firstPublishJob.jobKey, firstPublishJob.sourceRevision);
+  database.queueSyncJob("menu_publish");
   const failedJob = database.getPendingSyncJobs().find((job) => job.jobType === "menu_publish");
   assert.ok(failedJob);
-  assert.ok(failedJob.sourceRevision > initialJobRevisions.get(failedJob.jobKey));
+  assert.ok(failedJob.sourceRevision > firstPublishJob.sourceRevision);
   database.failSyncJob(failedJob.jobKey, failedJob.sourceRevision, "geçici ağ hatası", "2100-01-01T00:00:00.000Z");
   assert.equal(database.getPendingSyncJobs().some((job) => job.jobType === "menu_publish"), false);
   database.queueSyncJob("menu_publish");
@@ -329,11 +365,11 @@ try {
   assert.deepEqual(manualCustomer.tags, ["manuel", "talep"]);
 
   const requestStatusResult = database.updateRequestStatus({
-    requestId: "request_demo_001",
+    requestId: "request_smoke_001",
     status: "answered"
   });
   assert.equal(requestStatusResult.ok, true);
-  assert.ok(requestStatusResult.dashboardData.requests.some((request) => request.id === "request_demo_001" && request.status === "answered"));
+  assert.ok(requestStatusResult.dashboardData.requests.some((request) => request.id === "request_smoke_001" && request.status === "answered"));
 
   const roomStatusResult = database.updateRoomStatus({
     roomId: "room_101",
@@ -350,60 +386,60 @@ try {
   assert.ok(tableStatusResult.dashboardData.tables.some((table) => table.id === "table_001" && table.status === "bill_waiting"));
 
   const taskStatusResult = database.updateDailyTaskStatus({
-    taskId: "task_demo_001",
+    taskId: "task_smoke_001",
     status: "done"
   });
   assert.equal(taskStatusResult.ok, true);
-  assert.ok(taskStatusResult.dashboardData.dailyTasks.some((task) => task.id === "task_demo_001" && task.status === "done"));
+  assert.ok(taskStatusResult.dashboardData.dailyTasks.some((task) => task.id === "task_smoke_001" && task.status === "done"));
   assert.ok(taskStatusResult.dashboardData.summary.pendingDailyTasks >= 1);
 
   const reservationStatusResult = database.updateReservationStatus({
-    reservationId: "reservation_demo_001",
+    reservationId: "reservation_smoke_001",
     status: "approved"
   });
   assert.equal(reservationStatusResult.ok, true);
-  assert.ok(reservationStatusResult.dashboardData.reservations.some((reservation) => reservation.id === "reservation_demo_001" && reservation.status === "approved"));
+  assert.ok(reservationStatusResult.dashboardData.reservations.some((reservation) => reservation.id === "reservation_smoke_001" && reservation.status === "approved"));
   assert.ok(reservationStatusResult.dashboardData.rooms.some((room) => room.id === "room_101" && room.status === "reserved"));
 
   const reopenRequestForSuggestion = database.updateRequestStatus({
-    requestId: "request_demo_001",
+    requestId: "request_smoke_001",
     status: "new"
   });
   assert.equal(reopenRequestForSuggestion.ok, true);
 
   const aiSuggestionResult = database.saveRequestAiSuggestion({
-    requestId: "request_demo_001",
+    requestId: "request_smoke_001",
     summary: "Smoke AI özet",
-    suggestedReply: "Merhaba Demo Misafir, smoke AI cevap taslağı hazır.",
+    suggestedReply: "Merhaba Smoke Misafir, smoke AI cevap taslağı hazır.",
     missingFields: []
   });
   assert.equal(aiSuggestionResult.ok, true);
-  assert.ok(aiSuggestionResult.dashboardData.requests.some((request) => request.id === "request_demo_001" && request.ai_suggested_reply.includes("smoke AI")));
+  assert.ok(aiSuggestionResult.dashboardData.requests.some((request) => request.id === "request_smoke_001" && request.ai_suggested_reply.includes("smoke AI")));
   assert.ok(aiSuggestionResult.dashboardData.summary.preparedWhatsAppMessages >= 1);
-  assert.ok(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_demo_001" && message.message.includes("smoke AI")));
+  assert.ok(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_001" && message.message.includes("smoke AI")));
 
   const rejectedWhatsAppSentResult = database.markWhatsAppMessageSent({
-    requestId: "request_demo_001",
+    requestId: "request_smoke_001",
     message: "AI taslağından farklı bir metin"
   });
   assert.equal(rejectedWhatsAppSentResult.ok, false);
 
   const preparedBeforeSend = aiSuggestionResult.dashboardData.summary.preparedWhatsAppMessages;
   const whatsappSentResult = database.markWhatsAppMessageSent({
-    requestId: "request_demo_001",
-    message: "Merhaba Demo Misafir, smoke AI cevap taslağı hazır."
+    requestId: "request_smoke_001",
+    message: "Merhaba Smoke Misafir, smoke AI cevap taslağı hazır."
   });
   assert.equal(whatsappSentResult.ok, true);
   assert.equal(whatsappSentResult.dashboardData.summary.preparedWhatsAppMessages, preparedBeforeSend - 1);
-  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_demo_001"), false);
+  assert.equal(database.getAndroidPreparedMessages().some((message) => message.requestId === "request_smoke_001"), false);
   assert.ok(database.countEventsByType("whatsapp.message_sent") >= 1);
 
   const workspaceEntry = database.saveAiWorkspaceHistory({
     mode: "summary",
-    requestId: "request_demo_001",
-    requestLabel: "Demo Misafir • Pansiyon rezervasyonu",
+    requestId: "request_smoke_001",
+    requestLabel: "Smoke Misafir • Pansiyon rezervasyonu",
     instructions: "Eksik bilgileri öne çıkar.",
-    content: "Demo Misafir balkonlu oda için bilgi istiyor.",
+    content: "Smoke Misafir balkonlu oda için bilgi istiyor.",
     summary: "AI çalışma alanı smoke özeti",
     missingFields: ["giriş saati"],
     provider: "openai_compatible",
@@ -418,20 +454,20 @@ try {
 
   const workspaceSaveResult = database.saveAiWorkspaceResult({
     mode: "summary",
-    requestId: "request_demo_001",
+    requestId: "request_smoke_001",
     content: "Düzenlenen çalışma alanı özeti.",
     summary: workspaceEntry.summary,
     missingFields: workspaceEntry.missingFields
   });
   assert.equal(workspaceSaveResult.ok, true);
-  assert.ok(workspaceSaveResult.dashboardData.requests.some((request) => request.id === "request_demo_001" && request.ai_summary === "Düzenlenen çalışma alanı özeti."));
+  assert.ok(workspaceSaveResult.dashboardData.requests.some((request) => request.id === "request_smoke_001" && request.ai_summary === "Düzenlenen çalışma alanı özeti."));
 
-  const conversionResult = database.convertRequestToReservation("request_demo_001");
+  const conversionResult = database.convertRequestToReservation("request_smoke_001");
   assert.equal(conversionResult.ok, true);
-  assert.equal(conversionResult.reservationId, "reservation_demo_001");
+  assert.equal(conversionResult.reservationId, "reservation_smoke_001");
   assert.equal(conversionResult.dashboardData.summary.newRequests, 1);
   assert.equal(conversionResult.dashboardData.summary.pendingReservations, 0);
-  assert.ok(conversionResult.dashboardData.requests.some((request) => request.id === "request_demo_001" && request.status === "converted_to_reservation"));
+  assert.ok(conversionResult.dashboardData.requests.some((request) => request.id === "request_smoke_001" && request.status === "converted_to_reservation"));
   assert.ok(conversionResult.dashboardData.requests.some((request) => request.id === manualRequestResult.savedId && request.status === "new"));
 
   database.upsertRequests([
@@ -538,6 +574,55 @@ function seedOperationalSmokeData(databasePath) {
   } finally {
     sqlite.close();
   }
+}
+
+// Test-only menu fixture: ten stock-tracked items (two gram-based, one with a
+// consumption quantity of 200) without relying on production seed data.
+function seedSmokeMenu(database) {
+  const categories = ["Smoke Mutfak", "Smoke Izgara", "Smoke İçecek", "Smoke Tatlı"];
+  const categoryIds = categories.map((name, index) => {
+    const created = database.saveMenuCategory({
+      name,
+      description: "DB smoke test kategorisi.",
+      is_active: true,
+      sort_order: index + 1
+    });
+    assert.equal(created.ok, true, created.ok ? "" : created.message);
+    return created.savedId;
+  });
+  const tracked = [
+    { id: "smoke_item_001", name: "Smoke Ürün 1", unit: "adet", quantity: 50, consumption: 1 },
+    { id: "smoke_item_002", name: "Smoke Ürün 2", unit: "adet", quantity: 40, consumption: 1 },
+    { id: "smoke_item_003", name: "Smoke Ürün 3", unit: "adet", quantity: 30, consumption: 1 },
+    { id: "smoke_item_004", name: "Smoke Ürün 4", unit: "adet", quantity: 25, consumption: 1 },
+    { id: "smoke_item_005", name: "Smoke Ürün 5", unit: "adet", quantity: 20, consumption: 1 },
+    { id: "smoke_item_006", name: "Smoke Gram Ürün", unit: "gram", quantity: 5000, consumption: 200 },
+    { id: "smoke_item_007", name: "Smoke Gram Ürün 2", unit: "gram", quantity: 3000, consumption: 100 },
+    { id: "smoke_item_008", name: "Smoke Ürün 8", unit: "adet", quantity: 15, consumption: 1 },
+    { id: "smoke_item_009", name: "Smoke Ürün 9", unit: "adet", quantity: 12, consumption: 1 },
+    { id: "smoke_item_010", name: "Smoke Ürün 10", unit: "adet", quantity: 10, consumption: 1 }
+  ];
+  tracked.forEach((item, index) => {
+    const created = database.saveMenuItem({
+      id: item.id,
+      category_id: categoryIds[index % categoryIds.length],
+      name: item.name,
+      description: "DB smoke test ürünü.",
+      price: 100 + index,
+      currency: "TRY",
+      image_url: "",
+      is_available: true,
+      is_featured: false,
+      allergens: [],
+      tags: ["smoke"],
+      stock_quantity: item.quantity,
+      stock_min_quantity: 2,
+      stock_unit: item.unit,
+      stock_consumption_quantity: item.consumption,
+      sort_order: index + 1
+    });
+    assert.equal(created.ok, true, created.ok ? "" : created.message);
+  });
 }
 
 function assertTableOrderFlow(database, { appPath, dataDir, categoryId, menuItemId }) {
@@ -906,23 +991,23 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.ok(convertedDashboard.reservations.some((reservation) => reservation.requestId === convertibleRequestId && reservation.status === "approved"));
 
   const cancelledReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_cancel_001", "reservation_cancel", {
-    reservation_id: "reservation_demo_001"
+    reservation_id: "reservation_smoke_001"
   }));
   assert.equal(cancelledReservationResult.ok, true);
-  assert.equal(database.getDashboardData().reservations.find((reservation) => reservation.id === "reservation_demo_001")?.status, "cancelled");
+  assert.equal(database.getDashboardData().reservations.find((reservation) => reservation.id === "reservation_smoke_001")?.status, "cancelled");
   assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "available");
 
   const approvedReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_approve_001", "reservation_approve", {
-    reservation_id: "reservation_demo_001"
+    reservation_id: "reservation_smoke_001"
   }));
   assert.equal(approvedReservationResult.ok, true);
   assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "reserved");
 
   const rejectedReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_reject_001", "reservation_reject", {
-    reservation_id: "reservation_demo_001"
+    reservation_id: "reservation_smoke_001"
   }));
   assert.equal(rejectedReservationResult.ok, true);
-  assert.equal(database.getDashboardData().reservations.find((reservation) => reservation.id === "reservation_demo_001")?.status, "rejected");
+  assert.equal(database.getDashboardData().reservations.find((reservation) => reservation.id === "reservation_smoke_001")?.status, "rejected");
   assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "available");
 
   const roomEventCount = database.countEventsByType("room.status_changed");
@@ -949,22 +1034,22 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.match(failedAction.message, /bulunamadı/i);
 
   const taskCompleteResult = database.applyAndroidAction(androidAction("android_action_task_complete_001", "daily_task_complete", {
-    task_id: "task_demo_001"
+    task_id: "task_smoke_001"
   }));
   assert.equal(taskCompleteResult.ok, true);
-  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "done");
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_smoke_001")?.status, "done");
 
   const taskCancelResult = database.applyAndroidAction(androidAction("android_action_task_cancel_001", "daily_task_cancel", {
-    task_id: "task_demo_001"
+    task_id: "task_smoke_001"
   }));
   assert.equal(taskCancelResult.ok, true);
-  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "cancelled");
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_smoke_001")?.status, "cancelled");
 
   const taskReopenResult = database.applyAndroidAction(androidAction("android_action_task_reopen_001", "daily_task_reopen", {
-    task_id: "task_demo_001"
+    task_id: "task_smoke_001"
   }));
   assert.equal(taskReopenResult.ok, true);
-  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_demo_001")?.status, "pending");
+  assert.equal(database.getDashboardData().dailyTasks.find((task) => task.id === "task_smoke_001")?.status, "pending");
 
   const tableStatusResult = database.applyAndroidAction(androidAction("android_action_table_status_001", "table_status_update", {
     table_id: "table_001",
@@ -1008,23 +1093,23 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   const invariantDb = new DatabaseSync(database.databasePath);
   try {
     invariantDb
-      .prepare("UPDATE reservations SET status = 'pending', table_ids_json = '[\"table_001\"]', updated_at = ? WHERE id = 'reservation_demo_001'")
+      .prepare("UPDATE reservations SET status = 'pending', table_ids_json = '[\"table_001\"]', updated_at = ? WHERE id = 'reservation_smoke_001'")
       .run("2026-07-17T12:30:00.000Z");
     invariantDb
-      .prepare("UPDATE tables SET current_customer_id = 'customer_demo_001', current_reservation_id = 'reservation_demo_001' WHERE id = 'table_001'")
+      .prepare("UPDATE tables SET current_customer_id = 'customer_smoke_001', current_reservation_id = 'reservation_smoke_001' WHERE id = 'table_001'")
       .run();
   } finally {
     invariantDb.close();
   }
   const conflictingReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_order_conflict_001", "reservation_approve", {
-    reservation_id: "reservation_demo_001"
+    reservation_id: "reservation_smoke_001"
   }));
   assert.equal(conflictingReservationResult.ok, false);
   assert.match(conflictingReservationResult.message, /aktif adisyon/i);
   assert.equal(database.getActiveTableOrder("table_001")?.id, openedOrder.id);
   assert.equal(database.getDashboardData().tables.find((table) => table.id === "table_001")?.status, "occupied");
   const desktopReservationConflict = database.updateReservationStatus({
-    reservationId: "reservation_demo_001",
+    reservationId: "reservation_smoke_001",
     status: "cancelled"
   });
   assert.equal(desktopReservationConflict.ok, false);
@@ -1123,7 +1208,7 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   assert.equal(tableAfterClose?.currentReservationId, "");
   assert.equal(tableAfterClose?.currentCustomerId, "");
   const reservationAfterClose = database.updateReservationStatus({
-    reservationId: "reservation_demo_001",
+    reservationId: "reservation_smoke_001",
     status: "cancelled"
   });
   assert.equal(reservationAfterClose.ok, true);
@@ -1337,27 +1422,27 @@ function assertStockTrackingFlow(database, categoryId) {
     movement.sourceType === "android" && movement.actorDeviceId === "android-stock-smoke" && movement.note === "Sayım sonucu"
   ));
 
-  const gramItemId = "item_main_006";
+  const gramItemId = "smoke_item_006";
   const gramStockBefore = stockQuantity(database, gramItemId);
-  assert.equal(gramStockBefore, 6000);
+  assert.equal(gramStockBefore, 5000);
   const gramOrder = database.openTableOrder(stockTableId);
   assert.equal(gramOrder.ok, true);
   const gramAdded = database.addTableOrderItem({ orderId: gramOrder.order.id, menuItemId: gramItemId, quantity: 2, note: "" });
   assert.equal(gramAdded.ok, true);
-  assert.equal(stockQuantity(database, gramItemId), 5600, "Two portions must consume 2 × 200 grams.");
+  assert.equal(stockQuantity(database, gramItemId), 4600, "Two portions must consume 2 × 200 grams.");
   const gramOrderItemId = gramAdded.order.items[0].id;
   assert.equal(database.updateTableOrderItemQuantity({ itemId: gramOrderItemId, quantity: 3 }).ok, true);
-  assert.equal(stockQuantity(database, gramItemId), 5400);
+  assert.equal(stockQuantity(database, gramItemId), 4400);
   assert.equal(database.removeTableOrderItem(gramOrderItemId).ok, true);
-  assert.equal(stockQuantity(database, gramItemId), 6000, "Removing the line must restore the consumed grams.");
+  assert.equal(stockQuantity(database, gramItemId), 5000, "Removing the line must restore the consumed grams.");
   assert.equal(database.closeTableOrder({ orderId: gramOrder.order.id, status: "cancelled" }).ok, true);
 
   const gramCancelOrder = database.openTableOrder(stockTableId);
   assert.equal(gramCancelOrder.ok, true);
   assert.equal(database.addTableOrderItem({ orderId: gramCancelOrder.order.id, menuItemId: gramItemId, quantity: 2, note: "" }).ok, true);
-  assert.equal(stockQuantity(database, gramItemId), 5600);
+  assert.equal(stockQuantity(database, gramItemId), 4600);
   assert.equal(database.closeTableOrder({ orderId: gramCancelOrder.order.id, status: "cancelled" }).ok, true);
-  assert.equal(stockQuantity(database, gramItemId), 6000, "Cancelling the order must restore the consumed grams.");
+  assert.equal(stockQuantity(database, gramItemId), 5000, "Cancelling the order must restore the consumed grams.");
 
   const stopped = database.saveMenuItem({ ...baseInput, id: itemId, stock_quantity: null });
   assert.equal(stopped.ok, true);
