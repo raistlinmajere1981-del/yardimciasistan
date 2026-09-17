@@ -1810,59 +1810,7 @@ export class DesktopDatabase {
   }
 
   getSetupData(): DesktopSetupData {
-    const business = this.db.prepare("SELECT * FROM business WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
-    const settings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
-    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
-    const syncSecret = String(settings?.sync_secret ?? "");
-    const businessName = String(business?.display_name ?? "");
-    const aiService = normalizeStoredAiService(settings?.ai_service);
-    const aiProfiles = getStoredAiServiceProfiles(this.db);
-    const activeAiProfile = aiProfiles.find((profile) => profile.service === aiService);
-    const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
-    const setupRequired =
-      !setupCompleted ||
-      !businessName.trim() ||
-      syncSecret.length < 12 ||
-      syncSecret === "change-this-secret";
-
-    return {
-      setupRequired,
-      appPasswordConfigured: Boolean(String(settings?.app_password_verifier ?? "").trim()),
-      businessName,
-      profileId: normalizeBusinessType(String(business?.profile_id ?? "")),
-      phone: String(business?.phone ?? ""),
-      whatsapp: String(business?.whatsapp ?? ""),
-      email: String(business?.email ?? ""),
-      address: String(business?.address ?? ""),
-      webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
-      syncSecret,
-      autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
-      aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
-      aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
-      aiService,
-      aiProjectName: activeAiProfile?.projectName ?? String(settings?.ai_project_name ?? ""),
-      aiModel: activeAiProfile?.model ?? String(settings?.ai_model ?? ""),
-      aiBaseUrl: activeAiProfile?.baseUrl || normalizeStoredAiBaseUrl(settings?.ai_base_url),
-      aiTimeoutSeconds: activeAiProfile?.timeoutSeconds ?? normalizeStoredAiTimeout(settings?.ai_timeout_seconds),
-      aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
-      aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
-      aiProfiles,
-      servicePreferences: {
-        whatsapp: enabledCapabilities.has(BUSINESS_CAPABILITIES.WHATSAPP),
-        android: enabledCapabilities.has(BUSINESS_CAPABILITIES.ANDROID)
-      },
-      initialCounts: {
-        rooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''"),
-        tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
-      },
-      tableCategories: getStoredTableCategories(this.db),
-      birthdaySettings: normalizeBirthdaySettings({
-        enabled: normalizeBoolean(settings?.birthday_enabled, true),
-        mode: settings?.birthday_mode === "automatic" ? "automatic" : "manual",
-        sendTime: String(settings?.birthday_send_time ?? "10:00"),
-        messageTemplate: String(settings?.birthday_message_template ?? "")
-      })
-    };
+    return getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   getAppLockPasswordVerifier(): string {
@@ -1972,7 +1920,7 @@ export class DesktopDatabase {
 
   markAiSettingsPublished(timestamp: string): DesktopSetupData {
     markStoredAiSettingsPublished(this.db, timestamp);
-    return this.getSetupData();
+    return getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   saveInitialSetup(
@@ -2359,11 +2307,11 @@ export class DesktopDatabase {
         });
       }
 
-      this.ensureInitialRooms(normalizeInteger(input.initialCounts.rooms), now);
+      ensureStoredInitialRooms(this.db, normalizeInteger(input.initialCounts.rooms), now);
       if (tableCategoryResolution.categories) {
-        this.reconcileTableCategories(tableCategoryResolution.categories, now);
+        reconcileStoredTableCategories(this.db, tableCategoryResolution.categories, now, this.getProtectedTableIds());
       } else {
-        this.ensureInitialTables(normalizeInteger(input.initialCounts.tables), now);
+        ensureStoredInitialTables(this.db, normalizeInteger(input.initialCounts.tables), now);
       }
       this.db.exec("COMMIT");
     } catch (error) {
@@ -2393,7 +2341,7 @@ export class DesktopDatabase {
     return {
       ok: true,
       message: "İlk kurulum ayarları kaydedildi.",
-      setupData: this.getSetupData(),
+      setupData: getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities())),
       dashboardData: this.getDashboardData()
     };
   }
@@ -3140,56 +3088,6 @@ export class DesktopDatabase {
     }
   }
 
-  private ensureInitialRooms(targetCount: number, now: string) {
-    const count = this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''");
-    const missing = Math.max(0, targetCount - count);
-    const statement = this.db.prepare(`
-      INSERT INTO rooms (
-        id,
-        name,
-        number,
-        capacity,
-        bed_info,
-        status,
-        features_json,
-        description,
-        sort_order,
-        created_at,
-        updated_at,
-        sync_status
-      ) VALUES (?, ?, ?, 2, '1 çift kişilik yatak', 'available', '[]', '', ?, ?, ?, 'local_only')
-    `);
-
-    for (let index = 0; index < missing; index += 1) {
-      const order = count + index + 1;
-      const number = String(100 + order);
-      statement.run(createId("room_"), `Oda ${number}`, number, order, now, now);
-    }
-  }
-
-  private ensureInitialTables(targetCount: number, now: string) {
-    const count = this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''");
-    const missing = Math.max(0, targetCount - count);
-    const statement = this.db.prepare(`
-      INSERT INTO tables (
-        id,
-        name,
-        area,
-        capacity,
-        status,
-        sort_order,
-        created_at,
-        updated_at,
-        sync_status
-      ) VALUES (?, ?, 'Genel', 4, 'available', ?, ?, ?, 'local_only')
-    `);
-
-    for (let index = 0; index < missing; index += 1) {
-      const order = count + index + 1;
-      statement.run(createId("table_"), `Masa ${order}`, order, now, now);
-    }
-  }
-
   private getProtectedTableIds(): Set<string> {
     const protectedIds = new Set<string>();
     const activeOrders = this.db
@@ -3245,153 +3143,6 @@ export class DesktopDatabase {
         .filter(Boolean)
     );
     return new Set([...protectedIds].filter((tableId) => currentTableIds.has(tableId)));
-  }
-
-  private reconcileTableCategories(categories: NormalizedTableCategoryInput[], now: string) {
-    const tables = this.db
-      .prepare(`
-        SELECT id, name, area, capacity, status, is_active, sort_order
-        FROM tables
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const protectedIds = this.getProtectedTableIds();
-    const remaining = [...tables];
-    const assignments = categories.map((category) => ({
-      category,
-      tables: [] as Array<Record<string, unknown>>
-    }));
-
-    const takeFromRemaining = (
-      assignment: (typeof assignments)[number],
-      predicate: (table: Record<string, unknown>) => boolean
-    ) => {
-      for (let index = 0; index < remaining.length && assignment.tables.length < assignment.category.tableCount;) {
-        if (predicate(remaining[index])) {
-          assignment.tables.push(remaining.splice(index, 1)[0]);
-        } else {
-          index += 1;
-        }
-      }
-    };
-
-    // Önce kendi kategorisindeki korumalı masaları yerinde tut.
-    for (const assignment of assignments) {
-      const sourceKey = assignment.category.sourceKey || assignment.category.nameKey;
-      takeFromRemaining(assignment, (table) =>
-        protectedIds.has(String(table.id ?? ""))
-        && tableCategoryKey(normalizeTableCategoryName(table.area)) === sourceKey
-      );
-    }
-
-    // Kaldırılan veya küçültülen kategorilerdeki aktif masalara mutlaka yeni bir yer ayır.
-    const assignFromPool = (protectedOnly: boolean) => {
-      for (const assignment of assignments) {
-        while (assignment.tables.length < assignment.category.tableCount) {
-          const candidateIndex = remaining.findIndex((table) =>
-            protectedIds.has(String(table.id ?? "")) === protectedOnly
-          );
-          if (candidateIndex < 0) {
-            break;
-          }
-          assignment.tables.push(remaining.splice(candidateIndex, 1)[0]);
-        }
-      }
-    };
-
-    assignFromPool(true);
-
-    // Korumalı masalar yerleştirildikten sonra mevcut kategori eşleşmelerini koru.
-    for (const assignment of assignments) {
-      const sourceKey = assignment.category.sourceKey || assignment.category.nameKey;
-      takeFromRemaining(assignment, (table) =>
-        !protectedIds.has(String(table.id ?? ""))
-        && tableCategoryKey(normalizeTableCategoryName(table.area)) === sourceKey
-      );
-    }
-
-    assignFromPool(false);
-    for (const assignment of assignments) {
-      assignment.tables.sort((left, right) =>
-        Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0)
-        || String(left.name ?? "").localeCompare(String(right.name ?? ""), "tr")
-      );
-    }
-
-    const updateTable = this.db.prepare(`
-      UPDATE tables
-      SET name = ?,
-          area = ?,
-          is_active = 1,
-          sort_order = ?,
-          updated_at = ?,
-          deleted_at = '',
-          sync_status = 'local_only'
-      WHERE id = ?
-    `);
-    const insertTable = this.db.prepare(`
-      INSERT INTO tables (
-        id,
-        name,
-        area,
-        capacity,
-        status,
-        notes,
-        is_active,
-        sort_order,
-        created_at,
-        updated_at,
-        sync_status
-      ) VALUES (?, ?, ?, 4, 'available', '', 1, ?, ?, ?, 'local_only')
-    `);
-    let sortOrder = 1;
-
-    for (const assignment of assignments) {
-      for (let index = 0; index < assignment.category.tableCount; index += 1) {
-        const table = assignment.tables[index];
-        const position = index + 1;
-        if (table) {
-          const nextName = reconcileTableName(table.name, table.area, assignment.category.name, position);
-          if (
-            nextName !== String(table.name ?? "")
-            || assignment.category.name !== String(table.area ?? "")
-            || sortOrder !== Number(table.sort_order ?? 0)
-            || Number(table.is_active ?? 0) !== 1
-          ) {
-            updateTable.run(
-              nextName,
-              assignment.category.name,
-              sortOrder,
-              now,
-              String(table.id ?? "")
-            );
-          }
-        } else {
-          insertTable.run(
-            createId("table_"),
-            `${assignment.category.name} ${position}`,
-            assignment.category.name,
-            sortOrder,
-            now,
-            now
-          );
-        }
-        sortOrder += 1;
-      }
-    }
-
-    const archiveTable = this.db.prepare(`
-      UPDATE tables
-      SET is_active = 0,
-          deleted_at = ?,
-          updated_at = ?,
-          sync_status = 'local_only'
-      WHERE id = ?
-    `);
-    for (const table of remaining) {
-      archiveTable.run(now, now, String(table.id ?? ""));
-    }
   }
 
   private ensureCustomerForRequest(request: Record<string, unknown>, now: string) {
@@ -4763,7 +4514,6 @@ import {
 
 import {
   getTables as getStoredTables,
-  getTableCategories as getStoredTableCategories,
   updateTableStatus as updateStoredTableStatus,
 } from "./database/table-store.js";
 
@@ -4777,6 +4527,13 @@ import {
   applyAndroidMenuStockAction as applyStoredAndroidMenuStockAction,
   insertAndroidActionEvent as insertStoredAndroidActionEvent,
 } from "./android-action-service.js";
+
+import {
+  getSetupData as getStoredSetupData,
+  ensureInitialRooms as ensureStoredInitialRooms,
+  ensureInitialTables as ensureStoredInitialTables,
+  reconcileTableCategories as reconcileStoredTableCategories,
+} from "./setup-service.js";
 
 import {
   getTrackedStockCandidates as getStoredTrackedStockCandidates,
