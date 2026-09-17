@@ -147,7 +147,6 @@ import type {
   DesktopSyncJob,
   DesktopSyncRuntimeStatus,
   ApplyAndroidActionResult,
-  TableOrderItemStatus,
 } from "./database-types.js";
 
 export type {
@@ -345,7 +344,7 @@ export class DesktopDatabase {
       customers: this.getCustomers(),
       customerRoomStays: this.getCustomerRoomStays(),
       androidDevices: this.getAndroidDevices(),
-      paymentWaitingTableOrders: this.listPaymentWaitingTableOrders(),
+      paymentWaitingTableOrders: listPaymentWaitingTableOrders(this.db),
       androidActionFailures: this.getAndroidActionFailures(),
       birthdayOverview: readBirthdayOverview(this.db),
       summary: {
@@ -1414,93 +1413,12 @@ export class DesktopDatabase {
   }
 
   listTableOrders(): DesktopTableOrder[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          table_orders.*,
-          tables.name AS table_name,
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
-              ELSE 0
-            END
-          ), 0) AS item_count
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        GROUP BY table_orders.id
-        ORDER BY table_orders.opened_at DESC, table_orders.created_at DESC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => this.mapTableOrderRow(row));
+    return listStoredTableOrders(this.db);
   }
 
-  private listPaymentWaitingTableOrders(): DesktopPaymentWaitingTableOrder[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          table_orders.id,
-          table_orders.table_id,
-          tables.name AS table_name,
-          table_orders.total,
-          table_orders.opened_at,
-          table_orders.updated_at,
-          COALESCE(MAX(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.currency
-              ELSE NULL
-            END
-          ), 'TRY') AS currency
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.status = 'payment'
-        GROUP BY table_orders.id
-        ORDER BY table_orders.updated_at DESC, table_orders.opened_at DESC
-        LIMIT 100
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      tableId: String(row.table_id ?? ""),
-      tableName: String(row.table_name ?? "Masa"),
-      total: roundMoney(Number(row.total ?? 0)),
-      currency: normalizeTableOrderCurrency(row.currency),
-      openedAt: String(row.opened_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
 
   getActiveTableOrder(tableId: string): DesktopTableOrder | null {
-    const normalizedTableId = tableId.trim();
-    if (!normalizedTableId) {
-      return null;
-    }
-
-    const row = this.db
-      .prepare(`
-        SELECT
-          table_orders.*,
-          tables.name AS table_name,
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
-              ELSE 0
-            END
-          ), 0) AS item_count
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.table_id = ?
-          AND table_orders.status IN ('open', 'preparing', 'served', 'payment')
-        GROUP BY table_orders.id
-        LIMIT 1
-      `)
-      .get(normalizedTableId) as Record<string, unknown> | undefined;
-
-    return row ? this.mapTableOrderRow(row) : null;
+    return getStoredActiveTableOrder(this.db, tableId);
   }
 
   openTableOrder(tableId: string): DesktopTableOrderResult {
@@ -1571,7 +1489,7 @@ export class DesktopDatabase {
       throw error;
     }
 
-    const order = this.getTableOrderById(id);
+    const order = getTableOrderById(this.db, id);
     if (!order) {
       return { ok: false, message: "Adisyon açıldı ancak yeniden yüklenemedi." };
     }
@@ -1596,7 +1514,7 @@ export class DesktopDatabase {
     const now = new Date().toISOString();
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      if (!this.isActiveTableOrder(orderId)) {
+      if (!isActiveTableOrder(this.db, orderId)) {
         this.db.exec("ROLLBACK");
         return { ok: false, message: "Ürün yalnızca aktif bir adisyona eklenebilir." };
       }
@@ -1726,7 +1644,7 @@ export class DesktopDatabase {
             now
           );
       }
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      recalculateTableOrderTotalInTransaction(this.db, orderId, now);
       this.insertEvent({
         type: "table_order.item_added",
         entityType: "table_order",
@@ -1740,7 +1658,11 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(orderId, "Ürün adisyona eklendi.", true);
+    const mutationResult = getTableOrderMutationResult(this.db, orderId, "Ürün adisyona eklendi.");
+    if (!mutationResult.ok) {
+      return mutationResult;
+    }
+    return { ...mutationResult, dashboardData: this.getDashboardData() };
   }
 
   updateTableOrderItemQuantity(input: UpdateTableOrderItemQuantityInput): DesktopTableOrderResult {
@@ -1754,7 +1676,7 @@ export class DesktopDatabase {
     let orderId = "";
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      const item = this.getMutableTableOrderItem(itemId);
+      const item = getMutableTableOrderItem(this.db, itemId);
       if (!item) {
         this.db.exec("ROLLBACK");
         return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
@@ -1782,7 +1704,7 @@ export class DesktopDatabase {
       this.db
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
         .run(quantity, lineTotal, updatedAt, itemId);
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      recalculateTableOrderTotalInTransaction(this.db, orderId, now);
       this.insertEvent({
         type: "table_order.item_quantity_changed",
         entityType: "table_order",
@@ -1796,7 +1718,11 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(orderId, "Ürün adedi güncellendi.", true);
+    const mutationResult = getTableOrderMutationResult(this.db, orderId, "Ürün adedi güncellendi.");
+    if (!mutationResult.ok) {
+      return mutationResult;
+    }
+    return { ...mutationResult, dashboardData: this.getDashboardData() };
   }
 
   updateTableOrderItemNote(input: UpdateTableOrderItemNoteInput): DesktopTableOrderResult {
@@ -1806,7 +1732,7 @@ export class DesktopDatabase {
     let orderId = "";
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      const item = this.getMutableTableOrderItem(itemId);
+      const item = getMutableTableOrderItem(this.db, itemId);
       if (!item) {
         this.db.exec("ROLLBACK");
         return { ok: false, message: "Not eklenecek aktif sipariş satırı bulunamadı." };
@@ -1827,7 +1753,7 @@ export class DesktopDatabase {
       this.db.exec("ROLLBACK");
       throw error;
     }
-    return this.getTableOrderMutationResult(orderId, "Ürün notu kaydedildi.");
+    return getTableOrderMutationResult(this.db, orderId, "Ürün notu kaydedildi.");
   }
 
   removeTableOrderItem(itemId: string): DesktopTableOrderResult {
@@ -1836,7 +1762,7 @@ export class DesktopDatabase {
     let orderId = "";
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      const item = this.getMutableTableOrderItem(normalizedItemId);
+      const item = getMutableTableOrderItem(this.db, normalizedItemId);
       if (!item) {
         this.db.exec("ROLLBACK");
         return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
@@ -1858,7 +1784,7 @@ export class DesktopDatabase {
       }
       const updatedAt = nextMutationTimestamp(item.updated_at, now);
       this.db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(updatedAt, normalizedItemId);
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      recalculateTableOrderTotalInTransaction(this.db, orderId, now);
       this.insertEvent({
         type: "table_order.item_removed",
         entityType: "table_order",
@@ -1872,7 +1798,11 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(orderId, "Ürün adisyondan kaldırıldı.", true);
+    const mutationResult = getTableOrderMutationResult(this.db, orderId, "Ürün adisyondan kaldırıldı.");
+    if (!mutationResult.ok) {
+      return mutationResult;
+    }
+    return { ...mutationResult, dashboardData: this.getDashboardData() };
   }
 
   updateTableOrderStatus(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
@@ -1932,7 +1862,11 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(orderId, "Adisyon durumu güncellendi.", true);
+    const mutationResult = getTableOrderMutationResult(this.db, orderId, "Adisyon durumu güncellendi.");
+    if (!mutationResult.ok) {
+      return mutationResult;
+    }
+    return { ...mutationResult, dashboardData: this.getDashboardData() };
   }
 
   closeTableOrder(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
@@ -1953,13 +1887,13 @@ export class DesktopDatabase {
         return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
       }
       if (status === "cancelled") {
-        const stockRestore = this.restoreCancelledOrderStockInTransaction(orderId, "", now);
+        const stockRestore = restoreCancelledOrderStockInTransaction(this.db, orderId, "", now);
         if (!stockRestore.ok) {
           this.db.exec("ROLLBACK");
           return stockRestore;
         }
       }
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
+      recalculateTableOrderTotalInTransaction(this.db, orderId, now);
       const updateResult = this.db
         .prepare(`
           UPDATE table_orders
@@ -1986,33 +1920,19 @@ export class DesktopDatabase {
       throw error;
     }
 
-    return this.getTableOrderMutationResult(
+    const mutationResult = getTableOrderMutationResult(
+      this.db,
       orderId,
-      status === "paid" ? "Adisyon ödendi olarak kapatıldı." : "Adisyon iptal edildi.",
-      true
+      status === "paid" ? "Adisyon ödendi olarak kapatıldı." : "Adisyon iptal edildi."
     );
+    if (!mutationResult.ok) {
+      return mutationResult;
+    }
+    return { ...mutationResult, dashboardData: this.getDashboardData() };
   }
 
   recalculateTableOrderTotal(orderId: string): DesktopTableOrderResult {
-    const normalizedOrderId = orderId.trim();
-    if (!normalizedOrderId) {
-      return { ok: false, message: "Toplamı hesaplanacak adisyon bulunamadı." };
-    }
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const exists = this.db.prepare("SELECT id FROM table_orders WHERE id = ?").get(normalizedOrderId);
-      if (!exists) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Toplamı hesaplanacak adisyon bulunamadı." };
-      }
-      this.recalculateTableOrderTotalInTransaction(normalizedOrderId, new Date().toISOString());
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-    return this.getTableOrderMutationResult(normalizedOrderId, "Adisyon toplamı güncellendi.");
+    return recalculateStoredTableOrderTotal(this.db, orderId);
   }
 
   saveManualRestaurantReservation(input: SaveManualRestaurantReservationInput): DesktopStatusUpdateResult {
@@ -2391,7 +2311,7 @@ export class DesktopDatabase {
 
       const roomIds = this.parseStringArray(reservation.room_ids_json);
       const tableIds = this.parseStringArray(reservation.table_ids_json);
-      if (this.findActiveOrderForTables(tableIds)) {
+      if (findActiveOrderForTables(this.db, tableIds)) {
         this.db.exec("ROLLBACK");
         return {
           ok: false,
@@ -6042,7 +5962,7 @@ export class DesktopDatabase {
 
     const roomIds = this.parseStringArray(reservation.room_ids_json);
     const tableIds = this.parseStringArray(reservation.table_ids_json);
-    const activeOrder = this.findActiveOrderForTables(tableIds);
+    const activeOrder = findActiveOrderForTables(this.db, tableIds);
     if (activeOrder) {
       return { ok: false, message: "Aktif adisyonu olan masaya bağlı rezervasyon değiştirilemez. Önce adisyonu kapatın." };
     }
@@ -6238,13 +6158,13 @@ export class DesktopDatabase {
     const dependencyActionId = androidPayloadString(action.payload, "depends_on_action_id");
     let orderId = "";
     if (explicitOrderId) {
-      orderId = this.resolveAndroidActiveOrderId(action.payload);
+      orderId = resolveAndroidActiveOrderId(this.db, action.payload);
     } else if (dependencyActionId) {
       const dependencyReceipt = this.db
         .prepare("SELECT action_type FROM android_action_receipts WHERE id = ?")
         .get(dependencyActionId) as { action_type?: string } | undefined;
       const dependentOrderId = createAndroidEntityId("table_order_", dependencyActionId);
-      if (dependencyReceipt?.action_type !== "table_order_open" || !this.isActiveTableOrder(dependentOrderId)) {
+      if (dependencyReceipt?.action_type !== "table_order_open" || !isActiveTableOrder(this.db, dependentOrderId)) {
         return { ok: false, message: "Ürün eklenemedi çünkü bağlı adisyon açma işlemi uygulanmadı." };
       }
       orderId = dependentOrderId;
@@ -6347,7 +6267,7 @@ export class DesktopDatabase {
         `)
         .run(itemId, orderId, menuItemId, productName, unitPrice, currency, quantity, roundMoney(unitPrice * quantity), now, now);
     }
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    recalculateTableOrderTotalInTransaction(this.db, orderId, now);
     this.insertAndroidActionEvent(action, "table_order.item_added", "table_order", orderId, {
       item_id: itemId,
       menu_item_id: menuItemId,
@@ -6364,7 +6284,7 @@ export class DesktopDatabase {
     if (!itemId || !quantity) {
       return { ok: false, message: "Sipariş satırı veya adet bilgisi geçersiz." };
     }
-    const item = this.getMutableTableOrderItem(itemId);
+    const item = getMutableTableOrderItem(this.db, itemId);
     if (!item) {
       return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
     }
@@ -6393,7 +6313,7 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
       .run(quantity, roundMoney(Number(item.unit_price ?? 0) * quantity), updatedAt, itemId);
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    recalculateTableOrderTotalInTransaction(this.db, orderId, now);
     this.insertAndroidActionEvent(action, "table_order.item_quantity_changed", "table_order", orderId, {
       item_id: itemId,
       quantity
@@ -6403,7 +6323,7 @@ export class DesktopDatabase {
 
   private applyAndroidTableOrderRemoveItem(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
     const itemId = androidPayloadString(action.payload, "item_id");
-    const item = this.getMutableTableOrderItem(itemId);
+    const item = getMutableTableOrderItem(this.db, itemId);
     if (!item) {
       return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
     }
@@ -6429,7 +6349,7 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?")
       .run(updatedAt, itemId);
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    recalculateTableOrderTotalInTransaction(this.db, orderId, now);
     this.insertAndroidActionEvent(action, "table_order.item_removed", "table_order", orderId, { item_id: itemId }, now);
     return { ok: true, message: "Ürün telefondan adisyondan kaldırıldı." };
   }
@@ -6439,7 +6359,7 @@ export class DesktopDatabase {
     now: string,
     forcedStatus?: "preparing" | "served" | "payment"
   ): AndroidActionMutationResult {
-    const orderId = this.resolveAndroidActiveOrderId(action.payload);
+    const orderId = resolveAndroidActiveOrderId(this.db, action.payload);
     const status = forcedStatus ?? normalizeStatus(androidPayloadString(action.payload, "status"), ["open", "preparing", "served", "payment"]);
     if (!orderId || !status) {
       return { ok: false, message: "Adisyon veya yeni durum bilgisi geçersiz." };
@@ -6478,7 +6398,7 @@ export class DesktopDatabase {
     now: string,
     forcedStatus?: "paid" | "cancelled"
   ): AndroidActionMutationResult {
-    const orderId = this.resolveAndroidActiveOrderId(action.payload);
+    const orderId = resolveAndroidActiveOrderId(this.db, action.payload);
     const status = forcedStatus ?? normalizeStatus(androidPayloadString(action.payload, "status"), ["paid", "cancelled"]);
     if (!orderId || !status) {
       return { ok: false, message: "Kapatılacak adisyon veya kapanış durumu geçersiz." };
@@ -6495,12 +6415,12 @@ export class DesktopDatabase {
     }
     const updatedAt = nextMutationTimestamp(current.updated_at, now);
     if (status === "cancelled") {
-      const stockRestore = this.restoreCancelledOrderStockInTransaction(orderId, action.device_id, now);
+      const stockRestore = restoreCancelledOrderStockInTransaction(this.db, orderId, action.device_id, now);
       if (!stockRestore.ok) {
         return stockRestore;
       }
     }
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
+    recalculateTableOrderTotalInTransaction(this.db, orderId, now);
     this.db
       .prepare("UPDATE table_orders SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?")
       .run(status, now, updatedAt, orderId);
@@ -6738,58 +6658,8 @@ export class DesktopDatabase {
   }
 
 
-  private restoreCancelledOrderStockInTransaction(
-    orderId: string,
-    actorDeviceId: string,
-    now: string
-  ): AndroidActionMutationResult {
-    const balances = this.db
-      .prepare(`
-        SELECT menu_item_id, COALESCE(SUM(quantity_change), 0) AS quantity_balance
-        FROM menu_stock_movements
-        WHERE source_type = 'table_order'
-          AND source_id = ?
-          AND type IN ('order_add', 'order_update', 'order_remove')
-        GROUP BY menu_item_id
-      `)
-      .all(orderId) as Array<{ menu_item_id?: string; quantity_balance?: number }>;
-    for (const balance of balances) {
-      const outstandingQuantity = normalizeStockPrecision(-Number(balance.quantity_balance ?? 0));
-      if (outstandingQuantity <= 0) {
-        continue;
-      }
-      const result = mutateStoredMenuStock(this.db, {
-        menuItemId: String(balance.menu_item_id ?? ""),
-        type: "order_cancel",
-        quantityChange: outstandingQuantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId,
-        note: "Adisyon iptal edildi; ayrılan stok geri eklendi.",
-        now
-      });
-      if (!result.ok) {
-        return result;
-      }
-    }
-    return { ok: true, message: "İptal edilen adisyonun stoku geri eklendi." };
-  }
 
 
-  private resolveAndroidActiveOrderId(payload: Record<string, unknown>): string {
-    const orderId = androidPayloadString(payload, "order_id");
-    if (orderId) {
-      return this.isActiveTableOrder(orderId) ? orderId : "";
-    }
-    const tableId = androidPayloadString(payload, "table_id");
-    if (!tableId) {
-      return "";
-    }
-    const order = this.db
-      .prepare("SELECT id FROM table_orders WHERE table_id = ? AND status IN ('open', 'preparing', 'served', 'payment') LIMIT 1")
-      .get(tableId) as { id?: string } | undefined;
-    return String(order?.id ?? "");
-  }
 
   private insertAndroidActionEvent(
     action: AndroidSyncAction,
@@ -6810,118 +6680,10 @@ export class DesktopDatabase {
     });
   }
 
-  private getTableOrderById(orderId: string): DesktopTableOrder | null {
-    const row = this.db
-      .prepare(`
-        SELECT
-          table_orders.*,
-          tables.name AS table_name,
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
-              ELSE 0
-            END
-          ), 0) AS item_count
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.id = ?
-        GROUP BY table_orders.id
-        LIMIT 1
-      `)
-      .get(orderId) as Record<string, unknown> | undefined;
 
-    return row ? this.mapTableOrderRow(row) : null;
-  }
 
-  private mapTableOrderRow(row: Record<string, unknown>): DesktopTableOrder {
-    const id = String(row.id ?? "");
-    return {
-      id,
-      tableId: String(row.table_id ?? ""),
-      tableName: String(row.table_name ?? "Masa"),
-      status: String(row.status ?? "open") as TableOrderStatus,
-      openedAt: String(row.opened_at ?? ""),
-      closedAt: String(row.closed_at ?? ""),
-      subtotal: roundMoney(Number(row.subtotal ?? 0)),
-      discountTotal: roundMoney(Number(row.discount_total ?? 0)),
-      total: roundMoney(Number(row.total ?? 0)),
-      note: String(row.note ?? ""),
-      itemCount: Number(row.item_count ?? 0),
-      items: this.getTableOrderItems(id),
-      createdAt: String(row.created_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    };
-  }
 
-  private getTableOrderItems(orderId: string): DesktopTableOrderItem[] {
-    const rows = this.db
-      .prepare(`
-        SELECT *
-        FROM table_order_items
-        WHERE order_id = ?
-          AND status != 'cancelled'
-        ORDER BY created_at ASC, id ASC
-      `)
-      .all(orderId) as Array<Record<string, unknown>>;
 
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      orderId: String(row.order_id ?? ""),
-      menuItemId: String(row.menu_item_id ?? ""),
-      productName: String(row.product_name ?? "Ürün"),
-      unitPrice: roundMoney(Number(row.unit_price ?? 0)),
-      currency: normalizeTableOrderCurrency(row.currency),
-      quantity: Number(row.quantity ?? 0),
-      lineTotal: roundMoney(Number(row.line_total ?? 0)),
-      note: String(row.note ?? ""),
-      status: String(row.status ?? "open") as TableOrderItemStatus,
-      createdAt: String(row.created_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getMutableTableOrderItem(itemId: string): Record<string, unknown> | null {
-    if (!itemId) {
-      return null;
-    }
-
-    const row = this.db
-      .prepare(`
-        SELECT
-          table_order_items.order_id,
-          table_order_items.menu_item_id,
-          table_order_items.unit_price,
-          table_order_items.quantity,
-          table_order_items.updated_at
-        FROM table_order_items
-        INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
-        WHERE table_order_items.id = ?
-          AND table_order_items.status != 'cancelled'
-          AND table_orders.status IN ('open', 'preparing', 'served', 'payment')
-        LIMIT 1
-      `)
-      .get(itemId) as Record<string, unknown> | undefined;
-
-    return row ?? null;
-  }
-
-  private findActiveOrderForTables(tableIds: string[]): { id: string; tableId: string } | null {
-    const statement = this.db.prepare(`
-      SELECT id, table_id
-      FROM table_orders
-      WHERE table_id = ?
-        AND status IN ('open', 'preparing', 'served', 'payment')
-      LIMIT 1
-    `);
-    for (const tableId of tableIds) {
-      const row = statement.get(tableId) as { id?: string; table_id?: string } | undefined;
-      if (row?.id) {
-        return { id: row.id, tableId: String(row.table_id ?? tableId) };
-      }
-    }
-    return null;
-  }
 
   private markPreparedWhatsAppMessagesSentInTransaction(requestId: string, now: string) {
     this.db
@@ -6940,13 +6702,6 @@ export class DesktopDatabase {
       .run(now, now, requestId);
   }
 
-  private isActiveTableOrder(orderId: string): boolean {
-    return Boolean(
-      this.db
-        .prepare("SELECT id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-        .get(orderId)
-    );
-  }
 
   private updateTableStatusForOrderInTransaction(
     tableId: string,
@@ -7002,48 +6757,7 @@ export class DesktopDatabase {
     }
   }
 
-  private recalculateTableOrderTotalInTransaction(orderId: string, now: string) {
-    const row = this.db
-      .prepare(`
-        SELECT
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.line_total
-              ELSE 0
-            END
-          ), 0) AS subtotal,
-          table_orders.discount_total AS discount_total,
-          table_orders.updated_at AS updated_at
-        FROM table_orders
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.id = ?
-        GROUP BY table_orders.id
-      `)
-      .get(orderId) as { subtotal?: number; discount_total?: number; updated_at?: string } | undefined;
-    if (!row) {
-      throw new Error("Table order not found while recalculating totals.");
-    }
 
-    const subtotal = roundMoney(Number(row.subtotal ?? 0));
-    const discountTotal = roundMoney(Number(row.discount_total ?? 0));
-    const total = roundMoney(Math.max(0, subtotal - discountTotal));
-    const updatedAt = nextMutationTimestamp(row.updated_at, now);
-    this.db
-      .prepare("UPDATE table_orders SET subtotal = ?, total = ?, updated_at = ? WHERE id = ?")
-      .run(subtotal, total, updatedAt, orderId);
-  }
-
-  private getTableOrderMutationResult(orderId: string, message: string, includeDashboardData = false): DesktopTableOrderResult {
-    const order = this.getTableOrderById(orderId);
-    return order
-      ? {
-          ok: true,
-          message,
-          order,
-          ...(includeDashboardData ? { dashboardData: this.getDashboardData() } : {})
-        }
-      : { ok: false, message: "Adisyon güncellendi ancak yeniden yüklenemedi." };
-  }
 
   private insertEvent(input: {
     type: string;
@@ -7165,7 +6879,6 @@ import {
 
 import {
   TABLE_ORDER_STATUSES,
-  normalizeStockPrecision,
   normalizeNullableStockNumber,
   normalizePositiveStockNumber,
   normalizeMenuStockUnit,
@@ -7260,3 +6973,20 @@ import {
   saveMenuItem as saveStoredMenuItem,
   mutateMenuStockInTransaction as mutateStoredMenuStock,
 } from "./database/menu-stock-store.js";
+
+import {
+  listTableOrders as listStoredTableOrders,
+  getActiveTableOrder as getStoredActiveTableOrder,
+  recalculateTableOrderTotal as recalculateStoredTableOrderTotal,
+  listPaymentWaitingTableOrders,
+  getTableOrderById,
+  mapTableOrderRow,
+  getTableOrderItems,
+  getMutableTableOrderItem,
+  findActiveOrderForTables,
+  isActiveTableOrder,
+  recalculateTableOrderTotalInTransaction,
+  getTableOrderMutationResult,
+  restoreCancelledOrderStockInTransaction,
+  resolveAndroidActiveOrderId,
+} from "./database/table-order-store.js";
