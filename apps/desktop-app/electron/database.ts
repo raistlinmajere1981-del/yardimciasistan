@@ -236,16 +236,6 @@ export type {
   ApplyAndroidActionResult,
 } from "./database-types.js";
 
-type MenuStockMutationResult =
-  | {
-      ok: true;
-      message: string;
-      tracked: boolean;
-      quantityBefore: number;
-      quantityAfter: number;
-    }
-  | { ok: false; message: string };
-
 export class DesktopDatabase {
   private readonly db: DatabaseSync;
   readonly databasePath: string;
@@ -1673,7 +1663,7 @@ export class DesktopDatabase {
           this.db.exec("ROLLBACK");
           return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
         }
-        const stockResult = this.mutateMenuStockInTransaction({
+        const stockResult = mutateStoredMenuStock(this.db, {
           menuItemId,
           type: "order_add",
           quantityChange: -quantity,
@@ -1691,7 +1681,7 @@ export class DesktopDatabase {
           .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
           .run(nextQuantity, roundMoney(unitPrice * nextQuantity), now, itemId);
       } else {
-        const stockResult = this.mutateMenuStockInTransaction({
+        const stockResult = mutateStoredMenuStock(this.db, {
           menuItemId,
           type: "order_add",
           quantityChange: -quantity,
@@ -1772,7 +1762,7 @@ export class DesktopDatabase {
       orderId = String(item.order_id);
       const previousQuantity = Number(item.quantity ?? 0);
       if (quantity !== previousQuantity) {
-        const stockResult = this.mutateMenuStockInTransaction({
+        const stockResult = mutateStoredMenuStock(this.db, {
           menuItemId: String(item.menu_item_id ?? ""),
           type: "order_update",
           quantityChange: previousQuantity - quantity,
@@ -1852,7 +1842,7 @@ export class DesktopDatabase {
         return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
       }
       orderId = String(item.order_id);
-      const stockResult = this.mutateMenuStockInTransaction({
+      const stockResult = mutateStoredMenuStock(this.db, {
         menuItemId: String(item.menu_item_id ?? ""),
         type: "order_remove",
         quantityChange: Number(item.quantity ?? 0),
@@ -3187,31 +3177,7 @@ export class DesktopDatabase {
   }
 
   getMenuStockMovements(menuItemId = ""): DesktopMenuStockMovement[] {
-    const normalizedMenuItemId = menuItemId.trim();
-    const rows = (normalizedMenuItemId
-      ? this.db.prepare(`
-          SELECT * FROM menu_stock_movements
-          WHERE menu_item_id = ?
-          ORDER BY created_at ASC, id ASC
-        `).all(normalizedMenuItemId)
-      : this.db.prepare(`
-          SELECT * FROM menu_stock_movements
-          ORDER BY created_at ASC, id ASC
-        `).all()) as Array<Record<string, unknown>>;
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      menuItemId: String(row.menu_item_id ?? ""),
-      type: String(row.type ?? "adjust") as MenuStockMovementType,
-      quantityChange: Number(row.quantity_change ?? 0),
-      quantityBefore: Number(row.quantity_before ?? 0),
-      quantityAfter: Number(row.quantity_after ?? 0),
-      sourceType: String(row.source_type ?? "desktop") as MenuStockSourceType,
-      sourceId: String(row.source_id ?? ""),
-      actorSource: String(row.actor_source ?? (row.actor_device_id ? "android" : "desktop")) as StockImageImportSource,
-      actorDeviceId: String(row.actor_device_id ?? ""),
-      note: String(row.note ?? ""),
-      createdAt: String(row.created_at ?? "")
-    }));
+    return getStoredMenuStockMovements(this.db, menuItemId);
   }
 
   getTrackedStockCandidates(): StockImageMenuCandidate[] {
@@ -4246,141 +4212,11 @@ export class DesktopDatabase {
   }
 
   saveMenuItem(input: SaveMenuItemInput): DesktopMenuSaveResult {
-    const name = input.name.trim();
-    const categoryId = input.category_id.trim();
-    const stockQuantity = normalizeNullableStockNumber(input.stock_quantity);
-    const stockMinQuantity = normalizeNullableStockNumber(input.stock_min_quantity);
-    const stockUnit = normalizeMenuStockUnit(input.stock_unit);
-    const stockConsumptionQuantity = normalizePositiveStockNumber(input.stock_consumption_quantity) ?? 1;
-    if (!name) {
-      return {
-        ok: false,
-        message: "Ürün adı gerekli."
-      };
+    const result = saveStoredMenuItem(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const categoryExists = this.db.prepare("SELECT id FROM menu_categories WHERE id = ? AND deleted_at = ''").get(categoryId);
-    if (!categoryExists) {
-      return {
-        ok: false,
-        message: "Ürün için kategori seçilmeli."
-      };
-    }
-    if (input.stock_quantity !== null && input.stock_quantity !== undefined && stockQuantity === null) {
-      return { ok: false, message: "Stok miktarı 0 veya daha büyük bir sayı olmalı." };
-    }
-    if (input.stock_min_quantity !== null && input.stock_min_quantity !== undefined && stockMinQuantity === null) {
-      return { ok: false, message: "Minimum stok uyarısı 0 veya daha büyük bir sayı olmalı." };
-    }
-
-    const id = input.id?.trim() || createId("item_");
-    const now = new Date().toISOString();
-    const existing = this.db
-      .prepare("SELECT created_at, stock_quantity FROM menu_items WHERE id = ?")
-      .get(id) as { created_at?: string; stock_quantity?: number | null } | undefined;
-    const createdAt = existing?.created_at || now;
-    const previousStockQuantity = existing ? nullableNumber(existing.stock_quantity) : null;
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .prepare(`
-          INSERT INTO menu_items (
-            id,
-            category_id,
-            name,
-            description,
-            price,
-            currency,
-            image_url,
-            is_available,
-            is_featured,
-            allergens_json,
-            tags_json,
-            stock_quantity,
-            stock_min_quantity,
-            stock_unit,
-            stock_consumption_quantity,
-            hide_when_out_of_stock,
-            stock_note,
-            sort_order,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-          ON CONFLICT(id) DO UPDATE SET
-            category_id = excluded.category_id,
-            name = excluded.name,
-            description = excluded.description,
-            price = excluded.price,
-            currency = excluded.currency,
-            image_url = excluded.image_url,
-            is_available = excluded.is_available,
-            is_featured = excluded.is_featured,
-            allergens_json = excluded.allergens_json,
-            tags_json = excluded.tags_json,
-            stock_quantity = excluded.stock_quantity,
-            stock_min_quantity = excluded.stock_min_quantity,
-            stock_unit = excluded.stock_unit,
-            stock_consumption_quantity = excluded.stock_consumption_quantity,
-            hide_when_out_of_stock = excluded.hide_when_out_of_stock,
-            stock_note = excluded.stock_note,
-            sort_order = excluded.sort_order,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'pending'
-        `)
-        .run(
-          id,
-          categoryId,
-          name,
-          input.description.trim(),
-          normalizePrice(input.price),
-          normalizeCurrency(input.currency),
-          input.image_url.trim(),
-          input.is_available ? 1 : 0,
-          input.is_featured ? 1 : 0,
-          JSON.stringify(normalizeStringArray(input.allergens)),
-          JSON.stringify(normalizeStringArray(input.tags)),
-          stockQuantity,
-          stockMinQuantity,
-          stockUnit,
-          stockConsumptionQuantity,
-          input.hide_when_out_of_stock ? 1 : 0,
-          nullableTrimmedString(input.stock_note),
-          normalizeInteger(input.sort_order),
-          createdAt,
-          now
-        );
-
-      if (previousStockQuantity !== stockQuantity) {
-        const before = previousStockQuantity ?? 0;
-        const after = stockQuantity ?? 0;
-        this.insertMenuStockMovementInTransaction({
-          menuItemId: id,
-          type: "set",
-          quantityChange: after - before,
-          quantityBefore: before,
-          quantityAfter: after,
-          sourceType: "desktop",
-          sourceId: id,
-          actorDeviceId: "",
-          note: stockQuantity === null ? "Stok takibi bırakıldı." : "Menü ürün detayından stok ayarlandı.",
-          now
-        });
-      }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Ürün kaydedildi.",
-      savedId: id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   close() {
@@ -6472,7 +6308,7 @@ export class DesktopDatabase {
       if (nextQuantity > 999) {
         return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
       }
-      const stockResult = this.mutateMenuStockInTransaction({
+      const stockResult = mutateStoredMenuStock(this.db, {
         menuItemId,
         type: "order_add",
         quantityChange: -quantity,
@@ -6490,7 +6326,7 @@ export class DesktopDatabase {
         .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
         .run(nextQuantity, roundMoney(unitPrice * nextQuantity), itemUpdatedAt, itemId);
     } else {
-      const stockResult = this.mutateMenuStockInTransaction({
+      const stockResult = mutateStoredMenuStock(this.db, {
         menuItemId,
         type: "order_add",
         quantityChange: -quantity,
@@ -6540,7 +6376,7 @@ export class DesktopDatabase {
     const orderId = String(item.order_id ?? "");
     const previousQuantity = Number(item.quantity ?? 0);
     if (quantity !== previousQuantity) {
-      const stockResult = this.mutateMenuStockInTransaction({
+      const stockResult = mutateStoredMenuStock(this.db, {
         menuItemId: String(item.menu_item_id ?? ""),
         type: "order_update",
         quantityChange: previousQuantity - quantity,
@@ -6577,7 +6413,7 @@ export class DesktopDatabase {
     }
     const updatedAt = nextMutationTimestamp(item.updated_at, now);
     const orderId = String(item.order_id ?? "");
-    const stockResult = this.mutateMenuStockInTransaction({
+    const stockResult = mutateStoredMenuStock(this.db, {
       menuItemId: String(item.menu_item_id ?? ""),
       type: "order_remove",
       quantityChange: Number(item.quantity ?? 0),
@@ -6706,7 +6542,7 @@ export class DesktopDatabase {
       }
     }
 
-    const result = this.mutateMenuStockInTransaction({
+    const result = mutateStoredMenuStock(this.db, {
       menuItemId,
       type: mode,
       quantityChange,
@@ -6851,7 +6687,7 @@ export class DesktopDatabase {
         line.confidence,
         input.now
       );
-      const result = this.mutateMenuStockInTransaction({
+      const result = mutateStoredMenuStock(this.db, {
         menuItemId: line.menu_item_id,
         type: "image_import_add",
         quantityChange: line.quantity,
@@ -6901,94 +6737,6 @@ export class DesktopDatabase {
     };
   }
 
-  private mutateMenuStockInTransaction(input: {
-    menuItemId: string;
-    type: MenuStockMovementType;
-    quantityChange?: number;
-    quantityAfter?: number;
-    allowStartTracking?: boolean;
-    sourceType: MenuStockSourceType;
-    sourceId: string;
-    actorSource?: StockImageImportSource;
-    actorDeviceId: string;
-    note: string;
-    now: string;
-  }): MenuStockMutationResult {
-    const item = this.db
-      .prepare("SELECT stock_quantity, stock_consumption_quantity, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
-      .get(input.menuItemId) as {
-        stock_quantity?: number | null;
-        stock_consumption_quantity?: number;
-        updated_at?: string;
-      } | undefined;
-    if (!item) {
-      return { ok: false, message: "Menü ürünü bulunamadı." };
-    }
-
-    const storedQuantity = nullableNumber(item.stock_quantity);
-    if (storedQuantity === null && !input.allowStartTracking) {
-      if (input.sourceType === "table_order") {
-        return {
-          ok: true,
-          message: "Ürün stok takibinde değil.",
-          tracked: false,
-          quantityBefore: 0,
-          quantityAfter: 0
-        };
-      }
-      return { ok: false, message: "Bu ürün stok takibinde değil." };
-    }
-
-    const quantityBefore = storedQuantity ?? 0;
-    const stockConsumptionQuantity = normalizePositiveStockNumber(item.stock_consumption_quantity) ?? 1;
-    const quantityChange = input.quantityChange === undefined
-      ? undefined
-      : ["order_add", "order_update", "order_remove"].includes(input.type)
-        ? normalizeStockPrecision(input.quantityChange * stockConsumptionQuantity)
-        : input.quantityChange;
-    const requestedAfter = input.quantityAfter === undefined
-      ? quantityBefore + (quantityChange ?? 0)
-      : input.quantityAfter;
-    const quantityAfter = normalizeNullableStockNumber(requestedAfter);
-    if (quantityAfter === null) {
-      return {
-        ok: false,
-        message: input.actorDeviceId ? "Stokta yeterli ürün yok." : "Bu ürün stokta yeterli değil."
-      };
-    }
-
-    const updatedAt = nextMutationTimestamp(item.updated_at, input.now);
-    const update = this.db
-      .prepare(`
-        UPDATE menu_items
-        SET stock_quantity = ?, updated_at = ?, sync_status = 'pending'
-        WHERE id = ? AND deleted_at = ''
-      `)
-      .run(quantityAfter, updatedAt, input.menuItemId);
-    if (Number(update.changes) !== 1) {
-      return { ok: false, message: "Menü ürünü stoku güncellenemedi." };
-    }
-    this.insertMenuStockMovementInTransaction({
-      menuItemId: input.menuItemId,
-      type: input.type,
-      quantityChange: quantityAfter - quantityBefore,
-      quantityBefore,
-      quantityAfter,
-      sourceType: input.sourceType,
-      sourceId: input.sourceId,
-      actorSource: input.actorSource,
-      actorDeviceId: input.actorDeviceId,
-      note: input.note,
-      now: input.now
-    });
-    return {
-      ok: true,
-      message: "Stok güncellendi.",
-      tracked: true,
-      quantityBefore,
-      quantityAfter
-    };
-  }
 
   private restoreCancelledOrderStockInTransaction(
     orderId: string,
@@ -7010,7 +6758,7 @@ export class DesktopDatabase {
       if (outstandingQuantity <= 0) {
         continue;
       }
-      const result = this.mutateMenuStockInTransaction({
+      const result = mutateStoredMenuStock(this.db, {
         menuItemId: String(balance.menu_item_id ?? ""),
         type: "order_cancel",
         quantityChange: outstandingQuantity,
@@ -7027,41 +6775,6 @@ export class DesktopDatabase {
     return { ok: true, message: "İptal edilen adisyonun stoku geri eklendi." };
   }
 
-  private insertMenuStockMovementInTransaction(input: {
-    menuItemId: string;
-    type: MenuStockMovementType;
-    quantityChange: number;
-    quantityBefore: number;
-    quantityAfter: number;
-    sourceType: MenuStockSourceType;
-    sourceId: string;
-    actorSource?: StockImageImportSource;
-    actorDeviceId: string;
-    note: string;
-    now: string;
-  }) {
-    this.db
-      .prepare(`
-        INSERT INTO menu_stock_movements (
-          id, menu_item_id, type, quantity_change, quantity_before, quantity_after,
-          source_type, source_id, actor_source, actor_device_id, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        `stock_movement_${randomUUID()}`,
-        input.menuItemId,
-        input.type,
-        normalizeStockPrecision(input.quantityChange),
-        normalizeStockPrecision(input.quantityBefore),
-        normalizeStockPrecision(input.quantityAfter),
-        input.sourceType,
-        input.sourceId || null,
-        input.actorSource ?? (input.actorDeviceId ? "android" : "desktop"),
-        input.actorDeviceId || null,
-        input.note || null,
-        input.now
-      );
-  }
 
   private resolveAndroidActiveOrderId(payload: Record<string, unknown>): string {
     const orderId = androidPayloadString(payload, "order_id");
@@ -7452,13 +7165,11 @@ import {
 
 import {
   TABLE_ORDER_STATUSES,
-  normalizePrice,
   normalizeStockPrecision,
   normalizeNullableStockNumber,
   normalizePositiveStockNumber,
   normalizeMenuStockUnit,
   normalizeSignedStockNumber,
-  nullableNumber,
   nullableTrimmedString,
   normalizeOrderQuantity,
   createTableOrderId,
@@ -7467,7 +7178,6 @@ import {
   sanitizeStockImageAnalysis,
   normalizeStockImageApplyLines,
   roundMoney,
-  normalizeCurrency,
   normalizeTableOrderCurrency,
 } from "./database/stock-utils.js";
 
@@ -7497,7 +7207,6 @@ import {
   normalizeInteger,
   normalizeBoolean,
   parseAiWorkspacePayload,
-  normalizeStringArray,
   normalizeRequestType,
   normalizePriority,
   normalizeDateInput,
@@ -7545,3 +7254,9 @@ import {
   getQrMenuPublication as getStoredQrMenuPublication,
   saveMenuCategory as saveStoredMenuCategory,
 } from "./database/menu-store.js";
+
+import {
+  getMenuStockMovements as getStoredMenuStockMovements,
+  saveMenuItem as saveStoredMenuItem,
+  mutateMenuStockInTransaction as mutateStoredMenuStock,
+} from "./database/menu-stock-store.js";
