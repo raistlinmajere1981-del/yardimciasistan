@@ -56,7 +56,8 @@ async function smokePackagedRuntime(executablePath) {
       ...process.env,
       ELECTRON_ENABLE_LOGGING: "1",
       XDG_CONFIG_HOME: join(dataDir, "xdg-config"),
-      YA_DESKTOP_DATA_DIR: dataDir
+      YA_DESKTOP_DATA_DIR: dataDir,
+      YA_DESKTOP_BACKUP_DIR: backupPath
     }
   });
 

@@ -314,8 +314,7 @@ function createFixture({
   mode = "automatic",
   sendTime = "10:00",
   template = "Doğum günün kutlu olsun {ad}! {işletme}",
-  businessName = "Test İşletmesi",
-  now = fixedNow
+  businessName = "Test İşletmesi"
 } = {}) {
   const dataDir = mkdtempSync(join(tmpdir(), "yardimci-birthday-automatic-"));
   const database = new DesktopDatabase({

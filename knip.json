@@ -5,12 +5,10 @@
   "workspaces": {
     ".": {
       "entry": [
-        "scripts/**/*.{js,mjs,cjs,ts}",
-        "tests/**/*.{js,mjs,cjs,ts}"
+        "scripts/**/*.{js,mjs,cjs,ts}"
       ],
       "project": [
-        "scripts/**/*.{js,mjs,cjs,ts}",
-        "tests/**/*.{js,mjs,cjs,ts}"
+        "scripts/**/*.{js,mjs,cjs,ts}"
       ]
     },
     "apps/desktop-app": {
