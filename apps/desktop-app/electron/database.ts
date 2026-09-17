@@ -1,5 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -13,26 +13,15 @@ import {
   normalizePhone,
   validateBirthdaySettings,
   type BusinessCapability,
-  type BirthdaySettings,
-  type CustomerGender,
-  type CustomerIdentityType,
-  type IdentityImageAnalysis,
-  type MenuStockUnit,
   type StockImageAnalysis,
-  type StockImageAnalysisLine,
   type StockImageApplyLine,
-  type StockImageConfidence,
   type StockImageImportSource,
   type StockImageMenuCandidate
 } from "@yardimci-asistan/shared";
 import {
-  ANDROID_ADMIN_PERMISSIONS,
   ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
-  ANDROID_PERMISSION_GROUP_IDS,
-  ANDROID_PERMISSIONS,
   ANDROID_STAFF_PERMISSIONS,
   androidActionAllowedByCapabilities,
-  androidEffectivePermissionsForRole,
   androidPermissionsForGroups,
   resolveAndroidActionPermission
 } from "@yardimci-asistan/sync-core";
@@ -251,10 +240,6 @@ export type {
   DesktopSyncRuntimeStatus,
   ApplyAndroidActionResult,
 } from "./database-types.js";
-
-type AndroidActionMutationResult =
-  | { ok: true; message: string }
-  | { ok: false; message: string };
 
 type MenuStockMutationResult =
   | {
@@ -8373,1163 +8358,121 @@ function resolveBackupPath(appPath: string): string {
   return path.resolve(appPath, "..", "..", "backup");
 }
 
-interface NormalizedTableCategoryInput {
-  sourceName: string;
-  sourceKey: string;
-  name: string;
-  nameKey: string;
-  tableCount: number;
-}
-
-function normalizeTableCategoryInputs(
-  input: SaveTableCategoryInput[] | undefined
-):
-  | { ok: true; categories: NormalizedTableCategoryInput[] | undefined }
-  | { ok: false; message: string } {
-  if (input === undefined) {
-    return { ok: true, categories: undefined };
-  }
-  if (!Array.isArray(input)) {
-    return { ok: false, message: "Masa kategorileri geçerli bir liste olmalı." };
-  }
-  if (input.length > 30) {
-    return { ok: false, message: "En fazla 30 masa kategorisi tanımlanabilir." };
-  }
-
-  const categories: NormalizedTableCategoryInput[] = [];
-  const categoryNames = new Set<string>();
-  const sourceNames = new Set<string>();
-  let totalTableCount = 0;
-
-  for (const item of input) {
-    const name = normalizeTableCategoryLabel(item?.name);
-    const sourceName = normalizeTableCategoryLabel(item?.sourceName);
-    const tableCount = Number(item?.tableCount);
-    if (!name) {
-      return { ok: false, message: "Her masa kategorisinin bir adı olmalı." };
-    }
-    if (name.length > 50 || /[\x00-\x1F\x7F]/.test(name)) {
-      return { ok: false, message: `"${name.slice(0, 30)}" masa kategorisi adı geçersiz.` };
-    }
-    if (!Number.isInteger(tableCount) || tableCount < 1 || tableCount > 200) {
-      return { ok: false, message: `"${name}" kategorisindeki masa sayısı 1 ile 200 arasında olmalı.` };
-    }
-
-    const nameKey = tableCategoryKey(name);
-    const sourceKey = sourceName ? tableCategoryKey(sourceName) : "";
-    if (categoryNames.has(nameKey)) {
-      return { ok: false, message: `"${name}" masa kategorisi birden fazla kez kullanılamaz.` };
-    }
-    if (sourceKey && sourceNames.has(sourceKey)) {
-      return { ok: false, message: "Aynı mevcut masa kategorisi birden fazla satırda düzenlenemez." };
-    }
-
-    categoryNames.add(nameKey);
-    if (sourceKey) {
-      sourceNames.add(sourceKey);
-    }
-    totalTableCount += tableCount;
-    categories.push({ sourceName, sourceKey, name, nameKey, tableCount });
-  }
-
-  if (totalTableCount > 500) {
-    return { ok: false, message: "Toplam masa sayısı 500'ü aşamaz." };
-  }
-
-  return { ok: true, categories };
-}
-
-function normalizeTableCategoryLabel(value: unknown): string {
-  return String(value ?? "").trim().replace(/\s+/g, " ");
-}
-
-function normalizeTableCategoryName(value: unknown): string {
-  return normalizeTableCategoryLabel(value) || "Genel";
-}
-
-function tableCategoryKey(value: string): string {
-  return value.toLocaleLowerCase("tr-TR");
-}
-
-function reconcileTableName(currentNameValue: unknown, currentAreaValue: unknown, nextArea: string, position: number): string {
-  const currentName = normalizeTableCategoryLabel(currentNameValue);
-  if (!currentName) {
-    return `${nextArea} ${position}`;
-  }
-
-  const currentArea = normalizeTableCategoryName(currentAreaValue);
-  const numberedName = /^(.*\S)\s+(\d+)$/.exec(currentName);
-  if (!numberedName) {
-    return currentName;
-  }
-
-  const prefixKey = tableCategoryKey(normalizeTableCategoryLabel(numberedName[1]));
-  const currentAreaKey = tableCategoryKey(currentArea);
-  const isGenericTableName = currentAreaKey === tableCategoryKey("Genel") && prefixKey === tableCategoryKey("Masa");
-  return prefixKey === currentAreaKey || isGenericTableName
-    ? `${nextArea} ${position}`
-    : currentName;
-}
-
-const ANDROID_PERMISSION_SET = new Set<string>(ANDROID_PERMISSIONS);
-const ANDROID_ADMIN_ONLY_ACTIONS = new Set<string>([
-  "customer_request_delete",
-  "customer_create",
-  "customer_update",
-  "customer_delete",
-  "customer_room_assign",
-  "customer_room_stay_status",
-  "daily_task_delete",
-  "menu_category_delete",
-  "menu_item_delete",
-  "message_delete"
-]);
-const AI_SERVICE_IDS: DesktopAiService[] = ["openai", "openrouter", "groq", "gemini", "custom"];
-const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(AI_SERVICE_IDS);
-const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
-const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const DEFAULT_AI_TIMEOUT_SECONDS = 30;
-const AI_SERVICE_DEFAULT_BASE_URLS: Record<DesktopAiService, string> = {
-  openai: DEFAULT_AI_BASE_URL,
-  openrouter: "https://openrouter.ai/api/v1",
-  groq: "https://api.groq.com/openai/v1",
-  gemini: GOOGLE_AI_STUDIO_BASE_URL,
-  custom: ""
-};
-const AI_SERVICE_DISPLAY_NAMES: Record<DesktopAiService, string> = {
-  openai: "OpenAI",
-  openrouter: "OpenRouter",
-  groq: "Groq",
-  gemini: "Google AI Studio",
-  custom: "Özel AI servisi"
-};
-const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
-
-function isAndroidAdminOnlyAction(actionType: unknown): boolean {
-  return ANDROID_ADMIN_ONLY_ACTIONS.has(String(actionType ?? "").trim());
-}
-
-function normalizeAndroidDeviceId(value: unknown): string {
-  const deviceId = String(value ?? "").trim();
-  return /^[A-Za-z0-9._:-]{6,120}$/.test(deviceId) ? deviceId : "";
-}
-
-function normalizeAndroidDeviceRole(value: unknown): AndroidDeviceRole {
-  return String(value ?? "").trim() === "admin" ? "admin" : "staff";
-}
-
-function normalizeAndroidDeviceRoleInput(value: unknown): AndroidDeviceRole | null {
-  const role = String(value ?? "").trim();
-  return role === "admin" || role === "staff" ? role : null;
-}
-
-function androidPermissionsForRole(role: AndroidDeviceRole): AndroidPermission[] {
-  return [...(role === "admin" ? ANDROID_ADMIN_PERMISSIONS : ANDROID_STAFF_PERMISSIONS)];
-}
-
-function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
-  return {
-    service_orders: false,
-    cashier: false,
-    rooms_tasks: false,
-    customer_reservation: false,
-    market_operations: false
-  };
-}
-
-function parseStoredAndroidPermissionGroups(value: unknown): AndroidPermissionGroups {
-  try {
-    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return emptyAndroidPermissionGroups();
-    }
-    const record = parsed as Record<string, unknown>;
-    const groups = emptyAndroidPermissionGroups();
-    for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
-      groups[groupId] = record[groupId] === true;
-    }
-    return groups;
-  } catch {
-    return emptyAndroidPermissionGroups();
-  }
-}
-
-function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPermissionGroups | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
-  for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
-    if (!(groupId in record)) {
-      return null;
-    }
-    if (typeof record[groupId] !== "boolean") return null;
-    groups[groupId] = record[groupId];
-  }
-  return groups;
-}
-
-function effectiveAndroidPermissions(
-  role: AndroidDeviceRole,
-  value: unknown,
-  capabilities: Iterable<BusinessCapability>
-): AndroidPermission[] {
-  let storedPermissions: AndroidPermission[] = [];
-  try {
-    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-    if (Array.isArray(parsed)) {
-      storedPermissions = [...new Set(parsed
-        .map((permission) => String(permission).trim())
-        .filter((permission): permission is AndroidPermission => ANDROID_PERMISSION_SET.has(permission)))];
-    }
-  } catch {
-    storedPermissions = [];
-  }
-  return androidEffectivePermissionsForRole(role, storedPermissions, capabilities);
-}
-
-function normalizeAndroidTimestamp(value: unknown, fallback: string): string {
-  const timestamp = String(value ?? "").trim();
-  const parsed = Date.parse(timestamp);
-  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : fallback;
-}
-
-function normalizeAiService(value: unknown): DesktopAiService | null {
-  const service = String(value ?? "").trim().toLowerCase();
-  return SUPPORTED_AI_SERVICES.has(service as DesktopAiService) ? service as DesktopAiService : null;
-}
-
-function normalizeStoredAiService(value: unknown): DesktopAiService {
-  return normalizeAiService(value) ?? "openai";
-}
-
-function getAiServiceDisplayName(service: DesktopAiService): string {
-  return AI_SERVICE_DISPLAY_NAMES[service];
-}
-
-function normalizeAiModelOptions(value: unknown, selectedModel = ""): DesktopAiModelOption[] {
-  let candidates: unknown = value;
-  if (!Array.isArray(candidates)) {
-    try {
-      candidates = JSON.parse(String(value ?? "[]"));
-    } catch {
-      candidates = [];
-    }
-  }
-
-  const options: DesktopAiModelOption[] = [];
-  const seen = new Set<string>();
-  for (const candidate of Array.isArray(candidates) ? candidates : []) {
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
-      continue;
-    }
-    const record = candidate as Record<string, unknown>;
-    const id = String(record.id ?? "").trim();
-    const rawLabel = String(record.label ?? "").trim();
-    if (!id || id.length > 200 || /[\x00-\x1F\x7F]/.test(id) || seen.has(id)) {
-      continue;
-    }
-    const label = rawLabel && rawLabel.length <= 300 && !/[\x00-\x1F\x7F]/.test(rawLabel) ? rawLabel : id;
-    seen.add(id);
-    options.push({ id, label });
-    if (options.length >= 100) {
-      break;
-    }
-  }
-
-  const normalizedSelectedModel = String(selectedModel ?? "").trim();
-  if (normalizedSelectedModel && !seen.has(normalizedSelectedModel)) {
-    if (options.length >= 100) {
-      options.pop();
-    }
-    options.push({ id: normalizedSelectedModel, label: normalizedSelectedModel });
-  }
-  return options;
-}
-
-function normalizeAiBaseUrl(value: unknown): string {
-  const candidate = String(value ?? "").trim();
-  if (!candidate) {
-    return "";
-  }
-
-  try {
-    const parsed = new URL(candidate);
-    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname || parsed.username || parsed.password) {
-      return "";
-    }
-
-    return parsed.toString().replace(/\/+$/, "");
-  } catch {
-    return "";
-  }
-}
-
-function normalizeStoredAiBaseUrl(value: unknown): string {
-  return normalizeAiBaseUrl(value) || DEFAULT_AI_BASE_URL;
-}
-
-function normalizeAiTimeout(value: unknown): number | null {
-  const timeout = Number(value);
-  return Number.isInteger(timeout) && timeout >= 5 && timeout <= 120 ? timeout : null;
-}
-
-function normalizeStoredAiTimeout(value: unknown): number {
-  return normalizeAiTimeout(value) ?? DEFAULT_AI_TIMEOUT_SECONDS;
-}
-
-function normalizeStoredTimestamp(value: unknown): string {
-  const timestamp = String(value ?? "").trim();
-  return timestamp && Number.isFinite(Date.parse(timestamp)) ? timestamp : "";
-}
-
-function normalizePublishedTimestamp(value: string): string {
-  return normalizeStoredTimestamp(value);
-}
-
-function resolveEncryptedAiApiKey(input: {
-  rawKeyProvided: boolean;
-  clearRequested: boolean;
-  write: AiApiKeyWrite;
-  existingEncryptedValue: string;
-}): { ok: true; encryptedValue: string } | { ok: false; message: string } {
-  const encryptedValue = String(input.write.encryptedValue ?? "").trim();
-
-  if (input.clearRequested) {
-    if (input.rawKeyProvided || input.write.mode !== "clear" || encryptedValue) {
-      return {
-        ok: false,
-        message: "AI güvenlik anahtarını silme isteği güvenli depolama işlemiyle eşleşmiyor."
-      };
-    }
-
-    return { ok: true, encryptedValue: "" };
-  }
-
-  if (input.rawKeyProvided) {
-    if (input.write.mode !== "replace" || !encryptedValue) {
-      return {
-        ok: false,
-        message: "Yeni AI güvenlik anahtarı şifrelenmeden kaydedilemez."
-      };
-    }
-
-    return { ok: true, encryptedValue };
-  }
-
-  if (input.write.mode !== "keep" || encryptedValue) {
-    return {
-      ok: false,
-      message: "Boş AI güvenlik anahtarı mevcut kayıt korunarak kaydedilmeli."
-    };
-  }
-
-  return { ok: true, encryptedValue: input.existingEncryptedValue };
-}
-
-function normalizeInteger(value: number) {
-  return Number.isFinite(value) ? Math.trunc(value) : 0;
-}
-
-function normalizeBoolean(value: unknown, fallback: boolean): boolean {
-  if (value === true || value === 1 || value === "1" || value === "true") return true;
-  if (value === false || value === 0 || value === "0" || value === "false") return false;
-  return fallback;
-}
-
-interface NormalizedCustomerInput {
-  fullName: string;
-  phone: string;
-  email: string;
-  notes: string;
-  tags: string[];
-  identityType: CustomerIdentityType;
-  identityNumber: string;
-  nationality: string;
-  birthDate: string;
-  gender: CustomerGender;
-  documentSerialNumber: string;
-  documentExpiryDate: string;
-  birthPlace: string;
-  motherName: string;
-  fatherName: string;
-  issuingAuthority: string;
-  address: string;
-}
-
-function normalizeCustomerInput(
-  input: SaveCustomerInput
-): { ok: true; customer: NormalizedCustomerInput } | { ok: false; message: string } {
-  const fullName = normalizeCustomerSingleLine(input?.fullName, 160);
-  if (fullName.length < 2) {
-    return { ok: false, message: "Müşteri adı en az 2 karakter olmalı." };
-  }
-
-  const rawPhone = String(input?.phone ?? "").trim();
-  const phoneResult = rawPhone ? normalizePhone(rawPhone) : null;
-  if (phoneResult && !phoneResult.ok) {
-    return { ok: false, message: phoneResult.error };
-  }
-
-  const email = normalizeCustomerSingleLine(input?.email, 254).toLowerCase();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { ok: false, message: "E-posta adresi geçerli biçimde olmalı." };
-  }
-
-  const identityType = normalizeCustomerIdentityType(input?.identityType);
-  const identityNumber = normalizeIdentityNumber(input?.identityNumber, identityType);
-  if (identityNumber === null) {
-    return {
-      ok: false,
-      message: identityType === "tc_identity_card"
-        ? "T.C. kimlik numarası 11 haneli ve doğrulanabilir olmalı."
-        : "Kimlik veya pasaport numarası geçersiz."
-    };
-  }
-
-  const birthDate = normalizeOptionalIsoDate(input?.birthDate);
-  const documentExpiryDate = normalizeOptionalIsoDate(input?.documentExpiryDate);
-  if (birthDate === null || documentExpiryDate === null) {
-    return { ok: false, message: "Kimlik tarihleri geçerli gün/ay/yıl biçiminde olmalı." };
-  }
-
-  const tags = [...new Set(
-    (Array.isArray(input?.tags) ? input.tags : [])
-      .map((tag) => normalizeCustomerSingleLine(tag, 40))
-      .filter(Boolean)
-  )].slice(0, 20);
-
-  return {
-    ok: true,
-    customer: {
-      fullName,
-      phone: phoneResult?.ok ? phoneResult.e164 : "",
-      email,
-      notes: normalizeLimitedText(input?.notes, 4000),
-      tags,
-      identityType,
-      identityNumber,
-      nationality: normalizeCustomerSingleLine(input?.nationality, 80),
-      birthDate,
-      gender: normalizeCustomerGender(input?.gender),
-      documentSerialNumber: normalizeCustomerSingleLine(input?.documentSerialNumber, 80).toUpperCase(),
-      documentExpiryDate,
-      birthPlace: normalizeCustomerSingleLine(input?.birthPlace, 160),
-      motherName: normalizeCustomerSingleLine(input?.motherName, 160),
-      fatherName: normalizeCustomerSingleLine(input?.fatherName, 160),
-      issuingAuthority: normalizeCustomerSingleLine(input?.issuingAuthority, 160),
-      address: normalizeLimitedText(input?.address, 2000)
-    }
-  };
-}
-
-function normalizeCustomerIdentityType(value: unknown): CustomerIdentityType {
-  return value === "tc_identity_card" || value === "passport" || value === "other" ? value : "";
-}
-
-function normalizeCustomerGender(value: unknown): CustomerGender {
-  return value === "female" || value === "male" || value === "unspecified" ? value : "";
-}
-
-function normalizeIdentityNumber(value: unknown, identityType: CustomerIdentityType): string | null {
-  const normalized = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "");
-  if (!normalized) {
-    return "";
-  }
-  if (identityType === "tc_identity_card") {
-    return isValidTurkishIdentityNumber(normalized) ? normalized : null;
-  }
-  return /^[A-Z0-9]{4,32}$/.test(normalized) ? normalized : null;
-}
-
-function isValidTurkishIdentityNumber(value: string): boolean {
-  if (!/^[1-9]\d{10}$/.test(value)) {
-    return false;
-  }
-  const digits = [...value].map(Number);
-  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8];
-  const evenSum = digits[1] + digits[3] + digits[5] + digits[7];
-  return ((oddSum * 7 - evenSum) % 10 + 10) % 10 === digits[9]
-    && digits.slice(0, 10).reduce((total, digit) => total + digit, 0) % 10 === digits[10];
-}
-
-function normalizeOptionalIsoDate(value: unknown): string | null {
-  const normalized = String(value ?? "").trim();
-  return !normalized ? "" : isIsoDate(normalized) ? normalized : null;
-}
-
-function normalizeCustomerSingleLine(value: unknown, limit: number): string {
-  return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, limit);
-}
-
-function normalizeLimitedText(value: unknown, limit: number): string {
-  return String(value ?? "").trim().slice(0, limit);
-}
-
-function normalizePrice(value: number) {
-  return Number.isFinite(value) && value >= 0 ? value : 0;
-}
-
-function normalizeStockPrecision(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
-}
-
-function normalizeNullableStockNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  const quantity = Number(value);
-  return Number.isFinite(quantity) && quantity >= 0
-    ? normalizeStockPrecision(quantity)
-    : null;
-}
-
-function normalizePositiveStockNumber(value: unknown): number | null {
-  const quantity = Number(value);
-  return Number.isFinite(quantity) && quantity > 0
-    ? normalizeStockPrecision(quantity)
-    : null;
-}
-
-function normalizeMenuStockUnit(value: unknown): MenuStockUnit {
-  return value === "gram" ? "gram" : "piece";
-}
-
-function normalizeSignedStockNumber(value: unknown): number | null {
-  const quantity = Number(value);
-  return Number.isFinite(quantity) ? normalizeStockPrecision(quantity) : null;
-}
-
-function nullableNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function nullableString(value: unknown): string | null {
-  return value === null || value === undefined ? null : String(value);
-}
-
-function nullableTrimmedString(value: unknown): string | null {
-  const text = String(value ?? "").trim();
-  return text || null;
-}
-
-function normalizeOrderQuantity(value: number): number | null {
-  const quantity = Number(value);
-  return Number.isInteger(quantity) && quantity >= 1 && quantity <= 999 ? quantity : null;
-}
-
-function createTableOrderId(prefix: "table_order_" | "table_order_item_"): string {
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, "") || "000000";
-  return `${prefix}${timestamp}_${randomPart}`;
-}
-
-function createAndroidEntityId(
-  prefix: "customer_" | "reservation_" | "stay_" | "table_order_" | "table_order_item_",
-  actionId: string
-): string {
-  const digest = createHash("sha256").update(actionId).digest("hex").slice(0, 48);
-  return `${prefix}android_${digest}`;
-}
-
-function androidPayloadString(payload: Record<string, unknown>, field: string): string {
-  return typeof payload[field] === "string" ? payload[field].trim() : "";
-}
-
-function androidPayloadStringArray(payload: Record<string, unknown>, field: string): string[] {
-  const value = payload[field];
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function normalizeStockImageImportId(value: unknown): string {
-  const importId = String(value ?? "").trim();
-  return /^[A-Za-z0-9._:-]{8,160}$/.test(importId) ? importId : "";
-}
-
-function isSha256Hex(value: string): boolean {
-  return /^[a-f0-9]{64}$/.test(value);
-}
-
-function normalizeStockImageConfidence(value: unknown): StockImageConfidence {
-  return value === "high" || value === "medium" || value === "low" ? value : "low";
-}
-
-function normalizeStockImageText(value: unknown, limit: number): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const text = value.trim().slice(0, limit);
-  return text || null;
-}
-
-function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates: StockImageMenuCandidate[]): StockImageAnalysis {
-  const source = value && typeof value === "object" && !Array.isArray(value)
-    ? value as unknown as Record<string, unknown>
-    : {};
-  const documentSource = source.document && typeof source.document === "object" && !Array.isArray(source.document)
-    ? source.document as Record<string, unknown>
-    : {};
-  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
-  const sourceLines = Array.isArray(source.lines) ? source.lines.slice(0, 200) : [];
-  const lines: StockImageAnalysisLine[] = [];
-  for (const rawLine of sourceLines) {
-    if (!rawLine || typeof rawLine !== "object" || Array.isArray(rawLine)) {
-      continue;
-    }
-    const line = rawLine as Record<string, unknown>;
-    const rawText = normalizeStockImageText(line.raw_text, 1000);
-    if (!rawText) {
-      continue;
-    }
-    const requestedId = normalizeStockImageText(line.matched_menu_item_id, 160);
-    const candidate = requestedId ? candidateById.get(requestedId) : undefined;
-    const sourceQuantityText = normalizeStockImageText(line.source_quantity_text, 200);
-    const rawQuantity = Number(line.suggested_quantity);
-    const integerQuantity = Number.isInteger(rawQuantity) && rawQuantity > 0 && rawQuantity <= 100_000
-      ? rawQuantity
-      : null;
-    const quantityText = sourceQuantityText || rawText;
-    const gramQuantity = candidate?.stock_unit === "gram" ? parseGramQuantity(quantityText) : null;
-    const ambiguousQuantity = hasAmbiguousStockUnit(quantityText, candidate?.stock_unit ?? "piece");
-    const suggestedQuantity = candidate?.stock_unit === "gram" ? gramQuantity : integerQuantity;
-    let reason = normalizeStockImageText(line.needs_review_reason, 500);
-    if (requestedId && !candidate) {
-      reason = reason || "Önerilen ürün mevcut stok takipli menü listesinde değil.";
-    }
-    if (ambiguousQuantity) {
-      reason = candidate?.stock_unit === "gram"
-        ? "Miktar gram veya kilogram olarak açıkça okunamadı."
-        : "Koli, paket, ağırlık veya hacim bilgisi açık bir adede dönüştürülemedi.";
-    } else if (suggestedQuantity === null) {
-      reason = reason || (candidate?.stock_unit === "gram"
-        ? "Açık gram veya kilogram bilgisi bulunamadı."
-        : "Açık adet bilgisi bulunamadı.");
-    }
-    lines.push({
-      raw_text: rawText,
-      matched_menu_item_id: candidate?.id ?? null,
-      matched_menu_item_name: candidate?.name ?? null,
-      suggested_quantity: ambiguousQuantity ? null : suggestedQuantity,
-      source_quantity_text: sourceQuantityText,
-      confidence: normalizeStockImageConfidence(line.confidence),
-      needs_review_reason: reason
-    });
-  }
-  return {
-    document: {
-      supplier_name: normalizeStockImageText(documentSource.supplier_name, 255),
-      invoice_number: normalizeStockImageText(documentSource.invoice_number, 120),
-      invoice_date: normalizeStockImageText(documentSource.invoice_date, 40),
-      document_confidence: normalizeStockImageConfidence(documentSource.document_confidence)
-    },
-    lines
-  };
-}
-
-function hasAmbiguousStockUnit(value: string, stockUnit: MenuStockUnit): boolean {
-  const normalized = value.toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/\b\d+\s*['’]?\s*(?:li|lı|lu|lü|lik|lık|luk|lük)\s+paket\b/giu, "")
-    .replace(/\s+/g, " ");
-  if (stockUnit === "gram") {
-    return /\b(?:koli|paket|lt|litre|adet|ad|tane)\b/iu.test(normalized) || parseGramQuantity(normalized) === null;
-  }
-  return /\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|gr|gram|lt|litre)\b/iu.test(normalized);
-}
-
-function parseGramQuantity(value: string): number | null {
-  const normalized = value.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
-  const match = normalized.match(/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g)\b/iu);
-  if (!match) {
-    return null;
-  }
-  const quantity = parseTurkishDocumentNumber(match[1]);
-  const grams = ["kg", "kilogram", "kilo"].includes(match[2]) ? quantity * 1000 : quantity;
-  return Number.isInteger(grams) && grams > 0 && grams <= 100_000 ? grams : null;
-}
-
-function parseTurkishDocumentNumber(value: string): number {
-  const text = value.trim();
-  const normalized = text.includes(",")
-    ? text.replace(/\./g, "").replace(",", ".")
-    : /^\d{1,3}(?:\.\d{3})+$/.test(text)
-      ? text.replace(/\./g, "")
-      : text;
-  return Number(normalized);
-}
-
-function normalizeStockImageApplyLines(value: unknown): StockImageApplyLine[] | null {
-  if (!Array.isArray(value) || value.length > 200) {
-    return null;
-  }
-  const lines: StockImageApplyLine[] = [];
-  for (const rawLine of value) {
-    if (!rawLine || typeof rawLine !== "object" || Array.isArray(rawLine)) {
-      return null;
-    }
-    const line = rawLine as Record<string, unknown>;
-    const menuItemId = normalizeStockImageText(line.menu_item_id, 160);
-    const rawText = normalizeStockImageText(line.raw_text, 1000);
-    const quantity = Number(line.quantity);
-    if (!menuItemId || !rawText || !Number.isInteger(quantity) || quantity <= 0 || quantity > 100_000) {
-      return null;
-    }
-    lines.push({
-      menu_item_id: menuItemId,
-      quantity,
-      raw_text: rawText,
-      confidence: normalizeStockImageConfidence(line.confidence)
-    });
-  }
-  return lines;
-}
-
-function getAndroidVersionConflict(
-  payload: Record<string, unknown>,
-  field: string,
-  actualUpdatedAt: unknown,
-  entityLabel: string
-): AndroidActionMutationResult | null {
-  const expectedUpdatedAt = androidPayloadString(payload, field);
-  if (!expectedUpdatedAt || expectedUpdatedAt === String(actualUpdatedAt ?? "")) {
-    return null;
-  }
-  return {
-    ok: false,
-    message: `${entityLabel} masaüstünde değişmiş. Telefonda canlı veriyi yenileyip tekrar deneyin.`
-  };
-}
-
-function nextMutationTimestamp(previousUpdatedAt: unknown, candidate: string): string {
-  const previous = String(previousUpdatedAt ?? "").trim();
-  const previousTime = Date.parse(previous);
-  const candidateTime = Date.parse(candidate);
-  if (!Number.isFinite(previousTime) || !Number.isFinite(candidateTime) || candidateTime > previousTime) {
-    return candidate;
-  }
-  return new Date(previousTime + 1).toISOString();
-}
-
-function androidPayloadNumber(payload: Record<string, unknown>, field: string, fallback: number): number {
-  const value = Number(payload[field]);
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function roundMoney(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function normalizeCurrency(value: string) {
-  const currency = value.trim().toUpperCase();
-  return currency || "TRY";
-}
-
-function normalizeTableOrderCurrency(value: unknown): string {
-  const currency = String(value ?? "TRY").trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
-}
-
-function androidActionRelatedId(action: AndroidSyncAction): string {
-  const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
-    ? action.payload as Record<string, unknown>
-    : {};
-  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "customer_id", "folio_id", "room_id", "task_id", "item_id", "menu_item_id", "category_id", "message_id"]) {
-    const value = String(payload[key] ?? "").trim();
-    if (value) {
-      return value;
-    }
-  }
-  return "";
-}
-
-function androidActionResolutionKey(action: AndroidSyncAction): string {
-  return [
-    String(action.device_id ?? "").trim(),
-    String(action.action_type ?? "").trim(),
-    androidActionRelatedId(action)
-  ].join(":");
-}
-
-function androidActionTargetPage(
-  actionType: string,
-  payload: Record<string, unknown> = {}
-): DesktopAndroidActionFailure["targetPage"] {
-  if (actionType.startsWith("customer_") || actionType === "message_delete") {
-    return "customerWork";
-  }
-  if (actionType.startsWith("reservation_table_")) {
-    return "restaurant";
-  }
-  if (actionType.startsWith("daily_task_") && String(payload.task_type ?? "").trim() === "manual_restaurant") {
-    return "restaurant";
-  }
-  if (actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {
-    return "pension";
-  }
-  if (actionType.startsWith("table_") || actionType.startsWith("menu_")) {
-    return "restaurant";
-  }
-  return "settings";
-}
-
-function normalizeAndroidFailureTargetPage(value: unknown): DesktopAndroidActionFailure["targetPage"] {
-  const target = String(value ?? "");
-  return ["dashboard", "customerWork", "pension", "restaurant", "settings"].includes(target)
-    ? target as DesktopAndroidActionFailure["targetPage"]
-    : "settings";
-}
-
-function friendlyDesktopActionFailure(value: string): string {
-  const message = value.trim();
-  const lower = message.toLocaleLowerCase("tr-TR");
-  if (lower.includes("hesap kapatma yetkisi") || (lower.includes("yetki") && lower.includes("kapat"))) {
-    return "Bu cihazın hesap kapatma yetkisi yok.";
-  }
-  if (lower.includes("pasif")) {
-    return "Bu cihaz pasifleştirilmiş.";
-  }
-  if (lower.includes("adisyon") && (lower.includes("kapalı") || lower.includes("kapat"))) {
-    return "Adisyon kapalı olduğu için işlem yapılamadı.";
-  }
-  if (lower.includes("stok") && (lower.includes("yeterli") || lower.includes("yok"))) {
-    return "Stokta yeterli ürün yok.";
-  }
-  if (lower.includes("yetki") || lower.includes("izin")) {
-    return "Bu cihazın bu işlem için yetkisi yok.";
-  }
-  return message || "İşlem masaüstü tarafından uygulanamadı.";
-}
-
-function parseEventPayload(value: unknown): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function parseAiWorkspacePayload(value: unknown): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function normalizeStringArray(value: string[]) {
-  return value.map((item) => item.trim()).filter(Boolean);
-}
-
-function normalizeRequestType(value: string) {
-  const allowed = new Set([
-    "general_info",
-    "pension_reservation",
-    "restaurant_reservation",
-    "breakfast_request",
-    "qr_menu_question",
-    "location_question",
-    "price_question",
-    "other"
-  ]);
-  const requestType = value.trim();
-  return allowed.has(requestType) ? requestType : "general_info";
-}
-
-function normalizePriority(value: string) {
-  const allowed = new Set(["low", "normal", "high", "urgent"]);
-  const priority = value.trim();
-  return allowed.has(priority) ? priority : "normal";
-}
-
-function normalizeDateInput(value: string) {
-  const date = value.trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
-}
-
-function normalizeTimeInput(value: string) {
-  const time = value.trim();
-  return /^\d{2}:\d{2}$/.test(time) ? time : "";
-}
-
-function getCustomerTagsForSource(source: string) {
-  if (source === "manual") {
-    return ["manuel", "talep"];
-  }
-
-  if (source === "web_ai") {
-    return ["web", "ai", "talep"];
-  }
-
-  if (source === "whatsapp") {
-    return ["whatsapp", "talep"];
-  }
-
-  return ["web", "talep"];
-}
-
-function buildManualRequestReply(customerName: string) {
-  return `Merhaba ${customerName}, talebinizi aldık. Detayları kontrol edip size dönüş yapacağız.`;
-}
-
-function normalizeStatus(value: string, allowed: string[]) {
-  const status = value.trim();
-  return allowed.includes(status) ? status : "";
-}
-
-function normalizeUrl(value: string) {
-  const url = value.trim().replace(/\/+$/, "");
-  return /^https?:\/\//.test(url) ? url : "";
-}
-
-function slugifyBusinessName(value: string) {
-  return (
-    value
-      .trim()
-      .toLocaleLowerCase("tr-TR")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/ı/g, "i")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "firma"
-  );
-}
-
-function buildReservationTitle(request: Record<string, unknown>, reservationType: string) {
-  const name = String(request.customer_name ?? "Misafir").trim() || "Misafir";
-  const labels: Record<string, string> = {
-    room: "oda rezervasyonu",
-    table: "masa rezervasyonu",
-    other: "rezervasyon"
-  };
-
-  return `${name} - ${labels[reservationType] ?? "rezervasyon"}`;
-}
-
-function buildReservationNotes(request: Record<string, unknown>) {
-  const message = String(request.message ?? "").trim();
-  const summary = String(request.ai_summary ?? "").trim();
-  const parts = [message, summary ? `AI özet: ${summary}` : ""].filter(Boolean);
-
-  return parts.join("\n");
-}
-
-function normalizeDesktopReportRange(input: DesktopReportRangeInput): DesktopReportPeriod {
-  const preset = String(input?.preset ?? "") as DesktopReportPreset;
-  const supportedPresets = new Set<DesktopReportPreset>(["today", "yesterday", "last7", "last30", "custom"]);
-  const startDate = String(input?.startDate ?? "").trim();
-  const endDate = String(input?.endDate ?? "").trim();
-  if (!supportedPresets.has(preset) || !isIsoDate(startDate) || !isIsoDate(endDate)) {
-    throw new Error("Rapor için geçerli bir tarih aralığı seçin.");
-  }
-  const dayCount = isoDateDifference(startDate, endDate);
-  if (dayCount < 0) {
-    throw new Error("Rapor başlangıç tarihi bitiş tarihinden sonra olamaz.");
-  }
-  if (dayCount > 3659) {
-    throw new Error("Rapor tarih aralığı en fazla 10 yıl olabilir.");
-  }
-  const label = String(input?.label ?? "").trim().replace(/\s+/g, " ").slice(0, 80)
-    || (startDate === endDate ? startDate : `${startDate} – ${endDate}`);
-  return { preset, label, startDate, endDate };
-}
-
-function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-  const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  return parsed.getUTCFullYear() === year
-    && parsed.getUTCMonth() === month - 1
-    && parsed.getUTCDate() === day;
-}
-
-function isoDateDifference(startDate: string, endDate: string): number {
-  const start = Date.parse(`${startDate}T00:00:00.000Z`);
-  const end = Date.parse(`${endDate}T00:00:00.000Z`);
-  return Math.round((end - start) / 86_400_000);
-}
-
-function enumerateIsoDateRange(startDate: string, endDate: string): string[] {
-  const dayCount = isoDateDifference(startDate, endDate);
-  return Array.from({ length: dayCount + 1 }, (_value, index) => shiftIsoDate(startDate, index));
-}
-
-function reportReservationCapabilitySqlClause(
-  enabledCapabilities: ReadonlySet<BusinessCapability>
-): string {
-  const accommodation = enabledCapabilities.has(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS);
-  const foodService = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_RESERVATIONS);
-  if (accommodation && foodService) {
-    return "";
-  }
-  const domain = reportReservationDomainSql();
-  if (accommodation) {
-    return `AND NOT ${domain.hasTables}`;
-  }
-  if (foodService) {
-    return `AND NOT ${domain.hasRooms}`;
-  }
-  return "AND 1 = 0";
-}
-
-function reportReservationDomainSql(alias = ""): { hasRooms: string; hasTables: string } {
-  const column = (name: string) => alias ? `${alias}.${name}` : name;
-  const hasJsonItems = (name: string) => `json_array_length(CASE
-    WHEN json_valid(${column(name)}) THEN ${column(name)}
-    ELSE '[]'
-  END) > 0`;
-  return {
-    hasRooms: `(${column("reservation_type")} IN ('room', 'room_and_table', 'mixed') OR ${hasJsonItems("room_ids_json")})`,
-    hasTables: `(${column("reservation_type")} IN ('table', 'breakfast', 'room_and_table', 'mixed') OR ${hasJsonItems("table_ids_json")})`
-  };
-}
-
-function reportTaskCapabilitySqlClause(
-  enabledCapabilities: ReadonlySet<BusinessCapability>
-): string {
-  if (!enabledCapabilities.has(BUSINESS_CAPABILITIES.TASKS)) {
-    return "AND 1 = 0";
-  }
-  const accommodation = enabledCapabilities.has(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS) ? 1 : 0;
-  const foodService = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_TABLES) ? 1 : 0;
-  if (accommodation === 1 && foodService === 1) return "";
-  const reservationDomain = reportReservationDomainSql("task_reservation");
-
-  // Reservation-linked tasks use the reservation's actual domain before the
-  // generic task_type fallback, matching the shared/Android classifiers.
-  return `AND CASE
-    WHEN related_type = 'reservation' AND EXISTS (
-      SELECT 1 FROM reservations AS task_reservation
-      WHERE task_reservation.id = daily_tasks.related_id
-        AND task_reservation.deleted_at = ''
-        AND ${reservationDomain.hasRooms}
-        AND ${reservationDomain.hasTables}
-    ) THEN ${accommodation === 1 && foodService === 1 ? 1 : 0}
-    WHEN related_type = 'reservation' AND EXISTS (
-      SELECT 1 FROM reservations AS task_reservation
-      WHERE task_reservation.id = daily_tasks.related_id
-        AND task_reservation.deleted_at = ''
-        AND ${reservationDomain.hasRooms}
-        AND NOT ${reservationDomain.hasTables}
-    ) THEN ${accommodation}
-    WHEN related_type = 'reservation' AND EXISTS (
-      SELECT 1 FROM reservations AS task_reservation
-      WHERE task_reservation.id = daily_tasks.related_id
-        AND task_reservation.deleted_at = ''
-        AND ${reservationDomain.hasTables}
-        AND NOT ${reservationDomain.hasRooms}
-    ) THEN ${foodService}
-    WHEN task_type IN ('check_in', 'check_out', 'room_cleaning', 'room_maintenance', 'reservation', 'manual_pension')
-      OR related_type = 'room' THEN ${accommodation}
-    WHEN task_type IN ('table_reservation', 'breakfast', 'service', 'table_service', 'restaurant', 'table_check', 'payment', 'manual_restaurant')
-      OR related_type = 'table' THEN ${foodService}
-    ELSE 1
-  END = 1`;
-}
-
-function shiftIsoDate(value: string, days: number): string {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function formatLocalIsoDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function reportStockSourceLabel(sourceType: MenuStockSourceType): string {
-  if (sourceType === "android") {
-    return "Android manuel";
-  }
-  if (sourceType === "stock_image_import") {
-    return "Görsel / fatura";
-  }
-  if (sourceType === "table_order") {
-    return "Adisyon";
-  }
-  return "Masaüstü manuel";
-}
-
-function formatReportStockQuantity(value: number, unit: MenuStockUnit): string {
-  const amount = normalizeStockPrecision(value).toLocaleString("tr-TR", { maximumFractionDigits: 3 });
-  return unit === "gram" ? `${amount} g` : `${amount} adet`;
-}
-
-function toAndroidReportSnapshot(
-  key: AndroidReportPresetKey,
-  report: DesktopReportData
-): AndroidReportSnapshot {
-  return {
-    period: {
-      key,
-      label: report.period.label,
-      start: report.period.startDate,
-      end: report.period.endDate
-    },
-    summary: {
-      restaurant_revenue: report.summary.restaurantRevenue,
-      closed_orders: report.summary.closedOrders,
-      average_order: report.summary.averageOrder,
-      approved_reservations: report.summary.approvedReservations,
-      approved_accommodation_reservations: report.summary.approvedAccommodationReservations,
-      approved_food_reservations: report.summary.approvedFoodReservations,
-      approved_mixed_reservations: report.summary.approvedMixedReservations,
-      approved_generic_reservations: report.summary.approvedGenericReservations,
-      new_requests: report.summary.newRequests,
-      attention_count: report.attention.totalCount
-    },
-    restaurant: {
-      sold_item_count: report.restaurant.soldItemCount,
-      cancelled_orders: report.restaurant.cancelledOrders,
-      top_items: report.restaurant.topItems.slice(0, 3).map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        revenue: item.revenue
-      })),
-      daily_revenue: report.restaurant.dailyRevenue.map((day) => ({
-        date: day.date,
-        revenue: day.revenue,
-        closed_orders: day.closedOrders
-      }))
-    },
-    attention: {
-      pending_requests: report.attention.pendingRequests,
-      pending_reservations: report.attention.pendingReservations,
-      payment_waiting_tables: report.attention.paymentWaitingTables,
-      overdue_tasks: report.attention.overdueTasks,
-      incomplete_tasks: report.attention.incompleteTasks,
-      out_of_stock_items: report.attention.outOfStockItems,
-      low_stock_items: report.attention.lowStockItems,
-      items: report.attention.items.map((item) => ({
-        kind: item.kind,
-        title: item.title,
-        detail: item.detail
-      }))
-    }
-  };
-}
+import {
+  normalizeTableCategoryInputs,
+  normalizeTableCategoryName,
+  tableCategoryKey,
+  reconcileTableName,
+} from "./database/table-category-utils.js";
+
+import type {
+  NormalizedTableCategoryInput,
+} from "./database/table-category-utils.js";
+
+import {
+  AI_SERVICE_IDS,
+  DEFAULT_AI_BASE_URL,
+  GOOGLE_AI_STUDIO_BASE_URL,
+  DEFAULT_AI_TIMEOUT_SECONDS,
+  AI_SERVICE_DEFAULT_BASE_URLS,
+  normalizeAiService,
+  normalizeStoredAiService,
+  getAiServiceDisplayName,
+  normalizeAiModelOptions,
+  normalizeAiBaseUrl,
+  normalizeStoredAiBaseUrl,
+  normalizeAiTimeout,
+  normalizeStoredAiTimeout,
+  normalizeStoredTimestamp,
+  normalizePublishedTimestamp,
+  resolveEncryptedAiApiKey,
+} from "./database/ai-settings-utils.js";
+
+import {
+  normalizeCustomerInput,
+  normalizeCustomerIdentityType,
+  normalizeCustomerGender,
+  normalizeLimitedText,
+} from "./database/customer-utils.js";
+
+import {
+  TABLE_ORDER_STATUSES,
+  normalizePrice,
+  normalizeStockPrecision,
+  normalizeNullableStockNumber,
+  normalizePositiveStockNumber,
+  normalizeMenuStockUnit,
+  normalizeSignedStockNumber,
+  nullableNumber,
+  nullableString,
+  nullableTrimmedString,
+  normalizeOrderQuantity,
+  createTableOrderId,
+  normalizeStockImageImportId,
+  isSha256Hex,
+  sanitizeStockImageAnalysis,
+  normalizeStockImageApplyLines,
+  roundMoney,
+  normalizeCurrency,
+  normalizeTableOrderCurrency,
+} from "./database/stock-utils.js";
+
+import {
+  isAndroidAdminOnlyAction,
+  normalizeAndroidDeviceId,
+  normalizeAndroidDeviceRole,
+  normalizeAndroidDeviceRoleInput,
+  androidPermissionsForRole,
+  parseStoredAndroidPermissionGroups,
+  normalizeAndroidPermissionGroupsInput,
+  effectiveAndroidPermissions,
+  normalizeAndroidTimestamp,
+  createAndroidEntityId,
+  androidPayloadString,
+  androidPayloadStringArray,
+  androidPayloadNumber,
+  getAndroidVersionConflict,
+  nextMutationTimestamp,
+  androidActionRelatedId,
+  androidActionResolutionKey,
+  androidActionTargetPage,
+  normalizeAndroidFailureTargetPage,
+  friendlyDesktopActionFailure,
+  parseEventPayload,
+} from "./database/android-utils.js";
+
+import type {
+  AndroidActionMutationResult,
+} from "./database/android-utils.js";
+
+import {
+  normalizeInteger,
+  normalizeBoolean,
+  parseAiWorkspacePayload,
+  normalizeStringArray,
+  normalizeRequestType,
+  normalizePriority,
+  normalizeDateInput,
+  normalizeTimeInput,
+  getCustomerTagsForSource,
+  buildManualRequestReply,
+  normalizeStatus,
+  normalizeUrl,
+  slugifyBusinessName,
+  buildReservationTitle,
+  buildReservationNotes,
+} from "./database/request-utils.js";
+
+import {
+  normalizeDesktopReportRange,
+  isIsoDate,
+  enumerateIsoDateRange,
+  reportReservationCapabilitySqlClause,
+  reportReservationDomainSql,
+  reportTaskCapabilitySqlClause,
+  shiftIsoDate,
+  formatLocalIsoDate,
+  reportStockSourceLabel,
+  formatReportStockQuantity,
+  toAndroidReportSnapshot,
+} from "./database/report-utils.js";
