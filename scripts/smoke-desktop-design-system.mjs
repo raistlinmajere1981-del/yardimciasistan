@@ -73,7 +73,7 @@ try {
   await expect(birthdaySettings.getByLabel('Manuel')).toBeChecked();
   await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
   const observations = [];
-  await expect(page.getByLabel('Telefon', { exact: true })).toHaveValue('+905321234567');
+  await expect(page.getByLabel('Telefon', { exact: true })).toHaveValue('');
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[600,800]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);

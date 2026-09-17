@@ -464,7 +464,9 @@ try {
   await expect(page.locator(".menu-category-panel .menu-panel-heading p")).toHaveText("Menüdeki ürün gruplarını yönetin.");
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Ürünü Kaydet" })).toBeVisible();
+  await page.locator(".menu-category-panel .menu-record").filter({ hasText: "Yerel Kahvaltı" }).first().click();
   await expect(page.getByRole("button", { name: "Kategoriyi Sil" })).toBeVisible();
+  await page.locator(".menu-product-panel .menu-record").filter({ hasText: "Yerel Serpme Kahvaltı" }).first().click();
   await expect(page.getByRole("button", { name: "Ürünü Sil" })).toBeVisible();
   await page.getByRole("button", { name: "Ürünü Sil" }).click();
   const menuDeleteDialog = page.getByRole("dialog", { name: "Ürünü sil" });
