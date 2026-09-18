@@ -800,6 +800,7 @@ async function publishCurrentAndroidSnapshot(): Promise<PushAndroidSnapshotResul
   const snapshot = createAndroidOperationsSnapshot(getDatabase().getDashboardData());
   const result = await pushAndroidSnapshot({
     ...getWebSyncConfig(setup),
+    clientId: getDatabase().getSyncRuntimeStatus().clientId,
     snapshot
   });
 
