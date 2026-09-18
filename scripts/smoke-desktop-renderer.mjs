@@ -235,7 +235,7 @@ try {
     ["Uygulama", "settings-application"],
     ["Özellikler", "settings-capabilities"]
   ]) {
-    await expect(sectionNav.getByRole("link", { name })).toHaveAttribute("href", `#${target}`);
+    await expect(sectionNav.getByRole("link", { name, exact: true })).toHaveAttribute("href", `#${target}`);
     await expect(settings.locator(`#${target}`)).toBeVisible();
   }
   await expect(settings.getByRole("tab", { name: /Temel Ayarlar|Gelişmiş Ayarlar/ })).toHaveCount(0);
@@ -267,7 +267,7 @@ try {
   await tableCategoryEditor.getByRole("button", { name: "Teras satırını kaldır" }).click();
   await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
   const androidDeviceSection = page.locator(".settings-android-devices-section");
-  await expect(androidDeviceSection.getByRole("heading", { name: "Android Cihazlar" })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("heading", { name: "Cihazlar ve Yetkiler" })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Servis + Oda işleri", { exact: true })).toBeVisible();

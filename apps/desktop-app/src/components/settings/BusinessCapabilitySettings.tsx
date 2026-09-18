@@ -46,12 +46,10 @@ const CAPABILITY_LABELS: Readonly<Record<BusinessCapability, string>> = {
 
 const CAPABILITY_GROUPS: ReadonlyArray<{
   title: string;
-  description: string;
   capabilities: readonly BusinessCapability[];
 }> = [
   {
     title: "Konaklama",
-    description: "Oda ve konaklama işlerinde kullandığınız alanları seçin.",
     capabilities: [
       C.ACCOMMODATION_ROOMS,
       C.ACCOMMODATION_RESERVATIONS,
@@ -61,7 +59,6 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
   },
   {
     title: "Restoran / Kafe",
-    description: "Masa, rezervasyon, menü ve adisyon alanlarını seçin.",
     capabilities: [
       C.FOOD_TABLES,
       C.FOOD_RESERVATIONS,
@@ -72,12 +69,10 @@ const CAPABILITY_GROUPS: ReadonlyArray<{
   },
   {
     title: "Satış ve Stok",
-    description: "Ürün, stok, satış ve müşteri hesabı alanlarını seçin.",
     capabilities: [C.CATALOG, C.INVENTORY, C.SALES, C.CUSTOMER_CREDIT]
   },
   {
     title: "Market",
-    description: "Barkod, satın alma, tedarikçi ve etiket alanlarını seçin.",
     capabilities: [
       C.RETAIL_BARCODE,
       C.RETAIL_PURCHASING,
@@ -142,7 +137,6 @@ export function BusinessCapabilityEditor({
               <span>{group.title}</span>
               <small>{enabledCount}/{group.capabilities.length} açık</small>
             </legend>
-            <p>{group.description}</p>
             <div className="settings-capability-list">
               {group.capabilities.map((capability) => {
                 const entry = entries.get(capability);
