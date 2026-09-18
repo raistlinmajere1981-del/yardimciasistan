@@ -64,12 +64,6 @@ import {
   type UpdateRequestStatusInput,
   type UpdateRoomStatusInput,
   type UpdateTableStatusInput,
-  type DesktopTableOrder,
-  type DesktopTableOrderResult,
-  type AddTableOrderItemInput,
-  type UpdateTableOrderItemQuantityInput,
-  type UpdateTableOrderItemNoteInput,
-  type UpdateTableOrderStatusInput,
   type UpdateReservationStatusInput,
   type SaveManualReservationInput,
   type SaveManualRestaurantReservationInput,
@@ -121,6 +115,7 @@ import { BirthdayDeliveryService } from "./birthday-delivery-service.js";
 import { BirthdayScheduler } from "./birthday-scheduler.js";
 import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
 import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
+import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -1078,76 +1073,9 @@ function registerIpcHandlers() {
     return getDatabase().updateTableStatus(input);
   });
 
-  ipcMain.handle("tableOrder:list", (): DesktopTableOrder[] => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    return getDatabase().listTableOrders();
-  });
-
-  ipcMain.handle("tableOrder:getActive", (_event, tableId: unknown): DesktopTableOrder | null => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    return typeof tableId === "string" ? getDatabase().getActiveTableOrder(tableId) : null;
-  });
-
-  ipcMain.handle("tableOrder:open", (_event, tableId: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    return typeof tableId === "string"
-      ? getDatabase().openTableOrder(tableId)
-      : invalidTableOrderPayload("Sipariş açmak için geçerli bir masa seçin.");
-  });
-
-  ipcMain.handle("tableOrder:addItem", (_event, input: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    assertDesktopCapability(C.FOOD_MENU, "Siparişe ürün eklemek için menü yönetimi etkin olmalı.");
-    const parsedInput = parseAddTableOrderItemInput(input);
-    return parsedInput
-      ? getDatabase().addTableOrderItem(parsedInput)
-      : invalidTableOrderPayload("Ürün ekleme bilgileri geçersiz.");
-  });
-
-  ipcMain.handle("tableOrder:updateItemQuantity", (_event, input: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    const parsedInput = parseUpdateTableOrderItemQuantityInput(input);
-    return parsedInput
-      ? getDatabase().updateTableOrderItemQuantity(parsedInput)
-      : invalidTableOrderPayload("Ürün adedi bilgisi geçersiz.");
-  });
-
-  ipcMain.handle("tableOrder:updateItemNote", (_event, input: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    const parsedInput = parseUpdateTableOrderItemNoteInput(input);
-    return parsedInput
-      ? getDatabase().updateTableOrderItemNote(parsedInput)
-      : invalidTableOrderPayload("Ürün notu bilgisi geçersiz.");
-  });
-
-  ipcMain.handle("tableOrder:removeItem", (_event, itemId: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    return typeof itemId === "string"
-      ? getDatabase().removeTableOrderItem(itemId)
-      : invalidTableOrderPayload("Silinecek sipariş satırı geçersiz.");
-  });
-
-  ipcMain.handle("tableOrder:updateStatus", (_event, input: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    const parsedInput = parseUpdateTableOrderStatusInput(input);
-    return parsedInput
-      ? getDatabase().updateTableOrderStatus(parsedInput)
-      : invalidTableOrderPayload("Adisyon durumu bilgisi geçersiz.");
-  });
-
-  ipcMain.handle("tableOrder:close", (_event, input: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    const parsedInput = parseUpdateTableOrderStatusInput(input);
-    return parsedInput
-      ? getDatabase().closeTableOrder(parsedInput)
-      : invalidTableOrderPayload("Adisyon kapatma bilgisi geçersiz.");
-  });
-
-  ipcMain.handle("tableOrder:recalculate", (_event, orderId: unknown): DesktopTableOrderResult => {
-    assertDesktopCapability(C.FOOD_ORDERS, "Sipariş yönetimi bu işletmede etkin değil.");
-    return typeof orderId === "string"
-      ? getDatabase().recalculateTableOrderTotal(orderId)
-      : invalidTableOrderPayload("Toplamı hesaplanacak adisyon geçersiz.");
+  registerTableOrderIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability
   });
 
   ipcMain.handle("reservation:saveManual", (_event, input: SaveManualReservationInput): DesktopStatusUpdateResult => {
@@ -1461,10 +1389,6 @@ function registerAppLockIpcHandlers() {
       };
     }
   );
-}
-
-function invalidTableOrderPayload(message: string): DesktopTableOrderResult {
-  return { ok: false, message };
 }
 
 async function analyzeDesktopStockImage(value: unknown): Promise<DesktopStockImageAnalyzeResult> {
@@ -1883,47 +1807,6 @@ function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult):
     getSyncCoordinator().scheduleSoon();
   }
   return result;
-}
-
-function parseAddTableOrderItemInput(value: unknown): AddTableOrderItemInput | null {
-  const record = toUnknownRecord(value);
-  return record
-    && typeof record.orderId === "string"
-    && typeof record.menuItemId === "string"
-    && typeof record.quantity === "number"
-    && Number.isFinite(record.quantity)
-    && typeof record.note === "string"
-    ? {
-        orderId: record.orderId,
-        menuItemId: record.menuItemId,
-        quantity: record.quantity,
-        note: record.note
-      }
-    : null;
-}
-
-function parseUpdateTableOrderItemQuantityInput(value: unknown): UpdateTableOrderItemQuantityInput | null {
-  const record = toUnknownRecord(value);
-  return record
-    && typeof record.itemId === "string"
-    && typeof record.quantity === "number"
-    && Number.isFinite(record.quantity)
-    ? { itemId: record.itemId, quantity: record.quantity }
-    : null;
-}
-
-function parseUpdateTableOrderItemNoteInput(value: unknown): UpdateTableOrderItemNoteInput | null {
-  const record = toUnknownRecord(value);
-  return record && typeof record.itemId === "string" && typeof record.note === "string"
-    ? { itemId: record.itemId, note: record.note }
-    : null;
-}
-
-function parseUpdateTableOrderStatusInput(value: unknown): UpdateTableOrderStatusInput | null {
-  const record = toUnknownRecord(value);
-  return record && typeof record.orderId === "string" && typeof record.status === "string"
-    ? { orderId: record.orderId, status: record.status }
-    : null;
 }
 
 function toUnknownRecord(value: unknown): Record<string, unknown> | null {
