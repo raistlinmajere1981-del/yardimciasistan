@@ -227,12 +227,13 @@ try {
   await page.getByRole("button", { name: "Ayarlar" }).click();
   const settings = page.locator(".setup-capabilities");
   const sectionNav = settings.getByRole("navigation", { name: "Ayar bölümleri" });
-  await expect(sectionNav.getByRole("link")).toHaveCount(4);
+  await expect(sectionNav.getByRole("link")).toHaveCount(5);
   for (const [name, target] of [
     ["İşletme", "settings-business"],
     ["İşletme düzeni", "settings-operations"],
     ["Servisler", "settings-connections"],
-    ["Uygulama", "settings-application"]
+    ["Uygulama", "settings-application"],
+    ["Özellikler", "settings-capabilities"]
   ]) {
     await expect(sectionNav.getByRole("link", { name })).toHaveAttribute("href", `#${target}`);
     await expect(settings.locator(`#${target}`)).toBeVisible();
@@ -244,13 +245,13 @@ try {
   await expect(settings.getByRole("heading", { name: "Servisler", exact: true })).toBeVisible();
   await expect(settings.locator(".settings-service-card", { hasText: "Web Modülü" })).toBeVisible();
   await expect(settings.locator(".settings-service-card", { hasText: "AI Yardımcı" })).toBeVisible();
-  await expect(settings.locator(".settings-advanced-details")).not.toHaveAttribute("open");
-  await settings.locator(".settings-advanced-details > summary").click();
-  await expect(settings.getByRole("checkbox", { name: "Odalar", exact: true })).toBeVisible();
-  await expect(settings.getByRole("checkbox", { name: "Stok", exact: true })).toBeVisible();
-  await expect(settings.getByRole("checkbox", { name: "Barkod", exact: true })).toBeVisible();
-  await expect(settings.locator(".settings-advanced-details")).toHaveAttribute("open");
-  await settings.locator(".settings-advanced-details > summary").click();
+  await expect(settings.locator(".settings-capability-group-card")).toHaveCount(4);
+  await expect(settings.getByRole("switch", { name: "Odalar: Açık" })).toBeVisible();
+  await expect(settings.getByRole("switch", { name: "Stok: Açık" })).toBeVisible();
+  await expect(settings.getByRole("switch", { name: "Barkod: Kapalı" })).toBeVisible();
+  const roomsCapability = settings.locator(".settings-capability-row", { hasText: "Odalar" });
+  await expect(roomsCapability.getByText("Bağımlı", { exact: true })).toBeVisible();
+  await expect(roomsCapability.getByRole("switch")).toBeDisabled();
   await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode/)).toHaveCount(0);
   expect(await settings.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   const tableCategoryEditor = page.locator(".table-category-editor");
@@ -1618,7 +1619,7 @@ try {
   expect(await compactPage.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(compactPage.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(compactPage.locator(".setup-footer")).toHaveCount(0);
-  await expect(compactPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(4);
+  await expect(compactPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(5);
   await expect(compactPage.getByRole("heading", { name: "İşletme", exact: true })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "Müşteriye Açık Bilgiler" })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "İşletme Düzeni" })).toBeVisible();
