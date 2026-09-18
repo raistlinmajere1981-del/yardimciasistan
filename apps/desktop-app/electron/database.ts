@@ -4,13 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   BUSINESS_CAPABILITIES,
-  canConvertRequestToReservation,
   createId,
   normalizeBirthdaySettings,
-  getRequestReservationType,
-  isRequestTypeAvailable,
   normalizeBusinessType,
-  normalizePhone,
   validateBirthdaySettings,
   type BusinessCapability,
   type StockImageAnalysis,
@@ -1500,7 +1496,7 @@ export class DesktopDatabase {
     this.db.exec("BEGIN");
     try {
       for (const request of requests) {
-        const customerId = this.ensureCustomerForRequest(request as unknown as Record<string, unknown>, new Date().toISOString());
+        const customerId = ensureStoredCustomerForRequest(this.db, request as unknown as Record<string, unknown>, new Date().toISOString());
         statement.run(
           request.id,
           customerId,
@@ -1565,190 +1561,11 @@ export class DesktopDatabase {
   }
 
   createManualRequest(input: CreateManualRequestInput): CreateManualRequestResult {
-    const requestType = normalizeRequestType(input.requestType);
-    if (!isRequestTypeAvailable(this.getEnabledBusinessCapabilities(), requestType)) {
-      return {
-        ok: false,
-        message: "Bu talep türü işletmenin etkin yeteneklerinde kullanılamıyor."
-      };
+    const result = createStoredManualRequest(this.db, input, this.getEnabledBusinessCapabilities());
+    if (!result.ok) {
+      return result;
     }
-    const customerName = input.customerName.trim();
-    if (!customerName) {
-      return {
-        ok: false,
-        message: "Müşteri adı gerekli."
-      };
-    }
-
-    const phone = normalizePhone(input.customerPhone);
-    if (!phone.ok) {
-      return {
-        ok: false,
-        message: phone.error
-      };
-    }
-
-    const dateText = input.dateText.trim();
-    const startDate = normalizeDateInput(input.startDate);
-    const endDate = normalizeDateInput(input.endDate);
-    const time = normalizeTimeInput(input.time);
-    const message = input.message.trim();
-    const guestCount = normalizeInteger(input.guestCount);
-    const adultCount = Math.max(0, normalizeInteger(input.adultCount));
-    const childCount = Math.max(0, normalizeInteger(input.childCount));
-
-    if (input.startDate.trim() && !startDate) {
-      return {
-        ok: false,
-        message: "Giriş tarihi YYYY-AA-GG formatında olmalı."
-      };
-    }
-
-    if (input.endDate.trim() && !endDate) {
-      return {
-        ok: false,
-        message: "Çıkış tarihi YYYY-AA-GG formatında olmalı."
-      };
-    }
-
-    if (startDate && endDate && endDate < startDate) {
-      return {
-        ok: false,
-        message: "Çıkış tarihi giriş tarihinden önce olamaz."
-      };
-    }
-
-    if (input.time.trim() && !time) {
-      return {
-        ok: false,
-        message: "Saat HH:DD formatında olmalı."
-      };
-    }
-
-    if (guestCount < 1) {
-      return {
-        ok: false,
-        message: "Kişi sayısı en az 1 olmalı."
-      };
-    }
-
-    if (!dateText && !startDate && !message) {
-      return {
-        ok: false,
-        message: "Talep için tarih notu, giriş tarihi veya not girin."
-      };
-    }
-
-    const now = new Date().toISOString();
-    const request: SyncedCustomerRequest = {
-      id: createId("request_"),
-      customer_id: "",
-      source: "manual",
-      request_type: requestType as SyncedCustomerRequest["request_type"],
-      status: "new",
-      customer_name: customerName,
-      customer_phone: phone.e164,
-      date_text: dateText,
-      start_date: startDate,
-      end_date: endDate,
-      time,
-      guest_count: guestCount,
-      adult_count: adultCount,
-      child_count: childCount,
-      message,
-      ai_summary: "",
-      ai_suggested_reply: "",
-      whatsapp_message: buildManualRequestReply(customerName),
-      assigned_to: "",
-      priority: normalizePriority(input.priority) as SyncedCustomerRequest["priority"],
-      sync_status: "local_only",
-      created_at: now,
-      updated_at: now
-    };
-
-    this.db.exec("BEGIN");
-    try {
-      const customerId = this.ensureCustomerForRequest(request as unknown as Record<string, unknown>, now);
-      request.customer_id = customerId;
-
-      this.db
-        .prepare(`
-          INSERT INTO requests (
-            id,
-            customer_id,
-            source,
-            request_type,
-            status,
-            customer_name,
-            customer_phone,
-            date_text,
-            start_date,
-            end_date,
-            time,
-            guest_count,
-            adult_count,
-            child_count,
-            message,
-            ai_summary,
-            ai_suggested_reply,
-            whatsapp_message,
-            assigned_to,
-            priority,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-        .run(
-          request.id,
-          request.customer_id,
-          request.source,
-          request.request_type,
-          request.status,
-          request.customer_name,
-          request.customer_phone,
-          request.date_text,
-          request.start_date,
-          request.end_date,
-          request.time,
-          request.guest_count,
-          request.adult_count,
-          request.child_count,
-          request.message,
-          request.ai_summary,
-          request.ai_suggested_reply,
-          request.whatsapp_message,
-          request.assigned_to,
-          request.priority,
-          request.created_at,
-          request.updated_at,
-          request.sync_status
-        );
-
-      insertDatabaseEvent(this.db, {
-        type: "request.created",
-        entityType: "request",
-        entityId: request.id,
-        payload: {
-          source: request.source,
-          request_type: request.request_type,
-          customer_id: customerId
-        },
-        now
-      });
-
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Manuel talep kaydedildi.",
-      savedId: request.id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   getRequestById(requestId: string): SyncedCustomerRequest | null {
@@ -1821,147 +1638,11 @@ export class DesktopDatabase {
   }
 
   convertRequestToReservation(requestId: string): RequestReservationConversionResult {
-    const id = requestId.trim();
-    if (!id) {
-      return {
-        ok: false,
-        message: "Rezervasyona çevrilecek talep seçilmeli."
-      };
+    const result = convertStoredRequestToReservation(this.db, requestId, this.getEnabledBusinessCapabilities());
+    if (!result.ok) {
+      return result;
     }
-
-    const request = this.db.prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''").get(id) as Record<string, unknown> | undefined;
-    if (!request) {
-      return {
-        ok: false,
-        message: "Talep bulunamadı."
-      };
-    }
-
-    const requestType = String(request.request_type ?? "");
-    const reservationType = getRequestReservationType(requestType);
-    if (!reservationType || !canConvertRequestToReservation(this.getEnabledBusinessCapabilities(), requestType)) {
-      return {
-        ok: false,
-        message: reservationType
-          ? "Bu rezervasyon türü işletmenin etkin yeteneklerinde kullanılamıyor."
-          : "Bu talep türü rezervasyona dönüştürülemez."
-      };
-    }
-
-    const existingReservation = this.db.prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1").get(id) as { id?: string } | undefined;
-    const now = new Date().toISOString();
-    const reservationId = existingReservation?.id || createId("reservation_");
-    const title = buildReservationTitle(request, reservationType);
-    let customerId = "";
-
-    this.db.exec("BEGIN");
-    try {
-      customerId = this.ensureCustomerForRequest(request, now);
-      this.db
-        .prepare(`
-          INSERT INTO reservations (
-            id,
-            request_id,
-            customer_id,
-            reservation_type,
-            status,
-            title,
-            start_date,
-            end_date,
-            time,
-            guest_count,
-            adult_count,
-            child_count,
-            room_ids_json,
-            table_ids_json,
-            notes,
-            price_note,
-            payment_status,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, 'not_required', ?, ?, 'local_only')
-          ON CONFLICT(id) DO UPDATE SET
-            customer_id = excluded.customer_id,
-            reservation_type = excluded.reservation_type,
-            status = 'approved',
-            title = excluded.title,
-            start_date = excluded.start_date,
-            end_date = excluded.end_date,
-            time = excluded.time,
-            guest_count = excluded.guest_count,
-            adult_count = excluded.adult_count,
-            child_count = excluded.child_count,
-            notes = excluded.notes,
-            price_note = excluded.price_note,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          reservationId,
-          id,
-          customerId,
-          reservationType,
-          title,
-          String(request.start_date ?? ""),
-          String(request.end_date ?? ""),
-          String(request.time ?? ""),
-          Number(request.guest_count ?? 1),
-          Number(request.adult_count ?? 0),
-          Number(request.child_count ?? 0),
-          buildReservationNotes(request),
-          "Fiyat ve kaynak ataması işletme sahibi tarafından netleştirilecek.",
-          now,
-          now
-        );
-
-      this.db
-        .prepare(`
-          UPDATE requests
-          SET status = 'converted_to_reservation',
-              customer_id = ?,
-              updated_at = ?,
-              sync_status = 'local_only'
-          WHERE id = ?
-        `)
-        .run(customerId, now, id);
-
-      insertDatabaseEvent(this.db, {
-        type: "request.converted_to_reservation",
-        entityType: "request",
-        entityId: id,
-        payload: {
-          reservation_id: reservationId,
-          customer_id: customerId,
-          previous_status: String(request.status ?? "")
-        },
-        now
-      });
-      insertDatabaseEvent(this.db, {
-        type: "reservation.approved",
-        entityType: "reservation",
-        entityId: reservationId,
-        payload: {
-          request_id: id,
-          customer_id: customerId,
-          reservation_type: reservationType
-        },
-        now
-      });
-
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: existingReservation ? "Mevcut rezervasyon onaylandı." : "Talep rezervasyona çevrildi ve onaylandı.",
-      reservationId,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   markMenuPublished() {
@@ -2111,62 +1792,6 @@ export class DesktopDatabase {
     return new Set([...protectedIds].filter((tableId) => currentTableIds.has(tableId)));
   }
 
-  private ensureCustomerForRequest(request: Record<string, unknown>, now: string) {
-    const requestCustomerId = String(request.customer_id ?? "").trim();
-    if (requestCustomerId) {
-      const existing = this.db.prepare("SELECT id FROM customers WHERE id = ? AND deleted_at = ''").get(requestCustomerId);
-      if (existing) {
-        return requestCustomerId;
-      }
-    }
-
-    const phone = String(request.customer_phone ?? "").trim();
-    const existingByPhone = phone
-      ? (this.db.prepare("SELECT id FROM customers WHERE phone = ? AND deleted_at = '' LIMIT 1").get(phone) as { id?: string } | undefined)
-      : undefined;
-    const customerId = existingByPhone?.id || requestCustomerId || createId("customer_");
-    const source = String(request.source ?? "web_form").trim() || "web_form";
-
-    this.db
-      .prepare(`
-        INSERT INTO customers (
-          id,
-          full_name,
-          phone,
-          source,
-          notes,
-          tags_json,
-          last_contact_at,
-          created_at,
-          updated_at,
-          sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
-        ON CONFLICT(id) DO UPDATE SET
-          full_name = excluded.full_name,
-          phone = excluded.phone,
-          source = excluded.source,
-          notes = excluded.notes,
-          tags_json = excluded.tags_json,
-          last_contact_at = excluded.last_contact_at,
-          updated_at = excluded.updated_at,
-          deleted_at = '',
-          sync_status = 'local_only'
-      `)
-      .run(
-        customerId,
-        String(request.customer_name ?? "Misafir").trim() || "Misafir",
-        phone,
-        source,
-        String(request.message ?? ""),
-        JSON.stringify(getCustomerTagsForSource(source)),
-        now,
-        now,
-        now
-      );
-
-    return customerId;
-  }
-
   private authorizeAndroidActionInTransaction(action: AndroidSyncAction): AndroidActionMutationResult {
     return authorizeStoredAndroidAction(this.db, action, this.getEnabledBusinessCapabilities());
   }
@@ -2182,7 +1807,7 @@ export class DesktopDatabase {
       case "customer_request_reject":
         return applyStoredAndroidRequestStatus(this.db, action, "rejected", now, this.getEnabledBusinessCapabilities());
       case "customer_request_convert_to_reservation":
-        return this.applyAndroidRequestConversion(action, now);
+        return applyStoredAndroidRequestConversion(this.db, action, now, this.getEnabledBusinessCapabilities());
       case "customer_request_delete":
         return deleteStoredRequestInTransaction(
           this.db,
@@ -2400,94 +2025,6 @@ export class DesktopDatabase {
       message: androidAction
         ? "Müşteri telefondan silindi; talep ve rezervasyon geçmişi korundu."
         : "Müşteri silindi; talep ve rezervasyon geçmişi korundu."
-    };
-  }
-
-  private applyAndroidRequestConversion(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const requestId = androidPayloadString(action.payload, "request_id");
-    if (!requestId) {
-      return { ok: false, message: "Rezervasyona çevrilecek talep seçilmemiş." };
-    }
-    const request = this.db
-      .prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''")
-      .get(requestId) as Record<string, unknown> | undefined;
-    if (!request) {
-      return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", request.updated_at, "Talep");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(request.updated_at, now);
-
-    const requestType = String(request.request_type ?? "");
-    const reservationType = getRequestReservationType(requestType);
-    if (!reservationType || !canConvertRequestToReservation(this.getEnabledBusinessCapabilities(), requestType)) {
-      return { ok: false, message: "Bu talep türü etkin bir rezervasyon alanına dönüştürülemez." };
-    }
-
-    const existingReservation = this.db
-      .prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1")
-      .get(requestId) as { id?: string } | undefined;
-    const reservationId = existingReservation?.id || createAndroidEntityId("reservation_", action.id);
-    const customerId = this.ensureCustomerForRequest(request, now);
-    this.db
-      .prepare(`
-        INSERT INTO reservations (
-          id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
-          guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
-          payment_status, created_at, updated_at, sync_status
-        ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, 'not_required', ?, ?, 'local_only')
-        ON CONFLICT(id) DO UPDATE SET
-          customer_id = excluded.customer_id,
-          reservation_type = excluded.reservation_type,
-          status = 'approved',
-          title = excluded.title,
-          start_date = excluded.start_date,
-          end_date = excluded.end_date,
-          time = excluded.time,
-          guest_count = excluded.guest_count,
-          adult_count = excluded.adult_count,
-          child_count = excluded.child_count,
-          notes = excluded.notes,
-          price_note = excluded.price_note,
-          updated_at = excluded.updated_at,
-          deleted_at = '',
-          sync_status = 'local_only'
-      `)
-      .run(
-        reservationId,
-        requestId,
-        customerId,
-        reservationType,
-        buildReservationTitle(request, reservationType),
-        String(request.start_date ?? ""),
-        String(request.end_date ?? ""),
-        String(request.time ?? ""),
-        Number(request.guest_count ?? 1),
-        Number(request.adult_count ?? 0),
-        Number(request.child_count ?? 0),
-        buildReservationNotes(request),
-        "Fiyat ve kaynak ataması işletme sahibi tarafından netleştirilecek.",
-        updatedAt,
-        updatedAt
-      );
-    this.db
-      .prepare("UPDATE requests SET status = 'converted_to_reservation', customer_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(customerId, updatedAt, requestId);
-    this.insertAndroidActionEvent(action, "request.converted_to_reservation", "request", requestId, {
-      reservation_id: reservationId,
-      customer_id: customerId,
-      previous_status: String(request.status ?? "")
-    }, now);
-    this.insertAndroidActionEvent(action, "reservation.approved", "reservation", reservationId, {
-      request_id: requestId,
-      customer_id: customerId,
-      reservation_type: reservationType
-    }, now);
-    return {
-      ok: true,
-      message: existingReservation ? "Mevcut rezervasyon telefondan onaylandı." : "Talep telefondan rezervasyona çevrildi."
     };
   }
 
@@ -2723,18 +2260,9 @@ import type {
 import {
   normalizeInteger,
   normalizeBoolean,
-  parseAiWorkspacePayload,
-  normalizeRequestType,
-  normalizePriority,
-  normalizeDateInput,
-  normalizeTimeInput,
-  getCustomerTagsForSource,
-  buildManualRequestReply,
   normalizeStatus,
   normalizeUrl,
   slugifyBusinessName,
-  buildReservationTitle,
-  buildReservationNotes,
 } from "./database/request-utils.js";
 
 import {
@@ -2905,8 +2433,15 @@ import {
   applyAndroidCustomerRoomStayStatus as applyStoredAndroidCustomerRoomStayStatus,
   applyAndroidReservationStatus as applyStoredAndroidReservationStatus,
   applyAndroidRoomStatus as applyStoredAndroidRoomStatus,
+  applyAndroidRequestConversion as applyStoredAndroidRequestConversion,
   insertAndroidActionEvent as insertStoredAndroidActionEvent,
 } from "./android-action-service.js";
+
+import {
+  ensureCustomerForRequest as ensureStoredCustomerForRequest,
+  createManualRequest as createStoredManualRequest,
+  convertRequestToReservation as convertStoredRequestToReservation,
+} from "./request-intake-service.js";
 
 import {
   getSetupData as getStoredSetupData,

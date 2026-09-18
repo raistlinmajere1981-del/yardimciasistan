@@ -1,6 +1,8 @@
 import type { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
+  canConvertRequestToReservation,
+  getRequestReservationType,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import type {
@@ -24,8 +26,11 @@ import {
   enforceActiveStayRoomStatus as enforceStoredActiveStayRoomStatus,
   refreshRoomStatusFromStays as refreshStoredRoomStatusFromStays
 } from "./stay-reservation-service.js";
+import { ensureCustomerForRequest as ensureStoredCustomerForRequest } from "./request-intake-service.js";
 import { normalizeCustomerInput, normalizeLimitedText } from "./database/customer-utils.js";
 import {
+  buildReservationNotes,
+  buildReservationTitle,
   normalizeDateInput,
   normalizeInteger,
   normalizeStatus
@@ -792,4 +797,97 @@ export function applyAndroidRoomStatus(
     new_status: status
   }, now);
   return { ok: true, message: "Oda durumu telefondan güncellendi." };
+}
+
+export function applyAndroidRequestConversion(
+  db: DatabaseSync,
+  action: AndroidSyncAction,
+  now: string,
+  enabledCapabilities: BusinessCapability[]
+): AndroidActionMutationResult {
+  const requestId = androidPayloadString(action.payload, "request_id");
+  if (!requestId) {
+    return { ok: false, message: "Rezervasyona çevrilecek talep seçilmemiş." };
+  }
+  const request = db
+    .prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''")
+    .get(requestId) as Record<string, unknown> | undefined;
+  if (!request) {
+    return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
+  }
+  const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", request.updated_at, "Talep");
+  if (versionConflict) {
+    return versionConflict;
+  }
+  const updatedAt = nextMutationTimestamp(request.updated_at, now);
+
+  const requestType = String(request.request_type ?? "");
+  const reservationType = getRequestReservationType(requestType);
+  if (!reservationType || !canConvertRequestToReservation(enabledCapabilities, requestType)) {
+    return { ok: false, message: "Bu talep türü etkin bir rezervasyon alanına dönüştürülemez." };
+  }
+
+  const existingReservation = db
+    .prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1")
+    .get(requestId) as { id?: string } | undefined;
+  const reservationId = existingReservation?.id || createAndroidEntityId("reservation_", action.id);
+  const customerId = ensureStoredCustomerForRequest(db, request, now);
+  db
+    .prepare(`
+        INSERT INTO reservations (
+          id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
+          guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
+          payment_status, created_at, updated_at, sync_status
+        ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, 'not_required', ?, ?, 'local_only')
+        ON CONFLICT(id) DO UPDATE SET
+          customer_id = excluded.customer_id,
+          reservation_type = excluded.reservation_type,
+          status = 'approved',
+          title = excluded.title,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          time = excluded.time,
+          guest_count = excluded.guest_count,
+          adult_count = excluded.adult_count,
+          child_count = excluded.child_count,
+          notes = excluded.notes,
+          price_note = excluded.price_note,
+          updated_at = excluded.updated_at,
+          deleted_at = '',
+          sync_status = 'local_only'
+      `)
+    .run(
+      reservationId,
+      requestId,
+      customerId,
+      reservationType,
+      buildReservationTitle(request, reservationType),
+      String(request.start_date ?? ""),
+      String(request.end_date ?? ""),
+      String(request.time ?? ""),
+      Number(request.guest_count ?? 1),
+      Number(request.adult_count ?? 0),
+      Number(request.child_count ?? 0),
+      buildReservationNotes(request),
+      "Fiyat ve kaynak ataması işletme sahibi tarafından netleştirilecek.",
+      updatedAt,
+      updatedAt
+    );
+  db
+    .prepare("UPDATE requests SET status = 'converted_to_reservation', customer_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
+    .run(customerId, updatedAt, requestId);
+  insertAndroidActionEvent(db, action, "request.converted_to_reservation", "request", requestId, {
+    reservation_id: reservationId,
+    customer_id: customerId,
+    previous_status: String(request.status ?? "")
+  }, now);
+  insertAndroidActionEvent(db, action, "reservation.approved", "reservation", reservationId, {
+    request_id: requestId,
+    customer_id: customerId,
+    reservation_type: reservationType
+  }, now);
+  return {
+    ok: true,
+    message: existingReservation ? "Mevcut rezervasyon telefondan onaylandı." : "Talep telefondan rezervasyona çevrildi."
+  };
 }
