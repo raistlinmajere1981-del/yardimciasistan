@@ -12,6 +12,7 @@ import android.widget.TextView;
 
 import androidx.activity.ComponentActivity;
 import androidx.camera.core.CameraSelector;
+import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
@@ -190,6 +191,7 @@ final class BarcodeCameraScanner {
     }, ContextCompat.getMainExecutor(activity));
   }
 
+  @ExperimentalGetImage
   private void analyzeFrame(ImageProxy imageProxy) {
     if (closed || !processingFrame.compareAndSet(false, true)) {
       imageProxy.close();
