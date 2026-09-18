@@ -308,6 +308,39 @@ final class MarketUiRules {
     return Math.round((value + Math.ulp(value)) * factor) / factor;
   }
 
+  static final class BarcodeCameraGate {
+    private final long rearmGapMs;
+    private String lockedBarcode = "";
+    private long lastSeenAt = Long.MIN_VALUE;
+
+    BarcodeCameraGate(long rearmGapMs) {
+      this.rearmGapMs = Math.max(0L, rearmGapMs);
+    }
+
+    String observe(String rawBarcode, long nowMs) {
+      String barcode = text(rawBarcode);
+      if (barcode.isEmpty()) {
+        if (!lockedBarcode.isEmpty()
+            && lastSeenAt != Long.MIN_VALUE
+            && nowMs >= lastSeenAt
+            && nowMs - lastSeenAt >= rearmGapMs) {
+          lockedBarcode = "";
+          lastSeenAt = Long.MIN_VALUE;
+        }
+        return "";
+      }
+
+      if (barcode.equals(lockedBarcode)) {
+        lastSeenAt = nowMs;
+        return "";
+      }
+
+      lockedBarcode = barcode;
+      lastSeenAt = nowMs;
+      return barcode;
+    }
+  }
+
   static final class BarcodeDebouncer {
     private final long debounceMs;
     private String lastBarcode = "";
