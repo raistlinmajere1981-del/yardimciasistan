@@ -1,3 +1,4 @@
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
@@ -28,30 +29,15 @@ const database = new DesktopDatabase({
 try {
   database.initialize();
 
-  const setupResult = database.saveInitialSetup({
+  const setupResult = database.saveInitialSetup(createSmokeSetupInput({
     businessName: "Reports Test İşletmesi",
-    profileId: "pension_restaurant",
     phone: "+905550000300",
     whatsapp: "+905550000300",
-    email: "",
-    address: "",
-    webModuleUrl: "https://example.test/yardimci-asistan",
     syncSecret: "reports-test-secret-123",
-    autoSyncEnabled: false,
-    aiEnabled: false,
-    aiProvider: "openai_compatible",
-    aiService: "openai",
-    aiProjectName: "",
-    aiModel: "",
-    aiModelOptions: [],
-    aiBaseUrl: "https://api.openai.com/v1",
-    aiTimeoutSeconds: 30,
-    aiApiKey: "",
-    clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: false },
     initialCounts: { rooms: 0, tables: 3 },
     tableCategories: [{ name: "Rapor Salonu", tableCount: 3 }]
-  });
+  }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const reportTables = setupResult.dashboardData.tables;
   assert.equal(reportTables.length, 3);

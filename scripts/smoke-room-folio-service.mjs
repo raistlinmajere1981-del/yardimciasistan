@@ -1,3 +1,4 @@
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
@@ -20,30 +21,15 @@ let database = new DesktopDatabase({ appPath, userDataPath: dataDir });
 try {
   database.initialize();
 
-  const setupResult = database.saveInitialSetup({
+  const setupResult = database.saveInitialSetup(createSmokeSetupInput({
     businessName: "Room Folio Test İşletmesi",
-    profileId: "pension_restaurant",
     phone: "+905550000400",
     whatsapp: "+905550000400",
-    email: "",
-    address: "",
-    webModuleUrl: "https://example.test/yardimci-asistan",
     syncSecret: "room-folio-test-secret-123",
-    autoSyncEnabled: false,
-    aiEnabled: false,
-    aiProvider: "openai_compatible",
-    aiService: "openai",
-    aiProjectName: "",
-    aiModel: "",
-    aiModelOptions: [],
-    aiBaseUrl: "https://api.openai.com/v1",
-    aiTimeoutSeconds: 30,
-    aiApiKey: "",
-    clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: false },
     initialCounts: { rooms: 1, tables: 0 },
     tableCategories: []
-  });
+  }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
 
   const folioCategory = database.saveMenuCategory({

@@ -1,3 +1,4 @@
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -19,29 +20,14 @@ const database = new DesktopDatabase({
 
 try {
   database.initialize();
-  const initialSetupResult = database.saveInitialSetup({
+  const initialSetupResult = database.saveInitialSetup(createSmokeSetupInput({
     businessName: "Menü Test İşletmesi",
-    profileId: "pension_restaurant",
     phone: "+905550002020",
     whatsapp: "+905550002020",
-    email: "",
-    address: "",
-    webModuleUrl: "https://example.test/yardimci-asistan",
     syncSecret: "menu-smoke-secret",
-    autoSyncEnabled: false,
-    aiEnabled: false,
-    aiProvider: "openai_compatible",
-    aiService: "openai",
-    aiProjectName: "",
-    aiModel: "",
-    aiModelOptions: [],
-    aiBaseUrl: "https://api.openai.com/v1",
-    aiTimeoutSeconds: 30,
-    aiApiKey: "",
-    clearAiApiKey: false,
     servicePreferences: { whatsapp: true, android: true },
     initialCounts: { rooms: 3, tables: 3 }
-  });
+  }));
   assert.equal(initialSetupResult.ok, true, initialSetupResult.ok ? "" : initialSetupResult.message);
   // Test-only fixture: give the created rooms/tables stable smoke IDs so the
   // status-transition flows below can address them without demo seed data.
