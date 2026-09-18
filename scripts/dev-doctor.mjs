@@ -1,12 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
-import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { chromium } from "@playwright/test";
+import { getLocalElectronExecutable, getLocalElectronVersion } from "./test-helpers/local-electron.mjs";
 
-const require = createRequire(import.meta.url);
 const checks = [];
 
 checkCommand("node", ["--version"], true);
@@ -62,8 +61,8 @@ if (failedRequired.length > 0) {
 
 function checkLocalElectron() {
   try {
-    const executablePath = require("electron");
-    const version = require("electron/package.json").version;
+    const executablePath = getLocalElectronExecutable();
+    const version = getLocalElectronVersion();
     checks.push({
       name: "Yerel Electron",
       required: false,

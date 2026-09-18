@@ -1,11 +1,10 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
-import { createRequire } from "node:module";
 import { join } from "node:path";
 import process from "node:process";
+import { getLocalElectronExecutable } from "./test-helpers/local-electron.mjs";
 
-const require = createRequire(import.meta.url);
-const electronExecutable = require("electron");
+const electronExecutable = getLocalElectronExecutable();
 
 const xvfbCheck = spawnSync("xvfb-run", ["--help"], {
   encoding: "utf8"
