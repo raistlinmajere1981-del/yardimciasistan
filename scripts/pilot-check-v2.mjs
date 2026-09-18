@@ -22,7 +22,7 @@ const preflight = [
   npmArgs("build-desktop", "Masaüstü uygulamasını derle", ["run", "build", "-w", "@yardimci-asistan/desktop-app"]),
   n("typecheck", "Workspace TypeScript kontrolleri", "typecheck"),
   n("php-lint", "Web modülü PHP lint", "lint:php"),
-  n("package-web", "Web modülü dağıtım paketini doğrula", "pack:web-module")
+  n("package-web", "Web modülü dağıtım paketini doğrula", "pack:web-module:no-build")
 ];
 const core = [
   js("web-form", "Web talebi + public abuse guard", "smoke-web-form-api.mjs"),
