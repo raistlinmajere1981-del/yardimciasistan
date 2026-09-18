@@ -42,22 +42,13 @@ import {
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
   type DesktopStockImageApplyResult,
-  type DesktopCustomerMutationResult,
-  type DesktopReportQueryResult,
-  type GenerateDesktopReportAiInput,
-  type GenerateDesktopReportAiResult
+  type DesktopCustomerMutationResult
 } from "./database";
 import { DesktopFinanceService } from "./finance";
 import { resolveProjectBackupPath } from "./data-maintenance";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
 import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
 import { DesktopRoomFolioService, type DesktopRoomFolio } from "./room-folio";
-import {
-  buildReportAiMessages,
-  buildReportAiPayload,
-  reportHasEnoughData,
-  sanitizeReportAiAnswer
-} from "./report-ai";
 import {
   SyncCoordinator,
   type AutomaticSyncCycleResult,
@@ -96,6 +87,7 @@ import {
 import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiWorkspaceIpcHandlers } from "./ipc/ai-workspace-ipc";
+import { registerReportIpcHandlers } from "./ipc/report-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -467,27 +459,11 @@ function registerIpcHandlers() {
     return getSyncCoordinator().getStatus();
   });
 
-  ipcMain.handle("report:getData", (_event, input: GenerateDesktopReportAiInput["range"]): DesktopReportQueryResult => {
-    assertAppSessionUnlocked();
-    assertDesktopCapability(C.REPORTS, "Raporlar bu işletmede etkin değil.");
-    try {
-      return { ok: true, data: getDatabase().getReportData(input) };
-    } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : "Rapor verileri hazırlanamadı."
-      };
-    }
+  registerReportIpcHandlers({
+    getDatabase,
+    assertUnlocked: assertAppSessionUnlocked,
+    assertCapability: assertDesktopCapability
   });
-
-  ipcMain.handle(
-    "report:generateAiComment",
-    async (_event, input: GenerateDesktopReportAiInput): Promise<GenerateDesktopReportAiResult> => {
-      assertDesktopCapability(C.REPORTS, "Raporlar bu işletmede etkin değil.");
-      assertDesktopCapability(C.AI, "AI rapor yorumu bu işletmede etkin değil.");
-      return generateDesktopReportAiComment(input);
-    }
-  );
 
   ipcMain.handle("sync:runNow", async (): Promise<AutomaticSyncCycleResult> => {
     return getSyncCoordinator().runNow();
@@ -1600,51 +1576,6 @@ function formatLocalDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-async function generateDesktopReportAiComment(
-  input: GenerateDesktopReportAiInput
-): Promise<GenerateDesktopReportAiResult> {
-  const mode = input?.mode;
-  if (!["summary", "attention", "sales", "recommendations"].includes(mode)) {
-    return { ok: false, message: "Geçerli bir AI yorum türü seçin." };
-  }
-  if (mode === "sales" && !hasBusinessCapability(enabledBusinessCapabilities(), C.FOOD_ORDERS)) {
-    return { ok: false, message: "Restoran satış yorumu bu işletmede etkin değil." };
-  }
-
-  const setup = getDatabase().getSetupData();
-  const config = createDesktopAiConfig(getDatabase(), setup);
-  if (!config.enabled || config.provider === "disabled") {
-    return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
-  }
-
-  let report;
-  try {
-    report = getDatabase().getReportData(input.range);
-  } catch {
-    return { ok: false, message: "Rapor verileri hazırlanamadı." };
-  }
-  const payload = buildReportAiPayload(report);
-  if (!reportHasEnoughData(payload)) {
-    return { ok: true, content: "Bu dönem için yeterli veri yok." };
-  }
-
-  try {
-    const completion = await generateConfiguredChat({
-      ...config,
-      messages: buildReportAiMessages(mode, payload, setup.businessName || "İşletme")
-    });
-    if (!completion.ok) {
-      return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
-    }
-    const sanitized = sanitizeReportAiAnswer(completion.answer, payload, mode);
-    return sanitized.ok
-      ? sanitized
-      : { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
-  } catch {
-    return { ok: false, message: "Rapor verileri hazır ancak AI yorumu şu anda oluşturulamadı." };
-  }
 }
 
 async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {
