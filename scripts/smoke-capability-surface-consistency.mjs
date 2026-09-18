@@ -130,7 +130,7 @@ assert.match(
   "hosted Android action history must be filtered by current permissions and capabilities"
 );
 assert.match(
-  handlerSource(mainSource, "setup:saveInitial", 3_500),
+  functionSource(mainSource, "async function saveInitialSetupFromRenderer"),
   /getDatabase\(\)\.saveInitialSetup\([\s\S]*if \(!localResult\.ok\)/,
   "setup IPC must delegate persistence to DesktopDatabase and propagate failure; smoke-setup-profile-contract verifies capabilities and publication"
 );
@@ -702,6 +702,12 @@ function handlerSource(contents, channel, length = 1_500) {
   const start = channelPosition === -1 ? -1 : contents.lastIndexOf("ipcMain.handle(", channelPosition);
   assert.notEqual(start, -1, `${channel} handler missing`);
   assert.equal(channelPosition - start < 120, true, `${channel} is not an IPC handler`);
+  return contents.slice(start, start + length);
+}
+
+function functionSource(contents, fnName, length = 3_500) {
+  const start = contents.indexOf(fnName);
+  assert.notEqual(start, -1, `${fnName} missing`);
   return contents.slice(start, start + length);
 }
 

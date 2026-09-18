@@ -105,6 +105,7 @@ import { registerWhatsAppIpcHandlers, registerWhatsAppWebviewIpcEvents } from ".
 import { registerMenuIpcHandlers } from "./ipc/menu-ipc";
 import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
+import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -689,9 +690,10 @@ function registerIpcHandlers() {
     return result;
   });
 
-  ipcMain.handle("setup:getData", (): DesktopSetupData => {
-    assertAppSessionUnlocked();
-    return getDatabase().getSetupData();
+  registerSetupIpcHandlers({
+    assertUnlocked: assertAppSessionUnlocked,
+    getSetupData: () => getDatabase().getSetupData(),
+    saveInitial: saveInitialSetupFromRenderer
   });
 
   ipcMain.handle("ai:revealApiKey", (_event, serviceValue: unknown): AiApiKeyRevealResult => {
@@ -724,51 +726,6 @@ function registerIpcHandlers() {
     getDatabase,
     assertCapability: assertDesktopCapability,
     finalizeDeviceMutation: finalizeAndroidDeviceMutation
-  });
-
-  ipcMain.handle("setup:saveInitial", async (_event, input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> => {
-    assertAppSessionUnlocked();
-    const secretUpdate = createAiApiKeyUpdate(input);
-    if (!secretUpdate.ok) {
-      return secretUpdate;
-    }
-    const profileSecretUpdates = createAiProfileApiKeyUpdates(input);
-    if (!profileSecretUpdates.ok) {
-      return profileSecretUpdates;
-    }
-
-    const localResult = getDatabase().saveInitialSetup({
-      ...input,
-      aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
-      aiProfiles: profileSecretUpdates.profiles
-    }, secretUpdate.update, profileSecretUpdates.updates);
-    if (!localResult.ok) {
-      return localResult;
-    }
-
-    const aiWebSync = await publishSavedAiSettings();
-    getSyncCoordinator().restart();
-    void birthdayScheduler?.evaluateNow();
-    const setupData = getDatabase().getSetupData();
-    const dashboardData = getDatabase().getDashboardData();
-
-    if (!aiWebSync.ok) {
-      return {
-        ...localResult,
-        message: `Ayarlar bu bilgisayarda kaydedildi. Web sitesine uygulanamadı: ${aiWebSync.message}`,
-        setupData,
-        dashboardData,
-        aiWebSync
-      };
-    }
-
-    return {
-      ...localResult,
-      message: "Ayarlar kaydedildi ve AI bağlantısı web sitesinde güncellendi.",
-      setupData,
-      dashboardData,
-      aiWebSync
-    };
   });
 
   ipcMain.handle("ai:testConnection", async (_event, input: AiConnectionTestInput): Promise<AiConnectionTestResult> => {
@@ -1211,6 +1168,51 @@ function registerAppLockIpcHandlers() {
       };
     }
   );
+}
+
+async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> {
+  assertAppSessionUnlocked();
+  const secretUpdate = createAiApiKeyUpdate(input);
+  if (!secretUpdate.ok) {
+    return secretUpdate;
+  }
+  const profileSecretUpdates = createAiProfileApiKeyUpdates(input);
+  if (!profileSecretUpdates.ok) {
+    return profileSecretUpdates;
+  }
+
+  const localResult = getDatabase().saveInitialSetup({
+    ...input,
+    aiApiKey: String(input.aiApiKey ?? "").trim() ? "__encrypted_in_main_process__" : "",
+    aiProfiles: profileSecretUpdates.profiles
+  }, secretUpdate.update, profileSecretUpdates.updates);
+  if (!localResult.ok) {
+    return localResult;
+  }
+
+  const aiWebSync = await publishSavedAiSettings();
+  getSyncCoordinator().restart();
+  void birthdayScheduler?.evaluateNow();
+  const setupData = getDatabase().getSetupData();
+  const dashboardData = getDatabase().getDashboardData();
+
+  if (!aiWebSync.ok) {
+    return {
+      ...localResult,
+      message: `Ayarlar bu bilgisayarda kaydedildi. Web sitesine uygulanamadı: ${aiWebSync.message}`,
+      setupData,
+      dashboardData,
+      aiWebSync
+    };
+  }
+
+  return {
+    ...localResult,
+    message: "Ayarlar kaydedildi ve AI bağlantısı web sitesinde güncellendi.",
+    setupData,
+    dashboardData,
+    aiWebSync
+  };
 }
 
 async function analyzeDesktopStockImage(value: unknown): Promise<DesktopStockImageAnalyzeResult> {
