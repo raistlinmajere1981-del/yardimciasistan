@@ -11,12 +11,12 @@ import { SetupForm } from "./SetupForm";
 import type { SettingsSaveSectionHandle } from "../../app/settings-save";
 
 type SetupFormProps = ComponentProps<typeof SetupForm>;
-type SetupWizardProps = Omit<SetupFormProps, "form" | "onFormChange" | "enabledCapabilities" | "publicProfile" | "publicProfileSaveRef"> & {
+type SettingsWorkspaceProps = Omit<SetupFormProps, "form" | "onFormChange" | "enabledCapabilities" | "publicProfile" | "publicProfileSaveRef"> & {
   form: SetupFormState;
   onFormChange: (form: SetupFormState) => void;
 };
 
-export function SetupWizard(props: SetupWizardProps) {
+export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const publicProfileSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
   const capabilityRuntime = useBusinessCapabilityRuntime();
   const effectiveCapabilities = getEffectiveSetupCapabilities(

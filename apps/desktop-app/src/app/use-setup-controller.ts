@@ -24,8 +24,6 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
   const onInitialSetupReadyRef = useRef(onInitialSetupReady);
   const [setupData, setSetupData] = useState<DesktopSetupData>(defaultSetupData);
   const [setupForm, setSetupFormState] = useState<SetupFormState>(() => toSetupForm(defaultSetupData));
-  const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
-  const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
   const [setupDirty, setSetupDirty] = useState(false);
   const [aiConnectionTestState, setAiConnectionTestState] = useState<SyncState>("idle");
   const [aiConnectionTestMessage, setAiConnectionTestMessage] = useState("Bağlantı henüz denenmedi.");
@@ -61,7 +59,6 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
         onInitialSetupReadyRef.current?.();
       }
     }
-    setSetupMessage(nextSetupData.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
   }
 
   async function testAiConnection() {
@@ -114,8 +111,6 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
     setAiConnectionTestState(result.ok ? "success" : "error");
     setAiConnectionTestMessage(result.message);
     if (result.ok) {
-      setSetupSaveState("idle");
-      setSetupMessage("AI bağlantısı hazır. Ayarları kaydedin.");
       setSetupForm((current) => ({
         ...current,
         aiModel: result.model,
@@ -135,13 +130,9 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
       return { ok: true, changed: false, message: "Ayarlar zaten güncel." };
     }
 
-    setSetupSaveState("loading");
-    setSetupMessage("Kurulum ayarları kaydediliyor...");
 
     const bridge = window.yardimciDesktop;
     if (!bridge) {
-      setSetupSaveState("error");
-      setSetupMessage("Ayarlar kaydedilemedi. Masaüstü uygulamasını yeniden başlatın.");
       return { ok: false, message: "Ayarlar kaydedilemedi. Masaüstü uygulamasını yeniden başlatın." };
     }
 
@@ -186,14 +177,10 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
     try {
       result = await bridge.saveInitialSetup(input);
     } catch (error) {
-      setSetupSaveState("error");
       const message = error instanceof Error ? error.message : "Ayarlar kaydedilemedi.";
-      setSetupMessage(message);
       return { ok: false, message };
     }
     if (!result.ok) {
-      setSetupSaveState("error");
-      setSetupMessage(result.message);
       return { ok: false, message: result.message };
     }
 
@@ -203,8 +190,6 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
     setSetupFormState(toSetupForm(nextSetupData));
     setSetupDirty(false);
     const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
-    setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
-    setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
     return aiConnectionCouldNotBePublished
       ? { ok: false, message: result.message }
       : { ok: true, changed: true, message: "Ayarlar kaydedildi." };
@@ -218,8 +203,6 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
     setupData,
     setupForm,
     setSetupForm,
-    setupSaveState,
-    setupMessage,
     aiConnectionTestState,
     aiConnectionTestMessage,
     applyBootstrapSetup,

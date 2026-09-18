@@ -40,7 +40,7 @@ import {
   RoomsWorkspace,
   formatTaskDue
 } from "../operations/OperationWorkspaces";
-import { SetupWizard } from "../settings/SetupWizard";
+import { SettingsWorkspace } from "../settings/SettingsWorkspace";
 import { CustomerWorkPage } from "../../pages/CustomerWorkPage";
 import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
@@ -643,7 +643,7 @@ export function DesktopWorkspaceRouter({
       ) : activePage === "market" ? (
         <MarketPage customers={dashboardData.customers} />
       ) : activePage === "messages" ? null : (
-        <SetupWizard
+        <SettingsWorkspace
           form={setupForm}
           setupData={setupData}
           dashboardData={surfaceData}
