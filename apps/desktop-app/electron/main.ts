@@ -12,19 +12,13 @@ import {
 } from "@yardimci-asistan/shared";
 import {
   markAndroidActionResult,
-  markRequestsSynced,
   pullAndroidActions,
-  pullRequests,
-  pushAndroidSnapshot,
-  pushMenu
+  pushAndroidSnapshot
 } from "@yardimci-asistan/sync-core";
 import type {
   AndroidOperationsSnapshot,
-  PullRequestsResult,
-  MarkRequestsSyncedResult,
   PushAiSettingsResult,
-  PushAndroidSnapshotResult,
-  PushMenuResult
+  PushAndroidSnapshotResult
 } from "@yardimci-asistan/sync-core";
 import {
   DesktopDatabase,
@@ -83,6 +77,8 @@ import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
 import { registerAiWorkspaceIpcHandlers } from "./ipc/ai-workspace-ipc";
 import { registerReportIpcHandlers } from "./ipc/report-ipc";
+import { getWebSyncConfig } from "./sync-config";
+import { registerSyncIpcHandlers } from "./ipc/sync-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -434,22 +430,19 @@ function registerIpcHandlers() {
     };
   });
 
-  ipcMain.handle("sync:getStatus", (): AutomaticSyncStatus => {
-    return getSyncCoordinator().getStatus();
+  registerSyncIpcHandlers({
+    getDatabase,
+    getCoordinator: getSyncCoordinator,
+    assertCapability: assertDesktopCapability,
+    afterSuccessfulPull: () => processAndroidActionQueue(true),
+    publishAndroidSnapshot: publishCurrentAndroidSnapshot,
+    publishAiSettings: publishSavedAiSettingsFromMain
   });
 
   registerReportIpcHandlers({
     getDatabase,
     assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability
-  });
-
-  ipcMain.handle("sync:runNow", async (): Promise<AutomaticSyncCycleResult> => {
-    return getSyncCoordinator().runNow();
-  });
-
-  ipcMain.handle("sync:setAutoEnabled", (_event, enabled: unknown): AutomaticSyncStatus => {
-    return getSyncCoordinator().setEnabled(enabled === true);
   });
 
   ipcMain.handle("sync:setMarketBarcodeFastPull", (event, enabled: unknown) => {
@@ -471,117 +464,6 @@ function registerIpcHandlers() {
       marketBarcodeFastPullSenders.delete(senderId);
     }
     return getSyncCoordinator().setMarketBarcodeFastPullEnabled(marketBarcodeFastPullSenders.size > 0);
-  });
-
-  ipcMain.handle("sync:pullRequests", async (): Promise<PullRequestsResult> => {
-    const setup = getDatabase().getSetupData();
-    const { baseUrl, syncSecret } = getWebSyncConfig(setup);
-    const result = await pullRequests({
-      baseUrl,
-      syncSecret,
-      limit: 50
-    });
-
-    if (result.ok) {
-      getDatabase().upsertRequests(result.requests);
-      const requestIds = result.requests.map((request) => request.id);
-      if (requestIds.length > 0) {
-        const markResult = await markRequestsSynced({
-          baseUrl,
-          syncSecret,
-          requestIds
-        });
-
-        if (markResult.ok) {
-          getDatabase().markLocalRequestsSynced(requestIds);
-        } else {
-          getDatabase().recordSyncEvent({
-            direction: "push",
-            entityType: "request",
-            ok: false,
-            message: markResult.message,
-            status: markResult.status
-          });
-        }
-      }
-      getDatabase().recordSyncEvent({
-        direction: "pull",
-        entityType: "request",
-        ok: true,
-        recordCount: result.count
-      });
-    } else {
-      getDatabase().recordSyncEvent({
-        direction: "pull",
-        entityType: "request",
-        ok: false,
-        message: result.message,
-        status: result.status
-      });
-    }
-
-    if (result.ok) {
-      await processAndroidActionQueue(true);
-    }
-
-    return result;
-  });
-
-  ipcMain.handle("sync:markRequestsSynced", async (_event, requestIds: string[]): Promise<MarkRequestsSyncedResult> => {
-    const setup = getDatabase().getSetupData();
-    const syncConfig = getWebSyncConfig(setup);
-    const result = await markRequestsSynced({
-      ...syncConfig,
-      requestIds
-    });
-    getDatabase().recordSyncEvent({
-      direction: "push",
-      entityType: "request",
-      ok: result.ok,
-      recordCount: result.ok ? result.updated_count : 0,
-      message: result.ok ? result.message : result.message,
-      status: result.ok ? undefined : result.status
-    });
-
-    return result;
-  });
-
-  ipcMain.handle("sync:pushMenu", async (): Promise<PushMenuResult> => {
-    assertDesktopCapability(C.QR_MENU, "QR menü yayını bu işletmede etkin değil.");
-    const setup = getDatabase().getSetupData();
-    const result = await pushMenu({
-      ...getWebSyncConfig(setup),
-      menu: getDatabase().getQrMenuPublication()
-    });
-
-    if (result.ok) {
-      getDatabase().markMenuPublished();
-      getDatabase().recordSyncEvent({
-        direction: "push",
-        entityType: "menu",
-        ok: true,
-        recordCount: result.category_count + result.item_count
-      });
-    } else {
-      getDatabase().recordSyncEvent({
-        direction: "push",
-        entityType: "menu",
-        ok: false,
-        message: result.message,
-        status: result.status
-      });
-    }
-
-    return result;
-  });
-
-  ipcMain.handle("sync:pushAndroidSnapshot", async (): Promise<PushAndroidSnapshotResult> => {
-    assertDesktopCapability(C.ANDROID, "Android yayını bu işletmede etkin değil.");
-    return publishCurrentAndroidSnapshot();
-  });
-
-  ipcMain.handle("sync:pushAiSettings", async (): Promise<PushAiSettingsResult> => {
-    return publishSavedAiSettingsFromMain();
   });
 
   registerMenuIpcHandlers({
@@ -1427,11 +1309,4 @@ async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {
     database,
     getWebSyncConfig(database.getSetupData())
   );
-}
-
-function getWebSyncConfig(setup: DesktopSetupData) {
-  const baseUrl = process.env.YA_WEB_MODULE_URL ?? setup.webModuleUrl;
-  const syncSecret = process.env.YA_SYNC_SECRET ?? setup.syncSecret;
-
-  return { baseUrl, syncSecret };
 }
