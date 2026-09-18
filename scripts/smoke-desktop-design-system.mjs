@@ -83,14 +83,14 @@ try {
     const metrics = await page.evaluate(() => {
       const box = selector => { const e = document.querySelector(selector); const b = e.getBoundingClientRect(); return { width: b.width, height: b.height }; };
       const overflows = [...document.querySelectorAll('.content, .setup-capabilities, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className);
-      return { overflows, documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, phone: box('.settings-identity-section .form-field--short input'), time: box('#settings-public input[type="time"]'), map: box('.business-location-map-viewport'), button: box('.page-header-tools button'), timeRows: new Set([...document.querySelectorAll('#settings-public input[type="time"]')].map(el => Math.round(el.getBoundingClientRect().top))).size };
+      return { overflows, documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, phone: box('.settings-identity-section .form-field--short input'), time: box('#settings-connections input[type="time"]'), map: box('.business-location-map-viewport'), button: box('.page-header-tools button'), timeRows: new Set([...document.querySelectorAll('#settings-connections input[type="time"]')].map(el => Math.round(el.getBoundingClientRect().top))).size };
     });
     observations.push({ width, height, ...metrics });
     expect(metrics.documentOverflow, `Document overflow at ${width}`).toBe(false);
     expect(metrics.overflows, `Content overflow at ${width}`).toEqual([]);
     if (width > 760) expect(metrics.timeRows, `Four time controls share a row at ${width}`).toBe(1);
     const nav = page.getByRole('navigation', { name: 'Ayar bölümleri' });
-    for (const [name, id] of [['İşletmem','business'],['Müşteri bilgileri','public'],['İşletme düzeni','operations'],['Bağlantılar','connections'],['Uygulama','application'],['Bakım','maintenance']]) {
+    for (const [name, id] of [['İşletme','business'],['İşletme düzeni','operations'],['Servisler','connections'],['Uygulama','application'],['Özellikler','capabilities']]) {
       await nav.getByRole('link', { name, exact: true }).click();
       const section = page.locator(`#settings-${id}`);
       await expect(section).toBeInViewport();
@@ -99,7 +99,7 @@ try {
         const [headBox, navBox] = await Promise.all([visibleHeading.boundingBox(), nav.boundingBox()]);
         expect(headBox.y, `${name} obscured by nav at ${width}`).toBeGreaterThanOrEqual(navBox.y + navBox.height);
       }
-      if (['public','connections','application','maintenance'].includes(id)) await page.screenshot({ animations: "disabled", path: `${output}/settings-${width}-${id}.png` });
+      if (['connections','application','capabilities'].includes(id)) await page.screenshot({ animations: "disabled", path: `${output}/settings-${width}-${id}.png` });
     }
   }
   await page.locator('.business-location-map-viewport').scrollIntoViewIfNeeded();

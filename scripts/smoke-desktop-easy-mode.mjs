@@ -64,7 +64,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord)).toBeNull();
-    await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-mode", "easy");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     expect(await page.evaluate(() => ({
@@ -175,7 +175,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     });
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("radio", { name: /Kompakt ve Gelişmiş Görünüm/ })).toHaveAttribute("aria-checked", "true");
@@ -214,12 +214,12 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();
     await expect(page.locator(".setup-shell.is-embedded")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: /Büyük ve Sade Görünüm/ })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Karanlık tema")).toBeVisible();
     await expect(page.getByLabel("Karanlık tema")).toBeChecked();
 
-    await expect(page.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(6);
+    await expect(page.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(5);
     await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
     expect(await page.locator(".setup-capabilities").evaluate((surface) => surface.scrollWidth <= surface.clientWidth + 1)).toBe(true);
     expect(pageErrors).toEqual([]);
@@ -241,7 +241,7 @@ async function verifyPartialPreferenceRecord(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(JSON.parse(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord))).toEqual(partialPreferences);
-    await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("radio", { name: /Kompakt ve Gelişmiş Görünüm/ })).toHaveAttribute("aria-checked", "true");
@@ -272,7 +272,7 @@ async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord)).toBe(malformedPreferences);
-    await expect(page.getByRole("heading", { name: "Uygulama Görünümü" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await expect(page.getByRole("radio", { name: /Kompakt ve Gelişmiş Görünüm/ })).toHaveAttribute("aria-checked", "true");

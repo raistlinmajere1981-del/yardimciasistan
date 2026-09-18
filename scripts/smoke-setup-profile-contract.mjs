@@ -11,7 +11,6 @@ const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.
 const { readBusinessCapabilitySnapshot } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 
 const root = process.cwd();
-const setupWizard = readFileSync(join(root, "apps/desktop-app/src/components/settings/SetupWizard.tsx"), "utf8");
 const setupForm = readFileSync(join(root, "apps/desktop-app/src/components/settings/SetupForm.tsx"), "utf8");
 const setupController = readFileSync(join(root, "apps/desktop-app/src/app/use-setup-controller.ts"), "utf8");
 const profileIds = getBusinessProfiles().map((profile) => profile.id);
@@ -24,7 +23,7 @@ assert.match(setupForm, /value=\{form\.profileId\}/);
 assert.match(setupForm, /getBusinessProfiles\(\)\.map/);
 assert.match(setupController, /profileId:\s*setupForm\.profileId/);
 assert.match(setupController, /servicePreferences:/);
-assert.doesNotMatch(setupWizard, /LegacySetupWizard|querySelector|replaceChildren/);
+assert.doesNotMatch(setupForm, /LegacySetupWizard|querySelector|replaceChildren/);
 assert.doesNotMatch(setupForm, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/);
 
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-setup-profile-"));

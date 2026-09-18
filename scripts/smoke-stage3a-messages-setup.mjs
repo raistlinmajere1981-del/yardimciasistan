@@ -174,15 +174,19 @@ try {
   });
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(setupPage.locator("html")).toHaveAttribute("data-mode", "pro");
-  await expect(setupPage.getByRole("heading", { name: "İşletme panelini kullanıma hazırlayın." })).toBeVisible();
-  await expect(setupPage.locator(".setup-shell--onboarding")).toBeVisible();
-  await expect(setupPage.locator(".setup-hero")).toBeVisible();
-  await expect(setupPage.getByRole("navigation", { name: "Kurulum bölümleri" })).toBeVisible();
-  await expect(setupPage.locator(".setup-progress a[aria-current='step']")).toHaveCount(1);
-  await expect(setupPage.locator(".setup-form-surface .setup-section")).toHaveCount(7);
-  await expect(setupPage.locator(".setup-footer .action-button-primary")).toHaveCount(1);
-  await expect(setupPage.locator(".setup-footer .action-button-secondary")).toHaveCount(0);
-  await expect(setupPage.getByRole("button", { name: "Kurulumu Kaydet", exact: true })).toBeVisible();
+  await expect(setupPage.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();
+  await expect(setupPage.locator(".setup-shell.is-embedded")).toBeVisible();
+  await expect(setupPage.locator(".setup-shell")).toHaveClass(/is-initial-setup/);
+  await expect(setupPage.locator(".setup-hero")).toHaveCount(0);
+  await expect(setupPage.getByRole("navigation", { name: "Ayar bölümleri" })).toBeVisible();
+  await expect(setupPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link", { name: "İşletme", exact: true })).toHaveAttribute("href", "#settings-business");
+  await expect(setupPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(4);
+  await expect(setupPage.getByRole("navigation", { name: "Kurulum bölümleri" })).toHaveCount(0);
+  await expect(setupPage.locator(".setup-progress")).toHaveCount(0);
+  await expect(setupPage.locator(".setup-form-surface .setup-section")).toHaveCount(3);
+  await expect(setupPage.locator(".setup-footer")).toHaveCount(0);
+  await expect(setupPage.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toBeVisible();
+  await expect(setupPage.getByRole("button", { name: "Kurulumu Kaydet", exact: true })).toHaveCount(0);
   await expect(setupPage.getByRole("textbox", { name: "Firma adı", exact: true })).toHaveValue("");
   await expect(setupPage.getByRole("textbox", { name: "Firma adı", exact: true })).toHaveAttribute("placeholder", "İşletme adı");
   await expect(setupPage.getByRole("textbox", { name: "Telefon", exact: true })).toHaveValue("");
@@ -206,7 +210,7 @@ try {
     for (const [width, height] of viewports) {
       await setupPage.setViewportSize({ width, height });
       await setupPage.evaluate(() => window.scrollTo(0, 0));
-      await expect(setupPage.locator(".setup-shell--onboarding")).toBeVisible();
+      await expect(setupPage.locator(".setup-shell.is-embedded")).toBeVisible();
       await assertNoOverflow(setupPage, `setup ${theme}-${mode} ${width}`, observations.setup);
       if (width === 1440) {
         await setupPage.screenshot({ animations: "disabled", path: `${output}/setup-1440x1000-${theme}-${mode}.png` });
@@ -342,7 +346,7 @@ async function assertNoOverflow(page, label, collection) {
       ".messages-page",
       ".message-mode-content:not(.is-hidden)",
       ".whatsapp-workspace",
-      ".setup-shell--onboarding",
+      ".setup-shell.is-embedded",
       ".setup-form-surface",
       ".setup-section",
       ".setup-capabilities",
