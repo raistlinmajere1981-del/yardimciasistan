@@ -44,23 +44,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
 
       {capabilityRuntime.snapshot?.businessId && (
-        <details className="setup-capability-editor-shell settings-advanced-details disclosure">
-          <summary>Gelişmiş işletme özellikleri</summary>
-          <div className="settings-advanced-details-body disclosure-body">
-          <BusinessCapabilityEditor
-            profileId={props.form.profileId}
-            snapshot={capabilityRuntime.snapshot}
-            state={capabilityRuntime.state}
-            message={capabilityRuntime.message}
-            onSetCapability={(capability, enabled) => {
-              void capabilityRuntime.setCapability(capability, enabled);
-            }}
-            onClearOverride={(capability) => {
-              void capabilityRuntime.clearOverride(capability);
-            }}
-          />
-          </div>
-        </details>
+        <BusinessCapabilityEditor
+          profileId={props.form.profileId}
+          snapshot={capabilityRuntime.snapshot}
+          state={capabilityRuntime.state}
+          message={capabilityRuntime.message}
+          onSetCapability={(capability, enabled) => {
+            void capabilityRuntime.setCapability(capability, enabled);
+          }}
+          onClearOverride={(capability) => {
+            void capabilityRuntime.clearOverride(capability);
+          }}
+        />
       )}
     </div>
   );

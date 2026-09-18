@@ -423,6 +423,7 @@ export function SetupForm({
           <a href="#settings-operations">İşletme düzeni</a>
           <a href="#settings-connections">Servisler</a>
           <a href="#settings-application">Uygulama</a>
+          {!setupData.setupRequired && <a href="#settings-capabilities">Özellikler</a>}
         </nav>
 
         <div id="settings-business" className="setup-section settings-identity-section">

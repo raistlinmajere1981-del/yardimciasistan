@@ -123,24 +123,26 @@ export function BusinessCapabilityEditor({
   const busy = state === "loading";
 
   return (
-    <div className="setup-section settings-capabilities-section">
+    <div id="settings-capabilities" className="setup-section settings-capabilities-section">
       <div className="setup-section-title">
         <h2>İşletme Özellikleri</h2>
       </div>
-      <p className="setup-section-description">
-        Seçtiğiniz sektör için önerilen özellikler otomatik gelir. Yalnız ihtiyacınız olan ek alanları buradan açıp kapatın.
-      </p>
       {profilePendingSave && (
         <p className="menu-status sync-error" role="status">
           Önce üst bölümdeki sektör değişikliğini kaydedin.
         </p>
       )}
-      <div className="settings-section-grid">
-        {CAPABILITY_GROUPS.map((group) => (
-          <fieldset className="setup-section" key={group.title} disabled={busy || profilePendingSave}>
-            <legend>{group.title}</legend>
-            <small>{group.description}</small>
-            <div className="form-grid">
+      <div className="settings-capability-groups">
+        {CAPABILITY_GROUPS.map((group) => {
+          const enabledCount = group.capabilities.filter((capability) => enabled.has(capability)).length;
+          return (
+          <fieldset className="settings-capability-group-card" key={group.title} disabled={busy || profilePendingSave}>
+            <legend>
+              <span>{group.title}</span>
+              <small>{enabledCount}/{group.capabilities.length} açık</small>
+            </legend>
+            <p>{group.description}</p>
+            <div className="settings-capability-list">
               {group.capabilities.map((capability) => {
                 const entry = entries.get(capability);
                 const checked = enabled.has(capability);
@@ -181,7 +183,8 @@ export function BusinessCapabilityEditor({
               })}
             </div>
           </fieldset>
-        ))}
+          );
+        })}
       </div>
       {state !== "idle" && message && <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>}
     </div>
