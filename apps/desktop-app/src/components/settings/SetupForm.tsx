@@ -836,7 +836,6 @@ export function SetupForm({
             <div className="settings-subsection-heading">
               <h3>Görünüm</h3>
             </div>
-          <p className="setup-section-description">Size rahat gelen görünümü seçin. Değişiklikler anında uygulanır ve bu bilgisayarda saklanır.</p>
           <div className="appearance-mode-options" role="radiogroup" aria-label="Görünüm biçimi">
             <button
               className={`appearance-mode-card${uiPreferences.mode === "easy" ? " is-selected" : ""}`}
@@ -880,7 +879,6 @@ export function SetupForm({
                   <option value={scale} key={scale}>{Math.round(scale * 100)}%</option>
                 ))}
               </select>
-              <small>Metinler, menüler ve içerik alanları birlikte ölçeklenir.</small>
             </label>
             <div className="setup-field">
               <span>Tema</span>
@@ -892,7 +890,6 @@ export function SetupForm({
                 />
                 Karanlık tema
               </label>
-              <small>Az ışıklı ortamlarda daha rahat bir görünüm sağlar.</small>
             </div>
           </div>
           </section>

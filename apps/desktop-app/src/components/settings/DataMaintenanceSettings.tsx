@@ -210,8 +210,6 @@ export function DataMaintenanceSettings() {
         <div><h3>Veri ve Yedekleme</h3></div>
         {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
       </div>
-      <p className="setup-section-description">Bilgilerinizi yedekleyin veya önceki bir yedeği geri yükleyin.</p>
-
       <div className="form-actions backup-manager-toolbar">
         <button className="setup-secondary action-button action-button-secondary" type="button" onClick={() => void createBackup()} disabled={busy}>
           <Save size={16} aria-hidden="true" />
@@ -230,7 +228,6 @@ export function DataMaintenanceSettings() {
 
       <div className="backup-list-heading">
         <strong>Mevcut Yedekler</strong>
-        <span>Yeni yedekler en üstte</span>
       </div>
 
       <div className="backup-list" aria-busy={action === "load"}>

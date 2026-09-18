@@ -200,10 +200,6 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
             {configured ? "Şifre açık" : "İsteğe bağlı"}
           </span>
         </div>
-        <p className="setup-section-description">
-          Uygulama açılışını ve üst bardaki ekran kilidini korur. Alanları doldurduktan sonra sağ üstteki Ayarları Kaydet düğmesine basın; şifreniz düz metin olarak saklanmaz.
-        </p>
-
         <form className="password-settings-form" onSubmit={(event) => event.preventDefault()}>
           {configured && (
             <label className="form-field form-field--medium">
