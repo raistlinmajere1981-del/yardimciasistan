@@ -206,7 +206,7 @@ try {
     mime: "image/png",
     candidates,
     source: "android",
-    deviceId: "android-stock-smoke"
+    deviceId: "android-stock-forbidden"
   });
   assert.equal(forbiddenAndroid.status, 403);
   assert.match((await forbiddenAndroid.json()).message, /stok güncelleme yetkisi yok/i);
