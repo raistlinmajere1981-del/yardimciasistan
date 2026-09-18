@@ -432,10 +432,37 @@ function verifyIpc(databasePath, customerId, cart, account, raw) {
   const mainEntry = readFileSync(join(appPath, "electron/main-entry.ts"), "utf8");
   assert.ok(/registerCommerceIpcHandlers\(\{\s*databasePath,[\s\S]*?assertUnlocked: assertAppSessionUnlocked/.test(mainEntry));
   const main = readFileSync(join(appPath, "dist-electron/main.js"), "utf8");
-  const guard = main.match(/function assertAppSessionUnlocked\(\) \{[\s\S]*?\n\}/)?.[0];
-  assert.ok(guard);
-  const lock = runInNewContext(`let appSessionLocked = false; ${guard}
-    ({ assertAppSessionUnlocked, set: (value) => { appSessionLocked = value; } })`);
+  assert.ok(/registerAppLockIpcHandlers.{0,10}\(getAppLockService\(\)\)/.test(main));
+  const lockServiceExports = {};
+  runInNewContext(readFileSync(join(appPath, "dist-electron/app-lock-service.js"), "utf8"), {
+    exports: lockServiceExports,
+    require: (id) => {
+      if (id === "./app-lock") return require("../apps/desktop-app/dist-electron/app-lock.js");
+      if (id === "./sync-config") return require("../apps/desktop-app/dist-electron/sync-config.js");
+      throw new Error(`unexpected app-lock-service require: ${id}`);
+    },
+    process,
+    Buffer
+  });
+  const lockService = new lockServiceExports.DesktopAppLockService({
+    database: {
+      getAppLockPasswordVerifier: () => "",
+      getAppLockNotificationCount: () => 0,
+      getSetupData: () => ({ syncSecret: "" })
+    },
+    getSyncStatus: () => undefined,
+    onUnlocked: () => {}
+  });
+  const lock = {
+    assertAppSessionUnlocked: () => lockService.assertUnlocked(),
+    set: (value) => {
+      if (value) {
+        lockService.lock();
+      } else {
+        void lockService.unlock("");
+      }
+    }
+  };
   let mutations = 0;
   exports.registerCommerceIpcHandlers({ databasePath: () => databasePath, assertUnlocked: lock.assertAppSessionUnlocked,
     onMutation: () => { mutations += 1; } });

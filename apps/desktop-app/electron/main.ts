@@ -42,15 +42,6 @@ import {
   type AutomaticSyncCycleResult,
   type AutomaticSyncStatus
 } from "./sync-coordinator";
-import {
-  createAppPasswordVerifier,
-  secureTextEqual,
-  validateAppPassword,
-  verifyAppPassword,
-  type AppLockActionResult,
-  type AppLockStatus,
-  type UpdateAppPasswordInput
-} from "./app-lock";
 import { BirthdayDeliveryService } from "./birthday-delivery-service.js";
 import { BirthdayScheduler } from "./birthday-scheduler.js";
 import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
@@ -79,6 +70,8 @@ import { registerAiWorkspaceIpcHandlers } from "./ipc/ai-workspace-ipc";
 import { registerReportIpcHandlers } from "./ipc/report-ipc";
 import { getWebSyncConfig } from "./sync-config";
 import { registerSyncIpcHandlers } from "./ipc/sync-ipc";
+import { DesktopAppLockService } from "./app-lock-service";
+import { registerAppLockIpcHandlers } from "./ipc/app-lock-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -89,15 +82,11 @@ let syncCoordinator: SyncCoordinator | null = null;
 let androidActionSyncInFlight: Promise<AndroidActionProcessSummary> | null = null;
 let androidSnapshotPublishPending = true;
 const marketBarcodeFastPullSenders = new Set<number>();
-let appSessionLocked = false;
-let appLockFailureCount = 0;
-let appLockBlockedUntil = 0;
+let appLockService: DesktopAppLockService | null = null;
 let birthdayScheduler: BirthdayScheduler | null = null;
 const birthdayWebviewDriver = new WhatsAppWebviewDriver();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
-const APP_LOCK_FAILURE_LIMIT = 5;
-const APP_LOCK_RETRY_DELAY_MS = 30_000;
 const C = BUSINESS_CAPABILITIES;
 
 function enabledBusinessCapabilities(): BusinessCapability[] {
@@ -313,7 +302,13 @@ if (!hasSingleInstanceLock) {
       backupPath: resolveProjectBackupPath()
     });
     desktopDatabase.initialize();
-    appSessionLocked = Boolean(desktopDatabase.getAppLockPasswordVerifier());
+    appLockService = new DesktopAppLockService({
+      database: desktopDatabase,
+      getSyncStatus: () => syncCoordinator?.getStatus(),
+      onUnlocked: () => {
+        void birthdayScheduler?.evaluateNow();
+      }
+    });
     syncCoordinator = new SyncCoordinator({
       database: desktopDatabase,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
@@ -326,7 +321,7 @@ if (!hasSingleInstanceLock) {
       database: desktopDatabase,
       deliveryService: birthdayDeliveryService,
       isWhatsAppEnabled: () => {
-        if (appSessionLocked) return false;
+        if (getAppLockService().isLocked()) return false;
         const capabilities = enabledBusinessCapabilities();
         return hasBusinessCapability(capabilities, C.CUSTOMERS) && hasBusinessCapability(capabilities, C.WHATSAPP);
       },
@@ -411,7 +406,7 @@ app.on("before-quit", () => {
 });
 
 function registerIpcHandlers() {
-  registerAppLockIpcHandlers();
+  registerAppLockIpcHandlers(getAppLockService());
 
   ipcMain.handle("app:getBootstrapData", (): DesktopBootstrapData => {
     assertAppSessionUnlocked();
@@ -576,164 +571,6 @@ function registerIpcHandlers() {
   });
 }
 
-function registerAppLockIpcHandlers() {
-  ipcMain.handle("appLock:getStatus", (): AppLockStatus => getAppLockStatus());
-
-  ipcMain.handle("appLock:lock", (): AppLockActionResult => {
-    appSessionLocked = true;
-    return {
-      ok: true,
-      message: "Uygulama kilitlendi.",
-      status: getAppLockStatus()
-    };
-  });
-
-  ipcMain.handle("appLock:unlock", async (_event, passwordValue: unknown): Promise<AppLockActionResult> => {
-    const retryAfterSeconds = getAppLockRetryAfterSeconds();
-    if (retryAfterSeconds > 0) {
-      return appLockFailureResult(
-        `Çok fazla deneme yapıldı. ${retryAfterSeconds} saniye sonra tekrar deneyin.`,
-        retryAfterSeconds
-      );
-    }
-
-    const verifier = getDatabase().getAppLockPasswordVerifier();
-    if (!verifier) {
-      resetAppLockFailures();
-      appSessionLocked = false;
-      void birthdayScheduler?.evaluateNow();
-      return {
-        ok: true,
-        message: "Kilit açıldı.",
-        status: getAppLockStatus()
-      };
-    }
-
-    const password = typeof passwordValue === "string" ? passwordValue : "";
-    if (!await verifyAppPassword(password, verifier)) {
-      const nextRetryAfterSeconds = recordAppLockFailure();
-      return appLockFailureResult(
-        nextRetryAfterSeconds > 0
-          ? `Şifre doğru değil. ${nextRetryAfterSeconds} saniye sonra tekrar deneyin.`
-          : "Şifre doğru değil.",
-        nextRetryAfterSeconds
-      );
-    }
-
-    resetAppLockFailures();
-    appSessionLocked = false;
-    void birthdayScheduler?.evaluateNow();
-    return {
-      ok: true,
-      message: "Kilit açıldı.",
-      status: getAppLockStatus()
-    };
-  });
-
-  ipcMain.handle(
-    "appLock:updatePassword",
-    async (_event, inputValue: unknown): Promise<AppLockActionResult> => {
-      if (appSessionLocked) {
-        return appLockFailureResult("Şifreyi değiştirmek için önce uygulama kilidini açın.");
-      }
-
-      const input = toAppPasswordUpdateInput(inputValue);
-      if (!input) {
-        return appLockFailureResult("Şifre bilgileri okunamadı.");
-      }
-
-      const retryAfterSeconds = getAppLockRetryAfterSeconds();
-      if (retryAfterSeconds > 0) {
-        return appLockFailureResult(
-          `Çok fazla deneme yapıldı. ${retryAfterSeconds} saniye sonra tekrar deneyin.`,
-          retryAfterSeconds
-        );
-      }
-
-      const currentVerifier = getDatabase().getAppLockPasswordVerifier();
-      if (currentVerifier && !await verifyAppPassword(input.currentPassword, currentVerifier)) {
-        const nextRetryAfterSeconds = recordAppLockFailure();
-        return appLockFailureResult(
-          nextRetryAfterSeconds > 0
-            ? `Mevcut şifre doğru değil. ${nextRetryAfterSeconds} saniye sonra tekrar deneyin.`
-            : "Mevcut şifre doğru değil.",
-          nextRetryAfterSeconds
-        );
-      }
-
-      if (!input.newPassword) {
-        getDatabase().setAppLockPasswordVerifier("");
-        resetAppLockFailures();
-        return {
-          ok: true,
-          message: "Uygulama açılış şifresi kaldırıldı.",
-          status: getAppLockStatus()
-        };
-      }
-
-      const validationMessage = validateAppPassword(input.newPassword);
-      if (validationMessage) {
-        return appLockFailureResult(validationMessage);
-      }
-
-      try {
-        const verifier = await createAppPasswordVerifier(input.newPassword);
-        getDatabase().setAppLockPasswordVerifier(verifier);
-        resetAppLockFailures();
-        return {
-          ok: true,
-          message: currentVerifier
-            ? "Uygulama açılış şifresi değiştirildi."
-            : "Uygulama açılış şifresi belirlendi.",
-          status: getAppLockStatus()
-        };
-      } catch {
-        return appLockFailureResult("Uygulama şifresi güvenli biçimde kaydedilemedi.");
-      }
-    }
-  );
-
-  ipcMain.handle(
-    "appLock:resetWithWebSecurityKey",
-    (_event, webSecurityKeyValue: unknown): AppLockActionResult => {
-      const retryAfterSeconds = getAppLockRetryAfterSeconds();
-      if (retryAfterSeconds > 0) {
-        return appLockFailureResult(
-          `Çok fazla deneme yapıldı. ${retryAfterSeconds} saniye sonra tekrar deneyin.`,
-          retryAfterSeconds
-        );
-      }
-
-      const suppliedKey = typeof webSecurityKeyValue === "string" ? webSecurityKeyValue.trim() : "";
-      const expectedKey = getWebSyncConfig(getDatabase().getSetupData()).syncSecret.trim();
-      if (
-        !suppliedKey
-        || suppliedKey.length > 4096
-        || !expectedKey
-        || !secureTextEqual(suppliedKey, expectedKey)
-      ) {
-        const nextRetryAfterSeconds = recordAppLockFailure();
-        return appLockFailureResult(
-          nextRetryAfterSeconds > 0
-            ? `Web güvenlik anahtarı doğru değil. ${nextRetryAfterSeconds} saniye sonra tekrar deneyin.`
-            : "Web güvenlik anahtarı doğru değil.",
-          nextRetryAfterSeconds
-        );
-      }
-
-      getDatabase().setAppLockPasswordVerifier("");
-      resetAppLockFailures();
-      appSessionLocked = false;
-      void birthdayScheduler?.evaluateNow();
-      return {
-        ok: true,
-        message: "Uygulama şifresi sıfırlandı ve kilit açıldı.",
-        status: getAppLockStatus()
-      };
-    }
-  );
-}
-
 async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> {
   assertAppSessionUnlocked();
   const secretUpdate = createAiApiKeyUpdate(input);
@@ -838,64 +675,15 @@ function getDatabase() {
   return desktopDatabase;
 }
 
-function getAppLockStatus(): AppLockStatus {
-  const syncStatus = syncCoordinator?.getStatus();
-  const syncProblemCount = syncStatus?.enabled && syncStatus.consecutiveFailures > 0 && syncStatus.lastError ? 1 : 0;
-  return {
-    locked: appSessionLocked,
-    passwordConfigured: Boolean(getDatabase().getAppLockPasswordVerifier()),
-    notificationCount: getDatabase().getAppLockNotificationCount() + syncProblemCount
-  };
-}
-
-function appLockFailureResult(message: string, retryAfterSeconds = 0): AppLockActionResult {
-  return {
-    ok: false,
-    message,
-    status: getAppLockStatus(),
-    ...(retryAfterSeconds > 0 ? { retryAfterSeconds } : {})
-  };
-}
-
-function toAppPasswordUpdateInput(value: unknown): UpdateAppPasswordInput | null {
-  const record = toUnknownRecord(value);
-  if (!record) {
-    return null;
+function getAppLockService(): DesktopAppLockService {
+  if (!appLockService) {
+    throw new Error("App lock service is not initialized.");
   }
-  return {
-    currentPassword: typeof record.currentPassword === "string" ? record.currentPassword : "",
-    newPassword: typeof record.newPassword === "string" ? record.newPassword : ""
-  };
-}
-
-function getAppLockRetryAfterSeconds(): number {
-  if (appLockBlockedUntil <= Date.now()) {
-    appLockBlockedUntil = 0;
-    return 0;
-  }
-  return Math.max(1, Math.ceil((appLockBlockedUntil - Date.now()) / 1000));
-}
-
-function recordAppLockFailure(): number {
-  appLockFailureCount += 1;
-  if (appLockFailureCount < APP_LOCK_FAILURE_LIMIT) {
-    return 0;
-  }
-
-  appLockFailureCount = 0;
-  appLockBlockedUntil = Date.now() + APP_LOCK_RETRY_DELAY_MS;
-  return getAppLockRetryAfterSeconds();
-}
-
-function resetAppLockFailures() {
-  appLockFailureCount = 0;
-  appLockBlockedUntil = 0;
+  return appLockService;
 }
 
 export function assertAppSessionUnlocked() {
-  if (appSessionLocked) {
-    throw new Error("Uygulama kilitli. Devam etmek için kilidi açın.");
-  }
+  getAppLockService().assertUnlocked();
 }
 
 function getSyncCoordinator() {
