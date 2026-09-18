@@ -115,7 +115,7 @@ export function MarketQuickSaleWorkspace({
   const [simulatedBarcode, setSimulatedBarcode] = useState("");
   const [barcodeMessage, setBarcodeMessage] = useState("USB okuyucu hazır; barkodu okutun.");
   const [scanning, setScanning] = useState(false);
-  const [phoneBarcodeMode, setPhoneBarcodeMode] = useState(false);
+  const [phoneBarcodeReady, setPhoneBarcodeReady] = useState(false);
   const [lastScanDevice, setLastScanDevice] = useState("");
   const [sourceDraft, setSourceDraft] = useState<CommerceSaleDraft | null>(null);
   const [draftLoadWarnings, setDraftLoadWarnings] = useState<string[]>([]);
@@ -270,10 +270,14 @@ export function MarketQuickSaleWorkspace({
   interactionBlocked.current = busy || submitting;
 
   useEffect(() => {
-    if (!phoneBarcodeMode || !barcodeEnabled || !bridge) return;
+    if (!barcodeEnabled || !bridge) {
+      setPhoneBarcodeReady(false);
+      return;
+    }
     const activeBridge = bridge;
     let disposed = false;
     let intervalId: ReturnType<typeof setInterval> | undefined;
+    setPhoneBarcodeReady(false);
 
     async function consume() {
       if (disposed || localScanInFlight.current || interactionBlocked.current) return;
@@ -286,7 +290,6 @@ export function MarketQuickSaleWorkspace({
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Telefon barkodları alınamadı.";
-        setBarcodeMessage(message);
         onStateChange("error", message);
       } finally {
         localScanInFlight.current = false;
@@ -295,17 +298,18 @@ export function MarketQuickSaleWorkspace({
 
     void activeBridge.setBarcodeScanMode(true)
       .then(() => {
-        if (disposed) return activeBridge.setBarcodeScanMode(false).then(() => undefined);
-        setBarcodeMessage("Telefon Barkod Modu açık; telefon taramaları bekleniyor.");
-        onStateChange("success", "Telefon Barkod Modu açıldı. Ödeme masaüstünde ayrıca tamamlanır.");
+        if (disposed) {
+          return activeBridge.setBarcodeScanMode(false).then(() => undefined);
+        }
+        setPhoneBarcodeReady(true);
         void consume();
         intervalId = setInterval(() => void consume(), 600);
         return undefined;
       })
       .catch((error) => {
         if (disposed) return;
-        setPhoneBarcodeMode(false);
-        onStateChange("error", error instanceof Error ? error.message : "Telefon Barkod Modu açılamadı.");
+        setPhoneBarcodeReady(false);
+        onStateChange("error", error instanceof Error ? error.message : "Telefon barkod kanalı hazırlanamadı.");
       });
 
     return () => {
@@ -313,7 +317,7 @@ export function MarketQuickSaleWorkspace({
       if (intervalId) clearInterval(intervalId);
       void activeBridge.setBarcodeScanMode(false).catch(() => undefined);
     };
-  }, [barcodeEnabled, bridge, onStateChange, phoneBarcodeMode, resolveBarcode]);
+  }, [barcodeEnabled, bridge, onStateChange, resolveBarcode]);
 
   function setQuantity(productId: string, quantityInput: number) {
     const quantity = roundQuantity(quantityInput);
@@ -433,29 +437,23 @@ export function MarketQuickSaleWorkspace({
 
         {barcodeEnabled && (
           <div className="market-barcode-stack">
-            <section className={`market-phone-barcode-panel${phoneBarcodeMode ? " is-active" : ""}`} aria-label="Telefon barkod modu">
+            <section className={`market-phone-barcode-panel${phoneBarcodeReady ? " is-active" : ""}`} aria-label="Telefon barkod kanalı">
               <div>
-                <span><Smartphone size={17} aria-hidden="true" /><strong>Telefon Barkod Modu</strong></span>
+                <span><Smartphone size={17} aria-hidden="true" /><strong>Telefon Kamerası</strong></span>
                 <small>
-                  Telefon taramalarını bu sepete aktarır; ödeme otomatik yapılmaz. Hosting aktarımı internet bağlantısı
-                  gerektirebilir ve yalnız mod açıkken geçici hızlı çekim kullanır.
+                  Hızlı Satış açıkken telefondaki Kasa Barkod Modu otomatik dinlenir; masaüstünde ayrıca mod açmanız gerekmez.
+                  Tarama ürünü bu sepete ekler, ödeme yine masaüstünde tamamlanır.
                 </small>
               </div>
-              <button
-                type="button"
-                className={phoneBarcodeMode ? "market-danger-button" : "market-secondary-button"}
-                aria-pressed={phoneBarcodeMode}
-                onClick={() => setPhoneBarcodeMode((current) => !current)}
-                disabled={disabled}
-              >
-                {phoneBarcodeMode ? "Modu Kapat" : "Telefon Barkod Modunu Aç"}
-              </button>
-              {lastScanDevice && <small className="market-phone-device">Son cihaz: {lastScanDevice}</small>}
+              <small className="market-phone-device">
+                {phoneBarcodeReady ? "Hazır" : "Bağlanıyor…"}
+                {lastScanDevice ? ` · Son cihaz: ${lastScanDevice}` : ""}
+              </small>
             </section>
 
             <section className="market-barcode-panel" aria-label="Barkod girişi">
               <div className="market-barcode-heading">
-                <span><Barcode size={17} aria-hidden="true" /><strong>Yerel Barkod Girişi</strong></span>
+                <span><Barcode size={17} aria-hidden="true" /><strong>USB / Test Barkod Girişi</strong></span>
                 <select value={barcodeMode} onChange={(event) => setBarcodeMode(event.target.value as BarcodeMode)} disabled={disabled || scanning}>
                   <option value="keyboard-wedge">USB Klavye Okuyucu</option>
                   <option value="simulator">Simülatör</option>
