@@ -626,12 +626,40 @@ export function SetupForm({
             </fieldset>
           </section>
 
-          <div className="setup-toggle-grid settings-service-legacy-toggles">
-            <label>
-              <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
-              Android
-            </label>
-          </div>
+          <section className={`settings-service-card${form.androidEnabled ? " is-enabled" : " is-disabled"}`}>
+            <div className="settings-service-card-header">
+              <div>
+                <strong>Android</strong>
+                <span>{form.androidEnabled ? `${dashboardData?.androidDevices.length ?? 0} cihaz` : "Kapalı"}</span>
+              </div>
+              <label className="settings-service-toggle">
+                <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
+                <span>{form.androidEnabled ? "Açık" : "Kapalı"}</span>
+              </label>
+            </div>
+            <div className="settings-service-card-body">
+              {!form.androidEnabled ? (
+                <p className="settings-service-empty">Android bağlantısı kapalı.</p>
+              ) : setupData.setupRequired ? (
+                <p className="settings-service-empty">İlk ayar kaydından sonra Android cihazları burada yönetebilirsiniz.</p>
+              ) : (
+                <AndroidDevicesSection
+                  devices={dashboardData?.androidDevices ?? []}
+                  enabledCapabilities={enabledCapabilities}
+                  state={androidDeviceState}
+                  message={androidDeviceMessage}
+                  publishState={androidPublishState}
+                  publishMessage={androidPublishMessage}
+                  onPublish={onPublishAndroid}
+                  onSetRole={onSetAndroidDeviceRole}
+                  onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
+                  onSetActive={onSetAndroidDeviceActive}
+                  onResetPermissions={onResetAndroidDevicePermissions}
+                  onRevoke={onRevokeAndroidDevice}
+                />
+              )}
+            </div>
+          </section>
         </div>
 
         <section className="settings-service-card is-enabled settings-web-section">
@@ -801,22 +829,6 @@ export function SetupForm({
           </div>
         </section>
 
-        {!setupData.setupRequired && form.androidEnabled && (
-          <AndroidDevicesSection
-            devices={dashboardData?.androidDevices ?? []}
-            enabledCapabilities={enabledCapabilities}
-            state={androidDeviceState}
-            message={androidDeviceMessage}
-            publishState={androidPublishState}
-            publishMessage={androidPublishMessage}
-            onPublish={onPublishAndroid}
-            onSetRole={onSetAndroidDeviceRole}
-            onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
-            onSetActive={onSetAndroidDeviceActive}
-            onResetPermissions={onResetAndroidDevicePermissions}
-            onRevoke={onRevokeAndroidDevice}
-          />
-        )}
         <div id="settings-application" className="setup-section appearance-settings">
           <div className="setup-section-title">
             <h2>Uygulama Görünümü</h2>
@@ -941,11 +953,10 @@ function AndroidDevicesSection({
     onSetActive(device.deviceId, true);
   };
   return (
-    <section className="setup-section settings-android-devices-section">
-      <div className="setup-section-title android-devices-heading">
+    <section className="settings-android-devices-section">
+      <div className="android-devices-heading">
         <div>
-          <p>Telefon Yetkileri</p>
-          <h2>Android Cihazlar</h2>
+          <h3>Cihazlar ve Yetkiler</h3>
         </div>
         <div className="android-devices-heading-actions">
           <span>{availableDevices.length} cihaz</span>
@@ -961,7 +972,7 @@ function AndroidDevicesSection({
           </ActionButton>
         </div>
       </div>
-      <p className="setup-section-description">Rol ve görev alanları yalnız bu bilgisayardan değiştirilebilir. Kaldırılan cihazlar ana listeden çıkarılır ve erişimleri kapalı kalır.</p>
+      <p className="settings-service-note">Rol ve görev alanları yalnız bu bilgisayardan değiştirilebilir.</p>
       {availableDevices.length === 0 ? (
         <div className="android-devices-empty">
           <Smartphone size={22} aria-hidden="true" />
