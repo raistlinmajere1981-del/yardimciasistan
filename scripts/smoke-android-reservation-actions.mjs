@@ -1,22 +1,24 @@
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 
-const require = createRequire(import.meta.url);
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-android-reservation-"));
-const database = new DesktopDatabase({
-  appPath: join(process.cwd(), "apps", "desktop-app"),
-  userDataPath: dataRoot
-});
+const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-android-reservation-");
 
 const DEVICE_ID = "android-reservation-smoke";
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup(createSmokeSetupInput({
+    businessName: "Android Reservation Smoke",
+    phone: "+905550003030",
+    whatsapp: "+905550003030",
+    syncSecret: "android-reservation-secret-123",
+    servicePreferences: { whatsapp: false, android: true },
+    initialCounts: { rooms: 2, tables: 2 }
+  }));
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
   registerAdminDevice(database);
   const customerId = createCustomer(database);
   const initial = database.getDashboardData();
@@ -168,8 +170,7 @@ try {
 
   console.log("android-reservation-actions-smoke-ok: approved device, room/table create, update, conflicts, stale version and idempotency verified");
 } finally {
-  database.close();
-  rmSync(dataRoot, { recursive: true, force: true });
+  cleanup();
 }
 
 function registerAdminDevice(database) {
