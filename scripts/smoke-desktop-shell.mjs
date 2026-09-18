@@ -1,5 +1,6 @@
 import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
+import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createSetupFixture, createReportFixture, createCompactUiFixture } from './lib/desktop-renderer-fixtures.mjs';
@@ -8,7 +9,7 @@ import { BUSINESS_CAPABILITIES } from '@yardimci-asistan/shared';
 
 const port = await new Promise(resolve => { const s = createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); }); });
 const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn('npx', ['vite', '--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', String(port)], { cwd: 'apps/desktop-app', stdio: 'ignore' });
+const server = spawn(getLocalViteExecutable(), ['--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', String(port)], { cwd: 'apps/desktop-app', stdio: 'ignore' });
 const output = 'artifacts/design-system/stage1';
 mkdirSync(output, { recursive: true });
 let browser;

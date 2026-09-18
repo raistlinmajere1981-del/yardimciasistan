@@ -1,12 +1,13 @@
 import { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture, createBusinessCapabilitySnapshotFixture } from "./lib/desktop-renderer-fixtures.mjs";
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
+import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
 import { readFileSync } from "node:fs";
 import http from "node:http";
 
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
-const server = spawn("npx", ["vite", "--config", "vite.renderer.config.ts", "--host", "127.0.0.1", "--port", String(port)], {
+const server = spawn(getLocalViteExecutable(), ["--config", "vite.renderer.config.ts", "--host", "127.0.0.1", "--port", String(port)], {
   cwd: "apps/desktop-app",
   stdio: ["ignore", "pipe", "pipe"]
 });
