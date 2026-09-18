@@ -1,3 +1,4 @@
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -7,30 +8,15 @@ const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-record-de
 try {
   database.initialize();
 
-  const setupResult = database.saveInitialSetup({
+  const setupResult = database.saveInitialSetup(createSmokeSetupInput({
     businessName: "Record Deletions Test İşletmesi",
-    profileId: "pension_restaurant",
     phone: "+905550000100",
     whatsapp: "+905550000100",
-    email: "",
-    address: "",
-    webModuleUrl: "https://example.test/yardimci-asistan",
     syncSecret: "record-deletions-secret-123",
-    autoSyncEnabled: false,
-    aiEnabled: false,
-    aiProvider: "openai_compatible",
-    aiService: "openai",
-    aiProjectName: "",
-    aiModel: "",
-    aiModelOptions: [],
-    aiBaseUrl: "https://api.openai.com/v1",
-    aiTimeoutSeconds: 30,
-    aiApiKey: "",
-    clearAiApiKey: false,
     servicePreferences: { whatsapp: true, android: true },
     initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
-  });
+  }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
 
   assertDesktopMessageDeletion(database);
