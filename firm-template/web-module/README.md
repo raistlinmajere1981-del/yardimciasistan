@@ -351,6 +351,15 @@ Lokal smoke testi:
 npm run smoke:web-module
 ```
 
+Yeni kurulumda sync secret'ı otomatik üretmek ve canlı deploy paketini hazırlamak için:
+
+```bash
+npm run prepare:web-install -- --url https://firma.com/yardimci-asistan --name "Firma Adı"
+```
+
+Komut masaüstünde kullanılacak anahtarı terminalde ve
+`artifacts/web-module-deploy/install-info.txt` içinde gösterir.
+
 Hosting paneline yükleme öncesi doğrulanmış klasör üretmek için:
 
 ```bash

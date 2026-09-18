@@ -56,6 +56,30 @@ Yanındaki `artifacts/web-module-deploy/manifest.json` dosyası paketlenen dosya
 
 Hosting panelinde arşiv çıkarma desteği varsa `yardimci-asistan.zip` veya `yardimci-asistan.tar.gz` dosyasını yükleyip açabilirsiniz. Destek yoksa `yardimci-asistan/` klasörünün içeriğini FTP veya dosya yöneticisiyle kopyalayın.
 
+### Önerilen: anahtarı otomatik üretip kurulum paketi hazırlama
+
+Yeni bir site kurulurken sync anahtarını elle uydurmak yerine şu komutu kullanın:
+
+```bash
+npm run prepare:web-install -- \
+  --url https://firma.com/yardimci-asistan \
+  --name "Firma Adı"
+```
+
+Komut 256-bit rastgele bir güvenlik anahtarı üretir, canlı origin değerini ayarlar ve
+web modül arşivini hazırlar. Anahtar terminalde gösterilir ve yalnız yerelde:
+
+```text
+artifacts/web-module-deploy/install-info.txt
+```
+
+dosyasına `0600` izinle yazılır. Masaüstünde `Ayarlar → Web Bağlantısı` bölümüne
+bu dosyadaki **Web modül adresi** ve **Web güvenlik anahtarı** değerlerini girin.
+Anahtarı Git'e, site HTML'ine, widget koduna veya herkese açık bir dosyaya koymayın.
+
+Widget web modülünden farklı bir origin'de çalışıyorsa ek olarak bir veya daha fazla
+`--origin https://site.example` parametresi verilebilir.
+
 ### SSH ile canlı güncelleme
 
 Alwaysdata üzerindeki mevcut kurulumu güncellemek için proje kökünde önce farkları
@@ -87,6 +111,22 @@ Paket daha önce üretildiyse yalnız kod dağıtımını tekrar denemek için:
 ```bash
 npm run deploy:web -- --skip-pack
 ```
+
+### Temiz web modülü kurulumu
+
+Sunucuda saklanması gereken runtime veri yoksa önce yukarıdaki
+`prepare:web-install` komutuyla yeni paket ve yeni anahtar üretin. Alwaysdata gibi SSH
+erişimi olan kurulumlarda ardından:
+
+```bash
+npm run deploy:web -- --fresh --skip-pack
+```
+
+kullanın. `--fresh`, eski `data/`, `config/business.json`, local config,
+knowledge, assets ve `.env*` dosyalarını yeni sürüme taşımaz. Buna rağmen eski canlı
+kurulum önce normal yedek dizinine alınır; yani yanlışlık durumunda geri dönüş kopyası
+bulunur. `--fresh` mevcut paket içinde gerçek bir `sync_secret` yoksa çalışmayı
+reddeder.
 
 Kaynak template dosyasını değiştirmeden, sadece üretilecek deploy paketindeki `config/business.json` değerlerini doldurmak için şu ortam değişkenleri kullanılabilir:
 

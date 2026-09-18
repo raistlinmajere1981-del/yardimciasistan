@@ -11,6 +11,7 @@ Kullanım:
 Seçenekler:
   --dry-run      Sunucuda değişiklik yapmadan yayın farklarını gösterir.
   --skip-pack    Mevcut artifacts/web-module-deploy çıktısını kullanır.
+  --fresh        Eski runtime/config verilerini taşımadan temiz kurulum yapar.
   --yes          Etkileşimli onay istemeden yayınlar.
   --help         Bu yardımı gösterir.
 
@@ -21,20 +22,22 @@ Ortam değişkenleri:
   YARDIMCI_ASISTAN_DEPLOY_STAGE_PARENT  Uzak geçici dizin üst yolu
   YARDIMCI_ASISTAN_PUBLIC_URL           Canlı web modülü adresi
 
-Script canlı data/, config/business.json, config/*.local.*, knowledge/,
-assets/ ve kökteki .env* dosyalarını korur. Eski sürüm, runtime verileriyle
-birlikte sunucudaki yedek dizinine taşınır.
+Normal yayında script canlı data/, config/business.json, config/*.local.*,
+knowledge/, assets/ ve kökteki .env* dosyalarını korur. --fresh kullanıldığında
+bu veriler yeni sürüme taşınmaz; eski kurulum yine sunucudaki yedek dizinine alınır.
 EOF
 }
 
 dry_run=false
 skip_pack=false
+fresh_install=false
 assume_yes=false
 
 while (($# > 0)); do
   case "$1" in
     --dry-run) dry_run=true ;;
     --skip-pack) skip_pack=true ;;
+    --fresh) fresh_install=true ;;
     --yes) assume_yes=true ;;
     --help|-h) usage; exit 0 ;;
     *) printf 'Bilinmeyen seçenek: %s\n\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -94,16 +97,19 @@ done
 
 ssh_options=(-o BatchMode=yes -o ConnectTimeout=15)
 rsync_ssh="ssh -o BatchMode=yes -o ConnectTimeout=15"
-protected_paths=(
-  '--exclude=/data/***'
-  '--exclude=/config/business.json'
-  '--exclude=/config/*.local.php'
-  '--exclude=/config/*.local.json'
-  '--exclude=/knowledge/***'
-  '--exclude=/assets/***'
-  '--exclude=/.env'
-  '--exclude=/.env.*'
-)
+protected_paths=()
+if [[ "$fresh_install" == false ]]; then
+  protected_paths=(
+    '--exclude=/data/***'
+    '--exclude=/config/business.json'
+    '--exclude=/config/*.local.php'
+    '--exclude=/config/*.local.json'
+    '--exclude=/knowledge/***'
+    '--exclude=/assets/***'
+    '--exclude=/.env'
+    '--exclude=/.env.*'
+  )
+fi
 
 filter_rsync_changes() {
   awk '$1 !~ /^\.[fdLDS]$/'
@@ -145,6 +151,15 @@ for package_file in "${required_package_files[@]}"; do
   fi
 done
 
+if [[ "$fresh_install" == true ]]; then
+  package_sync_secret="$(php -r '$c=json_decode(file_get_contents($argv[1]), true); echo trim((string)($c["sync_secret"] ?? ""));' "$package_dir/config/business.json")"
+  if [[ -z "$package_sync_secret" ]]; then
+    printf 'Temiz kurulum paketinde sync secret yok. Önce şu komutu çalıştırın:\n' >&2
+    printf '  npm run prepare:web-install -- --url %s\n' "$public_url" >&2
+    exit 1
+  fi
+fi
+
 printf 'Paket içindeki PHP dosyaları doğrulanıyor...\n'
 while IFS= read -r -d '' php_file; do
   php -l "$php_file" >/dev/null
@@ -173,7 +188,11 @@ test "$root_device" = "$(stat -c %d "$stage_parent")"
 REMOTE_CHECK
 
 printf '\nHedef: %s:%s\n' "$deploy_host" "$remote_root"
-printf 'Korunan: data/, firma ve yerel config, knowledge/, assets/, .env*\n\n'
+if [[ "$fresh_install" == true ]]; then
+  printf 'Mod: temiz kurulum; eski runtime/config yeni sürüme taşınmayacak.\n\n'
+else
+  printf 'Korunan: data/, firma ve yerel config, knowledge/, assets/, .env*\n\n'
+fi
 
 show_dry_run() {
   printf 'Kod ve güvenlik dosyalarındaki değişiklikler:\n'
@@ -216,6 +235,9 @@ if [[ "$assume_yes" == false ]]; then
   if [[ ! -t 0 ]]; then
     printf 'Etkileşimsiz yayın için --yes kullanın.\n' >&2
     exit 2
+  fi
+  if [[ "$fresh_install" == true ]]; then
+    printf 'UYARI: --fresh eski runtime/config verilerini yeni sürüme TAŞIMAZ. Eski kurulum yedeklenecektir.\n'
   fi
   read -r -p 'Bu paket canlı web modülüne yayınlansın mı? [e/H] ' answer
   if [[ ! "$answer" =~ ^[eEyY]$ ]]; then
@@ -266,13 +288,18 @@ printf 'Sunucudaki geçici paketin PHP dosyaları doğrulanıyor...\n'
 ssh "${ssh_options[@]}" "$deploy_host" \
   "find '$remote_stage' -type f -name '*.php' -exec php -l {} \\; >/dev/null"
 
-printf 'Canlı veriler korunarak yeni sürüm etkinleştiriliyor...\n'
+if [[ "$fresh_install" == true ]]; then
+  printf 'Temiz web modülü kurulumu etkinleştiriliyor...\n'
+else
+  printf 'Canlı veriler korunarak yeni sürüm etkinleştiriliyor...\n'
+fi
 ssh "${ssh_options[@]}" "$deploy_host" bash -s -- \
-  "$remote_root" "$remote_stage" "$remote_backup" <<'REMOTE_ACTIVATE'
+  "$remote_root" "$remote_stage" "$remote_backup" "$fresh_install" <<'REMOTE_ACTIVATE'
 set -Eeuo pipefail
 remote_root="$1"
 remote_stage="$2"
 remote_backup="$3"
+fresh_install="$4"
 old_moved=false
 
 restore_old_release() {
@@ -286,6 +313,7 @@ trap 'exit 130' HUP INT TERM
 mv "$remote_root" "$remote_backup"
 old_moved=true
 
+if [[ "$fresh_install" != true ]]; then
 if [[ -d "$remote_backup/data" ]]; then
   data_guard="$remote_stage/.deploy-data-htaccess"
   if [[ -f "$remote_stage/data/.htaccess" ]]; then
@@ -325,6 +353,7 @@ for preserved_file in "$remote_backup"/.env "$remote_backup"/.env.*; do
   [[ -f "$preserved_file" ]] || continue
   cp -p "$preserved_file" "$remote_stage/"
 done
+fi
 
 find "$remote_stage" -type f -name '*.php' -exec php -l {} \; >/dev/null
 mv "$remote_stage" "$remote_root"
@@ -378,4 +407,8 @@ fi
 printf '\nYayın tamamlandı.\n'
 printf 'Canlı adres: %s\n' "$public_url"
 printf 'Önceki sürüm ve veri yedeği: %s\n' "$remote_backup"
-printf 'Canlı runtime verileri, firma ayarları, bilgi dosyaları ve assetler korundu.\n'
+if [[ "$fresh_install" == true ]]; then
+  printf 'Temiz kurulum tamamlandı; eski runtime/config yalnız yedekte tutuluyor.\n'
+else
+  printf 'Canlı runtime verileri, firma ayarları, bilgi dosyaları ve assetler korundu.\n'
+fi
