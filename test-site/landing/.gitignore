@@ -1,0 +1,20 @@
+# Local / secret / OS artifacts — never commit these.
+.env
+.env.*
+*.local.php
+*.local.json
+node_modules/
+dist/
+build/
+.DS_Store
+Thumbs.db
+
+# Local deploy working files (timestamps, dry-run logs).
+.deploy-tmp/
+*.bak
+*.orig
+
+# Never store live secrets in this repo.
+# config/business.json lives ONLY on the server and is read at runtime.
+config/business.json
+**/business.json
