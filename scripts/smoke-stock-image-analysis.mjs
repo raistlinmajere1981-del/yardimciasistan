@@ -147,28 +147,6 @@ try {
   ];
   const pngBytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64");
 
-  const missingAuth = await analyze({ bytes: pngBytes, mime: "image/png", candidates, includeAuth: false });
-  assert.equal(missingAuth.status, 401);
-  assert.equal((await missingAuth.json()).code, "unauthorized");
-
-  const unsupported = await analyze({ bytes: Buffer.from("not an image"), mime: "text/plain", candidates });
-  assert.equal(unsupported.status, 415);
-  assert.equal((await unsupported.json()).message, "Desteklenmeyen dosya türü.");
-
-  const oversized = await analyze({ bytes: Buffer.alloc(10 * 1024 * 1024 + 1, 0x41), mime: "image/png", candidates });
-  assert.equal(oversized.status, 413);
-  assert.equal((await oversized.json()).message, "Görsel çok büyük.");
-
-  const forbiddenAndroid = await analyze({
-    bytes: pngBytes,
-    mime: "image/png",
-    candidates,
-    source: "android",
-    deviceId: "android-stock-smoke"
-  });
-  assert.equal(forbiddenAndroid.status, 403);
-  assert.match((await forbiddenAndroid.json()).message, /stok güncelleme yetkisi yok/i);
-
   const snapshotPublication = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": secret },
@@ -210,6 +188,29 @@ try {
     })
   });
   assert.equal(snapshotPublication.status, 200);
+
+  const missingAuth = await analyze({ bytes: pngBytes, mime: "image/png", candidates, includeAuth: false });
+  assert.equal(missingAuth.status, 401);
+  assert.equal((await missingAuth.json()).code, "unauthorized");
+
+  const unsupported = await analyze({ bytes: Buffer.from("not an image"), mime: "text/plain", candidates });
+  assert.equal(unsupported.status, 415);
+  assert.equal((await unsupported.json()).message, "Desteklenmeyen dosya türü.");
+
+  const oversized = await analyze({ bytes: Buffer.alloc(10 * 1024 * 1024 + 1, 0x41), mime: "image/png", candidates });
+  assert.equal(oversized.status, 413);
+  assert.equal((await oversized.json()).message, "Görsel çok büyük.");
+
+  const forbiddenAndroid = await analyze({
+    bytes: pngBytes,
+    mime: "image/png",
+    candidates,
+    source: "android",
+    deviceId: "android-stock-smoke"
+  });
+  assert.equal(forbiddenAndroid.status, 403);
+  assert.match((await forbiddenAndroid.json()).message, /stok güncelleme yetkisi yok/i);
+
   const androidValid = await analyze({
     bytes: pngBytes,
     mime: "image/png",
