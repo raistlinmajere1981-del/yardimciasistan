@@ -81,6 +81,7 @@
     "pack:web-module:no-build": "node scripts/package-web-module.mjs",
     "sync:web-widget-template": "npm run sync:template -w @yardimci-asistan/web-widget",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:electron": "tsc -p apps/desktop-app/tsconfig.electron.json --noEmit",
     "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {

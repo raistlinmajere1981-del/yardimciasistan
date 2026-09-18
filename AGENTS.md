@@ -118,18 +118,11 @@ npm run pilot:check
 ```
 
 For Electron refactors, normally include:
-- `npx tsc -p apps/desktop-app/tsconfig.electron.json --noEmit`
+- `npm run typecheck:electron`
 - targeted smoke tests for the touched domain
 - `git diff --check`
 
 Prefer behavior/contract tests over tests that parse a specific function body or source-file location. If a source-structure assertion is unavoidable, keep it minimal and update it when ownership moves.
-
-## Known unrelated test/fixture debt
-
-Do not opportunistically fix these during unrelated work:
-- Android daily-task permission fixture
-
-Handle each as its own maintenance task after reproducing it against a clean baseline.
 
 ## Refactor discipline
 
