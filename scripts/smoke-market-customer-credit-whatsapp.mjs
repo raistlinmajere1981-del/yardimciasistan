@@ -119,6 +119,7 @@ try {
     addCustomerCreditAdjustment: "commerce:customerCredit:adjustment", createCustomerCreditSale: "commerce:customerCredit:sale",
     listProducts: "commerce:product:list", listCategories: "commerce:category:list", createPaidSale: "commerce:sale:createPaid"
   };
+  const scannerMethods = ["setBarcodeScanMode", "consumePendingBarcodeScans"];
   await page.exposeFunction("__m83Call", async (method, args) => {
     calls.push({ method, args });
     if (method === "toggle") return setBusinessCapability(path, { capability: args[0], enabled: args[1] });
@@ -126,6 +127,12 @@ try {
       assert.ok(readBusinessCapabilitySnapshot(path).enabledCapabilities.includes("service.whatsapp"));
       if (failExternal) throw new Error("WhatsApp açılamadı. Mesajı kopyalayıp elle paylaşabilirsiniz.");
       external.push(args[0]); return true;
+    }
+    if (method === "setBarcodeScanMode") {
+      return { active: args[0] === true, intervalMs: 1500, transport: "hosting" };
+    }
+    if (method === "consumePendingBarcodeScans") {
+      return [];
     }
     assert.ok(channels[method], `Unexpected bridge method: ${method}`);
     const result = invoke(channels[method], ...args);
@@ -136,7 +143,7 @@ try {
     window.__m83Initial = { dashboard, snapshot };
     const invoke = (method) => (...args) => window.__m83Call(method, args);
     window.yardimciDesktop = { commerce: Object.fromEntries(methods.map((method) => [method, invoke(method)])), openExternal: invoke("openExternal") };
-  }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path), methods: Object.keys(channels) });
+  }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path), methods: [...Object.keys(channels), ...scannerMethods] });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/m83-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
   await page.getByRole("button", { name: /Ahmet Paylaşım/ }).click();
