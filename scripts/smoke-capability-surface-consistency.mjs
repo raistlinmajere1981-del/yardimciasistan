@@ -45,6 +45,9 @@ const roomFolioSource = source("apps/desktop-app/src/components/pension/RoomFoli
 const tableOrdersSource = source("apps/desktop-app/src/components/restaurant/TableOrdersWorkspace.tsx");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
 const financeIpcSource = source("apps/desktop-app/electron/finance-ipc.ts");
+const customerIpcSource = source("apps/desktop-app/electron/ipc/customer-ipc.ts");
+const whatsappIpcSource = source("apps/desktop-app/electron/ipc/whatsapp-ipc.ts");
+const dailyTaskIpcSource = source("apps/desktop-app/electron/ipc/daily-task-ipc.ts");
 const financeWorkspaceSource = source("apps/desktop-app/src/components/finance/FinanceWorkspace.tsx");
 const restaurantReservationsSource = source("apps/desktop-app/src/components/operations/RestaurantReservationsWorkspace.tsx");
 const desktopProjectionSource = source("apps/desktop-app/src/app/capability-projection.ts");
@@ -61,16 +64,16 @@ const hostingSyncSource = source("firm-template/web-module/api/sync.php");
 // A — service.whatsapp controls both renderer affordances and hard boundaries.
 assert.match(requestsSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
 assert.match(customersSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
-assertHandlerGuard(mainSource, "whatsapp:markMessageSent", "C.WHATSAPP");
-assertHandlerGuard(mainSource, "whatsapp:deleteMessage", "C.WHATSAPP");
+assertHandlerGuard(whatsappIpcSource, "whatsapp:markMessageSent", "assertCapability(BUSINESS_CAPABILITIES.WHATSAPP");
+assertHandlerGuard(whatsappIpcSource, "whatsapp:deleteMessage", "assertCapability(BUSINESS_CAPABILITIES.WHATSAPP");
 assert.match(
-  handlerSource(mainSource, "customer:assignRoom"),
-  /assertDesktopCapability\(C\.CUSTOMERS[\s\S]*assertDesktopCapability\(C\.ACCOMMODATION_STAYS/,
+  handlerSource(customerIpcSource, "customer:assignRoom"),
+  /assertCapability\(BUSINESS_CAPABILITIES\.CUSTOMERS[\s\S]*assertCapability\(BUSINESS_CAPABILITIES\.ACCOMMODATION_STAYS/,
   "direct room assignment must require both customer and stay capabilities"
 );
 assert.match(
-  handlerSource(mainSource, "customer:updateRoomStayStatus"),
-  /assertDesktopCapability\(C\.CUSTOMERS[\s\S]*assertDesktopCapability\(C\.ACCOMMODATION_STAYS/,
+  handlerSource(customerIpcSource, "customer:updateRoomStayStatus"),
+  /assertCapability\(BUSINESS_CAPABILITIES\.CUSTOMERS[\s\S]*assertCapability\(BUSINESS_CAPABILITIES\.ACCOMMODATION_STAYS/,
   "direct stay mutations must require both customer and stay capabilities"
 );
 assert.match(mainSource, /if \(isWhatsAppUrl\(url\)\)[\s\S]{0,180}assertDesktopCapability\(C\.WHATSAPP/);
@@ -132,8 +135,8 @@ assert.match(
   "setup IPC must delegate persistence to DesktopDatabase and propagate failure; smoke-setup-profile-contract verifies capabilities and publication"
 );
 assert.match(
-  handlerSource(mainSource, "dailyTask:save"),
-  /existingTask[\s\S]*assertDesktopTaskScope\(\s*existingTask\.taskType[\s\S]*assertDesktopTaskScope\(String\(input\?\.taskType/,
+  handlerSource(dailyTaskIpcSource, "dailyTask:save"),
+  /existingTask[\s\S]*assertTaskScope\(\s*existingTask\.taskType[\s\S]*assertTaskScope\(String\(input\?\.taskType/,
   "daily task edits must authorize both the stored and requested domains"
 );
 
@@ -688,10 +691,10 @@ function reportFixture(preset) {
   };
 }
 
-function assertHandlerGuard(contents, channel, capability) {
+function assertHandlerGuard(contents, channel, guard) {
   const start = contents.indexOf(`ipcMain.handle("${channel}"`);
   assert.notEqual(start, -1, `${channel} handler missing`);
-  assert.equal(contents.slice(start, start + 500).includes(`assertDesktopCapability(${capability}`), true, `${channel} is not capability guarded`);
+  assert.equal(contents.slice(start, start + 500).includes(guard), true, `${channel} is not capability guarded`);
 }
 
 function handlerSource(contents, channel, length = 1_500) {

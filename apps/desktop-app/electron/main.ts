@@ -50,9 +50,6 @@ import {
   type SaveMenuCategoryInput,
   type SaveMenuItemInput,
   type DesktopMenuSaveResult,
-  type CreateManualRequestInput,
-  type CreateManualRequestResult,
-  type RequestReservationConversionResult,
   type RequestAiSuggestionResult,
   type GenerateAiWorkspaceInput,
   type GenerateAiWorkspaceResult,
@@ -61,20 +58,13 @@ import {
   type AiWorkspaceHistoryEntry,
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
-  type UpdateRequestStatusInput,
   type UpdateRoomStatusInput,
   type UpdateTableStatusInput,
-  type MarkWhatsAppMessageSentInput,
-  type DeleteWhatsAppMessageInput,
   type DesktopStockImageAnalyzeInput,
   type DesktopStockImageAnalyzeResult,
   type ApplyStockImageImportInput,
   type DesktopStockImageApplyResult,
-  type SaveCustomerInput,
-  type AssignCustomerRoomInput,
-  type UpdateCustomerRoomStayStatusInput,
   type DesktopCustomerMutationResult,
-  type DesktopBirthdayPrepareResult,
   type DesktopIdentityImageAnalyzeInput,
   type DesktopIdentityImageAnalyzeResult,
   type DesktopReportQueryResult,
@@ -113,6 +103,9 @@ import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
 import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
 import { registerReservationIpcHandlers } from "./ipc/reservation-ipc";
 import { registerDailyTaskIpcHandlers } from "./ipc/daily-task-ipc";
+import { registerRequestIpcHandlers } from "./ipc/request-ipc";
+import { registerCustomerIpcHandlers } from "./ipc/customer-ipc";
+import { registerWhatsAppIpcHandlers, registerWhatsAppWebviewIpcEvents } from "./ipc/whatsapp-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -955,79 +948,29 @@ function registerIpcHandlers() {
     };
   });
 
-  ipcMain.handle("request:createManual", (_event, input: CreateManualRequestInput): CreateManualRequestResult => {
-    assertDesktopRequestType(String(input?.requestType ?? ""));
-    return getDatabase().createManualRequest(input);
+  registerRequestIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability,
+    assertRequestType: assertDesktopRequestType,
+    finalizeRecordDeletion: finalizeDesktopRecordDeletion
   });
 
-  ipcMain.handle("request:convertToReservation", (_event, requestId: string): RequestReservationConversionResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
-    const request = getDatabase().getRequestById(requestId);
-    assertDesktopRequestType(request?.request_type ?? "");
-    return getDatabase().convertRequestToReservation(requestId);
+  registerCustomerIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability,
+    finalizeRecordDeletion: finalizeDesktopRecordDeletion,
+    finalizeCustomerMutation: finalizeDesktopCustomerMutation
   });
 
-  ipcMain.handle("request:updateStatus", (_event, input: UpdateRequestStatusInput): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
-    return getDatabase().updateRequestStatus(input);
-  });
-
-  ipcMain.handle("request:delete", (_event, requestId: unknown): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
-    return finalizeDesktopRecordDeletion(getDatabase().deleteRequest(String(requestId ?? "")));
-  });
-
-  ipcMain.handle("customer:delete", (_event, customerId: unknown): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
-    return finalizeDesktopRecordDeletion(getDatabase().deleteCustomer(String(customerId ?? "")));
-  });
-
-  ipcMain.handle("customer:save", (_event, input: SaveCustomerInput): DesktopCustomerMutationResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
-    return finalizeDesktopCustomerMutation(getDatabase().saveCustomer(input));
-  });
-
-  ipcMain.on("whatsapp:registerWebview", (event, webContentsId: unknown) => {
-    if (!isTrustedDesktopRendererUrl(event.sender.getURL())) return;
-    const id = Number(webContentsId);
-    if (!Number.isInteger(id) || id <= 0) return;
-    if (birthdayWebviewDriver.attach(id)) {
+  registerWhatsAppWebviewIpcEvents({
+    isTrustedRendererUrl: isTrustedDesktopRendererUrl,
+    attachWebview: (id) => birthdayWebviewDriver.attach(id),
+    detachWebview: (id) => birthdayWebviewDriver.detach(id),
+    setUserBusy: (busy) => whatsappDeliveryLock.setUserBusy(busy),
+    evaluateBirthdayNow: () => {
       void birthdayScheduler?.evaluateNow();
     }
   });
-
-  ipcMain.on("whatsapp:unregisterWebview", (event, webContentsId: unknown) => {
-    if (!isTrustedDesktopRendererUrl(event.sender.getURL())) return;
-    const id = Number(webContentsId);
-    if (Number.isInteger(id) && id > 0) birthdayWebviewDriver.detach(id);
-  });
-
-  ipcMain.on("whatsapp:userActivity", (event, active: unknown) => {
-    if (!isTrustedDesktopRendererUrl(event.sender.getURL())) return;
-    whatsappDeliveryLock.setUserBusy(active === true);
-    if (active !== true) void birthdayScheduler?.evaluateNow();
-  });
-
-  ipcMain.handle("birthday:prepareWhatsApp", (_event, customerId: unknown): DesktopBirthdayPrepareResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
-    assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
-    return getDatabase().prepareBirthdayWhatsApp(String(customerId ?? ""));
-  });
-
-  ipcMain.handle("customer:assignRoom", (_event, input: AssignCustomerRoomInput): DesktopCustomerMutationResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
-    assertDesktopCapability(C.ACCOMMODATION_STAYS, "Konaklama ataması bu işletmede etkin değil.");
-    return finalizeDesktopCustomerMutation(getDatabase().assignCustomerToRoom(input));
-  });
-
-  ipcMain.handle(
-    "customer:updateRoomStayStatus",
-    (_event, input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult => {
-      assertDesktopCapability(C.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
-      assertDesktopCapability(C.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
-      return finalizeDesktopCustomerMutation(getDatabase().updateCustomerRoomStayStatus(input));
-    }
-  );
 
   ipcMain.handle(
     "customer:analyzeIdentityImage",
@@ -1038,16 +981,10 @@ function registerIpcHandlers() {
     }
   );
 
-  ipcMain.handle("whatsapp:markMessageSent", (_event, input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
-    assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
-    return getDatabase().markWhatsAppMessageSent(input);
-  });
-
-  ipcMain.handle("whatsapp:deleteMessage", (_event, input: DeleteWhatsAppMessageInput): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
-    assertDesktopCapability(C.WHATSAPP, "WhatsApp bu işletmede etkin değil.");
-    return finalizeDesktopRecordDeletion(getDatabase().deleteWhatsAppMessage(input));
+  registerWhatsAppIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability,
+    finalizeRecordDeletion: finalizeDesktopRecordDeletion
   });
 
   ipcMain.handle("room:updateStatus", (_event, input: UpdateRoomStatusInput): DesktopStatusUpdateResult => {
