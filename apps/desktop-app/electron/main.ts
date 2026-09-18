@@ -64,11 +64,6 @@ import {
   type UpdateRequestStatusInput,
   type UpdateRoomStatusInput,
   type UpdateTableStatusInput,
-  type UpdateReservationStatusInput,
-  type SaveManualReservationInput,
-  type SaveManualRestaurantReservationInput,
-  type UpdateDailyTaskStatusInput,
-  type SaveDailyTaskInput,
   type MarkWhatsAppMessageSentInput,
   type DeleteWhatsAppMessageInput,
   type DesktopStockImageAnalyzeInput,
@@ -116,6 +111,8 @@ import { BirthdayScheduler } from "./birthday-scheduler.js";
 import { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } from "./whatsapp-delivery-adapter.js";
 import { WhatsAppWebviewDriver } from "./whatsapp-webview-driver.js";
 import { registerTableOrderIpcHandlers } from "./ipc/table-order-ipc";
+import { registerReservationIpcHandlers } from "./ipc/reservation-ipc";
+import { registerDailyTaskIpcHandlers } from "./ipc/daily-task-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -1078,77 +1075,17 @@ function registerIpcHandlers() {
     assertCapability: assertDesktopCapability
   });
 
-  ipcMain.handle("reservation:saveManual", (_event, input: SaveManualReservationInput): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.ACCOMMODATION_RESERVATIONS, "Pansiyon rezervasyonları bu işletmede etkin değil.");
-    return finalizeDesktopOperationMutation(getDatabase().saveManualReservation(input));
+  registerReservationIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability,
+    assertReservationType: assertDesktopReservationType,
+    finalizeOperationMutation: finalizeDesktopOperationMutation
   });
 
-  ipcMain.handle("reservation:saveManualRestaurant", (_event, input: SaveManualRestaurantReservationInput): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.FOOD_RESERVATIONS, "Restoran rezervasyonları bu işletmede etkin değil.");
-    return finalizeDesktopOperationMutation(getDatabase().saveManualRestaurantReservation(input));
-  });
-
-  ipcMain.handle("reservation:updateStatus", (_event, input: UpdateReservationStatusInput): DesktopStatusUpdateResult => {
-    const reservation = getDatabase().getDashboardData().reservations.find((item) => item.id === String(input?.reservationId ?? ""));
-    assertDesktopReservationType(
-      reservation?.reservationType ?? "",
-      reservation?.roomIds,
-      reservation?.tableIds
-    );
-    return getDatabase().updateReservationStatus(input);
-  });
-
-  ipcMain.handle("dailyTask:save", (_event, input: SaveDailyTaskInput): DesktopStatusUpdateResult => {
-    const dashboard = getDatabase().getDashboardData();
-    const existingTask = input?.id
-      ? dashboard.dailyTasks.find((item) => item.id === String(input.id))
-      : undefined;
-    const existingReservation = existingTask?.relatedType === "reservation"
-      ? dashboard.reservations.find((reservation) => reservation.id === existingTask.relatedId)
-      : undefined;
-    if (existingTask) {
-      assertDesktopTaskScope(
-        existingTask.taskType,
-        existingTask.relatedType,
-        existingReservation?.reservationType ?? "",
-        existingReservation?.roomIds,
-        existingReservation?.tableIds
-      );
-    }
-    assertDesktopTaskScope(String(input?.taskType ?? ""));
-    return finalizeDesktopOperationMutation(getDatabase().saveDailyTask(input));
-  });
-
-  ipcMain.handle("dailyTask:delete", (_event, taskId: unknown): DesktopStatusUpdateResult => {
-    const dashboard = getDatabase().getDashboardData();
-    const task = dashboard.dailyTasks.find((item) => item.id === String(taskId ?? ""));
-    const reservation = task?.relatedType === "reservation"
-      ? dashboard.reservations.find((item) => item.id === task.relatedId)
-      : undefined;
-    assertDesktopTaskScope(
-      task?.taskType ?? "",
-      task?.relatedType ?? "",
-      reservation?.reservationType ?? "",
-      reservation?.roomIds,
-      reservation?.tableIds
-    );
-    return finalizeDesktopOperationMutation(getDatabase().deleteDailyTask(String(taskId ?? "")));
-  });
-
-  ipcMain.handle("dailyTask:updateStatus", (_event, input: UpdateDailyTaskStatusInput): DesktopStatusUpdateResult => {
-    const dashboard = getDatabase().getDashboardData();
-    const task = dashboard.dailyTasks.find((item) => item.id === String(input?.taskId ?? ""));
-    const reservation = task?.relatedType === "reservation"
-      ? dashboard.reservations.find((item) => item.id === task.relatedId)
-      : undefined;
-    assertDesktopTaskScope(
-      task?.taskType ?? "",
-      task?.relatedType ?? "",
-      reservation?.reservationType ?? "",
-      reservation?.roomIds,
-      reservation?.tableIds
-    );
-    return getDatabase().updateDailyTaskStatus(input);
+  registerDailyTaskIpcHandlers({
+    getDatabase,
+    assertTaskScope: assertDesktopTaskScope,
+    finalizeOperationMutation: finalizeDesktopOperationMutation
   });
 
   ipcMain.handle("ai:createOwnerReplySuggestion", async (_event, requestId: string): Promise<RequestAiSuggestionResult> => {
