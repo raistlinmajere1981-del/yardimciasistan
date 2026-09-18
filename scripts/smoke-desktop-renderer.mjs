@@ -355,11 +355,12 @@ try {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
   await page.getByRole("button", { name: "Ayarlar" }).click();
-  await page.getByLabel("AI Yardımcı").check();
+  const aiServiceToggle = page.locator(".setup-ai-section").getByRole("checkbox");
+  await aiServiceToggle.check();
   await expect(page.getByLabel("Servis sağlayıcı")).toBeEnabled();
-  await page.getByLabel("AI Yardımcı").uncheck();
+  await aiServiceToggle.uncheck();
   await expect(page.getByLabel("Servis sağlayıcı")).toBeDisabled();
-  await page.getByLabel("AI Yardımcı").check();
+  await aiServiceToggle.check();
   await expect(page.locator(".settings-web-section .setup-section-title > p")).toHaveCount(0);
   await expect(page.getByText("AI Bağlantısı", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Bu Bilgisayar", { exact: true })).toHaveCount(0);
