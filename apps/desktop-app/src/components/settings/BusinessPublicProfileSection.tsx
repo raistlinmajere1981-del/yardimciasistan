@@ -267,63 +267,6 @@ export function BusinessPublicProfileSection({ businessAddress, saveHandleRef }:
         <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
       ) : (
         <div className="business-public-profile-body">
-          <label className="form-field form-field--fluid form-field--span">
-            İşletme açıklaması
-            <textarea
-              value={draft.description}
-              maxLength={BUSINESS_PUBLIC_PROFILE_LIMITS.description}
-              onChange={(event) => update("description", event.target.value)}
-              placeholder="İşletmenizi müşteriye kısa ve net biçimde anlatın."
-              rows={4}
-            />
-          </label>
-
-          <fieldset className="business-public-profile-features">
-            <legend>Sunulan özellikler</legend>
-            <div className="business-public-profile-feature-grid">
-              {BUSINESS_PUBLIC_FEATURE_CATALOG.map((feature) => (
-                <label className="form-check setup-checkline" key={feature.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedFeatures.has(feature.id)}
-                    onChange={(event) => toggleFeature(feature.id, event.target.checked)}
-                  />
-                  {feature.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="form-row business-public-profile-times">
-            <label className="form-field form-field--short">
-              Giriş saati
-              <input lang="tr-TR" type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
-            </label>
-            <label className="form-field form-field--short">
-              Çıkış saati
-              <input lang="tr-TR" type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
-            </label>
-            <label className="form-field form-field--short">
-              Kahvaltı başlangıcı
-              <input lang="tr-TR" type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
-            </label>
-            <label className="form-field form-field--short">
-              Kahvaltı bitişi
-              <input lang="tr-TR" type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
-            </label>
-          </div>
-
-          <label className="form-field form-field--fluid form-field--span">
-            Ulaşım tarifi
-            <textarea
-              value={draft.directionsNote}
-              maxLength={BUSINESS_PUBLIC_PROFILE_LIMITS.directionsNote}
-              onChange={(event) => update("directionsNote", event.target.value)}
-              placeholder="Örn. merkezden sahil yolunu takip edin; son 300 metre stabilize yoldur."
-              rows={3}
-            />
-          </label>
-
           <div className="business-public-profile-map-point">
             <div className="business-public-profile-address-lookup">
               <div>
@@ -398,6 +341,63 @@ export function BusinessPublicProfileSection({ businessAddress, saveHandleRef }:
             </div>
             {coordinateError && <small className="business-public-profile-field-error" role="status">{coordinateError}</small>}
           </div>
+
+          <label className="form-field form-field--fluid form-field--span">
+            İşletme açıklaması
+            <textarea
+              value={draft.description}
+              maxLength={BUSINESS_PUBLIC_PROFILE_LIMITS.description}
+              onChange={(event) => update("description", event.target.value)}
+              placeholder="İşletmenizi müşteriye kısa ve net biçimde anlatın."
+              rows={4}
+            />
+          </label>
+
+          <fieldset className="business-public-profile-features">
+            <legend>Sunulan özellikler</legend>
+            <div className="business-public-profile-feature-grid">
+              {BUSINESS_PUBLIC_FEATURE_CATALOG.map((feature) => (
+                <label className="form-check setup-checkline" key={feature.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedFeatures.has(feature.id)}
+                    onChange={(event) => toggleFeature(feature.id, event.target.checked)}
+                  />
+                  {feature.label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="form-row business-public-profile-times">
+            <label className="form-field form-field--short">
+              Giriş saati
+              <input lang="tr-TR" type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
+            </label>
+            <label className="form-field form-field--short">
+              Çıkış saati
+              <input lang="tr-TR" type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
+            </label>
+            <label className="form-field form-field--short">
+              Kahvaltı başlangıcı
+              <input lang="tr-TR" type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
+            </label>
+            <label className="form-field form-field--short">
+              Kahvaltı bitişi
+              <input lang="tr-TR" type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
+            </label>
+          </div>
+
+          <label className="form-field form-field--fluid form-field--span">
+            Ulaşım tarifi
+            <textarea
+              value={draft.directionsNote}
+              maxLength={BUSINESS_PUBLIC_PROFILE_LIMITS.directionsNote}
+              onChange={(event) => update("directionsNote", event.target.value)}
+              placeholder="Örn. merkezden sahil yolunu takip edin; son 300 metre stabilize yoldur."
+              rows={3}
+            />
+          </label>
 
           <div className="form-grid business-public-profile-notes">
             <label className="form-field form-field--fluid">
