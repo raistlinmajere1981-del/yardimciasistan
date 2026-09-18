@@ -1,17 +1,10 @@
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const require = createRequire(import.meta.url);
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-manual-reservation-"));
-const database = new DesktopDatabase({
-  appPath: join(process.cwd(), "apps", "desktop-app"),
-  userDataPath: dataRoot
-});
+const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-manual-reservation-");
 
 try {
   database.initialize();
@@ -191,6 +184,5 @@ try {
 
   console.log("manual-reservation-smoke-ok: quick customer, create, edit, room assign/change, overlap validation and events verified");
 } finally {
-  database.close();
-  rmSync(dataRoot, { recursive: true, force: true });
+  cleanup();
 }

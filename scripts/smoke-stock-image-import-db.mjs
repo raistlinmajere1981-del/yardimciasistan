@@ -1,19 +1,12 @@
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 const require = createRequire(import.meta.url);
 const { BUSINESS_CAPABILITIES: C } = require("../packages/shared/dist/index.js");
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
-const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-stock-import-db-"));
-const database = new DesktopDatabase({
-  appPath: join(process.cwd(), "apps", "desktop-app"),
-  userDataPath: dataRoot
-});
+const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-stock-import-db-");
 
 try {
   database.initialize();
@@ -276,8 +269,7 @@ try {
   }
   console.log("stock-image-import-db-smoke-ok: drafts, ambiguity, duplicate guard, atomic apply, provenance, approval and permissions verified");
 } finally {
-  database.close();
-  rmSync(dataRoot, { recursive: true, force: true });
+  cleanup();
 }
 
 function trackedInput(item, quantity, hideWhenOut) {

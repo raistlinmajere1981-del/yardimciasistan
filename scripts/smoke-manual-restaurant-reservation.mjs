@@ -1,17 +1,8 @@
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const require = createRequire(import.meta.url);
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-restaurant-reservation-"));
-const database = new DesktopDatabase({
-  appPath: join(process.cwd(), "apps", "desktop-app"),
-  userDataPath: dataRoot
-});
+const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-restaurant-reservation-");
 
 try {
   database.initialize();
@@ -151,6 +142,5 @@ try {
 
   console.log("manual-restaurant-reservation-smoke-ok: create, quick customer path, table assignment, conflict and capacity verified");
 } finally {
-  database.close();
-  rmSync(dataRoot, { recursive: true, force: true });
+  cleanup();
 }

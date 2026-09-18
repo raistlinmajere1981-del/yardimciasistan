@@ -1,16 +1,8 @@
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const require = createRequire(import.meta.url);
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-
-const appPath = join(process.cwd(), "apps", "desktop-app");
-const dataDir = mkdtempSync(join(tmpdir(), "yardimci-record-deletions-"));
-const database = new DesktopDatabase({ appPath, userDataPath: dataDir });
+const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-record-deletions-");
 
 try {
   database.initialize();
@@ -49,8 +41,7 @@ try {
   assertSoftDeleteRows(database);
   console.log("record-deletions-smoke-ok");
 } finally {
-  database.close();
-  rmSync(dataDir, { recursive: true, force: true });
+  cleanup();
 }
 
 function assertDesktopMessageDeletion(database) {

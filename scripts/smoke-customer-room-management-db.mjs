@@ -1,17 +1,8 @@
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-const require = createRequire(import.meta.url);
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-customer-room-"));
-const database = new DesktopDatabase({
-  appPath: join(process.cwd(), "apps", "desktop-app"),
-  userDataPath: dataRoot
-});
+const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-customer-room-");
 
 try {
   database.initialize();
@@ -240,8 +231,7 @@ try {
 
   console.log("customer-room-management-db-smoke-ok: manual cards, identity fields, capacity, overlap, archive, lifecycle and approved admin Android actions verified");
 } finally {
-  database.close();
-  rmSync(dataRoot, { recursive: true, force: true });
+  cleanup();
 }
 
 function customerInput(overrides = {}) {
