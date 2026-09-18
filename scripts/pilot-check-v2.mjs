@@ -32,7 +32,7 @@ const core = [
   js("availability-publication", "PII içermeyen oda müsaitlik yayını", "smoke-public-room-availability-publication.mjs"),
   js("sync-timeout", "Senkron HTTP zaman aşımı sınırı", "smoke-sync-timeout.mjs"),
   js("web-connection", "Masaüstü web bağlantı testi", "smoke-web-connection-test.mjs"),
-  current("automatic-sync", "Otomatik senkron ve geri dönüş", "automatic-sync"),
+  js("automatic-sync", "Otomatik senkron ve geri dönüş", "smoke-automatic-sync.mjs"),
   js("android-approval", "Android yeni cihaz onay sınırı", "smoke-android-device-approval-hosting.mjs"),
   js("android-token", "Android cihaz token güvenliği", "smoke-android-device-token.mjs"),
   js("android-secret", "Release Android bağlantısında ortak anahtar sızıntısı", "smoke-android-release-connection.mjs"),
@@ -58,7 +58,7 @@ const core = [
   js("finance-service", "Finans servis sözleşmesi", "smoke-finance-service.mjs"),
   js("room-folio", "Oda hesabı/tahsilat/çıkış", "smoke-room-folio-service.mjs"),
   js("room-transfer", "Restoran hesabını oda hesabına aktarma", "smoke-room-folio-table-order-transfer.mjs"),
-  current("renderer", "Masaüstü renderer browser smoke", "renderer", true),
+  jsb("renderer", "Masaüstü renderer browser smoke", "smoke-desktop-renderer.mjs"),
   jsb("customer-pension-ui", "Müşteri/Pansiyon formları, oda hesabı ve responsive UI", "smoke-desktop-customer-pension.mjs"),
   jsb("design-system", "Desktop tasarım sistemi ve responsive Ayarlar", "smoke-desktop-design-system.mjs"),
   jsb("stage2b", "Restoran menü ve transfer yüzeyleri", "smoke-stage2b-restaurant-menu.mjs"),
@@ -133,9 +133,6 @@ function nb(id, label, script) { return { ...n(id, label, script), browser: true
 function npmArgs(id, label, npmArgsValue) { return { id, label, cmd: npm, args: npmArgsValue, browser: false }; }
 function js(id, label, file) { return { id, label, cmd: process.execPath, args: [join("scripts", file)], browser: false }; }
 function jsb(id, label, file) { return { ...js(id, label, file), browser: true }; }
-function current(id, label, mode, browser = false) {
-  return { id, label, cmd: process.execPath, args: [join("scripts", "run-current-contract-smoke.mjs"), mode], browser };
-}
 function browserState() {
   try {
     const { chromium } = require("@playwright/test");
