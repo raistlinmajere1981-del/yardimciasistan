@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { spawn, spawnSync } from "node:child_process";
+import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import process from "node:process";
@@ -68,8 +69,8 @@ mkdirSync(output, { recursive: true });
 const port = await getFreePort();
 const baseUrl = `http://127.0.0.1:${port}`;
 const server = spawn(
-  process.platform === "win32" ? "npx.cmd" : "npx",
-  ["vite", "--config", "vite.renderer.config.ts", "--host", "127.0.0.1", "--port", String(port)],
+  getLocalViteExecutable(),
+  ["--config", "vite.renderer.config.ts", "--host", "127.0.0.1", "--port", String(port)],
   { cwd: "apps/desktop-app", stdio: "ignore" }
 );
 let browser;

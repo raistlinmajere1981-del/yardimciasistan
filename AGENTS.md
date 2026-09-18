@@ -103,6 +103,7 @@ Important command nesting:
 - Standalone smoke/package commands should remain self-contained and may keep their own build step.
 - `pilot:check` preflight builds packages before web-module packaging, so its packaging step should reuse the existing widget build.
 - Local checks must use the installed Electron runtime directly; do not invoke Electron through `npx` or let `electron-builder` redownload the Electron distribution when `node_modules/electron/dist` is available.
+- Local test/dev CLIs such as Vite must use repository-installed binaries directly; do not use `npx` paths that can implicitly download missing packages.
 - Do not additionally run `npm run quality:strict` when the unique strict gates below are run individually.
 
 Milestone unique gates:
