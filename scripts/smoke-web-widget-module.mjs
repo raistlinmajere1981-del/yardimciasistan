@@ -8,7 +8,9 @@ import process from "node:process";
 
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-widget-module-"));
 const webModuleRoot = join(tempRoot, "web-module");
+const widgetBundlePath = join(process.cwd(), "packages", "web-widget", "dist", "widget.js");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
+cpSync(widgetBundlePath, join(webModuleRoot, "widget.js"));
 const syncSecret = "pilot-web-smoke-secret";
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));

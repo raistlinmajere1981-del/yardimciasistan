@@ -20,7 +20,15 @@ npm run build
 packages/web-widget/dist/widget.js
 ```
 
-Build işlemi aynı bundle'ı `firm-template/web-module/widget.js` konumuna da kopyalar. Repodaki hazır hosting şablonu build alınmadan kullanıldığında `widget.js` loader'ı geriye uyumlu `widget-core.js` ve `direct-request-flow.js` dosyalarını yükler; normal build sonrasında aynı davranış tek bundle içinde çalışır.
+Normal build yalnız `packages/web-widget/dist/widget.js` üretir; tracked `firm-template/web-module/widget.js` dosyasını değiştirmez. Böylece rutin build/test akışları çalışma ağacında generated-artifact diff'i bırakmaz.
+
+Tracked template snapshot'ını bilinçli olarak yenilemek gerektiğinde:
+
+```bash
+npm run sync:web-widget-template
+```
+
+Deploy paketi üretirken ayrıca template'i güncellemek gerekmez. `npm run pack:web-module`, güncel `dist/widget.js` bundle'ını doğrudan `artifacts/web-module-deploy/yardimci-asistan/widget.js` içine yerleştirir ve tracked template dosyasını değiştirmez.
 
 ## Örnek Kullanım
 

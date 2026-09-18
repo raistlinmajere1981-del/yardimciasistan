@@ -6,8 +6,8 @@
   "main": "dist/widget.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "vite build && npm run copy:template",
-    "copy:template": "cp dist/widget.js ../../firm-template/web-module/widget.js",
+    "build": "vite build",
+    "sync:template": "npm run build && cp dist/widget.js ../../firm-template/web-module/widget.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

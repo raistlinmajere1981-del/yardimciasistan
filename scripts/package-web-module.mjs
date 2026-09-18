@@ -7,6 +7,7 @@ import process from "node:process";
 
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, "firm-template", "web-module");
+const widgetBundlePath = join(repoRoot, "packages", "web-widget", "dist", "widget.js");
 const outputRoot = join(repoRoot, "artifacts", "web-module-deploy");
 const packageRoot = join(outputRoot, "yardimci-asistan");
 const manifestPath = join(outputRoot, "manifest.json");
@@ -72,6 +73,7 @@ const businessOverrideFields = [
 ];
 
 validateSource();
+validateWidgetBundle();
 rmSync(packageRoot, { recursive: true, force: true });
 rmSync(tarballPath, { force: true });
 rmSync(zipPath, { force: true });
@@ -80,6 +82,12 @@ cpSync(sourceRoot, packageRoot, {
   recursive: true,
   filter: shouldCopySourcePath
 });
+cpSync(widgetBundlePath, join(packageRoot, "widget.js"));
+assert.equal(
+  sha256(join(packageRoot, "widget.js")),
+  sha256(widgetBundlePath),
+  "Deploy paketindeki widget.js güncel web-widget build çıktısıyla eşleşmeli."
+);
 
 zeroPackageBusinessConfig();
 const appliedOverrides = applyPackageOverrides();
@@ -111,6 +119,13 @@ validatePackage(manifest, businessConfig);
 
 const archiveSummary = archives.filter((archive) => archive.status === "created").map((archive) => archive.path).join(", ") || "arşiv yok";
 console.log(`web-module-package-ok: ${relative(repoRoot, packageRoot)} (${manifest.file_count} dosya, ${archiveSummary})`);
+
+function validateWidgetBundle() {
+  assert.ok(
+    existsSync(widgetBundlePath),
+    `Web widget build çıktısı bulunamadı: ${relative(repoRoot, widgetBundlePath)}. Önce npm run build -w @yardimci-asistan/web-widget çalıştırın.`
+  );
+}
 
 function validateSource() {
   assert.ok(existsSync(sourceRoot), `Web modül kaynak klasörü bulunamadı: ${sourceRoot}`);

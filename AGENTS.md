@@ -82,14 +82,15 @@ Prefer names such as `object-utils.ts`, `date-utils.ts`, or another domain-speci
 
 ## Generated artifacts
 
-Normal build/test commands should not leave tracked generated files modified.
+Normal build/test commands must not leave tracked generated files modified.
 
-`firm-template/web-module/widget.js` is a generated web-widget artifact and is currently known to churn during some build/check flows. Until the artifact pipeline is cleaned up:
-- do not treat generated widget churn as a product-code change,
-- revert only verified generated churn after checks,
-- do not discard unrelated changes.
+`firm-template/web-module/widget.js` is a tracked template snapshot, not a normal build output target.
 
-A future infrastructure task should separate normal widget build from template/deploy synchronization so routine checks do not mutate tracked files.
+Rules:
+- `npm run build -w @yardimci-asistan/web-widget` writes only `packages/web-widget/dist/widget.js`.
+- `npm run pack:web-module` packages the current `dist/widget.js` without modifying tracked template files.
+- Refresh the tracked template snapshot only with `npm run sync:web-widget-template`, and review that generated diff intentionally.
+- Do not hide, stash, or discard unrelated worktree changes while handling generated artifacts.
 
 ## Tests and checks
 
