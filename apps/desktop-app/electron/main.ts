@@ -47,9 +47,7 @@ import {
   type DesktopSetupSaveResult,
   type SaveAiServiceProfileInput,
   type SaveInitialSetupInput,
-  type SaveMenuCategoryInput,
   type SaveMenuItemInput,
-  type DesktopMenuSaveResult,
   type RequestAiSuggestionResult,
   type GenerateAiWorkspaceInput,
   type GenerateAiWorkspaceResult,
@@ -58,8 +56,6 @@ import {
   type AiWorkspaceHistoryEntry,
   type DesktopAndroidDeviceMutationResult,
   type DesktopStatusUpdateResult,
-  type UpdateRoomStatusInput,
-  type UpdateTableStatusInput,
   type DesktopStockImageAnalyzeInput,
   type DesktopStockImageAnalyzeResult,
   type ApplyStockImageImportInput,
@@ -106,6 +102,9 @@ import { registerDailyTaskIpcHandlers } from "./ipc/daily-task-ipc";
 import { registerRequestIpcHandlers } from "./ipc/request-ipc";
 import { registerCustomerIpcHandlers } from "./ipc/customer-ipc";
 import { registerWhatsAppIpcHandlers, registerWhatsAppWebviewIpcEvents } from "./ipc/whatsapp-ipc";
+import { registerMenuIpcHandlers } from "./ipc/menu-ipc";
+import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
+import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -645,25 +644,11 @@ function registerIpcHandlers() {
     return publishSavedAiSettings();
   });
 
-  ipcMain.handle("menu:saveCategory", (_event, input: SaveMenuCategoryInput): DesktopMenuSaveResult => {
-    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
-    return getDatabase().saveMenuCategory(input);
-  });
-
-  ipcMain.handle("menu:saveItem", (_event, input: SaveMenuItemInput): DesktopMenuSaveResult => {
-    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
-    assertMenuItemSubfeatureMutation(input);
-    return getDatabase().saveMenuItem(input);
-  });
-
-  ipcMain.handle("menu:deleteCategory", (_event, categoryId: unknown): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
-    return finalizeDesktopRecordDeletion(getDatabase().deleteMenuCategory(String(categoryId ?? "")));
-  });
-
-  ipcMain.handle("menu:deleteItem", (_event, itemId: unknown): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
-    return finalizeDesktopRecordDeletion(getDatabase().deleteMenuItem(String(itemId ?? "")));
+  registerMenuIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability,
+    assertMenuItemSubfeatureMutation: assertMenuItemSubfeatureMutation,
+    finalizeRecordDeletion: finalizeDesktopRecordDeletion
   });
 
   ipcMain.handle("stockImage:analyze", async (_event, value: unknown): Promise<DesktopStockImageAnalyzeResult> => {
@@ -735,32 +720,10 @@ function registerIpcHandlers() {
     }
   });
 
-  ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
-    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
-    const result = getDatabase().setAndroidDeviceRole(String(deviceId ?? ""), String(role ?? ""));
-    return finalizeAndroidDeviceMutation(result);
-  });
-
-  ipcMain.handle("androidDevice:setPermissionGroups", (_event, deviceId: unknown, groups: unknown): DesktopAndroidDeviceMutationResult => {
-    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
-    const result = getDatabase().setAndroidDevicePermissionGroups(String(deviceId ?? ""), groups);
-    return finalizeAndroidDeviceMutation(result);
-  });
-
-  ipcMain.handle("androidDevice:setActive", (_event, deviceId: unknown, active: unknown): DesktopAndroidDeviceMutationResult => {
-    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
-    const result = getDatabase().setAndroidDeviceActive(String(deviceId ?? ""), active === true);
-    return finalizeAndroidDeviceMutation(result);
-  });
-
-  ipcMain.handle("androidDevice:resetPermissions", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
-    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
-    return finalizeAndroidDeviceMutation(getDatabase().resetAndroidDevicePermissions(String(deviceId ?? "")));
-  });
-
-  ipcMain.handle("androidDevice:revoke", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
-    assertDesktopCapability(C.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
-    return finalizeAndroidDeviceMutation(getDatabase().revokeAndroidDevice(String(deviceId ?? "")));
+  registerAndroidDeviceIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability,
+    finalizeDeviceMutation: finalizeAndroidDeviceMutation
   });
 
   ipcMain.handle("setup:saveInitial", async (_event, input: SaveInitialSetupInput): Promise<DesktopSetupSaveResult> => {
@@ -987,24 +950,9 @@ function registerIpcHandlers() {
     finalizeRecordDeletion: finalizeDesktopRecordDeletion
   });
 
-  ipcMain.handle("room:updateStatus", (_event, input: UpdateRoomStatusInput): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.ACCOMMODATION_ROOMS, "Oda yönetimi bu işletmede etkin değil.");
-    if (String(input?.status ?? "").trim() === "reserved") {
-      assertDesktopCapability(C.ACCOMMODATION_RESERVATIONS, "Odayı rezerve etmek için konaklama rezervasyonları etkin olmalı.");
-    }
-    return getDatabase().updateRoomStatus(input);
-  });
-
-  ipcMain.handle("table:updateStatus", (_event, input: UpdateTableStatusInput): DesktopStatusUpdateResult => {
-    assertDesktopCapability(C.FOOD_TABLES, "Masa yönetimi bu işletmede etkin değil.");
-    const requestedStatus = String(input?.status ?? "").trim();
-    if (requestedStatus === "reserved") {
-      assertDesktopCapability(C.FOOD_RESERVATIONS, "Masayı rezerve etmek için restoran rezervasyonları etkin olmalı.");
-    }
-    if (["bill_waiting", "waiting_bill", "checkout", "payment"].includes(requestedStatus)) {
-      assertDesktopCapability(C.FOOD_ORDERS, "Hesap durumu için sipariş yönetimi etkin olmalı.");
-    }
-    return getDatabase().updateTableStatus(input);
+  registerRoomTableIpcHandlers({
+    getDatabase,
+    assertCapability: assertDesktopCapability
   });
 
   registerTableOrderIpcHandlers({
