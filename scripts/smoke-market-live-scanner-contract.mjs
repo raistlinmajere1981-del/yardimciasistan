@@ -266,10 +266,13 @@ function assertSourceContracts() {
   assert.doesNotMatch(androidAction, /createRuntimePaidSale|createPaidCommerceSale|applyInventoryMovement|createMarketCartDraftInTransaction[\s\S]{0,120}applyBarcodeScan/);
   assert.match(quickSale, /consumePendingBarcodeScans/);
   assert.match(quickSale, /findProductByBarcode/);
-  assert.match(quickSale, /Telefon Barkod Modu/);
+  assert.match(quickSale, /Telefon Kamerası/);
+  assert.match(quickSale, /setBarcodeScanMode\(true\)/);
+  assert.doesNotMatch(quickSale, /setPhoneBarcodeMode|Telefon Barkod Modunu Aç/);
   assert.match(androidRules, /market_barcode_scan/);
   assert.match(androidRules, /scanned_at/);
   assert.match(androidWorkspace, /KASA BARKOD MODU/);
+  assert.match(androidWorkspace, /BarcodeCameraScanner\.show/);
   assert.doesNotMatch(androidWorkspace, /KASA BARKOD MODU[\s\S]{0,900}Sepete Ekle/);
   assert.match(syncCoordinator, /NORMAL_PULL_INTERVAL_MS\s*=\s*15_000/);
   assert.match(syncCoordinator, /MARKET_BARCODE_FAST_PULL_INTERVAL_MS\s*=\s*1_500/);
