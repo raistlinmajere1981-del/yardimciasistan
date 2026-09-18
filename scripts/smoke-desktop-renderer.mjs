@@ -55,6 +55,8 @@ try {
         setup: setupData
       }),
       getDashboardData: async () => currentDashboardData,
+      getSetupData: async () => setupData,
+      onSyncStatusChanged: () => () => {},
       getReportData: async (range) => {
         window.__reportRanges.push(range);
         return {
@@ -377,42 +379,19 @@ try {
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
   await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.locator(".nav-item")).toHaveCount(8);
+  await expect(page.locator(".nav-item")).toHaveCount(9);
   await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);
   await expect(page.getByText("Web eşitleme adresi")).toHaveCount(0);
   await expect(page.getByText("Yerel kayıt dosyası")).toHaveCount(0);
   await expect(page.getByText("Yedek klasörü")).toHaveCount(0);
-  await page.getByRole("button", { name: "Raporlar", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Genel İşletme Özeti", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Restoran Satışları", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Pansiyon ve Talepler", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Stok Hareketleri", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AI İşletme Yorumu", exact: true })).toBeVisible();
-  await expect(page.locator(".daily-revenue-chart")).toHaveCount(1);
-  await expect(page.getByText(/6\.400,00/).first()).toBeVisible();
-  await page.getByRole("button", { name: "Dün", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__reportRanges.at(-1)?.preset)).toBe("yesterday");
-  await page.getByRole("button", { name: "Tarih Aralığı", exact: true }).click();
-  await expect(page.getByLabel("Başlangıç tarihi")).toBeVisible();
-  await expect(page.getByLabel("Bitiş tarihi")).toBeVisible();
-  await page.getByLabel("Başlangıç tarihi").fill("2026-07-12");
-  await page.getByLabel("Bitiş tarihi").fill("2026-07-19");
-  await expect(page.getByText("12 Temmuz 2026", { exact: true })).toBeVisible();
-  await expect(page.getByText("19 Temmuz 2026", { exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__reportRanges.at(-1))).toMatchObject({
-    preset: "custom",
-    startDate: "2026-07-12",
-    endDate: "2026-07-19"
-  });
-  await page.getByRole("button", { name: "Dönemi Özetle", exact: true }).click();
-  await expect(page.getByText("Seçilen dönemde 8 adisyon kapatıldı ve restoran cirosu ₺6.400 oldu.", { exact: true })).toBeVisible();
-  await expect.poll(() => page.evaluate(() => window.__reportAiCalls.at(-1)?.mode)).toBe("summary");
-  await page.getByRole("button", { name: "Son 7 Gün", exact: true }).click();
-  await page.setViewportSize({ width: 1366, height: 768 });
-  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
-  await page.screenshot({ path: "artifacts/screenshots/desktop-reports-dark-1366x768.png" });
-  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
+  await page.getByRole("button", { name: "Kasa", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Kasa", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByText("Bugün Gelen", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bugün Çıkan", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bugünkü Fark", { exact: true })).toBeVisible();
+  await expect(page.getByText("Bekleyen Alacak", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Gelir Ekle", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Gider Ekle", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Menü", exact: true })).toBeVisible();
@@ -621,6 +600,21 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getSyncStatus: async () => ({
+        enabled: true,
+        clientId: "renderer-smoke",
+        requestCursor: 0,
+        acknowledgedCursor: 0,
+        lastAttemptAt: "2026-07-18T12:35:00+03:00",
+        lastSuccessAt: "2026-07-18T12:00:00+03:00",
+        lastError: "",
+        consecutiveFailures: 0,
+        pendingJobs: 0,
+        nextRetryAt: "",
+        phase: "idle",
+        message: "Senkron hazır."
+      }),
+      onSyncStatusChanged: () => () => {},
       saveInitialSetup: async () => ({ ok: false, message: "smoke" }),
       createManualRequest: async (input) => {
         const savedId = "request_manual_smoke_001";
@@ -1225,6 +1219,30 @@ try {
         setup: setupData
       }),
       getDashboardData: async () => currentDashboardData,
+      getSetupData: async () => setupData,
+      getSyncStatus: async () => ({
+        enabled: true,
+        clientId: "renderer-smoke",
+        requestCursor: 0,
+        acknowledgedCursor: 0,
+        lastAttemptAt: "2026-07-18T12:35:00+03:00",
+        lastSuccessAt: "2026-07-18T12:00:00+03:00",
+        lastError: "",
+        consecutiveFailures: 0,
+        pendingJobs: 0,
+        nextRetryAt: "",
+        phase: "idle",
+        message: "Senkron hazır."
+      }),
+      onSyncStatusChanged: () => () => {},
+      getRoomFolioData: async () => ({
+        generatedAt: "",
+        rooms: [],
+        activeStays: [],
+        folios: [],
+        menuCategories: [],
+        menuItems: []
+      }),
       listTableOrders: async () => tableOrders,
       getActiveTableOrder: async (tableId) => tableOrders.find((order) => order.tableId === tableId && ["open", "preparing", "served", "payment"].includes(order.status)) ?? null,
       openTableOrder: async (tableId) => {
@@ -1640,6 +1658,21 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getSyncStatus: async () => ({
+        enabled: true,
+        clientId: "renderer-smoke",
+        requestCursor: 0,
+        acknowledgedCursor: 0,
+        lastAttemptAt: "2026-07-18T12:35:00+03:00",
+        lastSuccessAt: "2026-07-18T12:00:00+03:00",
+        lastError: "",
+        consecutiveFailures: 0,
+        pendingJobs: 0,
+        nextRetryAt: "",
+        phase: "idle",
+        message: "Senkron hazır."
+      }),
+      onSyncStatusChanged: () => () => {},
       saveInitialSetup: async () => ({ ok: false, message: "smoke" }),
       createManualBackup: async () => ({ ok: false, message: "smoke" }),
       createManualRequest: async () => ({ ok: false, message: "smoke" }),
@@ -1732,6 +1765,21 @@ try {
       }),
       getDashboardData: async () => dashboardData,
       getSetupData: async () => setupData,
+      getSyncStatus: async () => ({
+        enabled: true,
+        clientId: "renderer-smoke",
+        requestCursor: 0,
+        acknowledgedCursor: 0,
+        lastAttemptAt: "2026-07-18T12:35:00+03:00",
+        lastSuccessAt: "2026-07-18T12:00:00+03:00",
+        lastError: "",
+        consecutiveFailures: 0,
+        pendingJobs: 0,
+        nextRetryAt: "",
+        phase: "idle",
+        message: "Senkron hazır."
+      }),
+      onSyncStatusChanged: () => () => {},
       saveInitialSetup: async (input) => {
         for (const profile of input.aiProfiles || []) {
           if (profile.clearApiKey) {

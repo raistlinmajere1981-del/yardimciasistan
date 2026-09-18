@@ -4,21 +4,6 @@ import { basename, join } from "node:path";
 import process from "node:process";
 
 const mode = process.argv[2] ?? "";
-const syncStatusStub = `      getSyncStatus: async () => ({
-        enabled: true,
-        clientId: "renderer-smoke",
-        requestCursor: 0,
-        acknowledgedCursor: 0,
-        lastAttemptAt: "2026-07-18T12:35:00+03:00",
-        lastSuccessAt: "2026-07-18T12:00:00+03:00",
-        lastError: "",
-        consecutiveFailures: 0,
-        pendingJobs: 0,
-        nextRetryAt: "",
-        phase: "idle",
-        message: "Senkron hazır."
-      }),
-      onSyncStatusChanged: () => () => {},`;
 
 const definitions = {
   "automatic-sync": {
@@ -28,76 +13,7 @@ const definitions = {
   },
   renderer: {
     source: "smoke-desktop-renderer.mjs",
-    replacements: [
-      {
-        before: `      getDashboardData: async () => currentDashboardData,
-      getReportData: async (range) => {`,
-        after: `      getDashboardData: async () => currentDashboardData,
-      getSetupData: async () => setupData,
-      onSyncStatusChanged: () => () => {},
-      getReportData: async (range) => {`,
-        replaceAll: true
-      },
-      {
-        before: `      getDashboardData: async () => currentDashboardData,
-      getSetupData: async () => setupData,
-      saveInitialSetup: async () => ({ ok: false, message: "smoke" }),`,
-        after: `      getDashboardData: async () => currentDashboardData,
-      getSetupData: async () => setupData,
-${syncStatusStub}
-      saveInitialSetup: async () => ({ ok: false, message: "smoke" }),`,
-        replaceAll: true
-      },
-      {
-        before: `      getDashboardData: async () => dashboardData,
-      getSetupData: async () => setupData,
-      saveInitialSetup: async (input) => {`,
-        after: `      getDashboardData: async () => dashboardData,
-      getSetupData: async () => setupData,
-${syncStatusStub}
-      saveInitialSetup: async (input) => {`
-      },
-      {
-        before: `      getDashboardData: async () => currentDashboardData,
-      listTableOrders: async () => tableOrders,`,
-        after: `      getDashboardData: async () => currentDashboardData,
-      getSetupData: async () => setupData,
-${syncStatusStub}
-      getRoomFolioData: async () => ({
-        generatedAt: "",
-        rooms: [],
-        activeStays: [],
-        folios: [],
-        menuCategories: [],
-        menuItems: []
-      }),
-      listTableOrders: async () => tableOrders,`,
-        replaceAll: true
-      },
-      {
-        before: `  await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
-  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.locator(".nav-item")).toHaveCount(8);
-  await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);`,
-        after: `  await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
-  expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
-  await expect(page.locator(".nav-item")).toHaveCount(9);
-  await expect(page.getByRole("button", { name: "AI Yardımcı", exact: true })).toHaveCount(0);`
-      },
-      {
-        before: `  await page.getByRole("button", { name: "Raporlar", exact: true }).click();`,
-        through: `  await page.setViewportSize({ width: 1440, height: 1000 });`,
-        after: `  await page.getByRole("button", { name: "Kasa", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Kasa", exact: true, level: 1 })).toBeVisible();
-  await expect(page.getByText("Bugün Gelen", { exact: true })).toBeVisible();
-  await expect(page.getByText("Bugün Çıkan", { exact: true })).toBeVisible();
-  await expect(page.getByText("Bugünkü Fark", { exact: true })).toBeVisible();
-  await expect(page.getByText("Bekleyen Alacak", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Gelir Ekle", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Gider Ekle", exact: true })).toBeVisible();
-  await page.setViewportSize({ width: 1440, height: 1000 });`
-      }
-    ]
+    replacements: []
   }
 };
 
