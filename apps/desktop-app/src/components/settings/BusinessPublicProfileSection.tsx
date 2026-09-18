@@ -258,13 +258,10 @@ export function BusinessPublicProfileSection({ businessAddress, saveHandleRef }:
   useImperativeHandle(saveHandleRef, () => ({ validate: validateDraft, save, focus }), [focus, save, validateDraft]);
 
   return (
-    <section ref={sectionRef} className="setup-section business-public-profile-section" aria-busy={loading || saving}>
-      <div className="setup-section-title business-public-profile-heading">
-        <div>
-          <h2>Müşteriye Gösterilen Bilgiler</h2>
-        </div>
+    <section ref={sectionRef} className="business-public-profile-section settings-business-subsection" aria-busy={loading || saving}>
+      <div className="settings-subsection-heading">
+        <h3>Müşteriye Açık Bilgiler</h3>
       </div>
-      <p className="setup-section-description">Müşterilerin işletmeniz hakkında görmesini istediğiniz bilgileri düzenleyin. Değişiklikleri sağ üstteki Ayarları Kaydet düğmesiyle kaydedin.</p>
 
       {loading ? (
         <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
@@ -332,9 +329,6 @@ export function BusinessPublicProfileSection({ businessAddress, saveHandleRef }:
               <div>
                 <strong>Adrese göre haritada bul</strong>
                 <span>{normalizedBusinessAddress || "İşletmem bölümünde henüz adres girilmedi."}</span>
-                <small>
-                  Arama yalnız siz butona bastığınızda yapılır ve Türkiye ile sınırlandırılır. Sonuç kesin konum sayılmaz; pini haritada düzeltebilirsiniz.
-                </small>
               </div>
               <button
                 className="setup-secondary action-button action-button-secondary"
@@ -402,7 +396,6 @@ export function BusinessPublicProfileSection({ businessAddress, saveHandleRef }:
                 />
               </label>
             </div>
-            <small>Adres temel kaynak olmaya devam eder. Haritada seçtiğiniz nokta bu koordinat alanlarını doldurur; gerekirse elle de düzeltebilirsiniz.</small>
             {coordinateError && <small className="business-public-profile-field-error" role="status">{coordinateError}</small>}
           </div>
 
