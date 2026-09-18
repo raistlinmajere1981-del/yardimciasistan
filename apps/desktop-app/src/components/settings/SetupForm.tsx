@@ -482,16 +482,10 @@ export function SetupForm({
             <div className="table-category-heading">
               <div>
                 <strong>Masa kategorileri</strong>
-                <small>Restoran alanlarını adlandırın ve her alandaki masa sayısını belirleyin.</small>
               </div>
               <span>{tableCountTotal} masa</span>
             </div>
-            {form.tableCategories.length === 0 ? (
-              <div className="table-category-empty">
-                <span>Henüz masa kategorisi yok.</span>
-                <small>Masa kullanacaksanız ilk kategoriyi ekleyin.</small>
-              </div>
-            ) : (
+            {form.tableCategories.length > 0 && (
               <div className="table-category-list">
                 {form.tableCategories.map((category, index) => (
                   <div className="table-category-row" key={category.key}>
@@ -535,9 +529,6 @@ export function SetupForm({
               <Plus size={15} aria-hidden="true" />
               Kategori Ekle
             </ActionButton>
-            <small className="table-category-note">
-              Adedi azalttığınızda kullanılmayan masalar arşivlenir; aktif adisyon veya rezervasyona bağlı masalar korunur.
-            </small>
           </div>}
         </div>
         {!setupData.setupRequired && (
@@ -620,9 +611,6 @@ export function SetupForm({
                 <small>{"{ad}"} ve {"{işletme}"} yer tutucuları desteklenir.</small>
               </label>
             </div>
-              <small className="setup-birthday-note">
-                Otomatik modda uygulama ve WhatsApp oturumu açık olduğunda, doğum günü mesajları seçtiğiniz saatten itibaren aynı gün otomatik gönderilir.
-              </small>
             </fieldset>
           </section>
 

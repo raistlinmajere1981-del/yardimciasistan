@@ -320,8 +320,6 @@ export function RoomManagementSection({
           </span>
         </div>
       </div>
-      <p className="setup-section-description">Oda adlarını, gecelik fiyatları ve müşteriye açık oda özelliklerini tek yerden yönetin.</p>
-
       <div className="room-management-list" aria-label="Oda adı ve fiyatları">
         {loading ? (
           <div className="room-management-loading">Odalar hazırlanıyor…</div>
@@ -366,10 +364,6 @@ export function RoomManagementSection({
             ))}
           </>
         )}
-      </div>
-
-      <div className="room-management-footer">
-        <span>Oda sayısı, ad ve fiyat değişiklikleri üstteki “Ayarları Kaydet” düğmesiyle uygulanır. Fiyat değişikliği açık oda adisyonlarını etkilemez.</span>
       </div>
 
       <RoomPublicDetailsEditor

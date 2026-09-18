@@ -16,9 +16,7 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [busyAction, setBusyAction] = useState<"save" | "remove" | "reset" | "">("");
   const [message, setMessage] = useState(
-    configured
-      ? "Açılışta ve kilit ekranında bu şifre istenir."
-      : "İsterseniz uygulamayı şifresiz kullanabilirsiniz."
+    configured ? "Açılışta ve kilit ekranında bu şifre istenir." : ""
   );
   const [messageTone, setMessageTone] = useState<"idle" | "error" | "success">("idle");
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -284,9 +282,11 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
           </div>
         )}
 
-        <p className={`password-settings-message is-${messageTone}`} role="status" aria-live="polite">
-          {message}
-        </p>
+        {message && (
+          <p className={`password-settings-message is-${messageTone}`} role="status" aria-live="polite">
+            {message}
+          </p>
+        )}
       </div>
     </>
   );

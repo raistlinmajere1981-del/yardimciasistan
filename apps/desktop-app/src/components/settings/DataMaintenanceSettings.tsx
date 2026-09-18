@@ -37,9 +37,7 @@ export function DataMaintenanceSettings() {
         return;
       }
       setState("idle");
-      setMessage(result.backups.length > 0
-        ? `${result.backups.length} yedek hazır. İstediğiniz kaydı doğrudan geri yükleyebilirsiniz.`
-        : "Henüz yedek yok. İlk yedeği oluşturabilirsiniz.");
+      setMessage("");
     } catch {
       setState("error");
       setMessage("Yedek listesi okunamadı. Uygulamayı yeniden başlatıp tekrar deneyin.");
@@ -266,9 +264,11 @@ export function DataMaintenanceSettings() {
         })}
       </div>
 
-      <p className={`menu-status sync-${state}`} role="status" aria-live="polite">
-        {message}
-      </p>
+      {message && (
+        <p className={`menu-status sync-${state}`} role="status" aria-live="polite">
+          {message}
+        </p>
+      )}
     </div>
   );
 }
