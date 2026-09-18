@@ -37,9 +37,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         enabledCapabilities={deviceRuntimeCapabilities}
         publicProfileSaveRef={publicProfileSaveRef}
         publicProfile={capabilityRuntime.snapshot?.businessId ? (
-          <div id="settings-public" className="setup-public-profile-shell">
-            <BusinessPublicProfileSection businessAddress={props.form.address} saveHandleRef={publicProfileSaveRef} />
-          </div>
+          <BusinessPublicProfileSection businessAddress={props.form.address} saveHandleRef={publicProfileSaveRef} />
         ) : null}
       />
 

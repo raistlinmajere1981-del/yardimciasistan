@@ -419,8 +419,7 @@ export function SetupForm({
     <main className={`setup-shell is-embedded${setupData.setupRequired ? " is-initial-setup" : ""}`}>
       <section className="setup-form-surface">
         <nav className="settings-section-nav" aria-label="Ayar bölümleri">
-          <a href="#settings-business">İşletmem</a>
-          {!setupData.setupRequired && <a href="#settings-public">Müşteri bilgileri</a>}
+          <a href="#settings-business">İşletme</a>
           <a href="#settings-operations">İşletme düzeni</a>
           <a href="#settings-connections">Bağlantılar</a>
           <a href="#settings-application">Uygulama</a>
@@ -429,7 +428,7 @@ export function SetupForm({
 
         <div id="settings-business" className="setup-section settings-identity-section">
           <div className="setup-section-title">
-            <h2>İşletmem</h2>
+            <h2>İşletme</h2>
           </div>
           <div className="form-row">
             <label className="form-field form-field--long">
@@ -462,12 +461,12 @@ export function SetupForm({
           <div className="form-row">
             <label className="form-field form-field--long">
               Adres
-            <input value={form.address} onChange={(event) => update("address", event.target.value)} placeholder="İşletme adresi" />
+              <input value={form.address} onChange={(event) => update("address", event.target.value)} placeholder="İşletme adresi" />
             </label>
           </div>
-        </div>
 
-        {publicProfile}
+          {publicProfile}
+        </div>
 
         <div id="settings-operations" className="setup-section settings-daily-section">
           <div className="setup-section-title">
