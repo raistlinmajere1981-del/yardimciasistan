@@ -212,7 +212,7 @@ export function BusinessCapabilityEditor({
           );
         })}
       </div>
-      {state !== "idle" && message && <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>}
+      {state === "error" && message && <p className="menu-status sync-error" role="alert">{message}</p>}
     </div>
   );
 }
