@@ -1,39 +1,21 @@
 import { DatabaseSync } from "node:sqlite";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import {
   BUSINESS_CAPABILITIES,
-  canConvertRequestToReservation,
   createId,
   normalizeBirthdaySettings,
-  getRequestReservationType,
-  isRequestTypeAvailable,
   normalizeBusinessType,
-  normalizePhone,
   validateBirthdaySettings,
   type BusinessCapability,
-  type BirthdaySettings,
-  type CustomerGender,
-  type CustomerIdentityType,
-  type IdentityImageAnalysis,
-  type MenuStockUnit,
   type StockImageAnalysis,
-  type StockImageAnalysisLine,
   type StockImageApplyLine,
-  type StockImageConfidence,
   type StockImageImportSource,
   type StockImageMenuCandidate
 } from "@yardimci-asistan/shared";
 import {
-  ANDROID_ADMIN_PERMISSIONS,
-  ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
-  ANDROID_PERMISSION_GROUP_IDS,
-  ANDROID_PERMISSIONS,
-  ANDROID_STAFF_PERMISSIONS,
   androidActionAllowedByCapabilities,
-  androidEffectivePermissionsForRole,
-  androidPermissionsForGroups,
   resolveAndroidActionPermission
 } from "@yardimci-asistan/sync-core";
 import type {
@@ -77,973 +59,177 @@ import {
 
 export type { DesktopBirthdayCandidate, DesktopBirthdayDelivery, DesktopBirthdayOverview, DesktopBirthdayPrepareResult } from "./birthday-service.js";
 
-export interface DesktopDatabaseOptions {
-  appPath: string;
-  userDataPath: string;
-  backupPath?: string;
-}
-
-interface DashboardSummary {
-  newRequests: number;
-  waitingRequests: number;
-  pendingDailyTasks: number;
-  availableRooms: number;
-  totalRooms: number;
-  availableTables: number;
-  pendingReservations: number;
-  preparedWhatsAppMessages: number;
-  activeMenuCategories: number;
-  availableMenuItems: number;
-}
-
-export interface DesktopRoom {
-  id: string;
-  name: string;
-  number: string;
-  capacity: number;
-  bedInfo: string;
-  floor: string;
-  status: string;
-  features: string[];
-  description: string;
-  priceNote: string;
-  isActive: boolean;
-  sortOrder: number;
-  activeReservationTitle: string;
-  updatedAt: string;
-}
-
-export interface DesktopTable {
-  id: string;
-  name: string;
-  area: string;
-  capacity: number;
-  status: string;
-  currentCustomerId: string;
-  currentReservationId: string;
-  activeReservationTitle: string;
-  notes: string;
-  isActive: boolean;
-  sortOrder: number;
-  updatedAt: string;
-}
-
-export interface DesktopTableCategory {
-  name: string;
-  tableCount: number;
-}
-
-interface SaveTableCategoryInput {
-  sourceName?: string;
-  name: string;
-  tableCount: number;
-}
-
-export interface DesktopReservation {
-  id: string;
-  requestId: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  reservationType: string;
-  status: string;
-  title: string;
-  startDate: string;
-  endDate: string;
-  time: string;
-  guestCount: number;
-  adultCount: number;
-  childCount: number;
-  roomIds: string[];
-  tableIds: string[];
-  notes: string;
-  priceNote: string;
-  paymentStatus: string;
-  updatedAt: string;
-}
-
-export interface DesktopDailyTask {
-  id: string;
-  title: string;
-  description: string;
-  taskType: string;
-  status: string;
-  dueDate: string;
-  dueTime: string;
-  relatedType: string;
-  relatedId: string;
-  updatedAt: string;
-}
-
-export interface DesktopCustomer {
-  id: string;
-  fullName: string;
-  phone: string;
-  email: string;
-  source: string;
-  notes: string;
-  tags: string[];
-  lastContactAt: string;
-  identityType: CustomerIdentityType;
-  identityNumber: string;
-  nationality: string;
-  birthDate: string;
-  birthdayMessageEnabled: boolean;
-  gender: CustomerGender;
-  documentSerialNumber: string;
-  documentExpiryDate: string;
-  birthPlace: string;
-  motherName: string;
-  fatherName: string;
-  issuingAuthority: string;
-  address: string;
-  requestCount: number;
-  reservationCount: number;
-  stayCount: number;
-  updatedAt: string;
-}
-
-export interface DesktopCustomerRoomStay {
-  id: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  roomId: string;
-  roomName: string;
-  roomNumber: string;
-  reservationId: string;
-  status: string;
-  checkInDate: string;
-  checkOutDate: string;
-  guestCount: number;
-  notes: string;
-  source: string;
-  checkedInAt: string;
-  checkedOutAt: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface DesktopPreparedMessage {
-  id: string;
-  requestId: string;
-  customerName: string;
-  customerPhone: string;
-  message: string;
-  status: string;
-  updatedAt: string;
-}
-
-export interface DesktopAndroidDevice {
-  id: string;
-  deviceId: string;
-  deviceName: string;
-  appVersion: string;
-  role: AndroidDeviceRole;
-  isActive: boolean;
-  permissionGroups: AndroidPermissionGroups;
-  permissions: AndroidPermission[];
-  firstSeenAt: string;
-  lastSeenAt: string;
-  createdAt: string;
-  updatedAt: string;
-  revokedAt: string;
-}
-
-export interface DesktopAndroidActionFailure {
-  id: string;
-  actionType: string;
-  deviceId: string;
-  message: string;
-  targetPage: "dashboard" | "customerWork" | "pension" | "restaurant" | "settings";
-  relatedId: string;
-  createdAt: string;
-}
-
-export type DesktopAndroidDeviceMutationResult =
-  | { ok: true; message: string; devices: DesktopAndroidDevice[] }
-  | { ok: false; message: string; devices: DesktopAndroidDevice[] };
-
-export interface DesktopDashboardData {
-  databasePath: string;
-  backupPath: string;
-  webModuleUrl: string;
-  requests: SyncedCustomerRequest[];
-  rooms: DesktopRoom[];
-  tables: DesktopTable[];
-  reservations: DesktopReservation[];
-  dailyTasks: DesktopDailyTask[];
-  customers: DesktopCustomer[];
-  customerRoomStays: DesktopCustomerRoomStay[];
-  androidDevices: DesktopAndroidDevice[];
-  paymentWaitingTableOrders: DesktopPaymentWaitingTableOrder[];
-  androidActionFailures: DesktopAndroidActionFailure[];
-  menu: PublishedQrMenu;
-  summary: DashboardSummary;
-  birthdayOverview: DesktopBirthdayOverview;
-}
-
-export type DesktopReportPreset = "today" | "yesterday" | "last7" | "last30" | "custom";
-
-export interface DesktopReportRangeInput {
-  preset: DesktopReportPreset;
-  label: string;
-  startDate: string;
-  endDate: string;
-}
-
-export interface DesktopReportPeriod {
-  preset: DesktopReportPreset;
-  label: string;
-  startDate: string;
-  endDate: string;
-}
-
-interface DesktopReportTopItem {
-  name: string;
-  quantity: number;
-  revenue: number;
-}
-
-interface DesktopReportDailyRevenue {
-  date: string;
-  revenue: number;
-  closedOrders: number;
-}
-
-interface DesktopReportStockConsumption {
-  menuItemId: string;
-  name: string;
-  quantity: number;
-  unit: MenuStockUnit;
-}
-
-export interface DesktopReportStockMovement {
-  id: string;
-  menuItemId: string;
-  itemName: string;
-  type: MenuStockMovementType;
-  quantityChange: number;
-  quantityAfter: number;
-  unit: MenuStockUnit;
-  sourceType: MenuStockSourceType;
-  sourceLabel: string;
-  note: string;
-  createdAt: string;
-}
-
-type DesktopReportAttentionKind =
-  | "pending_request"
-  | "pending_reservation"
-  | "payment_waiting"
-  | "overdue_task"
-  | "open_task"
-  | "out_of_stock"
-  | "low_stock";
-
-interface DesktopReportAttentionItem {
-  kind: DesktopReportAttentionKind;
-  title: string;
-  detail: string;
-}
-
-export interface DesktopReportData {
-  period: DesktopReportPeriod;
-  generatedAt: string;
-  summary: {
-    restaurantRevenue: number;
-    closedOrders: number;
-    averageOrder: number;
-    approvedReservations: number;
-    approvedAccommodationReservations: number;
-    approvedFoodReservations: number;
-    approvedMixedReservations: number;
-    approvedGenericReservations: number;
-    newRequests: number;
-    pendingTasks: number;
-  };
-  restaurant: {
-    revenue: number;
-    closedOrders: number;
-    averageOrder: number;
-    soldItemCount: number;
-    cancelledOrders: number;
-    dailyRevenue: DesktopReportDailyRevenue[];
-    topItems: DesktopReportTopItem[];
-  };
-  pensionAndRequests: {
-    incomingReservations: number;
-    approvedReservations: number;
-    pendingReservations: number;
-    cancelledOrRejectedReservations: number;
-    accommodationNights: number;
-    newRequests: number;
-    answeredRequests: number;
-    waitingRequests: number;
-  };
-  stock: {
-    topConsumed: DesktopReportStockConsumption[];
-    manualMovementCount: number;
-    imageMovementCount: number;
-    manualMovements: DesktopReportStockMovement[];
-    imageMovements: DesktopReportStockMovement[];
-    recentMovements: DesktopReportStockMovement[];
-  };
-  attention: {
-    pendingRequests: number;
-    pendingReservations: number;
-    paymentWaitingTables: number;
-    overdueTasks: number;
-    incompleteTasks: number;
-    outOfStockItems: number;
-    lowStockItems: number;
-    totalCount: number;
-    items: DesktopReportAttentionItem[];
-  };
-}
-
-export type DesktopReportQueryResult =
-  | { ok: true; data: DesktopReportData }
-  | { ok: false; message: string };
-
-export type DesktopReportAiMode = "summary" | "attention" | "sales" | "recommendations";
-
-export interface GenerateDesktopReportAiInput {
-  mode: DesktopReportAiMode;
-  range: DesktopReportRangeInput;
-}
-
-export type GenerateDesktopReportAiResult =
-  | { ok: true; content: string }
-  | { ok: false; message: string };
-
-export type DesktopAiService = "openai" | "openrouter" | "groq" | "gemini" | "custom";
-
-export interface DesktopAiModelOption {
-  id: string;
-  label: string;
-}
-
-export interface DesktopAiServiceProfile {
-  service: DesktopAiService;
-  projectName: string;
-  baseUrl: string;
-  model: string;
-  modelOptions: DesktopAiModelOption[];
-  timeoutSeconds: number;
-  apiKeyConfigured: boolean;
-  updatedAt: string;
-}
-
-export interface SaveAiServiceProfileInput {
-  service: string;
-  projectName: string;
-  baseUrl: string;
-  model: string;
-  modelOptions?: DesktopAiModelOption[];
-  timeoutSeconds: number;
-  apiKey: string;
-  clearApiKey: boolean;
-}
-
-export interface AiApiKeyWrite {
-  mode: "keep" | "replace" | "clear";
-  encryptedValue?: string;
-}
-
-export interface DesktopSetupData {
-  setupRequired: boolean;
-  appPasswordConfigured: boolean;
-  businessName: string;
-  profileId: string;
-  phone: string;
-  whatsapp: string;
-  email: string;
-  address: string;
-  webModuleUrl: string;
-  syncSecret: string;
-  autoSyncEnabled: boolean;
-  aiEnabled: boolean;
-  aiProvider: string;
-  aiService: DesktopAiService;
-  aiProjectName: string;
-  aiModel: string;
-  aiBaseUrl: string;
-  aiTimeoutSeconds: number;
-  aiApiKeyConfigured: boolean;
-  aiLastPublishedAt: string;
-  aiProfiles: DesktopAiServiceProfile[];
-  servicePreferences: {
-    whatsapp: boolean;
-    android: boolean;
-  };
-  initialCounts: {
-    rooms: number;
-    tables: number;
-  };
-  tableCategories: DesktopTableCategory[];
-  birthdaySettings: BirthdaySettings;
-}
-
-export interface SaveInitialSetupInput {
-  businessName: string;
-  profileId: string;
-  phone: string;
-  whatsapp: string;
-  email: string;
-  address: string;
-  webModuleUrl: string;
-  syncSecret: string;
-  autoSyncEnabled?: boolean;
-  aiEnabled: boolean;
-  aiProvider: string;
-  aiService: string;
-  aiProjectName: string;
-  aiModel: string;
-  aiModelOptions?: DesktopAiModelOption[];
-  aiBaseUrl: string;
-  aiTimeoutSeconds: number;
-  aiApiKey: string;
-  clearAiApiKey: boolean;
-  aiProfiles?: SaveAiServiceProfileInput[];
-  servicePreferences: {
-    whatsapp: boolean;
-    android: boolean;
-  };
-  initialCounts: {
-    rooms: number;
-    tables: number;
-  };
-  tableCategories?: SaveTableCategoryInput[];
-  birthdaySettings?: BirthdaySettings;
-}
-
-export type DesktopSetupSaveResult =
-  | {
-      ok: true;
-      message: string;
-      setupData: DesktopSetupData;
-      dashboardData: DesktopDashboardData;
-      aiWebSync?: PushAiSettingsResult;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface SaveMenuCategoryInput {
-  id?: string;
-  name: string;
-  description: string;
-  is_active: boolean;
-  sort_order: number;
-}
-
-export interface SaveMenuItemInput {
-  id?: string;
-  category_id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-  image_url: string;
-  is_available: boolean;
-  is_featured: boolean;
-  allergens: string[];
-  tags: string[];
-  stock_quantity: number | null;
-  stock_min_quantity: number | null;
-  stock_unit: MenuStockUnit;
-  stock_consumption_quantity: number;
-  hide_when_out_of_stock: boolean;
-  stock_note: string | null;
-  sort_order: number;
-}
-
-export type MenuStockMovementType =
-  | "add"
-  | "remove"
-  | "set"
-  | "adjust"
-  | "image_import_add"
-  | "order_add"
-  | "order_update"
-  | "order_remove"
-  | "order_cancel";
-
-export type MenuStockSourceType = "desktop" | "android" | "table_order" | "stock_image_import";
-
-export interface DesktopMenuStockMovement {
-  id: string;
-  menuItemId: string;
-  type: MenuStockMovementType;
-  quantityChange: number;
-  quantityBefore: number;
-  quantityAfter: number;
-  sourceType: MenuStockSourceType;
-  sourceId: string;
-  actorSource: StockImageImportSource;
-  actorDeviceId: string;
-  note: string;
-  createdAt: string;
-}
-
-export type DesktopMenuSaveResult =
-  | {
-      ok: true;
-      message: string;
-      savedId: string;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface CreateStockImageImportInput {
-  importId: string;
-  source: StockImageImportSource;
-  deviceId?: string;
-  imageHash: string;
-  originalFilename?: string;
-}
-
-export interface ApplyStockImageImportInput {
-  importId: string;
-  imageHash: string;
-  duplicateWarningAcknowledged?: boolean;
-  lines: StockImageApplyLine[];
-}
-
-export interface DesktopStockImageAnalyzeInput {
-  importId: string;
-  fileName: string;
-  mimeType: string;
-  bytes: ArrayBuffer;
-}
-
-export type DesktopStockImageAnalyzeResult =
-  | {
-      ok: true;
-      message: string;
-      importId: string;
-      imageHash: string;
-      duplicateWarning: boolean;
-      analysis: StockImageAnalysis;
-    }
-  | {
-      ok: false;
-      message: string;
-      code?: string;
-    };
-
-export type DesktopStockImageApplyResult =
-  | {
-      ok: true;
-      message: string;
-      importId: string;
-      appliedLineCount: number;
-      totalQuantity: number;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface SaveCustomerInput {
-  id?: string;
-  fullName: string;
-  phone: string;
-  email: string;
-  notes: string;
-  tags: string[];
-  identityType: string;
-  identityNumber: string;
-  nationality: string;
-  birthDate: string;
-  birthdayMessageEnabled?: boolean;
-  gender: string;
-  documentSerialNumber: string;
-  documentExpiryDate: string;
-  birthPlace: string;
-  motherName: string;
-  fatherName: string;
-  issuingAuthority: string;
-  address: string;
-}
-
-export interface AssignCustomerRoomInput {
-  customerId: string;
-  roomId: string;
-  checkInDate: string;
-  checkOutDate: string;
-  guestCount: number;
-  notes: string;
-  status: "planned" | "checked_in";
-}
-
-export interface UpdateCustomerRoomStayStatusInput {
-  stayId: string;
-  status: "planned" | "checked_in" | "checked_out" | "cancelled";
-}
-
-export type DesktopCustomerMutationResult =
-  | {
-      ok: true;
-      message: string;
-      savedId: string;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface DesktopIdentityImageAnalyzeInput {
-  fileName: string;
-  mimeType: string;
-  bytes: ArrayBuffer;
-}
-
-export type DesktopIdentityImageAnalyzeResult =
-  | {
-      ok: true;
-      message: string;
-      analysis: IdentityImageAnalysis;
-    }
-  | {
-      ok: false;
-      message: string;
-      code?: string;
-    };
-
-export type RequestReservationConversionResult =
-  | {
-      ok: true;
-      message: string;
-      reservationId: string;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface CreateManualRequestInput {
-  requestType: string;
-  customerName: string;
-  customerPhone: string;
-  dateText: string;
-  startDate: string;
-  endDate: string;
-  time: string;
-  guestCount: number;
-  adultCount: number;
-  childCount: number;
-  message: string;
-  priority: string;
-}
-
-export type CreateManualRequestResult =
-  | {
-      ok: true;
-      message: string;
-      savedId: string;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface SaveRequestAiSuggestionInput {
-  requestId: string;
-  summary: string;
-  suggestedReply: string;
-  missingFields: string[];
-}
-
-export type RequestAiSuggestionResult =
-  | {
-      ok: true;
-      message: string;
-      requestId: string;
-      summary: string;
-      suggestedReply: string;
-      missingFields: string[];
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export type AiWorkspaceMode = "reply" | "summary" | "daily";
-
-export interface AiWorkspaceHistoryEntry {
-  id: string;
-  mode: AiWorkspaceMode;
-  requestId: string;
-  requestLabel: string;
-  instructions: string;
-  content: string;
-  summary: string;
-  missingFields: string[];
-  provider: string;
-  model: string;
-  fallback: boolean;
-  createdAt: string;
-}
-
-export interface GenerateAiWorkspaceInput {
-  mode: AiWorkspaceMode;
-  requestId: string;
-  instructions: string;
-}
-
-export type GenerateAiWorkspaceResult =
-  | {
-      ok: true;
-      message: string;
-      entry: AiWorkspaceHistoryEntry;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface SaveAiWorkspaceResultInput {
-  mode: AiWorkspaceMode;
-  requestId: string;
-  content: string;
-  summary: string;
-  missingFields: string[];
-}
-
-export type SaveAiWorkspaceResult =
-  | {
-      ok: true;
-      message: string;
-      requestId: string;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export type DesktopStatusUpdateResult =
-  | {
-      ok: true;
-      message: string;
-      dashboardData: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface UpdateRequestStatusInput {
-  requestId: string;
-  status: string;
-}
-
-export interface UpdateRoomStatusInput {
-  roomId: string;
-  status: string;
-}
-
-export interface UpdateTableStatusInput {
-  tableId: string;
-  status: string;
-}
-
-export type TableOrderStatus = "open" | "preparing" | "served" | "payment" | "paid" | "cancelled";
-type TableOrderItemStatus = "open" | "preparing" | "served" | "cancelled";
-
-export interface DesktopTableOrderItem {
-  id: string;
-  orderId: string;
-  menuItemId: string;
-  productName: string;
-  unitPrice: number;
-  currency: string;
-  quantity: number;
-  lineTotal: number;
-  note: string;
-  status: TableOrderItemStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface DesktopTableOrder {
-  id: string;
-  tableId: string;
-  tableName: string;
-  status: TableOrderStatus;
-  openedAt: string;
-  closedAt: string;
-  subtotal: number;
-  discountTotal: number;
-  total: number;
-  note: string;
-  itemCount: number;
-  items: DesktopTableOrderItem[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface DesktopPaymentWaitingTableOrder {
-  id: string;
-  tableId: string;
-  tableName: string;
-  total: number;
-  currency: string;
-  openedAt: string;
-  updatedAt: string;
-}
-
-export interface AddTableOrderItemInput {
-  orderId: string;
-  menuItemId: string;
-  quantity: number;
-  note: string;
-}
-
-export interface UpdateTableOrderItemQuantityInput {
-  itemId: string;
-  quantity: number;
-}
-
-export interface UpdateTableOrderItemNoteInput {
-  itemId: string;
-  note: string;
-}
-
-export interface UpdateTableOrderStatusInput {
-  orderId: string;
-  status: string;
-}
-
-export type DesktopTableOrderResult =
-  | {
-      ok: true;
-      message: string;
-      order: DesktopTableOrder;
-      dashboardData?: DesktopDashboardData;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-export interface UpdateReservationStatusInput {
-  reservationId: string;
-  status: string;
-}
-
-export interface SaveManualReservationInput {
-  reservationId?: string;
-  customerId: string;
-  roomId?: string;
-  startDate: string;
-  endDate: string;
-  guestCount: number;
-  notes: string;
-}
-
-export interface SaveManualRestaurantReservationInput {
-  customerId: string;
-  tableId?: string;
-  date: string;
-  time: string;
-  guestCount: number;
-  notes: string;
-}
-
-export interface UpdateDailyTaskStatusInput {
-  taskId: string;
-  status: string;
-}
-
-export interface SaveDailyTaskInput {
-  id?: string;
-  title: string;
-  description: string;
-  taskType: "manual_pension" | "manual_restaurant";
-  dueDate: string;
-  dueTime: string;
-}
-
-export interface MarkWhatsAppMessageSentInput {
-  requestId: string;
-  message: string;
-}
-
-export interface DeleteWhatsAppMessageInput {
-  messageId?: string;
-  requestId?: string;
-}
-
-export interface RecordSyncEventInput {
-  direction: string;
-  entityType: string;
-  ok: boolean;
-  recordCount?: number;
-  message?: string;
-  status?: number;
-}
-
-export type DesktopSyncJobType = "menu_publish" | "android_snapshot";
-
-export interface DesktopSyncJob {
-  jobKey: string;
-  jobType: DesktopSyncJobType;
-  sourceRevision: number;
-  attemptCount: number;
-  nextAttemptAt: string;
-  lastError: string;
-  updatedAt: string;
-}
-
-export interface DesktopSyncRuntimeStatus {
-  enabled: boolean;
-  clientId: string;
-  requestCursor: number;
-  acknowledgedCursor: number;
-  lastAttemptAt: string;
-  lastSuccessAt: string;
-  lastError: string;
-  consecutiveFailures: number;
-  pendingJobs: number;
-  nextRetryAt: string;
-}
-
-export type ApplyAndroidActionResult =
-  | {
-      ok: true;
-      message: string;
-      alreadyApplied: boolean;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
-
-type AndroidActionMutationResult =
-  | { ok: true; message: string }
-  | { ok: false; message: string };
-
-type MenuStockMutationResult =
-  | {
-      ok: true;
-      message: string;
-      tracked: boolean;
-      quantityBefore: number;
-      quantityAfter: number;
-    }
-  | { ok: false; message: string };
+import type {
+  DesktopDatabaseOptions,
+  DesktopRoom,
+  DesktopTable,
+  DesktopTableCategory,
+  DesktopReservation,
+  DesktopDailyTask,
+  DesktopCustomer,
+  DesktopCustomerRoomStay,
+  DesktopPreparedMessage,
+  DesktopAndroidDevice,
+  DesktopAndroidActionFailure,
+  DesktopAndroidDeviceMutationResult,
+  DesktopDashboardData,
+  DesktopReportPreset,
+  DesktopReportRangeInput,
+  DesktopReportPeriod,
+  DesktopReportStockMovement,
+  DesktopReportData,
+  DesktopReportQueryResult,
+  DesktopReportAiMode,
+  GenerateDesktopReportAiInput,
+  GenerateDesktopReportAiResult,
+  DesktopAiService,
+  DesktopAiModelOption,
+  DesktopAiServiceProfile,
+  SaveAiServiceProfileInput,
+  AiApiKeyWrite,
+  DesktopSetupData,
+  SaveInitialSetupInput,
+  DesktopSetupSaveResult,
+  SaveMenuCategoryInput,
+  SaveMenuItemInput,
+  MenuStockMovementType,
+  MenuStockSourceType,
+  DesktopMenuStockMovement,
+  DesktopMenuSaveResult,
+  CreateStockImageImportInput,
+  ApplyStockImageImportInput,
+  DesktopStockImageAnalyzeInput,
+  DesktopStockImageAnalyzeResult,
+  DesktopStockImageApplyResult,
+  SaveCustomerInput,
+  AssignCustomerRoomInput,
+  UpdateCustomerRoomStayStatusInput,
+  DesktopCustomerMutationResult,
+  DesktopIdentityImageAnalyzeInput,
+  DesktopIdentityImageAnalyzeResult,
+  RequestReservationConversionResult,
+  CreateManualRequestInput,
+  CreateManualRequestResult,
+  SaveRequestAiSuggestionInput,
+  RequestAiSuggestionResult,
+  AiWorkspaceMode,
+  AiWorkspaceHistoryEntry,
+  GenerateAiWorkspaceInput,
+  GenerateAiWorkspaceResult,
+  SaveAiWorkspaceResultInput,
+  SaveAiWorkspaceResult,
+  DesktopStatusUpdateResult,
+  UpdateRequestStatusInput,
+  UpdateRoomStatusInput,
+  UpdateTableStatusInput,
+  TableOrderStatus,
+  DesktopTableOrderItem,
+  DesktopTableOrder,
+  DesktopPaymentWaitingTableOrder,
+  AddTableOrderItemInput,
+  UpdateTableOrderItemQuantityInput,
+  UpdateTableOrderItemNoteInput,
+  UpdateTableOrderStatusInput,
+  DesktopTableOrderResult,
+  UpdateReservationStatusInput,
+  SaveManualReservationInput,
+  SaveManualRestaurantReservationInput,
+  UpdateDailyTaskStatusInput,
+  SaveDailyTaskInput,
+  MarkWhatsAppMessageSentInput,
+  DeleteWhatsAppMessageInput,
+  RecordSyncEventInput,
+  DesktopSyncJobType,
+  DesktopSyncJob,
+  DesktopSyncRuntimeStatus,
+  ApplyAndroidActionResult,
+} from "./database-types.js";
+
+export type {
+  DesktopDatabaseOptions,
+  DesktopRoom,
+  DesktopTable,
+  DesktopTableCategory,
+  DesktopReservation,
+  DesktopDailyTask,
+  DesktopCustomer,
+  DesktopCustomerRoomStay,
+  DesktopPreparedMessage,
+  DesktopAndroidDevice,
+  DesktopAndroidActionFailure,
+  DesktopAndroidDeviceMutationResult,
+  DesktopDashboardData,
+  DesktopReportPreset,
+  DesktopReportRangeInput,
+  DesktopReportPeriod,
+  DesktopReportStockMovement,
+  DesktopReportData,
+  DesktopReportQueryResult,
+  DesktopReportAiMode,
+  GenerateDesktopReportAiInput,
+  GenerateDesktopReportAiResult,
+  DesktopAiService,
+  DesktopAiModelOption,
+  DesktopAiServiceProfile,
+  SaveAiServiceProfileInput,
+  AiApiKeyWrite,
+  DesktopSetupData,
+  SaveInitialSetupInput,
+  DesktopSetupSaveResult,
+  SaveMenuCategoryInput,
+  SaveMenuItemInput,
+  MenuStockMovementType,
+  MenuStockSourceType,
+  DesktopMenuStockMovement,
+  DesktopMenuSaveResult,
+  CreateStockImageImportInput,
+  ApplyStockImageImportInput,
+  DesktopStockImageAnalyzeInput,
+  DesktopStockImageAnalyzeResult,
+  DesktopStockImageApplyResult,
+  SaveCustomerInput,
+  AssignCustomerRoomInput,
+  UpdateCustomerRoomStayStatusInput,
+  DesktopCustomerMutationResult,
+  DesktopIdentityImageAnalyzeInput,
+  DesktopIdentityImageAnalyzeResult,
+  RequestReservationConversionResult,
+  CreateManualRequestInput,
+  CreateManualRequestResult,
+  SaveRequestAiSuggestionInput,
+  RequestAiSuggestionResult,
+  AiWorkspaceMode,
+  AiWorkspaceHistoryEntry,
+  GenerateAiWorkspaceInput,
+  GenerateAiWorkspaceResult,
+  SaveAiWorkspaceResultInput,
+  SaveAiWorkspaceResult,
+  DesktopStatusUpdateResult,
+  UpdateRequestStatusInput,
+  UpdateRoomStatusInput,
+  UpdateTableStatusInput,
+  TableOrderStatus,
+  DesktopTableOrderItem,
+  DesktopTableOrder,
+  DesktopPaymentWaitingTableOrder,
+  AddTableOrderItemInput,
+  UpdateTableOrderItemQuantityInput,
+  UpdateTableOrderItemNoteInput,
+  UpdateTableOrderStatusInput,
+  DesktopTableOrderResult,
+  UpdateReservationStatusInput,
+  SaveManualReservationInput,
+  SaveManualRestaurantReservationInput,
+  UpdateDailyTaskStatusInput,
+  SaveDailyTaskInput,
+  MarkWhatsAppMessageSentInput,
+  DeleteWhatsAppMessageInput,
+  RecordSyncEventInput,
+  DesktopSyncJobType,
+  DesktopSyncJob,
+  DesktopSyncRuntimeStatus,
+  ApplyAndroidActionResult,
+} from "./database-types.js";
 
 export class DesktopDatabase {
   private readonly db: DatabaseSync;
@@ -1146,15 +332,15 @@ export class DesktopDatabase {
       databasePath: this.databasePath,
       backupPath: this.backupPath,
       webModuleUrl: settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
-      requests: this.getRequests(),
-      rooms: this.getRooms(),
-      tables: this.getTables(),
-      reservations: this.getReservations(),
-      dailyTasks: this.getDailyTasks(),
-      customers: this.getCustomers(),
-      customerRoomStays: this.getCustomerRoomStays(),
+      requests: getRequests(this.db),
+      rooms: getStoredRooms(this.db, getStoredActiveResourceReservationTitles(this.db, "room")),
+      tables: getStoredTables(this.db, getStoredActiveResourceReservationTitles(this.db, "table")),
+      reservations: getStoredReservations(this.db),
+      dailyTasks: getStoredDailyTasks(this.db),
+      customers: getStoredCustomers(this.db),
+      customerRoomStays: getStoredCustomerRoomStays(this.db),
       androidDevices: this.getAndroidDevices(),
-      paymentWaitingTableOrders: this.listPaymentWaitingTableOrders(),
+      paymentWaitingTableOrders: listPaymentWaitingTableOrders(this.db),
       androidActionFailures: this.getAndroidActionFailures(),
       birthdayOverview: readBirthdayOverview(this.db),
       summary: {
@@ -1246,609 +432,46 @@ export class DesktopDatabase {
   }
 
   getReportData(input: DesktopReportRangeInput): DesktopReportData {
-    const period = normalizeDesktopReportRange(input);
-    const { startDate, endDate } = period;
-    const generatedAt = new Date().toISOString();
-    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
-    const customerReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
-    const restaurantReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
-    const stockReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_MENU)
-      && enabledCapabilities.has(BUSINESS_CAPABILITIES.INVENTORY);
-    const reservationCapabilityClause = reportReservationCapabilitySqlClause(enabledCapabilities);
-    const reservationDomainSql = reportReservationDomainSql();
-    const taskCapabilityClause = reportTaskCapabilitySqlClause(enabledCapabilities);
-
-    const paidSummary = this.db
-      .prepare(`
-        SELECT
-          COUNT(*) AS closed_orders,
-          COALESCE(ROUND(SUM(total), 2), 0) AS revenue
-        FROM table_orders
-        WHERE status = 'paid'
-          AND closed_at != ''
-          AND date(closed_at, 'localtime') BETWEEN ? AND ?
-      `)
-      .get(startDate, endDate) as { closed_orders?: number; revenue?: number } | undefined;
-    const closedOrders = Math.max(0, Number(paidSummary?.closed_orders ?? 0));
-    const restaurantRevenue = roundMoney(Number(paidSummary?.revenue ?? 0));
-    const averageOrder = closedOrders > 0 ? roundMoney(restaurantRevenue / closedOrders) : 0;
-
-    const soldItemRow = this.db
-      .prepare(`
-        SELECT COALESCE(SUM(table_order_items.quantity), 0) AS sold_item_count
-        FROM table_order_items
-        INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
-        WHERE table_orders.status = 'paid'
-          AND table_orders.closed_at != ''
-          AND date(table_orders.closed_at, 'localtime') BETWEEN ? AND ?
-          AND table_order_items.status != 'cancelled'
-      `)
-      .get(startDate, endDate) as { sold_item_count?: number } | undefined;
-    const soldItemCount = Math.max(0, Number(soldItemRow?.sold_item_count ?? 0));
-    const cancelledOrders = this.getScalarCount(
-      `
-        SELECT COUNT(*) AS count
-        FROM table_orders
-        WHERE status = 'cancelled'
-          AND closed_at != ''
-          AND date(closed_at, 'localtime') BETWEEN ? AND ?
-      `,
-      startDate,
-      endDate
-    );
-
-    const topItems = (this.db
-      .prepare(`
-        SELECT
-          table_order_items.product_name AS name,
-          COALESCE(SUM(table_order_items.quantity), 0) AS quantity,
-          COALESCE(ROUND(SUM(table_order_items.line_total), 2), 0) AS revenue
-        FROM table_order_items
-        INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
-        WHERE table_orders.status = 'paid'
-          AND table_orders.closed_at != ''
-          AND date(table_orders.closed_at, 'localtime') BETWEEN ? AND ?
-          AND table_order_items.status != 'cancelled'
-        GROUP BY table_order_items.product_name
-        ORDER BY quantity DESC, revenue DESC, name COLLATE NOCASE ASC
-        LIMIT 5
-      `)
-      .all(startDate, endDate) as Array<Record<string, unknown>>)
-      .map((row) => ({
-        name: String(row.name ?? "Ürün"),
-        quantity: Math.max(0, Number(row.quantity ?? 0)),
-        revenue: roundMoney(Number(row.revenue ?? 0))
-      }));
-
-    const dailyRows = this.db
-      .prepare(`
-        SELECT
-          date(closed_at, 'localtime') AS report_date,
-          COUNT(*) AS closed_orders,
-          COALESCE(ROUND(SUM(total), 2), 0) AS revenue
-        FROM table_orders
-        WHERE status = 'paid'
-          AND closed_at != ''
-          AND date(closed_at, 'localtime') BETWEEN ? AND ?
-        GROUP BY report_date
-        ORDER BY report_date ASC
-      `)
-      .all(startDate, endDate) as Array<Record<string, unknown>>;
-    const dailyByDate = new Map(dailyRows.map((row) => [
-      String(row.report_date ?? ""),
-      {
-        revenue: roundMoney(Number(row.revenue ?? 0)),
-        closedOrders: Math.max(0, Number(row.closed_orders ?? 0))
-      }
-    ]));
-    const dailyRevenue = enumerateIsoDateRange(startDate, endDate).map((date) => ({
-      date,
-      revenue: dailyByDate.get(date)?.revenue ?? 0,
-      closedOrders: dailyByDate.get(date)?.closedOrders ?? 0
-    }));
-
-    const reservationSummary = this.db
-      .prepare(`
-        SELECT
-          COUNT(*) AS incoming,
-          COALESCE(SUM(CASE WHEN status IN ('approved', 'completed') THEN 1 ELSE 0 END), 0) AS approved,
-          COALESCE(SUM(CASE
-            WHEN status IN ('approved', 'completed')
-              AND ${reservationDomainSql.hasRooms}
-              AND NOT ${reservationDomainSql.hasTables}
-            THEN 1 ELSE 0
-          END), 0) AS approved_accommodation,
-          COALESCE(SUM(CASE
-            WHEN status IN ('approved', 'completed')
-              AND ${reservationDomainSql.hasTables}
-              AND NOT ${reservationDomainSql.hasRooms}
-            THEN 1 ELSE 0
-          END), 0) AS approved_food,
-          COALESCE(SUM(CASE
-            WHEN status IN ('approved', 'completed')
-              AND ${reservationDomainSql.hasRooms}
-              AND ${reservationDomainSql.hasTables}
-            THEN 1 ELSE 0
-          END), 0) AS approved_mixed,
-          COALESCE(SUM(CASE
-            WHEN status IN ('approved', 'completed')
-              AND NOT ${reservationDomainSql.hasRooms}
-              AND NOT ${reservationDomainSql.hasTables}
-            THEN 1 ELSE 0
-          END), 0) AS approved_generic,
-          COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) AS pending,
-          COALESCE(SUM(CASE WHEN status IN ('cancelled', 'rejected') THEN 1 ELSE 0 END), 0) AS cancelled_or_rejected,
-          COALESCE(SUM(
-            CASE
-              WHEN reservation_type = 'room'
-                AND status IN ('approved', 'completed')
-                AND date(end_date) > date(start_date)
-              THEN CAST(julianday(date(end_date)) - julianday(date(start_date)) AS INTEGER)
-              ELSE 0
-            END
-          ), 0) AS accommodation_nights
-        FROM reservations
-        WHERE deleted_at = ''
-          ${reservationCapabilityClause}
-          AND date(created_at, 'localtime') BETWEEN ? AND ?
-      `)
-      .get(startDate, endDate) as Record<string, unknown> | undefined;
-
-    const requestSummary = this.db
-      .prepare(`
-        SELECT
-          COUNT(*) AS incoming,
-          COALESCE(SUM(
-            CASE WHEN status IN ('answered', 'converted_to_reservation', 'waiting_customer') THEN 1 ELSE 0 END
-          ), 0) AS answered,
-          COALESCE(SUM(
-            CASE WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') THEN 1 ELSE 0 END
-          ), 0) AS waiting
-        FROM requests
-        WHERE deleted_at = ''
-          AND date(created_at, 'localtime') BETWEEN ? AND ?
-      `)
-      .get(startDate, endDate) as Record<string, unknown> | undefined;
-
-    const pendingTasks = this.getScalarCount(
-      `
-        SELECT COUNT(*) AS count
-        FROM daily_tasks
-        WHERE deleted_at = ''
-          AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
-          ${taskCapabilityClause}
-          AND (
-            (due_date != '' AND date(due_date) BETWEEN ? AND ?)
-            OR (due_date = '' AND date(created_at, 'localtime') BETWEEN ? AND ?)
-          )
-      `,
-      startDate,
-      endDate,
-      startDate,
-      endDate
-    );
-
-    const topConsumed = (this.db
-      .prepare(`
-        SELECT
-          menu_items.id AS menu_item_id,
-          menu_items.name AS name,
-          menu_items.stock_unit AS unit,
-          COALESCE(ROUND(SUM(
-            CASE WHEN menu_stock_movements.quantity_change < 0
-              THEN -menu_stock_movements.quantity_change
-              ELSE 0
-            END
-          ), 3), 0) AS consumed
-        FROM menu_stock_movements
-        INNER JOIN menu_items ON menu_items.id = menu_stock_movements.menu_item_id
-        WHERE menu_items.deleted_at = ''
-          AND date(menu_stock_movements.created_at, 'localtime') BETWEEN ? AND ?
-        GROUP BY menu_items.id, menu_items.name, menu_items.stock_unit
-        HAVING consumed > 0
-        ORDER BY consumed DESC, name COLLATE NOCASE ASC
-        LIMIT 5
-      `)
-      .all(startDate, endDate) as Array<Record<string, unknown>>)
-      .map((row) => ({
-        menuItemId: String(row.menu_item_id ?? ""),
-        name: String(row.name ?? "Ürün"),
-        quantity: normalizeStockPrecision(Number(row.consumed ?? 0)),
-        unit: normalizeMenuStockUnit(row.unit)
-      }));
-
-    const manualMovementCount = this.getScalarCount(
-      `
-        SELECT COUNT(*) AS count
-        FROM menu_stock_movements
-        WHERE source_type IN ('desktop', 'android')
-          AND date(created_at, 'localtime') BETWEEN ? AND ?
-      `,
-      startDate,
-      endDate
-    );
-    const imageMovementCount = this.getScalarCount(
-      `
-        SELECT COUNT(*) AS count
-        FROM menu_stock_movements
-        WHERE source_type = 'stock_image_import'
-          AND date(created_at, 'localtime') BETWEEN ? AND ?
-      `,
-      startDate,
-      endDate
-    );
-    const manualMovements = this.getReportStockMovements(startDate, endDate, "manual");
-    const imageMovements = this.getReportStockMovements(startDate, endDate, "image");
-    const recentMovements = this.getReportStockMovements(startDate, endDate, "all");
-    const attention = this.getReportAttention(enabledCapabilities);
-    const approvedReservations = Math.max(0, Number(reservationSummary?.approved ?? 0));
-    const approvedAccommodationReservations = Math.max(0, Number(reservationSummary?.approved_accommodation ?? 0));
-    const approvedFoodReservations = Math.max(0, Number(reservationSummary?.approved_food ?? 0));
-    const approvedMixedReservations = Math.max(0, Number(reservationSummary?.approved_mixed ?? 0));
-    const approvedGenericReservations = Math.max(0, Number(reservationSummary?.approved_generic ?? 0));
-    const newRequests = customerReportsEnabled ? Math.max(0, Number(requestSummary?.incoming ?? 0)) : 0;
-
-    return {
-      period,
-      generatedAt,
-      summary: {
-        restaurantRevenue: restaurantReportsEnabled ? restaurantRevenue : 0,
-        closedOrders: restaurantReportsEnabled ? closedOrders : 0,
-        averageOrder: restaurantReportsEnabled ? averageOrder : 0,
-        approvedReservations,
-        approvedAccommodationReservations,
-        approvedFoodReservations,
-        approvedMixedReservations,
-        approvedGenericReservations,
-        newRequests,
-        pendingTasks
-      },
-      restaurant: {
-        revenue: restaurantReportsEnabled ? restaurantRevenue : 0,
-        closedOrders: restaurantReportsEnabled ? closedOrders : 0,
-        averageOrder: restaurantReportsEnabled ? averageOrder : 0,
-        soldItemCount: restaurantReportsEnabled ? soldItemCount : 0,
-        cancelledOrders: restaurantReportsEnabled ? cancelledOrders : 0,
-        dailyRevenue: restaurantReportsEnabled ? dailyRevenue : [],
-        topItems: restaurantReportsEnabled ? topItems : []
-      },
-      pensionAndRequests: {
-        incomingReservations: Math.max(0, Number(reservationSummary?.incoming ?? 0)),
-        approvedReservations,
-        pendingReservations: Math.max(0, Number(reservationSummary?.pending ?? 0)),
-        cancelledOrRejectedReservations: Math.max(0, Number(reservationSummary?.cancelled_or_rejected ?? 0)),
-        accommodationNights: Math.max(0, Number(reservationSummary?.accommodation_nights ?? 0)),
-        newRequests,
-        answeredRequests: customerReportsEnabled ? Math.max(0, Number(requestSummary?.answered ?? 0)) : 0,
-        waitingRequests: customerReportsEnabled ? Math.max(0, Number(requestSummary?.waiting ?? 0)) : 0
-      },
-      stock: {
-        topConsumed: stockReportsEnabled ? topConsumed : [],
-        manualMovementCount: stockReportsEnabled ? manualMovementCount : 0,
-        imageMovementCount: stockReportsEnabled ? imageMovementCount : 0,
-        manualMovements: stockReportsEnabled ? manualMovements : [],
-        imageMovements: stockReportsEnabled ? imageMovements : [],
-        recentMovements: stockReportsEnabled ? recentMovements : []
-      },
-      attention
-    };
+    return getStoredReportData(this.db, input, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   getAndroidReportPresets(referenceDateInput = ""): Record<AndroidReportPresetKey, AndroidReportSnapshot> {
-    const referenceDate = isIsoDate(referenceDateInput) ? referenceDateInput : formatLocalIsoDate(new Date());
-    const ranges: Array<[AndroidReportPresetKey, DesktopReportRangeInput]> = [
-      ["today", { preset: "today", label: "Bugün", startDate: referenceDate, endDate: referenceDate }],
-      [
-        "yesterday",
-        {
-          preset: "yesterday",
-          label: "Dün",
-          startDate: shiftIsoDate(referenceDate, -1),
-          endDate: shiftIsoDate(referenceDate, -1)
-        }
-      ],
-      [
-        "last7",
-        {
-          preset: "last7",
-          label: "Son 7 Gün",
-          startDate: shiftIsoDate(referenceDate, -6),
-          endDate: referenceDate
-        }
-      ],
-      [
-        "last30",
-        {
-          preset: "last30",
-          label: "Son 30 Gün",
-          startDate: shiftIsoDate(referenceDate, -29),
-          endDate: referenceDate
-        }
-      ]
-    ];
-
-    return Object.fromEntries(ranges.map(([key, range]) => {
-      const report = this.getReportData(range);
-      return [key, toAndroidReportSnapshot(key, report)];
-    })) as Record<AndroidReportPresetKey, AndroidReportSnapshot>;
+    return getStoredAndroidReportPresets(this.db, referenceDateInput, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   getAndroidDevices(): DesktopAndroidDevice[] {
-    const enabledCapabilities = this.getEnabledBusinessCapabilities();
-    const rows = this.db
-      .prepare(`
-        SELECT *
-        FROM android_devices
-        ORDER BY is_active DESC, last_seen_at DESC, device_name ASC, device_id ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    return rows.map((row) => {
-      const role = normalizeAndroidDeviceRole(row.role);
-      return {
-        id: String(row.id ?? ""),
-        deviceId: String(row.device_id ?? ""),
-        deviceName: String(row.device_name ?? ""),
-        appVersion: String(row.app_version ?? ""),
-        role,
-        isActive: Number(row.is_active ?? 0) === 1 && !String(row.revoked_at ?? "").trim(),
-        permissionGroups: parseStoredAndroidPermissionGroups(row.permission_groups_json),
-        permissions: effectiveAndroidPermissions(role, row.permissions_json, enabledCapabilities),
-        firstSeenAt: String(row.first_seen_at ?? ""),
-        lastSeenAt: String(row.last_seen_at ?? ""),
-        createdAt: String(row.created_at ?? ""),
-        updatedAt: String(row.updated_at ?? ""),
-        revokedAt: String(row.revoked_at ?? "")
-      };
-    });
+    return getStoredAndroidDevices(this.db, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   getAndroidPermissionSnapshot(): Record<string, AndroidSnapshotPermissionProfile> {
-    return Object.fromEntries(this.getAndroidDevices().map((device) => [
-      device.deviceId,
-      {
-        role: device.role,
-        is_active: device.isActive,
-        permissions: device.permissions
-      }
-    ]));
+    return getStoredAndroidPermissionSnapshot(this.db, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   upsertAndroidDeviceSightings(sightings: AndroidDeviceSighting[]): number {
-    if (!Array.isArray(sightings) || sightings.length === 0) {
-      return 0;
-    }
-    const now = new Date().toISOString();
-    const statement = this.db.prepare(`
-      INSERT INTO android_devices (
-        id, device_id, device_name, app_version, role, is_active, permissions_json, permission_groups_json,
-        first_seen_at, last_seen_at, created_at, updated_at, revoked_at
-      ) VALUES (?, ?, ?, ?, 'staff', 1, ?, ?, ?, ?, ?, ?, NULL)
-      ON CONFLICT(device_id) DO UPDATE SET
-        device_name = CASE WHEN excluded.device_name != '' THEN excluded.device_name ELSE android_devices.device_name END,
-        app_version = CASE WHEN excluded.app_version != '' THEN excluded.app_version ELSE android_devices.app_version END,
-        last_seen_at = CASE
-          WHEN excluded.last_seen_at > android_devices.last_seen_at THEN excluded.last_seen_at
-          ELSE android_devices.last_seen_at
-        END,
-        updated_at = CASE
-          WHEN (excluded.device_name != '' AND excluded.device_name != android_devices.device_name)
-            OR (excluded.app_version != '' AND excluded.app_version != android_devices.app_version)
-            OR excluded.last_seen_at > android_devices.last_seen_at
-          THEN excluded.updated_at
-          ELSE android_devices.updated_at
-        END
-    `);
-    let changed = 0;
-    this.db.exec("BEGIN");
-    try {
-      for (const sighting of sightings) {
-        const deviceId = normalizeAndroidDeviceId(sighting?.device_id);
-        if (!deviceId) {
-          continue;
-        }
-        const firstSeenAt = normalizeAndroidTimestamp(sighting.first_seen_at, now);
-        const lastSeenAt = normalizeAndroidTimestamp(sighting.last_seen_at, firstSeenAt);
-        const result = statement.run(
-          createId("android_device_"),
-          deviceId,
-          String(sighting.device_name ?? "").trim().slice(0, 160),
-          String(sighting.app_version ?? "").trim().slice(0, 80),
-          JSON.stringify(ANDROID_STAFF_PERMISSIONS),
-          JSON.stringify(ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS),
-          firstSeenAt,
-          lastSeenAt,
-          firstSeenAt,
-          now
-        );
-        changed += Number(result.changes ?? 0);
-      }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-    return changed;
+    return upsertStoredAndroidDeviceSightings(this.db, sightings);
   }
 
   setAndroidDeviceRole(deviceIdInput: string, roleInput: string): DesktopAndroidDeviceMutationResult {
-    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
-    const role = normalizeAndroidDeviceRoleInput(roleInput);
-    if (!deviceId || !role) {
-      return { ok: false, message: "Telefon rolü için geçerli bir cihaz ve profil seçin.", devices: this.getAndroidDevices() };
-    }
-    const row = this.db
-      .prepare("SELECT permission_groups_json FROM android_devices WHERE device_id = ?")
-      .get(deviceId) as { permission_groups_json?: unknown } | undefined;
-    if (!row) {
-      return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
-    }
-    const groups = parseStoredAndroidPermissionGroups(row.permission_groups_json);
-    const permissions = role === "admin"
-      ? androidPermissionsForRole("admin")
-      : androidPermissionsForGroups(groups);
-    const now = new Date().toISOString();
-    const result = this.db
-      .prepare(`
-        UPDATE android_devices
-        SET role = ?, permissions_json = ?, updated_at = ?
-        WHERE device_id = ?
-      `)
-      .run(role, JSON.stringify(permissions), now, deviceId);
-    return Number(result.changes) === 1
-      ? { ok: true, message: role === "admin" ? "Telefon yönetici yapıldı." : "Telefon personel yapıldı.", devices: this.getAndroidDevices() }
-      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+    return setStoredAndroidDeviceRole(this.db, deviceIdInput, roleInput, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   setAndroidDevicePermissionGroups(deviceIdInput: string, groupsInput: unknown): DesktopAndroidDeviceMutationResult {
-    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
-    const groups = normalizeAndroidPermissionGroupsInput(groupsInput);
-    if (!deviceId || !groups) {
-      return { ok: false, message: "Telefon görev alanları için geçerli seçimler yapın.", devices: this.getAndroidDevices() };
-    }
-    const row = this.db
-      .prepare("SELECT role FROM android_devices WHERE device_id = ?")
-      .get(deviceId) as { role?: unknown } | undefined;
-    if (!row) {
-      return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
-    }
-    if (normalizeAndroidDeviceRole(row.role) === "admin") {
-      return {
-        ok: false,
-        message: "Yönetici cihazlarda yalnız işletmenin etkin yeteneklerine ait izinler kullanılır.",
-        devices: this.getAndroidDevices()
-      };
-    }
-    const result = this.db
-      .prepare(`
-        UPDATE android_devices
-        SET permission_groups_json = ?, permissions_json = ?, updated_at = ?
-        WHERE device_id = ?
-      `)
-      .run(
-        JSON.stringify(groups),
-        JSON.stringify(androidPermissionsForGroups(groups)),
-        new Date().toISOString(),
-        deviceId
-      );
-    return Number(result.changes) === 1
-      ? { ok: true, message: "Telefon görev alanları güncellendi.", devices: this.getAndroidDevices() }
-      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+    return setStoredAndroidDevicePermissionGroups(this.db, deviceIdInput, groupsInput, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   setAndroidDeviceActive(deviceIdInput: string, active: boolean): DesktopAndroidDeviceMutationResult {
-    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
-    if (!deviceId) {
-      return { ok: false, message: "Geçerli bir telefon seçin.", devices: this.getAndroidDevices() };
-    }
-    const now = new Date().toISOString();
-    const result = this.db
-      .prepare(`
-        UPDATE android_devices
-        SET is_active = ?, revoked_at = CASE WHEN ? = 1 THEN NULL ELSE revoked_at END, updated_at = ?
-        WHERE device_id = ?
-      `)
-      .run(active ? 1 : 0, active ? 1 : 0, now, deviceId);
-    return Number(result.changes) === 1
-      ? { ok: true, message: active ? "Telefon yeniden aktif edildi." : "Telefon pasifleştirildi.", devices: this.getAndroidDevices() }
-      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+    return setStoredAndroidDeviceActive(this.db, deviceIdInput, active, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   resetAndroidDevicePermissions(deviceIdInput: string): DesktopAndroidDeviceMutationResult {
-    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
-    const row = deviceId
-      ? this.db.prepare("SELECT role FROM android_devices WHERE device_id = ?").get(deviceId) as { role?: unknown } | undefined
-      : undefined;
-    if (!deviceId || !row) {
-      return { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
-    }
-    const role = normalizeAndroidDeviceRole(row.role);
-    const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
-    this.db
-      .prepare("UPDATE android_devices SET permission_groups_json = ?, permissions_json = ?, updated_at = ? WHERE device_id = ?")
-      .run(
-        JSON.stringify(groups),
-        JSON.stringify(role === "admin" ? androidPermissionsForRole("admin") : androidPermissionsForGroups(groups)),
-        new Date().toISOString(),
-        deviceId
-      );
-    return { ok: true, message: "Telefon görev alanları varsayılana döndürüldü.", devices: this.getAndroidDevices() };
+    return resetStoredAndroidDevicePermissions(this.db, deviceIdInput, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   revokeAndroidDevice(deviceIdInput: string): DesktopAndroidDeviceMutationResult {
-    const deviceId = normalizeAndroidDeviceId(deviceIdInput);
-    if (!deviceId) {
-      return { ok: false, message: "Geçerli bir telefon seçin.", devices: this.getAndroidDevices() };
-    }
-    const now = new Date().toISOString();
-    const result = this.db
-      .prepare("UPDATE android_devices SET is_active = 0, revoked_at = ?, updated_at = ? WHERE device_id = ?")
-      .run(now, now, deviceId);
-    return Number(result.changes) === 1
-      ? { ok: true, message: "Telefon kaldırıldı ve erişimi kapatıldı.", devices: this.getAndroidDevices() }
-      : { ok: false, message: "Telefon kaydı bulunamadı.", devices: this.getAndroidDevices() };
+    return revokeStoredAndroidDevice(this.db, deviceIdInput, new Set(this.getEnabledBusinessCapabilities()));
   }
-
   getAndroidPreparedMessages(): DesktopPreparedMessage[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          whatsapp_messages.id,
-          whatsapp_messages.request_id,
-          COALESCE(NULLIF(customers.full_name, ''), NULLIF(requests.customer_name, ''), 'Misafir') AS customer_name,
-          COALESCE(NULLIF(whatsapp_messages.phone, ''), NULLIF(customers.phone, ''), requests.customer_phone, '') AS customer_phone,
-          whatsapp_messages.message,
-          whatsapp_messages.status,
-          whatsapp_messages.updated_at
-        FROM whatsapp_messages
-        LEFT JOIN requests ON requests.id = whatsapp_messages.request_id AND requests.deleted_at = ''
-        LEFT JOIN customers ON customers.id = whatsapp_messages.customer_id AND customers.deleted_at = ''
-        WHERE whatsapp_messages.direction = 'outgoing'
-          AND whatsapp_messages.status = 'prepared'
-          AND whatsapp_messages.deleted_at = ''
-          AND (
-            requests.id IS NULL
-            OR requests.status NOT IN ('answered', 'rejected', 'cancelled', 'archived', 'converted_to_reservation')
-          )
-        ORDER BY whatsapp_messages.updated_at DESC, whatsapp_messages.created_at DESC
-        LIMIT 300
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const messages: DesktopPreparedMessage[] = rows.map((row) => ({
-      id: String(row.id ?? ""),
-      requestId: String(row.request_id ?? ""),
-      customerName: String(row.customer_name ?? "Misafir"),
-      customerPhone: String(row.customer_phone ?? ""),
-      message: String(row.message ?? ""),
-      status: String(row.status ?? "prepared"),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-
-    const requestIdsWithMessage = new Set(
-      (this.db
-        .prepare("SELECT request_id FROM whatsapp_messages WHERE direction = 'outgoing' AND request_id != '' AND deleted_at = ''")
-        .all() as Array<{ request_id?: string }>)
-        .map((row) => String(row.request_id ?? ""))
-    );
-    for (const request of this.getRequests()) {
-      if (messages.length >= 300 || requestIdsWithMessage.has(request.id)
-          || ["answered", "rejected", "cancelled", "archived", "converted_to_reservation"].includes(request.status)) {
-        continue;
-      }
-      const message = String(request.ai_suggested_reply || request.whatsapp_message || "").trim();
-      if (!message) {
-        continue;
-      }
-      messages.push({
-        id: `message_${request.id}`,
-        requestId: request.id,
-        customerName: request.customer_name,
-        customerPhone: request.customer_phone,
-        message,
-        status: "prepared",
-        updatedAt: request.updated_at
-      });
-    }
-    return messages;
+    return getStoredAndroidPreparedMessages(this.db, getRequests(this.db));
   }
 
   applyAndroidAction(action: AndroidSyncAction): ApplyAndroidActionResult {
@@ -1936,213 +559,35 @@ export class DesktopDatabase {
   }
 
   saveDailyTask(input: SaveDailyTaskInput): DesktopStatusUpdateResult {
-    const taskIdInput = String(input?.id ?? "").trim();
-    const title = String(input?.title ?? "").trim().replace(/\s+/g, " ");
-    const description = String(input?.description ?? "").trim();
-    const taskType = input?.taskType === "manual_pension" || input?.taskType === "manual_restaurant"
-      ? input.taskType
-      : "";
-    const dueDate = String(input?.dueDate ?? "").trim();
-    const dueTime = String(input?.dueTime ?? "").trim();
-
-    if (!title) {
-      return { ok: false, message: "Günlük iş başlığı boş olamaz." };
+    const result = saveStoredDailyTask(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-    if (title.length > 160) {
-      return { ok: false, message: "Günlük iş başlığı en fazla 160 karakter olabilir." };
-    }
-    if (description.length > 1000) {
-      return { ok: false, message: "Günlük iş notu en fazla 1000 karakter olabilir." };
-    }
-    if (!taskType) {
-      return { ok: false, message: "Günlük iş alanı seçilemedi." };
-    }
-    if (dueDate && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
-      return { ok: false, message: "Günlük iş tarihi geçersiz." };
-    }
-    if (dueTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(dueTime)) {
-      return { ok: false, message: "Günlük iş saati geçersiz." };
-    }
-
-    const now = new Date().toISOString();
-    const taskId = taskIdInput || createId("task_");
-    const existing = taskIdInput
-      ? this.db.prepare("SELECT task_type FROM daily_tasks WHERE id = ? AND deleted_at = ''").get(taskId) as { task_type?: string } | undefined
-      : undefined;
-    if (taskIdInput && !existing) {
-      return { ok: false, message: "Düzenlenecek günlük iş bulunamadı." };
-    }
-    if (existing && !String(existing.task_type ?? "").startsWith("manual_")) {
-      return { ok: false, message: "Otomatik oluşturulan günlük işler yalnız durum işlemleriyle yönetilebilir." };
-    }
-
-    this.db.exec("BEGIN");
-    try {
-      if (existing) {
-        this.db.prepare(`
-          UPDATE daily_tasks
-          SET title = ?, description = ?, task_type = ?, due_date = ?, due_time = ?, updated_at = ?, sync_status = 'local_only'
-          WHERE id = ? AND deleted_at = ''
-        `).run(title, description, taskType, dueDate, dueTime, now, taskId);
-      } else {
-        this.db.prepare(`
-          INSERT INTO daily_tasks (
-            id, title, description, task_type, status, due_date, due_time, related_type, related_id,
-            created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, ?, ?, 'pending', ?, ?, '', '', ?, ?, '', 'local_only')
-        `).run(taskId, title, description, taskType, dueDate, dueTime, now, now);
-      }
-      this.insertEvent({
-        type: existing ? "task.updated" : "task.created",
-        entityType: "daily_task",
-        entityId: taskId,
-        payload: { title, task_type: taskType, due_date: dueDate, due_time: dueTime },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : "Günlük iş kaydedilemedi."
-      };
-    }
-
-    return {
-      ok: true,
-      message: existing ? "Günlük iş güncellendi." : "Günlük iş eklendi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteDailyTask(taskIdInput: string): DesktopStatusUpdateResult {
-    const taskId = String(taskIdInput ?? "").trim();
-    if (!taskId) {
-      return { ok: false, message: "Silinecek günlük iş seçilmeli." };
+    const result = deleteStoredDailyTask(this.db, taskIdInput);
+    if (!result.ok) {
+      return result;
     }
-    const task = this.db.prepare("SELECT task_type, title FROM daily_tasks WHERE id = ? AND deleted_at = ''").get(taskId) as { task_type?: string; title?: string } | undefined;
-    if (!task) {
-      return { ok: false, message: "Günlük iş bulunamadı." };
-    }
-    if (!String(task.task_type ?? "").startsWith("manual_")) {
-      return { ok: false, message: "Otomatik oluşturulan günlük işler silinemez; durumunu tamamlandı veya iptal olarak değiştirin." };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE daily_tasks SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(now, now, taskId);
-      this.insertEvent({
-        type: "task.deleted",
-        entityType: "daily_task",
-        entityId: taskId,
-        payload: { title: String(task.title ?? "") },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : "Günlük iş silinemedi."
-      };
-    }
-
-    return { ok: true, message: "Günlük iş silindi.", dashboardData: this.getDashboardData() };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateDailyTaskStatus(input: UpdateDailyTaskStatusInput): DesktopStatusUpdateResult {
-    const taskId = input.taskId.trim();
-    const status = normalizeStatus(input.status, ["pending", "done", "cancelled", "archived"]);
-    if (!taskId || !status) {
-      return {
-        ok: false,
-        message: "Günlük iş için geçerli kayıt ve durum seçilmeli."
-      };
+    const result = updateStoredDailyTaskStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const task = this.db.prepare("SELECT status FROM daily_tasks WHERE id = ? AND deleted_at = ''").get(taskId) as { status?: string } | undefined;
-    if (!task) {
-      return {
-        ok: false,
-        message: "Günlük iş bulunamadı."
-      };
-    }
-
-    const now = new Date().toISOString();
-    const eventType = status === "done" ? "task.completed" : status === "cancelled" ? "task.cancelled" : "task.status_changed";
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE daily_tasks SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, taskId);
-      this.insertEvent({
-        type: eventType,
-        entityType: "daily_task",
-        entityId: taskId,
-        payload: {
-          previous_status: String(task.status ?? ""),
-          status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Günlük iş durumu güncellendi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateRequestStatus(input: UpdateRequestStatusInput): DesktopStatusUpdateResult {
-    const requestId = input.requestId.trim();
-    const status = normalizeStatus(input.status, ["new", "seen", "waiting_owner", "waiting_customer", "approved", "rejected", "answered", "cancelled", "archived"]);
-    if (!requestId || !status) {
-      return {
-        ok: false,
-        message: "Talep durumu için geçerli kayıt ve durum seçilmeli."
-      };
+    const result = updateStoredRequestStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const request = this.db.prepare("SELECT status FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { status?: string } | undefined;
-    if (!request) {
-      return {
-        ok: false,
-        message: "Talep bulunamadı."
-      };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, requestId);
-      if (status === "answered") {
-        this.markPreparedWhatsAppMessagesSentInTransaction(requestId, now);
-      }
-      this.insertEvent({
-        type: "request.status_changed",
-        entityType: "request",
-        entityId: requestId,
-        payload: {
-          previous_status: String(request.status ?? ""),
-          status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Talep durumu güncellendi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteRequest(requestIdInput: string): DesktopStatusUpdateResult {
@@ -2150,10 +595,15 @@ export class DesktopDatabase {
     if (!requestId) {
       return { ok: false, message: "Silinecek talep seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteRequestInTransaction(requestId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredRequestInTransaction(this.db, requestId, new Date().toISOString()),
       "Talep silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteCustomer(customerIdInput: string): DesktopStatusUpdateResult {
@@ -2161,340 +611,39 @@ export class DesktopDatabase {
     if (!customerId) {
       return { ok: false, message: "Silinecek müşteri seçilmeli." };
     }
-    return this.runDesktopDeletion(
+    const result = runStoredDesktopDeletion(
+      this.db,
       () => this.deleteCustomerInTransaction(customerId, new Date().toISOString()),
       "Müşteri silindi; talep ve rezervasyon geçmişi korundu."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   saveCustomer(input: SaveCustomerInput): DesktopCustomerMutationResult {
-    const normalized = normalizeCustomerInput(input);
-    if (!normalized.ok) {
-      return normalized;
+    const result = saveStoredCustomer(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const requestedId = String(input?.id ?? "").trim();
-    const existing = requestedId
-      ? this.db.prepare("SELECT id, source, created_at, birthday_message_enabled FROM customers WHERE id = ? AND deleted_at = ''").get(requestedId) as Record<string, unknown> | undefined
-      : undefined;
-    if (requestedId && !existing) {
-      return { ok: false, message: "Düzenlenecek müşteri bulunamadı." };
-    }
-
-    const duplicateIdentity = normalized.customer.identityNumber
-      ? this.db
-          .prepare("SELECT id FROM customers WHERE identity_number = ? AND id != ? AND deleted_at = '' LIMIT 1")
-          .get(normalized.customer.identityNumber, requestedId)
-      : undefined;
-    if (duplicateIdentity) {
-      return { ok: false, message: "Bu kimlik numarası başka bir müşteri kartında kayıtlı." };
-    }
-    const duplicatePhone = normalized.customer.phone
-      ? this.db
-          .prepare("SELECT id FROM customers WHERE phone = ? AND id != ? AND deleted_at = '' LIMIT 1")
-          .get(normalized.customer.phone, requestedId)
-      : undefined;
-    if (duplicatePhone) {
-      return { ok: false, message: "Bu telefon numarasıyla kayıtlı bir müşteri zaten var." };
-    }
-
-    const id = requestedId || createId("customer_");
-    const now = new Date().toISOString();
-    const source = String(existing?.source ?? "manual") || "manual";
-    const createdAt = String(existing?.created_at ?? now) || now;
-    const customer = normalized.customer;
-    const birthdayMessageEnabled = input.birthdayMessageEnabled === undefined
-      ? normalizeBoolean(existing?.birthday_message_enabled, true)
-      : normalizeBoolean(input.birthdayMessageEnabled, true);
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .prepare(`
-          INSERT INTO customers (
-            id, full_name, phone, email, source, notes, tags_json, last_contact_at,
-            identity_type, identity_number, nationality, birth_date, gender,
-            birthday_message_enabled,
-            document_serial_number, document_expiry_date, birth_place, mother_name,
-            father_name, issuing_authority, address, created_at, updated_at,
-            deleted_at, sync_status
-          ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, '',
-            ?, ?, ?, ?, ?,
-            ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?,
-            '', 'local_only'
-          )
-          ON CONFLICT(id) DO UPDATE SET
-            full_name = excluded.full_name,
-            phone = excluded.phone,
-            email = excluded.email,
-            notes = excluded.notes,
-            tags_json = excluded.tags_json,
-            identity_type = excluded.identity_type,
-            identity_number = excluded.identity_number,
-            nationality = excluded.nationality,
-            birth_date = excluded.birth_date,
-            gender = excluded.gender,
-            birthday_message_enabled = excluded.birthday_message_enabled,
-            document_serial_number = excluded.document_serial_number,
-            document_expiry_date = excluded.document_expiry_date,
-            birth_place = excluded.birth_place,
-            mother_name = excluded.mother_name,
-            father_name = excluded.father_name,
-            issuing_authority = excluded.issuing_authority,
-            address = excluded.address,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          id,
-          customer.fullName,
-          customer.phone,
-          customer.email,
-          source,
-          customer.notes,
-          JSON.stringify(customer.tags),
-          customer.identityType,
-          customer.identityNumber,
-          customer.nationality,
-          customer.birthDate,
-          customer.gender,
-          birthdayMessageEnabled ? 1 : 0,
-          customer.documentSerialNumber,
-          customer.documentExpiryDate,
-          customer.birthPlace,
-          customer.motherName,
-          customer.fatherName,
-          customer.issuingAuthority,
-          customer.address,
-          createdAt,
-          now
-        );
-      this.insertEvent({
-        type: requestedId ? "customer.updated" : "customer.created",
-        entityType: "customer",
-        entityId: id,
-        payload: {
-          source: requestedId ? "desktop_edit" : "desktop_manual",
-          identity_type: customer.identityType,
-          has_identity_number: Boolean(customer.identityNumber)
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      return { ok: false, message: "Müşteri kartı kaydedilemedi. Kimlik ve iletişim alanlarını kontrol edin." };
-    }
-
-    return {
-      ok: true,
-      message: requestedId ? "Müşteri kartı güncellendi." : "Müşteri kartı oluşturuldu.",
-      savedId: id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   assignCustomerToRoom(input: AssignCustomerRoomInput): DesktopCustomerMutationResult {
-    const customerId = String(input?.customerId ?? "").trim();
-    const roomId = String(input?.roomId ?? "").trim();
-    const checkInDate = normalizeDateInput(String(input?.checkInDate ?? ""));
-    const checkOutDate = normalizeDateInput(String(input?.checkOutDate ?? ""));
-    const guestCount = normalizeInteger(Number(input?.guestCount));
-    const status = input?.status === "checked_in" ? "checked_in" : input?.status === "planned" ? "planned" : "";
-    const notes = normalizeLimitedText(input?.notes, 2000);
-    if (!customerId || !roomId || !checkInDate || !status) {
-      return { ok: false, message: "Müşteri, oda, giriş tarihi ve konaklama durumu seçilmeli." };
+    const result = assignStoredCustomerToRoom(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-    if (checkOutDate && checkOutDate < checkInDate) {
-      return { ok: false, message: "Çıkış tarihi giriş tarihinden önce olamaz." };
-    }
-    if (guestCount < 1 || guestCount > 50) {
-      return { ok: false, message: "Konaklayan kişi sayısı 1 ile 50 arasında olmalı." };
-    }
-
-    const customer = this.db
-      .prepare("SELECT full_name FROM customers WHERE id = ? AND deleted_at = ''")
-      .get(customerId) as { full_name?: string } | undefined;
-    const room = this.db
-      .prepare("SELECT name, number, capacity, status, is_active FROM rooms WHERE id = ? AND deleted_at = ''")
-      .get(roomId) as Record<string, unknown> | undefined;
-    if (!customer) {
-      return { ok: false, message: "Odaya atanacak müşteri bulunamadı." };
-    }
-    if (!room || Number(room.is_active ?? 0) !== 1) {
-      return { ok: false, message: "Atama yapılacak aktif oda bulunamadı." };
-    }
-    if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
-      return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
-    }
-    if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
-      return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
-    }
-    if (this.hasOverlappingCustomerRoomStay(roomId, checkInDate, checkOutDate)) {
-      return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
-    }
-    const reservationConflict = this.findConflictingRoomReservation(roomId, customerId, checkInDate, checkOutDate);
-    if (reservationConflict) {
-      return { ok: false, message: `Oda bu tarihlerde ${reservationConflict} rezervasyonuna bağlı.` };
-    }
-
-    const id = createId("stay_");
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .prepare(`
-          INSERT INTO customer_room_stays (
-            id, customer_id, room_id, reservation_id, status, check_in_date,
-            check_out_date, guest_count, notes, source, checked_in_at,
-            checked_out_at, created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, 'manual', ?, '', ?, ?, '', 'local_only')
-        `)
-        .run(
-          id,
-          customerId,
-          roomId,
-          status,
-          checkInDate,
-          checkOutDate,
-          guestCount,
-          notes,
-          status === "checked_in" ? now : "",
-          now,
-          now
-        );
-      this.db
-        .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-        .run(status === "checked_in" ? "occupied" : "reserved", now, roomId);
-      this.insertEvent({
-        type: "customer.room_assigned",
-        entityType: "customer_room_stay",
-        entityId: id,
-        payload: {
-          customer_id: customerId,
-          room_id: roomId,
-          status,
-          check_in_date: checkInDate,
-          check_out_date: checkOutDate
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch {
-      this.db.exec("ROLLBACK");
-      return { ok: false, message: "Müşteri oda kaydı oluşturulamadı." };
-    }
-
-    const roomLabel = String(room.number ?? "").trim() || String(room.name ?? "").trim();
-    return {
-      ok: true,
-      message: `${String(customer.full_name ?? "Müşteri")} ${roomLabel ? `· ${roomLabel}` : ""} oda kaydına eklendi.`,
-      savedId: id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateCustomerRoomStayStatus(input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult {
-    const stayId = String(input?.stayId ?? "").trim();
-    const status = normalizeStatus(String(input?.status ?? ""), ["planned", "checked_in", "checked_out", "cancelled"]);
-    if (!stayId || !status) {
-      return { ok: false, message: "Konaklama kaydı ve yeni durum seçilmeli." };
+    const result = updateStoredCustomerRoomStayStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-    const stay = this.db
-      .prepare(`
-        SELECT customer_room_stays.*, customers.full_name, rooms.name AS room_name
-        FROM customer_room_stays
-        JOIN customers ON customers.id = customer_room_stays.customer_id
-        JOIN rooms ON rooms.id = customer_room_stays.room_id
-        WHERE customer_room_stays.id = ? AND customer_room_stays.deleted_at = ''
-      `)
-      .get(stayId) as Record<string, unknown> | undefined;
-    if (!stay) {
-      return { ok: false, message: "Konaklama kaydı bulunamadı." };
-    }
-    const previousStatus = String(stay.status ?? "");
-    if (previousStatus === status) {
-      return {
-        ok: true,
-        message: "Konaklama kaydı zaten seçilen durumda.",
-        savedId: stayId,
-        dashboardData: this.getDashboardData()
-      };
-    }
-    const allowedTransitions: Record<string, string[]> = {
-      planned: ["checked_in", "cancelled"],
-      checked_in: ["checked_out", "cancelled"],
-      cancelled: ["planned"],
-      checked_out: []
-    };
-    if (!(allowedTransitions[previousStatus] ?? []).includes(status)) {
-      return { ok: false, message: "Bu konaklama kaydı seçilen duruma geçirilemez." };
-    }
-    if (
-      ["planned", "checked_in"].includes(status)
-      && this.hasOverlappingCustomerRoomStay(
-        String(stay.room_id ?? ""),
-        String(stay.check_in_date ?? ""),
-        String(stay.check_out_date ?? ""),
-        stayId
-      )
-    ) {
-      return { ok: false, message: "Odanın aynı tarihlerde başka bir aktif müşteri kaydı var." };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .prepare(`
-          UPDATE customer_room_stays
-          SET status = ?,
-              checked_in_at = CASE WHEN ? = 'checked_in' THEN ? ELSE checked_in_at END,
-              checked_out_at = CASE WHEN ? = 'checked_out' THEN ? ELSE checked_out_at END,
-              updated_at = ?,
-              sync_status = 'local_only'
-          WHERE id = ?
-        `)
-        .run(status, status, now, status, now, now, stayId);
-      this.refreshRoomStatusFromStays(
-        String(stay.room_id ?? ""),
-        now,
-        status === "checked_out"
-      );
-      this.insertEvent({
-        type: "customer.room_stay_status_changed",
-        entityType: "customer_room_stay",
-        entityId: stayId,
-        payload: {
-          customer_id: String(stay.customer_id ?? ""),
-          room_id: String(stay.room_id ?? ""),
-          previous_status: previousStatus,
-          status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch {
-      this.db.exec("ROLLBACK");
-      return { ok: false, message: "Konaklama durumu güncellenemedi." };
-    }
-
-    return {
-      ok: true,
-      message: status === "checked_in"
-        ? "Müşteri odaya giriş yaptı."
-        : status === "checked_out"
-          ? "Müşteri çıkışı tamamlandı; oda temizlik durumuna alındı."
-          : status === "cancelled"
-            ? "Oda ataması iptal edildi."
-            : "Oda ataması yeniden planlandı.",
-      savedId: stayId,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteMenuCategory(categoryIdInput: string): DesktopStatusUpdateResult {
@@ -2502,10 +651,15 @@ export class DesktopDatabase {
     if (!categoryId) {
       return { ok: false, message: "Silinecek kategori seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteMenuCategoryInTransaction(categoryId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredMenuCategoryInTransaction(this.db, categoryId, new Date().toISOString()),
       "Kategori ve içindeki ürünler silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteMenuItem(itemIdInput: string): DesktopStatusUpdateResult {
@@ -2513,10 +667,15 @@ export class DesktopDatabase {
     if (!itemId) {
       return { ok: false, message: "Silinecek ürün seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteMenuItemInTransaction(itemId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredMenuItemInTransaction(this.db, itemId, new Date().toISOString()),
       "Ürün silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   deleteWhatsAppMessage(input: DeleteWhatsAppMessageInput): DesktopStatusUpdateResult {
@@ -2525,93 +684,23 @@ export class DesktopDatabase {
     if (!messageId && !requestId) {
       return { ok: false, message: "Silinecek mesaj seçilmeli." };
     }
-    return this.runDesktopDeletion(
-      () => this.deleteMessageInTransaction(messageId, requestId, new Date().toISOString()),
+    const result = runStoredDesktopDeletion(
+      this.db,
+      () => deleteStoredMessageInTransaction(this.db, messageId, requestId, new Date().toISOString()),
       "Hazır mesaj silindi."
     );
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   markWhatsAppMessageSent(input: MarkWhatsAppMessageSentInput): DesktopStatusUpdateResult {
-    const requestId = input.requestId.trim();
-    const message = input.message.trim();
-    if (!requestId || !message) {
-      return {
-        ok: false,
-        message: "Gönderilen WhatsApp mesajı için talep ve metin bilgisi gerekli."
-      };
+    const result = markStoredWhatsAppMessageSent(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const preparedMessage = this.db
-      .prepare(`
-        SELECT id, message, status
-        FROM whatsapp_messages
-        WHERE request_id = ?
-          AND direction = 'outgoing'
-          AND deleted_at = ''
-        ORDER BY updated_at DESC
-        LIMIT 1
-      `)
-      .get(requestId) as { id?: string; message?: string; status?: string } | undefined;
-
-    if (!preparedMessage?.id) {
-      return {
-        ok: false,
-        message: "Talebe ait hazır WhatsApp mesajı bulunamadı."
-      };
-    }
-
-    if (String(preparedMessage.message ?? "").trim() !== message) {
-      return {
-        ok: false,
-        message: "Gönderilen metin yerel AI taslağıyla eşleşmediği için kayıt güncellenmedi."
-      };
-    }
-
-    if (preparedMessage.status === "sent") {
-      return {
-        ok: true,
-        message: "WhatsApp mesajı daha önce gönderildi olarak kaydedilmiş.",
-        dashboardData: this.getDashboardData()
-      };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db
-        .prepare(`
-          UPDATE whatsapp_messages
-          SET mode = 'webview',
-              status = 'sent',
-              sent_at = ?,
-              updated_at = ?,
-              sync_status = 'local_only'
-          WHERE id = ?
-        `)
-        .run(now, now, preparedMessage.id);
-
-      this.insertEvent({
-        type: "whatsapp.message_sent",
-        entityType: "whatsapp_message",
-        entityId: preparedMessage.id,
-        payload: {
-          request_id: requestId,
-          mode: "webview",
-          user_approved: true
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "WhatsApp mesajı gönderildi olarak kaydedildi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateRoomStatus(input: UpdateRoomStatusInput): DesktopStatusUpdateResult {
@@ -2655,24 +744,7 @@ export class DesktopDatabase {
     }
 
     const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, roomId);
-      this.insertEvent({
-        type: "room.status_changed",
-        entityType: "room",
-        entityId: roomId,
-        payload: {
-          old_status: String(room.status ?? ""),
-          new_status: status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    updateStoredRoomStatus(this.db, roomId, status, String(room.status ?? ""), now);
 
     return {
       ok: true,
@@ -2682,1152 +754,104 @@ export class DesktopDatabase {
   }
 
   updateTableStatus(input: UpdateTableStatusInput): DesktopStatusUpdateResult {
-    const tableId = input.tableId.trim();
-    const status = normalizeStatus(input.status, ["available", "reserved", "occupied", "bill_waiting", "cleaning"]);
-    if (!tableId || !status) {
-      return {
-        ok: false,
-        message: "Masa durumu için geçerli kayıt ve durum seçilmeli."
-      };
+    const result = updateStoredTableStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const table = this.db.prepare("SELECT status FROM tables WHERE id = ? AND deleted_at = ''").get(tableId) as { status?: string } | undefined;
-    if (!table) {
-      return {
-        ok: false,
-        message: "Masa bulunamadı."
-      };
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN");
-    try {
-      this.db.prepare("UPDATE tables SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, tableId);
-      this.insertEvent({
-        type: "table.status_changed",
-        entityType: "table",
-        entityId: tableId,
-        payload: {
-          old_status: String(table.status ?? ""),
-          new_status: status
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Masa durumu güncellendi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   listTableOrders(): DesktopTableOrder[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          table_orders.*,
-          tables.name AS table_name,
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
-              ELSE 0
-            END
-          ), 0) AS item_count
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        GROUP BY table_orders.id
-        ORDER BY table_orders.opened_at DESC, table_orders.created_at DESC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => this.mapTableOrderRow(row));
+    return listStoredTableOrders(this.db);
   }
 
-  private listPaymentWaitingTableOrders(): DesktopPaymentWaitingTableOrder[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          table_orders.id,
-          table_orders.table_id,
-          tables.name AS table_name,
-          table_orders.total,
-          table_orders.opened_at,
-          table_orders.updated_at,
-          COALESCE(MAX(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.currency
-              ELSE NULL
-            END
-          ), 'TRY') AS currency
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.status = 'payment'
-        GROUP BY table_orders.id
-        ORDER BY table_orders.updated_at DESC, table_orders.opened_at DESC
-        LIMIT 100
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      tableId: String(row.table_id ?? ""),
-      tableName: String(row.table_name ?? "Masa"),
-      total: roundMoney(Number(row.total ?? 0)),
-      currency: normalizeTableOrderCurrency(row.currency),
-      openedAt: String(row.opened_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
 
   getActiveTableOrder(tableId: string): DesktopTableOrder | null {
-    const normalizedTableId = tableId.trim();
-    if (!normalizedTableId) {
-      return null;
-    }
-
-    const row = this.db
-      .prepare(`
-        SELECT
-          table_orders.*,
-          tables.name AS table_name,
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
-              ELSE 0
-            END
-          ), 0) AS item_count
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.table_id = ?
-          AND table_orders.status IN ('open', 'preparing', 'served', 'payment')
-        GROUP BY table_orders.id
-        LIMIT 1
-      `)
-      .get(normalizedTableId) as Record<string, unknown> | undefined;
-
-    return row ? this.mapTableOrderRow(row) : null;
+    return getStoredActiveTableOrder(this.db, tableId);
   }
 
   openTableOrder(tableId: string): DesktopTableOrderResult {
-    const normalizedTableId = tableId.trim();
-    if (!normalizedTableId) {
-      return { ok: false, message: "Sipariş açmak için geçerli bir masa seçin." };
+    const result = openStoredTableOrder(this.db, tableId);
+    if (!result.ok) {
+      return result;
     }
-
-    const id = createTableOrderId("table_order_");
-    const now = new Date().toISOString();
-    let tableName = "Masa";
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const table = this.db
-        .prepare("SELECT id, name, status FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-        .get(normalizedTableId) as { id?: string; name?: string; status?: string } | undefined;
-      if (!table?.id) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Sipariş açılacak aktif masa bulunamadı." };
-      }
-      tableName = String(table.name ?? "Masa");
-
-      const activeOrder = this.getActiveTableOrder(normalizedTableId);
-      if (activeOrder) {
-        this.updateTableStatusForOrderInTransaction(
-          normalizedTableId,
-          activeOrder.status === "payment" ? "bill_waiting" : "occupied",
-          activeOrder.id,
-          now
-        );
-        this.db.exec("COMMIT");
-        return {
-          ok: true,
-          message: `${tableName} için açık adisyon gösteriliyor.`,
-          order: activeOrder,
-          dashboardData: this.getDashboardData()
-        };
-      }
-
-      this.db
-        .prepare(`
-          INSERT INTO table_orders (
-            id,
-            table_id,
-            status,
-            opened_at,
-            closed_at,
-            subtotal,
-            discount_total,
-            total,
-            note,
-            created_at,
-            updated_at
-          ) VALUES (?, ?, 'open', ?, '', 0, 0, 0, '', ?, ?)
-        `)
-        .run(id, normalizedTableId, now, now, now);
-      this.updateTableStatusForOrderInTransaction(normalizedTableId, "occupied", id, now);
-      this.insertEvent({
-        type: "table_order.opened",
-        entityType: "table_order",
-        entityId: id,
-        payload: { table_id: normalizedTableId },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    const order = this.getTableOrderById(id);
-    if (!order) {
-      return { ok: false, message: "Adisyon açıldı ancak yeniden yüklenemedi." };
-    }
-
-    return {
-      ok: true,
-      message: `${tableName} için adisyon açıldı.`,
-      order,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   addTableOrderItem(input: AddTableOrderItemInput): DesktopTableOrderResult {
-    const orderId = input.orderId.trim();
-    const menuItemId = input.menuItemId.trim();
-    const quantity = normalizeOrderQuantity(input.quantity);
-    const note = String(input.note ?? "").trim().slice(0, 500);
-    if (!orderId || !menuItemId || !quantity) {
-      return { ok: false, message: "Ürün, aktif adisyon ve geçerli adet bilgisi gerekli." };
+    const result = addStoredTableOrderItem(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      if (!this.isActiveTableOrder(orderId)) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Ürün yalnızca aktif bir adisyona eklenebilir." };
-      }
-
-      const menuItem = this.db
-        .prepare(`
-          SELECT menu_items.id, menu_items.name, menu_items.price, menu_items.currency
-          FROM menu_items
-          INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
-          WHERE menu_items.id = ?
-            AND menu_items.is_available = 1
-            AND menu_items.deleted_at = ''
-            AND menu_categories.is_active = 1
-            AND menu_categories.deleted_at = ''
-          LIMIT 1
-        `)
-        .get(menuItemId) as { id?: string; name?: string; price?: number; currency?: string } | undefined;
-      if (!menuItem?.id) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Yalnızca aktif ve mevcut menü ürünleri siparişe eklenebilir." };
-      }
-
-      const productName = String(menuItem.name ?? "Ürün").trim() || "Ürün";
-      const unitPrice = roundMoney(Number(menuItem.price ?? 0));
-      const currency = normalizeTableOrderCurrency(menuItem.currency);
-      const orderCurrency = this.db
-        .prepare(`
-          SELECT currency
-          FROM table_order_items
-          WHERE order_id = ?
-            AND status != 'cancelled'
-          ORDER BY created_at ASC
-          LIMIT 1
-        `)
-        .get(orderId) as { currency?: string } | undefined;
-      if (orderCurrency?.currency && normalizeTableOrderCurrency(orderCurrency.currency) !== currency) {
-        this.db.exec("ROLLBACK");
-        return {
-          ok: false,
-          message: `Bu adisyon ${normalizeTableOrderCurrency(orderCurrency.currency)} para birimiyle açık; ${currency} ürün eklenemez.`
-        };
-      }
-
-      const existingItem = this.db
-        .prepare(`
-          SELECT id, quantity
-          FROM table_order_items
-          WHERE order_id = ?
-            AND menu_item_id = ?
-            AND product_name = ?
-            AND unit_price = ?
-            AND currency = ?
-            AND note = ?
-            AND status = 'open'
-          ORDER BY created_at DESC
-          LIMIT 1
-        `)
-        .get(orderId, menuItemId, productName, unitPrice, currency, note) as { id?: string; quantity?: number } | undefined;
-
-      const itemId = existingItem?.id || createTableOrderId("table_order_item_");
-      if (existingItem?.id) {
-        const nextQuantity = Number(existingItem.quantity ?? 0) + quantity;
-        if (nextQuantity > 999) {
-          this.db.exec("ROLLBACK");
-          return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
-        }
-        const stockResult = this.mutateMenuStockInTransaction({
-          menuItemId,
-          type: "order_add",
-          quantityChange: -quantity,
-          sourceType: "table_order",
-          sourceId: orderId,
-          actorDeviceId: "",
-          note: `${productName} adisyona eklendi.`,
-          now
-        });
-        if (!stockResult.ok) {
-          this.db.exec("ROLLBACK");
-          return stockResult;
-        }
-        this.db
-          .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
-          .run(nextQuantity, roundMoney(unitPrice * nextQuantity), now, itemId);
-      } else {
-        const stockResult = this.mutateMenuStockInTransaction({
-          menuItemId,
-          type: "order_add",
-          quantityChange: -quantity,
-          sourceType: "table_order",
-          sourceId: orderId,
-          actorDeviceId: "",
-          note: `${productName} adisyona eklendi.`,
-          now
-        });
-        if (!stockResult.ok) {
-          this.db.exec("ROLLBACK");
-          return stockResult;
-        }
-        this.db
-          .prepare(`
-            INSERT INTO table_order_items (
-              id,
-              order_id,
-              menu_item_id,
-              product_name,
-              unit_price,
-              currency,
-              quantity,
-              line_total,
-              note,
-              status,
-              created_at,
-              updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)
-          `)
-          .run(
-            itemId,
-            orderId,
-            menuItemId,
-            productName,
-            unitPrice,
-            currency,
-            quantity,
-            roundMoney(unitPrice * quantity),
-            note,
-            now,
-            now
-          );
-      }
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
-      this.insertEvent({
-        type: "table_order.item_added",
-        entityType: "table_order",
-        entityId: orderId,
-        payload: { item_id: itemId, menu_item_id: menuItemId, product_name: productName, quantity, unit_price: unitPrice, currency },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return this.getTableOrderMutationResult(orderId, "Ürün adisyona eklendi.", true);
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateTableOrderItemQuantity(input: UpdateTableOrderItemQuantityInput): DesktopTableOrderResult {
-    const itemId = input.itemId.trim();
-    const quantity = normalizeOrderQuantity(input.quantity);
-    if (!itemId || !quantity) {
-      return { ok: false, message: "Sipariş satırı için 1 ile 999 arasında bir adet girin." };
+    const result = updateStoredTableOrderItemQuantity(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const now = new Date().toISOString();
-    let orderId = "";
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const item = this.getMutableTableOrderItem(itemId);
-      if (!item) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
-      }
-      orderId = String(item.order_id);
-      const previousQuantity = Number(item.quantity ?? 0);
-      if (quantity !== previousQuantity) {
-        const stockResult = this.mutateMenuStockInTransaction({
-          menuItemId: String(item.menu_item_id ?? ""),
-          type: "order_update",
-          quantityChange: previousQuantity - quantity,
-          sourceType: "table_order",
-          sourceId: orderId,
-          actorDeviceId: "",
-          note: "Adisyon ürün adedi değiştirildi.",
-          now
-        });
-        if (!stockResult.ok) {
-          this.db.exec("ROLLBACK");
-          return stockResult;
-        }
-      }
-      const lineTotal = roundMoney(Number(item.unit_price ?? 0) * quantity);
-      const updatedAt = nextMutationTimestamp(item.updated_at, now);
-      this.db
-        .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
-        .run(quantity, lineTotal, updatedAt, itemId);
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
-      this.insertEvent({
-        type: "table_order.item_quantity_changed",
-        entityType: "table_order",
-        entityId: orderId,
-        payload: { item_id: itemId, quantity },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return this.getTableOrderMutationResult(orderId, "Ürün adedi güncellendi.", true);
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateTableOrderItemNote(input: UpdateTableOrderItemNoteInput): DesktopTableOrderResult {
-    const itemId = input.itemId.trim();
-    const note = String(input.note ?? "").trim().slice(0, 500);
-    const now = new Date().toISOString();
-    let orderId = "";
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const item = this.getMutableTableOrderItem(itemId);
-      if (!item) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Not eklenecek aktif sipariş satırı bulunamadı." };
-      }
-      orderId = String(item.order_id);
-      const updatedAt = nextMutationTimestamp(item.updated_at, now);
-      this.db.prepare("UPDATE table_order_items SET note = ?, updated_at = ? WHERE id = ?").run(note, updatedAt, itemId);
-      this.db.prepare("UPDATE table_orders SET updated_at = ? WHERE id = ?").run(now, orderId);
-      this.insertEvent({
-        type: "table_order.item_note_changed",
-        entityType: "table_order",
-        entityId: orderId,
-        payload: { item_id: itemId, has_note: Boolean(note) },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-    return this.getTableOrderMutationResult(orderId, "Ürün notu kaydedildi.");
+    return updateStoredTableOrderItemNote(this.db, input);
   }
 
   removeTableOrderItem(itemId: string): DesktopTableOrderResult {
-    const normalizedItemId = itemId.trim();
-    const now = new Date().toISOString();
-    let orderId = "";
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const item = this.getMutableTableOrderItem(normalizedItemId);
-      if (!item) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
-      }
-      orderId = String(item.order_id);
-      const stockResult = this.mutateMenuStockInTransaction({
-        menuItemId: String(item.menu_item_id ?? ""),
-        type: "order_remove",
-        quantityChange: Number(item.quantity ?? 0),
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: "",
-        note: "Ürün adisyondan silindi.",
-        now
-      });
-      if (!stockResult.ok) {
-        this.db.exec("ROLLBACK");
-        return stockResult;
-      }
-      const updatedAt = nextMutationTimestamp(item.updated_at, now);
-      this.db.prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?").run(updatedAt, normalizedItemId);
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
-      this.insertEvent({
-        type: "table_order.item_removed",
-        entityType: "table_order",
-        entityId: orderId,
-        payload: { item_id: normalizedItemId },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
+    const result = removeStoredTableOrderItem(this.db, itemId);
+    if (!result.ok) {
+      return result;
     }
-
-    return this.getTableOrderMutationResult(orderId, "Ürün adisyondan kaldırıldı.", true);
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateTableOrderStatus(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
-    const orderId = input.orderId.trim();
-    const status = normalizeStatus(input.status, TABLE_ORDER_STATUSES) as TableOrderStatus;
-    if (!orderId || !status) {
-      return { ok: false, message: "Adisyon için geçerli bir durum seçin." };
+    const result = updateStoredTableOrderStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    if (status === "paid" || status === "cancelled") {
-      return this.closeTableOrder({ orderId, status });
-    }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const current = this.db
-        .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-        .get(orderId) as { status?: string; table_id?: string } | undefined;
-      if (!current) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Durumu güncellenecek aktif adisyon bulunamadı." };
-      }
-
-      const updateResult = this.db
-        .prepare("UPDATE table_orders SET status = ?, updated_at = ? WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-        .run(status, now, orderId);
-      if (Number(updateResult.changes) !== 1) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Adisyon başka bir işlem tarafından güncellendi; yeniden yükleyin." };
-      }
-      if (status === "preparing") {
-        this.db
-          .prepare("UPDATE table_order_items SET status = 'preparing', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
-          .run(now, orderId);
-      } else if (status === "served") {
-        this.db
-          .prepare("UPDATE table_order_items SET status = 'served', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
-          .run(now, orderId);
-      }
-      this.updateTableStatusForOrderInTransaction(
-        String(current.table_id ?? ""),
-        status === "payment" ? "bill_waiting" : "occupied",
-        orderId,
-        now
-      );
-      this.insertEvent({
-        type: "table_order.status_changed",
-        entityType: "table_order",
-        entityId: orderId,
-        payload: { old_status: String(current.status ?? ""), new_status: status },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return this.getTableOrderMutationResult(orderId, "Adisyon durumu güncellendi.", true);
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   closeTableOrder(input: UpdateTableOrderStatusInput): DesktopTableOrderResult {
-    const orderId = input.orderId.trim();
-    const status = normalizeStatus(input.status, ["paid", "cancelled"]) as "paid" | "cancelled";
-    if (!orderId || !status) {
-      return { ok: false, message: "Adisyon yalnızca ödendi veya iptal durumuyla kapatılabilir." };
+    const result = closeStoredTableOrder(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const current = this.db
-        .prepare("SELECT status, table_id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-        .get(orderId) as { status?: string; table_id?: string } | undefined;
-      if (!current) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
-      }
-      if (status === "cancelled") {
-        const stockRestore = this.restoreCancelledOrderStockInTransaction(orderId, "", now);
-        if (!stockRestore.ok) {
-          this.db.exec("ROLLBACK");
-          return stockRestore;
-        }
-      }
-      this.recalculateTableOrderTotalInTransaction(orderId, now);
-      const updateResult = this.db
-        .prepare(`
-          UPDATE table_orders
-          SET status = ?, closed_at = ?, updated_at = ?
-          WHERE id = ?
-            AND status IN ('open', 'preparing', 'served', 'payment')
-        `)
-        .run(status, now, now, orderId);
-      if (Number(updateResult.changes) !== 1) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Adisyon başka bir işlem tarafından kapatıldı; yeniden yükleyin." };
-      }
-      this.updateTableStatusForOrderInTransaction(String(current.table_id ?? ""), "available", orderId, now);
-      this.insertEvent({
-        type: status === "paid" ? "table_order.paid" : "table_order.cancelled",
-        entityType: "table_order",
-        entityId: orderId,
-        payload: { old_status: String(current.status ?? ""), status },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return this.getTableOrderMutationResult(
-      orderId,
-      status === "paid" ? "Adisyon ödendi olarak kapatıldı." : "Adisyon iptal edildi.",
-      true
-    );
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   recalculateTableOrderTotal(orderId: string): DesktopTableOrderResult {
-    const normalizedOrderId = orderId.trim();
-    if (!normalizedOrderId) {
-      return { ok: false, message: "Toplamı hesaplanacak adisyon bulunamadı." };
-    }
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const exists = this.db.prepare("SELECT id FROM table_orders WHERE id = ?").get(normalizedOrderId);
-      if (!exists) {
-        this.db.exec("ROLLBACK");
-        return { ok: false, message: "Toplamı hesaplanacak adisyon bulunamadı." };
-      }
-      this.recalculateTableOrderTotalInTransaction(normalizedOrderId, new Date().toISOString());
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-    return this.getTableOrderMutationResult(normalizedOrderId, "Adisyon toplamı güncellendi.");
+    return recalculateStoredTableOrderTotal(this.db, orderId);
   }
 
   saveManualRestaurantReservation(input: SaveManualRestaurantReservationInput): DesktopStatusUpdateResult {
-    const customerId = String(input?.customerId ?? "").trim();
-    const tableId = String(input?.tableId ?? "").trim();
-    const date = normalizeDateInput(String(input?.date ?? ""));
-    const time = normalizeTimeInput(String(input?.time ?? ""));
-    const guestCount = normalizeInteger(input?.guestCount);
-    const notes = normalizeLimitedText(input?.notes, 2000);
-
-    if (!customerId || !date || !time || guestCount < 1 || guestCount > 99) {
-      return { ok: false, message: "Müşteri, tarih, saat ve geçerli kişi sayısı zorunludur." };
+    const result = saveStoredManualRestaurantReservation(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const customer = this.db
-      .prepare("SELECT id, full_name, phone FROM customers WHERE id = ? AND deleted_at = ''")
-      .get(customerId) as { id?: string; full_name?: string; phone?: string } | undefined;
-    if (!customer) {
-      return { ok: false, message: "Rezervasyon için seçilen müşteri bulunamadı." };
-    }
-
-    if (tableId) {
-      const table = this.db
-        .prepare("SELECT id, name, capacity, status, is_active FROM tables WHERE id = ? AND deleted_at = ''")
-        .get(tableId) as Record<string, unknown> | undefined;
-      if (!table || Number(table.is_active ?? 0) !== 1) {
-        return { ok: false, message: "Seçilen masa aktif değil veya bulunamadı." };
-      }
-      if (String(table.status ?? "") === "maintenance") {
-        return { ok: false, message: "Bakım durumundaki masaya rezervasyon atanamaz." };
-      }
-      const capacity = Math.max(0, Number(table.capacity ?? 0));
-      if (capacity > 0 && guestCount > capacity) {
-        return { ok: false, message: `${String(table.name ?? "Masa")} en fazla ${capacity} kişi kapasitelidir.` };
-      }
-
-      const sameSlotRows = this.db
-        .prepare(`
-          SELECT id, title, table_ids_json
-          FROM reservations
-          WHERE reservation_type IN ('table', 'breakfast')
-            AND status IN ('pending', 'approved')
-            AND start_date = ?
-            AND time = ?
-            AND deleted_at = ''
-        `)
-        .all(date, time) as Array<{ id?: string; title?: string; table_ids_json?: string }>;
-      const conflict = sameSlotRows.find((row) => this.parseStringArray(row.table_ids_json).includes(tableId));
-      if (conflict) {
-        return {
-          ok: false,
-          message: `Seçilen masada ${date} ${time} için aktif rezervasyon var${conflict.title ? `: ${conflict.title}` : "."}`
-        };
-      }
-    }
-
-    const now = new Date().toISOString();
-    const reservationId = createId("reservation_");
-    const customerName = String(customer.full_name ?? "").trim() || "Misafir";
-    const tableIds = tableId ? [tableId] : [];
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .prepare(`
-          INSERT INTO reservations (
-            id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
-            guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
-            payment_status, created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, ?, 'table', 'approved', ?, ?, ?, ?, ?, ?, 0, '[]', ?, ?, '',
-            'not_required', ?, ?, '', 'local_only')
-        `)
-        .run(
-          reservationId,
-          `manual:${reservationId}`,
-          customerId,
-          `${customerName} - restoran rezervasyonu`,
-          date,
-          date,
-          time,
-          guestCount,
-          guestCount,
-          JSON.stringify(tableIds),
-          notes,
-          now,
-          now
-        );
-
-      this.insertEvent({
-        type: "reservation.created",
-        entityType: "reservation",
-        entityId: reservationId,
-        payload: {
-          source: "manual_desktop",
-          customer_id: customerId,
-          reservation_type: "table",
-          table_ids: tableIds,
-          date,
-          time,
-          guest_count: guestCount
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: tableId
-        ? "Restoran rezervasyonu oluşturuldu ve masa planlandı."
-        : "Restoran rezervasyonu oluşturuldu. Masayı daha sonra atayabilirsiniz.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   saveManualReservation(input: SaveManualReservationInput): DesktopStatusUpdateResult {
-    const reservationId = String(input?.reservationId ?? "").trim();
-    const customerId = String(input?.customerId ?? "").trim();
-    const roomId = String(input?.roomId ?? "").trim();
-    const startDate = normalizeDateInput(input?.startDate);
-    const endDate = normalizeDateInput(input?.endDate);
-    const guestCount = normalizeInteger(Number(input?.guestCount ?? 0));
-    const notes = normalizeLimitedText(input?.notes, 2000);
-
-    if (!customerId || !startDate || !endDate || guestCount < 1) {
-      return { ok: false, message: "Müşteri, giriş-çıkış tarihi ve kişi sayısı zorunludur." };
+    const result = saveStoredManualReservation(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-    if (endDate <= startDate) {
-      return { ok: false, message: "Çıkış tarihi giriş tarihinden sonra olmalıdır." };
-    }
-
-    const customer = this.db
-      .prepare("SELECT id, full_name, phone FROM customers WHERE id = ? AND deleted_at = ''")
-      .get(customerId) as { id?: string; full_name?: string; phone?: string } | undefined;
-    if (!customer?.id) {
-      return { ok: false, message: "Rezervasyon için geçerli bir müşteri seçin." };
-    }
-
-    const existingReservation = reservationId
-      ? this.db
-        .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
-        .get(reservationId) as Record<string, unknown> | undefined
-      : undefined;
-    if (reservationId && !existingReservation) {
-      return { ok: false, message: "Düzenlenecek rezervasyon bulunamadı." };
-    }
-
-    const isEditing = Boolean(existingReservation);
-    const existingStatus = String(existingReservation?.status ?? "approved");
-    const existingRequestId = String(existingReservation?.request_id ?? "");
-    const isManualReservation = existingRequestId.startsWith("manual:");
-    const existingRoomIds = existingReservation ? this.parseStringArray(existingReservation.room_ids_json) : [];
-    const previousRoomId = existingRoomIds[0] ?? "";
-
-    if (existingReservation) {
-      if (String(existingReservation.reservation_type ?? "") !== "room") {
-        return { ok: false, message: "Bu ekrandan yalnızca pansiyon rezervasyonları düzenlenebilir." };
-      }
-      if (!["pending", "approved"].includes(existingStatus)) {
-        return { ok: false, message: "Tamamlanmış veya iptal edilmiş rezervasyon düzenlenemez." };
-      }
-      if (existingRoomIds.length > 1) {
-        return { ok: false, message: "Birden fazla odaya bağlı rezervasyon bu sade formdan düzenlenemez." };
-      }
-      if (String(existingReservation.customer_id ?? "") !== customerId) {
-        return { ok: false, message: "Rezervasyonun müşteri kaydı bu ekrandan değiştirilemez." };
-      }
-      if (!isManualReservation) {
-        if (String(existingReservation.start_date ?? "") !== startDate
-          || String(existingReservation.end_date ?? "") !== endDate
-          || Number(existingReservation.guest_count ?? 0) !== guestCount) {
-          return { ok: false, message: "Web talebinden oluşan rezervasyonda tarih ve kişi bilgisi bu ekrandan değiştirilemez." };
-        }
-      }
-      const activeStay = this.db
-        .prepare(`
-          SELECT id
-          FROM customer_room_stays
-          WHERE reservation_id = ?
-            AND status IN ('planned', 'checked_in')
-            AND deleted_at = ''
-          LIMIT 1
-        `)
-        .get(reservationId) as { id?: string } | undefined;
-      if (activeStay?.id) {
-        return { ok: false, message: "Bu rezervasyon aktif konaklamaya dönüştürülmüş. Oda ve tarih değişikliğini konaklama kaydından yönetin." };
-      }
-    }
-
-    let room: { id?: string; name?: string; capacity?: number; status?: string } | undefined;
-    if (roomId) {
-      room = this.db
-        .prepare("SELECT id, name, capacity, status FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-        .get(roomId) as { id?: string; name?: string; capacity?: number; status?: string } | undefined;
-      if (!room?.id) {
-        return { ok: false, message: "Seçilen oda artık kullanılamıyor." };
-      }
-      if (String(room.status ?? "") === "maintenance") {
-        return { ok: false, message: "Bakım durumundaki odaya rezervasyon açılamaz." };
-      }
-      if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity)) {
-        return { ok: false, message: `${String(room.name ?? "Oda")} en fazla ${Number(room.capacity)} kişi kapasitelidir.` };
-      }
-      if (this.hasOverlappingCustomerRoomStay(roomId, startDate, endDate)) {
-        return { ok: false, message: `${String(room.name ?? "Seçilen oda")} bu tarihlerde aktif bir konaklama kaydına bağlı.` };
-      }
-
-      const conflict = this.getDashboardData().reservations.find((reservation) => {
-        if (reservation.id === reservationId) return false;
-        if (!["pending", "approved"].includes(reservation.status) || !reservation.roomIds.includes(roomId)) {
-          return false;
-        }
-        const existingStart = reservation.startDate || reservation.endDate;
-        const existingEnd = reservation.endDate || reservation.startDate;
-        if (!existingStart || !existingEnd) return false;
-        return existingStart < endDate && startDate < existingEnd;
-      });
-      if (conflict) {
-        return {
-          ok: false,
-          message: `${String(room.name ?? "Seçilen oda")} bu tarih aralığında başka bir aktif rezervasyona bağlı.`
-        };
-      }
-    }
-
-    const now = new Date().toISOString();
-    const savedReservationId = reservationId || createId("reservation_");
-    const customerName = String(customer.full_name ?? "").trim() || "Misafir";
-    const roomIds = roomId ? [roomId] : [];
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      if (existingReservation) {
-        const nextAdultCount = isManualReservation
-          ? guestCount
-          : Number(existingReservation.adult_count ?? guestCount);
-        const nextChildCount = isManualReservation
-          ? 0
-          : Number(existingReservation.child_count ?? 0);
-        this.db
-          .prepare(`
-            UPDATE reservations
-            SET start_date = ?,
-                end_date = ?,
-                guest_count = ?,
-                adult_count = ?,
-                child_count = ?,
-                room_ids_json = ?,
-                notes = ?,
-                updated_at = ?,
-                sync_status = 'local_only'
-            WHERE id = ? AND deleted_at = ''
-          `)
-          .run(
-            startDate,
-            endDate,
-            guestCount,
-            nextAdultCount,
-            nextChildCount,
-            JSON.stringify(roomIds),
-            notes,
-            now,
-            savedReservationId
-          );
-
-        if (previousRoomId && previousRoomId !== roomId) {
-          const otherRows = this.db
-            .prepare(`
-              SELECT room_ids_json
-              FROM reservations
-              WHERE id != ?
-                AND status IN ('pending', 'approved')
-                AND deleted_at = ''
-            `)
-            .all(savedReservationId) as Array<{ room_ids_json?: string }>;
-          const stillReserved = otherRows.some((row) => this.parseStringArray(row.room_ids_json).includes(previousRoomId));
-          if (!stillReserved) {
-            this.db
-              .prepare("UPDATE rooms SET status = 'available', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status = 'reserved' AND deleted_at = ''")
-              .run(now, previousRoomId);
-            this.enforceActiveStayRoomStatus(previousRoomId, now);
-          }
-        }
-      } else {
-        this.db
-          .prepare(`
-            INSERT INTO reservations (
-              id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
-              guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
-              payment_status, created_at, updated_at, deleted_at, sync_status
-            ) VALUES (?, ?, ?, 'room', 'approved', ?, ?, ?, '', ?, ?, 0, ?, '[]', ?, '',
-              'not_required', ?, ?, '', 'local_only')
-          `)
-          .run(
-            savedReservationId,
-            `manual:${savedReservationId}`,
-            customerId,
-            `${customerName} - oda rezervasyonu`,
-            startDate,
-            endDate,
-            guestCount,
-            guestCount,
-            JSON.stringify(roomIds),
-            notes,
-            now,
-            now
-          );
-      }
-
-      if (roomId && existingStatus === "approved" && String(room?.status ?? "") === "available") {
-        this.db
-          .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-          .run(now, roomId);
-      }
-
-      this.insertEvent({
-        type: isEditing ? "reservation.updated" : "reservation.created",
-        entityType: "reservation",
-        entityId: savedReservationId,
-        payload: {
-          source: isManualReservation || !isEditing ? "manual_desktop" : "desktop_edit",
-          customer_id: customerId,
-          previous_room_ids: existingRoomIds,
-          room_ids: roomIds,
-          start_date: startDate,
-          end_date: endDate,
-          guest_count: guestCount
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: isEditing
-        ? roomId
-          ? "Rezervasyon güncellendi ve oda bilgisi kaydedildi."
-          : "Rezervasyon güncellendi. Odayı daha sonra atayabilirsiniz."
-        : roomId
-          ? "Rezervasyon oluşturuldu ve oda ayrıldı."
-          : "Rezervasyon oluşturuldu. Odayı daha sonra atayabilirsiniz.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   updateReservationStatus(input: UpdateReservationStatusInput): DesktopStatusUpdateResult {
-    const reservationId = input.reservationId.trim();
-    const status = normalizeStatus(input.status, ["pending", "approved", "rejected", "cancelled", "completed"]);
-    if (!reservationId || !status) {
-      return {
-        ok: false,
-        message: "Rezervasyon durumu için geçerli kayıt ve durum seçilmeli."
-      };
+    const result = updateStoredReservationStatus(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const reservation = this.db
-        .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
-        .get(reservationId) as Record<string, unknown> | undefined;
-      if (!reservation) {
-        this.db.exec("ROLLBACK");
-        return {
-          ok: false,
-          message: "Rezervasyon bulunamadı."
-        };
-      }
-
-      const roomIds = this.parseStringArray(reservation.room_ids_json);
-      const tableIds = this.parseStringArray(reservation.table_ids_json);
-      if (this.findActiveOrderForTables(tableIds)) {
-        this.db.exec("ROLLBACK");
-        return {
-          ok: false,
-          message: "Aktif adisyonu olan masaya bağlı rezervasyon değiştirilemez. Önce adisyonu kapatın."
-        };
-      }
-
-      this.db.prepare("UPDATE reservations SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?").run(status, now, reservationId);
-
-      if (status === "approved") {
-        for (const roomId of roomIds) {
-          this.db.prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''").run(now, roomId);
-        }
-        for (const tableId of tableIds) {
-          this.db
-            .prepare("UPDATE tables SET status = 'reserved', current_reservation_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-            .run(reservationId, now, tableId);
-        }
-      }
-
-      if (["rejected", "cancelled", "completed"].includes(status)) {
-        for (const roomId of roomIds) {
-          this.db.prepare("UPDATE rooms SET status = 'available', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status = 'reserved' AND deleted_at = ''").run(now, roomId);
-        }
-        for (const tableId of tableIds) {
-          this.db
-            .prepare(`
-              UPDATE tables
-              SET status = 'available',
-                  current_reservation_id = '',
-                  updated_at = ?,
-                  sync_status = 'local_only'
-              WHERE id = ?
-                AND current_reservation_id = ?
-                AND deleted_at = ''
-            `)
-            .run(now, tableId, reservationId);
-        }
-      }
-
-      for (const roomId of roomIds) {
-        this.enforceActiveStayRoomStatus(roomId, now);
-      }
-
-      this.insertEvent({
-        type: "reservation.status_changed",
-        entityType: "reservation",
-        entityId: reservationId,
-        payload: {
-          previous_status: String(reservation.status ?? ""),
-          status,
-          room_ids: roomIds,
-          table_ids: tableIds
-        },
-        now
-      });
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Rezervasyon durumu güncellendi.",
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   getSetupData(): DesktopSetupData {
-    const business = this.db.prepare("SELECT * FROM business WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
-    const settings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
-    const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());
-    const syncSecret = String(settings?.sync_secret ?? "");
-    const businessName = String(business?.display_name ?? "");
-    const aiService = normalizeStoredAiService(settings?.ai_service);
-    const aiProfiles = this.getAiServiceProfiles();
-    const activeAiProfile = aiProfiles.find((profile) => profile.service === aiService);
-    const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
-    const setupRequired =
-      !setupCompleted ||
-      !businessName.trim() ||
-      syncSecret.length < 12 ||
-      syncSecret === "change-this-secret";
-
-    return {
-      setupRequired,
-      appPasswordConfigured: Boolean(String(settings?.app_password_verifier ?? "").trim()),
-      businessName,
-      profileId: normalizeBusinessType(String(business?.profile_id ?? "")),
-      phone: String(business?.phone ?? ""),
-      whatsapp: String(business?.whatsapp ?? ""),
-      email: String(business?.email ?? ""),
-      address: String(business?.address ?? ""),
-      webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
-      syncSecret,
-      autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
-      aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
-      aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
-      aiService,
-      aiProjectName: activeAiProfile?.projectName ?? String(settings?.ai_project_name ?? ""),
-      aiModel: activeAiProfile?.model ?? String(settings?.ai_model ?? ""),
-      aiBaseUrl: activeAiProfile?.baseUrl || normalizeStoredAiBaseUrl(settings?.ai_base_url),
-      aiTimeoutSeconds: activeAiProfile?.timeoutSeconds ?? normalizeStoredAiTimeout(settings?.ai_timeout_seconds),
-      aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
-      aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
-      aiProfiles,
-      servicePreferences: {
-        whatsapp: enabledCapabilities.has(BUSINESS_CAPABILITIES.WHATSAPP),
-        android: enabledCapabilities.has(BUSINESS_CAPABILITIES.ANDROID)
-      },
-      initialCounts: {
-        rooms: this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''"),
-        tables: this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
-      },
-      tableCategories: this.getTableCategories(),
-      birthdaySettings: normalizeBirthdaySettings({
-        enabled: normalizeBoolean(settings?.birthday_enabled, true),
-        mode: settings?.birthday_mode === "automatic" ? "automatic" : "manual",
-        sendTime: String(settings?.birthday_send_time ?? "10:00"),
-        messageTemplate: String(settings?.birthday_message_template ?? "")
-      })
-    };
+    return getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   getAppLockPasswordVerifier(): string {
@@ -3888,211 +912,56 @@ export class DesktopDatabase {
   }
 
   getAiServiceProfiles(): DesktopAiServiceProfile[] {
-    const settings = this.db
-      .prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as Record<string, unknown> | undefined;
-    const activeService = normalizeStoredAiService(settings?.ai_service);
-    const rows = this.db
-      .prepare("SELECT * FROM ai_service_profiles ORDER BY service")
-      .all() as Array<Record<string, unknown>>;
-    const rowsByService = new Map<DesktopAiService, Record<string, unknown>>();
-
-    for (const row of rows) {
-      const service = normalizeAiService(row.service);
-      if (service) {
-        rowsByService.set(service, row);
-      }
-    }
-
-    return AI_SERVICE_IDS.map((service) => {
-      const row = rowsByService.get(service);
-      const useActiveSettings = !row && service === activeService;
-      const model = String(row?.model ?? (useActiveSettings ? settings?.ai_model : "") ?? "").trim();
-      const baseUrl = normalizeAiBaseUrl(row?.base_url ?? (useActiveSettings ? settings?.ai_base_url : ""))
-        || AI_SERVICE_DEFAULT_BASE_URLS[service];
-      return {
-        service,
-        projectName: String(row?.project_name ?? (useActiveSettings ? settings?.ai_project_name : "") ?? "").trim(),
-        baseUrl,
-        model,
-        modelOptions: normalizeAiModelOptions(row?.model_options_json, model),
-        timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? (useActiveSettings ? settings?.ai_timeout_seconds : DEFAULT_AI_TIMEOUT_SECONDS)),
-        apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? (useActiveSettings ? settings?.ai_api_key_encrypted : "") ?? "").trim()),
-        updatedAt: normalizeStoredTimestamp(row?.updated_at ?? (useActiveSettings ? settings?.updated_at : ""))
-      };
-    });
+    return getStoredAiServiceProfiles(this.db);
   }
 
   setAutoSyncEnabled(enabled: boolean): DesktopSyncRuntimeStatus {
-    const now = new Date().toISOString();
-    this.db
-      .prepare("UPDATE settings SET auto_sync_enabled = ?, updated_at = ? WHERE deleted_at = ''")
-      .run(enabled ? 1 : 0, now);
-    return this.getSyncRuntimeStatus();
+    return setStoredAutoSyncEnabled(this.db, enabled);
   }
 
   getSyncRuntimeStatus(): DesktopSyncRuntimeStatus {
-    const settings = this.db
-      .prepare("SELECT auto_sync_enabled FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as { auto_sync_enabled?: number } | undefined;
-    const identity = this.db
-      .prepare("SELECT client_id FROM desktop_sync_identity WHERE id = 'primary'")
-      .get() as { client_id?: string } | undefined;
-    const runtime = this.db
-      .prepare("SELECT * FROM sync_runtime WHERE id = 'primary'")
-      .get() as Record<string, unknown> | undefined;
-    const pending = this.db
-      .prepare("SELECT COUNT(*) AS count, MIN(NULLIF(next_attempt_at, '')) AS next_retry_at FROM sync_outbox")
-      .get() as { count?: number; next_retry_at?: string } | undefined;
-    return {
-      enabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
-      clientId: String(identity?.client_id ?? ""),
-      requestCursor: Number(runtime?.request_cursor ?? 0),
-      acknowledgedCursor: Number(runtime?.acknowledged_cursor ?? 0),
-      lastAttemptAt: String(runtime?.last_attempt_at ?? ""),
-      lastSuccessAt: String(runtime?.last_success_at ?? ""),
-      lastError: String(runtime?.last_error ?? ""),
-      consecutiveFailures: Number(runtime?.consecutive_failures ?? 0),
-      pendingJobs: Number(pending?.count ?? 0),
-      nextRetryAt: String(pending?.next_retry_at ?? "")
-    };
+    return getStoredSyncRuntimeStatus(this.db);
   }
 
   getPendingSyncJobs(now = new Date().toISOString()): DesktopSyncJob[] {
-    const rows = this.db
-      .prepare(`
-        SELECT job_key, job_type, source_revision, attempt_count, next_attempt_at, last_error, updated_at
-        FROM sync_outbox
-        WHERE next_attempt_at = '' OR next_attempt_at <= ?
-        ORDER BY CASE job_type WHEN 'menu_publish' THEN 0 ELSE 1 END, updated_at ASC
-      `)
-      .all(now) as Array<Record<string, unknown>>;
-    return rows.map((row) => ({
-      jobKey: String(row.job_key ?? ""),
-      jobType: String(row.job_type ?? "") as DesktopSyncJobType,
-      sourceRevision: Number(row.source_revision ?? 0),
-      attemptCount: Number(row.attempt_count ?? 0),
-      nextAttemptAt: String(row.next_attempt_at ?? ""),
-      lastError: String(row.last_error ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
+    return getStoredPendingSyncJobs(this.db, now);
   }
 
   queueSyncJob(jobType: DesktopSyncJobType, timestamp = new Date().toISOString()) {
-    const jobKey = jobType === "menu_publish" ? "menu" : "android_snapshot";
-    this.db
-      .prepare(`
-        INSERT INTO sync_outbox (
-          job_key, job_type, source_revision, attempt_count, next_attempt_at,
-          last_error, created_at, updated_at
-        ) VALUES (?, ?, 1, 0, '', '', ?, ?)
-        ON CONFLICT(job_key) DO UPDATE SET
-          source_revision = sync_outbox.source_revision + 1,
-          attempt_count = 0,
-          next_attempt_at = '',
-          last_error = '',
-          updated_at = excluded.updated_at
-      `)
-      .run(jobKey, jobType, timestamp, timestamp);
+    queueStoredSyncJob(this.db, jobType, timestamp);
   }
 
   completeSyncJob(jobKey: string, sourceRevision: number) {
-    this.db
-      .prepare("DELETE FROM sync_outbox WHERE job_key = ? AND source_revision = ?")
-      .run(jobKey, sourceRevision);
+    completeStoredSyncJob(this.db, jobKey, sourceRevision);
   }
 
   failSyncJob(jobKey: string, sourceRevision: number, errorMessage: string, nextAttemptAt: string) {
-    this.db
-      .prepare(`
-        UPDATE sync_outbox
-        SET attempt_count = attempt_count + 1,
-            next_attempt_at = ?,
-            last_error = ?,
-            updated_at = ?
-        WHERE job_key = ? AND source_revision = ?
-      `)
-      .run(nextAttemptAt, errorMessage.slice(0, 1000), new Date().toISOString(), jobKey, sourceRevision);
+    failStoredSyncJob(this.db, jobKey, sourceRevision, errorMessage, nextAttemptAt);
   }
 
   recordSyncAttempt(timestamp = new Date().toISOString()) {
-    this.db
-      .prepare("UPDATE sync_runtime SET last_attempt_at = ?, updated_at = ? WHERE id = 'primary'")
-      .run(timestamp, timestamp);
+    recordStoredSyncAttempt(this.db, timestamp);
   }
 
   recordAutomaticSyncSuccess(timestamp = new Date().toISOString()) {
-    this.db
-      .prepare(`
-        UPDATE sync_runtime
-        SET last_success_at = ?, last_error = '', consecutive_failures = 0, updated_at = ?
-        WHERE id = 'primary'
-      `)
-      .run(timestamp, timestamp);
+    recordStoredAutomaticSyncSuccess(this.db, timestamp);
   }
 
   recordAutomaticSyncFailure(message: string, timestamp = new Date().toISOString()) {
-    this.db
-      .prepare(`
-        UPDATE sync_runtime
-        SET last_error = ?, consecutive_failures = consecutive_failures + 1, updated_at = ?
-        WHERE id = 'primary'
-      `)
-      .run(message.slice(0, 1000), timestamp);
+    recordStoredAutomaticSyncFailure(this.db, message, timestamp);
   }
 
   acknowledgeRequestCursor(cursor: number, timestamp = new Date().toISOString()) {
-    this.db
-      .prepare(`
-        UPDATE sync_runtime
-        SET acknowledged_cursor = MAX(acknowledged_cursor, ?), updated_at = ?
-        WHERE id = 'primary'
-      `)
-      .run(Math.max(0, Math.trunc(cursor)), timestamp);
+    acknowledgeStoredRequestCursor(this.db, cursor, timestamp);
   }
 
   getEncryptedAiApiKey(service?: DesktopAiService | string): string {
-    const settings = this.db
-      .prepare("SELECT ai_service, ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1")
-      .get() as { ai_service?: string; ai_api_key_encrypted?: string } | undefined;
-    const requestedService = service === undefined ? normalizeStoredAiService(settings?.ai_service) : normalizeAiService(service);
-
-    if (!requestedService) {
-      return "";
-    }
-
-    const profile = this.db
-      .prepare("SELECT api_key_encrypted FROM ai_service_profiles WHERE service = ? LIMIT 1")
-      .get(requestedService) as { api_key_encrypted?: string } | undefined;
-    if (profile) {
-      return String(profile.api_key_encrypted ?? "").trim();
-    }
-
-    return normalizeStoredAiService(settings?.ai_service) === requestedService
-      ? String(settings?.ai_api_key_encrypted ?? "").trim()
-      : "";
+    return getStoredEncryptedAiApiKey(this.db, service);
   }
 
   markAiSettingsPublished(timestamp: string): DesktopSetupData {
-    const publishedAt = normalizePublishedTimestamp(timestamp);
-    if (!publishedAt) {
-      throw new Error("AI ayarları için geçerli yayın zamanı gerekli.");
-    }
-
-    const result = this.db
-      .prepare(`
-        UPDATE settings
-        SET ai_last_published_at = ?,
-            updated_at = ?
-        WHERE deleted_at = ''
-      `)
-      .run(publishedAt, new Date().toISOString());
-
-    if (Number(result.changes) === 0) {
-      throw new Error("Yayınlandı olarak işaretlenecek AI ayarı bulunamadı.");
-    }
-
-    return this.getSetupData();
+    markStoredAiSettingsPublished(this.db, timestamp);
+    return getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities()));
   }
 
   saveInitialSetup(
@@ -4453,80 +1322,37 @@ export class DesktopDatabase {
           now
         );
 
-      this.db
-        .prepare(`
-          INSERT INTO ai_service_profiles (
-            service,
-            project_name,
-            base_url,
-            model,
-            model_options_json,
-            timeout_seconds,
-            api_key_encrypted,
-            created_at,
-            updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(service) DO UPDATE SET
-            project_name = excluded.project_name,
-            base_url = excluded.base_url,
-            model = excluded.model,
-            model_options_json = excluded.model_options_json,
-            timeout_seconds = excluded.timeout_seconds,
-            api_key_encrypted = excluded.api_key_encrypted,
-            updated_at = excluded.updated_at
-        `)
-        .run(
-          storedAiService,
-          aiProjectName,
-          storedAiBaseUrl,
-          aiModel,
-          JSON.stringify(storedAiModelOptions),
-          storedAiTimeoutSeconds,
-          storedEncryptedAiApiKey,
-          String(existingAiProfile?.created_at ?? "") || now,
-          now
-        );
+      upsertStoredAiServiceProfileInTransaction(this.db, {
+        service: storedAiService,
+        projectName: aiProjectName,
+        baseUrl: storedAiBaseUrl,
+        model: aiModel,
+        modelOptionsJson: JSON.stringify(storedAiModelOptions),
+        timeoutSeconds: storedAiTimeoutSeconds,
+        apiKeyEncrypted: storedEncryptedAiApiKey,
+        createdAt: String(existingAiProfile?.created_at ?? "") || now,
+        now
+      });
 
-      const saveAiProfile = this.db.prepare(`
-        INSERT INTO ai_service_profiles (
-          service,
-          project_name,
-          base_url,
-          model,
-          model_options_json,
-          timeout_seconds,
-          api_key_encrypted,
-          created_at,
-          updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(service) DO UPDATE SET
-          project_name = excluded.project_name,
-          base_url = excluded.base_url,
-          model = excluded.model,
-          model_options_json = excluded.model_options_json,
-          timeout_seconds = excluded.timeout_seconds,
-          api_key_encrypted = excluded.api_key_encrypted,
-          updated_at = excluded.updated_at
-      `);
       for (const profile of additionalAiProfiles) {
-        saveAiProfile.run(
-          profile.service,
-          profile.projectName,
-          profile.baseUrl,
-          profile.model,
-          JSON.stringify(profile.modelOptions),
-          profile.timeoutSeconds,
-          profile.encryptedApiKey,
-          profile.createdAt || now,
+        upsertStoredAiServiceProfileInTransaction(this.db, {
+          service: profile.service,
+          projectName: profile.projectName,
+          baseUrl: profile.baseUrl,
+          model: profile.model,
+          modelOptionsJson: JSON.stringify(profile.modelOptions),
+          timeoutSeconds: profile.timeoutSeconds,
+          apiKeyEncrypted: profile.encryptedApiKey,
+          createdAt: profile.createdAt || now,
           now
-        );
+        });
       }
 
-      this.ensureInitialRooms(normalizeInteger(input.initialCounts.rooms), now);
+      ensureStoredInitialRooms(this.db, normalizeInteger(input.initialCounts.rooms), now);
       if (tableCategoryResolution.categories) {
-        this.reconcileTableCategories(tableCategoryResolution.categories, now);
+        reconcileStoredTableCategories(this.db, tableCategoryResolution.categories, now, this.getProtectedTableIds());
       } else {
-        this.ensureInitialTables(normalizeInteger(input.initialCounts.tables), now);
+        ensureStoredInitialTables(this.db, normalizeInteger(input.initialCounts.tables), now);
       }
       this.db.exec("COMMIT");
     } catch (error) {
@@ -4556,87 +1382,13 @@ export class DesktopDatabase {
     return {
       ok: true,
       message: "İlk kurulum ayarları kaydedildi.",
-      setupData: this.getSetupData(),
+      setupData: getStoredSetupData(this.db, new Set(this.getEnabledBusinessCapabilities())),
       dashboardData: this.getDashboardData()
     };
   }
 
   getPublishedMenu(): PublishedQrMenu {
-    const categories = this.db
-      .prepare(`
-        SELECT id, name, description, is_active, sort_order, created_at, updated_at
-        FROM menu_categories
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    const items = this.db
-      .prepare(`
-        SELECT
-          id,
-          category_id,
-          name,
-          description,
-          price,
-          currency,
-          image_url,
-          is_available,
-          is_featured,
-          allergens_json,
-          tags_json,
-          stock_quantity,
-          stock_min_quantity,
-          stock_unit,
-          stock_consumption_quantity,
-          hide_when_out_of_stock,
-          stock_note,
-          sort_order,
-          created_at,
-          updated_at
-        FROM menu_items
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    const updatedAtRows = [...categories, ...items].map((row) => String(row.updated_at ?? "")).filter(Boolean);
-    const updatedAt = updatedAtRows.sort().at(-1) ?? new Date().toISOString();
-
-    return {
-      categories: categories.map((row) => ({
-        id: String(row.id ?? ""),
-        name: String(row.name ?? ""),
-        description: String(row.description ?? ""),
-        is_active: Number(row.is_active ?? 0) === 1,
-        sort_order: Number(row.sort_order ?? 0),
-        created_at: String(row.created_at ?? ""),
-        updated_at: String(row.updated_at ?? "")
-      })),
-      items: items.map((row) => ({
-        id: String(row.id ?? ""),
-        category_id: String(row.category_id ?? ""),
-        name: String(row.name ?? ""),
-        description: String(row.description ?? ""),
-        price: Number(row.price ?? 0),
-        currency: String(row.currency ?? "TRY"),
-        image_url: String(row.image_url ?? ""),
-        is_available: Number(row.is_available ?? 0) === 1,
-        is_featured: Number(row.is_featured ?? 0) === 1,
-        allergens: this.parseStringArray(row.allergens_json),
-        tags: this.parseStringArray(row.tags_json),
-        stock_quantity: nullableNumber(row.stock_quantity),
-        stock_min_quantity: nullableNumber(row.stock_min_quantity),
-        stock_unit: normalizeMenuStockUnit(row.stock_unit),
-        stock_consumption_quantity: normalizePositiveStockNumber(row.stock_consumption_quantity) ?? 1,
-        hide_when_out_of_stock: Number(row.hide_when_out_of_stock ?? 0) === 1,
-        stock_note: nullableString(row.stock_note),
-        sort_order: Number(row.sort_order ?? 0),
-        created_at: String(row.created_at ?? ""),
-        updated_at: String(row.updated_at ?? "")
-      })),
-      updated_at: updatedAt
-    };
+    return getStoredPublishedMenu(this.db);
   }
 
   getDeletedRequestIds(): string[] {
@@ -4648,222 +1400,42 @@ export class DesktopDatabase {
   }
 
   getQrMenuPublication(): PublishedQrMenu {
-    const menu = this.getPublishedMenu();
-    return {
-      ...menu,
-      items: menu.items.filter((item) => !(
-        item.stock_quantity !== null
-        && item.hide_when_out_of_stock
-        && item.stock_quantity < item.stock_consumption_quantity
-      ))
-    };
+    return getStoredQrMenuPublication(this.db);
   }
 
   getMenuStockMovements(menuItemId = ""): DesktopMenuStockMovement[] {
-    const normalizedMenuItemId = menuItemId.trim();
-    const rows = (normalizedMenuItemId
-      ? this.db.prepare(`
-          SELECT * FROM menu_stock_movements
-          WHERE menu_item_id = ?
-          ORDER BY created_at ASC, id ASC
-        `).all(normalizedMenuItemId)
-      : this.db.prepare(`
-          SELECT * FROM menu_stock_movements
-          ORDER BY created_at ASC, id ASC
-        `).all()) as Array<Record<string, unknown>>;
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      menuItemId: String(row.menu_item_id ?? ""),
-      type: String(row.type ?? "adjust") as MenuStockMovementType,
-      quantityChange: Number(row.quantity_change ?? 0),
-      quantityBefore: Number(row.quantity_before ?? 0),
-      quantityAfter: Number(row.quantity_after ?? 0),
-      sourceType: String(row.source_type ?? "desktop") as MenuStockSourceType,
-      sourceId: String(row.source_id ?? ""),
-      actorSource: String(row.actor_source ?? (row.actor_device_id ? "android" : "desktop")) as StockImageImportSource,
-      actorDeviceId: String(row.actor_device_id ?? ""),
-      note: String(row.note ?? ""),
-      createdAt: String(row.created_at ?? "")
-    }));
+    return getStoredMenuStockMovements(this.db, menuItemId);
   }
 
   getTrackedStockCandidates(): StockImageMenuCandidate[] {
-    const rows = this.db
-      .prepare(`
-        SELECT menu_items.id, menu_items.name, menu_items.stock_quantity, menu_items.stock_unit,
-          menu_categories.name AS category
-        FROM menu_items
-        INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
-        WHERE menu_items.deleted_at = ''
-          AND menu_categories.deleted_at = ''
-          AND menu_items.stock_quantity IS NOT NULL
-        ORDER BY menu_categories.sort_order ASC, menu_items.sort_order ASC, menu_items.name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      category: String(row.category ?? "Menü"),
-      current_stock: Number(row.stock_quantity ?? 0),
-      stock_unit: normalizeMenuStockUnit(row.stock_unit)
-    }));
+    return getStoredTrackedStockCandidates(this.db);
   }
 
   getAppliedStockImageHashes(limit = 100): string[] {
-    const normalizedLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
-    const rows = this.db
-      .prepare(`
-        SELECT image_hash
-        FROM stock_image_imports
-        WHERE status = 'applied'
-        ORDER BY applied_at DESC, created_at DESC
-        LIMIT ?
-      `)
-      .all(normalizedLimit) as Array<{ image_hash?: string }>;
-    return [...new Set(rows.map((row) => String(row.image_hash ?? "").toLowerCase()).filter(isSha256Hex))];
+    return getStoredAppliedStockImageHashes(this.db, limit);
   }
 
   createStockImageImport(input: CreateStockImageImportInput): { ok: true; duplicateWarning: boolean } | { ok: false; message: string } {
-    const importId = normalizeStockImageImportId(input.importId);
-    const imageHash = String(input.imageHash ?? "").trim().toLowerCase();
-    const source = input.source === "android" ? "android" : input.source === "desktop" ? "desktop" : null;
-    if (!importId || !isSha256Hex(imageHash) || !source) {
-      return { ok: false, message: "Görsel içe aktarma kimliği veya özeti geçersiz." };
-    }
-    if (this.db.prepare("SELECT id FROM stock_image_imports WHERE import_id = ?").get(importId)) {
-      return { ok: false, message: "Bu içe aktarma daha önce başlatılmış." };
-    }
-    const duplicateWarning = Boolean(this.db
-      .prepare("SELECT id FROM stock_image_imports WHERE image_hash = ? AND status = 'applied' LIMIT 1")
-      .get(imageHash));
-    const now = new Date().toISOString();
-    this.db
-      .prepare(`
-        INSERT INTO stock_image_imports (
-          id, import_id, source, device_id, image_hash, original_filename, status,
-          supplier_name, invoice_number, invoice_date, raw_analysis_json, error_message,
-          created_at, applied_at
-        ) VALUES (?, ?, ?, ?, ?, ?, 'analyzing', NULL, NULL, NULL, NULL, NULL, ?, NULL)
-      `)
-      .run(
-        `stock_image_import_record_${randomUUID()}`,
-        importId,
-        source,
-        nullableTrimmedString(input.deviceId)?.slice(0, 120) ?? null,
-        imageHash,
-        nullableTrimmedString(input.originalFilename)?.slice(0, 255) ?? null,
-        now
-      );
-    return { ok: true, duplicateWarning };
+    return createStoredStockImageImport(this.db, input);
   }
 
   completeStockImageAnalysis(importIdValue: string, analysis: StockImageAnalysis): StockImageAnalysis | null {
-    const importId = normalizeStockImageImportId(importIdValue);
-    if (!importId) {
-      return null;
-    }
-    const existing = this.db
-      .prepare("SELECT status FROM stock_image_imports WHERE import_id = ?")
-      .get(importId) as { status?: string } | undefined;
-    if (!existing || !["analyzing", "review"].includes(String(existing.status ?? ""))) {
-      return null;
-    }
-    const sanitized = sanitizeStockImageAnalysis(analysis, this.getTrackedStockCandidates());
-    const now = new Date().toISOString();
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db.prepare("DELETE FROM stock_image_import_lines WHERE import_id = ?").run(importId);
-      const insertLine = this.db.prepare(`
-        INSERT INTO stock_image_import_lines (
-          id, import_id, raw_text, matched_menu_item_id, suggested_quantity,
-          approved_quantity, source_quantity_text, confidence, status, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
-      `);
-      for (const line of sanitized.lines) {
-        const needsReview = line.matched_menu_item_id === null
-          || line.suggested_quantity === null
-          || line.confidence === "low"
-          || Boolean(line.needs_review_reason);
-        insertLine.run(
-          `stock_image_import_line_${randomUUID()}`,
-          importId,
-          line.raw_text,
-          line.matched_menu_item_id,
-          line.suggested_quantity,
-          line.source_quantity_text,
-          line.confidence,
-          needsReview ? "needs_review" : "proposed",
-          line.needs_review_reason,
-          now
-        );
-      }
-      this.db
-        .prepare(`
-          UPDATE stock_image_imports
-          SET status = 'review', supplier_name = ?, invoice_number = ?, invoice_date = ?,
-              raw_analysis_json = ?, error_message = NULL
-          WHERE import_id = ? AND status IN ('analyzing', 'review')
-        `)
-        .run(
-          sanitized.document.supplier_name,
-          sanitized.document.invoice_number,
-          sanitized.document.invoice_date,
-          JSON.stringify(sanitized),
-          importId
-        );
-      this.db.exec("COMMIT");
-      return sanitized;
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
+    return completeStoredStockImageAnalysis(this.db, importIdValue, analysis);
   }
 
   failStockImageImport(importIdValue: string, message: string, cancelled = false): void {
-    const importId = normalizeStockImageImportId(importIdValue);
-    if (!importId) {
-      return;
-    }
-    this.db
-      .prepare(`
-        UPDATE stock_image_imports
-        SET status = ?, error_message = ?
-        WHERE import_id = ? AND status != 'applied'
-      `)
-      .run(cancelled ? "cancelled" : "failed", String(message ?? "").trim().slice(0, 1000) || null, importId);
+    failStoredStockImageImport(this.db, importIdValue, message, cancelled);
   }
 
   applyStockImageImport(input: ApplyStockImageImportInput): DesktopStockImageApplyResult {
-    const importId = normalizeStockImageImportId(input.importId);
-    const imageHash = String(input.imageHash ?? "").trim().toLowerCase();
-    if (!importId || !isSha256Hex(imageHash)) {
-      return { ok: false, message: "Görsel stok taslağı geçersiz." };
+    const result = applyStoredStockImageImport(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = this.applyStockImageImportInTransaction({
-        importId,
-        imageHash,
-        lines: input.lines,
-        source: "desktop",
-        actorDeviceId: "",
-        duplicateWarningAcknowledged: input.duplicateWarningAcknowledged === true,
-        canOverrideDuplicate: true,
-        now: new Date().toISOString()
-      });
-      if (!result.ok) {
-        this.db.exec("ROLLBACK");
-        return result;
-      }
-      this.db.exec("COMMIT");
-      return {
-        ...result,
-        dashboardData: this.getDashboardData()
-      };
-    } catch {
-      this.db.exec("ROLLBACK");
-      return { ok: false, message: "Stoklar tek işlem içinde güncellenemedi." };
-    }
+    return {
+      ...result,
+      dashboardData: this.getDashboardData()
+    };
   }
 
   upsertRequests(requests: SyncedCustomerRequest[], nextCursor?: number) {
@@ -4924,7 +1496,7 @@ export class DesktopDatabase {
     this.db.exec("BEGIN");
     try {
       for (const request of requests) {
-        const customerId = this.ensureCustomerForRequest(request as unknown as Record<string, unknown>, new Date().toISOString());
+        const customerId = ensureStoredCustomerForRequest(this.db, request as unknown as Record<string, unknown>, new Date().toISOString());
         statement.run(
           request.id,
           customerId,
@@ -4989,417 +1561,31 @@ export class DesktopDatabase {
   }
 
   createManualRequest(input: CreateManualRequestInput): CreateManualRequestResult {
-    const requestType = normalizeRequestType(input.requestType);
-    if (!isRequestTypeAvailable(this.getEnabledBusinessCapabilities(), requestType)) {
-      return {
-        ok: false,
-        message: "Bu talep türü işletmenin etkin yeteneklerinde kullanılamıyor."
-      };
+    const result = createStoredManualRequest(this.db, input, this.getEnabledBusinessCapabilities());
+    if (!result.ok) {
+      return result;
     }
-    const customerName = input.customerName.trim();
-    if (!customerName) {
-      return {
-        ok: false,
-        message: "Müşteri adı gerekli."
-      };
-    }
-
-    const phone = normalizePhone(input.customerPhone);
-    if (!phone.ok) {
-      return {
-        ok: false,
-        message: phone.error
-      };
-    }
-
-    const dateText = input.dateText.trim();
-    const startDate = normalizeDateInput(input.startDate);
-    const endDate = normalizeDateInput(input.endDate);
-    const time = normalizeTimeInput(input.time);
-    const message = input.message.trim();
-    const guestCount = normalizeInteger(input.guestCount);
-    const adultCount = Math.max(0, normalizeInteger(input.adultCount));
-    const childCount = Math.max(0, normalizeInteger(input.childCount));
-
-    if (input.startDate.trim() && !startDate) {
-      return {
-        ok: false,
-        message: "Giriş tarihi YYYY-AA-GG formatında olmalı."
-      };
-    }
-
-    if (input.endDate.trim() && !endDate) {
-      return {
-        ok: false,
-        message: "Çıkış tarihi YYYY-AA-GG formatında olmalı."
-      };
-    }
-
-    if (startDate && endDate && endDate < startDate) {
-      return {
-        ok: false,
-        message: "Çıkış tarihi giriş tarihinden önce olamaz."
-      };
-    }
-
-    if (input.time.trim() && !time) {
-      return {
-        ok: false,
-        message: "Saat HH:DD formatında olmalı."
-      };
-    }
-
-    if (guestCount < 1) {
-      return {
-        ok: false,
-        message: "Kişi sayısı en az 1 olmalı."
-      };
-    }
-
-    if (!dateText && !startDate && !message) {
-      return {
-        ok: false,
-        message: "Talep için tarih notu, giriş tarihi veya not girin."
-      };
-    }
-
-    const now = new Date().toISOString();
-    const request: SyncedCustomerRequest = {
-      id: createId("request_"),
-      customer_id: "",
-      source: "manual",
-      request_type: requestType as SyncedCustomerRequest["request_type"],
-      status: "new",
-      customer_name: customerName,
-      customer_phone: phone.e164,
-      date_text: dateText,
-      start_date: startDate,
-      end_date: endDate,
-      time,
-      guest_count: guestCount,
-      adult_count: adultCount,
-      child_count: childCount,
-      message,
-      ai_summary: "",
-      ai_suggested_reply: "",
-      whatsapp_message: buildManualRequestReply(customerName),
-      assigned_to: "",
-      priority: normalizePriority(input.priority) as SyncedCustomerRequest["priority"],
-      sync_status: "local_only",
-      created_at: now,
-      updated_at: now
-    };
-
-    this.db.exec("BEGIN");
-    try {
-      const customerId = this.ensureCustomerForRequest(request as unknown as Record<string, unknown>, now);
-      request.customer_id = customerId;
-
-      this.db
-        .prepare(`
-          INSERT INTO requests (
-            id,
-            customer_id,
-            source,
-            request_type,
-            status,
-            customer_name,
-            customer_phone,
-            date_text,
-            start_date,
-            end_date,
-            time,
-            guest_count,
-            adult_count,
-            child_count,
-            message,
-            ai_summary,
-            ai_suggested_reply,
-            whatsapp_message,
-            assigned_to,
-            priority,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-        .run(
-          request.id,
-          request.customer_id,
-          request.source,
-          request.request_type,
-          request.status,
-          request.customer_name,
-          request.customer_phone,
-          request.date_text,
-          request.start_date,
-          request.end_date,
-          request.time,
-          request.guest_count,
-          request.adult_count,
-          request.child_count,
-          request.message,
-          request.ai_summary,
-          request.ai_suggested_reply,
-          request.whatsapp_message,
-          request.assigned_to,
-          request.priority,
-          request.created_at,
-          request.updated_at,
-          request.sync_status
-        );
-
-      this.insertEvent({
-        type: "request.created",
-        entityType: "request",
-        entityId: request.id,
-        payload: {
-          source: request.source,
-          request_type: request.request_type,
-          customer_id: customerId
-        },
-        now
-      });
-
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Manuel talep kaydedildi.",
-      savedId: request.id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   getRequestById(requestId: string): SyncedCustomerRequest | null {
-    const id = requestId.trim();
-    if (!id) {
-      return null;
-    }
-
-    const row = this.db
-      .prepare(`
-        SELECT
-          id,
-          customer_id,
-          source,
-          request_type,
-          status,
-          customer_name,
-          customer_phone,
-          date_text,
-          start_date,
-          end_date,
-          time,
-          guest_count,
-          adult_count,
-          child_count,
-          message,
-          ai_summary,
-          ai_suggested_reply,
-          whatsapp_message,
-          assigned_to,
-          priority,
-          sync_status,
-          created_at,
-          updated_at
-        FROM requests
-        WHERE id = ? AND deleted_at = ''
-        LIMIT 1
-      `)
-      .get(id) as Record<string, unknown> | undefined;
-
-    return row ? this.mapRequestRow(row) : null;
+    return getStoredRequestById(this.db, requestId);
   }
 
   saveRequestAiSuggestion(input: SaveRequestAiSuggestionInput): RequestAiSuggestionResult {
-    const requestId = input.requestId.trim();
-    const summary = input.summary.trim();
-    const suggestedReply = input.suggestedReply.trim();
-
-    if (!requestId) {
-      return {
-        ok: false,
-        message: "AI taslağı için talep seçilmeli."
-      };
+    const result = saveStoredRequestAiSuggestion(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    if (!suggestedReply) {
-      return {
-        ok: false,
-        message: "AI cevap taslağı boş olamaz."
-      };
-    }
-
-    const request = this.db.prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as Record<string, unknown> | undefined;
-    if (!request) {
-      return {
-        ok: false,
-        message: "Talep bulunamadı."
-      };
-    }
-
-    const now = new Date().toISOString();
-    const existingMessage = this.db
-      .prepare("SELECT id FROM whatsapp_messages WHERE request_id = ? AND direction = 'outgoing' AND deleted_at = '' LIMIT 1")
-      .get(requestId) as { id?: string } | undefined;
-    const messageId = existingMessage?.id || createId("wa_msg_");
-    const missingFields = input.missingFields.map((field) => field.trim()).filter(Boolean);
-
-    this.db.exec("BEGIN");
-    try {
-      this.db
-        .prepare(`
-          UPDATE requests
-          SET ai_summary = ?,
-              ai_suggested_reply = ?,
-              updated_at = ?,
-              sync_status = 'local_only'
-          WHERE id = ?
-        `)
-        .run(summary, suggestedReply, now, requestId);
-
-      this.db
-        .prepare(`
-          INSERT INTO whatsapp_messages (
-            id,
-            request_id,
-            customer_id,
-            phone,
-            direction,
-            mode,
-            status,
-            message,
-            prepared_by_ai,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, 'outgoing', 'manual_copy', 'prepared', ?, 1, ?, ?, 'local_only')
-          ON CONFLICT(id) DO UPDATE SET
-            customer_id = excluded.customer_id,
-            phone = excluded.phone,
-            status = 'prepared',
-            message = excluded.message,
-            prepared_by_ai = 1,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          messageId,
-          requestId,
-          String(request.customer_id ?? ""),
-          String(request.customer_phone ?? ""),
-          suggestedReply,
-          now,
-          now
-        );
-
-      this.insertEvent({
-        type: "ai.reply_suggested",
-        entityType: "request",
-        entityId: requestId,
-        payload: {
-          summary,
-          missing_fields: missingFields,
-          whatsapp_message_id: messageId
-        },
-        now
-      });
-
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "AI cevap taslağı yenilendi.",
-      requestId,
-      summary,
-      suggestedReply,
-      missingFields,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   saveAiWorkspaceHistory(input: Omit<AiWorkspaceHistoryEntry, "id" | "createdAt">): AiWorkspaceHistoryEntry {
-    const id = createId("ai_conv_");
-    const createdAt = new Date().toISOString();
-    const entry: AiWorkspaceHistoryEntry = {
-      ...input,
-      id,
-      createdAt,
-      instructions: input.instructions.trim().slice(0, 800),
-      content: input.content.trim().slice(0, 6000),
-      summary: input.summary.trim().slice(0, 1600),
-      missingFields: input.missingFields.map((field) => field.trim()).filter(Boolean).slice(0, 8)
-    };
-
-    this.db
-      .prepare(`
-        INSERT INTO ai_conversations (
-          id, source, request_id, status, messages_json, summary,
-          created_at, updated_at, sync_status
-        ) VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, 'local_only')
-      `)
-      .run(
-        entry.id,
-        `desktop_workspace:${entry.mode}`,
-        entry.requestId,
-        JSON.stringify({
-          instructions: entry.instructions,
-          content: entry.content,
-          missing_fields: entry.missingFields,
-          provider: entry.provider,
-          model: entry.model,
-          fallback: entry.fallback,
-          request_label: entry.requestLabel
-        }),
-        entry.summary,
-        entry.createdAt,
-        entry.createdAt
-      );
-
-    return entry;
+    return saveStoredAiWorkspaceHistory(this.db, input);
   }
 
   getAiWorkspaceHistory(limit = 12): AiWorkspaceHistoryEntry[] {
-    const safeLimit = Math.max(1, Math.min(50, Math.trunc(limit) || 12));
-    const rows = this.db
-      .prepare(`
-        SELECT id, source, request_id, messages_json, summary, created_at
-        FROM ai_conversations
-        WHERE source LIKE 'desktop_workspace:%' AND deleted_at = ''
-        ORDER BY created_at DESC
-        LIMIT ?
-      `)
-      .all(safeLimit) as Record<string, unknown>[];
-
-    return rows.map((row) => {
-      const payload = parseAiWorkspacePayload(row.messages_json);
-      const modeCandidate = String(row.source ?? "").replace("desktop_workspace:", "");
-      const mode: AiWorkspaceMode = modeCandidate === "summary" || modeCandidate === "daily" ? modeCandidate : "reply";
-      return {
-        id: String(row.id ?? ""),
-        mode,
-        requestId: String(row.request_id ?? ""),
-        requestLabel: String(payload.request_label ?? ""),
-        instructions: String(payload.instructions ?? ""),
-        content: String(payload.content ?? ""),
-        summary: String(row.summary ?? ""),
-        missingFields: Array.isArray(payload.missing_fields) ? payload.missing_fields.map(String).filter(Boolean) : [],
-        provider: String(payload.provider ?? "disabled"),
-        model: String(payload.model ?? ""),
-        fallback: Boolean(payload.fallback),
-        createdAt: String(row.created_at ?? "")
-      };
-    });
+    return getStoredAiWorkspaceHistory(this.db, limit);
   }
 
   saveAiWorkspaceResult(input: SaveAiWorkspaceResultInput): SaveAiWorkspaceResult {
@@ -5436,7 +1622,7 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE requests SET ai_summary = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
       .run(content.slice(0, 1600), now, requestId);
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: "ai.request_summarized",
       entityType: "request",
       entityId: requestId,
@@ -5452,154 +1638,18 @@ export class DesktopDatabase {
   }
 
   convertRequestToReservation(requestId: string): RequestReservationConversionResult {
-    const id = requestId.trim();
-    if (!id) {
-      return {
-        ok: false,
-        message: "Rezervasyona çevrilecek talep seçilmeli."
-      };
+    const result = convertStoredRequestToReservation(this.db, requestId, this.getEnabledBusinessCapabilities());
+    if (!result.ok) {
+      return result;
     }
-
-    const request = this.db.prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''").get(id) as Record<string, unknown> | undefined;
-    if (!request) {
-      return {
-        ok: false,
-        message: "Talep bulunamadı."
-      };
-    }
-
-    const requestType = String(request.request_type ?? "");
-    const reservationType = getRequestReservationType(requestType);
-    if (!reservationType || !canConvertRequestToReservation(this.getEnabledBusinessCapabilities(), requestType)) {
-      return {
-        ok: false,
-        message: reservationType
-          ? "Bu rezervasyon türü işletmenin etkin yeteneklerinde kullanılamıyor."
-          : "Bu talep türü rezervasyona dönüştürülemez."
-      };
-    }
-
-    const existingReservation = this.db.prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1").get(id) as { id?: string } | undefined;
-    const now = new Date().toISOString();
-    const reservationId = existingReservation?.id || createId("reservation_");
-    const title = buildReservationTitle(request, reservationType);
-    let customerId = "";
-
-    this.db.exec("BEGIN");
-    try {
-      customerId = this.ensureCustomerForRequest(request, now);
-      this.db
-        .prepare(`
-          INSERT INTO reservations (
-            id,
-            request_id,
-            customer_id,
-            reservation_type,
-            status,
-            title,
-            start_date,
-            end_date,
-            time,
-            guest_count,
-            adult_count,
-            child_count,
-            room_ids_json,
-            table_ids_json,
-            notes,
-            price_note,
-            payment_status,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, 'not_required', ?, ?, 'local_only')
-          ON CONFLICT(id) DO UPDATE SET
-            customer_id = excluded.customer_id,
-            reservation_type = excluded.reservation_type,
-            status = 'approved',
-            title = excluded.title,
-            start_date = excluded.start_date,
-            end_date = excluded.end_date,
-            time = excluded.time,
-            guest_count = excluded.guest_count,
-            adult_count = excluded.adult_count,
-            child_count = excluded.child_count,
-            notes = excluded.notes,
-            price_note = excluded.price_note,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'local_only'
-        `)
-        .run(
-          reservationId,
-          id,
-          customerId,
-          reservationType,
-          title,
-          String(request.start_date ?? ""),
-          String(request.end_date ?? ""),
-          String(request.time ?? ""),
-          Number(request.guest_count ?? 1),
-          Number(request.adult_count ?? 0),
-          Number(request.child_count ?? 0),
-          buildReservationNotes(request),
-          "Fiyat ve kaynak ataması işletme sahibi tarafından netleştirilecek.",
-          now,
-          now
-        );
-
-      this.db
-        .prepare(`
-          UPDATE requests
-          SET status = 'converted_to_reservation',
-              customer_id = ?,
-              updated_at = ?,
-              sync_status = 'local_only'
-          WHERE id = ?
-        `)
-        .run(customerId, now, id);
-
-      this.insertEvent({
-        type: "request.converted_to_reservation",
-        entityType: "request",
-        entityId: id,
-        payload: {
-          reservation_id: reservationId,
-          customer_id: customerId,
-          previous_status: String(request.status ?? "")
-        },
-        now
-      });
-      this.insertEvent({
-        type: "reservation.approved",
-        entityType: "reservation",
-        entityId: reservationId,
-        payload: {
-          request_id: id,
-          customer_id: customerId,
-          reservation_type: reservationType
-        },
-        now
-      });
-
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: existingReservation ? "Mevcut rezervasyon onaylandı." : "Talep rezervasyona çevrildi ve onaylandı.",
-      reservationId,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   markMenuPublished() {
     const now = new Date().toISOString();
     this.db.prepare("UPDATE menu_categories SET sync_status = 'synced', updated_at = ? WHERE deleted_at = ''").run(now);
     this.db.prepare("UPDATE menu_items SET sync_status = 'synced', updated_at = ? WHERE deleted_at = ''").run(now);
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: "menu.published",
       entityType: "menu",
       entityId: "qr_menu",
@@ -5613,7 +1663,7 @@ export class DesktopDatabase {
 
   recordSyncEvent(input: RecordSyncEventInput) {
     const now = new Date().toISOString();
-    this.insertEvent({
+    insertDatabaseEvent(this.db, {
       type: input.ok ? "sync.completed" : "sync.failed",
       entityType: "sync",
       entityId: `${input.direction}:${input.entityType}`,
@@ -5634,75 +1684,11 @@ export class DesktopDatabase {
   }
 
   recordAndroidActionResult(action: AndroidSyncAction, result: ApplyAndroidActionResult) {
-    const actionId = String(action.id ?? "").trim();
-    const actionType = String(action.action_type ?? "").trim();
-    const deviceId = String(action.device_id ?? "").trim();
-    if (!actionId || !actionType || !deviceId) {
-      return;
-    }
-    const now = new Date().toISOString();
-    const resolutionKey = androidActionResolutionKey(action);
-    if (result.ok) {
-      for (const failure of this.getActiveAndroidActionFailureRows(null)) {
-        const payload = parseEventPayload(failure.payload_json);
-        if (String(payload.resolution_key ?? "") !== resolutionKey) {
-          continue;
-        }
-        this.db
-          .prepare("UPDATE events SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at = ''")
-          .run(now, now, String(failure.id ?? ""));
-      }
-      return;
-    }
-
-    const existing = this.db
-      .prepare("SELECT id FROM events WHERE type = 'android.action_failed' AND entity_id = ? AND deleted_at = '' LIMIT 1")
-      .get(actionId);
-    if (existing) {
-      return;
-    }
-    this.insertEvent({
-      type: "android.action_failed",
-      actorType: "android",
-      actorId: deviceId,
-      entityType: "android_action",
-      entityId: actionId,
-      payload: {
-        action_type: actionType,
-        device_id: deviceId,
-        error_message: result.message,
-        resolution_key: resolutionKey,
-        target_page: androidActionTargetPage(actionType, action.payload),
-        related_id: androidActionRelatedId(action)
-      },
-      now
-    });
+    recordStoredAndroidActionResult(this.db, action, result);
   }
 
   getAndroidActionFailures(): DesktopAndroidActionFailure[] {
-    return this.getActiveAndroidActionFailureRows().map((row) => {
-      const payload = parseEventPayload(row.payload_json);
-      return {
-        id: String(row.entity_id ?? ""),
-        actionType: String(payload.action_type ?? ""),
-        deviceId: String(payload.device_id ?? row.actor_id ?? ""),
-        message: friendlyDesktopActionFailure(String(payload.error_message ?? "")),
-        targetPage: normalizeAndroidFailureTargetPage(payload.target_page),
-        relatedId: String(payload.related_id ?? ""),
-        createdAt: String(row.created_at ?? "")
-      };
-    });
-  }
-
-  private getActiveAndroidActionFailureRows(limit: number | null = 100): Array<Record<string, unknown>> {
-    const statement = this.db.prepare(`
-        SELECT id, actor_id, entity_id, payload_json, created_at
-        FROM events
-        WHERE type = 'android.action_failed' AND deleted_at = ''
-        ORDER BY created_at DESC
-        ${limit === null ? "" : "LIMIT ?"}
-      `);
-    return (limit === null ? statement.all() : statement.all(limit)) as Array<Record<string, unknown>>;
+    return getStoredAndroidActionFailures(this.db);
   }
 
   countEventsByType(type: string) {
@@ -5711,956 +1697,25 @@ export class DesktopDatabase {
   }
 
   saveMenuCategory(input: SaveMenuCategoryInput): DesktopMenuSaveResult {
-    const name = input.name.trim();
-    if (!name) {
-      return {
-        ok: false,
-        message: "Kategori adı gerekli."
-      };
+    const result = saveStoredMenuCategory(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const id = input.id?.trim() || createId("cat_");
-    const now = new Date().toISOString();
-    const existing = this.db.prepare("SELECT created_at FROM menu_categories WHERE id = ?").get(id) as { created_at?: string } | undefined;
-    const createdAt = existing?.created_at || now;
-
-    this.db
-      .prepare(`
-        INSERT INTO menu_categories (
-          id,
-          name,
-          description,
-          is_active,
-          sort_order,
-          created_at,
-          updated_at,
-          sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')
-        ON CONFLICT(id) DO UPDATE SET
-          name = excluded.name,
-          description = excluded.description,
-          is_active = excluded.is_active,
-          sort_order = excluded.sort_order,
-          updated_at = excluded.updated_at,
-          deleted_at = '',
-          sync_status = 'pending'
-      `)
-      .run(id, name, input.description.trim(), input.is_active ? 1 : 0, normalizeInteger(input.sort_order), createdAt, now);
-
-    return {
-      ok: true,
-      message: "Kategori kaydedildi.",
-      savedId: id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   saveMenuItem(input: SaveMenuItemInput): DesktopMenuSaveResult {
-    const name = input.name.trim();
-    const categoryId = input.category_id.trim();
-    const stockQuantity = normalizeNullableStockNumber(input.stock_quantity);
-    const stockMinQuantity = normalizeNullableStockNumber(input.stock_min_quantity);
-    const stockUnit = normalizeMenuStockUnit(input.stock_unit);
-    const stockConsumptionQuantity = normalizePositiveStockNumber(input.stock_consumption_quantity) ?? 1;
-    if (!name) {
-      return {
-        ok: false,
-        message: "Ürün adı gerekli."
-      };
+    const result = saveStoredMenuItem(this.db, input);
+    if (!result.ok) {
+      return result;
     }
-
-    const categoryExists = this.db.prepare("SELECT id FROM menu_categories WHERE id = ? AND deleted_at = ''").get(categoryId);
-    if (!categoryExists) {
-      return {
-        ok: false,
-        message: "Ürün için kategori seçilmeli."
-      };
-    }
-    if (input.stock_quantity !== null && input.stock_quantity !== undefined && stockQuantity === null) {
-      return { ok: false, message: "Stok miktarı 0 veya daha büyük bir sayı olmalı." };
-    }
-    if (input.stock_min_quantity !== null && input.stock_min_quantity !== undefined && stockMinQuantity === null) {
-      return { ok: false, message: "Minimum stok uyarısı 0 veya daha büyük bir sayı olmalı." };
-    }
-
-    const id = input.id?.trim() || createId("item_");
-    const now = new Date().toISOString();
-    const existing = this.db
-      .prepare("SELECT created_at, stock_quantity FROM menu_items WHERE id = ?")
-      .get(id) as { created_at?: string; stock_quantity?: number | null } | undefined;
-    const createdAt = existing?.created_at || now;
-    const previousStockQuantity = existing ? nullableNumber(existing.stock_quantity) : null;
-
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
-      this.db
-        .prepare(`
-          INSERT INTO menu_items (
-            id,
-            category_id,
-            name,
-            description,
-            price,
-            currency,
-            image_url,
-            is_available,
-            is_featured,
-            allergens_json,
-            tags_json,
-            stock_quantity,
-            stock_min_quantity,
-            stock_unit,
-            stock_consumption_quantity,
-            hide_when_out_of_stock,
-            stock_note,
-            sort_order,
-            created_at,
-            updated_at,
-            sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
-          ON CONFLICT(id) DO UPDATE SET
-            category_id = excluded.category_id,
-            name = excluded.name,
-            description = excluded.description,
-            price = excluded.price,
-            currency = excluded.currency,
-            image_url = excluded.image_url,
-            is_available = excluded.is_available,
-            is_featured = excluded.is_featured,
-            allergens_json = excluded.allergens_json,
-            tags_json = excluded.tags_json,
-            stock_quantity = excluded.stock_quantity,
-            stock_min_quantity = excluded.stock_min_quantity,
-            stock_unit = excluded.stock_unit,
-            stock_consumption_quantity = excluded.stock_consumption_quantity,
-            hide_when_out_of_stock = excluded.hide_when_out_of_stock,
-            stock_note = excluded.stock_note,
-            sort_order = excluded.sort_order,
-            updated_at = excluded.updated_at,
-            deleted_at = '',
-            sync_status = 'pending'
-        `)
-        .run(
-          id,
-          categoryId,
-          name,
-          input.description.trim(),
-          normalizePrice(input.price),
-          normalizeCurrency(input.currency),
-          input.image_url.trim(),
-          input.is_available ? 1 : 0,
-          input.is_featured ? 1 : 0,
-          JSON.stringify(normalizeStringArray(input.allergens)),
-          JSON.stringify(normalizeStringArray(input.tags)),
-          stockQuantity,
-          stockMinQuantity,
-          stockUnit,
-          stockConsumptionQuantity,
-          input.hide_when_out_of_stock ? 1 : 0,
-          nullableTrimmedString(input.stock_note),
-          normalizeInteger(input.sort_order),
-          createdAt,
-          now
-        );
-
-      if (previousStockQuantity !== stockQuantity) {
-        const before = previousStockQuantity ?? 0;
-        const after = stockQuantity ?? 0;
-        this.insertMenuStockMovementInTransaction({
-          menuItemId: id,
-          type: "set",
-          quantityChange: after - before,
-          quantityBefore: before,
-          quantityAfter: after,
-          sourceType: "desktop",
-          sourceId: id,
-          actorDeviceId: "",
-          note: stockQuantity === null ? "Stok takibi bırakıldı." : "Menü ürün detayından stok ayarlandı.",
-          now
-        });
-      }
-      this.db.exec("COMMIT");
-    } catch (error) {
-      this.db.exec("ROLLBACK");
-      throw error;
-    }
-
-    return {
-      ok: true,
-      message: "Ürün kaydedildi.",
-      savedId: id,
-      dashboardData: this.getDashboardData()
-    };
+    return { ...result, dashboardData: this.getDashboardData() };
   }
 
   close() {
     this.db.close();
   }
 
-  private getDailyTasks(): DesktopDailyTask[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          id,
-          title,
-          description,
-          task_type,
-          status,
-          due_date,
-          due_time,
-          related_type,
-          related_id,
-          updated_at
-        FROM daily_tasks
-        WHERE deleted_at = ''
-        ORDER BY
-          CASE status WHEN 'pending' THEN 0 WHEN 'done' THEN 1 ELSE 2 END ASC,
-          due_date ASC,
-          due_time ASC,
-          created_at DESC
-        LIMIT 80
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      title: String(row.title ?? ""),
-      description: String(row.description ?? ""),
-      taskType: String(row.task_type ?? "note"),
-      status: String(row.status ?? "pending"),
-      dueDate: String(row.due_date ?? ""),
-      dueTime: String(row.due_time ?? ""),
-      relatedType: String(row.related_type ?? ""),
-      relatedId: String(row.related_id ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getCustomers(): DesktopCustomer[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          customers.id,
-          customers.full_name,
-          customers.phone,
-          customers.email,
-          customers.source,
-          customers.notes,
-          customers.tags_json,
-          customers.last_contact_at,
-          customers.identity_type,
-          customers.identity_number,
-          customers.nationality,
-          customers.birth_date,
-          customers.gender,
-          customers.birthday_message_enabled,
-          customers.document_serial_number,
-          customers.document_expiry_date,
-          customers.birth_place,
-          customers.mother_name,
-          customers.father_name,
-          customers.issuing_authority,
-          customers.address,
-          customers.updated_at,
-          COUNT(DISTINCT requests.id) AS request_count,
-          COUNT(DISTINCT reservations.id) AS reservation_count,
-          COUNT(DISTINCT customer_room_stays.id) AS stay_count
-        FROM customers
-        LEFT JOIN requests ON requests.customer_id = customers.id AND requests.deleted_at = ''
-        LEFT JOIN reservations ON reservations.customer_id = customers.id AND reservations.deleted_at = ''
-        LEFT JOIN customer_room_stays ON customer_room_stays.customer_id = customers.id AND customer_room_stays.deleted_at = ''
-        WHERE customers.deleted_at = ''
-        GROUP BY customers.id
-        ORDER BY
-          COALESCE(NULLIF(customers.last_contact_at, ''), customers.updated_at) DESC,
-          customers.full_name ASC
-        LIMIT 500
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      fullName: String(row.full_name ?? ""),
-      phone: String(row.phone ?? ""),
-      email: String(row.email ?? ""),
-      source: String(row.source ?? "manual"),
-      notes: String(row.notes ?? ""),
-      tags: this.parseStringArray(row.tags_json),
-      lastContactAt: String(row.last_contact_at ?? ""),
-      identityType: normalizeCustomerIdentityType(row.identity_type),
-      identityNumber: String(row.identity_number ?? ""),
-      nationality: String(row.nationality ?? ""),
-      birthDate: String(row.birth_date ?? ""),
-      gender: normalizeCustomerGender(row.gender),
-      birthdayMessageEnabled: normalizeBoolean(row.birthday_message_enabled, true),
-      documentSerialNumber: String(row.document_serial_number ?? ""),
-      documentExpiryDate: String(row.document_expiry_date ?? ""),
-      birthPlace: String(row.birth_place ?? ""),
-      motherName: String(row.mother_name ?? ""),
-      fatherName: String(row.father_name ?? ""),
-      issuingAuthority: String(row.issuing_authority ?? ""),
-      address: String(row.address ?? ""),
-      requestCount: Number(row.request_count ?? 0),
-      reservationCount: Number(row.reservation_count ?? 0),
-      stayCount: Number(row.stay_count ?? 0),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getCustomerRoomStays(): DesktopCustomerRoomStay[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          customer_room_stays.id,
-          customer_room_stays.customer_id,
-          customers.full_name AS customer_name,
-          customers.phone AS customer_phone,
-          customer_room_stays.room_id,
-          rooms.name AS room_name,
-          rooms.number AS room_number,
-          customer_room_stays.reservation_id,
-          customer_room_stays.status,
-          customer_room_stays.check_in_date,
-          customer_room_stays.check_out_date,
-          customer_room_stays.guest_count,
-          customer_room_stays.notes,
-          customer_room_stays.source,
-          customer_room_stays.checked_in_at,
-          customer_room_stays.checked_out_at,
-          customer_room_stays.created_at,
-          customer_room_stays.updated_at
-        FROM customer_room_stays
-        JOIN customers ON customers.id = customer_room_stays.customer_id
-        JOIN rooms ON rooms.id = customer_room_stays.room_id
-        WHERE customer_room_stays.deleted_at = ''
-        ORDER BY
-          CASE customer_room_stays.status
-            WHEN 'checked_in' THEN 0
-            WHEN 'planned' THEN 1
-            WHEN 'checked_out' THEN 2
-            ELSE 3
-          END,
-          customer_room_stays.check_in_date DESC,
-          customer_room_stays.created_at DESC
-        LIMIT 500
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      customerId: String(row.customer_id ?? ""),
-      customerName: String(row.customer_name ?? ""),
-      customerPhone: String(row.customer_phone ?? ""),
-      roomId: String(row.room_id ?? ""),
-      roomName: String(row.room_name ?? ""),
-      roomNumber: String(row.room_number ?? ""),
-      reservationId: String(row.reservation_id ?? ""),
-      status: String(row.status ?? "planned"),
-      checkInDate: String(row.check_in_date ?? ""),
-      checkOutDate: String(row.check_out_date ?? ""),
-      guestCount: Number(row.guest_count ?? 1),
-      notes: String(row.notes ?? ""),
-      source: String(row.source ?? "manual"),
-      checkedInAt: String(row.checked_in_at ?? ""),
-      checkedOutAt: String(row.checked_out_at ?? ""),
-      createdAt: String(row.created_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private hasOverlappingCustomerRoomStay(
-    roomId: string,
-    checkInDate: string,
-    checkOutDate: string,
-    excludedStayId = ""
-  ): boolean {
-    const rows = this.db
-      .prepare(`
-        SELECT id, check_in_date, check_out_date
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND id != ?
-          AND status IN ('planned', 'checked_in')
-          AND deleted_at = ''
-      `)
-      .all(roomId, excludedStayId) as Array<Record<string, unknown>>;
-    const candidateEnd = checkOutDate || "9999-12-31";
-    return rows.some((row) => {
-      const existingStart = String(row.check_in_date ?? "");
-      const existingEnd = String(row.check_out_date ?? "") || "9999-12-31";
-      return existingStart < candidateEnd && checkInDate < existingEnd;
-    });
-  }
-
-  private findConflictingRoomReservation(
-    roomId: string,
-    customerId: string,
-    checkInDate: string,
-    checkOutDate: string
-  ): string {
-    const candidateEnd = checkOutDate || "9999-12-31";
-    for (const reservation of this.getReservations()) {
-      if (
-        reservation.customerId === customerId
-        || !reservation.roomIds.includes(roomId)
-        || !["pending", "approved"].includes(reservation.status)
-      ) {
-        continue;
-      }
-      const reservationStart = reservation.startDate;
-      const reservationEnd = reservation.endDate || "9999-12-31";
-      if (reservationStart < candidateEnd && checkInDate < reservationEnd) {
-        return reservation.customerName || reservation.title || "başka bir müşteri";
-      }
-    }
-    return "";
-  }
-
-  private refreshRoomStatusFromStays(roomId: string, now: string, checkoutToCleaning: boolean) {
-    const active = this.db
-      .prepare(`
-        SELECT status
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND status IN ('checked_in', 'planned')
-          AND deleted_at = ''
-        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END, check_in_date ASC
-        LIMIT 1
-      `)
-      .get(roomId) as { status?: string } | undefined;
-    const room = this.db
-      .prepare("SELECT status FROM rooms WHERE id = ? AND deleted_at = ''")
-      .get(roomId) as { status?: string } | undefined;
-    if (!room) {
-      return;
-    }
-    const currentStatus = String(room.status ?? "");
-    let nextStatus = currentStatus;
-    if (active?.status === "checked_in") {
-      nextStatus = "occupied";
-    } else if (active?.status === "planned") {
-      nextStatus = "reserved";
-    } else if (checkoutToCleaning) {
-      nextStatus = "cleaning";
-    } else if (["occupied", "reserved"].includes(currentStatus)) {
-      nextStatus = "available";
-    }
-    if (nextStatus !== currentStatus) {
-      this.db
-        .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-        .run(nextStatus, now, roomId);
-    }
-  }
-
-  private enforceActiveStayRoomStatus(roomId: string, now: string) {
-    const active = this.db
-      .prepare(`
-        SELECT status
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND status IN ('checked_in', 'planned')
-          AND deleted_at = ''
-        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END, check_in_date ASC
-        LIMIT 1
-      `)
-      .get(roomId) as { status?: string } | undefined;
-    if (!active) {
-      return;
-    }
-    this.db
-      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-      .run(active.status === "checked_in" ? "occupied" : "reserved", now, roomId);
-  }
-
-  private getRooms(): DesktopRoom[] {
-    const reservationTitles = this.getActiveResourceReservationTitles("room");
-    const rows = this.db
-      .prepare(`
-        SELECT
-          id,
-          name,
-          number,
-          capacity,
-          bed_info,
-          floor,
-          status,
-          features_json,
-          description,
-          price_note,
-          is_active,
-          sort_order,
-          updated_at
-        FROM rooms
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, number ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      number: String(row.number ?? ""),
-      capacity: Number(row.capacity ?? 0),
-      bedInfo: String(row.bed_info ?? ""),
-      floor: String(row.floor ?? ""),
-      status: String(row.status ?? "available"),
-      features: this.parseStringArray(row.features_json),
-      description: String(row.description ?? ""),
-      priceNote: String(row.price_note ?? ""),
-      isActive: Number(row.is_active ?? 0) === 1,
-      sortOrder: Number(row.sort_order ?? 0),
-      activeReservationTitle: reservationTitles.get(String(row.id ?? "")) ?? "",
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getTables(): DesktopTable[] {
-    const reservationTitles = this.getActiveResourceReservationTitles("table");
-    const rows = this.db
-      .prepare(`
-        SELECT
-          id,
-          name,
-          area,
-          capacity,
-          status,
-          current_customer_id,
-          current_reservation_id,
-          notes,
-          is_active,
-          sort_order,
-          updated_at
-        FROM tables
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, area ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      area: String(row.area ?? ""),
-      capacity: Number(row.capacity ?? 0),
-      status: String(row.status ?? "available"),
-      currentCustomerId: String(row.current_customer_id ?? ""),
-      currentReservationId: String(row.current_reservation_id ?? ""),
-      activeReservationTitle: reservationTitles.get(String(row.id ?? "")) ?? "",
-      notes: String(row.notes ?? ""),
-      isActive: Number(row.is_active ?? 0) === 1,
-      sortOrder: Number(row.sort_order ?? 0),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getTableCategories(): DesktopTableCategory[] {
-    const rows = this.db
-      .prepare(`
-        SELECT area, sort_order
-        FROM tables
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const categories = new Map<string, DesktopTableCategory>();
-
-    for (const row of rows) {
-      const name = normalizeTableCategoryName(row.area);
-      const key = tableCategoryKey(name);
-      const existing = categories.get(key);
-      if (existing) {
-        existing.tableCount += 1;
-      } else {
-        categories.set(key, { name, tableCount: 1 });
-      }
-    }
-
-    return [...categories.values()];
-  }
-
-  private getReservations(): DesktopReservation[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          reservations.id,
-          reservations.request_id,
-          reservations.customer_id,
-          customers.full_name AS customer_name,
-          customers.phone AS customer_phone,
-          reservations.reservation_type,
-          reservations.status,
-          reservations.title,
-          reservations.start_date,
-          reservations.end_date,
-          reservations.time,
-          reservations.guest_count,
-          reservations.adult_count,
-          reservations.child_count,
-          reservations.room_ids_json,
-          reservations.table_ids_json,
-          reservations.notes,
-          reservations.price_note,
-          reservations.payment_status,
-          reservations.updated_at
-        FROM reservations
-        LEFT JOIN customers ON customers.id = reservations.customer_id AND customers.deleted_at = ''
-        WHERE reservations.deleted_at = ''
-        ORDER BY reservations.start_date ASC, reservations.time ASC, reservations.created_at DESC
-        LIMIT 80
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      requestId: String(row.request_id ?? ""),
-      customerId: String(row.customer_id ?? ""),
-      customerName: String(row.customer_name ?? ""),
-      customerPhone: String(row.customer_phone ?? ""),
-      reservationType: String(row.reservation_type ?? ""),
-      status: String(row.status ?? "pending"),
-      title: String(row.title ?? ""),
-      startDate: String(row.start_date ?? ""),
-      endDate: String(row.end_date ?? ""),
-      time: String(row.time ?? ""),
-      guestCount: Number(row.guest_count ?? 0),
-      adultCount: Number(row.adult_count ?? 0),
-      childCount: Number(row.child_count ?? 0),
-      roomIds: this.parseStringArray(row.room_ids_json),
-      tableIds: this.parseStringArray(row.table_ids_json),
-      notes: String(row.notes ?? ""),
-      priceNote: String(row.price_note ?? ""),
-      paymentStatus: String(row.payment_status ?? "not_required"),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
-
-  private getActiveResourceReservationTitles(resourceType: "room" | "table") {
-    const map = new Map<string, string>();
-    const rows = this.db
-      .prepare(`
-        SELECT id, title, room_ids_json, table_ids_json
-        FROM reservations
-        WHERE deleted_at = ''
-          AND status IN ('pending', 'approved')
-        ORDER BY start_date ASC, time ASC, created_at DESC
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    for (const row of rows) {
-      const ids = this.parseStringArray(resourceType === "room" ? row.room_ids_json : row.table_ids_json);
-      for (const id of ids) {
-        if (!map.has(id)) {
-          map.set(id, String(row.title ?? ""));
-        }
-      }
-    }
-
-    return map;
-  }
-
-  private getRequests(): SyncedCustomerRequest[] {
-    const rows = this.db
-      .prepare(`
-        SELECT
-          id,
-          customer_id,
-          source,
-          request_type,
-          status,
-          customer_name,
-          customer_phone,
-          date_text,
-          start_date,
-          end_date,
-          time,
-          guest_count,
-          adult_count,
-          child_count,
-          message,
-          ai_summary,
-          ai_suggested_reply,
-          whatsapp_message,
-          assigned_to,
-          priority,
-          sync_status,
-          created_at,
-          updated_at
-        FROM requests
-        WHERE deleted_at = ''
-        ORDER BY
-          CASE
-            WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND priority = 'urgent' THEN 0
-            WHEN status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress') AND priority = 'high' THEN 1
-            WHEN status = 'new' THEN 2
-            WHEN status IN ('seen', 'waiting_owner', 'pending', 'in_progress') AND priority <> 'low' THEN 3
-            WHEN status IN ('seen', 'waiting_owner', 'pending', 'in_progress') THEN 4
-            ELSE 5
-          END,
-          created_at DESC
-        LIMIT 80
-      `)
-      .all() as Array<Record<string, unknown>>;
-
-    return rows.map((row) => this.mapRequestRow(row));
-  }
-
-  private mapRequestRow(row: Record<string, unknown>): SyncedCustomerRequest {
-    return {
-      id: String(row.id ?? ""),
-      customer_id: String(row.customer_id ?? ""),
-      source: row.source as SyncedCustomerRequest["source"],
-      request_type: row.request_type as SyncedCustomerRequest["request_type"],
-      status: row.status as SyncedCustomerRequest["status"],
-      customer_name: String(row.customer_name ?? ""),
-      customer_phone: String(row.customer_phone ?? ""),
-      date_text: String(row.date_text ?? ""),
-      start_date: String(row.start_date ?? ""),
-      end_date: String(row.end_date ?? ""),
-      time: String(row.time ?? ""),
-      guest_count: Number(row.guest_count ?? 0),
-      adult_count: Number(row.adult_count ?? 0),
-      child_count: Number(row.child_count ?? 0),
-      message: String(row.message ?? ""),
-      ai_summary: String(row.ai_summary ?? ""),
-      ai_suggested_reply: String(row.ai_suggested_reply ?? ""),
-      whatsapp_message: String(row.whatsapp_message ?? ""),
-      assigned_to: String(row.assigned_to ?? ""),
-      priority: row.priority as SyncedCustomerRequest["priority"],
-      sync_status: row.sync_status as SyncedCustomerRequest["sync_status"],
-      created_at: String(row.created_at ?? ""),
-      updated_at: String(row.updated_at ?? "")
-    };
-  }
-
-  private getReportStockMovements(
-    startDate: string,
-    endDate: string,
-    mode: "manual" | "image" | "all"
-  ): DesktopReportStockMovement[] {
-    const sourceClause = mode === "manual"
-      ? "AND menu_stock_movements.source_type IN ('desktop', 'android')"
-      : mode === "image"
-        ? "AND menu_stock_movements.source_type = 'stock_image_import'"
-        : "";
-    const limit = mode === "all" ? 8 : 6;
-    const rows = this.db
-      .prepare(`
-        SELECT
-          menu_stock_movements.*,
-          menu_items.name AS item_name,
-          menu_items.stock_unit AS stock_unit
-        FROM menu_stock_movements
-        INNER JOIN menu_items ON menu_items.id = menu_stock_movements.menu_item_id
-        WHERE date(menu_stock_movements.created_at, 'localtime') BETWEEN ? AND ?
-          ${sourceClause}
-        ORDER BY menu_stock_movements.created_at DESC, menu_stock_movements.id DESC
-        LIMIT ${limit}
-      `)
-      .all(startDate, endDate) as Array<Record<string, unknown>>;
-
-    return rows.map((row) => {
-      const sourceType = String(row.source_type ?? "desktop") as MenuStockSourceType;
-      return {
-        id: String(row.id ?? ""),
-        menuItemId: String(row.menu_item_id ?? ""),
-        itemName: String(row.item_name ?? "Ürün"),
-        type: String(row.type ?? "adjust") as MenuStockMovementType,
-        quantityChange: normalizeStockPrecision(Number(row.quantity_change ?? 0)),
-        quantityAfter: normalizeStockPrecision(Number(row.quantity_after ?? 0)),
-        unit: normalizeMenuStockUnit(row.stock_unit),
-        sourceType,
-        sourceLabel: reportStockSourceLabel(sourceType),
-        note: String(row.note ?? ""),
-        createdAt: String(row.created_at ?? "")
-      };
-    });
-  }
-
-  private getReportAttention(
-    enabledCapabilities: ReadonlySet<BusinessCapability>
-  ): DesktopReportData["attention"] {
-    const today = formatLocalIsoDate(new Date());
-    const customerReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
-    const restaurantReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
-    const stockReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_MENU)
-      && enabledCapabilities.has(BUSINESS_CAPABILITIES.INVENTORY);
-    const reservationCapabilityClause = reportReservationCapabilitySqlClause(enabledCapabilities);
-    const taskCapabilityClause = reportTaskCapabilitySqlClause(enabledCapabilities);
-    const pendingRequests = customerReportsEnabled ? this.getScalarCount(`
-      SELECT COUNT(*) AS count
-      FROM requests
-      WHERE deleted_at = ''
-        AND status IN ('new', 'seen', 'waiting_owner', 'pending', 'in_progress')
-    `) : 0;
-    const pendingReservations = this.getScalarCount(`
-      SELECT COUNT(*) AS count
-      FROM reservations
-      WHERE deleted_at = ''
-        AND status = 'pending'
-        ${reservationCapabilityClause}
-    `);
-    const paymentWaitingRows = this.db
-      .prepare(`
-        SELECT DISTINCT tables.id, tables.name
-        FROM tables
-        LEFT JOIN table_orders
-          ON table_orders.table_id = tables.id
-          AND table_orders.status = 'payment'
-        WHERE tables.deleted_at = ''
-          AND tables.is_active = 1
-          AND (tables.status = 'bill_waiting' OR table_orders.id IS NOT NULL)
-        ORDER BY tables.sort_order ASC, tables.name COLLATE NOCASE ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const paymentWaitingTables = restaurantReportsEnabled ? paymentWaitingRows.length : 0;
-    const incompleteTasks = this.getScalarCount(`
-      SELECT COUNT(*) AS count
-      FROM daily_tasks
-      WHERE deleted_at = ''
-        AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
-        ${taskCapabilityClause}
-    `);
-    const overdueTasks = this.getScalarCount(
-      `
-        SELECT COUNT(*) AS count
-        FROM daily_tasks
-        WHERE deleted_at = ''
-          AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
-          ${taskCapabilityClause}
-          AND due_date != ''
-          AND date(due_date) < ?
-      `,
-      today
-    );
-    const openTaskRows = this.db
-      .prepare(`
-        SELECT title, due_date
-        FROM daily_tasks
-        WHERE deleted_at = ''
-          AND status NOT IN ('done', 'completed', 'cancelled', 'archived')
-          ${taskCapabilityClause}
-        ORDER BY
-          CASE WHEN due_date != '' AND date(due_date) < ? THEN 0 ELSE 1 END,
-          CASE WHEN due_date = '' THEN 1 ELSE 0 END,
-          due_date ASC,
-          created_at ASC
-        LIMIT 3
-      `)
-      .all(today) as Array<Record<string, unknown>>;
-    const stockRows = this.db
-      .prepare(`
-        SELECT
-          name,
-          stock_quantity,
-          stock_min_quantity,
-          stock_consumption_quantity,
-          stock_unit
-        FROM menu_items
-        WHERE deleted_at = ''
-          AND stock_quantity IS NOT NULL
-        ORDER BY name COLLATE NOCASE ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const outOfStockRows = stockRows.filter((row) =>
-      Number(row.stock_quantity ?? 0) < (normalizePositiveStockNumber(row.stock_consumption_quantity) ?? 1)
-    );
-    const lowStockRows = stockRows.filter((row) => {
-      const quantity = Number(row.stock_quantity ?? 0);
-      const consumption = normalizePositiveStockNumber(row.stock_consumption_quantity) ?? 1;
-      const minimum = nullableNumber(row.stock_min_quantity);
-      return quantity >= consumption && minimum !== null && quantity <= minimum;
-    });
-    const outOfStockItems = stockReportsEnabled ? outOfStockRows.length : 0;
-    const lowStockItems = stockReportsEnabled ? lowStockRows.length : 0;
-    const items: DesktopReportAttentionItem[] = [];
-
-    if (pendingRequests > 0) {
-      items.push({
-        kind: "pending_request",
-        title: `${pendingRequests} müşteri talebi cevap bekliyor`,
-        detail: "Yanıt bekleyen talepleri öncelik sırasıyla sonuçlandırın."
-      });
-    }
-    if (pendingReservations > 0) {
-      items.push({
-        kind: "pending_reservation",
-        title: `${pendingReservations} rezervasyon onay bekliyor`,
-        detail: "Bekleyen rezervasyonları onaylayın veya reddedin."
-      });
-    }
-    if (paymentWaitingTables > 0) {
-      const tableNames = paymentWaitingRows.slice(0, 3).map((row) => String(row.name ?? "Masa")).join(", ");
-      items.push({
-        kind: "payment_waiting",
-        title: `${paymentWaitingTables} masa hesap bekliyor`,
-        detail: tableNames
-      });
-    }
-    if (overdueTasks > 0) {
-      const titles = openTaskRows
-        .filter((row) => String(row.due_date ?? "") && String(row.due_date ?? "") < today)
-        .map((row) => String(row.title ?? "Günlük iş"))
-        .join(", ");
-      items.push({
-        kind: "overdue_task",
-        title: `${overdueTasks} günlük iş gecikti`,
-        detail: titles || "Geciken günlük işleri kontrol edin."
-      });
-    }
-    const remainingOpenTasks = Math.max(0, incompleteTasks - overdueTasks);
-    if (remainingOpenTasks > 0) {
-      items.push({
-        kind: "open_task",
-        title: `${remainingOpenTasks} günlük iş tamamlanmadı`,
-        detail: "Açık günlük işleri planlanan sırayla tamamlayın."
-      });
-    }
-    for (const row of (stockReportsEnabled ? outOfStockRows : []).slice(0, 4)) {
-      items.push({
-        kind: "out_of_stock",
-        title: `${String(row.name ?? "Ürün")} stokta yok`,
-        detail: "Satış için gereken en az birim stok bulunmuyor."
-      });
-    }
-    if (stockReportsEnabled && outOfStockRows.length > 4) {
-      items.push({
-        kind: "out_of_stock",
-        title: `${outOfStockRows.length - 4} ürün daha stokta yok`,
-        detail: "Stok listesindeki diğer tükenen ürünleri kontrol edin."
-      });
-    }
-    for (const row of (stockReportsEnabled ? lowStockRows : []).slice(0, 4)) {
-      const unit = normalizeMenuStockUnit(row.stock_unit);
-      items.push({
-        kind: "low_stock",
-        title: `${String(row.name ?? "Ürün")} minimum stok seviyesinde`,
-        detail: `${formatReportStockQuantity(Number(row.stock_quantity ?? 0), unit)} kaldı.`
-      });
-    }
-    if (stockReportsEnabled && lowStockRows.length > 4) {
-      items.push({
-        kind: "low_stock",
-        title: `${lowStockRows.length - 4} ürün daha minimum stok seviyesinde`,
-        detail: "Stok listesindeki diğer azalan ürünleri kontrol edin."
-      });
-    }
-
-    return {
-      pendingRequests,
-      pendingReservations,
-      paymentWaitingTables,
-      overdueTasks,
-      incompleteTasks,
-      outOfStockItems,
-      lowStockItems,
-      totalCount: pendingRequests
-        + pendingReservations
-        + paymentWaitingTables
-        + incompleteTasks
-        + outOfStockItems
-        + lowStockItems,
-      items
-    };
-  }
 
   private getScalarCount(sql: string, ...params: Array<string | number | null>): number {
     const row = this.db.prepare(sql).get(...params) as { count?: number } | undefined;
@@ -6677,56 +1732,6 @@ export class DesktopDatabase {
       return parsed.map((item) => String(item).trim()).filter(Boolean);
     } catch {
       return [];
-    }
-  }
-
-  private ensureInitialRooms(targetCount: number, now: string) {
-    const count = this.getScalarCount("SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''");
-    const missing = Math.max(0, targetCount - count);
-    const statement = this.db.prepare(`
-      INSERT INTO rooms (
-        id,
-        name,
-        number,
-        capacity,
-        bed_info,
-        status,
-        features_json,
-        description,
-        sort_order,
-        created_at,
-        updated_at,
-        sync_status
-      ) VALUES (?, ?, ?, 2, '1 çift kişilik yatak', 'available', '[]', '', ?, ?, ?, 'local_only')
-    `);
-
-    for (let index = 0; index < missing; index += 1) {
-      const order = count + index + 1;
-      const number = String(100 + order);
-      statement.run(createId("room_"), `Oda ${number}`, number, order, now, now);
-    }
-  }
-
-  private ensureInitialTables(targetCount: number, now: string) {
-    const count = this.getScalarCount("SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''");
-    const missing = Math.max(0, targetCount - count);
-    const statement = this.db.prepare(`
-      INSERT INTO tables (
-        id,
-        name,
-        area,
-        capacity,
-        status,
-        sort_order,
-        created_at,
-        updated_at,
-        sync_status
-      ) VALUES (?, ?, 'Genel', 4, 'available', ?, ?, ?, 'local_only')
-    `);
-
-    for (let index = 0; index < missing; index += 1) {
-      const order = count + index + 1;
-      statement.run(createId("table_"), `Masa ${order}`, order, now, now);
     }
   }
 
@@ -6787,335 +1792,41 @@ export class DesktopDatabase {
     return new Set([...protectedIds].filter((tableId) => currentTableIds.has(tableId)));
   }
 
-  private reconcileTableCategories(categories: NormalizedTableCategoryInput[], now: string) {
-    const tables = this.db
-      .prepare(`
-        SELECT id, name, area, capacity, status, is_active, sort_order
-        FROM tables
-        WHERE deleted_at = ''
-        ORDER BY sort_order ASC, name ASC
-      `)
-      .all() as Array<Record<string, unknown>>;
-    const protectedIds = this.getProtectedTableIds();
-    const remaining = [...tables];
-    const assignments = categories.map((category) => ({
-      category,
-      tables: [] as Array<Record<string, unknown>>
-    }));
-
-    const takeFromRemaining = (
-      assignment: (typeof assignments)[number],
-      predicate: (table: Record<string, unknown>) => boolean
-    ) => {
-      for (let index = 0; index < remaining.length && assignment.tables.length < assignment.category.tableCount;) {
-        if (predicate(remaining[index])) {
-          assignment.tables.push(remaining.splice(index, 1)[0]);
-        } else {
-          index += 1;
-        }
-      }
-    };
-
-    // Önce kendi kategorisindeki korumalı masaları yerinde tut.
-    for (const assignment of assignments) {
-      const sourceKey = assignment.category.sourceKey || assignment.category.nameKey;
-      takeFromRemaining(assignment, (table) =>
-        protectedIds.has(String(table.id ?? ""))
-        && tableCategoryKey(normalizeTableCategoryName(table.area)) === sourceKey
-      );
-    }
-
-    // Kaldırılan veya küçültülen kategorilerdeki aktif masalara mutlaka yeni bir yer ayır.
-    const assignFromPool = (protectedOnly: boolean) => {
-      for (const assignment of assignments) {
-        while (assignment.tables.length < assignment.category.tableCount) {
-          const candidateIndex = remaining.findIndex((table) =>
-            protectedIds.has(String(table.id ?? "")) === protectedOnly
-          );
-          if (candidateIndex < 0) {
-            break;
-          }
-          assignment.tables.push(remaining.splice(candidateIndex, 1)[0]);
-        }
-      }
-    };
-
-    assignFromPool(true);
-
-    // Korumalı masalar yerleştirildikten sonra mevcut kategori eşleşmelerini koru.
-    for (const assignment of assignments) {
-      const sourceKey = assignment.category.sourceKey || assignment.category.nameKey;
-      takeFromRemaining(assignment, (table) =>
-        !protectedIds.has(String(table.id ?? ""))
-        && tableCategoryKey(normalizeTableCategoryName(table.area)) === sourceKey
-      );
-    }
-
-    assignFromPool(false);
-    for (const assignment of assignments) {
-      assignment.tables.sort((left, right) =>
-        Number(left.sort_order ?? 0) - Number(right.sort_order ?? 0)
-        || String(left.name ?? "").localeCompare(String(right.name ?? ""), "tr")
-      );
-    }
-
-    const updateTable = this.db.prepare(`
-      UPDATE tables
-      SET name = ?,
-          area = ?,
-          is_active = 1,
-          sort_order = ?,
-          updated_at = ?,
-          deleted_at = '',
-          sync_status = 'local_only'
-      WHERE id = ?
-    `);
-    const insertTable = this.db.prepare(`
-      INSERT INTO tables (
-        id,
-        name,
-        area,
-        capacity,
-        status,
-        notes,
-        is_active,
-        sort_order,
-        created_at,
-        updated_at,
-        sync_status
-      ) VALUES (?, ?, ?, 4, 'available', '', 1, ?, ?, ?, 'local_only')
-    `);
-    let sortOrder = 1;
-
-    for (const assignment of assignments) {
-      for (let index = 0; index < assignment.category.tableCount; index += 1) {
-        const table = assignment.tables[index];
-        const position = index + 1;
-        if (table) {
-          const nextName = reconcileTableName(table.name, table.area, assignment.category.name, position);
-          if (
-            nextName !== String(table.name ?? "")
-            || assignment.category.name !== String(table.area ?? "")
-            || sortOrder !== Number(table.sort_order ?? 0)
-            || Number(table.is_active ?? 0) !== 1
-          ) {
-            updateTable.run(
-              nextName,
-              assignment.category.name,
-              sortOrder,
-              now,
-              String(table.id ?? "")
-            );
-          }
-        } else {
-          insertTable.run(
-            createId("table_"),
-            `${assignment.category.name} ${position}`,
-            assignment.category.name,
-            sortOrder,
-            now,
-            now
-          );
-        }
-        sortOrder += 1;
-      }
-    }
-
-    const archiveTable = this.db.prepare(`
-      UPDATE tables
-      SET is_active = 0,
-          deleted_at = ?,
-          updated_at = ?,
-          sync_status = 'local_only'
-      WHERE id = ?
-    `);
-    for (const table of remaining) {
-      archiveTable.run(now, now, String(table.id ?? ""));
-    }
-  }
-
-  private ensureCustomerForRequest(request: Record<string, unknown>, now: string) {
-    const requestCustomerId = String(request.customer_id ?? "").trim();
-    if (requestCustomerId) {
-      const existing = this.db.prepare("SELECT id FROM customers WHERE id = ? AND deleted_at = ''").get(requestCustomerId);
-      if (existing) {
-        return requestCustomerId;
-      }
-    }
-
-    const phone = String(request.customer_phone ?? "").trim();
-    const existingByPhone = phone
-      ? (this.db.prepare("SELECT id FROM customers WHERE phone = ? AND deleted_at = '' LIMIT 1").get(phone) as { id?: string } | undefined)
-      : undefined;
-    const customerId = existingByPhone?.id || requestCustomerId || createId("customer_");
-    const source = String(request.source ?? "web_form").trim() || "web_form";
-
-    this.db
-      .prepare(`
-        INSERT INTO customers (
-          id,
-          full_name,
-          phone,
-          source,
-          notes,
-          tags_json,
-          last_contact_at,
-          created_at,
-          updated_at,
-          sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
-        ON CONFLICT(id) DO UPDATE SET
-          full_name = excluded.full_name,
-          phone = excluded.phone,
-          source = excluded.source,
-          notes = excluded.notes,
-          tags_json = excluded.tags_json,
-          last_contact_at = excluded.last_contact_at,
-          updated_at = excluded.updated_at,
-          deleted_at = '',
-          sync_status = 'local_only'
-      `)
-      .run(
-        customerId,
-        String(request.customer_name ?? "Misafir").trim() || "Misafir",
-        phone,
-        source,
-        String(request.message ?? ""),
-        JSON.stringify(getCustomerTagsForSource(source)),
-        now,
-        now,
-        now
-      );
-
-    return customerId;
-  }
-
   private authorizeAndroidActionInTransaction(action: AndroidSyncAction): AndroidActionMutationResult {
-    const deviceId = String(action.device_id ?? "").trim();
-    const device = this.db
-      .prepare(`
-        SELECT role, is_active, permissions_json, revoked_at
-        FROM android_devices
-        WHERE device_id = ?
-        LIMIT 1
-      `)
-      .get(deviceId) as Record<string, unknown> | undefined;
-    if (!device) {
-      return { ok: false, message: "Telefon masaüstü cihaz listesine kaydedilemedi." };
-    }
-    if (Number(device.is_active ?? 0) !== 1 || String(device.revoked_at ?? "").trim()) {
-      return { ok: false, message: "Cihaz masaüstünde pasifleştirilmiş." };
-    }
-    const requiredPermission = resolveAndroidActionPermission(action.action_type, action.payload);
-    if (!requiredPermission) {
-      return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
-    }
-    const role = normalizeAndroidDeviceRole(device.role);
-    if (isAndroidAdminOnlyAction(action.action_type) && role !== "admin") {
-      return { ok: false, message: "Müşteri yönetimi ve kayıt silme işlemleri yalnız yönetici cihazlarda kullanılabilir." };
-    }
-    const enabledCapabilities = this.getEnabledBusinessCapabilities();
-    const capabilityContext = this.getAndroidActionCapabilityContext(action);
-    if (!androidActionAllowedByCapabilities(action.action_type, enabledCapabilities, capabilityContext)) {
-      return { ok: false, message: "Bu işlem işletmenin etkin yeteneklerinde kullanılamıyor." };
-    }
-    const permissions = effectiveAndroidPermissions(role, device.permissions_json, enabledCapabilities);
-    if (!permissions.includes(requiredPermission)) {
-      return {
-        ok: false,
-        message: requiredPermission === "table_order.close_paid"
-          ? "Bu cihazın hesap kapatma yetkisi yok."
-          : "Bu cihazın bu işlem için yetkisi yok."
-      };
-    }
-    if (
-      ["customer_room_assign", "customer_room_stay_status"].includes(action.action_type)
-      && !permissions.includes("customer.manage")
-    ) {
-      return { ok: false, message: "Bu cihazın müşteri yönetimi yetkisi yok." };
-    }
-    return { ok: true, message: "Telefon işlemi yetkilendirildi." };
-  }
-
-  private getAndroidActionCapabilityContext(action: AndroidSyncAction) {
-    const context = {
-      requestType: "",
-      reservationType: "",
-      reservationRoomIds: [] as string[],
-      reservationTableIds: [] as string[],
-      taskType: String(action.payload.task_type ?? "").trim(),
-      relatedType: String(action.payload.related_type ?? "").trim(),
-      relatedReservationType: "",
-      relatedReservationRoomIds: [] as string[],
-      relatedReservationTableIds: [] as string[],
-      payload: action.payload
-    };
-
-    if (action.action_type === "customer_request_convert_to_reservation") {
-      const requestId = androidPayloadString(action.payload, "request_id");
-      const request = requestId
-        ? this.db.prepare("SELECT request_type FROM requests WHERE id = ? AND deleted_at = ''").get(requestId) as { request_type?: unknown } | undefined
-        : undefined;
-      context.requestType = String(request?.request_type ?? "");
-    }
-
-    if (["reservation_approve", "reservation_reject", "reservation_cancel"].includes(action.action_type)) {
-      const reservationId = androidPayloadString(action.payload, "reservation_id");
-      const reservation = reservationId
-        ? this.db.prepare("SELECT reservation_type, room_ids_json, table_ids_json FROM reservations WHERE id = ? AND deleted_at = ''").get(reservationId) as Record<string, unknown> | undefined
-        : undefined;
-      context.reservationType = String(reservation?.reservation_type ?? "");
-      context.reservationRoomIds = this.parseStringArray(reservation?.room_ids_json);
-      context.reservationTableIds = this.parseStringArray(reservation?.table_ids_json);
-    }
-
-    if (action.action_type.startsWith("daily_task_")) {
-      const taskId = action.action_type === "daily_task_create"
-        ? ""
-        : androidPayloadString(action.payload, "task_id");
-      const task = taskId
-        ? this.db.prepare("SELECT task_type, related_type, related_id FROM daily_tasks WHERE id = ? AND deleted_at = ''").get(taskId) as Record<string, unknown> | undefined
-        : undefined;
-      context.taskType = String(task?.task_type ?? context.taskType).trim();
-      context.relatedType = String(task?.related_type ?? context.relatedType).trim();
-      if (context.relatedType === "reservation") {
-        const relatedId = String(task?.related_id ?? action.payload.related_id ?? "").trim();
-        const reservation = relatedId
-          ? this.db.prepare("SELECT reservation_type, room_ids_json, table_ids_json FROM reservations WHERE id = ? AND deleted_at = ''").get(relatedId) as Record<string, unknown> | undefined
-          : undefined;
-        context.relatedReservationType = String(reservation?.reservation_type ?? "");
-        context.relatedReservationRoomIds = this.parseStringArray(reservation?.room_ids_json);
-        context.relatedReservationTableIds = this.parseStringArray(reservation?.table_ids_json);
-      }
-    }
-
-    return context;
+    return authorizeStoredAndroidAction(this.db, action, this.getEnabledBusinessCapabilities());
   }
 
   private applyAndroidActionInTransaction(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
     switch (action.action_type) {
       case "customer_request_mark_answered":
-        return this.applyAndroidRequestStatus(action, "answered", now);
+        return applyStoredAndroidRequestStatus(this.db, action, "answered", now, this.getEnabledBusinessCapabilities());
       case "customer_request_reopen":
-        return this.applyAndroidRequestStatus(action, "new", now);
+        return applyStoredAndroidRequestStatus(this.db, action, "new", now, this.getEnabledBusinessCapabilities());
       case "customer_request_approve":
-        return this.applyAndroidRequestStatus(action, "approved", now);
+        return applyStoredAndroidRequestStatus(this.db, action, "approved", now, this.getEnabledBusinessCapabilities());
       case "customer_request_reject":
-        return this.applyAndroidRequestStatus(action, "rejected", now);
+        return applyStoredAndroidRequestStatus(this.db, action, "rejected", now, this.getEnabledBusinessCapabilities());
       case "customer_request_convert_to_reservation":
-        return this.applyAndroidRequestConversion(action, now);
+        return applyStoredAndroidRequestConversion(this.db, action, now, this.getEnabledBusinessCapabilities());
       case "customer_request_delete":
-        return this.deleteRequestInTransaction(androidPayloadString(action.payload, "request_id"), now, action);
+        return deleteStoredRequestInTransaction(
+          this.db,
+          androidPayloadString(action.payload, "request_id"),
+          now,
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
+        );
       case "customer_create":
-        return this.applyAndroidCustomerSave(action, now, false);
+        return applyStoredAndroidCustomerSave(this.db, action, now, false);
       case "customer_update":
-        return this.applyAndroidCustomerSave(action, now, true);
+        return applyStoredAndroidCustomerSave(this.db, action, now, true);
       case "customer_delete":
         return this.deleteCustomerInTransaction(androidPayloadString(action.payload, "customer_id"), now, action);
       case "customer_room_assign":
-        return this.applyAndroidCustomerRoomAssignment(action, now);
+        return applyStoredAndroidCustomerRoomAssignment(this.db, action, now);
       case "customer_room_stay_status":
-        return this.applyAndroidCustomerRoomStayStatus(action, now);
+        return applyStoredAndroidCustomerRoomStayStatus(this.db, action, now);
       case "reservation_room_create":
       case "reservation_room_update":
       case "reservation_table_create":
@@ -7128,13 +1839,13 @@ export class DesktopDatabase {
             this.insertAndroidActionEvent(action, type, "reservation", entityId, payload, now)
         });
       case "reservation_approve":
-        return this.applyAndroidReservationStatus(action, "approved", now);
+        return applyStoredAndroidReservationStatus(this.db, action, "approved", now);
       case "reservation_reject":
-        return this.applyAndroidReservationStatus(action, "rejected", now);
+        return applyStoredAndroidReservationStatus(this.db, action, "rejected", now);
       case "reservation_cancel":
-        return this.applyAndroidReservationStatus(action, "cancelled", now);
+        return applyStoredAndroidReservationStatus(this.db, action, "cancelled", now);
       case "room_status_update":
-        return this.applyAndroidRoomStatus(action, now);
+        return applyStoredAndroidRoomStatus(this.db, action, now);
       case "daily_task_create":
       case "daily_task_update":
       case "daily_task_delete":
@@ -7146,11 +1857,11 @@ export class DesktopDatabase {
             this.insertAndroidActionEvent(action, type, "daily_task", entityId, payload, now)
         });
       case "daily_task_complete":
-        return this.applyAndroidDailyTaskStatus(action, "done", now);
+        return applyStoredAndroidDailyTaskStatus(this.db, action, "done", now);
       case "daily_task_reopen":
-        return this.applyAndroidDailyTaskStatus(action, "pending", now);
+        return applyStoredAndroidDailyTaskStatus(this.db, action, "pending", now);
       case "daily_task_cancel":
-        return this.applyAndroidDailyTaskStatus(action, "cancelled", now);
+        return applyStoredAndroidDailyTaskStatus(this.db, action, "cancelled", now);
       case "finance_manual_create":
         return applyAndroidFinanceAction({
           db: this.db,
@@ -7171,40 +1882,57 @@ export class DesktopDatabase {
       case "table_status_update":
         return this.applyAndroidTableStatus(action, now);
       case "table_order_open":
-        return this.applyAndroidTableOrderOpen(action, now);
+        return applyStoredAndroidTableOrderOpen(this.db, action, now);
       case "table_order_add_item":
-        return this.applyAndroidTableOrderAddItem(action, now);
+        return applyStoredAndroidTableOrderAddItem(this.db, action, now);
       case "table_order_update_item_quantity":
-        return this.applyAndroidTableOrderItemQuantity(action, now);
+        return applyStoredAndroidTableOrderItemQuantity(this.db, action, now);
       case "table_order_remove_item":
-        return this.applyAndroidTableOrderRemoveItem(action, now);
+        return applyStoredAndroidTableOrderRemoveItem(this.db, action, now);
       case "table_order_set_preparing":
-        return this.applyAndroidTableOrderStatus(action, now, "preparing");
+        return applyStoredAndroidTableOrderStatus(this.db, action, now, "preparing");
       case "table_order_set_served":
-        return this.applyAndroidTableOrderStatus(action, now, "served");
+        return applyStoredAndroidTableOrderStatus(this.db, action, now, "served");
       case "table_order_set_payment_waiting":
-        return this.applyAndroidTableOrderStatus(action, now, "payment");
+        return applyStoredAndroidTableOrderStatus(this.db, action, now, "payment");
       case "table_order_close_paid":
-        return this.applyAndroidTableOrderClose(action, now, "paid");
+        return applyStoredAndroidTableOrderClose(this.db, action, now, "paid");
       case "table_order_cancel":
-        return this.applyAndroidTableOrderClose(action, now, "cancelled");
+        return applyStoredAndroidTableOrderClose(this.db, action, now, "cancelled");
       case "menu_category_delete":
-        return this.deleteMenuCategoryInTransaction(androidPayloadString(action.payload, "category_id"), now, action);
+        return deleteStoredMenuCategoryInTransaction(
+          this.db,
+          androidPayloadString(action.payload, "category_id"),
+          now,
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
+        );
       case "menu_item_delete":
-        return this.deleteMenuItemInTransaction(androidPayloadString(action.payload, "menu_item_id"), now, action);
+        return deleteStoredMenuItemInTransaction(
+          this.db,
+          androidPayloadString(action.payload, "menu_item_id"),
+          now,
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
+        );
       case "message_delete":
-        return this.deleteMessageInTransaction(
+        return deleteStoredMessageInTransaction(
+          this.db,
           androidPayloadString(action.payload, "message_id"),
           androidPayloadString(action.payload, "request_id"),
           now,
-          action
+          action,
+          (sinkAction, type, entityType, entityId, payload, eventNow) =>
+            this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow)
         );
       case "menu_stock_add":
-        return this.applyAndroidMenuStockAction(action, "add", now);
+        return applyStoredAndroidMenuStockAction(this.db, action, "add", now);
       case "menu_stock_set":
-        return this.applyAndroidMenuStockAction(action, "set", now);
+        return applyStoredAndroidMenuStockAction(this.db, action, "set", now);
       case "menu_stock_adjust":
-        return this.applyAndroidMenuStockAction(action, "adjust", now);
+        return applyStoredAndroidMenuStockAction(this.db, action, "adjust", now);
       case "menu_stock_image_import_apply":
         return this.applyAndroidStockImageImport(action, now);
       case "market_stock_count":
@@ -7223,81 +1951,6 @@ export class DesktopDatabase {
       default:
         return { ok: false, message: "Telefon işlem türü bu masaüstü sürümünde desteklenmiyor." };
     }
-  }
-
-  private runDesktopDeletion(
-    operation: () => AndroidActionMutationResult,
-    successMessage: string
-  ): DesktopStatusUpdateResult {
-    let transactionStarted = false;
-    try {
-      this.db.exec("BEGIN IMMEDIATE");
-      transactionStarted = true;
-      const result = operation();
-      if (!result.ok) {
-        this.db.exec("ROLLBACK");
-        transactionStarted = false;
-        return result;
-      }
-      this.db.exec("COMMIT");
-      transactionStarted = false;
-      return {
-        ok: true,
-        message: result.message || successMessage,
-        dashboardData: this.getDashboardData()
-      };
-    } catch {
-      if (transactionStarted) {
-        try {
-          this.db.exec("ROLLBACK");
-        } catch {
-          // SQLite işlemi zaten sonlandıysa kullanıcı dostu hata sonucunu koru.
-        }
-      }
-      return { ok: false, message: "Kayıt silinemedi. Yerel kayıtları kontrol edip tekrar deneyin." };
-    }
-  }
-
-  private deleteRequestInTransaction(
-    requestId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!requestId) {
-      return { ok: false, message: "Silinecek talep seçilmemiş." };
-    }
-    const request = this.db
-      .prepare("SELECT customer_name, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
-      .get(requestId) as { customer_name?: string; updated_at?: string } | undefined;
-    if (!request) {
-      return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", request.updated_at, "Talep")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(request.updated_at, now);
-    const messageResult = this.db
-      .prepare(`
-        UPDATE whatsapp_messages
-        SET deleted_at = ?, updated_at = ?, sync_status = 'local_only'
-        WHERE request_id = ? AND deleted_at = ''
-      `)
-      .run(updatedAt, updatedAt, requestId);
-    this.db
-      .prepare("UPDATE notifications SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE related_type = 'request' AND related_id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, requestId);
-    this.db
-      .prepare("UPDATE requests SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, requestId);
-    this.insertDeletionEvent(androidAction, "request.deleted", "request", requestId, {
-      customer_name: String(request.customer_name ?? ""),
-      deleted_message_count: Number(messageResult.changes ?? 0)
-    }, now);
-    return { ok: true, message: androidAction ? "Talep telefondan silindi." : "Talep silindi." };
   }
 
   private deleteCustomerInTransaction(
@@ -7361,7 +2014,8 @@ export class DesktopDatabase {
     this.db
       .prepare("UPDATE customers SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
       .run(updatedAt, updatedAt, customerId);
-    this.insertDeletionEvent(androidAction, "customer.deleted", "customer", customerId, {
+    insertStoredDeletionEvent(this.db, androidAction, (sinkAction, type, entityType, entityId, payload, eventNow) =>
+      this.insertAndroidActionEvent(sinkAction, type, entityType, entityId, payload, eventNow), "customer.deleted", "customer", customerId, {
       full_name: String(customer.full_name ?? ""),
       preserved_request_count: Number(requestResult.changes ?? 0),
       preserved_reservation_count: Number(reservationResult.changes ?? 0)
@@ -7372,699 +2026,6 @@ export class DesktopDatabase {
         ? "Müşteri telefondan silindi; talep ve rezervasyon geçmişi korundu."
         : "Müşteri silindi; talep ve rezervasyon geçmişi korundu."
     };
-  }
-
-  private deleteMenuCategoryInTransaction(
-    categoryId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!categoryId) {
-      return { ok: false, message: "Silinecek menü kategorisi seçilmemiş." };
-    }
-    const category = this.db
-      .prepare("SELECT name, updated_at FROM menu_categories WHERE id = ? AND deleted_at = ''")
-      .get(categoryId) as { name?: string; updated_at?: string } | undefined;
-    if (!category) {
-      return { ok: false, message: "Menü kategorisi masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", category.updated_at, "Menü kategorisi")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(category.updated_at, now);
-    const itemResult = this.db
-      .prepare(`
-        UPDATE menu_items
-        SET deleted_at = ?, updated_at = ?, sync_status = 'pending'
-        WHERE category_id = ? AND deleted_at = ''
-      `)
-      .run(updatedAt, updatedAt, categoryId);
-    this.db
-      .prepare("UPDATE menu_categories SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, categoryId);
-    this.insertDeletionEvent(androidAction, "menu.category_deleted", "menu_category", categoryId, {
-      name: String(category.name ?? ""),
-      deleted_item_count: Number(itemResult.changes ?? 0)
-    }, now);
-    return {
-      ok: true,
-      message: Number(itemResult.changes ?? 0) > 0
-        ? `${Number(itemResult.changes ?? 0)} ürünle birlikte kategori silindi.`
-        : "Kategori silindi."
-    };
-  }
-
-  private deleteMenuItemInTransaction(
-    itemId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!itemId) {
-      return { ok: false, message: "Silinecek menü ürünü seçilmemiş." };
-    }
-    const item = this.db
-      .prepare("SELECT name, category_id, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
-      .get(itemId) as { name?: string; category_id?: string; updated_at?: string } | undefined;
-    if (!item) {
-      return { ok: false, message: "Menü ürünü masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", item.updated_at, "Menü ürünü")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(item.updated_at, now);
-    this.db
-      .prepare("UPDATE menu_items SET deleted_at = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''")
-      .run(updatedAt, updatedAt, itemId);
-    this.insertDeletionEvent(androidAction, "menu.item_deleted", "menu_item", itemId, {
-      name: String(item.name ?? ""),
-      category_id: String(item.category_id ?? "")
-    }, now);
-    return { ok: true, message: androidAction ? "Menü ürünü telefondan silindi." : "Ürün silindi." };
-  }
-
-  private deleteMessageInTransaction(
-    messageId: string,
-    requestIdInput: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ): AndroidActionMutationResult {
-    if (!messageId && !requestIdInput) {
-      return { ok: false, message: "Silinecek hazır mesaj seçilmemiş." };
-    }
-    const message = messageId
-      ? this.db
-        .prepare("SELECT id, request_id, updated_at FROM whatsapp_messages WHERE id = ? AND deleted_at = ''")
-        .get(messageId) as { id?: string; request_id?: string; updated_at?: string } | undefined
-      : undefined;
-    if (message && requestIdInput && String(message.request_id ?? "") !== requestIdInput) {
-      return { ok: false, message: "Mesaj ile talep bilgisi eşleşmiyor." };
-    }
-    const requestId = requestIdInput || String(message?.request_id ?? "");
-    const request = requestId
-      ? this.db
-        .prepare("SELECT ai_suggested_reply, whatsapp_message, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
-        .get(requestId) as { ai_suggested_reply?: string; whatsapp_message?: string; updated_at?: string } | undefined
-      : undefined;
-    const hasRequestDraft = Boolean(String(request?.ai_suggested_reply ?? "").trim() || String(request?.whatsapp_message ?? "").trim());
-    if (!message && !hasRequestDraft) {
-      return { ok: false, message: "Hazır mesaj masaüstü kayıtlarında bulunamadı." };
-    }
-    const actualUpdatedAt = message?.updated_at || request?.updated_at;
-    const versionConflict = androidAction
-      ? getAndroidVersionConflict(androidAction.payload, "expected_updated_at", actualUpdatedAt, "Hazır mesaj")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const updatedAt = nextMutationTimestamp(actualUpdatedAt, now);
-    let deletedCount = 0;
-    if (requestId) {
-      const result = this.db
-        .prepare(`
-          UPDATE whatsapp_messages
-          SET deleted_at = ?, updated_at = ?, sync_status = 'local_only'
-          WHERE request_id = ? AND direction = 'outgoing' AND status = 'prepared' AND deleted_at = ''
-        `)
-        .run(updatedAt, updatedAt, requestId);
-      deletedCount = Number(result.changes ?? 0);
-      this.db
-        .prepare(`
-          UPDATE requests
-          SET ai_suggested_reply = '', whatsapp_message = '', updated_at = ?, sync_status = 'local_only'
-          WHERE id = ? AND deleted_at = ''
-        `)
-        .run(updatedAt, requestId);
-    } else if (message?.id) {
-      const result = this.db
-        .prepare("UPDATE whatsapp_messages SET deleted_at = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-        .run(updatedAt, updatedAt, message.id);
-      deletedCount = Number(result.changes ?? 0);
-    }
-    const eventId = String(message?.id ?? (messageId || `message_${requestId}`));
-    this.insertDeletionEvent(androidAction, "whatsapp.message_deleted", "whatsapp_message", eventId, {
-      request_id: requestId,
-      deleted_record_count: deletedCount
-    }, now);
-    return { ok: true, message: androidAction ? "Hazır mesaj telefondan silindi." : "Hazır mesaj silindi." };
-  }
-
-  private insertDeletionEvent(
-    androidAction: AndroidSyncAction | undefined,
-    type: string,
-    entityType: string,
-    entityId: string,
-    payload: Record<string, unknown>,
-    now: string
-  ) {
-    if (androidAction) {
-      this.insertAndroidActionEvent(androidAction, type, entityType, entityId, payload, now);
-      return;
-    }
-    this.insertEvent({ type, entityType, entityId, payload, now });
-  }
-
-  private applyAndroidRequestStatus(action: AndroidSyncAction, status: string, now: string): AndroidActionMutationResult {
-    const requestId = androidPayloadString(action.payload, "request_id");
-    if (!requestId) {
-      return { ok: false, message: "Güncellenecek talep seçilmemiş." };
-    }
-    const request = this.db
-      .prepare("SELECT status, updated_at FROM requests WHERE id = ? AND deleted_at = ''")
-      .get(requestId) as { status?: string; updated_at?: string } | undefined;
-    if (!request) {
-      return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", request.updated_at, "Talep");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(request.updated_at, now);
-
-    this.db
-      .prepare("UPDATE requests SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(status, updatedAt, requestId);
-    if (status === "answered" && this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.WHATSAPP)) {
-      this.markPreparedWhatsAppMessagesSentInTransaction(requestId, updatedAt);
-    }
-    this.insertAndroidActionEvent(action, "request.status_changed", "request", requestId, {
-      previous_status: String(request.status ?? ""),
-      status
-    }, now);
-    return { ok: true, message: "Talep durumu telefondan güncellendi." };
-  }
-
-  private applyAndroidRequestConversion(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const requestId = androidPayloadString(action.payload, "request_id");
-    if (!requestId) {
-      return { ok: false, message: "Rezervasyona çevrilecek talep seçilmemiş." };
-    }
-    const request = this.db
-      .prepare("SELECT * FROM requests WHERE id = ? AND deleted_at = ''")
-      .get(requestId) as Record<string, unknown> | undefined;
-    if (!request) {
-      return { ok: false, message: "Talep masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", request.updated_at, "Talep");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(request.updated_at, now);
-
-    const requestType = String(request.request_type ?? "");
-    const reservationType = getRequestReservationType(requestType);
-    if (!reservationType || !canConvertRequestToReservation(this.getEnabledBusinessCapabilities(), requestType)) {
-      return { ok: false, message: "Bu talep türü etkin bir rezervasyon alanına dönüştürülemez." };
-    }
-
-    const existingReservation = this.db
-      .prepare("SELECT id FROM reservations WHERE request_id = ? AND deleted_at = '' LIMIT 1")
-      .get(requestId) as { id?: string } | undefined;
-    const reservationId = existingReservation?.id || createAndroidEntityId("reservation_", action.id);
-    const customerId = this.ensureCustomerForRequest(request, now);
-    this.db
-      .prepare(`
-        INSERT INTO reservations (
-          id, request_id, customer_id, reservation_type, status, title, start_date, end_date, time,
-          guest_count, adult_count, child_count, room_ids_json, table_ids_json, notes, price_note,
-          payment_status, created_at, updated_at, sync_status
-        ) VALUES (?, ?, ?, ?, 'approved', ?, ?, ?, ?, ?, ?, ?, '[]', '[]', ?, ?, 'not_required', ?, ?, 'local_only')
-        ON CONFLICT(id) DO UPDATE SET
-          customer_id = excluded.customer_id,
-          reservation_type = excluded.reservation_type,
-          status = 'approved',
-          title = excluded.title,
-          start_date = excluded.start_date,
-          end_date = excluded.end_date,
-          time = excluded.time,
-          guest_count = excluded.guest_count,
-          adult_count = excluded.adult_count,
-          child_count = excluded.child_count,
-          notes = excluded.notes,
-          price_note = excluded.price_note,
-          updated_at = excluded.updated_at,
-          deleted_at = '',
-          sync_status = 'local_only'
-      `)
-      .run(
-        reservationId,
-        requestId,
-        customerId,
-        reservationType,
-        buildReservationTitle(request, reservationType),
-        String(request.start_date ?? ""),
-        String(request.end_date ?? ""),
-        String(request.time ?? ""),
-        Number(request.guest_count ?? 1),
-        Number(request.adult_count ?? 0),
-        Number(request.child_count ?? 0),
-        buildReservationNotes(request),
-        "Fiyat ve kaynak ataması işletme sahibi tarafından netleştirilecek.",
-        updatedAt,
-        updatedAt
-      );
-    this.db
-      .prepare("UPDATE requests SET status = 'converted_to_reservation', customer_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(customerId, updatedAt, requestId);
-    this.insertAndroidActionEvent(action, "request.converted_to_reservation", "request", requestId, {
-      reservation_id: reservationId,
-      customer_id: customerId,
-      previous_status: String(request.status ?? "")
-    }, now);
-    this.insertAndroidActionEvent(action, "reservation.approved", "reservation", reservationId, {
-      request_id: requestId,
-      customer_id: customerId,
-      reservation_type: reservationType
-    }, now);
-    return {
-      ok: true,
-      message: existingReservation ? "Mevcut rezervasyon telefondan onaylandı." : "Talep telefondan rezervasyona çevrildi."
-    };
-  }
-
-  private applyAndroidCustomerSave(
-    action: AndroidSyncAction,
-    now: string,
-    updating: boolean
-  ): AndroidActionMutationResult {
-    const customerId = updating
-      ? androidPayloadString(action.payload, "customer_id")
-      : createAndroidEntityId("customer_", action.id);
-    const existing = updating
-      ? this.db.prepare("SELECT id, source, created_at, updated_at FROM customers WHERE id = ? AND deleted_at = ''").get(customerId) as Record<string, unknown> | undefined
-      : undefined;
-    if (updating && !existing) {
-      return { ok: false, message: "Güncellenecek müşteri masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = updating
-      ? getAndroidVersionConflict(action.payload, "expected_updated_at", existing?.updated_at, "Müşteri")
-      : null;
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const normalized = normalizeCustomerInput({
-      id: customerId,
-      fullName: androidPayloadString(action.payload, "full_name"),
-      phone: androidPayloadString(action.payload, "phone"),
-      email: androidPayloadString(action.payload, "email"),
-      notes: androidPayloadString(action.payload, "notes"),
-      tags: androidPayloadStringArray(action.payload, "tags"),
-      identityType: androidPayloadString(action.payload, "identity_type"),
-      identityNumber: androidPayloadString(action.payload, "identity_number"),
-      nationality: androidPayloadString(action.payload, "nationality"),
-      birthDate: androidPayloadString(action.payload, "birth_date"),
-      gender: androidPayloadString(action.payload, "gender"),
-      documentSerialNumber: androidPayloadString(action.payload, "document_serial_number"),
-      documentExpiryDate: androidPayloadString(action.payload, "document_expiry_date"),
-      birthPlace: androidPayloadString(action.payload, "birth_place"),
-      motherName: androidPayloadString(action.payload, "mother_name"),
-      fatherName: androidPayloadString(action.payload, "father_name"),
-      issuingAuthority: androidPayloadString(action.payload, "issuing_authority"),
-      address: androidPayloadString(action.payload, "address")
-    });
-    if (!normalized.ok) {
-      return normalized;
-    }
-    const customer = normalized.customer;
-    const duplicateIdentity = customer.identityNumber
-      ? this.db
-          .prepare("SELECT id FROM customers WHERE identity_number = ? AND id != ? AND deleted_at = '' LIMIT 1")
-          .get(customer.identityNumber, customerId)
-      : undefined;
-    if (duplicateIdentity) {
-      return { ok: false, message: "Bu kimlik numarası başka bir müşteri kartında kayıtlı." };
-    }
-    const duplicatePhone = customer.phone
-      ? this.db
-          .prepare("SELECT id FROM customers WHERE phone = ? AND id != ? AND deleted_at = '' LIMIT 1")
-          .get(customer.phone, customerId)
-      : undefined;
-    if (duplicatePhone) {
-      return { ok: false, message: "Bu telefon numarasıyla kayıtlı bir müşteri zaten var." };
-    }
-
-    const updatedAt = nextMutationTimestamp(existing?.updated_at, now);
-    this.db
-      .prepare(`
-        INSERT INTO customers (
-          id, full_name, phone, email, source, notes, tags_json, last_contact_at,
-          identity_type, identity_number, nationality, birth_date, gender,
-          document_serial_number, document_expiry_date, birth_place, mother_name,
-          father_name, issuing_authority, address, created_at, updated_at,
-          deleted_at, sync_status
-        ) VALUES (
-          ?, ?, ?, ?, 'android', ?, ?, '',
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
-          ?, ?, ?, ?,
-          '', 'local_only'
-        )
-        ON CONFLICT(id) DO UPDATE SET
-          full_name = excluded.full_name,
-          phone = excluded.phone,
-          email = excluded.email,
-          notes = excluded.notes,
-          tags_json = excluded.tags_json,
-          identity_type = excluded.identity_type,
-          identity_number = excluded.identity_number,
-          nationality = excluded.nationality,
-          birth_date = excluded.birth_date,
-          gender = excluded.gender,
-          document_serial_number = excluded.document_serial_number,
-          document_expiry_date = excluded.document_expiry_date,
-          birth_place = excluded.birth_place,
-          mother_name = excluded.mother_name,
-          father_name = excluded.father_name,
-          issuing_authority = excluded.issuing_authority,
-          address = excluded.address,
-          updated_at = excluded.updated_at,
-          deleted_at = '',
-          sync_status = 'local_only'
-      `)
-      .run(
-        customerId,
-        customer.fullName,
-        customer.phone,
-        customer.email,
-        customer.notes,
-        JSON.stringify(customer.tags),
-        customer.identityType,
-        customer.identityNumber,
-        customer.nationality,
-        customer.birthDate,
-        customer.gender,
-        customer.documentSerialNumber,
-        customer.documentExpiryDate,
-        customer.birthPlace,
-        customer.motherName,
-        customer.fatherName,
-        customer.issuingAuthority,
-        customer.address,
-        String(existing?.created_at ?? updatedAt) || updatedAt,
-        updatedAt
-      );
-    this.insertAndroidActionEvent(
-      action,
-      updating ? "customer.updated" : "customer.created",
-      "customer",
-      customerId,
-      {
-        source: "android",
-        identity_type: customer.identityType,
-        has_identity_number: Boolean(customer.identityNumber)
-      },
-      now
-    );
-    return {
-      ok: true,
-      message: updating ? "Müşteri kartı telefondan güncellendi." : "Müşteri kartı telefondan oluşturuldu."
-    };
-  }
-
-  private applyAndroidCustomerRoomAssignment(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const customerId = androidPayloadString(action.payload, "customer_id");
-    const roomId = androidPayloadString(action.payload, "room_id");
-    const checkInDate = normalizeDateInput(androidPayloadString(action.payload, "check_in_date"));
-    const checkOutDate = normalizeDateInput(androidPayloadString(action.payload, "check_out_date"));
-    const guestCount = normalizeInteger(Number(action.payload.guest_count ?? 1));
-    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["planned", "checked_in"]);
-    const notes = normalizeLimitedText(action.payload.notes, 2000);
-    if (!customerId || !roomId || !checkInDate || !status) {
-      return { ok: false, message: "Müşteri, oda, giriş tarihi ve konaklama durumu seçilmeli." };
-    }
-    if (checkOutDate && checkOutDate < checkInDate) {
-      return { ok: false, message: "Çıkış tarihi giriş tarihinden önce olamaz." };
-    }
-    if (guestCount < 1 || guestCount > 50) {
-      return { ok: false, message: "Konaklayan kişi sayısı 1 ile 50 arasında olmalı." };
-    }
-    const customer = this.db
-      .prepare("SELECT full_name FROM customers WHERE id = ? AND deleted_at = ''")
-      .get(customerId) as { full_name?: string } | undefined;
-    const room = this.db
-      .prepare("SELECT name, capacity, status, is_active FROM rooms WHERE id = ? AND deleted_at = ''")
-      .get(roomId) as Record<string, unknown> | undefined;
-    if (!customer || !room || Number(room.is_active ?? 0) !== 1) {
-      return { ok: false, message: "Müşteri veya aktif oda masaüstü kayıtlarında bulunamadı." };
-    }
-    if (["maintenance", "out_of_service", "cleaning"].includes(String(room.status ?? ""))) {
-      return { ok: false, message: "Bakımda, servis dışı veya temizlikte olan odaya müşteri atanamaz." };
-    }
-    if (Number(room.capacity ?? 0) > 0 && guestCount > Number(room.capacity ?? 0)) {
-      return { ok: false, message: `Bu odanın kapasitesi en fazla ${Number(room.capacity)} kişi.` };
-    }
-    if (this.hasOverlappingCustomerRoomStay(roomId, checkInDate, checkOutDate)) {
-      return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
-    }
-    const reservationConflict = this.findConflictingRoomReservation(roomId, customerId, checkInDate, checkOutDate);
-    if (reservationConflict) {
-      return { ok: false, message: `Oda bu tarihlerde ${reservationConflict} rezervasyonuna bağlı.` };
-    }
-
-    const stayId = createAndroidEntityId("stay_", action.id);
-    this.db
-      .prepare(`
-        INSERT INTO customer_room_stays (
-          id, customer_id, room_id, reservation_id, status, check_in_date,
-          check_out_date, guest_count, notes, source, checked_in_at,
-          checked_out_at, created_at, updated_at, deleted_at, sync_status
-        ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, 'android', ?, '', ?, ?, '', 'local_only')
-      `)
-      .run(
-        stayId,
-        customerId,
-        roomId,
-        status,
-        checkInDate,
-        checkOutDate,
-        guestCount,
-        notes,
-        status === "checked_in" ? now : "",
-        now,
-        now
-      );
-    this.db
-      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(status === "checked_in" ? "occupied" : "reserved", now, roomId);
-    this.insertAndroidActionEvent(action, "customer.room_assigned", "customer_room_stay", stayId, {
-      customer_id: customerId,
-      room_id: roomId,
-      status,
-      check_in_date: checkInDate,
-      check_out_date: checkOutDate
-    }, now);
-    return { ok: true, message: "Müşteri telefondan odaya atandı." };
-  }
-
-  private applyAndroidCustomerRoomStayStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const stayId = androidPayloadString(action.payload, "stay_id");
-    const status = normalizeStatus(
-      androidPayloadString(action.payload, "status"),
-      ["planned", "checked_in", "checked_out", "cancelled"]
-    );
-    if (!stayId || !status) {
-      return { ok: false, message: "Konaklama kaydı ve yeni durum seçilmeli." };
-    }
-    const stay = this.db
-      .prepare("SELECT * FROM customer_room_stays WHERE id = ? AND deleted_at = ''")
-      .get(stayId) as Record<string, unknown> | undefined;
-    if (!stay) {
-      return { ok: false, message: "Konaklama kaydı masaüstünde bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", stay.updated_at, "Konaklama");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const previousStatus = String(stay.status ?? "");
-    const allowedTransitions: Record<string, string[]> = {
-      planned: ["checked_in", "cancelled"],
-      checked_in: ["checked_out", "cancelled"],
-      cancelled: ["planned"],
-      checked_out: []
-    };
-    if (!(allowedTransitions[previousStatus] ?? []).includes(status)) {
-      return { ok: false, message: "Bu konaklama kaydı seçilen duruma geçirilemez." };
-    }
-    if (
-      ["planned", "checked_in"].includes(status)
-      && this.hasOverlappingCustomerRoomStay(
-        String(stay.room_id ?? ""),
-        String(stay.check_in_date ?? ""),
-        String(stay.check_out_date ?? ""),
-        stayId
-      )
-    ) {
-      return { ok: false, message: "Odanın aynı tarihlerde başka bir aktif müşteri kaydı var." };
-    }
-    const updatedAt = nextMutationTimestamp(stay.updated_at, now);
-    this.db
-      .prepare(`
-        UPDATE customer_room_stays
-        SET status = ?,
-            checked_in_at = CASE WHEN ? = 'checked_in' THEN ? ELSE checked_in_at END,
-            checked_out_at = CASE WHEN ? = 'checked_out' THEN ? ELSE checked_out_at END,
-            updated_at = ?,
-            sync_status = 'local_only'
-        WHERE id = ?
-      `)
-      .run(status, status, updatedAt, status, updatedAt, updatedAt, stayId);
-    this.refreshRoomStatusFromStays(String(stay.room_id ?? ""), updatedAt, status === "checked_out");
-    this.insertAndroidActionEvent(action, "customer.room_stay_status_changed", "customer_room_stay", stayId, {
-      customer_id: String(stay.customer_id ?? ""),
-      room_id: String(stay.room_id ?? ""),
-      previous_status: previousStatus,
-      status
-    }, now);
-    return { ok: true, message: "Konaklama durumu telefondan güncellendi." };
-  }
-
-  private applyAndroidReservationStatus(action: AndroidSyncAction, status: "approved" | "rejected" | "cancelled", now: string): AndroidActionMutationResult {
-    const reservationId = androidPayloadString(action.payload, "reservation_id");
-    if (!reservationId) {
-      return { ok: false, message: "Güncellenecek rezervasyon seçilmemiş." };
-    }
-    const reservation = this.db
-      .prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''")
-      .get(reservationId) as Record<string, unknown> | undefined;
-    if (!reservation) {
-      return { ok: false, message: "Rezervasyon masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", reservation.updated_at, "Rezervasyon");
-    if (versionConflict) {
-      return versionConflict;
-    }
-
-    const roomIds = this.parseStringArray(reservation.room_ids_json);
-    const tableIds = this.parseStringArray(reservation.table_ids_json);
-    const activeOrder = this.findActiveOrderForTables(tableIds);
-    if (activeOrder) {
-      return { ok: false, message: "Aktif adisyonu olan masaya bağlı rezervasyon değiştirilemez. Önce adisyonu kapatın." };
-    }
-    const updatedAt = nextMutationTimestamp(reservation.updated_at, now);
-    this.db
-      .prepare("UPDATE reservations SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(status, updatedAt, reservationId);
-    if (status === "approved") {
-      for (const roomId of roomIds) {
-        this.db
-          .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-          .run(updatedAt, roomId);
-      }
-      for (const tableId of tableIds) {
-        this.db
-          .prepare("UPDATE tables SET status = 'reserved', current_reservation_id = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-          .run(reservationId, updatedAt, tableId);
-      }
-    } else {
-      for (const roomId of roomIds) {
-        this.db
-          .prepare("UPDATE rooms SET status = 'available', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status = 'reserved' AND deleted_at = ''")
-          .run(updatedAt, roomId);
-      }
-      for (const tableId of tableIds) {
-        this.db
-          .prepare(`
-            UPDATE tables
-            SET status = 'available', current_reservation_id = '', updated_at = ?, sync_status = 'local_only'
-            WHERE id = ? AND current_reservation_id = ? AND deleted_at = ''
-          `)
-          .run(updatedAt, tableId, reservationId);
-      }
-    }
-    for (const roomId of roomIds) {
-      this.enforceActiveStayRoomStatus(roomId, updatedAt);
-    }
-    this.insertAndroidActionEvent(action, "reservation.status_changed", "reservation", reservationId, {
-      previous_status: String(reservation.status ?? ""),
-      status,
-      room_ids: roomIds,
-      table_ids: tableIds
-    }, now);
-    return { ok: true, message: "Rezervasyon durumu telefondan güncellendi." };
-  }
-
-  private applyAndroidRoomStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const roomId = androidPayloadString(action.payload, "room_id");
-    const status = normalizeStatus(androidPayloadString(action.payload, "status"), ["available", "reserved", "occupied", "cleaning", "maintenance"]);
-    if (!roomId || !status) {
-      return { ok: false, message: "Oda veya yeni oda durumu geçersiz." };
-    }
-    const room = this.db
-      .prepare("SELECT status, updated_at FROM rooms WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-      .get(roomId) as { status?: string; updated_at?: string } | undefined;
-    if (!room) {
-      return { ok: false, message: "Oda masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", room.updated_at, "Oda");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const activeStay = this.db
-      .prepare(`
-        SELECT status
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND status IN ('checked_in', 'planned')
-          AND deleted_at = ''
-        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END
-        LIMIT 1
-      `)
-      .get(roomId) as { status?: string } | undefined;
-    const expectedStatus = activeStay?.status === "checked_in"
-      ? "occupied"
-      : activeStay?.status === "planned"
-        ? "reserved"
-        : "";
-    if (expectedStatus && status !== expectedStatus) {
-      return {
-        ok: false,
-        message: "Odanın aktif müşteri kaydı var. Durumu konaklama kartından değiştirin."
-      };
-    }
-    const updatedAt = nextMutationTimestamp(room.updated_at, now);
-    this.db
-      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(status, updatedAt, roomId);
-    this.insertAndroidActionEvent(action, "room.status_changed", "room", roomId, {
-      old_status: String(room.status ?? ""),
-      new_status: status
-    }, now);
-    return { ok: true, message: "Oda durumu telefondan güncellendi." };
-  }
-
-  private applyAndroidDailyTaskStatus(action: AndroidSyncAction, status: "done" | "pending" | "cancelled", now: string): AndroidActionMutationResult {
-    const taskId = androidPayloadString(action.payload, "task_id");
-    if (!taskId) {
-      return { ok: false, message: "Güncellenecek günlük iş seçilmemiş." };
-    }
-    const task = this.db
-      .prepare("SELECT status, updated_at FROM daily_tasks WHERE id = ? AND deleted_at = ''")
-      .get(taskId) as { status?: string; updated_at?: string } | undefined;
-    if (!task) {
-      return { ok: false, message: "Günlük iş masaüstü kayıtlarında bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", task.updated_at, "Günlük iş");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(task.updated_at, now);
-    this.db
-      .prepare("UPDATE daily_tasks SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(status, updatedAt, taskId);
-    this.insertAndroidActionEvent(action, status === "done" ? "task.completed" : "task.status_changed", "daily_task", taskId, {
-      previous_status: String(task.status ?? ""),
-      status
-    }, now);
-    return { ok: true, message: "Günlük iş telefondan güncellendi." };
   }
 
   private applyAndroidTableStatus(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
@@ -8100,374 +2061,6 @@ export class DesktopDatabase {
     return { ok: true, message: "Masa durumu telefondan güncellendi." };
   }
 
-  private applyAndroidTableOrderOpen(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const tableId = androidPayloadString(action.payload, "table_id");
-    if (!tableId) {
-      return { ok: false, message: "Sipariş açılacak masa seçilmemiş." };
-    }
-    const table = this.db
-      .prepare("SELECT id, updated_at FROM tables WHERE id = ? AND is_active = 1 AND deleted_at = ''")
-      .get(tableId) as { id?: string; updated_at?: string } | undefined;
-    if (!table) {
-      return { ok: false, message: "Sipariş açılacak masa bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_table_updated_at", table.updated_at, "Masa");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const activeOrder = this.db
-      .prepare("SELECT id, status FROM table_orders WHERE table_id = ? AND status IN ('open', 'preparing', 'served', 'payment') LIMIT 1")
-      .get(tableId) as { id?: string; status?: string } | undefined;
-    if (activeOrder?.id) {
-      this.updateTableStatusForOrderInTransaction(tableId, activeOrder.status === "payment" ? "bill_waiting" : "occupied", activeOrder.id, now, action);
-      return { ok: true, message: "Masada zaten açık bir adisyon var." };
-    }
-
-    const orderId = createAndroidEntityId("table_order_", action.id);
-    this.db
-      .prepare(`
-        INSERT INTO table_orders (
-          id, table_id, status, opened_at, closed_at, subtotal, discount_total, total, note, created_at, updated_at
-        ) VALUES (?, ?, 'open', ?, '', 0, 0, 0, '', ?, ?)
-      `)
-      .run(orderId, tableId, now, now, now);
-    this.updateTableStatusForOrderInTransaction(tableId, "occupied", orderId, now, action);
-    this.insertAndroidActionEvent(action, "table_order.opened", "table_order", orderId, { table_id: tableId }, now);
-    return { ok: true, message: "Masa adisyonu telefondan açıldı." };
-  }
-
-  private applyAndroidTableOrderAddItem(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const explicitOrderId = androidPayloadString(action.payload, "order_id");
-    const dependencyActionId = androidPayloadString(action.payload, "depends_on_action_id");
-    let orderId = "";
-    if (explicitOrderId) {
-      orderId = this.resolveAndroidActiveOrderId(action.payload);
-    } else if (dependencyActionId) {
-      const dependencyReceipt = this.db
-        .prepare("SELECT action_type FROM android_action_receipts WHERE id = ?")
-        .get(dependencyActionId) as { action_type?: string } | undefined;
-      const dependentOrderId = createAndroidEntityId("table_order_", dependencyActionId);
-      if (dependencyReceipt?.action_type !== "table_order_open" || !this.isActiveTableOrder(dependentOrderId)) {
-        return { ok: false, message: "Ürün eklenemedi çünkü bağlı adisyon açma işlemi uygulanmadı." };
-      }
-      orderId = dependentOrderId;
-    } else {
-      return { ok: false, message: "Ürün eklemek için açık adisyon veya uygulanmış adisyon açma işlemi gerekli." };
-    }
-    const menuItemId = androidPayloadString(action.payload, "menu_item_id");
-    const quantity = normalizeOrderQuantity(androidPayloadNumber(action.payload, "quantity", 1));
-    if (!orderId || !menuItemId || !quantity) {
-      return { ok: false, message: "Ürün, adisyon veya adet bilgisi geçersiz." };
-    }
-    const order = this.db
-      .prepare("SELECT table_id, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-      .get(orderId) as { table_id?: string; updated_at?: string } | undefined;
-    if (!order) {
-      return { ok: false, message: "Ürün eklenecek aktif adisyon bulunamadı." };
-    }
-    const payloadTableId = androidPayloadString(action.payload, "table_id");
-    if (payloadTableId && payloadTableId !== String(order.table_id ?? "")) {
-      return { ok: false, message: "Ürün ile adisyonun masa bilgisi eşleşmiyor." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_order_updated_at", order.updated_at, "Adisyon");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const menuItem = this.db
-      .prepare(`
-        SELECT menu_items.id, menu_items.name, menu_items.price, menu_items.currency
-        FROM menu_items
-        INNER JOIN menu_categories ON menu_categories.id = menu_items.category_id
-        WHERE menu_items.id = ?
-          AND menu_items.is_available = 1
-          AND menu_items.deleted_at = ''
-          AND menu_categories.is_active = 1
-          AND menu_categories.deleted_at = ''
-        LIMIT 1
-      `)
-      .get(menuItemId) as { id?: string; name?: string; price?: number; currency?: string } | undefined;
-    if (!menuItem?.id) {
-      return { ok: false, message: "Menü ürünü artık satışta değil veya bulunamadı." };
-    }
-    const productName = String(menuItem.name ?? "Ürün").trim() || "Ürün";
-    const unitPrice = roundMoney(Number(menuItem.price ?? 0));
-    const currency = normalizeTableOrderCurrency(menuItem.currency);
-    const orderCurrency = this.db
-      .prepare("SELECT currency FROM table_order_items WHERE order_id = ? AND status != 'cancelled' ORDER BY created_at ASC LIMIT 1")
-      .get(orderId) as { currency?: string } | undefined;
-    if (orderCurrency?.currency && normalizeTableOrderCurrency(orderCurrency.currency) !== currency) {
-      return { ok: false, message: "Farklı para birimindeki ürün aynı adisyona eklenemez." };
-    }
-    const existingItem = this.db
-      .prepare(`
-        SELECT id, quantity, updated_at FROM table_order_items
-        WHERE order_id = ? AND menu_item_id = ? AND product_name = ? AND unit_price = ? AND currency = ? AND note = '' AND status = 'open'
-        ORDER BY created_at DESC LIMIT 1
-      `)
-      .get(orderId, menuItemId, productName, unitPrice, currency) as { id?: string; quantity?: number; updated_at?: string } | undefined;
-    const itemId = existingItem?.id || createAndroidEntityId("table_order_item_", action.id);
-    if (existingItem?.id) {
-      const nextQuantity = Number(existingItem.quantity ?? 0) + quantity;
-      if (nextQuantity > 999) {
-        return { ok: false, message: "Bir sipariş satırındaki ürün adedi 999'u aşamaz." };
-      }
-      const stockResult = this.mutateMenuStockInTransaction({
-        menuItemId,
-        type: "order_add",
-        quantityChange: -quantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: action.device_id,
-        note: `${productName} Android siparişinden adisyona eklendi.`,
-        now
-      });
-      if (!stockResult.ok) {
-        return stockResult;
-      }
-      const itemUpdatedAt = nextMutationTimestamp(existingItem.updated_at, now);
-      this.db
-        .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
-        .run(nextQuantity, roundMoney(unitPrice * nextQuantity), itemUpdatedAt, itemId);
-    } else {
-      const stockResult = this.mutateMenuStockInTransaction({
-        menuItemId,
-        type: "order_add",
-        quantityChange: -quantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: action.device_id,
-        note: `${productName} Android siparişinden adisyona eklendi.`,
-        now
-      });
-      if (!stockResult.ok) {
-        return stockResult;
-      }
-      this.db
-        .prepare(`
-          INSERT INTO table_order_items (
-            id, order_id, menu_item_id, product_name, unit_price, currency, quantity, line_total, note, status, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 'open', ?, ?)
-        `)
-        .run(itemId, orderId, menuItemId, productName, unitPrice, currency, quantity, roundMoney(unitPrice * quantity), now, now);
-    }
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
-    this.insertAndroidActionEvent(action, "table_order.item_added", "table_order", orderId, {
-      item_id: itemId,
-      menu_item_id: menuItemId,
-      quantity,
-      unit_price: unitPrice,
-      currency
-    }, now);
-    return { ok: true, message: "Ürün telefondan adisyona eklendi." };
-  }
-
-  private applyAndroidTableOrderItemQuantity(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const itemId = androidPayloadString(action.payload, "item_id");
-    const quantity = normalizeOrderQuantity(androidPayloadNumber(action.payload, "quantity", 0));
-    if (!itemId || !quantity) {
-      return { ok: false, message: "Sipariş satırı veya adet bilgisi geçersiz." };
-    }
-    const item = this.getMutableTableOrderItem(itemId);
-    if (!item) {
-      return { ok: false, message: "Güncellenecek aktif sipariş satırı bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_item_updated_at", item.updated_at, "Sipariş satırı");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(item.updated_at, now);
-    const orderId = String(item.order_id ?? "");
-    const previousQuantity = Number(item.quantity ?? 0);
-    if (quantity !== previousQuantity) {
-      const stockResult = this.mutateMenuStockInTransaction({
-        menuItemId: String(item.menu_item_id ?? ""),
-        type: "order_update",
-        quantityChange: previousQuantity - quantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId: action.device_id,
-        note: "Android siparişinde ürün adedi değiştirildi.",
-        now
-      });
-      if (!stockResult.ok) {
-        return stockResult;
-      }
-    }
-    this.db
-      .prepare("UPDATE table_order_items SET quantity = ?, line_total = ?, updated_at = ? WHERE id = ?")
-      .run(quantity, roundMoney(Number(item.unit_price ?? 0) * quantity), updatedAt, itemId);
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
-    this.insertAndroidActionEvent(action, "table_order.item_quantity_changed", "table_order", orderId, {
-      item_id: itemId,
-      quantity
-    }, now);
-    return { ok: true, message: "Ürün adedi telefondan güncellendi." };
-  }
-
-  private applyAndroidTableOrderRemoveItem(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
-    const itemId = androidPayloadString(action.payload, "item_id");
-    const item = this.getMutableTableOrderItem(itemId);
-    if (!item) {
-      return { ok: false, message: "Silinecek aktif sipariş satırı bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_item_updated_at", item.updated_at, "Sipariş satırı");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(item.updated_at, now);
-    const orderId = String(item.order_id ?? "");
-    const stockResult = this.mutateMenuStockInTransaction({
-      menuItemId: String(item.menu_item_id ?? ""),
-      type: "order_remove",
-      quantityChange: Number(item.quantity ?? 0),
-      sourceType: "table_order",
-      sourceId: orderId,
-      actorDeviceId: action.device_id,
-      note: "Ürün Android siparişinden silindi.",
-      now
-    });
-    if (!stockResult.ok) {
-      return stockResult;
-    }
-    this.db
-      .prepare("UPDATE table_order_items SET status = 'cancelled', updated_at = ? WHERE id = ?")
-      .run(updatedAt, itemId);
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
-    this.insertAndroidActionEvent(action, "table_order.item_removed", "table_order", orderId, { item_id: itemId }, now);
-    return { ok: true, message: "Ürün telefondan adisyondan kaldırıldı." };
-  }
-
-  private applyAndroidTableOrderStatus(
-    action: AndroidSyncAction,
-    now: string,
-    forcedStatus?: "preparing" | "served" | "payment"
-  ): AndroidActionMutationResult {
-    const orderId = this.resolveAndroidActiveOrderId(action.payload);
-    const status = forcedStatus ?? normalizeStatus(androidPayloadString(action.payload, "status"), ["open", "preparing", "served", "payment"]);
-    if (!orderId || !status) {
-      return { ok: false, message: "Adisyon veya yeni durum bilgisi geçersiz." };
-    }
-    const current = this.db
-      .prepare("SELECT status, table_id, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-      .get(orderId) as { status?: string; table_id?: string; updated_at?: string } | undefined;
-    if (!current) {
-      return { ok: false, message: "Güncellenecek aktif adisyon bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", current.updated_at, "Adisyon");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(current.updated_at, now);
-    this.db.prepare("UPDATE table_orders SET status = ?, updated_at = ? WHERE id = ?").run(status, updatedAt, orderId);
-    if (status === "preparing") {
-      this.db
-        .prepare("UPDATE table_order_items SET status = 'preparing', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
-        .run(updatedAt, orderId);
-    } else if (status === "served") {
-      this.db
-        .prepare("UPDATE table_order_items SET status = 'served', updated_at = ? WHERE order_id = ? AND status != 'cancelled'")
-        .run(updatedAt, orderId);
-    }
-    this.updateTableStatusForOrderInTransaction(String(current.table_id ?? ""), status === "payment" ? "bill_waiting" : "occupied", orderId, now, action);
-    this.insertAndroidActionEvent(action, "table_order.status_changed", "table_order", orderId, {
-      old_status: String(current.status ?? ""),
-      new_status: status
-    }, now);
-    return { ok: true, message: "Adisyon durumu telefondan güncellendi." };
-  }
-
-  private applyAndroidTableOrderClose(
-    action: AndroidSyncAction,
-    now: string,
-    forcedStatus?: "paid" | "cancelled"
-  ): AndroidActionMutationResult {
-    const orderId = this.resolveAndroidActiveOrderId(action.payload);
-    const status = forcedStatus ?? normalizeStatus(androidPayloadString(action.payload, "status"), ["paid", "cancelled"]);
-    if (!orderId || !status) {
-      return { ok: false, message: "Kapatılacak adisyon veya kapanış durumu geçersiz." };
-    }
-    const current = this.db
-      .prepare("SELECT status, table_id, updated_at FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-      .get(orderId) as { status?: string; table_id?: string; updated_at?: string } | undefined;
-    if (!current) {
-      return { ok: false, message: "Kapatılacak aktif adisyon bulunamadı." };
-    }
-    const versionConflict = getAndroidVersionConflict(action.payload, "expected_updated_at", current.updated_at, "Adisyon");
-    if (versionConflict) {
-      return versionConflict;
-    }
-    const updatedAt = nextMutationTimestamp(current.updated_at, now);
-    if (status === "cancelled") {
-      const stockRestore = this.restoreCancelledOrderStockInTransaction(orderId, action.device_id, now);
-      if (!stockRestore.ok) {
-        return stockRestore;
-      }
-    }
-    this.recalculateTableOrderTotalInTransaction(orderId, now);
-    this.db
-      .prepare("UPDATE table_orders SET status = ?, closed_at = ?, updated_at = ? WHERE id = ?")
-      .run(status, now, updatedAt, orderId);
-    this.updateTableStatusForOrderInTransaction(String(current.table_id ?? ""), "available", orderId, now, action);
-    this.insertAndroidActionEvent(action, status === "paid" ? "table_order.paid" : "table_order.cancelled", "table_order", orderId, {
-      old_status: String(current.status ?? ""),
-      status
-    }, now);
-    return { ok: true, message: status === "paid" ? "Adisyon telefondan ödendi olarak kapatıldı." : "Adisyon telefondan iptal edildi." };
-  }
-
-  private applyAndroidMenuStockAction(
-    action: AndroidSyncAction,
-    mode: "add" | "set" | "adjust",
-    now: string
-  ): AndroidActionMutationResult {
-    const menuItemId = androidPayloadString(action.payload, "menu_item_id");
-    const note = androidPayloadString(action.payload, "note").slice(0, 500);
-    if (!menuItemId) {
-      return { ok: false, message: "Stoku güncellenecek menü ürünü seçilmemiş." };
-    }
-
-    let quantityChange: number | undefined;
-    let quantityAfter: number | undefined;
-    if (mode === "set") {
-      quantityAfter = normalizeNullableStockNumber(action.payload.quantity) ?? undefined;
-      if (quantityAfter === undefined) {
-        return { ok: false, message: "Yeni stok adedi 0 veya daha büyük bir sayı olmalı." };
-      }
-    } else if (mode === "add") {
-      quantityChange = normalizePositiveStockNumber(action.payload.quantity) ?? undefined;
-      if (quantityChange === undefined) {
-        return { ok: false, message: "Eklenecek stok adedi 0'dan büyük olmalı." };
-      }
-    } else {
-      quantityChange = normalizeSignedStockNumber(action.payload.quantity_change) ?? undefined;
-      if (quantityChange === undefined || quantityChange === 0) {
-        return { ok: false, message: "Stok farkı sıfırdan farklı bir sayı olmalı." };
-      }
-    }
-
-    const result = this.mutateMenuStockInTransaction({
-      menuItemId,
-      type: mode,
-      quantityChange,
-      quantityAfter,
-      allowStartTracking: mode === "set",
-      sourceType: "android",
-      sourceId: action.id,
-      actorDeviceId: action.device_id,
-      note,
-      now
-    });
-    if (!result.ok) {
-      return result;
-    }
-    this.insertAndroidActionEvent(action, "menu.stock_changed", "menu_item", menuItemId, {
-      movement_type: mode,
-      quantity_before: result.quantityBefore,
-      quantity_after: result.quantityAfter
-    }, now);
-    return { ok: true, message: "Menü ürünü stoku telefondan güncellendi." };
-  }
-
   private applyAndroidStockImageImport(action: AndroidSyncAction, now: string): AndroidActionMutationResult {
     const importId = normalizeStockImageImportId(androidPayloadString(action.payload, "import_id"));
     const imageHash = androidPayloadString(action.payload, "image_hash").toLowerCase();
@@ -8486,7 +2079,7 @@ export class DesktopDatabase {
           : "Bu içe aktarma kimliği daha önce kullanılmış."
       };
     }
-    const created = this.createStockImageImport({
+    const created = createStoredStockImageImport(this.db, {
       importId,
       source: "android",
       deviceId: action.device_id,
@@ -8501,7 +2094,7 @@ export class DesktopDatabase {
     const device = this.db
       .prepare("SELECT role FROM android_devices WHERE device_id = ? LIMIT 1")
       .get(action.device_id) as { role?: string } | undefined;
-    const result = this.applyStockImageImportInTransaction({
+    const result = applyStoredStockImageImportInTransaction(this.db, {
       importId,
       imageHash,
       lines,
@@ -8522,301 +2115,6 @@ export class DesktopDatabase {
     return { ok: true, message: "Görsel stok girişi telefondan uygulandı." };
   }
 
-  private applyStockImageImportInTransaction(input: {
-    importId: string;
-    imageHash: string;
-    lines: StockImageApplyLine[];
-    source: StockImageImportSource;
-    actorDeviceId: string;
-    duplicateWarningAcknowledged: boolean;
-    canOverrideDuplicate: boolean;
-    now: string;
-  }): { ok: true; message: string; importId: string; appliedLineCount: number; totalQuantity: number } | { ok: false; message: string } {
-    const record = this.db
-      .prepare("SELECT source, device_id, image_hash, status FROM stock_image_imports WHERE import_id = ? LIMIT 1")
-      .get(input.importId) as Record<string, unknown> | undefined;
-    if (!record || String(record.image_hash ?? "").toLowerCase() !== input.imageHash || String(record.source ?? "") !== input.source) {
-      return { ok: false, message: "Görsel stok taslağı bulunamadı veya değiştirilmiş." };
-    }
-    if (String(record.status ?? "") === "applied") {
-      return { ok: false, message: "Bu içe aktarma daha önce uygulanmış." };
-    }
-    if (!["analyzing", "review"].includes(String(record.status ?? ""))) {
-      return { ok: false, message: "Bu görsel stok taslağı artık uygulanamaz." };
-    }
-    const lines = normalizeStockImageApplyLines(input.lines);
-    if (!lines || lines.length === 0) {
-      return { ok: false, message: "Uygulanacak geçerli stok satırı bulunamadı." };
-    }
-    const duplicate = this.db
-      .prepare(`
-        SELECT import_id
-        FROM stock_image_imports
-        WHERE image_hash = ? AND status = 'applied' AND import_id != ?
-        LIMIT 1
-      `)
-      .get(input.imageHash, input.importId);
-    if (duplicate && !input.duplicateWarningAcknowledged) {
-      return { ok: false, message: "Bu görsel daha önce stok girişinde kullanılmış olabilir." };
-    }
-    if (duplicate && !input.canOverrideDuplicate) {
-      return { ok: false, message: "Bu görseli yeniden uygulamak için yönetici yetkisi gerekli." };
-    }
-
-    const candidates = new Map(this.getTrackedStockCandidates().map((candidate) => [candidate.id, candidate]));
-    for (const line of lines) {
-      if (!candidates.has(line.menu_item_id)) {
-        return { ok: false, message: "Satırlardan biri artık mevcut veya stok takipli bir menü ürünü değil." };
-      }
-    }
-
-    this.db
-      .prepare("UPDATE stock_image_import_lines SET status = 'ignored', approved_quantity = NULL WHERE import_id = ?")
-      .run(input.importId);
-    const insertApprovedLine = this.db.prepare(`
-      INSERT INTO stock_image_import_lines (
-        id, import_id, raw_text, matched_menu_item_id, suggested_quantity,
-        approved_quantity, source_quantity_text, confidence, status, note, created_at
-      ) VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, 'approved', NULL, ?)
-    `);
-    let totalQuantity = 0;
-    for (const line of lines) {
-      insertApprovedLine.run(
-        `stock_image_import_line_${randomUUID()}`,
-        input.importId,
-        line.raw_text.slice(0, 1000),
-        line.menu_item_id,
-        line.quantity,
-        line.confidence,
-        input.now
-      );
-      const result = this.mutateMenuStockInTransaction({
-        menuItemId: line.menu_item_id,
-        type: "image_import_add",
-        quantityChange: line.quantity,
-        sourceType: "stock_image_import",
-        sourceId: input.importId,
-        actorSource: input.source,
-        actorDeviceId: input.actorDeviceId,
-        note: line.raw_text.slice(0, 500),
-        now: input.now
-      });
-      if (!result.ok) {
-        return result;
-      }
-      totalQuantity += line.quantity;
-    }
-    const update = this.db
-      .prepare(`
-        UPDATE stock_image_imports
-        SET status = 'applied', applied_at = ?, error_message = NULL
-        WHERE import_id = ? AND status IN ('analyzing', 'review')
-      `)
-      .run(input.now, input.importId);
-    if (Number(update.changes) !== 1) {
-      return { ok: false, message: "Görsel stok taslağı uygulanmış olarak kaydedilemedi." };
-    }
-    this.insertEvent({
-      type: "stock.image_import_applied",
-      actorType: input.source,
-      actorId: input.actorDeviceId,
-      entityType: "stock_image_import",
-      entityId: input.importId,
-      payload: {
-        source: input.source,
-        line_count: lines.length,
-        total_quantity: totalQuantity
-      },
-      now: input.now
-    });
-    this.queueSyncJob("menu_publish", input.now);
-    this.queueSyncJob("android_snapshot", input.now);
-    return {
-      ok: true,
-      message: `${lines.length} stok satırı güncellendi.`,
-      importId: input.importId,
-      appliedLineCount: lines.length,
-      totalQuantity
-    };
-  }
-
-  private mutateMenuStockInTransaction(input: {
-    menuItemId: string;
-    type: MenuStockMovementType;
-    quantityChange?: number;
-    quantityAfter?: number;
-    allowStartTracking?: boolean;
-    sourceType: MenuStockSourceType;
-    sourceId: string;
-    actorSource?: StockImageImportSource;
-    actorDeviceId: string;
-    note: string;
-    now: string;
-  }): MenuStockMutationResult {
-    const item = this.db
-      .prepare("SELECT stock_quantity, stock_consumption_quantity, updated_at FROM menu_items WHERE id = ? AND deleted_at = ''")
-      .get(input.menuItemId) as {
-        stock_quantity?: number | null;
-        stock_consumption_quantity?: number;
-        updated_at?: string;
-      } | undefined;
-    if (!item) {
-      return { ok: false, message: "Menü ürünü bulunamadı." };
-    }
-
-    const storedQuantity = nullableNumber(item.stock_quantity);
-    if (storedQuantity === null && !input.allowStartTracking) {
-      if (input.sourceType === "table_order") {
-        return {
-          ok: true,
-          message: "Ürün stok takibinde değil.",
-          tracked: false,
-          quantityBefore: 0,
-          quantityAfter: 0
-        };
-      }
-      return { ok: false, message: "Bu ürün stok takibinde değil." };
-    }
-
-    const quantityBefore = storedQuantity ?? 0;
-    const stockConsumptionQuantity = normalizePositiveStockNumber(item.stock_consumption_quantity) ?? 1;
-    const quantityChange = input.quantityChange === undefined
-      ? undefined
-      : ["order_add", "order_update", "order_remove"].includes(input.type)
-        ? normalizeStockPrecision(input.quantityChange * stockConsumptionQuantity)
-        : input.quantityChange;
-    const requestedAfter = input.quantityAfter === undefined
-      ? quantityBefore + (quantityChange ?? 0)
-      : input.quantityAfter;
-    const quantityAfter = normalizeNullableStockNumber(requestedAfter);
-    if (quantityAfter === null) {
-      return {
-        ok: false,
-        message: input.actorDeviceId ? "Stokta yeterli ürün yok." : "Bu ürün stokta yeterli değil."
-      };
-    }
-
-    const updatedAt = nextMutationTimestamp(item.updated_at, input.now);
-    const update = this.db
-      .prepare(`
-        UPDATE menu_items
-        SET stock_quantity = ?, updated_at = ?, sync_status = 'pending'
-        WHERE id = ? AND deleted_at = ''
-      `)
-      .run(quantityAfter, updatedAt, input.menuItemId);
-    if (Number(update.changes) !== 1) {
-      return { ok: false, message: "Menü ürünü stoku güncellenemedi." };
-    }
-    this.insertMenuStockMovementInTransaction({
-      menuItemId: input.menuItemId,
-      type: input.type,
-      quantityChange: quantityAfter - quantityBefore,
-      quantityBefore,
-      quantityAfter,
-      sourceType: input.sourceType,
-      sourceId: input.sourceId,
-      actorSource: input.actorSource,
-      actorDeviceId: input.actorDeviceId,
-      note: input.note,
-      now: input.now
-    });
-    return {
-      ok: true,
-      message: "Stok güncellendi.",
-      tracked: true,
-      quantityBefore,
-      quantityAfter
-    };
-  }
-
-  private restoreCancelledOrderStockInTransaction(
-    orderId: string,
-    actorDeviceId: string,
-    now: string
-  ): AndroidActionMutationResult {
-    const balances = this.db
-      .prepare(`
-        SELECT menu_item_id, COALESCE(SUM(quantity_change), 0) AS quantity_balance
-        FROM menu_stock_movements
-        WHERE source_type = 'table_order'
-          AND source_id = ?
-          AND type IN ('order_add', 'order_update', 'order_remove')
-        GROUP BY menu_item_id
-      `)
-      .all(orderId) as Array<{ menu_item_id?: string; quantity_balance?: number }>;
-    for (const balance of balances) {
-      const outstandingQuantity = normalizeStockPrecision(-Number(balance.quantity_balance ?? 0));
-      if (outstandingQuantity <= 0) {
-        continue;
-      }
-      const result = this.mutateMenuStockInTransaction({
-        menuItemId: String(balance.menu_item_id ?? ""),
-        type: "order_cancel",
-        quantityChange: outstandingQuantity,
-        sourceType: "table_order",
-        sourceId: orderId,
-        actorDeviceId,
-        note: "Adisyon iptal edildi; ayrılan stok geri eklendi.",
-        now
-      });
-      if (!result.ok) {
-        return result;
-      }
-    }
-    return { ok: true, message: "İptal edilen adisyonun stoku geri eklendi." };
-  }
-
-  private insertMenuStockMovementInTransaction(input: {
-    menuItemId: string;
-    type: MenuStockMovementType;
-    quantityChange: number;
-    quantityBefore: number;
-    quantityAfter: number;
-    sourceType: MenuStockSourceType;
-    sourceId: string;
-    actorSource?: StockImageImportSource;
-    actorDeviceId: string;
-    note: string;
-    now: string;
-  }) {
-    this.db
-      .prepare(`
-        INSERT INTO menu_stock_movements (
-          id, menu_item_id, type, quantity_change, quantity_before, quantity_after,
-          source_type, source_id, actor_source, actor_device_id, note, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-      .run(
-        `stock_movement_${randomUUID()}`,
-        input.menuItemId,
-        input.type,
-        normalizeStockPrecision(input.quantityChange),
-        normalizeStockPrecision(input.quantityBefore),
-        normalizeStockPrecision(input.quantityAfter),
-        input.sourceType,
-        input.sourceId || null,
-        input.actorSource ?? (input.actorDeviceId ? "android" : "desktop"),
-        input.actorDeviceId || null,
-        input.note || null,
-        input.now
-      );
-  }
-
-  private resolveAndroidActiveOrderId(payload: Record<string, unknown>): string {
-    const orderId = androidPayloadString(payload, "order_id");
-    if (orderId) {
-      return this.isActiveTableOrder(orderId) ? orderId : "";
-    }
-    const tableId = androidPayloadString(payload, "table_id");
-    if (!tableId) {
-      return "";
-    }
-    const order = this.db
-      .prepare("SELECT id FROM table_orders WHERE table_id = ? AND status IN ('open', 'preparing', 'served', 'payment') LIMIT 1")
-      .get(tableId) as { id?: string } | undefined;
-    return String(order?.id ?? "");
-  }
-
   private insertAndroidActionEvent(
     action: AndroidSyncAction,
     type: string,
@@ -8825,288 +2123,19 @@ export class DesktopDatabase {
     payload: Record<string, unknown>,
     now: string
   ) {
-    this.insertEvent({
-      type,
-      entityType,
-      entityId,
-      payload: { ...payload, android_action_id: action.id },
-      now,
-      actorType: "android",
-      actorId: action.device_id
-    });
+    insertStoredAndroidActionEvent(this.db, action, type, entityType, entityId, payload, now);
   }
 
-  private getTableOrderById(orderId: string): DesktopTableOrder | null {
-    const row = this.db
-      .prepare(`
-        SELECT
-          table_orders.*,
-          tables.name AS table_name,
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.quantity
-              ELSE 0
-            END
-          ), 0) AS item_count
-        FROM table_orders
-        INNER JOIN tables ON tables.id = table_orders.table_id
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.id = ?
-        GROUP BY table_orders.id
-        LIMIT 1
-      `)
-      .get(orderId) as Record<string, unknown> | undefined;
 
-    return row ? this.mapTableOrderRow(row) : null;
-  }
 
-  private mapTableOrderRow(row: Record<string, unknown>): DesktopTableOrder {
-    const id = String(row.id ?? "");
-    return {
-      id,
-      tableId: String(row.table_id ?? ""),
-      tableName: String(row.table_name ?? "Masa"),
-      status: String(row.status ?? "open") as TableOrderStatus,
-      openedAt: String(row.opened_at ?? ""),
-      closedAt: String(row.closed_at ?? ""),
-      subtotal: roundMoney(Number(row.subtotal ?? 0)),
-      discountTotal: roundMoney(Number(row.discount_total ?? 0)),
-      total: roundMoney(Number(row.total ?? 0)),
-      note: String(row.note ?? ""),
-      itemCount: Number(row.item_count ?? 0),
-      items: this.getTableOrderItems(id),
-      createdAt: String(row.created_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    };
-  }
 
-  private getTableOrderItems(orderId: string): DesktopTableOrderItem[] {
-    const rows = this.db
-      .prepare(`
-        SELECT *
-        FROM table_order_items
-        WHERE order_id = ?
-          AND status != 'cancelled'
-        ORDER BY created_at ASC, id ASC
-      `)
-      .all(orderId) as Array<Record<string, unknown>>;
 
-    return rows.map((row) => ({
-      id: String(row.id ?? ""),
-      orderId: String(row.order_id ?? ""),
-      menuItemId: String(row.menu_item_id ?? ""),
-      productName: String(row.product_name ?? "Ürün"),
-      unitPrice: roundMoney(Number(row.unit_price ?? 0)),
-      currency: normalizeTableOrderCurrency(row.currency),
-      quantity: Number(row.quantity ?? 0),
-      lineTotal: roundMoney(Number(row.line_total ?? 0)),
-      note: String(row.note ?? ""),
-      status: String(row.status ?? "open") as TableOrderItemStatus,
-      createdAt: String(row.created_at ?? ""),
-      updatedAt: String(row.updated_at ?? "")
-    }));
-  }
 
-  private getMutableTableOrderItem(itemId: string): Record<string, unknown> | null {
-    if (!itemId) {
-      return null;
-    }
 
-    const row = this.db
-      .prepare(`
-        SELECT
-          table_order_items.order_id,
-          table_order_items.menu_item_id,
-          table_order_items.unit_price,
-          table_order_items.quantity,
-          table_order_items.updated_at
-        FROM table_order_items
-        INNER JOIN table_orders ON table_orders.id = table_order_items.order_id
-        WHERE table_order_items.id = ?
-          AND table_order_items.status != 'cancelled'
-          AND table_orders.status IN ('open', 'preparing', 'served', 'payment')
-        LIMIT 1
-      `)
-      .get(itemId) as Record<string, unknown> | undefined;
 
-    return row ?? null;
-  }
 
-  private findActiveOrderForTables(tableIds: string[]): { id: string; tableId: string } | null {
-    const statement = this.db.prepare(`
-      SELECT id, table_id
-      FROM table_orders
-      WHERE table_id = ?
-        AND status IN ('open', 'preparing', 'served', 'payment')
-      LIMIT 1
-    `);
-    for (const tableId of tableIds) {
-      const row = statement.get(tableId) as { id?: string; table_id?: string } | undefined;
-      if (row?.id) {
-        return { id: row.id, tableId: String(row.table_id ?? tableId) };
-      }
-    }
-    return null;
-  }
 
-  private markPreparedWhatsAppMessagesSentInTransaction(requestId: string, now: string) {
-    this.db
-      .prepare(`
-        UPDATE whatsapp_messages
-        SET mode = 'manual_copy',
-            status = 'sent',
-            sent_at = CASE WHEN sent_at = '' THEN ? ELSE sent_at END,
-            updated_at = ?,
-            sync_status = 'local_only'
-        WHERE request_id = ?
-          AND direction = 'outgoing'
-          AND status = 'prepared'
-          AND deleted_at = ''
-      `)
-      .run(now, now, requestId);
-  }
 
-  private isActiveTableOrder(orderId: string): boolean {
-    return Boolean(
-      this.db
-        .prepare("SELECT id FROM table_orders WHERE id = ? AND status IN ('open', 'preparing', 'served', 'payment')")
-        .get(orderId)
-    );
-  }
-
-  private updateTableStatusForOrderInTransaction(
-    tableId: string,
-    status: "available" | "occupied" | "bill_waiting",
-    orderId: string,
-    now: string,
-    androidAction?: AndroidSyncAction
-  ) {
-    if (!tableId) {
-      return;
-    }
-
-    const table = this.db
-      .prepare("SELECT status, current_customer_id, current_reservation_id, updated_at FROM tables WHERE id = ? AND deleted_at = ''")
-      .get(tableId) as { status?: string; current_customer_id?: string; current_reservation_id?: string; updated_at?: string } | undefined;
-    const shouldClearAssignment = status === "available"
-      && (Boolean(String(table?.current_customer_id ?? "")) || Boolean(String(table?.current_reservation_id ?? "")));
-    if (!table || (table.status === status && !shouldClearAssignment)) {
-      return;
-    }
-    const updatedAt = nextMutationTimestamp(table.updated_at, now);
-
-    const updateResult = this.db
-      .prepare(`
-        UPDATE tables
-        SET status = ?,
-            current_customer_id = CASE WHEN ? = 'available' THEN '' ELSE current_customer_id END,
-            current_reservation_id = CASE WHEN ? = 'available' THEN '' ELSE current_reservation_id END,
-            updated_at = ?,
-            sync_status = 'local_only'
-        WHERE id = ? AND deleted_at = ''
-      `)
-      .run(status, status, status, updatedAt, tableId);
-    if (Number(updateResult.changes) !== 1) {
-      throw new Error("Table status could not be synchronized with the active order.");
-    }
-    const payload = {
-      old_status: String(table.status ?? ""),
-      new_status: status,
-      source: "table_order",
-      order_id: orderId
-    };
-    if (androidAction) {
-      this.insertAndroidActionEvent(androidAction, "table.status_changed", "table", tableId, payload, now);
-    } else {
-      this.insertEvent({
-        type: "table.status_changed",
-        entityType: "table",
-        entityId: tableId,
-        payload,
-        now
-      });
-    }
-  }
-
-  private recalculateTableOrderTotalInTransaction(orderId: string, now: string) {
-    const row = this.db
-      .prepare(`
-        SELECT
-          COALESCE(SUM(
-            CASE
-              WHEN table_order_items.status != 'cancelled' THEN table_order_items.line_total
-              ELSE 0
-            END
-          ), 0) AS subtotal,
-          table_orders.discount_total AS discount_total,
-          table_orders.updated_at AS updated_at
-        FROM table_orders
-        LEFT JOIN table_order_items ON table_order_items.order_id = table_orders.id
-        WHERE table_orders.id = ?
-        GROUP BY table_orders.id
-      `)
-      .get(orderId) as { subtotal?: number; discount_total?: number; updated_at?: string } | undefined;
-    if (!row) {
-      throw new Error("Table order not found while recalculating totals.");
-    }
-
-    const subtotal = roundMoney(Number(row.subtotal ?? 0));
-    const discountTotal = roundMoney(Number(row.discount_total ?? 0));
-    const total = roundMoney(Math.max(0, subtotal - discountTotal));
-    const updatedAt = nextMutationTimestamp(row.updated_at, now);
-    this.db
-      .prepare("UPDATE table_orders SET subtotal = ?, total = ?, updated_at = ? WHERE id = ?")
-      .run(subtotal, total, updatedAt, orderId);
-  }
-
-  private getTableOrderMutationResult(orderId: string, message: string, includeDashboardData = false): DesktopTableOrderResult {
-    const order = this.getTableOrderById(orderId);
-    return order
-      ? {
-          ok: true,
-          message,
-          order,
-          ...(includeDashboardData ? { dashboardData: this.getDashboardData() } : {})
-        }
-      : { ok: false, message: "Adisyon güncellendi ancak yeniden yüklenemedi." };
-  }
-
-  private insertEvent(input: {
-    type: string;
-    entityType: string;
-    entityId: string;
-    payload: Record<string, unknown>;
-    now: string;
-    actorType?: "desktop" | "android";
-    actorId?: string;
-  }) {
-    this.db
-      .prepare(`
-        INSERT INTO events (
-          id,
-          type,
-          actor_type,
-          actor_id,
-          entity_type,
-          entity_id,
-          payload_json,
-          created_at,
-          updated_at,
-          sync_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'local_only')
-      `)
-      .run(
-        createId("event_"),
-        input.type,
-        input.actorType ?? "desktop",
-        input.actorId ?? "",
-        input.entityType,
-        input.entityId,
-        JSON.stringify(input.payload),
-        input.now,
-        input.now
-      );
-  }
 
   private ensureSyncClientId() {
     // Also initialize this local metadata for databases already marked 001_baseline.sql.
@@ -9152,1163 +2181,281 @@ function resolveBackupPath(appPath: string): string {
   return path.resolve(appPath, "..", "..", "backup");
 }
 
-interface NormalizedTableCategoryInput {
-  sourceName: string;
-  sourceKey: string;
-  name: string;
-  nameKey: string;
-  tableCount: number;
-}
-
-function normalizeTableCategoryInputs(
-  input: SaveTableCategoryInput[] | undefined
-):
-  | { ok: true; categories: NormalizedTableCategoryInput[] | undefined }
-  | { ok: false; message: string } {
-  if (input === undefined) {
-    return { ok: true, categories: undefined };
-  }
-  if (!Array.isArray(input)) {
-    return { ok: false, message: "Masa kategorileri geçerli bir liste olmalı." };
-  }
-  if (input.length > 30) {
-    return { ok: false, message: "En fazla 30 masa kategorisi tanımlanabilir." };
-  }
-
-  const categories: NormalizedTableCategoryInput[] = [];
-  const categoryNames = new Set<string>();
-  const sourceNames = new Set<string>();
-  let totalTableCount = 0;
-
-  for (const item of input) {
-    const name = normalizeTableCategoryLabel(item?.name);
-    const sourceName = normalizeTableCategoryLabel(item?.sourceName);
-    const tableCount = Number(item?.tableCount);
-    if (!name) {
-      return { ok: false, message: "Her masa kategorisinin bir adı olmalı." };
-    }
-    if (name.length > 50 || /[\x00-\x1F\x7F]/.test(name)) {
-      return { ok: false, message: `"${name.slice(0, 30)}" masa kategorisi adı geçersiz.` };
-    }
-    if (!Number.isInteger(tableCount) || tableCount < 1 || tableCount > 200) {
-      return { ok: false, message: `"${name}" kategorisindeki masa sayısı 1 ile 200 arasında olmalı.` };
-    }
-
-    const nameKey = tableCategoryKey(name);
-    const sourceKey = sourceName ? tableCategoryKey(sourceName) : "";
-    if (categoryNames.has(nameKey)) {
-      return { ok: false, message: `"${name}" masa kategorisi birden fazla kez kullanılamaz.` };
-    }
-    if (sourceKey && sourceNames.has(sourceKey)) {
-      return { ok: false, message: "Aynı mevcut masa kategorisi birden fazla satırda düzenlenemez." };
-    }
-
-    categoryNames.add(nameKey);
-    if (sourceKey) {
-      sourceNames.add(sourceKey);
-    }
-    totalTableCount += tableCount;
-    categories.push({ sourceName, sourceKey, name, nameKey, tableCount });
-  }
-
-  if (totalTableCount > 500) {
-    return { ok: false, message: "Toplam masa sayısı 500'ü aşamaz." };
-  }
-
-  return { ok: true, categories };
-}
-
-function normalizeTableCategoryLabel(value: unknown): string {
-  return String(value ?? "").trim().replace(/\s+/g, " ");
-}
-
-function normalizeTableCategoryName(value: unknown): string {
-  return normalizeTableCategoryLabel(value) || "Genel";
-}
-
-function tableCategoryKey(value: string): string {
-  return value.toLocaleLowerCase("tr-TR");
-}
-
-function reconcileTableName(currentNameValue: unknown, currentAreaValue: unknown, nextArea: string, position: number): string {
-  const currentName = normalizeTableCategoryLabel(currentNameValue);
-  if (!currentName) {
-    return `${nextArea} ${position}`;
-  }
-
-  const currentArea = normalizeTableCategoryName(currentAreaValue);
-  const numberedName = /^(.*\S)\s+(\d+)$/.exec(currentName);
-  if (!numberedName) {
-    return currentName;
-  }
-
-  const prefixKey = tableCategoryKey(normalizeTableCategoryLabel(numberedName[1]));
-  const currentAreaKey = tableCategoryKey(currentArea);
-  const isGenericTableName = currentAreaKey === tableCategoryKey("Genel") && prefixKey === tableCategoryKey("Masa");
-  return prefixKey === currentAreaKey || isGenericTableName
-    ? `${nextArea} ${position}`
-    : currentName;
-}
-
-const ANDROID_PERMISSION_SET = new Set<string>(ANDROID_PERMISSIONS);
-const ANDROID_ADMIN_ONLY_ACTIONS = new Set<string>([
-  "customer_request_delete",
-  "customer_create",
-  "customer_update",
-  "customer_delete",
-  "customer_room_assign",
-  "customer_room_stay_status",
-  "daily_task_delete",
-  "menu_category_delete",
-  "menu_item_delete",
-  "message_delete"
-]);
-const AI_SERVICE_IDS: DesktopAiService[] = ["openai", "openrouter", "groq", "gemini", "custom"];
-const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(AI_SERVICE_IDS);
-const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
-const GOOGLE_AI_STUDIO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const DEFAULT_AI_TIMEOUT_SECONDS = 30;
-const AI_SERVICE_DEFAULT_BASE_URLS: Record<DesktopAiService, string> = {
-  openai: DEFAULT_AI_BASE_URL,
-  openrouter: "https://openrouter.ai/api/v1",
-  groq: "https://api.groq.com/openai/v1",
-  gemini: GOOGLE_AI_STUDIO_BASE_URL,
-  custom: ""
-};
-const AI_SERVICE_DISPLAY_NAMES: Record<DesktopAiService, string> = {
-  openai: "OpenAI",
-  openrouter: "OpenRouter",
-  groq: "Groq",
-  gemini: "Google AI Studio",
-  custom: "Özel AI servisi"
-};
-const TABLE_ORDER_STATUSES = ["open", "preparing", "served", "payment", "paid", "cancelled"];
-
-function isAndroidAdminOnlyAction(actionType: unknown): boolean {
-  return ANDROID_ADMIN_ONLY_ACTIONS.has(String(actionType ?? "").trim());
-}
-
-function normalizeAndroidDeviceId(value: unknown): string {
-  const deviceId = String(value ?? "").trim();
-  return /^[A-Za-z0-9._:-]{6,120}$/.test(deviceId) ? deviceId : "";
-}
-
-function normalizeAndroidDeviceRole(value: unknown): AndroidDeviceRole {
-  return String(value ?? "").trim() === "admin" ? "admin" : "staff";
-}
-
-function normalizeAndroidDeviceRoleInput(value: unknown): AndroidDeviceRole | null {
-  const role = String(value ?? "").trim();
-  return role === "admin" || role === "staff" ? role : null;
-}
-
-function androidPermissionsForRole(role: AndroidDeviceRole): AndroidPermission[] {
-  return [...(role === "admin" ? ANDROID_ADMIN_PERMISSIONS : ANDROID_STAFF_PERMISSIONS)];
-}
-
-function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
-  return {
-    service_orders: false,
-    cashier: false,
-    rooms_tasks: false,
-    customer_reservation: false,
-    market_operations: false
-  };
-}
-
-function parseStoredAndroidPermissionGroups(value: unknown): AndroidPermissionGroups {
-  try {
-    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return emptyAndroidPermissionGroups();
-    }
-    const record = parsed as Record<string, unknown>;
-    const groups = emptyAndroidPermissionGroups();
-    for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
-      groups[groupId] = record[groupId] === true;
-    }
-    return groups;
-  } catch {
-    return emptyAndroidPermissionGroups();
-  }
-}
-
-function normalizeAndroidPermissionGroupsInput(value: unknown): AndroidPermissionGroups | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  const record = value as Record<string, unknown>;
-  const groups = { ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS };
-  for (const groupId of ANDROID_PERMISSION_GROUP_IDS) {
-    if (!(groupId in record)) {
-      return null;
-    }
-    if (typeof record[groupId] !== "boolean") return null;
-    groups[groupId] = record[groupId];
-  }
-  return groups;
-}
-
-function effectiveAndroidPermissions(
-  role: AndroidDeviceRole,
-  value: unknown,
-  capabilities: Iterable<BusinessCapability>
-): AndroidPermission[] {
-  let storedPermissions: AndroidPermission[] = [];
-  try {
-    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-    if (Array.isArray(parsed)) {
-      storedPermissions = [...new Set(parsed
-        .map((permission) => String(permission).trim())
-        .filter((permission): permission is AndroidPermission => ANDROID_PERMISSION_SET.has(permission)))];
-    }
-  } catch {
-    storedPermissions = [];
-  }
-  return androidEffectivePermissionsForRole(role, storedPermissions, capabilities);
-}
-
-function normalizeAndroidTimestamp(value: unknown, fallback: string): string {
-  const timestamp = String(value ?? "").trim();
-  const parsed = Date.parse(timestamp);
-  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : fallback;
-}
-
-function normalizeAiService(value: unknown): DesktopAiService | null {
-  const service = String(value ?? "").trim().toLowerCase();
-  return SUPPORTED_AI_SERVICES.has(service as DesktopAiService) ? service as DesktopAiService : null;
-}
-
-function normalizeStoredAiService(value: unknown): DesktopAiService {
-  return normalizeAiService(value) ?? "openai";
-}
-
-function getAiServiceDisplayName(service: DesktopAiService): string {
-  return AI_SERVICE_DISPLAY_NAMES[service];
-}
-
-function normalizeAiModelOptions(value: unknown, selectedModel = ""): DesktopAiModelOption[] {
-  let candidates: unknown = value;
-  if (!Array.isArray(candidates)) {
-    try {
-      candidates = JSON.parse(String(value ?? "[]"));
-    } catch {
-      candidates = [];
-    }
-  }
-
-  const options: DesktopAiModelOption[] = [];
-  const seen = new Set<string>();
-  for (const candidate of Array.isArray(candidates) ? candidates : []) {
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
-      continue;
-    }
-    const record = candidate as Record<string, unknown>;
-    const id = String(record.id ?? "").trim();
-    const rawLabel = String(record.label ?? "").trim();
-    if (!id || id.length > 200 || /[\x00-\x1F\x7F]/.test(id) || seen.has(id)) {
-      continue;
-    }
-    const label = rawLabel && rawLabel.length <= 300 && !/[\x00-\x1F\x7F]/.test(rawLabel) ? rawLabel : id;
-    seen.add(id);
-    options.push({ id, label });
-    if (options.length >= 100) {
-      break;
-    }
-  }
-
-  const normalizedSelectedModel = String(selectedModel ?? "").trim();
-  if (normalizedSelectedModel && !seen.has(normalizedSelectedModel)) {
-    if (options.length >= 100) {
-      options.pop();
-    }
-    options.push({ id: normalizedSelectedModel, label: normalizedSelectedModel });
-  }
-  return options;
-}
-
-function normalizeAiBaseUrl(value: unknown): string {
-  const candidate = String(value ?? "").trim();
-  if (!candidate) {
-    return "";
-  }
-
-  try {
-    const parsed = new URL(candidate);
-    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname || parsed.username || parsed.password) {
-      return "";
-    }
-
-    return parsed.toString().replace(/\/+$/, "");
-  } catch {
-    return "";
-  }
-}
-
-function normalizeStoredAiBaseUrl(value: unknown): string {
-  return normalizeAiBaseUrl(value) || DEFAULT_AI_BASE_URL;
-}
-
-function normalizeAiTimeout(value: unknown): number | null {
-  const timeout = Number(value);
-  return Number.isInteger(timeout) && timeout >= 5 && timeout <= 120 ? timeout : null;
-}
-
-function normalizeStoredAiTimeout(value: unknown): number {
-  return normalizeAiTimeout(value) ?? DEFAULT_AI_TIMEOUT_SECONDS;
-}
-
-function normalizeStoredTimestamp(value: unknown): string {
-  const timestamp = String(value ?? "").trim();
-  return timestamp && Number.isFinite(Date.parse(timestamp)) ? timestamp : "";
-}
-
-function normalizePublishedTimestamp(value: string): string {
-  return normalizeStoredTimestamp(value);
-}
-
-function resolveEncryptedAiApiKey(input: {
-  rawKeyProvided: boolean;
-  clearRequested: boolean;
-  write: AiApiKeyWrite;
-  existingEncryptedValue: string;
-}): { ok: true; encryptedValue: string } | { ok: false; message: string } {
-  const encryptedValue = String(input.write.encryptedValue ?? "").trim();
-
-  if (input.clearRequested) {
-    if (input.rawKeyProvided || input.write.mode !== "clear" || encryptedValue) {
-      return {
-        ok: false,
-        message: "AI güvenlik anahtarını silme isteği güvenli depolama işlemiyle eşleşmiyor."
-      };
-    }
-
-    return { ok: true, encryptedValue: "" };
-  }
-
-  if (input.rawKeyProvided) {
-    if (input.write.mode !== "replace" || !encryptedValue) {
-      return {
-        ok: false,
-        message: "Yeni AI güvenlik anahtarı şifrelenmeden kaydedilemez."
-      };
-    }
-
-    return { ok: true, encryptedValue };
-  }
-
-  if (input.write.mode !== "keep" || encryptedValue) {
-    return {
-      ok: false,
-      message: "Boş AI güvenlik anahtarı mevcut kayıt korunarak kaydedilmeli."
-    };
-  }
-
-  return { ok: true, encryptedValue: input.existingEncryptedValue };
-}
-
-function normalizeInteger(value: number) {
-  return Number.isFinite(value) ? Math.trunc(value) : 0;
-}
-
-function normalizeBoolean(value: unknown, fallback: boolean): boolean {
-  if (value === true || value === 1 || value === "1" || value === "true") return true;
-  if (value === false || value === 0 || value === "0" || value === "false") return false;
-  return fallback;
-}
-
-interface NormalizedCustomerInput {
-  fullName: string;
-  phone: string;
-  email: string;
-  notes: string;
-  tags: string[];
-  identityType: CustomerIdentityType;
-  identityNumber: string;
-  nationality: string;
-  birthDate: string;
-  gender: CustomerGender;
-  documentSerialNumber: string;
-  documentExpiryDate: string;
-  birthPlace: string;
-  motherName: string;
-  fatherName: string;
-  issuingAuthority: string;
-  address: string;
-}
-
-function normalizeCustomerInput(
-  input: SaveCustomerInput
-): { ok: true; customer: NormalizedCustomerInput } | { ok: false; message: string } {
-  const fullName = normalizeCustomerSingleLine(input?.fullName, 160);
-  if (fullName.length < 2) {
-    return { ok: false, message: "Müşteri adı en az 2 karakter olmalı." };
-  }
-
-  const rawPhone = String(input?.phone ?? "").trim();
-  const phoneResult = rawPhone ? normalizePhone(rawPhone) : null;
-  if (phoneResult && !phoneResult.ok) {
-    return { ok: false, message: phoneResult.error };
-  }
-
-  const email = normalizeCustomerSingleLine(input?.email, 254).toLowerCase();
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return { ok: false, message: "E-posta adresi geçerli biçimde olmalı." };
-  }
-
-  const identityType = normalizeCustomerIdentityType(input?.identityType);
-  const identityNumber = normalizeIdentityNumber(input?.identityNumber, identityType);
-  if (identityNumber === null) {
-    return {
-      ok: false,
-      message: identityType === "tc_identity_card"
-        ? "T.C. kimlik numarası 11 haneli ve doğrulanabilir olmalı."
-        : "Kimlik veya pasaport numarası geçersiz."
-    };
-  }
-
-  const birthDate = normalizeOptionalIsoDate(input?.birthDate);
-  const documentExpiryDate = normalizeOptionalIsoDate(input?.documentExpiryDate);
-  if (birthDate === null || documentExpiryDate === null) {
-    return { ok: false, message: "Kimlik tarihleri geçerli gün/ay/yıl biçiminde olmalı." };
-  }
-
-  const tags = [...new Set(
-    (Array.isArray(input?.tags) ? input.tags : [])
-      .map((tag) => normalizeCustomerSingleLine(tag, 40))
-      .filter(Boolean)
-  )].slice(0, 20);
-
-  return {
-    ok: true,
-    customer: {
-      fullName,
-      phone: phoneResult?.ok ? phoneResult.e164 : "",
-      email,
-      notes: normalizeLimitedText(input?.notes, 4000),
-      tags,
-      identityType,
-      identityNumber,
-      nationality: normalizeCustomerSingleLine(input?.nationality, 80),
-      birthDate,
-      gender: normalizeCustomerGender(input?.gender),
-      documentSerialNumber: normalizeCustomerSingleLine(input?.documentSerialNumber, 80).toUpperCase(),
-      documentExpiryDate,
-      birthPlace: normalizeCustomerSingleLine(input?.birthPlace, 160),
-      motherName: normalizeCustomerSingleLine(input?.motherName, 160),
-      fatherName: normalizeCustomerSingleLine(input?.fatherName, 160),
-      issuingAuthority: normalizeCustomerSingleLine(input?.issuingAuthority, 160),
-      address: normalizeLimitedText(input?.address, 2000)
-    }
-  };
-}
-
-function normalizeCustomerIdentityType(value: unknown): CustomerIdentityType {
-  return value === "tc_identity_card" || value === "passport" || value === "other" ? value : "";
-}
-
-function normalizeCustomerGender(value: unknown): CustomerGender {
-  return value === "female" || value === "male" || value === "unspecified" ? value : "";
-}
-
-function normalizeIdentityNumber(value: unknown, identityType: CustomerIdentityType): string | null {
-  const normalized = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "");
-  if (!normalized) {
-    return "";
-  }
-  if (identityType === "tc_identity_card") {
-    return isValidTurkishIdentityNumber(normalized) ? normalized : null;
-  }
-  return /^[A-Z0-9]{4,32}$/.test(normalized) ? normalized : null;
-}
-
-function isValidTurkishIdentityNumber(value: string): boolean {
-  if (!/^[1-9]\d{10}$/.test(value)) {
-    return false;
-  }
-  const digits = [...value].map(Number);
-  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8];
-  const evenSum = digits[1] + digits[3] + digits[5] + digits[7];
-  return ((oddSum * 7 - evenSum) % 10 + 10) % 10 === digits[9]
-    && digits.slice(0, 10).reduce((total, digit) => total + digit, 0) % 10 === digits[10];
-}
-
-function normalizeOptionalIsoDate(value: unknown): string | null {
-  const normalized = String(value ?? "").trim();
-  return !normalized ? "" : isIsoDate(normalized) ? normalized : null;
-}
-
-function normalizeCustomerSingleLine(value: unknown, limit: number): string {
-  return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, limit);
-}
-
-function normalizeLimitedText(value: unknown, limit: number): string {
-  return String(value ?? "").trim().slice(0, limit);
-}
-
-function normalizePrice(value: number) {
-  return Number.isFinite(value) && value >= 0 ? value : 0;
-}
-
-function normalizeStockPrecision(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
-}
-
-function normalizeNullableStockNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  const quantity = Number(value);
-  return Number.isFinite(quantity) && quantity >= 0
-    ? normalizeStockPrecision(quantity)
-    : null;
-}
-
-function normalizePositiveStockNumber(value: unknown): number | null {
-  const quantity = Number(value);
-  return Number.isFinite(quantity) && quantity > 0
-    ? normalizeStockPrecision(quantity)
-    : null;
-}
-
-function normalizeMenuStockUnit(value: unknown): MenuStockUnit {
-  return value === "gram" ? "gram" : "piece";
-}
-
-function normalizeSignedStockNumber(value: unknown): number | null {
-  const quantity = Number(value);
-  return Number.isFinite(quantity) ? normalizeStockPrecision(quantity) : null;
-}
-
-function nullableNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function nullableString(value: unknown): string | null {
-  return value === null || value === undefined ? null : String(value);
-}
-
-function nullableTrimmedString(value: unknown): string | null {
-  const text = String(value ?? "").trim();
-  return text || null;
-}
-
-function normalizeOrderQuantity(value: number): number | null {
-  const quantity = Number(value);
-  return Number.isInteger(quantity) && quantity >= 1 && quantity <= 999 ? quantity : null;
-}
-
-function createTableOrderId(prefix: "table_order_" | "table_order_item_"): string {
-  const timestamp = Date.now().toString(36);
-  const randomPart = Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, "") || "000000";
-  return `${prefix}${timestamp}_${randomPart}`;
-}
-
-function createAndroidEntityId(
-  prefix: "customer_" | "reservation_" | "stay_" | "table_order_" | "table_order_item_",
-  actionId: string
-): string {
-  const digest = createHash("sha256").update(actionId).digest("hex").slice(0, 48);
-  return `${prefix}android_${digest}`;
-}
-
-function androidPayloadString(payload: Record<string, unknown>, field: string): string {
-  return typeof payload[field] === "string" ? payload[field].trim() : "";
-}
-
-function androidPayloadStringArray(payload: Record<string, unknown>, field: string): string[] {
-  const value = payload[field];
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function normalizeStockImageImportId(value: unknown): string {
-  const importId = String(value ?? "").trim();
-  return /^[A-Za-z0-9._:-]{8,160}$/.test(importId) ? importId : "";
-}
-
-function isSha256Hex(value: string): boolean {
-  return /^[a-f0-9]{64}$/.test(value);
-}
-
-function normalizeStockImageConfidence(value: unknown): StockImageConfidence {
-  return value === "high" || value === "medium" || value === "low" ? value : "low";
-}
-
-function normalizeStockImageText(value: unknown, limit: number): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const text = value.trim().slice(0, limit);
-  return text || null;
-}
-
-function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates: StockImageMenuCandidate[]): StockImageAnalysis {
-  const source = value && typeof value === "object" && !Array.isArray(value)
-    ? value as unknown as Record<string, unknown>
-    : {};
-  const documentSource = source.document && typeof source.document === "object" && !Array.isArray(source.document)
-    ? source.document as Record<string, unknown>
-    : {};
-  const candidateById = new Map(candidates.map((candidate) => [candidate.id, candidate]));
-  const sourceLines = Array.isArray(source.lines) ? source.lines.slice(0, 200) : [];
-  const lines: StockImageAnalysisLine[] = [];
-  for (const rawLine of sourceLines) {
-    if (!rawLine || typeof rawLine !== "object" || Array.isArray(rawLine)) {
-      continue;
-    }
-    const line = rawLine as Record<string, unknown>;
-    const rawText = normalizeStockImageText(line.raw_text, 1000);
-    if (!rawText) {
-      continue;
-    }
-    const requestedId = normalizeStockImageText(line.matched_menu_item_id, 160);
-    const candidate = requestedId ? candidateById.get(requestedId) : undefined;
-    const sourceQuantityText = normalizeStockImageText(line.source_quantity_text, 200);
-    const rawQuantity = Number(line.suggested_quantity);
-    const integerQuantity = Number.isInteger(rawQuantity) && rawQuantity > 0 && rawQuantity <= 100_000
-      ? rawQuantity
-      : null;
-    const quantityText = sourceQuantityText || rawText;
-    const gramQuantity = candidate?.stock_unit === "gram" ? parseGramQuantity(quantityText) : null;
-    const ambiguousQuantity = hasAmbiguousStockUnit(quantityText, candidate?.stock_unit ?? "piece");
-    const suggestedQuantity = candidate?.stock_unit === "gram" ? gramQuantity : integerQuantity;
-    let reason = normalizeStockImageText(line.needs_review_reason, 500);
-    if (requestedId && !candidate) {
-      reason = reason || "Önerilen ürün mevcut stok takipli menü listesinde değil.";
-    }
-    if (ambiguousQuantity) {
-      reason = candidate?.stock_unit === "gram"
-        ? "Miktar gram veya kilogram olarak açıkça okunamadı."
-        : "Koli, paket, ağırlık veya hacim bilgisi açık bir adede dönüştürülemedi.";
-    } else if (suggestedQuantity === null) {
-      reason = reason || (candidate?.stock_unit === "gram"
-        ? "Açık gram veya kilogram bilgisi bulunamadı."
-        : "Açık adet bilgisi bulunamadı.");
-    }
-    lines.push({
-      raw_text: rawText,
-      matched_menu_item_id: candidate?.id ?? null,
-      matched_menu_item_name: candidate?.name ?? null,
-      suggested_quantity: ambiguousQuantity ? null : suggestedQuantity,
-      source_quantity_text: sourceQuantityText,
-      confidence: normalizeStockImageConfidence(line.confidence),
-      needs_review_reason: reason
-    });
-  }
-  return {
-    document: {
-      supplier_name: normalizeStockImageText(documentSource.supplier_name, 255),
-      invoice_number: normalizeStockImageText(documentSource.invoice_number, 120),
-      invoice_date: normalizeStockImageText(documentSource.invoice_date, 40),
-      document_confidence: normalizeStockImageConfidence(documentSource.document_confidence)
-    },
-    lines
-  };
-}
-
-function hasAmbiguousStockUnit(value: string, stockUnit: MenuStockUnit): boolean {
-  const normalized = value.toLocaleLowerCase("tr-TR")
-    .replace(/ı/g, "i")
-    .replace(/\b\d+\s*['’]?\s*(?:li|lı|lu|lü|lik|lık|luk|lük)\s+paket\b/giu, "")
-    .replace(/\s+/g, " ");
-  if (stockUnit === "gram") {
-    return /\b(?:koli|paket|lt|litre|adet|ad|tane)\b/iu.test(normalized) || parseGramQuantity(normalized) === null;
-  }
-  return /\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|gr|gram|lt|litre)\b/iu.test(normalized);
-}
-
-function parseGramQuantity(value: string): number | null {
-  const normalized = value.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
-  const match = normalized.match(/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g)\b/iu);
-  if (!match) {
-    return null;
-  }
-  const quantity = parseTurkishDocumentNumber(match[1]);
-  const grams = ["kg", "kilogram", "kilo"].includes(match[2]) ? quantity * 1000 : quantity;
-  return Number.isInteger(grams) && grams > 0 && grams <= 100_000 ? grams : null;
-}
-
-function parseTurkishDocumentNumber(value: string): number {
-  const text = value.trim();
-  const normalized = text.includes(",")
-    ? text.replace(/\./g, "").replace(",", ".")
-    : /^\d{1,3}(?:\.\d{3})+$/.test(text)
-      ? text.replace(/\./g, "")
-      : text;
-  return Number(normalized);
-}
-
-function normalizeStockImageApplyLines(value: unknown): StockImageApplyLine[] | null {
-  if (!Array.isArray(value) || value.length > 200) {
-    return null;
-  }
-  const lines: StockImageApplyLine[] = [];
-  for (const rawLine of value) {
-    if (!rawLine || typeof rawLine !== "object" || Array.isArray(rawLine)) {
-      return null;
-    }
-    const line = rawLine as Record<string, unknown>;
-    const menuItemId = normalizeStockImageText(line.menu_item_id, 160);
-    const rawText = normalizeStockImageText(line.raw_text, 1000);
-    const quantity = Number(line.quantity);
-    if (!menuItemId || !rawText || !Number.isInteger(quantity) || quantity <= 0 || quantity > 100_000) {
-      return null;
-    }
-    lines.push({
-      menu_item_id: menuItemId,
-      quantity,
-      raw_text: rawText,
-      confidence: normalizeStockImageConfidence(line.confidence)
-    });
-  }
-  return lines;
-}
-
-function getAndroidVersionConflict(
-  payload: Record<string, unknown>,
-  field: string,
-  actualUpdatedAt: unknown,
-  entityLabel: string
-): AndroidActionMutationResult | null {
-  const expectedUpdatedAt = androidPayloadString(payload, field);
-  if (!expectedUpdatedAt || expectedUpdatedAt === String(actualUpdatedAt ?? "")) {
-    return null;
-  }
-  return {
-    ok: false,
-    message: `${entityLabel} masaüstünde değişmiş. Telefonda canlı veriyi yenileyip tekrar deneyin.`
-  };
-}
-
-function nextMutationTimestamp(previousUpdatedAt: unknown, candidate: string): string {
-  const previous = String(previousUpdatedAt ?? "").trim();
-  const previousTime = Date.parse(previous);
-  const candidateTime = Date.parse(candidate);
-  if (!Number.isFinite(previousTime) || !Number.isFinite(candidateTime) || candidateTime > previousTime) {
-    return candidate;
-  }
-  return new Date(previousTime + 1).toISOString();
-}
-
-function androidPayloadNumber(payload: Record<string, unknown>, field: string, fallback: number): number {
-  const value = Number(payload[field]);
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function roundMoney(value: number): number {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function normalizeCurrency(value: string) {
-  const currency = value.trim().toUpperCase();
-  return currency || "TRY";
-}
-
-function normalizeTableOrderCurrency(value: unknown): string {
-  const currency = String(value ?? "TRY").trim().toUpperCase();
-  return /^[A-Z]{3}$/.test(currency) ? currency : "TRY";
-}
-
-function androidActionRelatedId(action: AndroidSyncAction): string {
-  const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
-    ? action.payload as Record<string, unknown>
-    : {};
-  for (const key of ["order_id", "table_id", "reservation_id", "request_id", "customer_id", "folio_id", "room_id", "task_id", "item_id", "menu_item_id", "category_id", "message_id"]) {
-    const value = String(payload[key] ?? "").trim();
-    if (value) {
-      return value;
-    }
-  }
-  return "";
-}
-
-function androidActionResolutionKey(action: AndroidSyncAction): string {
-  return [
-    String(action.device_id ?? "").trim(),
-    String(action.action_type ?? "").trim(),
-    androidActionRelatedId(action)
-  ].join(":");
-}
-
-function androidActionTargetPage(
-  actionType: string,
-  payload: Record<string, unknown> = {}
-): DesktopAndroidActionFailure["targetPage"] {
-  if (actionType.startsWith("customer_") || actionType === "message_delete") {
-    return "customerWork";
-  }
-  if (actionType.startsWith("reservation_table_")) {
-    return "restaurant";
-  }
-  if (actionType.startsWith("daily_task_") && String(payload.task_type ?? "").trim() === "manual_restaurant") {
-    return "restaurant";
-  }
-  if (actionType.startsWith("reservation_") || actionType.startsWith("room_") || actionType.startsWith("daily_task_")) {
-    return "pension";
-  }
-  if (actionType.startsWith("table_") || actionType.startsWith("menu_")) {
-    return "restaurant";
-  }
-  return "settings";
-}
-
-function normalizeAndroidFailureTargetPage(value: unknown): DesktopAndroidActionFailure["targetPage"] {
-  const target = String(value ?? "");
-  return ["dashboard", "customerWork", "pension", "restaurant", "settings"].includes(target)
-    ? target as DesktopAndroidActionFailure["targetPage"]
-    : "settings";
-}
-
-function friendlyDesktopActionFailure(value: string): string {
-  const message = value.trim();
-  const lower = message.toLocaleLowerCase("tr-TR");
-  if (lower.includes("hesap kapatma yetkisi") || (lower.includes("yetki") && lower.includes("kapat"))) {
-    return "Bu cihazın hesap kapatma yetkisi yok.";
-  }
-  if (lower.includes("pasif")) {
-    return "Bu cihaz pasifleştirilmiş.";
-  }
-  if (lower.includes("adisyon") && (lower.includes("kapalı") || lower.includes("kapat"))) {
-    return "Adisyon kapalı olduğu için işlem yapılamadı.";
-  }
-  if (lower.includes("stok") && (lower.includes("yeterli") || lower.includes("yok"))) {
-    return "Stokta yeterli ürün yok.";
-  }
-  if (lower.includes("yetki") || lower.includes("izin")) {
-    return "Bu cihazın bu işlem için yetkisi yok.";
-  }
-  return message || "İşlem masaüstü tarafından uygulanamadı.";
-}
-
-function parseEventPayload(value: unknown): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function parseAiWorkspacePayload(value: unknown): Record<string, unknown> {
-  try {
-    const parsed = JSON.parse(String(value ?? "{}")) as unknown;
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function normalizeStringArray(value: string[]) {
-  return value.map((item) => item.trim()).filter(Boolean);
-}
-
-function normalizeRequestType(value: string) {
-  const allowed = new Set([
-    "general_info",
-    "pension_reservation",
-    "restaurant_reservation",
-    "breakfast_request",
-    "qr_menu_question",
-    "location_question",
-    "price_question",
-    "other"
-  ]);
-  const requestType = value.trim();
-  return allowed.has(requestType) ? requestType : "general_info";
-}
-
-function normalizePriority(value: string) {
-  const allowed = new Set(["low", "normal", "high", "urgent"]);
-  const priority = value.trim();
-  return allowed.has(priority) ? priority : "normal";
-}
-
-function normalizeDateInput(value: string) {
-  const date = value.trim();
-  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "";
-}
-
-function normalizeTimeInput(value: string) {
-  const time = value.trim();
-  return /^\d{2}:\d{2}$/.test(time) ? time : "";
-}
-
-function getCustomerTagsForSource(source: string) {
-  if (source === "manual") {
-    return ["manuel", "talep"];
-  }
-
-  if (source === "web_ai") {
-    return ["web", "ai", "talep"];
-  }
-
-  if (source === "whatsapp") {
-    return ["whatsapp", "talep"];
-  }
-
-  return ["web", "talep"];
-}
-
-function buildManualRequestReply(customerName: string) {
-  return `Merhaba ${customerName}, talebinizi aldık. Detayları kontrol edip size dönüş yapacağız.`;
-}
-
-function normalizeStatus(value: string, allowed: string[]) {
-  const status = value.trim();
-  return allowed.includes(status) ? status : "";
-}
-
-function normalizeUrl(value: string) {
-  const url = value.trim().replace(/\/+$/, "");
-  return /^https?:\/\//.test(url) ? url : "";
-}
-
-function slugifyBusinessName(value: string) {
-  return (
-    value
-      .trim()
-      .toLocaleLowerCase("tr-TR")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/ı/g, "i")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "firma"
-  );
-}
-
-function buildReservationTitle(request: Record<string, unknown>, reservationType: string) {
-  const name = String(request.customer_name ?? "Misafir").trim() || "Misafir";
-  const labels: Record<string, string> = {
-    room: "oda rezervasyonu",
-    table: "masa rezervasyonu",
-    other: "rezervasyon"
-  };
-
-  return `${name} - ${labels[reservationType] ?? "rezervasyon"}`;
-}
-
-function buildReservationNotes(request: Record<string, unknown>) {
-  const message = String(request.message ?? "").trim();
-  const summary = String(request.ai_summary ?? "").trim();
-  const parts = [message, summary ? `AI özet: ${summary}` : ""].filter(Boolean);
-
-  return parts.join("\n");
-}
-
-function normalizeDesktopReportRange(input: DesktopReportRangeInput): DesktopReportPeriod {
-  const preset = String(input?.preset ?? "") as DesktopReportPreset;
-  const supportedPresets = new Set<DesktopReportPreset>(["today", "yesterday", "last7", "last30", "custom"]);
-  const startDate = String(input?.startDate ?? "").trim();
-  const endDate = String(input?.endDate ?? "").trim();
-  if (!supportedPresets.has(preset) || !isIsoDate(startDate) || !isIsoDate(endDate)) {
-    throw new Error("Rapor için geçerli bir tarih aralığı seçin.");
-  }
-  const dayCount = isoDateDifference(startDate, endDate);
-  if (dayCount < 0) {
-    throw new Error("Rapor başlangıç tarihi bitiş tarihinden sonra olamaz.");
-  }
-  if (dayCount > 3659) {
-    throw new Error("Rapor tarih aralığı en fazla 10 yıl olabilir.");
-  }
-  const label = String(input?.label ?? "").trim().replace(/\s+/g, " ").slice(0, 80)
-    || (startDate === endDate ? startDate : `${startDate} – ${endDate}`);
-  return { preset, label, startDate, endDate };
-}
-
-function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-  const [year, month, day] = value.split("-").map(Number);
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  return parsed.getUTCFullYear() === year
-    && parsed.getUTCMonth() === month - 1
-    && parsed.getUTCDate() === day;
-}
-
-function isoDateDifference(startDate: string, endDate: string): number {
-  const start = Date.parse(`${startDate}T00:00:00.000Z`);
-  const end = Date.parse(`${endDate}T00:00:00.000Z`);
-  return Math.round((end - start) / 86_400_000);
-}
-
-function enumerateIsoDateRange(startDate: string, endDate: string): string[] {
-  const dayCount = isoDateDifference(startDate, endDate);
-  return Array.from({ length: dayCount + 1 }, (_value, index) => shiftIsoDate(startDate, index));
-}
-
-function reportReservationCapabilitySqlClause(
-  enabledCapabilities: ReadonlySet<BusinessCapability>
-): string {
-  const accommodation = enabledCapabilities.has(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS);
-  const foodService = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_RESERVATIONS);
-  if (accommodation && foodService) {
-    return "";
-  }
-  const domain = reportReservationDomainSql();
-  if (accommodation) {
-    return `AND NOT ${domain.hasTables}`;
-  }
-  if (foodService) {
-    return `AND NOT ${domain.hasRooms}`;
-  }
-  return "AND 1 = 0";
-}
-
-function reportReservationDomainSql(alias = ""): { hasRooms: string; hasTables: string } {
-  const column = (name: string) => alias ? `${alias}.${name}` : name;
-  const hasJsonItems = (name: string) => `json_array_length(CASE
-    WHEN json_valid(${column(name)}) THEN ${column(name)}
-    ELSE '[]'
-  END) > 0`;
-  return {
-    hasRooms: `(${column("reservation_type")} IN ('room', 'room_and_table', 'mixed') OR ${hasJsonItems("room_ids_json")})`,
-    hasTables: `(${column("reservation_type")} IN ('table', 'breakfast', 'room_and_table', 'mixed') OR ${hasJsonItems("table_ids_json")})`
-  };
-}
-
-function reportTaskCapabilitySqlClause(
-  enabledCapabilities: ReadonlySet<BusinessCapability>
-): string {
-  if (!enabledCapabilities.has(BUSINESS_CAPABILITIES.TASKS)) {
-    return "AND 1 = 0";
-  }
-  const accommodation = enabledCapabilities.has(BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS) ? 1 : 0;
-  const foodService = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_TABLES) ? 1 : 0;
-  if (accommodation === 1 && foodService === 1) return "";
-  const reservationDomain = reportReservationDomainSql("task_reservation");
-
-  // Reservation-linked tasks use the reservation's actual domain before the
-  // generic task_type fallback, matching the shared/Android classifiers.
-  return `AND CASE
-    WHEN related_type = 'reservation' AND EXISTS (
-      SELECT 1 FROM reservations AS task_reservation
-      WHERE task_reservation.id = daily_tasks.related_id
-        AND task_reservation.deleted_at = ''
-        AND ${reservationDomain.hasRooms}
-        AND ${reservationDomain.hasTables}
-    ) THEN ${accommodation === 1 && foodService === 1 ? 1 : 0}
-    WHEN related_type = 'reservation' AND EXISTS (
-      SELECT 1 FROM reservations AS task_reservation
-      WHERE task_reservation.id = daily_tasks.related_id
-        AND task_reservation.deleted_at = ''
-        AND ${reservationDomain.hasRooms}
-        AND NOT ${reservationDomain.hasTables}
-    ) THEN ${accommodation}
-    WHEN related_type = 'reservation' AND EXISTS (
-      SELECT 1 FROM reservations AS task_reservation
-      WHERE task_reservation.id = daily_tasks.related_id
-        AND task_reservation.deleted_at = ''
-        AND ${reservationDomain.hasTables}
-        AND NOT ${reservationDomain.hasRooms}
-    ) THEN ${foodService}
-    WHEN task_type IN ('check_in', 'check_out', 'room_cleaning', 'room_maintenance', 'reservation', 'manual_pension')
-      OR related_type = 'room' THEN ${accommodation}
-    WHEN task_type IN ('table_reservation', 'breakfast', 'service', 'table_service', 'restaurant', 'table_check', 'payment', 'manual_restaurant')
-      OR related_type = 'table' THEN ${foodService}
-    ELSE 1
-  END = 1`;
-}
-
-function shiftIsoDate(value: string, days: number): string {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-function formatLocalIsoDate(value: Date): string {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function reportStockSourceLabel(sourceType: MenuStockSourceType): string {
-  if (sourceType === "android") {
-    return "Android manuel";
-  }
-  if (sourceType === "stock_image_import") {
-    return "Görsel / fatura";
-  }
-  if (sourceType === "table_order") {
-    return "Adisyon";
-  }
-  return "Masaüstü manuel";
-}
-
-function formatReportStockQuantity(value: number, unit: MenuStockUnit): string {
-  const amount = normalizeStockPrecision(value).toLocaleString("tr-TR", { maximumFractionDigits: 3 });
-  return unit === "gram" ? `${amount} g` : `${amount} adet`;
-}
-
-function toAndroidReportSnapshot(
-  key: AndroidReportPresetKey,
-  report: DesktopReportData
-): AndroidReportSnapshot {
-  return {
-    period: {
-      key,
-      label: report.period.label,
-      start: report.period.startDate,
-      end: report.period.endDate
-    },
-    summary: {
-      restaurant_revenue: report.summary.restaurantRevenue,
-      closed_orders: report.summary.closedOrders,
-      average_order: report.summary.averageOrder,
-      approved_reservations: report.summary.approvedReservations,
-      approved_accommodation_reservations: report.summary.approvedAccommodationReservations,
-      approved_food_reservations: report.summary.approvedFoodReservations,
-      approved_mixed_reservations: report.summary.approvedMixedReservations,
-      approved_generic_reservations: report.summary.approvedGenericReservations,
-      new_requests: report.summary.newRequests,
-      attention_count: report.attention.totalCount
-    },
-    restaurant: {
-      sold_item_count: report.restaurant.soldItemCount,
-      cancelled_orders: report.restaurant.cancelledOrders,
-      top_items: report.restaurant.topItems.slice(0, 3).map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        revenue: item.revenue
-      })),
-      daily_revenue: report.restaurant.dailyRevenue.map((day) => ({
-        date: day.date,
-        revenue: day.revenue,
-        closed_orders: day.closedOrders
-      }))
-    },
-    attention: {
-      pending_requests: report.attention.pendingRequests,
-      pending_reservations: report.attention.pendingReservations,
-      payment_waiting_tables: report.attention.paymentWaitingTables,
-      overdue_tasks: report.attention.overdueTasks,
-      incomplete_tasks: report.attention.incompleteTasks,
-      out_of_stock_items: report.attention.outOfStockItems,
-      low_stock_items: report.attention.lowStockItems,
-      items: report.attention.items.map((item) => ({
-        kind: item.kind,
-        title: item.title,
-        detail: item.detail
-      }))
-    }
-  };
-}
+import {
+  normalizeTableCategoryInputs,
+  normalizeTableCategoryName,
+  tableCategoryKey,
+  reconcileTableName,
+} from "./database/table-category-utils.js";
+
+import type {
+  NormalizedTableCategoryInput,
+} from "./database/table-category-utils.js";
+
+import {
+  AI_SERVICE_IDS,
+  DEFAULT_AI_BASE_URL,
+  GOOGLE_AI_STUDIO_BASE_URL,
+  DEFAULT_AI_TIMEOUT_SECONDS,
+  AI_SERVICE_DEFAULT_BASE_URLS,
+  normalizeAiService,
+  normalizeStoredAiService,
+  getAiServiceDisplayName,
+  normalizeAiModelOptions,
+  normalizeAiBaseUrl,
+  normalizeStoredAiBaseUrl,
+  normalizeAiTimeout,
+  normalizeStoredAiTimeout,
+  normalizeStoredTimestamp,
+  normalizePublishedTimestamp,
+  resolveEncryptedAiApiKey,
+} from "./database/ai-settings-utils.js";
+
+import {
+  normalizeCustomerInput,
+  normalizeCustomerIdentityType,
+  normalizeCustomerGender,
+  normalizeLimitedText,
+} from "./database/customer-utils.js";
+
+import {
+  TABLE_ORDER_STATUSES,
+  normalizeNullableStockNumber,
+  normalizePositiveStockNumber,
+  normalizeMenuStockUnit,
+  normalizeSignedStockNumber,
+  nullableTrimmedString,
+  normalizeOrderQuantity,
+  createTableOrderId,
+  normalizeStockImageImportId,
+  isSha256Hex,
+  sanitizeStockImageAnalysis,
+  normalizeStockImageApplyLines,
+  roundMoney,
+  normalizeTableOrderCurrency,
+} from "./database/stock-utils.js";
+
+import {
+  isAndroidAdminOnlyAction,
+  normalizeAndroidDeviceRole,
+  effectiveAndroidPermissions,
+  createAndroidEntityId,
+  androidPayloadString,
+  androidPayloadStringArray,
+  androidPayloadNumber,
+  getAndroidVersionConflict,
+  nextMutationTimestamp,
+  androidActionRelatedId,
+  androidActionResolutionKey,
+  androidActionTargetPage,
+  normalizeAndroidFailureTargetPage,
+  friendlyDesktopActionFailure,
+  parseEventPayload,
+} from "./database/android-utils.js";
+
+import type {
+  AndroidActionMutationResult,
+} from "./database/android-utils.js";
+
+import {
+  normalizeInteger,
+  normalizeBoolean,
+  normalizeStatus,
+  normalizeUrl,
+  slugifyBusinessName,
+} from "./database/request-utils.js";
+
+import {
+  setAutoSyncEnabled as setStoredAutoSyncEnabled,
+  getSyncRuntimeStatus as getStoredSyncRuntimeStatus,
+  getPendingSyncJobs as getStoredPendingSyncJobs,
+  queueSyncJob as queueStoredSyncJob,
+  completeSyncJob as completeStoredSyncJob,
+  failSyncJob as failStoredSyncJob,
+  recordSyncAttempt as recordStoredSyncAttempt,
+  recordAutomaticSyncSuccess as recordStoredAutomaticSyncSuccess,
+  recordAutomaticSyncFailure as recordStoredAutomaticSyncFailure,
+  acknowledgeRequestCursor as acknowledgeStoredRequestCursor,
+} from "./database/sync-runtime-store.js";
+
+import {
+  getReportData as getStoredReportData,
+  getAndroidReportPresets as getStoredAndroidReportPresets,
+} from "./database/report-store.js";
+
+import {
+  getAndroidDevices as getStoredAndroidDevices,
+  getAndroidPermissionSnapshot as getStoredAndroidPermissionSnapshot,
+  upsertAndroidDeviceSightings as upsertStoredAndroidDeviceSightings,
+  setAndroidDeviceRole as setStoredAndroidDeviceRole,
+  setAndroidDevicePermissionGroups as setStoredAndroidDevicePermissionGroups,
+  setAndroidDeviceActive as setStoredAndroidDeviceActive,
+  resetAndroidDevicePermissions as resetStoredAndroidDevicePermissions,
+  revokeAndroidDevice as revokeStoredAndroidDevice,
+} from "./database/android-device-store.js";
+
+import {
+  getPublishedMenu as getStoredPublishedMenu,
+  getQrMenuPublication as getStoredQrMenuPublication,
+  saveMenuCategory as saveStoredMenuCategory,
+  deleteMenuCategoryInTransaction as deleteStoredMenuCategoryInTransaction,
+  deleteMenuItemInTransaction as deleteStoredMenuItemInTransaction,
+} from "./database/menu-store.js";
+
+import {
+  getMenuStockMovements as getStoredMenuStockMovements,
+  saveMenuItem as saveStoredMenuItem,
+  mutateMenuStockInTransaction as mutateStoredMenuStock,
+} from "./database/menu-stock-store.js";
+
+import {
+  listTableOrders as listStoredTableOrders,
+  getActiveTableOrder as getStoredActiveTableOrder,
+  recalculateTableOrderTotal as recalculateStoredTableOrderTotal,
+  listPaymentWaitingTableOrders,
+  getTableOrderById,
+  mapTableOrderRow,
+  getTableOrderItems,
+  getMutableTableOrderItem,
+  findActiveOrderForTables,
+  isActiveTableOrder,
+  recalculateTableOrderTotalInTransaction,
+  getTableOrderMutationResult,
+  restoreCancelledOrderStockInTransaction,
+  resolveAndroidActiveOrderId,
+} from "./database/table-order-store.js";
+
+import {
+  openTableOrder as openStoredTableOrder,
+  addTableOrderItem as addStoredTableOrderItem,
+  updateTableOrderItemQuantity as updateStoredTableOrderItemQuantity,
+  updateTableOrderItemNote as updateStoredTableOrderItemNote,
+  removeTableOrderItem as removeStoredTableOrderItem,
+  updateTableOrderStatus as updateStoredTableOrderStatus,
+  closeTableOrder as closeStoredTableOrder,
+} from "./table-order-service.js";
+
+import {
+  applyAndroidTableOrderOpen as applyStoredAndroidTableOrderOpen,
+  applyAndroidTableOrderAddItem as applyStoredAndroidTableOrderAddItem,
+  applyAndroidTableOrderItemQuantity as applyStoredAndroidTableOrderItemQuantity,
+  applyAndroidTableOrderRemoveItem as applyStoredAndroidTableOrderRemoveItem,
+  applyAndroidTableOrderStatus as applyStoredAndroidTableOrderStatus,
+  applyAndroidTableOrderClose as applyStoredAndroidTableOrderClose,
+} from "./android-table-order-actions.js";
+
+import { insertDatabaseEvent } from "./database/event-store.js";
+
+import {
+  getRequests,
+  getRequestById as getStoredRequestById,
+  updateRequestStatus as updateStoredRequestStatus,
+  saveRequestAiSuggestion as saveStoredRequestAiSuggestion,
+  deleteRequestInTransaction as deleteStoredRequestInTransaction,
+} from "./database/request-store.js";
+
+import {
+  markPreparedWhatsAppMessagesSentInTransaction,
+  markWhatsAppMessageSent as markStoredWhatsAppMessageSent,
+  getAndroidPreparedMessages as getStoredAndroidPreparedMessages,
+  deleteMessageInTransaction as deleteStoredMessageInTransaction,
+} from "./database/prepared-message-store.js";
+
+import {
+  getDailyTasks as getStoredDailyTasks,
+  saveDailyTask as saveStoredDailyTask,
+  deleteDailyTask as deleteStoredDailyTask,
+  updateDailyTaskStatus as updateStoredDailyTaskStatus,
+} from "./database/daily-task-store.js";
+
+import {
+  getReservations as getStoredReservations,
+  getActiveResourceReservationTitles as getStoredActiveResourceReservationTitles,
+  saveManualRestaurantReservation as saveStoredManualRestaurantReservation,
+  findConflictingRoomReservation as findStoredConflictingRoomReservation,
+} from "./database/reservation-store.js";
+
+import {
+  runDesktopDeletion as runStoredDesktopDeletion,
+  insertDeletionEvent as insertStoredDeletionEvent,
+} from "./database/deletion-store.js";
+
+import {
+  getCustomers as getStoredCustomers,
+  saveCustomer as saveStoredCustomer,
+} from "./database/customer-store.js";
+
+import {
+  getCustomerRoomStays as getStoredCustomerRoomStays,
+  hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay,
+} from "./database/customer-room-stay-store.js";
+
+import {
+  getAiServiceProfiles as getStoredAiServiceProfiles,
+  getEncryptedAiApiKey as getStoredEncryptedAiApiKey,
+  markAiSettingsPublished as markStoredAiSettingsPublished,
+  upsertAiServiceProfileInTransaction as upsertStoredAiServiceProfileInTransaction,
+} from "./database/ai-profile-store.js";
+
+import {
+  saveAiWorkspaceHistory as saveStoredAiWorkspaceHistory,
+  getAiWorkspaceHistory as getStoredAiWorkspaceHistory,
+} from "./database/ai-workspace-store.js";
+
+import {
+  getRooms as getStoredRooms,
+  updateRoomStatus as updateStoredRoomStatus,
+} from "./database/room-store.js";
+
+import {
+  getTables as getStoredTables,
+  updateTableStatus as updateStoredTableStatus,
+} from "./database/table-store.js";
+
+import {
+  assignCustomerToRoom as assignStoredCustomerToRoom,
+  updateCustomerRoomStayStatus as updateStoredCustomerRoomStayStatus,
+  saveManualReservation as saveStoredManualReservation,
+  updateReservationStatus as updateStoredReservationStatus,
+  refreshRoomStatusFromStays as refreshStoredRoomStatusFromStays,
+  enforceActiveStayRoomStatus as enforceStoredActiveStayRoomStatus,
+} from "./stay-reservation-service.js";
+
+import {
+  authorizeAndroidAction as authorizeStoredAndroidAction,
+  recordAndroidActionResult as recordStoredAndroidActionResult,
+  getAndroidActionFailures as getStoredAndroidActionFailures,
+  applyAndroidRequestStatus as applyStoredAndroidRequestStatus,
+  applyAndroidCustomerSave as applyStoredAndroidCustomerSave,
+  applyAndroidDailyTaskStatus as applyStoredAndroidDailyTaskStatus,
+  applyAndroidMenuStockAction as applyStoredAndroidMenuStockAction,
+  applyAndroidCustomerRoomAssignment as applyStoredAndroidCustomerRoomAssignment,
+  applyAndroidCustomerRoomStayStatus as applyStoredAndroidCustomerRoomStayStatus,
+  applyAndroidReservationStatus as applyStoredAndroidReservationStatus,
+  applyAndroidRoomStatus as applyStoredAndroidRoomStatus,
+  applyAndroidRequestConversion as applyStoredAndroidRequestConversion,
+  insertAndroidActionEvent as insertStoredAndroidActionEvent,
+} from "./android-action-service.js";
+
+import {
+  ensureCustomerForRequest as ensureStoredCustomerForRequest,
+  createManualRequest as createStoredManualRequest,
+  convertRequestToReservation as convertStoredRequestToReservation,
+} from "./request-intake-service.js";
+
+import {
+  getSetupData as getStoredSetupData,
+  ensureInitialRooms as ensureStoredInitialRooms,
+  ensureInitialTables as ensureStoredInitialTables,
+  reconcileTableCategories as reconcileStoredTableCategories,
+} from "./setup-service.js";
+
+import {
+  getTrackedStockCandidates as getStoredTrackedStockCandidates,
+  getAppliedStockImageHashes as getStoredAppliedStockImageHashes,
+  createStockImageImport as createStoredStockImageImport,
+  completeStockImageAnalysis as completeStoredStockImageAnalysis,
+  failStockImageImport as failStoredStockImageImport,
+  applyStockImageImport as applyStoredStockImageImport,
+  applyStockImageImportInTransaction as applyStoredStockImageImportInTransaction,
+} from "./database/stock-image-store.js";
