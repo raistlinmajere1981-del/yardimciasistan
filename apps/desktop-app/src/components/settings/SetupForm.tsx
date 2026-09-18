@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type MutableRefObject, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { ExternalLink, Plus, RefreshCw, Save, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
+import { ExternalLink, Plus, RefreshCw, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
 import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import {
   BUSINESS_CAPABILITIES,
@@ -62,16 +62,11 @@ interface SetupFormProps {
   enabledCapabilities: BusinessCapability[];
   setupData: DesktopSetupData;
   dashboardData?: DesktopDashboardData;
-  embedded?: boolean;
   publicProfile?: ReactNode;
   publicProfileSaveRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
   settingsSaveRef?: MutableRefObject<SettingsSaveHandle | null>;
   onSettingsSaveStateChange?: (state: SettingsSaveState, message: string) => void;
   onDashboardRefresh?: () => Promise<unknown>;
-  saveState: SyncState;
-  message: string;
-  backupState?: SyncState;
-  backupMessage?: string;
   androidPublishState?: SyncState;
   androidPublishMessage?: string;
   androidDeviceState?: SyncState;
@@ -80,7 +75,6 @@ interface SetupFormProps {
   aiConnectionTestMessage: string;
   onFormChange: (form: SetupFormState) => void;
   onTestAiConnection: () => void;
-  onCreateBackup?: () => void;
   onPublishAndroid?: () => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetAndroidDevicePermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
@@ -89,7 +83,6 @@ interface SetupFormProps {
   onRevokeAndroidDevice?: (device: DesktopAndroidDevice) => void;
   onAppPasswordConfiguredChange?: (configured: boolean) => void;
   onSave: () => Promise<SettingsOperationResult>;
-  onSkip: () => void;
   uiPreferences: UiPreferences;
   onUiPreferencesChange: (preferences: UiPreferences) => void;
 }
@@ -99,16 +92,11 @@ export function SetupForm({
   enabledCapabilities,
   setupData,
   dashboardData,
-  embedded = false,
   publicProfile,
   publicProfileSaveRef,
   settingsSaveRef,
   onSettingsSaveStateChange,
   onDashboardRefresh,
-  saveState,
-  message,
-  backupState = "idle",
-  backupMessage = "Yedekleme bekliyor.",
   androidPublishState = "idle",
   androidPublishMessage = "Telefon özeti henüz yayınlanmadı.",
   androidDeviceState = "idle",
@@ -117,7 +105,6 @@ export function SetupForm({
   aiConnectionTestMessage,
   onFormChange,
   onTestAiConnection,
-  onCreateBackup,
   onPublishAndroid,
   onSetAndroidDeviceRole,
   onSetAndroidDevicePermissionGroups,
@@ -126,7 +113,6 @@ export function SetupForm({
   onRevokeAndroidDevice,
   onAppPasswordConfiguredChange,
   onSave,
-  onSkip,
   uiPreferences,
   onUiPreferencesChange
 }: SetupFormProps) {
@@ -372,7 +358,7 @@ export function SetupForm({
   );
 
   const saveSettings = useCallback(async () => {
-    if (!embedded || settingsSaveInFlightRef.current) return false;
+    if (settingsSaveInFlightRef.current) return false;
 
     const initialSetup = setupData.setupRequired;
     settingsSaveInFlightRef.current = true;
@@ -421,70 +407,28 @@ export function SetupForm({
     } finally {
       settingsSaveInFlightRef.current = false;
     }
-  }, [embedded, onSave, onSettingsSaveStateChange, publicProfileSaveRef, setupData.setupRequired]);
+  }, [onSave, onSettingsSaveStateChange, publicProfileSaveRef, setupData.setupRequired]);
 
   useImperativeHandle(settingsSaveRef, () => ({ save: saveSettings }), [saveSettings]);
 
   useEffect(() => {
-    if (embedded) onSettingsSaveStateChange?.("idle", "Ayarlar düzenlenebilir.");
-  }, [embedded, onSettingsSaveStateChange]);
+    onSettingsSaveStateChange?.("idle", "Ayarlar düzenlenebilir.");
+  }, [onSettingsSaveStateChange]);
 
   return (
-    <main className={embedded ? `setup-shell is-embedded${setupData.setupRequired ? " is-initial-setup" : ""}` : "setup-shell setup-shell--onboarding"} aria-labelledby={!embedded ? "setup-title" : undefined}>
-      {!embedded && <section className="setup-hero" aria-label="İlk kurulum">
-        <div className="setup-brand">
-          <img className="setup-brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
-          <div>
-            <strong>Yardımcı Asistan</strong>
-            <small>{setupData.setupRequired ? "İlk Kurulum" : "Ayarlar"}</small>
-          </div>
-        </div>
-        <div className="setup-hero-copy">
-          <p className="setup-eyebrow">Kurulum Sihirbazı</p>
-          <h1 id="setup-title">İşletme panelini kullanıma hazırlayın.</h1>
-          <p>Firma profili, bağlı servisler, WhatsApp ve web modül bağlantısı bu ekrandan ayarlanır. AI ayarı isteğe bağlıdır.</p>
-        </div>
-        <dl className="setup-paths">
-          <div>
-            <dt>Veri dosyası</dt>
-            <dd>{setupData.setupRequired ? "İlk kayıt sonrası oluşur" : "Bu bilgisayarda güvenle saklanır"}</dd>
-          </div>
-          <div>
-            <dt>Yedekleme</dt>
-            <dd>Uygulama veri klasöründe backups klasörü ayrıldı</dd>
-          </div>
-        </dl>
-        <nav className="setup-progress" aria-label="Kurulum bölümleri">
-          <ol>
-            <li className="is-current">
-              <a href="#settings-business" aria-current="step"><span>01</span><span><strong>İşletme</strong><small>Temel firma bilgileri</small></span></a>
-            </li>
-            <li>
-              <a href="#settings-operations"><span>02</span><span><strong>Düzen</strong><small>Oda ve masa kapasitesi</small></span></a>
-            </li>
-            <li>
-              <a href="#settings-connections"><span>03</span><span><strong>Bağlantılar</strong><small>Web, WhatsApp ve AI</small></span></a>
-            </li>
-            <li>
-              <a href="#settings-application"><span>04</span><span><strong>Son adım</strong><small>Görünüm ve kayıt</small></span></a>
-            </li>
-          </ol>
-        </nav>
-      </section>}
-
+    <main className={`setup-shell is-embedded${setupData.setupRequired ? " is-initial-setup" : ""}`}>
       <section className="setup-form-surface">
-        {embedded && <nav className="settings-section-nav" aria-label="Ayar bölümleri">
+        <nav className="settings-section-nav" aria-label="Ayar bölümleri">
           <a href="#settings-business">İşletmem</a>
           {!setupData.setupRequired && <a href="#settings-public">Müşteri bilgileri</a>}
           <a href="#settings-operations">İşletme düzeni</a>
           <a href="#settings-connections">Bağlantılar</a>
           <a href="#settings-application">Uygulama</a>
           {!setupData.setupRequired && <a href="#settings-maintenance">Bakım</a>}
-        </nav>}
+        </nav>
 
         <div id="settings-business" className="setup-section settings-identity-section">
           <div className="setup-section-title">
-            {!embedded && <p>Firma Bilgileri</p>}
             <h2>İşletmem</h2>
           </div>
           <div className="form-row">
@@ -527,7 +471,6 @@ export function SetupForm({
 
         <div id="settings-operations" className="setup-section settings-daily-section">
           <div className="setup-section-title">
-            {!embedded && <p>Kapasite ve Yardımcı</p>}
             <h2>İşletme Düzeni</h2>
           </div>
           {accommodationEnabled && <div className="setup-count-row settings-room-count">
@@ -598,7 +541,7 @@ export function SetupForm({
             </small>
           </div>}
         </div>
-        {embedded && !setupData.setupRequired && (
+        {!setupData.setupRequired && (
           <RoomManagementSection
             roomCount={form.roomCount}
             dashboardRoomCount={dashboardData?.rooms.length ?? 0}
@@ -609,7 +552,6 @@ export function SetupForm({
         )}
         <div id="settings-connections" className="setup-section settings-services-section">
           <div className="setup-section-title">
-            {!embedded && <p>Servisler</p>}
             <h2>Bağlı Servisler</h2>
           </div>
           <div className="setup-toggle-grid">
@@ -689,7 +631,6 @@ export function SetupForm({
 
 <div className="setup-section settings-web-section">
           <div className="setup-section-title settings-web-title">
-            {!embedded && <p>Web Bağlantısı</p>}
             <h2>Web Bağlantısı</h2>
             <label className="form-check setup-checkline settings-auto-sync-toggle">
               <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
@@ -725,7 +666,6 @@ export function SetupForm({
 
         <div className="setup-section setup-ai-section">
           <div className="setup-section-title">
-            {!embedded && <p>AI Bağlantısı</p>}
             <h2>AI Servisi ve Model</h2>
           </div>
           <div className="form-grid">
@@ -843,7 +783,7 @@ export function SetupForm({
           {form.aiService !== "gemini" && renderAiConnectionActions(false)}
         </div>
 
-        {embedded && !setupData.setupRequired && form.androidEnabled && (
+        {!setupData.setupRequired && form.androidEnabled && (
           <AndroidDevicesSection
             devices={dashboardData?.androidDevices ?? []}
             enabledCapabilities={enabledCapabilities}
@@ -923,43 +863,14 @@ export function SetupForm({
             </div>
           </div>
         </div>
-        {embedded && (
-          <PasswordSettings
-            configured={setupData.appPasswordConfigured}
-            onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
-            saveHandleRef={passwordSaveRef}
-          />
-        )}
-        {embedded && !setupData.setupRequired && <DataMaintenanceSettings />}
+        <PasswordSettings
+          configured={setupData.appPasswordConfigured}
+          onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
+          saveHandleRef={passwordSaveRef}
+        />
+        {!setupData.setupRequired && <DataMaintenanceSettings />}
 
-        <div className="setup-section settings-storage-section">
-          <div className="setup-section-title">{!embedded && <p>Bu Bilgisayar</p>}<h2>Kayıt ve Yedekleme</h2></div>
-          <dl className="info-list settings-technical-info">
-            <div><dt>Yerel kayıt dosyası</dt><dd>{dashboardData?.databasePath ?? "İlk kayıt sonrası oluşur"}</dd></div>
-            <div><dt>Yedek klasörü</dt><dd>{dashboardData?.backupPath ?? "İlk kayıt sonrası oluşur"}</dd></div>
-          </dl>
-          <div className="form-actions settings-action-row">
-            <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onCreateBackup} disabled={!onCreateBackup || backupState === "loading"}><Save size={16} aria-hidden="true" />{backupState === "loading" ? "Yedekleniyor" : "Yedek Al"}</ActionButton>
-            {form.androidEnabled && <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onPublishAndroid} disabled={!onPublishAndroid || androidPublishState === "loading"}><UploadCloud size={16} aria-hidden="true" />{androidPublishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}</ActionButton>}
-          </div>
-          <p className={setupStatusClass(backupState)} role="status" aria-live="polite">{backupMessage}</p>
-          {form.androidEnabled && <p className={setupStatusClass(androidPublishState)} role="status" aria-live="polite">{androidPublishMessage}</p>}
-        </div>
 
-        {!embedded && <footer className="setup-footer">
-          <span className={setupStatusClass(saveState)} role={saveState === "error" ? "alert" : "status"} aria-live="polite">{message}</span>
-          <div>
-            {!setupData.setupRequired && (
-              <ActionButton variant="secondary" className="setup-secondary" type="button" onClick={onSkip}>
-                Panele Dön
-              </ActionButton>
-            )}
-            <ActionButton className="setup-primary" type="button" onClick={onSave} disabled={saveState === "loading"}>
-              <Save size={16} aria-hidden="true" />
-              {setupData.setupRequired ? "Kurulumu Kaydet" : "Ayarları Kaydet"}
-            </ActionButton>
-          </div>
-        </footer>}
       </section>
     </main>
   );
