@@ -40,6 +40,7 @@ function installOnDevice(options) {
 
   if (!options.noBuild) {
     console.log(`${variantLabel} APK derleniyor...`);
+    runConnectionPreflight(options);
     runCommand(
       process.execPath,
       [resolve(repoRoot, "scripts", "run-android-gradle.mjs"), `assemble${variantLabel}`],
@@ -94,6 +95,7 @@ function parseArgs(args) {
     serial: process.env.ANDROID_SERIAL?.trim() ?? "",
     noBuild: false,
     launch: false,
+    skipConnectionPreflight: false,
     help: false
   };
   let explicitVariant = "";
@@ -122,6 +124,8 @@ function parseArgs(args) {
       }
     } else if (arg === "--no-build") {
       options.noBuild = true;
+    } else if (arg === "--skip-connection-preflight") {
+      options.skipConnectionPreflight = true;
     } else if (arg === "--launch") {
       options.launch = true;
     } else if (arg === "--help" || arg === "-h") {
@@ -288,6 +292,31 @@ function runAdb(args, options = {}) {
   return result;
 }
 
+function runConnectionPreflight(options) {
+  const preflightEnv = { ...process.env };
+  if (options.variant === "release") {
+    preflightEnv.YARDIMCI_ASISTAN_ANDROID_RELEASE_BUILD = "1";
+  }
+  if (options.skipConnectionPreflight) {
+    preflightEnv.YARDIMCI_ASISTAN_ANDROID_SKIP_CONNECTION_PREFLIGHT = "1";
+  }
+  const result = spawnSync(
+    process.execPath,
+    [resolve(repoRoot, "scripts", "preflight-android-connection.mjs")],
+    { cwd: repoRoot, env: preflightEnv, encoding: "utf8" }
+  );
+  const output = formatOutput(result);
+  if (output) {
+    console.log(output);
+  }
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error("Android bağlantı preflight başarısız olduğu için derleme durduruldu.");
+  }
+}
+
 function runCommand(command, args, label) {
   const result = spawnSync(command, args, {
     cwd: repoRoot,
@@ -341,6 +370,8 @@ Seçenekler:
   --release           İmzalı release APK derle ve kur.
   --serial, -s <id>   Birden fazla cihaz varsa hedef cihazı seç.
   --no-build          Mevcut APK'yı yeniden derlemeden kur.
+  --skip-connection-preflight
+                      Debug derleme öncesi web modülü anahtar doğrulamasını atla.
   --launch            Kurulumdan sonra uygulamayı aç.
   --help, -h          Bu yardımı göster.
 
