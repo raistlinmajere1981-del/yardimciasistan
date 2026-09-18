@@ -102,6 +102,7 @@ Important command nesting:
 - Inside `check:linux`, `npm run check` is the shared build barrier; dependent smoke/package steps after it should reuse those outputs through `:no-build` variants instead of rebuilding packages/apps.
 - Standalone smoke/package commands should remain self-contained and may keep their own build step.
 - `pilot:check` preflight builds packages before web-module packaging, so its packaging step should reuse the existing widget build.
+- Local checks must use the installed Electron runtime directly; do not invoke Electron through `npx` or let `electron-builder` redownload the Electron distribution when `node_modules/electron/dist` is available.
 - Do not additionally run `npm run quality:strict` when the unique strict gates below are run individually.
 
 Milestone unique gates:
