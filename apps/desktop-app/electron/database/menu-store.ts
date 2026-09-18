@@ -1,3 +1,4 @@
+import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
 import type { PublishedQrMenu } from "@yardimci-asistan/sync-core";
@@ -16,19 +17,6 @@ import {
   nullableNumber,
   nullableString
 } from "./stock-utils.js";
-
-function parseStringArray(value: unknown): string[] {
-  try {
-    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map((item) => String(item).trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
 
 export function getPublishedMenu(db: DatabaseSync): PublishedQrMenu {
   const categories = db
@@ -92,8 +80,8 @@ export function getPublishedMenu(db: DatabaseSync): PublishedQrMenu {
       image_url: String(row.image_url ?? ""),
       is_available: Number(row.is_available ?? 0) === 1,
       is_featured: Number(row.is_featured ?? 0) === 1,
-      allergens: parseStringArray(row.allergens_json),
-      tags: parseStringArray(row.tags_json),
+      allergens: parseStoredStringArray(row.allergens_json),
+      tags: parseStoredStringArray(row.tags_json),
       stock_quantity: nullableNumber(row.stock_quantity),
       stock_min_quantity: nullableNumber(row.stock_min_quantity),
       stock_unit: normalizeMenuStockUnit(row.stock_unit),

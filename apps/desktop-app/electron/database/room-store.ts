@@ -1,3 +1,4 @@
+import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
 import type { DesktopRoom } from "../database-types.js";
 import { insertDatabaseEvent } from "./event-store.js";
@@ -37,7 +38,7 @@ export function mapRoomRow(row: Record<string, unknown>, reservationTitles: Map<
     bedInfo: String(row.bed_info ?? ""),
     floor: String(row.floor ?? ""),
     status: String(row.status ?? "available"),
-    features: parseRoomStringArray(row.features_json),
+    features: parseStoredStringArray(row.features_json),
     description: String(row.description ?? ""),
     priceNote: String(row.price_note ?? ""),
     isActive: Number(row.is_active ?? 0) === 1,
@@ -77,17 +78,4 @@ export function updateRoomStatus(
     ok: true,
     message: "Oda durumu güncellendi."
   };
-}
-
-function parseRoomStringArray(value: unknown): string[] {
-  try {
-    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map((item) => String(item).trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
 }

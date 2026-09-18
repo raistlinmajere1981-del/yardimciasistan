@@ -1,3 +1,4 @@
+import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
 import type {
@@ -65,7 +66,7 @@ export function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
     email: String(row.email ?? ""),
     source: String(row.source ?? "manual"),
     notes: String(row.notes ?? ""),
-    tags: parseCustomerStringArray(row.tags_json),
+    tags: parseStoredStringArray(row.tags_json),
     lastContactAt: String(row.last_contact_at ?? ""),
     identityType: normalizeCustomerIdentityType(row.identity_type),
     identityNumber: String(row.identity_number ?? ""),
@@ -215,17 +216,4 @@ export function saveCustomer(db: DatabaseSync, input: SaveCustomerInput): { ok: 
     message: requestedId ? "Müşteri kartı güncellendi." : "Müşteri kartı oluşturuldu.",
     savedId: id
   };
-}
-
-function parseCustomerStringArray(value: unknown): string[] {
-  try {
-    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map((item) => String(item).trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
 }

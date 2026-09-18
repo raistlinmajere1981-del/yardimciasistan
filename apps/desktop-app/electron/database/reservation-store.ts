@@ -1,3 +1,4 @@
+import { parseStoredStringArray } from "./string-array-utils.js";
 import type { DatabaseSync } from "node:sqlite";
 import { createId } from "@yardimci-asistan/shared";
 import type {
@@ -60,7 +61,7 @@ export function getActiveResourceReservationTitles(db: DatabaseSync, resourceTyp
     .all() as Array<Record<string, unknown>>;
 
   for (const row of rows) {
-    const ids = parseReservationStringArray(resourceType === "room" ? row.room_ids_json : row.table_ids_json);
+    const ids = parseStoredStringArray(resourceType === "room" ? row.room_ids_json : row.table_ids_json);
     for (const id of ids) {
       if (!map.has(id)) {
         map.set(id, String(row.title ?? ""));
@@ -87,8 +88,8 @@ export function mapReservationRow(row: Record<string, unknown>): DesktopReservat
     guestCount: Number(row.guest_count ?? 0),
     adultCount: Number(row.adult_count ?? 0),
     childCount: Number(row.child_count ?? 0),
-    roomIds: parseReservationStringArray(row.room_ids_json),
-    tableIds: parseReservationStringArray(row.table_ids_json),
+    roomIds: parseStoredStringArray(row.room_ids_json),
+    tableIds: parseStoredStringArray(row.table_ids_json),
     notes: String(row.notes ?? ""),
     priceNote: String(row.price_note ?? ""),
     paymentStatus: String(row.payment_status ?? "not_required"),
@@ -141,7 +142,7 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
             AND deleted_at = ''
         `)
       .all(date, time) as Array<{ id?: string; title?: string; table_ids_json?: string }>;
-    const conflict = sameSlotRows.find((row) => parseReservationStringArray(row.table_ids_json).includes(tableId));
+    const conflict = sameSlotRows.find((row) => parseStoredStringArray(row.table_ids_json).includes(tableId));
     if (conflict) {
       return {
         ok: false,
@@ -209,19 +210,6 @@ export function saveManualRestaurantReservation(db: DatabaseSync, input: SaveMan
       ? "Restoran rezervasyonu oluşturuldu ve masa planlandı."
       : "Restoran rezervasyonu oluşturuldu. Masayı daha sonra atayabilirsiniz."
   };
-}
-
-function parseReservationStringArray(value: unknown): string[] {
-  try {
-    const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map((item) => String(item).trim()).filter(Boolean);
-  } catch {
-    return [];
-  }
 }
 
 export function findConflictingRoomReservation(
