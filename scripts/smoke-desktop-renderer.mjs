@@ -317,8 +317,8 @@ try {
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(page.locator(".setup-footer")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Panele Dön" })).toHaveCount(0);
-  await expect(page.getByText("İşletme", { exact: true })).toHaveCount(0);
-  await expect(page.getByText("Görünüm", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "İşletme", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
   await expect(page.getByText("Firma Bilgileri", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Modüller", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Kapasite ve Yardımcı", { exact: true })).toHaveCount(0);
