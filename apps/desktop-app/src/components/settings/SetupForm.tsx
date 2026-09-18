@@ -421,7 +421,7 @@ export function SetupForm({
         <nav className="settings-section-nav" aria-label="Ayar bölümleri">
           <a href="#settings-business">İşletme</a>
           <a href="#settings-operations">İşletme düzeni</a>
-          <a href="#settings-connections">Bağlantılar</a>
+          <a href="#settings-connections">Servisler</a>
           <a href="#settings-application">Uygulama</a>
           {!setupData.setupRequired && <a href="#settings-maintenance">Bakım</a>}
         </nav>
@@ -549,28 +549,26 @@ export function SetupForm({
             saveHandleRef={roomSaveRef}
           />
         )}
-        <div id="settings-connections" className="setup-section settings-services-section">
-          <div className="setup-section-title">
-            <h2>Bağlı Servisler</h2>
+        <div id="settings-connections" className="settings-services-workspace">
+          <div className="settings-services-heading">
+            <h2>Servisler</h2>
           </div>
-          <div className="setup-toggle-grid">
-            <label>
-              <input checked={form.whatsappEnabled} onChange={(event) => update("whatsappEnabled", event.target.checked)} type="checkbox" />
-              WhatsApp
-            </label>
-            <label>
-              <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
-              Android
-            </label>
-            <label>
-              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
-              AI Yardımcı
-            </label>
-          </div>
-          <div className="setup-birthday-settings form-stack">
-            <div className="setup-section-title setup-section-title--subsection">
-              <h3>Doğum Günü Mesajları</h3>
+
+          <section className={`settings-service-card${form.whatsappEnabled ? " is-enabled" : " is-disabled"}`}>
+            <div className="settings-service-card-header">
+              <div>
+                <strong>WhatsApp</strong>
+                <span>{form.whatsappEnabled ? "Açık" : "Kapalı"}</span>
+              </div>
+              <label className="settings-service-toggle">
+                <input checked={form.whatsappEnabled} onChange={(event) => update("whatsappEnabled", event.target.checked)} type="checkbox" />
+                <span>{form.whatsappEnabled ? "Açık" : "Kapalı"}</span>
+              </label>
             </div>
+            <fieldset className="settings-service-card-body setup-birthday-settings form-stack" disabled={!form.whatsappEnabled}>
+              <div className="setup-section-title setup-section-title--subsection">
+                <h3>Doğum Günü Mesajları</h3>
+              </div>
             <label className="form-check setup-checkline">
               <input
                 checked={form.birthdaySettings.enabled}
@@ -622,13 +620,25 @@ export function SetupForm({
                 <small>{"{ad}"} ve {"{işletme}"} yer tutucuları desteklenir.</small>
               </label>
             </div>
-            <small className="setup-birthday-note">
-              Otomatik modda uygulama ve WhatsApp oturumu açık olduğunda, doğum günü mesajları seçtiğiniz saatten itibaren aynı gün otomatik gönderilir.
-            </small>
+              <small className="setup-birthday-note">
+                Otomatik modda uygulama ve WhatsApp oturumu açık olduğunda, doğum günü mesajları seçtiğiniz saatten itibaren aynı gün otomatik gönderilir.
+              </small>
+            </fieldset>
+          </section>
+
+          <div className="setup-toggle-grid settings-service-legacy-toggles">
+            <label>
+              <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
+              Android
+            </label>
+            <label>
+              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
+              AI Yardımcı
+            </label>
           </div>
         </div>
 
-<div className="setup-section settings-web-section">
+        <div className="setup-section settings-web-section">
           <div className="setup-section-title settings-web-title">
             <h2>Web Bağlantısı</h2>
             <label className="form-check setup-checkline settings-auto-sync-toggle">
