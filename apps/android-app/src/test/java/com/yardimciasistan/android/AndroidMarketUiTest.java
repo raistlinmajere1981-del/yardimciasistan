@@ -109,6 +109,21 @@ public final class AndroidMarketUiTest {
   }
 
   @Test
+  public void cameraBarcodeGateRequiresBarcodeToLeaveFrameBeforeRepeating() {
+    MarketUiRules.BarcodeCameraGate gate = new MarketUiRules.BarcodeCameraGate(850L);
+
+    assertEquals("8690000000001", gate.observe("8690000000001", 1_000L));
+    assertEquals("", gate.observe("8690000000001", 1_100L));
+    assertEquals("", gate.observe("", 1_700L));
+    assertEquals("", gate.observe("", 1_949L));
+    assertEquals("", gate.observe("8690000000001", 1_950L));
+
+    assertEquals("8690000000002", gate.observe("8690000000002", 2_000L));
+    assertEquals("", gate.observe("", 2_900L));
+    assertEquals("8690000000002", gate.observe("8690000000002", 2_901L));
+  }
+
+  @Test
   public void knownAndUnknownBarcodesResolveWithoutInventingProducts() {
     OperationData data = marketDataWithProducts();
     data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_VIEW);
