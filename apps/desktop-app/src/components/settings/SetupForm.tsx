@@ -631,21 +631,21 @@ export function SetupForm({
               <input checked={form.androidEnabled} onChange={(event) => update("androidEnabled", event.target.checked)} type="checkbox" />
               Android
             </label>
-            <label>
-              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
-              AI Yardımcı
-            </label>
           </div>
         </div>
 
-        <div className="setup-section settings-web-section">
-          <div className="setup-section-title settings-web-title">
-            <h2>Web Bağlantısı</h2>
-            <label className="form-check setup-checkline settings-auto-sync-toggle">
+        <section className="settings-service-card is-enabled settings-web-section">
+          <div className="settings-service-card-header">
+            <div>
+              <strong>Web Modülü</strong>
+              <span>{form.webModuleUrl.trim() && form.syncSecret.trim() ? "Yapılandırıldı" : "Yapılandırılmadı"}</span>
+            </div>
+            <label className="settings-service-toggle">
               <input checked={form.autoSyncEnabled} onChange={(event) => update("autoSyncEnabled", event.target.checked)} type="checkbox" />
-              Otomatik eşitle
+              <span>Otomatik eşitle</span>
             </label>
           </div>
+          <div className="settings-service-card-body">
           <div className="form-grid">
             <label className="form-field form-field--long form-field--span setup-field">
               Web eşitleme adresi
@@ -669,14 +669,22 @@ export function SetupForm({
               {webConnectionTestState === "loading" ? "Bağlantı deneniyor" : "Web Bağlantısını Dene"}
             </ActionButton>
             <span className="setup-connection-message" role="status" aria-live="polite">{webConnectionTestMessage}</span>
-            <small>Bu kontrol yalnız bağlantıyı doğrular; talep çekmez veya veri yayınlamaz.</small>
           </div>
-        </div>
+          </div>
+        </section>
 
-        <div className="setup-section setup-ai-section">
-          <div className="setup-section-title">
-            <h2>AI Servisi ve Model</h2>
+        <section className={`settings-service-card setup-ai-section${form.aiEnabled ? " is-enabled" : " is-disabled"}`}>
+          <div className="settings-service-card-header">
+            <div>
+              <strong>AI Yardımcı</strong>
+              <span>{form.aiEnabled ? (form.aiStoredApiKeyConfigured ? "Hazır" : "Açık · anahtar bekliyor") : "Kapalı"}</span>
+            </div>
+            <label className="settings-service-toggle">
+              <input checked={form.aiEnabled} onChange={(event) => update("aiEnabled", event.target.checked)} type="checkbox" />
+              <span>{form.aiEnabled ? "Açık" : "Kapalı"}</span>
+            </label>
           </div>
+          <div className="settings-service-card-body">
           <div className="form-grid">
             <label className="form-field form-field--medium setup-ai-service-field">
               Servis sağlayıcı
@@ -790,7 +798,8 @@ export function SetupForm({
             )}
           </div>
           {form.aiService !== "gemini" && renderAiConnectionActions(false)}
-        </div>
+          </div>
+        </section>
 
         {!setupData.setupRequired && form.androidEnabled && (
           <AndroidDevicesSection

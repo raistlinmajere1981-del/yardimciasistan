@@ -119,6 +119,14 @@
   opacity: 0.58;
 }
 
+.settings-service-card-body > :first-child {
+  margin-top: 0;
+}
+
+.settings-service-card-body > :last-child {
+  margin-bottom: 0;
+}
+
 .settings-service-legacy-toggles {
   padding-top: var(--space-1);
 }
@@ -146,9 +154,7 @@
 }
 
 .setup-birthday-settings {
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
+  margin: 0;
 }
 
 .setup-section-title--subsection {
