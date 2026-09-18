@@ -335,7 +335,7 @@
 }
 
 .settings-capability-row.is-blocked {
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-hover);
 }
 
 .settings-capability-copy {
@@ -373,7 +373,7 @@
 
 .settings-capability-source.source-profile {
   color: var(--color-text-muted);
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-hover);
 }
 
 .settings-capability-source.source-user {
@@ -383,7 +383,7 @@
 
 .settings-capability-lock {
   color: var(--color-text-muted);
-  background: var(--color-bg-subtle);
+  background: var(--color-bg-hover);
 }
 
 .settings-capability-actions {
