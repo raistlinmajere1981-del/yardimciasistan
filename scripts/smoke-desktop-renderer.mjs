@@ -1354,12 +1354,13 @@ try {
   await compactPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
 
   const aiOnlyPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
-  await aiOnlyPage.addInitScript(({ setupData, dashboardData }) => {
+  await aiOnlyPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
     }
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "0.1.0",
@@ -1395,7 +1396,12 @@ try {
       setupRequired: false,
       servicePreferences: { ...createSetupFixture().servicePreferences, whatsapp: false }
     },
-    dashboardData: createCompactUiFixture()
+    dashboardData: createCompactUiFixture(),
+    capabilitySnapshot: createBusinessCapabilitySnapshotFixture({
+      ...createSetupFixture(),
+      setupRequired: false,
+      servicePreferences: { ...createSetupFixture().servicePreferences, whatsapp: false }
+    })
   });
   await aiOnlyPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(aiOnlyPage.locator("html")).toHaveAttribute("data-mode", "pro");
@@ -1636,13 +1642,14 @@ try {
   await compactPage.close();
 
   const pullPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  await pullPage.addInitScript(({ setupData, dashboardData, pulledRequest }) => {
+  await pullPage.addInitScript(({ setupData, dashboardData, pulledRequest, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
     }
     let currentDashboardData = dashboardData;
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "0.1.0",
@@ -1727,7 +1734,8 @@ try {
   }, {
     setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345" },
     dashboardData: createDashboardFixture(),
-    pulledRequest: createPulledRequestFixture()
+    pulledRequest: createPulledRequestFixture(),
+    capabilitySnapshot: createBusinessCapabilitySnapshotFixture({ ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345" })
   });
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(pullPage.locator("html")).toHaveAttribute("data-mode", "pro");
