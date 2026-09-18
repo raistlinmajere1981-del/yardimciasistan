@@ -19,43 +19,6 @@ const syncStatusStub = `      getSyncStatus: async () => ({
         message: "Senkron hazır."
       }),
       onSyncStatusChanged: () => () => {},`;
-const capabilitySnapshotStub = `      getBusinessCapabilitySnapshot: async () => {
-        const coreCapabilities = [
-          "core.customers",
-          "core.tasks",
-          "core.calendar",
-          "core.notifications",
-          "core.finance",
-          "core.reports",
-          "core.web",
-          "core.sync",
-          "core.backups",
-          "core.devices"
-        ];
-        const profileCapabilities = {
-          pension_restaurant: ["service.whatsapp", "service.android", "accommodation.rooms", "accommodation.reservations", "accommodation.stays", "accommodation.folio", "food_service.tables", "food_service.reservations", "food_service.orders", "food_service.menu", "channel.qr_menu", "commerce.catalog", "commerce.inventory", "commerce.sales"],
-          pension: ["service.whatsapp", "service.android", "accommodation.rooms", "accommodation.reservations", "accommodation.stays", "accommodation.folio"],
-          restaurant: ["service.whatsapp", "service.android", "food_service.tables", "food_service.reservations", "food_service.orders", "food_service.menu", "channel.qr_menu", "commerce.catalog", "commerce.inventory", "commerce.sales"],
-          cafe: ["service.whatsapp", "service.android", "food_service.tables", "food_service.reservations", "food_service.orders", "food_service.menu", "channel.qr_menu", "commerce.catalog", "commerce.inventory", "commerce.sales"],
-          market: ["service.whatsapp", "service.android", "commerce.catalog", "commerce.inventory", "commerce.sales", "commerce.customer_credit", "retail.barcode", "retail.purchasing", "retail.suppliers", "retail.labels"]
-        };
-        const enabledSet = new Set([...coreCapabilities, ...(profileCapabilities[setupData.profileId] || [])]);
-        if (setupData.servicePreferences?.whatsapp === false) enabledSet.delete("service.whatsapp");
-        if (setupData.servicePreferences?.android === false) enabledSet.delete("service.android");
-        if (setupData.aiEnabled) enabledSet.add("service.ai");
-        const enabledCapabilities = [...enabledSet];
-        return {
-          businessId: "renderer-smoke-business",
-          profileId: setupData.profileId,
-          capabilities: enabledCapabilities.map((capability) => ({
-            capability,
-            enabled: true,
-            source: capability.startsWith("core.") ? "system" : "profile",
-            updatedAt: "2026-07-18T12:00:00+03:00"
-          })),
-          enabledCapabilities
-        };
-      },`;
 
 const definitions = {
   "automatic-sync": {
@@ -66,11 +29,6 @@ const definitions = {
   renderer: {
     source: "smoke-desktop-renderer.mjs",
     replacements: [
-      {
-        before: `    window.yardimciDesktop = {`,
-        after: `    window.yardimciDesktop = {\n${capabilitySnapshotStub}`,
-        replaceAll: true
-      },
       {
         before: `      getDashboardData: async () => currentDashboardData,
       getReportData: async (range) => {`,

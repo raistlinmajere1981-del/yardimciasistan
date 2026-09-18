@@ -126,8 +126,6 @@ Prefer behavior/contract tests over tests that parse a specific function body or
 ## Known unrelated test/fixture debt
 
 Do not opportunistically fix these during unrelated work:
-- stock-image analysis PHP fixture: 403 vs expected 415
-- desktop renderer `Bildirimler` assertion
 - Android reservation fresh-DB fixture
 - Android daily-task permission fixture
 

@@ -1,3 +1,5 @@
+import { BUSINESS_CAPABILITIES, getBusinessProfile } from "@yardimci-asistan/shared";
+
 function createReportFixture() {
   return {
     period: {
@@ -671,4 +673,25 @@ function createPulledRequestFixture() {
   };
 }
 
-export { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture };
+function createBusinessCapabilitySnapshotFixture(setupData) {
+  const enabled = new Set(getBusinessProfile(setupData.profileId).defaultCapabilities);
+  if (setupData.servicePreferences?.whatsapp === false) enabled.delete(BUSINESS_CAPABILITIES.WHATSAPP);
+  if (setupData.servicePreferences?.android === false) enabled.delete(BUSINESS_CAPABILITIES.ANDROID);
+  if (setupData.aiEnabled) enabled.add(BUSINESS_CAPABILITIES.AI);
+  else enabled.delete(BUSINESS_CAPABILITIES.AI);
+
+  const enabledCapabilities = [...enabled];
+  return {
+    businessId: "renderer-smoke-business",
+    profileId: setupData.profileId,
+    capabilities: enabledCapabilities.map((capability) => ({
+      capability,
+      enabled: true,
+      source: capability.startsWith("core.") ? "system" : "profile",
+      updatedAt: "2026-07-18T12:00:00+03:00"
+    })),
+    enabledCapabilities
+  };
+}
+
+export { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture, createBusinessCapabilitySnapshotFixture };

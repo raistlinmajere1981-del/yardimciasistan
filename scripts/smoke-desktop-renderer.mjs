@@ -1,4 +1,4 @@
-import { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture } from "./lib/desktop-renderer-fixtures.mjs";
+import { createReportFixture, createSetupFixture, createDashboardFixture, createDashboardConversionFixture, createCompactUiFixture, createPulledRequestFixture, createBusinessCapabilitySnapshotFixture } from "./lib/desktop-renderer-fixtures.mjs";
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -25,7 +25,7 @@ try {
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
-  await page.addInitScript(({ setupData, dashboardData, reportData }) => {
+  await page.addInitScript(({ setupData, dashboardData, reportData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "dark", scale: 1 }));
@@ -42,6 +42,7 @@ try {
     window.__reportRanges = [];
     window.__reportAiCalls = [];
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "0.1.0",
@@ -196,7 +197,8 @@ try {
   }, {
     setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345", aiApiKeyConfigured: false },
     dashboardData: createDashboardConversionFixture(),
-    reportData: createReportFixture()
+    reportData: createReportFixture(),
+    capabilitySnapshot: createBusinessCapabilitySnapshotFixture({ ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345", aiApiKeyConfigured: false })
   });
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
@@ -594,7 +596,7 @@ try {
   await expect(page.locator(".whatsapp-send-status")).toContainText("Mesaj WhatsApp Web'e gönderildi");
 
   const conversionPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  await conversionPage.addInitScript(({ setupData, dashboardData }) => {
+  await conversionPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
@@ -602,6 +604,7 @@ try {
     let currentDashboardData = dashboardData;
     window.__identityAnalysisCalls = [];
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "0.1.0",
@@ -977,7 +980,8 @@ try {
     };
   }, {
     setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345" },
-    dashboardData: createDashboardConversionFixture()
+    dashboardData: createDashboardConversionFixture(),
+    capabilitySnapshot: createBusinessCapabilitySnapshotFixture({ ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345" })
   });
   await conversionPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(conversionPage.locator("html")).toHaveAttribute("data-mode", "pro");
@@ -1149,7 +1153,7 @@ try {
   await expect(assignableRoomCard.locator(".status-badge")).toHaveText("Temizlik");
 
   const compactPage = await browser.newPage({ viewport: { width: 1366, height: 768 } });
-  await compactPage.addInitScript(({ setupData, dashboardData }) => {
+  await compactPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
@@ -1208,6 +1212,7 @@ try {
       };
     };
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "0.1.0",
@@ -1283,7 +1288,8 @@ try {
     };
   }, {
     setupData: { ...createSetupFixture(), setupRequired: false, syncSecret: "compact-smoke-secret" },
-    dashboardData: createCompactUiFixture()
+    dashboardData: createCompactUiFixture(),
+    capabilitySnapshot: createBusinessCapabilitySnapshotFixture({ ...createSetupFixture(), setupRequired: false, syncSecret: "compact-smoke-secret" })
   });
   await compactPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
 
@@ -1699,7 +1705,7 @@ try {
   await pullPage.screenshot({ path: "artifacts/screenshots/desktop-web-pull-flow.png", fullPage: true });
 
   const setupPage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  await setupPage.addInitScript(({ setupData, dashboardData }) => {
+  await setupPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
       window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
@@ -1709,6 +1715,7 @@ try {
       openai: "sk-openai-stored-smoke"
     };
     window.yardimciDesktop = {
+      getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
         version: "0.1.0",
@@ -1832,7 +1839,8 @@ try {
     };
   }, {
     setupData: createSetupFixture(),
-    dashboardData: createDashboardFixture()
+    dashboardData: createDashboardFixture(),
+    capabilitySnapshot: createBusinessCapabilitySnapshotFixture(createSetupFixture())
   });
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(setupPage.locator("html")).toHaveAttribute("data-mode", "pro");
