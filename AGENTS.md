@@ -1,0 +1,153 @@
+# AGENTS.md
+
+## Scope
+
+This file defines repository-wide working rules for coding agents. Prefer the narrowest change that preserves current behavior and architecture.
+
+## Repository
+
+- Monorepo root: `~/YardimciAsistan`
+- Default branch: `main`
+- Create a focused branch for maintenance/refactor work; do not develop directly on `main`.
+- Do not use force-push, history rewrites, stash/pop, or discard unrelated working-tree changes.
+- Treat existing unrelated changes as owned by another task unless explicitly instructed otherwise.
+
+## Architecture
+
+### Electron main process
+
+`apps/desktop-app/electron/main.ts` is intentionally a composition/runtime root.
+
+Keep these kinds of responsibilities there when they depend on process-wide mutable state or Electron lifecycle:
+- app/window lifecycle
+- service/coordinator construction
+- BrowserWindow notifications
+- Android action-queue runtime state
+- Android snapshot publish/runtime state
+- sender/webContents lifecycle
+- thin bootstrap/shell/dashboard handlers
+
+Do not extract code only to reduce LOC.
+
+### IPC modules
+
+Domain IPC handlers live under:
+
+`apps/desktop-app/electron/ipc/`
+
+Rules:
+- IPC modules must not import `main.ts`.
+- Keep handlers thin: capability/session gates, argument routing, and service/facade delegation.
+- Preserve channel names, argument order, sync/async behavior, return shapes, gate order, and user-visible messages.
+- Do not change preload/renderer IPC contracts during behavior-preserving refactors.
+
+### Services
+
+Focused orchestration/services live under:
+
+`apps/desktop-app/electron/`
+
+Rules:
+- Services must not import `main.ts`.
+- Services must not import IPC modules.
+- Avoid generic context objects with many callbacks.
+- Prefer narrow dependencies and explicit domain ownership.
+- Do not create replacement god files.
+
+### Database
+
+`DesktopDatabase` is the compatibility facade for desktop persistence.
+
+Rules:
+- Prefer facade methods from `apps/desktop-app/electron/database.ts`.
+- Do not bypass the facade with new store imports unless the existing architecture explicitly requires it.
+- Do not add schema creation outside `apps/desktop-app/db/migrations/001_baseline.sql`.
+- Treat migration-baseline work as a separate migration task; do not mix it into unrelated refactors.
+
+## Shared utilities
+
+Do not create catch-all files such as `utils.ts`, `helpers.ts`, or `common.ts`.
+
+Centralize a helper only when:
+- semantics are genuinely identical,
+- it is pure or has a clearly defined platform boundary,
+- there are preferably 3+ real call sites.
+
+Placement:
+- cross-package and browser-safe helpers: `packages/shared`
+- Electron-only pure helpers: small thematic modules under `apps/desktop-app/electron/`
+- test-only helpers: `scripts/test-helpers/`
+
+Prefer names such as `object-utils.ts`, `date-utils.ts`, or another domain-specific filename over generic utility buckets.
+
+## Generated artifacts
+
+Normal build/test commands should not leave tracked generated files modified.
+
+`firm-template/web-module/widget.js` is a generated web-widget artifact and is currently known to churn during some build/check flows. Until the artifact pipeline is cleaned up:
+- do not treat generated widget churn as a product-code change,
+- revert only verified generated churn after checks,
+- do not discard unrelated changes.
+
+A future infrastructure task should separate normal widget build from template/deploy synchronization so routine checks do not mutate tracked files.
+
+## Tests and checks
+
+Use the narrowest useful checks during a stage, then full checkpoints at meaningful milestones.
+
+Important command nesting:
+- `npm run check:linux` already runs `npm run check`.
+- Do not run `npm run check` separately when running `check:linux`.
+- Do not additionally run `npm run quality:strict` when the unique strict gates below are run individually.
+
+Milestone unique gates:
+
+```bash
+npm run check:linux
+npm run lint:strict
+npm run knip:strict
+npm run design:audit:strict
+npm run architecture:audit
+npm run pilot:check
+```
+
+For Electron refactors, normally include:
+- `npx tsc -p apps/desktop-app/tsconfig.electron.json --noEmit`
+- targeted smoke tests for the touched domain
+- `git diff --check`
+
+Prefer behavior/contract tests over tests that parse a specific function body or source-file location. If a source-structure assertion is unavoidable, keep it minimal and update it when ownership moves.
+
+## Known unrelated test/fixture debt
+
+Do not opportunistically fix these during unrelated work:
+- stock-image analysis PHP fixture: 403 vs expected 415
+- desktop renderer `Bildirimler` assertion
+- Android reservation fresh-DB fixture
+- Android daily-task permission fixture
+
+Handle each as its own maintenance task after reproducing it against a clean baseline.
+
+## Refactor discipline
+
+Before editing:
+```bash
+git status --short --branch
+git rev-parse HEAD
+git diff --check
+```
+
+During behavior-preserving refactors:
+- preserve messages and error codes exactly,
+- preserve ordering where side effects are involved,
+- keep runtime mutable state with its natural owner,
+- avoid unrelated cleanup,
+- do not optimize or redesign behavior unless explicitly requested.
+
+Before finishing:
+- report changed files,
+- report targeted tests,
+- report any known pre-existing failure separately,
+- report `git diff --stat` and `git status --short`.
+
+If a change would broaden scope, stop and explain the dependency instead of silently expanding the task.
