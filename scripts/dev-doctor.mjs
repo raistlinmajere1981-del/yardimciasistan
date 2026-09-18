@@ -1,15 +1,17 @@
 import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { chromium } from "@playwright/test";
 
+const require = createRequire(import.meta.url);
 const checks = [];
 
 checkCommand("node", ["--version"], true);
 checkCommand("npm", ["--version"], true);
-checkCommand("npx", ["electron", "--version"], false);
+checkLocalElectron();
 checkCommand("php", ["-v"], false);
 checkPhpPdoSqlite();
 checkCommand("Xvfb", ["-help"], false);
@@ -56,6 +58,26 @@ if (failedRequired.length > 0) {
   console.error("");
   console.error("Zorunlu kontrollerden biri başarısız oldu.");
   process.exit(1);
+}
+
+function checkLocalElectron() {
+  try {
+    const executablePath = require("electron");
+    const version = require("electron/package.json").version;
+    checks.push({
+      name: "Yerel Electron",
+      required: false,
+      ok: existsSync(executablePath),
+      detail: existsSync(executablePath) ? `${version} - ${executablePath}` : "node_modules/electron kurulumu eksik"
+    });
+  } catch (error) {
+    checks.push({
+      name: "Yerel Electron",
+      required: false,
+      ok: false,
+      detail: error instanceof Error ? error.message : "node_modules/electron kurulumu eksik"
+    });
+  }
 }
 
 function checkCommand(command, args, required) {

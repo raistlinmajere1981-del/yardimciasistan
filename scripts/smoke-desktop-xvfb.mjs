@@ -1,7 +1,11 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join } from "node:path";
 import process from "node:process";
+
+const require = createRequire(import.meta.url);
+const electronExecutable = require("electron");
 
 const xvfbCheck = spawnSync("xvfb-run", ["--help"], {
   encoding: "utf8"
@@ -12,7 +16,7 @@ if (xvfbCheck.status !== 0) {
   process.exit(1);
 }
 
-const electron = spawn("xvfb-run", ["-a", "npx", "electron", "apps/desktop-app", "--no-sandbox"], {
+const electron = spawn("xvfb-run", ["-a", electronExecutable, "apps/desktop-app", "--no-sandbox"], {
   cwd: process.cwd(),
   stdio: ["ignore", "pipe", "pipe"],
   detached: true,
