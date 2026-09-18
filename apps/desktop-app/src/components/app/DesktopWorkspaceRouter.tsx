@@ -93,8 +93,6 @@ export function DesktopWorkspaceRouter({
     setupData,
     setupForm,
     setSetupForm,
-    setupSaveState,
-    setupMessage,
     aiConnectionTestState,
     aiConnectionTestMessage,
     testAiConnection: handleTestAiConnection,
@@ -195,8 +193,6 @@ export function DesktopWorkspaceRouter({
     handleUpdateDailyTaskStatus
   } = operationController;
   const {
-    backupState,
-    backupMessage,
     androidPublishState,
     androidPublishMessage,
     androidDeviceState,
@@ -206,8 +202,7 @@ export function DesktopWorkspaceRouter({
     handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
     handleResetAndroidDevicePermissions,
-    handleRevokeAndroidDevice,
-    handleCreateManualBackup
+    handleRevokeAndroidDevice
   } = deviceController;
 
   const C = BUSINESS_CAPABILITIES;
@@ -649,14 +644,9 @@ export function DesktopWorkspaceRouter({
         <MarketPage customers={dashboardData.customers} />
       ) : activePage === "messages" ? null : (
         <SetupWizard
-          embedded
           form={setupForm}
           setupData={setupData}
           dashboardData={surfaceData}
-          saveState={setupSaveState}
-          message={setupMessage}
-          backupState={backupState}
-          backupMessage={backupMessage}
           androidPublishState={androidPublishState}
           androidPublishMessage={androidPublishMessage}
           androidDeviceState={androidDeviceState}
@@ -665,7 +655,6 @@ export function DesktopWorkspaceRouter({
           aiConnectionTestMessage={aiConnectionTestMessage}
           onFormChange={setSetupForm}
           onTestAiConnection={handleTestAiConnection}
-          onCreateBackup={handleCreateManualBackup}
           onPublishAndroid={handlePublishAndroidSnapshot}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
           onSetAndroidDevicePermissionGroups={handleSetAndroidDevicePermissionGroups}
@@ -673,7 +662,6 @@ export function DesktopWorkspaceRouter({
           onResetAndroidDevicePermissions={handleResetAndroidDevicePermissions}
           onRevokeAndroidDevice={handleRevokeAndroidDevice}
           onSave={handleSaveSetup}
-          onSkip={() => setActivePage("dashboard")}
           onAppPasswordConfiguredChange={handleAppPasswordConfiguredChange}
           uiPreferences={uiPreferences}
           onUiPreferencesChange={setUiPreferences}

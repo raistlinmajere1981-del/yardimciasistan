@@ -36,7 +36,7 @@ export function SetupWizard(props: SetupWizardProps) {
         {...props}
         enabledCapabilities={deviceRuntimeCapabilities}
         publicProfileSaveRef={publicProfileSaveRef}
-        publicProfile={props.embedded && capabilityRuntime.snapshot?.businessId ? (
+        publicProfile={capabilityRuntime.snapshot?.businessId ? (
           <div id="settings-public" className="setup-public-profile-shell">
             <BusinessPublicProfileSection businessAddress={props.form.address} saveHandleRef={publicProfileSaveRef} />
           </div>
@@ -45,7 +45,7 @@ export function SetupWizard(props: SetupWizardProps) {
 
 
 
-      {props.embedded && capabilityRuntime.snapshot?.businessId && (
+      {capabilityRuntime.snapshot?.businessId && (
         <details className="setup-capability-editor-shell settings-advanced-details disclosure">
           <summary>Gelişmiş işletme özellikleri</summary>
           <div className="settings-advanced-details-body disclosure-body">

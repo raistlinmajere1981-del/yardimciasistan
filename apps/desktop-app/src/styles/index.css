@@ -49,7 +49,6 @@
 @import "./pages/restaurant.css" layer(pages);
 @import "./pages/room-folio.css" layer(pages);
 @import "./pages/settings.css" layer(pages);
-@import "./pages/setup.css" layer(pages);
 @import "../components/settings/business-location-map-picker.css" layer(pages);
 @import "./pages/menu-preview.css" layer(pages);
 @import "./utilities.css" layer(utilities);

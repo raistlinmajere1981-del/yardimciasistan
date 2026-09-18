@@ -129,6 +129,32 @@
   color: var(--color-danger);
 }
 
+
+.setup-status-message {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.setup-connection-message {
+  min-width: 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.setup-ai-actions.sync-success .setup-connection-message,
+.setup-web-actions.sync-success .setup-connection-message {
+  color: var(--color-success);
+}
+
+.setup-ai-actions.sync-error .setup-connection-message,
+.setup-web-actions.sync-error .setup-connection-message {
+  color: var(--color-danger);
+}
+
+.setup-ai-actions.sync-loading .setup-connection-message {
+  color: var(--color-info);
+}
+
 .setup-ai-actions {
   display: flex;
   flex-wrap: wrap;
@@ -162,14 +188,6 @@
 
 .setup-shell.is-embedded:not(.is-initial-setup) .settings-room-count {
   display: none;
-}
-
-.setup-capabilities .settings-storage-section {
-  display: none;
-}
-
-.settings-technical-info dd {
-  overflow-wrap: anywhere;
 }
 
 .settings-advanced-details {
