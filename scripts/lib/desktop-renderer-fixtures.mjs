@@ -682,7 +682,7 @@ function createBusinessCapabilitySnapshotFixture(setupData) {
 
   const enabledCapabilities = [...enabled];
   return {
-    businessId: "renderer-smoke-business",
+    businessId: setupData.setupRequired ? "" : "renderer-smoke-business",
     profileId: setupData.profileId,
     capabilities: enabledCapabilities.map((capability) => ({
       capability,

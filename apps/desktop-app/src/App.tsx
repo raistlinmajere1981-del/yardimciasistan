@@ -26,6 +26,7 @@ function App() {
   }), []);
 
   const setupController = useSetupController({
+    onInitialSetupRequired: () => setActivePage("settings"),
     onInitialSetupReady: () => setActivePage("dashboard")
   });
   const appLockController = useAppLock({

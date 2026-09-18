@@ -374,11 +374,12 @@ export function SetupForm({
   const saveSettings = useCallback(async () => {
     if (!embedded || settingsSaveInFlightRef.current) return false;
 
+    const initialSetup = setupData.setupRequired;
     settingsSaveInFlightRef.current = true;
     onSettingsSaveStateChange?.("loading", "Kaydediliyor...");
     const getSections = () => [
-      { label: "Müşteri bilgileri", handle: publicProfileSaveRef?.current },
-      { label: "Oda yönetimi", handle: roomSaveRef.current },
+      { label: "Müşteri bilgileri", handle: initialSetup ? null : publicProfileSaveRef?.current },
+      { label: "Oda yönetimi", handle: initialSetup ? null : roomSaveRef.current },
       { label: "Uygulama şifresi", handle: passwordSaveRef.current }
     ].filter(
       (section): section is { label: string; handle: SettingsSaveSectionHandle } => Boolean(section.handle)
@@ -420,7 +421,7 @@ export function SetupForm({
     } finally {
       settingsSaveInFlightRef.current = false;
     }
-  }, [embedded, onSave, onSettingsSaveStateChange, publicProfileSaveRef]);
+  }, [embedded, onSave, onSettingsSaveStateChange, publicProfileSaveRef, setupData.setupRequired]);
 
   useImperativeHandle(settingsSaveRef, () => ({ save: saveSettings }), [saveSettings]);
 
@@ -429,7 +430,7 @@ export function SetupForm({
   }, [embedded, onSettingsSaveStateChange]);
 
   return (
-    <main className={embedded ? "setup-shell is-embedded" : "setup-shell setup-shell--onboarding"} aria-labelledby={!embedded ? "setup-title" : undefined}>
+    <main className={embedded ? `setup-shell is-embedded${setupData.setupRequired ? " is-initial-setup" : ""}` : "setup-shell setup-shell--onboarding"} aria-labelledby={!embedded ? "setup-title" : undefined}>
       {!embedded && <section className="setup-hero" aria-label="İlk kurulum">
         <div className="setup-brand">
           <img className="setup-brand-symbol" src="./assets/yardimci-asistan-symbol.png" alt="" aria-hidden="true" />
@@ -474,11 +475,11 @@ export function SetupForm({
       <section className="setup-form-surface">
         {embedded && <nav className="settings-section-nav" aria-label="Ayar bölümleri">
           <a href="#settings-business">İşletmem</a>
-          <a href="#settings-public">Müşteri bilgileri</a>
+          {!setupData.setupRequired && <a href="#settings-public">Müşteri bilgileri</a>}
           <a href="#settings-operations">İşletme düzeni</a>
           <a href="#settings-connections">Bağlantılar</a>
           <a href="#settings-application">Uygulama</a>
-          <a href="#settings-maintenance">Bakım</a>
+          {!setupData.setupRequired && <a href="#settings-maintenance">Bakım</a>}
         </nav>}
 
         <div id="settings-business" className="setup-section settings-identity-section">
@@ -597,7 +598,7 @@ export function SetupForm({
             </small>
           </div>}
         </div>
-        {embedded && (
+        {embedded && !setupData.setupRequired && (
           <RoomManagementSection
             roomCount={form.roomCount}
             dashboardRoomCount={dashboardData?.rooms.length ?? 0}
@@ -842,7 +843,7 @@ export function SetupForm({
           {form.aiService !== "gemini" && renderAiConnectionActions(false)}
         </div>
 
-        {embedded && form.androidEnabled && (
+        {embedded && !setupData.setupRequired && form.androidEnabled && (
           <AndroidDevicesSection
             devices={dashboardData?.androidDevices ?? []}
             enabledCapabilities={enabledCapabilities}
@@ -929,7 +930,7 @@ export function SetupForm({
             saveHandleRef={passwordSaveRef}
           />
         )}
-        {embedded && <DataMaintenanceSettings />}
+        {embedded && !setupData.setupRequired && <DataMaintenanceSettings />}
 
         <div className="setup-section settings-storage-section">
           <div className="setup-section-title">{!embedded && <p>Bu Bilgisayar</p>}<h2>Kayıt ve Yedekleme</h2></div>

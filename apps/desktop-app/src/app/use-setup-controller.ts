@@ -15,14 +15,15 @@ import {
 } from "./setup-model";
 
 interface UseSetupControllerOptions {
+  onInitialSetupRequired?: () => void;
   onInitialSetupReady?: () => void;
 }
 
-export function useSetupController({ onInitialSetupReady }: UseSetupControllerOptions = {}) {
+export function useSetupController({ onInitialSetupRequired, onInitialSetupReady }: UseSetupControllerOptions = {}) {
+  const onInitialSetupRequiredRef = useRef(onInitialSetupRequired);
   const onInitialSetupReadyRef = useRef(onInitialSetupReady);
   const [setupData, setSetupData] = useState<DesktopSetupData>(defaultSetupData);
   const [setupForm, setSetupFormState] = useState<SetupFormState>(() => toSetupForm(defaultSetupData));
-  const [setupMode, setSetupMode] = useState(false);
   const [setupSaveState, setSetupSaveState] = useState<SyncState>("idle");
   const [setupMessage, setSetupMessage] = useState("Kurulum bilgileri bekliyor.");
   const [setupDirty, setSetupDirty] = useState(false);
@@ -34,6 +35,7 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     setSetupFormState(nextState);
   }, []);
 
+  onInitialSetupRequiredRef.current = onInitialSetupRequired;
   onInitialSetupReadyRef.current = onInitialSetupReady;
 
   useEffect(() => {
@@ -52,9 +54,12 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     setSetupData(nextSetupData);
     setSetupFormState(toSetupForm(nextSetupData));
     setSetupDirty(false);
-    setSetupMode(nextSetupData.setupRequired);
-    if (!nextSetupData.setupRequired && firstApplicationLoad) {
-      onInitialSetupReadyRef.current?.();
+    if (firstApplicationLoad) {
+      if (nextSetupData.setupRequired) {
+        onInitialSetupRequiredRef.current?.();
+      } else {
+        onInitialSetupReadyRef.current?.();
+      }
     }
     setSetupMessage(nextSetupData.setupRequired ? "İlk kurulum bilgilerini tamamlayın." : "Ayarlar düzenlenebilir.");
   }
@@ -200,9 +205,6 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
     setSetupSaveState(aiConnectionCouldNotBePublished ? "error" : "success");
     setSetupMessage(aiConnectionCouldNotBePublished ? result.message : "Ayarlar kaydedildi.");
-    if (!aiConnectionCouldNotBePublished) {
-      setSetupMode(false);
-    }
     return aiConnectionCouldNotBePublished
       ? { ok: false, message: result.message }
       : { ok: true, changed: true, message: "Ayarlar kaydedildi." };
@@ -216,8 +218,6 @@ export function useSetupController({ onInitialSetupReady }: UseSetupControllerOp
     setupData,
     setupForm,
     setSetupForm,
-    setupMode,
-    setSetupMode,
     setupSaveState,
     setupMessage,
     aiConnectionTestState,

@@ -160,7 +160,7 @@
   margin-bottom: var(--space-4);
 }
 
-.setup-shell.is-embedded .settings-room-count {
+.setup-shell.is-embedded:not(.is-initial-setup) .settings-room-count {
   display: none;
 }
 

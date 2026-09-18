@@ -19,7 +19,6 @@ import {
 } from "../../ui-preferences";
 import type { SettingsSaveHandle, SettingsSaveState } from "../../app/settings-save";
 import { AppLockScreen } from "../security/AppLockScreen";
-import { SetupWizard } from "../settings/SetupWizard";
 import { DesktopAppFrame } from "./DesktopAppFrame";
 import { DesktopWorkspaceRouter } from "./DesktopWorkspaceRouter";
 
@@ -61,19 +60,6 @@ export function DesktopAppView({
   const [settingsSaveState, setSettingsSaveState] = useState<SettingsSaveState>("idle");
   const [settingsSaveMessage, setSettingsSaveMessage] = useState("Ayarlar düzenlenebilir.");
   const {
-    setupData,
-    setupForm,
-    setSetupForm,
-    setupMode,
-    setSetupMode,
-    setupSaveState,
-    setupMessage,
-    aiConnectionTestState,
-    aiConnectionTestMessage,
-    testAiConnection: handleTestAiConnection,
-    saveSetup
-  } = setupController;
-  const {
     phase: appAccessPhase,
     status: appLockStatus,
     unlockApp,
@@ -84,12 +70,6 @@ export function DesktopAppView({
     applyUiPreferences(uiPreferences);
     saveUiPreferences(uiPreferences);
   }, [uiPreferences]);
-
-  async function handleSaveSetup() {
-    const result = await saveSetup(desktopSyncController.setDashboardData);
-    await desktopSyncController.loadBusinessCapabilities();
-    return result;
-  }
 
   const handleSettingsSaveStateChange = useCallback((state: SettingsSaveState, message: string) => {
     setSettingsSaveState(state);
@@ -104,25 +84,6 @@ export function DesktopAppView({
         notificationCount={appLockStatus.notificationCount}
         onUnlock={unlockApp}
         onResetPassword={resetAppPassword}
-      />
-    );
-  }
-
-  if (setupMode) {
-    return (
-      <SetupWizard
-        form={setupForm}
-        setupData={setupData}
-        saveState={setupSaveState}
-        message={setupMessage}
-        aiConnectionTestState={aiConnectionTestState}
-        aiConnectionTestMessage={aiConnectionTestMessage}
-        onFormChange={setSetupForm}
-        onTestAiConnection={handleTestAiConnection}
-        onSave={handleSaveSetup}
-        onSkip={() => setSetupMode(false)}
-        uiPreferences={uiPreferences}
-        onUiPreferencesChange={setUiPreferences}
       />
     );
   }
