@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import {
-  ANDROID_ADMIN_PERMISSIONS,
   ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
   ANDROID_PERMISSION_GROUP_IDS,
   ANDROID_PERMISSIONS,
@@ -20,9 +19,9 @@ export type AndroidActionMutationResult =
   | { ok: true; message: string }
   | { ok: false; message: string };
 
-export const ANDROID_PERMISSION_SET = new Set<string>(ANDROID_PERMISSIONS);
+const ANDROID_PERMISSION_SET = new Set<string>(ANDROID_PERMISSIONS);
 
-export const ANDROID_ADMIN_ONLY_ACTIONS = new Set<string>([
+const ANDROID_ADMIN_ONLY_ACTIONS = new Set<string>([
   "customer_request_delete",
   "customer_create",
   "customer_update",
@@ -54,10 +53,10 @@ export function normalizeAndroidDeviceRoleInput(value: unknown): AndroidDeviceRo
 }
 
 export function androidPermissionsForRole(role: AndroidDeviceRole): AndroidPermission[] {
-  return [...(role === "admin" ? ANDROID_ADMIN_PERMISSIONS : ANDROID_STAFF_PERMISSIONS)];
+  return [...(role === "admin" ? ANDROID_PERMISSIONS : ANDROID_STAFF_PERMISSIONS)];
 }
 
-export function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
+function emptyAndroidPermissionGroups(): AndroidPermissionGroups {
   return {
     service_orders: false,
     cashier: false,

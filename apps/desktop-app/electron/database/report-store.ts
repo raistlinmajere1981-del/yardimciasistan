@@ -363,7 +363,7 @@ export function getAndroidReportPresets(db: DatabaseSync, referenceDateInput = "
   })) as Record<AndroidReportPresetKey, AndroidReportSnapshot>;
 }
 
-export function getReportStockMovements(
+function getReportStockMovements(
   db: DatabaseSync,
   startDate: string,
   endDate: string,
@@ -408,7 +408,7 @@ export function getReportStockMovements(
   });
 }
 
-export function getReportAttention(
+function getReportAttention(
   db: DatabaseSync,
   enabledCapabilities: ReadonlySet<BusinessCapability>
 ): DesktopReportData["attention"] {

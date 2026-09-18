@@ -80,11 +80,11 @@ export function isSha256Hex(value: string): boolean {
   return /^[a-f0-9]{64}$/.test(value);
 }
 
-export function normalizeStockImageConfidence(value: unknown): StockImageConfidence {
+function normalizeStockImageConfidence(value: unknown): StockImageConfidence {
   return value === "high" || value === "medium" || value === "low" ? value : "low";
 }
 
-export function normalizeStockImageText(value: unknown, limit: number): string | null {
+function normalizeStockImageText(value: unknown, limit: number): string | null {
   if (typeof value !== "string") {
     return null;
   }
@@ -156,7 +156,7 @@ export function sanitizeStockImageAnalysis(value: StockImageAnalysis, candidates
   };
 }
 
-export function hasAmbiguousStockUnit(value: string, stockUnit: MenuStockUnit): boolean {
+function hasAmbiguousStockUnit(value: string, stockUnit: MenuStockUnit): boolean {
   const normalized = value.toLocaleLowerCase("tr-TR")
     .replace(/ı/g, "i")
     .replace(/\b\d+\s*['’]?\s*(?:li|lı|lu|lü|lik|lık|luk|lük)\s+paket\b/giu, "")
@@ -167,7 +167,7 @@ export function hasAmbiguousStockUnit(value: string, stockUnit: MenuStockUnit): 
   return /\b(?:\d+(?:[.,]\d+)?\s*)?(?:koli|paket|kg|kilogram|kilo|gr|gram|lt|litre)\b/iu.test(normalized);
 }
 
-export function parseGramQuantity(value: string): number | null {
+function parseGramQuantity(value: string): number | null {
   const normalized = value.toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
   const match = normalized.match(/(\d[\d.,]*)\s*(kg|kilogram|kilo|gr|gram|g)\b/iu);
   if (!match) {
@@ -178,7 +178,7 @@ export function parseGramQuantity(value: string): number | null {
   return Number.isInteger(grams) && grams > 0 && grams <= 100_000 ? grams : null;
 }
 
-export function parseTurkishDocumentNumber(value: string): number {
+function parseTurkishDocumentNumber(value: string): number {
   const text = value.trim();
   const normalized = text.includes(",")
     ? text.replace(/\./g, "").replace(",", ".")

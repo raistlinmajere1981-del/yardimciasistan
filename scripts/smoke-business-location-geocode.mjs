@@ -3,39 +3,76 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const {
-  buildBusinessLocationQueryVariants,
-  buildBusinessLocationSearchUrl
+  geocodeBusinessAddress
 } = require("../apps/desktop-app/dist-electron/business-location-geocode.js");
 
-const variants = buildBusinessLocationQueryVariants(
-  "Selanik caddesi No:65 Kızılay Çankaya Ankara Türkiye"
-);
+const address = "Selanik caddesi No:65 Kızılay Çankaya Ankara Türkiye";
+const requestedUrls = [];
+const originalFetch = globalThis.fetch;
 
-assert.equal(variants[0], "Selanik caddesi No:65 Kızılay Çankaya Ankara Türkiye");
-assert.ok(
-  variants.some((query) => /Selanik caddesi 65 Kızılay Çankaya Ankara/i.test(query)),
-  "Search-friendly fallback should keep the house number while removing country/noise."
-);
-assert.ok(
-  variants.some((query) => /Selanik caddesi Kızılay Çankaya Ankara/i.test(query) && !/\b65\b/.test(query)),
-  "Street-level fallback should remove an unmapped building number."
-);
-assert.ok(
-  variants.some((query) => /^Kızılay Çankaya Ankara$/i.test(query)),
-  "Locality fallback should remain available when the street itself is missing from OSM."
-);
-assert.equal(new Set(variants.map((query) => query.toLocaleLowerCase("tr-TR"))).size, variants.length);
-assert.ok(variants.length <= 4);
+globalThis.fetch = async (url) => {
+  requestedUrls.push(String(url));
+  if (requestedUrls.length === 1) {
+    return {
+      ok: true,
+      json: async () => []
+    };
+  }
+  return {
+    ok: true,
+    json: async () => [
+      {
+        lat: "39.920770",
+        lon: "32.854110",
+        display_name: "Selanik Caddesi 65, Kızılay, Çankaya, Ankara"
+      }
+    ]
+  };
+};
 
-const searchUrl = new URL(buildBusinessLocationSearchUrl(variants[0]));
-assert.equal(searchUrl.searchParams.get("countrycodes"), "tr");
-assert.equal(searchUrl.searchParams.get("limit"), "5");
-assert.equal(searchUrl.searchParams.get("q"), variants[0]);
+try {
+  const result = await geocodeBusinessAddress(address);
 
-const abbreviated = buildBusinessLocationQueryVariants(
-  "Atatürk Cd. No:12 Daire:4 Konak İzmir Türkiye"
-);
-assert.ok(abbreviated.some((query) => /Atatürk Caddesi 12/i.test(query)));
-assert.ok(abbreviated.some((query) => !/Daire/i.test(query)));
+  assert.equal(result.ok, true);
+  assert.equal(result.results.length, 1);
+  const candidate = result.results[0];
+  assert.equal(candidate.label, "Selanik Caddesi 65, Kızılay, Çankaya, Ankara");
+  assert.equal(candidate.latitude, 39.92077);
+  assert.equal(candidate.longitude, 32.85411);
+  assert.equal(candidate.id, "39.920770:32.854110:0");
 
-console.log("business-location-geocode-smoke-ok: exact, street and locality fallbacks verified");
+  assert.ok(requestedUrls.length >= 2, "Exact query should miss and fallback should be tried.");
+  assert.ok(requestedUrls.length <= 4, "Fallback chain should stay within variant limit.");
+
+  const firstUrl = new URL(requestedUrls[0]);
+  assert.equal(firstUrl.searchParams.get("format"), "jsonv2");
+  assert.equal(firstUrl.searchParams.get("countrycodes"), "tr");
+  assert.equal(firstUrl.searchParams.get("limit"), "5");
+  assert.equal(firstUrl.searchParams.get("q"), "Selanik caddesi No:65 Kızılay Çankaya Ankara Türkiye");
+
+  for (const rawUrl of requestedUrls) {
+    const parsed = new URL(rawUrl);
+    assert.equal(parsed.searchParams.get("format"), "jsonv2");
+    assert.equal(parsed.searchParams.get("countrycodes"), "tr");
+    assert.equal(parsed.searchParams.get("limit"), "5");
+  }
+
+  const queries = requestedUrls.map((rawUrl) => new URL(rawUrl).searchParams.get("q") ?? "");
+  assert.equal(new Set(queries.map((query) => query.toLocaleLowerCase("tr-TR"))).size, queries.length);
+
+  const fallbackQuery = queries[1];
+  assert.ok(
+    /Selanik caddesi 65 Kızılay Çankaya Ankara/i.test(fallbackQuery),
+    `Search-friendly fallback should keep the house number while removing country/noise, got: ${fallbackQuery}`
+  );
+  assert.equal(/\bTürkiye\b/iu.test(fallbackQuery), false);
+  assert.equal(/\bNo:/u.test(fallbackQuery), false);
+  assert.notEqual(
+    fallbackQuery.toLocaleLowerCase("tr-TR"),
+    queries[0].toLocaleLowerCase("tr-TR")
+  );
+
+  console.log("business-location-geocode-smoke-ok: exact, street and locality fallbacks verified");
+} finally {
+  globalThis.fetch = originalFetch;
+}

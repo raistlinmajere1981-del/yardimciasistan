@@ -35,7 +35,7 @@ export function getTables(db: DatabaseSync, reservationTitles: Map<string, strin
   return rows.map((row) => mapTableRow(row, reservationTitles));
 }
 
-export function mapTableRow(row: Record<string, unknown>, reservationTitles: Map<string, string>): DesktopTable {
+function mapTableRow(row: Record<string, unknown>, reservationTitles: Map<string, string>): DesktopTable {
   return {
     id: String(row.id ?? ""),
     name: String(row.name ?? ""),

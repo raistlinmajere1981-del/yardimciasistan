@@ -769,8 +769,6 @@ export const ANDROID_STAFF_PERMISSIONS: readonly AndroidPermission[] = androidPe
   ...ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS
 });
 
-export const ANDROID_ADMIN_PERMISSIONS: readonly AndroidPermission[] = ANDROID_PERMISSIONS;
-
 export interface AndroidSnapshotPermissionProfile {
   role: AndroidDeviceRole;
   is_active: boolean;

@@ -3,8 +3,7 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const {
-  createPublicRoomAvailabilityPublication,
-  roomStatusCanBeOffered
+  createPublicRoomAvailabilityPublication
 } = require("../apps/desktop-app/dist-electron/public-room-availability-publication.js");
 const { BUSINESS_CAPABILITIES } = require("../packages/shared/dist/index.js");
 
@@ -123,13 +122,55 @@ for (const forbidden of [
   assert.equal(serialized.includes(forbidden), false, `PII/internal field leaked into public availability: ${forbidden}`);
 }
 
-assert.equal(roomStatusCanBeOffered("available"), true);
-assert.equal(roomStatusCanBeOffered("reserved"), true);
-assert.equal(roomStatusCanBeOffered("occupied"), true);
-assert.equal(roomStatusCanBeOffered("cleaning"), false);
-assert.equal(roomStatusCanBeOffered("maintenance"), false);
-assert.equal(roomStatusCanBeOffered("out_of_service"), false);
-assert.equal(roomStatusCanBeOffered("unexpected"), false);
+const statusDashboard = {
+  rooms: [
+    { id: "s-available", name: "Müsait Oda", number: "10", capacity: 2, status: "available", isActive: true },
+    { id: "s-reserved-good", name: "Rezerve Dolu", number: "11", capacity: 2, status: "reserved", isActive: true },
+    { id: "s-occupied-good", name: "Dolu Oda", number: "12", capacity: 2, status: "occupied", isActive: true },
+    { id: "s-cleaning", name: "Temizlikte Oda", number: "13", capacity: 2, status: "cleaning", isActive: true },
+    { id: "s-maintenance", name: "Bakımda Oda", number: "14", capacity: 2, status: "maintenance", isActive: true },
+    { id: "s-oos", name: "Servis Dışı Oda", number: "15", capacity: 2, status: "out_of_service", isActive: true },
+    { id: "s-mystery", name: "Bilinmeyen Oda", number: "16", capacity: 2, status: "unexpected_mystery_status", isActive: true },
+    { id: "s-reserved-bad", name: "Bloksuz Rezerve", number: "17", capacity: 2, status: "reserved", isActive: true },
+    { id: "s-occupied-bad", name: "Bloksuz Dolu", number: "18", capacity: 2, status: "occupied", isActive: true }
+  ],
+  reservations: [
+    {
+      id: "reservation-good-1",
+      status: "approved",
+      startDate: "2026-09-20",
+      endDate: "2026-09-22",
+      roomIds: ["s-reserved-good"]
+    }
+  ],
+  customerRoomStays: [
+    {
+      id: "stay-good-1",
+      status: "planned",
+      roomId: "s-occupied-good",
+      checkInDate: "2026-09-21",
+      checkOutDate: "2026-09-24"
+    }
+  ]
+};
+
+const statusPublication = createPublicRoomAvailabilityPublication(statusDashboard, capabilities, now);
+assert.equal(statusPublication.enabled, true);
+assert.deepEqual(statusPublication.rooms, [
+  { id: "s-available", name: "Müsait Oda", number: "10", capacity: 2, status: "available" },
+  { id: "s-reserved-good", name: "Rezerve Dolu", number: "11", capacity: 2, status: "reserved" },
+  { id: "s-occupied-good", name: "Dolu Oda", number: "12", capacity: 2, status: "occupied" },
+  { id: "s-cleaning", name: "Temizlikte Oda", number: "13", capacity: 2, status: "cleaning" },
+  { id: "s-maintenance", name: "Bakımda Oda", number: "14", capacity: 2, status: "maintenance" },
+  { id: "s-oos", name: "Servis Dışı Oda", number: "15", capacity: 2, status: "out_of_service" },
+  { id: "s-mystery", name: "Bilinmeyen Oda", number: "16", capacity: 2, status: "out_of_service" },
+  { id: "s-reserved-bad", name: "Bloksuz Rezerve", number: "17", capacity: 2, status: "out_of_service" },
+  { id: "s-occupied-bad", name: "Bloksuz Dolu", number: "18", capacity: 2, status: "out_of_service" }
+]);
+assert.deepEqual(statusPublication.blocks, [
+  { room_id: "s-occupied-good", start_date: "2026-09-21", end_date: "2026-09-24" },
+  { room_id: "s-reserved-good", start_date: "2026-09-20", end_date: "2026-09-22" }
+]);
 
 const disabled = createPublicRoomAvailabilityPublication(
   dashboard,

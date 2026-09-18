@@ -58,7 +58,7 @@ export function getCustomers(db: DatabaseSync): DesktopCustomer[] {
   return rows.map((row) => mapCustomerRow(row));
 }
 
-export function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
+function mapCustomerRow(row: Record<string, unknown>): DesktopCustomer {
   return {
     id: String(row.id ?? ""),
     fullName: String(row.full_name ?? ""),

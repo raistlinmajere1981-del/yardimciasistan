@@ -15,7 +15,7 @@ type EditorState = "idle" | "loading" | "error";
 
 type RoomRecord = DesktopDashboardData["rooms"][number];
 
-export interface RoomPublicDetailsSaveResult {
+interface RoomPublicDetailsSaveResult {
   ok: boolean;
   message: string;
 }

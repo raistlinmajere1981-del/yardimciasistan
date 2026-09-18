@@ -1,7 +1,6 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {
-  ANDROID_ADMIN_PERMISSIONS,
   ANDROID_DEFAULT_STAFF_PERMISSION_GROUPS,
   ANDROID_PERMISSIONS,
   ANDROID_PERMISSION_GROUP_PERMISSIONS,
@@ -481,7 +480,6 @@ test("pushAndroidSnapshot sends desktop operation summary", async () => {
 });
 
 test("Android role presets and action permission mapping stay explicit", () => {
-  assert.deepEqual(ANDROID_ADMIN_PERMISSIONS, ANDROID_PERMISSIONS);
   assert.deepEqual(ANDROID_STAFF_PERMISSIONS, [
     "table.view",
     "table.update_status",

@@ -15,9 +15,9 @@ import {
 } from "@yardimci-asistan/shared";
 import { prepareWhatsAppAction, type WhatsAppAction } from "@yardimci-asistan/whatsapp-bridge";
 
-export const BIRTHDAY_AUTOMATIC_MAX_ATTEMPTS = 3;
-export const BIRTHDAY_AUTOMATIC_RETRY_DELAY_MS = 60_000;
-export const BIRTHDAY_AUTOMATIC_CLAIM_LEASE_MS = 90_000;
+const BIRTHDAY_AUTOMATIC_MAX_ATTEMPTS = 3;
+const BIRTHDAY_AUTOMATIC_RETRY_DELAY_MS = 60_000;
+const BIRTHDAY_AUTOMATIC_CLAIM_LEASE_MS = 90_000;
 
 type VisibleBirthdayEligibility = Extract<
   BirthdayEligibilityStatus,
@@ -90,7 +90,7 @@ export type BirthdayAutomaticClaimResult =
   | { ok: true; candidate: DesktopAutomaticBirthdayClaim }
   | { ok: false; code: "not_due" | "already_sent" | "excluded" | "invalid_phone" | "invalid_birth_date" | "not_birthday" | "retry_wait" | "attempts_exhausted" | "feature_disabled"; message: string };
 
-export type BirthdayPreparationErrorCode =
+type BirthdayPreparationErrorCode =
   | "feature_disabled"
   | "customer_not_found"
   | "not_birthday"
@@ -295,7 +295,7 @@ export function prepareBirthdayWhatsApp(db: DatabaseSync, customerIdInput: strin
   return { ok: true, action, candidate, delivery };
 }
 
-export function isBirthdaySendTimeReached(sendTime: string, now = new Date()): boolean {
+function isBirthdaySendTimeReached(sendTime: string, now = new Date()): boolean {
   const match = /^(\d{2}):(\d{2})$/.exec(sendTime);
   if (!match) return false;
   const hour = Number(match[1]);

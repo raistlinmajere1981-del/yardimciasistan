@@ -5,7 +5,7 @@ import {
 } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "./database";
 
-export interface PublicRoomAvailabilityRoom {
+interface PublicRoomAvailabilityRoom {
   id: string;
   name: string;
   number: string;
@@ -13,7 +13,7 @@ export interface PublicRoomAvailabilityRoom {
   status: string;
 }
 
-export interface PublicRoomAvailabilityBlock {
+interface PublicRoomAvailabilityBlock {
   room_id: string;
   start_date: string;
   end_date: string;
@@ -27,7 +27,6 @@ export interface PublicRoomAvailabilityPublication {
   blocks: PublicRoomAvailabilityBlock[];
 }
 
-const ROOM_UNAVAILABLE_STATUSES = new Set(["cleaning", "maintenance", "out_of_service"]);
 const RESERVATION_BLOCKING_STATUSES = new Set(["pending", "approved"]);
 const STAY_BLOCKING_STATUSES = new Set(["planned", "checked_in"]);
 
@@ -111,10 +110,6 @@ export function createPublicRoomAvailabilityPublication(
     rooms: safeRooms,
     blocks: mergedBlocks
   };
-}
-
-export function roomStatusCanBeOffered(status: string): boolean {
-  return !ROOM_UNAVAILABLE_STATUSES.has(normalizeRoomStatus(status));
 }
 
 function normalizeRoomStatus(value: string): string {

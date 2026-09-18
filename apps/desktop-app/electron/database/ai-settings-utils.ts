@@ -6,7 +6,7 @@ import type {
 
 export const AI_SERVICE_IDS: DesktopAiService[] = ["openai", "openrouter", "groq", "gemini", "custom"];
 
-export const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(AI_SERVICE_IDS);
+const SUPPORTED_AI_SERVICES = new Set<DesktopAiService>(AI_SERVICE_IDS);
 
 export const DEFAULT_AI_BASE_URL = "https://api.openai.com/v1";
 
@@ -22,7 +22,7 @@ export const AI_SERVICE_DEFAULT_BASE_URLS: Record<DesktopAiService, string> = {
   custom: ""
 };
 
-export const AI_SERVICE_DISPLAY_NAMES: Record<DesktopAiService, string> = {
+const AI_SERVICE_DISPLAY_NAMES: Record<DesktopAiService, string> = {
   openai: "OpenAI",
   openrouter: "OpenRouter",
   groq: "Groq",

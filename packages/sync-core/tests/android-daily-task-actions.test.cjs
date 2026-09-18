@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 
 const {
   ANDROID_ACTION_TYPES,
-  ANDROID_ADMIN_PERMISSIONS,
+  ANDROID_PERMISSIONS,
   ANDROID_PERMISSION_GROUP_PERMISSIONS,
   resolveAndroidActionPermission
 } = require("../dist/index.js");
@@ -25,5 +25,5 @@ test("oda ve işler grubu günlük iş oluşturup düzenleyebilir, silme yöneti
   assert.ok(permissions.includes("daily_task.complete"));
   assert.ok(permissions.includes("daily_task.reopen"));
   assert.equal(permissions.includes("daily_task.delete"), false);
-  assert.ok(ANDROID_ADMIN_PERMISSIONS.includes("daily_task.delete"));
+  assert.ok(ANDROID_PERMISSIONS.includes("daily_task.delete"));
 });

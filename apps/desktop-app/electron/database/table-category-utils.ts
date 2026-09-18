@@ -66,7 +66,7 @@ export function normalizeTableCategoryInputs(
   return { ok: true, categories };
 }
 
-export function normalizeTableCategoryLabel(value: unknown): string {
+function normalizeTableCategoryLabel(value: unknown): string {
   return String(value ?? "").trim().replace(/\s+/g, " ");
 }
 

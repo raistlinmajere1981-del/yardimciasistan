@@ -97,7 +97,7 @@ export function normalizeCustomerGender(value: unknown): CustomerGender {
   return value === "female" || value === "male" || value === "unspecified" ? value : "";
 }
 
-export function normalizeIdentityNumber(value: unknown, identityType: CustomerIdentityType): string | null {
+function normalizeIdentityNumber(value: unknown, identityType: CustomerIdentityType): string | null {
   const normalized = String(value ?? "").trim().toUpperCase().replace(/[\s-]+/g, "");
   if (!normalized) {
     return "";
@@ -108,7 +108,7 @@ export function normalizeIdentityNumber(value: unknown, identityType: CustomerId
   return /^[A-Z0-9]{4,32}$/.test(normalized) ? normalized : null;
 }
 
-export function isValidTurkishIdentityNumber(value: string): boolean {
+function isValidTurkishIdentityNumber(value: string): boolean {
   if (!/^[1-9]\d{10}$/.test(value)) {
     return false;
   }
@@ -119,12 +119,12 @@ export function isValidTurkishIdentityNumber(value: string): boolean {
     && digits.slice(0, 10).reduce((total, digit) => total + digit, 0) % 10 === digits[10];
 }
 
-export function normalizeOptionalIsoDate(value: unknown): string | null {
+function normalizeOptionalIsoDate(value: unknown): string | null {
   const normalized = String(value ?? "").trim();
   return !normalized ? "" : isIsoDate(normalized) ? normalized : null;
 }
 
-export function normalizeCustomerSingleLine(value: unknown, limit: number): string {
+function normalizeCustomerSingleLine(value: unknown, limit: number): string {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, limit);
 }
 

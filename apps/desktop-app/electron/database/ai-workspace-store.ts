@@ -62,7 +62,7 @@ export function getAiWorkspaceHistory(db: DatabaseSync, limit = 12): AiWorkspace
   return rows.map((row) => mapAiWorkspaceHistoryRow(row));
 }
 
-export function mapAiWorkspaceHistoryRow(row: Record<string, unknown>): AiWorkspaceHistoryEntry {
+function mapAiWorkspaceHistoryRow(row: Record<string, unknown>): AiWorkspaceHistoryEntry {
   const payload = parseAiWorkspacePayload(row.messages_json);
   const modeCandidate = String(row.source ?? "").replace("desktop_workspace:", "");
   const mode: AiWorkspaceMode = modeCandidate === "summary" || modeCandidate === "daily" ? modeCandidate : "reply";

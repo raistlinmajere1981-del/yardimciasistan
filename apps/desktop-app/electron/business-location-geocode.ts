@@ -56,7 +56,7 @@ export async function geocodeBusinessAddress(address: string): Promise<BusinessL
  * wins, so a precise building match is never replaced by a broader street or
  * neighbourhood match.
  */
-export function buildBusinessLocationQueryVariants(address: string): string[] {
+function buildBusinessLocationQueryVariants(address: string): string[] {
   const original = normalizeQuery(address);
   if (!original) return [];
 
@@ -83,7 +83,7 @@ export function buildBusinessLocationQueryVariants(address: string): string[] {
   return variants.slice(0, MAX_QUERY_VARIANTS);
 }
 
-export function buildBusinessLocationSearchUrl(address: string): string {
+function buildBusinessLocationSearchUrl(address: string): string {
   const configuredBaseUrl = String(process.env.YA_GEOCODER_BASE_URL ?? "").trim();
   const baseUrl = /^https?:\/\//i.test(configuredBaseUrl)
     ? configuredBaseUrl

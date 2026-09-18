@@ -41,7 +41,7 @@ export function isIsoDate(value: string): boolean {
     && parsed.getUTCDate() === day;
 }
 
-export function isoDateDifference(startDate: string, endDate: string): number {
+function isoDateDifference(startDate: string, endDate: string): number {
   const start = Date.parse(`${startDate}T00:00:00.000Z`);
   const end = Date.parse(`${endDate}T00:00:00.000Z`);
   return Math.round((end - start) / 86_400_000);

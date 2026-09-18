@@ -9,7 +9,7 @@ import {
   type SaveBusinessPublicProfileInput
 } from "@yardimci-asistan/shared";
 
-export const EMPTY_BUSINESS_PUBLIC_PROFILE: BusinessPublicProfile = {
+const EMPTY_BUSINESS_PUBLIC_PROFILE: BusinessPublicProfile = {
   description: "",
   latitude: null,
   longitude: null,

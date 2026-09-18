@@ -57,17 +57,14 @@ import {
   type DesktopBirthdayPrepareResult
 } from "./birthday-service.js";
 
-export type { DesktopBirthdayCandidate, DesktopBirthdayDelivery, DesktopBirthdayOverview, DesktopBirthdayPrepareResult } from "./birthday-service.js";
+export type { DesktopBirthdayDelivery, DesktopBirthdayOverview, DesktopBirthdayPrepareResult } from "./birthday-service.js";
 
 import type {
   DesktopDatabaseOptions,
   DesktopRoom,
-  DesktopTable,
-  DesktopTableCategory,
   DesktopReservation,
   DesktopDailyTask,
   DesktopCustomer,
-  DesktopCustomerRoomStay,
   DesktopPreparedMessage,
   DesktopAndroidDevice,
   DesktopAndroidActionFailure,
@@ -92,8 +89,6 @@ import type {
   DesktopSetupSaveResult,
   SaveMenuCategoryInput,
   SaveMenuItemInput,
-  MenuStockMovementType,
-  MenuStockSourceType,
   DesktopMenuStockMovement,
   DesktopMenuSaveResult,
   CreateStockImageImportInput,
@@ -123,9 +118,7 @@ import type {
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
   TableOrderStatus,
-  DesktopTableOrderItem,
   DesktopTableOrder,
-  DesktopPaymentWaitingTableOrder,
   AddTableOrderItemInput,
   UpdateTableOrderItemQuantityInput,
   UpdateTableOrderItemNoteInput,
@@ -148,12 +141,9 @@ import type {
 export type {
   DesktopDatabaseOptions,
   DesktopRoom,
-  DesktopTable,
-  DesktopTableCategory,
   DesktopReservation,
   DesktopDailyTask,
   DesktopCustomer,
-  DesktopCustomerRoomStay,
   DesktopPreparedMessage,
   DesktopAndroidDevice,
   DesktopAndroidActionFailure,
@@ -178,8 +168,6 @@ export type {
   DesktopSetupSaveResult,
   SaveMenuCategoryInput,
   SaveMenuItemInput,
-  MenuStockMovementType,
-  MenuStockSourceType,
   DesktopMenuStockMovement,
   DesktopMenuSaveResult,
   CreateStockImageImportInput,
@@ -209,9 +197,7 @@ export type {
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
   TableOrderStatus,
-  DesktopTableOrderItem,
   DesktopTableOrder,
-  DesktopPaymentWaitingTableOrder,
   AddTableOrderItemInput,
   UpdateTableOrderItemQuantityInput,
   UpdateTableOrderItemNoteInput,

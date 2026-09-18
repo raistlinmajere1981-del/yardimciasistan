@@ -72,7 +72,7 @@ export function getActiveResourceReservationTitles(db: DatabaseSync, resourceTyp
   return map;
 }
 
-export function mapReservationRow(row: Record<string, unknown>): DesktopReservation {
+function mapReservationRow(row: Record<string, unknown>): DesktopReservation {
   return {
     id: String(row.id ?? ""),
     requestId: String(row.request_id ?? ""),

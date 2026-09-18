@@ -8,10 +8,24 @@ import { DatabaseSync } from "node:sqlite";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const {
-  EMPTY_BUSINESS_PUBLIC_PROFILE,
   getBusinessPublicProfile,
   saveBusinessPublicProfile
 } = require("../apps/desktop-app/dist-electron/business-public-profile.js");
+
+const expectedEmptyProfile = {
+  description: "",
+  latitude: null,
+  longitude: null,
+  directionsNote: "",
+  checkInTime: "",
+  checkOutTime: "",
+  breakfastStartTime: "",
+  breakfastEndTime: "",
+  features: [],
+  policyNote: "",
+  paymentNote: "",
+  languages: []
+};
 
 const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-business-public-profile-"));
 const database = new DesktopDatabase({
@@ -30,7 +44,10 @@ try {
     sqlite.close();
   }
 
-  assert.deepEqual(getBusinessPublicProfile(database.databasePath), EMPTY_BUSINESS_PUBLIC_PROFILE);
+  assert.deepEqual(
+    getBusinessPublicProfile(database.databasePath),
+    expectedEmptyProfile
+  );
   const setupResult = database.saveInitialSetup({
     businessName: "Profil Test İşletmesi",
     profileId: "pension_restaurant",

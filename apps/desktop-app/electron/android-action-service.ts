@@ -128,7 +128,7 @@ export function authorizeAndroidAction(
   return { ok: true, message: "Telefon işlemi yetkilendirildi." };
 }
 
-export function getAndroidActionCapabilityContext(db: DatabaseSync, action: AndroidSyncAction) {
+function getAndroidActionCapabilityContext(db: DatabaseSync, action: AndroidSyncAction) {
   const context = {
     requestType: "",
     reservationType: "",

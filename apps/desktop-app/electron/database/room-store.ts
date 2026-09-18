@@ -29,7 +29,7 @@ export function getRooms(db: DatabaseSync, reservationTitles: Map<string, string
   return rows.map((row) => mapRoomRow(row, reservationTitles));
 }
 
-export function mapRoomRow(row: Record<string, unknown>, reservationTitles: Map<string, string>): DesktopRoom {
+function mapRoomRow(row: Record<string, unknown>, reservationTitles: Map<string, string>): DesktopRoom {
   return {
     id: String(row.id ?? ""),
     name: String(row.name ?? ""),

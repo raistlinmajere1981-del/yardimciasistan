@@ -2,7 +2,7 @@ import { getLocalIsoDate } from "@yardimci-asistan/shared";
 import type { DesktopBirthdayCandidate } from "./birthday-service.js";
 import { BirthdayDeliveryService } from "./birthday-delivery-service.js";
 
-export interface BirthdaySchedulerStore {
+interface BirthdaySchedulerStore {
   getAutomaticBirthdayCandidates(now?: Date): DesktopBirthdayCandidate[];
 }
 
