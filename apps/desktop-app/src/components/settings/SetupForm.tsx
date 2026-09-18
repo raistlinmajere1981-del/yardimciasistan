@@ -423,7 +423,6 @@ export function SetupForm({
           <a href="#settings-operations">İşletme düzeni</a>
           <a href="#settings-connections">Servisler</a>
           <a href="#settings-application">Uygulama</a>
-          {!setupData.setupRequired && <a href="#settings-maintenance">Bakım</a>}
         </nav>
 
         <div id="settings-business" className="setup-section settings-identity-section">
@@ -829,10 +828,14 @@ export function SetupForm({
           </div>
         </section>
 
-        <div id="settings-application" className="setup-section appearance-settings">
+        <div id="settings-application" className="setup-section settings-application-workspace">
           <div className="setup-section-title">
-            <h2>Uygulama Görünümü</h2>
+            <h2>Uygulama</h2>
           </div>
+          <section className="settings-application-subsection appearance-settings">
+            <div className="settings-subsection-heading">
+              <h3>Görünüm</h3>
+            </div>
           <p className="setup-section-description">Size rahat gelen görünümü seçin. Değişiklikler anında uygulanır ve bu bilgisayarda saklanır.</p>
           <div className="appearance-mode-options" role="radiogroup" aria-label="Görünüm biçimi">
             <button
@@ -892,13 +895,15 @@ export function SetupForm({
               <small>Az ışıklı ortamlarda daha rahat bir görünüm sağlar.</small>
             </div>
           </div>
+          </section>
+
+          <PasswordSettings
+            configured={setupData.appPasswordConfigured}
+            onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
+            saveHandleRef={passwordSaveRef}
+          />
+          {!setupData.setupRequired && <DataMaintenanceSettings />}
         </div>
-        <PasswordSettings
-          configured={setupData.appPasswordConfigured}
-          onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
-          saveHandleRef={passwordSaveRef}
-        />
-        {!setupData.setupRequired && <DataMaintenanceSettings />}
 
 
       </section>

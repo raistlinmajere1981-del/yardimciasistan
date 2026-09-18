@@ -509,6 +509,30 @@
   color: var(--color-danger);
 }
 
+.settings-application-workspace {
+  display: grid;
+  gap: 0;
+}
+
+.settings-application-subsection {
+  padding-block: var(--space-5);
+  border-top: 1px solid var(--color-border);
+}
+
+.settings-application-workspace > .settings-application-subsection:first-of-type {
+  padding-top: var(--space-3);
+  border-top: 0;
+}
+
+.settings-application-subsection .settings-subsection-heading {
+  margin-bottom: var(--space-4);
+}
+
+.settings-application-subsection .settings-subsection-heading h3 {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
 .appearance-mode-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

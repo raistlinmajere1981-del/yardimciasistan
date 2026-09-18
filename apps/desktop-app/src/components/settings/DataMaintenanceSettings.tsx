@@ -205,9 +205,9 @@ export function DataMaintenanceSettings() {
   }
 
   return (
-    <div id="settings-maintenance" className="setup-section settings-data-maintenance-section backup-manager">
-      <div className="setup-section-title backup-manager-title">
-        <div><h2>Bakım</h2></div>
+    <div className="settings-application-subsection settings-data-maintenance-section backup-manager">
+      <div className="settings-subsection-heading backup-manager-title">
+        <div><h3>Veri ve Yedekleme</h3></div>
         {backups.length > 0 && <span className="backup-count">{backups.length} yedek</span>}
       </div>
       <p className="setup-section-description">Bilgilerinizi yedekleyin veya önceki bir yedeği geri yükleyin.</p>

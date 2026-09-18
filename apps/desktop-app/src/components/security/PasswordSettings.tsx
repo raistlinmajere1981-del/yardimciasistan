@@ -190,11 +190,10 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
 
   return (
     <>
-      <div ref={sectionRef} className="setup-section settings-password-section">
-        <div className="setup-section-title settings-password-title">
+      <div ref={sectionRef} className="settings-application-subsection settings-password-section">
+        <div className="settings-subsection-heading settings-password-title">
           <div>
-            <p>Gizlilik</p>
-            <h2>Uygulama Şifresi</h2>
+            <h3>Uygulama Şifresi</h3>
           </div>
           <span className={configured ? "password-status is-enabled" : "password-status"}>
             {configured ? <ShieldCheck size={16} aria-hidden="true" /> : <ShieldOff size={16} aria-hidden="true" />}
