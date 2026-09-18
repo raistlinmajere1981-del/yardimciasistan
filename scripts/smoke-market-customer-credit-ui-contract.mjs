@@ -347,13 +347,14 @@ try {
   // shared cart and credit sale all use the actual components/runtime.
   barcodeEvents = [{ id: "scan-m82", deviceId: "Test Telefonu", barcode: product.barcode }];
   assert.ok(readBusinessCapabilitySnapshot(path).enabledCapabilities.includes("retail.barcode"), JSON.stringify(readBusinessCapabilitySnapshot(path)));
-  await page.getByRole("button", { name: "Telefon Barkod Modunu Aç" }).click();
+  // Hızlı Satış artık telefon barkod kanalını mount olur olmaz otomatik dinler;
+  // kullanıcıdan ikinci bir masaüstü modu açması beklenmez.
+  await expect(page.locator(".market-phone-device")).toContainText("Hazır");
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
   await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
   await quick.getByLabel("Müşteri", { exact: true }).selectOption(other);
   await quick.getByRole("button", { name: "Satışı Veresiye Kaydet" }).click();
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(0);
-  await page.getByRole("button", { name: "Modu Kapat", exact: true }).click();
   await quick.screenshot({ path: join(artifacts, "credit-receipt.png") });
   assert.equal(runtime.getCustomerCreditAccount(path, other).balances[0].amountMinor, 9000);
   // Seed older-account volume before mounting it; mutations below still use the UI.
