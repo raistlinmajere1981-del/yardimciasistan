@@ -1,22 +1,24 @@
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 
-const require = createRequire(import.meta.url);
-const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-android-daily-task-"));
-const database = new DesktopDatabase({
-  appPath: join(process.cwd(), "apps", "desktop-app"),
-  userDataPath: dataRoot
-});
+const { database, cleanup } = createTemporaryDesktopDatabase("yardimci-android-daily-task-");
 
 const DEVICE_ID = "android-daily-task-smoke";
 
 try {
   database.initialize();
+  const setupResult = database.saveInitialSetup(createSmokeSetupInput({
+    businessName: "Android Daily Task Smoke",
+    phone: "+905550004040",
+    whatsapp: "+905550004040",
+    syncSecret: "android-daily-task-secret-123",
+    servicePreferences: { whatsapp: false, android: true },
+    initialCounts: { rooms: 1, tables: 1 }
+  }));
+  assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
   registerStaffDevice(database);
 
   let device = database.getAndroidDevices().find((item) => item.deviceId === DEVICE_ID);
@@ -164,8 +166,7 @@ try {
 
   console.log("android-daily-task-actions-smoke-ok: create, update, stale version, idempotency, admin delete and automatic-task protection verified");
 } finally {
-  database.close();
-  rmSync(dataRoot, { recursive: true, force: true });
+  cleanup();
 }
 
 function registerStaffDevice(database) {

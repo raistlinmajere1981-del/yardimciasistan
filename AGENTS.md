@@ -127,7 +127,6 @@ Prefer behavior/contract tests over tests that parse a specific function body or
 ## Known unrelated test/fixture debt
 
 Do not opportunistically fix these during unrelated work:
-- Android reservation fresh-DB fixture
 - Android daily-task permission fixture
 
 Handle each as its own maintenance task after reproducing it against a clean baseline.
