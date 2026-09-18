@@ -1,3 +1,4 @@
+import { LockKeyhole, RotateCcw } from "lucide-react";
 import {
   BUSINESS_CAPABILITIES,
   getBusinessCapabilityDependencies,
@@ -156,28 +157,53 @@ export function BusinessCapabilityEditor({
                     : "";
                 const toggleDisabled = busy || profilePendingSave || Boolean(blockedReason) || !onSetCapability;
 
+                const detail = blockedReason
+                  || (capability === C.CUSTOMER_CREDIT
+                    ? "Kayıtlı müşterilerin veresiye satış ve tahsilat hareketlerini takip eder."
+                    : "");
+                const sourceLabel = entry?.source === "user"
+                  ? "Özel"
+                  : entry?.source === "profile"
+                    ? "Önerilen"
+                    : "";
+
                 return (
-                  <div className="setup-field" key={capability}>
-                    <label className="form-check">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        disabled={toggleDisabled}
-                        onChange={(event) => onSetCapability?.(capability, event.target.checked)}
-                      />
-                      {capabilityLabel(capability)}
-                    </label>
-                    {(blockedReason || capability === C.CUSTOMER_CREDIT) && <small>{blockedReason || "Kayıtlı müşterilerin veresiye satış ve tahsilat hareketlerini takip eder."}</small>}
-                    {entry?.source === "user" && (
+                  <div className={`settings-capability-row${checked ? " is-enabled" : ""}${blockedReason ? " is-blocked" : ""}`} key={capability}>
+                    <div className="settings-capability-copy">
+                      <div className="settings-capability-title-row">
+                        <strong>{capabilityLabel(capability)}</strong>
+                        {sourceLabel && <span className={`settings-capability-source source-${entry?.source}`}>{sourceLabel}</span>}
+                        {blockedReason && <span className="settings-capability-lock"><LockKeyhole size={13} aria-hidden="true" /> Bağımlı</span>}
+                      </div>
+                      {detail && <small>{detail}</small>}
+                    </div>
+                    <div className="settings-capability-actions">
+                      {entry?.source === "user" && (
+                        <button
+                          className="settings-capability-reset"
+                          type="button"
+                          disabled={busy || profilePendingSave || !onClearOverride}
+                          onClick={() => onClearOverride?.(capability)}
+                        >
+                          <RotateCcw size={14} aria-hidden="true" />
+                          Önerilene dön
+                        </button>
+                      )}
                       <button
-                        className="action-button action-button-secondary"
+                        className={`settings-capability-toggle${checked ? " is-on" : ""}`}
                         type="button"
-                        disabled={busy || profilePendingSave || !onClearOverride}
-                        onClick={() => onClearOverride?.(capability)}
+                        role="switch"
+                        aria-checked={checked}
+                        aria-label={`${capabilityLabel(capability)}: ${checked ? "Açık" : "Kapalı"}`}
+                        disabled={toggleDisabled}
+                        onClick={() => onSetCapability?.(capability, !checked)}
                       >
-                        Önerilen Ayara Dön
+                        <span className="settings-capability-toggle-track" aria-hidden="true">
+                          <span className="settings-capability-toggle-thumb" />
+                        </span>
+                        <span>{checked ? "Açık" : "Kapalı"}</span>
                       </button>
-                    )}
+                    </div>
                   </div>
                 );
               })}
