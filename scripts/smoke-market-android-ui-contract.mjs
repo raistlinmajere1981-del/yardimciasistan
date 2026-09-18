@@ -10,8 +10,10 @@ const main = read("apps/android-app/src/main/java/com/yardimciasistan/android/Ma
 const navigation = read("apps/android-app/src/main/java/com/yardimciasistan/android/AndroidUiRules.java");
 const rules = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketUiRules.java");
 const workspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
+const cameraScanner = read("apps/android-app/src/main/java/com/yardimciasistan/android/BarcodeCameraScanner.java");
 const tests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketUiTest.java");
 const gradle = read("apps/android-app/build.gradle");
+const manifest = read("apps/android-app/AndroidManifest.xml");
 const foundation = read("scripts/check-modular-foundation.mjs");
 const uiSources = `${workspace}\n${rules}\n${main}`;
 
@@ -42,7 +44,9 @@ assert.doesNotMatch(rules, /payload\.put\("payment/);
 for (const label of [
   "Barkod Tara",
   "Kasa Barkod Modu",
-  "Telefonu barkod okuyucu olarak kullanıyorsunuz. Ürünleri arka arkaya okutabilirsiniz.",
+  "Kamera barkodu gördüğünde tarama otomatik olarak masaüstü Hızlı Satış ekranına gönderilir.",
+  "Kamerayı Aç",
+  "Barkodu Elle Gir",
   "Modu Kapat",
   "Stok Say",
   "Mal Kabul",
@@ -69,7 +73,12 @@ assert.match(workspace, /submissionBlocked\(\)/);
 assert.match(main, /onSubmissionQueued/);
 assert.match(main, /containsOnlyMarketActions/);
 assert.match(main, /sendMarketBarcodeScan/);
-assert.match(workspace, /setOnEditorActionListener[\s\S]*captureCashBarcode/);
+assert.match(workspace, /BarcodeCameraScanner\.show/);
+assert.match(workspace, /requestCameraScanner\(PURPOSE_CASH, true\)/);
+assert.match(cameraScanner, /CameraSelector\.DEFAULT_BACK_CAMERA/);
+assert.match(cameraScanner, /BarcodeScanning\.getClient/);
+assert.match(cameraScanner, /MarketUiRules\.BarcodeCameraGate/);
+assert.match(manifest, /android\.permission\.CAMERA/);
 const cashModeSource = workspace.slice(
   workspace.indexOf("private LinearLayout cashBarcodeScreen"),
   workspace.indexOf("private LinearLayout barcodeResultScreen")
@@ -87,7 +96,8 @@ for (const forbidden of [
   assert.equal(workspace.includes(forbidden), false, `Forbidden mobile-POS concept leaked into Market UI: ${forbidden}`);
 }
 
-assert.doesNotMatch(gradle, /implementation\s+["'][^"']*(?:barcode|scanner|mlkit|zxing)/i);
+assert.match(gradle, /androidx\.camera:camera-view:/);
+assert.match(gradle, /com\.google\.mlkit:barcode-scanning:/);
 assert.match(gradle, /testImplementation\s+"org\.json:json:/);
 
 for (const coverage of [
@@ -95,6 +105,7 @@ for (const coverage of [
   "everyMarketCallToActionUsesItsEffectivePermission",
   "cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities",
   "continuousBarcodeCaptureCreatesActionWithoutConfirmationAndDebounces",
+  "cameraBarcodeGateRequiresBarcodeToLeaveFrameBeforeRepeating",
   "knownAndUnknownBarcodesResolveWithoutInventingProducts",
   "stockCountPayloadCarriesAbsoluteQuantityAndNoDelta",
   "repeatBarcodeIncrementsOneCartLineAndDraftHasNoPayment",
