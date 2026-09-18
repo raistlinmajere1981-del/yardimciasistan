@@ -17,6 +17,7 @@ on:
       - "scripts/smoke-sync-timeout.mjs"
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
+      - "scripts/test-helpers/**"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
   push:
@@ -39,6 +40,7 @@ on:
       - "scripts/smoke-sync-timeout.mjs"
       - "scripts/smoke-web-connection-test.mjs"
       - "scripts/smoke-web-widget-module.mjs"
+      - "scripts/test-helpers/**"
       - "package.json"
       - ".github/workflows/desktop-finance-check.yml"
 
