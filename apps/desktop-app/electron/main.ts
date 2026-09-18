@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, safeStorage, session, shell } from "electron";
+import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import {
@@ -23,7 +23,6 @@ import {
   markRequestsSynced,
   pullAndroidActions,
   pullRequests,
-  pushAiSettings,
   pushAndroidSnapshot,
   pushMenu
 } from "@yardimci-asistan/sync-core";
@@ -38,10 +37,8 @@ import type {
 import {
   DesktopDatabase,
   type DesktopDashboardData,
-  type DesktopAiService,
   type DesktopSetupData,
   type DesktopSetupSaveResult,
-  type SaveAiServiceProfileInput,
   type SaveInitialSetupInput,
   type SaveMenuItemInput,
   type RequestAiSuggestionResult,
@@ -98,6 +95,14 @@ import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
 import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 import { registerImageAnalysisIpcHandlers } from "./ipc/image-analysis-ipc";
+import { normalizeAiTimeoutSeconds } from "./ai-config";
+import {
+  createAiApiKeyUpdate,
+  createAiProfileApiKeyUpdates,
+  getEffectiveAiApiKey
+} from "./ai-secret-service";
+import { publishSavedAiSettings } from "./ai-settings-publish-service";
+import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 
 configureNetworkFamilyAttemptTimeout();
 
@@ -259,10 +264,6 @@ interface AiConnectionTestInput {
 type AiConnectionTestResult =
   | { ok: true; message: string; model: string; models: Array<{ id: string; label: string }> }
   | { ok: false; message: string; model?: string; models?: Array<{ id: string; label: string }> };
-
-type AiApiKeyRevealResult =
-  | { ok: true; apiKey: string }
-  | { ok: false; message: string };
 
 interface DesktopBootstrapData {
   appName: string;
@@ -632,7 +633,7 @@ function registerIpcHandlers() {
   });
 
   ipcMain.handle("sync:pushAiSettings", async (): Promise<PushAiSettingsResult> => {
-    return publishSavedAiSettings();
+    return publishSavedAiSettingsFromMain();
   });
 
   registerMenuIpcHandlers({
@@ -654,30 +655,9 @@ function registerIpcHandlers() {
     saveInitial: saveInitialSetupFromRenderer
   });
 
-  ipcMain.handle("ai:revealApiKey", (_event, serviceValue: unknown): AiApiKeyRevealResult => {
-    assertAppSessionUnlocked();
-    const service = String(serviceValue ?? "").trim().toLowerCase() as DesktopAiService;
-    if (!["openai", "openrouter", "groq", "gemini", "custom"].includes(service)) {
-      return { ok: false, message: "API anahtarı için geçerli bir servis sağlayıcı seçin." };
-    }
-
-    const encryptedValue = getDatabase().getEncryptedAiApiKey(service);
-    if (!encryptedValue) {
-      return { ok: false, message: "Bu sağlayıcı için kayıtlı bir API anahtarı bulunamadı." };
-    }
-    if (!encryptedValue.startsWith("safe-storage:v1:") || !safeStorage.isEncryptionAvailable()) {
-      return { ok: false, message: "Kayıtlı API anahtarı bu cihazda çözülemiyor." };
-    }
-
-    try {
-      const payload = encryptedValue.slice("safe-storage:v1:".length);
-      const apiKey = safeStorage.decryptString(Buffer.from(payload, "base64")).trim();
-      return apiKey
-        ? { ok: true, apiKey }
-        : { ok: false, message: "Kayıtlı API anahtarı boş." };
-    } catch {
-      return { ok: false, message: "Kayıtlı API anahtarı çözülemedi." };
-    }
+  registerAiSecretIpcHandlers({
+    getDatabase,
+    assertUnlocked: assertAppSessionUnlocked
   });
 
   registerAndroidDeviceIpcHandlers({
@@ -723,7 +703,7 @@ function registerIpcHandlers() {
       };
     }
 
-    const apiKey = String(input?.apiKey ?? "").trim() || (input?.useStoredApiKey ? getEffectiveAiApiKey(service) : "");
+    const apiKey = String(input?.apiKey ?? "").trim() || (input?.useStoredApiKey ? getEffectiveAiApiKey(getDatabase(), service) : "");
     const timeoutSeconds = normalizeAiTimeoutSeconds(timeoutCandidate);
 
     if (service === "gemini") {
@@ -1139,7 +1119,7 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
     return localResult;
   }
 
-  const aiWebSync = await publishSavedAiSettings();
+  const aiWebSync = await publishSavedAiSettingsFromMain();
   getSyncCoordinator().restart();
   void birthdayScheduler?.evaluateNow();
   const setupData = getDatabase().getSetupData();
@@ -1699,7 +1679,7 @@ function createDesktopAiConfig(setup: DesktopSetupData) {
     service: setup.aiService,
     baseUrl: setup.aiBaseUrl,
     model: setup.aiModel,
-    apiKey: getEffectiveAiApiKey(setup.aiService),
+    apiKey: getEffectiveAiApiKey(getDatabase(), setup.aiService),
     authMode: setup.aiService === "gemini" ? "google_api_key" as const : "bearer" as const,
     timeoutMs: timeoutSeconds * 1000
   };
@@ -2050,51 +2030,12 @@ function formatWorkspaceRequestType(value: string) {
   return labels[value] ?? "Genel talep";
 }
 
-async function publishSavedAiSettings(): Promise<PushAiSettingsResult> {
-  const setup = getDatabase().getSetupData();
-  const aiCapabilityEnabled = hasBusinessCapability(enabledBusinessCapabilities(), C.AI);
-  const result = await pushAiSettings({
-    ...getWebSyncConfig(setup),
-    aiSettings: {
-      enabled: aiCapabilityEnabled,
-      provider: setup.aiProvider || "openai_compatible",
-      service: setup.aiService || "custom",
-      baseUrl: setup.aiBaseUrl,
-      model: setup.aiModel,
-      apiKey: aiCapabilityEnabled ? getEffectiveAiApiKey(setup.aiService) : "",
-      timeoutSeconds: normalizeAiTimeoutSeconds(setup.aiTimeoutSeconds)
-    }
-  });
-
-  if (result.ok) {
-    try {
-      getDatabase().markAiSettingsPublished(result.published_at);
-    } catch {
-      const invalidResponse: PushAiSettingsResult = {
-        ok: false,
-        message: "Web modülü AI ayarını aldı ancak yayın zamanı doğrulanamadı. Web modülünü güncelleyip tekrar deneyin."
-      };
-      getDatabase().recordSyncEvent({
-        direction: "push",
-        entityType: "ai_settings",
-        ok: false,
-        recordCount: 0,
-        message: invalidResponse.message
-      });
-      return invalidResponse;
-    }
-  }
-
-  getDatabase().recordSyncEvent({
-    direction: "push",
-    entityType: "ai_settings",
-    ok: result.ok,
-    recordCount: result.ok ? 1 : 0,
-    message: result.message,
-    status: result.ok ? undefined : result.status
-  });
-
-  return result;
+async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {
+  const database = getDatabase();
+  return publishSavedAiSettings(
+    database,
+    getWebSyncConfig(database.getSetupData())
+  );
 }
 
 function getWebSyncConfig(setup: DesktopSetupData) {
@@ -2102,124 +2043,6 @@ function getWebSyncConfig(setup: DesktopSetupData) {
   const syncSecret = process.env.YA_SYNC_SECRET ?? setup.syncSecret;
 
   return { baseUrl, syncSecret };
-}
-
-type AiApiKeyUpdate =
-  | { mode: "keep" }
-  | { mode: "replace"; encryptedValue: string }
-  | { mode: "clear" };
-
-function createAiApiKeyUpdate(input: SaveInitialSetupInput): { ok: true; update: AiApiKeyUpdate } | { ok: false; message: string } {
-  if (!input || typeof input !== "object") {
-    return {
-      ok: false,
-      message: "Kaydedilecek ayarlar okunamadı."
-    };
-  }
-
-  return createEncryptedAiApiKeyUpdate(input.aiApiKey, input.clearAiApiKey);
-}
-
-function createAiProfileApiKeyUpdates(input: SaveInitialSetupInput):
-  | {
-      ok: true;
-      profiles: SaveAiServiceProfileInput[];
-      updates: Partial<Record<DesktopAiService, AiApiKeyUpdate>>;
-    }
-  | { ok: false; message: string } {
-  const profiles = Array.isArray(input.aiProfiles) ? input.aiProfiles : [];
-  const supportedServices = new Set<DesktopAiService>(["openai", "openrouter", "groq", "gemini", "custom"]);
-  const updates: Partial<Record<DesktopAiService, AiApiKeyUpdate>> = {};
-  const sanitizedProfiles: SaveAiServiceProfileInput[] = [];
-
-  for (const profile of profiles) {
-    const service = String(profile?.service ?? "").trim().toLowerCase() as DesktopAiService;
-    if (!supportedServices.has(service)) {
-      return { ok: false, message: "Kaydedilecek AI servis profillerinden biri geçersiz." };
-    }
-
-    const apiKey = String(profile.apiKey ?? "").trim();
-    if (service !== input.aiService) {
-      const update = createEncryptedAiApiKeyUpdate(apiKey, Boolean(profile.clearApiKey));
-      if (!update.ok) {
-        return update;
-      }
-      updates[service] = update.update;
-    }
-    sanitizedProfiles.push({
-      ...profile,
-      service,
-      apiKey: apiKey ? "__encrypted_in_main_process__" : ""
-    });
-  }
-
-  return { ok: true, profiles: sanitizedProfiles, updates };
-}
-
-function createEncryptedAiApiKeyUpdate(apiKeyValue: unknown, clearRequested: boolean): { ok: true; update: AiApiKeyUpdate } | { ok: false; message: string } {
-  if (clearRequested) {
-    return {
-      ok: true,
-      update: { mode: "clear" }
-    };
-  }
-
-  const apiKey = String(apiKeyValue ?? "").trim();
-  if (!apiKey) {
-    return {
-      ok: true,
-      update: { mode: "keep" }
-    };
-  }
-
-  if (!safeStorage.isEncryptionAvailable()) {
-    return {
-      ok: false,
-      message: "Gizli erişim anahtarı bu cihazda güvenli biçimde saklanamıyor. İşletim sistemi anahtar kasasını kontrol edin."
-    };
-  }
-
-  try {
-    const encryptedValue = safeStorage.encryptString(apiKey).toString("base64");
-    return {
-      ok: true,
-      update: {
-        mode: "replace",
-        encryptedValue: `safe-storage:v1:${encryptedValue}`
-      }
-    };
-  } catch {
-    return {
-      ok: false,
-      message: "Gizli erişim anahtarı güvenli biçimde kaydedilemedi."
-    };
-  }
-}
-
-function getEffectiveAiApiKey(service?: string) {
-  const encryptedValue = getDatabase().getEncryptedAiApiKey(service);
-  if (encryptedValue.startsWith("safe-storage:v1:")) {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return "";
-    }
-
-    try {
-      const payload = encryptedValue.slice("safe-storage:v1:".length);
-      return safeStorage.decryptString(Buffer.from(payload, "base64")).trim();
-    } catch {
-      return "";
-    }
-  }
-
-  return "";
-}
-
-function normalizeAiTimeoutSeconds(value: number) {
-  if (!Number.isFinite(value)) {
-    return 30;
-  }
-
-  return Math.max(5, Math.min(120, Math.trunc(value)));
 }
 
 function normalizeAiConnectionUrl(value: unknown) {
