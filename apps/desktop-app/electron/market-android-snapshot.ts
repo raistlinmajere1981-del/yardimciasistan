@@ -3,10 +3,7 @@ import type {
   AndroidMarketCartDraft,
   AndroidMarketSnapshot
 } from "@yardimci-asistan/sync-core";
-import {
-  listMarketCartDraftRecords,
-  listMarketProductDraftRecords
-} from "./market-companion-store.js";
+import { listMarketCartDraftRecords } from "./market-companion-store.js";
 
 export function emptyAndroidMarketSnapshot(currency = "TRY"): AndroidMarketSnapshot {
   return {
