@@ -7,6 +7,12 @@ import { listMarketCartDraftRecords } from "./market-companion-store.js";
 
 export function emptyAndroidMarketSnapshot(currency = "TRY"): AndroidMarketSnapshot {
   return {
+    product_data: {
+      enabled: false,
+      provider: "open_food_facts",
+      auto_search_unknown_barcode: false,
+      include_images: false
+    },
     summary: {
       today_sale_count: 0,
       today_sales_total: 0,
@@ -35,6 +41,19 @@ export function createAndroidMarketSnapshotSource(
   database.exec("PRAGMA busy_timeout = 5000;");
   try {
     const businessId = activeBusinessId(database);
+    const productDataRow = database.prepare(`
+      SELECT product_data_enabled, product_data_provider,
+             product_data_auto_search, product_data_include_images
+      FROM settings
+      WHERE deleted_at = ''
+      LIMIT 1
+    `).get() as Record<string, unknown> | undefined;
+    const productData = {
+      enabled: Number(productDataRow?.product_data_enabled ?? 0) === 1,
+      provider: text(productDataRow?.product_data_provider) || "open_food_facts",
+      auto_search_unknown_barcode: Number(productDataRow?.product_data_auto_search ?? 1) === 1,
+      include_images: Number(productDataRow?.product_data_include_images ?? 1) === 1
+    };
     const products = (database.prepare(`
       SELECT
         products.id,
@@ -184,6 +203,7 @@ export function createAndroidMarketSnapshotSource(
       ? text(salesRow?.currency) || "TRY"
       : "";
     return {
+      product_data: productData,
       summary: {
         today_sale_count: Math.max(0, Math.trunc(number(salesRow?.sale_count))),
         today_sales_total: nonNegativeNumber(salesRow?.sale_total),
