@@ -27,5 +27,6 @@ assert.ok(initializeIndex >= 0, "desktop logging initialization missing");
 assert.ok(mainImportIndex > initializeIndex, "desktop logging must initialize before main IPC registration");
 
 assert.match(commerceIpc, /commerce:product:previewExternalImage/);
+assert.match(commerceIpc, /desktopLogWarn\("product-data"/);
 
 console.log("desktop-logging-contract-ok");
