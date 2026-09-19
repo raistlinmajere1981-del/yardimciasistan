@@ -28,12 +28,10 @@ const {
 const {
   applyRuntimeInventoryMovement,
   createMarketCartDraft,
-  createMarketProductDraft,
   createRuntimePaidSale,
   getMarketCartDraft,
   getRuntimeInventoryBalance,
   listMarketCartDrafts,
-  listMarketProductDrafts,
   listRuntimeInventoryMovements,
   saveRuntimeCatalogProduct,
   saveRuntimeSupplier
@@ -52,7 +50,7 @@ const MARKET_PERMISSIONS = [
   "market.product.view",
   "market.stock_count",
   "market.receiving",
-  "market.product_draft",
+  "market.product_create",
   "market.cart_draft",
   "market.scan_to_desktop"
 ];
@@ -89,7 +87,7 @@ for (const permission of [
 for (const [actionType, permission] of [
   ["market_stock_count", "market.stock_count"],
   ["market_purchase_receive", "market.receiving"],
-  ["market_product_draft_create", "market.product_draft"],
+  ["market_product_create", "market.product_create"],
   ["market_cart_draft_create", "market.cart_draft"],
   ["market_barcode_scan", "market.scan_to_desktop"]
 ]) {
@@ -163,7 +161,6 @@ try {
   sqlite.exec("PRAGMA foreign_keys = ON;");
   try {
     for (const table of [
-      "catalog_product_drafts",
       "commerce_sale_drafts",
       "commerce_sale_draft_items"
     ]) {
@@ -296,34 +293,54 @@ try {
       1
     );
 
-    const productsBeforeDraft = activeProductCount(sqlite);
-    const productDraftResult = database.applyAndroidAction(action(
-      "market-product-draft",
-      "market_product_draft_create",
+    const productsBeforeCreate = activeProductCount(sqlite);
+    const productCreateResult = database.applyAndroidAction(action(
+      "market-product-create",
+      "market_product_create",
       {
         barcode: "8690000007199",
-        proposed_name: "Bilinmeyen Barkod Ürünü",
-        sku: "M71-DRAFT",
-        proposed_category: "Atıştırmalık",
-        proposed_purchase_price: 4.5,
-        proposed_sale_price: 7.5,
+        name: "Bilinmeyen Barkod Ürünü",
+        sku: "M71-PHONE",
+        category: "Atıştırmalık",
+        purchase_price: 4.5,
+        sale_price: 7.5,
         currency: "TRY",
         unit: "piece",
+        track_inventory: true,
         note: "Raf üzerinde bulundu"
       }
     ));
-    assert.equal(productDraftResult.ok, true, productDraftResult.message);
-    assert.equal(activeProductCount(sqlite), productsBeforeDraft);
-    const actionProductDraft = listMarketProductDrafts(database.databasePath)
-      .find((draft) => draft.barcode === "8690000007199");
-    assert.ok(actionProductDraft);
-    assert.equal(actionProductDraft.status, "pending");
-    assert.equal(actionProductDraft.source, "android");
-    assert.equal(actionProductDraft.createdByDevice, DEVICE_ID);
-    assert.equal(
-      scalar(sqlite, "SELECT COUNT(*) AS value FROM catalog_products WHERE barcode = ?", actionProductDraft.barcode),
-      0
-    );
+    assert.equal(productCreateResult.ok, true, productCreateResult.message);
+    assert.equal(activeProductCount(sqlite), productsBeforeCreate + 1);
+    const actionProduct = sqlite.prepare(`
+      SELECT name, sku, barcode, purchase_price, sale_price, unit, track_inventory
+      FROM catalog_products
+      WHERE barcode = ? AND deleted_at = ''
+      LIMIT 1
+    `).get("8690000007199");
+    assert.ok(actionProduct);
+    assert.equal(actionProduct.name, "Bilinmeyen Barkod Ürünü");
+    assert.equal(actionProduct.sku, "M71-PHONE");
+    assert.equal(actionProduct.purchase_price, 4.5);
+    assert.equal(actionProduct.sale_price, 7.5);
+    assert.equal(actionProduct.unit, "piece");
+    assert.equal(actionProduct.track_inventory, 1);
+    assert.equal(receiptById(sqlite, "market-product-create"), 1);
+
+    const duplicateProduct = database.applyAndroidAction(action(
+      "market-product-create-duplicate",
+      "market_product_create",
+      {
+        barcode: "8690000007199",
+        name: "Tekrar Ürün",
+        unit: "piece",
+        track_inventory: true
+      }
+    ));
+    assert.equal(duplicateProduct.ok, false);
+    assert.match(duplicateProduct.message, /barkod.*kayıtlı/i);
+    assert.equal(activeProductCount(sqlite), productsBeforeCreate + 1);
+    assert.equal(receiptById(sqlite, "market-product-create-duplicate"), 0);
 
     const salesBeforeCart = tableCount(sqlite, "commerce_sales");
     const movementsBeforeCart = tableCount(sqlite, "inventory_movements");
@@ -349,14 +366,6 @@ try {
     assert.equal(tableCount(sqlite, "finance_entries"), financeBeforeCart);
     assert.equal(getRuntimeInventoryBalance(database.databasePath, product.id).quantity, quantityBeforeCart);
 
-    const directProductDraft = createMarketProductDraft(database.databasePath, {
-      barcode: "8690000007188",
-      proposedName: "Masaüstü Runtime Taslağı",
-      proposedSalePrice: 6,
-      unit: "piece"
-    });
-    assert.equal(directProductDraft.status, "pending");
-    assert.equal(listMarketProductDrafts(database.databasePath).some((draft) => draft.id === directProductDraft.id), true);
     const directCartDraft = createMarketCartDraft(database.databasePath, {
       lines: [{ productId: product.id, quantity: 1 }],
       note: "Runtime helper sözleşmesi"
@@ -378,7 +387,6 @@ try {
     assert.equal(sourceSnapshot.recent_purchases.length, 1);
     assert.equal(sourceSnapshot.recent_purchases[0].status, "received");
     assert.equal("pending" in sourceSnapshot.recent_purchases[0], false);
-    assert.equal(sourceSnapshot.product_drafts.length, 2);
     assert.equal(sourceSnapshot.cart_drafts.length, 2);
 
     const projectedProduct = sourceSnapshot.products.find((item) => item.id === product.id);
@@ -410,7 +418,6 @@ try {
       capabilitySetWithout(C.RETAIL_BARCODE)
     );
     assert.equal(withoutBarcode.products.every((item) => item.barcode === ""), true);
-    assert.equal(withoutBarcode.product_drafts.every((item) => item.barcode === ""), true);
 
     const withoutSuppliers = projectAndroidMarketSnapshot(
       sourceSnapshot,
@@ -487,7 +494,7 @@ try {
   }
 
   console.log(
-    "market-android-foundation-smoke-ok: permissions, capabilities, absolute stock count, idempotency, receiving transaction, explicit drafts, snapshot redaction and runtime gates verified"
+    "market-android-foundation-smoke-ok: permissions, capabilities, stock count, receiving, direct product create, phone carts, snapshot redaction and runtime gates verified"
   );
 } finally {
   database.close();
@@ -566,7 +573,7 @@ function assertMirroredTransportContracts() {
   for (const [actionType, permission] of [
     ["market_stock_count", "market.stock_count"],
     ["market_purchase_receive", "market.receiving"],
-    ["market_product_draft_create", "market.product_draft"],
+    ["market_product_create", "market.product_create"],
     ["market_cart_draft_create", "market.cart_draft"],
     ["market_barcode_scan", "market.scan_to_desktop"]
   ]) {
