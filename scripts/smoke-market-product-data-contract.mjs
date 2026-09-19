@@ -33,6 +33,8 @@ for (const column of [
   assert.ok(schema.includes(column), `Product data schema missing: ${column}`);
 }
 
+assert.match(service, /interface ProductLookupProvider/);
+assert.match(service, /PRODUCT_LOOKUP_PROVIDERS/);
 assert.match(service, /world\.openfoodfacts\.org\/api\/v2\/product/);
 assert.match(service, /"User-Agent": userAgent\(\)/);
 assert.match(service, /product_name/);
