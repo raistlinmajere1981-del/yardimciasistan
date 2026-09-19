@@ -24,6 +24,22 @@ final class ProductDataLookupClient {
   private static final int IMAGE_MAX_BYTES = 5 * 1024 * 1024;
   private static final int IMAGE_MAX_DIMENSION = 768;
 
+  Bitmap previewImage(String providerValue, String imageUrl) throws LookupException {
+    String provider = text(providerValue);
+    if (!PROVIDER_OPEN_FOOD_FACTS.equals(provider) || !isAllowedOpenFoodFactsImageUrl(imageUrl)) {
+      return null;
+    }
+    try {
+      return downloadPreview(imageUrl);
+    } catch (java.net.SocketTimeoutException error) {
+      throw new LookupException("Ürün görseli alınırken zaman aşımı oluştu.", error);
+    } catch (java.net.UnknownHostException error) {
+      throw new LookupException("Ürün görseline ulaşılamadı.", error);
+    } catch (Exception error) {
+      throw new LookupException("Ürün görseli alınamadı.", error);
+    }
+  }
+
   Result lookup(String providerValue, String barcodeValue, boolean includeImages) throws LookupException {
     String provider = text(providerValue);
     if (!PROVIDER_OPEN_FOOD_FACTS.equals(provider)) {
