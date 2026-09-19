@@ -125,6 +125,14 @@ public final class AndroidMarketUiTest {
   }
 
   @Test
+  public void manualNumericBarcodeSeparatorsAreRemovedWithoutChangingAlphanumericCodes() {
+    assertEquals("5449000000996", MarketUiRules.normalizeBarcodeIdentity(" 5449-0000-00996 "));
+    assertEquals("5449000000996", MarketUiRules.normalizeBarcodeIdentity("5 449.000.000.996"));
+    assertEquals("5449000000996", MarketUiRules.normalizeBarcodeIdentity("5449–0000—00996"));
+    assertEquals("ABC-123", MarketUiRules.normalizeBarcodeIdentity("ABC-123"));
+  }
+
+  @Test
   public void cameraBarcodeGateRequiresBarcodeToLeaveFrameBeforeRepeating() {
     MarketUiRules.BarcodeCameraGate gate = new MarketUiRules.BarcodeCameraGate(850L);
 
