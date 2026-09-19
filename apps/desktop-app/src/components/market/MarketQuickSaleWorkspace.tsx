@@ -16,6 +16,7 @@ import {
 import type { DesktopCustomer } from "../../../electron/database";
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
+import { MarketProductThumbnail } from "./MarketProductThumbnail";
 
 interface CartLine {
   product: CatalogProduct;
@@ -521,6 +522,7 @@ export function MarketQuickSaleWorkspace({
               onClick={() => addProduct(product)}
               disabled={disabled}
             >
+              <MarketProductThumbnail product={product} className="market-sale-product-thumb" />
               <span>
                 <strong>{product.name}</strong>
                 <small>{product.sku || product.barcode || "Kod yok"}</small>
@@ -561,9 +563,12 @@ export function MarketQuickSaleWorkspace({
         <div className="market-sale-cart-lines">
           {cartLines.map((line) => (
             <div className="market-sale-cart-line" key={line.product.id}>
-              <div>
-                <strong>{line.product.name}</strong>
-                <small>{money(line.product.salePrice, line.product.currency)} / {unitLabels[line.product.unit]}</small>
+              <div className="market-sale-cart-product">
+                <MarketProductThumbnail product={line.product} className="market-sale-cart-thumb" />
+                <span>
+                  <strong>{line.product.name}</strong>
+                  <small>{money(line.product.salePrice, line.product.currency)} / {unitLabels[line.product.unit]}</small>
+                </span>
               </div>
               <div className="market-sale-quantity">
                 <button type="button" aria-label={`${line.product.name} miktarını azalt`} onClick={() => setQuantity(line.product.id, line.quantity - 1)} disabled={disabled}>
