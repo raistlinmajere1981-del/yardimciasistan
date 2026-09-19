@@ -53,7 +53,7 @@ const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
     id: "market_operations",
     label: "Market / El Terminali",
     shortLabel: "Market",
-    description: "Barkod, stok sayımı, mal kabulü, ürün taslağı ve sepet hazırlama"
+    description: "Barkod, stok sayımı, mal kabulü, ürün kaydı ve sepet hazırlama"
   }
 ];
 
