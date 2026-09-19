@@ -157,6 +157,12 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
       clearAiApiKey: setupForm.clearAiApiKey,
       aiProfiles: createSaveAiServiceProfiles(setupForm),
       aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
+      productData: {
+        enabled: setupForm.productDataEnabled,
+        provider: setupForm.productDataProvider,
+        autoSearchUnknownBarcode: setupForm.productDataAutoSearch,
+        includeImages: setupForm.productDataIncludeImages
+      },
       servicePreferences: {
         whatsapp: setupForm.whatsappEnabled,
         android: setupForm.androidEnabled
