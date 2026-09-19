@@ -59,14 +59,14 @@ final class MarketWorkspace {
   private static final String SCREEN_STOCK = "stock";
   private static final String SCREEN_RECEIVING = "receiving";
   private static final String SCREEN_CART = "cart";
-  private static final String SCREEN_PRODUCT_CREATE = "product_draft";
+  private static final String SCREEN_PRODUCT_CREATE = "product_create";
   private static final String SCREEN_CASH_BARCODE = "cash_barcode";
 
   private static final String PURPOSE_LOOKUP = "lookup";
   private static final String PURPOSE_STOCK = "stock";
   private static final String PURPOSE_RECEIVING = "receiving";
   private static final String PURPOSE_CART = "cart";
-  private static final String PURPOSE_PRODUCT_CREATE = "product_draft";
+  private static final String PURPOSE_PRODUCT_CREATE = "product_create";
   private static final String PURPOSE_CASH = "cash";
 
   private static final String[] UNIT_VALUES = {
