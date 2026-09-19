@@ -2,10 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { app, nativeImage } from "electron";
-import type {
-  ProductDataProviderId,
-  ProductLookupMode,
-  ProductLookupResponse
+import {
+  normalizeBarcodeIdentity,
+  type ProductDataProviderId,
+  type ProductLookupMode,
+  type ProductLookupResponse
 } from "@yardimci-asistan/shared";
 import {
   resolveProductAssetAbsoluteFromRelative,
@@ -65,7 +66,7 @@ function productDataSettings(databasePath: string): ProductDataSettings {
 }
 
 function normalizeBarcode(value: unknown): string {
-  const barcode = String(value ?? "").trim();
+  const barcode = normalizeBarcodeIdentity(value, 32);
   if (!/^[0-9]{6,32}$/.test(barcode)) {
     throw new Error("Ürün verisi araması için geçerli bir sayısal barkod gerekli.");
   }
