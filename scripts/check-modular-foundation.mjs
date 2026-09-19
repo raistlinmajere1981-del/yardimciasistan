@@ -21,6 +21,7 @@ const checks = [
   ["node", ["scripts/smoke-market-customer-credit-foundation.mjs"]],
   ["node", ["scripts/smoke-market-customer-credit-ui-contract.mjs"]],
   ["node", ["scripts/smoke-market-customer-credit-whatsapp.mjs"]],
+  ["node", ["--test", "packages/shared/tests/barcode.test.cjs"]],
   ["node", ["scripts/smoke-market-barcode-input-contract.mjs"]],
   ["node", ["scripts/smoke-market-label-printer-contract.mjs"]],
   ["node", ["scripts/smoke-market-profile-registry.mjs"]],
