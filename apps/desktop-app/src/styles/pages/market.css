@@ -857,6 +857,15 @@ button.market-list-row:hover {
   background: var(--color-accent-soft);
 }
 
+.market-sale-product-thumb {
+  display: block;
+  width: 100%;
+  height: 96px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-field);
+}
+
 .market-sale-product span {
   display: grid;
   gap: var(--space-1);
@@ -894,11 +903,29 @@ button.market-list-row:hover {
   background: var(--color-bg-surface);
 }
 
-.market-sale-cart-line > div:first-child {
+.market-sale-cart-product {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.market-sale-cart-product > span {
   display: grid;
   gap: var(--space-1);
   min-width: 0;
 }
+
+.market-sale-cart-thumb {
+  display: block;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-field);
+}
+
 
 .market-sale-cart-line small {
   color: var(--color-text-muted);
