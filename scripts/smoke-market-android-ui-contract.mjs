@@ -11,6 +11,7 @@ const navigation = read("apps/android-app/src/main/java/com/yardimciasistan/andr
 const rules = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketUiRules.java");
 const workspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
 const cameraScanner = read("apps/android-app/src/main/java/com/yardimciasistan/android/BarcodeCameraScanner.java");
+const productLookup = read("apps/android-app/src/main/java/com/yardimciasistan/android/ProductDataLookupClient.java");
 const tests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketUiTest.java");
 const foundationTests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketFoundationTest.java");
 const gradle = read("apps/android-app/build.gradle");
@@ -65,6 +66,10 @@ for (const label of [
 }
 
 assert.match(workspace, /MarketUiRules\.canScanBarcode\(data\)/);
+assert.match(workspace, /MarketUiRules\.canLookupProductData\(data\)/);
+assert.match(workspace, /onProductLookupRequested/);
+assert.match(productLookup, /world\.openfoodfacts\.org\/api\/v2\/product/);
+assert.match(productLookup, /image_front_url/);
 assert.match(workspace, /showProductPicker\(/);
 assert.match(workspace, /data\.market\.summary/);
 assert.match(workspace, /data\.market\.recentPurchases/);
@@ -103,6 +108,7 @@ assert.match(gradle, /testImplementation\s+"org\.json:json:/);
 for (const coverage of [
   "pureMarketProfileOnlyExposesRelevantNavigation",
   "everyMarketCallToActionUsesItsEffectivePermission",
+  "productDataLookupRequiresServiceAndProductCreatePermission",
   "cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities",
   "continuousBarcodeCaptureCreatesActionWithoutConfirmationAndDebounces",
   "cameraBarcodeGateRequiresBarcodeToLeaveFrameBeforeRepeating",
