@@ -4,10 +4,12 @@ import { DatabaseSync } from "node:sqlite";
 import { app, dialog, ipcMain, session, shell } from "electron";
 import {
   DESKTOP_DATABASE_FILE_NAME,
+  resolveAssetsPath,
   resolveBackupRoot,
   resolveDatabasePath,
   resolveMaintenancePath,
   resolvePendingMaintenanceMarkerPath,
+  resolveStagedRestoreAssetsPath,
   resolveStagedRestorePath
 } from "./data-paths.js";
 
@@ -57,10 +59,12 @@ type PendingDataMaintenance =
 interface DataMaintenancePaths {
   userDataPath: string;
   databasePath: string;
+  assetsPath: string;
   projectBackupPath: string;
   maintenancePath: string;
   markerPath: string;
   stagedRestorePath: string;
+  stagedRestoreAssetsPath: string;
 }
 
 interface BackupManifest {
@@ -75,11 +79,16 @@ interface BackupManifest {
     count: number;
     files: Array<{ menuItemId: string; menuItemName: string; fileName: string; mimeType: string }>;
   };
+  assets?: {
+    directory: string;
+    fileCount: number;
+  };
 }
 
 const BACKUP_DATABASE_FILE = DESKTOP_DATABASE_FILE_NAME;
 const BACKUP_MANIFEST_FILE = "backup.json";
 const QR_IMAGE_DIRECTORY = "qr-menu-images";
+const ASSET_DIRECTORY = "assets";
 
 export function resolveProjectBackupPath() {
   return resolveBackupRoot({
@@ -94,10 +103,12 @@ function resolvePaths(userDataPath: string): DataMaintenancePaths {
   return {
     userDataPath,
     databasePath: resolveDatabasePath(userDataPath),
+    assetsPath: resolveAssetsPath(userDataPath),
     projectBackupPath: resolveProjectBackupPath(),
     maintenancePath,
     markerPath: resolvePendingMaintenanceMarkerPath(userDataPath),
-    stagedRestorePath: resolveStagedRestorePath(userDataPath)
+    stagedRestorePath: resolveStagedRestorePath(userDataPath),
+    stagedRestoreAssetsPath: resolveStagedRestoreAssetsPath(userDataPath)
   };
 }
 
@@ -259,6 +270,26 @@ function directorySize(directoryPath: string): number {
   return total;
 }
 
+function directoryFileCount(directoryPath: string): number {
+  if (!fs.existsSync(directoryPath)) return 0;
+  let total = 0;
+  for (const entry of fs.readdirSync(directoryPath, { withFileTypes: true })) {
+    const entryPath = path.join(directoryPath, entry.name);
+    if (entry.isDirectory()) total += directoryFileCount(entryPath);
+    else if (entry.isFile()) total += 1;
+  }
+  return total;
+}
+
+function copyDurableAssets(sourcePath: string, destinationPath: string): number {
+  removeDirectoryIfExists(destinationPath);
+  if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isDirectory()) {
+    return 0;
+  }
+  fs.cpSync(sourcePath, destinationPath, { recursive: true, force: true, errorOnExist: false });
+  return directoryFileCount(destinationPath);
+}
+
 function readBackupManifest(folderPath: string): BackupManifest | null {
   const manifestPath = path.join(folderPath, BACKUP_MANIFEST_FILE);
   if (!fs.existsSync(manifestPath)) return null;
@@ -349,6 +380,7 @@ function createBackupPackageFromDatabase(options: {
 
     validateYardimciDatabase(outputDatabasePath);
     const imageFiles = extractQrMenuImages(outputDatabasePath, path.join(tempFolderPath, QR_IMAGE_DIRECTORY));
+    const assetFileCount = copyDurableAssets(options.paths.assetsPath, path.join(tempFolderPath, ASSET_DIRECTORY));
     const manifest: BackupManifest = {
       format: "yardimci-asistan-backup",
       version: 3,
@@ -361,6 +393,10 @@ function createBackupPackageFromDatabase(options: {
         count: imageFiles.length,
         files: imageFiles
       },
+      assets: {
+        directory: ASSET_DIRECTORY,
+        fileCount: assetFileCount
+      }
     };
     fs.writeFileSync(path.join(tempFolderPath, BACKUP_MANIFEST_FILE), JSON.stringify(manifest, null, 2), "utf8");
     fs.renameSync(tempFolderPath, finalFolderPath);
@@ -387,9 +423,12 @@ function createManualBackup(userDataPath: string): DesktopBackupCreateResult {
       liveDatabase: true
     });
     const imagesText = backup.imageCount > 0 ? ` QR menüden ${backup.imageCount} görsel de yedeğe eklendi.` : "";
+    const manifest = readBackupManifest(backup.folderPath);
+    const assetCount = manifest?.assets?.fileCount ?? 0;
+    const assetsText = assetCount > 0 ? ` Kalıcı asset klasöründen ${assetCount} dosya da yedeklendi.` : "";
     return {
       ok: true,
-      message: `Yerel kayıtların yedeği oluşturuldu.${imagesText}`,
+      message: `Yerel kayıtların yedeği oluşturuldu.${imagesText}${assetsText}`,
       backup,
       backupDirectory: paths.projectBackupPath,
       backups: listBackupItems(paths)
@@ -464,7 +503,7 @@ async function deleteBackup(userDataPath: string, backupId: string): Promise<Des
       type: "warning",
       title: "Yedeği Sil",
       message: "Bu yedek kalıcı olarak silinsin mi?",
-      detail: `${formatBackupDate(item.createdAt)} tarihli yedek klasörü ve içindeki QR menü görselleri silinecek.`,
+      detail: `${formatBackupDate(item.createdAt)} tarihli yedek klasörü, QR menü görselleri ve kalıcı asset dosyaları silinecek.`,
       buttons: ["Vazgeç", "Yedeği Sil"],
       defaultId: 0,
       cancelId: 0,
@@ -495,6 +534,32 @@ function readPendingOperation(paths: DataMaintenancePaths): PendingDataMaintenan
   return parsed as PendingDataMaintenance;
 }
 
+function replaceAssetsFromStagedRestore(paths: DataMaintenancePaths) {
+  if (!fs.existsSync(paths.stagedRestoreAssetsPath)) return;
+
+  const nextAssetsPath = `${paths.assetsPath}.restore-next`;
+  const rollbackAssetsPath = `${paths.assetsPath}.restore-rollback`;
+  removeDirectoryIfExists(nextAssetsPath);
+  removeDirectoryIfExists(rollbackAssetsPath);
+  fs.renameSync(paths.stagedRestoreAssetsPath, nextAssetsPath);
+
+  const hadCurrentAssets = fs.existsSync(paths.assetsPath);
+  if (hadCurrentAssets) fs.renameSync(paths.assetsPath, rollbackAssetsPath);
+
+  try {
+    fs.renameSync(nextAssetsPath, paths.assetsPath);
+    removeDirectoryIfExists(rollbackAssetsPath);
+  } catch (error) {
+    removeDirectoryIfExists(paths.assetsPath);
+    if (hadCurrentAssets && fs.existsSync(rollbackAssetsPath)) {
+      fs.renameSync(rollbackAssetsPath, paths.assetsPath);
+    }
+    throw error;
+  } finally {
+    removeDirectoryIfExists(nextAssetsPath);
+  }
+}
+
 function replaceDatabaseFromStagedRestore(paths: DataMaintenancePaths) {
   validateYardimciDatabase(paths.stagedRestorePath);
 
@@ -512,6 +577,7 @@ function replaceDatabaseFromStagedRestore(paths: DataMaintenancePaths) {
   try {
     fs.renameSync(nextDatabasePath, paths.databasePath);
     validateYardimciDatabase(paths.databasePath);
+    replaceAssetsFromStagedRestore(paths);
     removeIfExists(rollbackPath);
   } catch (error) {
     removeIfExists(paths.databasePath);
@@ -525,6 +591,7 @@ function replaceDatabaseFromStagedRestore(paths: DataMaintenancePaths) {
 function resetDatabaseFiles(paths: DataMaintenancePaths) {
   removeDatabaseSidecars(paths.databasePath);
   removeIfExists(paths.databasePath);
+  removeDirectoryIfExists(paths.assetsPath);
 }
 
 export function applyPendingDataMaintenanceAtStartup(userDataPath: string) {
@@ -542,6 +609,7 @@ export function applyPendingDataMaintenanceAtStartup(userDataPath: string) {
     if (pending) {
       removeIfExists(paths.markerPath);
       removeIfExists(paths.stagedRestorePath);
+      removeDirectoryIfExists(paths.stagedRestoreAssetsPath);
     }
   }
 }
@@ -592,8 +660,19 @@ async function prepareRestore(userDataPath: string, backupId: string): Promise<D
     const safetyBackup = createSafetyBackup(paths);
     fs.mkdirSync(paths.maintenancePath, { recursive: true });
     removeIfExists(paths.stagedRestorePath);
+    removeDirectoryIfExists(paths.stagedRestoreAssetsPath);
     fs.copyFileSync(sourcePath, paths.stagedRestorePath);
     validateYardimciDatabase(paths.stagedRestorePath);
+
+    const sourceManifest = readBackupManifest(backupFolderPath);
+    if (sourceManifest?.assets) {
+      fs.mkdirSync(paths.stagedRestoreAssetsPath, { recursive: true });
+      const sourceAssetsPath = path.join(backupFolderPath, sourceManifest.assets.directory || ASSET_DIRECTORY);
+      if (fs.existsSync(sourceAssetsPath) && fs.statSync(sourceAssetsPath).isDirectory()) {
+        fs.cpSync(sourceAssetsPath, paths.stagedRestoreAssetsPath, { recursive: true, force: true, errorOnExist: false });
+      }
+    }
+
     writePendingOperation(paths, { version: 1, kind: "restore", createdAt: new Date().toISOString() });
     scheduleRelaunch();
 
@@ -609,6 +688,7 @@ async function prepareRestore(userDataPath: string, backupId: string): Promise<D
   } catch (error) {
     removeIfExists(paths.markerPath);
     removeIfExists(paths.stagedRestorePath);
+    removeDirectoryIfExists(paths.stagedRestoreAssetsPath);
     return { ok: false, message: `Geri yükleme hazırlanamadı: ${errorMessage(error)}` };
   }
 }
