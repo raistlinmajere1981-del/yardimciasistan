@@ -29,6 +29,7 @@ export interface SaveCatalogProductInput {
   id?: string;
   categoryId?: string;
   name: string;
+  brand?: string;
   sku?: string;
   barcode?: string;
   description?: string;
@@ -40,6 +41,12 @@ export interface SaveCatalogProductInput {
   trackInventory?: boolean;
   isActive?: boolean;
   minimumQuantity?: number;
+  imageSourceUrl?: string;
+  dataSource?: string;
+  sourceProductUrl?: string;
+  dataLicense?: string;
+  imageLicense?: string;
+  sourceFetchedAt?: string;
 }
 
 export interface ApplyInventoryMovementInput {
@@ -160,6 +167,7 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
     businessId: String(row.business_id ?? ""),
     categoryId: String(row.category_id ?? ""),
     name: String(row.name ?? ""),
+    brand: String(row.brand ?? ""),
     sku: String(row.sku ?? ""),
     barcode: String(row.barcode ?? ""),
     description: String(row.description ?? ""),
@@ -170,6 +178,13 @@ function mapProduct(row: Record<string, unknown>): CatalogProduct {
     taxRate: Number(row.tax_rate ?? 0),
     trackInventory: Number(row.track_inventory ?? 0) === 1,
     isActive: Number(row.is_active ?? 0) === 1,
+    imageAssetPath: String(row.image_asset_path ?? ""),
+    imageSourceUrl: String(row.image_source_url ?? ""),
+    dataSource: String(row.data_source ?? ""),
+    sourceProductUrl: String(row.source_product_url ?? ""),
+    dataLicense: String(row.data_license ?? ""),
+    imageLicense: String(row.image_license ?? ""),
+    sourceFetchedAt: String(row.source_fetched_at ?? ""),
     createdAt: String(row.created_at ?? ""),
     updatedAt: String(row.updated_at ?? "")
   };
@@ -382,8 +397,8 @@ export function listCatalogProducts(
     }
     if (search) {
       const pattern = `%${search}%`;
-      conditions.push("(name LIKE ? COLLATE NOCASE OR sku LIKE ? COLLATE NOCASE OR barcode LIKE ? COLLATE NOCASE)");
-      params.push(pattern, pattern, pattern);
+      conditions.push("(name LIKE ? COLLATE NOCASE OR brand LIKE ? COLLATE NOCASE OR sku LIKE ? COLLATE NOCASE OR barcode LIKE ? COLLATE NOCASE)");
+      params.push(pattern, pattern, pattern, pattern);
     }
     params.push(normalizeLimit(options.limit));
 
@@ -431,9 +446,31 @@ export function saveCatalogProductInTransaction(
   const existing = getProductRow(database, businessId, id);
   if (input.id && !existing) throw new Error("Düzenlenecek ürün bulunamadı.");
 
+  const brand = input.brand === undefined
+    ? String(existing?.brand ?? "").trim().slice(0, 160)
+    : String(input.brand ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
   const sku = String(input.sku ?? "").trim().slice(0, 80);
   const barcode = String(input.barcode ?? "").trim().slice(0, 80);
   const description = String(input.description ?? "").trim().slice(0, 2000);
+  const imageAssetPath = String(existing?.image_asset_path ?? "").trim().slice(0, 500);
+  const imageSourceUrl = input.imageSourceUrl === undefined
+    ? String(existing?.image_source_url ?? "").trim().slice(0, 1200)
+    : String(input.imageSourceUrl ?? "").trim().slice(0, 1200);
+  const dataSource = input.dataSource === undefined
+    ? String(existing?.data_source ?? "").trim().slice(0, 80)
+    : String(input.dataSource ?? "").trim().slice(0, 80);
+  const sourceProductUrl = input.sourceProductUrl === undefined
+    ? String(existing?.source_product_url ?? "").trim().slice(0, 1200)
+    : String(input.sourceProductUrl ?? "").trim().slice(0, 1200);
+  const dataLicense = input.dataLicense === undefined
+    ? String(existing?.data_license ?? "").trim().slice(0, 80)
+    : String(input.dataLicense ?? "").trim().slice(0, 80);
+  const imageLicense = input.imageLicense === undefined
+    ? String(existing?.image_license ?? "").trim().slice(0, 80)
+    : String(input.imageLicense ?? "").trim().slice(0, 80);
+  const sourceFetchedAt = input.sourceFetchedAt === undefined
+    ? String(existing?.source_fetched_at ?? "").trim().slice(0, 80)
+    : String(input.sourceFetchedAt ?? "").trim().slice(0, 80);
   const salePrice = Math.max(0, roundMoney(Number(input.salePrice ?? 0)));
   const purchasePrice = Math.max(0, roundMoney(Number(input.purchasePrice ?? 0)));
   const currency = normalizeCurrency(input.currency);
@@ -446,13 +483,16 @@ export function saveCatalogProductInTransaction(
   try {
     database.prepare(`
       INSERT INTO catalog_products (
-        id, business_id, category_id, name, sku, barcode, description,
+        id, business_id, category_id, name, brand, sku, barcode, description,
         sale_price, purchase_price, currency, unit, tax_rate,
-        track_inventory, is_active, created_at, updated_at, deleted_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+        track_inventory, is_active, image_asset_path, image_source_url,
+        data_source, source_product_url, data_license, image_license, source_fetched_at,
+        created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
       ON CONFLICT(id) DO UPDATE SET
         category_id = excluded.category_id,
         name = excluded.name,
+        brand = excluded.brand,
         sku = excluded.sku,
         barcode = excluded.barcode,
         description = excluded.description,
@@ -463,12 +503,21 @@ export function saveCatalogProductInTransaction(
         tax_rate = excluded.tax_rate,
         track_inventory = excluded.track_inventory,
         is_active = excluded.is_active,
+        image_asset_path = excluded.image_asset_path,
+        image_source_url = excluded.image_source_url,
+        data_source = excluded.data_source,
+        source_product_url = excluded.source_product_url,
+        data_license = excluded.data_license,
+        image_license = excluded.image_license,
+        source_fetched_at = excluded.source_fetched_at,
         updated_at = excluded.updated_at,
         deleted_at = ''
     `).run(
-      id, businessId, categoryId, name, sku, barcode, description,
+      id, businessId, categoryId, name, brand, sku, barcode, description,
       salePrice, purchasePrice, currency, unit, taxRate,
       trackInventory ? 1 : 0, isActive ? 1 : 0,
+      imageAssetPath, imageSourceUrl, dataSource, sourceProductUrl,
+      dataLicense, imageLicense, sourceFetchedAt,
       String(existing?.created_at ?? now), now
     );
 
