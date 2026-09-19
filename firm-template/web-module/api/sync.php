@@ -1507,7 +1507,7 @@ function ya_sync_empty_android_market(): array
         'products' => [],
         'suppliers' => [],
         'recent_purchases' => [],
-        'product_drafts' => [],
+
         'cart_drafts' => []
     ];
 }
@@ -1605,36 +1605,6 @@ function ya_sync_sanitize_android_market(mixed $value): array
         ];
     }
 
-    $productDrafts = [];
-    foreach (array_slice(is_array($market['product_drafts'] ?? null) ? $market['product_drafts'] : [], 0, 100) as $rawDraft) {
-        if (!is_array($rawDraft)) {
-            continue;
-        }
-        $id = mb_substr(ya_sync_string($rawDraft['id'] ?? ''), 0, 220);
-        $name = mb_substr(ya_sync_string($rawDraft['proposed_name'] ?? ''), 0, 240);
-        $status = ya_sync_string($rawDraft['status'] ?? 'pending');
-        if ($id === '' || $name === '' || !in_array($status, ['pending', 'reviewed'], true)) {
-            continue;
-        }
-        $productDrafts[] = [
-            'id' => $id,
-            'barcode' => mb_substr(ya_sync_string($rawDraft['barcode'] ?? ''), 0, 120),
-            'proposed_name' => $name,
-            'sku' => mb_substr(ya_sync_string($rawDraft['sku'] ?? ''), 0, 120),
-            'proposed_category' => mb_substr(ya_sync_string($rawDraft['proposed_category'] ?? ''), 0, 180),
-            'proposed_purchase_price' => max(0, ya_sync_float($rawDraft['proposed_purchase_price'] ?? 0, 0)),
-            'proposed_sale_price' => max(0, ya_sync_float($rawDraft['proposed_sale_price'] ?? 0, 0)),
-            'currency' => mb_substr(ya_sync_string($rawDraft['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
-            'unit' => ya_sync_commerce_unit($rawDraft['unit'] ?? 'piece'),
-            'note' => mb_substr(ya_sync_string($rawDraft['note'] ?? ''), 0, 2000),
-            'source' => mb_substr(ya_sync_string($rawDraft['source'] ?? ''), 0, 80),
-            'created_by_device' => mb_substr(ya_sync_string($rawDraft['created_by_device'] ?? ''), 0, 120),
-            'status' => $status,
-            'created_at' => ya_sync_string($rawDraft['created_at'] ?? ''),
-            'updated_at' => ya_sync_string($rawDraft['updated_at'] ?? '')
-        ];
-    }
-
     $cartDrafts = [];
     foreach (array_slice(is_array($market['cart_drafts'] ?? null) ? $market['cart_drafts'] : [], 0, 100) as $rawDraft) {
         if (!is_array($rawDraft)) {
@@ -1690,7 +1660,7 @@ function ya_sync_sanitize_android_market(mixed $value): array
         'products' => $products,
         'suppliers' => $suppliers,
         'recent_purchases' => $purchases,
-        'product_drafts' => $productDrafts,
+
         'cart_drafts' => $cartDrafts
     ];
 }
@@ -1707,9 +1677,6 @@ function ya_sync_android_market_for_permissions(array $market, array $permission
     if (in_array('market.receiving', $permissions, true)) {
         $result['suppliers'] = $market['suppliers'];
         $result['recent_purchases'] = $market['recent_purchases'];
-    }
-    if (in_array('market.product_create', $permissions, true)) {
-        $result['product_drafts'] = $market['product_drafts'];
     }
     if (in_array('market.cart_draft', $permissions, true)) {
         $result['cart_drafts'] = $market['cart_drafts'];
