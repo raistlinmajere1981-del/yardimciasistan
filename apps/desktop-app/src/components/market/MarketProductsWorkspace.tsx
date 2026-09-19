@@ -2,9 +2,9 @@ import { Plus, Save, Search } from "lucide-react";
 import { useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
-   type CatalogCategory,
+  type CatalogCategory,
   type CatalogProduct,
-   type CommerceUnit
+  type CommerceUnit
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
