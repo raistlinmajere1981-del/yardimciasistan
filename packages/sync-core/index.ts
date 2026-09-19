@@ -420,7 +420,7 @@ export const ANDROID_PERMISSIONS = [
   "market.product.view",
   "market.stock_count",
   "market.receiving",
-  "market.product_draft",
+  "market.product_create",
   "market.cart_draft",
   "market.scan_to_desktop"
 ] as const;
@@ -489,7 +489,7 @@ export const ANDROID_PERMISSION_GROUP_PERMISSIONS: Readonly<Record<AndroidPermis
     "market.product.view",
     "market.stock_count",
     "market.receiving",
-    "market.product_draft",
+    "market.product_create",
     "market.cart_draft",
     "market.scan_to_desktop"
   ]
@@ -602,7 +602,7 @@ export const ANDROID_PERMISSION_CAPABILITY_REQUIREMENTS: Readonly<Record<Android
   "market.product.view": { allOf: [C.CATALOG] },
   "market.stock_count": { allOf: [C.INVENTORY] },
   "market.receiving": { allOf: [C.RETAIL_PURCHASING] },
-  "market.product_draft": { allOf: [C.CATALOG] },
+  "market.product_create": { allOf: [C.CATALOG] },
   "market.cart_draft": { allOf: [C.SALES, C.CATALOG] },
   "market.scan_to_desktop": { allOf: [C.RETAIL_BARCODE, C.CATALOG, C.SALES] }
 };
@@ -988,7 +988,7 @@ export const ANDROID_ACTION_TYPES = [
   "menu_stock_image_import_apply",
   "market_stock_count",
   "market_purchase_receive",
-  "market_product_draft_create",
+  "market_product_create",
   "market_cart_draft_create",
   "market_barcode_scan"
 ] as const;
@@ -1028,15 +1028,16 @@ export interface AndroidMarketPurchaseReceivePayload {
   }>;
 }
 
-export interface AndroidMarketProductDraftCreatePayload {
+export interface AndroidMarketProductCreatePayload {
   barcode: string;
-  proposed_name: string;
+  name: string;
   sku?: string;
-  proposed_category?: string;
-  proposed_purchase_price?: number;
-  proposed_sale_price?: number;
+  category?: string;
+  purchase_price?: number;
+  sale_price?: number;
   currency?: string;
   unit?: string;
+  track_inventory?: boolean;
   note?: string;
 }
 
@@ -1120,7 +1121,7 @@ export const ANDROID_ACTION_PERMISSION_MAP: Partial<Record<AndroidActionType, An
   menu_stock_image_import_apply: "menu.stock_update",
   market_stock_count: "market.stock_count",
   market_purchase_receive: "market.receiving",
-  market_product_draft_create: "market.product_draft",
+  market_product_create: "market.product_create",
   market_cart_draft_create: "market.cart_draft",
   market_barcode_scan: "market.scan_to_desktop"
 };
