@@ -23,6 +23,7 @@ export interface DesktopBackupListItem {
   folderPath: string;
   databaseFileName: string;
   imageCount: number;
+  assetFileCount: number;
   sizeBytes: number;
 }
 
@@ -329,6 +330,7 @@ function readBackupItem(folderPath: string): DesktopBackupListItem | null {
     folderPath,
     databaseFileName: manifest?.databaseFile || BACKUP_DATABASE_FILE,
     imageCount: manifest?.qrMenuImages?.count ?? fallbackImageCount,
+    assetFileCount: manifest?.assets?.fileCount ?? directoryFileCount(path.join(folderPath, ASSET_DIRECTORY)),
     sizeBytes: directorySize(folderPath)
   };
 }
