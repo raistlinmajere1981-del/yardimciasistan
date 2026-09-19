@@ -156,6 +156,7 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
 
   const product = saveCatalogProductInTransaction(context.db, {
     name,
+    brand: text(payload.brand),
     barcode,
     sku: text(payload.sku),
     categoryId,
@@ -167,7 +168,13 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
     taxRate: 0,
     trackInventory,
     minimumQuantity: 0,
-    isActive: true
+    isActive: true,
+    imageSourceUrl: text(payload.image_source_url),
+    dataSource: text(payload.data_source),
+    sourceProductUrl: text(payload.source_product_url),
+    dataLicense: text(payload.data_license),
+    imageLicense: text(payload.image_license),
+    sourceFetchedAt: text(payload.source_fetched_at)
   }, context.now);
 
   context.insertEvent("market.product_created", "catalog_product", product.id, {
@@ -175,6 +182,8 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
     device_id: context.action.device_id,
     barcode: product.barcode,
     name: product.name,
+    brand: product.brand,
+    data_source: product.dataSource,
     category_name: categoryName,
     category_matched: Boolean(categoryId)
   });
