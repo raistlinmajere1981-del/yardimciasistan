@@ -11,6 +11,7 @@ import {
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { StatusBadge } from "../ui/StatusBadge";
+import { MarketProductThumbnail } from "./MarketProductThumbnail";
 
 interface ProductFormState {
   id: string;
@@ -423,6 +424,7 @@ export function MarketProductsWorkspace({
         <div className="market-list">
           {filteredProducts.map((product) => (
             <button type="button" className="market-list-row" key={product.id} onClick={() => void editProduct(product)}>
+              <MarketProductThumbnail product={product} className="market-list-product-thumb" />
               <span>
                 <strong>{product.name}</strong>
                 <small>{product.brand ? `${product.brand} · ` : ""}{product.sku || "SKU yok"} · {product.barcode || "Barkod yok"}</small>
