@@ -196,13 +196,15 @@ export function MarketQuickSaleWorkspace({
     try {
       const product = await bridge.findProductByBarcode(barcode);
       if (!product || !product.isActive) {
-        const lookup = await bridge.lookupExternalProductByBarcode(barcode, "automatic");
-        if (lookup.status === "found") {
-          const message = `${lookup.product.name} bulundu; ürün kartı hazırlanıyor.`;
-          setBarcodeMessage(message);
-          onStateChange("success", message);
-          onExternalProductFound?.(lookup.product);
-          return;
+        if (typeof bridge.lookupExternalProductByBarcode === "function") {
+          const lookup = await bridge.lookupExternalProductByBarcode(barcode, "automatic");
+          if (lookup.status === "found") {
+            const message = `${lookup.product.name} bulundu; ürün kartı hazırlanıyor.`;
+            setBarcodeMessage(message);
+            onStateChange("success", message);
+            onExternalProductFound?.(lookup.product);
+            return;
+          }
         }
         const message = `Barkod bulunamadı: ${barcode}`;
         setBarcodeMessage(message);
