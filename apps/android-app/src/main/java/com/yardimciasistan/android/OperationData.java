@@ -610,6 +610,7 @@ final class OperationData {
   }
 
   static final class MarketSnapshot {
+    MarketProductDataSettings productData = new MarketProductDataSettings();
     MarketSummary summary = new MarketSummary();
     final List<MarketProduct> products = new ArrayList<>();
     final List<MarketSupplier> suppliers = new ArrayList<>();
@@ -618,12 +619,29 @@ final class OperationData {
 
     static MarketSnapshot fromJson(JSONObject source) {
       MarketSnapshot market = new MarketSnapshot();
+      market.productData = MarketProductDataSettings.fromJson(object(source, "product_data"));
       market.summary = MarketSummary.fromJson(object(source, "summary"));
       addRecords(array(source, "products"), market.products, MarketProduct::fromJson);
       addRecords(array(source, "suppliers"), market.suppliers, MarketSupplier::fromJson);
       addRecords(array(source, "recent_purchases"), market.recentPurchases, MarketPurchase::fromJson);
       addRecords(array(source, "cart_drafts"), market.cartDrafts, MarketCartDraft::fromJson);
       return market;
+    }
+  }
+
+  static final class MarketProductDataSettings {
+    boolean enabled;
+    String provider = "open_food_facts";
+    boolean autoSearchUnknownBarcode;
+    boolean includeImages;
+
+    static MarketProductDataSettings fromJson(JSONObject source) {
+      MarketProductDataSettings settings = new MarketProductDataSettings();
+      settings.enabled = source.optBoolean("enabled", false);
+      settings.provider = value(source, "provider", "open_food_facts");
+      settings.autoSearchUnknownBarcode = source.optBoolean("auto_search_unknown_barcode", false);
+      settings.includeImages = source.optBoolean("include_images", false);
+      return settings;
     }
   }
 
