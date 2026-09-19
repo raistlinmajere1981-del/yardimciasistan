@@ -260,6 +260,13 @@ export interface AndroidMarketSummary {
   recent_receiving_count: number;
 }
 
+export interface AndroidMarketProductDataSettings {
+  enabled: boolean;
+  provider: string;
+  auto_search_unknown_barcode: boolean;
+  include_images: boolean;
+}
+
 export interface AndroidMarketProduct {
   id: string;
   name: string;
@@ -311,6 +318,7 @@ export interface AndroidMarketCartDraft {
 }
 
 export interface AndroidMarketSnapshot {
+  product_data: AndroidMarketProductDataSettings;
   summary: AndroidMarketSummary;
   products: AndroidMarketProduct[];
   suppliers: AndroidMarketSupplier[];
@@ -1016,6 +1024,7 @@ export interface AndroidMarketPurchaseReceivePayload {
 export interface AndroidMarketProductCreatePayload {
   barcode: string;
   name: string;
+  brand?: string;
   sku?: string;
   category?: string;
   purchase_price?: number;
@@ -1024,6 +1033,12 @@ export interface AndroidMarketProductCreatePayload {
   unit?: string;
   track_inventory?: boolean;
   note?: string;
+  image_source_url?: string;
+  data_source?: string;
+  source_product_url?: string;
+  data_license?: string;
+  image_license?: string;
+  source_fetched_at?: ISODateTimeString | "";
 }
 
 export interface AndroidMarketCartDraftCreatePayload {
