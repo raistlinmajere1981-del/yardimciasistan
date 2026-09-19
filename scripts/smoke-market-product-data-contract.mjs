@@ -16,6 +16,13 @@ const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWo
 const products = read("apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx");
 const maintenance = read("apps/desktop-app/electron/data-maintenance.ts");
 const dataPaths = read("apps/desktop-app/electron/data-paths.ts");
+const androidSnapshot = read("apps/desktop-app/electron/market-android-snapshot.ts");
+const androidActions = read("apps/desktop-app/electron/market-android-actions.ts");
+const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
+const androidOperationData = read("apps/android-app/src/main/java/com/yardimciasistan/android/OperationData.java");
+const androidWorkspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
+const androidLookupClient = read("apps/android-app/src/main/java/com/yardimciasistan/android/ProductDataLookupClient.java");
+const hostingSync = read("firm-template/web-module/api/sync.php");
 
 for (const column of [
   "brand TEXT NOT NULL DEFAULT ''",
@@ -79,5 +86,24 @@ assert.match(dataPaths, /assets[^\n]*products|DESKTOP_PRODUCTS_DIR_NAME = "produ
 assert.match(maintenance, /copyDurableAssets/);
 assert.match(maintenance, /stagedRestoreAssetsPath/);
 assert.match(maintenance, /replaceAssetsFromStagedRestore/);
+
+assert.match(androidSnapshot, /product_data/);
+assert.match(androidSnapshot, /product_data_auto_search/);
+assert.match(androidActions, /brand: text\(payload\.brand\)/);
+assert.match(androidActions, /imageSourceUrl: text\(payload\.image_source_url\)/);
+assert.match(syncCoordinator, /archiveAndroidProductImage/);
+assert.match(syncCoordinator, /archiveExternalProductImage/);
+
+assert.match(androidOperationData, /MarketProductDataSettings/);
+assert.match(androidOperationData, /auto_search_unknown_barcode/);
+assert.match(androidWorkspace, /onProductLookupRequested/);
+assert.match(androidWorkspace, /Ürün Bilgilerini Ara/);
+assert.match(androidWorkspace, /productCreateImagePreview/);
+assert.match(androidLookupClient, /world\.openfoodfacts\.org\/api\/v2\/product/);
+assert.match(androidLookupClient, /User-Agent/);
+assert.match(androidLookupClient, /image_front_url/);
+assert.match(androidLookupClient, /IMAGE_MAX_DIMENSION = 768/);
+assert.match(hostingSync, /'product_data'/);
+assert.match(hostingSync, /market\.product_create|market_product_create/);
 
 console.log("market-product-data-contract-smoke-ok");
