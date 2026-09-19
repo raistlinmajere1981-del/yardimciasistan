@@ -44,7 +44,7 @@ public final class AndroidMarketUiTest {
     assertFalse(MarketUiRules.canViewSummary(data));
     assertFalse(MarketUiRules.canStockCount(data));
     assertFalse(MarketUiRules.canReceive(data));
-    assertFalse(MarketUiRules.canCreateProductDraft(data));
+    assertFalse(MarketUiRules.canCreateProduct(data));
     assertFalse(MarketUiRules.canCreateCartDraft(data));
 
     data.permissions.add(MarketUiRules.PERMISSION_SUMMARY);
@@ -53,8 +53,8 @@ public final class AndroidMarketUiTest {
     assertTrue(MarketUiRules.canStockCount(data));
     data.permissions.add(MarketUiRules.PERMISSION_RECEIVING);
     assertTrue(MarketUiRules.canReceive(data));
-    data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_DRAFT);
-    assertTrue(MarketUiRules.canCreateProductDraft(data));
+    data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_CREATE);
+    assertTrue(MarketUiRules.canCreateProduct(data));
     data.permissions.add(MarketUiRules.PERMISSION_CART_DRAFT);
     assertTrue(MarketUiRules.canCreateCartDraft(data));
 
@@ -127,13 +127,13 @@ public final class AndroidMarketUiTest {
   public void knownAndUnknownBarcodesResolveWithoutInventingProducts() {
     OperationData data = marketDataWithProducts();
     data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_VIEW);
-    data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_DRAFT);
+    data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_CREATE);
 
     OperationData.MarketProduct product = MarketUiRules.resolveBarcode(data, " 8690000000001 ");
     assertNotNull(product);
     assertEquals("Test Kola 330 ml", product.name);
     assertNull(MarketUiRules.resolveBarcode(data, "8699999999999"));
-    assertTrue(MarketUiRules.canCreateProductDraft(data));
+    assertTrue(MarketUiRules.canCreateProduct(data));
   }
 
   @Test
@@ -190,8 +190,8 @@ public final class AndroidMarketUiTest {
   }
 
   @Test
-  public void productDraftUsesReviewSemanticsAndFoundationFields() throws Exception {
-    JSONObject payload = MarketUiRules.productDraftPayload(
+  public void productCreatePayloadUsesDirectCatalogFields() throws Exception {
+    JSONObject payload = MarketUiRules.productCreatePayload(
         "8690000000999",
         "Yeni ürün",
         "SKU-9",
@@ -199,12 +199,15 @@ public final class AndroidMarketUiTest {
         "4,5",
         "7,5",
         "Atıştırmalık",
-        "Masaüstünde kontrol"
+        "Telefon kaydı"
     );
 
-    assertEquals("Yeni ürün", payload.getString("proposed_name"));
-    assertEquals(4.5, payload.getDouble("proposed_purchase_price"), 0);
-    assertEquals(7.5, payload.getDouble("proposed_sale_price"), 0);
+    assertEquals("Yeni ürün", payload.getString("name"));
+    assertEquals(4.5, payload.getDouble("purchase_price"), 0);
+    assertEquals(7.5, payload.getDouble("sale_price"), 0);
+    assertEquals("Atıştırmalık", payload.getString("category"));
+    assertTrue(payload.getBoolean("track_inventory"));
+    assertFalse(payload.has("proposed_name"));
     assertFalse(payload.has("photo"));
     assertFalse(payload.has("image"));
   }
