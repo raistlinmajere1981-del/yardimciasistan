@@ -92,7 +92,6 @@ try {
     recordCustomerCreditPayment: runtime.recordCustomerCreditPayment,
     addCustomerCreditAdjustment: runtime.addCustomerCreditAdjustment,
     listCartDrafts: runtime.listMarketCartDrafts,
-    listProductDrafts: runtime.listMarketProductDrafts,
     loadCartDraftForQuickSale: runtime.loadMarketCartDraftForQuickSale,
     markCartDraftReviewed: runtime.markMarketCartDraftReviewed,
     findProductByBarcode: runtime.findRuntimeProductByBarcode
@@ -329,7 +328,7 @@ try {
   // Real M7 cart draft loads into the same cart and closes after a credit sale.
   const draft = runtime.createMarketCartDraft(path, { lines: [{ productId: product.id, quantity: 2 }], source: "android", createdByDevice: "Test Telefonu" });
   await page.getByRole("navigation", { name: "Çalışma alanı" }).getByRole("button", { name: "Market", exact: true }).click();
-  await page.getByRole("button", { name: /Telefon Taslakları Ürün önerileri/ }).click();
+  await page.getByRole("button", { name: /Telefon Sepetleri/ }).click();
   await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
   await expect(quick.locator(".market-sale-cart-line")).toHaveCount(1);
   await quick.getByLabel("Ödeme yöntemi").selectOption("credit");
