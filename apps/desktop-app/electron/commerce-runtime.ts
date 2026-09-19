@@ -68,14 +68,12 @@ export {
   getMarketCartDraft,
   loadMarketCartDraftForQuickSale,
   listMarketCartDrafts,
-  markMarketCartDraftReviewed,
-  markMarketProductDraftReviewed
+  markMarketCartDraftReviewed
 } from "./market-companion-runtime";
 export type {
   ConsumePendingMarketBarcodeScansOptions,
   CreateMarketCartDraftInput,
-  ListMarketCartDraftsOptions,
-  ListMarketProductDraftsOptions
+  ListMarketCartDraftsOptions
 } from "./market-companion-runtime";
 
 export interface InventoryCountResult {
