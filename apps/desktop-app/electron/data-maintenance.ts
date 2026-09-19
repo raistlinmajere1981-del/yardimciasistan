@@ -23,7 +23,7 @@ export interface DesktopBackupListItem {
   folderPath: string;
   databaseFileName: string;
   imageCount: number;
-  assetFileCount: number;
+  assetFileCount?: number;
   sizeBytes: number;
 }
 
