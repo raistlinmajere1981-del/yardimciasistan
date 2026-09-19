@@ -25,9 +25,7 @@ import {
   listRuntimePurchaseOrders,
   listRuntimeSuppliers,
   listMarketCartDrafts,
-  listMarketProductDrafts,
   markMarketCartDraftReviewed,
-  markMarketProductDraftReviewed,
   receiveRuntimePurchase,
   saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct,
@@ -122,12 +120,6 @@ export function registerCommerceIpcHandlers(options: {
     mutate(() => addCustomerCreditAdjustment(databasePath(), input))
   );
 
-  ipcMain.handle("commerce:productDraft:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listProductDrafts"]>[0]) =>
-    read(() => listMarketProductDrafts(databasePath(), optionsArg))
-  );
-  ipcMain.handle("commerce:productDraft:markReviewed", (_event, draftId: string) =>
-    mutate(() => markMarketProductDraftReviewed(databasePath(), draftId))
-  );
   ipcMain.handle("commerce:cartDraft:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listCartDrafts"]>[0]) =>
     read(() => listMarketCartDrafts(databasePath(), optionsArg))
   );
