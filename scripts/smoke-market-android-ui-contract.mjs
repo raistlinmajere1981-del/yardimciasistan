@@ -66,6 +66,7 @@ for (const label of [
 }
 
 assert.match(workspace, /MarketUiRules\.canScanBarcode\(data\)/);
+assert.match(workspace, /normalizeBarcodeIdentity/);
 assert.match(workspace, /MarketUiRules\.canLookupProductData\(data\)/);
 assert.match(workspace, /onProductLookupRequested/);
 assert.match(productLookup, /world\.openfoodfacts\.org\/api\/v2\/product/);
@@ -111,6 +112,7 @@ for (const coverage of [
   "productDataLookupRequiresServiceAndProductCreatePermission",
   "cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities",
   "continuousBarcodeCaptureCreatesActionWithoutConfirmationAndDebounces",
+  "manualNumericBarcodeSeparatorsAreRemovedWithoutChangingAlphanumericCodes",
   "cameraBarcodeGateRequiresBarcodeToLeaveFrameBeforeRepeating",
   "knownAndUnknownBarcodesResolveWithoutInventingProducts",
   "stockCountPayloadCarriesAbsoluteQuantityAndNoDelta",
