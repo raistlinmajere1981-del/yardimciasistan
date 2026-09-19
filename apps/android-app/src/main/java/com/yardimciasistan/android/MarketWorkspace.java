@@ -1015,10 +1015,7 @@ final class MarketWorkspace {
     }
 
     if (productCreateImagePreview != null) {
-      ImageView preview = new ImageView(context);
-      preview.setImageBitmap(productCreateImagePreview);
-      preview.setAdjustViewBounds(true);
-      preview.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+      ImageView preview = productImageView(productCreateImagePreview, 180);
       LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(-1, dp(180));
       previewParams.setMargins(0, dp(4), 0, dp(10));
       preview.setLayoutParams(previewParams);
@@ -1064,7 +1061,9 @@ final class MarketWorkspace {
     bind(note, productCreateNote, value -> productCreateNote = value);
 
     Button submit = UiKit.button(context, "Ürünü Kaydet", UiKit.PRIMARY, view -> submitProductCreate());
-    submit.setEnabled(!submissionBlocked());
+    // Product creation is already outbox-safe. Another pending Market action must
+    // not lock this form; only wait for the active product-data lookup to finish.
+    submit.setEnabled(!productLookupLoading);
     submit.setLayoutParams(fullButtonParams(54, 4, 0));
     page.addView(submit);
     return page;
@@ -1420,12 +1419,8 @@ final class MarketWorkspace {
     String key = productImageKey(product.id, product.imageSourceUrl);
     Bitmap preview = productImagePreviews.get(key);
     if (preview != null) {
-      ImageView image = new ImageView(context);
-      image.setImageBitmap(preview);
-      image.setAdjustViewBounds(true);
-      image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-      image.setBackground(UiKit.rounded(context, UiKit.SURFACE, UiKit.BORDER, 10));
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(160));
+      ImageView image = productImageView(preview, 168);
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(168));
       params.setMargins(0, 0, 0, dp(10));
       image.setLayoutParams(params);
       card.addView(image);
@@ -1434,6 +1429,17 @@ final class MarketWorkspace {
 
     if (productImageFailures.contains(key) || !productImageRequests.add(key)) return;
     listener.onProductImageRequested(product.id, product.dataSource, product.imageSourceUrl);
+  }
+
+  private ImageView productImageView(Bitmap bitmap, int heightDp) {
+    ImageView image = new ImageView(context);
+    image.setImageBitmap(bitmap);
+    image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+    image.setAdjustViewBounds(false);
+    image.setPadding(dp(14), dp(12), dp(14), dp(12));
+    image.setBackground(UiKit.rounded(context, UiKit.SURFACE_ALT, UiKit.BORDER, 12));
+    image.setMinimumHeight(dp(heightDp));
+    return image;
   }
 
   private View messageCard(String message, boolean pending) {
