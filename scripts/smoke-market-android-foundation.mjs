@@ -123,6 +123,12 @@ try {
     aiTimeoutSeconds: 30,
     aiApiKey: "",
     clearAiApiKey: false,
+    productData: {
+      enabled: true,
+      provider: "open_food_facts",
+      autoSearchUnknownBarcode: true,
+      includeImages: true
+    },
     servicePreferences: { whatsapp: true, android: true },
     initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
@@ -300,6 +306,7 @@ try {
       {
         barcode: "8690000007199",
         name: "Bilinmeyen Barkod Ürünü",
+        brand: "Smoke Brand",
         sku: "M71-PHONE",
         category: "Atıştırmalık",
         purchase_price: 4.5,
@@ -307,20 +314,34 @@ try {
         currency: "TRY",
         unit: "piece",
         track_inventory: true,
-        note: "Raf üzerinde bulundu"
+        note: "Ambalaj: 330 ml",
+        image_source_url: "https://images.openfoodfacts.org/images/products/869/000/000/7199/front_tr.1.400.jpg",
+        data_source: "open_food_facts",
+        source_product_url: "https://world.openfoodfacts.org/product/8690000007199",
+        data_license: "ODbL",
+        image_license: "CC BY-SA",
+        source_fetched_at: "2026-09-19T12:00:00.000Z"
       }
     ));
     assert.equal(productCreateResult.ok, true, productCreateResult.message);
     assert.equal(activeProductCount(sqlite), productsBeforeCreate + 1);
     const actionProduct = sqlite.prepare(`
-      SELECT name, sku, barcode, purchase_price, sale_price, unit, track_inventory
+      SELECT name, brand, sku, barcode, purchase_price, sale_price, unit, track_inventory,
+             image_asset_path, image_source_url, data_source, source_product_url,
+             data_license, image_license, source_fetched_at
       FROM catalog_products
       WHERE barcode = ? AND deleted_at = ''
       LIMIT 1
     `).get("8690000007199");
     assert.ok(actionProduct);
     assert.equal(actionProduct.name, "Bilinmeyen Barkod Ürünü");
+    assert.equal(actionProduct.brand, "Smoke Brand");
     assert.equal(actionProduct.sku, "M71-PHONE");
+    assert.equal(actionProduct.data_source, "open_food_facts");
+    assert.equal(actionProduct.data_license, "ODbL");
+    assert.equal(actionProduct.image_license, "CC BY-SA");
+    assert.equal(actionProduct.image_asset_path, "");
+    assert.match(String(actionProduct.image_source_url), /openfoodfacts\.org/);
     assert.equal(actionProduct.purchase_price, 4.5);
     assert.equal(actionProduct.sale_price, 7.5);
     assert.equal(actionProduct.unit, "piece");
@@ -379,6 +400,10 @@ try {
     });
     const today = String(sqlite.prepare("SELECT date('now', 'localtime') AS today").get().today);
     const sourceSnapshot = createAndroidMarketSnapshotSource(database.databasePath, today);
+    assert.equal(sourceSnapshot.product_data.enabled, true);
+    assert.equal(sourceSnapshot.product_data.provider, "open_food_facts");
+    assert.equal(sourceSnapshot.product_data.auto_search_unknown_barcode, true);
+    assert.equal(sourceSnapshot.product_data.include_images, true);
     assert.equal(sourceSnapshot.summary.today_sale_count, 1);
     assert.equal(sourceSnapshot.summary.today_sales_total, 20);
     assert.equal(sourceSnapshot.summary.critical_stock_count >= 1, true);
@@ -409,9 +434,18 @@ try {
     assert.equal("description" in projectedProduct, false);
 
     const fullProjection = projectAndroidMarketSnapshot(sourceSnapshot, new Set(marketCapabilities));
+    assert.equal(fullProjection.product_data.enabled, true);
+    assert.equal(fullProjection.product_data.provider, "open_food_facts");
     assert.equal(fullProjection.products.find((item) => item.id === product.id)?.barcode, product.barcode);
     assert.equal(fullProjection.suppliers.length, 1);
     assert.equal(fullProjection.recent_purchases.length, 1);
+
+    const withoutCatalog = projectAndroidMarketSnapshot(
+      sourceSnapshot,
+      capabilitySetWithout(C.CATALOG)
+    );
+    assert.equal(withoutCatalog.product_data.enabled, false);
+    assert.deepEqual(withoutCatalog.products, []);
 
     const withoutBarcode = projectAndroidMarketSnapshot(
       sourceSnapshot,
@@ -581,7 +615,9 @@ function assertMirroredTransportContracts() {
   }
   assert.match(hosting, /ya_sync_sanitize_android_market\(\$snapshot\['market'\]/);
   assert.match(hosting, /ya_sync_android_market_for_permissions/);
+  assert.match(hosting, /'product_data'/);
   assert.match(android, /data\.market\s*=\s*MarketSnapshot\.fromJson\(object\(root, "market"\)\)/);
+  assert.match(android, /MarketProductDataSettings/);
   for (const permission of MARKET_PERMISSIONS) {
     assert.equal(android.includes(`"${permission}"`), true, `${permission} Android parser listesinde yok`);
   }
