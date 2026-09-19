@@ -100,6 +100,7 @@ assert.match(gradle, /com\.google\.mlkit:barcode-scanning:/);
 assert.match(gradle, /testImplementation\s+"org\.json:json:/);
 
 for (const coverage of [
+  "legacyProductDraftPermissionMapsToDirectProductCreate",
   "pureMarketProfileOnlyExposesRelevantNavigation",
   "everyMarketCallToActionUsesItsEffectivePermission",
   "cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities",
