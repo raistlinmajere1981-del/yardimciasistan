@@ -14,6 +14,7 @@ const preload = read("apps/desktop-app/electron/preload.ts");
 const settings = read("apps/desktop-app/src/components/settings/SetupForm.tsx");
 const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
 const products = read("apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx");
+const productThumbnail = read("apps/desktop-app/src/components/market/MarketProductThumbnail.tsx");
 const maintenance = read("apps/desktop-app/electron/data-maintenance.ts");
 const dataPaths = read("apps/desktop-app/electron/data-paths.ts");
 const androidSnapshot = read("apps/desktop-app/electron/market-android-snapshot.ts");
@@ -76,6 +77,8 @@ assert.doesNotMatch(settings, /Ürün formunu bulunan bilgilerle doldur/);
 
 assert.match(quickSale, /lookupExternalProductByBarcode\(barcode, "automatic"\)/);
 assert.match(quickSale, /onExternalProductFound/);
+assert.match(quickSale, /MarketProductThumbnail/);
+assert.match(productThumbnail, /getProductImageDataUrl/);
 assert.match(products, /normalizeBarcodeIdentity\(productForm\.barcode/);
 assert.match(products, /lookupExternalProductByBarcode\(normalizedBarcode, "manual"\)/);
 assert.match(products, /Ürün Bilgilerini Ara/);
@@ -90,6 +93,8 @@ assert.match(maintenance, /replaceAssetsFromStagedRestore/);
 
 assert.match(androidSnapshot, /product_data/);
 assert.match(androidSnapshot, /product_data_auto_search/);
+assert.match(androidSnapshot, /image_source_url/);
+assert.match(androidSnapshot, /data_source/);
 assert.match(androidActions, /brand: text\(payload\.brand\)/);
 assert.match(androidActions, /imageSourceUrl: text\(payload\.image_source_url\)/);
 assert.match(syncCoordinator, /archiveAndroidProductImage/);
@@ -97,13 +102,18 @@ assert.match(syncCoordinator, /archiveExternalProductImage/);
 
 assert.match(androidOperationData, /MarketProductDataSettings/);
 assert.match(androidOperationData, /auto_search_unknown_barcode/);
+assert.match(androidOperationData, /imageSourceUrl/);
+assert.match(androidOperationData, /dataSource/);
 assert.match(androidWorkspace, /onProductLookupRequested/);
 assert.match(androidWorkspace, /Ürün Bilgilerini Ara/);
 assert.match(androidWorkspace, /productCreateImagePreview/);
+assert.match(androidWorkspace, /onProductImageRequested/);
+assert.match(androidWorkspace, /addProductImage/);
 assert.match(androidLookupClient, /world\.openfoodfacts\.org\/api\/v2\/product/);
 assert.match(androidLookupClient, /User-Agent/);
 assert.match(androidLookupClient, /image_front_url/);
 assert.match(androidLookupClient, /IMAGE_MAX_DIMENSION = 768/);
+assert.match(androidLookupClient, /previewImage/);
 assert.match(hostingSync, /'product_data'/);
 assert.match(hostingSync, /market\.product_create|market_product_create/);
 
