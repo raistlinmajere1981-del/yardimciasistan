@@ -423,7 +423,7 @@ export interface DesktopSetupData {
   aiApiKeyConfigured: boolean;
   aiLastPublishedAt: string;
   aiProfiles: DesktopAiServiceProfile[];
-  productData?: DesktopProductDataSettings;
+  productData: DesktopProductDataSettings;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;
@@ -457,7 +457,7 @@ export interface SaveInitialSetupInput {
   aiApiKey: string;
   clearAiApiKey: boolean;
   aiProfiles?: SaveAiServiceProfileInput[];
-  productData: DesktopProductDataSettings;
+  productData?: DesktopProductDataSettings;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;
