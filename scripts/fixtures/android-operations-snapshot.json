@@ -360,6 +360,12 @@
     }
   ],
   "market": {
+    "product_data": {
+      "enabled": false,
+      "provider": "open_food_facts",
+      "auto_search_unknown_barcode": false,
+      "include_images": false
+    },
     "summary": {
       "today_sale_count": 0,
       "today_sales_total": 0,
@@ -371,7 +377,6 @@
     "products": [],
     "suppliers": [],
     "recent_purchases": [],
-    "product_drafts": [],
     "cart_drafts": []
   },
   "updated_at": "2026-07-17T09:20:00+03:00"
