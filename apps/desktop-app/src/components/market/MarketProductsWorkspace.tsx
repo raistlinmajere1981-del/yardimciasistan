@@ -1,10 +1,11 @@
-import { Plus, Save, Search } from "lucide-react";
-import { useState } from "react";
+import { Image as ImageIcon, Plus, Save, Search, Sparkles } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
   type CatalogCategory,
   type CatalogProduct,
-  type CommerceUnit
+  type CommerceUnit,
+  type ProductLookupCandidate
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
@@ -14,6 +15,7 @@ interface ProductFormState {
   id: string;
   categoryId: string;
   name: string;
+  brand: string;
   sku: string;
   barcode: string;
   description: string;
@@ -25,6 +27,12 @@ interface ProductFormState {
   minimumQuantity: string;
   trackInventory: boolean;
   isActive: boolean;
+  imageSourceUrl: string;
+  dataSource: string;
+  sourceProductUrl: string;
+  dataLicense: string;
+  imageLicense: string;
+  sourceFetchedAt: string;
 }
 
 interface CategoryFormState {
@@ -36,12 +44,19 @@ interface CategoryFormState {
   isActive: boolean;
 }
 
+export interface ProductLookupFormRequest {
+  requestId: number;
+  product: ProductLookupCandidate;
+}
+
 interface MarketProductsWorkspaceProps {
   products: CatalogProduct[];
   categories: CatalogCategory[];
   busy: boolean;
   onReload: () => Promise<void>;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
+  productLookupRequest?: ProductLookupFormRequest | null;
+  onProductLookupLoaded?: (requestId: number) => void;
 }
 
 const unitLabels: Record<CommerceUnit, string> = {
@@ -61,6 +76,7 @@ function emptyProductForm(inventoryEnabled = true): ProductFormState {
     id: "",
     categoryId: "",
     name: "",
+    brand: "",
     sku: "",
     barcode: "",
     description: "",
@@ -71,7 +87,13 @@ function emptyProductForm(inventoryEnabled = true): ProductFormState {
     taxRate: "0",
     minimumQuantity: "0",
     trackInventory: inventoryEnabled,
-    isActive: true
+    isActive: true,
+    imageSourceUrl: "",
+    dataSource: "",
+    sourceProductUrl: "",
+    dataLicense: "",
+    imageLicense: "",
+    sourceFetchedAt: ""
   };
 }
 
@@ -87,12 +109,29 @@ function money(value: number, currency = "TRY") {
   }
 }
 
+function providerLabel(provider: string) {
+  return provider === "open_food_facts" ? "Open Food Facts" : provider || "Harici kaynak";
+}
+
+function matchingCategoryId(categories: CatalogCategory[], hint: string) {
+  const hints = hint
+    .split(",")
+    .map((value) => value.trim().toLocaleLowerCase("tr-TR"))
+    .filter(Boolean);
+  if (hints.length === 0) return "";
+  return categories.find((category) =>
+    category.isActive && hints.includes(category.name.trim().toLocaleLowerCase("tr-TR"))
+  )?.id ?? "";
+}
+
 export function MarketProductsWorkspace({
   products,
   categories,
   busy,
   onReload,
-  onStateChange
+  onStateChange,
+  productLookupRequest = null,
+  onProductLookupLoaded
 }: MarketProductsWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
   const { snapshot } = useBusinessCapabilityRuntime();
@@ -100,12 +139,50 @@ export function MarketProductsWorkspace({
   const [search, setSearch] = useState("");
   const [productForm, setProductForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [imagePreviewDataUrl, setImagePreviewDataUrl] = useState("");
+  const loadedLookupRequestId = useRef<number | null>(null);
+
   const filteredProducts = products.filter((product) => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     if (!needle) return true;
-    return [product.name, product.sku, product.barcode]
+    return [product.name, product.brand, product.sku, product.barcode]
       .some((value) => value.toLocaleLowerCase("tr-TR").includes(needle));
   });
+
+  function applyLookupCandidate(candidate: ProductLookupCandidate, reset = false) {
+    setImagePreviewDataUrl("");
+    setProductForm((current) => {
+      const base = reset ? emptyProductForm(inventoryEnabled) : current;
+      const matchedCategoryId = matchingCategoryId(categories, candidate.categoryHint);
+      const quantityDescription = candidate.quantity ? `Ambalaj: ${candidate.quantity}` : "";
+      return {
+        ...base,
+        barcode: candidate.barcode,
+        name: base.name.trim() ? base.name : candidate.name,
+        brand: base.brand.trim() ? base.brand : candidate.brand,
+        categoryId: base.categoryId || matchedCategoryId,
+        description: base.description.trim() ? base.description : quantityDescription,
+        imageSourceUrl: candidate.imageUrl,
+        dataSource: candidate.provider,
+        sourceProductUrl: candidate.sourceProductUrl,
+        dataLicense: candidate.dataLicense,
+        imageLicense: candidate.imageLicense,
+        sourceFetchedAt: candidate.fetchedAt
+      };
+    });
+  }
+
+  useEffect(() => {
+    if (!productLookupRequest || loadedLookupRequestId.current === productLookupRequest.requestId) return;
+    loadedLookupRequestId.current = productLookupRequest.requestId;
+    applyLookupCandidate(productLookupRequest.product, true);
+    onProductLookupLoaded?.(productLookupRequest.requestId);
+    onStateChange(
+      "success",
+      `${productLookupRequest.product.name} bilgileri Open Food Facts'tan bulundu. Satış fiyatı ve diğer yerel alanları kontrol edip kaydedin.`
+    );
+  }, [categories, inventoryEnabled, onProductLookupLoaded, onStateChange, productLookupRequest]);
 
   async function editProduct(product: CatalogProduct) {
     let minimumQuantity = "0";
@@ -122,6 +199,7 @@ export function MarketProductsWorkspace({
       id: product.id,
       categoryId: product.categoryId,
       name: product.name,
+      brand: product.brand,
       sku: product.sku,
       barcode: product.barcode,
       description: product.description,
@@ -132,8 +210,50 @@ export function MarketProductsWorkspace({
       taxRate: String(product.taxRate),
       minimumQuantity,
       trackInventory: product.trackInventory,
-      isActive: product.isActive
+      isActive: product.isActive,
+      imageSourceUrl: product.imageSourceUrl,
+      dataSource: product.dataSource,
+      sourceProductUrl: product.sourceProductUrl,
+      dataLicense: product.dataLicense,
+      imageLicense: product.imageLicense,
+      sourceFetchedAt: product.sourceFetchedAt
     });
+    setImagePreviewDataUrl("");
+    if (bridge && product.imageAssetPath) {
+      try {
+        setImagePreviewDataUrl(await bridge.getProductImageDataUrl(product.id));
+      } catch {
+        setImagePreviewDataUrl("");
+      }
+    }
+  }
+
+  async function lookupProductInfo() {
+    if (!bridge || !productForm.barcode.trim() || lookupBusy) return;
+    setLookupBusy(true);
+    onStateChange("loading", "Ürün bilgileri aranıyor…");
+    try {
+      const result = await bridge.lookupExternalProductByBarcode(productForm.barcode.trim(), "manual");
+      if (result.status === "disabled") {
+        onStateChange(
+          "error",
+          result.reason === "service_disabled"
+            ? "Ürün Verisi servisi kapalı. Ayarlar > Servisler bölümünden açabilirsiniz."
+            : "Otomatik arama kapalı."
+        );
+        return;
+      }
+      if (result.status === "not_found") {
+        onStateChange("error", `Bu barkod Open Food Facts üzerinde bulunamadı: ${result.barcode}`);
+        return;
+      }
+      applyLookupCandidate(result.product);
+      onStateChange("success", `${result.product.name} bilgileri bulundu.`);
+    } catch (error) {
+      onStateChange("error", error instanceof Error ? error.message : "Ürün bilgileri alınamadı.");
+    } finally {
+      setLookupBusy(false);
+    }
   }
 
   async function saveProduct() {
@@ -145,6 +265,7 @@ export function MarketProductsWorkspace({
         id: productForm.id || undefined,
         categoryId: productForm.categoryId,
         name: productForm.name,
+        brand: productForm.brand,
         sku: productForm.sku,
         barcode: productForm.barcode,
         description: productForm.description,
@@ -155,11 +276,36 @@ export function MarketProductsWorkspace({
         taxRate: Number(productForm.taxRate),
         minimumQuantity: Number(productForm.minimumQuantity),
         trackInventory: productForm.trackInventory,
-        isActive: productForm.isActive
+        isActive: productForm.isActive,
+        imageSourceUrl: productForm.imageSourceUrl,
+        dataSource: productForm.dataSource,
+        sourceProductUrl: productForm.sourceProductUrl,
+        dataLicense: productForm.dataLicense,
+        imageLicense: productForm.imageLicense,
+        sourceFetchedAt: productForm.sourceFetchedAt
       });
     } catch (error) {
       onStateChange("error", error instanceof Error ? error.message : "Ürün kaydedilemedi.");
       return;
+    }
+
+    setProductForm((current) => ({
+      ...current,
+      id: saved.id,
+      brand: saved.brand,
+      imageSourceUrl: saved.imageSourceUrl,
+      dataSource: saved.dataSource,
+      sourceProductUrl: saved.sourceProductUrl,
+      dataLicense: saved.dataLicense,
+      imageLicense: saved.imageLicense,
+      sourceFetchedAt: saved.sourceFetchedAt
+    }));
+    if (saved.imageAssetPath) {
+      try {
+        setImagePreviewDataUrl(await bridge.getProductImageDataUrl(saved.id));
+      } catch {
+        setImagePreviewDataUrl("");
+      }
     }
 
     let catalogReloadFailed = false;
@@ -170,7 +316,7 @@ export function MarketProductsWorkspace({
     }
     onStateChange(
       "success",
-      `${saved.name} kaydedildi.${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`
+      `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`
     );
   }
 
@@ -224,19 +370,23 @@ export function MarketProductsWorkspace({
         <header className="market-panel-heading market-panel-heading-row">
           <div><span>Katalog</span><h2>Ürünler</h2><p>Ürün kartları satış ve stok tarafından ortak kullanılır.</p></div>
           <button type="button" className="market-secondary-button" onClick={() => {
-                    setProductForm(emptyProductForm(inventoryEnabled));
+            setProductForm(emptyProductForm(inventoryEnabled));
+            setImagePreviewDataUrl("");
           }}>
             <Plus size={16} aria-hidden="true" /> Yeni ürün
           </button>
         </header>
         <label className="market-search-field">
           <Search size={16} aria-hidden="true" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad, SKU veya barkod ara" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Ad, marka, SKU veya barkod ara" />
         </label>
         <div className="market-list">
           {filteredProducts.map((product) => (
             <button type="button" className="market-list-row" key={product.id} onClick={() => void editProduct(product)}>
-              <span><strong>{product.name}</strong><small>{product.sku || "SKU yok"} · {product.barcode || "Barkod yok"}</small></span>
+              <span>
+                <strong>{product.name}</strong>
+                <small>{product.brand ? `${product.brand} · ` : ""}{product.sku || "SKU yok"} · {product.barcode || "Barkod yok"}</small>
+              </span>
               <span className="market-list-value">{money(product.salePrice, product.currency)}</span>
             </button>
           ))}
@@ -246,10 +396,31 @@ export function MarketProductsWorkspace({
 
       <section className="market-panel">
         <header className="market-panel-heading"><span>{productForm.id ? "Düzenle" : "Yeni kayıt"}</span><h2>Ürün Kartı</h2></header>
+
+        <div className="market-product-image-card">
+          {imagePreviewDataUrl ? (
+            <img src={imagePreviewDataUrl} alt={productForm.name ? `${productForm.name} ürün görseli` : "Ürün görseli"} />
+          ) : (
+            <div className="market-product-image-placeholder">
+              <ImageIcon size={28} aria-hidden="true" />
+              <span>{productForm.imageSourceUrl ? "Görsel bulundu; ürün kaydedildiğinde yerel arşive eklenecek." : "Ürün görseli yok"}</span>
+            </div>
+          )}
+        </div>
+
         <div className="market-form-grid">
           <label className="market-field market-field-wide">Ürün adı<input value={productForm.name} onChange={(event) => setProductForm((current) => ({ ...current, name: event.target.value }))} /></label>
+          <label className="market-field">Marka<input value={productForm.brand} onChange={(event) => setProductForm((current) => ({ ...current, brand: event.target.value }))} /></label>
           <label className="market-field">SKU<input value={productForm.sku} onChange={(event) => setProductForm((current) => ({ ...current, sku: event.target.value }))} /></label>
-          <label className="market-field">Barkod<input value={productForm.barcode} onChange={(event) => setProductForm((current) => ({ ...current, barcode: event.target.value }))} /></label>
+          <label className="market-field market-field-wide">
+            Barkod
+            <span className="market-inline-field">
+              <input value={productForm.barcode} onChange={(event) => setProductForm((current) => ({ ...current, barcode: event.target.value }))} />
+              <button type="button" className="market-secondary-button" onClick={() => void lookupProductInfo()} disabled={busy || lookupBusy || !productForm.barcode.trim()}>
+                <Sparkles size={15} aria-hidden="true" /> {lookupBusy ? "Aranıyor…" : "Ürün Bilgilerini Ara"}
+              </button>
+            </span>
+          </label>
           <label className="market-field">Kategori<select value={productForm.categoryId} onChange={(event) => setProductForm((current) => ({ ...current, categoryId: event.target.value }))}><option value="">Kategorisiz</option>{categories.filter((category) => category.isActive).map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
           <label className="market-field">Birim<select value={productForm.unit} onChange={(event) => setProductForm((current) => ({ ...current, unit: event.target.value as CommerceUnit }))}>{Object.entries(unitLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
           <label className="market-field">Satış fiyatı<input type="number" min="0" step="0.01" value={productForm.salePrice} onChange={(event) => setProductForm((current) => ({ ...current, salePrice: event.target.value }))} /></label>
@@ -261,6 +432,15 @@ export function MarketProductsWorkspace({
           <label className="market-check"><input type="checkbox" checked={productForm.trackInventory} disabled={!inventoryEnabled} onChange={(event) => setProductForm((current) => ({ ...current, trackInventory: event.target.checked }))} /> Stok takip et</label>
           <label className="market-check"><input type="checkbox" checked={productForm.isActive} onChange={(event) => setProductForm((current) => ({ ...current, isActive: event.target.checked }))} /> Aktif ürün</label>
         </div>
+
+        {productForm.dataSource && (
+          <aside className="market-product-source">
+            <strong>Ürün verisi: {providerLabel(productForm.dataSource)}</strong>
+            <span>Veri lisansı: {productForm.dataLicense || "—"}{productForm.imageLicense ? ` · Görsel: ${productForm.imageLicense}` : ""}</span>
+            {productForm.sourceFetchedAt && <small>Alınma: {new Date(productForm.sourceFetchedAt).toLocaleString("tr-TR")}</small>}
+          </aside>
+        )}
+
         <div className="market-form-actions"><button type="button" onClick={() => void saveProduct()} disabled={busy}><Save size={16} aria-hidden="true" /> Ürünü kaydet</button></div>
       </section>
 
