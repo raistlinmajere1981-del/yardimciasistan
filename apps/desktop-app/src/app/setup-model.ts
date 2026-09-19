@@ -50,6 +50,10 @@ export interface SetupFormState {
   aiServiceDrafts: Partial<Record<DesktopAiService, AiServiceFormDraft>>;
   whatsappEnabled: boolean;
   androidEnabled: boolean;
+  productDataEnabled: boolean;
+  productDataProvider: "open_food_facts";
+  productDataAutoSearch: boolean;
+  productDataIncludeImages: boolean;
   roomCount: string;
   tableCategories: TableCategoryFormState[];
   birthdaySettings: BirthdaySettings;
@@ -103,6 +107,10 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     aiServiceDrafts,
     whatsappEnabled: setupData.servicePreferences.whatsapp,
     androidEnabled: setupData.servicePreferences.android,
+    productDataEnabled: setupData.productData.enabled,
+    productDataProvider: setupData.productData.provider,
+    productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,
+    productDataIncludeImages: setupData.productData.includeImages,
     roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
     tableCategories: toTableCategoryForm(setupData),
     birthdaySettings: normalizeBirthdaySettings(setupData.birthdaySettings)
