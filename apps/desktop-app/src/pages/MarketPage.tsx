@@ -99,7 +99,14 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
 
   useEffect(() => {
     let disposed = false;
-    void window.yardimciDesktop?.getSetupData()
+    const setupRequest = window.yardimciDesktop?.getSetupData?.();
+    if (!setupRequest) {
+      setProductDataEnabled(false);
+      return () => {
+        disposed = true;
+      };
+    }
+    void setupRequest
       .then((setup) => {
         if (!disposed) setProductDataEnabled(setup.productData.enabled);
       })
