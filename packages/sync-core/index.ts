@@ -280,6 +280,8 @@ export interface AndroidMarketProduct {
   current_quantity: number;
   minimum_quantity: number;
   inventory_updated_at: ISODateTimeString | "";
+  image_source_url: string;
+  data_source: string;
 }
 
 export interface AndroidMarketSupplier {
