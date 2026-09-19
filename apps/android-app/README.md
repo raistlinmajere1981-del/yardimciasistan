@@ -18,8 +18,9 @@ ekranlarını gösterir:
 - **Restoran:** yetkiye göre gösterilen `Masalar`, `Açık Adisyon` ve `Stok` modları.
   Masa kartları en fazla iki ana aksiyon taşır; stok düzenleme ayrıca açılan işlem
   yüzeyindedir.
-- **Market:** barkod/ürün arama, mutlak fiziksel stok sayımı, çok satırlı mal kabul,
-  masaüstüne gönderilen sepet taslağı, yeni ürün taslağı ve gerçek Market özeti.
+- **Market:** kamera ile barkod/ürün arama, mutlak fiziksel stok sayımı, çok satırlı mal
+  kabul, masaüstüne gönderilen sepet taslağı, doğrudan katalog ürünü oluşturma ve gerçek
+  Market özeti.
 - **Mesajlar:** `Hazır Mesajlar` ve `Cevap Bekleyenler` segmentleri. Kartlar kısa
   önizleme gösterir, uzun mesaj tam ekran detayda açılır.
 
@@ -45,34 +46,35 @@ Desktop = source of truth
 Android = retail handheld companion
 ```
 
-M7.1'in veri, izin, action queue ve persistence temeli M7.2'de telefon odaklı Market
+M7.1'in veri, izin, action queue ve persistence temeli telefon odaklı Market
 ekranlarıyla kullanılır. Uygulama masaüstü POS'unu kopyalamaz: sayım fiziksel miktarı
-mutlak değer olarak yollar, mal kabul mevcut purchase runtime'ını kullanır, ürün ve
-sepet yalnız inceleme taslağıdır. Telefonda satış, ödeme, stok düşürme veya finance
-mutation oluşturulmaz.
+mutlak değer olarak yollar, mal kabul mevcut purchase runtime'ını kullanır ve yeni ürün
+yetkili telefondan doğrudan katalog kaydı olarak gönderilir. Sepet ise ödeme ve gerçek
+satış kaydı masaüstünde tamamlanacağı için hazır sepet olarak bekler. Telefonda satış,
+ödeme veya finance mutation oluşturulmaz.
 
-Masaüstündeki tek `Market / El Terminali` görev grubu altı `market.*` iznini verir.
+Masaüstündeki tek `Market / El Terminali` görev grubu ilgili `market.*` izinlerini verir.
 İzinler cihaz rolünden sonra persisted business capability'lerle tekrar kesişir; admin
 rolü kapalı commerce/retail capability'sini aşamaz. Hosting kuyruğu aşağıdaki sözleşmeleri
 taşımaya hazırdır:
 
 ```text
-market_stock_count          → absolute fiziksel stok sayımı
-market_purchase_receive     → mevcut atomik purchase + stock-in akışı
-market_product_draft_create → gerçek üründen ayrı inceleme taslağı
-market_cart_draft_create    → satış/stok/ödeme üretmeyen sepet taslağı
+market_stock_count       → absolute fiziksel stok sayımı
+market_purchase_receive  → mevcut atomik purchase + stock-in akışı
+market_product_create    → doğrudan catalog_products kaydı
+market_cart_draft_create → satış/stok/ödeme üretmeyen hazır sepet
 ```
 
-Snapshot'ın `market` alanı ürün, tedarikçi, yakın mal kabul ve draft listelerini ilgili
-capability kapalıyken kırpar. `retail.barcode` yoksa barkodlar yayınlanmaz. Satın alma
+Snapshot'ın `market` alanı ürün, tedarikçi, yakın mal kabul ve hazır sepet listelerini
+ilgili capability kapalıyken kırpar. `retail.barcode` yoksa barkodlar yayınlanmaz. Satın alma
 modelinde bekleyen sipariş workflow'u bulunmadığından yalnız gerçek `received` kayıtları
 yakın mal kabul bilgisi olarak taşınır. Alan hiç yoksa Java parser boş Market modeliyle
 devam eder; eski ve Market dışı snapshot'lar geçerliliğini korur.
 
-Market ana ekranındaki barkod alanı harici/HID el terminali girişini ve elle barkod
-girişini aynı çözümleme akışında kullanır. Repoda kamera görüntüsünden barkod çözen bir
-altyapı olmadığı için M7.2 yeni scanner framework eklemez; `retail.barcode` kapalıysa
-`Barkod Tara` CTA'ları tamamen gizlenir ve ürün seçme/arama akışı açık kalır.
+Market barkod akışı CameraX + ML Kit ile cihaz üzerinde barkod çözer; aynı altyapı kasa
+barkod modu, ürün arama, stok, mal kabul, sepet ve yeni ürün ekranlarında kullanılır.
+Kamera izni verilmezse elle giriş geri dönüşü korunur. `retail.barcode` kapalıysa genel
+`Barkod Tara` CTA'ları gizlenir; ürün seçme/arama akışı açık kalır.
 
 Full mobile POS, telefonda ödeme, iadeler, fatura OCR, ürün fotoğrafları, bekleyen satın
 alma siparişi ve local LAN transport kapsam dışıdır.
@@ -253,8 +255,8 @@ Bağlı telefonda gerçek UI ve action queue smoke testi:
 npm run smoke:android-device-ui
 ```
 
-Saf Market profili, barkod akışları, ekran dönüşünde sepet state'i ve taslak gönderimi
-için odaklı fiziksel cihaz smoke testi:
+Saf Market profili, kamera barkod akışları, ekran dönüşünde sepet state'i ve doğrudan
+ürün kaydı için odaklı fiziksel cihaz smoke testi:
 
 ```bash
 npm run smoke:android-market-device-ui
