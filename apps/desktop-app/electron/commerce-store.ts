@@ -417,87 +417,102 @@ export function findCatalogProductByBarcode(databasePath: string, barcodeInput: 
   }
 }
 
+export function saveCatalogProductInTransaction(
+  database: DatabaseSync,
+  input: SaveCatalogProductInput,
+  now = new Date().toISOString()
+): CatalogProduct {
+  const businessId = activeBusinessId(database);
+  const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
+  if (!name) throw new Error("Ürün adı gerekli.");
+  if (name.length > 180) throw new Error("Ürün adı en fazla 180 karakter olabilir.");
+
+  const id = String(input.id ?? "").trim() || createId("product_");
+  const existing = getProductRow(database, businessId, id);
+  if (input.id && !existing) throw new Error("Düzenlenecek ürün bulunamadı.");
+
+  const sku = String(input.sku ?? "").trim().slice(0, 80);
+  const barcode = String(input.barcode ?? "").trim().slice(0, 80);
+  const description = String(input.description ?? "").trim().slice(0, 2000);
+  const salePrice = Math.max(0, roundMoney(Number(input.salePrice ?? 0)));
+  const purchasePrice = Math.max(0, roundMoney(Number(input.purchasePrice ?? 0)));
+  const currency = normalizeCurrency(input.currency);
+  const unit = normalizeUnit(input.unit);
+  const taxRate = Math.max(0, Math.min(100, Number(input.taxRate ?? 0)));
+  const trackInventory = input.trackInventory !== false;
+  const isActive = input.isActive !== false;
+  const categoryId = String(input.categoryId ?? "").trim();
+
+  try {
+    database.prepare(`
+      INSERT INTO catalog_products (
+        id, business_id, category_id, name, sku, barcode, description,
+        sale_price, purchase_price, currency, unit, tax_rate,
+        track_inventory, is_active, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
+      ON CONFLICT(id) DO UPDATE SET
+        category_id = excluded.category_id,
+        name = excluded.name,
+        sku = excluded.sku,
+        barcode = excluded.barcode,
+        description = excluded.description,
+        sale_price = excluded.sale_price,
+        purchase_price = excluded.purchase_price,
+        currency = excluded.currency,
+        unit = excluded.unit,
+        tax_rate = excluded.tax_rate,
+        track_inventory = excluded.track_inventory,
+        is_active = excluded.is_active,
+        updated_at = excluded.updated_at,
+        deleted_at = ''
+    `).run(
+      id, businessId, categoryId, name, sku, barcode, description,
+      salePrice, purchasePrice, currency, unit, taxRate,
+      trackInventory ? 1 : 0, isActive ? 1 : 0,
+      String(existing?.created_at ?? now), now
+    );
+
+    if (trackInventory) {
+      const locationId = ensurePrimaryLocation(database, businessId, now);
+      const minimumQuantity = Math.max(0, roundQuantity(Number(input.minimumQuantity ?? 0)));
+      database.prepare(`
+        INSERT INTO inventory_balances (product_id, location_id, quantity, minimum_quantity, updated_at)
+        VALUES (?, ?, 0, ?, ?)
+        ON CONFLICT(product_id, location_id) DO UPDATE SET
+          minimum_quantity = excluded.minimum_quantity,
+          updated_at = excluded.updated_at
+      `).run(id, locationId, minimumQuantity, now);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
+    if (message.includes("idx_catalog_products_barcode_unique")
+        || message.includes("catalog_products.business_id, catalog_products.barcode")) {
+      throw new Error("Bu barkod başka bir üründe kullanılıyor.", { cause: error });
+    }
+    if (message.includes("idx_catalog_products_sku_unique")
+        || message.includes("catalog_products.business_id, catalog_products.sku")) {
+      throw new Error("Bu stok kodu başka bir üründe kullanılıyor.", { cause: error });
+    }
+    throw error;
+  }
+
+  const saved = getProductRow(database, businessId, id);
+  if (!saved) throw new Error("Ürün kaydedildi ancak yeniden okunamadı.");
+  return mapProduct(saved);
+}
+
 export function saveCatalogProduct(databasePath: string, input: SaveCatalogProductInput): CatalogProduct {
   const database = openDatabase(databasePath);
   try {
-    const businessId = activeBusinessId(database);
-    const name = String(input.name ?? "").trim().replace(/\s+/g, " ");
-    if (!name) throw new Error("Ürün adı gerekli.");
-    if (name.length > 180) throw new Error("Ürün adı en fazla 180 karakter olabilir.");
-
-    const id = String(input.id ?? "").trim() || createId("product_");
-    const existing = getProductRow(database, businessId, id);
-    if (input.id && !existing) throw new Error("Düzenlenecek ürün bulunamadı.");
-    const now = new Date().toISOString();
-    const sku = String(input.sku ?? "").trim().slice(0, 80);
-    const barcode = String(input.barcode ?? "").trim().slice(0, 80);
-    const description = String(input.description ?? "").trim().slice(0, 2000);
-    const salePrice = Math.max(0, roundMoney(Number(input.salePrice ?? 0)));
-    const purchasePrice = Math.max(0, roundMoney(Number(input.purchasePrice ?? 0)));
-    const currency = normalizeCurrency(input.currency);
-    const unit = normalizeUnit(input.unit);
-    const taxRate = Math.max(0, Math.min(100, Number(input.taxRate ?? 0)));
-    const trackInventory = input.trackInventory !== false;
-    const isActive = input.isActive !== false;
-    const categoryId = String(input.categoryId ?? "").trim();
-
     database.exec("BEGIN IMMEDIATE");
     try {
-      database.prepare(`
-        INSERT INTO catalog_products (
-          id, business_id, category_id, name, sku, barcode, description,
-          sale_price, purchase_price, currency, unit, tax_rate,
-          track_inventory, is_active, created_at, updated_at, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '')
-        ON CONFLICT(id) DO UPDATE SET
-          category_id = excluded.category_id,
-          name = excluded.name,
-          sku = excluded.sku,
-          barcode = excluded.barcode,
-          description = excluded.description,
-          sale_price = excluded.sale_price,
-          purchase_price = excluded.purchase_price,
-          currency = excluded.currency,
-          unit = excluded.unit,
-          tax_rate = excluded.tax_rate,
-          track_inventory = excluded.track_inventory,
-          is_active = excluded.is_active,
-          updated_at = excluded.updated_at,
-          deleted_at = ''
-      `).run(
-        id, businessId, categoryId, name, sku, barcode, description,
-        salePrice, purchasePrice, currency, unit, taxRate,
-        trackInventory ? 1 : 0, isActive ? 1 : 0,
-        String(existing?.created_at ?? now), now
-      );
-
-      if (trackInventory) {
-        const locationId = ensurePrimaryLocation(database, businessId, now);
-        const minimumQuantity = Math.max(0, roundQuantity(Number(input.minimumQuantity ?? 0)));
-        database.prepare(`
-          INSERT INTO inventory_balances (product_id, location_id, quantity, minimum_quantity, updated_at)
-          VALUES (?, ?, 0, ?, ?)
-          ON CONFLICT(product_id, location_id) DO UPDATE SET
-            minimum_quantity = excluded.minimum_quantity,
-            updated_at = excluded.updated_at
-        `).run(id, locationId, minimumQuantity, now);
-      }
+      const saved = saveCatalogProductInTransaction(database, input);
       database.exec("COMMIT");
+      return saved;
     } catch (error) {
       database.exec("ROLLBACK");
-      const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
-      if (message.includes("idx_catalog_products_barcode_unique")) {
-        throw new Error("Bu barkod başka bir üründe kullanılıyor.", { cause: error });
-      }
-      if (message.includes("idx_catalog_products_sku_unique")) {
-        throw new Error("Bu stok kodu başka bir üründe kullanılıyor.", { cause: error });
-      }
       throw error;
     }
-
-    const saved = getProductRow(database, businessId, id);
-    if (!saved) throw new Error("Ürün kaydedildi ancak yeniden okunamadı.");
-    return mapProduct(saved);
   } finally {
     database.close();
   }
