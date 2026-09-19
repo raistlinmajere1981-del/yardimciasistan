@@ -69,6 +69,14 @@ assert.match(workspace, /MarketUiRules\.canScanBarcode\(data\)/);
 assert.match(workspace, /normalizeBarcodeIdentity/);
 assert.match(workspace, /MarketUiRules\.canLookupProductData\(data\)/);
 assert.match(workspace, /onProductLookupRequested/);
+const productCreateSource = workspace.slice(
+  workspace.indexOf("private LinearLayout productCreateScreen"),
+  workspace.indexOf("private void submitProductCreate")
+);
+assert.ok(productCreateSource.length > 0, "product create screen source missing");
+assert.match(productCreateSource, /submit\.setEnabled\(!productLookupLoading\)/);
+assert.doesNotMatch(productCreateSource, /submit\.setEnabled\(!submissionBlocked\(\)\)/);
+assert.match(workspace, /productImageView\(productCreateImagePreview, 180\)/);
 assert.match(workspace, /onProductImageRequested/);
 assert.match(workspace, /addProductImage/);
 assert.match(productLookup, /world\.openfoodfacts\.org\/api\/v2\/product/);
