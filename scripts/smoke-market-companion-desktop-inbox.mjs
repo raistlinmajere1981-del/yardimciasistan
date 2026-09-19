@@ -154,14 +154,11 @@ function assertSourceContracts() {
   const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
   const store = read("apps/desktop-app/electron/market-companion-store.ts");
 
-  assert.match(page, /Telefon Taslakları/);
-  assert.doesNotMatch(page, /businessType|business_type/);
-  assert.match(inbox, /Ürün Kartına Aktar/);
+  assert.match(page, /Telefon Sepetleri/);
+  assert.doesNotMatch(page, /businessType|business_type|Ürün önerileri/);
   assert.match(inbox, /Hızlı Satış'a Yükle/);
-  assert.match(inbox, /Taslağı Kapat/);
-  assert.match(inbox, /yerel masaüstü SQLite/);
-  assert.match(products, /marketProductDraftCatalogDefaults/);
-  assert.match(products, /Ürün kaydedildi ancak telefon taslağı kapatılamadı\./);
+  assert.match(inbox, /Sepeti Kapat/);
+  assert.doesNotMatch(inbox, /Ürün Kartına Aktar|ürün önerileri/i);
   assert.match(quickSale, /ürünü artık aktif olmadığı için sepete eklenmedi\./);
   assert.match(quickSale, /Satış tamamlandı ancak telefon sepeti kapatılamadı\./);
   assert.match(quickSale, /markCartDraftReviewed/);
