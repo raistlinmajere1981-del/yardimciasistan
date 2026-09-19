@@ -14,6 +14,7 @@ import type {
   InventoryMovement,
   MarketBarcodeScanEvent,
   MarketCartDraftLoadResult,
+  ProductLookupResponse,
   SaveBusinessPublicProfileInput
 } from "@yardimci-asistan/shared";
 import type { AndroidPermissionGroups, PullRequestsResult, MarkRequestsSyncedResult, PushAiSettingsResult, PushAndroidSnapshotResult, PushMenuResult } from "@yardimci-asistan/sync-core";
@@ -306,7 +307,7 @@ const bridge: DesktopBridge = {
     listProducts: (options) => invokeWhenUnlocked<CatalogProduct[]>("commerce:product:list", options),
     saveProduct: (input) => invokeWhenUnlocked<CatalogProduct>("commerce:product:save", input),
     findProductByBarcode: (barcode) => invokeWhenUnlocked<CatalogProduct | null>("commerce:product:findByBarcode", barcode),
-    lookupExternalProductByBarcode: (barcode, mode = "manual") => invokeWhenUnlocked("commerce:product:lookupExternal", barcode, mode),
+    lookupExternalProductByBarcode: (barcode, mode = "manual") => invokeWhenUnlocked<ProductLookupResponse>("commerce:product:lookupExternal", barcode, mode),
     getProductImageDataUrl: (productId) => invokeWhenUnlocked<string>("commerce:product:imageDataUrl", productId),
     getInventoryBalance: (productId, locationId) => invokeWhenUnlocked<InventoryBalance>("commerce:inventory:getBalance", productId, locationId),
     listInventoryMovements: (options) => invokeWhenUnlocked<InventoryMovement[]>("commerce:inventory:listMovements", options),
