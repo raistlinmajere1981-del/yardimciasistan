@@ -8,7 +8,9 @@ import {
   type CommerceSale,
   type CommerceSupplier,
   type InventoryBalance,
-  type InventoryMovement
+  type InventoryMovement,
+  type ProductLookupMode,
+  type ProductLookupResponse
 } from "@yardimci-asistan/shared";
 import {
   assertPersistedBusinessCapability,
@@ -23,6 +25,11 @@ import {
   type ListCatalogCategoriesOptions,
   type SaveCatalogCategoryInput
 } from "./commerce-category-store";
+import {
+  getProductImageDataUrl,
+  lookupExternalProductByBarcode
+} from "./product-data-service";
+
 import {
   getCommercePurchaseOrder,
   listCommercePurchaseOrders,
@@ -98,6 +105,28 @@ export function getCommerceRuntimeSnapshot(databasePath: string): CommerceStoreS
       ? snapshot.suppliers
       : []
   };
+}
+
+export async function lookupRuntimeExternalProductByBarcode(
+  databasePath: string,
+  barcode: string,
+  mode: ProductLookupMode = "manual"
+): Promise<ProductLookupResponse> {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  return lookupExternalProductByBarcode(databasePath, barcode, mode);
+}
+
+export function getRuntimeProductImageDataUrl(databasePath: string, productId: string): string {
+  requireCapability(
+    databasePath,
+    BUSINESS_CAPABILITIES.CATALOG,
+    "Ürün kataloğu bu işletmede etkin değil."
+  );
+  return getProductImageDataUrl(databasePath, productId);
 }
 
 export function listRuntimeCatalogCategories(
