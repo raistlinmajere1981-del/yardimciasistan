@@ -143,7 +143,9 @@ export function MarketProductsWorkspace({
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [imagePreviewDataUrl, setImagePreviewDataUrl] = useState("");
+  const [imagePreviewLoading, setImagePreviewLoading] = useState(false);
   const loadedLookupRequestId = useRef<number | null>(null);
+  const imagePreviewRequestId = useRef(0);
 
   const filteredProducts = products.filter((product) => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
@@ -152,8 +154,35 @@ export function MarketProductsWorkspace({
       .some((value) => String(value ?? "").toLocaleLowerCase("tr-TR").includes(needle));
   });
 
-  const applyLookupCandidate = useCallback((candidate: ProductLookupCandidate, reset = false) => {
+  const loadExternalImagePreview = useCallback((candidate: ProductLookupCandidate) => {
+    imagePreviewRequestId.current += 1;
+    const requestId = imagePreviewRequestId.current;
     setImagePreviewDataUrl("");
+    setImagePreviewLoading(Boolean(candidate.imageUrl));
+    if (!candidate.imageUrl || !bridge?.previewExternalProductImage) {
+      setImagePreviewLoading(false);
+      return;
+    }
+    void bridge.previewExternalProductImage(candidate.provider, candidate.imageUrl)
+      .then((dataUrl) => {
+        if (imagePreviewRequestId.current === requestId) {
+          setImagePreviewDataUrl(dataUrl);
+        }
+      })
+      .catch(() => {
+        if (imagePreviewRequestId.current === requestId) {
+          setImagePreviewDataUrl("");
+        }
+      })
+      .finally(() => {
+        if (imagePreviewRequestId.current === requestId) {
+          setImagePreviewLoading(false);
+        }
+      });
+  }, [bridge]);
+
+  const applyLookupCandidate = useCallback((candidate: ProductLookupCandidate, reset = false) => {
+    loadExternalImagePreview(candidate);
     setProductForm((current) => {
       const base = reset ? emptyProductForm(inventoryEnabled) : current;
       const matchedCategoryId = matchingCategoryId(categories, candidate.categoryHint);
@@ -173,7 +202,7 @@ export function MarketProductsWorkspace({
         sourceFetchedAt: candidate.fetchedAt
       };
     });
-  }, [categories, inventoryEnabled]);
+  }, [categories, inventoryEnabled, loadExternalImagePreview]);
 
   useEffect(() => {
     if (!productLookupRequest || loadedLookupRequestId.current === productLookupRequest.requestId) return;
@@ -220,6 +249,8 @@ export function MarketProductsWorkspace({
       imageLicense: product.imageLicense ?? "",
       sourceFetchedAt: product.sourceFetchedAt ?? ""
     });
+    imagePreviewRequestId.current += 1;
+    setImagePreviewLoading(false);
     setImagePreviewDataUrl("");
     if (bridge && product.imageAssetPath) {
       try {
@@ -373,6 +404,8 @@ export function MarketProductsWorkspace({
           <div><span>Katalog</span><h2>Ürünler</h2><p>Ürün kartları satış ve stok tarafından ortak kullanılır.</p></div>
           <button type="button" className="market-secondary-button" onClick={() => {
             setProductForm(emptyProductForm(inventoryEnabled));
+            imagePreviewRequestId.current += 1;
+            setImagePreviewLoading(false);
             setImagePreviewDataUrl("");
           }}>
             <Plus size={16} aria-hidden="true" /> Yeni ürün
@@ -405,7 +438,13 @@ export function MarketProductsWorkspace({
           ) : (
             <div className="market-product-image-placeholder">
               <ImageIcon size={28} aria-hidden="true" />
-              <span>{productForm.imageSourceUrl ? "Görsel bulundu; ürün kaydedildiğinde yerel arşive eklenecek." : "Ürün görseli yok"}</span>
+              <span>{
+                imagePreviewLoading
+                  ? "Ürün görseli yükleniyor…"
+                  : productForm.imageSourceUrl
+                    ? "Görsel önizlenemedi; ürün kaydedildiğinde yeniden arşivleme denenecek."
+                    : "Ürün görseli yok"
+              }</span>
             </div>
           )}
         </div>
