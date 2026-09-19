@@ -1,6 +1,7 @@
 import {
   PhpHostingSyncTransport,
   type AndroidOperationsSnapshot,
+  type AndroidSyncAction,
   type SyncCapabilitiesSuccess,
   type SyncFailure,
   type SyncTransport
@@ -14,6 +15,8 @@ import {
   DesktopDatabase,
   type DesktopSyncRuntimeStatus
 } from "./database";
+import { findCatalogProductByBarcode } from "./commerce-store";
+import { archiveExternalProductImage } from "./product-data-service";
 import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
 
 const NORMAL_PULL_INTERVAL_MS = 15_000;
@@ -413,6 +416,9 @@ export class SyncCoordinator {
     for (const action of pulled.actions) {
       const local = this.options.database.applyAndroidAction(action);
       this.options.database.recordAndroidActionResult(action, local);
+      if (local.ok && action.action_type === "market_product_create") {
+        await this.archiveAndroidProductImage(action);
+      }
       const status = local.ok ? "applied" : "failed";
       const completion = await transport.completeAndroidAction({
         actionId: action.id,
@@ -436,6 +442,26 @@ export class SyncCoordinator {
       message: `${applied} telefon işlemi uygulandı, ${failed} işlem reddedildi.`
     });
     return { pulled: pulled.count, applied, failed, devicesChanged, error: "" };
+  }
+
+  private async archiveAndroidProductImage(action: AndroidSyncAction): Promise<void> {
+    const barcode = String(action.payload?.barcode ?? "").trim();
+    const imageUrl = String(action.payload?.image_source_url ?? "").trim();
+    const provider = String(action.payload?.data_source ?? "").trim();
+    if (!barcode || !imageUrl || !provider) return;
+
+    try {
+      const product = findCatalogProductByBarcode(this.options.database.databasePath, barcode);
+      if (!product || product.imageAssetPath) return;
+      await archiveExternalProductImage(
+        this.options.database.databasePath,
+        product.id,
+        provider,
+        imageUrl
+      );
+    } catch (error) {
+      console.warn("[product-data] Android ürün görseli yerel arşive alınamadı:", error);
+    }
   }
 
   private async publishAvailabilityHeartbeat(
