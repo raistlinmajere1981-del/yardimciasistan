@@ -1,7 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import type {
   AndroidMarketCartDraft,
-  AndroidMarketProductDraft,
   AndroidMarketSnapshot
 } from "@yardimci-asistan/sync-core";
 import {
@@ -22,7 +21,6 @@ export function emptyAndroidMarketSnapshot(currency = "TRY"): AndroidMarketSnaps
     products: [],
     suppliers: [],
     recent_purchases: [],
-    product_drafts: [],
     cart_drafts: []
   };
 }
@@ -200,32 +198,11 @@ export function createAndroidMarketSnapshotSource(
       products,
       suppliers,
       recent_purchases: recentPurchases,
-      product_drafts: productDrafts(databasePath),
       cart_drafts: cartDrafts(databasePath)
     };
   } finally {
     database.close();
   }
-}
-
-function productDrafts(databasePath: string): AndroidMarketProductDraft[] {
-  return listMarketProductDraftRecords(databasePath, { limit: 100 }).map((draft) => ({
-    id: draft.id,
-    barcode: draft.barcode,
-    proposed_name: draft.proposedName,
-    sku: draft.sku,
-    proposed_category: draft.proposedCategory,
-    proposed_purchase_price: draft.proposedPurchasePrice,
-    proposed_sale_price: draft.proposedSalePrice,
-    currency: draft.currency,
-    unit: draft.unit,
-    note: draft.note,
-    source: draft.source,
-    created_by_device: draft.createdByDevice,
-    status: draft.status,
-    created_at: draft.createdAt,
-    updated_at: draft.updatedAt
-  }));
 }
 
 function cartDrafts(databasePath: string): AndroidMarketCartDraft[] {
