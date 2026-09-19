@@ -702,6 +702,8 @@ final class OperationData {
     double currentQuantity;
     double minimumQuantity;
     String inventoryUpdatedAt = "";
+    String imageSourceUrl = "";
+    String dataSource = "";
 
     static MarketProduct fromJson(JSONObject source) {
       MarketProduct product = new MarketProduct();
@@ -717,6 +719,8 @@ final class OperationData {
       product.currentQuantity = decimal(source, "current_quantity");
       product.minimumQuantity = decimal(source, "minimum_quantity");
       product.inventoryUpdatedAt = value(source, "inventory_updated_at", "");
+      product.imageSourceUrl = value(source, "image_source_url", "");
+      product.dataSource = value(source, "data_source", "");
       return product;
     }
   }
