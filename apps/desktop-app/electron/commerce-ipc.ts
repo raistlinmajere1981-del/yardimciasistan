@@ -80,6 +80,7 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:product:save", async (_event, input: Parameters<DesktopCommerceBridge["saveProduct"]>[0]) => {
     options.assertUnlocked();
     let saved = saveRuntimeCatalogProduct(databasePath(), input);
+    options.onMutation?.();
     if (saved.imageSourceUrl && !saved.imageAssetPath && input.imageSourceUrl !== undefined) {
       try {
         const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.imageSourceUrl);
@@ -88,7 +89,6 @@ export function registerCommerceIpcHandlers(options: {
         console.warn("[product-data] Ürün görseli arşivlenemedi:", error);
       }
     }
-    options.onMutation?.();
     return saved;
   });
   ipcMain.handle("commerce:product:findByBarcode", (_event, barcode: string) =>
