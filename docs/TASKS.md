@@ -1,6 +1,6 @@
 # Yardımcı Asistan — Güncel Görev Planı
 
-> Güncellik: 2026-09-03
+> Güncellik: 2026-09-19
 
 Bu belge Yardımcı Asistan'ın güncel çalışma sırasını tanımlar. Ayrıntılı capability/commerce kararları için `docs/MODULAR_BUSINESS_FOUNDATION.md` esas alınır.
 
@@ -54,11 +54,9 @@ current-baseline manifesti ve SQLite şemasıyla doğrulanır.
 
 ---
 
-# Aşama 1 — Market / Perakende MVP
+# Aşama 1 — Market / Perakende MVP — TAMAMLANDI
 
-Yeni session'ın ana işi budur.
-
-## M1.1 — Commerce repository tamamla
+## M1.1 — Commerce repository — TAMAMLANDI
 
 - kategori CRUD
 - ürün liste/arama
@@ -69,7 +67,7 @@ Yeni session'ın ana işi budur.
 - temel satın alma / stock-in servis sınırı
 - gerekirse minimum purchase order servisleri
 
-## M1.2 — Market IPC / preload contract
+## M1.2 — Market IPC / preload contract — TAMAMLANDI
 
 ```text
 Renderer Market Workspace
@@ -87,7 +85,7 @@ SQLite
 
 Her mutation ilgili capability ile korunmalıdır.
 
-## M1.3 — Market workspace
+## M1.3 — Market workspace — TAMAMLANDI
 
 İlk ekran küçük işletmenin günlük hızına göre düzenlenir:
 
@@ -101,7 +99,7 @@ Etiketler
 
 Büyük ERP dashboard'u yapılmaz.
 
-## M1.4 — Hızlı satış
+## M1.4 — Hızlı satış — TAMAMLANDI
 
 Kabul kriterleri:
 
@@ -115,17 +113,18 @@ Kabul kriterleri:
 - yetersiz stok/başarısız işlemde tam rollback,
 - duplicate sale üretmeme.
 
-## M1.5 — Barkod abstraction
+## M1.5 — Barkod abstraction — TAMAMLANDI
 
-İlk sıra:
+Tamamlanan giriş yolları:
 
 1. Simulator / elle barkod girişi
 2. USB keyboard scanner
-3. Android camera scanner (sonraki alt faz)
+3. Android CameraX + ML Kit scanner
 
-Market MVP gerçek scanner donanımına bağımlı olmamalıdır.
+Sayısal barkodlarda kullanıcı tarafından yazılan boşluk/tire/nokta benzeri ayraçlar
+canonical kimlikten temizlenir. Market MVP masaüstü scanner donanımına bağımlı değildir.
 
-## M1.6 — Etiket MVP
+## M1.6 — Etiket MVP — TAMAMLANDI
 
 İlk sürüm:
 
@@ -151,7 +150,22 @@ değerini doğrudan registry'den gösterir; ayrı availability/profil listesi yo
 
 ---
 
-# Aşama 2 — Market saha testi
+## M1.8 — Ürün Verisi / bilinmeyen barkod — TAMAMLANDI
+
+- Ayarlar → Servisler altında katalog işletmelerine özel `Ürün Verisi` servisi
+- provider abstraction; ilk provider Open Food Facts
+- bilinmeyen barkod için otomatik veya manuel sorgu
+- ad, marka, ambalaj, görsel ve kaynak/provenance aktarımı
+- ürün kaydedilmeden önce görsel önizleme
+- standart yerel `data/assets/products/<id>/front.jpg` arşivi
+- kalıcı ürün asset'lerinin backup/restore/reset kapsamına alınması
+- Android Yeni Ürün akışında aynı ayar ve provider kullanımının desteklenmesi
+- Android doğrudan katalog ürünü oluşturur; ürün taslağı/desktop approval akışı yoktur
+- telefon sepetleri ödeme masaüstünde tamamlandığı için draft olarak korunur
+
+---
+
+# Aşama 2 — Market saha testi — DEVAM EDİYOR
 
 MVP tamamlandıktan sonra sahte ürün verisiyle en az şu akışlar test edilir:
 
@@ -238,5 +252,5 @@ Gerçek ihtiyaç kanıtlanmadan eklenmez:
 1. Repo `main` güncel head'i oku.
 2. `docs/MODULAR_BUSINESS_FOUNDATION.md` dosyasını oku.
 3. `node scripts/check-modular-foundation.mjs` çalıştır.
-4. Yeşilse **M1.1 Commerce repository** işinden başla.
-5. Market UI'ye geçmeden önce commerce IPC/runtime sözleşmesini tamamla.
+4. Yeşilse Aşama 2 saha/pilot kontrollerinden veya açık ürün backlog'undan devam et.
+5. Yeni Market özelliğinde capability/runtime/IPC sınırlarını ve Product Data provider abstraction'ını koru.
