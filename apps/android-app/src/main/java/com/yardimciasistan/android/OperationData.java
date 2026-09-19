@@ -609,7 +609,6 @@ final class OperationData {
     final List<MarketProduct> products = new ArrayList<>();
     final List<MarketSupplier> suppliers = new ArrayList<>();
     final List<MarketPurchase> recentPurchases = new ArrayList<>();
-    final List<MarketProductDraft> productDrafts = new ArrayList<>();
     final List<MarketCartDraft> cartDrafts = new ArrayList<>();
 
     static MarketSnapshot fromJson(JSONObject source) {
@@ -618,7 +617,6 @@ final class OperationData {
       addRecords(array(source, "products"), market.products, MarketProduct::fromJson);
       addRecords(array(source, "suppliers"), market.suppliers, MarketSupplier::fromJson);
       addRecords(array(source, "recent_purchases"), market.recentPurchases, MarketPurchase::fromJson);
-      addRecords(array(source, "product_drafts"), market.productDrafts, MarketProductDraft::fromJson);
       addRecords(array(source, "cart_drafts"), market.cartDrafts, MarketCartDraft::fromJson);
       return market;
     }
@@ -735,60 +733,6 @@ final class OperationData {
       purchase.currency = value(source, "currency", "TRY");
       purchase.lineCount = number(source, "line_count");
       return purchase;
-    }
-  }
-
-  static final class MarketProductDraft {
-    String id = "";
-    String barcode = "";
-    String proposedName = "";
-    String sku = "";
-    String proposedCategory = "";
-    double proposedPurchasePrice;
-    double proposedSalePrice;
-    String currency = "TRY";
-    String unit = "piece";
-    String note = "";
-    String source = "";
-    String createdByDevice = "";
-    String status = "pending";
-    String createdAt = "";
-    String updatedAt = "";
-
-    static MarketProductDraft fromJson(JSONObject source) {
-      MarketProductDraft draft = new MarketProductDraft();
-      draft.id = value(source, "id", "");
-      draft.barcode = value(source, "barcode", "");
-      draft.proposedName = value(source, "proposed_name", "");
-      draft.sku = value(source, "sku", "");
-      draft.proposedCategory = value(source, "proposed_category", "");
-      draft.proposedPurchasePrice = decimal(source, "proposed_purchase_price");
-      draft.proposedSalePrice = decimal(source, "proposed_sale_price");
-      draft.currency = value(source, "currency", "TRY");
-      draft.unit = value(source, "unit", "piece");
-      draft.note = value(source, "note", "");
-      draft.source = value(source, "source", "");
-      draft.createdByDevice = value(source, "created_by_device", "");
-      draft.status = "reviewed".equals(value(source, "status", "pending")) ? "reviewed" : "pending";
-      draft.createdAt = value(source, "created_at", "");
-      draft.updatedAt = value(source, "updated_at", "");
-      return draft;
-    }
-  }
-
-  static final class MarketCartDraftLine {
-    String id = "";
-    String productId = "";
-    String productName = "Ürün";
-    double quantity;
-
-    static MarketCartDraftLine fromJson(JSONObject source) {
-      MarketCartDraftLine line = new MarketCartDraftLine();
-      line.id = value(source, "id", "");
-      line.productId = value(source, "product_id", "");
-      line.productName = value(source, "product_name", "Ürün");
-      line.quantity = decimal(source, "quantity");
-      return line;
     }
   }
 
