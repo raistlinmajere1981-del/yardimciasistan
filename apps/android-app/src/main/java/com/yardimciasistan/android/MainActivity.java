@@ -88,6 +88,7 @@ public final class MainActivity extends ComponentActivity {
   private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
 
   private final HostingSyncClient syncClient = new HostingSyncClient();
+  private final ProductDataLookupClient productDataLookupClient = new ProductDataLookupClient();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private SharedPreferences preferences;
   private AppTheme.Mode themeMode = AppTheme.Mode.NIGHT;
@@ -202,6 +203,26 @@ public final class MainActivity extends ComponentActivity {
       @Override
       public boolean onBarcodeScan(String barcode, JSONObject actionPayload) {
         return sendMarketBarcodeScan(barcode, actionPayload);
+      }
+
+      @Override
+      public void onProductLookupRequested(String provider, String barcode, boolean includeImages) {
+        executor.execute(() -> {
+          ProductDataLookupClient.Result result = null;
+          String errorMessage = "";
+          try {
+            result = productDataLookupClient.lookup(provider, barcode, includeImages);
+          } catch (ProductDataLookupClient.LookupException error) {
+            errorMessage = error.getMessage() == null ? "Ürün bilgileri alınamadı." : error.getMessage();
+          }
+          ProductDataLookupClient.Result completed = result;
+          String completedError = errorMessage;
+          runOnUiThread(() -> {
+            if (marketWorkspace != null) {
+              marketWorkspace.onProductLookupCompleted(barcode, completed, completedError);
+            }
+          });
+        });
       }
 
       @Override
