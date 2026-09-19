@@ -1,5 +1,5 @@
 import { Image as ImageIcon, Plus, Save, Search, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
   type CatalogCategory,
@@ -150,7 +150,7 @@ export function MarketProductsWorkspace({
       .some((value) => value.toLocaleLowerCase("tr-TR").includes(needle));
   });
 
-  function applyLookupCandidate(candidate: ProductLookupCandidate, reset = false) {
+  const applyLookupCandidate = useCallback((candidate: ProductLookupCandidate, reset = false) => {
     setImagePreviewDataUrl("");
     setProductForm((current) => {
       const base = reset ? emptyProductForm(inventoryEnabled) : current;
@@ -171,7 +171,7 @@ export function MarketProductsWorkspace({
         sourceFetchedAt: candidate.fetchedAt
       };
     });
-  }
+  }, [categories, inventoryEnabled]);
 
   useEffect(() => {
     if (!productLookupRequest || loadedLookupRequestId.current === productLookupRequest.requestId) return;
@@ -182,7 +182,7 @@ export function MarketProductsWorkspace({
       "success",
       `${productLookupRequest.product.name} bilgileri Open Food Facts'tan bulundu. Satış fiyatı ve diğer yerel alanları kontrol edip kaydedin.`
     );
-  }, [categories, inventoryEnabled, onProductLookupLoaded, onStateChange, productLookupRequest]);
+  }, [applyLookupCandidate, onProductLookupLoaded, onStateChange, productLookupRequest]);
 
   async function editProduct(product: CatalogProduct) {
     let minimumQuantity = "0";
