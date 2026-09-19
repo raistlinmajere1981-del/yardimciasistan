@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
+import { desktopLogWarn } from "./desktop-logger";
 import {
   archiveExternalProductImage,
   previewExternalProductImage
@@ -100,9 +101,15 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:product:lookupExternal", (_event, barcode: string, mode: NonNullable<Parameters<DesktopCommerceBridge["lookupExternalProductByBarcode"]>[1]> = "manual") =>
     read(() => lookupRuntimeExternalProductByBarcode(databasePath(), barcode, mode))
   );
-  ipcMain.handle("commerce:product:previewExternalImage", (_event, provider: string, imageUrl: string) =>
-    read(() => previewExternalProductImage(provider, imageUrl))
-  );
+  ipcMain.handle("commerce:product:previewExternalImage", async (_event, provider: string, imageUrl: string) => {
+    options.assertUnlocked();
+    try {
+      return await previewExternalProductImage(provider, imageUrl);
+    } catch (error) {
+      desktopLogWarn("product-data", "Ürün görseli önizlemesi alınamadı.", error);
+      return "";
+    }
+  });
   ipcMain.handle("commerce:product:imageDataUrl", (_event, productId: string) =>
     read(() => getRuntimeProductImageDataUrl(databasePath(), productId))
   );
