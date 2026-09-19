@@ -5,7 +5,8 @@ import type {
   CatalogProduct,
   CommerceSale,
   CommerceSaleDraft,
-  CommerceUnit
+  CommerceUnit,
+  ProductLookupCandidate
 } from "@yardimci-asistan/shared";
 import {
   createBarcodeSimulatorAdapter,
@@ -35,6 +36,7 @@ interface MarketQuickSaleWorkspaceProps {
   cartDraftRequest?: CartDraftQuickSaleRequest | null;
   onCartDraftLoaded?: (draftId: string) => Promise<void> | void;
   onCartDraftReviewed?: (draftId: string) => Promise<void> | void;
+  onExternalProductFound?: (product: ProductLookupCandidate) => void;
 }
 
 export interface CartDraftQuickSaleRequest {
@@ -98,7 +100,8 @@ export function MarketQuickSaleWorkspace({
   onStateChange,
   cartDraftRequest = null,
   onCartDraftLoaded,
-  onCartDraftReviewed
+  onCartDraftReviewed,
+  onExternalProductFound
 }: MarketQuickSaleWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
   const [search, setSearch] = useState("");
@@ -193,6 +196,14 @@ export function MarketQuickSaleWorkspace({
     try {
       const product = await bridge.findProductByBarcode(barcode);
       if (!product || !product.isActive) {
+        const lookup = await bridge.lookupExternalProductByBarcode(barcode, "automatic");
+        if (lookup.status === "found") {
+          const message = `${lookup.product.name} bulundu; ürün kartı hazırlanıyor.`;
+          setBarcodeMessage(message);
+          onStateChange("success", message);
+          onExternalProductFound?.(lookup.product);
+          return;
+        }
         const message = `Barkod bulunamadı: ${barcode}`;
         setBarcodeMessage(message);
         onStateChange("error", message);
@@ -206,7 +217,7 @@ export function MarketQuickSaleWorkspace({
       setBarcodeMessage(message);
       onStateChange("error", message);
     }
-  }, [addProduct, bridge, onStateChange]);
+  }, [addProduct, bridge, onExternalProductFound, onStateChange]);
 
   const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
     if (!barcodeEnabled || busy || submitting || localScanInFlight.current) return;
