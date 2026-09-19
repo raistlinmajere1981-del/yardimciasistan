@@ -232,12 +232,6 @@ export function projectAndroidMarketSnapshot(
       : [],
     suppliers: suppliersEnabled ? source.suppliers : [],
     recent_purchases: recentPurchases,
-    product_drafts: catalogEnabled
-      ? source.product_drafts.map((draft) => ({
-          ...draft,
-          barcode: barcodeEnabled ? draft.barcode : ""
-        }))
-      : [],
     cart_drafts: catalogEnabled && salesEnabled ? source.cart_drafts : []
   };
 }
