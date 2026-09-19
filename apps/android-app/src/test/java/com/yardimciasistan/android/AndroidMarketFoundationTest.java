@@ -18,6 +18,8 @@ public final class AndroidMarketFoundationTest {
     assertTrue(data.market.suppliers.isEmpty());
     assertTrue(data.market.recentPurchases.isEmpty());
     assertTrue(data.market.cartDrafts.isEmpty());
+    assertFalse(data.market.productData.enabled);
+    assertEquals("open_food_facts", data.market.productData.provider);
     assertEquals(0, data.market.summary.todaySaleCount);
     assertEquals(0.0, data.market.summary.todaySalesTotal, 0.0);
     assertEquals("TRY", data.market.summary.currency);
