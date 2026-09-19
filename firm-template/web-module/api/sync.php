@@ -1501,6 +1501,12 @@ function ya_sync_sanitize_business_capabilities(mixed $value): array
 function ya_sync_empty_android_market(): array
 {
     return [
+        'product_data' => [
+            'enabled' => false,
+            'provider' => 'open_food_facts',
+            'auto_search_unknown_barcode' => false,
+            'include_images' => false
+        ],
         'summary' => [
             'today_sale_count' => 0,
             'today_sales_total' => 0.0,
@@ -1521,6 +1527,12 @@ function ya_sync_sanitize_android_market(mixed $value): array
 {
     $market = is_array($value) ? $value : [];
     $summary = is_array($market['summary'] ?? null) ? $market['summary'] : [];
+
+    $productData = is_array($market['product_data'] ?? null) ? $market['product_data'] : [];
+    $provider = ya_sync_string($productData['provider'] ?? 'open_food_facts');
+    if ($provider !== 'open_food_facts') {
+        $provider = 'open_food_facts';
+    }
 
     $adjustments = [];
     foreach (array_slice(is_array($summary['recent_stock_adjustments'] ?? null)
@@ -1654,6 +1666,12 @@ function ya_sync_sanitize_android_market(mixed $value): array
     }
 
     return [
+        'product_data' => [
+            'enabled' => ya_sync_bool($productData['enabled'] ?? false),
+            'provider' => $provider,
+            'auto_search_unknown_barcode' => ya_sync_bool($productData['auto_search_unknown_barcode'] ?? false),
+            'include_images' => ya_sync_bool($productData['include_images'] ?? false)
+        ],
         'summary' => [
             'today_sale_count' => max(0, ya_sync_int($summary['today_sale_count'] ?? 0, 0)),
             'today_sales_total' => max(0, ya_sync_float($summary['today_sales_total'] ?? 0, 0)),
@@ -1678,6 +1696,9 @@ function ya_sync_android_market_for_permissions(array $market, array $permission
     }
     if (in_array('market.product.view', $permissions, true)) {
         $result['products'] = $market['products'];
+    }
+    if (in_array('market.product_create', $permissions, true)) {
+        $result['product_data'] = $market['product_data'];
     }
     if (in_array('market.receiving', $permissions, true)) {
         $result['suppliers'] = $market['suppliers'];
