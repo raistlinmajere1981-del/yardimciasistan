@@ -64,6 +64,22 @@ public final class AndroidMarketUiTest {
   }
 
   @Test
+  public void productDataLookupRequiresServiceAndProductCreatePermission() {
+    OperationData data = marketData();
+    data.market.productData.enabled = true;
+    data.market.productData.provider = "open_food_facts";
+    data.market.productData.autoSearchUnknownBarcode = true;
+    data.market.productData.includeImages = true;
+
+    assertFalse(MarketUiRules.canLookupProductData(data));
+    data.permissions.add(MarketUiRules.PERMISSION_PRODUCT_CREATE);
+    assertTrue(MarketUiRules.canLookupProductData(data));
+
+    data.market.productData.enabled = false;
+    assertFalse(MarketUiRules.canLookupProductData(data));
+  }
+
+  @Test
   public void cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities() {
     OperationData data = marketData();
     assertFalse(MarketUiRules.canScanToDesktop(data));
