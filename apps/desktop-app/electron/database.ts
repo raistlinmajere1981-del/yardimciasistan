@@ -1923,7 +1923,7 @@ export class DesktopDatabase {
         return this.applyAndroidStockImageImport(action, now);
       case "market_stock_count":
       case "market_purchase_receive":
-      case "market_product_draft_create":
+      case "market_product_create":
       case "market_cart_draft_create":
       case "market_barcode_scan":
         return applyMarketAndroidAction({
