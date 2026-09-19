@@ -35,6 +35,8 @@ for (const section of ["Hızlı Satış", "Ürünler", "Stok", "Tedarikçiler / 
 for (const method of [
   "listProducts",
   "saveProduct",
+  "lookupExternalProductByBarcode",
+  "getProductImageDataUrl",
   "listCategories",
   "saveCategory",
   "deleteCategory",
@@ -49,6 +51,9 @@ for (const method of [
   assert.match(marketSource, new RegExp(`bridge\\.${method}\\b`), `Market workspaces must use commerce.${method}.`);
 }
 assert.match(preload, /commerce:\s*DesktopCommerceBridge;/, "Preload must expose the typed commerce bridge used by Market workspaces.");
+assert.match(marketProducts, /Ürün Bilgilerini Ara/, "Product workspace must expose manual product-data lookup.");
+assert.match(marketProducts, /Ürün verisi:/, "Product workspace must retain source attribution.");
+assert.match(marketPage, /onExternalProductFound/, "Unknown quick-sale barcodes must hand off to the product form.");
 assert.doesNotMatch(marketSource, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/, "Market renderer must not bind to removed profile flags.");
 
 console.log("market-workspace-contract-smoke-ok");
