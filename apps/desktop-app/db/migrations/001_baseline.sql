@@ -117,27 +117,6 @@ CREATE TABLE catalog_categories (
   deleted_at TEXT NOT NULL DEFAULT ''
 );
 
-CREATE TABLE catalog_product_drafts (
-  id TEXT PRIMARY KEY,
-  business_id TEXT NOT NULL,
-  barcode TEXT NOT NULL,
-  proposed_name TEXT NOT NULL,
-  sku TEXT NOT NULL DEFAULT '',
-  proposed_category TEXT NOT NULL DEFAULT '',
-  proposed_purchase_price REAL NOT NULL DEFAULT 0 CHECK (proposed_purchase_price >= 0),
-  proposed_sale_price REAL NOT NULL DEFAULT 0 CHECK (proposed_sale_price >= 0),
-  currency TEXT NOT NULL DEFAULT 'TRY',
-  unit TEXT NOT NULL DEFAULT 'piece' CHECK (unit IN (
-    'piece', 'kg', 'g', 'l', 'ml', 'pack', 'box', 'meter', 'other'
-  )),
-  note TEXT NOT NULL DEFAULT '',
-  source TEXT NOT NULL DEFAULT 'android',
-  created_by_device TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed')),
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
 CREATE TABLE catalog_products (
   id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
@@ -889,12 +868,6 @@ CREATE INDEX idx_business_capabilities_enabled
 
 CREATE INDEX idx_catalog_categories_business
   ON catalog_categories (business_id, is_active, sort_order, name);
-
-CREATE INDEX idx_catalog_product_drafts_barcode
-  ON catalog_product_drafts (business_id, barcode, created_at DESC);
-
-CREATE INDEX idx_catalog_product_drafts_business_status
-  ON catalog_product_drafts (business_id, status, created_at DESC);
 
 CREATE UNIQUE INDEX idx_catalog_products_barcode_unique
   ON catalog_products (business_id, barcode)
