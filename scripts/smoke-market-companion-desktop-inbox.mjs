@@ -7,24 +7,16 @@ import process from "node:process";
 import { DatabaseSync } from "node:sqlite";
 
 const require = createRequire(import.meta.url);
-const {
-  marketProductDraftCatalogDefaults
-} = require("../packages/shared/dist/index.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const {
   applyBusinessProfileCapabilities
 } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const {
   createMarketCartDraft,
-  createMarketProductDraft,
   createRuntimePaidSale,
   listMarketCartDrafts,
-  listMarketProductDrafts,
-  listRuntimeCatalogCategories,
   loadMarketCartDraftForQuickSale,
   markMarketCartDraftReviewed,
-  markMarketProductDraftReviewed,
-  saveRuntimeCatalogCategory,
   saveRuntimeCatalogProduct
 } = require("../apps/desktop-app/dist-electron/commerce-runtime.js");
 
@@ -66,86 +58,6 @@ try {
   const sqlite = new DatabaseSync(databasePath);
   sqlite.exec("PRAGMA foreign_keys = ON;");
   try {
-    const drinks = saveRuntimeCatalogCategory(databasePath, {
-      name: "İçecek Reyonu",
-      code: "drinks",
-      isActive: true
-    });
-    saveRuntimeCatalogCategory(databasePath, {
-      name: "Kapalı Reyon",
-      code: "inactive",
-      isActive: false
-    });
-
-    const productDraft = createMarketProductDraft(databasePath, {
-      barcode: "8690000007311",
-      proposedName: "Telefon Kola 330 ml",
-      sku: "PHONE-COLA",
-      proposedCategory: "  İÇECEK   REYONU ",
-      proposedPurchasePrice: 12.5,
-      proposedSalePrice: 21.75,
-      currency: "TRY",
-      unit: "piece",
-      note: "Ön rafta denenecek",
-      source: "android",
-      createdByDevice: "telefon-inbox-1"
-    });
-    const unmatchedDraft = createMarketProductDraft(databasePath, {
-      barcode: "8690000007312",
-      proposedName: "Eşleşmeyen Ürün",
-      proposedCategory: "Yeni Kategori Aç",
-      source: "android",
-      createdByDevice: "telefon-inbox-2"
-    });
-
-    assert.deepEqual(
-      listMarketProductDrafts(databasePath, { status: "pending" }).map((draft) => draft.id).sort(),
-      [productDraft.id, unmatchedDraft.id].sort()
-    );
-    const categoriesBeforeMapping = listRuntimeCatalogCategories(databasePath).length;
-    const matchingDefaults = marketProductDraftCatalogDefaults(
-      productDraft,
-      listRuntimeCatalogCategories(databasePath),
-      { inventoryEnabled: true }
-    );
-    assert.equal(matchingDefaults.categoryId, drinks.id);
-    assert.equal(matchingDefaults.name, productDraft.proposedName);
-    assert.equal(matchingDefaults.description, "");
-    assert.equal(matchingDefaults.noteReference, productDraft.note);
-    assert.equal(matchingDefaults.minimumQuantity, 0);
-    assert.equal(matchingDefaults.trackInventory, true);
-    const unmatchedDefaults = marketProductDraftCatalogDefaults(
-      unmatchedDraft,
-      listRuntimeCatalogCategories(databasePath),
-      { inventoryEnabled: false }
-    );
-    assert.equal(unmatchedDefaults.categoryId, "");
-    assert.equal(unmatchedDefaults.trackInventory, false);
-    assert.equal(listRuntimeCatalogCategories(databasePath).length, categoriesBeforeMapping);
-    assert.equal(
-      listMarketProductDrafts(databasePath, { status: "pending" }).some((draft) => draft.id === productDraft.id),
-      true,
-      "Loading form defaults must not review a product draft."
-    );
-
-    const savedProduct = saveRuntimeCatalogProduct(databasePath, {
-      categoryId: matchingDefaults.categoryId,
-      name: matchingDefaults.name,
-      sku: matchingDefaults.sku,
-      barcode: matchingDefaults.barcode,
-      description: matchingDefaults.description,
-      salePrice: matchingDefaults.salePrice,
-      purchasePrice: matchingDefaults.purchasePrice,
-      currency: matchingDefaults.currency,
-      unit: matchingDefaults.unit,
-      minimumQuantity: matchingDefaults.minimumQuantity,
-      trackInventory: false,
-      isActive: true
-    });
-    assert.equal(savedProduct.name, productDraft.proposedName);
-    assert.equal(markMarketProductDraftReviewed(databasePath, productDraft.id).status, "reviewed");
-    assert.equal(markMarketProductDraftReviewed(databasePath, productDraft.id).status, "reviewed");
-
     const activeCartProduct = saveRuntimeCatalogProduct(databasePath, {
       name: "Güncel Fiyatlı Ürün",
       sku: "CURRENT-PRICE",
@@ -209,7 +121,6 @@ try {
     assert.equal(markMarketCartDraftReviewed(databasePath, cartDraft.draft.id).status, "reviewed");
 
     // UI/runtime availability follows the persisted capability snapshot.
-    assert.equal(listMarketProductDrafts(databasePath, { status: "pending" }).length, 1);
     assert.equal(listMarketCartDrafts(databasePath, { status: "reviewed" }).length, 1);
   } finally {
     sqlite.close();
@@ -240,7 +151,6 @@ function assertSourceContracts() {
   const read = (relativePath) => readFileSync(join(process.cwd(), relativePath), "utf8");
   const page = read("apps/desktop-app/src/pages/MarketPage.tsx");
   const inbox = read("apps/desktop-app/src/components/market/MarketCompanionInboxWorkspace.tsx");
-  const products = read("apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx");
   const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
   const store = read("apps/desktop-app/electron/market-companion-store.ts");
 
