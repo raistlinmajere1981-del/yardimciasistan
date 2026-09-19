@@ -97,6 +97,13 @@ final class MarketUiRules {
     return canOpenMarket(data) && data.hasPermission(PERMISSION_PRODUCT_CREATE);
   }
 
+  static boolean canLookupProductData(OperationData data) {
+    return canCreateProduct(data)
+        && data.market != null
+        && data.market.productData != null
+        && data.market.productData.enabled;
+  }
+
   static boolean canCreateCartDraft(OperationData data) {
     return canViewProducts(data) && data.hasPermission(PERMISSION_CART_DRAFT);
   }
