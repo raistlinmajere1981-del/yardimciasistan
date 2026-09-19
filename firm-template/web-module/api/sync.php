@@ -1159,6 +1159,11 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
         );
         return $task !== [] && ya_sync_android_task_capability_allowed($task, $snapshot, $capabilities);
     }
+    if ($actionType === 'market_product_create') {
+        return isset($capabilities['commerce.catalog'])
+            && (!ya_sync_bool($payload['track_inventory'] ?? false)
+                || isset($capabilities['commerce.inventory']));
+    }
     if ($actionType === 'room_status_update'
         && ya_sync_string($payload['status'] ?? '') === 'reserved') {
         return isset($capabilities['accommodation.rooms'], $capabilities['accommodation.reservations']);
