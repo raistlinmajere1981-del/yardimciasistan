@@ -99,7 +99,7 @@ retail.labels
 
 ## Commerce / Market Temeli
 
-Market UI ve sektör bağımsız commerce omurgası hazırdır:
+Market UI ve sektör bağımsız commerce omurgası çalışır durumdadır:
 
 ```text
 catalog_categories
@@ -114,7 +114,9 @@ commerce_sales
 commerce_sale_items
 ```
 
-`apps/desktop-app/electron/commerce-runtime.ts`, katalog/stok/satış/barkod/tedarikçi işlemlerini persisted capability'lerle korur. Market MVP'nin UI ve cihaz adapter aşaması sonraki geliştirme fazıdır.
+`apps/desktop-app/electron/commerce-runtime.ts`, katalog/stok/satış/barkod/tedarikçi işlemlerini persisted capability'lerle korur. Market masaüstü çalışma alanı, Hızlı Satış, stok, tedarik/alım, etiket akışı ve Android retail companion kullanılabilir durumdadır.
+
+Bilinmeyen barkodlar için isteğe bağlı `Ürün Verisi` servisi bulunur. İlk provider Open Food Facts'tır; ürün adı, marka, ambalaj, görsel ve kaynak/provenance bilgileri alınabilir. Görsel kaydetmeden önce önizlenir, kayıt sonrası yerel `data/assets/products/...` arşivine standartlaştırılır ve backup/restore kapsamına girer. Android yeni ürün akışı da aynı servis ayarını kullanır.
 
 ## Ana Müşteri Talep Akışı
 
@@ -240,8 +242,8 @@ npm run android:mirror
 
 ## Güncel Geliştirme Aşaması
 
-Pansiyon/restoran showcase omurgası ve capability-first modüler altyapı oluşturulmuştur. Market/perakende sıradaki sektör çalışma alanıdır.
+Pansiyon/restoran omurgası, capability-first modüler altyapı ve Market/perakende MVP'si oluşturulmuştur. Market tarafında masaüstü operasyonları, Android companion, kamera barkod akışı, doğrudan mobil ürün kaydı, telefon sepetleri ve bilinmeyen barkod için Product Data entegrasyonu çalışır durumdadır.
 
-Market geliştirmesi başlamadan önce `node scripts/check-modular-foundation.mjs` yeşil olmalıdır. Market için planlanan sıra, veri modeli, capability kararları, barkod/etiket cihaz abstraction'ı ve MVP sınırı [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) içinde kayıtlıdır.
+Yeni geliştirme paketlerinden önce `node scripts/check-modular-foundation.mjs` yeşil olmalıdır. Güncel capability kararları, Market/Android sınırları, Product Data ve durable asset modeli [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) içinde kayıtlıdır.
 
 Güncel baseline yalnız `profile_id` ve `business_capabilities` sözleşmesini taşır. Eski profil alanları, module projection'ları ve geçiş migration'ları desteklenmez; temiz kurulum `001_baseline.sql` ile başlar. Eski bir veritabanı veya backup açılmaya çalışılırsa runner/backup doğrulaması açık hata verir.
