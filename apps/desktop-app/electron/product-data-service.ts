@@ -212,16 +212,14 @@ export async function lookupExternalProductByBarcode(
   }
 }
 
-export async function archiveExternalProductImage(
-  databasePath: string,
-  productId: string,
+async function fetchNormalizedProductImage(
   providerId: string,
   imageUrl: string
-): Promise<string> {
-  const settings = productDataSettings(databasePath);
-  if (!settings.enabled || !settings.includeImages) return "";
+): Promise<Buffer> {
   const provider = PRODUCT_LOOKUP_PROVIDERS[providerId as ProductDataProviderId];
-  if (!provider || !imageUrl || !provider.isImageUrlAllowed(imageUrl)) return "";
+  if (!provider || !imageUrl || !provider.isImageUrlAllowed(imageUrl)) {
+    throw new Error("Ürün görseli kaynağı geçersiz.");
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMAGE_TIMEOUT_MS);
@@ -263,42 +261,65 @@ export async function archiveExternalProductImage(
     if (!encoded.length) {
       throw new Error("Ürün görseli standart formata dönüştürülemedi.");
     }
-
-    const dataRoot = path.dirname(databasePath);
-    const absolutePath = resolveProductAssetAbsolutePath(dataRoot, productId, "front.jpg");
-    const relativePath = resolveProductAssetRelativePath(productId, "front.jpg");
-    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-    const tempPath = `${absolutePath}.tmp-${process.pid}`;
-    try {
-      fs.writeFileSync(tempPath, encoded);
-      fs.copyFileSync(tempPath, absolutePath);
-    } finally {
-      try {
-        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
-      } catch {
-        // Temp cleanup is best effort; the product file has already been written or the caller gets the original error.
-      }
-    }
-
-    const database = openDatabase(databasePath);
-    try {
-      database.prepare(`
-        UPDATE catalog_products
-        SET image_asset_path = ?, updated_at = ?
-        WHERE id = ? AND deleted_at = ''
-      `).run(relativePath, new Date().toISOString(), productId);
-    } finally {
-      database.close();
-    }
-    return relativePath;
+    return encoded;
   } catch (error) {
     if (controller.signal.aborted) {
-      throw new Error("Ürün görseli indirilirken zaman aşımı oluştu.", { cause: error });
+      throw new Error("Ürün görseli alınırken zaman aşımı oluştu.", { cause: error });
     }
     throw error;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function previewExternalProductImage(
+  providerId: string,
+  imageUrl: string
+): Promise<string> {
+  const encoded = await fetchNormalizedProductImage(providerId, imageUrl);
+  return `data:image/jpeg;base64,${encoded.toString("base64")}`;
+}
+
+export async function archiveExternalProductImage(
+  databasePath: string,
+  productId: string,
+  providerId: string,
+  imageUrl: string
+): Promise<string> {
+  const settings = productDataSettings(databasePath);
+  if (!settings.enabled || !settings.includeImages) return "";
+
+  const provider = PRODUCT_LOOKUP_PROVIDERS[providerId as ProductDataProviderId];
+  if (!provider || !imageUrl || !provider.isImageUrlAllowed(imageUrl)) return "";
+
+  const encoded = await fetchNormalizedProductImage(providerId, imageUrl);
+  const dataRoot = path.dirname(databasePath);
+  const absolutePath = resolveProductAssetAbsolutePath(dataRoot, productId, "front.jpg");
+  const relativePath = resolveProductAssetRelativePath(productId, "front.jpg");
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  const tempPath = `${absolutePath}.tmp-${process.pid}`;
+  try {
+    fs.writeFileSync(tempPath, encoded);
+    fs.copyFileSync(tempPath, absolutePath);
+  } finally {
+    try {
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    } catch {
+      // Temp cleanup is best effort; the product file has already been written or the caller gets the original error.
+    }
+  }
+
+  const database = openDatabase(databasePath);
+  try {
+    database.prepare(`
+      UPDATE catalog_products
+      SET image_asset_path = ?, updated_at = ?
+      WHERE id = ? AND deleted_at = ''
+    `).run(relativePath, new Date().toISOString(), productId);
+  } finally {
+    database.close();
+  }
+  return relativePath;
 }
 
 export function getProductImageDataUrl(databasePath: string, productId: string): string {
