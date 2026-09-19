@@ -306,6 +306,8 @@ const bridge: DesktopBridge = {
     listProducts: (options) => invokeWhenUnlocked<CatalogProduct[]>("commerce:product:list", options),
     saveProduct: (input) => invokeWhenUnlocked<CatalogProduct>("commerce:product:save", input),
     findProductByBarcode: (barcode) => invokeWhenUnlocked<CatalogProduct | null>("commerce:product:findByBarcode", barcode),
+    lookupExternalProductByBarcode: (barcode, mode = "manual") => invokeWhenUnlocked("commerce:product:lookupExternal", barcode, mode),
+    getProductImageDataUrl: (productId) => invokeWhenUnlocked<string>("commerce:product:imageDataUrl", productId),
     getInventoryBalance: (productId, locationId) => invokeWhenUnlocked<InventoryBalance>("commerce:inventory:getBalance", productId, locationId),
     listInventoryMovements: (options) => invokeWhenUnlocked<InventoryMovement[]>("commerce:inventory:listMovements", options),
     applyInventoryMovement: (input) => invokeWhenUnlocked<InventoryMovement>("commerce:inventory:applyMovement", input),
