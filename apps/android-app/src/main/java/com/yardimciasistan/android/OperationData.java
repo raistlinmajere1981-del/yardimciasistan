@@ -67,7 +67,7 @@ final class OperationData {
       "market.product.view",
       "market.stock_count",
       "market.receiving",
-      "market.product_draft",
+      "market.product_create",
       "market.cart_draft",
       "market.scan_to_desktop"
   };
@@ -353,7 +353,7 @@ final class OperationData {
     if ("market.summary.view".equals(permission)) {
       return hasAnyMarketCapability();
     }
-    if ("market.product.view".equals(permission) || "market.product_draft".equals(permission)) {
+    if ("market.product.view".equals(permission) || "market.product_create".equals(permission)) {
       return hasBusinessCapability("commerce.catalog");
     }
     if ("market.stock_count".equals(permission)) {
