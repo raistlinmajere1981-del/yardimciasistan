@@ -2,6 +2,7 @@ import { Image as ImageIcon, Plus, Save, Search, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
+  normalizeBarcodeIdentity,
   type CatalogCategory,
   type CatalogProduct,
   type CommerceUnit,
@@ -266,7 +267,11 @@ export function MarketProductsWorkspace({
     setLookupBusy(true);
     onStateChange("loading", "Ürün bilgileri aranıyor…");
     try {
-      const result = await bridge.lookupExternalProductByBarcode(productForm.barcode.trim(), "manual");
+      const normalizedBarcode = normalizeBarcodeIdentity(productForm.barcode, 80);
+      if (normalizedBarcode !== productForm.barcode) {
+        setProductForm((current) => ({ ...current, barcode: normalizedBarcode }));
+      }
+      const result = await bridge.lookupExternalProductByBarcode(normalizedBarcode, "manual");
       if (result.status === "disabled") {
         onStateChange(
           "error",
@@ -300,7 +305,7 @@ export function MarketProductsWorkspace({
         name: productForm.name,
         brand: productForm.brand,
         sku: productForm.sku,
-        barcode: productForm.barcode,
+        barcode: normalizeBarcodeIdentity(productForm.barcode, 80),
         description: productForm.description,
         salePrice: Number(productForm.salePrice),
         purchasePrice: Number(productForm.purchasePrice),
@@ -456,7 +461,7 @@ export function MarketProductsWorkspace({
           <label className="market-field market-field-wide">
             Barkod
             <span className="market-inline-field">
-              <input value={productForm.barcode} onChange={(event) => setProductForm((current) => ({ ...current, barcode: event.target.value }))} />
+              <input value={productForm.barcode} onChange={(event) => setProductForm((current) => ({ ...current, barcode: normalizeBarcodeIdentity(event.target.value, 80) }))} />
               {productDataEnabled && (
                 <button type="button" className="market-secondary-button" onClick={() => void lookupProductInfo()} disabled={busy || lookupBusy || !productForm.barcode.trim()}>
                   <Sparkles size={15} aria-hidden="true" /> {lookupBusy ? "Aranıyor…" : "Ürün Bilgilerini Ara"}
