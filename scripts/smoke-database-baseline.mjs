@@ -75,6 +75,12 @@ try {
     aiTimeoutSeconds: 30,
     aiApiKey: "",
     clearAiApiKey: false,
+    productData: {
+      enabled: true,
+      provider: "open_food_facts",
+      autoSearchUnknownBarcode: false,
+      includeImages: true
+    },
     servicePreferences: { whatsapp: false, android: true },
     initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
@@ -195,6 +201,10 @@ function assertCurrentBaseline(database, options = {}) {
     assert.ok(enabled.has("commerce.catalog"));
     assert.ok(enabled.has("commerce.sales"));
     assert.ok(enabled.has("retail.barcode"));
+    assert.equal(setupData.productData.enabled, true);
+    assert.equal(setupData.productData.provider, "open_food_facts");
+    assert.equal(setupData.productData.autoSearchUnknownBarcode, false);
+    assert.equal(setupData.productData.includeImages, true);
   }
 }
 
@@ -248,12 +258,33 @@ function assertCurrentDatabase(database, options = {}) {
 
   const businessColumns = tableColumns(database, "business");
   const settingsColumns = tableColumns(database, "settings");
+  const productColumns = tableColumns(database, "catalog_products");
   assert.ok(businessColumns.has("profile_id"));
   for (const column of ["business_type", "modules_json"]) {
     assert.equal(businessColumns.has(column), false);
   }
   for (const column of ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]) {
     assert.equal(settingsColumns.has(column), false);
+  }
+  for (const column of [
+    "product_data_enabled",
+    "product_data_provider",
+    "product_data_auto_search",
+    "product_data_include_images"
+  ]) {
+    assert.equal(settingsColumns.has(column), true, `settings missing ${column}`);
+  }
+  for (const column of [
+    "brand",
+    "image_asset_path",
+    "image_source_url",
+    "data_source",
+    "source_product_url",
+    "data_license",
+    "image_license",
+    "source_fetched_at"
+  ]) {
+    assert.equal(productColumns.has(column), true, `catalog_products missing ${column}`);
   }
 
   if (options.market) {
