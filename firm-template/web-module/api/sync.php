@@ -1032,7 +1032,7 @@ function ya_sync_android_action_types(): array
         'menu_stock_image_import_apply',
         'market_stock_count',
         'market_purchase_receive',
-        'market_product_draft_create',
+        'market_product_create',
         'market_cart_draft_create',
         'market_barcode_scan',
         'menu_category_delete',
@@ -1102,7 +1102,7 @@ function ya_sync_android_action_permission(string $actionType, array $payload): 
         'menu_stock_image_import_apply' => 'menu.stock_update',
         'market_stock_count' => 'market.stock_count',
         'market_purchase_receive' => 'market.receiving',
-        'market_product_draft_create' => 'market.product_draft',
+        'market_product_create' => 'market.product_create',
         'market_cart_draft_create' => 'market.cart_draft',
         'market_barcode_scan' => 'market.scan_to_desktop'
     ];
@@ -1206,7 +1206,7 @@ function ya_sync_android_action_capability_allowed(string $actionType, array $pa
         'menu_stock_image_import_apply' => ['food_service.menu', 'commerce.inventory', 'service.ai'],
         'market_stock_count' => ['commerce.inventory'],
         'market_purchase_receive' => ['retail.purchasing'],
-        'market_product_draft_create' => ['commerce.catalog'],
+        'market_product_create' => ['commerce.catalog'],
         'market_cart_draft_create' => ['commerce.sales', 'commerce.catalog'],
         'market_barcode_scan' => ['retail.barcode', 'commerce.catalog', 'commerce.sales'],
         'message_delete' => ['core.customers', 'service.whatsapp']
@@ -1708,7 +1708,7 @@ function ya_sync_android_market_for_permissions(array $market, array $permission
         $result['suppliers'] = $market['suppliers'];
         $result['recent_purchases'] = $market['recent_purchases'];
     }
-    if (in_array('market.product_draft', $permissions, true)) {
+    if (in_array('market.product_create', $permissions, true)) {
         $result['product_drafts'] = $market['product_drafts'];
     }
     if (in_array('market.cart_draft', $permissions, true)) {
@@ -1992,7 +1992,7 @@ function ya_sync_android_permissions(): array
         'market.product.view',
         'market.stock_count',
         'market.receiving',
-        'market.product_draft',
+        'market.product_create',
         'market.cart_draft',
         'market.scan_to_desktop'
     ];
