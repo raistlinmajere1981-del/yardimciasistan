@@ -67,6 +67,12 @@ export const defaultSetupData: DesktopSetupData = {
   aiApiKeyConfigured: false,
   aiLastPublishedAt: "",
   aiProfiles: [],
+  productData: {
+    enabled: false,
+    provider: "open_food_facts",
+    autoSearchUnknownBarcode: true,
+    includeImages: true
+  },
   servicePreferences: {
     whatsapp: false,
     android: false
