@@ -649,6 +649,7 @@ export function SetupForm({
             </div>
           </section>
 
+          {hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.CATALOG) && (
           <section className={`settings-service-card${form.productDataEnabled ? " is-enabled" : " is-disabled"}`}>
             <div className="settings-service-card-header">
               <div>
@@ -698,6 +699,7 @@ export function SetupForm({
               </small>
             </fieldset>
           </section>
+          )}
         </div>
 
         <section className="settings-service-card is-enabled settings-web-section">
