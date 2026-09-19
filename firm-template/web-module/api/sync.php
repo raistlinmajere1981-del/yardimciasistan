@@ -1579,6 +1579,8 @@ function ya_sync_sanitize_android_market(mixed $value): array
             'currency' => mb_substr(ya_sync_string($rawProduct['currency'] ?? 'TRY') ?: 'TRY', 0, 8),
             'is_active' => ya_sync_bool($rawProduct['is_active'] ?? false),
             'track_inventory' => ya_sync_bool($rawProduct['track_inventory'] ?? false),
+            'image_source_url' => mb_substr(ya_sync_string($rawProduct['image_source_url'] ?? ''), 0, 1200),
+            'data_source' => mb_substr(ya_sync_string($rawProduct['data_source'] ?? ''), 0, 80),
             'current_quantity' => max(0, ya_sync_float($rawProduct['current_quantity'] ?? 0, 0)),
             'minimum_quantity' => max(0, ya_sync_float($rawProduct['minimum_quantity'] ?? 0, 0)),
             'inventory_updated_at' => ya_sync_string($rawProduct['inventory_updated_at'] ?? '')
