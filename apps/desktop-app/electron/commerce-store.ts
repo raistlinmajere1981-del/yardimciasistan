@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import {
   createId,
   moneyToMinor,
+  normalizeBarcodeIdentity,
   type CatalogProduct,
   type CommerceSale,
   type CommerceSupplier,
@@ -418,7 +419,7 @@ export function findCatalogProductByBarcode(databasePath: string, barcodeInput: 
   const database = openDatabase(databasePath);
   try {
     const businessId = activeBusinessId(database);
-    const barcode = String(barcodeInput ?? "").trim();
+    const barcode = normalizeBarcodeIdentity(barcodeInput);
     if (!barcode) throw new Error("Barkod boş olamaz.");
     const row = database.prepare(`
       SELECT *
@@ -450,7 +451,7 @@ export function saveCatalogProductInTransaction(
     ? String(existing?.brand ?? "").trim().slice(0, 160)
     : String(input.brand ?? "").trim().replace(/\s+/g, " ").slice(0, 160);
   const sku = String(input.sku ?? "").trim().slice(0, 80);
-  const barcode = String(input.barcode ?? "").trim().slice(0, 80);
+  const barcode = normalizeBarcodeIdentity(input.barcode, 80);
   const description = String(input.description ?? "").trim().slice(0, 2000);
   const previousImageSourceUrl = String(existing?.image_source_url ?? "").trim().slice(0, 1200);
   const imageSourceUrl = input.imageSourceUrl === undefined
