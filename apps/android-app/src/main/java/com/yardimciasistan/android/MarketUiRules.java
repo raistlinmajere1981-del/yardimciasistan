@@ -127,7 +127,7 @@ final class MarketUiRules {
 
   static JSONObject barcodeScanPayload(String rawBarcode, String scannedAt)
       throws ValidationException {
-    String barcode = limitedText(rawBarcode, 120, "Barkod");
+    String barcode = limitedText(normalizeBarcodeIdentity(rawBarcode), 120, "Barkod");
     if (barcode.length() < 3) throw new ValidationException("Geçerli bir barkod girin.");
     String timestamp = limitedText(scannedAt, 80, "Tarama zamanı");
     if (timestamp.isEmpty()) throw new ValidationException("Tarama zamanı gerekli.");
@@ -152,7 +152,7 @@ final class MarketUiRules {
 
   static OperationData.MarketProduct resolveBarcode(OperationData data, String rawBarcode) {
     if (!canViewProducts(data)) return null;
-    String barcode = text(rawBarcode);
+    String barcode = normalizeBarcodeIdentity(rawBarcode);
     if (barcode.isEmpty()) return null;
     for (OperationData.MarketProduct product : data.market.products) {
       if (product.active && barcode.equals(product.barcode.trim())) {
@@ -222,7 +222,7 @@ final class MarketUiRules {
       String category,
       String note
   ) throws ValidationException {
-    String normalizedBarcode = limitedText(barcode, 120, "Barkod");
+    String normalizedBarcode = limitedText(normalizeBarcodeIdentity(barcode), 120, "Barkod");
     if (normalizedBarcode.length() < 3) {
       throw new ValidationException("Geçerli bir barkod girin.");
     }
@@ -254,6 +254,27 @@ final class MarketUiRules {
     } catch (Exception error) {
       throw new ValidationException("Ürün kaydı hazırlanamadı.");
     }
+  }
+
+  static String normalizeBarcodeIdentity(String raw) {
+    String value = text(raw);
+    if (value.isEmpty()) return "";
+
+    boolean hasDigit = false;
+    boolean hasLetter = false;
+    for (int index = 0; index < value.length(); index += 1) {
+      char character = value.charAt(index);
+      if (character >= '0' && character <= '9') hasDigit = true;
+      if (Character.isLetter(character)) hasLetter = true;
+    }
+    if (!hasDigit || hasLetter) return value;
+
+    StringBuilder digits = new StringBuilder(value.length());
+    for (int index = 0; index < value.length(); index += 1) {
+      char character = value.charAt(index);
+      if (character >= '0' && character <= '9') digits.append(character);
+    }
+    return digits.toString();
   }
 
   static boolean isUnit(String unit) {
