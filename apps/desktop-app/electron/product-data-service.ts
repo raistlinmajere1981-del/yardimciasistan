@@ -225,8 +225,16 @@ export async function archiveExternalProductImage(
     const relativePath = resolveProductAssetRelativePath(productId, "front.jpg");
     fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
     const tempPath = `${absolutePath}.tmp-${process.pid}`;
-    fs.writeFileSync(tempPath, encoded);
-    fs.renameSync(tempPath, absolutePath);
+    try {
+      fs.writeFileSync(tempPath, encoded);
+      fs.copyFileSync(tempPath, absolutePath);
+    } finally {
+      try {
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      } catch {
+        // Temp cleanup is best effort; the product file has already been written or the caller gets the original error.
+      }
+    }
 
     const database = openDatabase(databasePath);
     try {
