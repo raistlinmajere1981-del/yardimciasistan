@@ -132,6 +132,9 @@ const openFoodFactsProvider: ProductLookupProvider = {
         signal: options.signal
       }
     );
+    if (response.status === 404) {
+      return { status: "not_found", barcode, provider: OPEN_FOOD_FACTS_PROVIDER };
+    }
     if (!response.ok) {
       throw new Error(`Ürün veri servisi HTTP ${response.status} yanıtı verdi.`);
     }
