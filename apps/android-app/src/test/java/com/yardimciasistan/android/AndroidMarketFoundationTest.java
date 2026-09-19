@@ -17,7 +17,6 @@ public final class AndroidMarketFoundationTest {
     assertTrue(data.market.products.isEmpty());
     assertTrue(data.market.suppliers.isEmpty());
     assertTrue(data.market.recentPurchases.isEmpty());
-    assertTrue(data.market.productDrafts.isEmpty());
     assertTrue(data.market.cartDrafts.isEmpty());
     assertEquals(0, data.market.summary.todaySaleCount);
     assertEquals(0.0, data.market.summary.todaySalesTotal, 0.0);
@@ -38,7 +37,7 @@ public final class AndroidMarketFoundationTest {
         "market.summary.view",
         "market.product.view",
         "market.stock_count",
-        "market.product_draft",
+        "market.product_create",
         "market.cart_draft"
     }) {
       data.permissions.add(permission);
@@ -62,7 +61,7 @@ public final class AndroidMarketFoundationTest {
         "market.product.view",
         "market.stock_count",
         "market.receiving",
-        "market.product_draft",
+        "market.product_create",
         "market.cart_draft",
         "market.scan_to_desktop"
     }) {
