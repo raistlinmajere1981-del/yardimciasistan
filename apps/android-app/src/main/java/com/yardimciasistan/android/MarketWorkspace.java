@@ -1121,6 +1121,18 @@ final class MarketWorkspace {
       return;
     }
     if (PURPOSE_PRODUCT_CREATE.equals(purpose)) {
+      OperationData.MarketProduct existingProduct = MarketUiRules.resolveBarcode(data, barcode);
+      if (existingProduct != null) {
+        resultReturnScreen = SCREEN_HOME;
+        barcodeResult = existingProduct.barcode;
+        barcodeResultProductId = existingProduct.id;
+        visibleMessage = "Bu barkod zaten " + existingProduct.name + " ürününe ait.";
+        visibleMessagePending = false;
+        screen = SCREEN_BARCODE_RESULT;
+        formError = "";
+        listener.onRenderRequested();
+        return;
+      }
       startProductCreate(barcode);
       return;
     }
