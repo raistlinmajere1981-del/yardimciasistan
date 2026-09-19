@@ -972,6 +972,14 @@ export class DesktopDatabase {
     const tableCategoryResolution = normalizeTableCategoryInputs(input.tableCategories);
     const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
     const existingSettings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
+    const productDataSettings = {
+      enabled: input.productData?.enabled ?? Number(existingSettings?.product_data_enabled ?? 0) === 1,
+      provider: "open_food_facts" as const,
+      autoSearchUnknownBarcode: input.productData?.autoSearchUnknownBarcode
+        ?? Number(existingSettings?.product_data_auto_search ?? 1) === 1,
+      includeImages: input.productData?.includeImages
+        ?? Number(existingSettings?.product_data_include_images ?? 1) === 1
+    };
     const birthdaySettings = normalizeBirthdaySettings(input.birthdaySettings ?? {
       enabled: normalizeBoolean(existingSettings?.birthday_enabled, true),
       mode: existingSettings?.birthday_mode === "automatic" ? "automatic" : "manual",
@@ -1264,11 +1272,15 @@ export class DesktopDatabase {
             birthday_mode,
             birthday_send_time,
             birthday_message_template,
+            product_data_enabled,
+            product_data_provider,
+            product_data_auto_search,
+            product_data_include_images,
             setup_completed,
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, 1, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             business_id = excluded.business_id,
             web_module_url = excluded.web_module_url,
@@ -1286,6 +1298,10 @@ export class DesktopDatabase {
             birthday_mode = excluded.birthday_mode,
             birthday_send_time = excluded.birthday_send_time,
             birthday_message_template = excluded.birthday_message_template,
+            product_data_enabled = excluded.product_data_enabled,
+            product_data_provider = excluded.product_data_provider,
+            product_data_auto_search = excluded.product_data_auto_search,
+            product_data_include_images = excluded.product_data_include_images,
             setup_completed = 1,
             updated_at = excluded.updated_at,
             deleted_at = '',
@@ -1309,6 +1325,10 @@ export class DesktopDatabase {
           birthdaySettings.mode,
           birthdaySettings.sendTime,
           birthdaySettings.messageTemplate,
+          productDataSettings.enabled ? 1 : 0,
+          productDataSettings.provider,
+          productDataSettings.autoSearchUnknownBarcode ? 1 : 0,
+          productDataSettings.includeImages ? 1 : 0,
           settingsCreatedAt,
           now
         );
