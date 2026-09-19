@@ -27,13 +27,13 @@ final class MarketUiRules {
   static final String PERMISSION_PRODUCT_VIEW = "market.product.view";
   static final String PERMISSION_STOCK_COUNT = "market.stock_count";
   static final String PERMISSION_RECEIVING = "market.receiving";
-  static final String PERMISSION_PRODUCT_DRAFT = "market.product_draft";
+  static final String PERMISSION_PRODUCT_CREATE = "market.product_create";
   static final String PERMISSION_CART_DRAFT = "market.cart_draft";
   static final String PERMISSION_SCAN_TO_DESKTOP = "market.scan_to_desktop";
 
   static final String ACTION_STOCK_COUNT = "market_stock_count";
   static final String ACTION_PURCHASE_RECEIVE = "market_purchase_receive";
-  static final String ACTION_PRODUCT_DRAFT_CREATE = "market_product_draft_create";
+  static final String ACTION_PRODUCT_CREATE = "market_product_create";
   static final String ACTION_CART_DRAFT_CREATE = "market_cart_draft_create";
   static final String ACTION_BARCODE_SCAN = "market_barcode_scan";
   static final long BARCODE_DEBOUNCE_MS = 1_000L;
@@ -43,7 +43,7 @@ final class MarketUiRules {
       PERMISSION_PRODUCT_VIEW,
       PERMISSION_STOCK_COUNT,
       PERMISSION_RECEIVING,
-      PERMISSION_PRODUCT_DRAFT,
+      PERMISSION_PRODUCT_CREATE,
       PERMISSION_CART_DRAFT,
       PERMISSION_SCAN_TO_DESKTOP
   };
@@ -93,8 +93,8 @@ final class MarketUiRules {
     return canViewProducts(data) && data.hasPermission(PERMISSION_RECEIVING);
   }
 
-  static boolean canCreateProductDraft(OperationData data) {
-    return canOpenMarket(data) && data.hasPermission(PERMISSION_PRODUCT_DRAFT);
+  static boolean canCreateProduct(OperationData data) {
+    return canOpenMarket(data) && data.hasPermission(PERMISSION_PRODUCT_CREATE);
   }
 
   static boolean canCreateCartDraft(OperationData data) {
@@ -112,7 +112,7 @@ final class MarketUiRules {
   static String requiredPermissionForAction(String actionType) {
     if (ACTION_STOCK_COUNT.equals(actionType)) return PERMISSION_STOCK_COUNT;
     if (ACTION_PURCHASE_RECEIVE.equals(actionType)) return PERMISSION_RECEIVING;
-    if (ACTION_PRODUCT_DRAFT_CREATE.equals(actionType)) return PERMISSION_PRODUCT_DRAFT;
+    if (ACTION_PRODUCT_CREATE.equals(actionType)) return PERMISSION_PRODUCT_CREATE;
     if (ACTION_CART_DRAFT_CREATE.equals(actionType)) return PERMISSION_CART_DRAFT;
     if (ACTION_BARCODE_SCAN.equals(actionType)) return PERMISSION_SCAN_TO_DESKTOP;
     return null;
@@ -205,7 +205,7 @@ final class MarketUiRules {
     }
   }
 
-  static JSONObject productDraftPayload(
+  static JSONObject productCreatePayload(
       String barcode,
       String proposedName,
       String sku,
@@ -232,19 +232,20 @@ final class MarketUiRules {
     try {
       JSONObject payload = new JSONObject();
       payload.put("barcode", normalizedBarcode);
-      payload.put("proposed_name", normalizedName);
+      payload.put("name", normalizedName);
       payload.put("sku", limitedText(sku, 120, "SKU"));
       payload.put("unit", normalizedUnit);
-      payload.put("proposed_purchase_price", purchasePrice);
-      payload.put("proposed_sale_price", salePrice);
-      payload.put("proposed_category", limitedText(category, 180, "Kategori"));
+      payload.put("purchase_price", purchasePrice);
+      payload.put("sale_price", salePrice);
+      payload.put("category", limitedText(category, 180, "Kategori"));
       payload.put("currency", "TRY");
+      payload.put("track_inventory", true);
       payload.put("note", limitedText(note, 2000, "Not"));
       return payload;
     } catch (ValidationException error) {
       throw error;
     } catch (Exception error) {
-      throw new ValidationException("Ürün taslağı hazırlanamadı.");
+      throw new ValidationException("Ürün kaydı hazırlanamadı.");
     }
   }
 
