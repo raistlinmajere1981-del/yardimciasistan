@@ -20,7 +20,9 @@ import type {
   InventoryBalance,
   InventoryMovement,
   MarketBarcodeScanEvent,
-  MarketCartDraftLoadResult
+  MarketCartDraftLoadResult,
+  ProductLookupMode,
+  ProductLookupResponse
 } from "@yardimci-asistan/shared";
 import type {
   DeleteCatalogCategoryResult,
@@ -69,6 +71,8 @@ export interface DesktopCommerceBridge {
   listProducts: (options?: ListCatalogProductsOptions) => Promise<CatalogProduct[]>;
   saveProduct: (input: SaveCatalogProductInput) => Promise<CatalogProduct>;
   findProductByBarcode: (barcode: string) => Promise<CatalogProduct | null>;
+  lookupExternalProductByBarcode: (barcode: string, mode?: ProductLookupMode) => Promise<ProductLookupResponse>;
+  getProductImageDataUrl: (productId: string) => Promise<string>;
 
   getInventoryBalance: (productId: string, locationId?: string) => Promise<InventoryBalance>;
   listInventoryMovements: (options?: ListInventoryMovementsOptions) => Promise<InventoryMovement[]>;
