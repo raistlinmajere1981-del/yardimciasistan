@@ -66,7 +66,7 @@ test("pure Market exposes one handheld group and capability-bounded permissions"
     "market.product.view",
     "market.stock_count",
     "market.receiving",
-    "market.product_draft",
+    "market.product_create",
     "market.cart_draft",
     "market.scan_to_desktop"
   ]) {
