@@ -389,7 +389,7 @@ Workspace profil kimliğiyle değil persisted capabilities ile açılır.
 - simulator
 - USB keyboard-wedge scanner
 - exact guarded lookup
-- camera/Android extension point reserved
+- Android CameraX + ML Kit scanner
 
 ### M5 — Label MVP — CLOSED
 
