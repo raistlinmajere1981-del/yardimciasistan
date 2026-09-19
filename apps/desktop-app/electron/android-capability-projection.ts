@@ -203,6 +203,9 @@ export function projectAndroidMarketSnapshot(
   const barcodeEnabled = enabled.has(C.RETAIL_BARCODE);
   const suppliersEnabled = enabled.has(C.RETAIL_SUPPLIERS);
   const purchasingEnabled = enabled.has(C.RETAIL_PURCHASING);
+  const productData = catalogEnabled
+    ? (source.product_data ?? emptyAndroidMarketSnapshot().product_data)
+    : emptyAndroidMarketSnapshot().product_data;
   const recentPurchases = purchasingEnabled
     ? source.recent_purchases.map((purchase) => ({
         ...purchase,
@@ -212,6 +215,7 @@ export function projectAndroidMarketSnapshot(
     : [];
 
   return {
+    product_data: productData,
     summary: {
       today_sale_count: salesEnabled ? source.summary.today_sale_count : 0,
       today_sales_total: salesEnabled ? source.summary.today_sales_total : 0,
