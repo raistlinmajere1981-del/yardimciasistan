@@ -1,6 +1,5 @@
 import {
   BUSINESS_CAPABILITIES,
-  type CatalogProductDraft,
   type CommerceSaleDraft,
   type CommerceSaleDraftDetail,
   type MarketBarcodeScanEvent,
@@ -9,26 +8,19 @@ import {
 import { assertPersistedBusinessCapability } from "./business-capability-runtime.js";
 import {
   createMarketCartDraftRecord,
-  createMarketProductDraftRecord,
   consumePendingMarketBarcodeScanRecords,
   getMarketCartDraftRecord,
   loadMarketCartDraftForQuickSaleRecord,
   listMarketCartDraftRecords,
-  listMarketProductDraftRecords,
   markMarketCartDraftReviewedRecord,
-  markMarketProductDraftReviewedRecord,
   type ConsumePendingMarketBarcodeScansOptions,
   type CreateMarketCartDraftInput,
-  type CreateMarketProductDraftInput,
-  type ListMarketCartDraftsOptions,
-  type ListMarketProductDraftsOptions
+  type ListMarketCartDraftsOptions
 } from "./market-companion-store.js";
 
 export type {
   CreateMarketCartDraftInput,
-  CreateMarketProductDraftInput,
   ListMarketCartDraftsOptions,
-  ListMarketProductDraftsOptions,
   ConsumePendingMarketBarcodeScansOptions
 };
 
@@ -36,7 +28,7 @@ function requireCatalog(databasePath: string): void {
   assertPersistedBusinessCapability(
     databasePath,
     BUSINESS_CAPABILITIES.CATALOG,
-    "Market ürün taslakları için ürün kataloğu etkin olmalı."
+    "Market işlemleri için ürün kataloğu etkin olmalı."
   );
 }
 
@@ -54,30 +46,6 @@ function requireBarcode(databasePath: string): void {
     BUSINESS_CAPABILITIES.RETAIL_BARCODE,
     "Telefon barkod modu için barkod yeteneği etkin olmalı."
   );
-}
-
-export function createMarketProductDraft(
-  databasePath: string,
-  input: CreateMarketProductDraftInput
-): CatalogProductDraft {
-  requireCatalog(databasePath);
-  return createMarketProductDraftRecord(databasePath, input);
-}
-
-export function listMarketProductDrafts(
-  databasePath: string,
-  options: ListMarketProductDraftsOptions = {}
-): CatalogProductDraft[] {
-  requireCatalog(databasePath);
-  return listMarketProductDraftRecords(databasePath, options);
-}
-
-export function markMarketProductDraftReviewed(
-  databasePath: string,
-  draftId: string
-): CatalogProductDraft {
-  requireCatalog(databasePath);
-  return markMarketProductDraftReviewedRecord(databasePath, draftId);
 }
 
 export function createMarketCartDraft(
