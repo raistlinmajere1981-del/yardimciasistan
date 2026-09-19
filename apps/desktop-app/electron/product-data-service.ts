@@ -55,9 +55,7 @@ function productDataSettings(databasePath: string): ProductDataSettings {
     `).get() as Record<string, unknown> | undefined;
     return {
       enabled: Number(row?.product_data_enabled ?? 0) === 1,
-      provider: text(row?.product_data_provider, 80) === OPEN_FOOD_FACTS_PROVIDER
-        ? OPEN_FOOD_FACTS_PROVIDER
-        : OPEN_FOOD_FACTS_PROVIDER,
+      provider: normalizeProductDataProvider(row?.product_data_provider),
       autoSearchUnknownBarcode: Number(row?.product_data_auto_search ?? 1) === 1,
       includeImages: Number(row?.product_data_include_images ?? 1) === 1
     };
@@ -76,6 +74,16 @@ function normalizeBarcode(value: unknown): string {
 
 function text(value: unknown, maximum = 240): string {
   return String(value ?? "").trim().replace(/\s+/g, " ").slice(0, maximum);
+}
+
+function normalizeProductDataProvider(value: unknown): ProductDataProviderId {
+  const provider = text(value, 80);
+  switch (provider) {
+    case "open_food_facts":
+      return "open_food_facts";
+    default:
+      return OPEN_FOOD_FACTS_PROVIDER;
+  }
 }
 
 function userAgent() {
