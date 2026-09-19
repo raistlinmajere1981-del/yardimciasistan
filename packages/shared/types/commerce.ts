@@ -9,6 +9,28 @@ export type CommerceUnit =
   | "meter"
   | "other";
 
+export type ProductDataProviderId = "open_food_facts";
+export type ProductLookupMode = "automatic" | "manual";
+
+export interface ProductLookupCandidate {
+  provider: ProductDataProviderId;
+  barcode: string;
+  name: string;
+  brand: string;
+  quantity: string;
+  categoryHint: string;
+  imageUrl: string;
+  sourceProductUrl: string;
+  dataLicense: string;
+  imageLicense: string;
+  fetchedAt: string;
+}
+
+export type ProductLookupResponse =
+  | { status: "found"; product: ProductLookupCandidate }
+  | { status: "not_found"; barcode: string; provider: ProductDataProviderId }
+  | { status: "disabled"; reason: "service_disabled" | "automatic_search_disabled" };
+
 export type InventoryMovementType =
   | "sale"
   | "purchase"
@@ -41,6 +63,7 @@ export interface CatalogProduct {
   businessId: string;
   categoryId: string;
   name: string;
+  brand: string;
   sku: string;
   barcode: string;
   description: string;
@@ -51,6 +74,13 @@ export interface CatalogProduct {
   taxRate: number;
   trackInventory: boolean;
   isActive: boolean;
+  imageAssetPath: string;
+  imageSourceUrl: string;
+  dataSource: string;
+  sourceProductUrl: string;
+  dataLicense: string;
+  imageLicense: string;
+  sourceFetchedAt: string;
   createdAt: string;
   updatedAt: string;
 }
