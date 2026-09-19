@@ -34,8 +34,12 @@ import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 
 /** Phone-first Market companion surface backed only by projected snapshots/actions. */
@@ -51,6 +55,8 @@ final class MarketWorkspace {
     boolean onBarcodeScan(String barcode, JSONObject payload);
 
     void onProductLookupRequested(String provider, String barcode, boolean includeImages);
+
+    void onProductImageRequested(String productId, String provider, String imageUrl);
 
     void onRenderRequested();
   }
@@ -89,6 +95,9 @@ final class MarketWorkspace {
   private final MarketUiRules.ReceivingDraft receiving = new MarketUiRules.ReceivingDraft();
   private final MarketUiRules.BarcodeScanCapture barcodeScanCapture =
       new MarketUiRules.BarcodeScanCapture(MarketUiRules.BARCODE_DEBOUNCE_MS);
+  private final Map<String, Bitmap> productImagePreviews = new HashMap<>();
+  private final Set<String> productImageRequests = new HashSet<>();
+  private final Set<String> productImageFailures = new HashSet<>();
 
   private OperationData data = new OperationData();
   private String screen = SCREEN_HOME;
@@ -257,6 +266,19 @@ final class MarketWorkspace {
     productLookupMessage = result.name + " bilgileri bulundu.";
     listener.onRenderRequested();
   }
+
+  void onProductImageLoaded(String productId, String imageUrl, Bitmap preview) {
+    String key = productImageKey(productId, imageUrl);
+    productImageRequests.remove(key);
+    if (preview == null) {
+      productImageFailures.add(key);
+    } else {
+      productImageFailures.remove(key);
+      productImagePreviews.put(key, preview);
+    }
+    listener.onRenderRequested();
+  }
+
 
   private void enforceVisibleScreen() {
     if (!MarketUiRules.canOpenMarket(data)) {
@@ -583,6 +605,7 @@ final class MarketWorkspace {
 
   private LinearLayout productCard(OperationData.MarketProduct product, boolean withActions) {
     LinearLayout card = UiKit.card(context);
+    addProductImage(card, product);
     card.addView(UiKit.text(context, product.name, 18, UiKit.TEXT, Typeface.BOLD));
     if (!product.barcode.isEmpty()) {
       card.addView(UiKit.text(context, "Barkod: " + product.barcode, 12, UiKit.SECONDARY, Typeface.NORMAL));
@@ -640,6 +663,7 @@ final class MarketWorkspace {
     }
 
     LinearLayout productInfo = UiKit.card(context);
+    addProductImage(productInfo, product);
     productInfo.addView(UiKit.text(context, product.name, 17, UiKit.TEXT, Typeface.BOLD));
     productInfo.addView(UiKit.text(
         context,
@@ -1384,6 +1408,32 @@ final class MarketWorkspace {
       description.setLayoutParams(descriptionParams);
       page.addView(description);
     }
+  }
+
+  private String productImageKey(String productId, String imageUrl) {
+    return (productId == null ? "" : productId) + "|" + (imageUrl == null ? "" : imageUrl);
+  }
+
+  private void addProductImage(LinearLayout card, OperationData.MarketProduct product) {
+    if (product == null || product.imageSourceUrl.isEmpty() || product.dataSource.isEmpty()) return;
+
+    String key = productImageKey(product.id, product.imageSourceUrl);
+    Bitmap preview = productImagePreviews.get(key);
+    if (preview != null) {
+      ImageView image = new ImageView(context);
+      image.setImageBitmap(preview);
+      image.setAdjustViewBounds(true);
+      image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+      image.setBackground(UiKit.rounded(context, UiKit.SURFACE, UiKit.BORDER, 10));
+      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(160));
+      params.setMargins(0, 0, 0, dp(10));
+      image.setLayoutParams(params);
+      card.addView(image);
+      return;
+    }
+
+    if (productImageFailures.contains(key) || !productImageRequests.add(key)) return;
+    listener.onProductImageRequested(product.id, product.dataSource, product.imageSourceUrl);
   }
 
   private View messageCard(String message, boolean pending) {
