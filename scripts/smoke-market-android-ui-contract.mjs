@@ -26,7 +26,7 @@ assert.match(main, /marketWorkspace\.handleBack\(\)/);
 for (const [actionType, permission] of [
   ["market_stock_count", "market.stock_count"],
   ["market_purchase_receive", "market.receiving"],
-  ["market_product_draft_create", "market.product_draft"],
+  ["market_product_create", "market.product_create"],
   ["market_cart_draft_create", "market.cart_draft"],
   ["market_barcode_scan", "market.scan_to_desktop"]
 ]) {
@@ -55,9 +55,8 @@ for (const label of [
   "Sayımı Kaydet",
   "Mal Kabulü Gönder",
   "Masaüstüne Gönder",
-  "Yeni Ürün Taslağı",
-  "Taslak Gönder",
-  "Masaüstünde kontrol edilip ürün kartına dönüştürülecek.",
+  "Ürünü Kaydet",
+  "Ürün bilgileri doğrudan kataloğa kaydedilir.",
   "Barkod kayıtlı değil.",
   "Gönderim bekliyor"
 ]) {
@@ -110,6 +109,7 @@ for (const coverage of [
   "stockCountPayloadCarriesAbsoluteQuantityAndNoDelta",
   "repeatBarcodeIncrementsOneCartLineAndDraftHasNoPayment",
   "receivingBuildsMultipleLinesAndRejectsInvalidNumbers",
+  "productCreatePayloadUsesDirectCatalogFields",
   "offlineActionPersistsAndPendingStateIsVisible",
   "missingMarketCapabilitiesRemainSafeForUi"
 ]) {
