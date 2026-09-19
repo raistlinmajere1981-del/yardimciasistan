@@ -65,6 +65,8 @@ export function createAndroidMarketSnapshotSource(
         products.currency,
         products.is_active,
         products.track_inventory,
+        products.image_source_url,
+        products.data_source,
         COALESCE(balance.quantity, 0) AS current_quantity,
         COALESCE(balance.minimum_quantity, 0) AS minimum_quantity,
         COALESCE(balance.updated_at, '') AS inventory_updated_at
@@ -90,6 +92,8 @@ export function createAndroidMarketSnapshotSource(
       currency: text(row.currency) || "TRY",
       is_active: Number(row.is_active ?? 0) === 1,
       track_inventory: Number(row.track_inventory ?? 0) === 1,
+      image_source_url: text(row.image_source_url),
+      data_source: text(row.data_source),
       current_quantity: nonNegativeNumber(row.current_quantity),
       minimum_quantity: nonNegativeNumber(row.minimum_quantity),
       inventory_updated_at: text(row.inventory_updated_at)
