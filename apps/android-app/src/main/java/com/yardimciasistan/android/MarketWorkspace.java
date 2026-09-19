@@ -59,14 +59,14 @@ final class MarketWorkspace {
   private static final String SCREEN_STOCK = "stock";
   private static final String SCREEN_RECEIVING = "receiving";
   private static final String SCREEN_CART = "cart";
-  private static final String SCREEN_PRODUCT_DRAFT = "product_draft";
+  private static final String SCREEN_PRODUCT_CREATE = "product_draft";
   private static final String SCREEN_CASH_BARCODE = "cash_barcode";
 
   private static final String PURPOSE_LOOKUP = "lookup";
   private static final String PURPOSE_STOCK = "stock";
   private static final String PURPOSE_RECEIVING = "receiving";
   private static final String PURPOSE_CART = "cart";
-  private static final String PURPOSE_PRODUCT_DRAFT = "product_draft";
+  private static final String PURPOSE_PRODUCT_CREATE = "product_draft";
   private static final String PURPOSE_CASH = "cash";
 
   private static final String[] UNIT_VALUES = {
@@ -93,14 +93,14 @@ final class MarketWorkspace {
   private String stockProductId = "";
   private String stockCountText = "";
   private String stockNote = "";
-  private String productDraftBarcode = "";
-  private String productDraftName = "";
-  private String productDraftSku = "";
-  private String productDraftUnit = "piece";
-  private String productDraftPurchasePrice = "";
-  private String productDraftSalePrice = "";
-  private String productDraftCategory = "";
-  private String productDraftNote = "";
+  private String productCreateBarcode = "";
+  private String productCreateName = "";
+  private String productCreateSku = "";
+  private String productCreateUnit = "piece";
+  private String productCreatePurchasePrice = "";
+  private String productCreateSalePrice = "";
+  private String productCreateCategory = "";
+  private String productCreateNote = "";
   private String visibleMessage = "";
   private boolean visibleMessagePending;
   private String formError = "";
@@ -155,8 +155,8 @@ final class MarketWorkspace {
       page = receivingScreen();
     } else if (SCREEN_CART.equals(screen)) {
       page = cartScreen();
-    } else if (SCREEN_PRODUCT_DRAFT.equals(screen)) {
-      page = productDraftScreen();
+    } else if (SCREEN_PRODUCT_CREATE.equals(screen)) {
+      page = productCreateScreen();
     } else if (SCREEN_BARCODE_RESULT.equals(screen)) {
       page = barcodeResultScreen();
     } else if (SCREEN_CASH_BARCODE.equals(screen)) {
@@ -215,7 +215,7 @@ final class MarketWorkspace {
     if (SCREEN_STOCK.equals(screen) && !MarketUiRules.canStockCount(data)) screen = SCREEN_HOME;
     if (SCREEN_RECEIVING.equals(screen) && !MarketUiRules.canReceive(data)) screen = SCREEN_HOME;
     if (SCREEN_CART.equals(screen) && !MarketUiRules.canCreateCartDraft(data)) screen = SCREEN_HOME;
-    if (SCREEN_PRODUCT_DRAFT.equals(screen) && !MarketUiRules.canCreateProductDraft(data)) screen = SCREEN_HOME;
+    if (SCREEN_PRODUCT_CREATE.equals(screen) && !MarketUiRules.canCreateProductCreate(data)) screen = SCREEN_HOME;
     if (SCREEN_BARCODE_RESULT.equals(screen) && !MarketUiRules.canViewProducts(data)) screen = SCREEN_HOME;
     if (SCREEN_CASH_BARCODE.equals(screen) && !MarketUiRules.canScanToDesktop(data)) screen = SCREEN_HOME;
   }
@@ -257,8 +257,8 @@ final class MarketWorkspace {
     if (MarketUiRules.canCreateCartDraft(data)) {
       actions.add(new ActionItem("Sepet", () -> openScreen(SCREEN_CART)));
     }
-    if (MarketUiRules.canCreateProductDraft(data)) {
-      actions.add(new ActionItem("Yeni Ürün", () -> showBarcodeEntry(PURPOSE_PRODUCT_DRAFT)));
+    if (MarketUiRules.canCreateProductCreate(data)) {
+      actions.add(new ActionItem("Yeni Ürün", () -> showBarcodeEntry(PURPOSE_PRODUCT_CREATE)));
     }
     addActionGrid(page, actions);
 
@@ -512,8 +512,8 @@ final class MarketWorkspace {
       LinearLayout unknown = UiKit.card(context);
       unknown.addView(UiKit.text(context, "Barkod kayıtlı değil.", 18, UiKit.TEXT, Typeface.BOLD));
       unknown.addView(UiKit.text(context, "Barkod: " + barcodeResult, 13, UiKit.SECONDARY, Typeface.NORMAL));
-      if (MarketUiRules.canCreateProductDraft(data)) {
-        Button draft = UiKit.button(context, "Yeni Ürün Taslağı", UiKit.PRIMARY, view -> startProductDraft(barcodeResult));
+      if (MarketUiRules.canCreateProductCreate(data)) {
+        Button draft = UiKit.button(context, "Yeni Ürün", UiKit.PRIMARY, view -> startProductCreate(barcodeResult));
         draft.setLayoutParams(fullButtonParams(48, 12, 0));
         unknown.addView(draft);
       }
@@ -907,19 +907,19 @@ final class MarketWorkspace {
     }
   }
 
-  private LinearLayout productDraftScreen() {
+  private LinearLayout productCreateScreen() {
     LinearLayout page = UiKit.column(context);
-    addBackHeader(page, "Yeni Ürün Taslağı", "Masaüstünde kontrol edilip ürün kartına dönüştürülecek.");
+    addBackHeader(page, "Yeni Ürün", "Ürün bilgileri doğrudan kataloğa kaydedilir.");
     addPendingState(page);
     addFormError(page);
 
     EditText barcode = labeledInput(page, "Barkod", "");
-    barcode.setText(productDraftBarcode);
+    barcode.setText(productCreateBarcode);
     barcode.setEnabled(false);
     EditText name = labeledInput(page, "Ürün adı", "Örn. Test Kola 330 ml");
-    bind(name, productDraftName, value -> productDraftName = value);
+    bind(name, productCreateName, value -> productCreateName = value);
     EditText sku = labeledInput(page, "SKU (isteğe bağlı)", "");
-    bind(sku, productDraftSku, value -> productDraftSku = value);
+    bind(sku, productCreateSku, value -> productCreateSku = value);
 
     addFieldLabel(page, "Birim");
     Spinner unit = new Spinner(context);
@@ -927,7 +927,7 @@ final class MarketWorkspace {
     int unitSelection = 0;
     for (int index = 0; index < UNIT_VALUES.length; index += 1) {
       unitChoices.add(new UnitChoice(UNIT_VALUES[index], UNIT_LABELS[index]));
-      if (UNIT_VALUES[index].equals(productDraftUnit)) unitSelection = index;
+      if (UNIT_VALUES[index].equals(productCreateUnit)) unitSelection = index;
     }
     ArrayAdapter<UnitChoice> unitAdapter = new ArrayAdapter<>(context, android.R.layout.simple_spinner_item, unitChoices);
     unitAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -937,51 +937,55 @@ final class MarketWorkspace {
     unit.setLayoutParams(fieldParams(50));
     unit.setOnItemSelectedListener(new SimpleItemSelectedListener(position -> {
       UnitChoice choice = (UnitChoice) unit.getSelectedItem();
-      productDraftUnit = choice == null ? "piece" : choice.value;
+      productCreateUnit = choice == null ? "piece" : choice.value;
     }));
     page.addView(unit);
 
     EditText purchase = labeledInput(page, "Alış fiyatı (isteğe bağlı)", "0,00");
     purchase.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    bind(purchase, productDraftPurchasePrice, value -> productDraftPurchasePrice = value);
+    bind(purchase, productCreatePurchasePrice, value -> productCreatePurchasePrice = value);
     EditText sale = labeledInput(page, "Satış fiyatı (isteğe bağlı)", "0,00");
     sale.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-    bind(sale, productDraftSalePrice, value -> productDraftSalePrice = value);
+    bind(sale, productCreateSalePrice, value -> productCreateSalePrice = value);
     EditText category = labeledInput(page, "Kategori (isteğe bağlı)", "");
-    bind(category, productDraftCategory, value -> productDraftCategory = value);
-    EditText note = labeledMultiline(page, "Not", "Masaüstü inceleme notu");
-    bind(note, productDraftNote, value -> productDraftNote = value);
+    bind(category, productCreateCategory, value -> productCreateCategory = value);
+    EditText note = labeledMultiline(page, "Not", "Ürün açıklaması / not");
+    bind(note, productCreateNote, value -> productCreateNote = value);
 
-    Button submit = UiKit.button(context, "Taslak Gönder", UiKit.PRIMARY, view -> submitProductDraft());
+    Button submit = UiKit.button(context, "Ürünü Kaydet", UiKit.PRIMARY, view -> submitProductCreate());
     submit.setEnabled(!submissionBlocked());
     submit.setLayoutParams(fullButtonParams(54, 4, 0));
     page.addView(submit);
     return page;
   }
 
-  private void submitProductDraft() {
+  private void submitProductCreate() {
     try {
-      JSONObject payload = MarketUiRules.productDraftPayload(
-          productDraftBarcode,
-          productDraftName,
-          productDraftSku,
-          productDraftUnit,
-          productDraftPurchasePrice,
-          productDraftSalePrice,
-          productDraftCategory,
-          productDraftNote
+      JSONObject payload = MarketUiRules.productCreatePayload(
+          productCreateBarcode,
+          productCreateName,
+          productCreateSku,
+          productCreateUnit,
+          productCreatePurchasePrice,
+          productCreateSalePrice,
+          productCreateCategory,
+          productCreateNote
+      );
+      payload.put(
+          "track_inventory",
+          data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)
       );
       boolean queued = listener.onSubmit(
-          MarketUiRules.ACTION_PRODUCT_DRAFT_CREATE,
+          MarketUiRules.ACTION_PRODUCT_CREATE,
           payload,
-          "Ürün taslağı masaüstü incelemesi için gönderildi.",
-          "Ürün taslağı gönderim kuyruğuna alındı."
+          "Ürün kataloğa kaydedildi.",
+          "Ürün kaydı gönderim kuyruğuna alındı."
       );
       if (queued) {
-        clearProductDraft();
+        clearProductCreate();
         screen = SCREEN_HOME;
         formError = "";
-        visibleMessage = "Ürün taslağı gönderim kuyruğuna alındı.";
+        visibleMessage = "Ürün kaydı gönderim kuyruğuna alındı.";
         visibleMessagePending = true;
         listener.onRenderRequested();
       }
@@ -990,15 +994,15 @@ final class MarketWorkspace {
     }
   }
 
-  private void clearProductDraft() {
-    productDraftBarcode = "";
-    productDraftName = "";
-    productDraftSku = "";
-    productDraftUnit = "piece";
-    productDraftPurchasePrice = "";
-    productDraftSalePrice = "";
-    productDraftCategory = "";
-    productDraftNote = "";
+  private void clearProductCreate() {
+    productCreateBarcode = "";
+    productCreateName = "";
+    productCreateSku = "";
+    productCreateUnit = "piece";
+    productCreatePurchasePrice = "";
+    productCreateSalePrice = "";
+    productCreateCategory = "";
+    productCreateNote = "";
   }
 
   private void addProductSelectionActions(LinearLayout page, String purpose, boolean inventoryOnly) {
@@ -1016,7 +1020,7 @@ final class MarketWorkspace {
   }
 
   private void showBarcodeEntry(String purpose) {
-    boolean directDraft = PURPOSE_PRODUCT_DRAFT.equals(purpose);
+    boolean directDraft = PURPOSE_PRODUCT_CREATE.equals(purpose);
     if (!directDraft && !MarketUiRules.canScanBarcode(data)) return;
     requestCameraScanner(purpose, false);
   }
@@ -1042,7 +1046,7 @@ final class MarketWorkspace {
     if (activity == null || purpose == null || purpose.isEmpty()) return;
     String title = PURPOSE_CASH.equals(purpose)
         ? "Kasa Barkod Okuyucu"
-        : PURPOSE_PRODUCT_DRAFT.equals(purpose)
+        : PURPOSE_PRODUCT_CREATE.equals(purpose)
           ? "Yeni ürün barkodu"
           : "Barkod Tara";
     BarcodeCameraScanner.show(activity, title, continuous, new BarcodeCameraScanner.Listener() {
@@ -1064,7 +1068,7 @@ final class MarketWorkspace {
   }
 
   private void showManualBarcodeEntry(String purpose) {
-    boolean directDraft = PURPOSE_PRODUCT_DRAFT.equals(purpose);
+    boolean directDraft = PURPOSE_PRODUCT_CREATE.equals(purpose);
     boolean cashMode = PURPOSE_CASH.equals(purpose);
     LinearLayout form = dialogForm();
     TextView help = UiKit.text(
@@ -1072,7 +1076,7 @@ final class MarketWorkspace {
         cashMode
             ? "Kamera yerine barkodu elle girip masaüstüne gönderebilirsiniz."
             : directDraft
-              ? "Ürün taslağının barkodunu elle girin."
+              ? "Yeni ürünün barkodunu elle girin."
               : "Barkodu elle girin.",
         12,
         UiKit.SECONDARY,
@@ -1116,8 +1120,8 @@ final class MarketWorkspace {
       captureCashBarcode(barcode);
       return;
     }
-    if (PURPOSE_PRODUCT_DRAFT.equals(purpose)) {
-      startProductDraft(barcode);
+    if (PURPOSE_PRODUCT_CREATE.equals(purpose)) {
+      startProductCreate(barcode);
       return;
     }
     OperationData.MarketProduct product = MarketUiRules.resolveBarcode(data, barcode);
@@ -1205,11 +1209,11 @@ final class MarketWorkspace {
     return "\n" + money(product.salePrice, product.currency) + barcode;
   }
 
-  private void startProductDraft(String barcode) {
-    if (!MarketUiRules.canCreateProductDraft(data)) return;
-    clearProductDraft();
-    productDraftBarcode = barcode == null ? "" : barcode.trim();
-    screen = SCREEN_PRODUCT_DRAFT;
+  private void startProductCreate(String barcode) {
+    if (!MarketUiRules.canCreateProductCreate(data)) return;
+    clearProductCreate();
+    productCreateBarcode = barcode == null ? "" : barcode.trim();
+    screen = SCREEN_PRODUCT_CREATE;
     formError = "";
     listener.onRenderRequested();
   }
