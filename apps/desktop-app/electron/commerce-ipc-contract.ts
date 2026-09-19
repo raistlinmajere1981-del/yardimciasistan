@@ -72,6 +72,7 @@ export interface DesktopCommerceBridge {
   saveProduct: (input: SaveCatalogProductInput) => Promise<CatalogProduct>;
   findProductByBarcode: (barcode: string) => Promise<CatalogProduct | null>;
   lookupExternalProductByBarcode: (barcode: string, mode?: ProductLookupMode) => Promise<ProductLookupResponse>;
+  previewExternalProductImage: (provider: string, imageUrl: string) => Promise<string>;
   getProductImageDataUrl: (productId: string) => Promise<string>;
 
   getInventoryBalance: (productId: string, locationId?: string) => Promise<InventoryBalance>;
