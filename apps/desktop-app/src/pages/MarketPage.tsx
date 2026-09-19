@@ -4,7 +4,6 @@ import {
   BUSINESS_CAPABILITIES,
   type CatalogCategory,
   type CatalogProduct,
-  type CatalogProductDraft,
   type CommerceSaleDraftDetail,
   type CommerceSale
 } from "@yardimci-asistan/shared";
@@ -15,17 +14,14 @@ import { useBusinessCapabilityRuntime } from "../app/business-capability-context
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
 import { MarketLabelsWorkspace } from "../components/market/MarketLabelsWorkspace";
 import { MarketCompanionInboxWorkspace } from "../components/market/MarketCompanionInboxWorkspace";
-import {
-  MarketProductsWorkspace,
-  type ProductDraftFormRequest
-} from "../components/market/MarketProductsWorkspace";
+import { MarketProductsWorkspace } from "../components/market/MarketProductsWorkspace";
 import { MarketPurchasingWorkspace } from "../components/market/MarketPurchasingWorkspace";
 import {
   MarketQuickSaleWorkspace,
   type CartDraftQuickSaleRequest
 } from "../components/market/MarketQuickSaleWorkspace";
 
-type MarketTab = "quickSale" | "products" | "phoneDrafts" | "inventory" | "purchasing" | "labels";
+type MarketTab = "quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels";
 type AsyncState = "idle" | "loading" | "success" | "error";
 
 interface MarketTabDefinition {
@@ -52,7 +48,7 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
   const tabs = useMemo<MarketTabDefinition[]>(() => [
     { id: "quickSale", label: "Hızlı Satış", description: "Kasada hızlı ürün ekleme ve ödeme", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
     { id: "products", label: "Ürünler", description: "Ürün ve kategori yönetimi", icon: Archive, enabled: catalogEnabled },
-    { id: "phoneDrafts", label: "Telefon Taslakları", description: "Ürün önerileri ve hazır sepetler", icon: Smartphone, enabled: catalogEnabled },
+    { id: "phoneCarts", label: "Telefon Sepetleri", description: "Telefonda hazırlanan satış sepetleri", icon: Smartphone, enabled: catalogEnabled && salesEnabled },
     { id: "inventory", label: "Stok", description: "Fiziksel sayım ve hareket geçmişi", icon: Boxes, enabled: inventoryEnabled },
     { id: "purchasing", label: "Tedarikçiler / Alım", description: "Tedarikçi ve stok girişi", icon: Truck, enabled: suppliersEnabled || purchasingEnabled },
     { id: "labels", label: "Etiketler", description: "Ürün ve raf etiketi hazırlama", icon: Tags, enabled: labelsEnabled }
@@ -62,7 +58,6 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<AsyncState>("idle");
-  const [productDraftRequest, setProductDraftRequest] = useState<ProductDraftFormRequest | null>(null);
   const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
   const handoffRequestId = useRef(0);
 
@@ -116,12 +111,6 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
     reportAppStatus("success", sale.status === "credit" ? "Veresiye satış kaydedildi." : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`);
   }
 
-  function openProductDraft(draft: CatalogProductDraft) {
-    handoffRequestId.current += 1;
-    setProductDraftRequest({ requestId: handoffRequestId.current, draft });
-    setActiveTab("products");
-  }
-
   function openCartDraft(detail: CommerceSaleDraftDetail) {
     handoffRequestId.current += 1;
     setCartDraftRequest({ requestId: handoffRequestId.current, draftId: detail.draft.id });
@@ -164,20 +153,11 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
           busy={dataState === "loading"}
           onReload={reloadCatalog}
           onStateChange={handleStateChange}
-          productDraftRequest={productDraftRequest}
-          onProductDraftLoaded={(draftId) => {
-            setProductDraftRequest((current) => current?.draft.id === draftId ? null : current);
-          }}
-          onProductDraftReviewed={(draftId) => {
-            setProductDraftRequest((current) => current?.draft.id === draftId ? null : current);
-          }}
         />
-      ) : activeTab === "phoneDrafts" ? (
+      ) : activeTab === "phoneCarts" ? (
         <MarketCompanionInboxWorkspace
-          catalogEnabled={catalogEnabled}
           cartDraftsEnabled={catalogEnabled && salesEnabled}
           busy={dataState === "loading"}
-          onOpenProductDraft={openProductDraft}
           onOpenCartDraft={openCartDraft}
           onStateChange={handleStateChange}
         />
