@@ -1,3 +1,4 @@
+import { normalizeBarcodeIdentity } from "@yardimci-asistan/shared";
 type BarcodeInputSource = "simulator" | "keyboard-wedge" | "camera-android";
 
 export interface BarcodeScan {
@@ -25,10 +26,7 @@ export interface KeyboardBarcodeInputOptions {
 }
 
 function normalizeBarcodeValue(value: unknown, maxLength = 80) {
-  return String(value ?? "")
-    .replace(/[\u0000-\u001f\u007f]/g, "")
-    .trim()
-    .slice(0, maxLength);
+  return normalizeBarcodeIdentity(value, maxLength);
 }
 
 function barcodeScan(value: string, source: BarcodeInputSource): BarcodeScan {
