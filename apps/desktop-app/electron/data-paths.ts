@@ -6,6 +6,7 @@ export const DESKTOP_DATABASE_FILE_NAME = "yardimci-asistan.sqlite";
 export const DESKTOP_MAINTENANCE_DIR_NAME = "maintenance";
 export const DESKTOP_PENDING_MAINTENANCE_FILE = "pending-data-maintenance.json";
 export const DESKTOP_STAGED_RESTORE_FILE = "restore.sqlite";
+export const DESKTOP_STAGED_RESTORE_ASSETS_DIR = "restore-assets";
 export const DESKTOP_ASSETS_DIR_NAME = "assets";
 export const DESKTOP_PRODUCTS_DIR_NAME = "products";
 export const DESKTOP_TEMPORARY_DIR_NAME = "tmp";
@@ -32,6 +33,7 @@ export interface DesktopDataPaths {
   maintenancePath: string;
   markerPath: string;
   stagedRestorePath: string;
+  stagedRestoreAssetsPath: string;
   backupPath: string;
   temporaryPath: string;
 }
@@ -99,6 +101,10 @@ export function resolveStagedRestorePath(dataRoot: string): string {
   return path.join(resolveMaintenancePath(dataRoot), DESKTOP_STAGED_RESTORE_FILE);
 }
 
+export function resolveStagedRestoreAssetsPath(dataRoot: string): string {
+  return path.join(resolveMaintenancePath(dataRoot), DESKTOP_STAGED_RESTORE_ASSETS_DIR);
+}
+
 export function resolveAssetsPath(dataRoot: string): string {
   return path.join(dataRoot, DESKTOP_ASSETS_DIR_NAME);
 }
@@ -120,6 +126,7 @@ export function buildDesktopDataPaths(dataRoot: string, backupPath: string): Des
     maintenancePath: resolveMaintenancePath(dataRoot),
     markerPath: resolvePendingMaintenanceMarkerPath(dataRoot),
     stagedRestorePath: resolveStagedRestorePath(dataRoot),
+    stagedRestoreAssetsPath: resolveStagedRestoreAssetsPath(dataRoot),
     backupPath,
     temporaryPath: resolveTemporaryPath(dataRoot)
   };
