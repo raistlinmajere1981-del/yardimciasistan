@@ -19,6 +19,12 @@ import {
   assertPersistedBusinessCapability,
   hasPersistedBusinessCapability
 } from "./business-capability-runtime";
+import {
+  desktopLogError,
+  desktopLogInfo,
+  desktopLogWarn,
+  initializeDesktopLogging
+} from "./desktop-logger";
 
 const DEV_RELAUNCH_EXIT_CODE = 75;
 
@@ -31,6 +37,29 @@ function resolveRuntimeDataRoot(): string {
 }
 
 const userDataPath = () => resolveRuntimeDataRoot();
+
+const desktopLogPath = initializeDesktopLogging(userDataPath());
+if (desktopLogPath) {
+  desktopLogInfo("startup", `Desktop process starting (packaged=${app.isPackaged ? "yes" : "no"})`);
+}
+
+app.on("render-process-gone", (_event, webContents, details) => {
+  desktopLogError(
+    "renderer",
+    `Renderer process gone (id=${webContents.id}, reason=${details.reason}, exitCode=${details.exitCode})`
+  );
+});
+
+app.on("child-process-gone", (_event, details) => {
+  desktopLogWarn(
+    "child-process",
+    `Child process gone (type=${details.type}, reason=${details.reason}, exitCode=${details.exitCode})`
+  );
+});
+
+app.on("before-quit", () => {
+  desktopLogInfo("shutdown", "Desktop application is quitting.");
+});
 
 type PendingMaintenanceKind = "restore" | "reset" | "";
 
