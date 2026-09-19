@@ -494,6 +494,13 @@ Kalıcı ürün asset'leri merkezi data root içinde tutulur ve backup/restore/r
 sözleşmesine dahildir. QR menü base64 görsellerinin mevcut backup davranışı ayrıca
 korunur.
 
+Tanılama kayıtları da merkezi data root altında `data/logs/yardimci-asistan.log`
+dosyasına yazılır. Bu kayıtlar kullanıcı verisi değil operasyonel tanılama verisidir;
+backup paketine alınmaz. Dosya 2 MB sınırında döndürülür ve üç eski kopya tutulur.
+Main-process `console.warn/error`, IPC handler hataları, renderer/child-process kapanmaları
+ve uncaught exception monitor kayıt altına alınır; secret/API key/token benzeri değerler
+log yazılmadan önce maskelenir.
+
 Kapsam dışında kalanlar:
 
 ```text
