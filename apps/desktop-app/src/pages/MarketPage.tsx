@@ -5,7 +5,8 @@ import {
   type CatalogCategory,
   type CatalogProduct,
   type CommerceSaleDraftDetail,
-  type CommerceSale
+  type CommerceSale,
+  type ProductLookupCandidate
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../app/capabilities";
 import { reportAppStatus } from "../app/runtime-state";
@@ -14,7 +15,10 @@ import { useBusinessCapabilityRuntime } from "../app/business-capability-context
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
 import { MarketLabelsWorkspace } from "../components/market/MarketLabelsWorkspace";
 import { MarketCompanionInboxWorkspace } from "../components/market/MarketCompanionInboxWorkspace";
-import { MarketProductsWorkspace } from "../components/market/MarketProductsWorkspace";
+import {
+  MarketProductsWorkspace,
+  type ProductLookupFormRequest
+} from "../components/market/MarketProductsWorkspace";
 import { MarketPurchasingWorkspace } from "../components/market/MarketPurchasingWorkspace";
 import {
   MarketQuickSaleWorkspace,
@@ -59,6 +63,7 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<AsyncState>("idle");
   const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
+  const [productLookupRequest, setProductLookupRequest] = useState<ProductLookupFormRequest | null>(null);
   const handoffRequestId = useRef(0);
 
   const handleStateChange = useCallback((state: Exclude<AsyncState, "idle">, nextMessage: string) => {
@@ -117,6 +122,16 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
     setActiveTab("quickSale");
   }
 
+  function openExternalProduct(product: ProductLookupCandidate) {
+    handoffRequestId.current += 1;
+    setProductLookupRequest({ requestId: handoffRequestId.current, product });
+    setActiveTab("products");
+  }
+
+  const clearProductLookupRequest = useCallback((requestId: number) => {
+    setProductLookupRequest((current) => current?.requestId === requestId ? null : current);
+  }, []);
+
   return (
     <section className="market-page" aria-label="Market yönetimi">
       <nav className="market-tabs" aria-label="Market çalışma alanları">
@@ -145,6 +160,7 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
           cartDraftRequest={cartDraftRequest}
           onCartDraftLoaded={clearCartDraftRequest}
           onCartDraftReviewed={clearCartDraftRequest}
+          onExternalProductFound={openExternalProduct}
         />
       ) : activeTab === "products" ? (
         <MarketProductsWorkspace
@@ -153,6 +169,8 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
           busy={dataState === "loading"}
           onReload={reloadCatalog}
           onStateChange={handleStateChange}
+          productLookupRequest={productLookupRequest}
+          onProductLookupLoaded={clearProductLookupRequest}
         />
       ) : activeTab === "phoneCarts" ? (
         <MarketCompanionInboxWorkspace
