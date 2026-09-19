@@ -146,21 +146,32 @@ const dp = await importDataPaths();
     const plan1 = dp.planLegacyDevRelocation(target, legacy);
     assert.equal(plan1.relocate, true);
     assert.equal(plan1.reason, "legacy-only");
-    // after relocation, target exists
+    // after relocation, target and durable marker exist
     const result = dp.relocateLegacyDevDatabaseOnce(target, legacy);
     assert.equal(result.relocated, true);
     assert.ok(fs.existsSync(target));
-    // second call should not relocate (target exists)
+    assert.ok(fs.existsSync(result.markerPath));
+    // second call should never import the legacy DB again
     const plan2 = dp.planLegacyDevRelocation(target, legacy);
     assert.equal(plan2.relocate, false);
-    assert.equal(plan2.reason, "target-exists");
-    // legacy still exists (never deleted on success)
+    assert.equal(plan2.reason, "already-relocated");
+    // even an intentional target reset must not resurrect legacy data
+    fs.unlinkSync(target);
+    const planAfterReset = dp.planLegacyDevRelocation(target, legacy);
+    assert.equal(planAfterReset.relocate, false);
+    assert.equal(planAfterReset.reason, "already-relocated");
+    // legacy still exists as a safety copy
     assert.ok(fs.existsSync(legacy));
     // same-path guard
-    const planSame = dp.planLegacyDevRelocation(legacy, legacy);
+    const alternateLegacy = path.join(tmpRoot, "same", "yardimci-asistan.sqlite");
+    fs.mkdirSync(path.dirname(alternateLegacy), { recursive: true });
+    const sameDb = new DatabaseSync(alternateLegacy);
+    sameDb.exec("CREATE TABLE t(id INTEGER PRIMARY KEY)");
+    sameDb.close();
+    const planSame = dp.planLegacyDevRelocation(alternateLegacy, alternateLegacy);
     assert.equal(planSame.relocate, false);
     assert.equal(planSame.reason, "same-path");
-    console.log("✓ one-time relocation güvenli (target doluyken overwrite yok, WAL-safe VACUUM, kaynak silinmez)");
+    console.log("✓ one-time relocation güvenli (marker sonrası reset eski DB'yi diriltmez, WAL-safe VACUUM, kaynak silinmez)");
   } finally {
     rmSync(tmpRoot, { recursive: true, force: true });
   }
