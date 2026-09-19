@@ -82,7 +82,7 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:product:save", async (_event, input: Parameters<DesktopCommerceBridge["saveProduct"]>[0]) => {
     options.assertUnlocked();
     let saved = saveRuntimeCatalogProduct(databasePath(), input);
-    if (saved.imageSourceUrl && input.imageSourceUrl !== undefined) {
+    if (saved.imageSourceUrl && !saved.imageAssetPath && input.imageSourceUrl !== undefined) {
       try {
         const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.imageSourceUrl);
         if (imageAssetPath) saved = { ...saved, imageAssetPath };
