@@ -53,8 +53,10 @@ assert.match(store, /imageAssetPath: String\(row\.image_asset_path/);
 assert.match(store, /dataSource: String\(row\.data_source/);
 
 assert.match(ipc, /commerce:product:lookupExternal/);
+assert.match(ipc, /commerce:product:previewExternalImage/);
 assert.match(ipc, /commerce:product:imageDataUrl/);
 assert.match(preload, /lookupExternalProductByBarcode/);
+assert.match(preload, /previewExternalProductImage/);
 assert.match(preload, /getProductImageDataUrl/);
 
 assert.match(settings, />Ürün Verisi</);
@@ -70,6 +72,7 @@ assert.match(quickSale, /onExternalProductFound/);
 assert.match(products, /lookupExternalProductByBarcode\(productForm\.barcode\.trim\(\), "manual"\)/);
 assert.match(products, /Ürün Bilgilerini Ara/);
 assert.match(products, /Ürün verisi:/);
+assert.match(products, /previewExternalProductImage/);
 assert.match(products, /getProductImageDataUrl/);
 
 assert.match(dataPaths, /assets[^\n]*products|DESKTOP_PRODUCTS_DIR_NAME = "products"/);
