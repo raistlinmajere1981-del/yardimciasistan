@@ -1,6 +1,6 @@
 # Yardımcı Asistan — Modüler İşletme Temeli ve Market Handoff
 
-> Güncellik: 2026-09-09
+> Güncellik: 2026-09-19
 > Amaç: Pansiyon/restoran odaklı ilk üründen, farklı küçük işletme türlerinin aynı çekirdeği paylaşabildiği capability-first mimariye geçişte alınan kararların tek referansı olmak.
 
 ## 1. Ürün yönü
@@ -159,10 +159,11 @@ Gerçek renderer DTO:
 - `CapabilitySetupFormState`
 - `SaveCapabilitySetupInput`
 
-Temel Ayarlar'da yalnız doğrudan kullanıcı tercihi olan bağlı servis kontrolleri görünür:
+Temel Ayarlar'da doğrudan kullanıcı tercihi olan bağlı servis kontrolleri görünür:
 
 - WhatsApp
 - Android
+- Ürün Verisi (katalog açık işletmelerde; ilk provider Open Food Facts)
 
 Domain yetenekleri `Ayarlar → Özel Yetenekler` alanından yönetilir. Burada Konaklama, Yiyecek & İçecek, Ticaret Çekirdeği ve Perakende grupları ayrı görünür; böylece Market + Pansiyon gibi hibritler profil çoğaltmadan kullanıcı override'larıyla kurulabilir.
 
@@ -256,7 +257,7 @@ Mevcut sınırlar:
 BarcodeInput
   Simulator             → available
   USB Keyboard Scanner  → available
-  Camera Scanner        → reserved / later
+  Android Camera Scanner→ available
 
 LabelPrinter
   Preview               → available
@@ -267,11 +268,11 @@ LabelPrinter
   System printer        → planned
 ```
 
-USB keyboard-wedge scanner hızlı karakter dizisi + `Enter` terminator davranışıyla normal kullanıcı yazımından ayrılır. Tarama sonucu mevcut capability-guarded exact barcode lookup hattına gider.
+USB keyboard-wedge scanner hızlı karakter dizisi + `Enter` terminator davranışıyla normal kullanıcı yazımından ayrılır. Android companion CameraX + ML Kit ile barkod çözer ve hosting action/snapshot hattını kullanır. Sayısal barkodlar elle girilirken boşluk, tire, nokta gibi görsel ayraçlar canonical kimlikten temizlenir; alfanümerik kodlar olduğu gibi korunur. Tüm yollar capability-guarded exact barcode lookup hattına gider.
 
 Etiket motoru aynı `LabelPrintJob` sözleşmesini Preview, PNG ve PDF adaptörlerinde kullanır. Code 128-B barkod üretimi, label-size preset'leri ve çoklu PDF kopyası desteklenir. ZPL/TSPL/sistem yazıcısı gerçek saha donanımı belli olduğunda aynı `LabelPrinterAdapter` sınırına takılacaktır.
 
-İlk Market MVP donanım zorunluluğu getirmez. Android kamera scanner daha sonra hosting/LAN transport tercihiyle eklenebilir ve mevcut desktop Market kullanımını bloke etmez.
+Market MVP masaüstü scanner donanımına bağımlı değildir; Android kamera okuyucu mevcut hosting transport üzerinden tamamlanmıştır. Doğrudan LAN transport hâlâ ayrı gelecek seçeneğidir.
 
 ## 9. Kalite kapıları
 
@@ -414,82 +415,93 @@ Desktop = source of truth
 Android = retail handheld companion
 ```
 
-Android masaüstü Market'in küçük bir kopyası veya masaüstü çalışmasının bağımlılığı
-değildir. Bu aşamada Android UI eklenmedi. Snapshot parser, action queue, masaüstü
-uygulama sınırı ve explicit draft persistence aşağıdaki sonraki mobil MVP akışlarını
-taşıyacak biçimde hazırlandı:
+Android, masaüstü SQLite'a doğrudan bağlanmaz. Hosting action queue + snapshot modeli,
+effective device permission, persisted capability ve action receipt/idempotency
+kontrolleri korunur.
+
+Tek kullanıcı görevi `market_operations` (`Market / El Terminali`) grubudur.
+Granular izinler:
 
 ```text
+market.summary.view    → etkin commerce/retail capability'lerinden en az biri
+market.product.view    → commerce.catalog
+market.stock_count     → commerce.inventory
+market.receiving       → retail.purchasing
+market.product_create  → commerce.catalog
+market.cart_draft      → commerce.catalog + commerce.sales
+market.scan_to_desktop → catalog + sales + retail.barcode
+```
+
+Admin rolü bu capability kesişimini aşamaz.
+
+### M7.2 — Android Market UI / saha işlemleri — CLOSED
+
+Android Market ekranı gerçek saha akışlarını taşır:
+
+```text
+Market Summary
+Kasa Barkod Modu
+Barkod Tara / Ürün Ara
 Stock Count
 Receiving
-Product Draft
 Cart Draft
-Market Summary
+Direct Product Create
 ```
 
-Tek kullanıcı görevi `market_operations` (`Market / El Terminali`) grubudur. Grup
-şu granular izinleri verir ve her izin ayrıca persisted business capability ile
-kesiştirilir:
+`market_product_create` yetkili telefondan doğrudan `catalog_products` kaydı
+oluşturur; masaüstünde ayrıca ürün taslağı onayı yoktur. Sepet ise ödeme ve gerçek satış
+masaüstünde tamamlandığı için `market_cart_draft_create` olarak kalır. Eski
+`market.product_draft`, `market_product_draft_create` ve
+`catalog_product_drafts` sözleşmeleri güncel baseline'da yoktur.
+
+Snapshot'ın `market` alanı capability'lere göre ürünleri, stok özetini, tedarikçileri,
+yakın mal kabullerini, telefon sepetlerini ve Product Data servis ayarlarını kırpar.
+`retail.barcode` kapalıysa barkod alanları/CTA'ları yayınlanmaz.
+
+### M7.3 — Ürün Verisi / bilinmeyen barkod — CLOSED
+
+`Ürün Verisi` capability değil, katalog kullanan işletmeler için isteğe bağlı bağlı
+servistir. İlk provider Open Food Facts'tır ve provider abstraction ikinci kaynakların
+eklenmesine açıktır.
+
+Davranış:
 
 ```text
-market.summary.view   → etkin commerce/retail capability'lerinden en az biri
-market.product.view   → commerce.catalog
-market.stock_count    → commerce.inventory
-market.receiving      → retail.purchasing
-market.product_draft  → commerce.catalog
-market.cart_draft     → commerce.catalog + commerce.sales
+local catalog lookup
+  ↓ bulunamadı
+Product Data açıksa provider lookup
+  ↓
+ad + marka + ambalaj + image URL + provenance
+  ↓
+kullanıcı fiyat/KDV/kategori gibi yerel alanları doğrular
+  ↓
+catalog save
 ```
 
-Admin rolü de bu capability kesişimini aşamaz. Saf Market profilinde Android ayarları
-yalnız `market_operations` grubunu gösterir; oda, rezervasyon, masa, restoran siparişi
-ve restoran menü stok izinleri Market grubuna taşınmaz.
+Otomatik arama kapatılabilir; bu durumda masaüstü ve Android yeni ürün ekranında
+`Ürün Bilgilerini Ara` ile manuel sorgu yapılır. Görseller opsiyoneldir. Provider
+görseli ürün kaydedilmeden önce önizlenir; kayıt sonrası standartlaştırılmış JPEG
+`data/assets/products/<product-id>/front.jpg` altında tutulur. Renderer uzak görsel
+URL'sini doğrudan açmaz; Electron main güvenli provider doğrulaması ve boyut kontrolü
+yapar. Android önizlemeyi telefonda indirir, masaüstü action uygulandığında görseli
+kendi yerel asset arşivine alır.
 
-Snapshot'taki ayrı `market` alanı kısa satış/stok/mal kabul özetini, mobil için gereken
-minimum ürün alanlarını, izinli tedarikçileri, yakın mal kabullerini ve iki taslak
-türünü taşır. Barkod `retail.barcode`, stok alanları `commerce.inventory`, tedarikçi
-kimliği `retail.suppliers`, yakın alımlar `retail.purchasing`, satış özeti ve sepet
-taslakları `commerce.sales` ile kırpılır. Mevcut satın alma store'u bekleyen sipariş
-workflow'u üretmediği için snapshot sahte `pending purchase order` içermez; yalnız
-gerçek `received` kayıtlarından yakın mal kabul bağlamı yayınlanır.
+Katalog ürününde kaynak/provenance alanları saklanır: provider, kaynak ürün URL'si,
+veri lisansı, görsel lisansı ve alınma zamanı. Open Food Facts verisi ODbL, kullanılan
+ürün görselleri sağlayıcının bildirdiği CC BY-SA provenance bilgisiyle kaydedilir.
 
-Android action sözleşmeleri:
+Kalıcı ürün asset'leri merkezi data root içinde tutulur ve backup/restore/reset
+sözleşmesine dahildir. QR menü base64 görsellerinin mevcut backup davranışı ayrıca
+korunur.
 
-```text
-market_stock_count
-market_purchase_receive
-market_product_draft_create
-market_cart_draft_create
-```
-
-`market_stock_count` telefondan absolute fiziksel miktar alır; delta masaüstündeki
-mevcut inventory transaction'ında hesaplanır ve aynı miktar için sıfır hareket yazılmaz.
-`market_purchase_receive` mevcut atomik purchase + stock-in store'unu kullanır. İki
-taslak action'ı gerçek ürün veya satış oluşturmaz.
-
-Yeni additive SQLite tabloları:
+Kapsam dışında kalanlar:
 
 ```text
-catalog_product_drafts
-commerce_sale_drafts
-commerce_sale_draft_items
-```
-
-Product draft bilinmeyen barkod, önerilen ürün alanları, kaynak/cihaz, zaman ve
-`pending|reviewed` durumunu tutar. Cart draft ürün adı snapshot'lı satırları ve miktarı
-tutar; stok, `commerce_sales`, ödeme veya finans kaydı üretmez. Masaüstü UI'den bağımsız
-create/list/get runtime yardımcıları sonraki entegrasyon için hazırdır. Her Android
-mutation'ı cihaz effective permission, persisted capability, payload/store validation,
-tek transaction ve mevcut action receipt idempotency sınırından geçer.
-
-M7.2 ve sonrasına bırakılanlar:
-
-```text
-Android Market UI
 full mobile POS
-payment
+telefon ödeme
 returns
 invoice OCR
-product photos
+telefondan serbest ürün fotoğrafı çekme
 local LAN transport
 ```
 
@@ -499,6 +511,7 @@ local LAN transport
 
 ```text
 name
+brand
 barcode
 sku
 category
@@ -507,6 +520,9 @@ purchase_price
 stock
 minimum_stock
 unit
+image_asset_path / image_source_url
+data_source / source_product_url
+data_license / image_license / source_fetched_at
 ```
 
 Stok hareketleri:
