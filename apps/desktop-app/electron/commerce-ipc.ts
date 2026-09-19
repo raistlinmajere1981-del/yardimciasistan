@@ -1,11 +1,7 @@
 import { ipcMain } from "electron";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
-import {
-  archiveExternalProductImage,
-  getProductImageDataUrl,
-  lookupExternalProductByBarcode
-} from "./product-data-service";
+import { archiveExternalProductImage } from "./product-data-service";
 import {
   addCustomerCreditAdjustment,
   createCustomerCreditSale,
@@ -20,6 +16,8 @@ import {
   findRuntimeProductByBarcode,
   getCommerceRuntimeSnapshot,
   getRuntimeCatalogCategory,
+  getRuntimeProductImageDataUrl,
+  lookupRuntimeExternalProductByBarcode,
   getRuntimeInventoryBalance,
   getRuntimePurchaseOrder,
   getMarketCartDraft,
@@ -97,10 +95,10 @@ export function registerCommerceIpcHandlers(options: {
     read(() => findRuntimeProductByBarcode(databasePath(), barcode))
   );
   ipcMain.handle("commerce:product:lookupExternal", (_event, barcode: string, mode: Parameters<DesktopCommerceBridge["lookupExternalProductByBarcode"]>[1] = "manual") =>
-    read(() => lookupExternalProductByBarcode(databasePath(), barcode, mode))
+    read(() => lookupRuntimeExternalProductByBarcode(databasePath(), barcode, mode))
   );
   ipcMain.handle("commerce:product:imageDataUrl", (_event, productId: string) =>
-    read(() => getProductImageDataUrl(databasePath(), productId))
+    read(() => getRuntimeProductImageDataUrl(databasePath(), productId))
   );
 
   ipcMain.handle("commerce:inventory:getBalance", (_event, productId: string, locationId?: string) =>
