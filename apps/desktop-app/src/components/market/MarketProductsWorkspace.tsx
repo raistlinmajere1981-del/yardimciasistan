@@ -1,12 +1,10 @@
 import { Plus, Save, Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
-  marketProductDraftCatalogDefaults,
-  type CatalogCategory,
+   type CatalogCategory,
   type CatalogProduct,
-  type CatalogProductDraft,
-  type CommerceUnit
+   type CommerceUnit
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
@@ -44,14 +42,6 @@ interface MarketProductsWorkspaceProps {
   busy: boolean;
   onReload: () => Promise<void>;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
-  productDraftRequest?: ProductDraftFormRequest | null;
-  onProductDraftLoaded?: (draftId: string) => Promise<void> | void;
-  onProductDraftReviewed?: (draftId: string) => Promise<void> | void;
-}
-
-export interface ProductDraftFormRequest {
-  requestId: number;
-  draft: CatalogProductDraft;
 }
 
 const unitLabels: Record<CommerceUnit, string> = {
@@ -102,10 +92,7 @@ export function MarketProductsWorkspace({
   categories,
   busy,
   onReload,
-  onStateChange,
-  productDraftRequest = null,
-  onProductDraftLoaded,
-  onProductDraftReviewed
+  onStateChange
 }: MarketProductsWorkspaceProps) {
   const bridge = window.yardimciDesktop?.commerce;
   const { snapshot } = useBusinessCapabilityRuntime();
@@ -113,41 +100,6 @@ export function MarketProductsWorkspace({
   const [search, setSearch] = useState("");
   const [productForm, setProductForm] = useState<ProductFormState>(() => emptyProductForm(inventoryEnabled));
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>(emptyCategoryForm);
-  const [sourceDraft, setSourceDraft] = useState<CatalogProductDraft | null>(null);
-  const loadedDraftRequestId = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!productDraftRequest || loadedDraftRequestId.current === productDraftRequest.requestId) return;
-    loadedDraftRequestId.current = productDraftRequest.requestId;
-    const defaults = marketProductDraftCatalogDefaults(
-      productDraftRequest.draft,
-      categories,
-      { inventoryEnabled }
-    );
-    setProductForm({
-      id: "",
-      categoryId: defaults.categoryId,
-      name: defaults.name,
-      sku: defaults.sku,
-      barcode: defaults.barcode,
-      description: defaults.description,
-      salePrice: String(defaults.salePrice),
-      purchasePrice: String(defaults.purchasePrice),
-      currency: defaults.currency,
-      unit: defaults.unit,
-      taxRate: String(defaults.taxRate),
-      minimumQuantity: String(defaults.minimumQuantity),
-      trackInventory: defaults.trackInventory,
-      isActive: defaults.isActive
-    });
-    setSourceDraft(productDraftRequest.draft);
-    void onProductDraftLoaded?.(productDraftRequest.draft.id);
-    onStateChange(
-      "success",
-      "Telefon taslağı ürün formuna yüklendi. Ürün kaydedilene kadar taslak açık kalır."
-    );
-  }, [categories, inventoryEnabled, onProductDraftLoaded, onStateChange, productDraftRequest]);
-
   const filteredProducts = products.filter((product) => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     if (!needle) return true;
@@ -156,7 +108,6 @@ export function MarketProductsWorkspace({
   });
 
   async function editProduct(product: CatalogProduct) {
-    setSourceDraft(null);
     let minimumQuantity = "0";
     if (bridge && inventoryEnabled && product.trackInventory) {
       try {
@@ -211,17 +162,6 @@ export function MarketProductsWorkspace({
       return;
     }
 
-    let draftReviewFailed = false;
-    if (sourceDraft) {
-      try {
-        await bridge.markProductDraftReviewed(sourceDraft.id);
-        await onProductDraftReviewed?.(sourceDraft.id);
-      } catch {
-        draftReviewFailed = true;
-      }
-    }
-    setSourceDraft(null);
-    setProductForm(emptyProductForm(inventoryEnabled));
     let catalogReloadFailed = false;
     try {
       await onReload();
@@ -230,9 +170,7 @@ export function MarketProductsWorkspace({
     }
     onStateChange(
       "success",
-      draftReviewFailed
-        ? "Ürün kaydedildi ancak telefon taslağı kapatılamadı."
-        : `${saved.name} kaydedildi${sourceDraft ? " ve telefon taslağı kapatıldı" : ""}.${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`
+      `${saved.name} kaydedildi.${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`
     );
   }
 
@@ -286,8 +224,7 @@ export function MarketProductsWorkspace({
         <header className="market-panel-heading market-panel-heading-row">
           <div><span>Katalog</span><h2>Ürünler</h2><p>Ürün kartları satış ve stok tarafından ortak kullanılır.</p></div>
           <button type="button" className="market-secondary-button" onClick={() => {
-            setSourceDraft(null);
-            setProductForm(emptyProductForm(inventoryEnabled));
+                    setProductForm(emptyProductForm(inventoryEnabled));
           }}>
             <Plus size={16} aria-hidden="true" /> Yeni ürün
           </button>
@@ -309,14 +246,6 @@ export function MarketProductsWorkspace({
 
       <section className="market-panel">
         <header className="market-panel-heading"><span>{productForm.id ? "Düzenle" : "Yeni kayıt"}</span><h2>Ürün Kartı</h2></header>
-        {sourceDraft && (
-          <aside className="market-draft-reference" aria-label="Telefon taslağı referansı">
-            <strong>Telefon taslağından hazırlanıyor</strong>
-            <span>{sourceDraft.createdByDevice || sourceDraft.source || "Telefon"} · {new Date(sourceDraft.createdAt).toLocaleString("tr-TR")}</span>
-            <p>{sourceDraft.note || "Taslak notu yok."}</p>
-            <small>Bu not açıklama alanına otomatik kopyalanmadı. Vazgeçerseniz taslak pending kalır.</small>
-          </aside>
-        )}
         <div className="market-form-grid">
           <label className="market-field market-field-wide">Ürün adı<input value={productForm.name} onChange={(event) => setProductForm((current) => ({ ...current, name: event.target.value }))} /></label>
           <label className="market-field">SKU<input value={productForm.sku} onChange={(event) => setProductForm((current) => ({ ...current, sku: event.target.value }))} /></label>
