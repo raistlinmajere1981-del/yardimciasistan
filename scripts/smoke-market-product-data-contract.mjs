@@ -43,6 +43,7 @@ assert.match(service, /image_front_url/);
 assert.match(service, /dataLicense: "ODbL"/);
 assert.match(service, /imageLicense: imageUrl \? "CC BY-SA" : ""/);
 assert.match(service, /IMAGE_MAX_DIMENSION = 768/);
+assert.match(service, /response\.status === 404[\s\S]*status: "not_found"/);
 assert.match(service, /resolveProductAssetRelativePath/);
 assert.match(service, /resolveProductAssetAbsolutePath/);
 assert.match(service, /hostname\.endsWith\("\.openfoodfacts\.org"\)/);
