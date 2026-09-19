@@ -64,19 +64,16 @@ export {
 } from "./customer-credit-runtime";
 export {
   createMarketCartDraft,
-  createMarketProductDraft,
   consumePendingMarketBarcodeScans,
   getMarketCartDraft,
   loadMarketCartDraftForQuickSale,
   listMarketCartDrafts,
-  listMarketProductDrafts,
   markMarketCartDraftReviewed,
   markMarketProductDraftReviewed
 } from "./market-companion-runtime";
 export type {
   ConsumePendingMarketBarcodeScansOptions,
   CreateMarketCartDraftInput,
-  CreateMarketProductDraftInput,
   ListMarketCartDraftsOptions,
   ListMarketProductDraftsOptions
 } from "./market-companion-runtime";
