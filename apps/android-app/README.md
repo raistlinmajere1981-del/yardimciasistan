@@ -73,11 +73,19 @@ devam eder; eski ve Market dışı snapshot'lar geçerliliğini korur.
 
 Market barkod akışı CameraX + ML Kit ile cihaz üzerinde barkod çözer; aynı altyapı kasa
 barkod modu, ürün arama, stok, mal kabul, sepet ve yeni ürün ekranlarında kullanılır.
-Kamera izni verilmezse elle giriş geri dönüşü korunur. `retail.barcode` kapalıysa genel
-`Barkod Tara` CTA'ları gizlenir; ürün seçme/arama akışı açık kalır.
+Kamera izni verilmezse elle giriş geri dönüşü korunur. Elle yazılan sayısal barkodlarda
+boşluk, tire, nokta ve benzeri görsel ayraçlar otomatik temizlenir. `retail.barcode`
+kapalıysa genel `Barkod Tara` CTA'ları gizlenir; ürün seçme/arama akışı açık kalır.
 
-Full mobile POS, telefonda ödeme, iadeler, fatura OCR, ürün fotoğrafları, bekleyen satın
-alma siparişi ve local LAN transport kapsam dışıdır.
+`Ürün Verisi` servisi açıksa bilinmeyen barkodlar Open Food Facts üzerinden
+tanımlanabilir. Ayardaki otomatik arama açıksa sorgu bilinmeyen barkoddan sonra kendiliğinden
+başlar; kapalıysa `Ürün Bilgilerini Ara` düğmesi kullanılır. Ad, marka, ambalaj bilgisi,
+kaynak/provenance ve isteğe bağlı ürün görseli yeni ürün formuna gelir. Görsel ürün
+kaydedilmeden önce telefonda önizlenir; masaüstü action'ı uyguladığında aynı kaynak görseli
+yerel ürün asset arşivine alır ve normal backup/restore kapsamına girer.
+
+Full mobile POS, telefonda ödeme, iadeler, fatura OCR, telefondan serbest ürün fotoğrafı
+çekme, bekleyen satın alma siparişi ve local LAN transport kapsam dışıdır.
 
 Uygulama ön plandayken canlı özet yaklaşık 15 saniyede bir otomatik kontrol edilir.
 Sunucu revision'ı değişmediyse tam snapshot indirilmez. Son başarılı JSON özeti
