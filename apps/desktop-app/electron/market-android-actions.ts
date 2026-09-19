@@ -129,7 +129,13 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
     WHERE product.barcode = ?
       AND product.deleted_at = ''
       AND business.deleted_at = ''
-    ORDER BY business.created_at ASC
+      AND product.business_id = (
+        SELECT id
+        FROM business
+        WHERE deleted_at = ''
+        ORDER BY created_at ASC
+        LIMIT 1
+      )
     LIMIT 1
   `).get(barcode) as { name?: unknown } | undefined;
   if (existing) {
