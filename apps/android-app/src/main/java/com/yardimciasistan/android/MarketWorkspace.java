@@ -1228,7 +1228,7 @@ final class MarketWorkspace {
   }
 
   private void handleBarcode(String rawBarcode, String purpose) {
-    String barcode = rawBarcode == null ? "" : rawBarcode.trim();
+    String barcode = MarketUiRules.normalizeBarcodeIdentity(rawBarcode);
     if (PURPOSE_CASH.equals(purpose)) {
       captureCashBarcode(barcode);
       return;
@@ -1337,7 +1337,7 @@ final class MarketWorkspace {
   private void startProductCreate(String barcode) {
     if (!MarketUiRules.canCreateProduct(data)) return;
     clearProductCreate();
-    productCreateBarcode = barcode == null ? "" : barcode.trim();
+    productCreateBarcode = MarketUiRules.normalizeBarcodeIdentity(barcode);
     screen = SCREEN_PRODUCT_CREATE;
     formError = "";
     listener.onRenderRequested();
