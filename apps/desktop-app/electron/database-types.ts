@@ -6,7 +6,8 @@ import type {
   MenuStockUnit,
   StockImageAnalysis,
   StockImageApplyLine,
-  StockImageImportSource
+  StockImageImportSource,
+  ProductDataProviderId
 } from "@yardimci-asistan/shared";
 import type {
   AndroidDeviceRole,
@@ -393,6 +394,13 @@ export interface AiApiKeyWrite {
   encryptedValue?: string;
 }
 
+export interface DesktopProductDataSettings {
+  enabled: boolean;
+  provider: ProductDataProviderId;
+  autoSearchUnknownBarcode: boolean;
+  includeImages: boolean;
+}
+
 export interface DesktopSetupData {
   setupRequired: boolean;
   appPasswordConfigured: boolean;
@@ -415,6 +423,7 @@ export interface DesktopSetupData {
   aiApiKeyConfigured: boolean;
   aiLastPublishedAt: string;
   aiProfiles: DesktopAiServiceProfile[];
+  productData: DesktopProductDataSettings;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;
@@ -448,6 +457,7 @@ export interface SaveInitialSetupInput {
   aiApiKey: string;
   clearAiApiKey: boolean;
   aiProfiles?: SaveAiServiceProfileInput[];
+  productData: DesktopProductDataSettings;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;
