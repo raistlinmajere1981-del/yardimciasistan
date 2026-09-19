@@ -5294,8 +5294,8 @@ public final class MainActivity extends ComponentActivity {
         return MarketUiRules.PERMISSION_STOCK_COUNT;
       case MarketUiRules.ACTION_PURCHASE_RECEIVE:
         return MarketUiRules.PERMISSION_RECEIVING;
-      case MarketUiRules.ACTION_PRODUCT_DRAFT_CREATE:
-        return MarketUiRules.PERMISSION_PRODUCT_DRAFT;
+      case MarketUiRules.ACTION_PRODUCT_CREATE:
+        return MarketUiRules.PERMISSION_PRODUCT_CREATE;
       case MarketUiRules.ACTION_CART_DRAFT_CREATE:
         return MarketUiRules.PERMISSION_CART_DRAFT;
       case MarketUiRules.ACTION_BARCODE_SCAN:
@@ -6028,7 +6028,7 @@ public final class MainActivity extends ComponentActivity {
   private String formatActionType(String value) {
     if (MarketUiRules.ACTION_STOCK_COUNT.equals(value)) return "Market stok sayımı";
     if (MarketUiRules.ACTION_PURCHASE_RECEIVE.equals(value)) return "Market mal kabulü";
-    if (MarketUiRules.ACTION_PRODUCT_DRAFT_CREATE.equals(value)) return "Yeni ürün taslağı";
+    if (MarketUiRules.ACTION_PRODUCT_CREATE.equals(value)) return "Yeni ürün";
     if (MarketUiRules.ACTION_CART_DRAFT_CREATE.equals(value)) return "Market sepet taslağı";
     if ("customer_create".equals(value)) return "Müşteri oluşturma";
     if ("customer_update".equals(value)) return "Müşteri güncelleme";

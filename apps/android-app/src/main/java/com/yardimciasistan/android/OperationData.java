@@ -736,6 +736,22 @@ final class OperationData {
     }
   }
 
+  static final class MarketCartDraftLine {
+    String id = "";
+    String productId = "";
+    String productName = "Ürün";
+    double quantity;
+
+    static MarketCartDraftLine fromJson(JSONObject source) {
+      MarketCartDraftLine line = new MarketCartDraftLine();
+      line.id = value(source, "id", "");
+      line.productId = value(source, "product_id", "");
+      line.productName = value(source, "product_name", "Ürün");
+      line.quantity = decimal(source, "quantity");
+      return line;
+    }
+  }
+
   static final class MarketCartDraft {
     String id = "";
     String status = "pending";

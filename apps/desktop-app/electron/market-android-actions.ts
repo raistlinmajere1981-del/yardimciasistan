@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import type { CommerceUnit } from "@yardimci-asistan/shared";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import { receiveCommercePurchaseInTransaction } from "./commerce-purchase-store.js";
 import { saveCatalogProductInTransaction, setInventoryCountInTransaction } from "./commerce-store.js";
@@ -6,6 +7,10 @@ import {
   createMarketBarcodeScanEventInTransaction,
   createMarketCartDraftInTransaction
 } from "./market-companion-store.js";
+
+const COMMERCE_UNITS = new Set<CommerceUnit>([
+  "piece", "kg", "g", "l", "ml", "pack", "box", "meter", "other"
+]);
 
 export type MarketAndroidActionResult =
   | { ok: true; message: string }
@@ -158,7 +163,7 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
     purchasePrice: Number(payload.purchase_price ?? 0),
     salePrice: Number(payload.sale_price ?? 0),
     currency: text(payload.currency) || "TRY",
-    unit: text(payload.unit) || "piece",
+    unit: normalizeCommerceUnit(text(payload.unit)),
     taxRate: 0,
     trackInventory,
     minimumQuantity: 0,
@@ -255,4 +260,9 @@ function record(value: unknown): Record<string, unknown> {
 
 function text(value: unknown): string {
   return String(value ?? "").trim();
+}
+
+function normalizeCommerceUnit(value: unknown): CommerceUnit {
+  const unit = String(value ?? "piece").trim() as CommerceUnit;
+  return COMMERCE_UNITS.has(unit) ? unit : "piece";
 }

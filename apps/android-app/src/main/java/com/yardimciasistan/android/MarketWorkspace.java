@@ -25,6 +25,7 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.content.ContextCompat;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.text.NumberFormat;
@@ -991,6 +992,8 @@ final class MarketWorkspace {
       }
     } catch (MarketUiRules.ValidationException error) {
       showFormError(error.getMessage());
+    } catch (JSONException error) {
+      showFormError("Ürün kaydı hazırlanamadı.");
     }
   }
 
