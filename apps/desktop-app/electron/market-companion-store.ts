@@ -2,7 +2,6 @@ import { DatabaseSync } from "node:sqlite";
 import {
   createId,
   type CatalogProduct,
-  type CatalogProductDraft,
   type CommerceSaleDraft,
   type CommerceSaleDraftDetail,
   type CommerceSaleDraftItem,
@@ -19,25 +18,6 @@ const DRAFT_STATUSES = new Set<MarketDraftStatus>(["pending", "reviewed"]);
 
 const MARKET_BARCODE_SCAN_TTL_MS = 60_000;
 const MARKET_BARCODE_SCAN_FUTURE_TOLERANCE_MS = 30_000;
-
-export interface CreateMarketProductDraftInput {
-  barcode: string;
-  proposedName: string;
-  sku?: string;
-  proposedCategory?: string;
-  proposedPurchasePrice?: number;
-  proposedSalePrice?: number;
-  currency?: string;
-  unit?: CommerceUnit | string;
-  note?: string;
-  source?: string;
-  createdByDevice?: string;
-}
-
-export interface ListMarketProductDraftsOptions {
-  status?: MarketDraftStatus;
-  limit?: number;
-}
 
 export interface CreateMarketCartDraftInput {
   lines: Array<{
@@ -100,14 +80,6 @@ function limitedText(value: unknown, maximum: number): string {
   return normalized;
 }
 
-function roundMoney(value: unknown): number {
-  const numeric = Number(value ?? 0);
-  if (!Number.isFinite(numeric) || numeric < 0) {
-    throw new Error("Taslak fiyatı 0 veya daha büyük olmalı.");
-  }
-  return Math.round((numeric + Number.EPSILON) * 100) / 100;
-}
-
 function roundQuantity(value: unknown): number {
   const numeric = Number(value);
   if (!Number.isFinite(numeric) || numeric <= 0) {
@@ -139,27 +111,6 @@ function normalizeStatus(value: unknown): MarketDraftStatus | "" {
   const status = text(value) as MarketDraftStatus;
   if (!DRAFT_STATUSES.has(status)) throw new Error("Taslak durumu geçersiz.");
   return status;
-}
-
-function mapProductDraft(row: Record<string, unknown>): CatalogProductDraft {
-  return {
-    id: text(row.id),
-    businessId: text(row.business_id),
-    barcode: text(row.barcode),
-    proposedName: text(row.proposed_name),
-    sku: text(row.sku),
-    proposedCategory: text(row.proposed_category),
-    proposedPurchasePrice: Number(row.proposed_purchase_price ?? 0),
-    proposedSalePrice: Number(row.proposed_sale_price ?? 0),
-    currency: text(row.currency) || "TRY",
-    unit: normalizeUnit(row.unit),
-    note: text(row.note),
-    source: text(row.source),
-    createdByDevice: text(row.created_by_device),
-    status: normalizeStatus(row.status) || "pending",
-    createdAt: text(row.created_at),
-    updatedAt: text(row.updated_at)
-  };
 }
 
 function mapCartDraft(row: Record<string, unknown>): CommerceSaleDraft {
@@ -224,168 +175,6 @@ function mapResolvedCatalogProduct(row: Record<string, unknown>): CatalogProduct
     createdAt: text(row.product_created_at),
     updatedAt: text(row.product_updated_at)
   };
-}
-
-export function createMarketProductDraftInTransaction(
-  database: DatabaseSync,
-  input: CreateMarketProductDraftInput,
-  now: string
-): CatalogProductDraft {
-  const businessId = activeBusinessId(database);
-  const barcode = limitedText(input.barcode, 120);
-  const proposedName = limitedText(input.proposedName, 240);
-  if (barcode.length < 3) throw new Error("Ürün taslağı için geçerli bir barkod gerekli.");
-  if (!proposedName) throw new Error("Ürün taslağı için önerilen ad gerekli.");
-
-  const existingProduct = database.prepare(`
-    SELECT id
-    FROM catalog_products
-    WHERE business_id = ? AND barcode = ? AND deleted_at = ''
-    LIMIT 1
-  `).get(businessId, barcode);
-  if (existingProduct) throw new Error("Bu barkod zaten gerçek bir katalog ürününe ait.");
-
-  const draft: CatalogProductDraft = {
-    id: createId("catalog_product_draft_"),
-    businessId,
-    barcode,
-    proposedName,
-    sku: limitedText(input.sku, 120),
-    proposedCategory: limitedText(input.proposedCategory, 180),
-    proposedPurchasePrice: roundMoney(input.proposedPurchasePrice),
-    proposedSalePrice: roundMoney(input.proposedSalePrice),
-    currency: normalizeCurrency(input.currency),
-    unit: normalizeUnit(input.unit),
-    note: limitedText(input.note, 2000),
-    source: limitedText(input.source || "desktop", 80) || "desktop",
-    createdByDevice: limitedText(input.createdByDevice, 120),
-    status: "pending",
-    createdAt: now,
-    updatedAt: now
-  };
-
-  database.prepare(`
-    INSERT INTO catalog_product_drafts (
-      id, business_id, barcode, proposed_name, sku, proposed_category,
-      proposed_purchase_price, proposed_sale_price, currency, unit, note,
-      source, created_by_device, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-  `).run(
-    draft.id,
-    draft.businessId,
-    draft.barcode,
-    draft.proposedName,
-    draft.sku,
-    draft.proposedCategory,
-    draft.proposedPurchasePrice,
-    draft.proposedSalePrice,
-    draft.currency,
-    draft.unit,
-    draft.note,
-    draft.source,
-    draft.createdByDevice,
-    draft.createdAt,
-    draft.updatedAt
-  );
-  return draft;
-}
-
-export function createMarketProductDraftRecord(
-  databasePath: string,
-  input: CreateMarketProductDraftInput
-): CatalogProductDraft {
-  const database = openDatabase(databasePath);
-  try {
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      const draft = createMarketProductDraftInTransaction(database, input, new Date().toISOString());
-      database.exec("COMMIT");
-      return draft;
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
-  } finally {
-    database.close();
-  }
-}
-
-export function listMarketProductDraftRecords(
-  databasePath: string,
-  options: ListMarketProductDraftsOptions = {}
-): CatalogProductDraft[] {
-  const database = openDatabase(databasePath);
-  try {
-    const businessId = activeBusinessId(database);
-    const status = normalizeStatus(options.status);
-    const conditions = ["business_id = ?"];
-    const parameters: Array<string | number> = [businessId];
-    if (status) {
-      conditions.push("status = ?");
-      parameters.push(status);
-    }
-    parameters.push(normalizeLimit(options.limit));
-    return (database.prepare(`
-      SELECT *
-      FROM catalog_product_drafts
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY created_at DESC, id DESC
-      LIMIT ?
-    `).all(...parameters) as Array<Record<string, unknown>>).map(mapProductDraft);
-  } finally {
-    database.close();
-  }
-}
-
-export function markMarketProductDraftReviewedRecord(
-  databasePath: string,
-  draftIdInput: string
-): CatalogProductDraft {
-  const database = openDatabase(databasePath);
-  try {
-    const businessId = activeBusinessId(database);
-    const draftId = limitedText(draftIdInput, 220);
-    if (!draftId) throw new Error("Ürün taslağı kimliği gerekli.");
-
-    database.exec("BEGIN IMMEDIATE");
-    try {
-      const current = database.prepare(`
-        SELECT *
-        FROM catalog_product_drafts
-        WHERE id = ? AND business_id = ?
-        LIMIT 1
-      `).get(draftId, businessId) as Record<string, unknown> | undefined;
-      if (!current) throw new Error("Ürün taslağı aktif işletmede bulunamadı.");
-      const draft = mapProductDraft(current);
-      if (draft.status === "reviewed") {
-        database.exec("COMMIT");
-        return draft;
-      }
-
-      const now = new Date().toISOString();
-      database.prepare(`
-        UPDATE catalog_product_drafts
-        SET status = 'reviewed', updated_at = ?
-        WHERE id = ? AND business_id = ? AND status = 'pending'
-      `).run(now, draftId, businessId);
-      const reviewed = database.prepare(`
-        SELECT *
-        FROM catalog_product_drafts
-        WHERE id = ? AND business_id = ?
-        LIMIT 1
-      `).get(draftId, businessId) as Record<string, unknown> | undefined;
-      if (!reviewed || mapProductDraft(reviewed).status !== "reviewed") {
-        throw new Error("Ürün taslağı kapatılamadı.");
-      }
-      database.exec("COMMIT");
-      return mapProductDraft(reviewed);
-    } catch (error) {
-      database.exec("ROLLBACK");
-      throw error;
-    }
-  } finally {
-    database.close();
-  }
 }
 
 export function createMarketCartDraftInTransaction(
