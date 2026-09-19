@@ -11,7 +11,6 @@ import type {
   RecordCustomerCreditPaymentInput,
   CatalogCategory,
   CatalogProduct,
-  CatalogProductDraft,
   CommercePurchaseOrder,
   CommercePurchaseOrderDetail,
   CommerceSale,
@@ -46,8 +45,7 @@ import type {
 import type { InventoryCountResult } from "./commerce-runtime";
 import type {
   ConsumePendingMarketBarcodeScansOptions,
-  ListMarketCartDraftsOptions,
-  ListMarketProductDraftsOptions
+  ListMarketCartDraftsOptions
 } from "./market-companion-runtime";
 
 export interface MarketBarcodeFastPullState {
@@ -86,8 +84,6 @@ export interface DesktopCommerceBridge {
   recordCustomerCreditPayment: (input: RecordCustomerCreditPaymentInput) => Promise<CustomerCreditEntry>;
   addCustomerCreditAdjustment: (input: AddCustomerCreditAdjustmentInput) => Promise<CustomerCreditEntry>;
 
-  listProductDrafts: (options?: ListMarketProductDraftsOptions) => Promise<CatalogProductDraft[]>;
-  markProductDraftReviewed: (draftId: string) => Promise<CatalogProductDraft>;
   listCartDrafts: (options?: ListMarketCartDraftsOptions) => Promise<CommerceSaleDraftDetail[]>;
   getCartDraft: (draftId: string) => Promise<CommerceSaleDraftDetail | null>;
   loadCartDraftForQuickSale: (draftId: string) => Promise<MarketCartDraftLoadResult>;
