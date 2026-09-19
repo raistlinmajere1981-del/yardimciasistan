@@ -110,8 +110,15 @@ try {
   const product = saveCatalogProduct(databasePath, {
     categoryId: chilledCategory.id,
     name: "Test Süt 1L",
+    brand: "Smoke Dairy",
     sku: "SUT-1L",
     barcode: "8690000000011",
+    imageSourceUrl: "https://images.openfoodfacts.org/images/products/869/test.jpg",
+    dataSource: "open_food_facts",
+    sourceProductUrl: "https://world.openfoodfacts.org/product/8690000000011",
+    dataLicense: "ODbL",
+    imageLicense: "CC BY-SA",
+    sourceFetchedAt: "2026-09-19T12:00:00.000Z",
     salePrice: 42.5,
     purchasePrice: 31.25,
     currency: "TRY",
@@ -119,7 +126,12 @@ try {
     minimumQuantity: 3
   });
   assert.equal(product.name, "Test Süt 1L");
+  assert.equal(product.brand, "Smoke Dairy");
   assert.equal(product.barcode, "8690000000011");
+  assert.equal(product.dataSource, "open_food_facts");
+  assert.equal(product.dataLicense, "ODbL");
+  assert.equal(product.imageLicense, "CC BY-SA");
+  assert.equal(product.imageAssetPath, "");
   assert.equal(product.categoryId, chilledCategory.id);
   assert.equal(product.trackInventory, true);
   assert.throws(
@@ -145,6 +157,11 @@ try {
     listCatalogProducts(databasePath, { search: "SUT-1L" }).map((item) => item.id),
     [product.id],
     "Product search should include SKU."
+  );
+  assert.deepEqual(
+    listCatalogProducts(databasePath, { search: "Smoke Dairy" }).map((item) => item.id),
+    [product.id],
+    "Product search should include brand."
   );
   assert.deepEqual(
     listCatalogProducts(databasePath, { search: "0000000012" }).map((item) => item.id),
@@ -309,6 +326,7 @@ try {
     id: product.id,
     categoryId: "",
     name: product.name,
+    brand: product.brand,
     sku: product.sku,
     barcode: product.barcode,
     description: product.description,
