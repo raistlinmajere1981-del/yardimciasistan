@@ -62,6 +62,7 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<AsyncState>("idle");
+  const [productDataEnabled, setProductDataEnabled] = useState(false);
   const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
   const [productLookupRequest, setProductLookupRequest] = useState<ProductLookupFormRequest | null>(null);
   const handoffRequestId = useRef(0);
@@ -95,6 +96,20 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
       setActiveTab(availableTabs[0]?.id ?? "products");
     }
   }, [activeTab, availableTabs]);
+
+  useEffect(() => {
+    let disposed = false;
+    void window.yardimciDesktop?.getSetupData()
+      .then((setup) => {
+        if (!disposed) setProductDataEnabled(setup.productData.enabled);
+      })
+      .catch(() => {
+        if (!disposed) setProductDataEnabled(false);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!catalogEnabled) return;
@@ -167,6 +182,7 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
           products={products}
           categories={categories}
           busy={dataState === "loading"}
+          productDataEnabled={productDataEnabled}
           onReload={reloadCatalog}
           onStateChange={handleStateChange}
           productLookupRequest={productLookupRequest}
