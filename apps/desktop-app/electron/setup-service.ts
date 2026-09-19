@@ -60,6 +60,12 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
     aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
     aiProfiles,
+    productData: {
+      enabled: Number(settings?.product_data_enabled ?? 0) === 1,
+      provider: "open_food_facts",
+      autoSearchUnknownBarcode: Number(settings?.product_data_auto_search ?? 1) === 1,
+      includeImages: Number(settings?.product_data_include_images ?? 1) === 1
+    },
     servicePreferences: {
       whatsapp: enabledCapabilities.has(BUSINESS_CAPABILITIES.WHATSAPP),
       android: enabledCapabilities.has(BUSINESS_CAPABILITIES.ANDROID)
