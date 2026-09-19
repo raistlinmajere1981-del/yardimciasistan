@@ -2,6 +2,11 @@ import { ipcMain } from "electron";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
 import {
+  archiveExternalProductImage,
+  getProductImageDataUrl,
+  lookupExternalProductByBarcode
+} from "./product-data-service";
+import {
   addCustomerCreditAdjustment,
   createCustomerCreditSale,
   getCustomerCreditAccount,
@@ -74,11 +79,28 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:product:list", (_event, optionsArg: Parameters<DesktopCommerceBridge["listProducts"]>[0]) =>
     read(() => listRuntimeCatalogProducts(databasePath(), optionsArg))
   );
-  ipcMain.handle("commerce:product:save", (_event, input: Parameters<DesktopCommerceBridge["saveProduct"]>[0]) =>
-    mutate(() => saveRuntimeCatalogProduct(databasePath(), input))
-  );
+  ipcMain.handle("commerce:product:save", async (_event, input: Parameters<DesktopCommerceBridge["saveProduct"]>[0]) => {
+    options.assertUnlocked();
+    let saved = saveRuntimeCatalogProduct(databasePath(), input);
+    if (saved.imageSourceUrl && input.imageSourceUrl !== undefined) {
+      try {
+        const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.imageSourceUrl);
+        if (imageAssetPath) saved = { ...saved, imageAssetPath };
+      } catch (error) {
+        console.warn("[product-data] Ürün görseli arşivlenemedi:", error);
+      }
+    }
+    options.onMutation?.();
+    return saved;
+  });
   ipcMain.handle("commerce:product:findByBarcode", (_event, barcode: string) =>
     read(() => findRuntimeProductByBarcode(databasePath(), barcode))
+  );
+  ipcMain.handle("commerce:product:lookupExternal", (_event, barcode: string, mode: Parameters<DesktopCommerceBridge["lookupExternalProductByBarcode"]>[1] = "manual") =>
+    read(() => lookupExternalProductByBarcode(databasePath(), barcode, mode))
+  );
+  ipcMain.handle("commerce:product:imageDataUrl", (_event, productId: string) =>
+    read(() => getProductImageDataUrl(databasePath(), productId))
   );
 
   ipcMain.handle("commerce:inventory:getBalance", (_event, productId: string, locationId?: string) =>
