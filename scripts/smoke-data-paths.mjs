@@ -76,7 +76,11 @@ const dp = await importDataPaths();
   assert.equal(marker, path.join(dataRoot, "maintenance", "pending-data-maintenance.json"));
   const staged = dp.resolveStagedRestorePath(dataRoot);
   assert.equal(staged, path.join(dataRoot, "maintenance", "restore.sqlite"));
-  console.log("✓ maintenance dataRoot altındadır");
+  const stagedAssets = dp.resolveStagedRestoreAssetsPath(dataRoot);
+  assert.equal(stagedAssets, path.join(dataRoot, "maintenance", "restore-assets"));
+  const paths = dp.buildDesktopDataPaths(dataRoot, path.join(repoRoot, "backup"));
+  assert.equal(paths.stagedRestoreAssetsPath, stagedAssets);
+  console.log("✓ maintenance ve staged asset restore dataRoot altındadır");
 }
 
 // 5) assets/products dataRoot altındadır
