@@ -1289,33 +1289,6 @@ BEGIN
     updated_at = excluded.updated_at;
 END;
 
-CREATE TRIGGER trg_market_product_drafts_android_snapshot_insert
-AFTER INSERT ON catalog_product_drafts
-BEGIN
-  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
-  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.created_at, NEW.updated_at)
-  ON CONFLICT(job_key) DO UPDATE SET
-    source_revision = sync_outbox.source_revision + 1,
-    attempt_count = 0,
-    next_attempt_at = '',
-    last_error = '',
-    updated_at = excluded.updated_at;
-END;
-
-CREATE TRIGGER trg_market_product_drafts_android_snapshot_update
-AFTER UPDATE OF status ON catalog_product_drafts
-WHEN OLD.status <> NEW.status
-BEGIN
-  INSERT INTO sync_outbox (job_key, job_type, source_revision, created_at, updated_at)
-  VALUES ('android_snapshot', 'android_snapshot', 1, NEW.updated_at, NEW.updated_at)
-  ON CONFLICT(job_key) DO UPDATE SET
-    source_revision = sync_outbox.source_revision + 1,
-    attempt_count = 0,
-    next_attempt_at = '',
-    last_error = '',
-    updated_at = excluded.updated_at;
-END;
-
 CREATE TRIGGER trg_paid_table_order_finance_insert
 AFTER INSERT ON table_orders
 WHEN NEW.status = 'paid'
