@@ -292,24 +292,6 @@ export interface AndroidMarketPurchase {
   line_count: number;
 }
 
-export interface AndroidMarketProductDraft {
-  id: string;
-  barcode: string;
-  proposed_name: string;
-  sku: string;
-  proposed_category: string;
-  proposed_purchase_price: number;
-  proposed_sale_price: number;
-  currency: string;
-  unit: string;
-  note: string;
-  source: string;
-  created_by_device: string;
-  status: "pending" | "reviewed";
-  created_at: ISODateTimeString | "";
-  updated_at: ISODateTimeString | "";
-}
-
 export interface AndroidMarketCartDraftLine {
   id: string;
   product_id: string;
@@ -333,7 +315,6 @@ export interface AndroidMarketSnapshot {
   products: AndroidMarketProduct[];
   suppliers: AndroidMarketSupplier[];
   recent_purchases: AndroidMarketPurchase[];
-  product_drafts: AndroidMarketProductDraft[];
   cart_drafts: AndroidMarketCartDraft[];
 }
 
