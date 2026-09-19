@@ -53,6 +53,7 @@ interface MarketProductsWorkspaceProps {
   products: CatalogProduct[];
   categories: CatalogCategory[];
   busy: boolean;
+  productDataEnabled?: boolean;
   onReload: () => Promise<void>;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
   productLookupRequest?: ProductLookupFormRequest | null;
@@ -128,6 +129,7 @@ export function MarketProductsWorkspace({
   products,
   categories,
   busy,
+  productDataEnabled = false,
   onReload,
   onStateChange,
   productLookupRequest = null,
@@ -416,9 +418,11 @@ export function MarketProductsWorkspace({
             Barkod
             <span className="market-inline-field">
               <input value={productForm.barcode} onChange={(event) => setProductForm((current) => ({ ...current, barcode: event.target.value }))} />
-              <button type="button" className="market-secondary-button" onClick={() => void lookupProductInfo()} disabled={busy || lookupBusy || !productForm.barcode.trim()}>
-                <Sparkles size={15} aria-hidden="true" /> {lookupBusy ? "Aranıyor…" : "Ürün Bilgilerini Ara"}
-              </button>
+              {productDataEnabled && (
+                <button type="button" className="market-secondary-button" onClick={() => void lookupProductInfo()} disabled={busy || lookupBusy || !productForm.barcode.trim()}>
+                  <Sparkles size={15} aria-hidden="true" /> {lookupBusy ? "Aranıyor…" : "Ürün Bilgilerini Ara"}
+                </button>
+              )}
             </span>
           </label>
           <label className="market-field">Kategori<select value={productForm.categoryId} onChange={(event) => setProductForm((current) => ({ ...current, categoryId: event.target.value }))}><option value="">Kategorisiz</option>{categories.filter((category) => category.isActive).map((category) => <option value={category.id} key={category.id}>{category.name}</option>)}</select></label>
