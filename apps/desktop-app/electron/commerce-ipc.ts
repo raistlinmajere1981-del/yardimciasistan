@@ -1,7 +1,10 @@
 import { ipcMain } from "electron";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
-import { archiveExternalProductImage } from "./product-data-service";
+import {
+  archiveExternalProductImage,
+  previewExternalProductImage
+} from "./product-data-service";
 import {
   addCustomerCreditAdjustment,
   createCustomerCreditSale,
@@ -96,6 +99,9 @@ export function registerCommerceIpcHandlers(options: {
   );
   ipcMain.handle("commerce:product:lookupExternal", (_event, barcode: string, mode: NonNullable<Parameters<DesktopCommerceBridge["lookupExternalProductByBarcode"]>[1]> = "manual") =>
     read(() => lookupRuntimeExternalProductByBarcode(databasePath(), barcode, mode))
+  );
+  ipcMain.handle("commerce:product:previewExternalImage", (_event, provider: string, imageUrl: string) =>
+    read(() => previewExternalProductImage(provider, imageUrl))
   );
   ipcMain.handle("commerce:product:imageDataUrl", (_event, productId: string) =>
     read(() => getRuntimeProductImageDataUrl(databasePath(), productId))
