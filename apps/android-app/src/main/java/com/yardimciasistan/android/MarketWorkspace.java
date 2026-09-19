@@ -968,7 +968,7 @@ final class MarketWorkspace {
     barcode.setText(productCreateBarcode);
     barcode.setEnabled(false);
 
-    if (data.market.productData.enabled) {
+    if (MarketUiRules.canLookupProductData(data)) {
       Button lookup = UiKit.outlineButton(
           context,
           productLookupLoading ? "Ürün Bilgileri Aranıyor…" : "Ürün Bilgilerini Ara",
@@ -1337,14 +1337,14 @@ final class MarketWorkspace {
     screen = SCREEN_PRODUCT_CREATE;
     formError = "";
     listener.onRenderRequested();
-    if (data.market.productData.enabled && data.market.productData.autoSearchUnknownBarcode) {
+    if (MarketUiRules.canLookupProductData(data) && data.market.productData.autoSearchUnknownBarcode) {
       requestProductLookup();
     }
   }
 
   private void requestProductLookup() {
     if (!MarketUiRules.canCreateProduct(data)
-        || !data.market.productData.enabled
+        || !MarketUiRules.canLookupProductData(data)
         || productCreateBarcode.isEmpty()
         || productLookupLoading) {
       return;
