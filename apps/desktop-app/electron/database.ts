@@ -31,6 +31,10 @@ import type {
   PushAiSettingsResult,
   SyncedCustomerRequest
 } from "@yardimci-asistan/sync-core";
+import {
+  resolveBackupRoot,
+  resolveDatabasePath
+} from "./data-paths.js";
 import { applyAndroidReservationAction } from "./android-reservation-actions.js";
 import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
 import { applyAndroidFinanceAction } from "./android-finance-actions.js";
@@ -224,13 +228,14 @@ export class DesktopDatabase {
   readonly backupPath: string;
 
   constructor(private readonly options: DesktopDatabaseOptions) {
-    fs.mkdirSync(options.userDataPath, { recursive: true });
-    this.userDataPath = options.userDataPath;
+    const dataRoot = options.dataRoot ?? options.userDataPath;
+    fs.mkdirSync(dataRoot, { recursive: true });
+    this.userDataPath = dataRoot;
     this.backupPath = options.backupPath
       ? path.resolve(options.backupPath)
-      : resolveBackupPath(options.appPath);
+      : resolveBackupRoot({ isPackaged: false, appPath: options.appPath });
     fs.mkdirSync(this.backupPath, { recursive: true });
-    this.databasePath = path.join(options.userDataPath, "yardimci-asistan.sqlite");
+    this.databasePath = resolveDatabasePath(dataRoot);
     this.db = new DatabaseSync(this.databasePath);
     this.db.exec("PRAGMA busy_timeout = 5000;");
     this.db.exec("PRAGMA journal_mode = WAL;");
@@ -2159,12 +2164,6 @@ export class DesktopDatabase {
         sql: fs.readFileSync(path.join(directory, file), "utf8")
       }));
   }
-}
-
-function resolveBackupPath(appPath: string): string {
-  const override = process.env.YA_DESKTOP_BACKUP_DIR?.trim();
-  if (override) return path.resolve(override);
-  return path.resolve(appPath, "..", "..", "backup");
 }
 
 import {

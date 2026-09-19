@@ -21,6 +21,7 @@ import type { DesktopBirthdayOverview } from "./birthday-service.js";
 export interface DesktopDatabaseOptions {
   appPath: string;
   userDataPath: string;
+  dataRoot?: string;
   backupPath?: string;
 }
 

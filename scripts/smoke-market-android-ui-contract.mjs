@@ -12,6 +12,7 @@ const rules = read("apps/android-app/src/main/java/com/yardimciasistan/android/M
 const workspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
 const cameraScanner = read("apps/android-app/src/main/java/com/yardimciasistan/android/BarcodeCameraScanner.java");
 const tests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketUiTest.java");
+const foundationTests = read("apps/android-app/src/test/java/com/yardimciasistan/android/AndroidMarketFoundationTest.java");
 const gradle = read("apps/android-app/build.gradle");
 const manifest = read("apps/android-app/AndroidManifest.xml");
 const foundation = read("scripts/check-modular-foundation.mjs");
@@ -100,7 +101,6 @@ assert.match(gradle, /com\.google\.mlkit:barcode-scanning:/);
 assert.match(gradle, /testImplementation\s+"org\.json:json:/);
 
 for (const coverage of [
-  "legacyProductDraftPermissionMapsToDirectProductCreate",
   "pureMarketProfileOnlyExposesRelevantNavigation",
   "everyMarketCallToActionUsesItsEffectivePermission",
   "cashBarcodeModeVisibilityRequiresPermissionAndAllThreeCapabilities",
@@ -116,6 +116,12 @@ for (const coverage of [
 ]) {
   assert.equal(tests.includes(coverage), true, `Android Market JVM coverage missing: ${coverage}`);
 }
+
+assert.equal(
+  foundationTests.includes("legacyProductDraftPermissionMapsToDirectProductCreate"),
+  true,
+  "Android Market JVM coverage missing: legacyProductDraftPermissionMapsToDirectProductCreate"
+);
 
 assert.match(foundation, /smoke-market-android-ui-contract\.mjs/);
 

@@ -1,10 +1,15 @@
 import { app, BrowserWindow } from "electron";
 import fs from "node:fs";
-import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { DesktopDatabase } from "./database";
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
+import {
+  relocateLegacyDevDatabaseOnce,
+  resolveDatabasePath,
+  resolveDataRoot,
+  resolvePendingMaintenanceMarkerPath
+} from "./data-paths.js";
 import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
 import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
@@ -16,12 +21,21 @@ import {
 } from "./business-capability-runtime";
 
 const DEV_RELAUNCH_EXIT_CODE = 75;
-const userDataPath = () => process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData");
+
+function resolveRuntimeDataRoot(): string {
+  return resolveDataRoot({
+    isPackaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    defaultUserDataPath: app.getPath("userData")
+  });
+}
+
+const userDataPath = () => resolveRuntimeDataRoot();
 
 type PendingMaintenanceKind = "restore" | "reset" | "";
 
 function readPendingMaintenanceKind(): PendingMaintenanceKind {
-  const markerPath = path.join(userDataPath(), "maintenance", "pending-data-maintenance.json");
+  const markerPath = resolvePendingMaintenanceMarkerPath(userDataPath());
   if (!fs.existsSync(markerPath)) return "";
   try {
     const parsed = JSON.parse(fs.readFileSync(markerPath, "utf8")) as { kind?: unknown };
@@ -61,7 +75,7 @@ function installDevelopmentRelaunchBridge() {
 
 function prepareRestoredStateForFullRepublish() {
   const restoredUserDataPath = userDataPath();
-  const restoredDatabasePath = path.join(restoredUserDataPath, "yardimci-asistan.sqlite");
+  const restoredDatabasePath = resolveDatabasePath(restoredUserDataPath);
   if (!fs.existsSync(restoredDatabasePath)) return;
 
   // The restore boundary already validated the current baseline schema. Open
@@ -120,6 +134,25 @@ function prepareRestoredStateForFullRepublish() {
 
 installDevelopmentRelaunchBridge();
 
+// Development varsayılanı artık repo-root/data. Eski Electron userData
+// konumunda kalan tek seferlik geliştirme verisini güvenli şekilde taşı;
+// hedef doluysa overwrite etme, WAL açıkken kör copy yapma, hata halinde
+// kaynağı silme. YA_DESKTOP_DATA_DIR varken test izolasyonunu korumak için
+// otomatik taşıma yapma.
+if (!app.isPackaged && !process.env.YA_DESKTOP_DATA_DIR) {
+  try {
+    const legacyUserDataPath = app.getPath("userData");
+    const targetDatabasePath = resolveDatabasePath(userDataPath());
+    const legacyDatabasePath = resolveDatabasePath(legacyUserDataPath);
+    const relocation = relocateLegacyDevDatabaseOnce(targetDatabasePath, legacyDatabasePath);
+    if (relocation.relocated) {
+      console.log(`[data-paths] Eski geliştirme verisi taşındı: ${relocation.legacyDatabasePath} -> ${relocation.targetDatabasePath}`);
+    }
+  } catch (error) {
+    console.error("[data-paths] Eski geliştirme verisi taşınamadı:", error);
+  }
+}
+
 // Restore/reset operations are intentionally applied before main.ts opens the
 // long-lived SQLite connection. This keeps WAL state and live database handles
 // out of destructive maintenance operations.
@@ -141,7 +174,7 @@ const mainProcessReady = import("./main");
 void mainProcessReady.then(async ({ assertAppSessionUnlocked }) => {
   await app.whenReady();
   setImmediate(() => {
-    const databasePath = () => path.join(userDataPath(), "yardimci-asistan.sqlite");
+    const databasePath = () => resolveDatabasePath(userDataPath());
 
     const publishCommittedMutation = (capabilitiesChanged = false) => {
       // Short-lived domain services cannot reach main.ts's in-memory

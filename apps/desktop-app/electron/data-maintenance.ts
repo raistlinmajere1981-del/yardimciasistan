@@ -2,6 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { app, dialog, ipcMain, session, shell } from "electron";
+import {
+  DESKTOP_DATABASE_FILE_NAME,
+  resolveBackupRoot,
+  resolveDatabasePath,
+  resolveMaintenancePath,
+  resolvePendingMaintenanceMarkerPath,
+  resolveStagedRestorePath
+} from "./data-paths.js";
 
 type DesktopBackupKind = "manual" | "safety";
 
@@ -69,33 +77,27 @@ interface BackupManifest {
   };
 }
 
-const BACKUP_DATABASE_FILE = "yardimci-asistan.sqlite";
+const BACKUP_DATABASE_FILE = DESKTOP_DATABASE_FILE_NAME;
 const BACKUP_MANIFEST_FILE = "backup.json";
 const QR_IMAGE_DIRECTORY = "qr-menu-images";
 
 export function resolveProjectBackupPath() {
-  const override = process.env.YA_DESKTOP_BACKUP_DIR?.trim();
-  if (override) return path.resolve(override);
-
-  if (!app.isPackaged) {
-    // Development runs from apps/desktop-app; keep backups at repo-root/backup.
-    return path.resolve(app.getAppPath(), "..", "..", "backup");
-  }
-
-  // Packaged builds have no source repo. The executable directory is the
-  // closest equivalent to the user's visible application/project folder.
-  return path.join(path.dirname(process.execPath), "backup");
+  return resolveBackupRoot({
+    isPackaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    execDir: path.dirname(process.execPath)
+  });
 }
 
 function resolvePaths(userDataPath: string): DataMaintenancePaths {
-  const maintenancePath = path.join(userDataPath, "maintenance");
+  const maintenancePath = resolveMaintenancePath(userDataPath);
   return {
     userDataPath,
-    databasePath: path.join(userDataPath, "yardimci-asistan.sqlite"),
+    databasePath: resolveDatabasePath(userDataPath),
     projectBackupPath: resolveProjectBackupPath(),
     maintenancePath,
-    markerPath: path.join(maintenancePath, "pending-data-maintenance.json"),
-    stagedRestorePath: path.join(maintenancePath, "restore.sqlite")
+    markerPath: resolvePendingMaintenanceMarkerPath(userDataPath),
+    stagedRestorePath: resolveStagedRestorePath(userDataPath)
   };
 }
 

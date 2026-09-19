@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-electron/
 dist-renderer/
+data/
 backup/
 .demo-runtime/
 apps/android-app/build/

@@ -34,6 +34,7 @@ import {
 } from "./database";
 import { DesktopFinanceService } from "./finance";
 import { resolveProjectBackupPath } from "./data-maintenance";
+import { resolveDataRoot } from "./data-paths.js";
 import { projectAndroidOperationsSnapshot } from "./android-capability-projection";
 import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js";
 import { DesktopRoomFolioService, type DesktopRoomFolio } from "./room-folio";
@@ -188,6 +189,14 @@ interface AndroidActionProcessSummary {
   failed: number;
 }
 
+function resolveRuntimeDataRoot(): string {
+  return resolveDataRoot({
+    isPackaged: app.isPackaged,
+    appPath: app.getAppPath(),
+    defaultUserDataPath: app.getPath("userData")
+  });
+}
+
 if (process.env.YA_DESKTOP_DATA_DIR) {
   app.setPath("userData", path.resolve(process.env.YA_DESKTOP_DATA_DIR));
 }
@@ -298,7 +307,7 @@ if (!hasSingleInstanceLock) {
 
     desktopDatabase = new DesktopDatabase({
       appPath: app.getAppPath(),
-      userDataPath: process.env.YA_DESKTOP_DATA_DIR ?? app.getPath("userData"),
+      userDataPath: resolveRuntimeDataRoot(),
       backupPath: resolveProjectBackupPath()
     });
     desktopDatabase.initialize();
