@@ -93,7 +93,21 @@ const dp = await importDataPaths();
   console.log("✓ assets/products dataRoot altındadır");
 }
 
-// 6) backup resolver beklenen ayrı backup kökünü kullanır
+// 6) logs dataRoot altındadır ve backup kaynağı değildir
+{
+  const dataRoot = path.join(repoRoot, "data");
+  const logs = dp.resolveLogsPath(dataRoot);
+  const logFile = dp.resolveDesktopLogFilePath(dataRoot);
+  assert.equal(logs, path.join(dataRoot, "logs"));
+  assert.equal(logFile, path.join(dataRoot, "logs", "yardimci-asistan.log"));
+  const paths = dp.buildDesktopDataPaths(dataRoot, path.join(repoRoot, "backup"));
+  assert.equal(paths.logsPath, logs);
+  assert.equal(paths.logFilePath, logFile);
+  assert.equal(dp.listDurableBackupSources(dataRoot).includes(logs), false);
+  console.log("✓ logs dataRoot altındadır ve durable backup kaynağı değildir");
+}
+
+// 7) backup resolver beklenen ayrı backup kökünü kullanır
 {
   // dev backup default
   const devBackup = dp.resolveBackupRoot({ isPackaged: false, appPath });
@@ -112,7 +126,7 @@ const dp = await importDataPaths();
   console.log("✓ backup resolver packaged execDir/backup olur");
 }
 
-// 7) path traversal ile asset root dışına çıkılamaz
+// 8) path traversal ile asset root dışına çıkılamaz
 {
   const dataRoot = path.join(repoRoot, "data");
   const rel = dp.resolveProductAssetRelativePath("product_123", "front.webp");
@@ -131,7 +145,7 @@ const dp = await importDataPaths();
   console.log("✓ path traversal ile asset root dışına çıkılamaz");
 }
 
-// 8) one-time relocation plan safety
+// 9) one-time relocation plan safety
 {
   const tmpRoot = mkdtempSync(path.join(os.tmpdir(), "reloc-test-"));
   try {
@@ -177,7 +191,7 @@ const dp = await importDataPaths();
   }
 }
 
-// 9) isPathWithinRoot boundary
+// 10) isPathWithinRoot boundary
 {
   const root = path.join(repoRoot, "data");
   assert.equal(dp.isPathWithinRoot(root, path.join(root, "assets/products/a/b.webp")), true);
