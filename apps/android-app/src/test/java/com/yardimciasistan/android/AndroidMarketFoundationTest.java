@@ -24,6 +24,20 @@ public final class AndroidMarketFoundationTest {
   }
 
   @Test
+  public void legacyProductDraftPermissionMapsToDirectProductCreate() throws Exception {
+    OperationData data = authorizedMarketData();
+    JSONObject profile = new JSONObject()
+        .put("role", "staff")
+        .put("is_active", true)
+        .put("permissions", new JSONArray().put("market.product_draft"));
+
+    data.applyPermissionProfile(profile);
+
+    assertTrue(data.hasPermission("market.product_create"));
+    assertTrue(MarketUiRules.canCreateProduct(data));
+  }
+
+  @Test
   public void genericCommerceCapabilitiesDoNotOpenRetailWorkspace() {
     OperationData data = new OperationData();
     data.capabilitiesResolved = true;
