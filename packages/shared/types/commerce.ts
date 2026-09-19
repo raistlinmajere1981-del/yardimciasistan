@@ -167,25 +167,6 @@ export interface CommercePurchaseOrderDetail {
 
 export type MarketDraftStatus = "pending" | "reviewed";
 
-export interface CatalogProductDraft {
-  id: string;
-  businessId: string;
-  barcode: string;
-  proposedName: string;
-  sku: string;
-  proposedCategory: string;
-  proposedPurchasePrice: number;
-  proposedSalePrice: number;
-  currency: string;
-  unit: CommerceUnit;
-  note: string;
-  source: string;
-  createdByDevice: string;
-  status: MarketDraftStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface CommerceSaleDraft {
   id: string;
   businessId: string;
