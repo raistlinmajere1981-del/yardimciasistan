@@ -54,7 +54,7 @@ export function MarketProductThumbnail({ product, className }: MarketProductThum
     return () => {
       disposed = true;
     };
-  }, [product.id, product.imageAssetPath, product.updatedAt]);
+  }, [product]);
 
   if (!src) return null;
   return <img className={className} src={src} alt="" aria-hidden="true" />;
