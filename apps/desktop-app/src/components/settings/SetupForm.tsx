@@ -648,6 +648,56 @@ export function SetupForm({
               )}
             </div>
           </section>
+
+          <section className={`settings-service-card${form.productDataEnabled ? " is-enabled" : " is-disabled"}`}>
+            <div className="settings-service-card-header">
+              <div>
+                <strong>Ürün Verisi</strong>
+                <span>{form.productDataEnabled ? "Açık" : "Kapalı"}</span>
+              </div>
+              <label className="settings-service-toggle">
+                <input
+                  checked={form.productDataEnabled}
+                  onChange={(event) => update("productDataEnabled", event.target.checked)}
+                  type="checkbox"
+                />
+                <span>{form.productDataEnabled ? "Açık" : "Kapalı"}</span>
+              </label>
+            </div>
+            <fieldset className="settings-service-card-body form-stack" disabled={!form.productDataEnabled}>
+              <label className="form-field form-field--medium">
+                Sağlayıcı
+                <select
+                  value={form.productDataProvider}
+                  onChange={() => update("productDataProvider", "open_food_facts")}
+                >
+                  <option value="open_food_facts">Open Food Facts</option>
+                </select>
+              </label>
+              <div className="settings-service-empty">
+                Veri kaynağı: Open Food Facts · Veri lisansı: ODbL · Görseller: CC BY-SA
+              </div>
+              <label className="form-check setup-checkline">
+                <input
+                  checked={form.productDataAutoSearch}
+                  onChange={(event) => update("productDataAutoSearch", event.target.checked)}
+                  type="checkbox"
+                />
+                Bilinmeyen barkodu otomatik ara
+              </label>
+              <label className="form-check setup-checkline">
+                <input
+                  checked={form.productDataIncludeImages}
+                  onChange={(event) => update("productDataIncludeImages", event.target.checked)}
+                  type="checkbox"
+                />
+                Görselleri ekle
+              </label>
+              <small>
+                Otomatik arama kapalıysa ürün kartındaki “Ürün Bilgilerini Ara” düğmesiyle manuel sorgu yapılabilir.
+              </small>
+            </fieldset>
+          </section>
         </div>
 
         <section className="settings-service-card is-enabled settings-web-section">
