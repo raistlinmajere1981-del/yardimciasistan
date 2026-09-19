@@ -10,6 +10,8 @@ export const DESKTOP_STAGED_RESTORE_ASSETS_DIR = "restore-assets";
 export const DESKTOP_ASSETS_DIR_NAME = "assets";
 export const DESKTOP_PRODUCTS_DIR_NAME = "products";
 export const DESKTOP_TEMPORARY_DIR_NAME = "tmp";
+export const DESKTOP_LOGS_DIR_NAME = "logs";
+export const DESKTOP_LOG_FILE_NAME = "yardimci-asistan.log";
 export const DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX = ".relocated-to-data-root.json";
 
 export interface DataRootResolutionInput {
@@ -37,6 +39,8 @@ export interface DesktopDataPaths {
   stagedRestoreAssetsPath: string;
   backupPath: string;
   temporaryPath: string;
+  logsPath: string;
+  logFilePath: string;
 }
 
 function readEnvOverride(value: string | undefined): string {
@@ -118,6 +122,14 @@ export function resolveTemporaryPath(dataRoot: string): string {
   return path.join(dataRoot, DESKTOP_TEMPORARY_DIR_NAME);
 }
 
+export function resolveLogsPath(dataRoot: string): string {
+  return path.join(dataRoot, DESKTOP_LOGS_DIR_NAME);
+}
+
+export function resolveDesktopLogFilePath(dataRoot: string): string {
+  return path.join(resolveLogsPath(dataRoot), DESKTOP_LOG_FILE_NAME);
+}
+
 export function buildDesktopDataPaths(dataRoot: string, backupPath: string): DesktopDataPaths {
   return {
     dataRoot,
@@ -129,7 +141,9 @@ export function buildDesktopDataPaths(dataRoot: string, backupPath: string): Des
     stagedRestorePath: resolveStagedRestorePath(dataRoot),
     stagedRestoreAssetsPath: resolveStagedRestoreAssetsPath(dataRoot),
     backupPath,
-    temporaryPath: resolveTemporaryPath(dataRoot)
+    temporaryPath: resolveTemporaryPath(dataRoot),
+    logsPath: resolveLogsPath(dataRoot),
+    logFilePath: resolveDesktopLogFilePath(dataRoot)
   };
 }
 
