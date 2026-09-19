@@ -162,6 +162,7 @@ function mapResolvedCatalogProduct(row: Record<string, unknown>): CatalogProduct
     businessId: text(row.product_business_id),
     categoryId: text(row.product_category_id),
     name: text(row.product_name_current),
+    brand: text(row.product_brand),
     sku: text(row.product_sku),
     barcode: text(row.product_barcode),
     description: text(row.product_description),
@@ -172,6 +173,13 @@ function mapResolvedCatalogProduct(row: Record<string, unknown>): CatalogProduct
     taxRate: Number(row.product_tax_rate ?? 0),
     trackInventory: Number(row.product_track_inventory ?? 0) === 1,
     isActive: Number(row.product_is_active ?? 0) === 1,
+    imageAssetPath: text(row.product_image_asset_path),
+    imageSourceUrl: text(row.product_image_source_url),
+    dataSource: text(row.product_data_source),
+    sourceProductUrl: text(row.product_source_product_url),
+    dataLicense: text(row.product_data_license),
+    imageLicense: text(row.product_image_license),
+    sourceFetchedAt: text(row.product_source_fetched_at),
     createdAt: text(row.product_created_at),
     updatedAt: text(row.product_updated_at)
   };
@@ -430,6 +438,7 @@ export function loadMarketCartDraftForQuickSaleRecord(
         product.business_id AS product_business_id,
         product.category_id AS product_category_id,
         product.name AS product_name_current,
+        product.brand AS product_brand,
         product.sku AS product_sku,
         product.barcode AS product_barcode,
         product.description AS product_description,
@@ -440,6 +449,13 @@ export function loadMarketCartDraftForQuickSaleRecord(
         product.tax_rate AS product_tax_rate,
         product.track_inventory AS product_track_inventory,
         product.is_active AS product_is_active,
+        product.image_asset_path AS product_image_asset_path,
+        product.image_source_url AS product_image_source_url,
+        product.data_source AS product_data_source,
+        product.source_product_url AS product_source_product_url,
+        product.data_license AS product_data_license,
+        product.image_license AS product_image_license,
+        product.source_fetched_at AS product_source_fetched_at,
         product.created_at AS product_created_at,
         product.updated_at AS product_updated_at
       FROM commerce_sale_draft_items AS draft_item
