@@ -1785,8 +1785,14 @@ function ya_sync_sanitize_android_permissions(mixed $profiles): array
         if (!in_array($role, ['admin', 'staff'], true)) {
             $role = 'staff';
         }
+        $rawPermissions = array_map(
+            static fn(string $permission): string => $permission === 'market.product_draft'
+                ? 'market.product_create'
+                : $permission,
+            ya_sync_string_array($profile['permissions'] ?? [])
+        );
         $permissions = array_values(array_unique(array_filter(
-            ya_sync_string_array($profile['permissions'] ?? []),
+            $rawPermissions,
             static fn(string $permission): bool => in_array($permission, $allowedPermissions, true)
         )));
         $result[$normalizedDeviceId] = [
