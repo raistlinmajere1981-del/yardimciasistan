@@ -76,7 +76,8 @@ assert.doesNotMatch(settings, /Ürün formunu bulunan bilgilerle doldur/);
 
 assert.match(quickSale, /lookupExternalProductByBarcode\(barcode, "automatic"\)/);
 assert.match(quickSale, /onExternalProductFound/);
-assert.match(products, /lookupExternalProductByBarcode\(productForm\.barcode\.trim\(\), "manual"\)/);
+assert.match(products, /normalizeBarcodeIdentity\(productForm\.barcode/);
+assert.match(products, /lookupExternalProductByBarcode\(normalizedBarcode, "manual"\)/);
 assert.match(products, /Ürün Bilgilerini Ara/);
 assert.match(products, /Ürün verisi:/);
 assert.match(products, /previewExternalProductImage/);
