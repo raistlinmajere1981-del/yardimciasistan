@@ -94,7 +94,7 @@ export function registerCommerceIpcHandlers(options: {
   ipcMain.handle("commerce:product:findByBarcode", (_event, barcode: string) =>
     read(() => findRuntimeProductByBarcode(databasePath(), barcode))
   );
-  ipcMain.handle("commerce:product:lookupExternal", (_event, barcode: string, mode: Parameters<DesktopCommerceBridge["lookupExternalProductByBarcode"]>[1] = "manual") =>
+  ipcMain.handle("commerce:product:lookupExternal", (_event, barcode: string, mode: NonNullable<Parameters<DesktopCommerceBridge["lookupExternalProductByBarcode"]>[1]> = "manual") =>
     read(() => lookupRuntimeExternalProductByBarcode(databasePath(), barcode, mode))
   );
   ipcMain.handle("commerce:product:imageDataUrl", (_event, productId: string) =>
