@@ -149,7 +149,7 @@ export function MarketProductsWorkspace({
     const needle = search.trim().toLocaleLowerCase("tr-TR");
     if (!needle) return true;
     return [product.name, product.brand, product.sku, product.barcode]
-      .some((value) => value.toLocaleLowerCase("tr-TR").includes(needle));
+      .some((value) => String(value ?? "").toLocaleLowerCase("tr-TR").includes(needle));
   });
 
   const applyLookupCandidate = useCallback((candidate: ProductLookupCandidate, reset = false) => {
@@ -201,7 +201,7 @@ export function MarketProductsWorkspace({
       id: product.id,
       categoryId: product.categoryId,
       name: product.name,
-      brand: product.brand,
+      brand: product.brand ?? "",
       sku: product.sku,
       barcode: product.barcode,
       description: product.description,
@@ -213,12 +213,12 @@ export function MarketProductsWorkspace({
       minimumQuantity,
       trackInventory: product.trackInventory,
       isActive: product.isActive,
-      imageSourceUrl: product.imageSourceUrl,
-      dataSource: product.dataSource,
-      sourceProductUrl: product.sourceProductUrl,
-      dataLicense: product.dataLicense,
-      imageLicense: product.imageLicense,
-      sourceFetchedAt: product.sourceFetchedAt
+      imageSourceUrl: product.imageSourceUrl ?? "",
+      dataSource: product.dataSource ?? "",
+      sourceProductUrl: product.sourceProductUrl ?? "",
+      dataLicense: product.dataLicense ?? "",
+      imageLicense: product.imageLicense ?? "",
+      sourceFetchedAt: product.sourceFetchedAt ?? ""
     });
     setImagePreviewDataUrl("");
     if (bridge && product.imageAssetPath) {
