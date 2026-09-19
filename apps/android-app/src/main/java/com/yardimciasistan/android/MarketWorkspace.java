@@ -515,7 +515,7 @@ final class MarketWorkspace {
   }
 
   private void captureCashBarcode(String rawBarcode) {
-    String barcode = rawBarcode == null ? "" : rawBarcode.trim();
+    String barcode = MarketUiRules.normalizeBarcodeIdentity(rawBarcode);
     try {
       JSONObject payload = barcodeScanCapture.capture(
           barcode,
@@ -1191,6 +1191,13 @@ final class MarketWorkspace {
     form.addView(help);
     EditText barcode = labeledInput(form, "Barkod", "Barkodu girin");
     barcode.setInputType(InputType.TYPE_CLASS_TEXT);
+    barcode.addTextChangedListener(watcher(value -> {
+      String normalized = MarketUiRules.normalizeBarcodeIdentity(value);
+      if (!normalized.equals(value)) {
+        barcode.setText(normalized);
+        barcode.setSelection(normalized.length());
+      }
+    }));
     TextView status = statusText();
     form.addView(status);
     AlertDialog dialog = new AlertDialog.Builder(context)
@@ -1202,7 +1209,7 @@ final class MarketWorkspace {
     dialog.setOnShowListener(ignored -> {
       Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
       Runnable submit = () -> {
-        String raw = value(barcode);
+        String raw = MarketUiRules.normalizeBarcodeIdentity(value(barcode));
         if (raw.length() < 3) {
           status.setText("Geçerli bir barkod girin.");
           return;
