@@ -439,7 +439,7 @@ export function MarketProductsWorkspace({
       <section className="market-panel">
         <header className="market-panel-heading"><span>{productForm.id ? "Düzenle" : "Yeni kayıt"}</span><h2>Ürün Kartı</h2></header>
 
-        <div className="market-product-image-card">
+        <div className={`market-product-image-card${imagePreviewDataUrl ? " has-image" : ""}`}>
           {imagePreviewDataUrl ? (
             <img src={imagePreviewDataUrl} alt={productForm.name ? `${productForm.name} ürün görseli` : "Ürün görseli"} />
           ) : (
