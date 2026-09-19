@@ -667,12 +667,12 @@ async function prepareRestore(userDataPath: string, backupId: string): Promise<D
     validateYardimciDatabase(paths.stagedRestorePath);
 
     const sourceManifest = readBackupManifest(backupFolderPath);
-    if (sourceManifest?.assets) {
-      fs.mkdirSync(paths.stagedRestoreAssetsPath, { recursive: true });
-      const sourceAssetsPath = path.join(backupFolderPath, sourceManifest.assets.directory || ASSET_DIRECTORY);
-      if (fs.existsSync(sourceAssetsPath) && fs.statSync(sourceAssetsPath).isDirectory()) {
-        fs.cpSync(sourceAssetsPath, paths.stagedRestoreAssetsPath, { recursive: true, force: true, errorOnExist: false });
-      }
+    fs.mkdirSync(paths.stagedRestoreAssetsPath, { recursive: true });
+    const sourceAssetsPath = path.join(backupFolderPath, ASSET_DIRECTORY);
+    if (sourceManifest?.assets
+        && fs.existsSync(sourceAssetsPath)
+        && fs.statSync(sourceAssetsPath).isDirectory()) {
+      fs.cpSync(sourceAssetsPath, paths.stagedRestoreAssetsPath, { recursive: true, force: true, errorOnExist: false });
     }
 
     writePendingOperation(paths, { version: 1, kind: "restore", createdAt: new Date().toISOString() });
