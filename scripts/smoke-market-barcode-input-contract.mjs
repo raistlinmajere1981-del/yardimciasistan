@@ -12,6 +12,7 @@ const marketPage = read("apps/desktop-app/src/pages/MarketPage.tsx");
 assert.match(barcodeInput, /export interface BarcodeInputAdapter/, "BarcodeInput adapter contract is missing.");
 assert.match(barcodeInput, /createBarcodeSimulatorAdapter/, "Simulator barcode adapter is missing.");
 assert.match(barcodeInput, /createKeyboardBarcodeInputAdapter/, "USB keyboard-wedge adapter is missing.");
+assert.match(barcodeInput, /normalizeBarcodeIdentity/, "Barcode input must normalize human-entered numeric separators.");
 assert.match(barcodeInput, /maxInterKeyMs/, "Keyboard barcode adapter must distinguish scanner timing from normal typing.");
 assert.match(barcodeInput, /event\.key === "Enter"/, "Keyboard barcode adapter must support scanner terminator input.");
 assert.doesNotMatch(barcodeInput, /getUserMedia|MediaDevices|androidBridge|adb/i, "M4 must not implement camera/Android barcode capture yet.");
