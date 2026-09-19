@@ -137,11 +137,11 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
     setActiveTab("quickSale");
   }
 
-  function openExternalProduct(product: ProductLookupCandidate) {
+  const openExternalProduct = useCallback((product: ProductLookupCandidate) => {
     handoffRequestId.current += 1;
     setProductLookupRequest({ requestId: handoffRequestId.current, product });
     setActiveTab("products");
-  }
+  }, []);
 
   const clearProductLookupRequest = useCallback((requestId: number) => {
     setProductLookupRequest((current) => current?.requestId === requestId ? null : current);
