@@ -29,7 +29,7 @@ final class ProductDataLookupClient {
     if (!PROVIDER_OPEN_FOOD_FACTS.equals(provider)) {
       throw new LookupException("Ürün veri sağlayıcısı bu Android sürümünde desteklenmiyor.");
     }
-    String barcode = text(barcodeValue);
+    String barcode = MarketUiRules.normalizeBarcodeIdentity(barcodeValue);
     if (!barcode.matches("[0-9]{6,32}")) {
       throw new LookupException("Ürün bilgisi aramak için geçerli bir barkod gerekli.");
     }
