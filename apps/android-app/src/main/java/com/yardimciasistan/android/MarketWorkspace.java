@@ -4,6 +4,7 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.text.Editable;
 import android.text.InputType;
@@ -14,6 +15,7 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
@@ -47,6 +49,8 @@ final class MarketWorkspace {
     );
 
     boolean onBarcodeScan(String barcode, JSONObject payload);
+
+    void onProductLookupRequested(String provider, String barcode, boolean includeImages);
 
     void onRenderRequested();
   }
@@ -96,12 +100,22 @@ final class MarketWorkspace {
   private String stockNote = "";
   private String productCreateBarcode = "";
   private String productCreateName = "";
+  private String productCreateBrand = "";
   private String productCreateSku = "";
   private String productCreateUnit = "piece";
   private String productCreatePurchasePrice = "";
   private String productCreateSalePrice = "";
   private String productCreateCategory = "";
   private String productCreateNote = "";
+  private String productCreateImageUrl = "";
+  private String productCreateDataSource = "";
+  private String productCreateSourceProductUrl = "";
+  private String productCreateDataLicense = "";
+  private String productCreateImageLicense = "";
+  private String productCreateSourceFetchedAt = "";
+  private boolean productLookupLoading;
+  private String productLookupMessage = "";
+  private Bitmap productCreateImagePreview;
   private String visibleMessage = "";
   private boolean visibleMessagePending;
   private String formError = "";
@@ -206,6 +220,42 @@ final class MarketWorkspace {
     if (!barcode.equals(cashBarcodeLast)) return;
     cashBarcodeStatus = message;
     updateCashBarcodeViews();
+  }
+
+  void onProductLookupCompleted(
+      String barcode,
+      ProductDataLookupClient.Result result,
+      String errorMessage
+  ) {
+    if (!barcode.equals(productCreateBarcode)) return;
+    productLookupLoading = false;
+    if (result == null) {
+      productLookupMessage = errorMessage == null || errorMessage.trim().isEmpty()
+          ? "Ürün bilgileri alınamadı."
+          : errorMessage.trim();
+      listener.onRenderRequested();
+      return;
+    }
+    if (!result.found) {
+      productLookupMessage = "Bu barkod ürün veri kaynağında bulunamadı.";
+      listener.onRenderRequested();
+      return;
+    }
+
+    if (productCreateName.trim().isEmpty()) productCreateName = result.name;
+    if (productCreateBrand.trim().isEmpty()) productCreateBrand = result.brand;
+    if (productCreateNote.trim().isEmpty() && !result.quantity.isEmpty()) {
+      productCreateNote = "Ambalaj: " + result.quantity;
+    }
+    productCreateImageUrl = result.imageUrl;
+    productCreateDataSource = result.provider;
+    productCreateSourceProductUrl = result.sourceProductUrl;
+    productCreateDataLicense = result.dataLicense;
+    productCreateImageLicense = result.imageLicense;
+    productCreateSourceFetchedAt = result.fetchedAt;
+    productCreateImagePreview = result.imagePreview;
+    productLookupMessage = result.name + " bilgileri bulundu.";
+    listener.onRenderRequested();
   }
 
   private void enforceVisibleScreen() {
@@ -917,8 +967,44 @@ final class MarketWorkspace {
     EditText barcode = labeledInput(page, "Barkod", "");
     barcode.setText(productCreateBarcode);
     barcode.setEnabled(false);
+
+    if (data.market.productData.enabled) {
+      Button lookup = UiKit.outlineButton(
+          context,
+          productLookupLoading ? "Ürün Bilgileri Aranıyor…" : "Ürün Bilgilerini Ara",
+          view -> requestProductLookup()
+      );
+      lookup.setEnabled(!productLookupLoading);
+      lookup.setLayoutParams(fullButtonParams(48, 0, 8));
+      page.addView(lookup);
+      if (!productLookupMessage.isEmpty()) {
+        page.addView(UiKit.text(
+            context,
+            productLookupMessage,
+            12,
+            productLookupMessage.contains("bulunamadı") || productLookupMessage.contains("alınamadı")
+                ? UiKit.WARNING
+                : UiKit.SUCCESS,
+            Typeface.NORMAL
+        ));
+      }
+    }
+
+    if (productCreateImagePreview != null) {
+      ImageView preview = new ImageView(context);
+      preview.setImageBitmap(productCreateImagePreview);
+      preview.setAdjustViewBounds(true);
+      preview.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+      LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(-1, dp(180));
+      previewParams.setMargins(0, dp(4), 0, dp(10));
+      preview.setLayoutParams(previewParams);
+      page.addView(preview);
+    }
+
     EditText name = labeledInput(page, "Ürün adı", "Örn. Test Kola 330 ml");
     bind(name, productCreateName, value -> productCreateName = value);
+    EditText brand = labeledInput(page, "Marka (isteğe bağlı)", "");
+    bind(brand, productCreateBrand, value -> productCreateBrand = value);
     EditText sku = labeledInput(page, "SKU (isteğe bağlı)", "");
     bind(sku, productCreateSku, value -> productCreateSku = value);
 
@@ -976,6 +1062,13 @@ final class MarketWorkspace {
           "track_inventory",
           data.hasBusinessCapability(MarketUiRules.CAPABILITY_INVENTORY)
       );
+      payload.put("brand", productCreateBrand);
+      payload.put("image_source_url", productCreateImageUrl);
+      payload.put("data_source", productCreateDataSource);
+      payload.put("source_product_url", productCreateSourceProductUrl);
+      payload.put("data_license", productCreateDataLicense);
+      payload.put("image_license", productCreateImageLicense);
+      payload.put("source_fetched_at", productCreateSourceFetchedAt);
       boolean queued = listener.onSubmit(
           MarketUiRules.ACTION_PRODUCT_CREATE,
           payload,
@@ -1000,12 +1093,25 @@ final class MarketWorkspace {
   private void clearProductCreate() {
     productCreateBarcode = "";
     productCreateName = "";
+    productCreateBrand = "";
     productCreateSku = "";
     productCreateUnit = "piece";
     productCreatePurchasePrice = "";
     productCreateSalePrice = "";
     productCreateCategory = "";
     productCreateNote = "";
+    productCreateImageUrl = "";
+    productCreateDataSource = "";
+    productCreateSourceProductUrl = "";
+    productCreateDataLicense = "";
+    productCreateImageLicense = "";
+    productCreateSourceFetchedAt = "";
+    productLookupLoading = false;
+    productLookupMessage = "";
+    if (productCreateImagePreview != null) {
+      productCreateImagePreview.recycle();
+      productCreateImagePreview = null;
+    }
   }
 
   private void addProductSelectionActions(LinearLayout page, String purpose, boolean inventoryOnly) {
@@ -1231,6 +1337,26 @@ final class MarketWorkspace {
     screen = SCREEN_PRODUCT_CREATE;
     formError = "";
     listener.onRenderRequested();
+    if (data.market.productData.enabled && data.market.productData.autoSearchUnknownBarcode) {
+      requestProductLookup();
+    }
+  }
+
+  private void requestProductLookup() {
+    if (!MarketUiRules.canCreateProduct(data)
+        || !data.market.productData.enabled
+        || productCreateBarcode.isEmpty()
+        || productLookupLoading) {
+      return;
+    }
+    productLookupLoading = true;
+    productLookupMessage = "Ürün bilgileri aranıyor…";
+    listener.onRenderRequested();
+    listener.onProductLookupRequested(
+        data.market.productData.provider,
+        productCreateBarcode,
+        data.market.productData.includeImages
+    );
   }
 
   private void openScreen(String next) {
