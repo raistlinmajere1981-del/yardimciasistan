@@ -10,6 +10,7 @@ export const DESKTOP_STAGED_RESTORE_ASSETS_DIR = "restore-assets";
 export const DESKTOP_ASSETS_DIR_NAME = "assets";
 export const DESKTOP_PRODUCTS_DIR_NAME = "products";
 export const DESKTOP_TEMPORARY_DIR_NAME = "tmp";
+export const DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX = ".relocated-to-data-root.json";
 
 export interface DataRootResolutionInput {
   envDataDir?: string;
@@ -209,29 +210,57 @@ export function listDurableBackupSources(dataRoot: string): string[] {
 
 export interface LegacyRelocationPlan {
   relocate: boolean;
-  reason: "target-exists" | "legacy-missing" | "same-path" | "legacy-only";
+  reason: "target-exists" | "legacy-missing" | "same-path" | "legacy-only" | "already-relocated";
   targetDatabasePath: string;
   legacyDatabasePath: string;
+  markerPath: string;
+}
+
+export function resolveLegacyDevRelocationMarkerPath(legacyDatabasePath: string): string {
+  return `${path.resolve(legacyDatabasePath)}${DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX}`;
+}
+
+function writeLegacyDevRelocationMarker(plan: LegacyRelocationPlan) {
+  const payload = JSON.stringify({
+    version: 1,
+    legacyDatabasePath: plan.legacyDatabasePath,
+    targetDatabasePath: plan.targetDatabasePath,
+    completedAt: new Date().toISOString()
+  }, null, 2);
+  fs.writeFileSync(plan.markerPath, `${payload}\n`, { encoding: "utf8", mode: 0o600 });
 }
 
 export function planLegacyDevRelocation(targetDatabasePath: string, legacyDatabasePath: string): LegacyRelocationPlan {
   const target = path.resolve(targetDatabasePath);
   const legacy = path.resolve(legacyDatabasePath);
+  const markerPath = resolveLegacyDevRelocationMarkerPath(legacy);
   if (target === legacy) {
-    return { relocate: false, reason: "same-path", targetDatabasePath: target, legacyDatabasePath: legacy };
+    return { relocate: false, reason: "same-path", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
+  }
+  if (fs.existsSync(markerPath)) {
+    return { relocate: false, reason: "already-relocated", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
   }
   if (fs.existsSync(target)) {
-    return { relocate: false, reason: "target-exists", targetDatabasePath: target, legacyDatabasePath: legacy };
+    return { relocate: false, reason: "target-exists", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
   }
   if (!fs.existsSync(legacy)) {
-    return { relocate: false, reason: "legacy-missing", targetDatabasePath: target, legacyDatabasePath: legacy };
+    return { relocate: false, reason: "legacy-missing", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
   }
-  return { relocate: true, reason: "legacy-only", targetDatabasePath: target, legacyDatabasePath: legacy };
+  return { relocate: true, reason: "legacy-only", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
 }
 
 export function relocateLegacyDevDatabaseOnce(targetDatabasePath: string, legacyDatabasePath: string): LegacyRelocationPlan & { relocated: boolean } {
   const plan = planLegacyDevRelocation(targetDatabasePath, legacyDatabasePath);
   if (!plan.relocate) {
+    // Older builds could already have copied the legacy DB before the marker
+    // existed. Once a development target DB is present, record that the
+    // relocation phase is complete so an intentional future reset does not
+    // silently resurrect the legacy database.
+    if (plan.reason === "target-exists"
+        && fs.existsSync(plan.legacyDatabasePath)
+        && !fs.existsSync(plan.markerPath)) {
+      writeLegacyDevRelocationMarker(plan);
+    }
     return { ...plan, relocated: false };
   }
 
@@ -247,5 +276,6 @@ export function relocateLegacyDevDatabaseOnce(targetDatabasePath: string, legacy
   if (!fs.existsSync(plan.targetDatabasePath)) {
     throw new Error("Eski geliştirme verisi yeni konuma kopyalanamadı.");
   }
+  writeLegacyDevRelocationMarker(plan);
   return { ...plan, relocated: true };
 }
