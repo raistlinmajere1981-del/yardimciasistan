@@ -55,7 +55,9 @@ function productDataSettings(databasePath: string): ProductDataSettings {
     `).get() as Record<string, unknown> | undefined;
     return {
       enabled: Number(row?.product_data_enabled ?? 0) === 1,
-      provider: OPEN_FOOD_FACTS_PROVIDER,
+      provider: text(row?.product_data_provider, 80) === OPEN_FOOD_FACTS_PROVIDER
+        ? OPEN_FOOD_FACTS_PROVIDER
+        : OPEN_FOOD_FACTS_PROVIDER,
       autoSearchUnknownBarcode: Number(row?.product_data_auto_search ?? 1) === 1,
       includeImages: Number(row?.product_data_include_images ?? 1) === 1
     };
