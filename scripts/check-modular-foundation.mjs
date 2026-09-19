@@ -6,6 +6,7 @@ const checks = [
   ["npm", ["run", "build", "-w", "@yardimci-asistan/desktop-app"]],
   ["node", ["scripts/smoke-database-baseline.mjs"]],
   ["node", ["scripts/smoke-data-paths.mjs"]],
+  ["node", ["scripts/smoke-desktop-logging-contract.mjs"]],
   ["node", ["scripts/smoke-birthday-foundation.mjs"]],
   ["node", ["scripts/smoke-business-capabilities.mjs"]],
   ["node", ["scripts/smoke-capability-runtime.mjs"]],
