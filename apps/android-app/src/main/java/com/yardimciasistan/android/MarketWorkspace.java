@@ -1108,10 +1108,7 @@ final class MarketWorkspace {
     productCreateSourceFetchedAt = "";
     productLookupLoading = false;
     productLookupMessage = "";
-    if (productCreateImagePreview != null) {
-      productCreateImagePreview.recycle();
-      productCreateImagePreview = null;
-    }
+    productCreateImagePreview = null;
   }
 
   private void addProductSelectionActions(LinearLayout page, String purpose, boolean inventoryOnly) {
