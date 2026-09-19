@@ -423,7 +423,7 @@ export interface DesktopSetupData {
   aiApiKeyConfigured: boolean;
   aiLastPublishedAt: string;
   aiProfiles: DesktopAiServiceProfile[];
-  productData: DesktopProductDataSettings;
+  productData?: DesktopProductDataSettings;
   servicePreferences: {
     whatsapp: boolean;
     android: boolean;
