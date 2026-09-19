@@ -83,7 +83,7 @@ export function registerCommerceIpcHandlers(options: {
     options.onMutation?.();
     if (saved.imageSourceUrl && !saved.imageAssetPath && input.imageSourceUrl !== undefined) {
       try {
-        const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.imageSourceUrl);
+        const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.dataSource, saved.imageSourceUrl);
         if (imageAssetPath) saved = { ...saved, imageAssetPath };
       } catch (error) {
         console.warn("[product-data] Ürün görseli arşivlenemedi:", error);
