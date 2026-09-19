@@ -123,9 +123,13 @@ function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidA
   if (!name) return { ok: false, message: "Yeni ürün için ürün adı gerekli." };
 
   const existing = context.db.prepare(`
-    SELECT name
-    FROM catalog_products
-    WHERE barcode = ? AND deleted_at = ''
+    SELECT product.name
+    FROM catalog_products AS product
+    INNER JOIN business ON business.id = product.business_id
+    WHERE product.barcode = ?
+      AND product.deleted_at = ''
+      AND business.deleted_at = ''
+    ORDER BY business.created_at ASC
     LIMIT 1
   `).get(barcode) as { name?: unknown } | undefined;
   if (existing) {
@@ -183,6 +187,13 @@ function findCategoryIdByName(database: DatabaseSync, categoryName: string): str
       AND category.is_active = 1
       AND category.deleted_at = ''
       AND business.deleted_at = ''
+      AND category.business_id = (
+        SELECT id
+        FROM business
+        WHERE deleted_at = ''
+        ORDER BY created_at ASC
+        LIMIT 1
+      )
     ORDER BY category.sort_order ASC, category.created_at ASC
     LIMIT 1
   `).get(categoryName) as { id?: unknown } | undefined;
