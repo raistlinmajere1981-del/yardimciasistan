@@ -26,7 +26,8 @@ const checks = [
   ["node", ["scripts/smoke-market-android-foundation.mjs"]],
   ["node", ["scripts/smoke-market-android-ui-contract.mjs"]],
   ["node", ["scripts/smoke-market-companion-desktop-inbox.mjs"]],
-  ["node", ["scripts/smoke-market-live-scanner-contract.mjs"]]
+  ["node", ["scripts/smoke-market-live-scanner-contract.mjs"]],
+  ["node", ["scripts/smoke-market-product-data-contract.mjs"]]
 ];
 
 for (const [command, args] of checks) {
