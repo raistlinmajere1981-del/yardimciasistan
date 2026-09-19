@@ -226,6 +226,24 @@ public final class MainActivity extends ComponentActivity {
       }
 
       @Override
+      public void onProductImageRequested(String productId, String provider, String imageUrl) {
+        executor.execute(() -> {
+          android.graphics.Bitmap preview = null;
+          try {
+            preview = productDataLookupClient.previewImage(provider, imageUrl);
+          } catch (ProductDataLookupClient.LookupException ignored) {
+            // Product details remain useful even if an optional image cannot be loaded.
+          }
+          android.graphics.Bitmap completedPreview = preview;
+          runOnUiThread(() -> {
+            if (marketWorkspace != null) {
+              marketWorkspace.onProductImageLoaded(productId, imageUrl, completedPreview);
+            }
+          });
+        });
+      }
+
+      @Override
       public void onRenderRequested() {
         render();
       }
