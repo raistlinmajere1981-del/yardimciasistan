@@ -1,11 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import { receiveCommercePurchaseInTransaction } from "./commerce-purchase-store.js";
-import { setInventoryCountInTransaction } from "./commerce-store.js";
+import { saveCatalogProductInTransaction, setInventoryCountInTransaction } from "./commerce-store.js";
 import {
   createMarketBarcodeScanEventInTransaction,
-  createMarketCartDraftInTransaction,
-  createMarketProductDraftInTransaction
+  createMarketCartDraftInTransaction
 } from "./market-companion-store.js";
 
 export type MarketAndroidActionResult =
@@ -34,8 +33,8 @@ export function applyMarketAndroidAction(
         return applyStockCount(context);
       case "market_purchase_receive":
         return applyPurchaseReceive(context);
-      case "market_product_draft_create":
-        return applyProductDraftCreate(context);
+      case "market_product_create":
+        return applyProductCreate(context);
       case "market_cart_draft_create":
         return applyCartDraftCreate(context);
       case "market_barcode_scan":
@@ -116,28 +115,78 @@ function applyPurchaseReceive(context: MarketAndroidActionContext): MarketAndroi
   };
 }
 
-function applyProductDraftCreate(context: MarketAndroidActionContext): MarketAndroidActionResult {
+function applyProductCreate(context: MarketAndroidActionContext): MarketAndroidActionResult {
   const payload = context.action.payload;
-  const draft = createMarketProductDraftInTransaction(context.db, {
-    barcode: text(payload.barcode),
-    proposedName: text(payload.proposed_name),
+  const barcode = text(payload.barcode);
+  const name = text(payload.name);
+  if (barcode.length < 3) return { ok: false, message: "Yeni ürün için geçerli bir barkod gerekli." };
+  if (!name) return { ok: false, message: "Yeni ürün için ürün adı gerekli." };
+
+  const existing = context.db.prepare(`
+    SELECT name
+    FROM catalog_products
+    WHERE barcode = ? AND deleted_at = ''
+    LIMIT 1
+  `).get(barcode) as { name?: unknown } | undefined;
+  if (existing) {
+    return {
+      ok: false,
+      message: `Bu barkod zaten ${text(existing.name) || "başka bir ürün"} için kayıtlı.`
+    };
+  }
+
+  const categoryName = text(payload.category);
+  const categoryId = categoryName ? findCategoryIdByName(context.db, categoryName) : "";
+  const trackInventory = payload.track_inventory === true;
+
+  const product = saveCatalogProductInTransaction(context.db, {
+    name,
+    barcode,
     sku: text(payload.sku),
-    proposedCategory: text(payload.proposed_category),
-    proposedPurchasePrice: Number(payload.proposed_purchase_price ?? 0),
-    proposedSalePrice: Number(payload.proposed_sale_price ?? 0),
+    categoryId,
+    description: text(payload.note),
+    purchasePrice: Number(payload.purchase_price ?? 0),
+    salePrice: Number(payload.sale_price ?? 0),
     currency: text(payload.currency) || "TRY",
     unit: text(payload.unit) || "piece",
-    note: text(payload.note),
-    source: "android",
-    createdByDevice: context.action.device_id
+    taxRate: 0,
+    trackInventory,
+    minimumQuantity: 0,
+    isActive: true
   }, context.now);
-  context.insertEvent("market.product_draft_created", "catalog_product_draft", draft.id, {
+
+  context.insertEvent("market.product_created", "catalog_product", product.id, {
     source: "android",
     device_id: context.action.device_id,
-    barcode: draft.barcode,
-    proposed_name: draft.proposedName
+    barcode: product.barcode,
+    name: product.name,
+    category_name: categoryName,
+    category_matched: Boolean(categoryId)
   });
-  return { ok: true, message: "Ürün taslağı masaüstü incelemesi için kaydedildi." };
+  context.queueSnapshot();
+
+  const categoryMessage = categoryName && !categoryId
+    ? " Kategori adı masaüstündeki kayıtlarla eşleşmediği için ürün kategorisiz kaydedildi."
+    : "";
+  return {
+    ok: true,
+    message: `${product.name} ürün kataloğuna kaydedildi.${categoryMessage}`
+  };
+}
+
+function findCategoryIdByName(database: DatabaseSync, categoryName: string): string {
+  const row = database.prepare(`
+    SELECT category.id
+    FROM catalog_categories AS category
+    INNER JOIN business ON business.id = category.business_id
+    WHERE category.name = ? COLLATE NOCASE
+      AND category.is_active = 1
+      AND category.deleted_at = ''
+      AND business.deleted_at = ''
+    ORDER BY category.sort_order ASC, category.created_at ASC
+    LIMIT 1
+  `).get(categoryName) as { id?: unknown } | undefined;
+  return text(row?.id);
 }
 
 function applyCartDraftCreate(context: MarketAndroidActionContext): MarketAndroidActionResult {
