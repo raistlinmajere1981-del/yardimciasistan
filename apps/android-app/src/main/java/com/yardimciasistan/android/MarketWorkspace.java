@@ -215,7 +215,7 @@ final class MarketWorkspace {
     if (SCREEN_STOCK.equals(screen) && !MarketUiRules.canStockCount(data)) screen = SCREEN_HOME;
     if (SCREEN_RECEIVING.equals(screen) && !MarketUiRules.canReceive(data)) screen = SCREEN_HOME;
     if (SCREEN_CART.equals(screen) && !MarketUiRules.canCreateCartDraft(data)) screen = SCREEN_HOME;
-    if (SCREEN_PRODUCT_CREATE.equals(screen) && !MarketUiRules.canCreateProductCreate(data)) screen = SCREEN_HOME;
+    if (SCREEN_PRODUCT_CREATE.equals(screen) && !MarketUiRules.canCreateProduct(data)) screen = SCREEN_HOME;
     if (SCREEN_BARCODE_RESULT.equals(screen) && !MarketUiRules.canViewProducts(data)) screen = SCREEN_HOME;
     if (SCREEN_CASH_BARCODE.equals(screen) && !MarketUiRules.canScanToDesktop(data)) screen = SCREEN_HOME;
   }
@@ -257,7 +257,7 @@ final class MarketWorkspace {
     if (MarketUiRules.canCreateCartDraft(data)) {
       actions.add(new ActionItem("Sepet", () -> openScreen(SCREEN_CART)));
     }
-    if (MarketUiRules.canCreateProductCreate(data)) {
+    if (MarketUiRules.canCreateProduct(data)) {
       actions.add(new ActionItem("Yeni Ürün", () -> showBarcodeEntry(PURPOSE_PRODUCT_CREATE)));
     }
     addActionGrid(page, actions);
@@ -512,7 +512,7 @@ final class MarketWorkspace {
       LinearLayout unknown = UiKit.card(context);
       unknown.addView(UiKit.text(context, "Barkod kayıtlı değil.", 18, UiKit.TEXT, Typeface.BOLD));
       unknown.addView(UiKit.text(context, "Barkod: " + barcodeResult, 13, UiKit.SECONDARY, Typeface.NORMAL));
-      if (MarketUiRules.canCreateProductCreate(data)) {
+      if (MarketUiRules.canCreateProduct(data)) {
         Button draft = UiKit.button(context, "Yeni Ürün", UiKit.PRIMARY, view -> startProductCreate(barcodeResult));
         draft.setLayoutParams(fullButtonParams(48, 12, 0));
         unknown.addView(draft);
@@ -978,7 +978,7 @@ final class MarketWorkspace {
       boolean queued = listener.onSubmit(
           MarketUiRules.ACTION_PRODUCT_CREATE,
           payload,
-          "Ürün kataloğa kaydedildi.",
+          "Ürün kaydı gönderildi; masaüstünde otomatik olarak kataloğa işlenecek.",
           "Ürün kaydı gönderim kuyruğuna alındı."
       );
       if (queued) {
@@ -1020,8 +1020,8 @@ final class MarketWorkspace {
   }
 
   private void showBarcodeEntry(String purpose) {
-    boolean directDraft = PURPOSE_PRODUCT_CREATE.equals(purpose);
-    if (!directDraft && !MarketUiRules.canScanBarcode(data)) return;
+    boolean directCreate = PURPOSE_PRODUCT_CREATE.equals(purpose);
+    if (!directCreate && !MarketUiRules.canScanBarcode(data)) return;
     requestCameraScanner(purpose, false);
   }
 
@@ -1068,14 +1068,14 @@ final class MarketWorkspace {
   }
 
   private void showManualBarcodeEntry(String purpose) {
-    boolean directDraft = PURPOSE_PRODUCT_CREATE.equals(purpose);
+    boolean directCreate = PURPOSE_PRODUCT_CREATE.equals(purpose);
     boolean cashMode = PURPOSE_CASH.equals(purpose);
     LinearLayout form = dialogForm();
     TextView help = UiKit.text(
         context,
         cashMode
             ? "Kamera yerine barkodu elle girip masaüstüne gönderebilirsiniz."
-            : directDraft
+            : directCreate
               ? "Yeni ürünün barkodunu elle girin."
               : "Barkodu elle girin.",
         12,
@@ -1088,10 +1088,10 @@ final class MarketWorkspace {
     TextView status = statusText();
     form.addView(status);
     AlertDialog dialog = new AlertDialog.Builder(context)
-        .setTitle(cashMode ? "Kasa barkodu" : directDraft ? "Yeni ürün barkodu" : "Barkod Gir")
+        .setTitle(cashMode ? "Kasa barkodu" : directCreate ? "Yeni ürün barkodu" : "Barkod Gir")
         .setView(form)
         .setNegativeButton("Vazgeç", null)
-        .setPositiveButton(cashMode ? "Gönder" : directDraft ? "Devam Et" : "Bul", null)
+        .setPositiveButton(cashMode ? "Gönder" : directCreate ? "Devam Et" : "Bul", null)
         .create();
     dialog.setOnShowListener(ignored -> {
       Button positive = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
@@ -1210,7 +1210,7 @@ final class MarketWorkspace {
   }
 
   private void startProductCreate(String barcode) {
-    if (!MarketUiRules.canCreateProductCreate(data)) return;
+    if (!MarketUiRules.canCreateProduct(data)) return;
     clearProductCreate();
     productCreateBarcode = barcode == null ? "" : barcode.trim();
     screen = SCREEN_PRODUCT_CREATE;
