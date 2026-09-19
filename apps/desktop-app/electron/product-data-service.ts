@@ -28,6 +28,15 @@ interface ProductDataSettings {
   includeImages: boolean;
 }
 
+interface ProductLookupProvider {
+  id: ProductDataProviderId;
+  lookupByBarcode: (
+    barcode: string,
+    options: { includeImages: boolean; signal: AbortSignal }
+  ) => Promise<ProductLookupResponse>;
+  isImageUrlAllowed: (value: string) => boolean;
+}
+
 function openDatabase(databasePath: string) {
   const database = new DatabaseSync(databasePath);
   database.exec("PRAGMA busy_timeout = 5000;");
@@ -88,23 +97,10 @@ function isOpenFoodFactsImageUrl(value: string): boolean {
   }
 }
 
-export async function lookupExternalProductByBarcode(
-  databasePath: string,
-  barcodeInput: string,
-  mode: ProductLookupMode
-): Promise<ProductLookupResponse> {
-  const settings = productDataSettings(databasePath);
-  if (!settings.enabled) {
-    return { status: "disabled", reason: "service_disabled" };
-  }
-  if (mode === "automatic" && !settings.autoSearchUnknownBarcode) {
-    return { status: "disabled", reason: "automatic_search_disabled" };
-  }
-
-  const barcode = normalizeBarcode(barcodeInput);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
-  try {
+const openFoodFactsProvider: ProductLookupProvider = {
+  id: OPEN_FOOD_FACTS_PROVIDER,
+  isImageUrlAllowed: isOpenFoodFactsImageUrl,
+  async lookupByBarcode(barcode, options) {
     const fields = [
       "code",
       "product_name",
@@ -123,7 +119,7 @@ export async function lookupExternalProductByBarcode(
           "Accept": "application/json"
         },
         redirect: "follow",
-        signal: controller.signal
+        signal: options.signal
       }
     );
     if (!response.ok) {
@@ -135,14 +131,14 @@ export async function lookupExternalProductByBarcode(
     if (Number(payload.status ?? 0) !== 1 || !product || typeof product !== "object" || Array.isArray(product)) {
       return { status: "not_found", barcode, provider: OPEN_FOOD_FACTS_PROVIDER };
     }
+
     const source = product as Record<string, unknown>;
     const name = text(source.product_name, 180) || text(source.generic_name, 180);
     const brand = text(source.brands, 160);
     const quantity = text(source.quantity, 80);
     const categoryHint = text(source.categories, 180);
     const rawImageUrl = text(source.image_front_url, 1200);
-    const imageUrl = settings.includeImages && isOpenFoodFactsImageUrl(rawImageUrl) ? rawImageUrl : "";
-    const fetchedAt = new Date().toISOString();
+    const imageUrl = options.includeImages && isOpenFoodFactsImageUrl(rawImageUrl) ? rawImageUrl : "";
 
     return {
       status: "found",
@@ -157,9 +153,42 @@ export async function lookupExternalProductByBarcode(
         sourceProductUrl: `${OPEN_FOOD_FACTS_PRODUCT}/${encodeURIComponent(barcode)}`,
         dataLicense: "ODbL",
         imageLicense: imageUrl ? "CC BY-SA" : "",
-        fetchedAt
+        fetchedAt: new Date().toISOString()
       }
     };
+  }
+};
+
+const PRODUCT_LOOKUP_PROVIDERS: Record<ProductDataProviderId, ProductLookupProvider> = {
+  open_food_facts: openFoodFactsProvider
+};
+
+function productLookupProvider(providerId: ProductDataProviderId): ProductLookupProvider {
+  return PRODUCT_LOOKUP_PROVIDERS[providerId] ?? openFoodFactsProvider;
+}
+
+export async function lookupExternalProductByBarcode(
+  databasePath: string,
+  barcodeInput: string,
+  mode: ProductLookupMode
+): Promise<ProductLookupResponse> {
+  const settings = productDataSettings(databasePath);
+  if (!settings.enabled) {
+    return { status: "disabled", reason: "service_disabled" };
+  }
+  if (mode === "automatic" && !settings.autoSearchUnknownBarcode) {
+    return { status: "disabled", reason: "automatic_search_disabled" };
+  }
+
+  const barcode = normalizeBarcode(barcodeInput);
+  const provider = productLookupProvider(settings.provider);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LOOKUP_TIMEOUT_MS);
+  try {
+    return await provider.lookupByBarcode(barcode, {
+      includeImages: settings.includeImages,
+      signal: controller.signal
+    });
   } catch (error) {
     if (controller.signal.aborted) {
       throw new Error("Ürün veri servisi zaman aşımına uğradı.", { cause: error });
@@ -173,11 +202,13 @@ export async function lookupExternalProductByBarcode(
 export async function archiveExternalProductImage(
   databasePath: string,
   productId: string,
+  providerId: string,
   imageUrl: string
 ): Promise<string> {
-  if (!imageUrl || !isOpenFoodFactsImageUrl(imageUrl)) return "";
   const settings = productDataSettings(databasePath);
   if (!settings.enabled || !settings.includeImages) return "";
+  const provider = PRODUCT_LOOKUP_PROVIDERS[providerId as ProductDataProviderId];
+  if (!provider || !imageUrl || !provider.isImageUrlAllowed(imageUrl)) return "";
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), IMAGE_TIMEOUT_MS);
