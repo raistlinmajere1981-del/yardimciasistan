@@ -229,7 +229,6 @@ function financialState(sqlite, databasePath, productId) {
     movements: tableCount(sqlite, "inventory_movements"),
     finance: tableCount(sqlite, "finance_entries"),
     cartDrafts: tableCount(sqlite, "commerce_sale_drafts"),
-    productDrafts: tableCount(sqlite, "catalog_product_drafts"),
     quantity: getRuntimeInventoryBalance(databasePath, productId).quantity
   };
 }
