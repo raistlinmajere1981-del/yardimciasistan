@@ -452,10 +452,13 @@ export function saveCatalogProductInTransaction(
   const sku = String(input.sku ?? "").trim().slice(0, 80);
   const barcode = String(input.barcode ?? "").trim().slice(0, 80);
   const description = String(input.description ?? "").trim().slice(0, 2000);
-  const imageAssetPath = String(existing?.image_asset_path ?? "").trim().slice(0, 500);
+  const previousImageSourceUrl = String(existing?.image_source_url ?? "").trim().slice(0, 1200);
   const imageSourceUrl = input.imageSourceUrl === undefined
-    ? String(existing?.image_source_url ?? "").trim().slice(0, 1200)
+    ? previousImageSourceUrl
     : String(input.imageSourceUrl ?? "").trim().slice(0, 1200);
+  const imageAssetPath = input.imageSourceUrl !== undefined && imageSourceUrl !== previousImageSourceUrl
+    ? ""
+    : String(existing?.image_asset_path ?? "").trim().slice(0, 500);
   const dataSource = input.dataSource === undefined
     ? String(existing?.data_source ?? "").trim().slice(0, 80)
     : String(input.dataSource ?? "").trim().slice(0, 80);
