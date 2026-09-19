@@ -729,6 +729,10 @@ export function androidActionAllowedByCapabilities(
       && enabled.has(C.INVENTORY)
       && enabled.has(C.AI);
   }
+  if (actionType === "market_product_create") {
+    return enabled.has(C.CATALOG)
+      && (context.payload?.track_inventory !== true || enabled.has(C.INVENTORY));
+  }
   if (actionType === "room_status_update" && String(context.payload?.status ?? "").trim() === "reserved") {
     return enabled.has(C.ACCOMMODATION_ROOMS) && enabled.has(C.ACCOMMODATION_RESERVATIONS);
   }
