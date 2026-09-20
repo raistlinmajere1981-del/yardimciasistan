@@ -131,11 +131,7 @@ final class HostingSyncClient {
       connection.setChunkedStreamingMode(16 * 1024);
       connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
       connection.setRequestProperty("Accept", "application/json");
-      if (includeAuthorization) {
-        applyAuthorization(connection, credential, identity);
-      } else {
-        connection.setRequestProperty("X-YA-Device-Id", identity.deviceId);
-      }
+      applyAuthorization(connection, credential, identity);
 
       try (DataOutputStream output = new DataOutputStream(connection.getOutputStream())) {
         writeMultipartField(output, boundary, "source", "android");
@@ -392,7 +388,11 @@ final class HostingSyncClient {
       connection.setDoOutput(true);
       connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
       connection.setRequestProperty("Accept", "application/json");
-      applyAuthorization(connection, credential, identity);
+      if (includeAuthorization) {
+        applyAuthorization(connection, credential, identity);
+      } else {
+        connection.setRequestProperty("X-YA-Device-Id", identity.deviceId);
+      }
 
       byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
       connection.setFixedLengthStreamingMode(body.length);
