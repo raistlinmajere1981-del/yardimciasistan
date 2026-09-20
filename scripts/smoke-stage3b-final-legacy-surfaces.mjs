@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn, spawnSync } from "node:child_process";
 import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -78,7 +79,7 @@ const observations = [];
 
 try {
   await waitForServer(baseUrl);
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ locale: "tr-TR", viewport: { width: 1440, height: 1000 } });
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
