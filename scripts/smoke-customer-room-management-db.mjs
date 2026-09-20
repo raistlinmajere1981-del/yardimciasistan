@@ -46,6 +46,18 @@ try {
   assert.equal(firstCustomer.birthDate, "1990-05-12");
   assert.equal(firstCustomer.documentSerialNumber, "A12B34567");
 
+  const internationalCustomer = database.saveCustomer(customerInput({
+    fullName: "International Guest",
+    phone: "+44 7911 123456",
+    identityType: "passport",
+    identityNumber: "GBR123456"
+  }));
+  assert.equal(internationalCustomer.ok, true, internationalCustomer.message);
+  assert.equal(
+    internationalCustomer.dashboardData.customers.find((customer) => customer.id === internationalCustomer.savedId)?.phone,
+    "+447911123456"
+  );
+
   const duplicateIdentity = database.saveCustomer(customerInput({
     fullName: "Kimlik Çakışması",
     phone: "+905550001002",

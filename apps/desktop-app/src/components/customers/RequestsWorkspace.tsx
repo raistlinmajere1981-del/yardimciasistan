@@ -340,7 +340,7 @@ export function RequestsWorkspace({
                 </label>
                 <label className="form-field form-field--short">
                   Telefon
-                  <input value={manualRequestForm.customerPhone} onChange={(event) => updateManualRequestForm("customerPhone", event.target.value)} placeholder="05xx xxx xx xx" />
+                  <input inputMode="tel" value={manualRequestForm.customerPhone} onChange={(event) => updateManualRequestForm("customerPhone", event.target.value)} placeholder="+90 5xx… / +44…" />
                 </label>
                 <label className="form-field form-field--medium">
                   Tarih notu

@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { BUSINESS_CAPABILITIES as C, type CustomerCreditAccountDetail } from "@yardimci-asistan/shared";
-import { customerCreditWhatsAppFingerprint, normalizeTRMobilePhone, prepareWhatsAppAction, type WhatsAppAction, type WhatsAppBridgeMode } from "@yardimci-asistan/whatsapp-bridge";
+import { customerCreditWhatsAppFingerprint, normalizeInternationalPhone, prepareWhatsAppAction, type WhatsAppAction, type WhatsAppBridgeMode } from "@yardimci-asistan/whatsapp-bridge";
 import { assertPersistedBusinessCapability } from "./business-capability-runtime";
 import { getCustomerCreditAccount } from "./customer-credit-runtime";
 
@@ -25,7 +25,7 @@ export function prepareCustomerCreditWhatsApp(databasePath: string, input: Prepa
   const account = getCustomerCreditAccount(databasePath, input.customerId);
   if (account.customer.deletedAt) throw new Error("Silinmiş müşteri hesabı paylaşılamaz.");
   if (!account.balances.some((balance) => balance.amountMinor > 0)) return { status: "no_debt", account };
-  if (!normalizeTRMobilePhone(account.customer.phone).ok) throw new Error("Bu müşterinin geçerli bir telefon numarası yok.");
+  if (!normalizeInternationalPhone(account.customer.phone).ok) throw new Error("Bu müşterinin geçerli bir telefon numarası yok.");
   const fingerprint = customerCreditWhatsAppFingerprint({ customerName: account.customer.fullName, phone: account.customer.phone, balances: account.balances });
   if (fingerprint !== input.expectedFingerprint) return { status: "changed", account };
 

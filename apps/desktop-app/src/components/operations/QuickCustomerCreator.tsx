@@ -112,7 +112,7 @@ export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: Qu
             maxLength={32}
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
-            placeholder="05xx xxx xx xx"
+            placeholder="+90 5xx… / +44…"
           />
         </label>
       </div>
