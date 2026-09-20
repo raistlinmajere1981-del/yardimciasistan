@@ -4,13 +4,25 @@ import type {
   DesktopAndroidDeviceMutationResult,
   DesktopDatabase
 } from "../database";
+import type {
+  DesktopAndroidInstallationSnapshot,
+  DesktopAndroidInstallResult
+} from "../android-installation-service";
 
 export function registerAndroidDeviceIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   finalizeDeviceMutation: (result: DesktopAndroidDeviceMutationResult) => DesktopAndroidDeviceMutationResult;
+  listInstallDevices: () => DesktopAndroidInstallationSnapshot;
+  installOnDevice: (serial: string) => Promise<DesktopAndroidInstallResult>;
 }) {
-  const { getDatabase, assertCapability, finalizeDeviceMutation } = options;
+  const {
+    getDatabase,
+    assertCapability,
+    finalizeDeviceMutation,
+    listInstallDevices,
+    installOnDevice
+  } = options;
 
   ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
@@ -38,5 +50,15 @@ export function registerAndroidDeviceIpcHandlers(options: {
   ipcMain.handle("androidDevice:revoke", (_event, deviceId: unknown): DesktopAndroidDeviceMutationResult => {
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
     return finalizeDeviceMutation(getDatabase().revokeAndroidDevice(String(deviceId ?? "")));
+  });
+
+  ipcMain.handle("androidDevice:listInstallDevices", (): DesktopAndroidInstallationSnapshot => {
+    assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android kurulumu bu işletmede etkin değil.");
+    return listInstallDevices();
+  });
+
+  ipcMain.handle("androidDevice:install", async (_event, serial: unknown): Promise<DesktopAndroidInstallResult> => {
+    assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android kurulumu bu işletmede etkin değil.");
+    return installOnDevice(String(serial ?? ""));
   });
 }
