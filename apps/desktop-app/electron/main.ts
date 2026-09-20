@@ -818,16 +818,15 @@ function reconcileLocalCompanionAdvertisement() {
     localCompanionMdnsAdvertiser = null;
     return;
   }
-  if (localCompanionMdnsAdvertiser) {
-    return;
+  if (!localCompanionMdnsAdvertiser) {
+    localCompanionMdnsAdvertiser = new LocalCompanionMdnsAdvertiser({
+      desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
+      protocolVersion: LOCAL_COMPANION_PROTOCOL_VERSION,
+      serviceType: LOCAL_COMPANION_SERVICE_TYPE,
+      logInfo: (message) => desktopLogInfo("local-companion-mdns", message),
+      logWarn: (message, error) => desktopLogWarn("local-companion-mdns", message, error)
+    });
   }
-  localCompanionMdnsAdvertiser = new LocalCompanionMdnsAdvertiser({
-    desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
-    protocolVersion: LOCAL_COMPANION_PROTOCOL_VERSION,
-    serviceType: LOCAL_COMPANION_SERVICE_TYPE,
-    logInfo: (message) => desktopLogInfo("local-companion-mdns", message),
-    logWarn: (message, error) => desktopLogWarn("local-companion-mdns", message, error)
-  });
   localCompanionMdnsAdvertiser.start(serverAddress.port);
 }
 
