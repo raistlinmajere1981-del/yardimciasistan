@@ -267,6 +267,8 @@ try {
   await tableCategoryEditor.getByRole("button", { name: "Teras satırını kaldır" }).click();
   await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
   const androidDeviceSection = page.locator(".settings-android-devices-section");
+  await expect(androidDeviceSection.getByRole("heading", { name: "Telefon Kurulumu" })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("button", { name: "USB Cihazları Yenile" })).toBeVisible();
   await expect(androidDeviceSection.getByRole("heading", { name: "Cihazlar ve Yetkiler" })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
@@ -986,9 +988,9 @@ try {
   await expect(conversionPage.locator(".settings-data-maintenance-section .backup-row")).toHaveCount(1);
   await expect(conversionPage.locator(".settings-data-maintenance-section").getByText("Yerel veritabanı yedeği oluşturuldu.")).toBeVisible();
   await expect(conversionPage.locator(".settings-data-maintenance-section").getByText("yardimci-asistan-smoke", { exact: true })).toHaveCount(0);
-  await expect(conversionPage.getByRole("button", { name: "Android'e Yayınla" })).toBeVisible();
-  await conversionPage.getByRole("button", { name: "Android'e Yayınla" }).click();
-  await expect(conversionPage.locator(".settings-android-devices-section").getByText("2 günlük iş ile Android özeti yayınlandı.")).toBeVisible();
+  await expect(conversionPage.getByRole("heading", { name: "Telefon Kurulumu" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "USB Cihazları Yenile" })).toBeVisible();
+  await expect(conversionPage.getByRole("button", { name: "Android'e Yayınla" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
