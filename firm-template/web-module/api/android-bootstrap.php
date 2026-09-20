@@ -115,20 +115,20 @@ if ($publishedDesktopId === '' || !hash_equals($publishedDesktopId, $desktopId))
     ]);
 }
 
-if (!ya_android_auth_consume_bootstrap_nonce($nonce)) {
-    ya_android_bootstrap_response(409, [
-        'ok' => false,
-        'code' => 'bootstrap_ticket_replayed',
-        'message' => 'Kurulum eşleştirme bileti daha önce kullanılmış.'
-    ]);
-}
-
 $deviceId = trim((string) ($_SERVER['HTTP_X_YA_DEVICE_ID'] ?? ''));
 if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId) !== 1) {
     ya_android_bootstrap_response(422, [
         'ok' => false,
         'code' => 'invalid_device_id',
         'message' => 'Telefon kimliği geçersiz.'
+    ]);
+}
+
+if (!ya_android_auth_consume_bootstrap_nonce($nonce)) {
+    ya_android_bootstrap_response(409, [
+        'ok' => false,
+        'code' => 'bootstrap_ticket_replayed',
+        'message' => 'Kurulum eşleştirme bileti daha önce kullanılmış.'
     ]);
 }
 
