@@ -105,6 +105,8 @@ try {
   await pensionPage.locator('[data-ya-open-date-picker="end_date"]').click();
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("1 gün");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("2 gün");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("7 gün");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("10 gün");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).not.toContainText("Bugün");
   await pensionPage.locator('[data-ya-calendar-shortcut="day1"]').click();
   await expect(pensionPage.locator('input[name="date_text"]')).not.toHaveValue("");
@@ -162,6 +164,9 @@ try {
   });
 
   await page.locator('[data-ya-request-type="restaurant_reservation"]').click();
+  await expect(page.locator(".ya-widget-schedule-row")).toBeVisible();
+  await expect(page.locator(".ya-widget-schedule-row [data-ya-open-date-picker]")).toBeVisible();
+  await expect(page.locator(".ya-widget-schedule-row [data-ya-open-time-picker]")).toBeVisible();
   await expect(page.locator('.ya-widget-form button[type="submit"]')).toContainText("Talebi Gönder");
   await expect(page.locator(".ya-widget-form-note")).toHaveCount(0);
   await expect(page.locator(".ya-widget-subview-intro p")).toContainText("Tarih ve iletişim");

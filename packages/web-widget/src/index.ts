@@ -478,12 +478,12 @@ function restaurantScheduleControlsTemplate() {
   return `
     <fieldset class="ya-widget-date-group" data-ya-restaurant-date>
       <legend>Tarih ve saat</legend>
-      <div class="ya-widget-date-range ya-widget-date-range-single">
+      <div class="ya-widget-schedule-row">
         ${datePickerControlTemplate("start_date", "Tarih", "Tarih seç", todayIso)}
+        ${timePickerControlTemplate()}
       </div>
       <input name="date_text" type="hidden" />
       <div class="ya-widget-calendar" data-ya-calendar hidden></div>
-      ${timePickerControlTemplate()}
       <p data-ya-selected-date aria-live="polite">Tarih ve saat seçiminizi yapın.</p>
     </fieldset>
   `;
@@ -867,7 +867,12 @@ function renderTurkishCalendar(root: HTMLElement) {
 
   const shortcuts: Array<[string, string, boolean]> = isAccommodation
     ? target === "end_date"
-      ? [["day1", "1 gün", !startValue], ["day2", "2 gün", !startValue]]
+      ? [
+          ["day1", "1 gün", !startValue],
+          ["day2", "2 gün", !startValue],
+          ["day7", "7 gün", !startValue],
+          ["day10", "10 gün", !startValue]
+        ]
       : [["today", "Bugün", false], ["tomorrow", "Yarın", false]]
     : [["today", "Bugün", false], ["tomorrow", "Yarın", false]];
 
@@ -894,8 +899,9 @@ function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HT
   const isAccommodation = Boolean(root.querySelector("[data-ya-accommodation-dates]"));
   const today = new Date();
 
-  if (shortcut === "day1" || shortcut === "day2") {
-    const days = shortcut === "day2" ? 2 : 1;
+  const dayShortcut = /^day(1|2|7|10)$/.exec(shortcut);
+  if (dayShortcut) {
+    const days = Number(dayShortcut[1]);
     const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
     const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
     const start = startInput ? parseLocalIsoDate(startInput.value) : null;
@@ -2141,6 +2147,17 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-date-range-single {
       grid-template-columns: 1fr;
+    }
+
+    .ya-widget-schedule-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      align-items: end;
+      gap: 8px;
+    }
+
+    .ya-widget-schedule-row .ya-widget-time-field {
+      margin-top: 0;
     }
 
     .ya-widget-date-picker {
