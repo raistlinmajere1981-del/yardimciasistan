@@ -1,4 +1,5 @@
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -24,7 +25,7 @@ mkdirSync(output, { recursive: true });
 let browser;
 try {
   await waitForServer(baseUrl);
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ locale: "tr-TR", viewport: { width: 1440, height: 1000 } });
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
