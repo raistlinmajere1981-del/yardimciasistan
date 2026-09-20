@@ -81,6 +81,7 @@ public final class MainActivity extends ComponentActivity {
   private static final String TAB_CASH = AndroidUiRules.TAB_CASH;
   private static final String TAB_REPORTS = AndroidUiRules.TAB_REPORTS;
   private static final long FOREGROUND_SYNC_INTERVAL_MS = 15_000L;
+  private static final long LOCAL_DISCOVERY_RETRY_INTERVAL_MS = 45_000L;
   private static final int BOTTOM_NAV_HEIGHT_DP = 70;
   private static final int MAIN_CONTENT_BOTTOM_PADDING_DP = BOTTOM_NAV_HEIGHT_DP + 24;
   private static final int LANDSCAPE_CONTENT_BOTTOM_PADDING_DP = 18;
@@ -119,6 +120,7 @@ public final class MainActivity extends ComponentActivity {
   private boolean settingsOpen;
   private boolean loading;
   private boolean foregroundActive;
+  private long lastLocalDiscoveryStartedAt;
   private String connectionState = "Henüz bağlanmadı";
 
   private LinearLayout root;
@@ -283,9 +285,7 @@ public final class MainActivity extends ComponentActivity {
     foregroundActive = true;
     foregroundSyncHandler.removeCallbacks(foregroundSyncRunnable);
     foregroundSyncHandler.postDelayed(foregroundSyncRunnable, FOREGROUND_SYNC_INTERVAL_MS);
-    if (canUseLocalNetworkDiscovery() && localCompanionDiscovery != null) {
-      localCompanionDiscovery.start();
-    }
+    startLocalDiscoveryIfDue(true);
   }
 
   @Override
@@ -337,9 +337,8 @@ public final class MainActivity extends ComponentActivity {
       localNotifications.refreshCurrentSnapshot(data);
     }
     if (requestCode == LOCAL_NETWORK_PERMISSION_REQUEST_CODE
-        && canUseLocalNetworkDiscovery()
-        && localCompanionDiscovery != null) {
-      localCompanionDiscovery.start();
+        && canUseLocalNetworkDiscovery()) {
+      startLocalDiscoveryIfDue(true);
     }
   }
 
@@ -1244,6 +1243,20 @@ public final class MainActivity extends ComponentActivity {
     }
     preferences.edit().putBoolean(KEY_NOTIFICATION_PERMISSION_REQUESTED, true).apply();
     requestPermissions(new String[] { Manifest.permission.POST_NOTIFICATIONS }, NOTIFICATION_PERMISSION_REQUEST_CODE);
+  }
+
+  private void startLocalDiscoveryIfDue(boolean force) {
+    if (!foregroundActive
+        || localCompanionDiscovery == null
+        || !canUseLocalNetworkDiscovery()) {
+      return;
+    }
+    long now = System.currentTimeMillis();
+    if (!force && now - lastLocalDiscoveryStartedAt < LOCAL_DISCOVERY_RETRY_INTERVAL_MS) {
+      return;
+    }
+    lastLocalDiscoveryStartedAt = now;
+    localCompanionDiscovery.start();
   }
 
   private void requestLocalNetworkPermissionIfNeeded() {
@@ -4925,16 +4938,17 @@ public final class MainActivity extends ComponentActivity {
         localNotifications.recordSyncSuccess();
         final int discardedActionCount = invalidatedPendingActions;
         final boolean usedLocalTransport = fetchedSourceKey.startsWith("local:");
+        final boolean webAllowsLocalNetwork = fetched.payload.optBoolean("local_network_enabled", true);
         final String successfulConnectionState = usedLocalTransport
             ? "Yerel ağ bağlı"
             : "Web bağlantısı hazır";
         runOnUiThread(() -> {
-          if (!usedLocalTransport
-              && foregroundActive
-              && localCompanionDiscovery != null
-              && !ConnectionSettings.localConnection(preferences).localToken.isEmpty()
-              && canUseLocalNetworkDiscovery()) {
-            localCompanionDiscovery.start();
+          if (!usedLocalTransport) {
+            if (webAllowsLocalNetwork) {
+              startLocalDiscoveryIfDue(false);
+            } else {
+              ConnectionSettings.clearLocalEndpoint(preferences);
+            }
           }
           data = nextData;
           loading = false;
