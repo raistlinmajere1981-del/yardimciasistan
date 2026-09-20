@@ -75,6 +75,11 @@ public final class SyncJobService extends JobService {
     if (baseUrl.isEmpty() || syncSecret.isEmpty() || identity.deviceId.isEmpty()) {
       return;
     }
+    String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    String sourceKey = CompanionConnectionIdentity.hostingSourceKey(baseUrl);
+    if (actionTargetKey.isEmpty() || sourceKey.isEmpty()) {
+      return;
+    }
 
     AndroidOperationsTransport client = new HostingAndroidOperationsTransport();
     OperationCache cache = new OperationCache(preferences, identity.deviceId);
@@ -83,7 +88,7 @@ public final class SyncJobService extends JobService {
     ActionOutbox outbox = new ActionOutbox(preferences);
     List<ActionOutbox.PendingAction> pendingActions = outbox.load();
     for (ActionOutbox.PendingAction pending : pendingActions) {
-      if (!pending.matchesTarget(baseUrl, syncSecret)) {
+      if (!pending.matchesTarget(actionTargetKey)) {
         continue;
       }
       try {
@@ -103,7 +108,7 @@ public final class SyncJobService extends JobService {
 
     AndroidOperationsTransport.FetchResult fetched;
     try {
-      fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision());
+      fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision(sourceKey));
     } catch (AndroidOperationsTransport.TransportException error) {
       if (error.disablesAndroidService()) {
         clearDisabledAndroidState(cache, outbox, notifications, previousData);
@@ -112,7 +117,7 @@ public final class SyncJobService extends JobService {
       throw error;
     }
     if (!fetched.notModified && fetched.data != null) {
-      cache.save(fetched.payload);
+      cache.save(fetched.payload, sourceKey, fetched.serverRevision);
       OperationData currentData = cache.load();
       notifications.processSnapshot(previousData, currentData == null ? fetched.data : currentData);
     }
