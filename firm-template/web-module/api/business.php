@@ -114,6 +114,9 @@ function ya_business_capability_public_surfaces(array $capabilities, array $conf
     if (isset($enabled['food_service.menu'])) {
         $surfaces[] = 'menu';
     }
+    if (isset($enabled['channel.qr_menu'])) {
+        $surfaces[] = 'qr_menu';
+    }
     if (isset($enabled['commerce.catalog'])) {
         $surfaces[] = 'catalog';
     }
@@ -132,7 +135,7 @@ function ya_business_normalize_public_surfaces(mixed $value): array
     if (!is_array($value)) {
         return [];
     }
-    $allowed = ['accommodation', 'food_service', 'menu', 'catalog', 'directions'];
+    $allowed = ['accommodation', 'food_service', 'menu', 'qr_menu', 'catalog', 'directions'];
     $normalized = [];
     foreach ($value as $surface) {
         $surface = ya_business_string($surface);
@@ -146,9 +149,9 @@ function ya_business_normalize_public_surfaces(mixed $value): array
 function ya_business_profile_public_surfaces(string $profileId): array
 {
     return match ($profileId) {
-        'pension_restaurant' => ['accommodation', 'food_service', 'menu', 'directions'],
+        'pension_restaurant' => ['accommodation', 'food_service', 'menu', 'qr_menu', 'directions'],
         'pension' => ['accommodation', 'directions'],
-        'restaurant', 'cafe' => ['food_service', 'menu', 'directions'],
+        'restaurant', 'cafe' => ['food_service', 'menu', 'qr_menu', 'directions'],
         'market' => ['catalog', 'directions'],
         default => []
     };
