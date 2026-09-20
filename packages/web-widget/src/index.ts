@@ -5,8 +5,25 @@ import {
 } from "@yardimci-asistan/whatsapp-bridge";
 
 type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
-type WidgetView = "home" | "form" | "info" | "whatsapp";
+type WidgetView = "home" | "form" | "info" | "whatsapp" | "directions";
 type DatePreset = "today" | "tomorrow" | "weekend" | "custom";
+type WidgetIntent = "home" | "accommodation.reserve" | "accommodation.info" | "food.reserve" | "info" | "directions";
+
+interface WidgetContext {
+  resourceType?: string;
+  resourceId?: string;
+  resourceName?: string;
+  imageUrl?: string;
+  sourcePath?: string;
+  question?: string;
+  address?: string;
+  mapUrl?: string;
+}
+
+interface WidgetOpenOptions {
+  intent?: WidgetIntent;
+  context?: WidgetContext;
+}
 type BusinessProfileId = "pension_restaurant" | "pension" | "restaurant" | "cafe" | "market";
 type PublicSurface = "accommodation" | "food_service" | "menu" | "catalog" | "directions";
 
@@ -19,6 +36,8 @@ interface WidgetConfig {
   accentColor: string;
   profileId: BusinessProfileId | "";
   publicSurfaces: PublicSurface[];
+  address: string;
+  mapUrl: string;
 }
 
 interface RequestPayload {
@@ -33,6 +52,7 @@ interface RequestPayload {
   message: string;
   source: "web_form";
   whatsapp_message: string;
+  context: Pick<WidgetContext, "resourceType" | "resourceId" | "resourceName" | "sourcePath">;
 }
 
 interface WidgetState {
@@ -45,6 +65,7 @@ interface WidgetState {
   questionDraft: string;
   whatsappDraft: string;
   whatsappTopic: string;
+  context: WidgetContext | null;
 }
 
 interface AiErrorDetail {
@@ -71,6 +92,8 @@ interface PublicBusinessApiResponse {
     primary_color?: string;
     accent_color?: string;
     public_surfaces?: unknown[];
+    address?: string;
+    map_url?: string;
   };
 }
 
@@ -78,7 +101,7 @@ declare global {
   interface Window {
     YardimciAsistanWidget?: {
       init: (config?: Partial<WidgetConfig>) => void;
-      open: () => void;
+      open: (options?: WidgetOpenOptions) => void;
       close: () => void;
     };
   }
@@ -95,7 +118,9 @@ const defaultConfig: WidgetConfig = {
   primaryColor: "#2F6F5E",
   accentColor: "#E47863",
   profileId: "",
-  publicSurfaces: []
+  publicSurfaces: [],
+  address: "",
+  mapUrl: ""
 };
 
 const initialScriptConfig = getScriptConfig();
@@ -110,9 +135,11 @@ let state: WidgetState = {
   aiLoading: false,
   questionDraft: "",
   whatsappDraft: "",
-  whatsappTopic: ""
+  whatsappTopic: "",
+  context: null
 };
 let footerAvoidanceBound = false;
+let externalActionBound = false;
 let footerPositionFrame = 0;
 let businessContextLoadId = 0;
 
@@ -131,15 +158,23 @@ export function init(userConfig: Partial<WidgetConfig> = {}) {
   };
 
   injectStyles(config);
+  ensureExternalActionBinding();
   render();
   const loadId = ++businessContextLoadId;
   void hydrateBusinessContext(loadId);
 }
 
-export function open() {
-  state = { ...state, isOpen: true, status: "" };
+export function open(options: WidgetOpenOptions = {}) {
+  state = {
+    ...state,
+    ...resolveOpenOptions(options),
+    isOpen: true,
+    status: "",
+    aiLoading: false,
+    aiAnswer: ""
+  };
   render();
-  focusWidgetElement("[data-ya-close]");
+  focusWidgetElement(".ya-widget-view-title, [data-ya-close]");
 }
 
 export function close() {
@@ -149,7 +184,9 @@ export function close() {
     view: "home",
     status: "",
     aiLoading: false,
-    aiAnswer: ""
+    aiAnswer: "",
+    questionDraft: "",
+    context: null
   };
   render();
   focusWidgetElement("[data-ya-open]");
@@ -231,6 +268,7 @@ function panelTemplate() {
         ${state.view === "form" ? formTemplate() : ""}
         ${state.view === "info" ? infoTemplate() : ""}
         ${state.view === "whatsapp" ? whatsappTemplate() : ""}
+        ${state.view === "directions" ? directionsTemplate() : ""}
         <p class="ya-widget-status" data-ya-status role="status" ${state.status ? "" : "hidden"}>${escapeHtml(state.status)}</p>
       </div>
     </section>
@@ -281,6 +319,15 @@ function homeTemplate() {
     </button>
   `);
 
+  if (surfaces.has("directions")) {
+    actions.push(`
+      <button type="button" data-ya-view="directions">
+        ${iconTemplate("pin")}
+        <span>Yol tarifi</span>
+      </button>
+    `);
+  }
+
   if (config.whatsappPhone.trim()) {
     actions.push(`
       <button type="button" data-ya-view="whatsapp">
@@ -329,8 +376,10 @@ function formTemplate() {
           <p>Sadece gerekli bilgileri ekleyin; mesajınız WhatsApp'ta hazır açılsın.</p>
         </div>
       </div>
+      ${contextCardTemplate()}
       <form class="ya-widget-form" data-ya-form>
         <input type="hidden" name="request_type" value="${state.requestType}" />
+        ${requestContextFieldsTemplate()}
         ${scheduleControls}
         <div class="ya-widget-field-grid">
           <label class="ya-widget-field">
@@ -369,6 +418,7 @@ function accommodationScheduleControlsTemplate() {
         ${datePickerControlTemplate("end_date", "Çıkış", "Çıkış tarihi", tomorrowIso)}
       </div>
       <input name="date_text" type="hidden" />
+      <div class="ya-widget-calendar" data-ya-calendar hidden></div>
       <p data-ya-selected-date aria-live="polite">Giriş ve çıkış tarihlerini seçin.</p>
     </fieldset>
   `;
@@ -392,8 +442,9 @@ function restaurantScheduleControlsTemplate() {
           <span data-ya-custom-date-label>Tarih seç</span>
         </button>
       </div>
-      <input class="ya-widget-native-date-input" name="start_date" type="date" min="${todayIso}" required aria-label="Rezervasyon tarihi" />
+      <input name="start_date" type="hidden" data-ya-date-value-input min="${todayIso}" />
       <input name="date_text" type="hidden" />
+      <div class="ya-widget-calendar" data-ya-calendar hidden></div>
       <label class="ya-widget-time-field">
         <span>Saat</span>
         <input name="time" type="time" required step="900" aria-label="Rezervasyon saati" />
@@ -411,7 +462,7 @@ function datePickerControlTemplate(name: "start_date" | "end_date", label: strin
         ${iconTemplate("calendar")}
         <strong data-ya-date-label="${name}">${placeholder}</strong>
       </button>
-      <input class="ya-widget-native-date-input" name="${name}" type="date" min="${min}" required aria-label="${placeholder}" />
+      <input name="${name}" type="hidden" data-ya-date-value-input min="${min}" />
     </div>
   `;
 }
@@ -442,6 +493,7 @@ function infoTemplate() {
           <p>Kısa sorunuzu yazın veya sık sorulanlardan birini seçin.</p>
         </div>
       </div>
+      ${contextCardTemplate()}
       <div class="ya-widget-suggestions" role="group" aria-label="Sık sorulan sorular">
         ${suggestions
           .map(
@@ -533,6 +585,71 @@ function whatsappTemplate() {
   `;
 }
 
+function directionsTemplate() {
+  const address = String(state.context?.address || config.address || "").trim();
+  const mapUrl = String(state.context?.mapUrl || config.mapUrl || buildMapSearchUrl(address)).trim();
+
+  return `
+    <div class="ya-widget-subview ya-widget-directions">
+      ${subviewNavigationTemplate("Yol tarifi", "pin")}
+      <div class="ya-widget-subview-intro">
+        <span aria-hidden="true">${iconTemplate("pin")}</span>
+        <div>
+          <h2 class="ya-widget-view-title" tabindex="-1">Bize nasıl ulaşabilirsiniz?</h2>
+          <p>Konumu açabilir veya ulaşım hakkında kısa bir soru sorabilirsiniz.</p>
+        </div>
+      </div>
+      ${contextCardTemplate()}
+      <div class="ya-widget-location-card">
+        <span>${iconTemplate("pin")}</span>
+        <div>
+          <strong>${escapeHtml(config.businessName)}</strong>
+          <p>${escapeHtml(address || "Adres bilgisi site tarafından iletilmedi.")}</p>
+        </div>
+      </div>
+      <div class="ya-widget-ai-actions">
+        ${mapUrl ? `<a class="ya-widget-primary-action" href="${escapeAttribute(mapUrl)}" target="_blank" rel="noopener noreferrer">${iconTemplate("pin")}<span>Haritada Aç</span></a>` : ""}
+        <button class="ya-widget-secondary-action" type="button" data-ya-directions-question>
+          ${iconTemplate("help")}<span>Yol Tarifi Sor</span>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function contextCardTemplate() {
+  const context = state.context;
+  const name = String(context?.resourceName ?? "").trim();
+  if (!name) return "";
+
+  const type = String(context?.resourceType ?? "").trim();
+  const label = type === "room" ? "Seçili oda"
+    : type === "table" ? "Seçili masa"
+      : type === "product" ? "Seçili ürün"
+        : "Sayfa bağlamı";
+  const imageUrl = String(context?.imageUrl ?? "").trim();
+
+  return `
+    <div class="ya-widget-context-card" data-ya-context-card>
+      ${imageUrl ? `<img src="${escapeAttribute(imageUrl)}" alt="" />` : `<span class="ya-widget-context-icon">${iconTemplate(type === "room" ? "bed" : "sparkles")}</span>`}
+      <div>
+        <small>${escapeHtml(label)}</small>
+        <strong>${escapeHtml(name)}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function requestContextFieldsTemplate() {
+  const context = state.context ?? {};
+  return `
+    <input type="hidden" name="context_resource_type" value="${escapeAttribute(String(context.resourceType ?? ""))}" />
+    <input type="hidden" name="context_resource_id" value="${escapeAttribute(String(context.resourceId ?? ""))}" />
+    <input type="hidden" name="context_resource_name" value="${escapeAttribute(String(context.resourceName ?? ""))}" />
+    <input type="hidden" name="context_source_path" value="${escapeAttribute(String(context.sourcePath ?? ""))}" />
+  `;
+}
+
 function subviewNavigationTemplate(label: string, icon: IconName) {
   return `
     <div class="ya-widget-subview-nav">
@@ -543,17 +660,20 @@ function subviewNavigationTemplate(label: string, icon: IconName) {
 }
 
 function bindEvents(root: HTMLElement) {
-  root.querySelector("[data-ya-open]")?.addEventListener("click", open);
+  root.querySelector("[data-ya-open]")?.addEventListener("click", () => open());
   root.querySelector("[data-ya-close]")?.addEventListener("click", close);
 
   root.querySelectorAll<HTMLElement>("[data-ya-view]").forEach((button) => {
     button.addEventListener("click", () => {
+      const nextView = button.dataset.yaView as WidgetView;
       state = {
         ...state,
         isOpen: true,
-        view: button.dataset.yaView as WidgetView,
+        view: nextView,
         status: "",
-        aiLoading: false
+        aiLoading: false,
+        context: nextView === "home" ? null : state.context,
+        questionDraft: nextView === "home" ? "" : state.questionDraft
       };
       render();
       focusWidgetElement(".ya-widget-view-title");
@@ -582,6 +702,7 @@ function bindEvents(root: HTMLElement) {
   bindGuestStepper(root);
   bindInfoControls(root);
   bindWhatsAppControls(root);
+  bindDirectionsControls(root);
 
   root.querySelector<HTMLFormElement>("[data-ya-form]")?.addEventListener("submit", handleFormSubmit);
   root.querySelector<HTMLFormElement>("[data-ya-ai-form]")?.addEventListener("submit", handleAiSubmit);
@@ -597,45 +718,96 @@ function bindEvents(root: HTMLElement) {
 
 function bindDateControls(root: HTMLElement) {
   root.querySelectorAll<HTMLButtonElement>("[data-ya-open-date-picker]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const inputName = String(button.dataset.yaOpenDatePicker ?? "");
-      const input = root.querySelector<HTMLInputElement>(`input[name="${inputName}"]`);
-      if (input) openNativeDatePicker(input);
-    });
+    button.addEventListener("click", () => openTurkishDatePicker(root, String(button.dataset.yaOpenDatePicker ?? "")));
   });
 
   root.querySelectorAll<HTMLButtonElement>("[data-ya-date-preset]").forEach((button) => {
     button.addEventListener("click", () => {
-      const preset = button.dataset.yaDatePreset as DatePreset;
-      const dateValue = String(button.dataset.yaDateValue ?? "");
-      updateRestaurantDateControls(root, preset, dateValue);
+      updateRestaurantDateControls(root, button.dataset.yaDatePreset as DatePreset, String(button.dataset.yaDateValue ?? ""));
+      closeTurkishDatePicker(root);
     });
+  });
+
+  const calendar = root.querySelector<HTMLElement>("[data-ya-calendar]");
+  calendar?.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("button") : null;
+    if (!button || button.disabled) return;
+
+    if (button.dataset.yaCalendarShift) {
+      const amount = Number(button.dataset.yaCalendarShift);
+      const current = parseLocalIsoDate(String(calendar.dataset.yaCalendarMonth ?? ""));
+      if (!current || !Number.isFinite(amount)) return;
+      calendar.dataset.yaCalendarMonth = toLocalIsoDate(new Date(current.getFullYear(), current.getMonth() + amount, 1));
+      renderTurkishCalendar(root);
+      return;
+    }
+
+    const dateValue = String(button.dataset.yaCalendarDay ?? "");
+    const input = root.querySelector<HTMLInputElement>(`input[name="${String(calendar.dataset.yaCalendarTarget ?? "")}"]`);
+    if (!dateValue || !input) return;
+    input.value = dateValue;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    closeTurkishDatePicker(root);
   });
 
   const startDate = root.querySelector<HTMLInputElement>('input[name="start_date"]');
   const endDate = root.querySelector<HTMLInputElement>('input[name="end_date"]');
-
   startDate?.addEventListener("change", () => {
-    if (root.querySelector("[data-ya-accommodation-dates]")) {
-      updateAccommodationDateControls(root);
-    } else {
-      updateRestaurantDateControls(root, "custom", startDate.value);
-    }
+    if (root.querySelector("[data-ya-accommodation-dates]")) updateAccommodationDateControls(root);
+    else updateRestaurantDateControls(root, "custom", startDate.value);
   });
   endDate?.addEventListener("change", () => updateAccommodationDateControls(root));
 }
 
-function openNativeDatePicker(input: HTMLInputElement) {
-  try {
-    if (typeof input.showPicker === "function") {
-      input.showPicker();
-      return;
-    }
-  } catch {
-    // Some browsers require their own native activation path; fall through.
+function openTurkishDatePicker(root: HTMLElement, inputName: string) {
+  const calendar = root.querySelector<HTMLElement>("[data-ya-calendar]");
+  const input = root.querySelector<HTMLInputElement>(`input[name="${inputName}"]`);
+  if (!calendar || !input) return;
+  const preferred = parseLocalIsoDate(input.value) ?? parseLocalIsoDate(input.min) ?? new Date();
+  calendar.dataset.yaCalendarTarget = inputName;
+  calendar.dataset.yaCalendarMonth = toLocalIsoDate(new Date(preferred.getFullYear(), preferred.getMonth(), 1));
+  calendar.hidden = false;
+  renderTurkishCalendar(root);
+}
+
+function closeTurkishDatePicker(root: HTMLElement) {
+  const calendar = root.querySelector<HTMLElement>("[data-ya-calendar]");
+  if (calendar) calendar.hidden = true;
+}
+
+function renderTurkishCalendar(root: HTMLElement) {
+  const calendar = root.querySelector<HTMLElement>("[data-ya-calendar]");
+  if (!calendar) return;
+  const input = root.querySelector<HTMLInputElement>(`input[name="${String(calendar.dataset.yaCalendarTarget ?? "")}"]`);
+  const monthDate = parseLocalIsoDate(String(calendar.dataset.yaCalendarMonth ?? ""));
+  if (!input || !monthDate) return;
+
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const leading = (monthStart.getDay() + 6) % 7;
+  const minValue = input.min || toLocalIsoDate(new Date());
+  const selectedValue = input.value;
+  const todayValue = toLocalIsoDate(new Date());
+  const cells: string[] = [];
+  for (let i = 0; i < leading; i += 1) cells.push('<span class="ya-widget-calendar-empty" aria-hidden="true"></span>');
+  for (let day = 1; day <= monthEnd.getDate(); day += 1) {
+    const value = toLocalIsoDate(new Date(year, month, day));
+    const disabled = value < minValue;
+    const classes = [value === selectedValue ? "is-selected" : "", value === todayValue ? "is-today" : ""].filter(Boolean).join(" ");
+    cells.push(`<button type="button" data-ya-calendar-day="${value}" class="${classes}" ${disabled ? "disabled" : ""} aria-label="${escapeAttribute(formatTurkishCalendarDate(value))}">${day}</button>`);
   }
-  input.focus({ preventScroll: true });
-  input.click();
+  const previousMonthEnd = toLocalIsoDate(new Date(year, month, 0));
+  calendar.innerHTML = `
+    <div class="ya-widget-calendar-head">
+      <button type="button" data-ya-calendar-shift="-1" aria-label="Önceki ay" ${previousMonthEnd < minValue ? "disabled" : ""}>${iconTemplate("chevron-left")}</button>
+      <strong class="ya-widget-calendar-title">${escapeHtml(formatTurkishMonth(monthDate))}</strong>
+      <button type="button" data-ya-calendar-shift="1" aria-label="Sonraki ay">${iconTemplate("chevron-right")}</button>
+    </div>
+    <div class="ya-widget-calendar-weekdays" aria-hidden="true"><span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div>
+    <div class="ya-widget-calendar-days">${cells.join("")}</div>
+  `;
 }
 
 function updateAccommodationDateControls(root: HTMLElement) {
@@ -644,29 +816,23 @@ function updateAccommodationDateControls(root: HTMLElement) {
   const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
   const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
   if (!startInput || !endInput || !dateTextInput) return;
-
   if (startInput.value) {
     const parsedStart = parseLocalIsoDate(startInput.value);
     if (parsedStart) {
       endInput.min = toLocalIsoDate(addLocalDays(parsedStart, 1));
-      if (endInput.value && endInput.value <= startInput.value) {
-        endInput.value = "";
-      }
+      if (endInput.value && endInput.value <= startInput.value) endInput.value = "";
     }
   }
-
   const startLabel = root.querySelector<HTMLElement>('[data-ya-date-label="start_date"]');
   const endLabel = root.querySelector<HTMLElement>('[data-ya-date-label="end_date"]');
   if (startLabel) startLabel.textContent = startInput.value ? formatTurkishCalendarDate(startInput.value) : "Giriş tarihi";
   if (endLabel) endLabel.textContent = endInput.value ? formatTurkishCalendarDate(endInput.value) : "Çıkış tarihi";
-
   if (startInput.value && endInput.value) {
     const dateText = `${formatTurkishCalendarDate(startInput.value)} – ${formatTurkishCalendarDate(endInput.value)}`;
     dateTextInput.value = dateText;
     if (selectedDate) selectedDate.textContent = `Konaklama: ${dateText}`;
     return;
   }
-
   dateTextInput.value = "";
   if (selectedDate) selectedDate.textContent = "Giriş ve çıkış tarihlerini seçin.";
 }
@@ -678,24 +844,17 @@ function updateRestaurantDateControls(root: HTMLElement, preset: DatePreset, dat
   const customLabel = root.querySelector<HTMLElement>("[data-ya-custom-date-label]");
   const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
   if (!dateInput || !dateTextInput || !dateValue) return;
-
   const dateText = formatDateForRequest(dateValue, preset);
   dateInput.value = dateValue;
   dateTextInput.value = dateText;
-
   root.querySelectorAll<HTMLButtonElement>("[data-ya-date-preset]").forEach((button) => {
-    const isActive = button.dataset.yaDatePreset === preset;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-pressed", String(isActive));
+    const active = button.dataset.yaDatePreset === preset;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   });
-
   customControl?.classList.toggle("is-active", preset === "custom");
-  if (customLabel) {
-    customLabel.textContent = preset === "custom" ? formatTurkishCalendarDate(dateValue) : "Tarih seç";
-  }
-  if (selectedDate) {
-    selectedDate.textContent = `Seçilen tarih: ${dateText}`;
-  }
+  if (customLabel) customLabel.textContent = preset === "custom" ? formatTurkishCalendarDate(dateValue) : "Tarih seç";
+  if (selectedDate) selectedDate.textContent = `Seçilen tarih: ${dateText}`;
 }
 
 function bindGuestStepper(root: HTMLElement) {
@@ -751,6 +910,20 @@ function bindInfoControls(root: HTMLElement) {
     const message = `Merhaba, ${config.businessName} hakkında bilgi almak istiyorum. Sorum: ${question}`;
     window.open(createWhatsAppLink(config.whatsappPhone, message), "_blank", "noopener,noreferrer");
     setStatus("Sorunuz WhatsApp mesajı olarak hazırlandı.");
+  });
+}
+
+function bindDirectionsControls(root: HTMLElement) {
+  root.querySelector<HTMLButtonElement>("[data-ya-directions-question]")?.addEventListener("click", () => {
+    const address = String(state.context?.address || config.address || "").trim();
+    state = {
+      ...state,
+      view: "info",
+      questionDraft: state.context?.question?.trim() || (address ? `${address} adresine nasıl gelebilirim?` : "İşletmenize nasıl gelebilirim?"),
+      status: ""
+    };
+    render();
+    focusWidgetElement(".ya-widget-ai textarea");
   });
 }
 
@@ -819,9 +992,19 @@ function handleFormSubmit(event: Event) {
     end_date: String(formData.get("end_date") ?? "").trim(),
     time: String(formData.get("time") ?? "").trim(),
     guest_count: Number(formData.get("guest_count") ?? 1),
-    message: String(formData.get("message") ?? "").trim(),
+    message: contextualRequestMessage(
+      String(formData.get("message") ?? "").trim(),
+      String(formData.get("context_resource_type") ?? "").trim(),
+      String(formData.get("context_resource_name") ?? "").trim()
+    ),
     source: "web_form",
-    whatsapp_message: ""
+    whatsapp_message: "",
+    context: {
+      resourceType: String(formData.get("context_resource_type") ?? "").trim(),
+      resourceId: String(formData.get("context_resource_id") ?? "").trim(),
+      resourceName: String(formData.get("context_resource_name") ?? "").trim(),
+      sourcePath: String(formData.get("context_source_path") ?? "").trim()
+    }
   };
 
   const scheduleError = validateRequestSchedule(payload);
@@ -834,6 +1017,12 @@ function handleFormSubmit(event: Event) {
   void saveRequest(payload);
   window.open(createWhatsAppLink(config.whatsappPhone, payload.whatsapp_message), "_blank", "noopener,noreferrer");
   setStatus("WhatsApp mesajı hazırlandı. Bilgileri kontrol edip gönder tuşuna basın.");
+}
+
+function contextualRequestMessage(note: string, resourceType: string, resourceName: string): string {
+  if (!resourceName) return note;
+  const label = resourceType === "room" ? "İlgili oda" : resourceType === "table" ? "İlgili masa" : resourceType === "product" ? "İlgili ürün" : "İlgili kayıt";
+  return [`${label}: ${resourceName}`, note].filter(Boolean).join("\n");
 }
 
 function validateRequestSchedule(payload: RequestPayload): string {
@@ -1390,6 +1579,65 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       background: #f5faf5;
     }
 
+    .ya-widget-context-card,
+    .ya-widget-location-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid rgba(47, 111, 94, 0.14);
+      border-radius: 14px;
+      background: #f7faf5;
+    }
+
+    .ya-widget-context-card img,
+    .ya-widget-context-icon {
+      width: 48px;
+      height: 42px;
+      flex: 0 0 auto;
+      border-radius: 10px;
+      object-fit: cover;
+    }
+
+    .ya-widget-context-icon,
+    .ya-widget-location-card > span {
+      display: grid;
+      place-items: center;
+      color: ${widgetConfig.primaryColor};
+      background: #ffffff;
+      box-shadow: inset 0 0 0 1px rgba(47, 111, 94, 0.14);
+    }
+
+    .ya-widget-context-card > div,
+    .ya-widget-location-card > div { display: grid; min-width: 0; gap: 2px; }
+
+    .ya-widget-context-card small {
+      color: ${widgetConfig.primaryColor};
+      font-size: 9px;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
+    .ya-widget-context-card strong,
+    .ya-widget-location-card strong {
+      overflow: hidden;
+      color: #172033;
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ya-widget-location-card > span {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 auto;
+      border-radius: 12px;
+    }
+
+    .ya-widget-location-card p { margin: 0; color: #626875; font-size: 11px; line-height: 1.4; }
+    .ya-widget-directions .ya-widget-primary-action { text-decoration: none; }
+
     .ya-widget-trust,
     .ya-widget-form-note {
       display: flex;
@@ -1519,6 +1767,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     }
 
     .ya-widget-date-group {
+      position: relative;
       padding: 11px;
       border: 1px solid rgba(47, 111, 94, 0.14);
       border-radius: 15px;
@@ -1619,17 +1868,80 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       white-space: nowrap;
     }
 
-    .ya-widget-native-date-input {
-      position: absolute !important;
-      width: 1px !important;
-      height: 1px !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      overflow: hidden;
-      border: 0 !important;
-      opacity: 0;
-      pointer-events: none;
+    .ya-widget-calendar {
+      position: absolute;
+      top: 69px;
+      right: 10px;
+      left: 10px;
+      z-index: 24;
+      display: grid;
+      gap: 8px;
+      padding: 11px;
+      border: 1px solid rgba(47, 111, 94, 0.2);
+      border-radius: 14px;
+      background: #fffdf8;
+      box-shadow: 0 18px 44px rgba(23, 32, 51, 0.2);
     }
+
+    .ya-widget-calendar[hidden] { display: none; }
+
+    .ya-widget-calendar-head {
+      display: grid;
+      grid-template-columns: 34px 1fr 34px;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ya-widget-calendar-head > button {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      padding: 0;
+      border: 1px solid #e1ddd5;
+      border-radius: 10px;
+      color: #334048;
+      background: #ffffff;
+      cursor: pointer;
+    }
+
+    .ya-widget-calendar-head > button:disabled { cursor: not-allowed; opacity: .35; }
+    .ya-widget-calendar-title { color: #172033; font-size: 12px; font-weight: 850; text-align: center; }
+
+    .ya-widget-calendar-weekdays,
+    .ya-widget-calendar-days {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 4px;
+    }
+
+    .ya-widget-calendar-weekdays span {
+      color: #7a8089;
+      font-size: 9px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .ya-widget-calendar-days button,
+    .ya-widget-calendar-empty { aspect-ratio: 1; min-width: 0; }
+
+    .ya-widget-calendar-days button {
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      color: #334048;
+      background: transparent;
+      font-size: 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .ya-widget-calendar-days button:hover:not(:disabled) { border-color: rgba(47, 111, 94, 0.28); background: #f1f7f0; }
+    .ya-widget-calendar-days button.is-today { border-color: rgba(47, 111, 94, 0.3); }
+    .ya-widget-calendar-days button.is-selected { color: #ffffff; border-color: transparent; background: ${widgetConfig.primaryColor}; }
+    .ya-widget-calendar-days button:disabled { color: #c4c5c7; cursor: not-allowed; }
 
     .ya-widget-time-field {
       display: grid;
@@ -1950,6 +2262,10 @@ const iconPaths = {
   bot: '<rect x="5" y="7" width="14" height="11" rx="4"/><path d="M12 4v3M9 12h.01M15 12h.01M9 15h6"/>',
   calendar: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 9h16M8 13h.01M12 13h.01M16 13h.01"/>',
   table: '<path d="M4 10h16M6 10l-1 10M18 10l1 10M8 6h8a2 2 0 0 1 2 2v2H6V8a2 2 0 0 1 2-2Z"/>',
+  bed: '<path d="M3 18v-7M21 18v-5a2 2 0 0 0-2-2H9a3 3 0 0 0-3 3v1M3 15h18M7 11V8h5a2 2 0 0 1 2 2v1"/>',
+  pin: '<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+  "chevron-left": '<path d="m15 18-6-6 6-6"/>',
+  "chevron-right": '<path d="m9 18 6-6-6-6"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.9.8-.9 1.6M12 17h.01"/>',
   whatsapp: '<path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.4-4A8 8 0 1 1 20 11.5Z"/><path d="M9 8.7c.5 2.5 2 4 4.5 4.8l1-1"/>',
   shield: '<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
@@ -1974,7 +2290,9 @@ function getScriptConfig(): Partial<WidgetConfig> {
     apiBaseUrl: dataset.apiBaseUrl,
     logoUrl: dataset.logoUrl,
     primaryColor: dataset.primaryColor,
-    accentColor: dataset.accentColor
+    accentColor: dataset.accentColor,
+    address: dataset.address,
+    mapUrl: dataset.mapUrl
   });
   const profileId = normalizeBusinessProfileId(dataset.profileId);
   if (profileId) {
@@ -2101,6 +2419,8 @@ async function hydrateBusinessContext(loadId: number) {
       whatsappPhone: String(business.whatsapp ?? "").trim() || config.whatsappPhone,
       primaryColor: String(business.primary_color ?? "").trim() || config.primaryColor,
       accentColor: String(business.accent_color ?? "").trim() || config.accentColor,
+      address: String(business.address ?? "").trim() || config.address,
+      mapUrl: String(business.map_url ?? "").trim() || config.mapUrl,
       profileId: profileId || config.profileId,
       publicSurfaces: publicSurfaces.length > 0 ? publicSurfaces : config.publicSurfaces
     };
@@ -2113,6 +2433,69 @@ async function hydrateBusinessContext(loadId: number) {
   } catch {
     // Script configuration remains the offline/failure fallback.
   }
+}
+
+function resolveOpenOptions(options: WidgetOpenOptions): Partial<WidgetState> {
+  const intent = options.intent ?? "home";
+  const context = normalizeWidgetContext(options.context);
+  if (intent === "accommodation.reserve") return { view: "form", requestType: "pension_reservation", context, questionDraft: "" };
+  if (intent === "food.reserve") return { view: "form", requestType: "restaurant_reservation", context, questionDraft: "" };
+  if (intent === "directions") return { view: "directions", context, questionDraft: context?.question ?? "" };
+  if (intent === "accommodation.info" || intent === "info") {
+    const name = String(context?.resourceName ?? "").trim();
+    const question = String(context?.question ?? "").trim() || (name ? `${name} hakkında bilgi almak istiyorum.` : "");
+    return { view: "info", context, questionDraft: question };
+  }
+  return { view: "home", context, questionDraft: "" };
+}
+
+function normalizeWidgetContext(value: WidgetContext | undefined): WidgetContext | null {
+  if (!value) return null;
+  const normalized: WidgetContext = {
+    resourceType: String(value.resourceType ?? "").trim(),
+    resourceId: String(value.resourceId ?? "").trim(),
+    resourceName: String(value.resourceName ?? "").trim(),
+    imageUrl: String(value.imageUrl ?? "").trim(),
+    sourcePath: String(value.sourcePath ?? "").trim() || window.location.pathname,
+    question: String(value.question ?? "").trim(),
+    address: String(value.address ?? "").trim(),
+    mapUrl: String(value.mapUrl ?? "").trim()
+  };
+  return Object.values(normalized).some(Boolean) ? normalized : null;
+}
+
+function ensureExternalActionBinding() {
+  if (externalActionBound) return;
+  externalActionBound = true;
+  document.addEventListener("click", (event) => {
+    const trigger = event.target instanceof Element ? event.target.closest<HTMLElement>("[data-ya-action]") : null;
+    if (!trigger || trigger.closest(`#${ROOT_ID}`)) return;
+    const intent = normalizeWidgetIntent(trigger.dataset.yaAction);
+    if (!intent) return;
+    event.preventDefault();
+    open({
+      intent,
+      context: {
+        resourceType: trigger.dataset.yaResourceType,
+        resourceId: trigger.dataset.yaResourceId,
+        resourceName: trigger.dataset.yaResourceName,
+        imageUrl: trigger.dataset.yaImageUrl,
+        sourcePath: trigger.dataset.yaSourcePath || window.location.pathname,
+        question: trigger.dataset.yaQuestion,
+        address: trigger.dataset.yaAddress,
+        mapUrl: trigger.dataset.yaMapUrl
+      }
+    });
+  });
+}
+
+function normalizeWidgetIntent(value: unknown): WidgetIntent | null {
+  const intent = String(value ?? "").trim();
+  return ["home", "accommodation.reserve", "accommodation.info", "food.reserve", "info", "directions"].includes(intent) ? intent as WidgetIntent : null;
+}
+
+function buildMapSearchUrl(address: string): string {
+  return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : "";
 }
 
 function focusWidgetElement(selector: string) {
@@ -2199,6 +2582,12 @@ function parseLocalIsoDate(value: string) {
 
   const date = new Date(year, month - 1, day);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatTurkishMonth(value: Date) {
+  return new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" })
+    .format(value)
+    .replace(/^./u, (letter) => letter.toLocaleUpperCase("tr-TR"));
 }
 
 function formatTurkishCalendarDate(value: string) {
