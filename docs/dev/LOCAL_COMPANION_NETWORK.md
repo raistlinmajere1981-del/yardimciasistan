@@ -116,7 +116,7 @@ Yeni modelde action kimliği transporttan bağımsız olmalıdır. Action bir i�
 eşleşmesine bağlı kalır; teslim kanalı local veya hosting olabilir. Aynı action ID'nin
 tekrar teslimi masaüstü receipt/idempotency katmanında güvenli kalmalıdır.
 
-Migration sırasında mevcut `pending_android_actions_v1` kayıtları kaybedilmemelidir.
+Bu geliştirme öncesi Android çalışma verisi korunmak zorunda değildir. `pending_android_actions_v1` okunmaz; yeni model temiz `pending_android_actions_v2` baseline'ı ile başlar. Gerekirse test/kurulum verisi sıfırlanabilir.
 
 ### Android OperationCache revision
 
@@ -155,7 +155,8 @@ kalabilir.
 
 - action target modelini LOCAL/HOSTING geçişine dayanıklı hale getir;
 - source-keyed revision cache ekle;
-- eski SharedPreferences kayıtları için migration testleri ekle.
+- eski SharedPreferences çalışma kayıtlarını migrate etme; v2 anahtarları temiz baseline olarak kullan;
+- eski test/kurulum verisinin gerektiğinde sıfırlanabileceğini kabul et.
 
 ### Faz 3 — Desktop Local Companion API
 
