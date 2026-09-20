@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -100,7 +100,11 @@ for (const filename of requiredFiles) {
     console.warn(`Platform-Tools dosyası atlandı: ${source}`);
     continue;
   }
-  copyFileSync(source, join(platformToolsDestination, filename));
+  const destination = join(platformToolsDestination, filename);
+  copyFileSync(source, destination);
+  if (targetPlatform === "linux" && filename === "adb") {
+    chmodSync(destination, 0o755);
+  }
 }
 
 console.log(`Android Platform-Tools staged: ${platformToolsDestination} (${targetPlatform})`);
