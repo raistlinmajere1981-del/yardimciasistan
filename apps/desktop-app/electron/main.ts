@@ -336,7 +336,10 @@ if (!hasSingleInstanceLock) {
         markLocalCompanionSnapshotDirty();
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
       },
-      onStatusChanged: notifySyncStatusChanged
+      onStatusChanged: (status) => {
+        notifySyncStatusChanged(status);
+        reconcileLocalCompanionAdvertisement();
+      }
     });
     localCompanionPairingService = new LocalCompanionPairingService(getDatabase(), {
       desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
