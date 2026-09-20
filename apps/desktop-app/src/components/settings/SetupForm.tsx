@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type MutableRefObject, type ReactNode, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { ExternalLink, Plus, RefreshCw, ShieldCheck, Smartphone, Trash2, UploadCloud } from "lucide-react";
+import { ExternalLink, Plus, RefreshCw, ShieldCheck, Smartphone, Trash2 } from "lucide-react";
 import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import {
   BUSINESS_CAPABILITIES,
@@ -67,15 +67,12 @@ interface SetupFormProps {
   settingsSaveRef?: MutableRefObject<SettingsSaveHandle | null>;
   onSettingsSaveStateChange?: (state: SettingsSaveState, message: string) => void;
   onDashboardRefresh?: () => Promise<unknown>;
-  androidPublishState?: SyncState;
-  androidPublishMessage?: string;
   androidDeviceState?: SyncState;
   androidDeviceMessage?: string;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
   onFormChange: (form: SetupFormState) => void;
   onTestAiConnection: () => void;
-  onPublishAndroid?: () => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetAndroidDevicePermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
@@ -97,15 +94,12 @@ export function SetupForm({
   settingsSaveRef,
   onSettingsSaveStateChange,
   onDashboardRefresh,
-  androidPublishState = "idle",
-  androidPublishMessage = "Telefon özeti henüz yayınlanmadı.",
   androidDeviceState = "idle",
   androidDeviceMessage = "Telefon rolleri ve görev alanları masaüstünden yönetilir.",
   aiConnectionTestState,
   aiConnectionTestMessage,
   onFormChange,
   onTestAiConnection,
-  onPublishAndroid,
   onSetAndroidDeviceRole,
   onSetAndroidDevicePermissionGroups,
   onSetAndroidDeviceActive,
@@ -651,9 +645,6 @@ export function SetupForm({
                   enabledCapabilities={enabledCapabilities}
                   state={androidDeviceState}
                   message={androidDeviceMessage}
-                  publishState={androidPublishState}
-                  publishMessage={androidPublishMessage}
-                  onPublish={onPublishAndroid}
                   onSetRole={onSetAndroidDeviceRole}
                   onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
                   onSetActive={onSetAndroidDeviceActive}
@@ -969,9 +960,6 @@ interface AndroidDevicesSectionProps {
   enabledCapabilities: BusinessCapability[];
   state: SyncState;
   message: string;
-  publishState: SyncState;
-  publishMessage: string;
-  onPublish?: () => void;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetPermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetActive?: (deviceId: string, active: boolean) => void;
@@ -984,9 +972,6 @@ function AndroidDevicesSection({
   enabledCapabilities,
   state,
   message,
-  publishState,
-  publishMessage,
-  onPublish,
   onSetRole,
   onSetPermissionGroups,
   onSetActive,
@@ -1018,16 +1003,6 @@ function AndroidDevicesSection({
         </div>
         <div className="android-devices-heading-actions">
           <span>{availableDevices.length} cihaz</span>
-          <ActionButton
-            variant="secondary"
-            className="setup-secondary"
-            type="button"
-            onClick={onPublish}
-            disabled={!onPublish || publishState === "loading"}
-          >
-            <UploadCloud size={15} aria-hidden="true" />
-            {publishState === "loading" ? "Yayınlanıyor" : "Android'e Yayınla"}
-          </ActionButton>
         </div>
       </div>
       <p className="settings-service-note">Rol ve görev alanları yalnız bu bilgisayardan değiştirilebilir.</p>
@@ -1145,7 +1120,6 @@ function AndroidDevicesSection({
         </details>
       )}
       <p className={`menu-status sync-${state}`} role="status" aria-live="polite">{message}</p>
-      <p className={`menu-status sync-${publishState}`} role="status" aria-live="polite">{publishMessage}</p>
     </section>
   );
 }
