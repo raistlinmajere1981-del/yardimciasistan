@@ -395,12 +395,16 @@ export class LocalCompanionServer {
 
       const body = await readJsonBody(request);
       if (url.pathname === LOCAL_COMPANION_ENDPOINTS.summary) {
+        const snapshot = this.options.createSummary(deviceId);
+        const approvalRequired = !snapshot.androidPermissions[deviceId]?.is_active;
         const knownRevision = Math.max(0, Number(body.known_server_revision ?? 0) || 0);
         if (knownRevision > 0 && knownRevision === this.sourceRevision) {
           writeJson(response, 200, {
             ok: true,
-            message: "Android verisi yerel ağda zaten güncel.",
-            approval_required: false,
+            message: approvalRequired
+              ? "Bu cihaz masaüstü onayı bekliyor."
+              : "Android verisi yerel ağda zaten güncel.",
+            approval_required: approvalRequired,
             not_modified: true,
             server_revision: this.sourceRevision,
             pulled_at: new Date().toISOString(),
@@ -409,7 +413,6 @@ export class LocalCompanionServer {
           return;
         }
 
-        const snapshot = this.options.createSummary(deviceId);
         writeJson(response, 200, {
           protocol_version: LOCAL_COMPANION_PROTOCOL_VERSION,
           desktop_id: this.options.desktopId(),
