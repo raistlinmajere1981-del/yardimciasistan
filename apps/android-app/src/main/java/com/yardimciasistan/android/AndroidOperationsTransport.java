@@ -3,6 +3,8 @@ package com.yardimciasistan.android;
 import org.json.JSONObject;
 
 interface AndroidOperationsTransport {
+  String preferredSourceKey(String baseUrl, String credential);
+
   FetchResult fetchOperations(
       String baseUrl,
       String credential,
@@ -24,12 +26,24 @@ interface AndroidOperationsTransport {
     final long serverRevision;
     final OperationData data;
     final JSONObject payload;
+    final String sourceKey;
 
-    FetchResult(boolean notModified, long serverRevision, OperationData data, JSONObject payload) {
+    FetchResult(
+        boolean notModified,
+        long serverRevision,
+        OperationData data,
+        JSONObject payload,
+        String sourceKey
+    ) {
       this.notModified = notModified;
       this.serverRevision = serverRevision;
       this.data = data;
       this.payload = payload;
+      this.sourceKey = sourceKey == null ? "" : sourceKey.trim();
+    }
+
+    FetchResult(boolean notModified, long serverRevision, OperationData data, JSONObject payload) {
+      this(notModified, serverRevision, data, payload, "");
     }
   }
 
@@ -60,7 +74,15 @@ interface AndroidOperationsTransport {
           || "device_approval_required".equals(code)
           || "customer_management_permission_denied".equals(code)
           || "android_action_permission_denied".equals(code)
-          || "android_action_capability_disabled".equals(code);
+          || "android_action_capability_disabled".equals(code)
+          || "local_action_rejected".equals(code);
+    }
+
+    boolean allowsHostingFallback() {
+      return code.isEmpty()
+          || "local_unreachable".equals(code)
+          || "local_auth_required".equals(code)
+          || "local_auth_failed".equals(code);
     }
   }
 }
