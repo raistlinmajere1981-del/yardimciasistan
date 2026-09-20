@@ -78,6 +78,7 @@ try {
   expect(publicBusinessAfterSyncResponse.status).toBe(200);
   const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
   expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu"]);
+  expect(publicBusinessAfterSync.business.ai_enabled).toBe(true);
 
   browser = await launchChromiumForSmoke(chromium);
 
@@ -93,13 +94,15 @@ try {
   await pensionPage.locator('[data-ya-open-date-picker="start_date"]').click();
   await expect(pensionPage.locator("[data-ya-calendar]")).toBeVisible();
   await expect(pensionPage.locator(".ya-widget-calendar-weekdays")).toContainText("Pzt");
-  await expect(pensionPage.locator(".ya-widget-calendar-weekdays")).toContainText("Çar");
-  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Temizle");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Bugün");
-  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("1 gece");
-  await pensionPage.locator(".ya-widget-calendar-days button:not([disabled])").first().click();
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Yarın");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).not.toContainText("1 gün");
+  await pensionPage.locator('[data-ya-calendar-shortcut="today"]').click();
   await pensionPage.locator('[data-ya-open-date-picker="end_date"]').click();
-  await pensionPage.locator(".ya-widget-calendar-days button:not([disabled])").first().click();
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("1 gün");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("2 gün");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).not.toContainText("Bugün");
+  await pensionPage.locator('[data-ya-calendar-shortcut="day1"]').click();
   await expect(pensionPage.locator('input[name="date_text"]')).not.toHaveValue("");
   await pensionPage.close();
 
@@ -161,8 +164,15 @@ try {
 
   await page.locator('.ya-widget-form input[name="customer_name"]').fill("Widget Misafir");
   await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 444 33 22");
-  await page.locator('[data-ya-date-preset="today"]').click();
-  await page.locator('.ya-widget-form input[name="time"]').fill("20:30");
+  await expect(page.locator("[data-ya-date-preset]")).toHaveCount(0);
+  await page.locator('[data-ya-open-date-picker="start_date"]').click();
+  await expect(page.locator(".ya-widget-calendar-shortcuts")).toContainText("Bugün");
+  await expect(page.locator(".ya-widget-calendar-shortcuts")).toContainText("Yarın");
+  await expect(page.locator(".ya-widget-calendar-shortcuts")).not.toContainText("Hafta sonu");
+  await page.locator('[data-ya-calendar-shortcut="today"]').click();
+  await page.locator("[data-ya-time-hour]").selectOption("20");
+  await page.locator("[data-ya-time-minute]").selectOption("30");
+  await expect(page.locator('.ya-widget-form input[name="time"]')).toHaveValue("20:30");
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
 
@@ -229,6 +239,41 @@ try {
   const requests = await pullRequests();
   expect(requests).toHaveLength(1);
   expect(requests[0].id).toBe(requestResult.request_id);
+
+  const aiDisabledPublication = await fetch(`${baseUrl}/api/sync.php`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
+    body: JSON.stringify({
+      action: "publish_android_snapshot",
+      client_id: "desktop-widget-module-smoke",
+      source_revision: 2,
+      idempotency_key: "widget-ai-capability-2",
+      snapshot: {
+        business_capabilities: [
+          "accommodation.rooms",
+          "accommodation.reservations",
+          "food_service.tables",
+          "food_service.reservations",
+          "food_service.menu"
+        ]
+      }
+    })
+  });
+  expect(aiDisabledPublication.status).toBe(200);
+  expect((await aiDisabledPublication.json()).ok).toBe(true);
+
+  const aiDisabledBusinessResponse = await fetch(`${baseUrl}/api/business.php`);
+  expect(aiDisabledBusinessResponse.status).toBe(200);
+  const aiDisabledBusiness = await aiDisabledBusinessResponse.json();
+  expect(aiDisabledBusiness.business.ai_enabled).toBe(false);
+
+  const aiDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await aiDisabledPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await injectWidget(aiDisabledPage, baseUrl);
+  await aiDisabledPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
+  await expect(aiDisabledPage.locator('[data-ya-view="info"]')).toHaveCount(0);
+  await expect(aiDisabledPage.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Yardımcısı");
+  await aiDisabledPage.close();
 
   console.log(`web-widget-module-smoke-ok: ${baseUrl}/widget.js`);
 } catch (error) {
