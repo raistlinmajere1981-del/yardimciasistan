@@ -155,10 +155,9 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
     if ("local_auth_required".equals(error.code)
         || "local_auth_failed".equals(error.code)) {
       ConnectionSettings.clearLocalCredential(preferences);
-      return;
     }
-    if ("local_unreachable".equals(error.code) || error.code.isEmpty()) {
-      ConnectionSettings.clearLocalEndpoint(preferences);
-    }
+    // Temporary reachability failures must not erase the paired desktop
+    // endpoint. Foreground discovery can refresh a changed address while the
+    // router keeps trying the cached endpoint before hosting fallback.
   }
 }
