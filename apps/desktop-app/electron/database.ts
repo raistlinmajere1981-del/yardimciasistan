@@ -442,6 +442,18 @@ export class DesktopDatabase {
     return upsertStoredAndroidDeviceSightings(this.db, sightings);
   }
 
+  registerPendingLocalAndroidDevice(sighting: AndroidDeviceSighting): boolean {
+    return registerStoredPendingLocalAndroidDevice(this.db, sighting);
+  }
+
+  storeAndroidLocalCredential(deviceId: string, token: string): boolean {
+    return storeStoredAndroidLocalCredential(this.db, deviceId, token);
+  }
+
+  authorizeAndroidLocalCredential(deviceId: string, token: string): boolean {
+    return authorizeStoredAndroidLocalCredential(this.db, deviceId, token);
+  }
+
   setAndroidDeviceRole(deviceIdInput: string, roleInput: string): DesktopAndroidDeviceMutationResult {
     return setStoredAndroidDeviceRole(this.db, deviceIdInput, roleInput, new Set(this.getEnabledBusinessCapabilities()));
   }
@@ -2298,6 +2310,12 @@ import {
   resetAndroidDevicePermissions as resetStoredAndroidDevicePermissions,
   revokeAndroidDevice as revokeStoredAndroidDevice,
 } from "./database/android-device-store.js";
+
+import {
+  authorizeAndroidLocalCredential as authorizeStoredAndroidLocalCredential,
+  registerPendingLocalAndroidDevice as registerStoredPendingLocalAndroidDevice,
+  storeAndroidLocalCredential as storeStoredAndroidLocalCredential,
+} from "./database/android-local-credential-store.js";
 
 import {
   getPublishedMenu as getStoredPublishedMenu,
