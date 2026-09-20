@@ -21,6 +21,7 @@ import {
   normalizeAndroidTimestamp,
   parseStoredAndroidPermissionGroups
 } from "./android-utils.js";
+import { revokeAndroidLocalCredential } from "./android-local-credential-store.js";
 
 export function getAndroidDevices(db: DatabaseSync, enabledCapabilities: ReadonlySet<BusinessCapability>): DesktopAndroidDevice[] {
   const rows = db
@@ -227,11 +228,27 @@ export function revokeAndroidDevice(db: DatabaseSync, deviceIdInput: string, ena
   if (!deviceId) {
     return { ok: false, message: "Geçerli bir telefon seçin.", devices: getAndroidDevices(db, enabledCapabilities) };
   }
+
   const now = new Date().toISOString();
-  const result = db
-    .prepare("UPDATE android_devices SET is_active = 0, revoked_at = ?, updated_at = ? WHERE device_id = ?")
-    .run(now, now, deviceId);
-  return Number(result.changes) === 1
-    ? { ok: true, message: "Telefon kaldırıldı ve erişimi kapatıldı.", devices: getAndroidDevices(db, enabledCapabilities) }
-    : { ok: false, message: "Telefon kaydı bulunamadı.", devices: getAndroidDevices(db, enabledCapabilities) };
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = db
+      .prepare("UPDATE android_devices SET is_active = 0, revoked_at = ?, updated_at = ? WHERE device_id = ?")
+      .run(now, now, deviceId);
+    if (Number(result.changes) !== 1) {
+      db.exec("ROLLBACK");
+      return { ok: false, message: "Telefon kaydı bulunamadı.", devices: getAndroidDevices(db, enabledCapabilities) };
+    }
+    revokeAndroidLocalCredential(db, deviceId, now);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return {
+    ok: true,
+    message: "Telefon kaldırıldı ve yerel ağ erişimi kapatıldı.",
+    devices: getAndroidDevices(db, enabledCapabilities)
+  };
 }
