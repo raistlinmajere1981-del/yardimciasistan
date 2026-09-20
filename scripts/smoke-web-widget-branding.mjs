@@ -1,11 +1,12 @@
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const widgetBundlePath = join(repoRoot, "packages", "web-widget", "dist", "widget.js");
 
-const browser = await chromium.launch();
+const browser = await launchChromiumForSmoke(chromium);
 
 try {
   const page = await browser.newPage({ viewport: { width: 420, height: 760 } });
