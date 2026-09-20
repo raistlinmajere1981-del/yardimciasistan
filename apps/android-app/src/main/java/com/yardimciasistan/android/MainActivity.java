@@ -1234,7 +1234,12 @@ public final class MainActivity extends ComponentActivity {
 
   private void showLocalPairingDialog() {
     if (!canUseLocalNetworkDiscovery()) {
-      requestLocalNetworkPermissionIfNeeded();
+      if (Build.VERSION.SDK_INT >= 33) {
+        requestPermissions(
+            new String[] { Manifest.permission.NEARBY_WIFI_DEVICES },
+            LOCAL_NETWORK_PERMISSION_REQUEST_CODE
+        );
+      }
       Toast.makeText(this, "Yerel ağ erişimine izin verip tekrar deneyin.", Toast.LENGTH_SHORT).show();
       return;
     }
