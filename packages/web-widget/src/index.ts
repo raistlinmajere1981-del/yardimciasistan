@@ -142,6 +142,7 @@ let footerAvoidanceBound = false;
 let externalActionBound = false;
 let footerPositionFrame = 0;
 let closeAnimationTimer = 0;
+let panelEntrancePending = false;
 let businessContextLoadId = 0;
 
 export function init(userConfig: Partial<WidgetConfig> = {}) {
@@ -166,6 +167,7 @@ export function init(userConfig: Partial<WidgetConfig> = {}) {
 }
 
 export function open(options: WidgetOpenOptions = {}) {
+  panelEntrancePending = !state.isOpen;
   if (closeAnimationTimer) {
     window.clearTimeout(closeAnimationTimer);
     closeAnimationTimer = 0;
@@ -244,6 +246,7 @@ export function normalizeTRMobilePhone(phone: string): { ok: true; whatsapp: str
 function render() {
   const root = getOrCreateRoot();
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
+  if (state.isOpen) panelEntrancePending = false;
   bindEvents(root);
   ensureFooterAvoidance();
   updateFooterSafePosition();
@@ -267,7 +270,7 @@ function buttonTemplate() {
 
 function panelTemplate() {
   return `
-    <section class="ya-widget-panel" role="dialog" aria-labelledby="ya-widget-title">
+    <section class="ya-widget-panel${panelEntrancePending ? " is-opening" : ""}" role="dialog" aria-labelledby="ya-widget-title">
       <header class="ya-widget-header">
         <div class="ya-widget-identity">
           <span class="ya-widget-avatar">
@@ -1490,6 +1493,9 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       background: #fff9ef;
       box-shadow: 0 28px 80px rgba(23, 32, 51, 0.26), 0 0 0 5px rgba(47, 111, 94, 0.07);
       transform-origin: right bottom;
+    }
+
+    .ya-widget-panel.is-opening {
       animation: ya-widget-panel-in 210ms cubic-bezier(.2,.8,.2,1) both;
     }
 
@@ -2542,7 +2548,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
         transition: none;
       }
 
-      .ya-widget-panel,
+      .ya-widget-panel.is-opening,
       .ya-widget-panel.is-closing,
       .ya-widget-home,
       .ya-widget-subview,
