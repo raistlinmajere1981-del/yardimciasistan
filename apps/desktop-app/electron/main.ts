@@ -1,6 +1,9 @@
 import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
+import { desktopLogError, desktopLogInfo, desktopLogWarn } from "./desktop-logger";
+import { LocalCompanionServer } from "./local-companion-server";
+import { projectLocalAndroidSnapshotForDevice } from "./local-android-device-projection";
 import {
   BUSINESS_CAPABILITIES,
   getOperationalTaskDomain,
@@ -85,6 +88,7 @@ let androidSnapshotPublishPending = true;
 const marketBarcodeFastPullSenders = new Set<number>();
 let appLockService: DesktopAppLockService | null = null;
 let birthdayScheduler: BirthdayScheduler | null = null;
+let localCompanionServer: LocalCompanionServer | null = null;
 const birthdayWebviewDriver = new WhatsAppWebviewDriver();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
@@ -325,6 +329,28 @@ if (!hasSingleInstanceLock) {
       onDashboardChanged: () => notifyDesktopDashboardChanged(getDatabase().getDashboardData()),
       onStatusChanged: notifySyncStatusChanged
     });
+    localCompanionServer = new LocalCompanionServer({
+      desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
+      createSummary: (deviceId) => projectLocalAndroidSnapshotForDevice(
+        createAndroidOperationsSnapshot(getDatabase().getDashboardData()),
+        deviceId
+      ),
+      // Faz 4 local pairing store'u gelene kadar summary/action bilinçli olarak kapalı.
+      authorize: () => false,
+      applyAction: (action) => {
+        const result = getDatabase().applyAndroidAction(action);
+        getDatabase().recordAndroidActionResult(action, result);
+        markLocalCompanionSnapshotDirty();
+        notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+        androidSnapshotPublishPending = true;
+        getSyncCoordinator().scheduleSoon();
+        return result;
+      },
+      logInfo: (message) => desktopLogInfo("local-companion", message),
+      logWarn: (message, error) => desktopLogWarn("local-companion", message, error),
+      logError: (message, error) => desktopLogError("local-companion", message, error)
+    });
+
     const birthdayDeliveryService = new BirthdayDeliveryService(desktopDatabase, birthdayDeliveryAdapter);
     birthdayScheduler = new BirthdayScheduler({
       database: desktopDatabase,
@@ -340,6 +366,9 @@ if (!hasSingleInstanceLock) {
     createMainWindow();
     syncCoordinator.start();
     birthdayScheduler.start();
+    void localCompanionServer.start().catch((error) => {
+      desktopLogError("local-companion", "Local companion server could not start.", error);
+    });
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -404,6 +433,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     syncCoordinator?.stop();
     birthdayScheduler?.stop();
+    void localCompanionServer?.stop();
     desktopDatabase?.close();
     app.quit();
   }
@@ -412,6 +442,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   syncCoordinator?.stop();
   birthdayScheduler?.stop();
+  void localCompanionServer?.stop();
 });
 
 function registerIpcHandlers() {
@@ -625,8 +656,13 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   };
 }
 
+export function markLocalCompanionSnapshotDirty(): number {
+  return localCompanionServer?.markSnapshotDirty() ?? 0;
+}
+
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {
   if (result.ok) {
+    markLocalCompanionSnapshotDirty();
     androidSnapshotPublishPending = true;
     notifyDesktopDashboardChanged(getDatabase().getDashboardData());
     getSyncCoordinator().scheduleSoon();
@@ -636,6 +672,7 @@ function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResul
 
 function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
   if (result.ok) {
+    markLocalCompanionSnapshotDirty();
     androidSnapshotPublishPending = true;
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
@@ -645,6 +682,7 @@ function finalizeDesktopOperationMutation(result: DesktopStatusUpdateResult): De
 
 function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): DesktopStatusUpdateResult {
   if (result.ok) {
+    markLocalCompanionSnapshotDirty();
     androidSnapshotPublishPending = true;
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
@@ -654,6 +692,7 @@ function finalizeDesktopRecordDeletion(result: DesktopStatusUpdateResult): Deskt
 
 function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult): DesktopCustomerMutationResult {
   if (result.ok) {
+    markLocalCompanionSnapshotDirty();
     androidSnapshotPublishPending = true;
     notifyDesktopDashboardChanged(result.dashboardData);
     getSyncCoordinator().scheduleSoon();
@@ -663,6 +702,7 @@ function finalizeDesktopCustomerMutation(result: DesktopCustomerMutationResult):
 
 function finalizeStockImageApply(result: DesktopStockImageApplyResult): DesktopStockImageApplyResult {
   if (result.ok) {
+    markLocalCompanionSnapshotDirty();
     notifyDesktopDashboardChanged(result.dashboardData);
     androidSnapshotPublishPending = true;
     getSyncCoordinator().scheduleSoon();
@@ -779,6 +819,7 @@ async function processAndroidActionQueueOnce(allowPlaceholderSecret: boolean): P
     message: `${summary.applied} telefon işlemi uygulandı, ${summary.failed} işlem uygulanamadı.`
   });
   if (summary.applied > 0 || summary.failed > 0 || androidDevicesChanged > 0) {
+    markLocalCompanionSnapshotDirty();
     notifyDesktopDashboardChanged(getDatabase().getDashboardData());
     androidSnapshotPublishPending = true;
   }
