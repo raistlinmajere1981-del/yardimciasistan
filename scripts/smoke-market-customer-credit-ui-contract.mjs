@@ -6,6 +6,7 @@ import { join } from "node:path";
 import process from "node:process";
 import { DatabaseSync } from "node:sqlite";
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { createServer } from "vite";
 
 const require = createRequire(import.meta.url);
@@ -110,7 +111,7 @@ try {
     } }]
   });
   await server.listen();
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   page = await context.newPage();
   page.setDefaultTimeout(10000);
