@@ -27,6 +27,8 @@ interface RequestPayload {
   customer_phone: string;
   date_text: string;
   start_date: string;
+  end_date: string;
+  time: string;
   guest_count: number;
   message: string;
   source: "web_form";
@@ -158,10 +160,13 @@ export function createWhatsAppLink(phone: string, message: string): string {
 }
 
 export function buildWhatsAppMessage(
-  payload: Pick<RequestPayload, "request_type" | "customer_name" | "customer_phone" | "date_text" | "guest_count" | "message">,
+  payload: Pick<RequestPayload, "request_type" | "customer_name" | "customer_phone" | "date_text" | "guest_count" | "message" | "time">,
   businessName = config.businessName
 ): string {
-  return buildCustomerRequestWhatsAppMessage(payload, businessName);
+  return buildCustomerRequestWhatsAppMessage({
+    ...payload,
+    time_text: payload.time
+  }, businessName);
 }
 
 export function normalizeTRMobilePhone(phone: string): { ok: true; whatsapp: string } | { ok: false; error: string } {
@@ -310,6 +315,9 @@ function formTemplate() {
   const isTableRequest = state.requestType === "restaurant_reservation";
   const requestLabel = isTableRequest ? "Masa talebi" : "Rezervasyon talebi";
   const title = isTableRequest ? "Masa talebinizi hazırlayalım" : "Rezervasyonunuzu hazırlayalım";
+  const scheduleControls = isTableRequest
+    ? restaurantScheduleControlsTemplate()
+    : accommodationScheduleControlsTemplate();
 
   return `
     <div class="ya-widget-subview">
@@ -323,7 +331,7 @@ function formTemplate() {
       </div>
       <form class="ya-widget-form" data-ya-form>
         <input type="hidden" name="request_type" value="${state.requestType}" />
-        ${dateControlsTemplate()}
+        ${scheduleControls}
         <div class="ya-widget-field-grid">
           <label class="ya-widget-field">
             <span>Ad soyad</span>
@@ -349,28 +357,62 @@ function formTemplate() {
   `;
 }
 
-function dateControlsTemplate() {
+function accommodationScheduleControlsTemplate() {
+  const todayIso = toLocalIsoDate(new Date());
+  const tomorrowIso = toLocalIsoDate(addLocalDays(new Date(), 1));
+
+  return `
+    <fieldset class="ya-widget-date-group" data-ya-accommodation-dates>
+      <legend>Konaklama tarihleri</legend>
+      <div class="ya-widget-date-range">
+        ${datePickerControlTemplate("start_date", "Giriş", "Giriş tarihi", todayIso)}
+        ${datePickerControlTemplate("end_date", "Çıkış", "Çıkış tarihi", tomorrowIso)}
+      </div>
+      <input name="date_text" type="hidden" />
+      <p data-ya-selected-date aria-live="polite">Giriş ve çıkış tarihlerini seçin.</p>
+    </fieldset>
+  `;
+}
+
+function restaurantScheduleControlsTemplate() {
   const today = new Date();
   const todayIso = toLocalIsoDate(today);
   const tomorrowIso = toLocalIsoDate(addLocalDays(today, 1));
   const weekendIso = toLocalIsoDate(nextWeekendDate(today));
 
   return `
-    <fieldset class="ya-widget-date-group">
-      <legend>Ne zaman?</legend>
+    <fieldset class="ya-widget-date-group" data-ya-restaurant-date>
+      <legend>Tarih ve saat</legend>
       <div class="ya-widget-date-options">
         <button type="button" data-ya-date-preset="today" data-ya-date-value="${todayIso}" aria-pressed="false">Bugün</button>
         <button type="button" data-ya-date-preset="tomorrow" data-ya-date-value="${tomorrowIso}" aria-pressed="false">Yarın</button>
         <button type="button" data-ya-date-preset="weekend" data-ya-date-value="${weekendIso}" aria-pressed="false">Hafta sonu</button>
-        <label class="ya-widget-date-custom" data-ya-date-custom>
+        <button class="ya-widget-date-custom" type="button" data-ya-open-date-picker="start_date">
           ${iconTemplate("calendar")}
           <span data-ya-custom-date-label>Tarih seç</span>
-          <input name="date_iso" type="date" min="${todayIso}" required aria-label="Tarih seç" />
-        </label>
-        <input name="date_text" type="hidden" />
+        </button>
       </div>
-      <p data-ya-selected-date aria-live="polite">Tarih seçiminizi yukarıdan yapın.</p>
+      <input class="ya-widget-native-date-input" name="start_date" type="date" min="${todayIso}" required aria-label="Rezervasyon tarihi" />
+      <input name="date_text" type="hidden" />
+      <label class="ya-widget-time-field">
+        <span>Saat</span>
+        <input name="time" type="time" required step="900" aria-label="Rezervasyon saati" />
+      </label>
+      <p data-ya-selected-date aria-live="polite">Tarih ve saat seçiminizi yapın.</p>
     </fieldset>
+  `;
+}
+
+function datePickerControlTemplate(name: "start_date" | "end_date", label: string, placeholder: string, min: string) {
+  return `
+    <div class="ya-widget-date-picker" data-ya-date-picker-control="${name}">
+      <span>${label}</span>
+      <button type="button" data-ya-open-date-picker="${name}">
+        ${iconTemplate("calendar")}
+        <strong data-ya-date-label="${name}">${placeholder}</strong>
+      </button>
+      <input class="ya-widget-native-date-input" name="${name}" type="date" min="${min}" required aria-label="${placeholder}" />
+    </div>
   `;
 }
 
@@ -554,29 +596,88 @@ function bindEvents(root: HTMLElement) {
 }
 
 function bindDateControls(root: HTMLElement) {
+  root.querySelectorAll<HTMLButtonElement>("[data-ya-open-date-picker]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const inputName = String(button.dataset.yaOpenDatePicker ?? "");
+      const input = root.querySelector<HTMLInputElement>(`input[name="${inputName}"]`);
+      if (input) openNativeDatePicker(input);
+    });
+  });
+
   root.querySelectorAll<HTMLButtonElement>("[data-ya-date-preset]").forEach((button) => {
     button.addEventListener("click", () => {
       const preset = button.dataset.yaDatePreset as DatePreset;
       const dateValue = String(button.dataset.yaDateValue ?? "");
-      updateDateControls(root, preset, dateValue);
+      updateRestaurantDateControls(root, preset, dateValue);
     });
   });
 
-  root.querySelector<HTMLInputElement>('input[name="date_iso"]')?.addEventListener("change", (event) => {
-    const input = event.currentTarget as HTMLInputElement;
-    updateDateControls(root, "custom", input.value);
+  const startDate = root.querySelector<HTMLInputElement>('input[name="start_date"]');
+  const endDate = root.querySelector<HTMLInputElement>('input[name="end_date"]');
+
+  startDate?.addEventListener("change", () => {
+    if (root.querySelector("[data-ya-accommodation-dates]")) {
+      updateAccommodationDateControls(root);
+    } else {
+      updateRestaurantDateControls(root, "custom", startDate.value);
+    }
   });
+  endDate?.addEventListener("change", () => updateAccommodationDateControls(root));
 }
 
-function updateDateControls(root: HTMLElement, preset: DatePreset, dateValue: string) {
-  const dateInput = root.querySelector<HTMLInputElement>('input[name="date_iso"]');
+function openNativeDatePicker(input: HTMLInputElement) {
+  try {
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+      return;
+    }
+  } catch {
+    // Some browsers require their own native activation path; fall through.
+  }
+  input.focus({ preventScroll: true });
+  input.click();
+}
+
+function updateAccommodationDateControls(root: HTMLElement) {
+  const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
+  const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
   const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
-  const customControl = root.querySelector<HTMLElement>("[data-ya-date-custom]");
-  const customLabel = root.querySelector<HTMLElement>("[data-ya-custom-date-label]");
   const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
-  if (!dateInput || !dateTextInput || !dateValue) {
+  if (!startInput || !endInput || !dateTextInput) return;
+
+  if (startInput.value) {
+    const parsedStart = parseLocalIsoDate(startInput.value);
+    if (parsedStart) {
+      endInput.min = toLocalIsoDate(addLocalDays(parsedStart, 1));
+      if (endInput.value && endInput.value <= startInput.value) {
+        endInput.value = "";
+      }
+    }
+  }
+
+  const startLabel = root.querySelector<HTMLElement>('[data-ya-date-label="start_date"]');
+  const endLabel = root.querySelector<HTMLElement>('[data-ya-date-label="end_date"]');
+  if (startLabel) startLabel.textContent = startInput.value ? formatTurkishCalendarDate(startInput.value) : "Giriş tarihi";
+  if (endLabel) endLabel.textContent = endInput.value ? formatTurkishCalendarDate(endInput.value) : "Çıkış tarihi";
+
+  if (startInput.value && endInput.value) {
+    const dateText = `${formatTurkishCalendarDate(startInput.value)} – ${formatTurkishCalendarDate(endInput.value)}`;
+    dateTextInput.value = dateText;
+    if (selectedDate) selectedDate.textContent = `Konaklama: ${dateText}`;
     return;
   }
+
+  dateTextInput.value = "";
+  if (selectedDate) selectedDate.textContent = "Giriş ve çıkış tarihlerini seçin.";
+}
+
+function updateRestaurantDateControls(root: HTMLElement, preset: DatePreset, dateValue: string) {
+  const dateInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
+  const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
+  const customControl = root.querySelector<HTMLElement>("[data-ya-open-date-picker]");
+  const customLabel = root.querySelector<HTMLElement>("[data-ya-custom-date-label]");
+  const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
+  if (!dateInput || !dateTextInput || !dateValue) return;
 
   const dateText = formatDateForRequest(dateValue, preset);
   dateInput.value = dateValue;
@@ -714,15 +815,18 @@ function handleFormSubmit(event: Event) {
     customer_name: String(formData.get("customer_name") ?? "").trim(),
     customer_phone: customerPhone.trim(),
     date_text: String(formData.get("date_text") ?? "").trim(),
-    start_date: String(formData.get("date_iso") ?? "").trim(),
+    start_date: String(formData.get("start_date") ?? "").trim(),
+    end_date: String(formData.get("end_date") ?? "").trim(),
+    time: String(formData.get("time") ?? "").trim(),
     guest_count: Number(formData.get("guest_count") ?? 1),
     message: String(formData.get("message") ?? "").trim(),
     source: "web_form",
     whatsapp_message: ""
   };
 
-  if (!payload.customer_name || (!payload.date_text && !payload.start_date) || !Number.isFinite(payload.guest_count) || payload.guest_count < 1) {
-    setStatus("Lütfen gerekli alanları kontrol edin.");
+  const scheduleError = validateRequestSchedule(payload);
+  if (!payload.customer_name || scheduleError || !Number.isFinite(payload.guest_count) || payload.guest_count < 1) {
+    setStatus(scheduleError || "Lütfen gerekli alanları kontrol edin.");
     return;
   }
 
@@ -730,6 +834,24 @@ function handleFormSubmit(event: Event) {
   void saveRequest(payload);
   window.open(createWhatsAppLink(config.whatsappPhone, payload.whatsapp_message), "_blank", "noopener,noreferrer");
   setStatus("WhatsApp mesajı hazırlandı. Bilgileri kontrol edip gönder tuşuna basın.");
+}
+
+function validateRequestSchedule(payload: RequestPayload): string {
+  if (payload.request_type === "pension_reservation") {
+    if (!payload.start_date || !payload.end_date) {
+      return "Lütfen giriş ve çıkış tarihlerini seçin.";
+    }
+    if (payload.end_date <= payload.start_date) {
+      return "Çıkış tarihi giriş tarihinden sonra olmalı.";
+    }
+    return "";
+  }
+
+  if (payload.request_type === "restaurant_reservation") {
+    if (!payload.start_date) return "Lütfen rezervasyon tarihini seçin.";
+    if (!payload.time) return "Lütfen rezervasyon saatini seçin.";
+  }
+  return "";
 }
 
 async function saveRequest(payload: RequestPayload) {
@@ -1447,25 +1569,85 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       box-shadow: inset 0 0 0 1px rgba(47, 111, 94, 0.07);
     }
 
-    .ya-widget-date-custom .ya-widget-icon {
+    .ya-widget-date-custom .ya-widget-icon,
+    .ya-widget-date-picker .ya-widget-icon {
       width: 14px !important;
       height: 14px !important;
     }
 
-    .ya-widget-date-custom input {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      padding: 0;
-      border: 0;
-      opacity: 0;
-      cursor: pointer;
+    .ya-widget-date-range {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
     }
 
-    .ya-widget-date-custom:focus-within {
-      outline: 3px solid rgba(255, 184, 146, 0.72);
-      outline-offset: 2px;
+    .ya-widget-date-picker {
+      position: relative;
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .ya-widget-date-picker > span,
+    .ya-widget-time-field > span {
+      color: #5f6872;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .ya-widget-date-picker > button {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      min-height: 44px;
+      padding: 9px 10px;
+      border: 1px solid #dcd7cf;
+      border-radius: 11px;
+      color: #334048;
+      background: rgba(255, 255, 255, 0.94);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .ya-widget-date-picker > button strong {
+      min-width: 0;
+      overflow: hidden;
+      font-size: 11px;
+      font-weight: 800;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ya-widget-native-date-input {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      overflow: hidden;
+      border: 0 !important;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .ya-widget-time-field {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 9px;
+      margin-top: 9px;
+    }
+
+    .ya-widget-time-field input {
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 1px solid #dcd7cf;
+      border-radius: 10px;
+      color: #334048;
+      background: rgba(255, 255, 255, 0.94);
+      font-size: 12px;
+      font-weight: 700;
     }
 
     .ya-widget-date-options > input[type="hidden"] {
@@ -1725,7 +1907,8 @@ function widgetStyles(widgetConfig: WidgetConfig) {
         grid-template-columns: 1fr;
       }
 
-      .ya-widget-date-options {
+      .ya-widget-date-options,
+      .ya-widget-date-range {
         grid-template-columns: 1fr 1fr;
       }
 

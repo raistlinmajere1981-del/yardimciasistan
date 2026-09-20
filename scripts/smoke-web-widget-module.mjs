@@ -73,6 +73,22 @@ try {
   await pensionPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(pensionPage.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
   await expect(pensionPage.locator('[data-ya-request-type="restaurant_reservation"]')).toHaveCount(0);
+  await pensionPage.locator('[data-ya-request-type="pension_reservation"]').click();
+  await expect(pensionPage.locator('input[name="start_date"]')).toHaveAttribute("type", "date");
+  await expect(pensionPage.locator('input[name="end_date"]')).toHaveAttribute("type", "date");
+  await pensionPage.evaluate(() => {
+    const input = document.querySelector('input[name="start_date"]');
+    if (input instanceof HTMLInputElement) {
+      input.showPicker = () => {
+        input.dataset.yaPickerOpened = "1";
+      };
+    }
+  });
+  await pensionPage.locator('[data-ya-open-date-picker="start_date"]').click();
+  await expect(pensionPage.locator('input[name="start_date"]')).toHaveAttribute("data-ya-picker-opened", "1");
+  await pensionPage.locator('input[name="start_date"]').fill("2026-09-25");
+  await pensionPage.locator('input[name="end_date"]').fill("2026-09-27");
+  await expect(pensionPage.locator('input[name="date_text"]')).not.toHaveValue("");
   await pensionPage.close();
 
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -104,6 +120,7 @@ try {
   await page.locator('.ya-widget-form input[name="customer_name"]').fill("Widget Misafir");
   await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 444 33 22");
   await page.locator('[data-ya-date-preset="today"]').click();
+  await page.locator('.ya-widget-form input[name="time"]').fill("20:30");
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
 
@@ -131,6 +148,8 @@ try {
   expect(requestsAfterForm[0].customer_name).toBe("Widget Misafir");
   expect(requestsAfterForm[0].customer_phone).toBe("+905554443322");
   expect(requestsAfterForm[0].date_text).toMatch(/^Bugün, /);
+  expect(requestsAfterForm[0].start_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  expect(requestsAfterForm[0].time).toBe("20:30");
   expect(requestsAfterForm[0].guest_count).toBe(4);
   expect(requestsAfterForm[0].message).toContain("Bahçede sakin");
   expect(requestsAfterForm[0].sync_status).toBe("pending");
@@ -140,6 +159,7 @@ try {
   expect(openedUrl).toContain("https://wa.me/905316969334");
   expect(decodeURIComponent(openedUrl)).toContain("Masa rezervasyonu");
   expect(decodeURIComponent(openedUrl)).toContain("Widget Misafir");
+  expect(decodeURIComponent(openedUrl)).toContain("Saat: 20:30");
 
   const requestsAfterOptionalWhatsApp = await pullRequests();
   expect(requestsAfterOptionalWhatsApp).toHaveLength(1);

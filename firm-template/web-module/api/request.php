@@ -216,15 +216,51 @@ function ya_validate_request_payload(array $payload): array
 
     $dateText = ya_string($payload['date_text'] ?? '');
     $startDate = ya_string($payload['start_date'] ?? '');
-    if ($dateText === '' && $startDate === '') {
+    $endDate = ya_string($payload['end_date'] ?? '');
+    $time = ya_string($payload['time'] ?? '');
+
+    if ($requestType === 'pension_reservation') {
+        if (!ya_is_iso_date($startDate)) {
+            $errors[] = [
+                'field' => 'start_date',
+                'message' => 'Giriş tarihi gerekli ve YYYY-MM-DD biçiminde olmalı.'
+            ];
+        }
+        if (!ya_is_iso_date($endDate)) {
+            $errors[] = [
+                'field' => 'end_date',
+                'message' => 'Çıkış tarihi gerekli ve YYYY-MM-DD biçiminde olmalı.'
+            ];
+        } elseif (ya_is_iso_date($startDate) && $endDate <= $startDate) {
+            $errors[] = [
+                'field' => 'end_date',
+                'message' => 'Çıkış tarihi giriş tarihinden sonra olmalı.'
+            ];
+        }
+    } elseif ($requestType === 'restaurant_reservation') {
+        if (!ya_is_iso_date($startDate)) {
+            $errors[] = [
+                'field' => 'start_date',
+                'message' => 'Rezervasyon tarihi gerekli ve YYYY-MM-DD biçiminde olmalı.'
+            ];
+        }
+        if (!ya_is_time($time)) {
+            $errors[] = [
+                'field' => 'time',
+                'message' => 'Rezervasyon saati HH:MM biçiminde olmalı.'
+            ];
+        }
+    } elseif ($dateText === '' && $startDate === '') {
         $errors[] = [
             'field' => 'date_text',
             'message' => 'Tarih bilgisi gerekli.'
         ];
-    } elseif (strlen($dateText) > 160 || strlen($startDate) > 40) {
+    }
+
+    if (strlen($dateText) > 160 || strlen($startDate) > 40 || strlen($endDate) > 40 || strlen($time) > 20) {
         $errors[] = [
             'field' => 'date_text',
-            'message' => 'Tarih bilgisi çok uzun.'
+            'message' => 'Tarih veya saat bilgisi çok uzun.'
         ];
     }
 
@@ -267,14 +303,28 @@ function ya_build_whatsapp_message(array $businessConfig, array $payload): strin
         'other' => 'Diğer'
     ];
     $requestType = ya_string($payload['request_type'] ?? 'general_info');
+    $startDate = ya_string($payload['start_date'] ?? '');
+    $endDate = ya_string($payload['end_date'] ?? '');
+    $dateText = ya_string($payload['date_text'] ?? '');
+    if ($dateText === '') {
+        $dateText = $startDate;
+        if ($endDate !== '') {
+            $dateText .= ' - ' . $endDate;
+        }
+    }
+
     $lines = [
         'Merhaba, ' . $businessName . ' için talep oluşturmak istiyorum.',
         'Talep türü: ' . ($requestTypeLabels[$requestType] ?? 'Bilgi talebi'),
         'Ad soyad: ' . ya_string($payload['customer_name'] ?? ''),
         'Telefon: ' . ya_string($payload['customer_phone'] ?? ''),
-        'Tarih: ' . (ya_string($payload['date_text'] ?? '') ?: ya_string($payload['start_date'] ?? '')),
-        'Kişi sayısı: ' . ya_int($payload['guest_count'] ?? 1, 1)
+        'Tarih: ' . $dateText
     ];
+    $time = ya_string($payload['time'] ?? '');
+    if ($time !== '') {
+        $lines[] = 'Saat: ' . $time;
+    }
+    $lines[] = 'Kişi sayısı: ' . ya_int($payload['guest_count'] ?? 1, 1);
     $message = ya_string($payload['message'] ?? '');
 
     if ($message !== '') {
@@ -315,6 +365,20 @@ function ya_normalize_tr_phone(string $phone): array
         'e164' => '+90' . $national,
         'whatsapp' => '90' . $national
     ];
+}
+
+function ya_is_iso_date(string $value): bool
+{
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) !== 1) {
+        return false;
+    }
+    $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+    return $date instanceof DateTimeImmutable && $date->format('Y-m-d') === $value;
+}
+
+function ya_is_time(string $value): bool
+{
+    return preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $value) === 1;
 }
 
 function ya_create_id(string $prefix): string

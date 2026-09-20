@@ -12,6 +12,8 @@ interface RequestPayload {
   customer_phone: string;
   date_text: string;
   start_date: string;
+  end_date: string;
+  time: string;
   guest_count: number;
   message: string;
   source: "web_form";
@@ -141,19 +143,25 @@ async function submitRequest(form: HTMLFormElement) {
     customer_name: String(formData.get("customer_name") ?? "").trim(),
     customer_phone: customerPhone,
     date_text: String(formData.get("date_text") ?? "").trim(),
-    start_date: String(formData.get("date_iso") ?? "").trim(),
+    start_date: String(formData.get("start_date") ?? "").trim(),
+    end_date: String(formData.get("end_date") ?? "").trim(),
+    time: String(formData.get("time") ?? "").trim(),
     guest_count: Number(formData.get("guest_count") ?? 1),
     message: String(formData.get("message") ?? "").trim(),
     source: "web_form",
     whatsapp_message: ""
   };
 
-  if (!payload.customer_name || (!payload.date_text && !payload.start_date) || !Number.isFinite(payload.guest_count) || payload.guest_count < 1) {
-    showStatus("Lütfen gerekli alanları kontrol edin.");
+  const scheduleError = validateRequestSchedule(payload);
+  if (!payload.customer_name || scheduleError || !Number.isFinite(payload.guest_count) || payload.guest_count < 1) {
+    showStatus(scheduleError || "Lütfen gerekli alanları kontrol edin.");
     return;
   }
 
-  payload.whatsapp_message = buildCustomerRequestWhatsAppMessage(payload, runtimeConfig.businessName || "İşletme");
+  payload.whatsapp_message = buildCustomerRequestWhatsAppMessage({
+    ...payload,
+    time_text: payload.time
+  }, runtimeConfig.businessName || "İşletme");
   if (!runtimeConfig.apiBaseUrl.trim()) {
     showStatus("Web talep bağlantısı bu sitede etkin değil. İsterseniz WhatsApp üzerinden yazabilirsiniz.");
     showWhatsAppFallback(form, payload.whatsapp_message);
@@ -187,6 +195,22 @@ async function submitRequest(form: HTMLFormElement) {
   } finally {
     submitting = false;
   }
+}
+
+function validateRequestSchedule(payload: RequestPayload): string {
+  if (payload.request_type === "pension_reservation") {
+    if (!payload.start_date || !payload.end_date) {
+      return "Lütfen giriş ve çıkış tarihlerini seçin.";
+    }
+    if (payload.end_date <= payload.start_date) {
+      return "Çıkış tarihi giriş tarihinden sonra olmalı.";
+    }
+    return "";
+  }
+
+  if (!payload.start_date) return "Lütfen rezervasyon tarihini seçin.";
+  if (!payload.time) return "Lütfen rezervasyon saatini seçin.";
+  return "";
 }
 
 function renderSuccess(form: HTMLFormElement, whatsappMessage: string) {
