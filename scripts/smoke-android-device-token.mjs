@@ -10,6 +10,7 @@ import process from "node:process";
 
 const syncSecret = "android-device-token-smoke-secret-12345";
 const deviceId = "android-token-smoke-device";
+const installDeviceId = "android-install-smoke-device";
 const desktopId = "desktop-android-token-smoke";
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-android-token-"));
 const webModuleRoot = join(tempRoot, "web-module");
@@ -60,6 +61,40 @@ try {
     "X-YA-Sync-Secret": syncSecret
   });
   assert.equal(inactivePublication.status, 200);
+
+  const installBootstrapTicket = createInstallBootstrapTicket();
+  const installBootstrap = await postJson(`${baseUrl}/api/android-bootstrap.php`, {
+    bootstrap_ticket: installBootstrapTicket,
+    device_name: "USB Kurulum Telefonu",
+    app_version: "0.1.1"
+  }, {
+    "X-YA-Device-Id": installDeviceId
+  });
+  assert.equal(installBootstrap.status, 201, "USB kurulum ticketı kişisel cihaz tokenı üretmeli.");
+  const installBootstrapBody = await installBootstrap.json();
+  const installDeviceToken = String(installBootstrapBody.device_token ?? "");
+  assert.match(installDeviceToken, /^yat_[a-f0-9]{64}$/);
+  assert.equal(installBootstrapBody.approval_required, true);
+
+  const installPendingSummary = await postJson(`${baseUrl}/api/android.php`, {
+    action: "android_summary",
+    device_id: installDeviceId
+  }, {
+    "X-YA-Device-Id": installDeviceId,
+    "X-YA-Device-Token": installDeviceToken
+  });
+  assert.equal(installPendingSummary.status, 200);
+  assert.equal((await installPendingSummary.json()).approval_required, true);
+
+  const replayedInstallBootstrap = await postJson(`${baseUrl}/api/android-bootstrap.php`, {
+    bootstrap_ticket: installBootstrapTicket,
+    device_name: "USB Kurulum Telefonu",
+    app_version: "0.1.1"
+  }, {
+    "X-YA-Device-Id": installDeviceId
+  });
+  assert.equal(replayedInstallBootstrap.status, 409);
+  assert.equal((await replayedInstallBootstrap.json()).code, "bootstrap_ticket_replayed");
 
   const pendingClaim = await claimToken();
   assert.equal(pendingClaim.status, 403, "Onaysız cihaz token alamamalı.");
@@ -283,6 +318,20 @@ function createSnapshot(isActive, androidEnabled = true, localNetworkEnabled = t
     reports: [],
     updated_at: new Date().toISOString()
   };
+}
+
+function createInstallBootstrapTicket() {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = {
+    v: 1,
+    desktop_id: desktopId,
+    iat: issuedAt,
+    exp: issuedAt + 120,
+    nonce: "abcdef0123456789abcdef0123456789"
+  };
+  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = createHmac("sha256", syncSecret).update(encoded, "utf8").digest("hex");
+  return `yab1.${encoded}.${signature}`;
 }
 
 function assertLocalPairingTicket(body) {
