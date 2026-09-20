@@ -2,6 +2,7 @@ import { createReportFixture, createSetupFixture, createDashboardFixture, create
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { readFileSync } from "node:fs";
 import http from "node:http";
 
@@ -23,7 +24,7 @@ server.stderr.on("data", (chunk) => {
 try {
   await waitForUrl(baseUrl);
 
-  const browser = await chromium.launch();
+  const browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 
   await page.addInitScript(({ setupData, dashboardData, reportData, capabilitySnapshot }) => {
