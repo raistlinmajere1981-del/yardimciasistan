@@ -48,7 +48,7 @@ if (!is_array($decodedBody)) {
     ]);
 }
 $action = trim((string) ($decodedBody['action'] ?? ''));
-if (!in_array($action, ['android_summary', 'enqueue_android_action'], true)) {
+if (!in_array($action, ['android_summary', 'enqueue_android_action', 'local_pairing_ticket'], true)) {
     ya_android_gate_response(403, [
         'ok' => false,
         'code' => 'android_action_scope_denied',
