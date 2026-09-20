@@ -195,6 +195,11 @@ export function DesktopWorkspaceRouter({
   const {
     androidDeviceState,
     androidDeviceMessage,
+    androidInstallState,
+    androidInstallMessage,
+    androidInstallSnapshot,
+    refreshAndroidInstallDevices,
+    handleInstallAndroidApp,
     handleSetAndroidDeviceRole,
     handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
@@ -646,10 +651,15 @@ export function DesktopWorkspaceRouter({
           dashboardData={surfaceData}
           androidDeviceState={androidDeviceState}
           androidDeviceMessage={androidDeviceMessage}
+          androidInstallState={androidInstallState}
+          androidInstallMessage={androidInstallMessage}
+          androidInstallSnapshot={androidInstallSnapshot}
           aiConnectionTestState={aiConnectionTestState}
           aiConnectionTestMessage={aiConnectionTestMessage}
           onFormChange={setSetupForm}
           onTestAiConnection={handleTestAiConnection}
+          onRefreshAndroidInstallDevices={refreshAndroidInstallDevices}
+          onInstallAndroidApp={handleInstallAndroidApp}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
           onSetAndroidDevicePermissionGroups={handleSetAndroidDevicePermissionGroups}
           onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
