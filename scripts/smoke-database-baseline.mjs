@@ -259,6 +259,10 @@ function assertCurrentDatabase(database, options = {}) {
   const businessColumns = tableColumns(database, "business");
   const settingsColumns = tableColumns(database, "settings");
   const productColumns = tableColumns(database, "catalog_products");
+  const localCredentialColumns = tableColumns(database, "android_local_credentials");
+  assert.ok(localCredentialColumns.has("device_id"));
+  assert.ok(localCredentialColumns.has("token_hash"));
+  assert.ok(localCredentialColumns.has("revoked_at"));
   assert.ok(businessColumns.has("profile_id"));
   for (const column of ["business_type", "modules_json"]) {
     assert.equal(businessColumns.has(column), false);
