@@ -23,6 +23,9 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
   @Override
   public String preferredSourceKey(String baseUrl, String credential) {
     String targetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    if (ConnectionSettings.hasHostingActionBarrier(preferences, targetKey)) {
+      return hostingTransport.preferredSourceKey(baseUrl, credential);
+    }
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     return local.isComplete()
@@ -38,6 +41,17 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       long knownServerRevision
   ) throws TransportException {
     String targetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    if (ConnectionSettings.hasHostingActionBarrier(preferences, targetKey)) {
+      FetchResult hostingResult = hostingTransport.fetchOperations(
+          baseUrl,
+          credential,
+          identity,
+          knownServerRevision
+      );
+      clearBarrierWhenHostingDrained(targetKey, hostingResult);
+      return hostingResult;
+    }
+
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     if (local.isComplete()) {
@@ -57,7 +71,9 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
         handleLocalFailure(error);
         // The caller's revision belongs to the local namespace. Never pass it
         // into hosting after failover because equal integers are unrelated.
-        return hostingTransport.fetchOperations(baseUrl, credential, identity, 0L);
+        FetchResult hostingResult = hostingTransport.fetchOperations(baseUrl, credential, identity, 0L);
+        clearBarrierWhenHostingDrained(targetKey, hostingResult);
+        return hostingResult;
       }
     }
 
@@ -79,6 +95,19 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       JSONObject actionPayload
   ) throws TransportException {
     String targetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    if (ConnectionSettings.hasHostingActionBarrier(preferences, targetKey)) {
+      OperationData.ActionRecord accepted = hostingTransport.enqueueAction(
+          baseUrl,
+          credential,
+          identity,
+          actionId,
+          actionType,
+          actionPayload
+      );
+      ConnectionSettings.markHostingActionBarrier(preferences, targetKey);
+      return accepted;
+    }
+
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     if (local.isComplete()) {
@@ -101,7 +130,7 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       }
     }
 
-    return hostingTransport.enqueueAction(
+    OperationData.ActionRecord accepted = hostingTransport.enqueueAction(
         baseUrl,
         credential,
         identity,
@@ -109,6 +138,17 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
         actionType,
         actionPayload
     );
+    ConnectionSettings.markHostingActionBarrier(preferences, targetKey);
+    return accepted;
+  }
+
+  private void clearBarrierWhenHostingDrained(String targetKey, FetchResult result) {
+    int pending = result.data != null
+        ? result.data.pendingActions
+        : Math.max(0, result.payload.optInt("pending_action_count", -1));
+    if (pending == 0) {
+      ConnectionSettings.clearHostingActionBarrier(preferences, targetKey);
+    }
   }
 
   private void handleLocalFailure(TransportException error) {
