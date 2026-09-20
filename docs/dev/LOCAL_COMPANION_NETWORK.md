@@ -92,13 +92,17 @@ remote credential: yat_...
 local credential:  yal_...
 ```
 
-İlk eşleştirme masaüstünün ürettiği kısa ömürlü/tek kullanımlık pairing secret ile
-yapılır. Başarılı eşleştirme sonrasında:
+İlk eşleştirme kullanıcı kodu gerektirmez. Android web kimliğiyle hosting'den
+kısa ömürlü, `desktop_id + device_id` bağlı HMAC imzalı `yalp1...` ticket alır.
+Aynı ağda mDNS ile bulunan masaüstü ticket'ı mevcut işletme sync secret ile doğrular
+ve yalnız o zaman `yal_...` local credential üretir. Başarılı eşleştirme sonrasında:
 
 - telefon `desktop_id` + local credential saklar;
 - masaüstü local credentialın yalnız hash'ini saklar;
+- ticket nonce'u başarılı kullanımda tek kullanımlıdır;
 - istekler kalıcı `device_id` taşır;
 - masaüstü mevcut Android cihaz rolü/aktiflik/izin kontrollerini tekrar kullanır;
+- pairing cihazı otomatik aktif etmez; mevcut cihaz onay sınırı korunur;
 - cihaz revoke edildiğinde local credential da geçersiz kılınır.
 
 Local HTTP ilk geliştirme ve güvenilir işletme LAN'ı için kullanılabilir. Protokol
@@ -182,7 +186,7 @@ kalabilir.
 
 - desktop DNS-SD/mDNS ilanı;
 - Android `NsdManager` discovery;
-- yalnız önceden eşleşmiş `desktop_id` için otomatik local bağlantı;
+- hosting ticket ile doğrulanmış `desktop_id` için otomatik local bağlantı;
 - kısa local timeout sonrası hosting fallback;
 - local ve hosting hata durumlarını kullanıcıya tek bir sync hatası gibi yansıtmama.
 
