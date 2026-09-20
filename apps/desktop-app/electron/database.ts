@@ -293,6 +293,16 @@ export class DesktopDatabase {
         this.db.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run(migration.name, new Date().toISOString());
       }
 
+      const currentBaselineReady = this.db.prepare(`
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = 'android_local_credentials'
+        LIMIT 1
+      `).get();
+      if (!currentBaselineReady) {
+        throw new Error("Veritabanı güncel geliştirme baseline şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
+      }
+
       this.ensureSyncClientId();
       this.db.exec("COMMIT");
     } catch (error) {
