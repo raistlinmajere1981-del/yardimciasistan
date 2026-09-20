@@ -235,7 +235,7 @@ async function assertServer() {
         }
       : {
           ok: false,
-          code: "pairing_secret_invalid",
+          code: "local_pairing_ticket_invalid",
           message: "Invalid.",
           statusCode: 401
         }
