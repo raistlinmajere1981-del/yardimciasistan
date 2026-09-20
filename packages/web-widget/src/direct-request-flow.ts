@@ -18,6 +18,12 @@ interface RequestPayload {
   message: string;
   source: "web_form";
   whatsapp_message: string;
+  context: {
+    resourceType: string;
+    resourceId: string;
+    resourceName: string;
+    sourcePath: string;
+  };
 }
 
 interface RequestApiResponse {
@@ -147,9 +153,19 @@ async function submitRequest(form: HTMLFormElement) {
     end_date: String(formData.get("end_date") ?? "").trim(),
     time: String(formData.get("time") ?? "").trim(),
     guest_count: Number(formData.get("guest_count") ?? 1),
-    message: String(formData.get("message") ?? "").trim(),
+    message: contextualRequestMessage(
+      String(formData.get("message") ?? "").trim(),
+      String(formData.get("context_resource_type") ?? "").trim(),
+      String(formData.get("context_resource_name") ?? "").trim()
+    ),
     source: "web_form",
-    whatsapp_message: ""
+    whatsapp_message: "",
+    context: {
+      resourceType: String(formData.get("context_resource_type") ?? "").trim(),
+      resourceId: String(formData.get("context_resource_id") ?? "").trim(),
+      resourceName: String(formData.get("context_resource_name") ?? "").trim(),
+      sourcePath: String(formData.get("context_source_path") ?? "").trim()
+    }
   };
 
   const scheduleError = validateRequestSchedule(payload);
@@ -195,6 +211,15 @@ async function submitRequest(form: HTMLFormElement) {
   } finally {
     submitting = false;
   }
+}
+
+function contextualRequestMessage(note: string, resourceType: string, resourceName: string): string {
+  if (!resourceName) return note;
+  const label = resourceType === "room" ? "İlgili oda"
+    : resourceType === "table" ? "İlgili masa"
+      : resourceType === "product" ? "İlgili ürün"
+        : "İlgili kayıt";
+  return [`${label}: ${resourceName}`, note].filter(Boolean).join("\n");
 }
 
 function validateRequestSchedule(payload: RequestPayload): string {

@@ -67,6 +67,7 @@ $request = [
     'adult_count' => ya_int($payload['adult_count'] ?? 0, 0),
     'child_count' => ya_int($payload['child_count'] ?? 0, 0),
     'message' => ya_string($payload['message'] ?? ''),
+    'context' => ya_request_context($payload['context'] ?? []),
     'ai_summary' => '',
     'ai_suggested_reply' => '',
     'whatsapp_message' => $whatsappMessage,
@@ -287,6 +288,17 @@ function ya_validate_request_payload(array $payload): array
     }
 
     return $errors;
+}
+
+function ya_request_context(mixed $value): array
+{
+    $context = is_array($value) ? $value : [];
+    return [
+        'resource_type' => substr(ya_string($context['resourceType'] ?? $context['resource_type'] ?? ''), 0, 80),
+        'resource_id' => substr(ya_string($context['resourceId'] ?? $context['resource_id'] ?? ''), 0, 160),
+        'resource_name' => substr(ya_string($context['resourceName'] ?? $context['resource_name'] ?? ''), 0, 240),
+        'source_path' => substr(ya_string($context['sourcePath'] ?? $context['source_path'] ?? ''), 0, 500)
+    ];
 }
 
 function ya_build_whatsapp_message(array $businessConfig, array $payload): string

@@ -47,6 +47,7 @@ ya_business_response(200, [
         'email' => ya_business_string($config['email'] ?? ''),
         'website' => ya_business_string($config['website'] ?? ''),
         'address' => ya_business_string($config['address'] ?? ''),
+        'map_url' => ya_business_string($config['map_url'] ?? ''),
         'primary_color' => ya_business_color($config['primary_color'] ?? '', '#2f6f5e'),
         'accent_color' => ya_business_color($config['accent_color'] ?? '', '#e47863')
     ]

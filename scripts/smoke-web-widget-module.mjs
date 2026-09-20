@@ -88,31 +88,46 @@ try {
   await expect(pensionPage.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
   await expect(pensionPage.locator('[data-ya-request-type="restaurant_reservation"]')).toHaveCount(0);
   await pensionPage.locator('[data-ya-request-type="pension_reservation"]').click();
-  await expect(pensionPage.locator('input[name="start_date"]')).toHaveAttribute("type", "date");
-  await expect(pensionPage.locator('input[name="end_date"]')).toHaveAttribute("type", "date");
-  await pensionPage.evaluate(() => {
-    const input = document.querySelector('input[name="start_date"]');
-    if (input instanceof HTMLInputElement) {
-      input.showPicker = () => {
-        input.dataset.yaPickerOpened = "1";
-      };
-    }
-  });
+  await expect(pensionPage.locator('input[name="start_date"]')).toHaveAttribute("type", "hidden");
+  await expect(pensionPage.locator('input[name="end_date"]')).toHaveAttribute("type", "hidden");
   await pensionPage.locator('[data-ya-open-date-picker="start_date"]').click();
-  await expect(pensionPage.locator('input[name="start_date"]')).toHaveAttribute("data-ya-picker-opened", "1");
-  await pensionPage.evaluate(() => {
-    const start = document.querySelector('input[name="start_date"]');
-    const end = document.querySelector('input[name="end_date"]');
-    if (!(start instanceof HTMLInputElement) || !(end instanceof HTMLInputElement)) {
-      throw new Error("Accommodation date inputs are missing.");
-    }
-    start.value = "2026-09-25";
-    start.dispatchEvent(new Event("change", { bubbles: true }));
-    end.value = "2026-09-27";
-    end.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await expect(pensionPage.locator("[data-ya-calendar]")).toBeVisible();
+  await expect(pensionPage.locator(".ya-widget-calendar-weekdays")).toContainText("Pzt");
+  await expect(pensionPage.locator(".ya-widget-calendar-weekdays")).toContainText("Çar");
+  await pensionPage.locator(".ya-widget-calendar-days button:not([disabled])").first().click();
+  await pensionPage.locator('[data-ya-open-date-picker="end_date"]').click();
+  await pensionPage.locator(".ya-widget-calendar-days button:not([disabled])").first().click();
   await expect(pensionPage.locator('input[name="date_text"]')).not.toHaveValue("");
   await pensionPage.close();
+
+  const contextPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await contextPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await injectWidget(contextPage, baseUrl, { profileId: "pension", connectApi: false });
+  await contextPage.evaluate(() => {
+    const reserve = document.createElement("button");
+    reserve.textContent = "Balkonlu Odayı Ayır";
+    reserve.dataset.yaAction = "accommodation.reserve";
+    reserve.dataset.yaResourceType = "room";
+    reserve.dataset.yaResourceId = "balcony-room";
+    reserve.dataset.yaResourceName = "Balkonlu Oda";
+    document.body.appendChild(reserve);
+    reserve.click();
+  });
+  await expect(contextPage.locator("[data-ya-context-card]")).toContainText("Balkonlu Oda");
+  await expect(contextPage.locator('input[name="context_resource_id"]')).toHaveValue("balcony-room");
+
+  await contextPage.evaluate(() => {
+    const directions = document.createElement("button");
+    directions.textContent = "Yol Tarifi";
+    directions.dataset.yaAction = "directions";
+    directions.dataset.yaAddress = "Cide, Kastamonu";
+    document.body.appendChild(directions);
+    directions.click();
+  });
+  await expect(contextPage.locator(".ya-widget-view-title")).toHaveText("Bize nasıl ulaşabilirsiniz?");
+  await expect(contextPage.locator(".ya-widget-location-card")).toContainText("Cide, Kastamonu");
+  await expect(contextPage.locator('.ya-widget-directions a[target="_blank"]')).toHaveAttribute("href", /google\.com\/maps\/search/);
+  await contextPage.close();
 
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });

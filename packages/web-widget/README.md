@@ -2,7 +2,7 @@
 
 Mevcut web sitelerine tek script ile eklenebilecek Yardımcı Asistan widget'ı burada geliştirilir.
 
-Widget; sağ altta AI asistan başlatıcısı, hızlı aksiyon chipleri, kompakt rezervasyon/masa akışı, öneri sorulu AI bilgi alanı ve isteğe bağlı WhatsApp iletişimi sunar. Tarih seçimi Bugün/Yarın/Hafta sonu seçenekleriyle veya görünür Türkçe tarih üreten native date picker ile yapılır.
+Widget; sağ altta AI asistan başlatıcısı, hızlı aksiyon chipleri, kompakt rezervasyon/masa akışı, öneri sorulu AI bilgi alanı ve isteğe bağlı WhatsApp iletişimi sunar. Tarih seçimi Bugün/Yarın/Hafta sonu seçenekleriyle veya widget'ın kendi Türkçe takvimiyle yapılır; tarayıcının sistem dilindeki native tarih penceresine bağımlı değildir.
 
 Rezervasyon ve masa formlarında ana işlem **Talebi Gönder**'dir. Mini API adresi verildiğinde form `api/request.php` üzerinden doğrudan işletmenin Yardımcı Asistan kaydına gönderilir ve başarılı kayıt sonrasında kullanıcıya net bir onay gösterilir. WhatsApp otomatik açılmaz; isteyen kullanıcı kayıt tamamlandıktan sonra **WhatsApp'tan da yaz** seçeneğini kullanabilir. Web kaydı başarısız olursa form korunur ve WhatsApp yalnız alternatif iletişim yolu olarak sunulur.
 
@@ -49,3 +49,50 @@ Deploy paketi üretirken ayrıca template'i güncellemek gerekmez. `npm run pack
 Widget ana eylemleri işletme profilinden türetilen müşteriye açık yüzeylere göre gösterir. `pension` profilinde oda rezervasyonu görünürken masa rezervasyonu gizlenir; `restaurant` ve `cafe` profillerinde bunun tersi uygulanır; `pension_restaurant` iki alanı birlikte açar. `market` profili ürün/stok bilgi akışına yönelir.
 
 Canlı web modülü kullanıldığında widget `api/business.php` üzerinden `profile_id` ve `public_surfaces` alanlarını okuyarak script üzerindeki ilk ayarı günceller. API kullanmayan statik kurulumlarda `data-profile-id` verilmelidir.
+
+
+## Sayfa bağlamı ve intent API
+
+Site üzerindeki oda, masa, ürün veya iletişim düğmeleri widget'ı doğrudan doğru akışta açabilir.
+
+```html
+<button
+  data-ya-action="accommodation.reserve"
+  data-ya-resource-type="room"
+  data-ya-resource-id="balcony-room"
+  data-ya-resource-name="Balkonlu Oda"
+  data-ya-image-url="/images/rooms/balcony.webp">
+  Rezervasyon Yap
+</button>
+
+<button
+  data-ya-action="accommodation.info"
+  data-ya-resource-type="room"
+  data-ya-resource-id="balcony-room"
+  data-ya-resource-name="Balkonlu Oda">
+  Bu oda hakkında sor
+</button>
+
+<button
+  data-ya-action="directions"
+  data-ya-address="Cide, Kastamonu">
+  Yol tarifi
+</button>
+```
+
+Aynı sözleşme JavaScript üzerinden de kullanılabilir:
+
+```js
+window.YardimciAsistanWidget.open({
+  intent: "accommodation.reserve",
+  context: {
+    resourceType: "room",
+    resourceId: "balcony-room",
+    resourceName: "Balkonlu Oda",
+    imageUrl: "/images/rooms/balcony.webp",
+    sourcePath: "/odalar/balkonlu-oda"
+  }
+});
+```
+
+Desteklenen intent değerleri: `home`, `accommodation.reserve`, `accommodation.info`, `food.reserve`, `info`, `directions`.
