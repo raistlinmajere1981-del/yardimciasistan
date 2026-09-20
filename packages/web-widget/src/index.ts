@@ -473,36 +473,45 @@ function accommodationScheduleControlsTemplate() {
 }
 
 function restaurantScheduleControlsTemplate() {
-  const today = new Date();
-  const todayIso = toLocalIsoDate(today);
-  const tomorrowIso = toLocalIsoDate(addLocalDays(today, 1));
-  const weekendIso = toLocalIsoDate(nextWeekendDate(today));
+  const todayIso = toLocalIsoDate(new Date());
 
   return `
     <fieldset class="ya-widget-date-group" data-ya-restaurant-date>
       <legend>Tarih ve saat</legend>
-      <div class="ya-widget-date-options">
-        <button type="button" data-ya-date-preset="today" data-ya-date-value="${todayIso}" aria-pressed="false">Bugün</button>
-        <button type="button" data-ya-date-preset="tomorrow" data-ya-date-value="${tomorrowIso}" aria-pressed="false">Yarın</button>
-        <button type="button" data-ya-date-preset="weekend" data-ya-date-value="${weekendIso}" aria-pressed="false">Hafta sonu</button>
-        <button class="ya-widget-date-custom" type="button" data-ya-open-date-picker="start_date">
-          ${iconTemplate("calendar")}
-          <span data-ya-custom-date-label>Tarih seç</span>
-        </button>
+      <div class="ya-widget-date-range ya-widget-date-range-single">
+        ${datePickerControlTemplate("start_date", "Tarih", "Tarih seç", todayIso)}
       </div>
-      <input name="start_date" type="hidden" data-ya-date-value-input min="${todayIso}" />
       <input name="date_text" type="hidden" />
       <div class="ya-widget-calendar" data-ya-calendar hidden></div>
-      <label class="ya-widget-time-field">
-        <span>Saat</span>
-        <input name="time" type="time" required step="900" aria-label="Rezervasyon saati" />
-      </label>
+      ${timePickerControlTemplate()}
       <p data-ya-selected-date aria-live="polite">Tarih ve saat seçiminizi yapın.</p>
     </fieldset>
   `;
 }
 
-function datePickerControlTemplate(name: "start_date" | "end_date", label: string, placeholder: string, min: string) {
+function timePickerControlTemplate() {
+  const hours = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+  const minutes = ["00", "15", "30", "45"];
+  return `
+    <div class="ya-widget-time-field">
+      <span>Saat</span>
+      <div class="ya-widget-time-selectors">
+        <select data-ya-time-hour aria-label="Saat">
+          <option value="">Saat</option>
+          ${hours.map((hour) => `<option value="${hour}">${hour}</option>`).join("")}
+        </select>
+        <span aria-hidden="true">:</span>
+        <select data-ya-time-minute aria-label="Dakika">
+          <option value="">Dakika</option>
+          ${minutes.map((minute) => `<option value="${minute}">${minute}</option>`).join("")}
+        </select>
+      </div>
+      <input name="time" type="hidden" />
+    </div>
+  `;
+}
+
+function datePickerControlTemplate(function datePickerControlTemplate(name: "start_date" | "end_date", label: string, placeholder: string, min: string) {
   return `
     <div class="ya-widget-date-picker" data-ya-date-picker-control="${name}">
       <span>${label}</span>
@@ -746,6 +755,7 @@ function bindEvents(root: HTMLElement) {
   });
 
   bindDateControls(root);
+  bindTimeControls(root);
   bindGuestStepper(root);
   bindInfoControls(root);
   bindWhatsAppControls(root);
@@ -766,13 +776,6 @@ function bindEvents(root: HTMLElement) {
 function bindDateControls(root: HTMLElement) {
   root.querySelectorAll<HTMLButtonElement>("[data-ya-open-date-picker]").forEach((button) => {
     button.addEventListener("click", () => openTurkishDatePicker(root, String(button.dataset.yaOpenDatePicker ?? "")));
-  });
-
-  root.querySelectorAll<HTMLButtonElement>("[data-ya-date-preset]").forEach((button) => {
-    button.addEventListener("click", () => {
-      updateRestaurantDateControls(root, button.dataset.yaDatePreset as DatePreset, String(button.dataset.yaDateValue ?? ""));
-      closeTurkishDatePicker(root);
-    });
   });
 
   const calendar = root.querySelector<HTMLElement>("[data-ya-calendar]");
@@ -863,9 +866,11 @@ function renderTurkishCalendar(root: HTMLElement) {
     cells.push(`<button type="button" data-ya-calendar-day="${value}" class="${classes}" ${disabled ? "disabled" : ""} aria-label="${escapeAttribute(formatTurkishCalendarDate(value))}">${day}</button>`);
   }
 
-  const shortcuts = isAccommodation
-    ? [["clear", "Temizle"], ["today", "Bugün"], ["tomorrow", "Yarın"], ["night1", "1 gece"], ["night2", "2 gece"]]
-    : [["clear", "Temizle"], ["today", "Bugün"], ["tomorrow", "Yarın"], ["weekend", "Hafta sonu"]];
+  const shortcuts: Array<[string, string, boolean]> = isAccommodation
+    ? target === "end_date"
+      ? [["day1", "1 gün", !startValue], ["day2", "2 gün", !startValue]]
+      : [["today", "Bugün", false], ["tomorrow", "Yarın", false]]
+    : [["today", "Bugün", false], ["tomorrow", "Yarın", false]];
 
   const previousMonthEnd = toLocalIsoDate(new Date(year, month, 0));
   calendar.innerHTML = `
@@ -875,7 +880,7 @@ function renderTurkishCalendar(root: HTMLElement) {
       <button type="button" data-ya-calendar-shift="1" aria-label="Sonraki ay">${iconTemplate("chevron-right")}</button>
     </div>
     <div class="ya-widget-calendar-shortcuts">
-      ${shortcuts.map(([key, label]) => `<button type="button" data-ya-calendar-shortcut="${key}">${label}</button>`).join("")}
+      ${shortcuts.map(([key, label, disabled]) => `<button type="button" data-ya-calendar-shortcut="${key}" ${disabled ? "disabled" : ""}>${label}</button>`).join("")}
     </div>
     <div class="ya-widget-calendar-weekdays" aria-hidden="true"><span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div>
     <div class="ya-widget-calendar-days">${cells.join("")}</div>
@@ -889,31 +894,19 @@ function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HT
   const isAccommodation = Boolean(root.querySelector("[data-ya-accommodation-dates]"));
   const today = new Date();
 
-  if (shortcut === "clear") {
-    clearCalendarSelection(root, target);
-    closeTurkishDatePicker(root);
-    return;
-  }
-
-  if (shortcut === "night1" || shortcut === "night2") {
-    const nights = shortcut === "night2" ? 2 : 1;
+  if (shortcut === "day1" || shortcut === "day2") {
+    const days = shortcut === "day2" ? 2 : 1;
     const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
     const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
-    if (!isAccommodation || !startInput || !endInput) return;
-    const start = parseLocalIsoDate(startInput.value) ?? today;
-    startInput.value = toLocalIsoDate(start);
-    endInput.value = toLocalIsoDate(addLocalDays(start, nights));
-    startInput.dispatchEvent(new Event("change", { bubbles: true }));
+    const start = startInput ? parseLocalIsoDate(startInput.value) : null;
+    if (!isAccommodation || target !== "end_date" || !startInput || !endInput || !start) return;
+    endInput.value = toLocalIsoDate(addLocalDays(start, days));
     endInput.dispatchEvent(new Event("change", { bubbles: true }));
     closeTurkishDatePicker(root);
     return;
   }
 
-  const chosen = shortcut === "tomorrow"
-    ? addLocalDays(today, 1)
-    : shortcut === "weekend"
-      ? nextWeekendDate(today)
-      : today;
+  const chosen = shortcut === "tomorrow" ? addLocalDays(today, 1) : today;
   const value = toLocalIsoDate(chosen);
   if (input.min && value < input.min) return;
   input.value = value;
@@ -921,35 +914,7 @@ function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HT
   closeTurkishDatePicker(root);
 }
 
-function clearCalendarSelection(root: HTMLElement, target: string) {
-  const input = root.querySelector<HTMLInputElement>(`input[name="${target}"]`);
-  if (input) input.value = "";
-
-  if (root.querySelector("[data-ya-accommodation-dates]")) {
-    const start = root.querySelector<HTMLInputElement>('input[name="start_date"]');
-    const end = root.querySelector<HTMLInputElement>('input[name="end_date"]');
-    if (target === "start_date" && start && end) {
-      start.value = "";
-      end.value = "";
-      end.min = toLocalIsoDate(addLocalDays(new Date(), 1));
-    }
-    updateAccommodationDateControls(root);
-    return;
-  }
-
-  const dateText = root.querySelector<HTMLInputElement>('input[name="date_text"]');
-  const label = root.querySelector<HTMLElement>("[data-ya-custom-date-label]");
-  const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
-  if (dateText) dateText.value = "";
-  if (label) label.textContent = "Tarih seç";
-  if (selectedDate) selectedDate.textContent = "Tarih ve saat seçiminizi yapın.";
-  root.querySelectorAll<HTMLButtonElement>("[data-ya-date-preset]").forEach((button) => {
-    button.classList.remove("is-active");
-    button.setAttribute("aria-pressed", "false");
-  });
-}
-
-function updateAccommodationDateControls(root: HTMLElement) {
+function updateAccommodationDateControls(function updateAccommodationDateControls(root: HTMLElement) {
   const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
   const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
   const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
@@ -994,6 +959,20 @@ function updateRestaurantDateControls(root: HTMLElement, preset: DatePreset, dat
   customControl?.classList.toggle("is-active", preset === "custom");
   if (customLabel) customLabel.textContent = preset === "custom" ? formatTurkishCalendarDate(dateValue) : "Tarih seç";
   if (selectedDate) selectedDate.textContent = `Seçilen tarih: ${dateText}`;
+}
+
+function bindTimeControls(root: HTMLElement) {
+  const hour = root.querySelector<HTMLSelectElement>("[data-ya-time-hour]");
+  const minute = root.querySelector<HTMLSelectElement>("[data-ya-time-minute]");
+  const time = root.querySelector<HTMLInputElement>('input[name="time"]');
+  if (!hour || !minute || !time) return;
+
+  const sync = () => {
+    time.value = hour.value && minute.value ? `${hour.value}:${minute.value}` : "";
+  };
+  hour.addEventListener("change", sync);
+  minute.addEventListener("change", sync);
+  sync();
 }
 
 function bindGuestStepper(root: HTMLElement) {
@@ -1367,6 +1346,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     #${ROOT_ID} button,
     #${ROOT_ID} input,
+    #${ROOT_ID} select,
     #${ROOT_ID} textarea {
       font: inherit;
     }
@@ -1374,6 +1354,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     #${ROOT_ID} button:focus-visible,
     #${ROOT_ID} a:focus-visible,
     #${ROOT_ID} input:focus-visible,
+    #${ROOT_ID} select:focus-visible,
     #${ROOT_ID} textarea:focus-visible {
       outline: 3px solid rgba(255, 184, 146, 0.72);
       outline-offset: 2px;
@@ -2073,6 +2054,10 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       gap: 8px;
     }
 
+    .ya-widget-date-range-single {
+      grid-template-columns: 1fr;
+    }
+
     .ya-widget-date-picker {
       position: relative;
       display: grid;
@@ -2171,7 +2156,8 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     }
 
     .ya-widget-calendar-shortcuts button:first-child { color: #7a6557; background: #fff8ef; }
-    .ya-widget-calendar-shortcuts button:hover { transform: translateY(-1px); border-color: rgba(47, 111, 94, 0.34); }
+    .ya-widget-calendar-shortcuts button:hover:not(:disabled) { transform: translateY(-1px); border-color: rgba(47, 111, 94, 0.34); }
+    .ya-widget-calendar-shortcuts button:disabled { cursor: not-allowed; opacity: .38; }
 
     .ya-widget-calendar-weekdays,
     .ya-widget-calendar-days {
@@ -2218,21 +2204,34 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-time-field {
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: center;
-      gap: 9px;
+      gap: 5px;
       margin-top: 9px;
     }
 
-    .ya-widget-time-field input {
+    .ya-widget-time-selectors {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: 7px;
+    }
+
+    .ya-widget-time-selectors > span {
+      color: #6b727c;
+      font-size: 16px;
+      font-weight: 850;
+    }
+
+    .ya-widget-time-selectors select {
+      width: 100%;
       min-height: 42px;
-      padding: 8px 10px;
+      padding: 8px 30px 8px 10px;
       border: 1px solid #dcd7cf;
       border-radius: 10px;
       color: #334048;
       background: rgba(255, 255, 255, 0.94);
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 750;
+      cursor: pointer;
     }
 
     .ya-widget-date-options > input[type="hidden"] {
