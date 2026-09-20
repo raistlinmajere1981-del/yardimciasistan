@@ -8,6 +8,7 @@ import {
   type LocalCompanionPairingSession
 } from "./local-companion-pairing-service";
 import { projectLocalAndroidSnapshotForDevice } from "./local-android-device-projection";
+import { LocalCompanionMdnsAdvertiser } from "./local-companion-mdns";
 import {
   BUSINESS_CAPABILITIES,
   getOperationalTaskDomain,
@@ -18,6 +19,8 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import {
+  LOCAL_COMPANION_PROTOCOL_VERSION,
+  LOCAL_COMPANION_SERVICE_TYPE,
   markAndroidActionResult,
   pullAndroidActions,
   pushAndroidSnapshot
@@ -94,6 +97,7 @@ let appLockService: DesktopAppLockService | null = null;
 let birthdayScheduler: BirthdayScheduler | null = null;
 let localCompanionServer: LocalCompanionServer | null = null;
 let localCompanionPairingService: LocalCompanionPairingService | null = null;
+let localCompanionMdnsAdvertiser: LocalCompanionMdnsAdvertiser | null = null;
 const birthdayWebviewDriver = new WhatsAppWebviewDriver();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
@@ -405,9 +409,20 @@ if (!hasSingleInstanceLock) {
     createMainWindow();
     syncCoordinator.start();
     birthdayScheduler.start();
-    void localCompanionServer.start().catch((error) => {
-      desktopLogError("local-companion", "Local companion server could not start.", error);
-    });
+    void localCompanionServer.start()
+      .then((address) => {
+        localCompanionMdnsAdvertiser = new LocalCompanionMdnsAdvertiser({
+          desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
+          protocolVersion: LOCAL_COMPANION_PROTOCOL_VERSION,
+          serviceType: LOCAL_COMPANION_SERVICE_TYPE,
+          logInfo: (message) => desktopLogInfo("local-companion-mdns", message),
+          logWarn: (message, error) => desktopLogWarn("local-companion-mdns", message, error)
+        });
+        localCompanionMdnsAdvertiser.start(address.port);
+      })
+      .catch((error) => {
+        desktopLogError("local-companion", "Local companion server could not start.", error);
+      });
 
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
@@ -472,6 +487,7 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     syncCoordinator?.stop();
     birthdayScheduler?.stop();
+    localCompanionMdnsAdvertiser?.stop();
     void localCompanionServer?.stop();
     desktopDatabase?.close();
     app.quit();
@@ -481,6 +497,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   syncCoordinator?.stop();
   birthdayScheduler?.stop();
+  localCompanionMdnsAdvertiser?.stop();
   void localCompanionServer?.stop();
 });
 
