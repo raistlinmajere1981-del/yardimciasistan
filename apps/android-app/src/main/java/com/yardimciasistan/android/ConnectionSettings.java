@@ -12,6 +12,7 @@ final class ConnectionSettings {
   static final String KEY_LOCAL_TARGET_KEY = "local_target_key_v1";
   static final String KEY_LOCAL_LAST_SEEN_AT = "local_last_seen_at_v1";
   static final String KEY_HOSTING_ACTION_BARRIER_TARGET = "hosting_action_barrier_target_v1";
+  static final String KEY_BOOTSTRAP_TICKET = "bootstrap_ticket_v1";
 
   private static final String DEVICE_CREDENTIAL_PREFIX = "device:";
   private static final String KEY_DEBUG_CONNECTION_OVERRIDE_ACTIVE = "debug_connection_override_active";
@@ -72,6 +73,37 @@ final class ConnectionSettings {
       return "";
     }
     return credential.trim().substring(DEVICE_CREDENTIAL_PREFIX.length());
+  }
+
+  static boolean storeBootstrapProvisioning(
+      SharedPreferences preferences,
+      String webModuleUrl,
+      String ticket
+  ) {
+    String normalizedUrl = normalizeWebModuleUrl(webModuleUrl);
+    String normalizedTicket = ticket == null ? "" : ticket.trim();
+    if (normalizedUrl.isEmpty()
+        || !normalizedTicket.matches("^yab1\\.[A-Za-z0-9_-]+\\.[a-f0-9]{64}$")) {
+      return false;
+    }
+    return preferences.edit()
+        .putString(KEY_WEB_MODULE_URL, normalizedUrl)
+        .putString(KEY_BOOTSTRAP_TICKET, normalizedTicket)
+        .remove(KEY_SYNC_SECRET)
+        .commit();
+  }
+
+  static boolean hasPendingBootstrap(SharedPreferences preferences) {
+    return !bootstrapTicket(preferences).isEmpty();
+  }
+
+  static String bootstrapTicket(SharedPreferences preferences) {
+    String value = storedValue(preferences, KEY_BOOTSTRAP_TICKET);
+    return value.matches("^yab1\\.[A-Za-z0-9_-]+\\.[a-f0-9]{64}$") ? value : "";
+  }
+
+  static void clearBootstrapTicket(SharedPreferences preferences) {
+    preferences.edit().remove(KEY_BOOTSTRAP_TICKET).apply();
   }
 
   static boolean storeDeviceToken(SharedPreferences preferences, String token) {
@@ -220,6 +252,14 @@ final class ConnectionSettings {
   private static String normalizeDesktopId(String value) {
     String normalized = value == null ? "" : value.trim();
     return normalized.matches("desktop-[A-Za-z0-9._:-]{8,120}") ? normalized : "";
+  }
+
+  private static String normalizeWebModuleUrl(String value) {
+    String normalized = value == null ? "" : value.trim();
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    return normalized.matches("https?://[^\\s]+") ? normalized : "";
   }
 
   private static String normalizeLocalBaseUrl(String value) {
