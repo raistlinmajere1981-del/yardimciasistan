@@ -16,35 +16,46 @@ final class LocalCompanionPairingClient {
   private static final int CONNECT_TIMEOUT_MS = 1500;
   private static final int READ_TIMEOUT_MS = 3500;
 
-  PairResult pair(
+  PairResult pairWithTicket(
       SharedPreferences preferences,
       DeviceIdentity identity,
       String hostingBaseUrl,
-      String pairingSecret
+      HostingSyncClient.LocalPairingTicketResult ticketResult
   ) throws PairingException {
     String targetKey = CompanionConnectionIdentity.actionTargetKey(hostingBaseUrl);
     if (targetKey.isEmpty()) {
-      throw new PairingException("Web bağlantı hedefi belirlenemedi.");
+      throw new PairingException("Web bağlantı hedefi belirlenemedi.", "local_target_invalid");
     }
 
     ConnectionSettings.LocalConnection discovered = ConnectionSettings.localConnection(preferences);
     if (!discovered.hasEndpoint()) {
       throw new PairingException(
-          "Aynı ağdaki masaüstü henüz bulunamadı. Yerel ağ taramasını yeniden deneyin.",
+          "Aynı ağdaki masaüstü henüz bulunamadı.",
           "local_desktop_not_found"
       );
     }
 
-    String secret = pairingSecret == null ? "" : pairingSecret.trim();
-    if (secret.isEmpty()) {
-      throw new PairingException("Masaüstündeki eşleştirme kodunu girin.");
+    String expectedDesktopId = ticketResult == null ? "" : ticketResult.desktopId;
+    if (expectedDesktopId.isEmpty()) {
+      throw new PairingException("Web modülü yerel masaüstü kimliği vermedi.", "local_desktop_unavailable");
+    }
+    if (!expectedDesktopId.equals(discovered.desktopId)) {
+      if (!discovered.localToken.isEmpty()) {
+        ConnectionSettings.clearLocalConnection(preferences);
+      } else {
+        ConnectionSettings.clearLocalEndpoint(preferences);
+      }
+      throw new PairingException(
+          "Bulunan masaüstü bu işletmenin web kaydıyla eşleşmiyor.",
+          "local_desktop_mismatch"
+      );
     }
 
-    probeStatus(discovered);
+    probeStatus(discovered, expectedDesktopId);
 
     JSONObject request = new JSONObject();
     try {
-      request.put("pairing_secret", secret);
+      request.put("pairing_ticket", ticketResult.ticket);
       request.put("device_id", identity.deviceId);
       request.put("device_name", identity.deviceName);
       request.put("app_version", identity.appVersion);
@@ -55,8 +66,11 @@ final class LocalCompanionPairingClient {
     JSONObject response = post(discovered.baseUrl + LocalCompanionProtocol.PAIR_PATH, request);
     String desktopId = response.optString("desktop_id", "").trim();
     String token = response.optString("local_token", "").trim();
-    if (!desktopId.equals(discovered.desktopId)) {
-      throw new PairingException("Bulunan masaüstü kimliği eşleştirme sırasında değişti.");
+    if (!expectedDesktopId.equals(desktopId)) {
+      throw new PairingException(
+          "Yerel masaüstü kimliği eşleştirme sırasında değişti.",
+          "local_desktop_mismatch"
+      );
     }
     if (!ConnectionSettings.storeLocalPairing(
         preferences,
@@ -71,11 +85,14 @@ final class LocalCompanionPairingClient {
     return new PairResult(
         desktopId,
         response.optBoolean("approval_required", true),
-        response.optString("message", "Telefon yerel ağ için eşleştirildi.").trim()
+        response.optString("message", "Telefon yerel ağa otomatik bağlandı.").trim()
     );
   }
 
-  private static void probeStatus(ConnectionSettings.LocalConnection discovered) throws PairingException {
+  private static void probeStatus(
+      ConnectionSettings.LocalConnection discovered,
+      String expectedDesktopId
+  ) throws PairingException {
     HttpURLConnection connection = null;
     String endpoint = discovered.baseUrl + LocalCompanionProtocol.STATUS_PATH;
     try {
@@ -92,13 +109,19 @@ final class LocalCompanionPairingClient {
       String desktopId = response.optString("desktop_id", "").trim();
       if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
         throw new PairingException(
-            "Masaüstü bulundu ancak yerel HTTP servisi hazır değil: " + discovered.baseUrl,
+            "Masaüstü bulundu ancak yerel HTTP servisi hazır değil.",
             "local_status_failed"
         );
       }
-      if (!desktopId.equals(discovered.desktopId)) {
+      if (!response.optBoolean("local_network_enabled", true)) {
         throw new PairingException(
-            "Bulunan yerel adres farklı bir masaüstüne ait: " + discovered.baseUrl,
+            "Yerel ağ bağlantısı masaüstü ayarlarından kapatılmış.",
+            "local_network_disabled"
+        );
+      }
+      if (!expectedDesktopId.equals(desktopId)) {
+        throw new PairingException(
+            "Bulunan yerel adres farklı bir masaüstüne ait.",
             "local_desktop_mismatch"
         );
       }
@@ -106,7 +129,7 @@ final class LocalCompanionPairingClient {
       throw error;
     } catch (Exception error) {
       throw new PairingException(
-          "Masaüstü bulundu fakat yerel HTTP adresine ulaşılamadı: " + discovered.baseUrl,
+          "Masaüstü bulundu fakat yerel HTTP adresine ulaşılamadı.",
           "local_desktop_unreachable",
           error
       );
@@ -149,7 +172,7 @@ final class LocalCompanionPairingClient {
         String message = response.optString("message", "").trim();
         String code = response.optString("code", "").trim();
         throw new PairingException(
-            message.isEmpty() ? "Yerel eşleştirme başarısız oldu." : message,
+            message.isEmpty() ? "Otomatik yerel eşleştirme başarısız oldu." : message,
             code
         );
       }
@@ -158,7 +181,7 @@ final class LocalCompanionPairingClient {
       throw error;
     } catch (Exception error) {
       throw new PairingException(
-          "Aynı ağdaki masaüstüne eşleştirme için ulaşılamadı: " + endpoint,
+          "Aynı ağdaki masaüstüne otomatik eşleştirme için ulaşılamadı.",
           "local_desktop_unreachable",
           error
       );
