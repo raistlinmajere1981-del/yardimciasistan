@@ -34,3 +34,7 @@ firm-template/web-module/data/ai-settings.local.php
 firm-template/web-module/data/.ai-settings.*
 firm-template/web-module/data/yardimci-asistan.sqlite*
 firm-template/web-module/data/*.legacy-backup-v1
+
+# Generated desktop Android installer resources
+apps/desktop-app/resources/android/*
+!apps/desktop-app/resources/android/.gitkeep
