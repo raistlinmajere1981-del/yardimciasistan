@@ -520,7 +520,7 @@ function ya_storage_publish(
 function ya_storage_get_publication(string $name, array $fallback): array
 {
     $statement = ya_storage_open()->prepare(
-        'SELECT payload_json, source_revision, server_revision, updated_at FROM publications WHERE name = :name'
+        'SELECT payload_json, source_client_id, source_revision, server_revision, updated_at FROM publications WHERE name = :name'
     );
     $statement->execute([':name' => $name]);
     $row = $statement->fetch();
@@ -529,6 +529,7 @@ function ya_storage_get_publication(string $name, array $fallback): array
     }
     $payload = ya_storage_decode($row['payload_json'] ?? '{}', $fallback);
     $payload['_publication'] = [
+        'source_client_id' => ya_storage_string($row['source_client_id'] ?? ''),
         'source_revision' => (int) ($row['source_revision'] ?? 0),
         'server_revision' => (int) ($row['server_revision'] ?? 0),
         'updated_at' => ya_storage_string($row['updated_at'] ?? '')
