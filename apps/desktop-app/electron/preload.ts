@@ -66,6 +66,10 @@ import type {
   GenerateDesktopReportAiResult
 } from "./database";
 import type {
+  DesktopAndroidInstallationSnapshot,
+  DesktopAndroidInstallResult
+} from "./android-installation-service";
+import type {
   DesktopBackupActionResult,
   DesktopBackupCreateResult,
   DesktopBackupListResult,
@@ -181,6 +185,8 @@ export interface DesktopBridge {
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
   resetAndroidDevicePermissions: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
   revokeAndroidDevice: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
+  listAndroidInstallDevices: () => Promise<DesktopAndroidInstallationSnapshot>;
+  installAndroidApp: (serial: string) => Promise<DesktopAndroidInstallResult>;
   createManualRequest: (input: CreateManualRequestInput) => Promise<CreateManualRequestResult>;
   convertRequestToReservation: (requestId: string) => Promise<RequestReservationConversionResult>;
   updateRequestStatus: (input: UpdateRequestStatusInput) => Promise<DesktopStatusUpdateResult>;
@@ -339,6 +345,8 @@ const bridge: DesktopBridge = {
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
   resetAndroidDevicePermissions: (deviceId: string) => ipcRenderer.invoke("androidDevice:resetPermissions", deviceId),
   revokeAndroidDevice: (deviceId: string) => ipcRenderer.invoke("androidDevice:revoke", deviceId),
+  listAndroidInstallDevices: () => ipcRenderer.invoke("androidDevice:listInstallDevices"),
+  installAndroidApp: (serial: string) => ipcRenderer.invoke("androidDevice:install", serial),
   createManualRequest: (input: CreateManualRequestInput) => ipcRenderer.invoke("request:createManual", input),
   convertRequestToReservation: (requestId: string) => ipcRenderer.invoke("request:convertToReservation", requestId),
   updateRequestStatus: (input: UpdateRequestStatusInput) => ipcRenderer.invoke("request:updateStatus", input),
