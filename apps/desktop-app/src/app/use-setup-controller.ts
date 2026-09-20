@@ -146,6 +146,7 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
       webModuleUrl: setupForm.webModuleUrl,
       syncSecret: setupForm.syncSecret,
       autoSyncEnabled: setupForm.autoSyncEnabled,
+      localNetworkEnabled: setupForm.localNetworkEnabled,
       aiEnabled: setupForm.aiEnabled,
       aiProvider: setupForm.aiProvider,
       aiService: setupForm.aiService,
