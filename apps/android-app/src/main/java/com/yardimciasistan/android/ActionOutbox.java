@@ -10,8 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 final class ActionOutbox {
-  private static final String KEY_PENDING_ACTIONS_V1 = "pending_android_actions_v1";
-  private static final String KEY_PENDING_ACTIONS_V2 = "pending_android_actions_v2";
+  private static final String KEY_PENDING_ACTIONS = "pending_android_actions_v2";
 
   private final SharedPreferences preferences;
 
@@ -21,21 +20,17 @@ final class ActionOutbox {
 
   synchronized List<PendingAction> load() throws OutboxException {
     try {
-      if (preferences.contains(KEY_PENDING_ACTIONS_V2)) {
-        return parse(
-            preferences.getString(KEY_PENDING_ACTIONS_V2, "[]"),
-            false
-        );
+      String serialized = preferences.getString(KEY_PENDING_ACTIONS, "[]");
+      JSONArray source = new JSONArray(serialized == null ? "[]" : serialized);
+      ArrayList<PendingAction> actions = new ArrayList<>();
+      for (int index = 0; index < source.length(); index += 1) {
+        JSONObject value = source.optJSONObject(index);
+        if (value == null) {
+          throw new OutboxException("Telefondaki bekleyen işlem kaydı okunamadı.");
+        }
+        actions.add(PendingAction.fromJson(value));
       }
-
-      List<PendingAction> migrated = parse(
-          preferences.getString(KEY_PENDING_ACTIONS_V1, "[]"),
-          true
-      );
-      if (preferences.contains(KEY_PENDING_ACTIONS_V1)) {
-        migrateLegacy(migrated);
-      }
-      return migrated;
+      return actions;
     } catch (OutboxException error) {
       throw error;
     } catch (Exception error) {
@@ -78,43 +73,14 @@ final class ActionOutbox {
     return "android_action_" + UUID.randomUUID().toString().replace("-", "");
   }
 
-  private List<PendingAction> parse(String serialized, boolean legacy) throws OutboxException {
-    JSONArray source = new JSONArray(serialized == null ? "[]" : serialized);
-    ArrayList<PendingAction> actions = new ArrayList<>();
-    for (int index = 0; index < source.length(); index += 1) {
-      JSONObject value = source.optJSONObject(index);
-      if (value == null) {
-        throw new OutboxException("Telefondaki bekleyen işlem kaydı okunamadı.");
-      }
-      actions.add(legacy ? PendingAction.fromLegacyJson(value) : PendingAction.fromJson(value));
-    }
-    return actions;
-  }
-
-  private void migrateLegacy(List<PendingAction> actions) throws OutboxException {
-    JSONArray serialized = serialize(actions);
-    boolean committed = preferences.edit()
-        .putString(KEY_PENDING_ACTIONS_V2, serialized.toString())
-        .remove(KEY_PENDING_ACTIONS_V1)
-        .commit();
-    if (!committed) {
-      throw new OutboxException("Bekleyen telefon işlemleri yeni saklama biçimine taşınamadı.");
-    }
-  }
-
   private void persist(List<PendingAction> actions) throws OutboxException {
-    JSONArray serialized = serialize(actions);
-    if (!preferences.edit().putString(KEY_PENDING_ACTIONS_V2, serialized.toString()).commit()) {
-      throw new OutboxException("Bekleyen işlem telefonda güvenli biçimde saklanamadı.");
-    }
-  }
-
-  private static JSONArray serialize(List<PendingAction> actions) throws OutboxException {
     JSONArray serialized = new JSONArray();
     for (PendingAction action : actions) {
       serialized.put(action.toJson());
     }
-    return serialized;
+    if (!preferences.edit().putString(KEY_PENDING_ACTIONS, serialized.toString()).commit()) {
+      throw new OutboxException("Bekleyen işlem telefonda güvenli biçimde saklanamadı.");
+    }
   }
 
   static final class PendingAction {
@@ -171,24 +137,6 @@ final class ActionOutbox {
         return new PendingAction(id, type, new JSONObject(payload.toString()), targetKey);
       } catch (Exception error) {
         throw new OutboxException("Telefondaki bekleyen işlem kaydı okunamadı.", error);
-      }
-    }
-
-    static PendingAction fromLegacyJson(JSONObject source) throws OutboxException {
-      String id = source.optString("id", "").trim();
-      String type = source.optString("type", "").trim();
-      JSONObject payload = source.optJSONObject("payload");
-      String targetEndpoint = source.optString("target_endpoint", "").trim();
-      String targetFingerprint = source.optString("target_fingerprint", "").trim();
-      String targetKey = CompanionConnectionIdentity.actionTargetKeyFromLegacyEndpoint(targetEndpoint);
-      if (id.isEmpty() || type.isEmpty() || payload == null
-          || targetEndpoint.isEmpty() || targetFingerprint.isEmpty() || targetKey.isEmpty()) {
-        throw new OutboxException("Telefondaki eski bekleyen işlem kaydı eksik.");
-      }
-      try {
-        return new PendingAction(id, type, new JSONObject(payload.toString()), targetKey);
-      } catch (Exception error) {
-        throw new OutboxException("Telefondaki eski bekleyen işlem kaydı okunamadı.", error);
       }
     }
 
