@@ -49,6 +49,10 @@ try {
         ya_sync_android_summary($payload, $businessConfig);
     }
 
+    if ($action === 'local_pairing_ticket') {
+        ya_sync_local_pairing_ticket($payload, $businessConfig);
+    }
+
     if ($action === 'mark_requests_synced') {
         ya_sync_mark_requests_synced($payload);
     }
@@ -115,6 +119,79 @@ function ya_sync_capabilities(): void
         ...ya_storage_capabilities(),
         'server_time' => $now,
         'server_revision' => ya_storage_server_revision()
+    ]);
+}
+
+function ya_sync_local_pairing_ticket(array $payload, array $businessConfig): void
+{
+    $deviceId = ya_sync_string($payload['device_id'] ?? '');
+    if (preg_match('/^[A-Za-z0-9._:-]{6,120}$/', $deviceId) !== 1) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'code' => 'invalid_device_id',
+            'message' => 'Telefon kimliği geçersiz.'
+        ]);
+    }
+
+    $publication = ya_storage_get_publication('android_snapshot', []);
+    if (!ya_android_auth_snapshot_has_capabilities(['service.android'], $publication)) {
+        ya_sync_response(403, [
+            'ok' => false,
+            'code' => 'android_capability_disabled',
+            'message' => 'Android bağlantısı bu işletmede etkin değil.'
+        ]);
+    }
+    if (!ya_sync_bool($publication['local_network_enabled'] ?? true)) {
+        ya_sync_response(403, [
+            'ok' => false,
+            'code' => 'local_network_disabled',
+            'message' => 'Yerel ağ bağlantısı masaüstü ayarlarından kapatılmış.'
+        ]);
+    }
+
+    $metadata = is_array($publication['_publication'] ?? null) ? $publication['_publication'] : [];
+    $desktopId = ya_sync_string($metadata['source_client_id'] ?? '');
+    if (preg_match('/^desktop-[A-Za-z0-9._:-]{8,120}$/', $desktopId) !== 1) {
+        ya_sync_response(409, [
+            'ok' => false,
+            'code' => 'local_desktop_unavailable',
+            'message' => 'Yerel masaüstü kimliği henüz web modülüne yayınlanmadı.'
+        ]);
+    }
+
+    $syncSecret = ya_sync_string($businessConfig['sync_secret'] ?? '');
+    if ($syncSecret === '') {
+        ya_sync_response(503, [
+            'ok' => false,
+            'code' => 'local_pairing_unavailable',
+            'message' => 'Yerel eşleştirme anahtarı hazırlanamadı.'
+        ]);
+    }
+
+    $issuedAt = time();
+    $expiresAt = $issuedAt + 120;
+    $ticketPayload = [
+        'v' => 1,
+        'desktop_id' => $desktopId,
+        'device_id' => $deviceId,
+        'iat' => $issuedAt,
+        'exp' => $expiresAt,
+        'nonce' => bin2hex(random_bytes(16))
+    ];
+    $json = json_encode($ticketPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($json) || $json === '') {
+        throw new RuntimeException('local_pairing_ticket_encode_failed');
+    }
+    $encoded = rtrim(strtr(base64_encode($json), '+/', '-_'), '=');
+    $signature = hash_hmac('sha256', $encoded, $syncSecret);
+    $ticket = 'yalp1.' . $encoded . '.' . $signature;
+
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'Yerel ağ eşleştirme bileti hazırlandı.',
+        'local_pairing_ticket' => $ticket,
+        'desktop_id' => $desktopId,
+        'expires_at' => date(DATE_ATOM, $expiresAt)
     ]);
 }
 
@@ -1411,6 +1488,7 @@ function ya_sync_sanitize_android_snapshot(array $snapshot, string $fallbackTime
         'business_capabilities' => ya_sync_sanitize_business_capabilities(
             $snapshot['business_capabilities'] ?? []
         ),
+        'local_network_enabled' => ya_sync_bool($snapshot['local_network_enabled'] ?? true),
         'summary' => [
             'pending_daily_tasks' => max(0, ya_sync_int($summary['pending_daily_tasks'] ?? 0, 0)),
             'today_tasks' => max(0, ya_sync_int($summary['today_tasks'] ?? 0, 0)),
