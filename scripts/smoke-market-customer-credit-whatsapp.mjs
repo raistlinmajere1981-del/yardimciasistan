@@ -7,6 +7,7 @@ import { runInNewContext } from "node:vm";
 import { DatabaseSync } from "node:sqlite";
 import process from "node:process";
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { createServer } from "vite";
 import { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint, prepareWhatsAppAction } from "@yardimci-asistan/whatsapp-bridge";
 
@@ -106,7 +107,7 @@ try {
       });
     } }] });
   await server.listen();
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 }, permissions: ["clipboard-read", "clipboard-write"] });
   page = await context.newPage();
   page.setDefaultTimeout(10000);
