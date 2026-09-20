@@ -1236,90 +1236,6 @@ public final class MainActivity extends ComponentActivity {
     activeTab = canOpenTab(destination.tab) ? destination.tab : TAB_TODAY;
   }
 
-  private void showLocalPairingDialog() {
-    if (!canUseLocalNetworkDiscovery()) {
-      if (Build.VERSION.SDK_INT >= 33) {
-        requestPermissions(
-            new String[] { Manifest.permission.NEARBY_WIFI_DEVICES },
-            LOCAL_NETWORK_PERMISSION_REQUEST_CODE
-        );
-      }
-      Toast.makeText(this, "Yerel ağ erişimine izin verip tekrar deneyin.", Toast.LENGTH_SHORT).show();
-      return;
-    }
-    if (localCompanionDiscovery != null) {
-      localCompanionDiscovery.start(10_000L);
-    }
-
-    EditText pairingInput = UiKit.input(this, "Masaüstündeki eşleştirme kodu");
-    pairingInput.setSingleLine(true);
-    pairingInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-    pairingInput.setSelectAllOnFocus(true);
-    int horizontal = UiKit.dp(this, 20);
-    FrameLayout wrapper = new FrameLayout(this);
-    wrapper.setPadding(horizontal, UiKit.dp(this, 8), horizontal, 0);
-    wrapper.addView(pairingInput, new FrameLayout.LayoutParams(-1, UiKit.dp(this, 52)));
-
-    new AlertDialog.Builder(this)
-        .setTitle("Yerel Ağ Eşleştir")
-        .setMessage("Masaüstünde Ayarlar → Android → Yerel Eşleştir ile oluşturulan tek kullanımlık kodu girin.")
-        .setView(wrapper)
-        .setNegativeButton("Vazgeç", null)
-        .setPositiveButton("Eşleştir", (dialog, which) ->
-            pairWithLocalDesktop(pairingInput.getText().toString()))
-        .show();
-  }
-
-  private void pairWithLocalDesktop(String pairingSecret) {
-    if (loading) {
-      return;
-    }
-    String hostingBaseUrl = ConnectionSettings.webModuleUrl(preferences);
-    if (hostingBaseUrl.isEmpty()) {
-      showError("Yerel eşleştirme için önce web bağlantı hedefi yapılandırılmalı.");
-      return;
-    }
-
-    loading = true;
-    connectionState = "Yerel masaüstü eşleştiriliyor";
-    clearError();
-    render();
-    executor.execute(() -> {
-      try {
-        LocalCompanionPairingClient.PairResult result = new LocalCompanionPairingClient().pair(
-            preferences,
-            identity,
-            hostingBaseUrl,
-            pairingSecret
-        );
-        runOnUiThread(() -> {
-          loading = false;
-          connectionState = result.approvalRequired
-              ? "Yerel eşleştirme tamamlandı · masaüstü onayı bekleniyor"
-              : "Yerel ağ bağlantısı hazır";
-          clearError();
-          Toast.makeText(
-              this,
-              result.message.isEmpty() ? "Yerel eşleştirme tamamlandı." : result.message,
-              Toast.LENGTH_LONG
-          ).show();
-          render();
-          syncOperations(false);
-        });
-      } catch (LocalCompanionPairingClient.PairingException error) {
-        if ("local_desktop_not_found".equals(error.code) && localCompanionDiscovery != null) {
-          localCompanionDiscovery.start(10_000L);
-        }
-        runOnUiThread(() -> {
-          loading = false;
-          connectionState = "Yerel eşleştirme başarısız";
-          showError(error.getMessage());
-          render();
-        });
-      }
-    });
-  }
-
   private void requestNotificationPermissionIfNeeded() {
     if (Build.VERSION.SDK_INT < 33
         || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -1675,7 +1591,7 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout page = UiKit.column(this);
     boolean androidEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID);
     page.addView(androidEnabled
-        ? screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yerel ağ eşleştirmesi yapılabilir; işletme işlemleri için masaüstünden yeniden etkinleştirilmesi gerekir.", false)
+        ? screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yerel ağ bağlantısı aynı ağda otomatik hazırlanır; işletme işlemleri için masaüstünden yeniden etkinleştirilmesi gerekir.", false)
         : screenIntro("ERİŞİM DURUMU", "Android bağlantısı kapalı", "İşletmenin Android hizmeti kapatıldığı için telefondaki işletme verileri temizlendi.", false));
 
     ConnectionSettings.LocalConnection inactiveLocal = ConnectionSettings.localConnection(preferences);
@@ -1685,8 +1601,8 @@ public final class MainActivity extends ComponentActivity {
       localCard.addView(UiKit.text(
           this,
           inactiveLocal.isComplete()
-              ? "Bu telefon masaüstüyle yerel ağ için eşleştirildi. İşletme işlemleri için cihazı masaüstünden etkinleştirin."
-              : "Bu cihaz pasif olsa da aynı ağdaki masaüstüyle güvenli biçimde eşleştirilebilir.",
+              ? "Bu telefon masaüstüyle yerel ağ için otomatik bağlandı. İşletme işlemleri için cihazı masaüstünden etkinleştirin."
+              : "Masaüstü aynı ağda bulunursa yerel bağlantı otomatik hazırlanır.",
           12,
           UiKit.SECONDARY,
           Typeface.NORMAL
@@ -1697,15 +1613,6 @@ public final class MainActivity extends ComponentActivity {
           inactiveLocal.isComplete() ? "Eşleşti" : (inactiveLocal.hasEndpoint() ? "Masaüstü bulundu" : "Bekliyor"),
           inactiveLocal.isComplete() ? UiKit.SUCCESS : UiKit.MUTED
       ));
-      Button pairButton = UiKit.outlineButton(
-          this,
-          inactiveLocal.isComplete() ? "Yerel Ağı Yeniden Eşleştir" : "Yerel Ağ Eşleştir",
-          view -> showLocalPairingDialog()
-      );
-      LinearLayout.LayoutParams pairParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-      pairParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
-      pairButton.setLayoutParams(pairParams);
-      localCard.addView(pairButton);
       page.addView(localCard);
     }
 
@@ -2765,21 +2672,12 @@ public final class MainActivity extends ComponentActivity {
     localConnectionCard.addView(UiKit.text(
         this,
         localConnection.isComplete()
-            ? "Bu telefon eşleşmiş masaüstünü aynı ağda bulduğunda doğrudan bağlanır."
-            : "Aynı ağdaki masaüstüyle eşleştirildiğinde işlemler önce yerel ağ üzerinden gönderilir.",
+            ? "Aynı ağda masaüstü bulunduğunda yerel bağlantı otomatik kullanılır; ulaşılamazsa web bağlantısına geçilir."
+            : "Yerel bağlantı kullanıcı işlemi gerektirmez. Masaüstü aynı ağda bulunduğunda otomatik hazırlanır.",
         12,
         UiKit.SECONDARY,
         Typeface.NORMAL
     ));
-    Button localPairButton = UiKit.outlineButton(
-        this,
-        localConnection.isComplete() ? "Yerel Ağı Yeniden Eşleştir" : "Yerel Ağ Eşleştir",
-        view -> showLocalPairingDialog()
-    );
-    LinearLayout.LayoutParams localPairParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
-    localPairParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
-    localPairButton.setLayoutParams(localPairParams);
-    localConnectionCard.addView(localPairButton);
     page.addView(localConnectionCard);
 
     page.addView(UiKit.sectionTitle(this, "Bağlantı özeti"));
