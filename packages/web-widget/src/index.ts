@@ -7,7 +7,7 @@ import {
 type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
 type WidgetView = "home" | "form" | "info" | "whatsapp" | "directions";
 type DatePreset = "today" | "tomorrow" | "custom";
-type WidgetIntent = "home" | "accommodation.reserve" | "accommodation.info" | "food.reserve" | "info" | "directions";
+type WidgetIntent = "home" | "accommodation.reserve" | "accommodation.info" | "food.reserve" | "contact.whatsapp" | "info" | "directions";
 
 interface WidgetContext {
   resourceType?: string;
@@ -25,7 +25,7 @@ interface WidgetOpenOptions {
   context?: WidgetContext;
 }
 type BusinessProfileId = "pension_restaurant" | "pension" | "restaurant" | "cafe" | "market";
-type PublicSurface = "accommodation" | "food_service" | "menu" | "catalog" | "directions";
+type PublicSurface = "accommodation" | "food_service" | "menu" | "qr_menu" | "catalog" | "directions";
 
 interface WidgetConfig {
   businessName: string;
@@ -2953,7 +2953,7 @@ function normalizeBusinessProfileId(value: unknown): BusinessProfileId | "" {
 
 function normalizePublicSurfaces(value: unknown): PublicSurface[] {
   if (!Array.isArray(value)) return [];
-  const allowed = new Set<PublicSurface>(["accommodation", "food_service", "menu", "catalog", "directions"]);
+  const allowed = new Set<PublicSurface>(["accommodation", "food_service", "menu", "qr_menu", "catalog", "directions"]);
   return [...new Set(
     value
       .map((item) => String(item ?? "").trim() as PublicSurface)
@@ -2962,9 +2962,9 @@ function normalizePublicSurfaces(value: unknown): PublicSurface[] {
 }
 
 function profilePublicSurfaces(profileId: BusinessProfileId | ""): PublicSurface[] {
-  if (profileId === "pension_restaurant") return ["accommodation", "food_service", "menu", "directions"];
+  if (profileId === "pension_restaurant") return ["accommodation", "food_service", "menu", "qr_menu", "directions"];
   if (profileId === "pension") return ["accommodation", "directions"];
-  if (profileId === "restaurant" || profileId === "cafe") return ["food_service", "menu", "directions"];
+  if (profileId === "restaurant" || profileId === "cafe") return ["food_service", "menu", "qr_menu", "directions"];
   if (profileId === "market") return ["catalog", "directions"];
   return [];
 }
@@ -3080,6 +3080,7 @@ function resolveOpenOptions(options: WidgetOpenOptions): Partial<WidgetState> {
   const context = normalizeWidgetContext(options.context);
   if (intent === "accommodation.reserve") return { view: "form", requestType: "pension_reservation", context, questionDraft: "" };
   if (intent === "food.reserve") return { view: "form", requestType: "restaurant_reservation", context, questionDraft: "" };
+  if (intent === "contact.whatsapp") return { view: "whatsapp", context, questionDraft: "" };
   if (intent === "directions") return { view: "directions", context, questionDraft: context?.question ?? "" };
   if (intent === "accommodation.info" || intent === "info") {
     if (!config.aiEnabled) return { view: "home", context: null, questionDraft: "" };
@@ -3132,7 +3133,7 @@ function ensureExternalActionBinding() {
 
 function normalizeWidgetIntent(value: unknown): WidgetIntent | null {
   const intent = String(value ?? "").trim();
-  return ["home", "accommodation.reserve", "accommodation.info", "food.reserve", "info", "directions"].includes(intent) ? intent as WidgetIntent : null;
+  return ["home", "accommodation.reserve", "accommodation.info", "food.reserve", "contact.whatsapp", "info", "directions"].includes(intent) ? intent as WidgetIntent : null;
 }
 
 function buildMapSearchUrl(address: string): string {
