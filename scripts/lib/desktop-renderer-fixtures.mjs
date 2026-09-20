@@ -115,6 +115,8 @@ function createSetupFixture() {
     address: "",
     webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     syncSecret: "",
+    autoSyncEnabled: true,
+    localNetworkEnabled: true,
     aiEnabled: true,
     aiProvider: "openai_compatible",
     aiService: "openai",
@@ -124,6 +126,13 @@ function createSetupFixture() {
     aiTimeoutSeconds: 30,
     aiApiKeyConfigured: true,
     aiLastPublishedAt: "",
+    aiProfiles: [],
+    productData: {
+      enabled: true,
+      provider: "open_food_facts",
+      autoSearchUnknownBarcode: true,
+      includeImages: true
+    },
     servicePreferences: {
       whatsapp: true,
       android: true
