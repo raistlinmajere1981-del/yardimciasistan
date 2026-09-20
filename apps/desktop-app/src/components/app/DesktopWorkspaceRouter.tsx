@@ -193,11 +193,8 @@ export function DesktopWorkspaceRouter({
     handleUpdateDailyTaskStatus
   } = operationController;
   const {
-    androidPublishState,
-    androidPublishMessage,
     androidDeviceState,
     androidDeviceMessage,
-    handlePublishAndroidSnapshot,
     handleSetAndroidDeviceRole,
     handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
@@ -647,15 +644,12 @@ export function DesktopWorkspaceRouter({
           form={setupForm}
           setupData={setupData}
           dashboardData={surfaceData}
-          androidPublishState={androidPublishState}
-          androidPublishMessage={androidPublishMessage}
           androidDeviceState={androidDeviceState}
           androidDeviceMessage={androidDeviceMessage}
           aiConnectionTestState={aiConnectionTestState}
           aiConnectionTestMessage={aiConnectionTestMessage}
           onFormChange={setSetupForm}
           onTestAiConnection={handleTestAiConnection}
-          onPublishAndroid={handlePublishAndroidSnapshot}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
           onSetAndroidDevicePermissionGroups={handleSetAndroidDevicePermissionGroups}
           onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
