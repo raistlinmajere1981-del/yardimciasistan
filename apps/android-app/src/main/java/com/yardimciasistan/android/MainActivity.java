@@ -1138,7 +1138,7 @@ public final class MainActivity extends ComponentActivity {
         && !extraUrl.trim().isEmpty() && !extraSecret.trim().isEmpty()) {
       try {
         for (ActionOutbox.PendingAction pending : actionOutbox.load()) {
-          if (!pending.matchesTarget(extraUrl.trim(), extraSecret.trim())) {
+          if (!pending.matchesTarget(CompanionConnectionIdentity.actionTargetKey(extraUrl.trim()))) {
             connectionState = "Önceki bağlantıya ait bekleyen işlem korunuyor";
             return;
           }
@@ -4751,11 +4751,18 @@ public final class MainActivity extends ComponentActivity {
       return;
     }
 
+    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    final String sourceKey = CompanionConnectionIdentity.hostingSourceKey(baseUrl);
+    if (actionTargetKey.isEmpty() || sourceKey.isEmpty()) {
+      showError("Bağlantı hedefi doğrulanamadı.");
+      return;
+    }
+
     final List<ActionOutbox.PendingAction> pendingToRetry;
     try {
       pendingToRetry = actionOutbox.load();
       for (ActionOutbox.PendingAction pending : pendingToRetry) {
-        if (!pending.matchesTarget(baseUrl, syncSecret)) {
+        if (!pending.matchesTarget(actionTargetKey)) {
           showError("Telefonda önceki bağlantıya ait bekleyen işlem var. Önce eski bağlantı bilgileriyle işlemi gönderin.");
           return;
         }
@@ -4797,10 +4804,10 @@ public final class MainActivity extends ComponentActivity {
             }
           }
         }
-        AndroidOperationsTransport.FetchResult fetched = operationsTransport.fetchOperations(baseUrl, syncSecret, identity, fallbackData.serverRevision);
+        AndroidOperationsTransport.FetchResult fetched = operationsTransport.fetchOperations(baseUrl, syncSecret, identity, operationCache.revision(sourceKey));
         final OperationData nextData;
         if (!fetched.notModified && fetched.data != null) {
-          operationCache.save(fetched.payload);
+          operationCache.save(fetched.payload, sourceKey, fetched.serverRevision);
           OperationData cachedData = operationCache.load();
           nextData = cachedData == null ? fetched.data : cachedData;
         } else {
@@ -4919,10 +4926,15 @@ public final class MainActivity extends ComponentActivity {
       showError("Barkod gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
       return false;
     }
+    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    if (actionTargetKey.isEmpty()) {
+      showError("Barkod gönderim hedefi doğrulanamadı.");
+      return false;
+    }
 
     try {
       for (ActionOutbox.PendingAction existing : actionOutbox.load()) {
-        if (!existing.matchesTarget(baseUrl, syncSecret)) {
+        if (!existing.matchesTarget(actionTargetKey)) {
           showError("Telefonda önceki bağlantıya ait bekleyen işlem var.");
           return false;
         }
@@ -4938,8 +4950,7 @@ public final class MainActivity extends ComponentActivity {
           ActionOutbox.createActionId(),
           MarketUiRules.ACTION_BARCODE_SCAN,
           actionPayload,
-          baseUrl,
-          syncSecret
+          actionTargetKey
       );
       ArrayList<ActionOutbox.PendingAction> additions = new ArrayList<>();
       additions.add(pending);
@@ -5034,6 +5045,11 @@ public final class MainActivity extends ComponentActivity {
       showError("İşlem gönderilemedi. Ayarlar'dan bağlantıyı tamamlayın.");
       return false;
     }
+    final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
+    if (actionTargetKey.isEmpty()) {
+      showError("İşlem hedefi doğrulanamadı.");
+      return false;
+    }
 
     try {
       if (!actionOutbox.load().isEmpty()) {
@@ -5058,8 +5074,7 @@ public final class MainActivity extends ComponentActivity {
             action.id,
             action.type,
             action.payload,
-            baseUrl,
-            syncSecret
+            actionTargetKey
         ));
       }
       actionOutbox.appendAll(pendingActions);
