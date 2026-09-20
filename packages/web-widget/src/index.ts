@@ -7,6 +7,8 @@ import {
 type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
 type WidgetView = "home" | "form" | "info" | "whatsapp";
 type DatePreset = "today" | "tomorrow" | "weekend" | "custom";
+type BusinessProfileId = "pension_restaurant" | "pension" | "restaurant" | "cafe" | "market";
+type PublicSurface = "accommodation" | "food_service" | "menu" | "catalog" | "directions";
 
 interface WidgetConfig {
   businessName: string;
@@ -15,6 +17,8 @@ interface WidgetConfig {
   logoUrl: string;
   primaryColor: string;
   accentColor: string;
+  profileId: BusinessProfileId | "";
+  publicSurfaces: PublicSurface[];
 }
 
 interface RequestPayload {
@@ -56,6 +60,18 @@ interface AiChatResponse {
   error?: AiErrorDetail | null;
 }
 
+interface PublicBusinessApiResponse {
+  ok?: boolean;
+  business?: {
+    display_name?: string;
+    whatsapp?: string;
+    profile_id?: string;
+    primary_color?: string;
+    accent_color?: string;
+    public_surfaces?: unknown[];
+  };
+}
+
 declare global {
   interface Window {
     YardimciAsistanWidget?: {
@@ -75,7 +91,9 @@ const defaultConfig: WidgetConfig = {
   apiBaseUrl: "",
   logoUrl: "",
   primaryColor: "#2F6F5E",
-  accentColor: "#E47863"
+  accentColor: "#E47863",
+  profileId: "",
+  publicSurfaces: []
 };
 
 const initialScriptConfig = getScriptConfig();
@@ -94,17 +112,26 @@ let state: WidgetState = {
 };
 let footerAvoidanceBound = false;
 let footerPositionFrame = 0;
+let businessContextLoadId = 0;
 
 export function init(userConfig: Partial<WidgetConfig> = {}) {
-  config = {
+  const mergedConfig = {
     ...defaultConfig,
     ...initialScriptConfig,
     ...getScriptConfig(),
     ...userConfig
   };
 
+  config = {
+    ...mergedConfig,
+    profileId: normalizeBusinessProfileId(mergedConfig.profileId),
+    publicSurfaces: normalizePublicSurfaces(mergedConfig.publicSurfaces)
+  };
+
   injectStyles(config);
   render();
+  const loadId = ++businessContextLoadId;
+  void hydrateBusinessContext(loadId);
 }
 
 export function open() {
@@ -187,7 +214,7 @@ function panelTemplate() {
           </span>
           <span class="ya-widget-title-copy">
             <strong id="ya-widget-title">${escapeHtml(getAssistantTitle())}</strong>
-            <small>Rezervasyon, masa ve bilgi taleplerinizi hızlıca hazırlayayım.</small>
+            <small>${escapeHtml(getAssistantSubtitle())}</small>
           </span>
         </div>
         <button class="ya-widget-close" type="button" data-ya-close aria-label="Asistanı kapat">
@@ -214,6 +241,50 @@ function brandMarkTemplate() {
 }
 
 function homeTemplate() {
+  const surfaces = currentPublicSurfaces();
+  const actions: string[] = [];
+
+  if (surfaces.has("accommodation")) {
+    actions.push(`
+      <button type="button" data-ya-request-type="pension_reservation">
+        ${iconTemplate("calendar")}
+        <span>Rezervasyon yap</span>
+      </button>
+    `);
+  }
+  if (surfaces.has("food_service")) {
+    actions.push(`
+      <button type="button" data-ya-request-type="restaurant_reservation">
+        ${iconTemplate("table")}
+        <span>Masa sor</span>
+      </button>
+    `);
+  }
+  if (surfaces.has("catalog")) {
+    actions.push(`
+      <button type="button" data-ya-view="info">
+        ${iconTemplate("help")}
+        <span>Ürün / stok sor</span>
+      </button>
+    `);
+  }
+
+  actions.push(`
+    <button type="button" data-ya-view="info">
+      ${iconTemplate("help")}
+      <span>Bilgi al</span>
+    </button>
+  `);
+
+  if (config.whatsappPhone.trim()) {
+    actions.push(`
+      <button type="button" data-ya-view="whatsapp">
+        ${iconTemplate("whatsapp")}
+        <span>WhatsApp mesajı hazırla</span>
+      </button>
+    `);
+  }
+
   return `
     <div class="ya-widget-home">
       <div class="ya-widget-welcome">
@@ -225,22 +296,7 @@ function homeTemplate() {
         </div>
       </div>
       <div class="ya-widget-actions" role="group" aria-label="Hızlı asistan seçenekleri">
-        <button type="button" data-ya-request-type="pension_reservation">
-          ${iconTemplate("calendar")}
-          <span>Rezervasyon yap</span>
-        </button>
-        <button type="button" data-ya-request-type="restaurant_reservation">
-          ${iconTemplate("table")}
-          <span>Masa sor</span>
-        </button>
-        <button type="button" data-ya-view="info">
-          ${iconTemplate("help")}
-          <span>Bilgi al</span>
-        </button>
-        <button type="button" data-ya-view="whatsapp">
-          ${iconTemplate("whatsapp")}
-          <span>WhatsApp mesajı hazırla</span>
-        </button>
+        ${actions.join("")}
       </div>
       <p class="ya-widget-trust">
         ${iconTemplate("shield")}
@@ -332,7 +388,7 @@ function guestStepperTemplate() {
 }
 
 function infoTemplate() {
-  const suggestions = ["Oda fiyatları", "Kahvaltı saatleri", "Konum", "Masa var mı?", "Çocuk uygun mu?"];
+  const suggestions = getInfoSuggestions();
 
   return `
     <div class="ya-widget-subview ya-widget-info">
@@ -364,10 +420,12 @@ function infoTemplate() {
             ${iconTemplate("sparkles")}
             <span>${state.aiLoading ? "Yanıt hazırlanıyor" : "AI Yardımcıya Sor"}</span>
           </button>
-          <button class="ya-widget-secondary-action" type="button" data-ya-ai-whatsapp>
-            ${iconTemplate("whatsapp")}
-            <span>WhatsApp'tan Yaz</span>
-          </button>
+          ${config.whatsappPhone.trim()
+            ? `<button class="ya-widget-secondary-action" type="button" data-ya-ai-whatsapp>
+                ${iconTemplate("whatsapp")}
+                <span>WhatsApp'tan Yaz</span>
+              </button>`
+            : ""}
         </div>
       </form>
       ${
@@ -384,24 +442,7 @@ function infoTemplate() {
 }
 
 function whatsappTemplate() {
-  const topics = [
-    {
-      key: "reservation",
-      label: "Rezervasyon soracağım",
-      message: `Merhaba, ${config.businessName} için oda müsaitliği ve rezervasyon hakkında bilgi almak istiyorum.`
-    },
-    {
-      key: "table",
-      label: "Masa soracağım",
-      message: `Merhaba, ${config.businessName} için masa müsaitliği hakkında bilgi almak istiyorum.`
-    },
-    {
-      key: "menu",
-      label: "Menü hakkında soracağım",
-      message: `Merhaba, ${config.businessName} menüsü hakkında bilgi almak istiyorum.`
-    },
-    { key: "custom", label: "Kendi mesajımı yazacağım", message: "" }
-  ];
+  const topics = getWhatsAppTopics();
 
   return `
     <div class="ya-widget-subview ya-widget-whatsapp-view">
@@ -479,10 +520,15 @@ function bindEvents(root: HTMLElement) {
 
   root.querySelectorAll<HTMLElement>("[data-ya-request-type]").forEach((button) => {
     button.addEventListener("click", () => {
+      const requestType = button.dataset.yaRequestType as RequestType;
+      if (!isRequestTypeEnabled(requestType)) {
+        setStatus("Bu işlem işletmenin etkin web seçeneklerinde kullanılamıyor.");
+        return;
+      }
       state = {
         ...state,
         view: "form",
-        requestType: button.dataset.yaRequestType as RequestType,
+        requestType,
         status: ""
       };
       render();
@@ -649,6 +695,10 @@ function bindWhatsAppControls(root: HTMLElement) {
 function handleFormSubmit(event: Event) {
   event.preventDefault();
   const form = event.currentTarget as HTMLFormElement;
+  if (!isRequestTypeEnabled(state.requestType)) {
+    setStatus("Bu işlem işletmenin etkin web seçeneklerinde kullanılamıyor.");
+    return;
+  }
   const formData = new FormData(form);
   const customerPhone = String(formData.get("customer_phone") ?? "");
   const normalizedPhone = normalizeTRMobilePhone(customerPhone);
@@ -794,6 +844,23 @@ function formatAiError(error?: AiErrorDetail | null, fallbackMessage = ""): stri
   const retryText = error?.retryable === true ? " Biraz sonra yeniden deneyebilirsiniz." : "";
 
   return `${message} Hata kodu: ${code}${statusText}.${retryText}`;
+}
+
+function getAssistantSubtitle() {
+  const surfaces = currentPublicSurfaces();
+  if (surfaces.has("accommodation") && surfaces.has("food_service")) {
+    return "Rezervasyon, masa ve bilgi taleplerinizi hızlıca hazırlayayım.";
+  }
+  if (surfaces.has("accommodation")) {
+    return "Oda, rezervasyon ve konaklama sorularınızda yardımcı olayım.";
+  }
+  if (surfaces.has("food_service")) {
+    return "Masa, menü ve restoran sorularınızda yardımcı olayım.";
+  }
+  if (surfaces.has("catalog")) {
+    return "Ürün, stok ve işletme bilgileri için yardımcı olayım.";
+  }
+  return "İşletme hakkında bilgi ve iletişim taleplerinizde yardımcı olayım.";
 }
 
 function getAssistantTitle() {
@@ -1718,8 +1785,7 @@ function iconTemplate(name: IconName, className = "") {
 function getScriptConfig(): Partial<WidgetConfig> {
   const script = document.currentScript as HTMLScriptElement | null;
   const dataset = script?.dataset ?? {};
-
-  return removeEmptyValues({
+  const scriptConfig = removeEmptyValues({
     businessName: dataset.businessName,
     whatsappPhone: dataset.whatsappPhone,
     apiBaseUrl: dataset.apiBaseUrl,
@@ -1727,10 +1793,143 @@ function getScriptConfig(): Partial<WidgetConfig> {
     primaryColor: dataset.primaryColor,
     accentColor: dataset.accentColor
   });
+  const profileId = normalizeBusinessProfileId(dataset.profileId);
+  if (profileId) {
+    scriptConfig.profileId = profileId;
+  }
+  return scriptConfig;
 }
 
 function removeEmptyValues(values: Partial<WidgetConfig>): Partial<WidgetConfig> {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => typeof value === "string" && value.length > 0)) as Partial<WidgetConfig>;
+}
+
+function normalizeBusinessProfileId(value: unknown): BusinessProfileId | "" {
+  const profileId = String(value ?? "").trim();
+  return ["pension_restaurant", "pension", "restaurant", "cafe", "market"].includes(profileId)
+    ? profileId as BusinessProfileId
+    : "";
+}
+
+function normalizePublicSurfaces(value: unknown): PublicSurface[] {
+  if (!Array.isArray(value)) return [];
+  const allowed = new Set<PublicSurface>(["accommodation", "food_service", "menu", "catalog", "directions"]);
+  return [...new Set(
+    value
+      .map((item) => String(item ?? "").trim() as PublicSurface)
+      .filter((item) => allowed.has(item))
+  )];
+}
+
+function profilePublicSurfaces(profileId: BusinessProfileId | ""): PublicSurface[] {
+  if (profileId === "pension_restaurant") return ["accommodation", "food_service", "menu", "directions"];
+  if (profileId === "pension") return ["accommodation", "directions"];
+  if (profileId === "restaurant" || profileId === "cafe") return ["food_service", "menu", "directions"];
+  if (profileId === "market") return ["catalog", "directions"];
+  return [];
+}
+
+function currentPublicSurfaces(): ReadonlySet<PublicSurface> {
+  const configured = normalizePublicSurfaces(config.publicSurfaces);
+  return new Set(configured.length > 0 ? configured : profilePublicSurfaces(config.profileId));
+}
+
+function isRequestTypeEnabled(requestType: RequestType): boolean {
+  const surfaces = currentPublicSurfaces();
+  if (requestType === "pension_reservation") return surfaces.has("accommodation");
+  if (requestType === "restaurant_reservation") return surfaces.has("food_service");
+  return true;
+}
+
+function getInfoSuggestions(): string[] {
+  const surfaces = currentPublicSurfaces();
+  const suggestions: string[] = [];
+  if (surfaces.has("accommodation")) {
+    suggestions.push("Oda fiyatları", "Oda müsaitliği", "Kahvaltı saatleri");
+  }
+  if (surfaces.has("food_service")) {
+    suggestions.push("Masa var mı?", "Menü hakkında bilgi", "Çocuklar için uygun mu?");
+  }
+  if (surfaces.has("catalog")) {
+    suggestions.push("Ürün stokta mı?", "Ürün fiyatı", "Çalışma saatleri");
+  }
+  if (surfaces.has("directions")) {
+    suggestions.push("Konum ve yol tarifi");
+  }
+  if (suggestions.length === 0) {
+    suggestions.push("Çalışma saatleri", "İletişim", "Konum");
+  }
+  return [...new Set(suggestions)].slice(0, 6);
+}
+
+function getWhatsAppTopics() {
+  const surfaces = currentPublicSurfaces();
+  const topics: Array<{ key: string; label: string; message: string }> = [];
+  if (surfaces.has("accommodation")) {
+    topics.push({
+      key: "reservation",
+      label: "Rezervasyon soracağım",
+      message: `Merhaba, ${config.businessName} için oda müsaitliği ve rezervasyon hakkında bilgi almak istiyorum.`
+    });
+  }
+  if (surfaces.has("food_service")) {
+    topics.push({
+      key: "table",
+      label: "Masa soracağım",
+      message: `Merhaba, ${config.businessName} için masa müsaitliği hakkında bilgi almak istiyorum.`
+    });
+  }
+  if (surfaces.has("menu")) {
+    topics.push({
+      key: "menu",
+      label: "Menü hakkında soracağım",
+      message: `Merhaba, ${config.businessName} menüsü hakkında bilgi almak istiyorum.`
+    });
+  }
+  if (surfaces.has("catalog")) {
+    topics.push({
+      key: "product",
+      label: "Ürün / stok soracağım",
+      message: `Merhaba, ${config.businessName} için ürün ve stok bilgisi almak istiyorum.`
+    });
+  }
+  topics.push({ key: "custom", label: "Kendi mesajımı yazacağım", message: "" });
+  return topics;
+}
+
+async function hydrateBusinessContext(loadId: number) {
+  const apiBaseUrl = config.apiBaseUrl.trim().replace(/\/$/, "");
+  if (!apiBaseUrl) return;
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/business.php`, {
+      method: "GET",
+      headers: { Accept: "application/json" }
+    });
+    const result = (await response.json().catch(() => null)) as PublicBusinessApiResponse | null;
+    if (loadId !== businessContextLoadId || !response.ok || result?.ok !== true || !result.business) return;
+
+    const business = result.business;
+    const profileId = normalizeBusinessProfileId(business.profile_id);
+    const publicSurfaces = normalizePublicSurfaces(business.public_surfaces);
+    config = {
+      ...config,
+      businessName: String(business.display_name ?? "").trim() || config.businessName,
+      whatsappPhone: String(business.whatsapp ?? "").trim() || config.whatsappPhone,
+      primaryColor: String(business.primary_color ?? "").trim() || config.primaryColor,
+      accentColor: String(business.accent_color ?? "").trim() || config.accentColor,
+      profileId: profileId || config.profileId,
+      publicSurfaces: publicSurfaces.length > 0 ? publicSurfaces : config.publicSurfaces
+    };
+
+    if (state.view === "form" && !isRequestTypeEnabled(state.requestType)) {
+      state = { ...state, view: "home", status: "" };
+    }
+    injectStyles(config);
+    render();
+  } catch {
+    // Script configuration remains the offline/failure fallback.
+  }
 }
 
 function focusWidgetElement(selector: string) {

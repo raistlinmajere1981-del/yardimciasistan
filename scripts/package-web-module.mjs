@@ -63,6 +63,7 @@ const FORBIDDEN_PACKAGE_STRINGS = [
 ];
 const businessOverrideFields = [
   ["display_name", "YARDIMCI_ASISTAN_DEPLOY_DISPLAY_NAME"],
+  ["profile_id", "YARDIMCI_ASISTAN_DEPLOY_PROFILE_ID"],
   ["phone", "YARDIMCI_ASISTAN_DEPLOY_PHONE"],
   ["whatsapp", "YARDIMCI_ASISTAN_DEPLOY_WHATSAPP"],
   ["email", "YARDIMCI_ASISTAN_DEPLOY_EMAIL"],
@@ -335,6 +336,7 @@ function zeroPackageBusinessConfig() {
 
 function validateBusinessConfig(business, label) {
   assert.equal(typeof business.display_name, "string", `${label} display_name string olmalı.`);
+  assert.equal(typeof business.profile_id, "string", `${label} profile_id string olmalı.`);
   assert.equal(typeof business.sync_secret, "string", `${label} sync_secret string olmalı.`);
   assert.ok(Array.isArray(business.allowed_origins), `${label} allowed_origins dizi olmalı.`);
 }
@@ -406,6 +408,13 @@ function createDeploymentWarnings(business) {
     warnings.push({
       code: "missing_display_name",
       message: "config/business.json içindeki display_name henüz yapılandırılmadı."
+    });
+  }
+
+  if (!String(business.profile_id ?? "").trim()) {
+    warnings.push({
+      code: "missing_profile_id",
+      message: "config/business.json içindeki profile_id henüz yapılandırılmadı; widget sektör seçeneklerini sınırlayamaz."
     });
   }
 

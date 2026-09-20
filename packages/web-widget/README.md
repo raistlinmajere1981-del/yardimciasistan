@@ -39,5 +39,13 @@ Deploy paketi üretirken ayrıca template'i güncellemek gerekmez. `npm run pack
   data-whatsapp-phone="+90 532 123 45 67"
   data-api-base-url="/yardimci-asistan"
   data-logo-url="/yardimci-asistan/assets/yardimci-asistan-symbol.png"
+  data-profile-id="pension"
 ></script>
 ```
+
+
+## Sektöre göre web seçenekleri
+
+Widget ana eylemleri işletme profilinden türetilen müşteriye açık yüzeylere göre gösterir. `pension` profilinde oda rezervasyonu görünürken masa rezervasyonu gizlenir; `restaurant` ve `cafe` profillerinde bunun tersi uygulanır; `pension_restaurant` iki alanı birlikte açar. `market` profili ürün/stok bilgi akışına yönelir.
+
+Canlı web modülü kullanıldığında widget `api/business.php` üzerinden `profile_id` ve `public_surfaces` alanlarını okuyarak script üzerindeki ilk ayarı günceller. API kullanmayan statik kurulumlarda `data-profile-id` verilmelidir.

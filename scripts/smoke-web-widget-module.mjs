@@ -16,6 +16,9 @@ const syncSecret = "pilot-web-smoke-secret";
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
 businessConfig.sync_secret = syncSecret;
+businessConfig.display_name = "Deniz Çiçeği Pansiyon & Kafe";
+businessConfig.whatsapp = "+90 531 696 9334";
+businessConfig.profile_id = "pension_restaurant";
 writeFileSync(businessConfigFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
 const conversationsFile = join(webModuleRoot, "data", "ai-conversations.json");
 for (const runtimeFile of ["yardimci-asistan.sqlite", "yardimci-asistan.sqlite-wal", "yardimci-asistan.sqlite-shm"]) {
@@ -42,6 +45,12 @@ server.stderr.on("data", (chunk) => {
 try {
   await waitForUrl(`${baseUrl}/widget.js`);
 
+  const publicBusinessResponse = await fetch(`${baseUrl}/api/business.php`);
+  expect(publicBusinessResponse.status).toBe(200);
+  const publicBusiness = await publicBusinessResponse.json();
+  expect(publicBusiness.business.profile_id).toBe("pension_restaurant");
+  expect(publicBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
+
   const capabilityPublication = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
@@ -57,6 +66,15 @@ try {
   expect((await capabilityPublication.json()).ok).toBe(true);
 
   browser = await launchChromiumForSmoke(chromium);
+
+  const pensionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await pensionPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await injectWidget(pensionPage, baseUrl, { profileId: "pension", connectApi: false });
+  await pensionPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
+  await expect(pensionPage.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
+  await expect(pensionPage.locator('[data-ya-request-type="restaurant_reservation"]')).toHaveCount(0);
+  await pensionPage.close();
+
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
   await injectWidget(page, baseUrl);
@@ -67,6 +85,8 @@ try {
   await page.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(page.locator(".ya-widget-header img.ya-widget-mark")).toHaveAttribute("src", `${baseUrl}/assets/yardimci-asistan-symbol.png`);
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
+  await expect(page.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
+  await expect(page.locator('[data-ya-request-type="restaurant_reservation"]')).toBeVisible();
   await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
 
   await page.evaluate(() => {
@@ -175,15 +195,16 @@ async function pullRequests() {
   return (await response.json()).requests;
 }
 
-async function injectWidget(page, widgetBaseUrl) {
-  await page.evaluate((url) => {
+async function injectWidget(page, widgetBaseUrl, options = {}) {
+  await page.evaluate(({ url, profileId, connectApi }) => {
     document.body.innerHTML = "<main>Firma sitesi</main>";
 
     const script = document.createElement("script");
     script.src = `${url}/widget.js`;
     script.dataset.businessName = "Deniz Çiçeği Pansiyon & Kafe";
     script.dataset.whatsappPhone = "+90 531 696 9334";
-    script.dataset.apiBaseUrl = url;
+    if (connectApi) script.dataset.apiBaseUrl = url;
+    script.dataset.profileId = profileId;
     script.dataset.menuUrl = `${url}/menu.html`;
     script.dataset.logoUrl = `${url}/assets/yardimci-asistan-symbol.png`;
     script.dataset.primaryColor = "#2F6F5E";
@@ -194,7 +215,11 @@ async function injectWidget(page, widgetBaseUrl) {
       script.addEventListener("error", () => reject(new Error("Widget script could not be loaded.")), { once: true });
       document.body.appendChild(script);
     });
-  }, widgetBaseUrl);
+  }, {
+    url: widgetBaseUrl,
+    profileId: options.profileId ?? "pension_restaurant",
+    connectApi: options.connectApi !== false
+  });
 }
 
 function getFreePort() {

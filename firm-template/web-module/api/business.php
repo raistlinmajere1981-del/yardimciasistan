@@ -22,6 +22,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 
 $displayName = ya_business_string($config['display_name'] ?? $config['name'] ?? 'Yardımcı Asistan İşletmesi');
 $whatsapp = ya_business_string($config['whatsapp'] ?? $config['phone'] ?? '');
+$profileId = ya_business_string($config['profile_id'] ?? '');
+$publicSurfaces = array_key_exists('public_surfaces', $config)
+    ? ya_business_normalize_public_surfaces($config['public_surfaces'])
+    : ya_business_profile_public_surfaces($profileId);
 
 ya_business_response(200, [
     'ok' => true,
@@ -29,7 +33,8 @@ ya_business_response(200, [
         'id' => ya_business_string($config['id'] ?? ''),
         'name' => ya_business_string($config['name'] ?? ''),
         'display_name' => $displayName !== '' ? $displayName : 'Yardımcı Asistan İşletmesi',
-        'profile_id' => ya_business_string($config['profile_id'] ?? ''),
+        'profile_id' => $profileId,
+        'public_surfaces' => $publicSurfaces,
         'phone' => ya_business_string($config['phone'] ?? ''),
         'whatsapp' => $whatsapp,
         'email' => ya_business_string($config['email'] ?? ''),
@@ -64,6 +69,33 @@ function ya_business_apply_cors(array $config): void
     header('Access-Control-Allow-Methods: GET, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
     header('Access-Control-Max-Age: 86400');
+}
+
+function ya_business_normalize_public_surfaces(mixed $value): array
+{
+    if (!is_array($value)) {
+        return [];
+    }
+    $allowed = ['accommodation', 'food_service', 'menu', 'catalog', 'directions'];
+    $normalized = [];
+    foreach ($value as $surface) {
+        $surface = ya_business_string($surface);
+        if ($surface !== '' && in_array($surface, $allowed, true) && !in_array($surface, $normalized, true)) {
+            $normalized[] = $surface;
+        }
+    }
+    return $normalized;
+}
+
+function ya_business_profile_public_surfaces(string $profileId): array
+{
+    return match ($profileId) {
+        'pension_restaurant' => ['accommodation', 'food_service', 'menu', 'directions'],
+        'pension' => ['accommodation', 'directions'],
+        'restaurant', 'cafe' => ['food_service', 'menu', 'directions'],
+        'market' => ['catalog', 'directions'],
+        default => []
+    };
 }
 
 function ya_business_color(mixed $value, string $fallback): string
