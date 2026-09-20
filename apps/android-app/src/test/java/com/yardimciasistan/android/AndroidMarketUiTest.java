@@ -245,8 +245,7 @@ public final class AndroidMarketUiTest {
         "android_action_market_1",
         MarketUiRules.ACTION_STOCK_COUNT,
         payload,
-        "https://example.test/module",
-        "secret"
+        CompanionConnectionIdentity.actionTargetKey("https://example.test/module")
     );
     first.appendAll(singleton(pending));
 
