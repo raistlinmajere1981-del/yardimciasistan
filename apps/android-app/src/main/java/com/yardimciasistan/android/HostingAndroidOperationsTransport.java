@@ -14,6 +14,11 @@ final class HostingAndroidOperationsTransport implements AndroidOperationsTransp
   }
 
   @Override
+  public String preferredSourceKey(String baseUrl, String credential) {
+    return CompanionConnectionIdentity.hostingSourceKey(baseUrl);
+  }
+
+  @Override
   public FetchResult fetchOperations(
       String baseUrl,
       String credential,
@@ -31,7 +36,8 @@ final class HostingAndroidOperationsTransport implements AndroidOperationsTransp
           result.notModified,
           result.serverRevision,
           result.data,
-          result.payload
+          result.payload,
+          CompanionConnectionIdentity.hostingSourceKey(baseUrl)
       );
     } catch (HostingSyncClient.SyncException error) {
       throw adapt(error);
