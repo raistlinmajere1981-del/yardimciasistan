@@ -13,6 +13,29 @@ assert.ok(existsSync(packageRoot), `Paket klasörü bulunamadı: ${packageRoot}`
 assert.ok(existsSync(packageExecutable), "Linux paket çalıştırılabilir dosyası bulunamadı.");
 assert.ok(existsSync(appAsar), `app.asar bulunamadı: ${appAsar}`);
 
+const stagedAndroidRoot = join(process.cwd(), "apps", "desktop-app", "resources", "android");
+const stagedApk = join(stagedAndroidRoot, "yardimci-asistan-release.apk");
+const stagedVersion = join(stagedAndroidRoot, "version.json");
+if (existsSync(stagedApk) && existsSync(stagedVersion)) {
+  const packagedAndroidRoot = join(packageRoot, "resources", "android");
+  assert.ok(
+    existsSync(join(packagedAndroidRoot, "yardimci-asistan-release.apk")),
+    "Staged Android APK desktop paketine kopyalanmalı."
+  );
+  assert.ok(
+    existsSync(join(packagedAndroidRoot, "version.json")),
+    "Android version metadata desktop paketine kopyalanmalı."
+  );
+  const adbName = process.platform === "win32" ? "adb.exe" : "adb";
+  const stagedAdb = join(stagedAndroidRoot, "platform-tools", adbName);
+  if (existsSync(stagedAdb)) {
+    assert.ok(
+      existsSync(join(packagedAndroidRoot, "platform-tools", adbName)),
+      "Staged ADB desktop paketine kopyalanmalı."
+    );
+  }
+}
+
 const entries = new Set(listPackage(appAsar));
 const requiredEntries = [
   "/package.json",
