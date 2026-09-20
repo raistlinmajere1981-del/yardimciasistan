@@ -3760,7 +3760,7 @@ public final class MainActivity extends ComponentActivity {
     CustomerFormSession session = new CustomerFormSession(dialog);
     session.fullName = addCustomerFormInput(form, "Ad soyad *", "Örn. Ayşe Yılmaz", value(existing, "fullName"), false);
     session.fullName.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_WORDS);
-    session.phone = addCustomerFormInput(form, "Telefon", "05xx xxx xx xx", value(existing, "phone"), false);
+    session.phone = addCustomerFormInput(form, "Telefon", "+90 5xx… / +44…", value(existing, "phone"), false);
     session.phone.setInputType(InputType.TYPE_CLASS_PHONE);
     session.email = addCustomerFormInput(form, "E-posta", "ornek@eposta.com", value(existing, "email"), false);
     session.email.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
@@ -5596,7 +5596,7 @@ public final class MainActivity extends ComponentActivity {
       Toast.makeText(this, "WhatsApp bu işletmede etkin değil.", Toast.LENGTH_SHORT).show();
       return;
     }
-    String normalizedPhone = normalizeWhatsAppPhone(phone);
+    String normalizedPhone = AndroidPhoneRules.normalizeWhatsAppPhone(phone);
     if (normalizedPhone.isEmpty()) {
       Toast.makeText(this, "WhatsApp için telefon numarası bulunamadı.", Toast.LENGTH_SHORT).show();
       return;
@@ -6093,17 +6093,6 @@ public final class MainActivity extends ComponentActivity {
   private String reservationMessage(OperationData.ReservationRecord reservation) {
     return "Merhaba " + reservation.customerName + ", " + joinDateRange(reservation.startDate, reservation.endDate)
         + " tarihli rezervasyonunuz hakkında size ulaşıyoruz.";
-  }
-
-  private String normalizeWhatsAppPhone(String phone) {
-    String digits = phone == null ? "" : phone.replaceAll("[^0-9]", "");
-    if (digits.startsWith("0") && digits.length() == 11) {
-      return "90" + digits.substring(1);
-    }
-    if (digits.length() == 10) {
-      return "90" + digits;
-    }
-    return digits;
   }
 
   private String compactDeviceId() {
