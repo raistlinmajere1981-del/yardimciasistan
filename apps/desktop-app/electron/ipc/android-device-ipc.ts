@@ -4,13 +4,20 @@ import type {
   DesktopAndroidDeviceMutationResult,
   DesktopDatabase
 } from "../database";
+import type { LocalCompanionPairingSession } from "../local-companion-pairing-service";
 
 export function registerAndroidDeviceIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   finalizeDeviceMutation: (result: DesktopAndroidDeviceMutationResult) => DesktopAndroidDeviceMutationResult;
+  beginLocalPairing: () => LocalCompanionPairingSession;
 }) {
-  const { getDatabase, assertCapability, finalizeDeviceMutation } = options;
+  const { getDatabase, assertCapability, finalizeDeviceMutation, beginLocalPairing } = options;
+
+  ipcMain.handle("androidDevice:beginLocalPairing", (): LocalCompanionPairingSession => {
+    assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz eşleştirmesi bu işletmede etkin değil.");
+    return beginLocalPairing();
+  });
 
   ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android cihaz yönetimi bu işletmede etkin değil.");
