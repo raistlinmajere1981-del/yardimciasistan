@@ -95,4 +95,6 @@ window.YardimciAsistanWidget.open({
 });
 ```
 
-Desteklenen intent değerleri: `home`, `accommodation.reserve`, `accommodation.info`, `food.reserve`, `info`, `directions`.
+Desteklenen intent değerleri: `home`, `accommodation.reserve`, `accommodation.info`, `food.reserve`, `contact.whatsapp`, `info`, `directions`.
+
+Site üzerindeki özel WhatsApp düğmeleri `data-ya-action="contact.whatsapp"` ile doğrudan widget'ın WhatsApp mesaj hazırlama görünümünü açabilir. `api/business.php` ayrıca `channel.qr_menu` etkin olduğunda `qr_menu` public surface değerini yayınlar; dış site QR menü bağlantısını bu değere göre gösterebilir.
