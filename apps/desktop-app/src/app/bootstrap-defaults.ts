@@ -57,6 +57,7 @@ export const defaultSetupData: DesktopSetupData = {
   webModuleUrl: "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
   syncSecret: "",
   autoSyncEnabled: true,
+  localNetworkEnabled: true,
   aiEnabled: false,
   aiProvider: "openai_compatible",
   aiService: "openai",
