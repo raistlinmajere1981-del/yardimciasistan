@@ -88,6 +88,7 @@ public final class MainActivity extends ComponentActivity {
   private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
 
   private final HostingSyncClient syncClient = new HostingSyncClient();
+  private final AndroidOperationsTransport operationsTransport = new HostingAndroidOperationsTransport(syncClient);
   private final ProductDataLookupClient productDataLookupClient = new ProductDataLookupClient();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private SharedPreferences preferences;
@@ -4782,9 +4783,9 @@ public final class MainActivity extends ComponentActivity {
         int invalidatedPendingActions = 0;
         for (ActionOutbox.PendingAction pending : pendingToRetry) {
           try {
-            syncClient.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
+            operationsTransport.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
             actionOutbox.remove(pending.id);
-          } catch (HostingSyncClient.SyncException error) {
+          } catch (AndroidOperationsTransport.TransportException error) {
             if (!error.invalidatesPendingAction()) {
               throw error;
             }
@@ -4796,7 +4797,7 @@ public final class MainActivity extends ComponentActivity {
             }
           }
         }
-        HostingSyncClient.FetchResult fetched = syncClient.fetchOperations(baseUrl, syncSecret, identity, fallbackData.serverRevision);
+        AndroidOperationsTransport.FetchResult fetched = operationsTransport.fetchOperations(baseUrl, syncSecret, identity, fallbackData.serverRevision);
         final OperationData nextData;
         if (!fetched.notModified && fetched.data != null) {
           operationCache.save(fetched.payload);
@@ -4831,9 +4832,9 @@ public final class MainActivity extends ComponentActivity {
             render();
           }
         });
-      } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
-        if (error instanceof HostingSyncClient.SyncException
-            && ((HostingSyncClient.SyncException) error).disablesAndroidService()) {
+      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException | OperationCache.CacheException error) {
+        if (error instanceof AndroidOperationsTransport.TransportException
+            && ((AndroidOperationsTransport.TransportException) error).disablesAndroidService()) {
           OperationData disabledData = OperationData.androidCapabilityDisabled();
           String disabledMessage = error.getMessage();
           try {
@@ -4951,7 +4952,7 @@ public final class MainActivity extends ComponentActivity {
     clearError();
     executor.execute(() -> {
       try {
-        OperationData.ActionRecord accepted = syncClient.enqueueAction(
+        OperationData.ActionRecord accepted = operationsTransport.enqueueAction(
             baseUrl,
             syncSecret,
             identity,
@@ -4965,9 +4966,9 @@ public final class MainActivity extends ComponentActivity {
           data.pendingActions += 1;
           if (marketWorkspace != null) marketWorkspace.onBarcodeScanAccepted(barcode, "Gönderildi");
         });
-      } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException error) {
-        boolean rejected = error instanceof HostingSyncClient.SyncException
-            && ((HostingSyncClient.SyncException) error).invalidatesPendingAction();
+      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException error) {
+        boolean rejected = error instanceof AndroidOperationsTransport.TransportException
+            && ((AndroidOperationsTransport.TransportException) error).invalidatesPendingAction();
         if (rejected) {
           try {
             actionOutbox.remove(pending.id);
@@ -5074,7 +5075,7 @@ public final class MainActivity extends ComponentActivity {
       ArrayList<OperationData.ActionRecord> queued = new ArrayList<>();
       try {
         for (ActionOutbox.PendingAction action : pendingActions) {
-          OperationData.ActionRecord accepted = syncClient.enqueueAction(baseUrl, syncSecret, identity, action.id, action.type, action.payload);
+          OperationData.ActionRecord accepted = operationsTransport.enqueueAction(baseUrl, syncSecret, identity, action.id, action.type, action.payload);
           actionOutbox.remove(action.id);
           queued.add(accepted);
         }
@@ -5091,9 +5092,9 @@ public final class MainActivity extends ComponentActivity {
           }
           render();
         });
-      } catch (HostingSyncClient.SyncException | ActionOutbox.OutboxException error) {
-        boolean rejected = error instanceof HostingSyncClient.SyncException
-            && ((HostingSyncClient.SyncException) error).invalidatesPendingAction();
+      } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException error) {
+        boolean rejected = error instanceof AndroidOperationsTransport.TransportException
+            && ((AndroidOperationsTransport.TransportException) error).invalidatesPendingAction();
         if (rejected) {
           for (ActionOutbox.PendingAction pending : pendingActions) {
             try {
