@@ -86,8 +86,17 @@ try {
   });
   await pensionPage.locator('[data-ya-open-date-picker="start_date"]').click();
   await expect(pensionPage.locator('input[name="start_date"]')).toHaveAttribute("data-ya-picker-opened", "1");
-  await pensionPage.locator('input[name="start_date"]').fill("2026-09-25");
-  await pensionPage.locator('input[name="end_date"]').fill("2026-09-27");
+  await pensionPage.evaluate(() => {
+    const start = document.querySelector('input[name="start_date"]');
+    const end = document.querySelector('input[name="end_date"]');
+    if (!(start instanceof HTMLInputElement) || !(end instanceof HTMLInputElement)) {
+      throw new Error("Accommodation date inputs are missing.");
+    }
+    start.value = "2026-09-25";
+    start.dispatchEvent(new Event("change", { bubbles: true }));
+    end.value = "2026-09-27";
+    end.dispatchEvent(new Event("change", { bubbles: true }));
+  });
   await expect(pensionPage.locator('input[name="date_text"]')).not.toHaveValue("");
   await pensionPage.close();
 
