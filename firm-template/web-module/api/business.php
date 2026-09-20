@@ -26,6 +26,7 @@ $displayName = ya_business_string($config['display_name'] ?? $config['name'] ?? 
 $whatsapp = ya_business_string($config['whatsapp'] ?? $config['phone'] ?? '');
 $profileId = ya_business_string($config['profile_id'] ?? '');
 $runtimeCapabilities = ya_business_public_capabilities();
+$aiEnabled = $runtimeCapabilities === null || in_array('service.ai', $runtimeCapabilities, true);
 if ($runtimeCapabilities !== null) {
     $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, $config);
 } elseif (array_key_exists('public_surfaces', $config)) {
@@ -42,6 +43,7 @@ ya_business_response(200, [
         'display_name' => $displayName !== '' ? $displayName : 'Yardımcı Asistan İşletmesi',
         'profile_id' => $profileId,
         'public_surfaces' => $publicSurfaces,
+        'ai_enabled' => $aiEnabled,
         'phone' => ya_business_string($config['phone'] ?? ''),
         'whatsapp' => $whatsapp,
         'email' => ya_business_string($config['email'] ?? ''),

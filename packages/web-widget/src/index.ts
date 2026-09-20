@@ -36,6 +36,7 @@ interface WidgetConfig {
   accentColor: string;
   profileId: BusinessProfileId | "";
   publicSurfaces: PublicSurface[];
+  aiEnabled: boolean;
   address: string;
   mapUrl: string;
 }
@@ -92,6 +93,7 @@ interface PublicBusinessApiResponse {
     primary_color?: string;
     accent_color?: string;
     public_surfaces?: unknown[];
+    ai_enabled?: boolean;
     address?: string;
     map_url?: string;
   };
@@ -119,6 +121,7 @@ const defaultConfig: WidgetConfig = {
   accentColor: "#E47863",
   profileId: "",
   publicSurfaces: [],
+  aiEnabled: true,
   address: "",
   mapUrl: ""
 };
@@ -260,7 +263,7 @@ function buttonTemplate() {
         <span class="ya-widget-online-dot" aria-hidden="true"></span>
       </span>
       <span class="ya-widget-launcher-copy">
-        <strong>AI Asistan</strong>
+        <strong>${config.aiEnabled ? "AI Asistan" : "İşletme Yardımcısı"}</strong>
         <small>Size yardımcı olayım</small>
       </span>
       ${iconTemplate("sparkles", "ya-widget-launcher-sparkle")}
@@ -303,7 +306,7 @@ function panelTemplate() {
 
 function brandMarkTemplate() {
   if (!config.logoUrl) {
-    return `<span class="ya-widget-mark ya-widget-mark-fallback">AI</span>`;
+    return `<span class="ya-widget-mark ya-widget-mark-fallback">${config.aiEnabled ? "AI" : "YA"}</span>`;
   }
 
   return `<img class="ya-widget-mark" src="${escapeAttribute(config.logoUrl)}" alt="" aria-hidden="true" />`;
@@ -329,7 +332,7 @@ function homeTemplate() {
       description: "Tarih, saat ve kişi sayısını seçin"
     }));
   }
-  if (surfaces.has("catalog")) {
+  if (config.aiEnabled && surfaces.has("catalog")) {
     actions.push(homeActionCard({
       view: "info",
       icon: "search",
@@ -338,12 +341,14 @@ function homeTemplate() {
     }));
   }
 
-  actions.push(homeActionCard({
-    view: "info",
-    icon: "sparkles",
-    title: "Asistana sor",
-    description: "İşletme hakkında kısa bir soru sorun"
-  }));
+  if (config.aiEnabled) {
+    actions.push(homeActionCard({
+      view: "info",
+      icon: "sparkles",
+      title: "Asistana sor",
+      description: "İşletme hakkında kısa bir soru sorun"
+    }));
+  }
 
   if (surfaces.has("directions")) {
     actions.push(homeActionCard({
@@ -651,9 +656,9 @@ function directionsTemplate() {
       </div>
       <div class="ya-widget-ai-actions">
         ${mapUrl ? `<a class="ya-widget-primary-action" href="${escapeAttribute(mapUrl)}" target="_blank" rel="noopener noreferrer">${iconTemplate("pin")}<span>Haritada Aç</span></a>` : ""}
-        <button class="ya-widget-secondary-action" type="button" data-ya-directions-question>
+        ${config.aiEnabled ? `<button class="ya-widget-secondary-action" type="button" data-ya-directions-question>
           ${iconTemplate("help")}<span>Yol Tarifi Sor</span>
-        </button>
+        </button>` : ""}
       </div>
     </div>
   `;
@@ -1203,6 +1208,11 @@ async function saveRequest(payload: RequestPayload) {
 
 async function handleAiSubmit(event: Event) {
   event.preventDefault();
+  if (!config.aiEnabled) {
+    state = { ...state, view: "home", status: "", aiLoading: false, aiAnswer: "" };
+    render();
+    return;
+  }
   const form = event.currentTarget as HTMLFormElement;
   const formData = new FormData(form);
   const message = String(formData.get("message") ?? "").trim();
@@ -1312,7 +1322,7 @@ function getAssistantTitle() {
     .replace(/\s+(?:Pansiyon|Otel|Butik Otel|Restoran|Kafe)(?:\s*(?:&|\/)\s*(?:Pansiyon|Otel|Restoran|Kafe))*\s*$/i, "")
     .trim();
   const baseName = shortName && shortName.toLocaleLowerCase("tr-TR") !== "yardımcı asistan" ? shortName : "Yardımcı";
-  return `${baseName} AI Asistanı`;
+  return `${baseName} ${config.aiEnabled ? "AI Asistanı" : "Yardımcısı"}`;
 }
 
 function getOrCreateRoot() {
@@ -2605,6 +2615,9 @@ function getScriptConfig(): Partial<WidgetConfig> {
   if (profileId) {
     scriptConfig.profileId = profileId;
   }
+  if (dataset.aiEnabled === "true" || dataset.aiEnabled === "false") {
+    scriptConfig.aiEnabled = dataset.aiEnabled === "true";
+  }
   return scriptConfig;
 }
 
@@ -2728,12 +2741,13 @@ async function hydrateBusinessContext(loadId: number) {
       accentColor: String(business.accent_color ?? "").trim() || config.accentColor,
       address: String(business.address ?? "").trim() || config.address,
       mapUrl: String(business.map_url ?? "").trim() || config.mapUrl,
+      aiEnabled: typeof business.ai_enabled === "boolean" ? business.ai_enabled : config.aiEnabled,
       profileId: profileId || config.profileId,
       publicSurfaces: publicSurfaces.length > 0 ? publicSurfaces : config.publicSurfaces
     };
 
-    if (state.view === "form" && !isRequestTypeEnabled(state.requestType)) {
-      state = { ...state, view: "home", status: "" };
+    if ((state.view === "form" && !isRequestTypeEnabled(state.requestType)) || (state.view === "info" && !config.aiEnabled)) {
+      state = { ...state, view: "home", status: "", aiLoading: false, aiAnswer: "", questionDraft: "" };
     }
     injectStyles(config);
     render();
@@ -2749,6 +2763,7 @@ function resolveOpenOptions(options: WidgetOpenOptions): Partial<WidgetState> {
   if (intent === "food.reserve") return { view: "form", requestType: "restaurant_reservation", context, questionDraft: "" };
   if (intent === "directions") return { view: "directions", context, questionDraft: context?.question ?? "" };
   if (intent === "accommodation.info" || intent === "info") {
+    if (!config.aiEnabled) return { view: "home", context: null, questionDraft: "" };
     const name = String(context?.resourceName ?? "").trim();
     const question = String(context?.question ?? "").trim() || (name ? `${name} hakkında bilgi almak istiyorum.` : "");
     return { view: "info", context, questionDraft: question };
