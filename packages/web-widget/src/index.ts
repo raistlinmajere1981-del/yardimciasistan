@@ -2372,7 +2372,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       top: 66px;
       right: 0;
       z-index: 25;
-      width: min(268px, 100%);
+      width: min(220px, calc(200% + 8px));
       padding: 10px;
       border: 1px solid rgba(47, 111, 94, 0.2);
       border-radius: 14px;
@@ -2426,7 +2426,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-time-columns {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 78px;
+      grid-template-columns: minmax(0, 1fr) 62px;
       gap: 8px;
     }
 
@@ -2445,7 +2445,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-time-scroll {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 4px;
       max-height: 128px;
       padding: 2px;
