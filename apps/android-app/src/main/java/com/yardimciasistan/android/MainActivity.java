@@ -88,7 +88,7 @@ public final class MainActivity extends ComponentActivity {
   private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
 
   private final HostingSyncClient syncClient = new HostingSyncClient();
-  private final AndroidOperationsTransport operationsTransport = new HostingAndroidOperationsTransport(syncClient);
+  private AndroidOperationsTransport operationsTransport;
   private final ProductDataLookupClient productDataLookupClient = new ProductDataLookupClient();
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private SharedPreferences preferences;
@@ -146,7 +146,7 @@ public final class MainActivity extends ComponentActivity {
         return;
       }
       if (hasConnectionSettings() && !loading) {
-        syncFromHosting(false);
+        syncOperations(false);
       }
       foregroundSyncHandler.postDelayed(this, FOREGROUND_SYNC_INTERVAL_MS);
     }
@@ -186,6 +186,7 @@ public final class MainActivity extends ComponentActivity {
     applyWindowTheme();
     ConnectionSettings.setDebugConnectionOverrideActive(preferences, isDebugConnectionOverrideRequested());
     ConnectionSettings.ensureDefaults(preferences);
+    operationsTransport = new CompanionOperationsRouter(preferences);
     identity = DeviceIdentity.loadOrCreate(this, preferences);
     actionOutbox = new ActionOutbox(preferences);
     operationCache = new OperationCache(preferences, identity.deviceId);
@@ -261,7 +262,7 @@ public final class MainActivity extends ComponentActivity {
     render();
     requestNotificationPermissionIfNeeded();
     if (hasConnectionSettings()) {
-      syncFromHosting(false);
+      syncOperations(false);
     } else {
       showError("Canlı veriyi görmek için Ayarlar'dan bağlantıyı tamamlayın.");
     }
@@ -1252,7 +1253,7 @@ public final class MainActivity extends ComponentActivity {
     header.addView(titleGroup);
 
     LinearLayout headerActions = UiKit.row(this);
-    refreshButton = UiKit.iconButton(this, "↻", "Yenile", false, view -> syncFromHosting(false));
+    refreshButton = UiKit.iconButton(this, "↻", "Yenile", false, view -> syncOperations(false));
     headerActions.addView(refreshButton, headerActionParams(false));
 
     themeButton = createThemeButton(null);
@@ -2583,7 +2584,7 @@ public final class MainActivity extends ComponentActivity {
       syncSecretInput.setLayoutParams(secretParams);
       connection.addView(syncSecretInput);
 
-      Button refresh = UiKit.button(this, loading ? "Bağlanıyor..." : "Canlı Veriyi Çek", UiKit.PRIMARY, view -> syncFromHosting(true));
+      Button refresh = UiKit.button(this, loading ? "Bağlanıyor..." : "Canlı Veriyi Çek", UiKit.PRIMARY, view -> syncOperations(true));
       refresh.setEnabled(!loading);
       refresh.setLayoutParams(new LinearLayout.LayoutParams(-1, UiKit.dp(this, 48)));
       connection.addView(refresh);
@@ -2656,7 +2657,7 @@ public final class MainActivity extends ComponentActivity {
     titleView.setLayoutParams(new LinearLayout.LayoutParams(0, -2, 1f));
     titleRow.addView(titleView);
     if (includeRefresh) {
-      Button refresh = UiKit.chip(this, loading ? "Bekleyin" : "Yenile", false, view -> syncFromHosting(false));
+      Button refresh = UiKit.chip(this, loading ? "Bekleyin" : "Yenile", false, view -> syncOperations(false));
       refresh.setEnabled(!loading);
       titleRow.addView(refresh);
     }
@@ -4728,7 +4729,7 @@ public final class MainActivity extends ComponentActivity {
     ), message);
   }
 
-  private void syncFromHosting(boolean readSettingsInputs) {
+  private void syncOperations(boolean readSettingsInputs) {
     if (loading) {
       return;
     }
@@ -4752,8 +4753,8 @@ public final class MainActivity extends ComponentActivity {
     }
 
     final String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
-    final String sourceKey = CompanionConnectionIdentity.hostingSourceKey(baseUrl);
-    if (actionTargetKey.isEmpty() || sourceKey.isEmpty()) {
+    final String preferredSourceKey = operationsTransport.preferredSourceKey(baseUrl, syncSecret);
+    if (actionTargetKey.isEmpty() || preferredSourceKey.isEmpty()) {
       showError("Bağlantı hedefi doğrulanamadı.");
       return;
     }
@@ -4804,10 +4805,18 @@ public final class MainActivity extends ComponentActivity {
             }
           }
         }
-        AndroidOperationsTransport.FetchResult fetched = operationsTransport.fetchOperations(baseUrl, syncSecret, identity, operationCache.revision(sourceKey));
+        AndroidOperationsTransport.FetchResult fetched = operationsTransport.fetchOperations(
+            baseUrl,
+            syncSecret,
+            identity,
+            operationCache.revision(preferredSourceKey)
+        );
+        final String fetchedSourceKey = fetched.sourceKey.isEmpty()
+            ? preferredSourceKey
+            : fetched.sourceKey;
         final OperationData nextData;
         if (!fetched.notModified && fetched.data != null) {
-          operationCache.save(fetched.payload, sourceKey, fetched.serverRevision);
+          operationCache.save(fetched.payload, fetchedSourceKey, fetched.serverRevision);
           OperationData cachedData = operationCache.load();
           nextData = cachedData == null ? fetched.data : cachedData;
         } else {
@@ -4974,7 +4983,9 @@ public final class MainActivity extends ComponentActivity {
         actionOutbox.remove(pending.id);
         runOnUiThread(() -> {
           data.actions.add(0, accepted);
-          data.pendingActions += 1;
+          if ("pending".equals(accepted.status)) {
+            data.pendingActions += 1;
+          }
           if (marketWorkspace != null) marketWorkspace.onBarcodeScanAccepted(barcode, "Gönderildi");
         });
       } catch (AndroidOperationsTransport.TransportException | ActionOutbox.OutboxException error) {
@@ -5054,7 +5065,7 @@ public final class MainActivity extends ComponentActivity {
     try {
       if (!actionOutbox.load().isEmpty()) {
         Toast.makeText(this, "Önce telefonda bekleyen işlem yeniden gönderiliyor.", Toast.LENGTH_SHORT).show();
-        syncFromHosting(false);
+        syncOperations(false);
         return false;
       }
     } catch (ActionOutbox.OutboxException error) {
@@ -5099,7 +5110,7 @@ public final class MainActivity extends ComponentActivity {
           for (int index = queued.size() - 1; index >= 0; index -= 1) {
             data.actions.add(0, queued.get(index));
           }
-          data.pendingActions += queued.size();
+          data.pendingActions += pendingActionCount(queued);
           clearError();
           if (marketQueuedMessage != null && marketWorkspace != null) {
             marketWorkspace.onSubmissionAccepted(feedbackActionType, successMessage);
@@ -5126,7 +5137,7 @@ public final class MainActivity extends ComponentActivity {
             for (int index = queued.size() - 1; index >= 0; index -= 1) {
               data.actions.add(0, queued.get(index));
             }
-            data.pendingActions += queued.size();
+            data.pendingActions += pendingActionCount(queued);
           }
           if (actionRemainsQueued && marketWorkspace != null) {
             connectionState = error.getMessage();
@@ -6176,6 +6187,16 @@ public final class MainActivity extends ComponentActivity {
       }
     }
     return null;
+  }
+
+  private int pendingActionCount(List<OperationData.ActionRecord> actions) {
+    int count = 0;
+    for (OperationData.ActionRecord action : actions) {
+      if ("pending".equals(action.status)) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   private int actionTone(String status) {
