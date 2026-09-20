@@ -25,7 +25,7 @@ export interface LocalCompanionActionResult {
 }
 
 export interface LocalCompanionPairingRequest {
-  pairingSecret: string;
+  pairingTicket: string;
   deviceId: string;
   deviceName: string;
   appVersion: string;
@@ -58,6 +58,7 @@ export interface LocalCompanionServerOptions {
   createSummary: (deviceId: string) => AndroidOperationsSnapshot;
   applyAction: (action: AndroidSyncAction) => LocalCompanionActionResult;
   authorize: (input: LocalCompanionAuthorizationInput) => boolean;
+  enabled?: () => boolean;
   pair?: (input: LocalCompanionPairingRequest) => LocalCompanionPairingResponse;
   logInfo?: (message: string) => void;
   logWarn?: (message: string, error?: unknown) => void;
@@ -319,12 +320,21 @@ export class LocalCompanionServer {
           protocol_version: LOCAL_COMPANION_PROTOCOL_VERSION,
           desktop_id: this.options.desktopId(),
           pairing_required: true,
+          local_network_enabled: this.options.enabled?.() !== false,
           source_revision: this.sourceRevision
         });
         return;
       }
 
       if (request.method === "POST" && url.pathname === LOCAL_COMPANION_ENDPOINTS.pair) {
+        if (this.options.enabled?.() === false) {
+          writeJson(response, 403, {
+            ok: false,
+            code: "local_network_disabled",
+            message: "Yerel ağ bağlantısı masaüstü ayarlarından kapatılmış."
+          });
+          return;
+        }
         if (!this.options.pair) {
           writeJson(response, 503, {
             ok: false,
@@ -335,11 +345,11 @@ export class LocalCompanionServer {
         }
 
         const body = await readJsonBody(request);
-        const pairingSecret = stringValue(body.pairing_secret);
+        const pairingTicket = stringValue(body.pairing_ticket);
         const deviceId = stringValue(body.device_id);
         const deviceName = stringValue(body.device_name);
         const appVersion = stringValue(body.app_version);
-        if (!pairingSecret || !/^[A-Za-z0-9._:-]{6,120}$/.test(deviceId)) {
+        if (!pairingTicket || !/^[A-Za-z0-9._:-]{6,120}$/.test(deviceId)) {
           writeJson(response, 422, {
             ok: false,
             code: "invalid_pairing_request",
@@ -349,7 +359,7 @@ export class LocalCompanionServer {
         }
 
         const result = this.options.pair({
-          pairingSecret,
+          pairingTicket,
           deviceId,
           deviceName,
           appVersion,
@@ -378,6 +388,15 @@ export class LocalCompanionServer {
         || (url.pathname !== LOCAL_COMPANION_ENDPOINTS.summary && url.pathname !== LOCAL_COMPANION_ENDPOINTS.action)
       ) {
         writeJson(response, 404, { ok: false, code: "not_found", message: "Yerel companion endpoint bulunamadı." });
+        return;
+      }
+
+      if (this.options.enabled?.() === false) {
+        writeJson(response, 403, {
+          ok: false,
+          code: "local_network_disabled",
+          message: "Yerel ağ bağlantısı masaüstü ayarlarından kapatılmış."
+        });
         return;
       }
 
