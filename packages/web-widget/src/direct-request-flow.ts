@@ -101,24 +101,14 @@ function enhanceRequestForm(root: HTMLElement) {
   const form = root.querySelector<HTMLFormElement>(".ya-widget-form[data-ya-form]");
   if (!form) return;
 
-  const intro = form.closest(".ya-widget-subview")?.querySelector<HTMLElement>(".ya-widget-subview-intro p");
-  if (intro && intro.textContent !== "Bilgileri işletmeye doğrudan iletin. Son onayı işletme yapar.") {
-    intro.textContent = "Bilgileri işletmeye doğrudan iletin. Son onayı işletme yapar.";
-  }
-
   const submitButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
   if (submitButton && submitButton.dataset.yaDirectRequestButton !== "1") {
     submitButton.dataset.yaDirectRequestButton = "1";
     submitButton.innerHTML = `${sendIcon()}<span>Talebi Gönder</span>`;
   }
-
-  const note = form.querySelector<HTMLElement>(".ya-widget-form-note");
-  if (note && note.dataset.yaDirectRequestNote !== "1") {
-    note.dataset.yaDirectRequestNote = "1";
-    note.innerHTML = `${shieldIcon()}<span>Talebiniz doğrudan işletmeye kaydedilir. WhatsApp kullanmak zorunlu değildir.</span>`;
-  }
 }
 
+function interceptRequestSubmit(event: Event) {
 function interceptRequestSubmit(event: Event) {
   const form = event.target instanceof HTMLFormElement ? event.target : null;
   if (!form?.matches(".ya-widget-form[data-ya-form]")) return;
@@ -185,8 +175,8 @@ async function submitRequest(form: HTMLFormElement) {
   }
 
   submitting = true;
+  hideStatus();
   setFormBusy(form, true);
-  showStatus("Talebiniz işletmeye iletiliyor...");
 
   try {
     const response = await fetch(`${runtimeConfig.apiBaseUrl.trim().replace(/\/$/, "")}/api/request.php`, {
@@ -251,7 +241,7 @@ function renderSuccess(form: HTMLFormElement, whatsappMessage: string) {
 
   const summary = document.createElement("div");
   summary.className = "ya-widget-request-success-card";
-  summary.innerHTML = `${checkIcon()}<div><strong>Talebiniz kaydedildi.</strong><span>WhatsApp üzerinden ayrıca yazmanız gerekmez.</span></div>`;
+  summary.innerHTML = `${checkIcon()}<div><strong>Talebiniz kaydedildi.</strong></div>`;
   success.appendChild(summary);
 
   const actions = document.createElement("div");
@@ -302,23 +292,26 @@ function setFormBusy(form: HTMLFormElement, busy: boolean) {
   const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
   if (!button) return;
   button.disabled = busy;
+  button.classList.toggle("is-loading", busy);
   button.innerHTML = busy
-    ? `${sendIcon()}<span>Talep gönderiliyor...</span>`
+    ? '<span class="ya-widget-spinner" aria-hidden="true"></span><span>Talep gönderiliyor…</span>'
     : `${sendIcon()}<span>Talebi Gönder</span>`;
 }
 
 function showStatus(message: string) {
-  const status = document.querySelector<HTMLElement>(`${ROOT_SELECTOR} [data-ya-status]`);
-  if (!status) return;
-  status.textContent = message;
-  status.hidden = false;
+  const notice = document.querySelector<HTMLElement>(`${ROOT_SELECTOR} [data-ya-status]`);
+  const text = notice?.querySelector<HTMLElement>("[data-ya-status-text]");
+  if (!notice || !text) return;
+  text.textContent = message;
+  notice.hidden = false;
 }
 
 function hideStatus() {
-  const status = document.querySelector<HTMLElement>(`${ROOT_SELECTOR} [data-ya-status]`);
-  if (!status) return;
-  status.textContent = "";
-  status.hidden = true;
+  const notice = document.querySelector<HTMLElement>(`${ROOT_SELECTOR} [data-ya-status]`);
+  const text = notice?.querySelector<HTMLElement>("[data-ya-status-text]");
+  if (!notice || !text) return;
+  text.textContent = "";
+  notice.hidden = true;
 }
 
 function readScriptConfig(): Partial<RuntimeConfig> {
@@ -353,7 +346,6 @@ function injectDirectRequestStyles() {
     ${ROOT_SELECTOR} .ya-widget-request-success-card > .ya-widget-icon { color: #2F6F5E; }
     ${ROOT_SELECTOR} .ya-widget-request-success-card div { display: grid; gap: 3px; }
     ${ROOT_SELECTOR} .ya-widget-request-success-card strong { color: #172033; font-size: 13px; }
-    ${ROOT_SELECTOR} .ya-widget-request-success-card span { color: #5d6670; font-size: 11px; line-height: 1.45; }
     ${ROOT_SELECTOR} .ya-widget-request-success-actions { display: grid; gap: 8px; }
     ${ROOT_SELECTOR} .ya-widget-request-fallback { margin-top: -4px; }
   `;
@@ -366,10 +358,6 @@ function icon(path: string) {
 
 function sendIcon() {
   return icon('<path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/>');
-}
-
-function shieldIcon() {
-  return icon('<path d="M12 3 5 6v5c0 4.5 2.8 7.8 7 10 4.2-2.2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>');
 }
 
 function whatsappIcon() {

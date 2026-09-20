@@ -141,6 +141,7 @@ let state: WidgetState = {
 let footerAvoidanceBound = false;
 let externalActionBound = false;
 let footerPositionFrame = 0;
+let closeAnimationTimer = 0;
 let businessContextLoadId = 0;
 
 export function init(userConfig: Partial<WidgetConfig> = {}) {
@@ -165,6 +166,10 @@ export function init(userConfig: Partial<WidgetConfig> = {}) {
 }
 
 export function open(options: WidgetOpenOptions = {}) {
+  if (closeAnimationTimer) {
+    window.clearTimeout(closeAnimationTimer);
+    closeAnimationTimer = 0;
+  }
   state = {
     ...state,
     ...resolveOpenOptions(options),
@@ -178,6 +183,21 @@ export function open(options: WidgetOpenOptions = {}) {
 }
 
 export function close() {
+  const panel = document.querySelector<HTMLElement>(`#${ROOT_ID} .ya-widget-panel`);
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+  if (panel && !reduceMotion) {
+    panel.classList.add("is-closing");
+    if (closeAnimationTimer) window.clearTimeout(closeAnimationTimer);
+    closeAnimationTimer = window.setTimeout(() => {
+      closeAnimationTimer = 0;
+      finalizeClose();
+    }, 150);
+    return;
+  }
+  finalizeClose();
+}
+
+function finalizeClose() {
   state = {
     ...state,
     isOpen: false,
@@ -263,13 +283,16 @@ function panelTemplate() {
           <span aria-hidden="true">×</span>
         </button>
       </header>
+      <div class="ya-widget-notice" data-ya-status role="status" ${state.status ? "" : "hidden"}>
+        <span class="ya-widget-notice-icon" aria-hidden="true">${iconTemplate("info")}</span>
+        <span data-ya-status-text>${escapeHtml(state.status)}</span>
+      </div>
       <div class="ya-widget-content">
         ${state.view === "home" ? homeTemplate() : ""}
         ${state.view === "form" ? formTemplate() : ""}
         ${state.view === "info" ? infoTemplate() : ""}
         ${state.view === "whatsapp" ? whatsappTemplate() : ""}
         ${state.view === "directions" ? directionsTemplate() : ""}
-        <p class="ya-widget-status" data-ya-status role="status" ${state.status ? "" : "hidden"}>${escapeHtml(state.status)}</p>
       </div>
     </section>
   `;
@@ -288,76 +311,95 @@ function homeTemplate() {
   const actions: string[] = [];
 
   if (surfaces.has("accommodation")) {
-    actions.push(`
-      <button type="button" data-ya-request-type="pension_reservation">
-        ${iconTemplate("calendar")}
-        <span>Rezervasyon yap</span>
-      </button>
-    `);
+    actions.push(homeActionCard({
+      requestType: "pension_reservation",
+      icon: "calendar",
+      title: "Rezervasyon yap",
+      description: "Tarih ve kişi bilgilerini iletin"
+    }));
   }
   if (surfaces.has("food_service")) {
-    actions.push(`
-      <button type="button" data-ya-request-type="restaurant_reservation">
-        ${iconTemplate("table")}
-        <span>Masa sor</span>
-      </button>
-    `);
+    actions.push(homeActionCard({
+      requestType: "restaurant_reservation",
+      icon: "table",
+      title: "Masa sor",
+      description: "Tarih, saat ve kişi sayısını seçin"
+    }));
   }
   if (surfaces.has("catalog")) {
-    actions.push(`
-      <button type="button" data-ya-view="info">
-        ${iconTemplate("help")}
-        <span>Ürün / stok sor</span>
-      </button>
-    `);
+    actions.push(homeActionCard({
+      view: "info",
+      icon: "search",
+      title: "Ürün / stok sor",
+      description: "Ürün ve stok bilgisini hızlıca öğrenin"
+    }));
   }
 
-  actions.push(`
-    <button type="button" data-ya-view="info">
-      ${iconTemplate("help")}
-      <span>Bilgi al</span>
-    </button>
-  `);
+  actions.push(homeActionCard({
+    view: "info",
+    icon: "sparkles",
+    title: "Asistana sor",
+    description: "İşletme hakkında kısa bir soru sorun"
+  }));
 
   if (surfaces.has("directions")) {
-    actions.push(`
-      <button type="button" data-ya-view="directions">
-        ${iconTemplate("pin")}
-        <span>Yol tarifi</span>
-      </button>
-    `);
+    actions.push(homeActionCard({
+      view: "directions",
+      icon: "pin",
+      title: "Yol tarifi",
+      description: "Konumu açın veya ulaşımı sorun"
+    }));
   }
 
   if (config.whatsappPhone.trim()) {
-    actions.push(`
-      <button type="button" data-ya-view="whatsapp">
-        ${iconTemplate("whatsapp")}
-        <span>WhatsApp mesajı hazırla</span>
-      </button>
-    `);
+    actions.push(homeActionCard({
+      view: "whatsapp",
+      icon: "whatsapp",
+      title: "WhatsApp",
+      description: "Hazır bir mesaj oluşturun"
+    }));
   }
 
   return `
     <div class="ya-widget-home">
       <div class="ya-widget-welcome">
-        <span class="ya-widget-bot-bubble" aria-hidden="true">${iconTemplate("bot")}</span>
+        <span class="ya-widget-bot-bubble" aria-hidden="true">${iconTemplate("sparkles")}</span>
         <div>
-          <span class="ya-widget-kicker">AI destekli hızlı yardımcı</span>
-          <h2 class="ya-widget-view-title" tabindex="-1">Size nasıl yardımcı olayım?</h2>
-          <p>İhtiyacınızı seçin, gerekli adımları birlikte tamamlayalım.</p>
+          <span class="ya-widget-kicker">İşletme yardımcısı</span>
+          <h2 class="ya-widget-view-title" tabindex="-1">Ne yapmak istiyorsunuz?</h2>
+          <p>İşlemi seçin; gerekli alanı doğrudan açayım.</p>
         </div>
       </div>
       <div class="ya-widget-actions" role="group" aria-label="Hızlı asistan seçenekleri">
         ${actions.join("")}
       </div>
-      <p class="ya-widget-trust">
-        ${iconTemplate("shield")}
-        <span>Bilgileriniz işletmeye iletilir, son onayı işletme yapar.</span>
-      </p>
     </div>
   `;
 }
 
+function homeActionCard(input: {
+  view?: WidgetView;
+  requestType?: RequestType;
+  icon: IconName;
+  title: string;
+  description: string;
+}) {
+  const actionAttribute = input.requestType
+    ? `data-ya-request-type="${input.requestType}"`
+    : `data-ya-view="${input.view ?? "home"}"`;
+  return `
+    <button class="ya-widget-action-card" type="button" ${actionAttribute}>
+      <span class="ya-widget-action-icon" aria-hidden="true">${iconTemplate(input.icon)}</span>
+      <span class="ya-widget-action-copy">
+        <strong>${escapeHtml(input.title)}</strong>
+        <small>${escapeHtml(input.description)}</small>
+      </span>
+      <span class="ya-widget-action-arrow" aria-hidden="true">${iconTemplate("chevron-right")}</span>
+    </button>
+  `;
+}
+
+function formTemplate() {
 function formTemplate() {
   const isTableRequest = state.requestType === "restaurant_reservation";
   const requestLabel = isTableRequest ? "Masa talebi" : "Rezervasyon talebi";
@@ -373,7 +415,7 @@ function formTemplate() {
         <span aria-hidden="true">${iconTemplate("sparkles")}</span>
         <div>
           <h2 class="ya-widget-view-title" tabindex="-1">${title}</h2>
-          <p>Sadece gerekli bilgileri ekleyin; mesajınız WhatsApp'ta hazır açılsın.</p>
+          <p>Tarih ve iletişim bilgilerinizi ekleyin.</p>
         </div>
       </div>
       ${contextCardTemplate()}
@@ -397,10 +439,9 @@ function formTemplate() {
           <textarea name="message" rows="2" placeholder="Tercihiniz veya eklemek istediğiniz kısa not"></textarea>
         </label>
         <button class="ya-widget-primary-action" type="submit">
-          ${iconTemplate("whatsapp")}
-          <span>WhatsApp mesajını hazırla</span>
+          ${iconTemplate("send")}
+          <span>Talebi Gönder</span>
         </button>
-        <p class="ya-widget-form-note">${iconTemplate("shield")} Bilgileriniz yalnızca talebinize dönüş yapılması için kullanılır.</p>
       </form>
     </div>
   `;
@@ -510,9 +551,9 @@ function infoTemplate() {
           )}</textarea>
         </label>
         <div class="ya-widget-ai-actions">
-          <button class="ya-widget-primary-action" type="submit" ${state.aiLoading ? "disabled" : ""}>
-            ${iconTemplate("sparkles")}
-            <span>${state.aiLoading ? "Yanıt hazırlanıyor" : "AI Yardımcıya Sor"}</span>
+          <button class="ya-widget-primary-action ${state.aiLoading ? "is-loading" : ""}" type="submit" ${state.aiLoading ? "disabled" : ""}>
+            ${state.aiLoading ? '<span class="ya-widget-spinner" aria-hidden="true"></span>' : iconTemplate("sparkles")}
+            <span>${state.aiLoading ? "Yanıt hazırlanıyor…" : "AI Yardımcıya Sor"}</span>
           </button>
           ${config.whatsappPhone.trim()
             ? `<button class="ya-widget-secondary-action" type="button" data-ya-ai-whatsapp>
@@ -530,7 +571,6 @@ function infoTemplate() {
             </div>`
           : ""
       }
-      <p class="ya-widget-trust ya-widget-inline-trust">${iconTemplate("shield")} Kesin fiyat ve müsaitlik bilgisini işletme onaylar.</p>
     </div>
   `;
 }
@@ -733,6 +773,11 @@ function bindDateControls(root: HTMLElement) {
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("button") : null;
     if (!button || button.disabled) return;
 
+    if (button.dataset.yaCalendarShortcut) {
+      applyCalendarShortcut(root, String(button.dataset.yaCalendarShortcut), calendar);
+      return;
+    }
+
     if (button.dataset.yaCalendarShift) {
       const amount = Number(button.dataset.yaCalendarShift);
       const current = parseLocalIsoDate(String(calendar.dataset.yaCalendarMonth ?? ""));
@@ -778,7 +823,8 @@ function closeTurkishDatePicker(root: HTMLElement) {
 function renderTurkishCalendar(root: HTMLElement) {
   const calendar = root.querySelector<HTMLElement>("[data-ya-calendar]");
   if (!calendar) return;
-  const input = root.querySelector<HTMLInputElement>(`input[name="${String(calendar.dataset.yaCalendarTarget ?? "")}"]`);
+  const target = String(calendar.dataset.yaCalendarTarget ?? "");
+  const input = root.querySelector<HTMLInputElement>(`input[name="${target}"]`);
   const monthDate = parseLocalIsoDate(String(calendar.dataset.yaCalendarMonth ?? ""));
   if (!input || !monthDate) return;
 
@@ -790,14 +836,30 @@ function renderTurkishCalendar(root: HTMLElement) {
   const minValue = input.min || toLocalIsoDate(new Date());
   const selectedValue = input.value;
   const todayValue = toLocalIsoDate(new Date());
+  const startValue = root.querySelector<HTMLInputElement>('input[name="start_date"]')?.value ?? "";
+  const endValue = root.querySelector<HTMLInputElement>('input[name="end_date"]')?.value ?? "";
+  const isAccommodation = Boolean(root.querySelector("[data-ya-accommodation-dates]"));
   const cells: string[] = [];
+
   for (let i = 0; i < leading; i += 1) cells.push('<span class="ya-widget-calendar-empty" aria-hidden="true"></span>');
   for (let day = 1; day <= monthEnd.getDate(); day += 1) {
     const value = toLocalIsoDate(new Date(year, month, day));
     const disabled = value < minValue;
-    const classes = [value === selectedValue ? "is-selected" : "", value === todayValue ? "is-today" : ""].filter(Boolean).join(" ");
+    const inRange = Boolean(isAccommodation && startValue && endValue && value > startValue && value < endValue);
+    const rangeEdge = Boolean(isAccommodation && (value === startValue || value === endValue));
+    const classes = [
+      value === selectedValue ? "is-selected" : "",
+      value === todayValue ? "is-today" : "",
+      inRange ? "is-in-range" : "",
+      rangeEdge ? "is-range-edge" : ""
+    ].filter(Boolean).join(" ");
     cells.push(`<button type="button" data-ya-calendar-day="${value}" class="${classes}" ${disabled ? "disabled" : ""} aria-label="${escapeAttribute(formatTurkishCalendarDate(value))}">${day}</button>`);
   }
+
+  const shortcuts = isAccommodation
+    ? [["clear", "Temizle"], ["today", "Bugün"], ["tomorrow", "Yarın"], ["night1", "1 gece"], ["night2", "2 gece"]]
+    : [["clear", "Temizle"], ["today", "Bugün"], ["tomorrow", "Yarın"], ["weekend", "Hafta sonu"]];
+
   const previousMonthEnd = toLocalIsoDate(new Date(year, month, 0));
   calendar.innerHTML = `
     <div class="ya-widget-calendar-head">
@@ -805,9 +867,79 @@ function renderTurkishCalendar(root: HTMLElement) {
       <strong class="ya-widget-calendar-title">${escapeHtml(formatTurkishMonth(monthDate))}</strong>
       <button type="button" data-ya-calendar-shift="1" aria-label="Sonraki ay">${iconTemplate("chevron-right")}</button>
     </div>
+    <div class="ya-widget-calendar-shortcuts">
+      ${shortcuts.map(([key, label]) => `<button type="button" data-ya-calendar-shortcut="${key}">${label}</button>`).join("")}
+    </div>
     <div class="ya-widget-calendar-weekdays" aria-hidden="true"><span>Pzt</span><span>Sal</span><span>Çar</span><span>Per</span><span>Cum</span><span>Cmt</span><span>Paz</span></div>
     <div class="ya-widget-calendar-days">${cells.join("")}</div>
   `;
+}
+
+function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HTMLElement) {
+  const target = String(calendar.dataset.yaCalendarTarget ?? "");
+  const input = root.querySelector<HTMLInputElement>(`input[name="${target}"]`);
+  if (!input) return;
+  const isAccommodation = Boolean(root.querySelector("[data-ya-accommodation-dates]"));
+  const today = new Date();
+
+  if (shortcut === "clear") {
+    clearCalendarSelection(root, target);
+    closeTurkishDatePicker(root);
+    return;
+  }
+
+  if (shortcut === "night1" || shortcut === "night2") {
+    const nights = shortcut === "night2" ? 2 : 1;
+    const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
+    const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
+    if (!isAccommodation || !startInput || !endInput) return;
+    const start = parseLocalIsoDate(startInput.value) ?? today;
+    startInput.value = toLocalIsoDate(start);
+    endInput.value = toLocalIsoDate(addLocalDays(start, nights));
+    startInput.dispatchEvent(new Event("change", { bubbles: true }));
+    endInput.dispatchEvent(new Event("change", { bubbles: true }));
+    closeTurkishDatePicker(root);
+    return;
+  }
+
+  const chosen = shortcut === "tomorrow"
+    ? addLocalDays(today, 1)
+    : shortcut === "weekend"
+      ? nextWeekendDate(today)
+      : today;
+  const value = toLocalIsoDate(chosen);
+  if (input.min && value < input.min) return;
+  input.value = value;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  closeTurkishDatePicker(root);
+}
+
+function clearCalendarSelection(root: HTMLElement, target: string) {
+  const input = root.querySelector<HTMLInputElement>(`input[name="${target}"]`);
+  if (input) input.value = "";
+
+  if (root.querySelector("[data-ya-accommodation-dates]")) {
+    const start = root.querySelector<HTMLInputElement>('input[name="start_date"]');
+    const end = root.querySelector<HTMLInputElement>('input[name="end_date"]');
+    if (target === "start_date" && start && end) {
+      start.value = "";
+      end.value = "";
+      end.min = toLocalIsoDate(addLocalDays(new Date(), 1));
+    }
+    updateAccommodationDateControls(root);
+    return;
+  }
+
+  const dateText = root.querySelector<HTMLInputElement>('input[name="date_text"]');
+  const label = root.querySelector<HTMLElement>("[data-ya-custom-date-label]");
+  const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
+  if (dateText) dateText.value = "";
+  if (label) label.textContent = "Tarih seç";
+  if (selectedDate) selectedDate.textContent = "Tarih ve saat seçiminizi yapın.";
+  root.querySelectorAll<HTMLButtonElement>("[data-ya-date-preset]").forEach((button) => {
+    button.classList.remove("is-active");
+    button.setAttribute("aria-pressed", "false");
+  });
 }
 
 function updateAccommodationDateControls(root: HTMLElement) {
@@ -909,7 +1041,7 @@ function bindInfoControls(root: HTMLElement) {
     state.questionDraft = textarea.value;
     const message = `Merhaba, ${config.businessName} hakkında bilgi almak istiyorum. Sorum: ${question}`;
     window.open(createWhatsAppLink(config.whatsappPhone, message), "_blank", "noopener,noreferrer");
-    setStatus("Sorunuz WhatsApp mesajı olarak hazırlandı.");
+    setStatus("");
   });
 }
 
@@ -1083,7 +1215,7 @@ async function handleAiSubmit(event: Event) {
     return;
   }
 
-  state = { ...state, questionDraft: message, status: "Yanıt hazırlanıyor.", aiLoading: true };
+  state = { ...state, questionDraft: message, status: "", aiLoading: true };
   render();
 
   let failureStatus = "";
@@ -1133,18 +1265,16 @@ function handleDirectWhatsAppSubmit(event: Event) {
 
   state.whatsappDraft = message;
   window.open(createWhatsAppLink(config.whatsappPhone, message), "_blank", "noopener,noreferrer");
-  setStatus("Mesajınız WhatsApp'ta hazırlandı.");
+  setStatus("");
 }
 
 function setStatus(message: string) {
   state.status = message;
-  const status = document.querySelector<HTMLElement>(`#${ROOT_ID} [data-ya-status]`);
-  if (!status) {
-    return;
-  }
-
-  status.textContent = message;
-  status.hidden = !message;
+  const notice = document.querySelector<HTMLElement>(`#${ROOT_ID} [data-ya-status]`);
+  const text = notice?.querySelector<HTMLElement>("[data-ya-status-text]");
+  if (!notice || !text) return;
+  text.textContent = message;
+  notice.hidden = !message;
 }
 
 function formatAiError(error?: AiErrorDetail | null, fallbackMessage = ""): string {
@@ -1284,6 +1414,8 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       box-shadow: 0 22px 52px rgba(18, 59, 54, 0.34), 0 0 0 6px rgba(47, 111, 94, 0.09);
     }
 
+    .ya-widget-button:active { transform: translateY(0) scale(.98); }
+
     .ya-widget-launcher-avatar {
       position: relative;
       display: grid;
@@ -1358,6 +1490,23 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       border-radius: 24px;
       background: #fff9ef;
       box-shadow: 0 28px 80px rgba(23, 32, 51, 0.26), 0 0 0 5px rgba(47, 111, 94, 0.07);
+      transform-origin: right bottom;
+      animation: ya-widget-panel-in 210ms cubic-bezier(.2,.8,.2,1) both;
+    }
+
+    .ya-widget-panel.is-closing {
+      animation: ya-widget-panel-out 150ms ease-in both;
+      pointer-events: none;
+    }
+
+    @keyframes ya-widget-panel-in {
+      from { opacity: 0; transform: translateY(14px) scale(.975); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @keyframes ya-widget-panel-out {
+      from { opacity: 1; transform: translateY(0) scale(1); }
+      to { opacity: 0; transform: translateY(10px) scale(.985); }
     }
 
     .ya-widget-header {
@@ -1470,6 +1619,38 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       transform: translateY(-1px);
     }
 
+    .ya-widget-notice {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 9px 13px;
+      border-bottom: 1px solid rgba(185, 112, 25, 0.18);
+      color: #6c4719;
+      background: #fff4df;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.4;
+      animation: ya-widget-notice-in 150ms ease-out both;
+    }
+
+    .ya-widget-notice-icon {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 7px;
+      color: #8b5b1c;
+      background: rgba(255,255,255,.72);
+    }
+
+    .ya-widget-notice-icon .ya-widget-icon { width: 13px !important; height: 13px !important; }
+
+    @keyframes ya-widget-notice-in {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .ya-widget-content {
       min-height: 0;
       overflow-y: auto;
@@ -1482,6 +1663,12 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       display: grid;
       gap: 14px;
       padding: 16px;
+      animation: ya-widget-view-in 170ms ease-out both;
+    }
+
+    @keyframes ya-widget-view-in {
+      from { opacity: 0; transform: translateX(7px); }
+      to { opacity: 1; transform: translateX(0); }
     }
 
     .ya-widget-welcome,
@@ -1537,46 +1724,87 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     }
 
     .ya-widget-actions {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
 
-    .ya-widget-actions button,
-    .ya-widget-actions a,
+    .ya-widget-action-card {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) 16px;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      min-height: 72px;
+      padding: 10px;
+      border: 1px solid rgba(47, 111, 94, 0.14);
+      border-radius: 15px;
+      color: #24313a;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 5px 16px rgba(23, 32, 51, 0.04);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+    }
+
+    .ya-widget-action-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(47, 111, 94, 0.36);
+      box-shadow: 0 8px 20px rgba(23, 32, 51, 0.07);
+    }
+
+    .ya-widget-action-card:active { transform: translateY(0) scale(.985); }
+
+    .ya-widget-action-icon {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 11px;
+      color: ${widgetConfig.primaryColor};
+      background: #edf6ec;
+    }
+
+    .ya-widget-action-copy { display: grid; min-width: 0; gap: 2px; }
+    .ya-widget-action-copy strong { color: #172033; font-size: 11px; font-weight: 850; }
+
+    .ya-widget-action-copy small {
+      display: -webkit-box;
+      overflow: hidden;
+      color: #6d737c;
+      font-size: 9px;
+      font-weight: 600;
+      line-height: 1.3;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .ya-widget-action-arrow { display: grid; place-items: center; color: #8b918f; }
+    .ya-widget-action-arrow .ya-widget-icon { width: 14px !important; height: 14px !important; }
+
     .ya-widget-suggestions button,
     .ya-widget-topic-chips button {
       display: inline-flex;
       align-items: center;
       justify-content: center;
       gap: 7px;
-      min-height: 44px;
-      padding: 9px 12px;
+      min-height: 40px;
+      padding: 8px 11px;
       border: 1px solid #ddd9d0;
       border-radius: 999px;
       color: #24313a;
       background: rgba(255, 255, 255, 0.92);
       box-shadow: 0 5px 16px rgba(23, 32, 51, 0.04);
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 750;
-      text-decoration: none;
       cursor: pointer;
       transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
     }
 
-    .ya-widget-actions button:hover,
-    .ya-widget-actions a:hover,
     .ya-widget-suggestions button:hover,
     .ya-widget-topic-chips button:hover {
       transform: translateY(-1px);
       border-color: rgba(47, 111, 94, 0.42);
-    }
-
-    .ya-widget-actions button:nth-child(1),
-    .ya-widget-actions button:nth-child(2) {
-      color: ${widgetConfig.primaryColor};
-      border-color: rgba(47, 111, 94, 0.2);
-      background: #f5faf5;
     }
 
     .ya-widget-context-card,
@@ -1908,6 +2136,28 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     .ya-widget-calendar-head > button:disabled { cursor: not-allowed; opacity: .35; }
     .ya-widget-calendar-title { color: #172033; font-size: 12px; font-weight: 850; text-align: center; }
 
+    .ya-widget-calendar-shortcuts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .ya-widget-calendar-shortcuts button {
+      min-height: 28px;
+      padding: 5px 8px;
+      border: 1px solid rgba(47, 111, 94, 0.14);
+      border-radius: 999px;
+      color: #52605c;
+      background: #f5faf4;
+      font-size: 9px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease;
+    }
+
+    .ya-widget-calendar-shortcuts button:first-child { color: #7a6557; background: #fff8ef; }
+    .ya-widget-calendar-shortcuts button:hover { transform: translateY(-1px); border-color: rgba(47, 111, 94, 0.34); }
+
     .ya-widget-calendar-weekdays,
     .ya-widget-calendar-days {
       display: grid;
@@ -1940,7 +2190,15 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-calendar-days button:hover:not(:disabled) { border-color: rgba(47, 111, 94, 0.28); background: #f1f7f0; }
     .ya-widget-calendar-days button.is-today { border-color: rgba(47, 111, 94, 0.3); }
-    .ya-widget-calendar-days button.is-selected { color: #ffffff; border-color: transparent; background: ${widgetConfig.primaryColor}; }
+    .ya-widget-calendar-days button.is-in-range { border-radius: 7px; background: rgba(47, 111, 94, 0.10); }
+
+    .ya-widget-calendar-days button.is-range-edge,
+    .ya-widget-calendar-days button.is-selected {
+      color: #ffffff;
+      border-color: transparent;
+      background: ${widgetConfig.primaryColor};
+    }
+
     .ya-widget-calendar-days button:disabled { color: #c4c5c7; cursor: not-allowed; }
 
     .ya-widget-time-field {
@@ -2130,6 +2388,36 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       padding-top: 2px;
     }
 
+    .ya-widget-primary-action,
+    .ya-widget-secondary-action {
+      transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+    }
+
+    .ya-widget-primary-action:active:not(:disabled),
+    .ya-widget-secondary-action:active:not(:disabled) { transform: scale(.985); }
+
+    .ya-widget-primary-action.is-loading { cursor: wait; }
+
+    .ya-widget-spinner {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: ya-widget-spin 700ms linear infinite;
+    }
+
+    @keyframes ya-widget-spin { to { transform: rotate(360deg); } }
+
+    .ya-widget-ai-answer,
+    .ya-widget-request-success { animation: ya-widget-result-in 190ms ease-out both; }
+
+    @keyframes ya-widget-result-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
     .ya-widget-message-preview {
       padding: 11px;
       border: 1px solid rgba(47, 111, 94, 0.14);
@@ -2247,11 +2535,23 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     @media (prefers-reduced-motion: reduce) {
       .ya-widget-button,
-      .ya-widget-actions button,
-      .ya-widget-actions a,
+      .ya-widget-action-card,
       .ya-widget-suggestions button,
-      .ya-widget-topic-chips button {
+      .ya-widget-topic-chips button,
+      .ya-widget-primary-action,
+      .ya-widget-secondary-action {
         transition: none;
+      }
+
+      .ya-widget-panel,
+      .ya-widget-panel.is-closing,
+      .ya-widget-home,
+      .ya-widget-subview,
+      .ya-widget-notice,
+      .ya-widget-ai-answer,
+      .ya-widget-request-success,
+      .ya-widget-spinner {
+        animation: none;
       }
     }
   `;
@@ -2264,6 +2564,8 @@ const iconPaths = {
   table: '<path d="M4 10h16M6 10l-1 10M18 10l1 10M8 6h8a2 2 0 0 1 2 2v2H6V8a2 2 0 0 1 2-2Z"/>',
   bed: '<path d="M3 18v-7M21 18v-5a2 2 0 0 0-2-2H9a3 3 0 0 0-3 3v1M3 15h18M7 11V8h5a2 2 0 0 1 2 2v1"/>',
   pin: '<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/>',
   "chevron-left": '<path d="m15 18-6-6 6-6"/>',
   "chevron-right": '<path d="m9 18 6-6-6-6"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.7 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-.9.8-.9 1.6M12 17h.01"/>',

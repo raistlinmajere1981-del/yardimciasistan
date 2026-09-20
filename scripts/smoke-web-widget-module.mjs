@@ -94,6 +94,9 @@ try {
   await expect(pensionPage.locator("[data-ya-calendar]")).toBeVisible();
   await expect(pensionPage.locator(".ya-widget-calendar-weekdays")).toContainText("Pzt");
   await expect(pensionPage.locator(".ya-widget-calendar-weekdays")).toContainText("Çar");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Temizle");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Bugün");
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("1 gece");
   await pensionPage.locator(".ya-widget-calendar-days button:not([disabled])").first().click();
   await pensionPage.locator('[data-ya-open-date-picker="end_date"]').click();
   await pensionPage.locator(".ya-widget-calendar-days button:not([disabled])").first().click();
@@ -141,6 +144,7 @@ try {
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
   await expect(page.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
   await expect(page.locator('[data-ya-request-type="restaurant_reservation"]')).toBeVisible();
+  await expect(page.locator(".ya-widget-action-card")).toHaveCount(5);
   await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
 
   await page.evaluate(() => {
@@ -152,8 +156,8 @@ try {
 
   await page.locator('[data-ya-request-type="restaurant_reservation"]').click();
   await expect(page.locator('.ya-widget-form button[type="submit"]')).toContainText("Talebi Gönder");
-  await expect(page.locator(".ya-widget-subview-intro p")).toContainText("doğrudan iletin");
-  await expect(page.locator(".ya-widget-form-note")).toContainText("WhatsApp kullanmak zorunlu değildir");
+  await expect(page.locator(".ya-widget-form-note")).toHaveCount(0);
+  await expect(page.locator(".ya-widget-subview-intro p")).toContainText("Tarih ve iletişim");
 
   await page.locator('.ya-widget-form input[name="customer_name"]').fill("Widget Misafir");
   await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 444 33 22");
@@ -210,8 +214,8 @@ try {
   await page.locator('.ya-widget-ai button[type="submit"]').click();
 
   await expect(page.locator(".ya-widget-ai-answer")).toContainText("işletme sahibi");
-  await expect(page.locator(".ya-widget-status")).toContainText("AI bağlantısı işletme ayarlarında kapalı");
-  await expect(page.locator(".ya-widget-status")).toContainText("ai_disabled");
+  await expect(page.locator(".ya-widget-notice")).toContainText("AI bağlantısı işletme ayarlarında kapalı");
+  await expect(page.locator(".ya-widget-notice")).toContainText("ai_disabled");
 
   const conversations = JSON.parse(readFileSync(conversationsFile, "utf8"));
   expect(conversations).toHaveLength(1);
