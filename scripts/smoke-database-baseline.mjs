@@ -260,7 +260,6 @@ function assertCurrentDatabase(database, options = {}) {
   const settingsColumns = tableColumns(database, "settings");
   const productColumns = tableColumns(database, "catalog_products");
   const localCredentialColumns = tableColumns(database, "android_local_credentials");
-  const settingsColumns = tableColumns(database, "settings");
   assert.ok(settingsColumns.has("local_network_enabled"));
   assert.ok(localCredentialColumns.has("device_id"));
   assert.ok(localCredentialColumns.has("token_hash"));
