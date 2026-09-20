@@ -63,9 +63,9 @@ export class LocalCompanionPairingService {
 
   pair(input: LocalCompanionPairingInput): LocalCompanionPairingResult {
     const session = this.activeSession;
-    this.activeSession = null;
 
     if (!session || Date.now() > session.expiresAtMs) {
+      this.activeSession = null;
       return {
         ok: false,
         code: "pairing_expired",
@@ -83,6 +83,10 @@ export class LocalCompanionPairingService {
         statusCode: 401
       };
     }
+
+    // A valid code is consumed before any database mutation. Failed guesses do
+    // not let another LAN peer cancel the user's pairing window.
+    this.activeSession = null;
 
     const now = new Date().toISOString();
     const registered = this.database.registerPendingLocalAndroidDevice({
