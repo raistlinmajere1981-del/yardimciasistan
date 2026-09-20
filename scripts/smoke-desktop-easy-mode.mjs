@@ -1,4 +1,5 @@
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import http from "node:http";
@@ -36,7 +37,7 @@ server.stderr.on("data", (chunk) => {
 async function runSmoke() {
   try {
     await waitForUrl(baseUrl);
-    browser = await chromium.launch();
+    browser = await launchChromiumForSmoke(chromium);
 
     await verifyFreshSetup(browser, baseUrl);
     await verifyEmbeddedSettings(browser, baseUrl);
