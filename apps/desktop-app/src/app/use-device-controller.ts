@@ -11,7 +11,7 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
   const [backupState, setBackupState] = useState<SyncState>("idle");
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidPublishState, setAndroidPublishState] = useState<SyncState>("idle");
-  const [androidPublishMessage, setAndroidPublishMessage] = useState("Android özeti henüz yayınlanmadı.");
+  const [androidPublishMessage, setAndroidPublishMessage] = useState("Web Android özeti henüz yayınlanmadı.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
   const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
   const [localPairingState, setLocalPairingState] = useState<SyncState>("idle");
