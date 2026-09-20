@@ -10,31 +10,8 @@ interface UseDeviceControllerOptions {
 export function useDeviceController({ setDashboardData }: UseDeviceControllerOptions) {
   const [backupState, setBackupState] = useState<SyncState>("idle");
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
-  const [androidPublishState, setAndroidPublishState] = useState<SyncState>("idle");
-  const [androidPublishMessage, setAndroidPublishMessage] = useState("Web Android özeti henüz yayınlanmadı.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
   const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
-  async function handlePublishAndroidSnapshot() {
-    setAndroidPublishState("loading");
-    setAndroidPublishMessage("Android özeti web modülüne gönderiliyor...");
-
-    if (!window.yardimciDesktop) {
-      setAndroidPublishState("error");
-      setAndroidPublishMessage("Telefon özeti yayınlanamadı. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.pushAndroidSnapshot();
-    if (!result.ok) {
-      setAndroidPublishState("error");
-      setAndroidPublishMessage(result.message);
-      return;
-    }
-
-    setAndroidPublishState("success");
-    setAndroidPublishMessage(`${result.task_count} günlük iş ile Android özeti yayınlandı.`);
-  }
-
   async function runAndroidDeviceMutation(
     pendingMessage: string,
     operation: () => ReturnType<NonNullable<typeof window.yardimciDesktop>["setAndroidDeviceRole"]>
@@ -128,11 +105,8 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
   return {
     backupState,
     backupMessage,
-    androidPublishState,
-    androidPublishMessage,
     androidDeviceState,
     androidDeviceMessage,
-    handlePublishAndroidSnapshot,
     handleSetAndroidDeviceRole,
     handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
