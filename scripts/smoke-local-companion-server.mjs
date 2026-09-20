@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import {
   LocalCompanionServer
@@ -8,8 +11,14 @@ import {
 import {
   emptyAndroidMarketSnapshot
 } from "../apps/desktop-app/dist-electron/market-android-snapshot.js";
+import {
+  LocalCompanionPairingService
+} from "../apps/desktop-app/dist-electron/local-companion-pairing-service.js";
+import {
+  DesktopDatabase
+} from "../apps/desktop-app/dist-electron/database.js";
 
-const TOKEN = "yal_test_local_token";
+const TOKEN = "yal_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 function baseSnapshot() {
   return {
@@ -113,6 +122,54 @@ function assertProjection() {
   assert.deepEqual(unknown.market.products, []);
 }
 
+function assertPairingStore() {
+  const root = mkdtempSync(join(tmpdir(), "yardimci-local-companion-"));
+  const database = new DesktopDatabase({
+    appPath: join(process.cwd(), "apps", "desktop-app"),
+    userDataPath: root,
+    backupPath: join(root, "backups")
+  });
+
+  try {
+    database.initialize();
+    const pairing = new LocalCompanionPairingService(database);
+    const session = pairing.begin(60_000);
+    const first = pairing.pair({
+      pairingSecret: session.pairingSecret,
+      deviceId: "device-local-test",
+      deviceName: "Local Test Telefonu",
+      appVersion: "0.1.1"
+    });
+    assert.equal(first.ok, true);
+    if (!first.ok) throw new Error(first.message);
+    assert.match(first.token, /^yal_[a-f0-9]{64}$/);
+    assert.equal(first.approvalRequired, true);
+    assert.equal(database.authorizeAndroidLocalCredential("device-local-test", first.token), false);
+
+    const activated = database.setAndroidDeviceActive("device-local-test", true);
+    assert.equal(activated.ok, true);
+    assert.equal(database.authorizeAndroidLocalCredential("device-local-test", first.token), true);
+    assert.equal(database.authorizeAndroidLocalCredential("device-local-test", TOKEN), false);
+
+    const replay = pairing.pair({
+      pairingSecret: session.pairingSecret,
+      deviceId: "device-local-test",
+      deviceName: "Local Test Telefonu",
+      appVersion: "0.1.1"
+    });
+    assert.equal(replay.ok, false);
+    if (replay.ok) throw new Error("Pairing secret replay unexpectedly succeeded.");
+    assert.equal(replay.code, "pairing_expired");
+
+    const revoked = database.revokeAndroidDevice("device-local-test");
+    assert.equal(revoked.ok, true);
+    assert.equal(database.authorizeAndroidLocalCredential("device-local-test", first.token), false);
+  } finally {
+    database.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 async function assertServer() {
   let appliedAction = null;
   const server = new LocalCompanionServer({
@@ -189,5 +246,6 @@ async function assertServer() {
 }
 
 assertProjection();
+assertPairingStore();
 await assertServer();
-console.log("Local companion server smoke passed.");
+console.log("Local companion server + pairing smoke passed.");
