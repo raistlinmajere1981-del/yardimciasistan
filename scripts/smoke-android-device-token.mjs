@@ -65,6 +65,17 @@ try {
   assert.equal(pendingClaim.status, 403, "Onaysız cihaz token alamamalı.");
   assert.equal((await pendingClaim.json()).code, "device_approval_required");
 
+  const pendingTicketResponse = await postAndroid({
+    action: "local_pairing_ticket",
+    device_id: deviceId
+  }, { "X-YA-Sync-Secret": syncSecret });
+  assert.equal(
+    pendingTicketResponse.status,
+    200,
+    "Onaysız cihaz operasyon yetkisi kazanmadan otomatik local ticket alabilmeli."
+  );
+  assertLocalPairingTicket(await pendingTicketResponse.json());
+
   const publication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
     client_id: desktopId,
