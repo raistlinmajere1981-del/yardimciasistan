@@ -131,7 +131,11 @@ final class HostingSyncClient {
       connection.setChunkedStreamingMode(16 * 1024);
       connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
       connection.setRequestProperty("Accept", "application/json");
-      applyAuthorization(connection, credential, identity);
+      if (includeAuthorization) {
+        applyAuthorization(connection, credential, identity);
+      } else {
+        connection.setRequestProperty("X-YA-Device-Id", identity.deviceId);
+      }
 
       try (DataOutputStream output = new DataOutputStream(connection.getOutputStream())) {
         writeMultipartField(output, boundary, "source", "android");
@@ -284,6 +288,36 @@ final class HostingSyncClient {
     }
   }
 
+  String claimBootstrapDeviceToken(
+      String baseUrl,
+      String bootstrapTicket,
+      DeviceIdentity identity
+  ) throws SyncException {
+    JSONObject request = new JSONObject();
+    try {
+      request.put("bootstrap_ticket", bootstrapTicket == null ? "" : bootstrapTicket.trim());
+      request.put("device_name", identity.deviceName);
+      request.put("app_version", identity.appVersion);
+    } catch (Exception error) {
+      throw new SyncException("Android kurulum eşleştirme isteği hazırlanamadı.", error);
+    }
+
+    JSONObject response = postJson(
+        normalizeBaseUrl(baseUrl) + "/api/android-bootstrap.php",
+        "",
+        identity,
+        request,
+        READ_TIMEOUT_MS,
+        "Web modülü Android kurulum eşleştirmesini desteklemiyor. Hosting paketini güncelleyin.",
+        false
+    );
+    String token = response.optString("device_token", "").trim();
+    if (!token.matches("yat_[a-f0-9]{64}")) {
+      throw new SyncException("Telefonun kişisel bağlantı anahtarı alınamadı.");
+    }
+    return token;
+  }
+
   LocalPairingTicketResult requestLocalPairingTicket(
       String baseUrl,
       String credential,
@@ -335,6 +369,18 @@ final class HostingSyncClient {
       JSONObject payload,
       int readTimeoutMs,
       String notFoundMessage
+  ) throws SyncException {
+    return postJson(endpointUrl, credential, identity, payload, readTimeoutMs, notFoundMessage, true);
+  }
+
+  private JSONObject postJson(
+      String endpointUrl,
+      String credential,
+      DeviceIdentity identity,
+      JSONObject payload,
+      int readTimeoutMs,
+      String notFoundMessage,
+      boolean includeAuthorization
   ) throws SyncException {
     HttpURLConnection connection = null;
     try {
