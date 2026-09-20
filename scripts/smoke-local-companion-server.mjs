@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -26,6 +27,7 @@ const TOKEN = "yal_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 function baseSnapshot() {
   return {
     business_capabilities: ["service.android", "core.reports", "core.finance"],
+    local_network_enabled: true,
     summary: {
       pending_daily_tasks: 0,
       today_tasks: 0,
@@ -130,6 +132,26 @@ function assertProjection() {
   assert.deepEqual(unknown.market.products, []);
 }
 
+function createPairingTicket({
+  syncSecret,
+  desktopId,
+  deviceId,
+  nonce = "0123456789abcdef0123456789abcdef",
+  issuedAt = Math.floor(Date.now() / 1000)
+}) {
+  const payload = {
+    v: 1,
+    desktop_id: desktopId,
+    device_id: deviceId,
+    iat: issuedAt,
+    exp: issuedAt + 120,
+    nonce
+  };
+  const encoded = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+  const signature = createHmac("sha256", syncSecret).update(encoded, "utf8").digest("hex");
+  return `yalp1.${encoded}.${signature}`;
+}
+
 function assertPairingStore() {
   const root = mkdtempSync(join(tmpdir(), "yardimci-local-companion-"));
   const database = new DesktopDatabase({
@@ -140,10 +162,20 @@ function assertPairingStore() {
 
   try {
     database.initialize();
-    const pairing = new LocalCompanionPairingService(database);
-    const session = pairing.begin(60_000);
+    const syncSecret = "ya-local-smoke-secret-123456";
+    const desktopId = database.getSyncRuntimeStatus().clientId;
+    const pairing = new LocalCompanionPairingService(database, {
+      desktopId: () => desktopId,
+      syncSecret: () => syncSecret,
+      localNetworkEnabled: () => true
+    });
+    const ticket = createPairingTicket({
+      syncSecret,
+      desktopId,
+      deviceId: "device-local-test"
+    });
     const first = pairing.pair({
-      pairingSecret: session.pairingSecret,
+      pairingTicket: ticket,
       deviceId: "device-local-test",
       deviceName: "Local Test Telefonu",
       appVersion: "0.1.1"
@@ -160,14 +192,14 @@ function assertPairingStore() {
     assert.equal(database.authorizeAndroidLocalCredential("device-local-test", TOKEN), false);
 
     const replay = pairing.pair({
-      pairingSecret: session.pairingSecret,
+      pairingTicket: ticket,
       deviceId: "device-local-test",
       deviceName: "Local Test Telefonu",
       appVersion: "0.1.1"
     });
     assert.equal(replay.ok, false);
-    if (replay.ok) throw new Error("Pairing secret replay unexpectedly succeeded.");
-    assert.equal(replay.code, "pairing_expired");
+    if (replay.ok) throw new Error("Pairing ticket replay unexpectedly succeeded.");
+    assert.equal(replay.code, "local_pairing_ticket_replayed");
 
     const revoked = database.revokeAndroidDevice("device-local-test");
     assert.equal(revoked.ok, true);
@@ -193,7 +225,8 @@ async function assertServer() {
       return { ok: true, message: "Applied.", alreadyApplied: false };
     },
     authorize: ({ deviceId, token }) => deviceId === "device-test" && token === TOKEN,
-    pair: ({ pairingSecret, deviceId }) => pairingSecret === "pair-secret" && deviceId === "device-pair"
+    enabled: () => true,
+    pair: ({ pairingTicket, deviceId }) => pairingTicket === "pair-ticket" && deviceId === "device-pair"
       ? {
           ok: true,
           token: TOKEN,
@@ -217,6 +250,7 @@ async function assertServer() {
     assert.equal(statusBody.ok, true);
     assert.equal(statusBody.desktop_id, "desktop-test-123");
     assert.equal(statusBody.pairing_required, true);
+    assert.equal(statusBody.local_network_enabled, true);
 
     const denied = await fetch(`${base}/local/v1/summary`, {
       method: "POST",
@@ -282,7 +316,7 @@ async function assertServer() {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        pairing_secret: "pair-secret",
+        pairing_ticket: "pair-ticket",
         device_id: "device-pair",
         device_name: "Pair Telefonu",
         app_version: "0.1.1"
