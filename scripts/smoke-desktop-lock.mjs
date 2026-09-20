@@ -1,4 +1,5 @@
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import http from "node:http";
@@ -25,7 +26,7 @@ server.stderr.on("data", (chunk) => {
 
 try {
   await waitForUrl(baseUrl);
-  const browser = await chromium.launch();
+  const browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 1366, height: 768 } });
 
   await page.addInitScript(({ capabilitySnapshot, setupData, dashboardData }) => {
