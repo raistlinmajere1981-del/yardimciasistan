@@ -1,0 +1,193 @@
+import assert from "node:assert/strict";
+import {
+  LocalCompanionServer
+} from "../apps/desktop-app/dist-electron/local-companion-server.js";
+import {
+  projectLocalAndroidSnapshotForDevice
+} from "../apps/desktop-app/dist-electron/local-android-device-projection.js";
+import {
+  emptyAndroidMarketSnapshot
+} from "../apps/desktop-app/dist-electron/market-android-snapshot.js";
+
+const TOKEN = "yal_test_local_token";
+
+function baseSnapshot() {
+  return {
+    business_capabilities: ["service.android", "core.reports", "core.finance"],
+    summary: {
+      pending_daily_tasks: 0,
+      today_tasks: 0,
+      available_rooms: 0,
+      total_rooms: 0,
+      available_tables: 0,
+      occupied_tables: 0,
+      bill_waiting_tables: 0,
+      active_table_orders: 0,
+      pending_reservations: 0,
+      prepared_whatsapp_messages: 0,
+      waiting_responses: 0,
+      active_menu_categories: 0,
+      available_menu_items: 0,
+      customer_count: 1
+    },
+    daily_tasks: [],
+    requests: [],
+    customers: [{ id: "customer-1", full_name: "Test Customer" }],
+    customer_room_stays: [{ id: "stay-1" }],
+    room_folios: [{ id: "folio-1" }],
+    reservations: [],
+    rooms: [],
+    tables: [],
+    menu: { categories: [], items: [], updated_at: "" },
+    admin_menu: { categories: [], items: [], updated_at: "" },
+    deleted_request_ids: [],
+    trackedStockItems: [],
+    appliedStockImageHashes: [],
+    table_orders: [],
+    messages: [],
+    androidPermissions: {
+      "device-admin": {
+        role: "admin",
+        is_active: true,
+        permissions: [
+          "customer.manage",
+          "finance.view",
+          "room_folio.view",
+          "market.product.view"
+        ]
+      },
+      "device-staff": {
+        role: "staff",
+        is_active: true,
+        permissions: []
+      },
+      "device-other": {
+        role: "admin",
+        is_active: true,
+        permissions: ["finance.view"]
+      }
+    },
+    finance: {
+      generated_at: "2026-09-20T00:00:00Z",
+      currency: "TRY",
+      today_income_minor: 1000,
+      today_expense_minor: 100,
+      today_net_minor: 900,
+      outstanding_pension_minor: 300,
+      recent_entries: []
+    },
+    reports: {},
+    market: {
+      ...emptyAndroidMarketSnapshot(),
+      products: []
+    },
+    updated_at: "2026-09-20T00:00:00Z"
+  };
+}
+
+function assertProjection() {
+  const source = baseSnapshot();
+
+  const staff = projectLocalAndroidSnapshotForDevice(source, "device-staff");
+  assert.equal(Object.keys(staff.androidPermissions).length, 1);
+  assert.equal(staff.androidPermissions["device-staff"].role, "staff");
+  assert.deepEqual(staff.customers, []);
+  assert.deepEqual(staff.customer_room_stays, []);
+  assert.deepEqual(staff.room_folios, []);
+  assert.equal(staff.finance.today_income_minor, 0);
+  assert.deepEqual(staff.reports, {});
+  assert.deepEqual(staff.market.products, []);
+
+  const admin = projectLocalAndroidSnapshotForDevice(source, "device-admin");
+  assert.equal(Object.keys(admin.androidPermissions).length, 1);
+  assert.equal(admin.androidPermissions["device-other"], undefined);
+  assert.equal(admin.customers.length, 1);
+  assert.equal(admin.customer_room_stays.length, 1);
+  assert.equal(admin.room_folios.length, 1);
+  assert.equal(admin.finance.today_income_minor, 1000);
+
+  const unknown = projectLocalAndroidSnapshotForDevice(source, "device-unknown");
+  assert.equal(unknown.androidPermissions["device-unknown"].is_active, false);
+  assert.deepEqual(unknown.requests, []);
+  assert.deepEqual(unknown.rooms, []);
+  assert.deepEqual(unknown.market.products, []);
+}
+
+async function assertServer() {
+  let appliedAction = null;
+  const server = new LocalCompanionServer({
+    desktopId: () => "desktop-test-123",
+    createSummary: (deviceId) => ({ device_id: deviceId, marker: "summary-ok" }),
+    applyAction: (action) => {
+      appliedAction = action;
+      return { ok: true, message: "Applied.", alreadyApplied: false };
+    },
+    authorize: ({ deviceId, token }) => deviceId === "device-test" && token === TOKEN
+  });
+
+  const address = await server.start("127.0.0.1", 0);
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const status = await fetch(`${base}/local/v1/status`);
+    assert.equal(status.status, 200);
+    const statusBody = await status.json();
+    assert.equal(statusBody.ok, true);
+    assert.equal(statusBody.desktop_id, "desktop-test-123");
+    assert.equal(statusBody.pairing_required, true);
+
+    const denied = await fetch(`${base}/local/v1/summary`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ya-device-id": "device-test",
+        "x-ya-local-token": "wrong"
+      },
+      body: "{}"
+    });
+    assert.equal(denied.status, 401);
+
+    const summary = await fetch(`${base}/local/v1/summary`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ya-device-id": "device-test",
+        "x-ya-local-token": TOKEN
+      },
+      body: "{}"
+    });
+    assert.equal(summary.status, 200);
+    const summaryBody = await summary.json();
+    assert.equal(summaryBody.snapshot.marker, "summary-ok");
+
+    const beforeRevision = summaryBody.source_revision;
+    const action = await fetch(`${base}/local/v1/action`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ya-device-id": "device-test",
+        "x-ya-local-token": TOKEN
+      },
+      body: JSON.stringify({
+        id: "android_action_local_smoke",
+        action_type: "room_update_status",
+        payload: { room_id: "room-1", status: "available" }
+      })
+    });
+    assert.equal(action.status, 200);
+    const actionBody = await action.json();
+    assert.equal(actionBody.status, "applied");
+    assert.ok(actionBody.source_revision > beforeRevision);
+    assert.equal(appliedAction.device_id, "device-test");
+
+    const pair = await fetch(`${base}/local/v1/pair`, { method: "POST", body: "{}" });
+    assert.equal(pair.status, 503);
+    const pairBody = await pair.json();
+    assert.equal(pairBody.code, "pairing_not_configured");
+  } finally {
+    await server.stop();
+  }
+}
+
+assertProjection();
+await assertServer();
+console.log("Local companion server smoke passed.");
