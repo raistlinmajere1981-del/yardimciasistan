@@ -71,11 +71,16 @@ interface SetupFormProps {
   androidPublishMessage?: string;
   androidDeviceState?: SyncState;
   androidDeviceMessage?: string;
+  localPairingState?: SyncState;
+  localPairingMessage?: string;
+  localPairingSecret?: string;
+  localPairingExpiresAt?: string;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
   onFormChange: (form: SetupFormState) => void;
   onTestAiConnection: () => void;
   onPublishAndroid?: () => void;
+  onBeginLocalPairing?: () => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetAndroidDevicePermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
@@ -101,11 +106,16 @@ export function SetupForm({
   androidPublishMessage = "Telefon özeti henüz yayınlanmadı.",
   androidDeviceState = "idle",
   androidDeviceMessage = "Telefon rolleri ve görev alanları masaüstünden yönetilir.",
+  localPairingState = "idle",
+  localPairingMessage = "Aynı ağdaki telefonu doğrudan eşleştirebilirsiniz.",
+  localPairingSecret = "",
+  localPairingExpiresAt = "",
   aiConnectionTestState,
   aiConnectionTestMessage,
   onFormChange,
   onTestAiConnection,
   onPublishAndroid,
+  onBeginLocalPairing,
   onSetAndroidDeviceRole,
   onSetAndroidDevicePermissionGroups,
   onSetAndroidDeviceActive,
@@ -638,7 +648,12 @@ export function SetupForm({
                   message={androidDeviceMessage}
                   publishState={androidPublishState}
                   publishMessage={androidPublishMessage}
+                  pairingState={localPairingState}
+                  pairingMessage={localPairingMessage}
+                  pairingSecret={localPairingSecret}
+                  pairingExpiresAt={localPairingExpiresAt}
                   onPublish={onPublishAndroid}
+                  onBeginLocalPairing={onBeginLocalPairing}
                   onSetRole={onSetAndroidDeviceRole}
                   onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
                   onSetActive={onSetAndroidDeviceActive}
@@ -956,7 +971,12 @@ interface AndroidDevicesSectionProps {
   message: string;
   publishState: SyncState;
   publishMessage: string;
+  pairingState: SyncState;
+  pairingMessage: string;
+  pairingSecret: string;
+  pairingExpiresAt: string;
   onPublish?: () => void;
+  onBeginLocalPairing?: () => void;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetPermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetActive?: (deviceId: string, active: boolean) => void;
@@ -971,7 +991,12 @@ function AndroidDevicesSection({
   message,
   publishState,
   publishMessage,
+  pairingState,
+  pairingMessage,
+  pairingSecret,
+  pairingExpiresAt,
   onPublish,
+  onBeginLocalPairing,
   onSetRole,
   onSetPermissionGroups,
   onSetActive,
@@ -1007,6 +1032,16 @@ function AndroidDevicesSection({
             variant="secondary"
             className="setup-secondary"
             type="button"
+            onClick={onBeginLocalPairing}
+            disabled={!onBeginLocalPairing || pairingState === "loading"}
+          >
+            <Smartphone size={15} aria-hidden="true" />
+            {pairingState === "loading" ? "Kod hazırlanıyor" : "Yerel Eşleştir"}
+          </ActionButton>
+          <ActionButton
+            variant="secondary"
+            className="setup-secondary"
+            type="button"
             onClick={onPublish}
             disabled={!onPublish || publishState === "loading"}
           >
@@ -1016,6 +1051,18 @@ function AndroidDevicesSection({
         </div>
       </div>
       <p className="settings-service-note">Rol ve görev alanları yalnız bu bilgisayardan değiştirilebilir.</p>
+      {pairingSecret && (
+        <div className="android-local-pairing">
+          <div>
+            <strong>Yerel eşleştirme kodu</strong>
+            <code>{pairingSecret}</code>
+          </div>
+          <span>
+            {pairingExpiresAt ? `Son kullanım: ${formatDateTime(pairingExpiresAt)}` : "Kod kısa süre için geçerlidir."}
+          </span>
+        </div>
+      )}
+      <p className={`menu-status sync-${pairingState}`} role="status" aria-live="polite">{pairingMessage}</p>
       {availableDevices.length === 0 ? (
         <div className="android-devices-empty">
           <Smartphone size={22} aria-hidden="true" />
