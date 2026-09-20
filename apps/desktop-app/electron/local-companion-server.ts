@@ -186,6 +186,7 @@ function summaryResponse(
     },
     operations: snapshot.summary,
     business_capabilities: snapshot.business_capabilities,
+    local_network_enabled: snapshot.local_network_enabled !== false,
     daily_tasks: snapshot.daily_tasks,
     requests: snapshot.requests,
     customers: snapshot.customers,
