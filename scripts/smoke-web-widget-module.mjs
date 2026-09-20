@@ -49,7 +49,7 @@ try {
   expect(publicBusinessBeforeSyncResponse.status).toBe(200);
   const publicBusinessBeforeSync = await publicBusinessBeforeSyncResponse.json();
   expect(publicBusinessBeforeSync.business.profile_id).toBe("pension_restaurant");
-  expect(publicBusinessBeforeSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
+  expect(publicBusinessBeforeSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu", "directions"]);
 
   const capabilityPublication = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
@@ -66,7 +66,8 @@ try {
           "accommodation.reservations",
           "food_service.tables",
           "food_service.reservations",
-          "food_service.menu"
+          "food_service.menu",
+          "channel.qr_menu"
         ]
       }
     })
@@ -77,7 +78,7 @@ try {
   const publicBusinessAfterSyncResponse = await fetch(`${baseUrl}/api/business.php`);
   expect(publicBusinessAfterSyncResponse.status).toBe(200);
   const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
-  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu"]);
+  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
   expect(publicBusinessAfterSync.business.ai_enabled).toBe(true);
 
   browser = await launchChromiumForSmoke(chromium);
@@ -146,6 +147,15 @@ try {
   await expect(contextPage.locator(".ya-widget-view-title")).toHaveText("Bize nasıl ulaşabilirsiniz?");
   await expect(contextPage.locator(".ya-widget-location-card")).toContainText("Cide, Kastamonu");
   await expect(contextPage.locator('.ya-widget-directions a[target="_blank"]')).toHaveAttribute("href", /google\.com\/maps\/search/);
+
+  await contextPage.evaluate(() => {
+    const whatsapp = document.createElement("button");
+    whatsapp.textContent = "WhatsApp";
+    whatsapp.dataset.yaAction = "contact.whatsapp";
+    document.body.appendChild(whatsapp);
+    whatsapp.click();
+  });
+  await expect(contextPage.locator(".ya-widget-view-title")).toHaveText("Mesajınızı birlikte hazırlayalım");
   await contextPage.close();
 
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
