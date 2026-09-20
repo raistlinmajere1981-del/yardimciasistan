@@ -364,7 +364,6 @@ if (!hasSingleInstanceLock) {
           appVersion
         });
         if (result.ok) {
-          markLocalCompanionSnapshotDirty();
           notifyDesktopDashboardChanged(getDatabase().getDashboardData());
           androidSnapshotPublishPending = true;
           getSyncCoordinator().scheduleSoon();
@@ -374,7 +373,6 @@ if (!hasSingleInstanceLock) {
       applyAction: (action) => {
         const result = getDatabase().applyAndroidAction(action);
         getDatabase().recordAndroidActionResult(action, result);
-        markLocalCompanionSnapshotDirty();
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
         androidSnapshotPublishPending = true;
         getSyncCoordinator().scheduleSoon();
