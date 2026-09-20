@@ -14,6 +14,33 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
   const [androidPublishMessage, setAndroidPublishMessage] = useState("Android özeti henüz yayınlanmadı.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
   const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
+  const [localPairingState, setLocalPairingState] = useState<SyncState>("idle");
+  const [localPairingMessage, setLocalPairingMessage] = useState("Aynı ağdaki telefonu doğrudan eşleştirebilirsiniz.");
+  const [localPairingSecret, setLocalPairingSecret] = useState("");
+  const [localPairingExpiresAt, setLocalPairingExpiresAt] = useState("");
+
+  async function handleBeginLocalPairing() {
+    if (!window.yardimciDesktop) {
+      setLocalPairingState("error");
+      setLocalPairingMessage("Yerel eşleştirme hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+
+    setLocalPairingState("loading");
+    setLocalPairingMessage("Tek kullanımlık eşleştirme kodu hazırlanıyor...");
+    try {
+      const session = await window.yardimciDesktop.beginLocalCompanionPairing();
+      setLocalPairingSecret(session.pairingSecret);
+      setLocalPairingExpiresAt(session.expiresAt);
+      setLocalPairingState("success");
+      setLocalPairingMessage("Bu kodu aynı ağdaki Android uygulamasında girin.");
+    } catch {
+      setLocalPairingSecret("");
+      setLocalPairingExpiresAt("");
+      setLocalPairingState("error");
+      setLocalPairingMessage("Yerel eşleştirme kodu oluşturulamadı.");
+    }
+  }
 
   async function handlePublishAndroidSnapshot() {
     setAndroidPublishState("loading");
@@ -133,6 +160,11 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
     androidPublishMessage,
     androidDeviceState,
     androidDeviceMessage,
+    localPairingState,
+    localPairingMessage,
+    localPairingSecret,
+    localPairingExpiresAt,
+    handleBeginLocalPairing,
     handlePublishAndroidSnapshot,
     handleSetAndroidDeviceRole,
     handleSetAndroidDevicePermissionGroups,
