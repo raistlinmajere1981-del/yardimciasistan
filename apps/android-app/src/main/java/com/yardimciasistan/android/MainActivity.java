@@ -57,6 +57,10 @@ import java.io.File;
 import java.net.URLEncoder;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -5022,10 +5026,18 @@ public final class MainActivity extends ComponentActivity {
         }
         localNotifications.recordSyncSuccess();
         final int discardedActionCount = invalidatedPendingActions;
-        final String successfulConnectionState = fetchedSourceKey.startsWith("local:")
+        final boolean usedLocalTransport = fetchedSourceKey.startsWith("local:");
+        final String successfulConnectionState = usedLocalTransport
             ? "Yerel ağ bağlı"
             : "Web bağlantısı hazır";
         runOnUiThread(() -> {
+          if (!usedLocalTransport
+              && foregroundActive
+              && localCompanionDiscovery != null
+              && !ConnectionSettings.localConnection(preferences).localToken.isEmpty()
+              && canUseLocalNetworkDiscovery()) {
+            localCompanionDiscovery.start();
+          }
           data = nextData;
           loading = false;
           connectionState = successfulConnectionState;
@@ -6149,15 +6161,26 @@ public final class MainActivity extends ComponentActivity {
     if (value == null || value.trim().isEmpty()) {
       return "";
     }
-    String text = value.trim().replace("T", " ");
-    int zone = text.indexOf('+', 10);
-    if (zone > 0) {
-      text = text.substring(0, zone);
+    String normalized = value.trim();
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT)
+        .withZone(ZoneId.systemDefault());
+    try {
+      return formatter.format(Instant.parse(normalized));
+    } catch (Exception ignored) {
+      try {
+        return formatter.format(OffsetDateTime.parse(normalized).toInstant());
+      } catch (Exception ignoredAgain) {
+        String text = normalized.replace("T", " ");
+        int zone = text.indexOf('+', 10);
+        if (zone > 0) {
+          text = text.substring(0, zone);
+        }
+        if (text.endsWith("Z")) {
+          text = text.substring(0, text.length() - 1);
+        }
+        return text.length() > 16 ? text.substring(0, 16) : text;
+      }
     }
-    if (text.endsWith("Z")) {
-      text = text.substring(0, text.length() - 1);
-    }
-    return text.length() > 16 ? text.substring(0, 16) : text;
   }
 
   private String ellipsize(String value, int length) {
