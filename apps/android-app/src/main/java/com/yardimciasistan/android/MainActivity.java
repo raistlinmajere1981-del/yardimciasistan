@@ -1696,6 +1696,11 @@ public final class MainActivity extends ComponentActivity {
     card.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
     card.addView(UiKit.divider(this));
     card.addView(settingLine("Rol", data.deviceRoleLabel(), UiKit.WARNING));
+    ConnectionSettings.LocalConnection inactiveLocal = ConnectionSettings.localConnection(preferences);
+    if (inactiveLocal.hasEndpoint()) {
+      card.addView(UiKit.divider(this));
+      card.addView(settingLine("Yerel adres", inactiveLocal.baseUrl, UiKit.MUTED));
+    }
     page.addView(card);
     return UiKit.scroll(this, page);
   }
@@ -2773,6 +2778,10 @@ public final class MainActivity extends ComponentActivity {
             : (localSummary.hasEndpoint() ? "Bulundu · eşleştirme bekliyor" : "Henüz bulunmadı"),
         localSummary.isComplete() && localSummary.hasEndpoint() ? UiKit.SUCCESS : UiKit.MUTED
     ));
+    if (localSummary.hasEndpoint()) {
+      state.addView(UiKit.divider(this));
+      state.addView(settingLine("Yerel adres", localSummary.baseUrl, UiKit.MUTED));
+    }
     state.addView(UiKit.divider(this));
     state.addView(settingLine("Son senkron", data.pulledAt.isEmpty() ? "Henüz yok" : shortTimestamp(data.pulledAt), UiKit.INFO));
     state.addView(UiKit.divider(this));
