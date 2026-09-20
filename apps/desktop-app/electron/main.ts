@@ -810,7 +810,7 @@ function getLocalCompanionPairingService(): LocalCompanionPairingService {
 
 function localCompanionEnabled(): boolean {
   const setup = getDatabase().getSetupData();
-  return setup.localNetworkEnabled
+  return setup.localNetworkEnabled !== false
     && hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID);
 }
 
@@ -985,7 +985,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
 
   const source: AndroidOperationsSnapshot = {
     business_capabilities: [],
-    local_network_enabled: getDatabase().getSetupData().localNetworkEnabled,
+    local_network_enabled: getDatabase().getSetupData().localNetworkEnabled !== false,
     summary: {
       pending_daily_tasks: dashboardData.summary.pendingDailyTasks,
       today_tasks: dashboardData.dailyTasks.filter((task) => task.dueDate === today && task.status !== "archived").length,
