@@ -5,8 +5,9 @@ import android.content.SharedPreferences;
 import org.json.JSONObject;
 
 final class OperationCache {
-  private static final String KEY_CACHE = "operations_cache_v1";
-  private static final String KEY_DEVICE_PROFILE_PREFIX = "operations_device_profile_v1_";
+  private static final String KEY_CACHE = "operations_cache_v2";
+  private static final String KEY_REVISIONS = "operations_revisions_v2";
+  private static final String KEY_DEVICE_PROFILE_PREFIX = "operations_device_profile_v2_";
   private final SharedPreferences preferences;
   private final String deviceId;
 
@@ -32,25 +33,59 @@ final class OperationCache {
     }
   }
 
-  long revision() {
-    OperationData cached = load();
-    return cached == null ? 0L : cached.serverRevision;
+  long revision(String sourceKey) {
+    String normalizedSourceKey = sourceKey == null ? "" : sourceKey.trim();
+    if (normalizedSourceKey.isEmpty()) {
+      return 0L;
+    }
+    try {
+      String serialized = preferences.getString(KEY_REVISIONS, "{}");
+      JSONObject revisions = new JSONObject(serialized == null ? "{}" : serialized);
+      return Math.max(0L, revisions.optLong(normalizedSourceKey, 0L));
+    } catch (Exception ignored) {
+      return 0L;
+    }
   }
 
-  void save(JSONObject payload) throws CacheException {
-    SharedPreferences.Editor editor = preferences.edit().putString(KEY_CACHE, payload.toString());
-    JSONObject profiles = payload.optJSONObject("androidPermissions");
-    JSONObject ownProfile = profiles == null ? null : profiles.optJSONObject(deviceId);
-    if (ownProfile != null) {
-      editor.putString(profileKey(), ownProfile.toString());
+  void save(JSONObject payload, String sourceKey, long sourceRevision) throws CacheException {
+    String normalizedSourceKey = sourceKey == null ? "" : sourceKey.trim();
+    if (normalizedSourceKey.isEmpty()) {
+      throw new CacheException("Canlı veri kaynağı belirlenemedi.");
     }
-    if (!editor.commit()) {
+
+    try {
+      String serialized = preferences.getString(KEY_REVISIONS, "{}");
+      JSONObject revisions = new JSONObject(serialized == null ? "{}" : serialized);
+      revisions.put(normalizedSourceKey, Math.max(0L, sourceRevision));
+
+      SharedPreferences.Editor editor = preferences.edit()
+          .putString(KEY_CACHE, payload.toString())
+          .putString(KEY_REVISIONS, revisions.toString());
+
+      JSONObject profiles = payload.optJSONObject("androidPermissions");
+      JSONObject ownProfile = profiles == null ? null : profiles.optJSONObject(deviceId);
+      if (ownProfile != null) {
+        editor.putString(profileKey(), ownProfile.toString());
+      }
+
+      if (!editor.commit()) {
+        throw new CacheException("Canlı veri telefon önbelleğine kaydedilemedi.");
+      }
+    } catch (CacheException error) {
+      throw error;
+    } catch (Exception error) {
       throw new CacheException("Canlı veri telefon önbelleğine kaydedilemedi.");
     }
   }
 
   void clear() throws CacheException {
-    if (!preferences.edit().remove(KEY_CACHE).remove(profileKey()).commit()) {
+    if (!preferences.edit()
+        .remove(KEY_CACHE)
+        .remove(KEY_REVISIONS)
+        .remove(profileKey())
+        .remove("operations_cache_v1")
+        .remove("operations_device_profile_v1_" + deviceId)
+        .commit()) {
       throw new CacheException("Eski Android verisi telefon önbelleğinden temizlenemedi.");
     }
   }
