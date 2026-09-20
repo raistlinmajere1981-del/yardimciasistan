@@ -3,6 +3,10 @@ import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import { desktopLogError, desktopLogInfo, desktopLogWarn } from "./desktop-logger";
 import { LocalCompanionServer } from "./local-companion-server";
+import {
+  LocalCompanionPairingService,
+  type LocalCompanionPairingSession
+} from "./local-companion-pairing-service";
 import { projectLocalAndroidSnapshotForDevice } from "./local-android-device-projection";
 import {
   BUSINESS_CAPABILITIES,
@@ -89,6 +93,7 @@ const marketBarcodeFastPullSenders = new Set<number>();
 let appLockService: DesktopAppLockService | null = null;
 let birthdayScheduler: BirthdayScheduler | null = null;
 let localCompanionServer: LocalCompanionServer | null = null;
+let localCompanionPairingService: LocalCompanionPairingService | null = null;
 const birthdayWebviewDriver = new WhatsAppWebviewDriver();
 const whatsappDeliveryLock = new WhatsAppDeliveryLock();
 const birthdayDeliveryAdapter = new WhatsAppDeliveryAdapter(birthdayWebviewDriver, whatsappDeliveryLock);
@@ -332,14 +337,40 @@ if (!hasSingleInstanceLock) {
       },
       onStatusChanged: notifySyncStatusChanged
     });
+    localCompanionPairingService = new LocalCompanionPairingService(getDatabase());
     localCompanionServer = new LocalCompanionServer({
       desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
       createSummary: (deviceId) => projectLocalAndroidSnapshotForDevice(
         createAndroidOperationsSnapshot(getDatabase().getDashboardData()),
         deviceId
       ),
-      // Faz 4 local pairing store'u gelene kadar summary/action bilinçli olarak kapalı.
-      authorize: () => false,
+      authorize: ({ deviceId, token }) =>
+        hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)
+        && getDatabase().authorizeAndroidLocalCredential(deviceId, token),
+      pair: ({ pairingSecret, deviceId, deviceName, appVersion }) => {
+        if (!hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)) {
+          return {
+            ok: false,
+            code: "android_capability_disabled",
+            message: "Android bağlantısı bu işletmede etkin değil.",
+            statusCode: 403
+          };
+        }
+        const service = getLocalCompanionPairingService();
+        const result = service.pair({
+          pairingSecret,
+          deviceId,
+          deviceName,
+          appVersion
+        });
+        if (result.ok) {
+          markLocalCompanionSnapshotDirty();
+          notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+          androidSnapshotPublishPending = true;
+          getSyncCoordinator().scheduleSoon();
+        }
+        return result;
+      },
       applyAction: (action) => {
         const result = getDatabase().applyAndroidAction(action);
         getDatabase().recordAndroidActionResult(action, result);
@@ -743,6 +774,20 @@ function getSyncCoordinator() {
     throw new Error("Sync coordinator is not initialized.");
   }
   return syncCoordinator;
+}
+
+function getLocalCompanionPairingService(): LocalCompanionPairingService {
+  if (!localCompanionPairingService) {
+    throw new Error("Local companion pairing service is not initialized.");
+  }
+  return localCompanionPairingService;
+}
+
+export function beginLocalCompanionPairing(): LocalCompanionPairingSession {
+  assertDesktopCapability(C.ANDROID, "Android cihaz eşleştirmesi bu işletmede etkin değil.");
+  const session = getLocalCompanionPairingService().begin();
+  desktopLogInfo("local-companion", `Local pairing session opened until ${session.expiresAt}.`);
+  return session;
 }
 
 function canUseAndroidSync(setup: DesktopSetupData, allowPlaceholderSecret: boolean) {
