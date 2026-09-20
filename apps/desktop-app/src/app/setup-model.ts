@@ -93,7 +93,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     webModuleUrl: setupData.webModuleUrl || "https://yardimciasistan.alwaysdata.net/yardimci-asistan",
     syncSecret: setupData.syncSecret && setupData.syncSecret !== "change-this-secret" ? setupData.syncSecret : generateSyncSecret(),
     autoSyncEnabled: setupData.autoSyncEnabled,
-    localNetworkEnabled: setupData.localNetworkEnabled,
+    localNetworkEnabled: setupData.localNetworkEnabled !== false,
     aiEnabled: setupData.aiEnabled,
     aiProvider: setupData.aiProvider || "openai_compatible",
     aiService: service,
