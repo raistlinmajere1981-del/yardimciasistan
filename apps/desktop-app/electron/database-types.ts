@@ -413,6 +413,7 @@ export interface DesktopSetupData {
   webModuleUrl: string;
   syncSecret: string;
   autoSyncEnabled: boolean;
+  localNetworkEnabled: boolean;
   aiEnabled: boolean;
   aiProvider: string;
   aiService: DesktopAiService;
@@ -446,6 +447,7 @@ export interface SaveInitialSetupInput {
   webModuleUrl: string;
   syncSecret: string;
   autoSyncEnabled?: boolean;
+  localNetworkEnabled?: boolean;
   aiEnabled: boolean;
   aiProvider: string;
   aiService: string;
