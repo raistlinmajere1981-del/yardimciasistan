@@ -584,7 +584,8 @@ function registerIpcHandlers() {
   registerAndroidDeviceIpcHandlers({
     getDatabase,
     assertCapability: assertDesktopCapability,
-    finalizeDeviceMutation: finalizeAndroidDeviceMutation
+    finalizeDeviceMutation: finalizeAndroidDeviceMutation,
+    beginLocalPairing: beginLocalCompanionPairing
   });
 
   registerAiConnectionIpcHandlers({
