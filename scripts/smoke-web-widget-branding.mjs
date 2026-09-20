@@ -66,8 +66,9 @@ try {
   await page.locator(".ya-widget-ai textarea").fill("Bu akşam 4 kişilik masa var mı?");
   await page.locator('.ya-widget-ai button[type="submit"]').click();
   await expect(page.locator(".ya-widget-ai-answer")).toContainText("Müsaitlik ve fiyat");
-  await expect(page.locator(".ya-widget-status")).toContainText("istek sınırına ulaştı");
-  await expect(page.locator(".ya-widget-status")).toContainText("provider_rate_limited (HTTP 429)");
+  await expect(page.locator(".ya-widget-notice")).toBeVisible();
+  await expect(page.locator(".ya-widget-notice")).toContainText("istek sınırına ulaştı");
+  await expect(page.locator(".ya-widget-notice")).toContainText("provider_rate_limited (HTTP 429)");
 
   console.log("web-widget-branding-smoke-ok");
 } finally {
