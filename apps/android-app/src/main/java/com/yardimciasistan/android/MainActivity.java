@@ -90,9 +90,7 @@ public final class MainActivity extends ComponentActivity {
   private static final int LANDSCAPE_HEADER_HEIGHT_DP = 60;
   private static final int HEADER_ACTION_SIZE_DP = 44;
   private static final int NOTIFICATION_PERMISSION_REQUEST_CODE = 0x5941;
-  private static final int LOCAL_NETWORK_PERMISSION_REQUEST_CODE = 0x5942;
   private static final String KEY_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested_v1";
-  private static final String KEY_LOCAL_NETWORK_PERMISSION_REQUESTED = "local_network_permission_requested_v1";
 
   private final HostingSyncClient syncClient = new HostingSyncClient();
   private AndroidOperationsTransport operationsTransport;
@@ -271,7 +269,6 @@ public final class MainActivity extends ComponentActivity {
     buildShell();
     render();
     requestNotificationPermissionIfNeeded();
-    requestLocalNetworkPermissionIfNeeded();
     if (hasConnectionSettings()) {
       syncOperations(false);
     } else {
@@ -335,10 +332,6 @@ public final class MainActivity extends ComponentActivity {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     if (requestCode == NOTIFICATION_PERMISSION_REQUEST_CODE && localNotifications != null) {
       localNotifications.refreshCurrentSnapshot(data);
-    }
-    if (requestCode == LOCAL_NETWORK_PERMISSION_REQUEST_CODE
-        && canUseLocalNetworkDiscovery()) {
-      startLocalDiscoveryIfDue(true);
     }
   }
 
@@ -1246,9 +1239,7 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private void startLocalDiscoveryIfDue(boolean force) {
-    if (!foregroundActive
-        || localCompanionDiscovery == null
-        || !canUseLocalNetworkDiscovery()) {
+    if (!foregroundActive || localCompanionDiscovery == null) {
       return;
     }
     long now = System.currentTimeMillis();
@@ -1257,24 +1248,6 @@ public final class MainActivity extends ComponentActivity {
     }
     lastLocalDiscoveryStartedAt = now;
     localCompanionDiscovery.start();
-  }
-
-  private void requestLocalNetworkPermissionIfNeeded() {
-    if (Build.VERSION.SDK_INT < 33
-        || checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED
-        || preferences.getBoolean(KEY_LOCAL_NETWORK_PERMISSION_REQUESTED, false)) {
-      return;
-    }
-    preferences.edit().putBoolean(KEY_LOCAL_NETWORK_PERMISSION_REQUESTED, true).apply();
-    requestPermissions(
-        new String[] { Manifest.permission.NEARBY_WIFI_DEVICES },
-        LOCAL_NETWORK_PERMISSION_REQUEST_CODE
-    );
-  }
-
-  private boolean canUseLocalNetworkDiscovery() {
-    return Build.VERSION.SDK_INT < 33
-        || checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) == PackageManager.PERMISSION_GRANTED;
   }
 
   private void buildShell() {
