@@ -7,6 +7,7 @@ import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -14,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 final class LocalCompanionDiscovery {
+  private static final String TAG = "YardimciLocal";
   private static final long DEFAULT_DISCOVERY_WINDOW_MS = 6_000L;
 
   private final Context context;
@@ -44,11 +46,12 @@ final class LocalCompanionDiscovery {
     discoveryListener = new NsdManager.DiscoveryListener() {
       @Override
       public void onDiscoveryStarted(String serviceType) {
-        // Discovery is intentionally quiet; a resolved service updates the cache.
+        Log.i(TAG, "NSD discovery started: " + serviceType);
       }
 
       @Override
       public void onServiceFound(NsdServiceInfo serviceInfo) {
+        Log.i(TAG, "NSD service found: " + String.valueOf(serviceInfo));
         resolveCandidate(serviceInfo);
       }
 
@@ -60,16 +63,19 @@ final class LocalCompanionDiscovery {
 
       @Override
       public void onDiscoveryStopped(String serviceType) {
+        Log.i(TAG, "NSD discovery stopped: " + serviceType);
         finishDiscovery(false);
       }
 
       @Override
       public void onStartDiscoveryFailed(String serviceType, int errorCode) {
+        Log.w(TAG, "NSD discovery start failed: " + serviceType + " code=" + errorCode);
         finishDiscovery(true);
       }
 
       @Override
       public void onStopDiscoveryFailed(String serviceType, int errorCode) {
+        Log.w(TAG, "NSD discovery stop failed: " + serviceType + " code=" + errorCode);
         finishDiscovery(true);
       }
     };
@@ -82,6 +88,7 @@ final class LocalCompanionDiscovery {
       );
       handler.postDelayed(this::stop, Math.max(1_000L, Math.min(windowMs, 15_000L)));
     } catch (RuntimeException error) {
+      Log.w(TAG, "NSD discovery threw before start.", error);
       finishDiscovery(true);
     }
   }
@@ -115,16 +122,19 @@ final class LocalCompanionDiscovery {
         @Override
         public void onServiceResolved(NsdServiceInfo resolved) {
           resolving = false;
+          Log.i(TAG, "NSD service resolved: " + String.valueOf(resolved));
           acceptResolvedService(resolved);
         }
 
         @Override
         public void onResolveFailed(NsdServiceInfo failed, int errorCode) {
           resolving = false;
+          Log.w(TAG, "NSD resolve failed code=" + errorCode + " service=" + String.valueOf(failed));
         }
       });
     } catch (RuntimeException error) {
       resolving = false;
+      Log.w(TAG, "NSD resolve threw.", error);
     }
   }
 
@@ -133,6 +143,7 @@ final class LocalCompanionDiscovery {
     String desktopId = attribute(serviceInfo, "desktop_id");
     if (!String.valueOf(LocalCompanionProtocol.VERSION).equals(protocol)
         || desktopId.isEmpty()) {
+      Log.w(TAG, "NSD service rejected because protocol/desktop_id is missing or incompatible.");
       return;
     }
 
@@ -161,12 +172,16 @@ final class LocalCompanionDiscovery {
       hostText = "[" + hostText + "]";
     }
 
+    String baseUrl = "http://" + hostText + ":" + port;
     if (ConnectionSettings.storeDiscoveredLocalEndpoint(
         preferences,
         desktopId,
-        "http://" + hostText + ":" + port
+        baseUrl
     )) {
+      Log.i(TAG, "NSD local desktop accepted: " + desktopId + " @ " + baseUrl);
       stop();
+    } else {
+      Log.w(TAG, "NSD local desktop could not be stored: " + desktopId + " @ " + baseUrl);
     }
   }
 
