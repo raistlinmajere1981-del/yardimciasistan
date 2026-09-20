@@ -340,13 +340,20 @@ if (!hasSingleInstanceLock) {
     localCompanionPairingService = new LocalCompanionPairingService(getDatabase());
     localCompanionServer = new LocalCompanionServer({
       desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
+      businessInfo: () => {
+        const setup = getDatabase().getSetupData();
+        return {
+          displayName: setup.businessName,
+          phone: setup.phone,
+          whatsapp: setup.whatsapp
+        };
+      },
       createSummary: (deviceId) => projectLocalAndroidSnapshotForDevice(
         createAndroidOperationsSnapshot(getDatabase().getDashboardData()),
         deviceId
       ),
       authorize: ({ deviceId, token }) =>
-        hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)
-        && getDatabase().authorizeAndroidLocalCredential(deviceId, token),
+        getDatabase().authorizeAndroidLocalCredential(deviceId, token),
       pair: ({ pairingSecret, deviceId, deviceName, appVersion }) => {
         if (!hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)) {
           return {
