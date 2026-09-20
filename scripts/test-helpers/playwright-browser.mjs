@@ -3,23 +3,31 @@ import { join } from "node:path";
 import process from "node:process";
 
 export async function launchChromiumForSmoke(chromium, options = {}) {
-  try {
-    return await chromium.launch(options);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!message.includes("Executable doesn't exist")) {
-      throw error;
-    }
-
-    const executablePath = resolveSystemChromiumExecutable();
-    if (!executablePath) {
-      throw error;
-    }
-
+  const executablePath = resolveSystemChromiumExecutable();
+  if (executablePath) {
     return chromium.launch({
       ...options,
       executablePath
     });
+  }
+
+  try {
+    return await chromium.launch(options);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("Executable doesn't exist")) {
+      throw new Error(
+        [
+          "Sistem Brave/Chromium/Chrome tarayıcısı bulunamadı ve Playwright Chromium kurulu değil.",
+          "Test tarayıcısı indirmek yerine Brave/Chromium/Chrome kurabilir veya",
+          "PLAYWRIGHT_CHROMIUM_EXECUTABLE ile mevcut Chromium tabanlı tarayıcı yolunu verebilirsiniz.",
+          "",
+          message
+        ].join("\n"),
+        { cause: error }
+      );
+    }
+    throw error;
   }
 }
 
@@ -47,6 +55,38 @@ export function resolveSystemChromiumExecutable() {
         ];
 
   return candidates.find((candidate) => existsSync(candidate)) ?? "";
+}
+
+export function describeSmokeBrowser(chromium) {
+  const systemExecutable = resolveSystemChromiumExecutable();
+  if (systemExecutable) {
+    return {
+      ready: true,
+      source: "system",
+      executablePath: systemExecutable,
+      message: `Sistem tarayıcısı kullanılacak: ${systemExecutable}`
+    };
+  }
+
+  try {
+    const executablePath = chromium.executablePath();
+    const ready = existsSync(executablePath);
+    return {
+      ready,
+      source: "playwright",
+      executablePath,
+      message: ready
+        ? `Playwright Chromium kullanılacak: ${executablePath}`
+        : `Sistem Chromium tabanlı tarayıcı ve Playwright Chromium bulunamadı: ${executablePath}`
+    };
+  } catch (error) {
+    return {
+      ready: false,
+      source: "none",
+      executablePath: "",
+      message: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 
 function windowsCandidates() {
