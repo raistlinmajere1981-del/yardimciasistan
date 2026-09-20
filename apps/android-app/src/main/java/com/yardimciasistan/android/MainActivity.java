@@ -4982,10 +4982,13 @@ public final class MainActivity extends ComponentActivity {
         }
         localNotifications.recordSyncSuccess();
         final int discardedActionCount = invalidatedPendingActions;
+        final String successfulConnectionState = fetchedSourceKey.startsWith("local:")
+            ? "Yerel ağ bağlı"
+            : "Web bağlantısı hazır";
         runOnUiThread(() -> {
           data = nextData;
           loading = false;
-          connectionState = "Bağlantı hazır";
+          connectionState = successfulConnectionState;
           if (discardedActionCount > 0) {
             showError(discardedActionCount + " bekleyen telefon işlemi yeni yetki veya capability sınırı nedeniyle iptal edildi.");
           } else {
