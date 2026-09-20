@@ -1,5 +1,6 @@
 import { MessageCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
+import { MessageModeErrorBoundary } from "../components/messages/MessageModeErrorBoundary";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 
 type MessageMode = "safe" | "web";
@@ -67,7 +68,9 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
       {whatsappEnabled && <div className={mode === "safe" ? "message-mode-content" : "message-mode-content is-hidden"}>{safeMode}</div>}
       {whatsappEnabled && webModeActivated && (
         <div className={mode === "web" ? "message-mode-content" : "message-mode-content is-hidden"}>
-          {webMode(() => selectMode("safe"))}
+          <MessageModeErrorBoundary onReturnToSafe={() => selectMode("safe")}>
+            {webMode(() => selectMode("safe"))}
+          </MessageModeErrorBoundary>
         </div>
       )}
       {aiEnabled && (aiOpen || !whatsappEnabled) && mode === "safe" && <div className="messages-ai-tools">{aiTools}</div>}

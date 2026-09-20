@@ -320,6 +320,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   const [sendState, setSendState] = useState<SyncState>("idle");
   const [sendMessage, setSendMessage] = useState("");
   const [webViewUrl, setWebViewUrl] = useState(WHATSAPP_WEB_HOME_URL);
+  const [webViewError, setWebViewError] = useState("");
   const recipientPhone = preparedMessage?.phone ?? selectedRequest?.customer_phone;
   const recipientName = preparedMessage?.customerName || selectedRequest?.customer_name || (preparedMessage ? "Müşteri" : "Talep seçin");
   const preparedMessageLabel = preparedMessage?.source === "birthday" ? "Doğum günü mesajı" : "Veresiye hesabı";
@@ -335,27 +336,70 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
     const webView = webViewRef.current;
     if (!webView) return;
 
+    // getWebContentsId throws while the guest has not attached yet (and can
+    // throw again once it is destroyed). A throw here must never escape the
+    // effect: without an error boundary it unmounts the whole renderer and
+    // leaves a blank window behind the app background.
+    const readGuestId = (): number | null => {
+      try {
+        const id = webView.getWebContentsId?.();
+        return typeof id === "number" && Number.isInteger(id) && id > 0 ? id : null;
+      } catch {
+        return null;
+      }
+    };
     const registerWebview = () => {
-      const id = webView.getWebContentsId?.();
-      if (Number.isInteger(id) && id && window.yardimciDesktop?.registerWhatsAppWebview) {
-        window.yardimciDesktop.registerWhatsAppWebview(id);
+      const id = readGuestId();
+      if (id === null) return;
+      try {
+        window.yardimciDesktop?.registerWhatsAppWebview?.(id);
+      } catch {
+        // Registration is best-effort automation wiring; the visible page
+        // must keep working even if the bridge call fails.
       }
     };
     const unregisterWebview = () => {
-      const id = webView.getWebContentsId?.();
-      if (Number.isInteger(id) && id && window.yardimciDesktop?.unregisterWhatsAppWebview) {
-        window.yardimciDesktop.unregisterWhatsAppWebview(id);
+      const id = readGuestId();
+      if (id === null) return;
+      try {
+        window.yardimciDesktop?.unregisterWhatsAppWebview?.(id);
+      } catch {
+        // Ignore bridge failures during teardown.
       }
+    };
+    const handleLoad = () => {
+      setWebViewError("");
+    };
+    const handleFail = (event: Event) => {
+      const detail = event as Event & { errorCode?: number; errorDescription?: string };
+      // -3 (ERR_ABORTED) fires on ordinary src swaps, not real failures.
+      if (detail?.errorCode === -3) return;
+      setWebViewError(
+        typeof detail?.errorDescription === "string" && detail.errorDescription
+          ? `WhatsApp Web yüklenemedi: ${detail.errorDescription}`
+          : "WhatsApp Web yüklenemedi. Bağlantıyı kontrol edip tekrar deneyin."
+      );
+    };
+    const handleCrash = () => {
+      setWebViewError("WhatsApp Web beklenmedik şekilde kapandı. Yeniden yükleyip tekrar deneyin.");
     };
 
     webView.addEventListener("did-attach", registerWebview);
     webView.addEventListener("dom-ready", registerWebview);
     webView.addEventListener("did-detach", unregisterWebview);
+    webView.addEventListener("did-finish-load", handleLoad);
+    webView.addEventListener("did-fail-load", handleFail);
+    webView.addEventListener("crashed", handleCrash);
+    webView.addEventListener("unresponsive", handleCrash);
     registerWebview();
     return () => {
       webView.removeEventListener("did-attach", registerWebview);
       webView.removeEventListener("dom-ready", registerWebview);
       webView.removeEventListener("did-detach", unregisterWebview);
+      webView.removeEventListener("did-finish-load", handleLoad);
+      webView.removeEventListener("did-fail-load", handleFail);
+      webView.removeEventListener("crashed", handleCrash);
+      webView.removeEventListener("unresponsive", handleCrash);
       unregisterWebview();
     };
   }, [view, webViewUrl]);
@@ -404,7 +448,17 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
 
     setSendState("idle");
     setSendMessage("WhatsApp Web sohbeti ve hazır metin yükleniyor.");
+    setWebViewError("");
     setWebViewUrl(webViewPayload.url);
+  }
+
+  function reloadWebView() {
+    setWebViewError("");
+    try {
+      webViewRef.current?.reload?.();
+    } catch {
+      setWebViewError("WhatsApp Web yeniden yüklenemedi. Dışarıda Aç seçeneğini deneyin.");
+    }
   }
 
   async function approveAndSendMessage() {
@@ -417,7 +471,13 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
       return;
     }
 
-    const currentUrl = webView.getURL?.() || webViewUrl;
+    const currentUrl = (() => {
+      try {
+        return webView.getURL?.() || webViewUrl;
+      } catch {
+        return webViewUrl;
+      }
+    })();
     if (!currentUrl.startsWith(WHATSAPP_WEB_HOME_URL)) {
       setSendState("error");
       setSendMessage("Güvenlik kontrolü: açık sayfa WhatsApp Web olmadığı için gönderim durduruldu.");
@@ -562,6 +622,24 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
         </div>
 
         <div className="whatsapp-webview-frame">
+          {webViewError && (
+            <div className="whatsapp-webview-fallback status-message status-message--danger" role="alert">
+              <span>{webViewError}</span>
+              <div className="whatsapp-webview-fallback-actions">
+                <ActionButton size="sm" type="button" onClick={reloadWebView}>
+                  Yeniden Yükle
+                </ActionButton>
+                <ActionButton variant="secondary" size="sm" type="button" onClick={onOpenExternal} disabled={!selectedUrl}>
+                  <ExternalLink size={15} aria-hidden="true" />
+                  Dışarıda Aç
+                </ActionButton>
+                <ActionButton variant="secondary" size="sm" type="button" onClick={onReturnToSafe} disabled={!onReturnToSafe}>
+                  <ShieldCheck size={15} aria-hidden="true" />
+                  Güvenli Moda Dön
+                </ActionButton>
+              </div>
+            </div>
+          )}
           {webViewUrl ? (
             <webview
               ref={webViewRef}
