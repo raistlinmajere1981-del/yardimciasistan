@@ -144,7 +144,7 @@ try {
   await expect(page.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği AI Asistanı");
   await expect(page.locator('[data-ya-request-type="pension_reservation"]')).toBeVisible();
   await expect(page.locator('[data-ya-request-type="restaurant_reservation"]')).toBeVisible();
-  await expect(page.locator(".ya-widget-action-card")).toHaveCount(5);
+  await expect(page.locator(".ya-widget-action-card")).toHaveCount(4);
   await expect(page.getByRole("link", { name: /Menüyü gör/i })).toHaveCount(0);
 
   await page.evaluate(() => {

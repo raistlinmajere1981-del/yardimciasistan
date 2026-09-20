@@ -400,7 +400,6 @@ function homeActionCard(input: {
 }
 
 function formTemplate() {
-function formTemplate() {
   const isTableRequest = state.requestType === "restaurant_reservation";
   const requestLabel = isTableRequest ? "Masa talebi" : "Rezervasyon talebi";
   const title = isTableRequest ? "Masa talebinizi hazırlayalım" : "Rezervasyonunuzu hazırlayalım";

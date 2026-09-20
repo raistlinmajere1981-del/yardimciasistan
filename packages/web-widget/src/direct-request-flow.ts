@@ -109,7 +109,6 @@ function enhanceRequestForm(root: HTMLElement) {
 }
 
 function interceptRequestSubmit(event: Event) {
-function interceptRequestSubmit(event: Event) {
   const form = event.target instanceof HTMLFormElement ? event.target : null;
   if (!form?.matches(".ya-widget-form[data-ya-form]")) return;
 
