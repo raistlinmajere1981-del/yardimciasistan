@@ -326,7 +326,10 @@ if (!hasSingleInstanceLock) {
       database: desktopDatabase,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
       createAndroidSnapshot: () => createAndroidOperationsSnapshot(getDatabase().getDashboardData()),
-      onDashboardChanged: () => notifyDesktopDashboardChanged(getDatabase().getDashboardData()),
+      onDashboardChanged: () => {
+        markLocalCompanionSnapshotDirty();
+        notifyDesktopDashboardChanged(getDatabase().getDashboardData());
+      },
       onStatusChanged: notifySyncStatusChanged
     });
     localCompanionServer = new LocalCompanionServer({
