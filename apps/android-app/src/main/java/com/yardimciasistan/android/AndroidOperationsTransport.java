@@ -82,7 +82,8 @@ interface AndroidOperationsTransport {
       return code.isEmpty()
           || "local_unreachable".equals(code)
           || "local_auth_required".equals(code)
-          || "local_auth_failed".equals(code);
+          || "local_auth_failed".equals(code)
+          || "local_network_disabled".equals(code);
     }
   }
 }
