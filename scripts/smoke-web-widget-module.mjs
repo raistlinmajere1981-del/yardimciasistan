@@ -1,4 +1,5 @@
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -55,7 +56,7 @@ try {
   expect(capabilityPublication.status).toBe(200);
   expect((await capabilityPublication.json()).ok).toBe(true);
 
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
   await injectWidget(page, baseUrl);
