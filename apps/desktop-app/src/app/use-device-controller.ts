@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import type { DesktopAndroidDevice, DesktopDashboardData } from "../../electron/database";
 import type { DesktopAndroidInstallationSnapshot } from "../../electron/android-installation-service";
@@ -16,7 +16,7 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
   const [androidInstallState, setAndroidInstallState] = useState<SyncState>("idle");
   const [androidInstallMessage, setAndroidInstallMessage] = useState("USB Android cihazları aranıyor...");
   const [androidInstallSnapshot, setAndroidInstallSnapshot] = useState<DesktopAndroidInstallationSnapshot | null>(null);
-  async function refreshAndroidInstallDevices() {
+  const refreshAndroidInstallDevices = useCallback(async () => {
     if (!window.yardimciDesktop?.listAndroidInstallDevices) {
       setAndroidInstallState("error");
       setAndroidInstallMessage("Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
@@ -33,7 +33,7 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
       setAndroidInstallState("error");
       setAndroidInstallMessage("USB Android cihazları okunamadı.");
     }
-  }
+  }, []);
 
   async function handleInstallAndroidApp(serial: string) {
     if (!window.yardimciDesktop?.installAndroidApp) {
@@ -60,7 +60,7 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
 
   useEffect(() => {
     void refreshAndroidInstallDevices();
-  }, []);
+  }, [refreshAndroidInstallDevices]);
 
   async function runAndroidDeviceMutation(
     pendingMessage: string,
