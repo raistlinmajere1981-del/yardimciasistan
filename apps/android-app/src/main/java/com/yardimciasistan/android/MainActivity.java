@@ -1671,8 +1671,27 @@ public final class MainActivity extends ComponentActivity {
     LinearLayout page = UiKit.column(this);
     boolean androidEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ANDROID);
     page.addView(androidEnabled
-        ? screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yeniden etkinleştirmek için masaüstü yöneticinize başvurun.", false)
+        ? screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yerel ağ eşleştirmesi yapılabilir; işletme işlemleri için masaüstünden yeniden etkinleştirilmesi gerekir.", false)
         : screenIntro("ERİŞİM DURUMU", "Android bağlantısı kapalı", "İşletmenin Android hizmeti kapatıldığı için telefondaki işletme verileri temizlendi.", false));
+
+    if (androidEnabled) {
+      LinearLayout localCard = UiKit.card(this);
+      localCard.addView(UiKit.text(this, "Yerel ağ", 14, UiKit.TEXT, Typeface.BOLD));
+      localCard.addView(UiKit.text(
+          this,
+          "Bu cihaz pasif olsa da aynı ağdaki masaüstüyle güvenli biçimde eşleştirilebilir.",
+          12,
+          UiKit.SECONDARY,
+          Typeface.NORMAL
+      ));
+      Button pairButton = UiKit.outlineButton(this, "Yerel Ağ Eşleştir", view -> showLocalPairingDialog());
+      LinearLayout.LayoutParams pairParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+      pairParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
+      pairButton.setLayoutParams(pairParams);
+      localCard.addView(pairButton);
+      page.addView(localCard);
+    }
+
     LinearLayout card = UiKit.card(this);
     card.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
     card.addView(UiKit.divider(this));
@@ -6141,10 +6160,13 @@ public final class MainActivity extends ComponentActivity {
   }
 
   private int connectionTone() {
-    if ("Bağlantı hazır".equals(connectionState)) {
+    if ("Bağlantı hazır".equals(connectionState)
+        || "Yerel ağ bağlı".equals(connectionState)
+        || "Web bağlantısı hazır".equals(connectionState)
+        || connectionState.contains("eşleştirme tamamlandı")) {
       return UiKit.SUCCESS;
     }
-    if (connectionState.contains("çekiliyor")) {
+    if (connectionState.contains("çekiliyor") || connectionState.contains("eşleştiriliyor")) {
       return UiKit.INFO;
     }
     return "Henüz bağlanmadı".equals(connectionState) ? UiKit.MUTED : UiKit.DANGER;
