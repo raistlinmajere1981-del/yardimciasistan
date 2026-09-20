@@ -3,10 +3,7 @@ import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
 import { desktopLogError, desktopLogInfo, desktopLogWarn } from "./desktop-logger";
 import { LocalCompanionServer } from "./local-companion-server";
-import {
-  LocalCompanionPairingService,
-  type LocalCompanionPairingSession
-} from "./local-companion-pairing-service";
+import { LocalCompanionPairingService } from "./local-companion-pairing-service";
 import { projectLocalAndroidSnapshotForDevice } from "./local-android-device-projection";
 import { LocalCompanionMdnsAdvertiser } from "./local-companion-mdns";
 import {
@@ -341,7 +338,11 @@ if (!hasSingleInstanceLock) {
       },
       onStatusChanged: notifySyncStatusChanged
     });
-    localCompanionPairingService = new LocalCompanionPairingService(getDatabase());
+    localCompanionPairingService = new LocalCompanionPairingService(getDatabase(), {
+      desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
+      syncSecret: () => getWebSyncConfig(getDatabase().getSetupData()).syncSecret,
+      localNetworkEnabled: () => localCompanionEnabled()
+    });
     localCompanionServer = new LocalCompanionServer({
       desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
       businessInfo: () => {
@@ -358,7 +359,8 @@ if (!hasSingleInstanceLock) {
       ),
       authorize: ({ deviceId, token }) =>
         getDatabase().authorizeAndroidLocalCredential(deviceId, token),
-      pair: ({ pairingSecret, deviceId, deviceName, appVersion }) => {
+      enabled: () => localCompanionEnabled(),
+      pair: ({ pairingTicket, deviceId, deviceName, appVersion }) => {
         if (!hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID)) {
           return {
             ok: false,
@@ -369,7 +371,7 @@ if (!hasSingleInstanceLock) {
         }
         const service = getLocalCompanionPairingService();
         const result = service.pair({
-          pairingSecret,
+          pairingTicket,
           deviceId,
           deviceName,
           appVersion
@@ -410,15 +412,8 @@ if (!hasSingleInstanceLock) {
     syncCoordinator.start();
     birthdayScheduler.start();
     void localCompanionServer.start()
-      .then((address) => {
-        localCompanionMdnsAdvertiser = new LocalCompanionMdnsAdvertiser({
-          desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
-          protocolVersion: LOCAL_COMPANION_PROTOCOL_VERSION,
-          serviceType: LOCAL_COMPANION_SERVICE_TYPE,
-          logInfo: (message) => desktopLogInfo("local-companion-mdns", message),
-          logWarn: (message, error) => desktopLogWarn("local-companion-mdns", message, error)
-        });
-        localCompanionMdnsAdvertiser.start(address.port);
+      .then(() => {
+        reconcileLocalCompanionAdvertisement();
       })
       .catch((error) => {
         desktopLogError("local-companion", "Local companion server could not start.", error);
@@ -584,8 +579,7 @@ function registerIpcHandlers() {
   registerAndroidDeviceIpcHandlers({
     getDatabase,
     assertCapability: assertDesktopCapability,
-    finalizeDeviceMutation: finalizeAndroidDeviceMutation,
-    beginLocalPairing: beginLocalCompanionPairing
+    finalizeDeviceMutation: finalizeAndroidDeviceMutation
   });
 
   registerAiConnectionIpcHandlers({
@@ -687,6 +681,11 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   if (!localResult.ok) {
     return localResult;
   }
+
+  markLocalCompanionSnapshotDirty();
+  androidSnapshotPublishPending = true;
+  reconcileLocalCompanionAdvertisement();
+  getSyncCoordinator().scheduleSoon();
 
   const aiWebSync = await publishSavedAiSettingsFromMain();
   getSyncCoordinator().restart();
@@ -806,11 +805,30 @@ function getLocalCompanionPairingService(): LocalCompanionPairingService {
   return localCompanionPairingService;
 }
 
-export function beginLocalCompanionPairing(): LocalCompanionPairingSession {
-  assertDesktopCapability(C.ANDROID, "Android cihaz eşleştirmesi bu işletmede etkin değil.");
-  const session = getLocalCompanionPairingService().begin();
-  desktopLogInfo("local-companion", `Local pairing session opened until ${session.expiresAt}.`);
-  return session;
+function localCompanionEnabled(): boolean {
+  const setup = getDatabase().getSetupData();
+  return setup.localNetworkEnabled
+    && hasBusinessCapability(enabledBusinessCapabilities(), C.ANDROID);
+}
+
+function reconcileLocalCompanionAdvertisement() {
+  const serverAddress = localCompanionServer?.address;
+  if (!serverAddress || !localCompanionEnabled()) {
+    localCompanionMdnsAdvertiser?.stop();
+    localCompanionMdnsAdvertiser = null;
+    return;
+  }
+  if (localCompanionMdnsAdvertiser) {
+    return;
+  }
+  localCompanionMdnsAdvertiser = new LocalCompanionMdnsAdvertiser({
+    desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
+    protocolVersion: LOCAL_COMPANION_PROTOCOL_VERSION,
+    serviceType: LOCAL_COMPANION_SERVICE_TYPE,
+    logInfo: (message) => desktopLogInfo("local-companion-mdns", message),
+    logWarn: (message, error) => desktopLogWarn("local-companion-mdns", message, error)
+  });
+  localCompanionMdnsAdvertiser.start(serverAddress.port);
 }
 
 function canUseAndroidSync(setup: DesktopSetupData, allowPlaceholderSecret: boolean) {
