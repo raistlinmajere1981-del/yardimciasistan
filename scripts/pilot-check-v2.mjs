@@ -4,6 +4,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import { join } from "node:path";
 import process from "node:process";
+import { describeSmokeBrowser } from "./test-helpers/playwright-browser.mjs";
 
 const require = createRequire(import.meta.url);
 const flags = new Set(process.argv.slice(2));
@@ -136,9 +137,17 @@ function jsb(id, label, file) { return { ...js(id, label, file), browser: true }
 function browserState() {
   try {
     const { chromium } = require("@playwright/test");
-    const path = chromium.executablePath();
-    return { ready: existsSync(path), error: existsSync(path) ? "" : `Chromium bulunamadı: ${path}` };
-  } catch (error) { return { ready: false, error: error instanceof Error ? error.message : String(error) }; }
+    const state = describeSmokeBrowser(chromium);
+    return {
+      ready: state.ready,
+      error: state.ready ? "" : state.message
+    };
+  } catch (error) {
+    return {
+      ready: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
 }
 function save() {
   const json = `${JSON.stringify(report, null, 2)}\n`;
