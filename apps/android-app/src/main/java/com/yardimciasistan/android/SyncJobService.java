@@ -76,12 +76,11 @@ public final class SyncJobService extends JobService {
       return;
     }
     String actionTargetKey = CompanionConnectionIdentity.actionTargetKey(baseUrl);
-    String sourceKey = CompanionConnectionIdentity.hostingSourceKey(baseUrl);
-    if (actionTargetKey.isEmpty() || sourceKey.isEmpty()) {
+    AndroidOperationsTransport client = new CompanionOperationsRouter(preferences);
+    String preferredSourceKey = client.preferredSourceKey(baseUrl, syncSecret);
+    if (actionTargetKey.isEmpty() || preferredSourceKey.isEmpty()) {
       return;
     }
-
-    AndroidOperationsTransport client = new HostingAndroidOperationsTransport();
     OperationCache cache = new OperationCache(preferences, identity.deviceId);
     OperationData previousData = cache.load();
     LocalNotificationCenter notifications = new LocalNotificationCenter(this, preferences);
@@ -108,7 +107,12 @@ public final class SyncJobService extends JobService {
 
     AndroidOperationsTransport.FetchResult fetched;
     try {
-      fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision(sourceKey));
+      fetched = client.fetchOperations(
+          baseUrl,
+          syncSecret,
+          identity,
+          cache.revision(preferredSourceKey)
+      );
     } catch (AndroidOperationsTransport.TransportException error) {
       if (error.disablesAndroidService()) {
         clearDisabledAndroidState(cache, outbox, notifications, previousData);
@@ -117,7 +121,10 @@ public final class SyncJobService extends JobService {
       throw error;
     }
     if (!fetched.notModified && fetched.data != null) {
-      cache.save(fetched.payload, sourceKey, fetched.serverRevision);
+      String fetchedSourceKey = fetched.sourceKey.isEmpty()
+          ? preferredSourceKey
+          : fetched.sourceKey;
+      cache.save(fetched.payload, fetchedSourceKey, fetched.serverRevision);
       OperationData currentData = cache.load();
       notifications.processSnapshot(previousData, currentData == null ? fetched.data : currentData);
     }
