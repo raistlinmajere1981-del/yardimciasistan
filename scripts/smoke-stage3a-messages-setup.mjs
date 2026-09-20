@@ -108,6 +108,33 @@ try {
   await messagesPage.getByRole("tab", { name: "WhatsApp", exact: true }).click();
   await expect(messagesPage.locator(".whatsapp-webview")).toHaveAttribute("partition", "persist:yardimci-whatsapp");
   await expect(messagesPage.locator(".whatsapp-webview")).toHaveAttribute("src", "https://web.whatsapp.com/");
+  const webviewLayout = await messagesPage.locator(".whatsapp-webview-frame").evaluate((frame) => {
+    const webview = frame.querySelector(".whatsapp-webview");
+    if (!webview) return null;
+    const frameRect = frame.getBoundingClientRect();
+    const webviewRect = webview.getBoundingClientRect();
+    const style = getComputedStyle(webview);
+    return {
+      position: style.position,
+      display: style.display,
+      frameWidth: frameRect.width,
+      frameHeight: frameRect.height,
+      webviewWidth: webviewRect.width,
+      webviewHeight: webviewRect.height,
+      contained:
+        webviewRect.left >= frameRect.left - 1
+        && webviewRect.top >= frameRect.top - 1
+        && webviewRect.right <= frameRect.right + 1
+        && webviewRect.bottom <= frameRect.bottom + 1
+    };
+  });
+  expect(webviewLayout, "WhatsApp webview layout").not.toBeNull();
+  expect(webviewLayout.position, "WhatsApp webview must stay in normal layout flow").not.toBe("absolute");
+  expect(webviewLayout.frameWidth).toBeGreaterThan(0);
+  expect(webviewLayout.frameHeight).toBeGreaterThan(0);
+  expect(webviewLayout.webviewWidth).toBeGreaterThan(0);
+  expect(webviewLayout.webviewHeight).toBeGreaterThan(0);
+  expect(webviewLayout.contained, "WhatsApp webview must remain inside its panel").toBe(true);
   await messagesPage.locator(".whatsapp-webview").evaluate((element) => { element.dataset.stage3aMarker = "persistent"; });
   await messagesPage.getByRole("button", { name: "Güvenli Moda Dön", exact: true }).click();
   await expect(messagesPage.locator(".message-mode-content.is-hidden .whatsapp-webview")).toHaveCount(1);
