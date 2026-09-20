@@ -1,3 +1,4 @@
+import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import type {
   AndroidFinanceSnapshot,
   AndroidOperationsSnapshot,
@@ -102,7 +103,7 @@ export function projectLocalAndroidSnapshotForDevice(
   const customerManagementAllowed = profile.role === "admin" && permissions.has("customer.manage");
   const roomFolioAllowed = permissions.has("room_folio.view");
   const financeAllowed = permissions.has("finance.view");
-  const reportsAllowed = profile.role === "admin" && source.business_capabilities.includes("core.reports" as never);
+  const reportsAllowed = profile.role === "admin" && source.business_capabilities.includes(BUSINESS_CAPABILITIES.REPORTS);
 
   const market = emptyAndroidMarketSnapshot();
   if (permissions.has("market.summary.view")) {
