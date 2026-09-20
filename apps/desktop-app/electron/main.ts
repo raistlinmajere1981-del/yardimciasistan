@@ -62,6 +62,7 @@ import { registerCustomerIpcHandlers } from "./ipc/customer-ipc";
 import { registerWhatsAppIpcHandlers, registerWhatsAppWebviewIpcEvents } from "./ipc/whatsapp-ipc";
 import { registerMenuIpcHandlers } from "./ipc/menu-ipc";
 import { registerAndroidDeviceIpcHandlers } from "./ipc/android-device-ipc";
+import { AndroidInstallationService } from "./android-installation-service";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
 import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 import { registerImageAnalysisIpcHandlers } from "./ipc/image-analysis-ipc";
@@ -579,10 +580,26 @@ function registerIpcHandlers() {
     assertUnlocked: assertAppSessionUnlocked
   });
 
+  const androidInstallationService = new AndroidInstallationService({
+    getConnection: () => getWebSyncConfig(getDatabase().getSetupData()),
+    getDesktopId: () => getDatabase().getSyncRuntimeStatus().clientId
+  });
+
   registerAndroidDeviceIpcHandlers({
     getDatabase,
     assertCapability: assertDesktopCapability,
-    finalizeDeviceMutation: finalizeAndroidDeviceMutation
+    finalizeDeviceMutation: finalizeAndroidDeviceMutation,
+    listInstallDevices: () => androidInstallationService.listDevices(),
+    installOnDevice: async (serial) => {
+      const publication = await publishCurrentAndroidSnapshot();
+      if (!publication.ok) {
+        return {
+          ok: false,
+          message: `Android kurulumu için web bağlantısı hazırlanamadı. ${publication.message}`
+        };
+      }
+      return androidInstallationService.install(serial);
+    }
   });
 
   registerAiConnectionIpcHandlers({
