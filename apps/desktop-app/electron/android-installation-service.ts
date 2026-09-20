@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -115,7 +115,7 @@ export class AndroidInstallationService {
     };
   }
 
-  install(serial: string): DesktopAndroidInstallResult {
+  async install(serial: string): Promise<DesktopAndroidInstallResult> {
     const normalizedSerial = String(serial ?? "").trim();
     if (!normalizedSerial) {
       return { ok: false, message: "Kurulum için Android cihaz seri numarası gerekli." };
@@ -149,10 +149,9 @@ export class AndroidInstallationService {
     }
 
     const alreadyInstalled = this.isPackageInstalled(adb, normalizedSerial);
-    const installResult = this.runAdb(
+    const installResult = await this.runAdbAsync(
       adb,
-      ["-s", normalizedSerial, "install", "-r", androidPackage.apkPath],
-      true
+      ["-s", normalizedSerial, "install", "-r", androidPackage.apkPath]
     );
     if (installResult.status !== 0 || /\bFailure\s*\[/.test(installResult.output)) {
       return { ok: false, message: this.installFailureMessage(installResult.output) };
@@ -197,7 +196,7 @@ export class AndroidInstallationService {
       launchArgs.push("--es", "ya_provision_url", baseUrl, "--es", "ya_provision_ticket", ticket);
     }
 
-    const launchResult = this.runAdb(adb, launchArgs, true);
+    const launchResult = await this.runAdbAsync(adb, launchArgs);
     if (launchResult.status !== 0) {
       return {
         ok: false,
@@ -447,6 +446,49 @@ export class AndroidInstallationService {
         };
       })
       .filter((device) => Boolean(device.serial));
+  }
+
+  private runAdbAsync(adb: string, args: string[]): Promise<{
+    status: number;
+    stdout: string;
+    output: string;
+    errorCode: string;
+  }> {
+    return new Promise((resolveResult) => {
+      let stdout = "";
+      let stderr = "";
+      let settled = false;
+      const child = spawn(adb, args, {
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      child.stdout?.on("data", (chunk) => {
+        stdout += chunk.toString();
+      });
+      child.stderr?.on("data", (chunk) => {
+        stderr += chunk.toString();
+      });
+      child.once("error", (error) => {
+        if (settled) return;
+        settled = true;
+        resolveResult({
+          status: 1,
+          stdout,
+          output: `${stdout}${stderr}${error.message ? `\n${error.message}` : ""}`.trim(),
+          errorCode: (error as NodeJS.ErrnoException).code ?? ""
+        });
+      });
+      child.once("close", (code) => {
+        if (settled) return;
+        settled = true;
+        resolveResult({
+          status: code ?? 1,
+          stdout,
+          output: `${stdout}${stderr}`.trim(),
+          errorCode: ""
+        });
+      });
+    });
   }
 
   private runAdb(adb: string, args: string[], allowFailure: boolean) {
