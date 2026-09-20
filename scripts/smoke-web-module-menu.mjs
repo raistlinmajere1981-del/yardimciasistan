@@ -1,4 +1,5 @@
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import http from "node:http";
@@ -78,7 +79,7 @@ server.stderr.on("data", (chunk) => {
 try {
   await waitForUrl(`${baseUrl}/api/menu.php`);
 
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
   await page.goto(`${baseUrl}/menu.html`);
