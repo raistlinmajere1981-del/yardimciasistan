@@ -490,23 +490,16 @@ function restaurantScheduleControlsTemplate() {
 }
 
 function timePickerControlTemplate() {
-  const hours = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
-  const minutes = ["00", "15", "30", "45"];
   return `
     <div class="ya-widget-time-field">
       <span>Saat</span>
-      <div class="ya-widget-time-selectors">
-        <select data-ya-time-hour aria-label="Saat">
-          <option value="">Saat</option>
-          ${hours.map((hour) => `<option value="${hour}">${hour}</option>`).join("")}
-        </select>
-        <span aria-hidden="true">:</span>
-        <select data-ya-time-minute aria-label="Dakika">
-          <option value="">Dakika</option>
-          ${minutes.map((minute) => `<option value="${minute}">${minute}</option>`).join("")}
-        </select>
-      </div>
+      <button class="ya-widget-time-trigger" type="button" data-ya-open-time-picker aria-expanded="false">
+        ${iconTemplate("clock")}
+        <strong data-ya-time-label>Saat seç</strong>
+        ${iconTemplate("chevron-right")}
+      </button>
       <input name="time" type="hidden" />
+      <div class="ya-widget-time-popover" data-ya-time-popover hidden></div>
     </div>
   `;
 }
@@ -783,6 +776,11 @@ function bindDateControls(root: HTMLElement) {
     const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("button") : null;
     if (!button || button.disabled) return;
 
+    if (button.dataset.yaCalendarClose === "1") {
+      closeTurkishDatePicker(root);
+      return;
+    }
+
     if (button.dataset.yaCalendarShortcut) {
       applyCalendarShortcut(root, String(button.dataset.yaCalendarShortcut), calendar);
       return;
@@ -815,6 +813,7 @@ function bindDateControls(root: HTMLElement) {
 }
 
 function openTurkishDatePicker(root: HTMLElement, inputName: string) {
+  closeTimePicker(root);
   const calendar = root.querySelector<HTMLElement>("[data-ya-calendar]");
   const input = root.querySelector<HTMLInputElement>(`input[name="${inputName}"]`);
   if (!calendar || !input) return;
@@ -878,6 +877,7 @@ function renderTurkishCalendar(root: HTMLElement) {
       <button type="button" data-ya-calendar-shift="-1" aria-label="Önceki ay" ${previousMonthEnd < minValue ? "disabled" : ""}>${iconTemplate("chevron-left")}</button>
       <strong class="ya-widget-calendar-title">${escapeHtml(formatTurkishMonth(monthDate))}</strong>
       <button type="button" data-ya-calendar-shift="1" aria-label="Sonraki ay">${iconTemplate("chevron-right")}</button>
+      <button class="ya-widget-calendar-close" type="button" data-ya-calendar-close="1" aria-label="Takvimi kapat">×</button>
     </div>
     <div class="ya-widget-calendar-shortcuts">
       ${shortcuts.map(([key, label, disabled]) => `<button type="button" data-ya-calendar-shortcut="${key}" ${disabled ? "disabled" : ""}>${label}</button>`).join("")}
@@ -966,17 +966,98 @@ function updateRestaurantDateControls(root: HTMLElement, preset: DatePreset, dat
 }
 
 function bindTimeControls(root: HTMLElement) {
-  const hour = root.querySelector<HTMLSelectElement>("[data-ya-time-hour]");
-  const minute = root.querySelector<HTMLSelectElement>("[data-ya-time-minute]");
+  const trigger = root.querySelector<HTMLButtonElement>("[data-ya-open-time-picker]");
+  const popover = root.querySelector<HTMLElement>("[data-ya-time-popover]");
   const time = root.querySelector<HTMLInputElement>('input[name="time"]');
-  if (!hour || !minute || !time) return;
+  if (!trigger || !popover || !time) return;
 
-  const sync = () => {
-    time.value = hour.value && minute.value ? `${hour.value}:${minute.value}` : "";
-  };
-  hour.addEventListener("change", sync);
-  minute.addEventListener("change", sync);
-  sync();
+  trigger.addEventListener("click", () => {
+    closeTurkishDatePicker(root);
+    const opening = popover.hidden;
+    if (opening) renderTimePicker(root);
+    popover.hidden = !opening;
+    trigger.setAttribute("aria-expanded", String(opening));
+  });
+
+  popover.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>("button") : null;
+    if (!button || button.disabled) return;
+
+    if (button.dataset.yaTimeClose === "1") {
+      closeTimePicker(root);
+      return;
+    }
+
+    const hour = button.dataset.yaTimeHour;
+    const minute = button.dataset.yaTimeMinute;
+    if (hour !== undefined) popover.dataset.yaSelectedHour = hour;
+    if (minute !== undefined) popover.dataset.yaSelectedMinute = minute;
+
+    const selectedHour = String(popover.dataset.yaSelectedHour ?? "");
+    const selectedMinute = String(popover.dataset.yaSelectedMinute ?? "");
+    if (selectedHour && selectedMinute) {
+      time.value = `${selectedHour}:${selectedMinute}`;
+      const label = root.querySelector<HTMLElement>("[data-ya-time-label]");
+      if (label) label.textContent = time.value;
+    }
+    renderTimePicker(root);
+
+    if (minute !== undefined && selectedHour && selectedMinute) {
+      closeTimePicker(root);
+    }
+  });
+}
+
+function renderTimePicker(root: HTMLElement) {
+  const popover = root.querySelector<HTMLElement>("[data-ya-time-popover]");
+  const time = root.querySelector<HTMLInputElement>('input[name="time"]');
+  if (!popover || !time) return;
+
+  const current = /^([01]\\d|2[0-3]):([0-5]\\d)$/.exec(time.value);
+  if (current) {
+    popover.dataset.yaSelectedHour = current[1];
+    popover.dataset.yaSelectedMinute = current[2];
+  }
+
+  const selectedHour = String(popover.dataset.yaSelectedHour ?? "");
+  const selectedMinute = String(popover.dataset.yaSelectedMinute ?? "");
+  const hours = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+  const minutes = ["00", "15", "30", "45"];
+
+  popover.innerHTML = `
+    <div class="ya-widget-time-popover-head">
+      <div>
+        <small>Saat seçimi</small>
+        <strong>${selectedHour || "--"}:${selectedMinute || "--"}</strong>
+      </div>
+      <button type="button" data-ya-time-close="1" aria-label="Saat seçimini kapat">×</button>
+    </div>
+    <div class="ya-widget-time-columns">
+      <div class="ya-widget-time-column" aria-label="Saatler">
+        <span>Saat</span>
+        <div class="ya-widget-time-scroll">
+          ${hours.map((hour) => `<button type="button" data-ya-time-hour="${hour}" class="${selectedHour === hour ? "is-selected" : ""}">${hour}</button>`).join("")}
+        </div>
+      </div>
+      <div class="ya-widget-time-column" aria-label="Dakikalar">
+        <span>Dakika</span>
+        <div class="ya-widget-time-scroll ya-widget-time-minutes">
+          ${minutes.map((minute) => `<button type="button" data-ya-time-minute="${minute}" class="${selectedMinute === minute ? "is-selected" : ""}">${minute}</button>`).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+
+  window.requestAnimationFrame(() => {
+    popover.querySelector<HTMLElement>(".ya-widget-time-scroll .is-selected")?.scrollIntoView({ block: "center" });
+  });
+}
+
+function closeTimePicker(root: HTMLElement) {
+  const popover = root.querySelector<HTMLElement>("[data-ya-time-popover]");
+  const trigger = root.querySelector<HTMLButtonElement>("[data-ya-open-time-picker]");
+  if (popover) popover.hidden = true;
+  trigger?.setAttribute("aria-expanded", "false");
 }
 
 function bindGuestStepper(root: HTMLElement) {
@@ -2119,7 +2200,7 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-calendar-head {
       display: grid;
-      grid-template-columns: 34px 1fr 34px;
+      grid-template-columns: 34px minmax(0, 1fr) 34px 30px;
       align-items: center;
       gap: 6px;
     }
@@ -2138,6 +2219,22 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     }
 
     .ya-widget-calendar-head > button:disabled { cursor: not-allowed; opacity: .35; }
+
+    .ya-widget-calendar-head > .ya-widget-calendar-close {
+      width: 30px;
+      height: 30px;
+      border-color: transparent;
+      color: #6d737c;
+      background: #f6f3ed;
+      font-size: 19px;
+      line-height: 1;
+    }
+
+    .ya-widget-calendar-head > .ya-widget-calendar-close:hover {
+      color: #172033;
+      background: #ece8df;
+    }
+
     .ya-widget-calendar-title { color: #172033; font-size: 12px; font-weight: 850; text-align: center; }
 
     .ya-widget-calendar-shortcuts {
@@ -2207,35 +2304,166 @@ function widgetStyles(widgetConfig: WidgetConfig) {
     .ya-widget-calendar-days button:disabled { color: #c4c5c7; cursor: not-allowed; }
 
     .ya-widget-time-field {
+      position: relative;
       display: grid;
       gap: 5px;
       margin-top: 9px;
     }
 
-    .ya-widget-time-selectors {
+    .ya-widget-time-trigger {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      grid-template-columns: 18px minmax(0, 1fr) 16px;
       align-items: center;
-      gap: 7px;
-    }
-
-    .ya-widget-time-selectors > span {
-      color: #6b727c;
-      font-size: 16px;
-      font-weight: 850;
-    }
-
-    .ya-widget-time-selectors select {
+      gap: 8px;
       width: 100%;
       min-height: 42px;
-      padding: 8px 30px 8px 10px;
+      padding: 8px 10px;
       border: 1px solid #dcd7cf;
       border-radius: 10px;
       color: #334048;
       background: rgba(255, 255, 255, 0.94);
-      font-size: 12px;
-      font-weight: 750;
+      text-align: left;
       cursor: pointer;
+      transition: border-color 130ms ease, box-shadow 130ms ease;
+    }
+
+    .ya-widget-time-trigger:hover,
+    .ya-widget-time-trigger[aria-expanded="true"] {
+      border-color: rgba(47, 111, 94, 0.44);
+      box-shadow: 0 0 0 3px rgba(47, 111, 94, 0.08);
+    }
+
+    .ya-widget-time-trigger strong {
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .ya-widget-time-trigger .ya-widget-icon {
+      width: 15px !important;
+      height: 15px !important;
+      color: ${widgetConfig.primaryColor};
+    }
+
+    .ya-widget-time-trigger .ya-widget-icon:last-child {
+      justify-self: end;
+      color: #8b918f;
+      transform: rotate(90deg);
+    }
+
+    .ya-widget-time-popover {
+      position: absolute;
+      top: 66px;
+      right: 0;
+      z-index: 25;
+      width: min(268px, 100%);
+      padding: 10px;
+      border: 1px solid rgba(47, 111, 94, 0.2);
+      border-radius: 14px;
+      background: #fffdf8;
+      box-shadow: 0 18px 44px rgba(23, 32, 51, 0.2);
+      animation: ya-widget-result-in 150ms ease-out both;
+    }
+
+    .ya-widget-time-popover[hidden] { display: none; }
+
+    .ya-widget-time-popover-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .ya-widget-time-popover-head > div {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+    }
+
+    .ya-widget-time-popover-head small {
+      color: #777d87;
+      font-size: 9px;
+      font-weight: 750;
+    }
+
+    .ya-widget-time-popover-head strong {
+      color: ${widgetConfig.primaryColor};
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .ya-widget-time-popover-head > button {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      border-radius: 9px;
+      color: #6d737c;
+      background: #f3efe7;
+      font-size: 19px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .ya-widget-time-columns {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 78px;
+      gap: 8px;
+    }
+
+    .ya-widget-time-column {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .ya-widget-time-column > span {
+      color: #6b727c;
+      font-size: 9px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .ya-widget-time-scroll {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 4px;
+      max-height: 128px;
+      padding: 2px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(47, 111, 94, 0.25) transparent;
+    }
+
+    .ya-widget-time-minutes {
+      grid-template-columns: 1fr;
+    }
+
+    .ya-widget-time-scroll button {
+      min-height: 32px;
+      padding: 4px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: #36444b;
+      background: #f5f7f3;
+      font-size: 10px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .ya-widget-time-scroll button:hover {
+      border-color: rgba(47, 111, 94, 0.24);
+      background: #eef5ec;
+    }
+
+    .ya-widget-time-scroll button.is-selected {
+      color: #ffffff;
+      border-color: transparent;
+      background: ${widgetConfig.primaryColor};
+      box-shadow: 0 4px 10px rgba(47, 111, 94, 0.18);
     }
 
     .ya-widget-date-options > input[type="hidden"] {
@@ -2579,6 +2807,7 @@ const iconPaths = {
   sparkles: '<path d="m12 3-1.4 3.5L7 8l3.6 1.4L12 13l1.4-3.6L17 8l-3.6-1.5L12 3Z"/><path d="m5 15-.8 2-2.2.8 2.2.9L5 21l.8-2.3 2.2-.9-2.2-.8L5 15Z"/>',
   bot: '<rect x="5" y="7" width="14" height="11" rx="4"/><path d="M12 4v3M9 12h.01M15 12h.01M9 15h6"/>',
   calendar: '<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 9h16M8 13h.01M12 13h.01M16 13h.01"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   table: '<path d="M4 10h16M6 10l-1 10M18 10l1 10M8 6h8a2 2 0 0 1 2 2v2H6V8a2 2 0 0 1 2-2Z"/>',
   bed: '<path d="M3 18v-7M21 18v-5a2 2 0 0 0-2-2H9a3 3 0 0 0-3 3v1M3 15h18M7 11V8h5a2 2 0 0 1 2 2v1"/>',
   pin: '<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',

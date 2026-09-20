@@ -93,6 +93,10 @@ try {
   await expect(pensionPage.locator('input[name="end_date"]')).toHaveAttribute("type", "hidden");
   await pensionPage.locator('[data-ya-open-date-picker="start_date"]').click();
   await expect(pensionPage.locator("[data-ya-calendar]")).toBeVisible();
+  await expect(pensionPage.locator('[data-ya-calendar-close="1"]')).toBeVisible();
+  await pensionPage.locator('[data-ya-calendar-close="1"]').click();
+  await expect(pensionPage.locator("[data-ya-calendar]")).toBeHidden();
+  await pensionPage.locator('[data-ya-open-date-picker="start_date"]').click();
   await expect(pensionPage.locator(".ya-widget-calendar-weekdays")).toContainText("Pzt");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Bugün");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Yarın");
@@ -170,8 +174,12 @@ try {
   await expect(page.locator(".ya-widget-calendar-shortcuts")).toContainText("Yarın");
   await expect(page.locator(".ya-widget-calendar-shortcuts")).not.toContainText("Hafta sonu");
   await page.locator('[data-ya-calendar-shortcut="today"]').click();
-  await page.locator("[data-ya-time-hour]").selectOption("20");
-  await page.locator("[data-ya-time-minute]").selectOption("30");
+  await page.locator("[data-ya-open-time-picker]").click();
+  await expect(page.locator("[data-ya-time-popover]")).toBeVisible();
+  await page.locator('[data-ya-time-hour="20"]').click();
+  await page.locator('[data-ya-time-minute="30"]').click();
+  await expect(page.locator("[data-ya-time-popover]")).toBeHidden();
+  await expect(page.locator("[data-ya-time-label]")).toHaveText("20:30");
   await expect(page.locator('.ya-widget-form input[name="time"]')).toHaveValue("20:30");
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
