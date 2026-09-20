@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { DesktopDatabase } from "./database.js";
 
 const DEFAULT_PAIRING_TTL_MS = 5 * 60 * 1000;
+const PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 export interface LocalCompanionPairingSession {
   pairingSecret: string;
@@ -34,8 +35,18 @@ interface ActivePairingSession {
   expiresAtMs: number;
 }
 
+function normalizePairingSecret(secret: string): string {
+  return String(secret ?? "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function createPairingSecret(): string {
+  const bytes = randomBytes(12);
+  const raw = [...bytes].map((value) => PAIRING_ALPHABET[value & 31]).join("");
+  return `${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+}
+
 function hashSecret(secret: string): Buffer {
-  return createHash("sha256").update(secret, "utf8").digest();
+  return createHash("sha256").update(normalizePairingSecret(secret), "utf8").digest();
 }
 
 export class LocalCompanionPairingService {
@@ -45,7 +56,7 @@ export class LocalCompanionPairingService {
 
   begin(ttlMs = DEFAULT_PAIRING_TTL_MS): LocalCompanionPairingSession {
     const safeTtl = Math.max(30_000, Math.min(ttlMs, 15 * 60 * 1000));
-    const pairingSecret = randomBytes(24).toString("base64url");
+    const pairingSecret = createPairingSecret();
     const expiresAtMs = Date.now() + safeTtl;
     this.activeSession = {
       secretHash: hashSecret(pairingSecret),
