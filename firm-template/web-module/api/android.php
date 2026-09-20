@@ -37,7 +37,7 @@ if (!ya_android_auth_snapshot_has_capabilities(['service.android'])) {
 }
 
 // Device tokens are intentionally not general sync credentials. They may only
-// call the two transport actions required by the Android companion.
+// call the narrow Android transport actions required by the companion.
 $rawBody = file_get_contents('php://input') ?: '';
 $decodedBody = json_decode($rawBody, true);
 if (!is_array($decodedBody)) {
