@@ -17,6 +17,9 @@ import {
 import {
   DesktopDatabase
 } from "../apps/desktop-app/dist-electron/database.js";
+import {
+  buildLocalCompanionMdnsResponse
+} from "../apps/desktop-app/dist-electron/local-companion-mdns.js";
 
 const TOKEN = "yal_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -74,6 +77,11 @@ function baseSnapshot() {
         role: "admin",
         is_active: true,
         permissions: ["finance.view"]
+      },
+      "device-test": {
+        role: "staff",
+        is_active: true,
+        permissions: []
       }
     },
     finance: {
@@ -144,7 +152,7 @@ function assertPairingStore() {
     if (!first.ok) throw new Error(first.message);
     assert.match(first.token, /^yal_[a-f0-9]{64}$/);
     assert.equal(first.approvalRequired, true);
-    assert.equal(database.authorizeAndroidLocalCredential("device-local-test", first.token), false);
+    assert.equal(database.authorizeAndroidLocalCredential("device-local-test", first.token), true);
 
     const activated = database.setAndroidDeviceActive("device-local-test", true);
     assert.equal(activated.ok, true);
@@ -174,7 +182,12 @@ async function assertServer() {
   let appliedAction = null;
   const server = new LocalCompanionServer({
     desktopId: () => "desktop-test-123",
-    createSummary: (deviceId) => ({ device_id: deviceId, marker: "summary-ok" }),
+    businessInfo: () => ({
+      displayName: "Local Test İşletmesi",
+      phone: "05550000000",
+      whatsapp: "05550000000"
+    }),
+    createSummary: (deviceId) => projectLocalAndroidSnapshotForDevice(baseSnapshot(), deviceId),
     applyAction: (action) => {
       appliedAction = action;
       return { ok: true, message: "Applied.", alreadyApplied: false };
@@ -227,9 +240,25 @@ async function assertServer() {
     });
     assert.equal(summary.status, 200);
     const summaryBody = await summary.json();
-    assert.equal(summaryBody.snapshot.marker, "summary-ok");
+    assert.equal(summaryBody.business.display_name, "Local Test İşletmesi");
+    assert.equal(summaryBody.approval_required, false);
+    assert.equal(summaryBody.business_capabilities.includes("service.android"), true);
+    assert.equal(summaryBody.androidPermissions["device-test"].is_active, true);
 
-    const beforeRevision = summaryBody.source_revision;
+    const beforeRevision = summaryBody.server_revision;
+    const unchanged = await fetch(`${base}/local/v1/summary`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-ya-device-id": "device-test",
+        "x-ya-local-token": TOKEN
+      },
+      body: JSON.stringify({ known_server_revision: beforeRevision })
+    });
+    assert.equal(unchanged.status, 200);
+    const unchangedBody = await unchanged.json();
+    assert.equal(unchangedBody.not_modified, true);
+    assert.equal(unchangedBody.server_revision, beforeRevision);
     const action = await fetch(`${base}/local/v1/action`, {
       method: "POST",
       headers: {
@@ -269,7 +298,23 @@ async function assertServer() {
   }
 }
 
+function assertMdnsPacket() {
+  const packet = buildLocalCompanionMdnsResponse({
+    desktopId: "desktop-test-123",
+    protocolVersion: 1,
+    serviceType: "_yardimciasistan._tcp",
+    port: 47831,
+    addresses: ["192.168.1.20"]
+  });
+  const text = packet.toString("latin1");
+  assert.ok(text.includes("_yardimciasistan"));
+  assert.ok(text.includes("protocol=1"));
+  assert.ok(text.includes("desktop_id=desktop-test-123"));
+  assert.ok(packet.includes(Buffer.from([192, 168, 1, 20])));
+}
+
 assertProjection();
 assertPairingStore();
+assertMdnsPacket();
 await assertServer();
-console.log("Local companion server + pairing smoke passed.");
+console.log("Local companion server + pairing + mDNS smoke passed.");
