@@ -52,6 +52,15 @@ CREATE TABLE android_devices (
 , permission_groups_json TEXT NOT NULL
   DEFAULT '{"service_orders":true,"cashier":false,"rooms_tasks":true,"customer_reservation":false}');
 
+CREATE TABLE android_local_credentials (
+  device_id TEXT PRIMARY KEY,
+  token_hash TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  revoked_at TEXT NOT NULL DEFAULT '',
+  FOREIGN KEY (device_id) REFERENCES android_devices(device_id) ON DELETE CASCADE
+);
+
 CREATE TABLE business (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
