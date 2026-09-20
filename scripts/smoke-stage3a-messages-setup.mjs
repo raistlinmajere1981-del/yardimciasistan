@@ -1,4 +1,5 @@
 import { chromium, expect } from "@playwright/test";
+import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { spawn } from "node:child_process";
 import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -63,7 +64,7 @@ let browser;
 
 try {
   await waitForServer(baseUrl);
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const dashboard = {
     ...createDashboardConversionFixture(),
     requests: [request]
