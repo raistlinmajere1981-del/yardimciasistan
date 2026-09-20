@@ -104,7 +104,6 @@ export function authorizeAndroidLocalCredential(
       INNER JOIN android_devices AS devices ON devices.device_id = credentials.device_id
       WHERE credentials.device_id = ?
         AND credentials.revoked_at = ''
-        AND devices.is_active = 1
         AND COALESCE(devices.revoked_at, '') = ''
       LIMIT 1
     `).get(deviceId) as { token_hash?: unknown } | undefined;
