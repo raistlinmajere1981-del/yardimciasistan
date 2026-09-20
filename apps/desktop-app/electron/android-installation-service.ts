@@ -1,8 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { app } from "electron";
 import { createAndroidBootstrapTicket } from "./android-bootstrap-ticket.js";
 
@@ -390,8 +389,7 @@ export class AndroidInstallationService {
   }
 
   private developmentRepoRoot(): string {
-    const moduleDirectory = dirname(fileURLToPath(import.meta.url));
-    return resolve(moduleDirectory, "../../..");
+    return resolve(app.getAppPath(), "../..");
   }
 
   private readVersionProperties(path: string) {
