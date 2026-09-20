@@ -223,9 +223,9 @@ export function buildLocalCompanionMdnsResponse(input: {
   header.writeUInt16BE(0, 0);
   header.writeUInt16BE(DNS_RESPONSE_FLAGS, 2);
   header.writeUInt16BE(0, 4);
-  header.writeUInt16BE(records.length, 6);
+  header.writeUInt16BE(records.length > 0 ? 1 : 0, 6);
   header.writeUInt16BE(0, 8);
-  header.writeUInt16BE(0, 10);
+  header.writeUInt16BE(Math.max(0, records.length - 1), 10);
   return Buffer.concat([header, ...records]);
 }
 
