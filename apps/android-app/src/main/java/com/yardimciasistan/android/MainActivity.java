@@ -1232,6 +1232,85 @@ public final class MainActivity extends ComponentActivity {
     activeTab = canOpenTab(destination.tab) ? destination.tab : TAB_TODAY;
   }
 
+  private void showLocalPairingDialog() {
+    if (!canUseLocalNetworkDiscovery()) {
+      requestLocalNetworkPermissionIfNeeded();
+      Toast.makeText(this, "Yerel ağ erişimine izin verip tekrar deneyin.", Toast.LENGTH_SHORT).show();
+      return;
+    }
+    if (localCompanionDiscovery != null) {
+      localCompanionDiscovery.start(10_000L);
+    }
+
+    EditText pairingInput = UiKit.input(this, "Masaüstündeki eşleştirme kodu");
+    pairingInput.setSingleLine(true);
+    pairingInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+    pairingInput.setSelectAllOnFocus(true);
+    int horizontal = UiKit.dp(this, 20);
+    FrameLayout wrapper = new FrameLayout(this);
+    wrapper.setPadding(horizontal, UiKit.dp(this, 8), horizontal, 0);
+    wrapper.addView(pairingInput, new FrameLayout.LayoutParams(-1, UiKit.dp(this, 52)));
+
+    new AlertDialog.Builder(this)
+        .setTitle("Yerel Ağ Eşleştir")
+        .setMessage("Masaüstünde Ayarlar → Android → Yerel Eşleştir ile oluşturulan tek kullanımlık kodu girin.")
+        .setView(wrapper)
+        .setNegativeButton("Vazgeç", null)
+        .setPositiveButton("Eşleştir", (dialog, which) ->
+            pairWithLocalDesktop(pairingInput.getText().toString()))
+        .show();
+  }
+
+  private void pairWithLocalDesktop(String pairingSecret) {
+    if (loading) {
+      return;
+    }
+    String hostingBaseUrl = ConnectionSettings.webModuleUrl(preferences);
+    if (hostingBaseUrl.isEmpty()) {
+      showError("Yerel eşleştirme için önce web bağlantı hedefi yapılandırılmalı.");
+      return;
+    }
+
+    loading = true;
+    connectionState = "Yerel masaüstü eşleştiriliyor";
+    clearError();
+    render();
+    executor.execute(() -> {
+      try {
+        LocalCompanionPairingClient.PairResult result = new LocalCompanionPairingClient().pair(
+            preferences,
+            identity,
+            hostingBaseUrl,
+            pairingSecret
+        );
+        runOnUiThread(() -> {
+          loading = false;
+          connectionState = result.approvalRequired
+              ? "Yerel eşleştirme tamamlandı · masaüstü onayı bekleniyor"
+              : "Yerel ağ bağlantısı hazır";
+          clearError();
+          Toast.makeText(
+              this,
+              result.message.isEmpty() ? "Yerel eşleştirme tamamlandı." : result.message,
+              Toast.LENGTH_LONG
+          ).show();
+          render();
+          syncOperations(false);
+        });
+      } catch (LocalCompanionPairingClient.PairingException error) {
+        if ("local_desktop_not_found".equals(error.code) && localCompanionDiscovery != null) {
+          localCompanionDiscovery.start(10_000L);
+        }
+        runOnUiThread(() -> {
+          loading = false;
+          connectionState = "Yerel eşleştirme başarısız";
+          showError(error.getMessage());
+          render();
+        });
+      }
+    });
+  }
+
   private void requestNotificationPermissionIfNeeded() {
     if (Build.VERSION.SDK_INT < 33
         || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -2635,9 +2714,42 @@ public final class MainActivity extends ComponentActivity {
       page.addView(readOnly);
     }
 
+    ConnectionSettings.LocalConnection localConnection = ConnectionSettings.localConnection(preferences);
+    LinearLayout localConnectionCard = UiKit.card(this);
+    localConnectionCard.addView(UiKit.text(this, "Yerel ağ", 14, UiKit.TEXT, Typeface.BOLD));
+    localConnectionCard.addView(UiKit.text(
+        this,
+        localConnection.isComplete()
+            ? "Bu telefon eşleşmiş masaüstünü aynı ağda bulduğunda doğrudan bağlanır."
+            : "Aynı ağdaki masaüstüyle eşleştirildiğinde işlemler önce yerel ağ üzerinden gönderilir.",
+        12,
+        UiKit.SECONDARY,
+        Typeface.NORMAL
+    ));
+    Button localPairButton = UiKit.button(
+        this,
+        localConnection.isComplete() ? "Yerel Ağı Yeniden Eşleştir" : "Yerel Ağ Eşleştir",
+        UiKit.SECONDARY,
+        view -> showLocalPairingDialog()
+    );
+    LinearLayout.LayoutParams localPairParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
+    localPairParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
+    localPairButton.setLayoutParams(localPairParams);
+    localConnectionCard.addView(localPairButton);
+    page.addView(localConnectionCard);
+
     page.addView(UiKit.sectionTitle(this, "Bağlantı özeti"));
     LinearLayout state = UiKit.card(this);
     state.addView(settingLine("Bağlantı durumu", connectionState, connectionTone()));
+    state.addView(UiKit.divider(this));
+    ConnectionSettings.LocalConnection localSummary = ConnectionSettings.localConnection(preferences);
+    state.addView(settingLine(
+        "Yerel masaüstü",
+        localSummary.isComplete()
+            ? (localSummary.hasEndpoint() ? "Eşleşti · ağda bulundu" : "Eşleşti · ağda aranıyor")
+            : (localSummary.hasEndpoint() ? "Bulundu · eşleştirme bekliyor" : "Henüz bulunmadı"),
+        localSummary.isComplete() && localSummary.hasEndpoint() ? UiKit.SUCCESS : UiKit.MUTED
+    ));
     state.addView(UiKit.divider(this));
     state.addView(settingLine("Son senkron", data.pulledAt.isEmpty() ? "Henüz yok" : shortTimestamp(data.pulledAt), UiKit.INFO));
     state.addView(UiKit.divider(this));
