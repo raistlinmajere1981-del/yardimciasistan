@@ -25,10 +25,6 @@ final class CompanionConnectionIdentity {
     return normalized.isEmpty() ? "" : "companion:" + normalized;
   }
 
-  static String actionTargetKeyFromLegacyEndpoint(String endpoint) {
-    return actionTargetKey(endpoint);
-  }
-
   private static String normalizedHostingBaseUrl(String value) {
     String endpoint = HostingSyncClient.toSyncEndpoint(value == null ? "" : value.trim());
     if (!endpoint.endsWith(HOSTING_SYNC_SUFFIX)) {
