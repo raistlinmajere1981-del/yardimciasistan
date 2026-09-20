@@ -1264,6 +1264,36 @@ export interface VersionedPublication<T> {
   value: T;
 }
 
+export const LOCAL_COMPANION_PROTOCOL_VERSION = 1;
+export const LOCAL_COMPANION_SERVICE_TYPE = "_yardimciasistan._tcp";
+export const LOCAL_COMPANION_API_PREFIX = "/local/v1";
+export const LOCAL_COMPANION_ENDPOINTS = {
+  status: `${LOCAL_COMPANION_API_PREFIX}/status`,
+  summary: `${LOCAL_COMPANION_API_PREFIX}/summary`,
+  action: `${LOCAL_COMPANION_API_PREFIX}/action`,
+  pair: `${LOCAL_COMPANION_API_PREFIX}/pair`
+} as const;
+export const LOCAL_COMPANION_DEVICE_ID_HEADER = "X-YA-Device-Id";
+export const LOCAL_COMPANION_TOKEN_HEADER = "X-YA-Local-Token";
+
+export type CompanionTransportKind = "local" | "hosting";
+
+export interface LocalCompanionServiceDescriptor {
+  protocolVersion: number;
+  desktopId: string;
+}
+
+/**
+ * Stable cache/outbox namespace. Network address and port are deliberately not
+ * part of local identity; desktopId survives DHCP and listener port changes.
+ */
+export function createCompanionSourceKey(kind: CompanionTransportKind, sourceId: string): string {
+  const normalized = kind === "hosting"
+    ? sourceId.trim().replace(/\\/+$/, "")
+    : sourceId.trim();
+  return normalized ? `${kind}:${normalized}` : "";
+}
+
 export interface SyncTransport {
   getCapabilities(): Promise<SyncCapabilitiesResult>;
   pullRequests(input: PullCursorInput): Promise<PullRequestsResult>;
