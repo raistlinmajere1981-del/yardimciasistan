@@ -6,7 +6,7 @@ import {
 
 type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
 type WidgetView = "home" | "form" | "info" | "whatsapp" | "directions";
-type DatePreset = "today" | "tomorrow" | "weekend" | "custom";
+type DatePreset = "today" | "tomorrow" | "custom";
 type WidgetIntent = "home" | "accommodation.reserve" | "accommodation.info" | "food.reserve" | "info" | "directions";
 
 interface WidgetContext {
@@ -910,7 +910,11 @@ function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HT
   const value = toLocalIsoDate(chosen);
   if (input.min && value < input.min) return;
   input.value = value;
-  input.dispatchEvent(new Event("change", { bubbles: true }));
+  if (isAccommodation) {
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  } else {
+    updateRestaurantDateControls(root, shortcut === "tomorrow" ? "tomorrow" : "today", value);
+  }
   closeTurkishDatePicker(root);
 }
 
@@ -2883,11 +2887,6 @@ function addLocalDays(date: Date, amount: number) {
   return nextDate;
 }
 
-function nextWeekendDate(date: Date) {
-  const day = date.getDay();
-  return addLocalDays(date, day === 0 || day === 6 ? 0 : 6 - day);
-}
-
 function toLocalIsoDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -2932,9 +2931,6 @@ function formatDateForRequest(value: string, preset: DatePreset) {
   }
   if (preset === "tomorrow") {
     return `Yarın, ${calendarDate}`;
-  }
-  if (preset === "weekend") {
-    return `Hafta sonu, ${calendarDate}`;
   }
   return calendarDate;
 }
