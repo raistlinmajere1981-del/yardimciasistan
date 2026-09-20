@@ -1,6 +1,7 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import type { DesktopAndroidDevice, DesktopDashboardData } from "../../electron/database";
+import type { DesktopAndroidInstallationSnapshot } from "../../electron/android-installation-service";
 import type { SyncState } from "./runtime-state";
 
 interface UseDeviceControllerOptions {
@@ -12,6 +13,55 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
   const [androidDeviceMessage, setAndroidDeviceMessage] = useState("Telefon rolleri ve görev alanları masaüstünden yönetilir.");
+  const [androidInstallState, setAndroidInstallState] = useState<SyncState>("idle");
+  const [androidInstallMessage, setAndroidInstallMessage] = useState("USB Android cihazları aranıyor...");
+  const [androidInstallSnapshot, setAndroidInstallSnapshot] = useState<DesktopAndroidInstallationSnapshot | null>(null);
+  async function refreshAndroidInstallDevices() {
+    if (!window.yardimciDesktop?.listAndroidInstallDevices) {
+      setAndroidInstallState("error");
+      setAndroidInstallMessage("Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+    setAndroidInstallState("loading");
+    setAndroidInstallMessage("USB Android cihazları aranıyor...");
+    try {
+      const snapshot = await window.yardimciDesktop.listAndroidInstallDevices();
+      setAndroidInstallSnapshot(snapshot);
+      setAndroidInstallState(snapshot.ok ? "success" : "error");
+      setAndroidInstallMessage(snapshot.message);
+    } catch {
+      setAndroidInstallState("error");
+      setAndroidInstallMessage("USB Android cihazları okunamadı.");
+    }
+  }
+
+  async function handleInstallAndroidApp(serial: string) {
+    if (!window.yardimciDesktop?.installAndroidApp) {
+      setAndroidInstallState("error");
+      setAndroidInstallMessage("Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+    setAndroidInstallState("loading");
+    setAndroidInstallMessage("Android uygulaması telefona kuruluyor...");
+    try {
+      const result = await window.yardimciDesktop.installAndroidApp(serial);
+      setAndroidInstallState(result.ok ? "success" : "error");
+      setAndroidInstallMessage(result.message);
+      await refreshAndroidInstallDevices();
+      if (result.ok) {
+        setAndroidInstallState("success");
+        setAndroidInstallMessage(result.message);
+      }
+    } catch {
+      setAndroidInstallState("error");
+      setAndroidInstallMessage("Android uygulaması kurulamadı.");
+    }
+  }
+
+  useEffect(() => {
+    void refreshAndroidInstallDevices();
+  }, []);
+
   async function runAndroidDeviceMutation(
     pendingMessage: string,
     operation: () => ReturnType<NonNullable<typeof window.yardimciDesktop>["setAndroidDeviceRole"]>
@@ -107,6 +157,11 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
     backupMessage,
     androidDeviceState,
     androidDeviceMessage,
+    androidInstallState,
+    androidInstallMessage,
+    androidInstallSnapshot,
+    refreshAndroidInstallDevices,
+    handleInstallAndroidApp,
     handleSetAndroidDeviceRole,
     handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
