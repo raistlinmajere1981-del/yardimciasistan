@@ -200,7 +200,7 @@ const mainProcessReady = import("./main");
 // hesabı, commerce, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı
 // testi IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı migration'larından
 // sonra yapılır.
-void mainProcessReady.then(async ({ assertAppSessionUnlocked }) => {
+void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanionSnapshotDirty }) => {
   await app.whenReady();
   setImmediate(() => {
     const databasePath = () => resolveDatabasePath(userDataPath());
@@ -210,6 +210,7 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked }) => {
       // SyncCoordinator directly. Domain mutations only affect the Android
       // publication while that service is active; setup/restore separately
       // queue the tombstone that clears stale hosted data when it is disabled.
+      markLocalCompanionSnapshotDirty();
       const database = new DesktopDatabase({
         appPath: app.getAppPath(),
         userDataPath: userDataPath(),
