@@ -22,6 +22,14 @@ files:
   - "!tsconfig*.json"
   - "!vite*.ts"
 
+extraResources:
+  - from: resources/android
+    to: android
+    filter:
+      - yardimci-asistan-release.apk
+      - version.json
+      - platform-tools/**/*
+
 extraMetadata:
   main: dist-electron/main-entry.js
   name: yardimci-asistan-desktop
