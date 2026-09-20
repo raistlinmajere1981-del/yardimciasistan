@@ -35,7 +35,7 @@ PHP CLI + PDO_SQLITE (web modülü ve senkron testleri için)
 
 ```text
 ImageMagick: görselleri WebP'ye çevirmek için
-Playwright Chromium: web ve widget ekranlarını otomatik test etmek için
+Brave / Chromium / Chrome: Playwright tabanlı web ve widget testleri için
 Android Studio + platform-tools: telefonda Android testleri için
 JDK 17 veya üzeri: Android build zinciri için
 ```
@@ -50,13 +50,23 @@ npm run doctor
 
 ```bash
 npm install
-npx playwright install chromium
 npm run doctor
 npm run build
 npm test
 ```
 
 ## Görsel Kontrol
+
+Playwright testleri ayrı bir tarayıcı indirmeyi zorunlu tutmaz. Test launcher sırası:
+
+1. `PLAYWRIGHT_CHROMIUM_EXECUTABLE` ile verilen mevcut tarayıcı
+2. sistemde kurulu Brave
+3. sistemde kurulu Chromium / Chrome
+4. varsa daha önce kurulmuş Playwright Chromium
+
+Bu nedenle normal geliştirme kurulumunda `npx playwright install chromium` çalıştırmayın.
+Sistemde Chromium tabanlı bir tarayıcı yoksa test açık bir hata ile durur; otomatik browser
+indirme yapılmaz.
 
 Playwright ile temel web akışı:
 
