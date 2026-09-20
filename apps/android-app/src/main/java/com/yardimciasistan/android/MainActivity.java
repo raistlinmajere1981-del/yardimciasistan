@@ -1674,17 +1674,30 @@ public final class MainActivity extends ComponentActivity {
         ? screenIntro("ERİŞİM DURUMU", "Bu cihaz pasifleştirildi", "Cihaz masaüstünde pasifleştirilmiş. Yerel ağ eşleştirmesi yapılabilir; işletme işlemleri için masaüstünden yeniden etkinleştirilmesi gerekir.", false)
         : screenIntro("ERİŞİM DURUMU", "Android bağlantısı kapalı", "İşletmenin Android hizmeti kapatıldığı için telefondaki işletme verileri temizlendi.", false));
 
+    ConnectionSettings.LocalConnection inactiveLocal = ConnectionSettings.localConnection(preferences);
     if (androidEnabled) {
       LinearLayout localCard = UiKit.card(this);
       localCard.addView(UiKit.text(this, "Yerel ağ", 14, UiKit.TEXT, Typeface.BOLD));
       localCard.addView(UiKit.text(
           this,
-          "Bu cihaz pasif olsa da aynı ağdaki masaüstüyle güvenli biçimde eşleştirilebilir.",
+          inactiveLocal.isComplete()
+              ? "Bu telefon masaüstüyle yerel ağ için eşleştirildi. İşletme işlemleri için cihazı masaüstünden etkinleştirin."
+              : "Bu cihaz pasif olsa da aynı ağdaki masaüstüyle güvenli biçimde eşleştirilebilir.",
           12,
           UiKit.SECONDARY,
           Typeface.NORMAL
       ));
-      Button pairButton = UiKit.outlineButton(this, "Yerel Ağ Eşleştir", view -> showLocalPairingDialog());
+      localCard.addView(UiKit.divider(this));
+      localCard.addView(settingLine(
+          "Yerel bağlantı",
+          inactiveLocal.isComplete() ? "Eşleşti" : (inactiveLocal.hasEndpoint() ? "Masaüstü bulundu" : "Bekliyor"),
+          inactiveLocal.isComplete() ? UiKit.SUCCESS : UiKit.MUTED
+      ));
+      Button pairButton = UiKit.outlineButton(
+          this,
+          inactiveLocal.isComplete() ? "Yerel Ağı Yeniden Eşleştir" : "Yerel Ağ Eşleştir",
+          view -> showLocalPairingDialog()
+      );
       LinearLayout.LayoutParams pairParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
       pairParams.setMargins(0, UiKit.dp(this, 10), 0, 0);
       pairButton.setLayoutParams(pairParams);
@@ -1696,7 +1709,6 @@ public final class MainActivity extends ComponentActivity {
     card.addView(settingLine("Telefon kimliği", compactDeviceId(), UiKit.MUTED));
     card.addView(UiKit.divider(this));
     card.addView(settingLine("Rol", data.deviceRoleLabel(), UiKit.WARNING));
-    ConnectionSettings.LocalConnection inactiveLocal = ConnectionSettings.localConnection(preferences);
     if (inactiveLocal.hasEndpoint()) {
       card.addView(UiKit.divider(this));
       card.addView(settingLine("Yerel adres", inactiveLocal.baseUrl, UiKit.MUTED));
