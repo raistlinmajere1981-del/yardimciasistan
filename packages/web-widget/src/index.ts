@@ -511,7 +511,7 @@ function timePickerControlTemplate() {
   `;
 }
 
-function datePickerControlTemplate(function datePickerControlTemplate(name: "start_date" | "end_date", label: string, placeholder: string, min: string) {
+function datePickerControlTemplate(name: "start_date" | "end_date", label: string, placeholder: string, min: string) {
   return `
     <div class="ya-widget-date-picker" data-ya-date-picker-control="${name}">
       <span>${label}</span>
@@ -914,7 +914,7 @@ function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HT
   closeTurkishDatePicker(root);
 }
 
-function updateAccommodationDateControls(function updateAccommodationDateControls(root: HTMLElement) {
+function updateAccommodationDateControls(root: HTMLElement) {
   const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
   const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
   const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
