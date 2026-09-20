@@ -965,6 +965,7 @@ function createAndroidOperationsSnapshot(dashboardData: DesktopDashboardData): A
 
   const source: AndroidOperationsSnapshot = {
     business_capabilities: [],
+    local_network_enabled: getDatabase().getSetupData().localNetworkEnabled,
     summary: {
       pending_daily_tasks: dashboardData.summary.pendingDailyTasks,
       today_tasks: dashboardData.dailyTasks.filter((task) => task.dueDate === today && task.status !== "archived").length,
