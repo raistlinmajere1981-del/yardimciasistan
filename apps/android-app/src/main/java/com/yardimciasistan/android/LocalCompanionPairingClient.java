@@ -40,6 +40,8 @@ final class LocalCompanionPairingClient {
       throw new PairingException("Masaüstündeki eşleştirme kodunu girin.");
     }
 
+    probeStatus(discovered);
+
     JSONObject request = new JSONObject();
     try {
       request.put("pairing_secret", secret);
@@ -71,6 +73,48 @@ final class LocalCompanionPairingClient {
         response.optBoolean("approval_required", true),
         response.optString("message", "Telefon yerel ağ için eşleştirildi.").trim()
     );
+  }
+
+  private static void probeStatus(ConnectionSettings.LocalConnection discovered) throws PairingException {
+    HttpURLConnection connection = null;
+    String endpoint = discovered.baseUrl + LocalCompanionProtocol.STATUS_PATH;
+    try {
+      connection = (HttpURLConnection) new URL(endpoint).openConnection();
+      connection.setRequestMethod("GET");
+      connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
+      connection.setReadTimeout(READ_TIMEOUT_MS);
+      connection.setRequestProperty("Accept", "application/json");
+      int status = connection.getResponseCode();
+      String responseText = readAll(
+          status >= 200 && status < 300 ? connection.getInputStream() : connection.getErrorStream()
+      );
+      JSONObject response = new JSONObject(responseText);
+      String desktopId = response.optString("desktop_id", "").trim();
+      if (status < 200 || status >= 300 || !response.optBoolean("ok", false)) {
+        throw new PairingException(
+            "Masaüstü bulundu ancak yerel HTTP servisi hazır değil: " + discovered.baseUrl,
+            "local_status_failed"
+        );
+      }
+      if (!desktopId.equals(discovered.desktopId)) {
+        throw new PairingException(
+            "Bulunan yerel adres farklı bir masaüstüne ait: " + discovered.baseUrl,
+            "local_desktop_mismatch"
+        );
+      }
+    } catch (PairingException error) {
+      throw error;
+    } catch (Exception error) {
+      throw new PairingException(
+          "Masaüstü bulundu fakat yerel HTTP adresine ulaşılamadı: " + discovered.baseUrl,
+          "local_desktop_unreachable",
+          error
+      );
+    } finally {
+      if (connection != null) {
+        connection.disconnect();
+      }
+    }
   }
 
   private static JSONObject post(String endpoint, JSONObject payload) throws PairingException {
@@ -114,7 +158,7 @@ final class LocalCompanionPairingClient {
       throw error;
     } catch (Exception error) {
       throw new PairingException(
-          "Aynı ağdaki masaüstüne eşleştirme için ulaşılamadı.",
+          "Aynı ağdaki masaüstüne eşleştirme için ulaşılamadı: " + endpoint,
           "local_desktop_unreachable",
           error
       );
