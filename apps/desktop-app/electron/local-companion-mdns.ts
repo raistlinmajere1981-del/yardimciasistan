@@ -1,4 +1,4 @@
-import dgram, { type Socket } from "node:dgram";
+import dgram, { type RemoteInfo, type Socket } from "node:dgram";
 import os from "node:os";
 
 const MDNS_ADDRESS = "224.0.0.251";
@@ -113,16 +113,52 @@ function looksVirtualInterface(interfaceName: string): boolean {
   return /^(docker|br-|veth|virbr|vmnet|vbox|tun|tap|tailscale|wg|zt)/i.test(interfaceName);
 }
 
-function externalIpv4Interfaces(): Array<{ address: string; interfaceName: string }> {
-  const result: Array<{ address: string; interfaceName: string }> = [];
+interface LocalIpv4Interface {
+  address: string;
+  netmask: string;
+  interfaceName: string;
+}
+
+function ipv4ToInt(address: string): number | null {
+  const parts = address.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return null;
+  }
+  return (
+    ((parts[0] << 24) >>> 0)
+    | (parts[1] << 16)
+    | (parts[2] << 8)
+    | parts[3]
+  ) >>> 0;
+}
+
+function sameSubnet(left: string, right: string, netmask: string): boolean {
+  const a = ipv4ToInt(left);
+  const b = ipv4ToInt(right);
+  const mask = ipv4ToInt(netmask);
+  return a !== null && b !== null && mask !== null && ((a & mask) >>> 0) === ((b & mask) >>> 0);
+}
+
+function externalIpv4Interfaces(): LocalIpv4Interface[] {
+  const result: LocalIpv4Interface[] = [];
   for (const [interfaceName, entries] of Object.entries(os.networkInterfaces())) {
     if (looksVirtualInterface(interfaceName)) continue;
     for (const entry of entries ?? []) {
       if (entry.internal || entry.family !== "IPv4" || !isPrivateIpv4(entry.address)) continue;
-      result.push({ address: entry.address, interfaceName });
+      result.push({
+        address: entry.address,
+        netmask: entry.netmask,
+        interfaceName
+      });
     }
   }
   return result;
+}
+
+function interfacesForPeer(peer: string): LocalIpv4Interface[] {
+  const interfaces = externalIpv4Interfaces();
+  const matching = interfaces.filter((item) => sameSubnet(item.address, peer, item.netmask));
+  return matching.length > 0 ? matching : interfaces;
 }
 
 function decodeName(packet: Buffer, start: number): { name: string; next: number } | null {
@@ -255,7 +291,7 @@ export class LocalCompanionMdnsAdvertiser {
     socket.on("error", (error) => {
       this.options.logWarn?.("Local companion mDNS socket error.", error);
     });
-    socket.on("message", (message) => {
+    socket.on("message", (message, remoteInfo: RemoteInfo) => {
       const serviceName = normalizedServiceType(this.options.serviceType).toLowerCase();
       const hostName = `yardimci-${shortDesktopId(this.options.desktopId())}.local`.toLowerCase();
       const names = queriedNames(message);
@@ -264,7 +300,7 @@ export class LocalCompanionMdnsAdvertiser {
         || name.endsWith(`.${serviceName}`)
         || name === hostName
       )) {
-        this.announce();
+        this.announce(interfacesForPeer(remoteInfo.address));
       }
     });
 
@@ -310,30 +346,34 @@ export class LocalCompanionMdnsAdvertiser {
     }
   }
 
-  private announce() {
+  private announce(selectedInterfaces = externalIpv4Interfaces()) {
     const socket = this.socket;
-    if (!socket || !this.port) return;
-    const interfaces = externalIpv4Interfaces();
-    if (interfaces.length === 0) return;
+    if (!socket || !this.port || selectedInterfaces.length === 0) return;
 
-    let packet: Buffer;
-    try {
-      packet = buildLocalCompanionMdnsResponse({
-        desktopId: this.options.desktopId(),
-        protocolVersion: this.options.protocolVersion,
-        serviceType: this.options.serviceType,
-        port: this.port,
-        addresses: interfaces.map((item) => item.address)
-      });
-    } catch (error) {
-      this.options.logWarn?.("Local companion mDNS packet could not be built.", error);
-      return;
-    }
+    for (const item of selectedInterfaces) {
+      let packet: Buffer;
+      try {
+        packet = buildLocalCompanionMdnsResponse({
+          desktopId: this.options.desktopId(),
+          protocolVersion: this.options.protocolVersion,
+          serviceType: this.options.serviceType,
+          port: this.port,
+          addresses: [item.address]
+        });
+      } catch (error) {
+        this.options.logWarn?.("Local companion mDNS packet could not be built.", error);
+        continue;
+      }
 
-    try {
-      socket.send(packet, MDNS_PORT, MDNS_ADDRESS);
-    } catch (error) {
-      this.options.logWarn?.("Local companion mDNS announcement failed.", error);
+      try {
+        socket.setMulticastInterface(item.address);
+        socket.send(packet, MDNS_PORT, MDNS_ADDRESS);
+      } catch (error) {
+        this.options.logWarn?.(
+          `Local companion mDNS announcement failed on ${item.interfaceName} (${item.address}).`,
+          error
+        );
+      }
     }
   }
 }
