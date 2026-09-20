@@ -284,3 +284,30 @@ veya tam `/api/sync.php` adresi girilebilir.
 
 Canlı hostingde HTTPS kullanın. Senkron anahtarı JSON gövdesine veya URL'ye değil,
 `X-YA-Sync-Secret` header'ına gönderilir.
+
+
+## Desktop üzerinden USB kurulum
+
+Desktop Ayarlar > Android bölümündeki **Telefon Kurulumu** alanı, ADB üzerinden bağlı
+Android cihazları uygulama kurulu olmasa bile gösterebilir. Cihazda USB hata ayıklaması
+açık ve bilgisayar yetkilendirilmişse:
+
+- uygulama yoksa **Uygulamayı Kur**,
+- desktop paketindekinden eski sürüm varsa **Güncelle**,
+- aynı sürüm varsa **Güncel**
+
+durumu gösterilir.
+
+İlk kurulumda desktop ortak `sync_secret` değerini telefona göndermez. Bunun yerine
+kısa ömürlü, tek kullanımlık `yab1...` kurulum bileti oluşturur ve ADB intent extras
+ile uygulamayı açar. Android bu bileti `api/android-bootstrap.php` üzerinden kişisel
+`yat_...` cihaz tokenına çevirir. Cihaz normal masaüstü onay sınırını korur.
+
+Production desktop paketleri Android release APK ve hedef platformun ADB dosyalarını
+`resources/android` altında taşır. Aynı platformda Android SDK bulunuyorsa staging
+otomatik yapılır. Linux'tan Windows paketi hazırlanırken Windows Platform-Tools klasörü
+`YA_ANDROID_PLATFORM_TOOLS_WIN32` ile verilmelidir. Linux kaynağı gerektiğinde
+`YA_ANDROID_PLATFORM_TOOLS_LINUX` kullanılabilir.
+
+Release APK ortak işletme anahtarını içermez; mevcut release signing yapılandırmasıyla
+önceden imzalanmış APK desktop paketine eklenir.
