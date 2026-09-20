@@ -6,6 +6,12 @@ final class ConnectionSettings {
   static final String PREFS_NAME = "yardimci_asistan_android";
   static final String KEY_WEB_MODULE_URL = "web_module_url";
   static final String KEY_SYNC_SECRET = "sync_secret";
+  static final String KEY_LOCAL_DESKTOP_ID = "local_desktop_id_v1";
+  static final String KEY_LOCAL_BASE_URL = "local_base_url_v1";
+  static final String KEY_LOCAL_TOKEN = "local_token_v1";
+  static final String KEY_LOCAL_TARGET_KEY = "local_target_key_v1";
+  static final String KEY_LOCAL_LAST_SEEN_AT = "local_last_seen_at_v1";
+
   private static final String DEVICE_CREDENTIAL_PREFIX = "device:";
   private static final String KEY_DEBUG_CONNECTION_OVERRIDE_ACTIVE = "debug_connection_override_active";
 
@@ -77,6 +83,100 @@ final class ConnectionSettings {
         .commit();
   }
 
+  static LocalConnection localConnection(SharedPreferences preferences) {
+    return new LocalConnection(
+        storedValue(preferences, KEY_LOCAL_DESKTOP_ID),
+        storedValue(preferences, KEY_LOCAL_BASE_URL),
+        storedValue(preferences, KEY_LOCAL_TOKEN),
+        storedValue(preferences, KEY_LOCAL_TARGET_KEY),
+        storedValue(preferences, KEY_LOCAL_LAST_SEEN_AT)
+    );
+  }
+
+  static LocalConnection localConnectionForTarget(SharedPreferences preferences, String targetKey) {
+    LocalConnection connection = localConnection(preferences);
+    String normalizedTarget = targetKey == null ? "" : targetKey.trim();
+    return connection.isComplete() && connection.targetKey.equals(normalizedTarget)
+        ? connection
+        : LocalConnection.empty();
+  }
+
+  static boolean storeDiscoveredLocalEndpoint(
+      SharedPreferences preferences,
+      String desktopId,
+      String baseUrl
+  ) {
+    String normalizedDesktopId = normalizeDesktopId(desktopId);
+    String normalizedBaseUrl = normalizeLocalBaseUrl(baseUrl);
+    if (normalizedDesktopId.isEmpty() || normalizedBaseUrl.isEmpty()) {
+      return false;
+    }
+
+    LocalConnection existing = localConnection(preferences);
+    if (!existing.desktopId.isEmpty()
+        && !existing.desktopId.equals(normalizedDesktopId)
+        && !existing.localToken.isEmpty()) {
+      return false;
+    }
+
+    return preferences.edit()
+        .putString(KEY_LOCAL_DESKTOP_ID, normalizedDesktopId)
+        .putString(KEY_LOCAL_BASE_URL, normalizedBaseUrl)
+        .putString(KEY_LOCAL_LAST_SEEN_AT, String.valueOf(System.currentTimeMillis()))
+        .commit();
+  }
+
+  static boolean storeLocalPairing(
+      SharedPreferences preferences,
+      String desktopId,
+      String baseUrl,
+      String targetKey,
+      String token
+  ) {
+    String normalizedDesktopId = normalizeDesktopId(desktopId);
+    String normalizedBaseUrl = normalizeLocalBaseUrl(baseUrl);
+    String normalizedTargetKey = targetKey == null ? "" : targetKey.trim();
+    String normalizedToken = token == null ? "" : token.trim();
+    if (normalizedDesktopId.isEmpty()
+        || normalizedBaseUrl.isEmpty()
+        || normalizedTargetKey.isEmpty()
+        || !normalizedToken.matches("yal_[a-f0-9]{64}")) {
+      return false;
+    }
+
+    return preferences.edit()
+        .putString(KEY_LOCAL_DESKTOP_ID, normalizedDesktopId)
+        .putString(KEY_LOCAL_BASE_URL, normalizedBaseUrl)
+        .putString(KEY_LOCAL_TARGET_KEY, normalizedTargetKey)
+        .putString(KEY_LOCAL_TOKEN, normalizedToken)
+        .putString(KEY_LOCAL_LAST_SEEN_AT, String.valueOf(System.currentTimeMillis()))
+        .commit();
+  }
+
+  static void clearLocalEndpoint(SharedPreferences preferences) {
+    preferences.edit()
+        .remove(KEY_LOCAL_BASE_URL)
+        .remove(KEY_LOCAL_LAST_SEEN_AT)
+        .apply();
+  }
+
+  static void clearLocalCredential(SharedPreferences preferences) {
+    preferences.edit()
+        .remove(KEY_LOCAL_TOKEN)
+        .remove(KEY_LOCAL_TARGET_KEY)
+        .apply();
+  }
+
+  static void clearLocalConnection(SharedPreferences preferences) {
+    preferences.edit()
+        .remove(KEY_LOCAL_DESKTOP_ID)
+        .remove(KEY_LOCAL_BASE_URL)
+        .remove(KEY_LOCAL_TOKEN)
+        .remove(KEY_LOCAL_TARGET_KEY)
+        .remove(KEY_LOCAL_LAST_SEEN_AT)
+        .apply();
+  }
+
   static boolean isComplete(SharedPreferences preferences) {
     return !webModuleUrl(preferences).isEmpty() && !syncSecret(preferences).isEmpty();
   }
@@ -97,8 +197,60 @@ final class ConnectionSettings {
     return preferences.getBoolean(KEY_DEBUG_CONNECTION_OVERRIDE_ACTIVE, false);
   }
 
+  private static String normalizeDesktopId(String value) {
+    String normalized = value == null ? "" : value.trim();
+    return normalized.matches("desktop-[A-Za-z0-9._:-]{8,120}") ? normalized : "";
+  }
+
+  private static String normalizeLocalBaseUrl(String value) {
+    String normalized = value == null ? "" : value.trim();
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    if (!normalized.matches("http://[^/\\s]+:[0-9]{1,5}")) {
+      return "";
+    }
+    return normalized;
+  }
+
   private static String storedValue(SharedPreferences preferences, String key) {
     String value = preferences.getString(key, "");
     return value == null ? "" : value.trim();
+  }
+
+  static final class LocalConnection {
+    final String desktopId;
+    final String baseUrl;
+    final String localToken;
+    final String targetKey;
+    final String lastSeenAt;
+
+    LocalConnection(
+        String desktopId,
+        String baseUrl,
+        String localToken,
+        String targetKey,
+        String lastSeenAt
+    ) {
+      this.desktopId = desktopId == null ? "" : desktopId.trim();
+      this.baseUrl = baseUrl == null ? "" : baseUrl.trim();
+      this.localToken = localToken == null ? "" : localToken.trim();
+      this.targetKey = targetKey == null ? "" : targetKey.trim();
+      this.lastSeenAt = lastSeenAt == null ? "" : lastSeenAt.trim();
+    }
+
+    static LocalConnection empty() {
+      return new LocalConnection("", "", "", "", "");
+    }
+
+    boolean hasEndpoint() {
+      return !desktopId.isEmpty() && !baseUrl.isEmpty();
+    }
+
+    boolean isComplete() {
+      return hasEndpoint()
+          && localToken.matches("yal_[a-f0-9]{64}")
+          && !targetKey.isEmpty();
+    }
   }
 }
