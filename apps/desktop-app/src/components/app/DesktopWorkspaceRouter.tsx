@@ -197,11 +197,6 @@ export function DesktopWorkspaceRouter({
     androidPublishMessage,
     androidDeviceState,
     androidDeviceMessage,
-    localPairingState,
-    localPairingMessage,
-    localPairingSecret,
-    localPairingExpiresAt,
-    handleBeginLocalPairing,
     handlePublishAndroidSnapshot,
     handleSetAndroidDeviceRole,
     handleSetAndroidDevicePermissionGroups,
@@ -656,16 +651,11 @@ export function DesktopWorkspaceRouter({
           androidPublishMessage={androidPublishMessage}
           androidDeviceState={androidDeviceState}
           androidDeviceMessage={androidDeviceMessage}
-          localPairingState={localPairingState}
-          localPairingMessage={localPairingMessage}
-          localPairingSecret={localPairingSecret}
-          localPairingExpiresAt={localPairingExpiresAt}
           aiConnectionTestState={aiConnectionTestState}
           aiConnectionTestMessage={aiConnectionTestMessage}
           onFormChange={setSetupForm}
           onTestAiConnection={handleTestAiConnection}
           onPublishAndroid={handlePublishAndroidSnapshot}
-          onBeginLocalPairing={handleBeginLocalPairing}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
           onSetAndroidDevicePermissionGroups={handleSetAndroidDevicePermissionGroups}
           onSetAndroidDeviceActive={handleSetAndroidDeviceActive}
