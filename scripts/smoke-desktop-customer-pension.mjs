@@ -1,6 +1,7 @@
 import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
+import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createSetupFixture, createReportFixture, createCompactUiFixture } from './lib/desktop-renderer-fixtures.mjs';
@@ -15,7 +16,7 @@ mkdirSync(output, { recursive: true });
 let browser;
 try {
   for (let i = 0; i < 100; i++) { try { if ((await fetch(baseUrl)).ok) break; } catch {} await new Promise(r => setTimeout(r, 100)); }
-  browser = await chromium.launch();
+  browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ locale: "tr-TR" });
   page.setDefaultTimeout(15000);
   const errors = [];
