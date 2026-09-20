@@ -277,6 +277,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
                 'customer_count' => 0
             ],
             'business_capabilities' => $androidSnapshot['business_capabilities'],
+            'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
             'daily_tasks' => [],
             'requests' => [],
             'customers' => [],
@@ -326,6 +327,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
             'message' => 'Android verisi zaten güncel.',
             'approval_required' => false,
             'not_modified' => true,
+            'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
             'server_revision' => $serverRevision,
             'pulled_at' => $now,
             'pending_action_count' => $pendingActionCount
@@ -446,6 +448,7 @@ function ya_sync_android_summary(array $payload, array $businessConfig): void
         ],
         'operations' => $androidSnapshot['summary'],
         'business_capabilities' => $androidSnapshot['business_capabilities'],
+        'local_network_enabled' => ya_sync_bool($androidSnapshot['local_network_enabled'] ?? true),
         'daily_tasks' => $androidSnapshot['daily_tasks'],
         'requests' => $visibleRequests,
         'customers' => $customerManagementAllowed ? $androidSnapshot['customers'] : [],
