@@ -92,7 +92,7 @@ const REQUEST_TYPE_TEXT: Record<string, string> = {
 
 const DEFAULT_REPLY_MESSAGE = "Merhaba, talebiniz için teşekkür ederiz. Size en kısa sürede dönüş yapacağız.";
 const E164_PATTERN = /^\+[1-9]\d{6,14}$/;
-const TR_NATIONAL_PATTERN = /^[2-5]\d{9}$/;
+const TR_MOBILE_PATTERN = /^5\d{9}$/;
 const PHONE_ERROR = "Telefon numarası geçerli formatta olmalı. Yurt dışı numaralarında ülke kodunu ekleyin. Örnek: +90 532 123 45 67 veya +44 7911 123456";
 export const WHATSAPP_WEB_HOME_URL = "https://web.whatsapp.com/";
 
@@ -277,10 +277,11 @@ function normalizePhone(phone: string): { ok: true; e164: string; national: stri
 
   if (compact.startsWith("+")) {
     if (!E164_PATTERN.test(compact)) return { ok: false, error: PHONE_ERROR };
+    if (compact.startsWith("+90") && !TR_MOBILE_PATTERN.test(compact.slice(3))) return { ok: false, error: PHONE_ERROR };
     e164 = compact;
   } else {
     const national = toTRNationalNumber(compact);
-    if (!national || !TR_NATIONAL_PATTERN.test(national)) return { ok: false, error: PHONE_ERROR };
+    if (!national || !TR_MOBILE_PATTERN.test(national)) return { ok: false, error: PHONE_ERROR };
     e164 = `+90${national}`;
   }
 

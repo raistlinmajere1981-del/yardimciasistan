@@ -43,4 +43,6 @@ test("invalid or ambiguous phone numbers return an understandable result", () =>
   assert.equal(result.ok, false);
   assert.match(result.error, /ülke kodunu|geçerli format/i);
   assert.equal(isValidPhone("123"), false);
+  assert.equal(normalizePhone("0212 123 45 67").ok, false);
+  assert.equal(normalizePhone("+90 212 123 45 67").ok, false);
 });

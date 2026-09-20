@@ -15,7 +15,7 @@ export interface InvalidPhone {
 export type NormalizePhoneResult = NormalizedPhone | InvalidPhone;
 
 const E164_PATTERN = /^\+[1-9]\d{6,14}$/;
-const TR_NATIONAL_PATTERN = /^[2-5]\d{9}$/;
+const TR_MOBILE_PATTERN = /^5\d{9}$/;
 const PHONE_ERROR = "Telefon numarası geçerli formatta olmalı. Yurt dışı numaralarında ülke kodunu ekleyin. Örnek: +90 532 123 45 67 veya +44 7911 123456";
 
 export function normalizePhone(phone: string): NormalizePhoneResult {
@@ -25,10 +25,11 @@ export function normalizePhone(phone: string): NormalizePhoneResult {
 
   if (compact.startsWith("+")) {
     if (!E164_PATTERN.test(compact)) return invalidPhone(input);
+    if (compact.startsWith("+90") && !TR_MOBILE_PATTERN.test(compact.slice(3))) return invalidPhone(input);
     e164 = compact;
   } else {
     const national = toTRNationalNumber(compact);
-    if (!national || !TR_NATIONAL_PATTERN.test(national)) return invalidPhone(input);
+    if (!national || !TR_MOBILE_PATTERN.test(national)) return invalidPhone(input);
     e164 = `+90${national}`;
   }
 

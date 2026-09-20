@@ -365,6 +365,9 @@ function ya_normalize_phone(string $phone): array
         if (preg_match('/^\+[1-9]\d{6,14}$/', $value) !== 1) {
             return ['ok' => false, 'e164' => '', 'whatsapp' => ''];
         }
+        if (substr($value, 0, 3) === '+90' && preg_match('/^\+905\d{9}$/', $value) !== 1) {
+            return ['ok' => false, 'e164' => '', 'whatsapp' => ''];
+        }
         $e164 = $value;
     } else {
         $national = null;
@@ -376,7 +379,7 @@ function ya_normalize_phone(string $phone): array
             $national = $value;
         }
 
-        if (!is_string($national) || preg_match('/^[2-5]\d{9}$/', $national) !== 1) {
+        if (!is_string($national) || preg_match('/^5\d{9}$/', $national) !== 1) {
             return ['ok' => false, 'e164' => '', 'whatsapp' => ''];
         }
         $e164 = '+90' . $national;

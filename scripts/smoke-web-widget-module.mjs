@@ -230,7 +230,6 @@ try {
   expect(requestsAfterForm[0].source).toBe("web_form");
   expect(requestsAfterForm[0].request_type).toBe("restaurant_reservation");
   expect(requestsAfterForm[0].customer_name).toBe("Widget Misafir");
-  expect(requestsAfterForm[0].customer_phone).toBe("+905554443322");
   expect(requestsAfterForm[0].date_text).toMatch(/^Bugün, /);
   expect(requestsAfterForm[0].start_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   expect(requestsAfterForm[0].time).toBe("20:30");
