@@ -168,10 +168,15 @@ kalabilir.
 
 ### Faz 4 — Pairing
 
-- desktop local credential store;
-- tek kullanımlık pairing secret;
-- cihaz revoke akışının local credentialı da kapatması;
-- daha sonra QR UI bağlanabilecek provider-neutral pairing sözleşmesi.
+- desktop local credential store: `android_local_credentials`;
+- local token biçimi `yal_<64 hex>`; plaintext yalnız başarılı pairing yanıtında telefona verilir, masaüstünde yalnız SHA-256 hash tutulur;
+- yeni local-only cihaz eşleşince pasif/onay bekleyen Android cihaz kaydı açılır; pairing tek başına operasyon yetkisi vermez;
+- pairing secret kısa ömürlü ve başarılı kullanımda tek kullanımlıktır;
+- yanlış secret denemesi kullanıcının açık pairing penceresini iptal etmez;
+- cihaz revoke akışı local credentialı da aynı transaction içinde kapatır;
+- yeniden etkinleştirilen revoke edilmiş cihaz eski local tokenı kullanamaz; yeniden pairing gerekir;
+- mevcut geliştirme verisi migrate edilmez; baseline şema değiştiği için gerçek pairing testi öncesi temiz veri/reset kabul edilir;
+- daha sonra QR UI bağlanabilecek provider-neutral pairing sözleşmesi kullanılır.
 
 ### Faz 5 — Discovery ve hybrid router
 
