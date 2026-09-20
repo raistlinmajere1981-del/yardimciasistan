@@ -11,6 +11,7 @@ final class ConnectionSettings {
   static final String KEY_LOCAL_TOKEN = "local_token_v1";
   static final String KEY_LOCAL_TARGET_KEY = "local_target_key_v1";
   static final String KEY_LOCAL_LAST_SEEN_AT = "local_last_seen_at_v1";
+  static final String KEY_HOSTING_ACTION_BARRIER_TARGET = "hosting_action_barrier_target_v1";
 
   private static final String DEVICE_CREDENTIAL_PREFIX = "device:";
   private static final String KEY_DEBUG_CONNECTION_OVERRIDE_ACTIVE = "debug_connection_override_active";
@@ -175,6 +176,25 @@ final class ConnectionSettings {
         .remove(KEY_LOCAL_TARGET_KEY)
         .remove(KEY_LOCAL_LAST_SEEN_AT)
         .apply();
+  }
+
+  static void markHostingActionBarrier(SharedPreferences preferences, String targetKey) {
+    String normalized = targetKey == null ? "" : targetKey.trim();
+    if (!normalized.isEmpty()) {
+      preferences.edit().putString(KEY_HOSTING_ACTION_BARRIER_TARGET, normalized).commit();
+    }
+  }
+
+  static boolean hasHostingActionBarrier(SharedPreferences preferences, String targetKey) {
+    String normalized = targetKey == null ? "" : targetKey.trim();
+    return !normalized.isEmpty()
+        && normalized.equals(storedValue(preferences, KEY_HOSTING_ACTION_BARRIER_TARGET));
+  }
+
+  static void clearHostingActionBarrier(SharedPreferences preferences, String targetKey) {
+    if (hasHostingActionBarrier(preferences, targetKey)) {
+      preferences.edit().remove(KEY_HOSTING_ACTION_BARRIER_TARGET).commit();
+    }
   }
 
   static boolean isComplete(SharedPreferences preferences) {
