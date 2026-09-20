@@ -13,6 +13,15 @@ test("createWhatsAppLink normalizes Turkey mobile phone and encodes message", as
   assert.equal(result.url, "https://wa.me/905321234567?text=Merhaba%2C%20bilgi%20almak%20istiyorum.%0ATe%C5%9Fekk%C3%BCrler.");
 });
 
+test("createWhatsAppLink accepts international phone numbers", async () => {
+  const { createWhatsAppLink } = await bridgePromise;
+  const result = createWhatsAppLink("+44 7911 123456", "Hello");
+  assert.equal(result.ok, true);
+  assert.equal(result.whatsappPhone, "447911123456");
+  assert.equal(result.phoneDisplay, "+447911123456");
+  assert.equal(result.url, "https://wa.me/447911123456?text=Hello");
+});
+
 test("createWhatsAppLink reports invalid phone and empty messages without throwing", async () => {
   const { createWhatsAppLink, createWhatsAppUrl } = await bridgePromise;
   const invalidPhone = createWhatsAppLink("123", "Merhaba");
@@ -97,13 +106,13 @@ test("request and reply messages keep the expected Turkish business wording", as
   assert.equal(buildOwnerReplyWhatsAppMessage(""), "Merhaba, talebiniz için teşekkür ederiz. Size en kısa sürede dönüş yapacağız.");
 });
 
-test("normalizeTRMobilePhone exposes bridge-friendly display and whatsapp fields", async () => {
-  const { normalizeTRMobilePhone } = await bridgePromise;
-  const result = normalizeTRMobilePhone("+90 532 123 45 67");
-
+test("normalizeInternationalPhone exposes bridge-friendly display and whatsapp fields", async () => {
+  const { normalizeInternationalPhone } = await bridgePromise;
+  const result = normalizeInternationalPhone("+44 7911 123456");
   assert.equal(result.ok, true);
-  assert.equal(result.whatsapp, "905321234567");
-  assert.equal(result.display, "+90 532 123 45 67");
+  assert.equal(result.whatsapp, "447911123456");
+  assert.equal(result.e164, "+447911123456");
+  assert.equal(result.display, "+447911123456");
 });
 
 test("automatic webview scripts centralize target verification, safe input and send confirmation", async () => {
