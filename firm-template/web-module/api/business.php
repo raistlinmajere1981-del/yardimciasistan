@@ -4,6 +4,8 @@ declare(strict_types=1);
 const YA_BASE_DIR = __DIR__ . '/..';
 const YA_CONFIG_FILE = YA_BASE_DIR . '/config/business.json';
 
+require_once YA_BASE_DIR . '/lib/storage.php';
+
 $config = ya_business_load_json(YA_CONFIG_FILE);
 ya_business_apply_cors($config);
 
@@ -23,9 +25,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
 $displayName = ya_business_string($config['display_name'] ?? $config['name'] ?? 'Yardımcı Asistan İşletmesi');
 $whatsapp = ya_business_string($config['whatsapp'] ?? $config['phone'] ?? '');
 $profileId = ya_business_string($config['profile_id'] ?? '');
-$publicSurfaces = array_key_exists('public_surfaces', $config)
-    ? ya_business_normalize_public_surfaces($config['public_surfaces'])
-    : ya_business_profile_public_surfaces($profileId);
+$runtimeCapabilities = ya_business_public_capabilities();
+if ($runtimeCapabilities !== null) {
+    $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, $config);
+} elseif (array_key_exists('public_surfaces', $config)) {
+    $publicSurfaces = ya_business_normalize_public_surfaces($config['public_surfaces']);
+} else {
+    $publicSurfaces = ya_business_profile_public_surfaces($profileId);
+}
 
 ya_business_response(200, [
     'ok' => true,
@@ -69,6 +76,52 @@ function ya_business_apply_cors(array $config): void
     header('Access-Control-Allow-Methods: GET, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
     header('Access-Control-Max-Age: 86400');
+}
+
+function ya_business_public_capabilities(): ?array
+{
+    try {
+        $publication = ya_storage_get_publication('android_snapshot', []);
+    } catch (Throwable) {
+        return null;
+    }
+
+    $capabilities = $publication['business_capabilities'] ?? null;
+    if (!is_array($capabilities)) {
+        return null;
+    }
+
+    return array_values(array_unique(array_filter(array_map(
+        static fn (mixed $capability): string => trim((string) $capability),
+        $capabilities
+    ))));
+}
+
+function ya_business_capability_public_surfaces(array $capabilities, array $config): array
+{
+    $enabled = array_fill_keys($capabilities, true);
+    $surfaces = [];
+
+    if (isset($enabled['accommodation.reservations'])) {
+        $surfaces[] = 'accommodation';
+    }
+    if (isset($enabled['food_service.reservations'])) {
+        $surfaces[] = 'food_service';
+    }
+    if (isset($enabled['food_service.menu'])) {
+        $surfaces[] = 'menu';
+    }
+    if (isset($enabled['commerce.catalog'])) {
+        $surfaces[] = 'catalog';
+    }
+
+    $address = ya_business_string($config['address'] ?? '');
+    $mapUrl = ya_business_string($config['map_url'] ?? '');
+    if ($address !== '' || $mapUrl !== '') {
+        $surfaces[] = 'directions';
+    }
+
+    return $surfaces;
 }
 
 function ya_business_normalize_public_surfaces(mixed $value): array

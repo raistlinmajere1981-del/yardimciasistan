@@ -45,11 +45,11 @@ server.stderr.on("data", (chunk) => {
 try {
   await waitForUrl(`${baseUrl}/widget.js`);
 
-  const publicBusinessResponse = await fetch(`${baseUrl}/api/business.php`);
-  expect(publicBusinessResponse.status).toBe(200);
-  const publicBusiness = await publicBusinessResponse.json();
-  expect(publicBusiness.business.profile_id).toBe("pension_restaurant");
-  expect(publicBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
+  const publicBusinessBeforeSyncResponse = await fetch(`${baseUrl}/api/business.php`);
+  expect(publicBusinessBeforeSyncResponse.status).toBe(200);
+  const publicBusinessBeforeSync = await publicBusinessBeforeSyncResponse.json();
+  expect(publicBusinessBeforeSync.business.profile_id).toBe("pension_restaurant");
+  expect(publicBusinessBeforeSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "directions"]);
 
   const capabilityPublication = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
@@ -59,11 +59,25 @@ try {
       client_id: "desktop-widget-module-smoke",
       source_revision: 1,
       idempotency_key: "widget-ai-capability-1",
-      snapshot: { business_capabilities: ["service.ai"] }
+      snapshot: {
+        business_capabilities: [
+          "service.ai",
+          "accommodation.rooms",
+          "accommodation.reservations",
+          "food_service.tables",
+          "food_service.reservations",
+          "food_service.menu"
+        ]
+      }
     })
   });
   expect(capabilityPublication.status).toBe(200);
   expect((await capabilityPublication.json()).ok).toBe(true);
+
+  const publicBusinessAfterSyncResponse = await fetch(`${baseUrl}/api/business.php`);
+  expect(publicBusinessAfterSyncResponse.status).toBe(200);
+  const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
+  expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu"]);
 
   browser = await launchChromiumForSmoke(chromium);
 
