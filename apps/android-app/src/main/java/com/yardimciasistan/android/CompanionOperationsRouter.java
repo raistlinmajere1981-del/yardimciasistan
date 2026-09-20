@@ -7,6 +7,8 @@ import org.json.JSONObject;
 final class CompanionOperationsRouter implements AndroidOperationsTransport {
   private final SharedPreferences preferences;
   private final HostingAndroidOperationsTransport hostingTransport;
+  private final HostingSyncClient pairingHostingClient = new HostingSyncClient();
+  private final LocalCompanionPairingClient pairingClient = new LocalCompanionPairingClient();
 
   CompanionOperationsRouter(SharedPreferences preferences) {
     this(preferences, new HostingAndroidOperationsTransport());
@@ -52,6 +54,8 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       return hostingResult;
     }
 
+    boolean pairedNow = ensureAutomaticLocalPairing(baseUrl, credential, identity, targetKey);
+    ensureAutomaticLocalPairing(baseUrl, credential, identity, targetKey);
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     if (local.isComplete()) {
@@ -62,7 +66,7 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
             local.baseUrl,
             local.localToken,
             identity,
-            knownServerRevision
+            pairedNow ? 0L : knownServerRevision
         );
       } catch (TransportException error) {
         if (!error.allowsHostingFallback()) {
@@ -140,6 +144,46 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
     );
     ConnectionSettings.markHostingActionBarrier(preferences, targetKey);
     return accepted;
+  }
+
+  private boolean ensureAutomaticLocalPairing(
+      String baseUrl,
+      String credential,
+      DeviceIdentity identity,
+      String targetKey
+  ) {
+    ConnectionSettings.LocalConnection current =
+        ConnectionSettings.localConnectionForTarget(preferences, targetKey);
+    if (current.isComplete()) {
+      return false;
+    }
+
+    ConnectionSettings.LocalConnection discovered = ConnectionSettings.localConnection(preferences);
+    if (!discovered.hasEndpoint()) {
+      return false;
+    }
+
+    try {
+      HostingSyncClient.LocalPairingTicketResult ticket =
+          pairingHostingClient.requestLocalPairingTicket(baseUrl, credential, identity);
+      pairingClient.pairWithTicket(
+          preferences,
+          identity,
+          baseUrl,
+          ticket
+      );
+      return ConnectionSettings.localConnectionForTarget(preferences, targetKey).isComplete();
+    } catch (HostingSyncClient.SyncException error) {
+      if ("local_network_disabled".equals(error.code)) {
+        ConnectionSettings.clearLocalEndpoint(preferences);
+      }
+      return false;
+    } catch (LocalCompanionPairingClient.PairingException error) {
+      if ("local_network_disabled".equals(error.code)) {
+        ConnectionSettings.clearLocalEndpoint(preferences);
+      }
+      return false;
+    }
   }
 
   private void clearBarrierWhenHostingDrained(String targetKey, FetchResult result) {
