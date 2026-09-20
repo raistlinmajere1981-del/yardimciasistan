@@ -24,6 +24,16 @@ public final class AndroidOperationsTransportSmoke {
     require(!permissionDenied.disablesAndroidService(), "Permission error must not disable Android service.");
     require(permissionDenied.invalidatesPendingAction(), "Permission error must invalidate the rejected action.");
 
+    AndroidOperationsTransport.TransportException localDisabled =
+        new AndroidOperationsTransport.TransportException(
+            "Yerel ağ kapalı.",
+            "local_network_disabled",
+            403,
+            null
+        );
+    require(localDisabled.allowsHostingFallback(), "Disabled local networking must fall back to hosting.");
+    require(!localDisabled.invalidatesPendingAction(), "Disabled local networking must not discard pending actions.");
+
     AndroidOperationsTransport.TransportException offline =
         new AndroidOperationsTransport.TransportException("Bağlantı kurulamadı.");
     require(!offline.disablesAndroidService(), "Connection errors must not disable Android service.");
