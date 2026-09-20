@@ -5,8 +5,15 @@ const {
   ANDROID_PERMISSIONS,
   ANDROID_PERMISSION_GROUP_PERMISSIONS,
   ANDROID_STAFF_PERMISSIONS,
+  LOCAL_COMPANION_API_PREFIX,
+  LOCAL_COMPANION_DEVICE_ID_HEADER,
+  LOCAL_COMPANION_ENDPOINTS,
+  LOCAL_COMPANION_PROTOCOL_VERSION,
+  LOCAL_COMPANION_SERVICE_TYPE,
+  LOCAL_COMPANION_TOKEN_HEADER,
   androidPermissionsForGroups,
   acknowledgeRequests,
+  createCompanionSourceKey,
   createSyncEndpointUrl,
   getSyncCapabilities,
   markAndroidActionResult,
@@ -19,6 +26,26 @@ const {
   PhpHostingSyncTransport,
   resolveAndroidActionPermission
 } = require("../dist");
+
+test("local companion protocol contract keeps discovery identity independent from address", () => {
+  assert.equal(LOCAL_COMPANION_PROTOCOL_VERSION, 1);
+  assert.equal(LOCAL_COMPANION_SERVICE_TYPE, "_yardimciasistan._tcp");
+  assert.equal(LOCAL_COMPANION_API_PREFIX, "/local/v1");
+  assert.deepEqual(LOCAL_COMPANION_ENDPOINTS, {
+    status: "/local/v1/status",
+    summary: "/local/v1/summary",
+    action: "/local/v1/action",
+    pair: "/local/v1/pair"
+  });
+  assert.equal(LOCAL_COMPANION_DEVICE_ID_HEADER, "X-YA-Device-Id");
+  assert.equal(LOCAL_COMPANION_TOKEN_HEADER, "X-YA-Local-Token");
+  assert.equal(createCompanionSourceKey("local", " desktop-123 "), "local:desktop-123");
+  assert.equal(
+    createCompanionSourceKey("hosting", "https://firma.example/yardimci-asistan///"),
+    "hosting:https://firma.example/yardimci-asistan"
+  );
+  assert.equal(createCompanionSourceKey("local", "   "), "");
+});
 
 test("createSyncEndpointUrl creates the mini API sync endpoint", () => {
   assert.equal(
