@@ -50,6 +50,7 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     webModuleUrl: String(settings?.web_module_url ?? "https://yardimciasistan.alwaysdata.net/yardimci-asistan"),
     syncSecret,
     autoSyncEnabled: Number(settings?.auto_sync_enabled ?? 1) === 1,
+    localNetworkEnabled: Number(settings?.local_network_enabled ?? 1) === 1,
     aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
     aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
     aiService,
