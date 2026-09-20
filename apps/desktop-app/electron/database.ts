@@ -299,7 +299,9 @@ export class DesktopDatabase {
         WHERE type = 'table' AND name = 'android_local_credentials'
         LIMIT 1
       `).get();
-      if (!currentBaselineReady) {
+      const settingsColumns = this.db.prepare("PRAGMA table_info(settings)").all() as Array<{ name?: string }>;
+      const localNetworkColumnReady = settingsColumns.some((column) => column.name === "local_network_enabled");
+      if (!currentBaselineReady || !localNetworkColumnReady) {
         throw new Error("Veritabanı güncel geliştirme baseline şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
       }
 
