@@ -1,7 +1,7 @@
 import {
   buildCustomerRequestWhatsAppMessage,
   createWhatsAppUrl,
-  normalizeTRMobilePhone
+  normalizeInternationalPhone
 } from "@yardimci-asistan/whatsapp-bridge";
 
 type RequestType = "pension_reservation" | "restaurant_reservation";
@@ -120,7 +120,7 @@ function interceptRequestSubmit(event: Event) {
 async function submitRequest(form: HTMLFormElement) {
   const formData = new FormData(form);
   const customerPhone = String(formData.get("customer_phone") ?? "").trim();
-  const normalizedPhone = normalizeTRMobilePhone(customerPhone);
+  const normalizedPhone = normalizeInternationalPhone(customerPhone);
   if (!normalizedPhone.ok) {
     showStatus(normalizedPhone.error);
     form.querySelector<HTMLInputElement>('input[name="customer_phone"]')?.focus();

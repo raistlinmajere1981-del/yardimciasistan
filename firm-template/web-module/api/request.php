@@ -43,7 +43,7 @@ if ($errors !== []) {
     ]);
 }
 
-$phone = ya_normalize_tr_phone(ya_string($payload['customer_phone'] ?? ''));
+$phone = ya_normalize_phone(ya_string($payload['customer_phone'] ?? ''));
 $now = date(DATE_ATOM);
 $whatsappMessage = ya_string($payload['whatsapp_message'] ?? '');
 
@@ -207,11 +207,11 @@ function ya_validate_request_payload(array $payload): array
         ];
     }
 
-    $phone = ya_normalize_tr_phone(ya_string($payload['customer_phone'] ?? ''));
+    $phone = ya_normalize_phone(ya_string($payload['customer_phone'] ?? ''));
     if (!$phone['ok']) {
         $errors[] = [
             'field' => 'customer_phone',
-            'message' => 'Telefon numarası Türkiye cep telefonu formatında olmalı.'
+            'message' => 'Telefon numarası geçerli formatta olmalı. Yurt dışı numaralarında ülke kodunu ekleyin.'
         ];
     }
 
@@ -348,34 +348,44 @@ function ya_build_whatsapp_message(array $businessConfig, array $payload): strin
     return implode("\n", $lines);
 }
 
-function ya_normalize_tr_phone(string $phone): array
+function ya_normalize_phone(string $phone): array
 {
-    $value = preg_replace('/[^\d+]/', '', trim($phone));
-    $value = preg_replace('/^00/', '+', $value ?? '');
-    $national = null;
-
-    if (substr($value, 0, 3) === '+90') {
-        $national = substr($value, 3);
-    } elseif (substr($value, 0, 2) === '90' && strlen($value) === 12) {
-        $national = substr($value, 2);
-    } elseif (substr($value, 0, 1) === '0' && strlen($value) === 11) {
-        $national = substr($value, 1);
-    } elseif (strlen($value) === 10) {
-        $national = $value;
+    $raw = trim($phone);
+    if ($raw === '' || preg_match('/^[+\d\s().\/-]+$/', $raw) !== 1) {
+        return ['ok' => false, 'e164' => '', 'whatsapp' => ''];
     }
 
-    if (!is_string($national) || preg_match('/^5\d{9}$/', $national) !== 1) {
-        return [
-            'ok' => false,
-            'e164' => '',
-            'whatsapp' => ''
-        ];
+    $value = preg_replace('/[\s().\/-]/', '', $raw) ?? '';
+    if (substr($value, 0, 2) === '00') {
+        $value = '+' . substr($value, 2);
+    }
+
+    $e164 = '';
+    if (substr($value, 0, 1) === '+') {
+        if (preg_match('/^\+[1-9]\d{6,14}$/', $value) !== 1) {
+            return ['ok' => false, 'e164' => '', 'whatsapp' => ''];
+        }
+        $e164 = $value;
+    } else {
+        $national = null;
+        if (substr($value, 0, 2) === '90' && strlen($value) === 12) {
+            $national = substr($value, 2);
+        } elseif (substr($value, 0, 1) === '0' && strlen($value) === 11) {
+            $national = substr($value, 1);
+        } elseif (strlen($value) === 10) {
+            $national = $value;
+        }
+
+        if (!is_string($national) || preg_match('/^[2-5]\d{9}$/', $national) !== 1) {
+            return ['ok' => false, 'e164' => '', 'whatsapp' => ''];
+        }
+        $e164 = '+90' . $national;
     }
 
     return [
         'ok' => true,
-        'e164' => '+90' . $national,
-        'whatsapp' => '90' . $national
+        'e164' => $e164,
+        'whatsapp' => substr($e164, 1)
     ];
 }
 

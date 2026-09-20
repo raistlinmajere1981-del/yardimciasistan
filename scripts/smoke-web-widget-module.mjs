@@ -179,7 +179,7 @@ try {
   await expect(page.locator(".ya-widget-subview-intro p")).toContainText("Tarih ve iletişim");
 
   await page.locator('.ya-widget-form input[name="customer_name"]').fill("Widget Misafir");
-  await page.locator('.ya-widget-form input[name="customer_phone"]').fill("0555 444 33 22");
+  await page.locator('.ya-widget-form input[name="customer_phone"]').fill("+44 7911 123456");
   await expect(page.locator("[data-ya-date-preset]")).toHaveCount(0);
   await page.locator('[data-ya-open-date-picker="start_date"]').click();
   await expect(page.locator(".ya-widget-calendar-shortcuts")).toContainText("Bugün");
@@ -226,6 +226,7 @@ try {
   const requestsAfterForm = await pullRequests();
   expect(requestsAfterForm).toHaveLength(1);
   expect(requestsAfterForm[0].id).toBe(requestResult.request_id);
+  expect(requestsAfterForm[0].customer_phone).toBe("+447911123456");
   expect(requestsAfterForm[0].source).toBe("web_form");
   expect(requestsAfterForm[0].request_type).toBe("restaurant_reservation");
   expect(requestsAfterForm[0].customer_name).toBe("Widget Misafir");

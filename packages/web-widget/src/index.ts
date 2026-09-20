@@ -437,7 +437,7 @@ function formTemplate() {
           </label>
           <label class="ya-widget-field">
             <span>Telefon</span>
-            <input name="customer_phone" required inputmode="tel" autocomplete="tel" placeholder="05xx xxx xx xx" />
+            <input name="customer_phone" required inputmode="tel" autocomplete="tel" placeholder="+90 5xx… / +44…" />
           </label>
         </div>
         ${guestStepperTemplate()}

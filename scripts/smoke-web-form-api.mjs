@@ -96,7 +96,7 @@ try {
   const restaurantResponse = await postRequest({
     request_type: "restaurant_reservation",
     customer_name: "Demo Masa",
-    customer_phone: "+90 555 111 22 44",
+    customer_phone: "+44 7911 123456",
     date_text: "Bu akşam",
     start_date: "2026-07-18",
     time: "20:00",
@@ -108,6 +108,7 @@ try {
   const restaurantResult = await restaurantResponse.json();
   assert.equal(restaurantResult.ok, true);
   assert.equal(restaurantResult.whatsapp_message, "Hazır restoran mesajı");
+  assert.equal(restaurantResult.whatsapp_phone, "447911123456");
 
   const syncResponse = await fetch(`${baseUrl}/api/sync.php`, {
     method: "POST",
@@ -125,6 +126,7 @@ try {
   assert.equal(records[0].customer_phone, "+905551112233");
   assert.equal(records[0].sync_status, "pending");
   assert.equal(records[1].request_type, "restaurant_reservation");
+  assert.equal(records[1].customer_phone, "+447911123456");
   assert.equal(records[1].time, "20:00");
 
   for (let index = 0; index < 3; index += 1) {
