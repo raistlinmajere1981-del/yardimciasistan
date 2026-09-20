@@ -284,6 +284,39 @@ final class HostingSyncClient {
     }
   }
 
+  LocalPairingTicketResult requestLocalPairingTicket(
+      String baseUrl,
+      String credential,
+      DeviceIdentity identity
+  ) throws SyncException {
+    JSONObject request = new JSONObject();
+    try {
+      request.put("action", "local_pairing_ticket");
+      request.put("device_id", identity.deviceId);
+      request.put("device_name", identity.deviceName);
+      request.put("app_version", identity.appVersion);
+    } catch (Exception error) {
+      throw new SyncException("Yerel bağlantı bileti hazırlanamadı.", error);
+    }
+
+    JSONObject response = postJson(
+        normalizeBaseUrl(baseUrl) + "/api/android.php",
+        credential,
+        identity,
+        request,
+        READ_TIMEOUT_MS,
+        "Web modülü otomatik yerel bağlantıyı desteklemiyor. Hosting paketini güncelleyin."
+    );
+    String ticket = response.optString("local_pairing_ticket", "").trim();
+    String desktopId = response.optString("desktop_id", "").trim();
+    String expiresAt = response.optString("expires_at", "").trim();
+    if (!ticket.startsWith("yalp1.")
+        || !desktopId.matches("desktop-[A-Za-z0-9._:-]{8,120}")) {
+      throw new SyncException("Yerel bağlantı bileti doğrulanamadı.");
+    }
+    return new LocalPairingTicketResult(ticket, desktopId, expiresAt);
+  }
+
   private JSONObject post(String baseUrl, String credential, DeviceIdentity identity, JSONObject payload) throws SyncException {
     return postJson(
         toSyncEndpoint(baseUrl, credential),
@@ -526,6 +559,18 @@ final class HostingSyncClient {
       this.serverRevision = serverRevision;
       this.data = data;
       this.payload = payload;
+    }
+  }
+
+  static final class LocalPairingTicketResult {
+    final String ticket;
+    final String desktopId;
+    final String expiresAt;
+
+    LocalPairingTicketResult(String ticket, String desktopId, String expiresAt) {
+      this.ticket = ticket == null ? "" : ticket.trim();
+      this.desktopId = desktopId == null ? "" : desktopId.trim();
+      this.expiresAt = expiresAt == null ? "" : expiresAt.trim();
     }
   }
 
