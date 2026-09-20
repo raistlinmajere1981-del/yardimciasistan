@@ -5,6 +5,7 @@ import {
   LOCAL_COMPANION_ENDPOINTS,
   LOCAL_COMPANION_PROTOCOL_VERSION,
   LOCAL_COMPANION_TOKEN_HEADER,
+  type AndroidOperationsSnapshot,
   type AndroidSyncAction
 } from "@yardimci-asistan/sync-core";
 
@@ -45,9 +46,16 @@ export type LocalCompanionPairingResponse =
       statusCode: number;
     };
 
+export interface LocalCompanionBusinessInfo {
+  displayName: string;
+  phone: string;
+  whatsapp: string;
+}
+
 export interface LocalCompanionServerOptions {
   desktopId: () => string;
-  createSummary: (deviceId: string) => unknown;
+  businessInfo: () => LocalCompanionBusinessInfo;
+  createSummary: (deviceId: string) => AndroidOperationsSnapshot;
   applyAction: (action: AndroidSyncAction) => LocalCompanionActionResult;
   authorize: (input: LocalCompanionAuthorizationInput) => boolean;
   pair?: (input: LocalCompanionPairingRequest) => LocalCompanionPairingResponse;
@@ -135,6 +143,69 @@ function objectValue(value: unknown): Record<string, unknown> | null {
 
 function stringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function pendingRequestStatus(status: string): boolean {
+  return ["new", "seen", "waiting_owner", "waiting_customer"].includes(status);
+}
+
+function latestRequestTimestamp(snapshot: AndroidOperationsSnapshot): string {
+  return snapshot.requests.reduce((latest, request) =>
+    request.created_at && request.created_at > latest ? request.created_at : latest, "");
+}
+
+function summaryResponse(
+  snapshot: AndroidOperationsSnapshot,
+  business: LocalCompanionBusinessInfo,
+  deviceId: string,
+  sourceRevision: number
+): Record<string, unknown> {
+  const profile = snapshot.androidPermissions[deviceId];
+  const active = Boolean(profile?.is_active);
+  const now = new Date().toISOString();
+  return {
+    ok: true,
+    message: active ? "Android özeti yerel ağdan alındı." : "Bu cihaz masaüstü onayı bekliyor.",
+    approval_required: !active,
+    business: {
+      display_name: business.displayName,
+      phone: business.phone,
+      whatsapp: business.whatsapp
+    },
+    summary: {
+      total_requests: snapshot.requests.length,
+      new_requests: snapshot.requests.filter((request) => request.status === "new").length,
+      pending_requests: snapshot.requests.filter((request) => pendingRequestStatus(request.status)).length,
+      synced_requests: snapshot.requests.length,
+      request_count: snapshot.requests.length,
+      latest_created_at: latestRequestTimestamp(snapshot),
+      pulled_at: now,
+      android_snapshot_updated_at: snapshot.updated_at,
+      pending_action_count: 0
+    },
+    operations: snapshot.summary,
+    business_capabilities: snapshot.business_capabilities,
+    daily_tasks: snapshot.daily_tasks,
+    requests: snapshot.requests,
+    customers: snapshot.customers,
+    customer_room_stays: snapshot.customer_room_stays,
+    room_folios: snapshot.room_folios,
+    reservations: snapshot.reservations,
+    rooms: snapshot.rooms,
+    tables: snapshot.tables,
+    menu: snapshot.menu,
+    admin_menu: snapshot.admin_menu,
+    trackedStockItems: snapshot.trackedStockItems,
+    appliedStockImageHashes: snapshot.appliedStockImageHashes,
+    table_orders: snapshot.table_orders,
+    messages: snapshot.messages,
+    androidPermissions: snapshot.androidPermissions,
+    finance: snapshot.finance,
+    reports: snapshot.reports,
+    market: snapshot.market,
+    actions: [],
+    server_revision: sourceRevision
+  };
 }
 
 function normalizeAction(body: Record<string, unknown>, deviceId: string): AndroidSyncAction | null {
@@ -324,13 +395,30 @@ export class LocalCompanionServer {
 
       const body = await readJsonBody(request);
       if (url.pathname === LOCAL_COMPANION_ENDPOINTS.summary) {
+        const knownRevision = Math.max(0, Number(body.known_server_revision ?? 0) || 0);
+        if (knownRevision > 0 && knownRevision === this.sourceRevision) {
+          writeJson(response, 200, {
+            ok: true,
+            message: "Android verisi yerel ağda zaten güncel.",
+            approval_required: false,
+            not_modified: true,
+            server_revision: this.sourceRevision,
+            pulled_at: new Date().toISOString(),
+            pending_action_count: 0
+          });
+          return;
+        }
+
+        const snapshot = this.options.createSummary(deviceId);
         writeJson(response, 200, {
-          ok: true,
           protocol_version: LOCAL_COMPANION_PROTOCOL_VERSION,
           desktop_id: this.options.desktopId(),
-          source_revision: this.sourceRevision,
-          not_modified: false,
-          snapshot: this.options.createSummary(deviceId)
+          ...summaryResponse(
+            snapshot,
+            this.options.businessInfo(),
+            deviceId,
+            this.sourceRevision
+          )
         });
         return;
       }
