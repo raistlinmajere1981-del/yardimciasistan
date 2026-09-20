@@ -58,7 +58,12 @@ if (!hash_equals($expectedSignature, $signature)) {
     ]);
 }
 
-$decodedText = base64_decode(strtr($encoded, '-_', '+/'), true);
+$base64Payload = strtr($encoded, '-_', '+/');
+$padding = strlen($base64Payload) % 4;
+if ($padding !== 0) {
+    $base64Payload .= str_repeat('=', 4 - $padding);
+}
+$decodedText = base64_decode($base64Payload, true);
 $ticketPayload = is_string($decodedText) ? json_decode($decodedText, true) : null;
 if (!is_array($ticketPayload)) {
     ya_android_bootstrap_response(401, [
