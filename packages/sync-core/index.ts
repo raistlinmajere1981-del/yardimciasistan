@@ -1289,7 +1289,7 @@ export interface LocalCompanionServiceDescriptor {
  */
 export function createCompanionSourceKey(kind: CompanionTransportKind, sourceId: string): string {
   const normalized = kind === "hosting"
-    ? sourceId.trim().replace(/\\/+$/, "")
+    ? sourceId.trim().replace(/\/+$/, "")
     : sourceId.trim();
   return normalized ? `${kind}:${normalized}` : "";
 }
