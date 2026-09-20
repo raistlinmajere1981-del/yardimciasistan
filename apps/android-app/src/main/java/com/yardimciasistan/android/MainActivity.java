@@ -2726,10 +2726,9 @@ public final class MainActivity extends ComponentActivity {
         UiKit.SECONDARY,
         Typeface.NORMAL
     ));
-    Button localPairButton = UiKit.button(
+    Button localPairButton = UiKit.outlineButton(
         this,
         localConnection.isComplete() ? "Yerel Ağı Yeniden Eşleştir" : "Yerel Ağ Eşleştir",
-        UiKit.SECONDARY,
         view -> showLocalPairingDialog()
     );
     LinearLayout.LayoutParams localPairParams = new LinearLayout.LayoutParams(-1, UiKit.dp(this, 46));
