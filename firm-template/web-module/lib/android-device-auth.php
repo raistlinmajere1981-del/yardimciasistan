@@ -38,6 +38,12 @@ function ya_android_auth_ensure_schema(): void
           revoked_at TEXT NOT NULL DEFAULT ''
         )
     SQL);
+    ya_storage_open()->exec(<<<'SQL'
+        CREATE TABLE IF NOT EXISTS android_bootstrap_nonces (
+          nonce TEXT PRIMARY KEY,
+          consumed_at TEXT NOT NULL
+        )
+    SQL);
 }
 
 function ya_android_auth_has_token(string $deviceId): bool
@@ -148,6 +154,27 @@ function ya_android_auth_request_authorized(array $businessConfig, string $devic
     $configured = trim((string) ($businessConfig['sync_secret'] ?? ''));
     $provided = trim((string) ($_SERVER['HTTP_X_YA_SYNC_SECRET'] ?? ''));
     return $configured !== '' && $provided !== '' && hash_equals($configured, $provided);
+}
+
+function ya_android_auth_consume_bootstrap_nonce(string $nonce): bool
+{
+    $nonce = trim($nonce);
+    if (preg_match('/^[a-f0-9]{32}$/', $nonce) !== 1) {
+        return false;
+    }
+    ya_android_auth_ensure_schema();
+    try {
+        $statement = ya_storage_open()->prepare(
+            'INSERT INTO android_bootstrap_nonces (nonce, consumed_at) VALUES (:nonce, :consumed_at)'
+        );
+        $statement->execute([
+            ':nonce' => $nonce,
+            ':consumed_at' => date(DATE_ATOM)
+        ]);
+        return true;
+    } catch (Throwable $error) {
+        return false;
+    }
 }
 
 function ya_android_auth_revoke_token(string $deviceId): void
