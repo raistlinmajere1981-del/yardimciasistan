@@ -179,7 +179,20 @@ async function assertServer() {
       appliedAction = action;
       return { ok: true, message: "Applied.", alreadyApplied: false };
     },
-    authorize: ({ deviceId, token }) => deviceId === "device-test" && token === TOKEN
+    authorize: ({ deviceId, token }) => deviceId === "device-test" && token === TOKEN,
+    pair: ({ pairingSecret, deviceId }) => pairingSecret === "pair-secret" && deviceId === "device-pair"
+      ? {
+          ok: true,
+          token: TOKEN,
+          approvalRequired: true,
+          message: "Paired."
+        }
+      : {
+          ok: false,
+          code: "pairing_secret_invalid",
+          message: "Invalid.",
+          statusCode: 401
+        }
   });
 
   const address = await server.start("127.0.0.1", 0);
@@ -236,10 +249,21 @@ async function assertServer() {
     assert.ok(actionBody.source_revision > beforeRevision);
     assert.equal(appliedAction.device_id, "device-test");
 
-    const pair = await fetch(`${base}/local/v1/pair`, { method: "POST", body: "{}" });
-    assert.equal(pair.status, 503);
+    const pair = await fetch(`${base}/local/v1/pair`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        pairing_secret: "pair-secret",
+        device_id: "device-pair",
+        device_name: "Pair Telefonu",
+        app_version: "0.1.1"
+      })
+    });
+    assert.equal(pair.status, 200);
     const pairBody = await pair.json();
-    assert.equal(pairBody.code, "pairing_not_configured");
+    assert.equal(pairBody.ok, true);
+    assert.equal(pairBody.local_token, TOKEN);
+    assert.equal(pairBody.approval_required, true);
   } finally {
     await server.stop();
   }
