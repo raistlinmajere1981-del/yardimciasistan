@@ -331,6 +331,8 @@ export interface AndroidMarketSnapshot {
 export interface AndroidOperationsSnapshot {
   /** Persisted runtime capabilities used by desktop projection and Android UI. */
   business_capabilities: BusinessCapability[];
+  /** Whether same-LAN desktop discovery and direct transport may be used. */
+  local_network_enabled: boolean;
   summary: AndroidOperationsSummary;
   daily_tasks: AndroidSnapshotTask[];
   requests: AndroidSnapshotRequest[];
