@@ -8,6 +8,7 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice, DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
+import type { DesktopAndroidInstallationSnapshot } from "../../../electron/android-installation-service";
 import { formatDateTime } from "../../app/record-formatters";
 import {
   aiServicePresets,
@@ -69,10 +70,15 @@ interface SetupFormProps {
   onDashboardRefresh?: () => Promise<unknown>;
   androidDeviceState?: SyncState;
   androidDeviceMessage?: string;
+  androidInstallState?: SyncState;
+  androidInstallMessage?: string;
+  androidInstallSnapshot?: DesktopAndroidInstallationSnapshot | null;
   aiConnectionTestState: SyncState;
   aiConnectionTestMessage: string;
   onFormChange: (form: SetupFormState) => void;
   onTestAiConnection: () => void;
+  onRefreshAndroidInstallDevices?: () => void;
+  onInstallAndroidApp?: (serial: string) => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetAndroidDevicePermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
@@ -96,10 +102,15 @@ export function SetupForm({
   onDashboardRefresh,
   androidDeviceState = "idle",
   androidDeviceMessage = "Telefon rolleri ve görev alanları masaüstünden yönetilir.",
+  androidInstallState = "idle",
+  androidInstallMessage = "USB Android cihazları aranıyor...",
+  androidInstallSnapshot = null,
   aiConnectionTestState,
   aiConnectionTestMessage,
   onFormChange,
   onTestAiConnection,
+  onRefreshAndroidInstallDevices,
+  onInstallAndroidApp,
   onSetAndroidDeviceRole,
   onSetAndroidDevicePermissionGroups,
   onSetAndroidDeviceActive,
@@ -645,6 +656,11 @@ export function SetupForm({
                   enabledCapabilities={enabledCapabilities}
                   state={androidDeviceState}
                   message={androidDeviceMessage}
+                  installState={androidInstallState}
+                  installMessage={androidInstallMessage}
+                  installSnapshot={androidInstallSnapshot}
+                  onRefreshInstallDevices={onRefreshAndroidInstallDevices}
+                  onInstallApp={onInstallAndroidApp}
                   onSetRole={onSetAndroidDeviceRole}
                   onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
                   onSetActive={onSetAndroidDeviceActive}
@@ -960,6 +976,11 @@ interface AndroidDevicesSectionProps {
   enabledCapabilities: BusinessCapability[];
   state: SyncState;
   message: string;
+  installState: SyncState;
+  installMessage: string;
+  installSnapshot: DesktopAndroidInstallationSnapshot | null;
+  onRefreshInstallDevices?: () => void;
+  onInstallApp?: (serial: string) => void;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetPermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetActive?: (deviceId: string, active: boolean) => void;
@@ -972,6 +993,11 @@ function AndroidDevicesSection({
   enabledCapabilities,
   state,
   message,
+  installState,
+  installMessage,
+  installSnapshot,
+  onRefreshInstallDevices,
+  onInstallApp,
   onSetRole,
   onSetPermissionGroups,
   onSetActive,
@@ -997,6 +1023,89 @@ function AndroidDevicesSection({
   };
   return (
     <section className="settings-android-devices-section">
+      <div className="android-devices-heading">
+        <div>
+          <h3>Telefon Kurulumu</h3>
+        </div>
+        <div className="android-devices-heading-actions">
+          {installSnapshot?.bundledVersionName && <span>APK {installSnapshot.bundledVersionName}</span>}
+          <ActionButton
+            variant="secondary"
+            className="setup-secondary"
+            type="button"
+            onClick={onRefreshInstallDevices}
+            disabled={!onRefreshInstallDevices || installState === "loading"}
+          >
+            <RefreshCw size={15} aria-hidden="true" />
+            {installState === "loading" ? "Taranıyor" : "USB Cihazları Yenile"}
+          </ActionButton>
+        </div>
+      </div>
+      <p className="settings-service-note">
+        USB hata ayıklaması açık Android cihazlara Yardımcı Asistanı doğrudan kurabilir veya güncelleyebilirsiniz.
+      </p>
+      {installSnapshot?.devices?.length ? (
+        <div className="android-device-list android-install-device-list">
+          {installSnapshot.devices.map((device) => {
+            const canInstall = installSnapshot.apkAvailable
+              && (device.action === "install" || device.action === "update");
+            const actionLabel = device.action === "install"
+              ? "Uygulamayı Kur"
+              : device.action === "update"
+                ? "Güncelle"
+                : device.action === "authorize"
+                  ? "USB Onayı Bekleniyor"
+                  : device.action === "offline"
+                    ? "Cihaz Hazır Değil"
+                    : device.action === "newer"
+                      ? "Daha Yeni Sürüm Kurulu"
+                      : "Güncel";
+            return (
+              <article className="android-device-card android-install-device-card" key={device.serial}>
+                <div className="android-device-identity">
+                  <span className="android-device-icon"><Smartphone size={18} aria-hidden="true" /></span>
+                  <div>
+                    <strong>{device.model || "Android Cihaz"}</strong>
+                    <code title={device.serial}>{device.serial}</code>
+                  </div>
+                  <div className="android-device-badges">
+                    <span className={`device-state${device.state === "device" ? " is-active" : " is-inactive"}`}>
+                      USB · {device.state === "device" ? "Hazır" : device.state}
+                    </span>
+                  </div>
+                </div>
+                <dl className="android-device-details">
+                  <div><dt>Telefon</dt><dd>{device.appInstalled ? device.installedVersionName || "Kurulu" : "Uygulama kurulu değil"}</dd></div>
+                  <div><dt>Desktop APK</dt><dd>{device.bundledVersionName || "Hazır değil"}</dd></div>
+                  <div><dt>Durum</dt><dd>{device.message}</dd></div>
+                </dl>
+                <div className="android-device-actions">
+                  <ActionButton
+                    variant="secondary"
+                    size="sm"
+                    className="setup-secondary"
+                    type="button"
+                    onClick={() => onInstallApp?.(device.serial)}
+                    disabled={!canInstall || !onInstallApp || installState === "loading"}
+                  >
+                    {actionLabel}
+                  </ActionButton>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="android-devices-empty">
+          <Smartphone size={22} aria-hidden="true" />
+          <div>
+            <strong>USB Android cihazı bekleniyor.</strong>
+            <span>{installSnapshot?.message || "Telefonu USB ile bağlayın ve USB hata ayıklamasını açın."}</span>
+          </div>
+        </div>
+      )}
+      <p className={`menu-status sync-${installState}`} role="status" aria-live="polite">{installMessage}</p>
+
       <div className="android-devices-heading">
         <div>
           <h3>Cihazlar ve Yetkiler</h3>
