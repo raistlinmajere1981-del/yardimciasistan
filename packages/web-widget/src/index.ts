@@ -467,7 +467,6 @@ function accommodationScheduleControlsTemplate() {
       </div>
       <input name="date_text" type="hidden" />
       <div class="ya-widget-calendar" data-ya-calendar hidden></div>
-      <p data-ya-selected-date aria-live="polite">Giriş ve çıkış tarihlerini seçin.</p>
     </fieldset>
   `;
 }
@@ -484,7 +483,6 @@ function restaurantScheduleControlsTemplate() {
       </div>
       <input name="date_text" type="hidden" />
       <div class="ya-widget-calendar" data-ya-calendar hidden></div>
-      <p data-ya-selected-date aria-live="polite">Tarih ve saat seçiminizi yapın.</p>
     </fieldset>
   `;
 }
@@ -868,13 +866,22 @@ function renderTurkishCalendar(root: HTMLElement) {
   const shortcuts: Array<[string, string, boolean]> = isAccommodation
     ? target === "end_date"
       ? [
+          ["clear", "Temizle", !endValue],
           ["day1", "1 gün", !startValue],
           ["day2", "2 gün", !startValue],
           ["day7", "7 gün", !startValue],
           ["day10", "10 gün", !startValue]
         ]
-      : [["today", "Bugün", false], ["tomorrow", "Yarın", false]]
-    : [["today", "Bugün", false], ["tomorrow", "Yarın", false]];
+      : [
+          ["clear", "Temizle", !startValue],
+          ["today", "Bugün", false],
+          ["tomorrow", "Yarın", false]
+        ]
+    : [
+        ["clear", "Temizle", !selectedValue],
+        ["today", "Bugün", false],
+        ["tomorrow", "Yarın", false]
+      ];
 
   const previousMonthEnd = toLocalIsoDate(new Date(year, month, 0));
   calendar.innerHTML = `
@@ -898,6 +905,12 @@ function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HT
   if (!input) return;
   const isAccommodation = Boolean(root.querySelector("[data-ya-accommodation-dates]"));
   const today = new Date();
+
+  if (shortcut === "clear") {
+    clearDateSelection(root, target);
+    closeTurkishDatePicker(root);
+    return;
+  }
 
   const dayShortcut = /^day(1|2|7|10)$/.exec(shortcut);
   if (dayShortcut) {
@@ -924,11 +937,35 @@ function applyCalendarShortcut(root: HTMLElement, shortcut: string, calendar: HT
   closeTurkishDatePicker(root);
 }
 
+function clearDateSelection(root: HTMLElement, target: string) {
+  const input = root.querySelector<HTMLInputElement>(`input[name="${target}"]`);
+  if (!input) return;
+
+  const isAccommodation = Boolean(root.querySelector("[data-ya-accommodation-dates]"));
+  input.value = "";
+
+  if (isAccommodation) {
+    const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
+    const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
+    if (target === "start_date" && startInput && endInput) {
+      endInput.value = "";
+      endInput.min = toLocalIsoDate(addLocalDays(new Date(), 1));
+    }
+    updateAccommodationDateControls(root);
+    return;
+  }
+
+  const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
+  const label = root.querySelector<HTMLElement>('[data-ya-date-label="start_date"]');
+  if (dateTextInput) dateTextInput.value = "";
+  if (label) label.textContent = "Tarih seç";
+  root.querySelector<HTMLElement>("[data-ya-open-date-picker]")?.classList.remove("is-active");
+}
+
 function updateAccommodationDateControls(root: HTMLElement) {
   const startInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
   const endInput = root.querySelector<HTMLInputElement>('input[name="end_date"]');
   const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
-  const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
   if (!startInput || !endInput || !dateTextInput) return;
   if (startInput.value) {
     const parsedStart = parseLocalIsoDate(startInput.value);
@@ -944,19 +981,16 @@ function updateAccommodationDateControls(root: HTMLElement) {
   if (startInput.value && endInput.value) {
     const dateText = `${formatTurkishCalendarDate(startInput.value)} – ${formatTurkishCalendarDate(endInput.value)}`;
     dateTextInput.value = dateText;
-    if (selectedDate) selectedDate.textContent = `Konaklama: ${dateText}`;
     return;
   }
   dateTextInput.value = "";
-  if (selectedDate) selectedDate.textContent = "Giriş ve çıkış tarihlerini seçin.";
 }
 
 function updateRestaurantDateControls(root: HTMLElement, preset: DatePreset, dateValue: string) {
   const dateInput = root.querySelector<HTMLInputElement>('input[name="start_date"]');
   const dateTextInput = root.querySelector<HTMLInputElement>('input[name="date_text"]');
   const customControl = root.querySelector<HTMLElement>("[data-ya-open-date-picker]");
-  const customLabel = root.querySelector<HTMLElement>("[data-ya-custom-date-label]");
-  const selectedDate = root.querySelector<HTMLElement>("[data-ya-selected-date]");
+  const customLabel = root.querySelector<HTMLElement>('[data-ya-date-label="start_date"]');
   if (!dateInput || !dateTextInput || !dateValue) return;
   const dateText = formatDateForRequest(dateValue, preset);
   dateInput.value = dateValue;
@@ -966,9 +1000,8 @@ function updateRestaurantDateControls(root: HTMLElement, preset: DatePreset, dat
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-pressed", String(active));
   });
-  customControl?.classList.toggle("is-active", preset === "custom");
-  if (customLabel) customLabel.textContent = preset === "custom" ? formatTurkishCalendarDate(dateValue) : "Tarih seç";
-  if (selectedDate) selectedDate.textContent = `Seçilen tarih: ${dateText}`;
+  customControl?.classList.add("is-active");
+  if (customLabel) customLabel.textContent = formatTurkishCalendarDate(dateValue);
 }
 
 function bindTimeControls(root: HTMLElement) {
@@ -990,6 +1023,12 @@ function bindTimeControls(root: HTMLElement) {
     if (!button || button.disabled) return;
 
     if (button.dataset.yaTimeClose === "1") {
+      closeTimePicker(root);
+      return;
+    }
+
+    if (button.dataset.yaTimeClear === "1") {
+      clearTimeSelection(root);
       closeTimePicker(root);
       return;
     }
@@ -1036,7 +1075,10 @@ function renderTimePicker(root: HTMLElement) {
         <small>Saat seçimi</small>
         <strong>${selectedHour || "--"}:${selectedMinute || "--"}</strong>
       </div>
-      <button type="button" data-ya-time-close="1" aria-label="Saat seçimini kapat">×</button>
+      <div class="ya-widget-time-popover-actions">
+        <button class="ya-widget-time-clear" type="button" data-ya-time-clear="1" ${time.value ? "" : "disabled"}>Temizle</button>
+        <button class="ya-widget-time-close" type="button" data-ya-time-close="1" aria-label="Saat seçimini kapat">×</button>
+      </div>
     </div>
     <div class="ya-widget-time-columns">
       <div class="ya-widget-time-column" aria-label="Saatler">
@@ -1057,6 +1099,18 @@ function renderTimePicker(root: HTMLElement) {
   window.requestAnimationFrame(() => {
     popover.querySelector<HTMLElement>(".ya-widget-time-scroll .is-selected")?.scrollIntoView({ block: "center" });
   });
+}
+
+function clearTimeSelection(root: HTMLElement) {
+  const popover = root.querySelector<HTMLElement>("[data-ya-time-popover]");
+  const time = root.querySelector<HTMLInputElement>('input[name="time"]');
+  const label = root.querySelector<HTMLElement>("[data-ya-time-label]");
+  if (time) time.value = "";
+  if (label) label.textContent = "Saat seç";
+  if (popover) {
+    delete popover.dataset.yaSelectedHour;
+    delete popover.dataset.yaSelectedMinute;
+  }
 }
 
 function closeTimePicker(root: HTMLElement) {
@@ -2409,19 +2463,41 @@ function widgetStyles(widgetConfig: WidgetConfig) {
       font-weight: 900;
     }
 
-    .ya-widget-time-popover-head > button {
-      display: grid;
-      width: 28px;
-      height: 28px;
-      place-items: center;
-      padding: 0;
+    .ya-widget-time-popover-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .ya-widget-time-popover-actions button {
+      min-height: 28px;
       border: 0;
       border-radius: 9px;
+      cursor: pointer;
+    }
+
+    .ya-widget-time-clear {
+      padding: 0 8px;
+      color: #6f6258;
+      background: #f8f1e8;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .ya-widget-time-clear:disabled {
+      cursor: default;
+      opacity: .4;
+    }
+
+    .ya-widget-time-close {
+      display: grid;
+      width: 28px;
+      place-items: center;
+      padding: 0;
       color: #6d737c;
       background: #f3efe7;
       font-size: 19px;
       line-height: 1;
-      cursor: pointer;
     }
 
     .ya-widget-time-columns {
@@ -2485,12 +2561,6 @@ function widgetStyles(widgetConfig: WidgetConfig) {
 
     .ya-widget-date-options > input[type="hidden"] {
       display: none;
-    }
-
-    .ya-widget-date-group > p {
-      margin: 7px 1px 0;
-      color: #6b727c;
-      font-size: 10px;
     }
 
     .ya-widget-stepper {

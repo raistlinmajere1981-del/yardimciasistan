@@ -102,6 +102,7 @@ try {
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Yarın");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).not.toContainText("1 gün");
   await pensionPage.locator('[data-ya-calendar-shortcut="today"]').click();
+  await expect(pensionPage.locator('[data-ya-date-label="start_date"]')).not.toHaveText("Giriş tarihi");
   await pensionPage.locator('[data-ya-open-date-picker="end_date"]').click();
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("1 gün");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("2 gün");
@@ -109,7 +110,13 @@ try {
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("10 gün");
   await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).not.toContainText("Bugün");
   await pensionPage.locator('[data-ya-calendar-shortcut="day1"]').click();
+  await expect(pensionPage.locator('[data-ya-date-label="end_date"]')).not.toHaveText("Çıkış tarihi");
   await expect(pensionPage.locator('input[name="date_text"]')).not.toHaveValue("");
+  await pensionPage.locator('[data-ya-open-date-picker="end_date"]').click();
+  await expect(pensionPage.locator(".ya-widget-calendar-shortcuts")).toContainText("Temizle");
+  await pensionPage.locator('[data-ya-calendar-shortcut="clear"]').click();
+  await expect(pensionPage.locator('[data-ya-date-label="end_date"]')).toHaveText("Çıkış tarihi");
+  await expect(pensionPage.locator('input[name="end_date"]')).toHaveValue("");
   await pensionPage.close();
 
   const contextPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -178,7 +185,10 @@ try {
   await expect(page.locator(".ya-widget-calendar-shortcuts")).toContainText("Bugün");
   await expect(page.locator(".ya-widget-calendar-shortcuts")).toContainText("Yarın");
   await expect(page.locator(".ya-widget-calendar-shortcuts")).not.toContainText("Hafta sonu");
+  await expect(page.locator(".ya-widget-calendar-shortcuts")).toContainText("Temizle");
   await page.locator('[data-ya-calendar-shortcut="today"]').click();
+  await expect(page.locator('[data-ya-date-label="start_date"]')).not.toHaveText("Tarih seç");
+  await expect(page.locator("[data-ya-selected-date]")).toHaveCount(0);
   await page.locator("[data-ya-open-time-picker]").click();
   await expect(page.locator("[data-ya-time-popover]")).toBeVisible();
   await page.locator('[data-ya-time-hour="20"]').click();
@@ -186,6 +196,14 @@ try {
   await expect(page.locator("[data-ya-time-popover]")).toBeHidden();
   await expect(page.locator("[data-ya-time-label]")).toHaveText("20:30");
   await expect(page.locator('.ya-widget-form input[name="time"]')).toHaveValue("20:30");
+  await page.locator("[data-ya-open-time-picker]").click();
+  await expect(page.locator('[data-ya-time-clear="1"]')).toBeEnabled();
+  await page.locator('[data-ya-time-clear="1"]').click();
+  await expect(page.locator("[data-ya-time-label]")).toHaveText("Saat seç");
+  await expect(page.locator('.ya-widget-form input[name="time"]')).toHaveValue("");
+  await page.locator("[data-ya-open-time-picker]").click();
+  await page.locator('[data-ya-time-hour="20"]').click();
+  await page.locator('[data-ya-time-minute="30"]').click();
   await page.locator('.ya-widget-form input[name="guest_count"]').fill("4");
   await page.locator('.ya-widget-form textarea[name="message"]').fill("Bahçede sakin bir masa rica ediyoruz.");
 
