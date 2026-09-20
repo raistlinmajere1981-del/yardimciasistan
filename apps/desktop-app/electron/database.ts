@@ -1355,6 +1355,10 @@ export class DesktopDatabase {
           now
         );
 
+      this.db.prepare(
+        "UPDATE settings SET local_network_enabled = ?, updated_at = ? WHERE id = ?"
+      ).run(input.localNetworkEnabled === false ? 0 : 1, now, settingsId);
+
       upsertStoredAiServiceProfileInTransaction(this.db, {
         service: storedAiService,
         projectName: aiProjectName,
