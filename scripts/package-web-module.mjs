@@ -26,6 +26,7 @@ const requiredFiles = [
   "api/stock-image-analysis.php",
   "api/identity-image-analysis.php",
   "api/android.php",
+  "api/android-bootstrap.php",
   "api/android-device-token.php",
   "api/android-chat.php",
   "api/android-stock-image-analysis.php",
@@ -177,8 +178,12 @@ function validateSource() {
   assert.ok(androidGate.includes("android_action_scope_denied"), "Android tokenı genel masaüstü sync yetkisine dönüşmemeli.");
   assert.ok(androidGate.includes("device_identity_mismatch"), "Android tokenı payload cihaz kimliğine bağlanmalı.");
 
+  const androidBootstrapEndpoint = readFileSync(join(sourceRoot, "api", "android-bootstrap.php"), "utf8");
+  assert.ok(androidBootstrapEndpoint.includes("bootstrap_ticket_replayed"), "Android kurulum bileti tek kullanımlı olmalı.");
+  assert.ok(androidBootstrapEndpoint.includes("ya_android_auth_issue_token"), "USB kurulum bileti kişisel cihaz tokenına dönüşmeli.");
+
   const androidTokenEndpoint = readFileSync(join(sourceRoot, "api", "android-device-token.php"), "utf8");
-  assert.ok(androidTokenEndpoint.includes("device_approval_required"), "Onaysız telefon cihaz tokenı alamamalı.");
+  assert.ok(androidTokenEndpoint.includes("device_approval_required"), "Onaysız telefon legacy bootstrap ile cihaz tokenı alamamalı.");
   assert.ok(androidTokenEndpoint.includes("ya_android_auth_issue_token"), "Onaylı telefon kişisel token almalı.");
 
   const stockImageEndpoint = readFileSync(join(sourceRoot, "api", "stock-image-analysis.php"), "utf8");
