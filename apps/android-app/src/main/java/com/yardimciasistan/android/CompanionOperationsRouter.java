@@ -55,7 +55,6 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
     }
 
     boolean pairedNow = ensureAutomaticLocalPairing(baseUrl, credential, identity, targetKey);
-    ensureAutomaticLocalPairing(baseUrl, credential, identity, targetKey);
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     if (local.isComplete()) {
@@ -112,6 +111,7 @@ final class CompanionOperationsRouter implements AndroidOperationsTransport {
       return accepted;
     }
 
+    ensureAutomaticLocalPairing(baseUrl, credential, identity, targetKey);
     ConnectionSettings.LocalConnection local =
         ConnectionSettings.localConnectionForTarget(preferences, targetKey);
     if (local.isComplete()) {
