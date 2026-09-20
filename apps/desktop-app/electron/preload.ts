@@ -90,7 +90,6 @@ import type {
   UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
 import type { AutomaticSyncCycleResult, AutomaticSyncStatus } from "./sync-coordinator";
-import type { LocalCompanionPairingSession } from "./local-companion-pairing-service";
 import type {
   AppLockActionResult,
   AppLockStatus,
@@ -177,7 +176,6 @@ export interface DesktopBridge {
   clearBusinessCapabilityOverride: (capability: BusinessCapability) => Promise<BusinessCapabilitySnapshot>;
   applyBusinessProfile: (profileId: string, preserveUserOverrides?: boolean) => Promise<BusinessCapabilitySnapshot>;
   commerce: DesktopCommerceBridge;
-  beginLocalCompanionPairing: () => Promise<LocalCompanionPairingSession>;
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => Promise<DesktopAndroidDeviceMutationResult>;
   setAndroidDeviceActive: (deviceId: string, active: boolean) => Promise<DesktopAndroidDeviceMutationResult>;
@@ -336,7 +334,6 @@ const bridge: DesktopBridge = {
     getPurchaseOrder: (purchaseOrderId) => invokeWhenUnlocked<CommercePurchaseOrderDetail | null>("commerce:purchase:get", purchaseOrderId),
     receivePurchase: (input) => invokeWhenUnlocked<CommercePurchaseOrderDetail>("commerce:purchase:receive", input)
   },
-  beginLocalCompanionPairing: () => ipcRenderer.invoke("androidDevice:beginLocalPairing"),
   setAndroidDeviceRole: (deviceId: string, role: "admin" | "staff") => ipcRenderer.invoke("androidDevice:setRole", deviceId, role),
   setAndroidDevicePermissionGroups: (deviceId: string, groups: AndroidPermissionGroups) => ipcRenderer.invoke("androidDevice:setPermissionGroups", deviceId, groups),
   setAndroidDeviceActive: (deviceId: string, active: boolean) => ipcRenderer.invoke("androidDevice:setActive", deviceId, active),
