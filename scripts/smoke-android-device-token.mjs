@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -9,6 +10,7 @@ import process from "node:process";
 
 const syncSecret = "android-device-token-smoke-secret-12345";
 const deviceId = "android-token-smoke-device";
+const desktopId = "desktop-android-token-smoke";
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-android-token-"));
 const webModuleRoot = join(tempRoot, "web-module");
 cpSync(join(process.cwd(), "firm-template", "web-module"), webModuleRoot, { recursive: true });
@@ -35,7 +37,7 @@ try {
 
   const disabledPublication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
-    client_id: "android-token-smoke-desktop",
+    client_id: desktopId,
     source_revision: 1,
     idempotency_key: "android-token-smoke-snapshot-disabled",
     snapshot: createSnapshot(false, false)
@@ -50,7 +52,7 @@ try {
 
   const inactivePublication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
-    client_id: "android-token-smoke-desktop",
+    client_id: desktopId,
     source_revision: 2,
     idempotency_key: "android-token-smoke-snapshot-2",
     snapshot: createSnapshot(false)
@@ -65,7 +67,7 @@ try {
 
   const publication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
-    client_id: "android-token-smoke-desktop",
+    client_id: desktopId,
     source_revision: 3,
     idempotency_key: "android-token-smoke-snapshot-3",
     snapshot: createSnapshot(true)
@@ -82,6 +84,13 @@ try {
   }, { "X-YA-Sync-Secret": syncSecret });
   assert.equal(bootstrapSummary.status, 200, "Token üretilmeden Android kapısı bootstrap secret kabul etmeli.");
   assert.equal((await bootstrapSummary.json()).approval_required, false);
+
+  const bootstrapTicketResponse = await postAndroid({
+    action: "local_pairing_ticket",
+    device_id: deviceId
+  }, { "X-YA-Sync-Secret": syncSecret });
+  assert.equal(bootstrapTicketResponse.status, 200, "Bootstrap credential otomatik local ticket alabilmeli.");
+  assertLocalPairingTicket(await bootstrapTicketResponse.json());
 
   const firstClaim = await claimToken();
   assert.equal(firstClaim.status, 201);
@@ -116,6 +125,13 @@ try {
   }, { "X-YA-Device-Token": firstToken });
   assert.equal(tokenSummary.status, 200);
   assert.equal((await tokenSummary.json()).approval_required, false);
+
+  const tokenTicketResponse = await postAndroid({
+    action: "local_pairing_ticket",
+    device_id: deviceId
+  }, { "X-YA-Device-Token": firstToken });
+  assert.equal(tokenTicketResponse.status, 200, "Cihaz tokenı otomatik local ticket alabilmeli.");
+  assertLocalPairingTicket(await tokenTicketResponse.json());
 
   const mismatchedDevice = await postAndroid({
     action: "android_summary",
@@ -155,7 +171,7 @@ try {
 
   const deactivationPublication = await postJson(`${baseUrl}/api/sync.php`, {
     action: "publish_android_snapshot",
-    client_id: "android-token-smoke-desktop",
+    client_id: desktopId,
     source_revision: 4,
     idempotency_key: "android-token-smoke-snapshot-4",
     snapshot: createSnapshot(false)
@@ -185,6 +201,22 @@ try {
   assert.equal(inactiveAction.status, 403, "Pasif cihaz action kuyruğunu dolduramamalı.");
   assert.equal((await inactiveAction.json()).code, "device_approval_required");
 
+  const localDisabledPublication = await postJson(`${baseUrl}/api/sync.php`, {
+    action: "publish_android_snapshot",
+    client_id: desktopId,
+    source_revision: 5,
+    idempotency_key: "android-token-smoke-snapshot-5",
+    snapshot: createSnapshot(true, true, false)
+  }, { "X-YA-Sync-Secret": syncSecret });
+  assert.equal(localDisabledPublication.status, 200);
+
+  const disabledLocalTicket = await postAndroid({
+    action: "local_pairing_ticket",
+    device_id: deviceId
+  }, { "X-YA-Device-Token": secondToken });
+  assert.equal(disabledLocalTicket.status, 403);
+  assert.equal((await disabledLocalTicket.json()).code, "local_network_disabled");
+
   console.log("android-device-token-smoke-ok");
 } catch (error) {
   if (serverOutput.trim()) console.error(serverOutput.trim());
@@ -194,7 +226,7 @@ try {
   rmSync(tempRoot, { recursive: true, force: true });
 }
 
-function createSnapshot(isActive, androidEnabled = true) {
+function createSnapshot(isActive, androidEnabled = true, localNetworkEnabled = true) {
   return {
     business_capabilities: [
       "core.customers",
@@ -203,6 +235,7 @@ function createSnapshot(isActive, androidEnabled = true) {
       "food_service.tables",
       "food_service.menu"
     ],
+    local_network_enabled: localNetworkEnabled,
     summary: {},
     daily_tasks: [],
     requests: [{
@@ -239,6 +272,21 @@ function createSnapshot(isActive, androidEnabled = true) {
     reports: [],
     updated_at: new Date().toISOString()
   };
+}
+
+function assertLocalPairingTicket(body) {
+  const ticket = String(body.local_pairing_ticket ?? "");
+  assert.equal(body.desktop_id, desktopId);
+  assert.match(ticket, /^yalp1\.[A-Za-z0-9_-]+\.[a-f0-9]{64}$/);
+  const [, encoded, signature] = ticket.split(".");
+  const expected = createHmac("sha256", syncSecret).update(encoded, "utf8").digest("hex");
+  assert.equal(signature, expected, "Local ticket HMAC business sync secret ile doğrulanmalı.");
+  const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+  assert.equal(payload.v, 1);
+  assert.equal(payload.desktop_id, desktopId);
+  assert.equal(payload.device_id, deviceId);
+  assert.ok(payload.exp > payload.iat);
+  assert.match(String(payload.nonce), /^[a-f0-9]{32}$/);
 }
 
 function claimToken() {
