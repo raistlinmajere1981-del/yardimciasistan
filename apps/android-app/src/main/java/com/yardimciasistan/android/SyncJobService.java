@@ -76,7 +76,7 @@ public final class SyncJobService extends JobService {
       return;
     }
 
-    HostingSyncClient client = new HostingSyncClient();
+    AndroidOperationsTransport client = new HostingAndroidOperationsTransport();
     OperationCache cache = new OperationCache(preferences, identity.deviceId);
     OperationData previousData = cache.load();
     LocalNotificationCenter notifications = new LocalNotificationCenter(this, preferences);
@@ -89,7 +89,7 @@ public final class SyncJobService extends JobService {
       try {
         client.enqueueAction(baseUrl, syncSecret, identity, pending.id, pending.type, pending.payload);
         outbox.remove(pending.id);
-      } catch (HostingSyncClient.SyncException error) {
+      } catch (AndroidOperationsTransport.TransportException error) {
         if (!error.invalidatesPendingAction()) {
           throw error;
         }
@@ -101,10 +101,10 @@ public final class SyncJobService extends JobService {
       }
     }
 
-    HostingSyncClient.FetchResult fetched;
+    AndroidOperationsTransport.FetchResult fetched;
     try {
       fetched = client.fetchOperations(baseUrl, syncSecret, identity, cache.revision());
-    } catch (HostingSyncClient.SyncException error) {
+    } catch (AndroidOperationsTransport.TransportException error) {
       if (error.disablesAndroidService()) {
         clearDisabledAndroidState(cache, outbox, notifications, previousData);
         return;
