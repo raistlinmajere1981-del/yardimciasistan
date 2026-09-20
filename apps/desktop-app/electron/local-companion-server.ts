@@ -23,11 +23,34 @@ export interface LocalCompanionActionResult {
   alreadyApplied?: boolean;
 }
 
+export interface LocalCompanionPairingRequest {
+  pairingSecret: string;
+  deviceId: string;
+  deviceName: string;
+  appVersion: string;
+  remoteAddress: string;
+}
+
+export type LocalCompanionPairingResponse =
+  | {
+      ok: true;
+      token: string;
+      approvalRequired: boolean;
+      message: string;
+    }
+  | {
+      ok: false;
+      code: string;
+      message: string;
+      statusCode: number;
+    };
+
 export interface LocalCompanionServerOptions {
   desktopId: () => string;
   createSummary: (deviceId: string) => unknown;
   applyAction: (action: AndroidSyncAction) => LocalCompanionActionResult;
   authorize: (input: LocalCompanionAuthorizationInput) => boolean;
+  pair?: (input: LocalCompanionPairingRequest) => LocalCompanionPairingResponse;
   logInfo?: (message: string) => void;
   logWarn?: (message: string, error?: unknown) => void;
   logError?: (message: string, error?: unknown) => void;
@@ -231,10 +254,50 @@ export class LocalCompanionServer {
       }
 
       if (request.method === "POST" && url.pathname === LOCAL_COMPANION_ENDPOINTS.pair) {
-        writeJson(response, 503, {
-          ok: false,
-          code: "pairing_not_configured",
-          message: "Yerel cihaz eşleştirmesi henüz yapılandırılmadı."
+        if (!this.options.pair) {
+          writeJson(response, 503, {
+            ok: false,
+            code: "pairing_not_configured",
+            message: "Yerel cihaz eşleştirmesi henüz yapılandırılmadı."
+          });
+          return;
+        }
+
+        const body = await readJsonBody(request);
+        const pairingSecret = stringValue(body.pairing_secret);
+        const deviceId = stringValue(body.device_id);
+        const deviceName = stringValue(body.device_name);
+        const appVersion = stringValue(body.app_version);
+        if (!pairingSecret || !/^[A-Za-z0-9._:-]{6,120}$/.test(deviceId)) {
+          writeJson(response, 422, {
+            ok: false,
+            code: "invalid_pairing_request",
+            message: "Yerel eşleştirme isteği eksik veya geçersiz."
+          });
+          return;
+        }
+
+        const result = this.options.pair({
+          pairingSecret,
+          deviceId,
+          deviceName,
+          appVersion,
+          remoteAddress
+        });
+        if (!result.ok) {
+          writeJson(response, result.statusCode, result);
+          return;
+        }
+        this.markSnapshotDirty();
+        this.options.logInfo?.(`Local companion paired device ${deviceId} from ${remoteAddress}.`);
+        writeJson(response, 200, {
+          ok: true,
+          protocol_version: LOCAL_COMPANION_PROTOCOL_VERSION,
+          desktop_id: this.options.desktopId(),
+          local_token: result.token,
+          approval_required: result.approvalRequired,
+          message: result.message,
+          source_revision: this.sourceRevision
         });
         return;
       }
