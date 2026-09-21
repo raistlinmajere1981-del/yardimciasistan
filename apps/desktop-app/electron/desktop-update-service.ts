@@ -116,7 +116,7 @@ interface UpdatePaths {
 let currentRuntimeStatus: DesktopUpdateStatus | null = null;
 let automaticTimer: NodeJS.Timeout | null = null;
 let automaticInitialTimer: NodeJS.Timeout | null = null;
-let updateOperation: Promise<DesktopUpdateStatus> | null = null;
+let updateOperation: { kind: "check" | "download"; promise: Promise<DesktopUpdateStatus> } | null = null;
 
 function resolveUpdatePaths(userDataPath: string): UpdatePaths {
   const root = path.join(userDataPath, UPDATE_DIRECTORY_NAME);
@@ -499,11 +499,12 @@ async function performCheck(userDataPath: string, force: boolean): Promise<Deskt
 }
 
 export async function checkDesktopUpdate(userDataPath: string, force = false): Promise<DesktopUpdateStatus> {
-  if (updateOperation) return updateOperation;
-  updateOperation = performCheck(userDataPath, force).finally(() => {
-    updateOperation = null;
+  if (updateOperation) return updateOperation.promise;
+  const promise = performCheck(userDataPath, force).finally(() => {
+    if (updateOperation?.promise === promise) updateOperation = null;
   });
-  return updateOperation;
+  updateOperation = { kind: "check", promise };
+  return promise;
 }
 
 async function sha256File(filePath: string): Promise<string> {
@@ -705,11 +706,17 @@ async function downloadUpdate(userDataPath: string): Promise<DesktopUpdateStatus
 }
 
 export async function downloadDesktopUpdate(userDataPath: string): Promise<DesktopUpdateStatus> {
-  if (updateOperation) return updateOperation;
-  updateOperation = downloadUpdate(userDataPath).finally(() => {
-    updateOperation = null;
+  if (updateOperation?.kind === "download") return updateOperation.promise;
+  if (updateOperation?.kind === "check") {
+    await updateOperation.promise;
+  }
+  if (updateOperation?.kind === "download") return updateOperation.promise;
+
+  const promise = downloadUpdate(userDataPath).finally(() => {
+    if (updateOperation?.promise === promise) updateOperation = null;
   });
-  return updateOperation;
+  updateOperation = { kind: "download", promise };
+  return promise;
 }
 
 export function saveDesktopUpdatePreferences(
