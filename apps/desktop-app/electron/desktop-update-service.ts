@@ -828,27 +828,6 @@ function cleanupInstallArtifacts(paths: UpdatePaths, installerPath?: string) {
   }
 }
 
-function powershellLiteral(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
-}
-
-function createWindowsUpdateLauncherCommand(installerPath: string, applicationPath: string): string {
-  const script = [
-    `$installer = ${powershellLiteral(installerPath)}`,
-    `$application = ${powershellLiteral(applicationPath)}`,
-    "$exitCode = 1",
-    "try {",
-    "  $process = Start-Process -FilePath $installer -ArgumentList @('--updated', '/S') -Wait -PassThru",
-    "  $exitCode = $process.ExitCode",
-    "} catch {",
-    "  $exitCode = 1",
-    "}",
-    "try { Start-Process -FilePath $application } catch {}",
-    "exit $exitCode"
-  ].join("\r\n");
-  return Buffer.from(script, "utf16le").toString("base64");
-}
-
 export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolean {
   const paths = resolveUpdatePaths(userDataPath);
   const currentVersion = app.getVersion();
@@ -895,10 +874,13 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
     };
     writeJsonAtomic(paths.installing, installingState);
 
-    const encodedLauncher = createWindowsUpdateLauncherCommand(pending.installerPath, process.execPath);
+    // Match electron-builder/electron-updater's NSIS update invocation.
+    // --force-run lets the installer relaunch the application only after the
+    // update transaction has completed, avoiding a race where an external
+    // wrapper could reopen the old executable while NSIS is still replacing it.
     const child = spawn(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodedLauncher],
+      pending.installerPath,
+      ["--updated", "/S", "--force-run"],
       {
         detached: true,
         stdio: "ignore",
