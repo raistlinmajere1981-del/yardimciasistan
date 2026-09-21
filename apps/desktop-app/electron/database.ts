@@ -1458,7 +1458,8 @@ export class DesktopDatabase {
       replaceStoredBusinessCapabilities(this.db, {
         businessId,
         profileId: input.profileId,
-        selectedOptionalCapabilities: input.profileOptions,
+        selectedOptionalCapabilities: input.profileOptions
+          ?? getBusinessProfile(input.profileId).defaultOptionalCapabilities,
         whatsappEnabled: input.servicePreferences.whatsapp,
         androidEnabled: input.servicePreferences.android,
         aiEnabled: input.aiEnabled,

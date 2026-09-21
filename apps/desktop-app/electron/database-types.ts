@@ -442,7 +442,7 @@ export interface DesktopSetupData {
 export interface SaveInitialSetupInput {
   businessName: string;
   profileId: string;
-  profileOptions: BusinessCapability[];
+  profileOptions?: BusinessCapability[];
   phone: string;
   whatsapp: string;
   email: string;
