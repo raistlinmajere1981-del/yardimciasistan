@@ -3,6 +3,7 @@ const test = require("node:test");
 const {
   BUSINESS_PUBLIC_FEATURE_CATALOG,
   BUSINESS_PUBLIC_PROFILE_LIMITS,
+  getBusinessPublicFeatureCatalogForCapabilities,
   getBusinessPublicFeatureLabel,
   hasCompleteBusinessPublicMapPoint,
   isBusinessPublicClockTime,
@@ -52,4 +53,27 @@ test("business public languages are trimmed, deduplicated and bounded", () => {
   );
   const many = Array.from({ length: BUSINESS_PUBLIC_PROFILE_LIMITS.languages + 4 }, (_, index) => `Dil ${index}`);
   assert.equal(normalizeBusinessPublicLanguages(many).length, BUSINESS_PUBLIC_PROFILE_LIMITS.languages);
+});
+
+
+test("business public features are capability-aware", () => {
+  assert.deepEqual(
+    getBusinessPublicFeatureCatalogForCapabilities(["commerce.catalog", "retail.barcode"]).map((feature) => feature.id),
+    []
+  );
+
+  const restaurantFeatures = getBusinessPublicFeatureCatalogForCapabilities([
+    "food_service.menu",
+    "food_service.tables"
+  ]).map((feature) => feature.id);
+  assert.ok(restaurantFeatures.includes("wifi"));
+  assert.ok(restaurantFeatures.includes("parking"));
+  assert.equal(restaurantFeatures.includes("luggage_storage"), false);
+  assert.equal(restaurantFeatures.includes("airport_transfer"), false);
+
+  const accommodationFeatures = getBusinessPublicFeatureCatalogForCapabilities([
+    "accommodation.rooms"
+  ]).map((feature) => feature.id);
+  assert.ok(accommodationFeatures.includes("luggage_storage"));
+  assert.ok(accommodationFeatures.includes("airport_transfer"));
 });

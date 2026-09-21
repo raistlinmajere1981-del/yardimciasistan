@@ -5,6 +5,7 @@ import {
   type BusinessCapability
 } from "./business-capabilities";
 import {
+  getBusinessPublicFeatureCatalogForCapabilities,
   getBusinessPublicFeatureLabel,
   normalizeBusinessPublicFeatures,
   normalizeBusinessPublicLanguages,
@@ -75,12 +76,15 @@ export function createBusinessAiContext(source: BusinessAiContextSource): Busine
     paymentNote: cleanText(source.publicProfile.paymentNote, 800),
     languages: normalizeBusinessPublicLanguages(source.publicProfile.languages),
     features: hospitalityDetailsRelevant
-      ? normalizeBusinessPublicFeatures(source.publicProfile.features).map(getBusinessPublicFeatureLabel)
+      ? normalizeBusinessPublicFeatures(source.publicProfile.features)
+          .filter((featureId) => getBusinessPublicFeatureCatalogForCapabilities(enabled)
+            .some((feature) => feature.id === featureId))
+          .map(getBusinessPublicFeatureLabel)
       : [],
     checkInTime: hasAccommodation ? source.publicProfile.checkInTime : "",
     checkOutTime: hasAccommodation ? source.publicProfile.checkOutTime : "",
-    breakfastStartTime: hospitalityDetailsRelevant ? source.publicProfile.breakfastStartTime : "",
-    breakfastEndTime: hospitalityDetailsRelevant ? source.publicProfile.breakfastEndTime : ""
+    breakfastStartTime: hasAccommodation ? source.publicProfile.breakfastStartTime : "",
+    breakfastEndTime: hasAccommodation ? source.publicProfile.breakfastEndTime : ""
   };
 }
 

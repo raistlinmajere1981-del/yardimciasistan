@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type MutableRefObject } from "react";
 import {
   BUSINESS_CAPABILITIES,
-  BUSINESS_PUBLIC_FEATURE_CATALOG,
   BUSINESS_PUBLIC_PROFILE_LIMITS,
+  getBusinessPublicFeatureCatalogForCapabilities,
   hasBusinessCapability,
   type BusinessCapability,
   type BusinessPublicFeatureId,
@@ -117,8 +117,14 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
     enabledCapabilities,
     BUSINESS_CAPABILITIES.FOOD_TABLES
   );
-  const showPublicFeatures = accommodationDetailsEnabled || foodDetailsEnabled;
-  const showBreakfastTimes = accommodationDetailsEnabled || foodDetailsEnabled;
+  const publicFeatureCatalog = getBusinessPublicFeatureCatalogForCapabilities(enabledCapabilities);
+  const showPublicFeatures = publicFeatureCatalog.length > 0;
+  const showBreakfastTimes = accommodationDetailsEnabled;
+  const policyPlaceholder = accommodationDetailsEnabled
+    ? "Evcil hayvan, çocuk, sigara, sessizlik saatleri veya diğer konaklama kuralları."
+    : foodDetailsEnabled
+      ? "Rezervasyon, paket servis, evcil hayvan, sigara veya servisle ilgili kurallar."
+      : "İade/değişim, teslimat, sipariş veya müşterinin bilmesi gereken diğer kurallar.";
 
   const update = <Key extends keyof BusinessPublicProfileDraft>(
     key: Key,
@@ -374,7 +380,7 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
             <fieldset className="business-public-profile-features">
               <legend>Sunulan özellikler</legend>
               <div className="business-public-profile-feature-grid">
-                {BUSINESS_PUBLIC_FEATURE_CATALOG.map((feature) => (
+                {publicFeatureCatalog.map((feature) => (
                   <label className="form-check setup-checkline" key={feature.id}>
                     <input
                       type="checkbox"
@@ -435,7 +441,7 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
                 value={draft.policyNote}
                 maxLength={BUSINESS_PUBLIC_PROFILE_LIMITS.policyNote}
                 onChange={(event) => update("policyNote", event.target.value)}
-                placeholder="Evcil hayvan, çocuk, sigara, sessizlik saatleri gibi bilgiler."
+                placeholder={policyPlaceholder}
                 rows={4}
               />
             </label>

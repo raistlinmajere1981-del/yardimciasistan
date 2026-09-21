@@ -14,6 +14,11 @@ export const BUSINESS_PUBLIC_FEATURE_CATALOG = [
 export type BusinessPublicFeatureId = (typeof BUSINESS_PUBLIC_FEATURE_CATALOG)[number]["id"];
 export type BusinessPublicFeatureGroup = (typeof BUSINESS_PUBLIC_FEATURE_CATALOG)[number]["group"];
 
+const ACCOMMODATION_ONLY_PUBLIC_FEATURE_IDS = new Set<BusinessPublicFeatureId>([
+  "luggage_storage",
+  "airport_transfer"
+]);
+
 export const BUSINESS_PUBLIC_PROFILE_LIMITS = {
   description: 1600,
   directionsNote: 1200,
@@ -77,6 +82,26 @@ export function normalizeBusinessPublicFeatures(values: readonly unknown[]): Bus
 
 export function getBusinessPublicFeatureLabel(value: string): string {
   return BUSINESS_PUBLIC_FEATURE_LABELS.get(value) ?? value;
+}
+
+export function getBusinessPublicFeatureCatalogForCapabilities(
+  capabilities: Iterable<string>
+): readonly (typeof BUSINESS_PUBLIC_FEATURE_CATALOG)[number][] {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  const hasAccommodation = enabled.has("accommodation.rooms");
+  const hasFoodService = enabled.has("food_service.menu")
+    || enabled.has("food_service.tables")
+    || enabled.has("food_service.orders");
+
+  if (hasAccommodation) {
+    return BUSINESS_PUBLIC_FEATURE_CATALOG;
+  }
+  if (hasFoodService) {
+    return BUSINESS_PUBLIC_FEATURE_CATALOG.filter(
+      (feature) => !ACCOMMODATION_ONLY_PUBLIC_FEATURE_IDS.has(feature.id)
+    );
+  }
+  return [];
 }
 
 export function isBusinessPublicClockTime(value: unknown): value is string {
