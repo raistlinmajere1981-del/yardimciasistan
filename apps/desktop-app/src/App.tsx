@@ -75,7 +75,11 @@ function App() {
     setStatusMessage
   });
   const deviceController = useDeviceController({
-    setDashboardData: desktopSyncController.setDashboardData
+    setDashboardData: desktopSyncController.setDashboardData,
+    androidEnabled: runtimeHasCapability(
+      desktopSyncController.businessCapabilities,
+      BUSINESS_CAPABILITIES.ANDROID
+    )
   });
 
   return (

@@ -6,9 +6,10 @@ import type { SyncState } from "./runtime-state";
 
 interface UseDeviceControllerOptions {
   setDashboardData: Dispatch<SetStateAction<DesktopDashboardData>>;
+  androidEnabled: boolean;
 }
 
-export function useDeviceController({ setDashboardData }: UseDeviceControllerOptions) {
+export function useDeviceController({ setDashboardData, androidEnabled }: UseDeviceControllerOptions) {
   const [backupState, setBackupState] = useState<SyncState>("idle");
   const [backupMessage, setBackupMessage] = useState("Yerel yedek bekliyor.");
   const [androidDeviceState, setAndroidDeviceState] = useState<SyncState>("idle");
@@ -17,6 +18,12 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
   const [androidInstallMessage, setAndroidInstallMessage] = useState("USB Android cihazları aranıyor...");
   const [androidInstallSnapshot, setAndroidInstallSnapshot] = useState<DesktopAndroidInstallationSnapshot | null>(null);
   const refreshAndroidInstallDevices = useCallback(async () => {
+    if (!androidEnabled) {
+      setAndroidInstallSnapshot(null);
+      setAndroidInstallState("idle");
+      setAndroidInstallMessage("Android bağlantısı kapalı.");
+      return;
+    }
     if (!window.yardimciDesktop?.listAndroidInstallDevices) {
       setAndroidInstallState("error");
       setAndroidInstallMessage("Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
@@ -33,9 +40,15 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
       setAndroidInstallState("error");
       setAndroidInstallMessage("USB Android cihazları okunamadı.");
     }
-  }, []);
+  }, [androidEnabled]);
 
   async function handleInstallAndroidApp(serial: string) {
+    if (!androidEnabled) {
+      setAndroidInstallSnapshot(null);
+      setAndroidInstallState("idle");
+      setAndroidInstallMessage("Android bağlantısını kullanmak için önce Android servisini açıp ayarları kaydedin.");
+      return;
+    }
     if (!window.yardimciDesktop?.installAndroidApp) {
       setAndroidInstallState("error");
       setAndroidInstallMessage("Android kurulum aracı hazır değil. Uygulamayı yeniden başlatın.");
@@ -59,13 +72,24 @@ export function useDeviceController({ setDashboardData }: UseDeviceControllerOpt
   }
 
   useEffect(() => {
+    if (!androidEnabled) {
+      setAndroidInstallSnapshot(null);
+      setAndroidInstallState("idle");
+      setAndroidInstallMessage("Android bağlantısı kapalı.");
+      return;
+    }
     void refreshAndroidInstallDevices();
-  }, [refreshAndroidInstallDevices]);
+  }, [androidEnabled, refreshAndroidInstallDevices]);
 
   async function runAndroidDeviceMutation(
     pendingMessage: string,
     operation: () => ReturnType<NonNullable<typeof window.yardimciDesktop>["setAndroidDeviceRole"]>
   ) {
+    if (!androidEnabled) {
+      setAndroidDeviceState("idle");
+      setAndroidDeviceMessage("Android bağlantısını kullanmak için önce Android servisini açıp ayarları kaydedin.");
+      return;
+    }
     setAndroidDeviceState("loading");
     setAndroidDeviceMessage(pendingMessage);
     try {
