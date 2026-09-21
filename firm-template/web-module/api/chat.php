@@ -974,6 +974,7 @@ function ya_chat_catalog_context_text(array $items): string
             $currency = ya_chat_string($item['currency'] ?? 'TRY') ?: 'TRY';
             $parts[] = 'fiyat: ' . rtrim(rtrim(number_format($price, 2, '.', ''), '0'), '.') . ' ' . $currency;
         }
+        $parts[] = ($item['available'] ?? false) === true ? 'durum: mevcut' : 'durum: şu anda mevcut değil';
         $description = ya_chat_string($item['description'] ?? '');
         if ($description !== '') $parts[] = 'açıklama: ' . mb_substr($description, 0, 240);
         $lines[] = '- ' . implode(' | ', $parts);
@@ -1012,7 +1013,7 @@ function ya_chat_find_catalog_matches(array $catalog, string $query, int $limit)
 
     $scored = [];
     foreach ($items as $item) {
-        if (!is_array($item) || ($item['available'] ?? false) !== true) {
+        if (!is_array($item)) {
             continue;
         }
         $source = ya_chat_string($item['source'] ?? '');
@@ -1039,10 +1040,11 @@ function ya_chat_find_catalog_matches(array $catalog, string $query, int $limit)
             if ($barcode !== '' && $barcode === $token) $score += 100;
         }
 
-        if ($score === 0 && $tokens === [] && $genericMenu && $source === 'menu') {
+        if ($score === 0 && $tokens === [] && $genericMenu && $source === 'menu' && ($item['available'] ?? false) === true) {
             $score = ($item['featured'] ?? false) === true ? 2 : 1;
-        } elseif ($score > 0 && ($item['featured'] ?? false) === true) {
-            $score += 1;
+        } elseif ($score > 0) {
+            if (($item['featured'] ?? false) === true) $score += 1;
+            if (($item['available'] ?? false) === true) $score += 1;
         }
 
         if ($score > 0) {
