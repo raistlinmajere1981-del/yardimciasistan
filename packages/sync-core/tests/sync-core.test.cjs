@@ -19,6 +19,7 @@ const {
   markAndroidActionResult,
   markRequestsSynced,
   pullAndroidActions,
+  pushAiCatalog,
   pushAiSettings,
   pushBusinessContext,
   pushAndroidSnapshot,
@@ -939,4 +940,44 @@ test("pushBusinessContext publishes only profile-aware public business facts", a
   assert.equal(calls[0].body.business_context.directions_note, "Ana caddeden ikinci sokak.");
   assert.deepEqual(calls[0].body.business_context.features, []);
   assert.equal("sync_secret" in calls[0].body, false);
+});
+
+
+test("pushAiCatalog publishes only compact public catalog fields", async () => {
+  const calls = [];
+  const fetchImpl = async (_url, init) => {
+    calls.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "AI ürün kaynağı yayınlandı.",
+      published_at: "2026-09-22T01:00:00+03:00",
+      item_count: 1,
+      source_revision: 1,
+      server_revision: 8,
+      deduplicated: false
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const result = await pushAiCatalog({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "sync-secret",
+    clientId: "desktop-1",
+    catalog: {
+      version: 1,
+      updatedAt: "2026-09-22T00:59:00+03:00",
+      items: [{
+        id: "p1", source: "catalog", name: "Coca-Cola Zero", description: "330 ml",
+        category: "İçecek", brand: "Coca-Cola", barcode: "5449000131805",
+        price: 45, currency: "TRY", unit: "piece", available: true, featured: false, tags: []
+      }]
+    },
+    fetchImpl
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].action, "publish_ai_catalog");
+  assert.equal(calls[0].client_id, "desktop-1");
+  assert.equal(calls[0].ai_catalog.items[0].name, "Coca-Cola Zero");
+  assert.equal("purchase_price" in calls[0].ai_catalog.items[0], false);
+  assert.equal("current_quantity" in calls[0].ai_catalog.items[0], false);
 });

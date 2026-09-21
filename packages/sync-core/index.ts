@@ -3,6 +3,7 @@ import {
   canConvertRequestToReservation,
   isOperationalTaskAvailable,
   isReservationTypeAvailable,
+  type BusinessAiCatalog,
   type BusinessAiContext,
   type BusinessCapability,
   type CustomerRequest,
@@ -65,6 +66,11 @@ export interface PushAiSettingsOptions extends SyncCoreConfig {
 export interface PushBusinessContextOptions extends SyncCoreConfig {
   clientId: string;
   context: BusinessAiContext;
+}
+
+export interface PushAiCatalogOptions extends SyncCoreConfig {
+  clientId: string;
+  catalog: BusinessAiCatalog;
 }
 
 export interface SyncedCustomerRequest extends CustomerRequest {
@@ -1247,6 +1253,16 @@ export interface PushBusinessContextSuccess {
   deduplicated?: boolean;
 }
 
+export interface PushAiCatalogSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  item_count: number;
+  source_revision?: number;
+  server_revision?: number;
+  deduplicated?: boolean;
+}
+
 export type PullRequestsResult = PullRequestsSuccess | SyncFailure;
 export type MarkRequestsSyncedResult = MarkRequestsSyncedSuccess | SyncFailure;
 export type AcknowledgeRequestsResult = AcknowledgeRequestsSuccess | SyncFailure;
@@ -1254,6 +1270,7 @@ export type PushMenuResult = PushMenuSuccess | SyncFailure;
 export type PushAndroidSnapshotResult = PushAndroidSnapshotSuccess | SyncFailure;
 export type PushAiSettingsResult = PushAiSettingsSuccess | SyncFailure;
 export type PushBusinessContextResult = PushBusinessContextSuccess | SyncFailure;
+export type PushAiCatalogResult = PushAiCatalogSuccess | SyncFailure;
 export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
 export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
 export type SyncCapabilitiesResult = SyncCapabilitiesSuccess | SyncFailure;
@@ -1396,6 +1413,32 @@ export async function markAndroidActionResult(options: MarkAndroidActionResultOp
     action_id: options.actionId,
     status: options.status,
     error_message: options.errorMessage ?? ""
+  });
+}
+
+export async function pushAiCatalog(options: PushAiCatalogOptions): Promise<PushAiCatalogResult> {
+  return syncRequest<PushAiCatalogSuccess>(options, {
+    action: "publish_ai_catalog",
+    client_id: options.clientId,
+    ai_catalog: {
+      version: options.catalog.version,
+      updated_at: options.catalog.updatedAt,
+      items: options.catalog.items.map((item) => ({
+        id: item.id,
+        source: item.source,
+        name: item.name,
+        description: item.description,
+        category: item.category,
+        brand: item.brand,
+        barcode: item.barcode,
+        price: item.price,
+        currency: item.currency,
+        unit: item.unit,
+        available: item.available,
+        featured: item.featured,
+        tags: item.tags
+      }))
+    }
   });
 }
 
