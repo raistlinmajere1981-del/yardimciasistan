@@ -72,6 +72,7 @@ try {
   assert.deepEqual(setup.servicePreferences, { whatsapp: true, android: false });
   assert.equal(capabilities.profileId, "market");
   assert.equal(capabilities.enabledCapabilities.includes("retail.barcode"), true);
+  assert.equal(capabilities.enabledCapabilities.includes("customer.requests"), false);
   assert.equal(capabilities.enabledCapabilities.includes("food_service.tables"), false);
   assert.equal(capabilities.enabledCapabilities.includes("accommodation.rooms"), false);
   assert.equal(capabilities.enabledCapabilities.includes("service.android"), false);

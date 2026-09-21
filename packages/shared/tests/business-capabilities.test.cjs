@@ -24,7 +24,19 @@ test("market profile is available as retail foundation without accommodation cou
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.RETAIL_BARCODE), true);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.INVENTORY), true);
   assert.equal(hasBusinessCapability(market.defaultCapabilities, C.ACCOMMODATION_ROOMS), false);
+  assert.equal(market.optionalCapabilities.includes(C.REQUESTS), true);
+  assert.equal(market.defaultOptionalCapabilities.includes(C.REQUESTS), false);
+  assert.equal(hasBusinessCapability(market.defaultCapabilities, C.REQUESTS), false);
   assert.equal(getBusinessProfiles().some((profile) => profile.id === "market"), true);
+});
+
+test("customer requests are an optional default-on feature outside Market", () => {
+  for (const profileId of ["pension_restaurant", "pension", "restaurant"]) {
+    const profile = BUSINESS_PROFILES[profileId];
+    assert.equal(profile.optionalCapabilities.includes(C.REQUESTS), true);
+    assert.equal(profile.defaultOptionalCapabilities.includes(C.REQUESTS), true);
+    assert.equal(hasBusinessCapability(profile.defaultCapabilities, C.REQUESTS), true);
+  }
 });
 
 test("accommodation profiles expose room reservations as a default optional feature", () => {

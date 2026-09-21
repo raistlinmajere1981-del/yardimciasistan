@@ -7,6 +7,7 @@ final class AndroidUiRules {
   static final String CAPABILITY_AI = "service.ai";
   static final String CAPABILITY_ANDROID = "service.android";
   static final String CAPABILITY_CUSTOMERS = "core.customers";
+  static final String CAPABILITY_REQUESTS = "customer.requests";
   static final String CAPABILITY_TASKS = "core.tasks";
   static final String CAPABILITY_NOTIFICATIONS = "core.notifications";
   static final String CAPABILITY_FINANCE = "core.finance";

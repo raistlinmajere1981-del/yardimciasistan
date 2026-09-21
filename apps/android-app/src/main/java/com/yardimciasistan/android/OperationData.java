@@ -73,6 +73,7 @@ final class OperationData {
   };
   private static final String[] KNOWN_BUSINESS_CAPABILITIES = {
       "core.customers",
+      "customer.requests",
       "core.tasks",
       "core.calendar",
       "core.notifications",
@@ -332,9 +333,18 @@ final class OperationData {
       return hasAnyReservationCapability();
     }
     if ("customer.convert_to_reservation".equals(permission)) {
-      return hasBusinessCapability("core.customers") && hasAnyReservationCapability();
+      return hasBusinessCapability("core.customers")
+          && hasBusinessCapability("customer.requests")
+          && hasAnyReservationCapability();
     }
-    if (permission.startsWith("customer.") || permission.startsWith("request.")) {
+    if ("customer.respond".equals(permission)
+        || "customer.mark_answered".equals(permission)
+        || "customer.reject".equals(permission)
+        || permission.startsWith("request.")) {
+      return hasBusinessCapability("core.customers")
+          && hasBusinessCapability("customer.requests");
+    }
+    if (permission.startsWith("customer.")) {
       return hasBusinessCapability("core.customers");
     }
     if (permission.startsWith("daily_task.")) {

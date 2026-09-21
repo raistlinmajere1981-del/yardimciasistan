@@ -80,6 +80,7 @@ export function buildNavigation(capabilities: BusinessCapabilitySnapshot | null 
 
 export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapabilitySnapshot | null) {
   const customersEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.CUSTOMERS);
+  const requestsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.REQUESTS);
   const tasksEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.TASKS);
   const aiEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.AI);
   const reservationsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS)
@@ -94,7 +95,7 @@ export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapability
   const financeEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.FINANCE);
   const reportsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.REPORTS);
   const dashboardTopics = [
-    customersEnabled ? "yeni talepler" : "",
+    requestsEnabled ? "yeni talepler" : "",
     tasksEnabled ? "günlük işler" : "",
     reservationsEnabled ? "bekleyen rezervasyonlar" : ""
   ].filter(Boolean);
@@ -114,7 +115,7 @@ export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapability
   ].filter(Boolean);
   const meta: Record<DesktopPage, { eyebrow: string; title: string; description: string }> = {
     dashboard: { eyebrow: "Günlük özet", title: "Bugün ne var?", description: dashboardTopics.length > 0 ? `${dashboardTopics.join(", ")} ve işletme durumunuz.` : "Etkin işletme operasyonlarının özeti." },
-    customerWork: { eyebrow: "Müşteri operasyonu", title: "Müşteri İşleri", description: "Talepleri, müşterileri ve bekleyen yanıtları yönetin." },
+    customerWork: { eyebrow: "Müşteri operasyonu", title: "Müşteri İşleri", description: requestsEnabled ? "Talepleri ve müşteri kayıtlarını yönetin." : "Müşteri kayıtlarını yönetin." },
     calendar: { eyebrow: "Operasyon planı", title: "Takvim", description: reservationsEnabled && tasksEnabled ? "Etkin rezervasyon alanlarını ve günlük işleri gün veya hafta bazında görün." : reservationsEnabled ? "Etkin rezervasyon alanlarını gün veya hafta bazında görün." : tasksEnabled ? "Günlük işleri gün veya hafta bazında görün." : "Etkin takvim alanlarını gün veya hafta bazında görün." },
     pension: { eyebrow: "Konaklama", title: "Pansiyon", description: accommodationReservationsEnabled && tasksEnabled ? "Rezervasyonları, odaları ve günlük işleri izleyin." : accommodationReservationsEnabled ? "Rezervasyonları ve odaları izleyin." : tasksEnabled ? "Odaları ve günlük işleri izleyin." : "Odaların güncel durumunu izleyin." },
     restaurant: { eyebrow: "Servis", title: "Restoran", description: `${restaurantTopics.join(", ")} takip edin.` },

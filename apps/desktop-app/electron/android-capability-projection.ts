@@ -24,6 +24,7 @@ export function projectAndroidOperationsSnapshot(
   const enabled = new Set(capabilities);
   const androidEnabled = enabled.has(C.ANDROID);
   const has = (capability: BusinessCapability) => androidEnabled && enabled.has(capability);
+  const requestsEnabled = has(C.REQUESTS) && has(C.CUSTOMERS);
   const stays = has(C.ACCOMMODATION_STAYS) ? source.customer_room_stays : [];
   const activeStayRoomIds = new Set(
     stays
@@ -90,7 +91,7 @@ export function projectAndroidOperationsSnapshot(
         stay_count: stays.filter((stay) => stay.customer_id === customer.id).length
       }))
     : [];
-  const requests = has(C.CUSTOMERS)
+  const requests = requestsEnabled
     ? source.requests.map((request) => ({
         ...request,
         ai_summary: has(C.AI) ? request.ai_summary : "",
@@ -136,7 +137,9 @@ export function projectAndroidOperationsSnapshot(
       active_table_orders: orders.length,
       pending_reservations: reservations.filter((reservation) => reservation.status === "pending").length,
       prepared_whatsapp_messages: messages.length,
-      waiting_responses: requests.filter((request) => ["new", "seen", "waiting_owner"].includes(request.status)).length,
+      waiting_responses: requestsEnabled
+        ? requests.filter((request) => ["new", "seen", "waiting_owner"].includes(request.status)).length
+        : 0,
       active_menu_categories: activeMenuCategories,
       available_menu_items: availableMenuItems,
       customer_count: customers.length
@@ -151,7 +154,7 @@ export function projectAndroidOperationsSnapshot(
     tables,
     menu,
     admin_menu: adminMenu,
-    deleted_request_ids: has(C.CUSTOMERS) ? source.deleted_request_ids : [],
+    deleted_request_ids: requestsEnabled ? source.deleted_request_ids : [],
     trackedStockItems,
     appliedStockImageHashes,
     table_orders: orders,
@@ -331,6 +334,7 @@ function projectReport(
 
   const ordersEnabled = enabled.has(C.FOOD_ORDERS);
   const customersEnabled = enabled.has(C.CUSTOMERS);
+  const requestsEnabled = customersEnabled && enabled.has(C.REQUESTS);
   const stockEnabled = enabled.has(C.FOOD_MENU) && enabled.has(C.INVENTORY);
   const accommodationReservationsEnabled = enabled.has(C.ACCOMMODATION_RESERVATIONS);
   const foodReservationsEnabled = enabled.has(C.FOOD_RESERVATIONS);
@@ -353,7 +357,7 @@ function projectReport(
     && task.due_date < today
   ).length;
   const attentionItems = report.attention.items.filter((item) => {
-    if (item.kind === "pending_request") return customersEnabled;
+    if (item.kind === "pending_request") return requestsEnabled;
     if (item.kind === "pending_reservation") return false;
     if (item.kind === "overdue_task" || item.kind === "open_task") return false;
     if (item.kind === "payment_waiting") return ordersEnabled;
@@ -382,7 +386,7 @@ function projectReport(
       detail: "Etkin operasyon alanlarındaki açık işleri kontrol edin."
     });
   }
-  const pendingRequests = customersEnabled ? report.attention.pending_requests : 0;
+  const pendingRequests = requestsEnabled ? report.attention.pending_requests : 0;
   const paymentWaitingTables = ordersEnabled ? report.attention.payment_waiting_tables : 0;
   const outOfStockItems = stockEnabled ? report.attention.out_of_stock_items : 0;
   const lowStockItems = stockEnabled ? report.attention.low_stock_items : 0;
@@ -399,7 +403,7 @@ function projectReport(
       approved_food_reservations: foodReservationsEnabled ? foodApproved : 0,
       approved_mixed_reservations: accommodationReservationsEnabled && foodReservationsEnabled ? mixedApproved : 0,
       approved_generic_reservations: accommodationReservationsEnabled || foodReservationsEnabled ? genericApproved : 0,
-      new_requests: customersEnabled ? report.summary.new_requests : 0,
+      new_requests: requestsEnabled ? report.summary.new_requests : 0,
       attention_count: pendingRequests + pendingReservations + paymentWaitingTables
         + incompleteTasks + outOfStockItems + lowStockItems
     },

@@ -11,7 +11,7 @@ const {
   androidEffectivePermissionsForRole
 } = require("../dist");
 
-const core = [C.ANDROID, C.CUSTOMERS, C.TASKS, C.FINANCE, C.DEVICES];
+const core = [C.ANDROID, C.CUSTOMERS, C.REQUESTS, C.TASKS, C.FINANCE, C.DEVICES];
 const allGroups = {
   service_orders: true,
   cashier: true,
@@ -30,6 +30,17 @@ test("stored Android groups cannot grant disabled room or food domains", () => {
   assert.equal(permissions.includes("daily_task.view"), true);
   assert.equal(permissions.includes("customer.view"), true);
   assert.deepEqual(androidAvailablePermissionGroupIds(core), ["cashier", "rooms_tasks", "customer_reservation"]);
+});
+
+test("request permissions close independently while customer management remains available", () => {
+  const withoutRequests = core.filter((capability) => capability !== C.REQUESTS);
+  const permissions = androidEffectivePermissionsForRole("admin", ANDROID_PERMISSIONS, withoutRequests);
+  assert.equal(permissions.includes("customer.view"), true);
+  assert.equal(permissions.includes("customer.manage"), true);
+  assert.equal(permissions.includes("customer.respond"), false);
+  assert.equal(permissions.includes("customer.mark_answered"), false);
+  assert.equal(permissions.includes("customer.reject"), false);
+  assert.equal(permissions.includes("request.delete"), false);
 });
 
 test("admin remains bounded by active business capabilities", () => {

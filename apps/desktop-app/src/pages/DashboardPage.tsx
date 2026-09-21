@@ -37,6 +37,7 @@ interface DashboardPageProps {
   };
   aiEnabled: boolean;
   customersEnabled: boolean;
+  requestsEnabled: boolean;
   tasksEnabled: boolean;
   calendarEnabled: boolean;
   reservationsEnabled: boolean;
@@ -61,6 +62,7 @@ export function DashboardPage({
   features,
   aiEnabled,
   customersEnabled,
+  requestsEnabled,
   tasksEnabled,
   calendarEnabled,
   reservationsEnabled,
@@ -162,7 +164,7 @@ export function DashboardPage({
         </div>
 
         <div className="dashboard-attention-grid" aria-label="İlgi bekleyen konular">
-          {customersEnabled && <AttentionCard tone="info" icon={MessageCircle} value={waitingRequestCount} label="müşteri yanıt bekliyor" />}
+          {requestsEnabled && <AttentionCard tone="info" icon={MessageCircle} value={waitingRequestCount} label="müşteri yanıt bekliyor" />}
           {tasksEnabled && <AttentionCard tone="wait" icon={ClipboardCheck} value={openTaskCount} label="açık iş bulunuyor" />}
           {reservationsEnabled && <AttentionCard tone="wait" icon={CalendarCheck2} value={pendingReservationCount} label="rezervasyon onay bekliyor" />}
           {customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0 && (
@@ -180,7 +182,7 @@ export function DashboardPage({
               <p>Öncelik sırası</p>
               <h2 id="dashboard-priority-title">Şimdi yapılacaklar</h2>
             </div>
-            {customersEnabled && (
+            {requestsEnabled && (
               <ActionButton variant="ghost" size="sm" onClick={() => onOpenCustomerWork()}>
                 Tüm talepler
                 <ChevronRight size={15} aria-hidden="true" />

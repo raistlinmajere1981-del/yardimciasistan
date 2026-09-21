@@ -26,7 +26,7 @@ interface ReportsPageProps {
   aiEnabled: boolean;
   financeEnabled: boolean;
   reportsEnabled: boolean;
-  customersEnabled: boolean;
+  requestsEnabled: boolean;
   tasksEnabled: boolean;
   accommodationEnabled: boolean;
   accommodationReservationsEnabled: boolean;
@@ -56,7 +56,7 @@ export function ReportsPage({
   aiEnabled,
   financeEnabled,
   reportsEnabled,
-  customersEnabled,
+  requestsEnabled,
   tasksEnabled,
   accommodationEnabled,
   accommodationReservationsEnabled,
@@ -117,7 +117,7 @@ export function ReportsPage({
     };
   }, [
     accommodationReservationsEnabled,
-    customersEnabled,
+    requestsEnabled,
     foodMenuEnabled,
     foodOrdersEnabled,
     foodReservationsEnabled,
@@ -194,7 +194,7 @@ export function ReportsPage({
   const reservationsEnabled = accommodationReservationsEnabled || foodReservationsEnabled;
   const stockEnabled = foodMenuEnabled && inventoryEnabled;
   const visibleAttentionItems = report.attention.items.filter((item) => {
-    if (item.kind === "pending_request") return customersEnabled;
+    if (item.kind === "pending_request") return requestsEnabled;
     if (item.kind === "overdue_task" || item.kind === "open_task") return tasksEnabled;
     if (item.kind === "pending_reservation") return reservationsEnabled;
     if (item.kind === "payment_waiting") return foodOrdersEnabled;
@@ -296,7 +296,7 @@ export function ReportsPage({
           {foodOrdersEnabled && <MetricCard compact title="Kapatılan adisyon" value={count(report.summary.closedOrders)} detail="Ödendi olarak kapatılan" tone="info" icon={ReceiptText} />}
           {foodOrdersEnabled && <MetricCard compact title="Ortalama hesap" value={report.summary.closedOrders > 0 ? money(report.summary.averageOrder) : "Veri yok"} detail="Ciro / ödenmiş adisyon" tone="neutral" icon={Calculator} />}
           {reservationsEnabled && <MetricCard compact title="Onaylanan rezervasyon" value={count(report.summary.approvedReservations)} detail="Etkin alanlardaki onaylı veya tamamlanmış kayıtlar" tone="info" icon={CalendarCheck} />}
-          {customersEnabled && <MetricCard compact title="Yeni müşteri talebi" value={count(report.summary.newRequests)} detail="Dönemde alınan talepler" tone="info" icon={Inbox} />}
+          {requestsEnabled && <MetricCard compact title="Yeni müşteri talebi" value={count(report.summary.newRequests)} detail="Dönemde alınan talepler" tone="info" icon={Inbox} />}
           {tasksEnabled && <MetricCard compact title="Tamamlanmayan günlük iş" value={count(report.summary.pendingTasks)} detail="Döneme bağlı açık işler" tone={report.summary.pendingTasks > 0 ? "wait" : "ok"} icon={ClipboardList} />}
         </div>
       </section>
@@ -366,11 +366,11 @@ export function ReportsPage({
         </div>
       </Panel>}
 
-      {(reservationsEnabled || customersEnabled) && <Panel className="report-section-panel">
+      {(reservationsEnabled || requestsEnabled) && <Panel className="report-section-panel">
         <div className="report-section-title">
           <div>
-            <p>{reservationsEnabled && customersEnabled ? "Rezervasyon ve müşteri hareketleri" : reservationsEnabled ? "Rezervasyon hareketleri" : "Müşteri hareketleri"}</p>
-            <h2>{reservationsEnabled && customersEnabled ? "Rezervasyonlar ve Talepler" : reservationsEnabled ? "Rezervasyonlar" : "Müşteri Talepleri"}</h2>
+            <p>{reservationsEnabled && requestsEnabled ? "Rezervasyon ve müşteri hareketleri" : reservationsEnabled ? "Rezervasyon hareketleri" : "Müşteri hareketleri"}</p>
+            <h2>{reservationsEnabled && requestsEnabled ? "Rezervasyonlar ve Talepler" : reservationsEnabled ? "Rezervasyonlar" : "Müşteri Talepleri"}</h2>
           </div>
         </div>
         <div className="report-operation-grid">
@@ -384,7 +384,7 @@ export function ReportsPage({
               {accommodationReservationsEnabled && <ReportCounter label="Konaklama gecesi" value={report.pensionAndRequests.accommodationNights} />}
             </div>
           </section>}
-          {customersEnabled && <section>
+          {requestsEnabled && <section>
             <h3>Müşteri talepleri</h3>
             <div className="report-compact-counters">
               <ReportCounter label="Yeni müşteri talebi" value={report.pensionAndRequests.newRequests} />

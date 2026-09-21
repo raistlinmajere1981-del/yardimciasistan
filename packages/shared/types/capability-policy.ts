@@ -1,4 +1,4 @@
-import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "./business-capabilities";
+import { BUSINESS_CAPABILITIES, type BusinessCapability } from "./business-capabilities";
 import type { RequestType } from "./request";
 import type { ReservationType } from "./reservation";
 
@@ -69,16 +69,22 @@ export function isRequestTypeAvailable(
   capabilities: Iterable<BusinessCapability>,
   requestType: string
 ): boolean {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
+  if (!enabled.has(C.REQUESTS) || !enabled.has(C.CUSTOMERS)) return false;
   const requiredCapability = getRequestTypeRequiredCapability(requestType);
-  return requiredCapability === null || hasBusinessCapability(capabilities, requiredCapability);
+  return requiredCapability === null || enabled.has(requiredCapability);
 }
 
 export function canConvertRequestToReservation(
   capabilities: Iterable<BusinessCapability>,
   requestType: string
 ): boolean {
+  const enabled = capabilities instanceof Set ? capabilities : new Set(capabilities);
   const requiredCapability = getRequestReservationCapability(requestType);
-  return requiredCapability !== null && hasBusinessCapability(capabilities, requiredCapability);
+  return enabled.has(C.REQUESTS)
+    && enabled.has(C.CUSTOMERS)
+    && requiredCapability !== null
+    && enabled.has(requiredCapability);
 }
 
 export function getReservationDomain(

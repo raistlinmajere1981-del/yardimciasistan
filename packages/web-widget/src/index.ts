@@ -37,6 +37,7 @@ interface WidgetConfig {
   profileId: BusinessProfileId | "";
   publicSurfaces: PublicSurface[];
   aiEnabled: boolean;
+  requestsEnabled: boolean;
   address: string;
   mapUrl: string;
 }
@@ -94,6 +95,7 @@ interface PublicBusinessApiResponse {
     accent_color?: string;
     public_surfaces?: unknown[];
     ai_enabled?: boolean;
+    requests_enabled?: boolean;
     address?: string;
     map_url?: string;
   };
@@ -122,6 +124,7 @@ const defaultConfig: WidgetConfig = {
   profileId: "",
   publicSurfaces: [],
   aiEnabled: true,
+  requestsEnabled: true,
   address: "",
   mapUrl: ""
 };
@@ -312,7 +315,7 @@ function homeTemplate() {
   const surfaces = currentPublicSurfaces();
   const actions: string[] = [];
 
-  if (surfaces.has("accommodation")) {
+  if (config.requestsEnabled && surfaces.has("accommodation")) {
     actions.push(homeActionCard({
       requestType: "pension_reservation",
       icon: "calendar",
@@ -320,7 +323,7 @@ function homeTemplate() {
       description: "Tarih ve kişi bilgilerini iletin"
     }));
   }
-  if (surfaces.has("food_service")) {
+  if (config.requestsEnabled && surfaces.has("food_service")) {
     actions.push(homeActionCard({
       requestType: "restaurant_reservation",
       icon: "table",
@@ -2971,6 +2974,7 @@ function currentPublicSurfaces(): ReadonlySet<PublicSurface> {
 }
 
 function isRequestTypeEnabled(requestType: RequestType): boolean {
+  if (!config.requestsEnabled) return false;
   const surfaces = currentPublicSurfaces();
   if (requestType === "pension_reservation") return surfaces.has("accommodation");
   if (requestType === "restaurant_reservation") return surfaces.has("food_service");
@@ -3057,6 +3061,7 @@ async function hydrateBusinessContext(loadId: number) {
       address: String(business.address ?? "").trim() || config.address,
       mapUrl: String(business.map_url ?? "").trim() || config.mapUrl,
       aiEnabled: typeof business.ai_enabled === "boolean" ? business.ai_enabled : config.aiEnabled,
+      requestsEnabled: typeof business.requests_enabled === "boolean" ? business.requests_enabled : config.requestsEnabled,
       profileId: profileId || config.profileId,
       publicSurfaces: publicSurfaces.length > 0 ? publicSurfaces : config.publicSurfaces
     };
@@ -3074,8 +3079,16 @@ async function hydrateBusinessContext(loadId: number) {
 function resolveOpenOptions(options: WidgetOpenOptions): Partial<WidgetState> {
   const intent = options.intent ?? "home";
   const context = normalizeWidgetContext(options.context);
-  if (intent === "accommodation.reserve") return { view: "form", requestType: "pension_reservation", context, questionDraft: "" };
-  if (intent === "food.reserve") return { view: "form", requestType: "restaurant_reservation", context, questionDraft: "" };
+  if (intent === "accommodation.reserve") {
+    return isRequestTypeEnabled("pension_reservation")
+      ? { view: "form", requestType: "pension_reservation", context, questionDraft: "" }
+      : { view: "home", context: null, questionDraft: "" };
+  }
+  if (intent === "food.reserve") {
+    return isRequestTypeEnabled("restaurant_reservation")
+      ? { view: "form", requestType: "restaurant_reservation", context, questionDraft: "" }
+      : { view: "home", context: null, questionDraft: "" };
+  }
   if (intent === "contact.whatsapp") return { view: "whatsapp", context, questionDraft: "" };
   if (intent === "directions") return { view: "directions", context, questionDraft: context?.question ?? "" };
   if (intent === "accommodation.info" || intent === "info") {

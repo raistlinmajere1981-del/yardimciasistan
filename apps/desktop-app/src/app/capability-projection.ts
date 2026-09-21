@@ -17,6 +17,7 @@ export function projectDesktopDashboardData(
   const accommodationReservationsEnabled = enabled.has(C.ACCOMMODATION_RESERVATIONS);
   const foodReservationsEnabled = enabled.has(C.FOOD_RESERVATIONS);
   const foodOrdersEnabled = enabled.has(C.FOOD_ORDERS);
+  const requestsEnabled = enabled.has(C.REQUESTS) && enabled.has(C.CUSTOMERS);
   const stays = enabled.has(C.ACCOMMODATION_STAYS) ? source.customerRoomStays : [];
   const activeStayRoomIds = new Set(
     stays
@@ -48,7 +49,7 @@ export function projectDesktopDashboardData(
       tableIds: reservation.tableIds
     })
   );
-  const requests = enabled.has(C.CUSTOMERS)
+  const requests = requestsEnabled
     ? source.requests.map((request) => ({
         ...request,
         ai_summary: enabled.has(C.AI) ? request.ai_summary : "",
@@ -97,8 +98,8 @@ export function projectDesktopDashboardData(
     menu,
     summary: {
       ...source.summary,
-      newRequests: enabled.has(C.CUSTOMERS) ? source.summary.newRequests : 0,
-      waitingRequests: enabled.has(C.CUSTOMERS) ? source.summary.waitingRequests : 0,
+      newRequests: requestsEnabled ? source.summary.newRequests : 0,
+      waitingRequests: requestsEnabled ? source.summary.waitingRequests : 0,
       pendingDailyTasks: dailyTasks.filter((task) => task.status === "pending").length,
       availableRooms: rooms.filter((room) => room.status === "available").length,
       totalRooms: rooms.length,

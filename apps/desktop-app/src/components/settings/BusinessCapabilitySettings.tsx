@@ -7,6 +7,7 @@ import {
 const C = BUSINESS_CAPABILITIES;
 
 const CAPABILITY_LABELS: Partial<Record<BusinessCapability, string>> = {
+  [C.REQUESTS]: "Talepler",
   [C.ACCOMMODATION_RESERVATIONS]: "Oda rezervasyonları",
   [C.FOOD_RESERVATIONS]: "Masa rezervasyonları",
   [C.QR_MENU]: "QR Menü",

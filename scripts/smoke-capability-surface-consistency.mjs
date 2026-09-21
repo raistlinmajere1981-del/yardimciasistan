@@ -30,7 +30,7 @@ const {
   projectAndroidOperationsSnapshot
 } = require("../apps/desktop-app/dist-electron/android-capability-projection.js");
 
-const androidCore = [C.ANDROID, C.CUSTOMERS, C.TASKS, C.FINANCE, C.REPORTS, C.DEVICES];
+const androidCore = [C.ANDROID, C.CUSTOMERS, C.REQUESTS, C.TASKS, C.FINANCE, C.REPORTS, C.DEVICES];
 
 const requestsSource = source("apps/desktop-app/src/components/customers/RequestsWorkspace.tsx");
 const customersSource = source("apps/desktop-app/src/components/customers/CustomersWorkspace.tsx");
@@ -90,7 +90,15 @@ const whatsappProjection = projectAndroidOperationsSnapshot(fullSnapshot, withou
 assert.deepEqual(whatsappProjection.messages, []);
 assert.equal(whatsappProjection.summary.prepared_whatsapp_messages, 0);
 assert.equal(whatsappProjection.requests.every((request) => request.whatsapp_message === ""), true);
-const withoutCustomers = fullSnapshot.business_capabilities.filter((capability) => capability !== C.CUSTOMERS);
+const withoutRequests = fullSnapshot.business_capabilities.filter((capability) => capability !== C.REQUESTS);
+const requestProjection = projectAndroidOperationsSnapshot(fullSnapshot, withoutRequests, "2026-07-17");
+assert.deepEqual(requestProjection.requests, []);
+assert.equal(requestProjection.summary.waiting_responses, 0);
+assert.deepEqual(requestProjection.deleted_request_ids, []);
+
+const withoutCustomers = fullSnapshot.business_capabilities.filter(
+  (capability) => capability !== C.CUSTOMERS && capability !== C.REQUESTS
+);
 const customerProjection = projectAndroidOperationsSnapshot(fullSnapshot, withoutCustomers, "2026-07-17");
 assert.deepEqual(customerProjection.requests, []);
 assert.deepEqual(customerProjection.customers, []);
@@ -498,10 +506,10 @@ function verifyPersistedRuntimeSource() {
     assert.equal(contextualTaskReport(database).summary.approvedReservations, 3);
     assert.equal(contextualTaskReport(database).summary.newRequests, 1);
     const currentBusiness = readBusinessCapabilitySnapshot(database.databasePath);
-    setCapabilityEnabled(database.databasePath, currentBusiness.businessId, C.CUSTOMERS, false);
+    setCapabilityEnabled(database.databasePath, currentBusiness.businessId, C.REQUESTS, false);
     assert.equal(contextualTaskReport(database).summary.newRequests, 0);
     assert.equal(contextualTaskReport(database).attention.pendingRequests, 0);
-    setCapabilityEnabled(database.databasePath, currentBusiness.businessId, C.CUSTOMERS, true);
+    setCapabilityEnabled(database.databasePath, currentBusiness.businessId, C.REQUESTS, true);
     applyBusinessProfileCapabilities(database.databasePath, "pension", { preserveUserOverrides: false });
     assert.equal(contextualTaskReport(database).summary.pendingTasks, 1);
     assert.equal(contextualTaskReport(database).summary.approvedReservations, 3);
@@ -632,6 +640,7 @@ function fixtureSnapshot() {
   fixture.tables[0].active_reservation_title = "Demo Masa";
   return {
     ...fixture,
+    business_capabilities: [...new Set([...fixture.business_capabilities, C.REQUESTS])],
     customer_room_stays: [{ id: "stay_demo", customer_id: "customer_android_demo_001" }],
     room_folios: [{ id: "folio_demo" }],
     admin_menu: structuredClone(fixture.menu),

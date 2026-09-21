@@ -1711,6 +1711,8 @@ public final class MainActivity extends ComponentActivity {
   private View todayScreen() {
     LinearLayout page = UiKit.column(this);
     boolean canViewCustomers = data.hasPermission("customer.view");
+    boolean canViewRequests = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS)
+        && data.hasPermission("customer.view");
     boolean canViewReservations = data.hasPermission("reservation.view");
     boolean canViewRooms = data.hasPermission("room.view");
     boolean canViewPensionTasks = AndroidUiRules.canOpenPensionMode(data, AndroidUiRules.PENSION_TASKS);
@@ -1721,7 +1723,7 @@ public final class MainActivity extends ComponentActivity {
     boolean canViewStock = data.hasPermission("menu.stock_view");
 
     ArrayList<CounterValue> counters = new ArrayList<>();
-    if (canViewCustomers) {
+    if (canViewRequests) {
       counters.add(new CounterValue("Yeni", data.newRequests, UiKit.INFO, "customers:new"));
       counters.add(new CounterValue("Cevap", data.waitingResponses > 0 ? data.waitingResponses : countWaitingRequests(), UiKit.DANGER, "customers:waiting"));
     }
@@ -1790,7 +1792,7 @@ public final class MainActivity extends ComponentActivity {
     page.addView(sectionLabel("Öncelikli işler"));
     int shown = 0;
     int categoryShown = 0;
-    if (canViewCustomers) {
+    if (canViewRequests) {
       for (OperationData.RequestRecord request : data.requests) {
         if (!"new".equals(request.status) || categoryShown >= 2 || shown >= 8) {
           continue;
@@ -1891,7 +1893,8 @@ public final class MainActivity extends ComponentActivity {
   private View customerScreen() {
     LinearLayout page = UiKit.column(this);
     boolean canManageCustomers = AndroidUiRules.canManageCustomers(data);
-    boolean canViewRequests = data.hasPermission("customer.view");
+    boolean canViewRequests = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS)
+        && data.hasPermission("customer.view");
     if (!canManageCustomers && !canViewRequests) {
       page.addView(permissionDeniedCard());
       return mainScreenScroll(page);
@@ -2254,10 +2257,15 @@ public final class MainActivity extends ComponentActivity {
       page.addView(permissionDeniedCard());
       return mainScreenScroll(page);
     }
-    page.addView(filterBar(new String[][] {
-        {AndroidUiRules.MESSAGES_PREPARED, "Hazır Mesajlar"},
-        {AndroidUiRules.MESSAGES_WAITING, "Cevap Bekleyenler"}
-    }, messageMode, value -> {
+    boolean requestsEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS);
+    ArrayList<String[]> messageOptions = new ArrayList<>();
+    messageOptions.add(new String[] {AndroidUiRules.MESSAGES_PREPARED, "Hazır Mesajlar"});
+    if (requestsEnabled) {
+      messageOptions.add(new String[] {AndroidUiRules.MESSAGES_WAITING, "Cevap Bekleyenler"});
+    } else if (AndroidUiRules.MESSAGES_WAITING.equals(messageMode)) {
+      messageMode = AndroidUiRules.MESSAGES_PREPARED;
+    }
+    page.addView(filterBar(messageOptions.toArray(new String[0][]), messageMode, value -> {
       messageMode = value;
       render();
     }));
@@ -2326,6 +2334,7 @@ public final class MainActivity extends ComponentActivity {
     }
     boolean ordersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_ORDERS);
     boolean customersEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_CUSTOMERS);
+    boolean requestsEnabled = customersEnabled && data.hasBusinessCapability(AndroidUiRules.CAPABILITY_REQUESTS);
     boolean reservationsEnabled = data.hasAnyReservationCapability();
     boolean tasksEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_TASKS);
     boolean stockEnabled = data.hasBusinessCapability(AndroidUiRules.CAPABILITY_MENU)
@@ -2347,7 +2356,7 @@ public final class MainActivity extends ComponentActivity {
     if (reservationsEnabled) {
       addReportMetric(summary, "Onaylanan rezervasyon", String.valueOf(report.approvedReservations), UiKit.PRIMARY);
     }
-    if (customersEnabled) {
+    if (requestsEnabled) {
       addReportMetric(summary, "Yeni talep", String.valueOf(report.newRequests), UiKit.WARNING);
     }
     addReportMetric(summary, "Dikkat gerektiren", String.valueOf(report.attentionCount), report.attentionCount > 0 ? UiKit.DANGER : UiKit.SUCCESS);
@@ -2374,7 +2383,7 @@ public final class MainActivity extends ComponentActivity {
 
     page.addView(sectionLabel("Şu an dikkat gerektirenler"));
     LinearLayout attentionSummary = UiKit.card(this);
-    if (customersEnabled) {
+    if (requestsEnabled) {
       addReportMetric(attentionSummary, "Bekleyen müşteri talebi", String.valueOf(report.pendingRequests), UiKit.WARNING);
     }
     if (reservationsEnabled) {

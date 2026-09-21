@@ -210,6 +210,7 @@ export function DesktopWorkspaceRouter({
   const C = BUSINESS_CAPABILITIES;
   const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
   const customersEnabled = runtimeHasCapability(businessCapabilities, C.CUSTOMERS);
+  const requestsEnabled = runtimeHasCapability(businessCapabilities, C.REQUESTS);
   const tasksEnabled = runtimeHasCapability(businessCapabilities, C.TASKS);
   const aiEnabled = runtimeHasCapability(businessCapabilities, C.AI);
   const whatsappEnabled = runtimeHasCapability(businessCapabilities, C.WHATSAPP);
@@ -417,6 +418,7 @@ export function DesktopWorkspaceRouter({
           features={runtimeFeatures}
           aiEnabled={aiEnabled}
           customersEnabled={customersEnabled}
+          requestsEnabled={requestsEnabled}
           tasksEnabled={tasksEnabled}
           calendarEnabled={runtimeHasCapability(businessCapabilities, C.CALENDAR)}
           reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
@@ -446,6 +448,7 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "customerWork" ? (
         <CustomerWorkPage
+          requestsEnabled={requestsEnabled}
           requests={(
             <RequestsWorkspace
               requests={surfaceData.requests}
@@ -606,7 +609,7 @@ export function DesktopWorkspaceRouter({
           aiEnabled={aiEnabled}
           financeEnabled={runtimeHasCapability(businessCapabilities, C.FINANCE)}
           reportsEnabled={runtimeHasCapability(businessCapabilities, C.REPORTS)}
-          customersEnabled={runtimeHasCapability(businessCapabilities, C.CUSTOMERS)}
+          requestsEnabled={requestsEnabled}
           tasksEnabled={tasksEnabled}
           accommodationEnabled={roomsEnabled || accommodationReservationsEnabled || accommodationStaysEnabled || accommodationFolioEnabled}
           accommodationReservationsEnabled={accommodationReservationsEnabled}

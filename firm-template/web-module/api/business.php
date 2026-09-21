@@ -27,6 +27,9 @@ $whatsapp = ya_business_string($config['whatsapp'] ?? $config['phone'] ?? '');
 $profileId = ya_business_string($config['profile_id'] ?? '');
 $runtimeCapabilities = ya_business_public_capabilities();
 $aiEnabled = $runtimeCapabilities === null || in_array('service.ai', $runtimeCapabilities, true);
+$requestsEnabled = $runtimeCapabilities !== null
+    ? in_array('customer.requests', $runtimeCapabilities, true)
+    : ya_business_profile_requests_enabled($profileId);
 if ($runtimeCapabilities !== null) {
     $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, $config);
 } elseif (array_key_exists('public_surfaces', $config)) {
@@ -44,6 +47,7 @@ ya_business_response(200, [
         'profile_id' => $profileId,
         'public_surfaces' => $publicSurfaces,
         'ai_enabled' => $aiEnabled,
+        'requests_enabled' => $requestsEnabled,
         'phone' => ya_business_string($config['phone'] ?? ''),
         'whatsapp' => $whatsapp,
         'email' => ya_business_string($config['email'] ?? ''),
@@ -144,6 +148,11 @@ function ya_business_normalize_public_surfaces(mixed $value): array
         }
     }
     return $normalized;
+}
+
+function ya_business_profile_requests_enabled(string $profileId): bool
+{
+    return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant', 'cafe'], true);
 }
 
 function ya_business_profile_public_surfaces(string $profileId): array

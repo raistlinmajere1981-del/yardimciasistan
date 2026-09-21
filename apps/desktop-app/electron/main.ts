@@ -112,7 +112,7 @@ function assertDesktopCapability(capability: BusinessCapability, message = "Bu i
 }
 
 function assertDesktopRequestType(requestType: string) {
-  assertDesktopCapability(C.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+  assertDesktopCapability(C.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
   const requiredCapability = getRequestTypeRequiredCapability(requestType);
   if (requiredCapability) {
     assertDesktopCapability(requiredCapability, "Bu talep türü işletmenin etkin yeteneklerinde kullanılamıyor.");

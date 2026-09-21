@@ -45,10 +45,12 @@ export function registerSyncIpcHandlers(options: {
   });
 
   ipcMain.handle("sync:pullRequests", async (): Promise<PullRequestsResult> => {
+    assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     return pullRequestsFromWeb(getDatabase(), afterSuccessfulPull);
   });
 
   ipcMain.handle("sync:markRequestsSynced", async (_event, requestIds: string[]): Promise<MarkRequestsSyncedResult> => {
+    assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     return markRequestsSyncedOnWeb(getDatabase(), requestIds);
   });
 

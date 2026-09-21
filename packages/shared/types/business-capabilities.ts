@@ -2,6 +2,7 @@ import type { BusinessType } from "./business";
 
 export const BUSINESS_CAPABILITIES = {
   CUSTOMERS: "core.customers",
+  REQUESTS: "customer.requests",
   TASKS: "core.tasks",
   CALENDAR: "core.calendar",
   NOTIFICATIONS: "core.notifications",
@@ -64,6 +65,7 @@ const C = BUSINESS_CAPABILITIES;
  * hardcoded business-type combinations.
  */
 export const BUSINESS_CAPABILITY_DEPENDENCIES: Partial<Record<BusinessCapability, readonly BusinessCapability[]>> = {
+  [C.REQUESTS]: [C.CUSTOMERS],
   [C.ACCOMMODATION_RESERVATIONS]: [C.ACCOMMODATION_ROOMS],
   [C.ACCOMMODATION_STAYS]: [C.ACCOMMODATION_ROOMS],
   [C.ACCOMMODATION_FOLIO]: [C.ACCOMMODATION_ROOMS, C.ACCOMMODATION_STAYS, C.FINANCE],
@@ -92,6 +94,9 @@ export const CORE_BUSINESS_CAPABILITIES: BusinessCapability[] = [
   C.BACKUPS,
   C.DEVICES
 ];
+
+const COMMON_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS];
+const COMMON_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [C.REQUESTS];
 
 const ACCOMMODATION_REQUIRED_CAPABILITIES: BusinessCapability[] = [
   C.ACCOMMODATION_ROOMS,
@@ -232,31 +237,31 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
     "Pansiyon + Restoran/Kafe",
     "Konaklama ve yiyecek-içecek operasyonları aynı işletme omurgasında çalışır.",
     uniqueCapabilities(ACCOMMODATION_REQUIRED_CAPABILITIES, FOOD_SERVICE_REQUIRED_CAPABILITIES),
-    uniqueCapabilities(ACCOMMODATION_OPTIONAL_CAPABILITIES, FOOD_SERVICE_OPTIONAL_CAPABILITIES),
-    uniqueCapabilities(ACCOMMODATION_DEFAULT_OPTIONAL_CAPABILITIES, FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES)
+    uniqueCapabilities(COMMON_OPTIONAL_CAPABILITIES, ACCOMMODATION_OPTIONAL_CAPABILITIES, FOOD_SERVICE_OPTIONAL_CAPABILITIES),
+    uniqueCapabilities(COMMON_DEFAULT_OPTIONAL_CAPABILITIES, ACCOMMODATION_DEFAULT_OPTIONAL_CAPABILITIES, FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES)
   ),
   pension: createBusinessProfile(
     "pension",
     "Pansiyon",
     "Konaklama, müşteri, finans, web ve saha operasyonları için hazır profil.",
     ACCOMMODATION_REQUIRED_CAPABILITIES,
-    ACCOMMODATION_OPTIONAL_CAPABILITIES,
-    ACCOMMODATION_DEFAULT_OPTIONAL_CAPABILITIES
+    uniqueCapabilities(COMMON_OPTIONAL_CAPABILITIES, ACCOMMODATION_OPTIONAL_CAPABILITIES),
+    uniqueCapabilities(COMMON_DEFAULT_OPTIONAL_CAPABILITIES, ACCOMMODATION_DEFAULT_OPTIONAL_CAPABILITIES)
   ),
   restaurant: createBusinessProfile(
     "restaurant",
     "Restoran / Kafe",
     "Masa, sipariş, menü, stok, satış ve saha operasyonları için hazır profil.",
     FOOD_SERVICE_REQUIRED_CAPABILITIES,
-    FOOD_SERVICE_OPTIONAL_CAPABILITIES,
-    FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES
+    uniqueCapabilities(COMMON_OPTIONAL_CAPABILITIES, FOOD_SERVICE_OPTIONAL_CAPABILITIES),
+    uniqueCapabilities(COMMON_DEFAULT_OPTIONAL_CAPABILITIES, FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES)
   ),
   market: createBusinessProfile(
     "market",
     "Market / Perakende",
     "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için hazır profil.",
     RETAIL_REQUIRED_CAPABILITIES,
-    RETAIL_OPTIONAL_CAPABILITIES,
+    uniqueCapabilities(COMMON_OPTIONAL_CAPABILITIES, RETAIL_OPTIONAL_CAPABILITIES),
     RETAIL_DEFAULT_OPTIONAL_CAPABILITIES
   )
 };

@@ -53,6 +53,7 @@ try {
   assert.ok(initial.businessId, "Demo fixture should create an active business.");
   assert.equal(initial.profileId, "pension_restaurant");
   assert.equal(initial.enabledCapabilities.includes(C.CUSTOMERS), true);
+  assert.equal(initial.enabledCapabilities.includes(C.REQUESTS), true);
   assert.equal(initial.enabledCapabilities.includes(C.ACCOMMODATION_ROOMS), true);
   assert.equal(initial.enabledCapabilities.includes(C.FOOD_TABLES), true);
   assert.equal(initial.enabledCapabilities.includes(C.QR_MENU), true);

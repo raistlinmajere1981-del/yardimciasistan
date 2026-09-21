@@ -40,7 +40,8 @@ export function getReportData(db: DatabaseSync, input: DesktopReportRangeInput, 
   const period = normalizeDesktopReportRange(input);
   const { startDate, endDate } = period;
   const generatedAt = new Date().toISOString();
-  const customerReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
+  const requestReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.REQUESTS)
+    && enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
   const restaurantReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
   const stockReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_MENU)
     && enabledCapabilities.has(BUSINESS_CAPABILITIES.INVENTORY);
@@ -276,7 +277,7 @@ export function getReportData(db: DatabaseSync, input: DesktopReportRangeInput, 
   const approvedFoodReservations = Math.max(0, Number(reservationSummary?.approved_food ?? 0));
   const approvedMixedReservations = Math.max(0, Number(reservationSummary?.approved_mixed ?? 0));
   const approvedGenericReservations = Math.max(0, Number(reservationSummary?.approved_generic ?? 0));
-  const newRequests = customerReportsEnabled ? Math.max(0, Number(requestSummary?.incoming ?? 0)) : 0;
+  const newRequests = requestReportsEnabled ? Math.max(0, Number(requestSummary?.incoming ?? 0)) : 0;
 
   return {
     period,
@@ -309,8 +310,8 @@ export function getReportData(db: DatabaseSync, input: DesktopReportRangeInput, 
       cancelledOrRejectedReservations: Math.max(0, Number(reservationSummary?.cancelled_or_rejected ?? 0)),
       accommodationNights: Math.max(0, Number(reservationSummary?.accommodation_nights ?? 0)),
       newRequests,
-      answeredRequests: customerReportsEnabled ? Math.max(0, Number(requestSummary?.answered ?? 0)) : 0,
-      waitingRequests: customerReportsEnabled ? Math.max(0, Number(requestSummary?.waiting ?? 0)) : 0
+      answeredRequests: requestReportsEnabled ? Math.max(0, Number(requestSummary?.answered ?? 0)) : 0,
+      waitingRequests: requestReportsEnabled ? Math.max(0, Number(requestSummary?.waiting ?? 0)) : 0
     },
     stock: {
       topConsumed: stockReportsEnabled ? topConsumed : [],
@@ -413,13 +414,14 @@ function getReportAttention(
   enabledCapabilities: ReadonlySet<BusinessCapability>
 ): DesktopReportData["attention"] {
   const today = formatLocalIsoDate(new Date());
-  const customerReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
+  const requestReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.REQUESTS)
+    && enabledCapabilities.has(BUSINESS_CAPABILITIES.CUSTOMERS);
   const restaurantReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_ORDERS);
   const stockReportsEnabled = enabledCapabilities.has(BUSINESS_CAPABILITIES.FOOD_MENU)
     && enabledCapabilities.has(BUSINESS_CAPABILITIES.INVENTORY);
   const reservationCapabilityClause = reportReservationCapabilitySqlClause(enabledCapabilities);
   const taskCapabilityClause = reportTaskCapabilitySqlClause(enabledCapabilities);
-  const pendingRequests = customerReportsEnabled ? getScalarCount(db, `
+  const pendingRequests = requestReportsEnabled ? getScalarCount(db, `
       SELECT COUNT(*) AS count
       FROM requests
       WHERE deleted_at = ''

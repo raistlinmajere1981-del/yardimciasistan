@@ -266,6 +266,7 @@ export class SyncCoordinator {
     });
     const enabledCapabilities = this.options.database.getEnabledBusinessCapabilities();
     const androidEnabled = hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.ANDROID);
+    const requestsEnabled = hasBusinessCapability(enabledCapabilities, BUSINESS_CAPABILITIES.REQUESTS);
     this.phase = "syncing";
     this.message = "Web, masaüstü ve Android verileri eşitleniyor...";
     this.options.database.recordSyncAttempt();
@@ -298,11 +299,13 @@ export class SyncCoordinator {
     }
 
     let dashboardChanged = false;
-    const requestResult = await this.pullRequestPages(transport);
-    counts.pulledRequests = requestResult.count;
-    dashboardChanged ||= requestResult.count > 0;
-    if (requestResult.error) {
-      errors.push(requestResult.error);
+    if (requestsEnabled) {
+      const requestResult = await this.pullRequestPages(transport);
+      counts.pulledRequests = requestResult.count;
+      dashboardChanged ||= requestResult.count > 0;
+      if (requestResult.error) {
+        errors.push(requestResult.error);
+      }
     }
 
     const actionResult = await this.processAndroidActions(transport);
@@ -314,9 +317,11 @@ export class SyncCoordinator {
       errors.push(actionResult.error);
     }
 
-    const acknowledgementError = await this.acknowledgeImportedRequests(transport);
-    if (acknowledgementError) {
-      errors.push(acknowledgementError);
+    if (requestsEnabled) {
+      const acknowledgementError = await this.acknowledgeImportedRequests(transport);
+      if (acknowledgementError) {
+        errors.push(acknowledgementError);
+      }
     }
 
     const availabilityError = await this.publishAvailabilityHeartbeat(config, clientId, enabledCapabilities);

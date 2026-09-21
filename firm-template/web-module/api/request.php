@@ -22,6 +22,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     ]);
 }
 
+if (!ya_request_feature_enabled($businessConfig)) {
+    ya_json_response(403, [
+        'ok' => false,
+        'code' => 'requests_disabled',
+        'message' => 'Talep alma özelliği bu işletmede etkin değil.'
+    ]);
+}
+
 ya_public_guard_enforce('request');
 
 $payloadResult = ya_read_payload();
@@ -97,6 +105,25 @@ ya_json_response(201, [
     'whatsapp_message' => $whatsappMessage,
     'whatsapp_phone' => $phone['whatsapp']
 ]);
+
+function ya_request_feature_enabled(array $businessConfig): bool
+{
+    try {
+        $publication = ya_storage_get_publication('android_snapshot', []);
+        $capabilities = $publication['business_capabilities'] ?? null;
+        if (is_array($capabilities)) {
+            return in_array('customer.requests', array_map(
+                static fn (mixed $capability): string => trim((string) $capability),
+                $capabilities
+            ), true);
+        }
+    } catch (Throwable) {
+        // Fall back to the current profile defaults until a runtime manifest is published.
+    }
+
+    $profileId = ya_string($businessConfig['profile_id'] ?? '');
+    return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant', 'cafe'], true);
+}
 
 function ya_load_business_config(): array
 {

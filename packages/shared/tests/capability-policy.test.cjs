@@ -15,13 +15,13 @@ const {
 test("request types use reservation capabilities rather than room/table presence", () => {
   assert.equal(isRequestTypeAvailable([C.ACCOMMODATION_ROOMS], "pension_reservation"), false);
   assert.equal(canConvertRequestToReservation([C.ACCOMMODATION_ROOMS], "pension_reservation"), false);
-  assert.equal(isRequestTypeAvailable([C.ACCOMMODATION_RESERVATIONS], "pension_reservation"), true);
+  assert.equal(isRequestTypeAvailable([C.CUSTOMERS, C.REQUESTS, C.ACCOMMODATION_RESERVATIONS], "pension_reservation"), true);
   assert.equal(getRequestReservationCapability("pension_reservation"), C.ACCOMMODATION_RESERVATIONS);
   assert.equal(getRequestReservationType("pension_reservation"), "room");
 
   assert.equal(isRequestTypeAvailable([C.FOOD_TABLES], "restaurant_reservation"), false);
   assert.equal(canConvertRequestToReservation([C.FOOD_TABLES], "breakfast_request"), false);
-  assert.equal(canConvertRequestToReservation([C.FOOD_RESERVATIONS], "breakfast_request"), true);
+  assert.equal(canConvertRequestToReservation([C.CUSTOMERS, C.REQUESTS, C.FOOD_RESERVATIONS], "breakfast_request"), true);
   assert.equal(getRequestReservationType("restaurant_reservation"), "table");
 });
 
@@ -63,10 +63,12 @@ test("domain-scoped tasks share one capability classifier", () => {
   assert.equal(isOperationalTaskAvailable([C.ACCOMMODATION_ROOMS], "room_cleaning"), false);
 });
 
-test("generic requests are available but cannot be converted into fake reservations", () => {
-  assert.equal(isRequestTypeAvailable([], "general_info"), true);
-  assert.equal(isRequestTypeAvailable([], "location_question"), true);
-  assert.equal(canConvertRequestToReservation([C.ACCOMMODATION_RESERVATIONS], "general_info"), false);
+test("generic requests require the request capability and cannot become fake reservations", () => {
+  assert.equal(isRequestTypeAvailable([], "general_info"), false);
+  assert.equal(isRequestTypeAvailable([C.CUSTOMERS], "location_question"), false);
+  assert.equal(isRequestTypeAvailable([C.CUSTOMERS, C.REQUESTS], "general_info"), true);
+  assert.equal(isRequestTypeAvailable([C.CUSTOMERS, C.REQUESTS], "location_question"), true);
+  assert.equal(canConvertRequestToReservation([C.CUSTOMERS, C.REQUESTS, C.ACCOMMODATION_RESERVATIONS], "general_info"), false);
   assert.equal(getRequestReservationType("general_info"), null);
 });
 

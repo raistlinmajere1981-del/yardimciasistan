@@ -23,19 +23,19 @@ export function registerRequestIpcHandlers(options: {
   });
 
   ipcMain.handle("request:convertToReservation", (_event, requestId: string): RequestReservationConversionResult => {
-    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     const request = getDatabase().getRequestById(requestId);
     assertRequestType(request?.request_type ?? "");
     return getDatabase().convertRequestToReservation(requestId);
   });
 
   ipcMain.handle("request:updateStatus", (_event, input: UpdateRequestStatusInput): DesktopStatusUpdateResult => {
-    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     return getDatabase().updateRequestStatus(input);
   });
 
   ipcMain.handle("request:delete", (_event, requestId: unknown): DesktopStatusUpdateResult => {
-    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri talepleri bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.REQUESTS, "Müşteri talepleri bu işletmede etkin değil.");
     return finalizeRecordDeletion(getDatabase().deleteRequest(String(requestId ?? "")));
   });
 }
