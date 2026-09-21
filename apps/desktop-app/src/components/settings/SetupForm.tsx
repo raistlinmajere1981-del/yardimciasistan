@@ -37,11 +37,6 @@ type SyncState = "idle" | "loading" | "success" | "error";
 
 const STORED_AI_API_KEY_MASK = "*".repeat(20);
 
-function setupStatusClass(state: SyncState) {
-  const tone = state === "error" ? "danger" : state === "success" ? "success" : state === "loading" ? "info" : "";
-  return `status-message setup-status-message${tone ? ` status-message--${tone}` : ""}`;
-}
-
 const ANDROID_PERMISSION_GROUP_OPTIONS: Array<{
   id: AndroidPermissionGroupId;
   label: string;

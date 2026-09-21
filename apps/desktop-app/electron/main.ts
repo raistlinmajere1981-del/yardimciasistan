@@ -47,7 +47,6 @@ import { createAndroidMarketSnapshotSource } from "./market-android-snapshot.js"
 import { DesktopRoomFolioService, type DesktopRoomFolio } from "./room-folio";
 import {
   SyncCoordinator,
-  type AutomaticSyncCycleResult,
   type AutomaticSyncStatus
 } from "./sync-coordinator";
 import { BirthdayDeliveryService } from "./birthday-delivery-service.js";
@@ -66,11 +65,9 @@ import { AndroidInstallationService } from "./android-installation-service";
 import { registerRoomTableIpcHandlers } from "./ipc/room-table-ipc";
 import { registerSetupIpcHandlers } from "./ipc/setup-ipc";
 import { registerImageAnalysisIpcHandlers } from "./ipc/image-analysis-ipc";
-import { createDesktopAiConfig, normalizeAiTimeoutSeconds } from "./ai-config";
 import {
   createAiApiKeyUpdate,
-  createAiProfileApiKeyUpdates,
-  getEffectiveAiApiKey
+  createAiProfileApiKeyUpdates
 } from "./ai-secret-service";
 import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
@@ -784,12 +781,6 @@ function finalizeStockImageApply(result: DesktopStockImageApplyResult): DesktopS
     getSyncCoordinator().scheduleSoon();
   }
   return result;
-}
-
-function toUnknownRecord(value: unknown): Record<string, unknown> | null {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
 }
 
 function getDatabase() {

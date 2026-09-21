@@ -282,6 +282,26 @@ public final class AndroidUiRulesSmoke {
         AndroidUiRules.canOpenTab(data, AndroidUiRules.TAB_MESSAGES),
         "message navigation must disappear when WhatsApp is disabled"
     );
+
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_REQUESTS);
+    data.permissions.add("customer.view");
+    data.permissions.add("customer.delete");
+    data.permissions.add("customer.respond");
+    data.permissions.add("customer.mark_answered");
+    data.permissions.add("customer.reject");
+    data.permissions.add("customer.convert_to_reservation");
+    data.permissions.add("request.delete");
+    assertTrue(data.hasPermission("customer.respond"), "customer.respond should be open with customer.requests");
+    assertTrue(data.hasPermission("request.delete"), "request.delete should be open with customer.requests");
+    data.businessCapabilities.remove(AndroidUiRules.CAPABILITY_REQUESTS);
+    assertFalse(data.hasPermission("customer.respond"), "customer.respond must close without customer.requests");
+    assertFalse(data.hasPermission("customer.mark_answered"), "customer.mark_answered must close without customer.requests");
+    assertFalse(data.hasPermission("customer.reject"), "customer.reject must close without customer.requests");
+    assertFalse(data.hasPermission("customer.convert_to_reservation"), "customer.convert_to_reservation must close without customer.requests");
+    assertFalse(data.hasPermission("request.delete"), "request.delete must close without customer.requests");
+    assertTrue(data.hasPermission("customer.view"), "customer.view must stay with core.customers alone");
+    assertTrue(data.hasPermission("customer.delete"), "customer.delete must stay with core.customers alone");
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_REQUESTS);
   }
 
   private static void classifiesAutomaticTasksByDomain() {
@@ -414,6 +434,7 @@ public final class AndroidUiRulesSmoke {
     data.permissions.clear();
     data.businessCapabilities.add(AndroidUiRules.CAPABILITY_ANDROID);
     data.businessCapabilities.add(AndroidUiRules.CAPABILITY_CUSTOMERS);
+    data.businessCapabilities.add(AndroidUiRules.CAPABILITY_REQUESTS);
     data.businessCapabilities.add(AndroidUiRules.CAPABILITY_TASKS);
     data.businessCapabilities.add(AndroidUiRules.CAPABILITY_FINANCE);
     data.businessCapabilities.add(AndroidUiRules.CAPABILITY_REPORTS);

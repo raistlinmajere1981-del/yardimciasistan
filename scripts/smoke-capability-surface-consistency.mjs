@@ -250,7 +250,10 @@ assert.equal(contextualFoodProjection.reservations.some((item) => item.id === ge
 assert.equal(contextualFoodProjection.reservations.some((item) => item.id === genericTableReservation.id), true);
 
 // D — Market keeps retail capabilities while non-retail Android groups lose domain permissions.
-const marketCapabilities = getBusinessProfile("market").defaultCapabilities;
+const marketCapabilities = [
+  ...getBusinessProfile("market").defaultCapabilities,
+  C.ANDROID
+];
 assert.equal(marketCapabilities.includes(C.RETAIL_BARCODE), true);
 assert.equal(marketCapabilities.includes(C.RETAIL_PURCHASING), true);
 assert.equal(marketCapabilities.includes(C.ACCOMMODATION_ROOMS), false);
@@ -354,8 +357,8 @@ assert.match(
   /surfaceAiWorkspaceMode:\s*AiWorkspaceMode\s*=\s*customersEnabled\s*\?\s*aiWorkspaceMode\s*:\s*"daily"/,
   "AI customer modes must collapse to the daily surface when core.customers is disabled"
 );
-assert.match(desktopProjectionSource, /newRequests: enabled\.has\(C\.CUSTOMERS\)[^\n]+: 0/);
-assert.match(desktopProjectionSource, /waitingRequests: enabled\.has\(C\.CUSTOMERS\)[^\n]+: 0/);
+assert.match(desktopProjectionSource, /newRequests: requestsEnabled \? source\.summary\.newRequests : 0/);
+assert.match(desktopProjectionSource, /waitingRequests: requestsEnabled \? source\.summary\.waitingRequests : 0/);
 assert.match(
   routerSource,
   /<WhatsAppWorkspace[\s\S]{0,180}requests=\{surfaceData\.requests\}/,
@@ -376,6 +379,7 @@ assert.match(
 // E — a composed pension + retail set exposes both domains without inventing food service.
 const pensionRetail = new Set([
   ...getBusinessProfile("pension").defaultCapabilities,
+  C.ANDROID,
   C.CATALOG,
   C.INVENTORY,
   C.SALES,
@@ -484,7 +488,7 @@ function verifyPersistedRuntimeSource() {
     assert.deepEqual(database.getEnabledBusinessCapabilities().sort(), expected);
     const setup = database.getSetupData();
     assert.equal(setup.profileId, "market");
-    assert.deepEqual(setup.servicePreferences, { whatsapp: true, android: true });
+    assert.deepEqual(setup.servicePreferences, { whatsapp: false, android: false });
 
     const raw = new DatabaseSync(database.databasePath);
     try {

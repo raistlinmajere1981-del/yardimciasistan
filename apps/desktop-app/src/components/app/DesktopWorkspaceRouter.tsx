@@ -168,7 +168,6 @@ export function DesktopWorkspaceRouter({
     setManualRequestForm,
     manualRequestState,
     manualRequestMessage,
-    selectedRequestId,
     setSelectedRequestId,
     selectedRequest,
     convertingRequestId,

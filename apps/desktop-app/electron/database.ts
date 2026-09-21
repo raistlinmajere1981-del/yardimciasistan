@@ -13,25 +13,15 @@ import {
   validateBirthdaySettings,
   type BusinessCapability,
   type StockImageAnalysis,
-  type StockImageApplyLine,
-  type StockImageImportSource,
   type StockImageMenuCandidate
 } from "@yardimci-asistan/shared";
-import {
-  androidActionAllowedByCapabilities,
-  resolveAndroidActionPermission
-} from "@yardimci-asistan/sync-core";
 import type {
   AndroidReportPresetKey,
   AndroidReportSnapshot,
-  AndroidDeviceRole,
   AndroidDeviceSighting,
-  AndroidPermission,
-  AndroidPermissionGroups,
   AndroidSnapshotPermissionProfile,
   AndroidSyncAction,
   PublishedQrMenu,
-  PushAiSettingsResult,
   SyncedCustomerRequest
 } from "@yardimci-asistan/sync-core";
 import {
@@ -64,28 +54,16 @@ export type { DesktopBirthdayDelivery, DesktopBirthdayOverview, DesktopBirthdayP
 
 import type {
   DesktopDatabaseOptions,
-  DesktopRoom,
-  DesktopReservation,
-  DesktopDailyTask,
-  DesktopCustomer,
   DesktopPreparedMessage,
   DesktopAndroidDevice,
   DesktopAndroidActionFailure,
   DesktopAndroidDeviceMutationResult,
   DesktopDashboardData,
-  DesktopReportPreset,
   DesktopReportRangeInput,
-  DesktopReportPeriod,
-  DesktopReportStockMovement,
   DesktopReportData,
-  DesktopReportQueryResult,
-  DesktopReportAiMode,
-  GenerateDesktopReportAiInput,
-  GenerateDesktopReportAiResult,
   DesktopAiService,
   DesktopAiModelOption,
   DesktopAiServiceProfile,
-  SaveAiServiceProfileInput,
   AiApiKeyWrite,
   DesktopSetupData,
   SaveInitialSetupInput,
@@ -96,31 +74,23 @@ import type {
   DesktopMenuSaveResult,
   CreateStockImageImportInput,
   ApplyStockImageImportInput,
-  DesktopStockImageAnalyzeInput,
-  DesktopStockImageAnalyzeResult,
   DesktopStockImageApplyResult,
   SaveCustomerInput,
   AssignCustomerRoomInput,
   UpdateCustomerRoomStayStatusInput,
   DesktopCustomerMutationResult,
-  DesktopIdentityImageAnalyzeInput,
-  DesktopIdentityImageAnalyzeResult,
   RequestReservationConversionResult,
   CreateManualRequestInput,
   CreateManualRequestResult,
   SaveRequestAiSuggestionInput,
   RequestAiSuggestionResult,
-  AiWorkspaceMode,
   AiWorkspaceHistoryEntry,
-  GenerateAiWorkspaceInput,
-  GenerateAiWorkspaceResult,
   SaveAiWorkspaceResultInput,
   SaveAiWorkspaceResult,
   DesktopStatusUpdateResult,
   UpdateRequestStatusInput,
   UpdateRoomStatusInput,
   UpdateTableStatusInput,
-  TableOrderStatus,
   DesktopTableOrder,
   AddTableOrderItemInput,
   UpdateTableOrderItemQuantityInput,
@@ -2278,17 +2248,9 @@ export class DesktopDatabase {
 
 import {
   normalizeTableCategoryInputs,
-  normalizeTableCategoryName,
-  tableCategoryKey,
-  reconcileTableName,
-} from "./database/table-category-utils.js";
-
-import type {
-  NormalizedTableCategoryInput,
 } from "./database/table-category-utils.js";
 
 import {
-  AI_SERVICE_IDS,
   DEFAULT_AI_BASE_URL,
   GOOGLE_AI_STUDIO_BASE_URL,
   DEFAULT_AI_TIMEOUT_SECONDS,
@@ -2302,50 +2264,20 @@ import {
   normalizeAiTimeout,
   normalizeStoredAiTimeout,
   normalizeStoredTimestamp,
-  normalizePublishedTimestamp,
   resolveEncryptedAiApiKey,
 } from "./database/ai-settings-utils.js";
 
 import {
-  normalizeCustomerInput,
-  normalizeCustomerIdentityType,
-  normalizeCustomerGender,
-  normalizeLimitedText,
-} from "./database/customer-utils.js";
-
-import {
-  TABLE_ORDER_STATUSES,
-  normalizeNullableStockNumber,
-  normalizePositiveStockNumber,
-  normalizeMenuStockUnit,
-  normalizeSignedStockNumber,
-  nullableTrimmedString,
-  normalizeOrderQuantity,
-  createTableOrderId,
   normalizeStockImageImportId,
   isSha256Hex,
-  sanitizeStockImageAnalysis,
   normalizeStockImageApplyLines,
-  roundMoney,
-  normalizeTableOrderCurrency,
 } from "./database/stock-utils.js";
 
 import {
-  isAndroidAdminOnlyAction,
   normalizeAndroidDeviceRole,
-  effectiveAndroidPermissions,
-  createAndroidEntityId,
   androidPayloadString,
-  androidPayloadStringArray,
-  androidPayloadNumber,
   getAndroidVersionConflict,
   nextMutationTimestamp,
-  androidActionRelatedId,
-  androidActionResolutionKey,
-  androidActionTargetPage,
-  normalizeAndroidFailureTargetPage,
-  friendlyDesktopActionFailure,
-  parseEventPayload,
 } from "./database/android-utils.js";
 
 import type {
@@ -2406,7 +2338,6 @@ import {
 import {
   getMenuStockMovements as getStoredMenuStockMovements,
   saveMenuItem as saveStoredMenuItem,
-  mutateMenuStockInTransaction as mutateStoredMenuStock,
 } from "./database/menu-stock-store.js";
 
 import {
@@ -2414,16 +2345,6 @@ import {
   getActiveTableOrder as getStoredActiveTableOrder,
   recalculateTableOrderTotal as recalculateStoredTableOrderTotal,
   listPaymentWaitingTableOrders,
-  getTableOrderById,
-  mapTableOrderRow,
-  getTableOrderItems,
-  getMutableTableOrderItem,
-  findActiveOrderForTables,
-  isActiveTableOrder,
-  recalculateTableOrderTotalInTransaction,
-  getTableOrderMutationResult,
-  restoreCancelledOrderStockInTransaction,
-  resolveAndroidActiveOrderId,
 } from "./database/table-order-store.js";
 
 import {
@@ -2456,7 +2377,6 @@ import {
 } from "./database/request-store.js";
 
 import {
-  markPreparedWhatsAppMessagesSentInTransaction,
   markWhatsAppMessageSent as markStoredWhatsAppMessageSent,
   getAndroidPreparedMessages as getStoredAndroidPreparedMessages,
   deleteMessageInTransaction as deleteStoredMessageInTransaction,
@@ -2473,7 +2393,6 @@ import {
   getReservations as getStoredReservations,
   getActiveResourceReservationTitles as getStoredActiveResourceReservationTitles,
   saveManualRestaurantReservation as saveStoredManualRestaurantReservation,
-  findConflictingRoomReservation as findStoredConflictingRoomReservation,
 } from "./database/reservation-store.js";
 
 import {
@@ -2488,7 +2407,6 @@ import {
 
 import {
   getCustomerRoomStays as getStoredCustomerRoomStays,
-  hasOverlappingCustomerRoomStay as hasStoredOverlappingCustomerRoomStay,
 } from "./database/customer-room-stay-store.js";
 
 import {
@@ -2518,8 +2436,6 @@ import {
   updateCustomerRoomStayStatus as updateStoredCustomerRoomStayStatus,
   saveManualReservation as saveStoredManualReservation,
   updateReservationStatus as updateStoredReservationStatus,
-  refreshRoomStatusFromStays as refreshStoredRoomStatusFromStays,
-  enforceActiveStayRoomStatus as enforceStoredActiveStayRoomStatus,
 } from "./stay-reservation-service.js";
 
 import {
