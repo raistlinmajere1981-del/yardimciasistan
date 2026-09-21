@@ -9,6 +9,7 @@ require_once YA_BASE_DIR . '/lib/public-request-guard.php';
 
 $businessConfig = ya_load_business_config();
 ya_apply_cors($businessConfig);
+$businessConfig = ya_merge_business_public_context($businessConfig);
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
     http_response_code(204);
@@ -123,6 +124,33 @@ function ya_request_feature_enabled(array $businessConfig): bool
 
     $profileId = ya_string($businessConfig['profile_id'] ?? '');
     return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant', 'cafe'], true);
+}
+
+function ya_merge_business_public_context(array $config): array
+{
+    try {
+        $context = ya_storage_get_publication('business_context', []);
+        unset($context['_publication']);
+        if (!is_array($context)) {
+            return $config;
+        }
+        $fieldMap = [
+            'business_name' => 'display_name',
+            'profile_id' => 'profile_id',
+            'phone' => 'phone',
+            'whatsapp' => 'whatsapp',
+            'email' => 'email',
+            'address' => 'address'
+        ];
+        foreach ($fieldMap as $contextKey => $configKey) {
+            if (array_key_exists($contextKey, $context)) {
+                $config[$configKey] = ya_string($context[$contextKey]);
+            }
+        }
+    } catch (Throwable) {
+        // Static business.json remains the bootstrap fallback.
+    }
+    return $config;
 }
 
 function ya_load_business_config(): array

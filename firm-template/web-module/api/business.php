@@ -39,11 +39,10 @@ $whatsappEnabled = array_key_exists('whatsapp_enabled', $publicContext)
 $requestsEnabled = $runtimeCapabilities !== null
     ? in_array('customer.requests', $runtimeCapabilities, true)
     : ya_business_profile_requests_enabled($profileId);
+$surfaceConfig = $config;
+$surfaceConfig['address'] = $address;
 if ($runtimeCapabilities !== null) {
-    $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, [
-        ...$config,
-        'address' => $address
-    ]);
+    $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, $surfaceConfig);
 } elseif (array_key_exists('public_surfaces', $config)) {
     $publicSurfaces = ya_business_normalize_public_surfaces($config['public_surfaces']);
 } else {

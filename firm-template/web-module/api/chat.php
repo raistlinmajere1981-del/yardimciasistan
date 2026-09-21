@@ -66,12 +66,13 @@ if (mb_strlen($message) > 1200) {
 }
 
 $businessContext = ya_chat_load_business_context();
-$profileId = ya_chat_string($businessContext['profile_id'] ?? $businessConfig['profile_id'] ?? '');
+$effectiveBusinessConfig = ya_chat_merge_business_context($businessConfig, $businessContext);
+$profileId = ya_chat_string($effectiveBusinessConfig['profile_id'] ?? '');
 $knowledgeDocuments = ya_chat_load_knowledge(YA_KNOWLEDGE_DIR, $profileId);
-$result = ya_chat_generate_reply($businessConfig, $aiConfig, $payload, $message, $knowledgeDocuments, $businessContext);
+$result = ya_chat_generate_reply($effectiveBusinessConfig, $aiConfig, $payload, $message, $knowledgeDocuments, $businessContext);
 $conversationId = ya_chat_create_id('ai_conv_');
 $now = date(DATE_ATOM);
-$requestDraft = ya_chat_extract_request($businessConfig, $payload, $message, $now);
+$requestDraft = ya_chat_extract_request($effectiveBusinessConfig, $payload, $message, $now);
 $request = $requestDraft['request'];
 $requestId = '';
 $requestShouldBeCreated = is_array($request);
@@ -926,6 +927,24 @@ function ya_chat_google_generate_content_url(string $baseUrl, string $model): st
 {
     $apiBaseUrl = preg_replace('#/openai/?$#', '', rtrim($baseUrl, '/'));
     return rtrim((string) $apiBaseUrl, '/') . '/models/' . rawurlencode(preg_replace('#^models/#', '', trim($model))) . ':generateContent';
+}
+
+function ya_chat_merge_business_context(array $config, array $context): array
+{
+    $fieldMap = [
+        'business_name' => 'display_name',
+        'profile_id' => 'profile_id',
+        'phone' => 'phone',
+        'whatsapp' => 'whatsapp',
+        'email' => 'email',
+        'address' => 'address'
+    ];
+    foreach ($fieldMap as $contextKey => $configKey) {
+        if (array_key_exists($contextKey, $context)) {
+            $config[$configKey] = ya_chat_string($context[$contextKey]);
+        }
+    }
+    return $config;
 }
 
 function ya_chat_load_business_context(): array
