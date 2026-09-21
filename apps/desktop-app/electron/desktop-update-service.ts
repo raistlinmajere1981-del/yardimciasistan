@@ -805,6 +805,27 @@ function cleanupInstallArtifacts(paths: UpdatePaths, installerPath?: string) {
   }
 }
 
+function powershellLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function createWindowsUpdateLauncherCommand(installerPath: string, applicationPath: string): string {
+  const script = [
+    `$installer = ${powershellLiteral(installerPath)}`,
+    `$application = ${powershellLiteral(applicationPath)}`,
+    "$exitCode = 1",
+    "try {",
+    "  $process = Start-Process -FilePath $installer -ArgumentList @('--updated', '/S') -Wait -PassThru",
+    "  $exitCode = $process.ExitCode",
+    "} catch {",
+    "  $exitCode = 1",
+    "}",
+    "try { Start-Process -FilePath $application } catch {}",
+    "exit $exitCode"
+  ].join("\r\n");
+  return Buffer.from(script, "utf16le").toString("base64");
+}
+
 export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolean {
   const paths = resolveUpdatePaths(userDataPath);
   const currentVersion = app.getVersion();
@@ -851,11 +872,16 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
     };
     writeJsonAtomic(paths.installing, installingState);
 
-    const child = spawn(pending.installerPath, ["--updated", "/S", "--force-run"], {
-      detached: true,
-      stdio: "ignore",
-      windowsHide: true
-    });
+    const encodedLauncher = createWindowsUpdateLauncherCommand(pending.installerPath, process.execPath);
+    const child = spawn(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encodedLauncher],
+      {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: true
+      }
+    );
     child.unref();
     removeIfExists(paths.pending);
     desktopLogInfo(
