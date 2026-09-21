@@ -450,6 +450,49 @@ function createSafetyBackup(paths: DataMaintenancePaths): DesktopBackupListItem 
   });
 }
 
+export function createUpdateSafetyBackup(
+  userDataPath: string,
+  targetVersion: string,
+  keepLatest = 3
+): DesktopBackupListItem | undefined {
+  const paths = resolvePaths(userDataPath);
+  if (!fs.existsSync(paths.databasePath)) return undefined;
+
+  const normalizedVersion = String(targetVersion || "unknown")
+    .trim()
+    .replace(/[^0-9A-Za-z._-]+/g, "-")
+    .slice(0, 48) || "unknown";
+  const createdAt = new Date().toISOString();
+  const backup = createBackupPackageFromDatabase({
+    paths,
+    sourceDatabasePath: paths.databasePath,
+    kind: "safety",
+    createdAt,
+    folderName: `yardimci-asistan-guncelleme-${normalizedVersion}-${backupTimestamp(createdAt)}`,
+    liveDatabase: true
+  });
+
+  const limit = Number.isInteger(keepLatest) && keepLatest > 0 ? keepLatest : 3;
+  try {
+    const updateBackups = fs.readdirSync(paths.projectBackupPath, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith("yardimci-asistan-guncelleme-"))
+      .map((entry) => ({
+        name: entry.name,
+        path: path.join(paths.projectBackupPath, entry.name),
+        mtimeMs: fs.statSync(path.join(paths.projectBackupPath, entry.name)).mtimeMs
+      }))
+      .sort((left, right) => right.mtimeMs - left.mtimeMs);
+
+    for (const stale of updateBackups.slice(limit)) {
+      fs.rmSync(stale.path, { recursive: true, force: true });
+    }
+  } catch {
+    // Update backup retention is best effort; never block the prepared update.
+  }
+
+  return backup;
+}
+
 function getBackups(userDataPath: string): DesktopBackupListResult {
   const paths = resolvePaths(userDataPath);
   try {
