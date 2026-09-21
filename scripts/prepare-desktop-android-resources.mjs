@@ -14,12 +14,6 @@ if (!["linux", "win32"].includes(targetPlatform)) {
   fail(`Desteklenmeyen Android Platform-Tools hedefi: ${targetPlatform}`);
 }
 
-mkdirSync(desktopResourceRoot, { recursive: true });
-rmSync(join(desktopResourceRoot, "platform-tools"), { recursive: true, force: true });
-for (const filename of ["yardimci-asistan-release.apk", "version.json"]) {
-  rmSync(join(desktopResourceRoot, filename), { force: true });
-}
-
 const version = readVersionProperties(join(repoRoot, "apps", "android-app", "version.properties"));
 const releaseApk = join(
   repoRoot,
@@ -55,6 +49,37 @@ if (!sourceApk && !allowMissing) {
   );
 }
 
+const platformToolsSource = resolvePlatformToolsSource(targetPlatform);
+const requiredFiles = targetPlatform === "win32"
+  ? ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"]
+  : ["adb"];
+
+if (!platformToolsSource && !allowMissing) {
+  const envName = targetPlatform === "win32"
+    ? "YA_ANDROID_PLATFORM_TOOLS_WIN32"
+    : "YA_ANDROID_PLATFORM_TOOLS_LINUX";
+  fail(
+    `${targetPlatform} Android Platform-Tools bulunamadı. ` +
+    `${envName} ile platform-tools klasörünü belirtin.`
+  );
+}
+if (platformToolsSource && !allowMissing) {
+  for (const filename of requiredFiles) {
+    const source = join(platformToolsSource, filename);
+    if (!existsSync(source)) {
+      fail(`Platform-Tools dosyası bulunamadı: ${source}`);
+    }
+  }
+}
+
+// Strict build preflight is complete. Only now replace staged resources, so a
+// missing cross-platform dependency cannot destroy the previous working stage.
+mkdirSync(desktopResourceRoot, { recursive: true });
+rmSync(join(desktopResourceRoot, "platform-tools"), { recursive: true, force: true });
+for (const filename of ["yardimci-asistan-release.apk", "version.json"]) {
+  rmSync(join(desktopResourceRoot, filename), { force: true });
+}
+
 if (sourceApk) {
   const apkDestination = join(desktopResourceRoot, "yardimci-asistan-release.apk");
   copyFileSync(sourceApk, apkDestination);
@@ -70,26 +95,13 @@ if (sourceApk) {
   console.log(`Android APK staged: ${apkDestination}`);
 }
 
-const platformToolsSource = resolvePlatformToolsSource(targetPlatform);
 if (!platformToolsSource) {
-  if (!allowMissing) {
-    const envName = targetPlatform === "win32"
-      ? "YA_ANDROID_PLATFORM_TOOLS_WIN32"
-      : "YA_ANDROID_PLATFORM_TOOLS_LINUX";
-    fail(
-      `${targetPlatform} Android Platform-Tools bulunamadı. ` +
-      `${envName} ile platform-tools klasörünü belirtin.`
-    );
-  }
   console.warn(`Android Platform-Tools staging atlandı: ${targetPlatform} kaynağı bulunamadı.`);
   process.exit(0);
 }
 
 const platformToolsDestination = join(desktopResourceRoot, "platform-tools");
 mkdirSync(platformToolsDestination, { recursive: true });
-const requiredFiles = targetPlatform === "win32"
-  ? ["adb.exe", "AdbWinApi.dll", "AdbWinUsbApi.dll"]
-  : ["adb"];
 
 for (const filename of requiredFiles) {
   const source = join(platformToolsSource, filename);
