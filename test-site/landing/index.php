@@ -67,6 +67,38 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
             }
           } catch (e) {}
         }
+        function patchX86Download() {
+          try {
+            var grid = document.querySelector(".download-grid");
+            if (!grid || grid.querySelector('[data-ya-x86-download="1"]')) {
+              return;
+            }
+            var cards = grid.querySelectorAll("a.download-card");
+            var x64Card = null;
+            for (var i = 0; i < cards.length; i++) {
+              var small = cards[i].querySelector("small");
+              if (small && /Windows.+x64/i.test(small.textContent || "")) {
+                x64Card = cards[i];
+                break;
+              }
+            }
+            if (!x64Card) {
+              return;
+            }
+            var href = x64Card.getAttribute("href") || "";
+            if (!/\.exe(?:$|[?#])/i.test(href)) {
+              return;
+            }
+            var x86Card = x64Card.cloneNode(true);
+            x86Card.setAttribute("data-ya-x86-download", "1");
+            x86Card.setAttribute("href", href.replace(/\.exe(?=$|[?#])/i, "-x86.exe"));
+            var x86Small = x86Card.querySelector("small");
+            if (x86Small) {
+              x86Small.textContent = "Windows 10 / 11 · x86 (32-bit)";
+            }
+            x64Card.insertAdjacentElement("afterend", x86Card);
+          } catch (e) {}
+        }
         try {
           var realKey = liveKey();
           if (realKey !== "" && typeof window.fetch === "function") {
@@ -123,6 +155,7 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
         try {
           var observer = new MutationObserver(function () {
             patchSyncKeyDisplay();
+            patchX86Download();
           });
           observer.observe(document.documentElement, {
             childList: true,
@@ -133,15 +166,20 @@ $syncKeyDisplay = $syncKey !== '' ? $syncKey : '—';
         var attempts = 0;
         var timer = setInterval(function () {
           patchSyncKeyDisplay();
+          patchX86Download();
           attempts += 1;
           if (attempts > 40) {
             clearInterval(timer);
           }
         }, 500);
         if (document.readyState === "loading") {
-          document.addEventListener("DOMContentLoaded", patchSyncKeyDisplay);
+          document.addEventListener("DOMContentLoaded", function () {
+            patchSyncKeyDisplay();
+            patchX86Download();
+          });
         } else {
           patchSyncKeyDisplay();
+          patchX86Download();
         }
       })();
     </script>
