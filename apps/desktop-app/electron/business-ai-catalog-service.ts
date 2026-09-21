@@ -16,7 +16,7 @@ export function createBusinessAiCatalog(database: DesktopDatabase): BusinessAiCa
   const items: BusinessAiCatalogItem[] = [];
   const updatedAtCandidates: string[] = [];
 
-  if (hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.CATALOG)) {
+  if (hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.RETAIL_BARCODE)) {
     const market = readCatalogProducts(
       database.databasePath,
       hasBusinessCapability(enabled, BUSINESS_CAPABILITIES.INVENTORY)
