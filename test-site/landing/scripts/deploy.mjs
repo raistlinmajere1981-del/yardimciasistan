@@ -248,14 +248,6 @@ sshRun(
     `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ls -la ${remoteBackup}/`
 );
 
-if (withDownloads) {
-  sshRun(`mkdir -p ${remoteDownloads} ${remoteBackup}/downloads`);
-  for (const artifact of downloadArtifacts) {
-    const remotePath = `${remoteDownloads}/${artifact.name}`;
-    sshRun(`[ ! -f '${remotePath}' ] || cp -p '${remotePath}' ${remoteBackup}/downloads/`);
-  }
-}
-
 step("Gecici isimle upload + syntax kontrolu");
 runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localIndex, `${deployHost}:${remoteTmpIndex}`]);
 runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localFavicon, `${deployHost}:${remoteTmpFavicon}`]);
@@ -317,6 +309,13 @@ if (withDownloads) {
   console.log("Windows x64 installer ve Android release APK /downloads altinda guncellendi.");
 }
 console.log("Web modulu (config/business.json, data/, sqlite) degistirilmedi.");
+
+step("Eski landing yedekleri temizleniyor (son 3 tutulur)");
+sshRun(
+  `find '${backupParent}' -mindepth 1 -maxdepth 1 -type d -name 'landing-*' -printf '%T@ %p\\n' | ` +
+  `sort -nr | tail -n +4 | cut -d' ' -f2- | while IFS= read -r old_backup; do ` +
+  `[ -n "$old_backup" ] && rm -rf -- "$old_backup"; done`
+);
 
 // ---------- helpers ----------
 function step(message) {
