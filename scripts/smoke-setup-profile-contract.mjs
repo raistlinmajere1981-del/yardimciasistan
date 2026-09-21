@@ -40,6 +40,16 @@ try {
     database.completeSyncJob(job.jobKey, job.sourceRevision);
   }
   assert.equal(database.getPendingSyncJobs().length, 0);
+
+  const freshSetup = database.getSetupData();
+  assert.equal(freshSetup.setupRequired, true);
+  assert.equal(freshSetup.profileId, "pension_restaurant");
+  assert.deepEqual(
+    [...freshSetup.profileOptions].sort(),
+    [...BUSINESS_PROFILES.pension_restaurant.defaultOptionalCapabilities].sort(),
+    "fresh setup must expose the selected profile's default optional capabilities"
+  );
+
   const result = database.saveInitialSetup({
     businessName: "Temiz Kurulum İşletmesi",
     profileId: "market",
