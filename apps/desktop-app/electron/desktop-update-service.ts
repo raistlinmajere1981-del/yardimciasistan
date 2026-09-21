@@ -500,10 +500,12 @@ async function performCheck(userDataPath: string, force: boolean): Promise<Deskt
 
 export async function checkDesktopUpdate(userDataPath: string, force = false): Promise<DesktopUpdateStatus> {
   if (updateOperation) return updateOperation.promise;
-  const promise = performCheck(userDataPath, force).finally(() => {
-    if (updateOperation?.promise === promise) updateOperation = null;
-  });
+  const promise = performCheck(userDataPath, force);
   updateOperation = { kind: "check", promise };
+  const clear = () => {
+    if (updateOperation?.promise === promise) updateOperation = null;
+  };
+  void promise.then(clear, clear);
   return promise;
 }
 
@@ -712,10 +714,12 @@ export async function downloadDesktopUpdate(userDataPath: string): Promise<Deskt
   }
   if (updateOperation?.kind === "download") return updateOperation.promise;
 
-  const promise = downloadUpdate(userDataPath).finally(() => {
-    if (updateOperation?.promise === promise) updateOperation = null;
-  });
+  const promise = downloadUpdate(userDataPath);
   updateOperation = { kind: "download", promise };
+  const clear = () => {
+    if (updateOperation?.promise === promise) updateOperation = null;
+  };
+  void promise.then(clear, clear);
   return promise;
 }
 
