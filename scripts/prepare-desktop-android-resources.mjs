@@ -129,6 +129,20 @@ function resolvePlatformToolsSource(platform) {
     return resolve(explicit.trim());
   }
 
+  const knownCrossPlatformCandidates = platform === "win32"
+    ? [
+        join(homedir(), "Android", "platform-tools-windows", "platform-tools"),
+        join(repoRoot, "tools", "android", "platform-tools", "win32")
+      ]
+    : [
+        join(homedir(), "Android", "Sdk", "platform-tools"),
+        join(repoRoot, "tools", "android", "platform-tools", "linux")
+      ];
+  const knownCandidate = knownCrossPlatformCandidates.find((candidate) => existsSync(candidate));
+  if (knownCandidate) {
+    return resolve(knownCandidate);
+  }
+
   if (platform !== process.platform) {
     return "";
   }
