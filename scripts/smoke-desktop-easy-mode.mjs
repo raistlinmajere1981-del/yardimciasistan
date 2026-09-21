@@ -6,6 +6,7 @@ import http from "node:http";
 import { dirname, join } from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { getBusinessProfile } from "@yardimci-asistan/shared";
 import { createCapabilitySnapshotFixture } from "./capability-smoke-fixture.mjs";
 
 const UI_PREFERENCES_KEY = "yardimci-asistan.ui-preferences";
@@ -220,7 +221,7 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
     await expect(page.getByLabel("Karanlık tema")).toBeVisible();
     await expect(page.getByLabel("Karanlık tema")).toBeChecked();
 
-    await expect(page.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(5);
+    await expect(page.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(4);
     await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
     expect(await page.locator(".setup-capabilities").evaluate((surface) => surface.scrollWidth <= surface.clientWidth + 1)).toBe(true);
     expect(pageErrors).toEqual([]);
@@ -358,6 +359,7 @@ function createSetupFixture(setupRequired = true) {
     appPasswordConfigured: false,
     businessName: "Deniz Çiçeği Pansiyon & Kafe",
     profileId: "pension_restaurant",
+    profileOptions: [...getBusinessProfile("pension_restaurant").defaultOptionalCapabilities],
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "smoke@example.test",
@@ -365,6 +367,7 @@ function createSetupFixture(setupRequired = true) {
     webModuleUrl: "https://example.test/yardimci-asistan",
     syncSecret: "easy-mode-smoke-secret",
     autoSyncEnabled: true,
+    localNetworkEnabled: true,
     aiEnabled: false,
     aiProvider: "openai_compatible",
     aiService: "openai",
@@ -375,6 +378,12 @@ function createSetupFixture(setupRequired = true) {
     aiApiKeyConfigured: false,
     aiLastPublishedAt: "",
     aiProfiles: [],
+    productData: {
+      enabled: true,
+      provider: "open_food_facts",
+      autoSearchUnknownBarcode: true,
+      includeImages: true
+    },
     servicePreferences: {
       whatsapp: true,
       android: true
