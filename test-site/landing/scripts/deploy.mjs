@@ -308,6 +308,15 @@ step("HTTP smoke");
 await smoke(publicUrl, liveSecret);
 if (withDownloads) {
   await smokeDownloads(publicUrl, downloadArtifacts);
+
+  step("Eski kurulum dosyalari temizleniyor");
+  const keepNames = downloadArtifacts.map((artifact) => artifact.name);
+  const keepTests = keepNames.map((name) => `! -name \'${name}\'`).join(" ");
+  sshRun(
+    `find \'${remoteDownloads}\' -mindepth 1 -maxdepth 1 -type f \\( ` +
+    `-name \'YardimciAsistan-Setup-*.exe\' -o -name \'YardimciAsistan-Android-*.apk\' \\) ` +
+    `${keepTests} -delete`
+  );
 }
 
 console.log("\nYayin tamamlandi.");
