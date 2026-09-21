@@ -1,17 +1,24 @@
-import { Download, RefreshCw, RotateCcw, Save } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Download, RefreshCw, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type MutableRefObject } from "react";
 import type { DesktopUpdateStatus } from "../../../electron/desktop-update-service";
+import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
 import { ActionButton } from "../ui/ActionButton";
 
 type UpdateAction = "load" | "save" | "check" | "download" | "restart" | "reset" | null;
 
-export function UpdateSettings() {
+interface UpdateSettingsProps {
+  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
+}
+
+export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
   const [status, setStatus] = useState<DesktopUpdateStatus | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(true);
   const [action, setAction] = useState<UpdateAction>("load");
   const [localMessage, setLocalMessage] = useState("");
   const preferencesDirtyRef = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const baseUrlInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const bridge = window.yardimciDesktop;
@@ -61,32 +68,66 @@ export function UpdateSettings() {
     preferencesDirtyRef.current = true;
   }
 
-  async function savePreferences(customBaseUrl = baseUrl, enabled = autoCheckEnabled) {
-    if (busy && action !== "reset") return;
+  const validatePreferences = useCallback(() => {
+    if (!preferencesDirtyRef.current) return null;
+    if (busy) return "Güncelleme işlemi devam ediyor.";
+    if (!window.yardimciDesktop?.saveUpdatePreferences) {
+      return "Güncelleme ayarları kaydedilemiyor. Uygulamayı yeniden başlatın.";
+    }
+    return null;
+  }, [busy]);
+
+  const focus = useCallback(() => {
+    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    baseUrlInputRef.current?.focus();
+  }, []);
+
+  const savePreferences = useCallback(async (): Promise<SettingsOperationResult> => {
+    const validationMessage = validatePreferences();
+    if (validationMessage) {
+      setLocalMessage(validationMessage);
+      return { ok: false, message: validationMessage };
+    }
+    if (!preferencesDirtyRef.current) return { ok: true, changed: false };
+
     const bridge = window.yardimciDesktop;
     if (!bridge?.saveUpdatePreferences) {
-      setLocalMessage("Güncelleme ayarları kaydedilemiyor.");
-      return;
+      const message = "Güncelleme ayarları kaydedilemiyor. Uygulamayı yeniden başlatın.";
+      setLocalMessage(message);
+      return { ok: false, message };
     }
 
     setAction("save");
     setLocalMessage("Güncelleme ayarları kaydediliyor...");
     try {
       const result = await bridge.saveUpdatePreferences({
-        customBaseUrl,
-        autoCheckEnabled: enabled
+        customBaseUrl: baseUrl,
+        autoCheckEnabled
       });
       setStatus(result.status);
       setBaseUrl(result.status.customBaseUrl || result.status.defaultBaseUrl);
       setAutoCheckEnabled(result.status.autoCheckEnabled);
+      if (!result.ok) {
+        setLocalMessage(result.message);
+        return { ok: false, message: result.message };
+      }
       preferencesDirtyRef.current = false;
       setLocalMessage(result.message);
+      return { ok: true, changed: true, message: result.message };
     } catch {
-      setLocalMessage("Güncelleme ayarları kaydedilemedi.");
+      const message = "Güncelleme ayarları kaydedilemedi.";
+      setLocalMessage(message);
+      return { ok: false, message };
     } finally {
       setAction(null);
     }
-  }
+  }, [autoCheckEnabled, baseUrl, validatePreferences]);
+
+  useImperativeHandle(saveHandleRef, () => ({
+    validate: validatePreferences,
+    save: savePreferences,
+    focus
+  }), [focus, savePreferences, validatePreferences]);
 
   async function resetToDefault() {
     if (busy) return;
@@ -158,7 +199,7 @@ export function UpdateSettings() {
   }
 
   return (
-    <section className="settings-application-subsection settings-update-section">
+    <section ref={sectionRef} className="settings-application-subsection settings-update-section">
       <div className="settings-subsection-heading">
         <div>
           <h3>Güncellemeler</h3>
@@ -177,6 +218,7 @@ export function UpdateSettings() {
         <label className="form-field form-field--long">
           Güncelleme sunucusu
           <input
+            ref={baseUrlInputRef}
             value={baseUrl}
             onChange={(event) => {
               markPreferencesDirty();
@@ -207,15 +249,6 @@ export function UpdateSettings() {
       </div>
 
       <div className="form-actions">
-        <ActionButton
-          variant="secondary"
-          type="button"
-          onClick={() => void savePreferences()}
-          disabled={busy}
-        >
-          <Save size={16} aria-hidden="true" />
-          {action === "save" ? "Güncelleme Ayarları Kaydediliyor" : "Güncelleme Ayarlarını Kaydet"}
-        </ActionButton>
         <ActionButton
           variant="ghost"
           type="button"

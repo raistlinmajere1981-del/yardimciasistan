@@ -28,6 +28,23 @@ try {
       { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', nightlyPriceMinor: 240000 },
       { id: 'room_design_102', name: 'Smoke Aile Odası', number: '102', nightlyPriceMinor: 320000 }
     ];
+    let updateStatus = {
+      phase: 'idle',
+      message: 'Güncelleme sistemi hazır.',
+      currentVersion: '0.1.2',
+      latestVersion: '0.1.2',
+      progressPercent: 0,
+      downloadedBytes: 0,
+      totalBytes: 0,
+      lastCheckedAt: '',
+      defaultBaseUrl: 'https://updates.example.test/stable',
+      effectiveBaseUrl: 'https://updates.example.test/stable',
+      customBaseUrl: '',
+      autoCheckEnabled: true,
+      notes: [],
+      installSupported: false,
+      pendingVersion: ''
+    };
     window.__designCalls = [];
     window.yardimciDesktop = {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
@@ -44,6 +61,19 @@ try {
       },
       listLocalBackups: async () => ({ ok: true, backups: [{ id: 'design-backup', createdAt: '2026-09-13T09:00:00Z', kind: 'manual', sizeBytes: 2048000, imageCount: 3 }] }),
       updateAppPassword: async input => { window.__designCalls.push({ kind: 'password', input }); return { ok: true, message: 'Şifre kaydedildi.', status: { passwordConfigured: true } }; },
+      getUpdateStatus: async () => updateStatus,
+      saveUpdatePreferences: async input => {
+        updateStatus = {
+          ...updateStatus,
+          customBaseUrl: input.customBaseUrl,
+          effectiveBaseUrl: input.customBaseUrl || updateStatus.defaultBaseUrl,
+          autoCheckEnabled: input.autoCheckEnabled,
+          message: 'Güncelleme ayarları kaydedildi.'
+        };
+        window.__designCalls.push({ kind: 'update', input });
+        return { ok: true, message: 'Güncelleme ayarları kaydedildi.', status: updateStatus };
+      },
+      onUpdateStatusChanged: () => () => {},
       saveInitialSetup: async input => {
         Object.assign(setup, {
           businessName: input.businessName,
@@ -122,6 +152,7 @@ try {
   // Test actual form semantics and unchanged bridge payloads.
   await page.setViewportSize({ width: 1440, height: 1000 });
   await expect(page.getByRole('button', { name: 'Ayarları Kaydet', exact: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Güncelleme Ayarlarını Kaydet', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Bilgileri Kaydet', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Oda Bilgilerini Kaydet', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Şifreyi (Belirle|Değiştir)/, exact: true })).toHaveCount(0);
@@ -133,6 +164,7 @@ try {
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
   await page.getByLabel('Şifre belirleyin', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('design-test-password');
+  await page.getByLabel('Güncelleme sunucusu', { exact: true }).fill('https://updates.example.test/custom');
   await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
   expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
@@ -148,6 +180,11 @@ try {
   expect(saveOrder.slice(0, 2)).toEqual(['setup', 'public']);
   expect(saveOrder.at(-1)).toBe('password');
   expect(saveOrder.filter(kind => kind === 'room').length).toBe(2);
+  expect(saveOrder.filter(kind => kind === 'update').length).toBe(1);
+  expect(await page.evaluate(() => window.__designCalls.find(call => call.kind === 'update')?.input)).toEqual({
+    customBaseUrl: 'https://updates.example.test/custom',
+    autoCheckEnabled: true
+  });
   await expect(page.getByText('Şifre kaydedildi.', { exact: true })).toBeVisible();
   await expect(page.getByText('Ayarlar kaydedildi.', { exact: true })).toBeVisible();
   const callCountAfterSave = await page.evaluate(() => window.__designCalls.length);

@@ -127,6 +127,7 @@ export function SetupForm({
   const selectedAiServiceRef = useRef(form.aiService);
   const appearanceModeRefs = useRef<Record<UiMode, HTMLButtonElement | null>>({ easy: null, pro: null });
   const roomSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
+  const updateSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
   const passwordSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
   const settingsSaveInFlightRef = useRef(false);
   const [webConnectionTestState, setWebConnectionTestState] = useState<SyncState>("idle");
@@ -377,6 +378,7 @@ export function SetupForm({
     const getSections = () => [
       { label: "Müşteri bilgileri", handle: initialSetup ? null : publicProfileSaveRef?.current },
       { label: "Oda yönetimi", handle: initialSetup ? null : roomSaveRef.current },
+      { label: "Güncelleme ayarları", handle: initialSetup ? null : updateSaveRef.current },
       { label: "Uygulama şifresi", handle: passwordSaveRef.current }
     ].filter(
       (section): section is { label: string; handle: SettingsSaveSectionHandle } => Boolean(section.handle)
@@ -967,7 +969,7 @@ export function SetupForm({
           </div>
           </section>
 
-          {!setupData.setupRequired && <UpdateSettings />}
+          {!setupData.setupRequired && <UpdateSettings saveHandleRef={updateSaveRef} />}
           <PasswordSettings
             configured={setupData.appPasswordConfigured}
             onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
