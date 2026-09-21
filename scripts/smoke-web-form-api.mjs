@@ -13,6 +13,7 @@ const syncSecret = "pilot-web-smoke-secret";
 const businessConfigFile = join(webModuleRoot, "config", "business.json");
 const businessConfig = JSON.parse(readFileSync(businessConfigFile, "utf8"));
 businessConfig.sync_secret = syncSecret;
+businessConfig.profile_id = "pension_restaurant";
 writeFileSync(businessConfigFile, `${JSON.stringify(businessConfig, null, 2)}\n`);
 for (const runtimeFile of [
   "yardimci-asistan.sqlite",

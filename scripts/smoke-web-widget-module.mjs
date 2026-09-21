@@ -62,6 +62,8 @@ try {
       snapshot: {
         business_capabilities: [
           "service.ai",
+          "core.customers",
+          "customer.requests",
           "accommodation.rooms",
           "accommodation.reservations",
           "food_service.tables",
@@ -80,6 +82,7 @@ try {
   const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
   expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
   expect(publicBusinessAfterSync.business.ai_enabled).toBe(true);
+  expect(publicBusinessAfterSync.business.requests_enabled).toBe(true);
 
   browser = await launchChromiumForSmoke(chromium);
 
@@ -309,6 +312,8 @@ try {
       idempotency_key: "widget-ai-capability-2",
       snapshot: {
         business_capabilities: [
+          "core.customers",
+          "customer.requests",
           "accommodation.rooms",
           "accommodation.reservations",
           "food_service.tables",
@@ -325,6 +330,7 @@ try {
   expect(aiDisabledBusinessResponse.status).toBe(200);
   const aiDisabledBusiness = await aiDisabledBusinessResponse.json();
   expect(aiDisabledBusiness.business.ai_enabled).toBe(false);
+  expect(aiDisabledBusiness.business.requests_enabled).toBe(true);
 
   const aiDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await aiDisabledPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
@@ -333,6 +339,69 @@ try {
   await expect(aiDisabledPage.locator('[data-ya-view="info"]')).toHaveCount(0);
   await expect(aiDisabledPage.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Yardımcısı");
   await aiDisabledPage.close();
+
+  const requestsDisabledPublication = await fetch(`${baseUrl}/api/sync.php`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-YA-Sync-Secret": syncSecret },
+    body: JSON.stringify({
+      action: "publish_android_snapshot",
+      client_id: "desktop-widget-module-smoke",
+      source_revision: 3,
+      idempotency_key: "widget-ai-capability-3",
+      snapshot: {
+        business_capabilities: [
+          "service.ai",
+          "core.customers",
+          "accommodation.rooms",
+          "accommodation.reservations",
+          "food_service.tables",
+          "food_service.reservations",
+          "food_service.menu",
+          "channel.qr_menu"
+        ]
+      }
+    })
+  });
+  expect(requestsDisabledPublication.status).toBe(200);
+  expect((await requestsDisabledPublication.json()).ok).toBe(true);
+
+  const requestsDisabledBusinessResponse = await fetch(`${baseUrl}/api/business.php`);
+  expect(requestsDisabledBusinessResponse.status).toBe(200);
+  const requestsDisabledBusiness = await requestsDisabledBusinessResponse.json();
+  expect(requestsDisabledBusiness.business.requests_enabled).toBe(false);
+  expect(requestsDisabledBusiness.business.ai_enabled).toBe(true);
+  expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
+
+  const requestsDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await requestsDisabledPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await injectWidget(requestsDisabledPage, baseUrl);
+  await requestsDisabledPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
+  await expect(requestsDisabledPage.locator('[data-ya-request-type="pension_reservation"]')).toHaveCount(0);
+  await expect(requestsDisabledPage.locator('[data-ya-request-type="restaurant_reservation"]')).toHaveCount(0);
+  await expect(requestsDisabledPage.locator('[data-ya-view="info"]')).toBeVisible();
+  await expect(requestsDisabledPage.locator('[data-ya-view="whatsapp"]')).toBeVisible();
+  await requestsDisabledPage.locator('[data-ya-view="whatsapp"]').click();
+  await expect(requestsDisabledPage.locator(".ya-widget-view-title")).toHaveText("Mesajınızı birlikte hazırlayalım");
+  await requestsDisabledPage.locator('[data-ya-view="home"]').click();
+  await requestsDisabledPage.locator('[data-ya-view="info"]').click();
+  await expect(requestsDisabledPage.locator(".ya-widget-ai textarea")).toBeVisible();
+  await requestsDisabledPage.close();
+
+  const requestsDisabledFormResponse = await fetch(`${baseUrl}/api/request.php`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      request_type: "restaurant_reservation",
+      customer_name: "Kapalı Talep Misafir",
+      customer_phone: "+44 7911 123456",
+      date_text: "Bu akşam",
+      start_date: "2026-07-18",
+      time: "20:30",
+      guest_count: 2
+    })
+  });
+  expect(requestsDisabledFormResponse.status).toBe(403);
+  expect((await requestsDisabledFormResponse.json()).code).toBe("requests_disabled");
 
   console.log(`web-widget-module-smoke-ok: ${baseUrl}/widget.js`);
 } catch (error) {

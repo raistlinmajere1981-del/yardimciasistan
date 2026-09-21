@@ -1543,6 +1543,7 @@ function ya_sync_sanitize_business_capabilities(mixed $value): array
 {
     $allowed = [
         'core.customers',
+        'customer.requests',
         'core.tasks',
         'core.calendar',
         'core.notifications',
