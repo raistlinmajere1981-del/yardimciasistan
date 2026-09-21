@@ -9,6 +9,7 @@
  *
  * With --with-downloads it also deploys the current release artifacts:
  *   www/downloads/YardimciAsistan-Setup-<version>.exe
+ *   www/downloads/YardimciAsistan-Setup-<version>-x86.exe
  *   www/downloads/YardimciAsistan-Android-<version>.apk
  *
  * NEVER touches:
@@ -41,7 +42,7 @@ Kullanim:
   node scripts/deploy.mjs --yes --with-downloads       Landing + Windows/APK paketlerini yayinlar.
 
 Secenekler:
-  --with-downloads   Windows x64 installer ve Android release APK'yi /downloads altina yayinlar.
+  --with-downloads   Windows x64/x86 installer ve Android release APK'yi /downloads altina yayinlar.
 
 Ortam degiskenleri:
   LANDING_DEPLOY_HOST            SSH hedefi
@@ -98,15 +99,16 @@ if (withDownloads) {
   const desktopVersion = packageVersion(join(monorepoRoot, "apps", "desktop-app", "package.json"));
   const androidVersion = packageVersion(join(monorepoRoot, "apps", "android-app", "package.json"));
   const desktopInstaller = join(monorepoRoot, "dist", "desktop", `YardimciAsistan-Setup-${desktopVersion}.exe`);
+  const desktopInstallerX86 = join(monorepoRoot, "dist", "desktop", `YardimciAsistan-Setup-${desktopVersion}-x86.exe`);
   const androidResourceDir = join(monorepoRoot, "apps", "desktop-app", "resources", "android");
   const androidApk = join(androidResourceDir, "yardimci-asistan-release.apk");
   const androidVersionFile = join(androidResourceDir, "version.json");
 
-  for (const f of [desktopInstaller, androidApk, androidVersionFile]) {
+  for (const f of [desktopInstaller, desktopInstallerX86, androidApk, androidVersionFile]) {
     if (!existsSync(f)) {
       fail(
         `Kurulum paketi eksik: ${f}\n` +
-        "Once npm run pack:desktop:win calistirarak Windows installer + release APK hazirlayin."
+        "Once npm run pack:desktop:windows calistirarak Windows x64/x86 installer + release APK hazirlayin."
       );
     }
   }
@@ -127,6 +129,7 @@ if (withDownloads) {
   if (
     !bundleSource.includes("/downloads/YardimciAsistan-Setup-${kr}.exe") ||
     !bundleSource.includes("/downloads/YardimciAsistan-Android-${wr}.apk") ||
+    !readFileSync(localIndex, "utf8").includes('data-ya-x86-download="1"') ||
     !bundleSource.includes(desktopMarker) ||
     !bundleSource.includes(androidMarker)
   ) {
@@ -141,6 +144,11 @@ if (withDownloads) {
       label: "Windows x64",
       source: desktopInstaller,
       name: `YardimciAsistan-Setup-${desktopVersion}.exe`
+    },
+    {
+      label: "Windows x86",
+      source: desktopInstallerX86,
+      name: `YardimciAsistan-Setup-${desktopVersion}-x86.exe`
     },
     {
       label: "Android",
@@ -306,7 +314,7 @@ console.log("\nYayin tamamlandi.");
 console.log(`Canli adres: ${publicUrl}`);
 console.log(`Yedek: ${remoteBackup}`);
 if (withDownloads) {
-  console.log("Windows x64 installer ve Android release APK /downloads altinda guncellendi.");
+  console.log("Windows x64/x86 installer ve Android release APK /downloads altinda guncellendi.");
 }
 console.log("Web modulu (config/business.json, data/, sqlite) degistirilmedi.");
 
