@@ -420,7 +420,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
             'ai_disabled',
             'AI bağlantısı işletme ayarlarında kapalı.',
             false
-        ));
+        ), $businessConfig, $businessContext, $catalogContext, $message);
     }
 
     if ($provider !== 'openai_compatible') {
@@ -428,7 +428,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
             'unsupported_provider',
             'Seçili AI sağlayıcısı web sohbeti tarafından desteklenmiyor.',
             false
-        ));
+        ), $businessConfig, $businessContext, $catalogContext, $message);
     }
 
     $baseUrl = ya_chat_string($aiConfig['base_url'] ?? '');
@@ -441,7 +441,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
             'configuration_incomplete',
             'AI bağlantı adresi, model veya erişim anahtarı ayarlarından biri eksik.',
             false
-        ));
+        ), $businessConfig, $businessContext, $catalogContext, $message);
     }
 
     $chatOptions = [
@@ -456,7 +456,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
         : ya_chat_call_openai_compatible($chatOptions);
 
     if (!$chatResult['ok']) {
-        return ya_chat_fallback_result('openai_compatible', $model, $chatResult['error']);
+        return ya_chat_fallback_result('openai_compatible', $model, $chatResult['error'], $businessConfig, $businessContext, $catalogContext, $message);
     }
 
     return [
@@ -908,10 +908,23 @@ function ya_chat_error(string $code, string $message, bool $retryable, int $http
     ];
 }
 
-function ya_chat_fallback_result(string $provider, string $model, array $error): array
-{
+function ya_chat_fallback_result(
+    string $provider,
+    string $model,
+    array $error,
+    array $businessConfig = [],
+    array $businessContext = [],
+    array $catalogContext = [],
+    string $message = ''
+): array {
     return [
-        'answer' => ya_chat_fallback_answer((string) ($error['message'] ?? '')),
+        'answer' => ya_chat_fallback_answer(
+            (string) ($error['message'] ?? ''),
+            $businessConfig,
+            $businessContext,
+            $catalogContext,
+            $message
+        ),
         'fallback' => true,
         'provider' => $provider,
         'model' => $model,
@@ -1152,14 +1165,64 @@ function ya_chat_markdown_title(string $content): string
     return '';
 }
 
-function ya_chat_fallback_answer(string $reason = ''): string
-{
+function ya_chat_fallback_answer(
+    string $reason = '',
+    array $businessConfig = [],
+    array $businessContext = [],
+    array $catalogContext = [],
+    string $message = ''
+): string {
+    $normalized = ya_chat_catalog_normalize($message);
+
+    if ($catalogContext !== []) {
+        $item = $catalogContext[0] ?? null;
+        if (is_array($item)) {
+            $name = ya_chat_string($item['name'] ?? '');
+            $available = ($item['available'] ?? false) === true;
+            $price = is_numeric($item['price'] ?? null) ? (float) $item['price'] : null;
+            $currency = ya_chat_string($item['currency'] ?? 'TRY') ?: 'TRY';
+            if ($name !== '') {
+                $parts = [$available
+                    ? $name . ' şu anda mevcut görünüyor.'
+                    : $name . ' şu anda mevcut görünmüyor.'];
+                if ($price !== null) {
+                    $formattedPrice = rtrim(rtrim(number_format($price, 2, '.', ''), '0'), '.');
+                    $parts[] = 'Kayıtlı satış fiyatı ' . $formattedPrice . ' ' . $currency . '.';
+                }
+                return implode(' ', $parts);
+            }
+        }
+    }
+
+    $asksPayment = preg_match('/\b(kart|kredi kart|banka kart|nakit|odeme|ödeme|pos|temassiz|temassız)\b/u', $normalized) === 1;
+    if ($asksPayment) {
+        $payment = ya_chat_string($businessContext['payment_note'] ?? '');
+        if ($payment !== '') {
+            return $payment;
+        }
+    }
+
+    $asksDirections = preg_match('/\b(nasil gel|nasıl gel|adres|konum|nerede|yol|tarif|ulaşim|ulasim|ulaşım)\b/u', $normalized) === 1;
+    if ($asksDirections) {
+        $directions = ya_chat_string($businessContext['directions_note'] ?? '');
+        $address = ya_chat_string($businessContext['address'] ?? $businessConfig['address'] ?? '');
+        if ($directions !== '' && $address !== '') {
+            return 'Adres: ' . $address . '. Ulaşım tarifi: ' . $directions;
+        }
+        if ($directions !== '') {
+            return $directions;
+        }
+        if ($address !== '') {
+            return 'Adres: ' . $address;
+        }
+    }
+
     $prefix = trim($reason);
     if ($prefix !== '') {
         $prefix .= ' ';
     }
 
-    return $prefix . 'Talebinizi form veya WhatsApp üzerinden iletebilirsiniz; işletme sahibi müsaitlik ve fiyat bilgisini kontrol edip dönüş yapacaktır.';
+    return $prefix . 'Mesajınızı işletmeye iletebilirsiniz; işletme sahibi gerekli bilgiyi kontrol edip dönüş yapacaktır.';
 }
 
 function ya_chat_extract_request(array $businessConfig, array $payload, string $message, string $now): array
