@@ -84,7 +84,9 @@ YARDIMCI_ASISTAN_AI_MODEL=...
 YARDIMCI_ASISTAN_AI_API_KEY=...
 ```
 
-Masaüstündeki firma adı, sektör tipi ve “Müşteriye Açık Bilgiler” alanları ayrıca güncel `business_context` yayını olarak hosting SQLite’ına gönderilir. Web AI bu bağlamı birincil kaynak kabul eder; `knowledge/*.md` dosyaları yalnız ek bilgi kaynağıdır ve sektör tipine göre filtrelenir. Böylece örneğin Market / Perakende profilinde oda, giriş-çıkış veya kahvaltı bilgileri AI bağlamına taşınmaz. AI promptu kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı vermeyecek şekilde sınırlandırılır.
+Masaüstündeki firma adı, sektör tipi ve “Müşteriye Açık Bilgiler” alanları ayrıca güncel `business_context` yayını olarak hosting SQLite’ına gönderilir. Web AI bu bağlamı birincil kaynak kabul eder; `knowledge/*.md` dosyaları yalnız ek bilgi kaynağıdır ve sektör tipine göre filtrelenir. Böylece örneğin Market / Perakende profilinde oda, giriş-çıkış veya kahvaltı bilgileri AI bağlamına taşınmaz.
+
+Ürün ve menü verisi ayrı `ai_catalog` yayınıyla güncellenir. Bu yayında yalnız müşteriye güvenle gösterilebilecek ad, kategori, marka, barkod, satış fiyatı, birim ve bulunabilirlik gibi alanlar vardır; alış fiyatı veya ham stok miktarı yayınlanmaz. AI tüm kataloğu prompta dökmez, müşterinin mesajıyla eşleşen küçük bir ürün/menü grubunu kullanır. AI promptu kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı vermeyecek şekilde sınırlandırılır.
 
 ## Canlı Oda Müsaitliği
 
@@ -225,6 +227,7 @@ publish_menu
 publish_android_snapshot
 publish_ai_settings
 publish_business_context
+publish_ai_catalog
 ```
 
 `publish_ai_settings` yalnız `POST` ve `X-YA-Sync-Secret` header'ı ile çalışır. API anahtarı hiçbir HTTP cevabına eklenmez.

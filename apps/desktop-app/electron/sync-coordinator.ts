@@ -62,7 +62,7 @@ export interface SyncCoordinatorOptions {
   database: DesktopDatabase;
   getSyncConfig: () => { baseUrl: string; syncSecret: string };
   createAndroidSnapshot: () => AndroidOperationsSnapshot;
-  createAiCatalog: () => BusinessAiCatalog;
+  createAiCatalog?: () => BusinessAiCatalog;
   onDashboardChanged: () => void;
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
@@ -536,7 +536,7 @@ export class SyncCoordinator {
   ): Promise<string> {
     if (this.aiCatalogSupported === false) return "";
 
-    const catalog = this.options.createAiCatalog();
+    const catalog = this.options.createAiCatalog?.() ?? { version: 1, updatedAt: "", items: [] };
     const payload = JSON.stringify(catalog);
     if (payload === this.lastAiCatalogPayload) return "";
 
