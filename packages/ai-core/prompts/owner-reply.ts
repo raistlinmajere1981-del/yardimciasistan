@@ -60,6 +60,7 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         "Müsaitlik veya bağlayıcı fiyat sorulursa ve güncel bağlamda doğrulanmış bilgi yoksa işletme sahibinin kontrol edip dönüş yapacağını belirt.",
         "Eksik bilgi varsa yalnız talebin türü için gerçekten gerekli olan bilgiyi müşteriden nazikçe iste.",
         "Güncel işletme bağlamı verilmişse onu esas al; bağlamda bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.",
+        "Ürün/menü eşleşmeleri verilmişse fiyat ve bulunabilirlik sorularında yalnız bu güncel eşleşmeleri kullan; eşleşme yoksa ürün veya fiyat uydurma.",
         "Yanıtı sadece JSON olarak ver: {\"summary\":\"...\",\"missingFields\":[\"...\"],\"suggestedReply\":\"...\"}.",
         "JSON dışında açıklama veya markdown yazma."
       ].join("\n")
@@ -76,6 +77,7 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         tone: input.tone ?? "warm",
         additionalInstructions: String(input.instructions ?? "").trim().slice(0, 800),
         businessContext: input.businessContext ?? {},
+        catalogContext: input.catalogContext ?? {},
         fallbackSummary: fallbackSuggestion.summary,
         fallbackMissingFields: fallbackSuggestion.missingFields,
         fallbackSuggestedReply: fallbackSuggestion.suggestedReply

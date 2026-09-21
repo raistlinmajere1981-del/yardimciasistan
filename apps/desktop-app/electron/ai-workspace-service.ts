@@ -17,6 +17,7 @@ import type {
 } from "./database";
 import { createDesktopAiConfig } from "./ai-config";
 import { createCurrentBusinessAiContext } from "./business-ai-context-service";
+import { createRelevantBusinessAiCatalogContext } from "./business-ai-catalog-service";
 
 export async function createOwnerReplySuggestionForRequest(
   database: DesktopDatabase,
@@ -32,6 +33,7 @@ export async function createOwnerReplySuggestionForRequest(
 
   const setup = database.getSetupData();
   const businessContext = createCurrentBusinessAiContext(database);
+  const catalogContext = createRelevantBusinessAiCatalogContext(database, request.message);
   const suggestion = await generateOwnerReplySuggestion(
     {
       businessName: setup.businessName || "Yardımcı Asistan",
@@ -41,7 +43,8 @@ export async function createOwnerReplySuggestionForRequest(
       guestCount: request.guest_count,
       message: request.message,
       tone: "warm",
-      businessContext
+      businessContext,
+      catalogContext
     },
     createDesktopAiConfig(database, setup)
   );
@@ -101,7 +104,8 @@ export async function generateAiWorkspaceEntry(
         message: request.message,
         tone: "warm",
         instructions,
-        businessContext
+        businessContext,
+        catalogContext: createRelevantBusinessAiCatalogContext(database, request.message)
       },
       config
     );

@@ -68,6 +68,7 @@ export interface OwnerReplyInput {
   tone?: "warm" | "formal" | "short";
   instructions?: string;
   businessContext?: object;
+  catalogContext?: object;
 }
 
 export interface OwnerReplySuggestion {
