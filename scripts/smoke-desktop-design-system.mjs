@@ -164,7 +164,7 @@ try {
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
   await page.getByLabel('Şifre belirleyin', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('design-test-password');
-  await page.getByLabel('Güncelleme sunucusu', { exact: true }).fill('https://updates.example.test/custom');
+  await page.getByRole('textbox', { name: /Güncelleme sunucusu/ }).fill('https://updates.example.test/custom');
   await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
   expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
