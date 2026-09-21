@@ -108,6 +108,11 @@ import type { MarketBarcodeFastPullState } from "./commerce-ipc-contract";
 import type { DeleteCatalogCategoryResult } from "./commerce-category-store";
 import type { CommerceStoreSnapshot } from "./commerce-store";
 import type { InventoryCountResult } from "./commerce-runtime";
+import type {
+  DesktopUpdateActionResult,
+  DesktopUpdatePreferencesInput,
+  DesktopUpdateStatus
+} from "./desktop-update-service";
 
 interface AiConnectionTestInput {
   provider: string;
@@ -245,6 +250,12 @@ export interface DesktopBridge {
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => Promise<DesktopStockImageAnalyzeResult>;
   cancelStockImageAnalysis: (importId: string) => Promise<boolean>;
   applyStockImageImport: (input: ApplyStockImageImportInput) => Promise<DesktopStockImageApplyResult>;
+  getUpdateStatus: () => Promise<DesktopUpdateStatus>;
+  checkForUpdates: (force?: boolean) => Promise<DesktopUpdateStatus>;
+  downloadUpdate: () => Promise<DesktopUpdateStatus>;
+  saveUpdatePreferences: (input: DesktopUpdatePreferencesInput) => Promise<DesktopUpdateActionResult>;
+  restartAndInstallUpdate: () => Promise<DesktopUpdateActionResult>;
+  onUpdateStatusChanged: (listener: (status: DesktopUpdateStatus) => void) => () => void;
   openExternal: (url: string) => Promise<boolean>;
 }
 
@@ -405,6 +416,16 @@ const bridge: DesktopBridge = {
   analyzeStockImage: (input: DesktopStockImageAnalyzeInput) => ipcRenderer.invoke("stockImage:analyze", input),
   cancelStockImageAnalysis: (importId: string) => ipcRenderer.invoke("stockImage:cancel", importId),
   applyStockImageImport: (input: ApplyStockImageImportInput) => ipcRenderer.invoke("stockImage:apply", input),
+  getUpdateStatus: () => ipcRenderer.invoke("update:getStatus"),
+  checkForUpdates: (force = true) => ipcRenderer.invoke("update:check", force),
+  downloadUpdate: () => ipcRenderer.invoke("update:download"),
+  saveUpdatePreferences: (input: DesktopUpdatePreferencesInput) => ipcRenderer.invoke("update:savePreferences", input),
+  restartAndInstallUpdate: () => ipcRenderer.invoke("update:restartAndInstall"),
+  onUpdateStatusChanged: (listener: (status: DesktopUpdateStatus) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: DesktopUpdateStatus) => listener(status);
+    ipcRenderer.on("update:statusChanged", handler);
+    return () => ipcRenderer.removeListener("update:statusChanged", handler);
+  },
   openExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url)
 };
 
