@@ -4,7 +4,12 @@ import type {
   DesktopSetupData,
   SaveInitialSetupInput
 } from "../../electron/database";
-import { normalizeBirthdaySettings, type BirthdaySettings } from "@yardimci-asistan/shared";
+import {
+  getBusinessProfile,
+  normalizeBirthdaySettings,
+  type BirthdaySettings,
+  type BusinessCapability
+} from "@yardimci-asistan/shared";
 
 interface TableCategoryFormState {
   key: string;
@@ -28,6 +33,7 @@ export interface AiServiceFormDraft {
 export interface SetupFormState {
   businessName: string;
   profileId: string;
+  profileOptions: BusinessCapability[];
   phone: string;
   whatsapp: string;
   email: string;
@@ -86,6 +92,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
   return {
     businessName: setupData.businessName || "",
     profileId: setupData.profileId || "pension_restaurant",
+    profileOptions: [...setupData.profileOptions],
     phone: setupData.phone || "",
     whatsapp: setupData.whatsapp || "",
     email: setupData.email || "",
@@ -117,6 +124,10 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     tableCategories: toTableCategoryForm(setupData),
     birthdaySettings: normalizeBirthdaySettings(setupData.birthdaySettings)
   };
+}
+
+export function createProfileOptionDefaults(profileId: string): BusinessCapability[] {
+  return [...getBusinessProfile(profileId).defaultOptionalCapabilities];
 }
 
 let tableCategoryFormSequence = 0;

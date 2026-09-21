@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import {
   BUSINESS_CAPABILITIES,
   createId,
+  getBusinessProfile,
   normalizeBirthdaySettings,
   normalizeBusinessType,
   type BusinessCapability
@@ -31,6 +32,8 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
   const aiService = normalizeStoredAiService(settings?.ai_service);
   const aiProfiles = getStoredAiServiceProfiles(db);
   const activeAiProfile = aiProfiles.find((profile) => profile.service === aiService);
+  const profileId = normalizeBusinessType(String(business?.profile_id ?? ""));
+  const profile = getBusinessProfile(profileId);
   const setupCompleted = Number(settings?.setup_completed ?? 0) === 1;
   const setupRequired =
     !setupCompleted ||
@@ -42,7 +45,8 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     setupRequired,
     appPasswordConfigured: Boolean(String(settings?.app_password_verifier ?? "").trim()),
     businessName,
-    profileId: normalizeBusinessType(String(business?.profile_id ?? "")),
+    profileId,
+    profileOptions: profile.optionalCapabilities.filter((capability) => enabledCapabilities.has(capability)),
     phone: String(business?.phone ?? ""),
     whatsapp: String(business?.whatsapp ?? ""),
     email: String(business?.email ?? ""),

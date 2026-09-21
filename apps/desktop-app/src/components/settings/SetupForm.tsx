@@ -13,6 +13,7 @@ import { formatDateTime } from "../../app/record-formatters";
 import {
   aiServicePresets,
   createDefaultAiServiceDraft,
+  createProfileOptionDefaults,
   isAiServiceProfileStored,
   nextTableCategoryFormKey,
   normalizeAiService,
@@ -27,6 +28,7 @@ import type {
   SettingsSaveState
 } from "../../app/settings-save";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
+import { BusinessProfileOptionEditor } from "./BusinessCapabilitySettings";
 import { PasswordSettings } from "../security/PasswordSettings";
 import { RoomManagementSection } from "./RoomManagementSection";
 import { ActionButton } from "../ui/ActionButton";
@@ -150,6 +152,14 @@ export function SetupForm({
 
   const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
     onFormChange({ ...form, [key]: value });
+  };
+
+  const updateProfile = (profileId: string) => {
+    onFormChange({
+      ...form,
+      profileId,
+      profileOptions: createProfileOptionDefaults(profileId)
+    });
   };
 
   const updateBirthday = <Key extends keyof SetupFormState["birthdaySettings"],>(
@@ -428,7 +438,6 @@ export function SetupForm({
           <a href="#settings-operations">İşletme düzeni</a>
           <a href="#settings-connections">Servisler</a>
           <a href="#settings-application">Uygulama</a>
-          {!setupData.setupRequired && <a href="#settings-capabilities">Özellikler</a>}
         </nav>
 
         <div id="settings-business" className="setup-section settings-identity-section">
@@ -442,12 +451,17 @@ export function SetupForm({
             </label>
             <label className="form-field form-field--medium">
               Sektör tipi
-              <select value={form.profileId} onChange={(event) => update("profileId", event.target.value)}>
+              <select value={form.profileId} onChange={(event) => updateProfile(event.target.value)}>
                 {getBusinessProfiles().map((profile) => (
                   <option value={profile.id} key={profile.id}>{profile.label}</option>
                 ))}
               </select>
             </label>
+            <BusinessProfileOptionEditor
+              profileId={form.profileId}
+              selectedCapabilities={form.profileOptions}
+              onChange={(profileOptions) => update("profileOptions", profileOptions)}
+            />
           </div>
           <div className="form-row">
             <label className="form-field form-field--short">

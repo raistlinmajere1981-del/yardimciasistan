@@ -1,3 +1,4 @@
+import { getBusinessProfile } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
 
 export const defaultDashboardData: DesktopDashboardData = {
@@ -50,6 +51,7 @@ export const defaultSetupData: DesktopSetupData = {
   appPasswordConfigured: false,
   businessName: "",
   profileId: "pension_restaurant",
+  profileOptions: [...getBusinessProfile("pension_restaurant").defaultOptionalCapabilities],
   phone: "",
   whatsapp: "",
   email: "",

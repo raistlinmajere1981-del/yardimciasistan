@@ -44,6 +44,9 @@ export interface BusinessProfileDefinition {
   id: BusinessType;
   label: string;
   description: string;
+  requiredCapabilities: BusinessCapability[];
+  optionalCapabilities: BusinessCapability[];
+  defaultOptionalCapabilities: BusinessCapability[];
   defaultCapabilities: BusinessCapability[];
 }
 
@@ -90,42 +93,80 @@ export const CORE_BUSINESS_CAPABILITIES: BusinessCapability[] = [
   C.DEVICES
 ];
 
-const STANDARD_CONNECTED_CAPABILITIES: BusinessCapability[] = [
-  C.WHATSAPP,
-  C.ANDROID
-];
-
-const ACCOMMODATION_CAPABILITIES: BusinessCapability[] = [
+const ACCOMMODATION_REQUIRED_CAPABILITIES: BusinessCapability[] = [
   C.ACCOMMODATION_ROOMS,
   C.ACCOMMODATION_RESERVATIONS,
   C.ACCOMMODATION_STAYS,
   C.ACCOMMODATION_FOLIO
 ];
 
-const FOOD_SERVICE_CAPABILITIES: BusinessCapability[] = [
+const FOOD_SERVICE_REQUIRED_CAPABILITIES: BusinessCapability[] = [
   C.FOOD_TABLES,
-  C.FOOD_RESERVATIONS,
   C.FOOD_ORDERS,
   C.FOOD_MENU,
-  C.QR_MENU,
   C.CATALOG,
-  C.INVENTORY,
   C.SALES
 ];
 
-const RETAIL_CAPABILITIES: BusinessCapability[] = [
+const FOOD_SERVICE_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
+  C.FOOD_RESERVATIONS,
+  C.QR_MENU,
+  C.INVENTORY,
+  C.CUSTOMER_CREDIT
+];
+
+const FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
+  C.FOOD_RESERVATIONS,
+  C.QR_MENU,
+  C.INVENTORY
+];
+
+const RETAIL_REQUIRED_CAPABILITIES: BusinessCapability[] = [
   C.CATALOG,
   C.INVENTORY,
   C.SALES,
-  C.CUSTOMER_CREDIT,
-  C.RETAIL_BARCODE,
+  C.RETAIL_BARCODE
+];
+
+const RETAIL_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
   C.RETAIL_PURCHASING,
   C.RETAIL_SUPPLIERS,
-  C.RETAIL_LABELS
+  C.RETAIL_LABELS,
+  C.CUSTOMER_CREDIT
+];
+
+const RETAIL_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
+  C.RETAIL_PURCHASING,
+  C.RETAIL_SUPPLIERS
 ];
 
 function uniqueCapabilities(...groups: BusinessCapability[][]): BusinessCapability[] {
   return [...new Set(groups.flat())];
+}
+
+function createBusinessProfile(
+  id: BusinessType,
+  label: string,
+  description: string,
+  requiredCapabilities: BusinessCapability[],
+  optionalCapabilities: BusinessCapability[],
+  defaultOptionalCapabilities: BusinessCapability[]
+): BusinessProfileDefinition {
+  const allowedOptional = new Set(optionalCapabilities);
+  const normalizedDefaults = defaultOptionalCapabilities.filter((capability) => allowedOptional.has(capability));
+  return {
+    id,
+    label,
+    description,
+    requiredCapabilities: [...requiredCapabilities],
+    optionalCapabilities: [...optionalCapabilities],
+    defaultOptionalCapabilities: [...normalizedDefaults],
+    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
+      CORE_BUSINESS_CAPABILITIES,
+      requiredCapabilities,
+      normalizedDefaults
+    ))
+  };
 }
 
 export function getBusinessCapabilityDependencies(capability: BusinessCapability): readonly BusinessCapability[] {
@@ -179,57 +220,46 @@ export function getEnabledBusinessCapabilityDependents(
 }
 
 export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> = {
-  pension_restaurant: {
-    id: "pension_restaurant",
-    label: "Pansiyon + Restoran/Kafe",
-    description: "Konaklama ve yiyecek-içecek operasyonları aynı işletme omurgasında çalışır.",
-    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
-      CORE_BUSINESS_CAPABILITIES,
-      STANDARD_CONNECTED_CAPABILITIES,
-      ACCOMMODATION_CAPABILITIES,
-      FOOD_SERVICE_CAPABILITIES
-    ))
-  },
-  pension: {
-    id: "pension",
-    label: "Pansiyon",
-    description: "Konaklama, müşteri, finans, web ve saha operasyonları için hazır profil.",
-    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
-      CORE_BUSINESS_CAPABILITIES,
-      STANDARD_CONNECTED_CAPABILITIES,
-      ACCOMMODATION_CAPABILITIES
-    ))
-  },
-  restaurant: {
-    id: "restaurant",
-    label: "Restoran",
-    description: "Masa, sipariş, menü, stok, satış ve saha operasyonları için hazır profil.",
-    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
-      CORE_BUSINESS_CAPABILITIES,
-      STANDARD_CONNECTED_CAPABILITIES,
-      FOOD_SERVICE_CAPABILITIES
-    ))
-  },
-  cafe: {
-    id: "cafe",
-    label: "Kafe",
-    description: "Restoran profilinin daha hafif kullanım biçimi; aynı yiyecek-içecek yeteneklerini kullanır.",
-    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
-      CORE_BUSINESS_CAPABILITIES,
-      STANDARD_CONNECTED_CAPABILITIES,
-      FOOD_SERVICE_CAPABILITIES
-    ))
-  },
-  market: {
-    id: "market",
-    label: "Market / Perakende",
-    description: "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için hazır profil.",
-    defaultCapabilities: expandBusinessCapabilities(uniqueCapabilities(
-      CORE_BUSINESS_CAPABILITIES,
-      STANDARD_CONNECTED_CAPABILITIES,
-      RETAIL_CAPABILITIES
-    ))
-  }
+  pension_restaurant: createBusinessProfile(
+    "pension_restaurant",
+    "Pansiyon + Restoran/Kafe",
+    "Konaklama ve yiyecek-içecek operasyonları aynı işletme omurgasında çalışır.",
+    uniqueCapabilities(ACCOMMODATION_REQUIRED_CAPABILITIES, FOOD_SERVICE_REQUIRED_CAPABILITIES),
+    FOOD_SERVICE_OPTIONAL_CAPABILITIES,
+    FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES
+  ),
+  pension: createBusinessProfile(
+    "pension",
+    "Pansiyon",
+    "Konaklama, müşteri, finans, web ve saha operasyonları için hazır profil.",
+    ACCOMMODATION_REQUIRED_CAPABILITIES,
+    [],
+    []
+  ),
+  restaurant: createBusinessProfile(
+    "restaurant",
+    "Restoran",
+    "Masa, sipariş, menü, stok, satış ve saha operasyonları için hazır profil.",
+    FOOD_SERVICE_REQUIRED_CAPABILITIES,
+    FOOD_SERVICE_OPTIONAL_CAPABILITIES,
+    FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES
+  ),
+  cafe: createBusinessProfile(
+    "cafe",
+    "Kafe",
+    "Restoran profilinin daha hafif kullanım biçimi; aynı yiyecek-içecek yeteneklerini kullanır.",
+    FOOD_SERVICE_REQUIRED_CAPABILITIES,
+    FOOD_SERVICE_OPTIONAL_CAPABILITIES,
+    FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES
+  ),
+  market: createBusinessProfile(
+    "market",
+    "Market / Perakende",
+    "Ürün, barkod, stok, hızlı satış, tedarikçi ve etiket operasyonları için hazır profil.",
+    RETAIL_REQUIRED_CAPABILITIES,
+    RETAIL_OPTIONAL_CAPABILITIES,
+    RETAIL_DEFAULT_OPTIONAL_CAPABILITIES
+  )
 };
 
 export function normalizeBusinessType(value: string): BusinessType {
@@ -240,6 +270,21 @@ export function normalizeBusinessType(value: string): BusinessType {
 
 export function getBusinessProfile(value: string): BusinessProfileDefinition {
   return BUSINESS_PROFILES[normalizeBusinessType(value)];
+}
+
+export function getBusinessProfileSelectionCapabilities(
+  value: string,
+  selectedOptionalCapabilities: Iterable<BusinessCapability>
+): BusinessCapability[] {
+  const profile = getBusinessProfile(value);
+  const allowedOptional = new Set(profile.optionalCapabilities);
+  const selected = [...new Set(selectedOptionalCapabilities)]
+    .filter((capability) => allowedOptional.has(capability));
+  return expandBusinessCapabilities(uniqueCapabilities(
+    CORE_BUSINESS_CAPABILITIES,
+    profile.requiredCapabilities,
+    selected
+  ));
 }
 
 export function getBusinessProfiles(): BusinessProfileDefinition[] {

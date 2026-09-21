@@ -4,7 +4,10 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   BUSINESS_CAPABILITIES,
+  CORE_BUSINESS_CAPABILITIES,
   createId,
+  expandBusinessCapabilities,
+  getBusinessProfile,
   normalizeBirthdaySettings,
   normalizeBusinessType,
   validateBirthdaySettings,
@@ -40,10 +43,6 @@ import { applyAndroidDailyTaskAction } from "./android-daily-task-actions.js";
 import { applyAndroidFinanceAction } from "./android-finance-actions.js";
 import { applyAndroidRoomFolioAction } from "./android-room-folio-actions.js";
 import { applyMarketAndroidAction } from "./market-android-actions.js";
-import {
-  applyBusinessProfileCapabilities,
-  setBusinessCapability
-} from "./business-capability-store.js";
 import {
   claimAutomaticBirthdayDelivery,
   getAutomaticBirthdayCandidates,
@@ -220,6 +219,68 @@ export type {
   DesktopSyncRuntimeStatus,
   ApplyAndroidActionResult,
 } from "./database-types.js";
+
+interface ReplaceStoredBusinessCapabilitiesInput {
+  businessId: string;
+  profileId: string;
+  selectedOptionalCapabilities: BusinessCapability[];
+  whatsappEnabled: boolean;
+  androidEnabled: boolean;
+  aiEnabled: boolean;
+  now: string;
+}
+
+function replaceStoredBusinessCapabilities(
+  db: DatabaseSync,
+  input: ReplaceStoredBusinessCapabilitiesInput
+) {
+  const profile = getBusinessProfile(input.profileId);
+  const allowedOptional = new Set(profile.optionalCapabilities);
+  const selectedOptional = [...new Set(input.selectedOptionalCapabilities)]
+    .filter((capability) => allowedOptional.has(capability));
+  const serviceCapabilities: BusinessCapability[] = [
+    ...(input.whatsappEnabled ? [BUSINESS_CAPABILITIES.WHATSAPP] : []),
+    ...(input.androidEnabled ? [BUSINESS_CAPABILITIES.ANDROID] : []),
+    ...(input.aiEnabled ? [BUSINESS_CAPABILITIES.AI] : [])
+  ];
+  const enabled = new Set(expandBusinessCapabilities([
+    ...CORE_BUSINESS_CAPABILITIES,
+    ...profile.requiredCapabilities,
+    ...selectedOptional,
+    ...serviceCapabilities
+  ]));
+  const systemCapabilities = new Set(CORE_BUSINESS_CAPABILITIES);
+  const userCapabilities = new Set<BusinessCapability>([
+    ...selectedOptional,
+    ...serviceCapabilities
+  ]);
+
+  const statement = db.prepare(`
+    INSERT INTO business_capabilities (
+      business_id, capability_id, is_enabled, source, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(business_id, capability_id) DO UPDATE SET
+      is_enabled = excluded.is_enabled,
+      source = excluded.source,
+      updated_at = excluded.updated_at
+  `);
+
+  for (const capability of Object.values(BUSINESS_CAPABILITIES)) {
+    const source = systemCapabilities.has(capability)
+      ? "system"
+      : userCapabilities.has(capability)
+        ? "user"
+        : "profile";
+    statement.run(
+      input.businessId,
+      capability,
+      enabled.has(capability) ? 1 : 0,
+      source,
+      input.now,
+      input.now
+    );
+  }
+}
 
 export class DesktopDatabase {
   private readonly db: DatabaseSync;
@@ -1393,21 +1454,21 @@ export class DesktopDatabase {
       } else {
         ensureStoredInitialTables(this.db, normalizeInteger(input.initialCounts.tables), now);
       }
+
+      replaceStoredBusinessCapabilities(this.db, {
+        businessId,
+        profileId: input.profileId,
+        selectedOptionalCapabilities: input.profileOptions,
+        whatsappEnabled: input.servicePreferences.whatsapp,
+        androidEnabled: input.servicePreferences.android,
+        aiEnabled: input.aiEnabled,
+        now
+      });
+
       this.db.exec("COMMIT");
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
-    }
-
-    applyBusinessProfileCapabilities(this.databasePath, input.profileId, {
-      preserveUserOverrides: true
-    });
-    for (const [capability, enabled] of [
-      [BUSINESS_CAPABILITIES.WHATSAPP, input.servicePreferences.whatsapp],
-      [BUSINESS_CAPABILITIES.ANDROID, input.servicePreferences.android],
-      [BUSINESS_CAPABILITIES.AI, input.aiEnabled]
-    ] as const) {
-      setBusinessCapability(this.databasePath, { capability, enabled });
     }
 
     const enabledCapabilities = new Set(this.getEnabledBusinessCapabilities());

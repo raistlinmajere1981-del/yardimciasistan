@@ -139,6 +139,7 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
     const input: SaveInitialSetupInput = {
       businessName: setupForm.businessName,
       profileId: setupForm.profileId,
+      profileOptions: setupForm.profileOptions,
       phone: setupForm.phone,
       whatsapp: setupForm.whatsapp,
       email: setupForm.email,

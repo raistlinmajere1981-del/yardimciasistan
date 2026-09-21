@@ -7,7 +7,8 @@ import type {
   StockImageAnalysis,
   StockImageApplyLine,
   StockImageImportSource,
-  ProductDataProviderId
+  ProductDataProviderId,
+  BusinessCapability
 } from "@yardimci-asistan/shared";
 import type {
   AndroidDeviceRole,
@@ -406,6 +407,7 @@ export interface DesktopSetupData {
   appPasswordConfigured: boolean;
   businessName: string;
   profileId: string;
+  profileOptions: BusinessCapability[];
   phone: string;
   whatsapp: string;
   email: string;
@@ -440,6 +442,7 @@ export interface DesktopSetupData {
 export interface SaveInitialSetupInput {
   businessName: string;
   profileId: string;
+  profileOptions: BusinessCapability[];
   phone: string;
   whatsapp: string;
   email: string;

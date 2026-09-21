@@ -1,11 +1,7 @@
 import { useRef } from "react";
 import type { ComponentProps } from "react";
-import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
+import { getBusinessProfileSelectionCapabilities } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "../../app/setup-model";
-import {
-  BusinessCapabilityEditor,
-  getEffectiveSetupCapabilities
-} from "./BusinessCapabilitySettings";
 import { BusinessPublicProfileSection } from "./BusinessPublicProfileSection";
 import { SetupForm } from "./SetupForm";
 import type { SettingsSaveSectionHandle } from "../../app/settings-save";
@@ -18,45 +14,21 @@ type SettingsWorkspaceProps = Omit<SetupFormProps, "form" | "onFormChange" | "en
 
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const publicProfileSaveRef = useRef<SettingsSaveSectionHandle | null>(null);
-  const capabilityRuntime = useBusinessCapabilityRuntime();
-  const effectiveCapabilities = getEffectiveSetupCapabilities(
+  const effectiveCapabilities = getBusinessProfileSelectionCapabilities(
     props.form.profileId,
-    capabilityRuntime.snapshot
+    props.form.profileOptions
   );
-  // Existing device controls mutate the persisted business immediately. Keep
-  // their visibility anchored to the persisted snapshot until a pending profile
-  // selection is actually saved. First setup has no persisted business yet, so
-  // the selected profile defaults remain the correct preview there.
-  const deviceRuntimeCapabilities = capabilityRuntime.snapshot?.businessId
-    ? capabilityRuntime.snapshot.enabledCapabilities
-    : effectiveCapabilities;
+
   return (
     <div className="setup-capabilities">
       <SetupForm
         {...props}
-        enabledCapabilities={deviceRuntimeCapabilities}
+        enabledCapabilities={effectiveCapabilities}
         publicProfileSaveRef={publicProfileSaveRef}
-        publicProfile={capabilityRuntime.snapshot?.businessId ? (
+        publicProfile={!props.setupData.setupRequired ? (
           <BusinessPublicProfileSection businessAddress={props.form.address} saveHandleRef={publicProfileSaveRef} />
         ) : null}
       />
-
-
-
-      {capabilityRuntime.snapshot?.businessId && (
-        <BusinessCapabilityEditor
-          profileId={props.form.profileId}
-          snapshot={capabilityRuntime.snapshot}
-          state={capabilityRuntime.state}
-          message={capabilityRuntime.message}
-          onSetCapability={(capability, enabled) => {
-            void capabilityRuntime.setCapability(capability, enabled);
-          }}
-          onClearOverride={(capability) => {
-            void capabilityRuntime.clearOverride(capability);
-          }}
-        />
-      )}
     </div>
   );
 }
