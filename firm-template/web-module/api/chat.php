@@ -69,7 +69,8 @@ $businessContext = ya_chat_load_business_context();
 $effectiveBusinessConfig = ya_chat_merge_business_context($businessConfig, $businessContext);
 $profileId = ya_chat_string($effectiveBusinessConfig['profile_id'] ?? '');
 $knowledgeDocuments = ya_chat_load_knowledge(YA_KNOWLEDGE_DIR, $profileId);
-$result = ya_chat_generate_reply($effectiveBusinessConfig, $aiConfig, $payload, $message, $knowledgeDocuments, $businessContext);
+$catalogContext = ya_chat_find_catalog_matches(ya_chat_load_ai_catalog(), $message, 8);
+$result = ya_chat_generate_reply($effectiveBusinessConfig, $aiConfig, $payload, $message, $knowledgeDocuments, $businessContext, $catalogContext);
 $conversationId = ya_chat_create_id('ai_conv_');
 $now = date(DATE_ATOM);
 $requestDraft = ya_chat_extract_request($effectiveBusinessConfig, $payload, $message, $now);
@@ -409,7 +410,7 @@ function ya_chat_report_decimal(float $value): string
     return rtrim(rtrim(number_format(round($value, 3), 3, '.', ''), '0'), '.') ?: '0';
 }
 
-function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $payload, string $message, array $knowledgeDocuments, array $businessContext): array
+function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $payload, string $message, array $knowledgeDocuments, array $businessContext, array $catalogContext): array
 {
     $enabled = ya_chat_bool($aiConfig['enabled'] ?? false);
     $provider = ya_chat_string($aiConfig['provider'] ?? 'disabled') ?: 'disabled';
@@ -448,7 +449,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
         'model' => $model,
         'api_key' => $apiKey,
         'timeout_seconds' => ya_chat_int($aiConfig['timeout_seconds'] ?? 15, 15),
-        'messages' => ya_chat_build_messages($businessConfig, $payload, $message, $knowledgeDocuments, $businessContext)
+        'messages' => ya_chat_build_messages($businessConfig, $payload, $message, $knowledgeDocuments, $businessContext, $catalogContext)
     ];
     $chatResult = $service === 'gemini'
         ? ya_chat_call_google_ai_studio($chatOptions)
@@ -467,13 +468,13 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
     ];
 }
 
-function ya_chat_build_messages(array $businessConfig, array $payload, string $message, array $knowledgeDocuments, array $businessContext): array
+function ya_chat_build_messages(array $businessConfig, array $payload, string $message, array $knowledgeDocuments, array $businessContext, array $catalogContext): array
 {
     $history = $payload['history'] ?? [];
     $messages = [
         [
             'role' => 'system',
-            'content' => ya_chat_build_system_prompt($businessConfig, $knowledgeDocuments, $businessContext)
+            'content' => ya_chat_build_system_prompt($businessConfig, $knowledgeDocuments, $businessContext, $catalogContext)
         ]
     ];
 
@@ -505,7 +506,7 @@ function ya_chat_build_messages(array $businessConfig, array $payload, string $m
     return $messages;
 }
 
-function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocuments, array $businessContext): string
+function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocuments, array $businessContext, array $catalogContext): string
 {
     $businessName = ya_chat_string(
         $businessContext['business_name']
@@ -518,6 +519,7 @@ function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocu
         $knowledge[] = '## ' . $document['title'] . "\n" . $document['content'];
     }
     $currentContext = ya_chat_business_context_text($businessContext);
+    $catalogText = ya_chat_catalog_context_text($catalogContext);
 
     return implode("\n", [
         $businessName . ' için web sitesinde müşteriye yardımcı olan kısa yanıtlı bir asistansın.',
@@ -528,9 +530,13 @@ function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocu
         'Gerekirse etkin kanallara yönlendir; WhatsApp kapalıysa WhatsApp önermemelisin.',
         'Bilmediğin konuda tahmin yürütme; güncel işletme bağlamında bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.',
         'Güncel işletme bağlamı, aşağıdaki ek bilgi dosyalarıyla çelişirse güncel işletme bağlamını esas al.',
+        'Güncel ürün/menü eşleşmeleri verilmişse fiyat ve bulunabilirlik sorularında yalnız bu eşleşmeleri kullan; eşleşme yoksa ürün veya fiyat uydurma.',
         '',
         'Güncel işletme bağlamı:',
         $currentContext !== '' ? $currentContext : 'Masaüstünden yayınlanmış güncel işletme bağlamı bulunamadı.',
+        '',
+        'Güncel ürün/menü eşleşmeleri:',
+        $catalogText !== '' ? $catalogText : 'Bu soru için güncel ürün veya menü eşleşmesi bulunamadı.',
         '',
         'Ek bilgi dosyaları:',
         $knowledge === [] ? 'Bu sektör için ek bilgi dosyası bulunamadı.' : implode("\n\n", $knowledge)
@@ -945,6 +951,137 @@ function ya_chat_merge_business_context(array $config, array $context): array
         }
     }
     return $config;
+}
+
+function ya_chat_catalog_context_text(array $items): string
+{
+    $lines = [];
+    foreach ($items as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $name = ya_chat_string($item['name'] ?? '');
+        if ($name === '') {
+            continue;
+        }
+        $parts = [$name];
+        $category = ya_chat_string($item['category'] ?? '');
+        $brand = ya_chat_string($item['brand'] ?? '');
+        if ($brand !== '') $parts[] = 'marka: ' . $brand;
+        if ($category !== '') $parts[] = 'kategori: ' . $category;
+        if (is_numeric($item['price'] ?? null)) {
+            $price = (float) $item['price'];
+            $currency = ya_chat_string($item['currency'] ?? 'TRY') ?: 'TRY';
+            $parts[] = 'fiyat: ' . rtrim(rtrim(number_format($price, 2, '.', ''), '0'), '.') . ' ' . $currency;
+        }
+        $description = ya_chat_string($item['description'] ?? '');
+        if ($description !== '') $parts[] = 'açıklama: ' . mb_substr($description, 0, 240);
+        $lines[] = '- ' . implode(' | ', $parts);
+    }
+    return implode("\n", $lines);
+}
+
+function ya_chat_load_ai_catalog(): array
+{
+    try {
+        $catalog = ya_storage_get_publication('ai_catalog', []);
+        unset($catalog['_publication']);
+        return is_array($catalog) ? $catalog : [];
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+function ya_chat_find_catalog_matches(array $catalog, string $query, int $limit): array
+{
+    $items = is_array($catalog['items'] ?? null) ? $catalog['items'] : [];
+    if ($items === []) {
+        return [];
+    }
+
+    $normalizedQuery = ya_chat_catalog_normalize($query);
+    if ($normalizedQuery === '') {
+        return [];
+    }
+    $compactQuery = str_replace(' ', '', $normalizedQuery);
+    $tokens = array_values(array_filter(
+        array_unique(explode(' ', $normalizedQuery)),
+        static fn (string $token): bool => mb_strlen($token) >= 2 && !in_array($token, ya_chat_catalog_stop_words(), true)
+    ));
+    $genericMenu = str_contains($normalizedQuery, 'menu') || str_contains($normalizedQuery, 'menü');
+
+    $scored = [];
+    foreach ($items as $item) {
+        if (!is_array($item) || ($item['available'] ?? false) !== true) {
+            continue;
+        }
+        $source = ya_chat_string($item['source'] ?? '');
+        $name = ya_chat_catalog_normalize($item['name'] ?? '');
+        $brand = ya_chat_catalog_normalize($item['brand'] ?? '');
+        $category = ya_chat_catalog_normalize($item['category'] ?? '');
+        $description = ya_chat_catalog_normalize($item['description'] ?? '');
+        $tags = ya_chat_catalog_normalize(implode(' ', is_array($item['tags'] ?? null) ? $item['tags'] : []));
+        $barcode = preg_replace('/\s+/', '', ya_chat_string($item['barcode'] ?? '')) ?: '';
+        $score = 0;
+
+        if (preg_match('/^\d{6,18}$/', $compactQuery) === 1 && $barcode === $compactQuery) $score += 100;
+        if ($normalizedQuery === $name) $score += 80;
+        if (mb_strlen($normalizedQuery) >= 3 && str_contains($name, $normalizedQuery)) $score += 45;
+        if (mb_strlen($normalizedQuery) >= 3 && $brand !== '' && str_contains($brand, $normalizedQuery)) $score += 20;
+
+        foreach ($tokens as $token) {
+            if ($name === $token) $score += 24;
+            elseif (str_contains($name, $token)) $score += 14;
+            if ($brand !== '' && str_contains($brand, $token)) $score += 7;
+            if ($category !== '' && str_contains($category, $token)) $score += 5;
+            if ($description !== '' && str_contains($description, $token)) $score += 3;
+            if ($tags !== '' && str_contains($tags, $token)) $score += 3;
+            if ($barcode !== '' && $barcode === $token) $score += 100;
+        }
+
+        if ($score === 0 && $tokens === [] && $genericMenu && $source === 'menu') {
+            $score = ($item['featured'] ?? false) === true ? 2 : 1;
+        } elseif ($score > 0 && ($item['featured'] ?? false) === true) {
+            $score += 1;
+        }
+
+        if ($score > 0) {
+            $scored[] = ['score' => $score, 'item' => $item];
+        }
+    }
+
+    usort($scored, static function (array $left, array $right): int {
+        $scoreOrder = ((int) $right['score']) <=> ((int) $left['score']);
+        if ($scoreOrder !== 0) return $scoreOrder;
+        return strcasecmp(
+            ya_chat_string($left['item']['name'] ?? ''),
+            ya_chat_string($right['item']['name'] ?? '')
+        );
+    });
+
+    return array_values(array_map(
+        static fn (array $entry): array => $entry['item'],
+        array_slice($scored, 0, max(1, min(20, $limit)))
+    ));
+}
+
+function ya_chat_catalog_normalize(mixed $value): string
+{
+    $text = mb_strtolower(ya_chat_string($value), 'UTF-8');
+    $text = strtr($text, [
+        'ç' => 'c', 'ğ' => 'g', 'ı' => 'i', 'ö' => 'o', 'ş' => 's', 'ü' => 'u'
+    ]);
+    $text = preg_replace('/[^a-z0-9]+/u', ' ', $text) ?: '';
+    return trim(preg_replace('/\s+/', ' ', $text) ?: '');
+}
+
+function ya_chat_catalog_stop_words(): array
+{
+    return [
+        'acaba', 'adet', 'bir', 'bu', 'bunu', 'da', 'de', 'fiyat', 'fiyati', 'fiyatlar',
+        'icin', 'kac', 'kadar', 'mevcut', 'mi', 'mu', 'nedir', 'ne', 'neler', 'olan',
+        'olarak', 'urun', 'urunler', 'var', 'varmi', 've'
+    ];
 }
 
 function ya_chat_load_business_context(): array

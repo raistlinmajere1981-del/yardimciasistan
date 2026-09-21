@@ -19,7 +19,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if (in_array($action, ['publish_ai_settings', 'publish_business_context'], true)
+if (in_array($action, ['publish_ai_settings', 'publish_business_context', 'publish_ai_catalog'], true)
     && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
@@ -92,6 +92,10 @@ try {
 
     if ($action === 'publish_business_context') {
         ya_sync_publish_business_context($payload);
+    }
+
+    if ($action === 'publish_ai_catalog') {
+        ya_sync_publish_ai_catalog($payload);
     }
 
     ya_sync_response(400, [
@@ -884,6 +888,80 @@ function ya_sync_publish_android_snapshot(array $payload): void
         'published_at' => $now,
         'updated_at' => $publishedSnapshot['updated_at'],
         'task_count' => count($publishedSnapshot['daily_tasks']),
+        'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'],
+        'deduplicated' => $publication['deduplicated']
+    ]);
+}
+
+function ya_sync_publish_ai_catalog(array $payload): void
+{
+    $candidate = $payload['ai_catalog'] ?? null;
+    if (!is_array($candidate) || (int) ($candidate['version'] ?? 0) !== 1) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Yayınlanacak AI ürün kaynağı geçersiz.'
+        ]);
+    }
+
+    $rawItems = $candidate['items'] ?? [];
+    if (!is_array($rawItems)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'AI ürün listesi geçersiz.'
+        ]);
+    }
+
+    $items = [];
+    foreach (array_slice($rawItems, 0, 600) as $rawItem) {
+        if (!is_array($rawItem)) {
+            continue;
+        }
+        $id = mb_substr(ya_sync_string($rawItem['id'] ?? ''), 0, 160);
+        $name = mb_substr(ya_sync_string($rawItem['name'] ?? ''), 0, 240);
+        $source = ya_sync_string($rawItem['source'] ?? '');
+        if ($id === '' || $name === '' || !in_array($source, ['catalog', 'menu'], true)) {
+            continue;
+        }
+        $price = is_numeric($rawItem['price'] ?? null) ? max(0.0, (float) $rawItem['price']) : 0.0;
+        $items[] = [
+            'id' => $id,
+            'source' => $source,
+            'name' => $name,
+            'description' => mb_substr(ya_sync_string($rawItem['description'] ?? ''), 0, 500),
+            'category' => mb_substr(ya_sync_string($rawItem['category'] ?? ''), 0, 160),
+            'brand' => mb_substr(ya_sync_string($rawItem['brand'] ?? ''), 0, 160),
+            'barcode' => mb_substr(ya_sync_string($rawItem['barcode'] ?? ''), 0, 40),
+            'price' => $price,
+            'currency' => mb_substr(ya_sync_string($rawItem['currency'] ?? 'TRY'), 0, 12) ?: 'TRY',
+            'unit' => mb_substr(ya_sync_string($rawItem['unit'] ?? 'piece'), 0, 24) ?: 'piece',
+            'available' => ya_sync_bool($rawItem['available'] ?? false),
+            'featured' => ya_sync_bool($rawItem['featured'] ?? false),
+            'tags' => array_slice(ya_sync_string_array($rawItem['tags'] ?? []), 0, 20)
+        ];
+    }
+
+    $clientId = ya_sync_require_client_id($payload);
+    $now = date(DATE_ATOM);
+    $catalog = [
+        'version' => 1,
+        'updated_at' => mb_substr(ya_sync_string($candidate['updated_at'] ?? ''), 0, 64),
+        'items' => $items
+    ];
+    $publication = ya_storage_publish(
+        'ai_catalog',
+        $catalog,
+        $clientId,
+        null,
+        '',
+        $now
+    );
+
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'AI ürün kaynağı yayınlandı.',
+        'published_at' => $now,
+        'item_count' => count($items),
         'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'],
         'deduplicated' => $publication['deduplicated']
