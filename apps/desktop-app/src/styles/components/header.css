@@ -63,12 +63,13 @@
   min-width: 0;
 }
 .sync-pill > span {
-  max-width: var(--field-width-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: min(42vw, var(--reading-max-width));
+  overflow-wrap: anywhere;
+  white-space: normal;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  text-align: right;
 }
 .app-lock-trigger {
   display: inline-flex;
