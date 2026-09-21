@@ -86,7 +86,7 @@ unset LIVE_SECRET
 node scripts/deploy.mjs --dry-run                    # landing farkını göster
 node scripts/deploy.mjs --dry-run --with-downloads   # landing + installer/APK farkını göster
 node scripts/deploy.mjs --yes                        # yalnız landing'i yayınla
-node scripts/deploy.mjs --yes --with-downloads       # landing + Windows x64 + Android APK
+node scripts/deploy.mjs --yes --with-downloads       # landing + Windows x64/x86 + Android APK
 ```
 
 Deploy sırası:
@@ -99,7 +99,7 @@ Deploy sırası:
 5. `assets/` içeriğini **ekleme/güncelleme** olarak eşitler (`--delete` yok;
    eski hash'li bundle'lar silinmez).
 6. `--with-downloads` verilirse ana monorepodaki güncel release çıktılarının
-   varlığını ve sürüm eşleşmesini doğrular; Windows x64 installer ile Android
+   varlığını ve sürüm eşleşmesini doğrular; Windows x64/x86 installer ile Android
    **release** APK'yi geçici adla yükler, SHA-256 doğrular ve atomic `mv` ile
    `www/downloads/` altında devreye alır.
 7. HTTP smoke yapar: `/` 200, `ya-sync-key` / `window.__YA_SYNC_KEY__`
@@ -111,18 +111,20 @@ Deploy sırası:
 `--with-downloads` için önce ana repo kökünde:
 
 ```bash
-npm run pack:desktop:win
+npm run pack:desktop:windows
 ```
 
 çalıştırılmalıdır. Script şu çıktıları kullanır:
 
 - `dist/desktop/YardimciAsistan-Setup-<desktop-version>.exe`
+- `dist/desktop/YardimciAsistan-Setup-<desktop-version>-x86.exe`
 - `apps/desktop-app/resources/android/yardimci-asistan-release.apk`
 - `apps/desktop-app/resources/android/version.json`
 
 Bunları landing'in beklediği sürümlü adlarla yayınlar:
 
 - `/downloads/YardimciAsistan-Setup-<desktop-version>.exe`
+- `/downloads/YardimciAsistan-Setup-<desktop-version>-x86.exe`
 - `/downloads/YardimciAsistan-Android-<android-version>.apk`
 
 Deploy **asla** şunlara dokunmaz:
