@@ -46,7 +46,9 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     appPasswordConfigured: Boolean(String(settings?.app_password_verifier ?? "").trim()),
     businessName,
     profileId,
-    profileOptions: profile.optionalCapabilities.filter((capability) => enabledCapabilities.has(capability)),
+    profileOptions: setupCompleted
+      ? profile.optionalCapabilities.filter((capability) => enabledCapabilities.has(capability))
+      : [...profile.defaultOptionalCapabilities],
     phone: String(business?.phone ?? ""),
     whatsapp: String(business?.whatsapp ?? ""),
     email: String(business?.email ?? ""),
