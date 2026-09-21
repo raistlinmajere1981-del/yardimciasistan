@@ -434,7 +434,8 @@
         if (business.profile_id) heroMeta.append(metaChip(formatProfileId(business.profile_id)));
 
         const whatsapp = String(business.whatsapp || "").replace(/\D/g, "");
-        if (whatsapp) {
+        const whatsappEnabled = business.whatsapp_enabled === true;
+        if (whatsappEnabled && whatsapp) {
           whatsappLink.href = `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Merhaba, ${displayName} menüsü hakkında bilgi almak istiyorum.`)}`;
           whatsappLink.classList.add("is-visible");
         } else {
