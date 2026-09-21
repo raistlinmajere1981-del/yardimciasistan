@@ -137,6 +137,8 @@ fi
 required_package_files=(
   menu.html
   widget.js
+  api/business.php
+  api/chat.php
   api/menu.php
   api/sync.php
   config/business.json
@@ -393,11 +395,15 @@ for protected_file in data/.htaccess knowledge/.htaccess; do
 done
 
 if command -v curl >/dev/null 2>&1; then
-  printf 'Canlı menü ve API sağlık kontrolü yapılıyor...\n'
+  printf 'Canlı web modülü sağlık kontrolü yapılıyor...\n'
   if ! curl --fail --silent --show-error --max-time 20 \
       "${public_url%/}/menu.html" >/dev/null \
     || ! curl --fail --silent --show-error --max-time 20 \
-      "${public_url%/}/api/menu.php" >/dev/null; then
+      "${public_url%/}/api/menu.php" >/dev/null \
+    || ! curl --fail --silent --show-error --max-time 20 \
+      "${public_url%/}/api/business.php" >/dev/null \
+    || ! curl --fail --silent --show-error --max-time 20 \
+      -X OPTIONS "${public_url%/}/api/chat.php" >/dev/null; then
     printf 'Yayın uygulandı ancak canlı HTTP kontrolü başarısız oldu.\n' >&2
     printf 'Önceki sürüm: %s\n' "$remote_backup" >&2
     exit 1
