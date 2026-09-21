@@ -313,6 +313,7 @@ try {
   await expect(androidDeviceSection.getByText("1 cihaz", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-removed-devices")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Güncelleme Ayarlarını Kaydet", exact: true })).toHaveCount(1);
   await expect(page.locator(".setup-footer")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Panele Dön" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "İşletme", exact: true })).toBeVisible();

@@ -214,7 +214,7 @@ export function UpdateSettings() {
           disabled={busy}
         >
           <Save size={16} aria-hidden="true" />
-          {action === "save" ? "Kaydediliyor" : "Ayarları Kaydet"}
+          {action === "save" ? "Güncelleme Ayarları Kaydediliyor" : "Güncelleme Ayarlarını Kaydet"}
         </ActionButton>
         <ActionButton
           variant="ghost"
