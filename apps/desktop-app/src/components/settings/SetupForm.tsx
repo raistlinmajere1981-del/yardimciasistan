@@ -28,6 +28,7 @@ import type {
   SettingsSaveState
 } from "../../app/settings-save";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
+import { UpdateSettings } from "./UpdateSettings";
 import { BusinessProfileOptionEditor } from "./BusinessCapabilitySettings";
 import { PasswordSettings } from "../security/PasswordSettings";
 import { RoomManagementSection } from "./RoomManagementSection";
@@ -966,6 +967,7 @@ export function SetupForm({
           </div>
           </section>
 
+          {!setupData.setupRequired && <UpdateSettings />}
           <PasswordSettings
             configured={setupData.appPasswordConfigured}
             onConfiguredChange={onAppPasswordConfiguredChange ?? (() => undefined)}
