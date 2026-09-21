@@ -2,17 +2,23 @@
 /**
  * Landing deploy script (landing-only).
  *
- * Deploys ONLY:
+ * Deploys landing code:
  *   www/index.php
  *   www/favicon.png
  *   www/assets/  (add/update, never delete)
+ *
+ * With --with-downloads it also deploys the current release artifacts:
+ *   www/downloads/YardimciAsistan-Setup-<version>.exe
+ *   www/downloads/YardimciAsistan-Android-<version>.apk
  *
  * NEVER touches:
  *   www/yardimci-asistan/** (web module code, config/business.json, data/, sqlite, AI local config)
  *
  * Usage:
  *   node scripts/deploy.mjs --dry-run
+ *   node scripts/deploy.mjs --dry-run --with-downloads
  *   node scripts/deploy.mjs --yes
+ *   node scripts/deploy.mjs --yes --with-downloads
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -22,14 +28,20 @@ import { fileURLToPath } from "node:url";
 import process from "node:process";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const monorepoRoot = join(repoRoot, "..", "..");
 const args = new Set(process.argv.slice(2));
 
 if (args.has("--help") || args.has("-h")) {
   console.log(`Landing deploy (landing-only).
 
 Kullanim:
-  node scripts/deploy.mjs --dry-run   Sunucuda degisiklik yapmadan farki gosterir.
-  node scripts/deploy.mjs --yes       Backup + atomic deploy + HTTP smoke.
+  node scripts/deploy.mjs --dry-run                    Sunucuda degisiklik yapmadan farki gosterir.
+  node scripts/deploy.mjs --dry-run --with-downloads   Landing + kurulum dosyasi farklarini gosterir.
+  node scripts/deploy.mjs --yes                        Backup + atomic deploy + HTTP smoke.
+  node scripts/deploy.mjs --yes --with-downloads       Landing + Windows/APK paketlerini yayinlar.
+
+Secenekler:
+  --with-downloads   Windows x64 installer ve Android release APK'yi /downloads altina yayinlar.
 
 Ortam degiskenleri:
   LANDING_DEPLOY_HOST            SSH hedefi
@@ -42,6 +54,7 @@ Ortam degiskenleri:
 
 const dryRun = args.has("--dry-run");
 const assumeYes = args.has("--yes");
+const withDownloads = args.has("--with-downloads");
 
 const deployHost = process.env.LANDING_DEPLOY_HOST ?? "yardimciasistan@ssh-yardimciasistan.alwaysdata.net";
 const remoteWww = (process.env.LANDING_DEPLOY_WWW ?? "/home/yardimciasistan/www").replace(/\/+$/, "");
@@ -74,9 +87,72 @@ for (const cmd of ["ssh", "scp", "rsync", "php"]) {
 const localIndex = join(repoRoot, "index.php");
 const localFavicon = join(repoRoot, "favicon.png");
 const localAssets = join(repoRoot, "assets");
-const requiredLocal = [localIndex, localFavicon, join(localAssets, "index-t2kNTUv0.js"), join(localAssets, "index-fcReLA3k.css")];
+const landingBundle = join(localAssets, "index-t2kNTUv0.js");
+const requiredLocal = [localIndex, localFavicon, landingBundle, join(localAssets, "index-fcReLA3k.css")];
 for (const f of requiredLocal) {
   if (!existsSync(f)) fail(`Yerel kaynak dosya eksik: ${f}`);
+}
+
+const downloadArtifacts = [];
+if (withDownloads) {
+  const desktopVersion = packageVersion(join(monorepoRoot, "apps", "desktop-app", "package.json"));
+  const androidVersion = packageVersion(join(monorepoRoot, "apps", "android-app", "package.json"));
+  const desktopInstaller = join(monorepoRoot, "dist", "desktop", `YardimciAsistan-Setup-${desktopVersion}.exe`);
+  const androidResourceDir = join(monorepoRoot, "apps", "desktop-app", "resources", "android");
+  const androidApk = join(androidResourceDir, "yardimci-asistan-release.apk");
+  const androidVersionFile = join(androidResourceDir, "version.json");
+
+  for (const f of [desktopInstaller, androidApk, androidVersionFile]) {
+    if (!existsSync(f)) {
+      fail(
+        `Kurulum paketi eksik: ${f}\n` +
+        "Once npm run pack:desktop:win calistirarak Windows installer + release APK hazirlayin."
+      );
+    }
+  }
+
+  const androidResourceVersion = JSON.parse(readFileSync(androidVersionFile, "utf8"));
+  if (androidResourceVersion.variant !== "release") {
+    fail(`Web sitesine debug APK yayinlanamaz: variant=${androidResourceVersion.variant ?? "?"}`);
+  }
+  if (String(androidResourceVersion.versionName ?? "") !== androidVersion) {
+    fail(
+      `Android staged APK surumu uyusmuyor: staged=${androidResourceVersion.versionName ?? "?"}, package=${androidVersion}`
+    );
+  }
+
+  const bundleSource = readFileSync(landingBundle, "utf8");
+  const desktopMarker = `"${desktopVersion}".trim()||"${desktopVersion}"`;
+  const androidMarker = `"${androidVersion}".trim()||"${androidVersion}"`;
+  if (
+    !bundleSource.includes("/downloads/YardimciAsistan-Setup-${kr}.exe") ||
+    !bundleSource.includes("/downloads/YardimciAsistan-Android-${wr}.apk") ||
+    !bundleSource.includes(desktopMarker) ||
+    !bundleSource.includes(androidMarker)
+  ) {
+    fail(
+      "Landing bundle ile release surumleri eslesmiyor. " +
+      "Kurulum dosyalarini yayinlamadan once landing download surumlerini guncelleyin."
+    );
+  }
+
+  downloadArtifacts.push(
+    {
+      label: "Windows x64",
+      source: desktopInstaller,
+      name: `YardimciAsistan-Setup-${desktopVersion}.exe`
+    },
+    {
+      label: "Android",
+      source: androidApk,
+      name: `YardimciAsistan-Android-${androidVersion}.apk`
+    }
+  );
+
+  for (const artifact of downloadArtifacts) {
+    artifact.size = statSize(artifact.source);
+    artifact.sha256 = sha256FileHex(artifact.source);
+  }
 }
 
 step("Yerel PHP syntax kontrolu");
@@ -112,6 +188,7 @@ const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\..+$/, "Z"
 const remoteBackup = `${backupParent}/landing-${stamp}`;
 const remoteTmpIndex = `${remoteWww}/.landing-index-${stamp}.php`;
 const remoteTmpFavicon = `${remoteWww}/.landing-favicon-${stamp}.png`;
+const remoteDownloads = `${remoteWww}/downloads`;
 
 if (dryRun) {
   step("Dry-run: uzak farklar (degisiklik yapilmaz)");
@@ -134,6 +211,22 @@ if (dryRun) {
     `${localAssets}/`,
     `${deployHost}:${remoteWww}/assets/`
   ]);
+  if (withDownloads) {
+    step("Dry-run: kurulum dosyalari");
+    for (const artifact of downloadArtifacts) {
+      const remotePath = `${remoteDownloads}/${artifact.name}`;
+      const remoteHash = sshCapture(
+        `if [ -f '${remotePath}' ]; then php -r 'echo hash_file("sha256", $argv[1]);' '${remotePath}'; else echo __MISSING__; fi`
+      );
+      if (remoteHash === "__MISSING__") {
+        console.log(`${artifact.label}: eklenecek -> /downloads/${artifact.name}`);
+      } else if (remoteHash === artifact.sha256) {
+        console.log(`${artifact.label}: ayni, degisiklik yok -> /downloads/${artifact.name}`);
+      } else {
+        console.log(`${artifact.label}: farkli, guncellenecek -> /downloads/${artifact.name}`);
+      }
+    }
+  }
   console.log("\nDry-run tamamlandi; sunucuda degisiklik yapilmadi.");
   process.exit(0);
 }
@@ -155,6 +248,14 @@ sshRun(
     `[ -d assets ] && cp -a assets ${remoteBackup}/ || true && ls -la ${remoteBackup}/`
 );
 
+if (withDownloads) {
+  sshRun(`mkdir -p ${remoteDownloads} ${remoteBackup}/downloads`);
+  for (const artifact of downloadArtifacts) {
+    const remotePath = `${remoteDownloads}/${artifact.name}`;
+    sshRun(`[ ! -f '${remotePath}' ] || cp -p '${remotePath}' ${remoteBackup}/downloads/`);
+  }
+}
+
 step("Gecici isimle upload + syntax kontrolu");
 runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localIndex, `${deployHost}:${remoteTmpIndex}`]);
 runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", localFavicon, `${deployHost}:${remoteTmpFavicon}`]);
@@ -173,6 +274,24 @@ runLocal("rsync", [
   `${deployHost}:${remoteWww}/assets/`
 ]);
 
+if (withDownloads) {
+  step("Kurulum dosyalari atomik olarak yayinlaniyor");
+  sshRun(`mkdir -p ${remoteDownloads}`);
+  for (const artifact of downloadArtifacts) {
+    const remotePath = `${remoteDownloads}/${artifact.name}`;
+    const remoteTmp = `${remoteDownloads}/.${artifact.name}.${stamp}.tmp`;
+    sshRun(`rm -f '${remoteTmp}'`);
+    runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", artifact.source, `${deployHost}:${remoteTmp}`]);
+    const uploadedHash = sshCapture(`php -r 'echo hash_file("sha256", $argv[1]);' '${remoteTmp}'`);
+    if (uploadedHash !== artifact.sha256) {
+      sshRun(`rm -f '${remoteTmp}'`);
+      fail(`${artifact.label} upload SHA-256 dogrulamasi basarisiz.`);
+    }
+    sshRun(`mv '${remoteTmp}' '${remotePath}'`);
+    console.log(`${artifact.label}: /downloads/${artifact.name} (${formatBytes(artifact.size)})`);
+  }
+}
+
 step("Uzak dogrulama: hardcoded yok, syntax temiz");
 sshRun(`php -l ${remoteWww}/index.php`);
 const remoteGrep = sshCapture(
@@ -187,10 +306,16 @@ console.log("Sunucuda hardcoded yok.");
 
 step("HTTP smoke");
 await smoke(publicUrl, liveSecret);
+if (withDownloads) {
+  await smokeDownloads(publicUrl, downloadArtifacts);
+}
 
 console.log("\nYayin tamamlandi.");
 console.log(`Canli adres: ${publicUrl}`);
 console.log(`Yedek: ${remoteBackup}`);
+if (withDownloads) {
+  console.log("Windows x64 installer ve Android release APK /downloads altinda guncellendi.");
+}
 console.log("Web modulu (config/business.json, data/, sqlite) degistirilmedi.");
 
 // ---------- helpers ----------
@@ -261,6 +386,53 @@ function promptSync(question) {
 }
 function sha256Hex(value) {
   return createHash("sha256").update(value, "utf8").digest("hex");
+}
+function sha256FileHex(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+function statSize(path) {
+  const result = spawnSync("stat", ["-c", "%s", path], { encoding: "utf8" });
+  if (result.status !== 0) fail(`Dosya boyutu okunamadi: ${path}`);
+  const size = Number((result.stdout ?? "").trim());
+  if (!Number.isSafeInteger(size) || size < 1) fail(`Gecersiz dosya boyutu: ${path}`);
+  return size;
+}
+function packageVersion(path) {
+  if (!existsSync(path)) fail(`package.json bulunamadi: ${path}`);
+  const parsed = JSON.parse(readFileSync(path, "utf8"));
+  const version = String(parsed.version ?? "").trim();
+  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+    fail(`Gecersiz package version: ${path}`);
+  }
+  return version;
+}
+function formatBytes(bytes) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
+}
+async function smokeDownloads(base, artifacts) {
+  for (const artifact of artifacts) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(`${base}/downloads/${encodeURIComponent(artifact.name)}`, {
+        method: "HEAD",
+        signal: controller.signal
+      });
+      if (response.status !== 200) {
+        fail(`${artifact.label} HTTP smoke basarisiz: ${response.status}`);
+      }
+      const contentLength = Number(response.headers.get("content-length") ?? 0);
+      if (contentLength > 0 && contentLength !== artifact.size) {
+        fail(
+          `${artifact.label} HTTP boyutu uyusmuyor: remote=${contentLength}, local=${artifact.size}`
+        );
+      }
+      console.log(`${artifact.label} download: 200 (${artifact.name})`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }
 async function smoke(base, secret) {
   const expectedHash = sha256Hex(secret);
