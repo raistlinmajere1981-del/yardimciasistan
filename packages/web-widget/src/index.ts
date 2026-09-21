@@ -39,7 +39,6 @@ interface WidgetConfig {
   aiEnabled: boolean;
   address: string;
   mapUrl: string;
-  avoidFooter: boolean;
 }
 
 interface RequestPayload {
@@ -124,8 +123,7 @@ const defaultConfig: WidgetConfig = {
   publicSurfaces: [],
   aiEnabled: true,
   address: "",
-  mapUrl: "",
-  avoidFooter: false
+  mapUrl: ""
 };
 
 const initialScriptConfig = getScriptConfig();
@@ -143,9 +141,7 @@ let state: WidgetState = {
   whatsappTopic: "",
   context: null
 };
-let footerAvoidanceBound = false;
 let externalActionBound = false;
-let footerPositionFrame = 0;
 let closeAnimationTimer = 0;
 let panelEntrancePending = false;
 let businessContextLoadId = 0;
@@ -253,7 +249,6 @@ function render() {
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
   if (state.isOpen) panelEntrancePending = false;
   bindEvents(root);
-  syncFooterAvoidance();
 }
 
 function buttonTemplate() {
@@ -2931,9 +2926,6 @@ function getScriptConfig(): Partial<WidgetConfig> {
     address: dataset.address,
     mapUrl: dataset.mapUrl
   });
-  if (dataset.avoidFooter === "true" || dataset.avoidFooter === "false") {
-    scriptConfig.avoidFooter = dataset.avoidFooter === "true";
-  }
   const profileId = normalizeBusinessProfileId(dataset.profileId);
   if (profileId) {
     scriptConfig.profileId = profileId;
@@ -3148,71 +3140,6 @@ function focusWidgetElement(selector: string) {
   window.requestAnimationFrame(() => {
     document.querySelector<HTMLElement>(`#${ROOT_ID} ${selector}`)?.focus();
   });
-}
-
-function syncFooterAvoidance() {
-  const root = document.getElementById(ROOT_ID);
-  if (!root) {
-    return;
-  }
-
-  if (!config.avoidFooter) {
-    if (footerAvoidanceBound) {
-      window.removeEventListener("scroll", scheduleFooterPositionUpdate);
-      window.removeEventListener("resize", scheduleFooterPositionUpdate);
-      footerAvoidanceBound = false;
-    }
-    if (footerPositionFrame) {
-      window.cancelAnimationFrame(footerPositionFrame);
-      footerPositionFrame = 0;
-    }
-    root.style.setProperty("--ya-widget-bottom", "18px");
-    return;
-  }
-
-  if (!footerAvoidanceBound) {
-    footerAvoidanceBound = true;
-    window.addEventListener("scroll", scheduleFooterPositionUpdate, { passive: true });
-    window.addEventListener("resize", scheduleFooterPositionUpdate);
-  }
-  updateFooterSafePosition();
-}
-
-function scheduleFooterPositionUpdate() {
-  if (footerPositionFrame) {
-    return;
-  }
-
-  footerPositionFrame = window.requestAnimationFrame(() => {
-    footerPositionFrame = 0;
-    updateFooterSafePosition();
-  });
-}
-
-function updateFooterSafePosition() {
-  const root = document.getElementById(ROOT_ID);
-  if (!root) {
-    return;
-  }
-
-  const defaultBottom = 18;
-  if (!config.avoidFooter || state.isOpen || window.innerWidth <= 520) {
-    root.style.setProperty("--ya-widget-bottom", `${defaultBottom}px`);
-    return;
-  }
-
-  const footer = document.querySelector<HTMLElement>(".site-footer, footer");
-  if (!footer) {
-    root.style.setProperty("--ya-widget-bottom", `${defaultBottom}px`);
-    return;
-  }
-
-  const footerBox = footer.getBoundingClientRect();
-  const footerIsVisible = footerBox.top > 0 && footerBox.top < window.innerHeight && footerBox.bottom > 0;
-  const safeBottom = footerIsVisible
-    ? Math.min(window.innerHeight - 76, Math.ceil(window.innerHeight - footerBox.top + 14))
-    : defaultBottom;
-  root.style.setProperty("--ya-widget-bottom", `${Math.max(defaultBottom, safeBottom)}px`);
 }
 
 function readGuestCount(value: string) {
