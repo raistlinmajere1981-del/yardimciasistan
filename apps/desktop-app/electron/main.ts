@@ -25,7 +25,8 @@ import {
 import type {
   AndroidOperationsSnapshot,
   PushAiSettingsResult,
-  PushAndroidSnapshotResult
+  PushAndroidSnapshotResult,
+  PushBusinessContextResult
 } from "@yardimci-asistan/sync-core";
 import {
   DesktopDatabase,
@@ -70,6 +71,8 @@ import {
   createAiProfileApiKeyUpdates
 } from "./ai-secret-service";
 import { publishSavedAiSettings } from "./ai-settings-publish-service";
+import { publishBusinessAiContext } from "./business-ai-context-service";
+import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
 import { registerAiWorkspaceIpcHandlers } from "./ipc/ai-workspace-ipc";
@@ -546,6 +549,14 @@ function registerIpcHandlers() {
     assertCapability: assertDesktopCapability
   });
 
+  registerBusinessPublicProfileIpcHandlers({
+    databasePath: () => getDatabase().databasePath,
+    assertUnlocked: assertAppSessionUnlocked,
+    onMutation: () => {
+      void publishBusinessAiContextFromMain();
+    }
+  });
+
   ipcMain.handle("sync:setMarketBarcodeFastPull", (event, enabled: unknown) => {
     assertAppSessionUnlocked();
     const shouldEnable = enabled === true;
@@ -718,7 +729,10 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
   reconcileLocalCompanionAdvertisement();
   getSyncCoordinator().scheduleSoon();
 
-  const aiWebSync = await publishSavedAiSettingsFromMain();
+  const [aiWebSync, businessContextWebSync] = await Promise.all([
+    publishSavedAiSettingsFromMain(),
+    publishBusinessAiContextFromMain()
+  ]);
   getSyncCoordinator().restart();
   void birthdayScheduler?.evaluateNow();
   const setupData = getDatabase().getSetupData();
@@ -730,16 +744,20 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
       message: `Ayarlar bu bilgisayarda kaydedildi. Web sitesine uygulanamadı: ${aiWebSync.message}`,
       setupData,
       dashboardData,
-      aiWebSync
+      aiWebSync,
+      businessContextWebSync
     };
   }
 
   return {
     ...localResult,
-    message: "Ayarlar kaydedildi ve AI bağlantısı web sitesinde güncellendi.",
+    message: businessContextWebSync.ok
+      ? "Ayarlar kaydedildi; AI bağlantısı ve işletme bağlamı web sitesinde güncellendi."
+      : `Ayarlar bu bilgisayarda kaydedildi. İşletme AI bağlamı web sitesine uygulanamadı: ${businessContextWebSync.message}`,
     setupData,
     dashboardData,
-    aiWebSync
+    aiWebSync,
+    businessContextWebSync
   };
 }
 
@@ -1259,6 +1277,14 @@ function formatLocalDateKey(date: Date): string {
 async function publishSavedAiSettingsFromMain(): Promise<PushAiSettingsResult> {
   const database = getDatabase();
   return publishSavedAiSettings(
+    database,
+    getWebSyncConfig(database.getSetupData())
+  );
+}
+
+async function publishBusinessAiContextFromMain(): Promise<PushBusinessContextResult> {
+  const database = getDatabase();
+  return publishBusinessAiContext(
     database,
     getWebSyncConfig(database.getSetupData())
   );

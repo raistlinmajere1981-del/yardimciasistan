@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type MutableRefObject } from "react";
 import {
+  BUSINESS_CAPABILITIES,
   BUSINESS_PUBLIC_FEATURE_CATALOG,
   BUSINESS_PUBLIC_PROFILE_LIMITS,
+  hasBusinessCapability,
+  type BusinessCapability,
   type BusinessPublicFeatureId,
   type BusinessPublicProfile,
   type SaveBusinessPublicProfileInput
@@ -28,7 +31,7 @@ interface BusinessPublicProfileDraft {
 
 interface BusinessPublicProfileSectionProps {
   businessAddress: string;
-  profileId: string;
+  enabledCapabilities: BusinessCapability[];
   saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
 }
 
@@ -49,7 +52,7 @@ const EMPTY_DRAFT: BusinessPublicProfileDraft = {
   languages: ""
 };
 
-export function BusinessPublicProfileSection({ businessAddress, profileId, saveHandleRef }: BusinessPublicProfileSectionProps) {
+export function BusinessPublicProfileSection({ businessAddress, enabledCapabilities, saveHandleRef }: BusinessPublicProfileSectionProps) {
   const [draft, setDraft] = useState<BusinessPublicProfileDraft>(EMPTY_DRAFT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -103,7 +106,19 @@ export function BusinessPublicProfileSection({ businessAddress, profileId, saveH
   const mapLongitude = parseMapCoordinate(draft.longitude, -180, 180);
   const hasCompleteMapPoint = mapLatitude !== null && mapLongitude !== null;
   const normalizedBusinessAddress = businessAddress.trim();
-  const showHospitalityDetails = profileId !== "market";
+  const accommodationDetailsEnabled = hasBusinessCapability(
+    enabledCapabilities,
+    BUSINESS_CAPABILITIES.ACCOMMODATION_ROOMS
+  );
+  const foodDetailsEnabled = hasBusinessCapability(
+    enabledCapabilities,
+    BUSINESS_CAPABILITIES.FOOD_MENU
+  ) || hasBusinessCapability(
+    enabledCapabilities,
+    BUSINESS_CAPABILITIES.FOOD_TABLES
+  );
+  const showPublicFeatures = accommodationDetailsEnabled || foodDetailsEnabled;
+  const showBreakfastTimes = accommodationDetailsEnabled || foodDetailsEnabled;
 
   const update = <Key extends keyof BusinessPublicProfileDraft>(
     key: Key,
@@ -355,43 +370,51 @@ export function BusinessPublicProfileSection({ businessAddress, profileId, saveH
             />
           </label>
 
-          {showHospitalityDetails && (
-            <>
-              <fieldset className="business-public-profile-features">
-                <legend>Sunulan özellikler</legend>
-                <div className="business-public-profile-feature-grid">
-                  {BUSINESS_PUBLIC_FEATURE_CATALOG.map((feature) => (
-                    <label className="form-check setup-checkline" key={feature.id}>
-                      <input
-                        type="checkbox"
-                        checked={selectedFeatures.has(feature.id)}
-                        onChange={(event) => toggleFeature(feature.id, event.target.checked)}
-                      />
-                      {feature.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-
-              <div className="form-row business-public-profile-times">
-                <label className="form-field form-field--short">
-                  Giriş saati
-                  <input lang="tr-TR" type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
-                </label>
-                <label className="form-field form-field--short">
-                  Çıkış saati
-                  <input lang="tr-TR" type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
-                </label>
-                <label className="form-field form-field--short">
-                  Kahvaltı başlangıcı
-                  <input lang="tr-TR" type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
-                </label>
-                <label className="form-field form-field--short">
-                  Kahvaltı bitişi
-                  <input lang="tr-TR" type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
-                </label>
+          {showPublicFeatures && (
+            <fieldset className="business-public-profile-features">
+              <legend>Sunulan özellikler</legend>
+              <div className="business-public-profile-feature-grid">
+                {BUSINESS_PUBLIC_FEATURE_CATALOG.map((feature) => (
+                  <label className="form-check setup-checkline" key={feature.id}>
+                    <input
+                      type="checkbox"
+                      checked={selectedFeatures.has(feature.id)}
+                      onChange={(event) => toggleFeature(feature.id, event.target.checked)}
+                    />
+                    {feature.label}
+                  </label>
+                ))}
               </div>
-            </>
+            </fieldset>
+          )}
+
+          {(accommodationDetailsEnabled || showBreakfastTimes) && (
+            <div className="form-row business-public-profile-times">
+              {accommodationDetailsEnabled && (
+                <>
+                  <label className="form-field form-field--short">
+                    Giriş saati
+                    <input lang="tr-TR" type="time" value={draft.checkInTime} onChange={(event) => update("checkInTime", event.target.value)} />
+                  </label>
+                  <label className="form-field form-field--short">
+                    Çıkış saati
+                    <input lang="tr-TR" type="time" value={draft.checkOutTime} onChange={(event) => update("checkOutTime", event.target.value)} />
+                  </label>
+                </>
+              )}
+              {showBreakfastTimes && (
+                <>
+                  <label className="form-field form-field--short">
+                    Kahvaltı başlangıcı
+                    <input lang="tr-TR" type="time" value={draft.breakfastStartTime} onChange={(event) => update("breakfastStartTime", event.target.value)} />
+                  </label>
+                  <label className="form-field form-field--short">
+                    Kahvaltı bitişi
+                    <input lang="tr-TR" type="time" value={draft.breakfastEndTime} onChange={(event) => update("breakfastEndTime", event.target.value)} />
+                  </label>
+                </>
+              )}
+            </div>
           )}
 
           <label className="form-field form-field--fluid form-field--span">

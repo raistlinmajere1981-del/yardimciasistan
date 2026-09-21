@@ -16,6 +16,7 @@ import type {
   AndroidPermissionGroups,
   PublishedQrMenu,
   PushAiSettingsResult,
+  PushBusinessContextResult,
   SyncedCustomerRequest
 } from "@yardimci-asistan/sync-core";
 import type { DesktopBirthdayOverview } from "./birthday-service.js";
@@ -482,6 +483,7 @@ export type DesktopSetupSaveResult =
       setupData: DesktopSetupData;
       dashboardData: DesktopDashboardData;
       aiWebSync?: PushAiSettingsResult;
+      businessContextWebSync?: PushBusinessContextResult;
     }
   | {
       ok: false;

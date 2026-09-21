@@ -16,6 +16,7 @@ import type {
   RequestAiSuggestionResult
 } from "./database";
 import { createDesktopAiConfig } from "./ai-config";
+import { createCurrentBusinessAiContext } from "./business-ai-context-service";
 
 export async function createOwnerReplySuggestionForRequest(
   database: DesktopDatabase,
@@ -30,6 +31,7 @@ export async function createOwnerReplySuggestionForRequest(
   }
 
   const setup = database.getSetupData();
+  const businessContext = createCurrentBusinessAiContext(database);
   const suggestion = await generateOwnerReplySuggestion(
     {
       businessName: setup.businessName || "Yardımcı Asistan",
@@ -38,7 +40,8 @@ export async function createOwnerReplySuggestionForRequest(
       dateText: request.date_text || request.start_date,
       guestCount: request.guest_count,
       message: request.message,
-      tone: "warm"
+      tone: "warm",
+      businessContext
     },
     createDesktopAiConfig(database, setup)
   );
@@ -70,6 +73,7 @@ export async function generateAiWorkspaceEntry(
   }
 
   const setup = database.getSetupData();
+  const businessContext = createCurrentBusinessAiContext(database);
   const instructions = String(input?.instructions ?? "").trim().slice(0, 800);
   const request = mode === "daily" ? null : database.getRequestById(String(input?.requestId ?? ""));
   if (mode !== "daily" && !request) {
@@ -96,7 +100,8 @@ export async function generateAiWorkspaceEntry(
         guestCount: request.guest_count,
         message: request.message,
         tone: "warm",
-        instructions
+        instructions,
+        businessContext
       },
       config
     );
@@ -127,6 +132,7 @@ export async function generateAiWorkspaceEntry(
           businessName: setup.businessName || "Yardımcı Asistan",
           request,
           dashboard,
+          businessContext,
           instructions
         })
       });
@@ -242,13 +248,15 @@ function buildAiWorkspaceMessages(input: {
   businessName: string;
   request: ReturnType<DesktopDatabase["getRequestById"]>;
   dashboard: DesktopDashboardData;
+  businessContext: ReturnType<typeof createCurrentBusinessAiContext>;
   instructions: string;
 }) {
   const commonRules = [
     `${input.businessName} için işletme sahibine yardımcı ol.`,
     "Türkçe, kısa, açık ve uygulanabilir yaz.",
     "Kesin rezervasyon, müsaitlik veya bağlayıcı fiyat onayı verme.",
-    "Olmayan bilgi üretme."
+    "Olmayan bilgi üretme.",
+    "Güncel işletme bağlamında yer almayan sektör, hizmet veya müşteri bilgilerini varsayma."
   ];
   if (input.mode === "summary" && input.request) {
     return [
@@ -259,6 +267,7 @@ function buildAiWorkspaceMessages(input: {
       {
         role: "user" as const,
         content: JSON.stringify({
+          businessContext: input.businessContext,
           request: {
             customer: input.request.customer_name,
             type: input.request.request_type,
@@ -283,6 +292,7 @@ function buildAiWorkspaceMessages(input: {
     {
       role: "user" as const,
       content: JSON.stringify({
+        businessContext: input.businessContext,
         summary: input.dashboard.summary,
         pendingTasks: input.dashboard.dailyTasks.filter((task) => task.status !== "completed").slice(0, 20),
         pendingReservations: input.dashboard.reservations.filter((reservation) => !["confirmed", "cancelled", "completed"].includes(reservation.status)).slice(0, 20),

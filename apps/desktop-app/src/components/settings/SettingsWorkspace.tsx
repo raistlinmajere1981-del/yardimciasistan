@@ -34,7 +34,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         publicProfile={!props.setupData.setupRequired ? (
           <BusinessPublicProfileSection
             businessAddress={props.form.address}
-            profileId={props.form.profileId}
+            enabledCapabilities={effectiveCapabilities}
             saveHandleRef={publicProfileSaveRef}
           />
         ) : null}

@@ -198,7 +198,8 @@ export function useSetupController({ onInitialSetupRequired, onInitialSetupReady
     setSetupFormState(toSetupForm(nextSetupData));
     setSetupDirty(false);
     const aiConnectionCouldNotBePublished = setupForm.aiEnabled && result.aiWebSync?.ok === false;
-    return aiConnectionCouldNotBePublished
+    const businessContextCouldNotBePublished = setupForm.aiEnabled && result.businessContextWebSync?.ok === false;
+    return aiConnectionCouldNotBePublished || businessContextCouldNotBePublished
       ? { ok: false, message: result.message }
       : { ok: true, changed: true, message: "Ayarlar kaydedildi." };
   }
