@@ -90,12 +90,39 @@ export async function markRequestsSyncedOnWeb(
 
 export async function pushMenuToWeb(database: DesktopDatabase): Promise<PushMenuResult> {
   const setup = database.getSetupData();
+  const runtime = database.getSyncRuntimeStatus();
+  const clientId = runtime.clientId.trim();
+
+  if (!clientId) {
+    const result: PushMenuResult = {
+      ok: false,
+      message: "Masaüstü senkron kimliği oluşturulamadı."
+    };
+    database.recordSyncEvent({
+      direction: "push",
+      entityType: "menu",
+      ok: false,
+      message: result.message
+    });
+    return result;
+  }
+
+  const pendingJob = database.getPendingSyncJobs()
+    .find((job) => job.jobType === "menu_publish");
   const result = await pushMenu({
     ...getWebSyncConfig(setup),
+    clientId,
+    ...(pendingJob ? {
+      sourceRevision: pendingJob.sourceRevision,
+      idempotencyKey: `${clientId}:${pendingJob.jobKey}:${pendingJob.sourceRevision}`
+    } : {}),
     menu: database.getQrMenuPublication()
   });
 
   if (result.ok) {
+    if (pendingJob) {
+      database.completeSyncJob(pendingJob.jobKey, pendingJob.sourceRevision);
+    }
     database.markMenuPublished();
     database.recordSyncEvent({
       direction: "push",

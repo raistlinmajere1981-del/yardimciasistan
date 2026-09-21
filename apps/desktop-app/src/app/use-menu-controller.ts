@@ -78,7 +78,7 @@ export function useMenuController({
     const result = await bridge.pushMenu();
     if (!result.ok) {
       setMenuPublishState("error");
-      setMenuStatusMessage("Menü yayınlanamadı. Bağlantıyı kontrol edin.");
+      setMenuStatusMessage(result.message || "Menü yayınlanamadı. Bağlantıyı kontrol edin.");
       return;
     }
 
