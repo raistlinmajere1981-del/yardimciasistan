@@ -23,7 +23,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
@@ -95,6 +95,8 @@ for (const f of requiredLocal) {
 }
 
 const downloadArtifacts = [];
+const updateManifests = [];
+const localDeployTmp = join(repoRoot, ".deploy-tmp");
 if (withDownloads) {
   const desktopVersion = packageVersion(join(monorepoRoot, "apps", "desktop-app", "package.json"));
   const androidVersion = packageVersion(join(monorepoRoot, "apps", "android-app", "package.json"));
@@ -161,6 +163,43 @@ if (withDownloads) {
     artifact.size = statSize(artifact.source);
     artifact.sha256 = sha256FileHex(artifact.source);
   }
+
+  mkdirSync(localDeployTmp, { recursive: true });
+  const publishedAt = new Date().toISOString();
+  const updateNotes = String(process.env.YA_UPDATE_NOTES ?? "")
+    .split(/\r?\n/)
+    .map((note) => note.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+  for (const artifact of downloadArtifacts.filter((item) => item.label.startsWith("Windows "))) {
+    const platformDir = artifact.label === "Windows x86" ? "win-x86" : "win-x64";
+    const arch = artifact.label === "Windows x86" ? "ia32" : "x64";
+    const manifest = {
+      format: "yardimci-asistan-update",
+      version: 1,
+      channel: "stable",
+      appVersion: desktopVersion,
+      publishedAt,
+      platform: "win32",
+      arch,
+      notes: updateNotes,
+      artifact: {
+        file: artifact.name,
+        url: `../../../downloads/${artifact.name}`,
+        size: artifact.size,
+        sha256: artifact.sha256
+      }
+    };
+    const localPath = join(localDeployTmp, `release-${platformDir}.json`);
+    writeFileSync(localPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+    updateManifests.push({
+      label: artifact.label,
+      platformDir,
+      version: desktopVersion,
+      sha256: artifact.sha256,
+      localPath
+    });
+  }
 }
 
 step("Yerel PHP syntax kontrolu");
@@ -197,6 +236,7 @@ const remoteBackup = `${backupParent}/landing-${stamp}`;
 const remoteTmpIndex = `${remoteWww}/.landing-index-${stamp}.php`;
 const remoteTmpFavicon = `${remoteWww}/.landing-favicon-${stamp}.png`;
 const remoteDownloads = `${remoteWww}/downloads`;
+const remoteUpdates = `${remoteWww}/updates/stable`;
 
 if (dryRun) {
   step("Dry-run: uzak farklar (degisiklik yapilmaz)");
@@ -233,6 +273,9 @@ if (dryRun) {
       } else {
         console.log(`${artifact.label}: farkli, guncellenecek -> /downloads/${artifact.name}`);
       }
+    }
+    for (const manifest of updateManifests) {
+      console.log(`${manifest.label} update feed: /updates/stable/${manifest.platformDir}/release.json -> ${manifest.version}`);
     }
   }
   console.log("\nDry-run tamamlandi; sunucuda degisiklik yapilmadi.");
@@ -290,6 +333,16 @@ if (withDownloads) {
     sshRun(`mv '${remoteTmp}' '${remotePath}'`);
     console.log(`${artifact.label}: /downloads/${artifact.name} (${formatBytes(artifact.size)})`);
   }
+
+  step("Desktop guncelleme manifestleri yayinlaniyor");
+  for (const manifest of updateManifests) {
+    const remoteDir = `${remoteUpdates}/${manifest.platformDir}`;
+    const remoteTmp = `${remoteDir}/.release.${stamp}.json`;
+    sshRun(`mkdir -p '${remoteDir}' && rm -f '${remoteTmp}'`);
+    runLocal("scp", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=15", manifest.localPath, `${deployHost}:${remoteTmp}`]);
+    sshRun(`mv '${remoteTmp}' '${remoteDir}/release.json'`);
+    console.log(`${manifest.label}: /updates/stable/${manifest.platformDir}/release.json`);
+  }
 }
 
 step("Uzak dogrulama: hardcoded yok, syntax temiz");
@@ -307,7 +360,7 @@ console.log("Sunucuda hardcoded yok.");
 step("HTTP smoke");
 await smoke(publicUrl, liveSecret);
 if (withDownloads) {
-  await smokeDownloads(publicUrl, downloadArtifacts);
+  await smokeDownloads(publicUrl, downloadArtifacts, updateManifests);
 
   step("Eski kurulum dosyalari temizleniyor");
   const keepNames = downloadArtifacts.map((artifact) => artifact.name);
@@ -317,6 +370,9 @@ if (withDownloads) {
     `-name \'YardimciAsistan-Setup-*.exe\' -o -name \'YardimciAsistan-Android-*.apk\' \\) ` +
     `${keepTests} -delete`
   );
+  for (const manifest of updateManifests) {
+    rmSync(manifest.localPath, { force: true });
+  }
 }
 
 console.log("\nYayin tamamlandi.");
@@ -426,7 +482,7 @@ function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
-async function smokeDownloads(base, artifacts) {
+async function smokeDownloads(base, artifacts, manifests) {
   for (const artifact of artifacts) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 20000);
@@ -445,6 +501,31 @@ async function smokeDownloads(base, artifacts) {
         );
       }
       console.log(`${artifact.label} download: 200 (${artifact.name})`);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  for (const manifest of manifests) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(`${base}/updates/stable/${manifest.platformDir}/release.json`, {
+        headers: { "Cache-Control": "no-cache" },
+        signal: controller.signal
+      });
+      if (response.status !== 200) {
+        fail(`${manifest.label} update manifest HTTP smoke basarisiz: ${response.status}`);
+      }
+      const body = await response.json();
+      if (
+        body?.format !== "yardimci-asistan-update"
+        || body?.appVersion !== manifest.version
+        || body?.artifact?.sha256 !== manifest.sha256
+      ) {
+        fail(`${manifest.label} update manifest icerigi dogrulanamadi.`);
+      }
+      console.log(`${manifest.label} update feed: 200 (${manifest.version})`);
     } finally {
       clearTimeout(timer);
     }
