@@ -102,12 +102,5 @@ Site üzerindeki özel WhatsApp düğmeleri `data-ya-action="contact.whatsapp"` 
 
 ## Footer davranışı
 
-Widget launcher varsayılan olarak viewport'un sağ alt köşesinde sabit kalır; site footer'ı
-görünür olduğunda yukarı taşınmaz. Bir entegrasyon özellikle footer'ın üstünde kalmasını
-istiyorsa script etiketine açıkça şu seçenek eklenebilir:
-
-```html
-data-avoid-footer="true"
-```
-
-Bu seçenek kapalıyken kaydırma sırasında widget'ın `bottom` değeri değişmez.
+Widget launcher viewport'un sağ alt köşesinde sabit kalır. Site footer'ı görünür olduğunda
+yukarı taşınmaz; sayfa kaydırması launcher konumunu değiştirmez.
