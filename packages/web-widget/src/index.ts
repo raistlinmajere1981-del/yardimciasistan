@@ -39,6 +39,7 @@ interface WidgetConfig {
   aiEnabled: boolean;
   address: string;
   mapUrl: string;
+  avoidFooter: boolean;
 }
 
 interface RequestPayload {
@@ -123,7 +124,8 @@ const defaultConfig: WidgetConfig = {
   publicSurfaces: [],
   aiEnabled: true,
   address: "",
-  mapUrl: ""
+  mapUrl: "",
+  avoidFooter: false
 };
 
 const initialScriptConfig = getScriptConfig();
@@ -251,8 +253,7 @@ function render() {
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
   if (state.isOpen) panelEntrancePending = false;
   bindEvents(root);
-  ensureFooterAvoidance();
-  updateFooterSafePosition();
+  syncFooterAvoidance();
 }
 
 function buttonTemplate() {
@@ -2930,6 +2931,9 @@ function getScriptConfig(): Partial<WidgetConfig> {
     address: dataset.address,
     mapUrl: dataset.mapUrl
   });
+  if (dataset.avoidFooter === "true" || dataset.avoidFooter === "false") {
+    scriptConfig.avoidFooter = dataset.avoidFooter === "true";
+  }
   const profileId = normalizeBusinessProfileId(dataset.profileId);
   if (profileId) {
     scriptConfig.profileId = profileId;
@@ -3146,14 +3150,32 @@ function focusWidgetElement(selector: string) {
   });
 }
 
-function ensureFooterAvoidance() {
-  if (footerAvoidanceBound) {
+function syncFooterAvoidance() {
+  const root = document.getElementById(ROOT_ID);
+  if (!root) {
     return;
   }
 
-  footerAvoidanceBound = true;
-  window.addEventListener("scroll", scheduleFooterPositionUpdate, { passive: true });
-  window.addEventListener("resize", scheduleFooterPositionUpdate);
+  if (!config.avoidFooter) {
+    if (footerAvoidanceBound) {
+      window.removeEventListener("scroll", scheduleFooterPositionUpdate);
+      window.removeEventListener("resize", scheduleFooterPositionUpdate);
+      footerAvoidanceBound = false;
+    }
+    if (footerPositionFrame) {
+      window.cancelAnimationFrame(footerPositionFrame);
+      footerPositionFrame = 0;
+    }
+    root.style.setProperty("--ya-widget-bottom", "18px");
+    return;
+  }
+
+  if (!footerAvoidanceBound) {
+    footerAvoidanceBound = true;
+    window.addEventListener("scroll", scheduleFooterPositionUpdate, { passive: true });
+    window.addEventListener("resize", scheduleFooterPositionUpdate);
+  }
+  updateFooterSafePosition();
 }
 
 function scheduleFooterPositionUpdate() {
@@ -3174,7 +3196,7 @@ function updateFooterSafePosition() {
   }
 
   const defaultBottom = 18;
-  if (state.isOpen || window.innerWidth <= 520) {
+  if (!config.avoidFooter || state.isOpen || window.innerWidth <= 520) {
     root.style.setProperty("--ya-widget-bottom", `${defaultBottom}px`);
     return;
   }
