@@ -11,6 +11,7 @@ landing yüzeyi (`www/` kökü) ile ilgilenir. Web modülüne dokunmaz.
 | Katman | Canlı path | Kaynak |
 |---|---|---|
 | Landing (bu repo) | `/home/yardimciasistan/www/index.php` + `/home/yardimciasistan/www/assets/` + `/home/yardimciasistan/www/favicon.png` | Bu repo (`index.php`, `assets/`, `favicon.png`) |
+| Kurulum dosyaları | `/home/yardimciasistan/www/downloads/` | Ana monorepo release çıktıları; yalnız `--with-downloads` ile yayınlanır |
 | Web modülü (ayrı) | `/home/yardimciasistan/www/yardimci-asistan/` | Ana `YardimciAsistan` repo + `scripts/deploy-web.sh` |
 
 Bu repo **asla** `www/yardimci-asistan/` altına yazmaz.
@@ -82,8 +83,10 @@ unset LIVE_SECRET
 ## Deploy
 
 ```bash
-node scripts/deploy.mjs --dry-run   # değişiklik yapmadan farkı göster
-node scripts/deploy.mjs --yes       # backup + atomic deploy + HTTP smoke
+node scripts/deploy.mjs --dry-run                    # landing farkını göster
+node scripts/deploy.mjs --dry-run --with-downloads   # landing + installer/APK farkını göster
+node scripts/deploy.mjs --yes                        # yalnız landing'i yayınla
+node scripts/deploy.mjs --yes --with-downloads       # landing + Windows x64 + Android APK
 ```
 
 Deploy sırası:
@@ -95,10 +98,32 @@ Deploy sırası:
 4. Atomic `mv` ile devreye alır.
 5. `assets/` içeriğini **ekleme/güncelleme** olarak eşitler (`--delete` yok;
    eski hash'li bundle'lar silinmez).
-6. HTTP smoke yapar: `/` 200, `ya-sync-key` / `window.__YA_SYNC_KEY__`
+6. `--with-downloads` verilirse ana monorepodaki güncel release çıktılarının
+   varlığını ve sürüm eşleşmesini doğrular; Windows x64 installer ile Android
+   **release** APK'yi geçici adla yükler, SHA-256 doğrular ve atomic `mv` ile
+   `www/downloads/` altında devreye alır.
+7. HTTP smoke yapar: `/` 200, `ya-sync-key` / `window.__YA_SYNC_KEY__`
    canlı config ile aynı, hardcoded yok, `business.php` / `menu.php` /
    `sync capabilities` / `operations (gerçek secret → ok:true,
-   yanlış secret → 401)` kontrolü.
+   yanlış secret → 401)` kontrolü. Download yayını açıksa iki kurulum
+   dosyasının da HTTP 200 verdiğini ve bildirilen dosya boyutunu doğrular.
+
+`--with-downloads` için önce ana repo kökünde:
+
+```bash
+npm run pack:desktop:win
+```
+
+çalıştırılmalıdır. Script şu çıktıları kullanır:
+
+- `dist/desktop/YardimciAsistan-Setup-<desktop-version>.exe`
+- `apps/desktop-app/resources/android/yardimci-asistan-release.apk`
+- `apps/desktop-app/resources/android/version.json`
+
+Bunları landing'in beklediği sürümlü adlarla yayınlar:
+
+- `/downloads/YardimciAsistan-Setup-<desktop-version>.exe`
+- `/downloads/YardimciAsistan-Android-<android-version>.apk`
 
 Deploy **asla** şunlara dokunmaz:
 
