@@ -25,6 +25,11 @@ import {
   desktopLogWarn,
   initializeDesktopLogging
 } from "./desktop-logger";
+import {
+  applyPendingDesktopUpdateAtStartup,
+  registerDesktopUpdateIpcHandlers,
+  startAutomaticDesktopUpdateChecks
+} from "./desktop-update-service";
 
 const DEV_RELAUNCH_EXIT_CODE = 75;
 
@@ -182,6 +187,14 @@ if (!app.isPackaged && !process.env.YA_DESKTOP_DATA_DIR) {
   }
 }
 
+// The packaged Windows process doubles as the lightweight launcher. A verified
+// installer staged by the previous run is applied before SQLite or the renderer
+// are opened, then the silent NSIS installer relaunches the updated app.
+if (applyPendingDesktopUpdateAtStartup(userDataPath())) {
+  desktopLogInfo("update", "Startup launcher handed control to the update installer.");
+  process.exit(0);
+}
+
 // Restore/reset operations are intentionally applied before main.ts opens the
 // long-lived SQLite connection. This keeps WAL state and live database handles
 // out of destructive maintenance operations.
@@ -238,6 +251,8 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanion
     };
 
     registerDataMaintenanceIpcHandlers(userDataPath);
+    registerDesktopUpdateIpcHandlers(userDataPath);
+    startAutomaticDesktopUpdateChecks(userDataPath);
 
     registerBusinessCapabilityIpcHandlers({
       databasePath,
