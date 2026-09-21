@@ -50,11 +50,11 @@ try {
     "fresh setup must expose the selected profile's default optional capabilities"
   );
 
-  const result = database.saveInitialSetup({
+  const baseSetupInput = {
     businessName: "Temiz Kurulum İşletmesi",
     profileId: "market",
     phone: "+905550000000",
-    whatsapp: "+905550000000",
+    whatsapp: "",
     email: "",
     address: "",
     webModuleUrl: "https://example.test/yardimci-asistan",
@@ -70,9 +70,25 @@ try {
     aiTimeoutSeconds: 30,
     aiApiKey: "",
     clearAiApiKey: false,
-    servicePreferences: { whatsapp: true, android: false },
+    servicePreferences: { whatsapp: false, android: false },
     initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
+  };
+
+  const missingWhatsAppResult = database.saveInitialSetup({
+    ...baseSetupInput,
+    servicePreferences: { whatsapp: true, android: false }
+  });
+  assert.equal(missingWhatsAppResult.ok, false);
+  assert.equal(missingWhatsAppResult.message, "WhatsApp servisi açıkken WhatsApp numarası gerekli.");
+
+  const whatsappDisabledResult = database.saveInitialSetup(baseSetupInput);
+  assert.equal(whatsappDisabledResult.ok, true);
+
+  const result = database.saveInitialSetup({
+    ...baseSetupInput,
+    whatsapp: "+905550000000",
+    servicePreferences: { whatsapp: true, android: false }
   });
 
   assert.equal(result.ok, true);

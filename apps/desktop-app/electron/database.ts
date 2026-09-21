@@ -1085,10 +1085,10 @@ export class DesktopDatabase {
       };
     }
 
-    if (!input.whatsapp.trim()) {
+    if (input.servicePreferences.whatsapp && !input.whatsapp.trim()) {
       return {
         ok: false,
-        message: "WhatsApp numarası gerekli."
+        message: "WhatsApp servisi açıkken WhatsApp numarası gerekli."
       };
     }
 
