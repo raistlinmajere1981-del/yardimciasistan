@@ -22,19 +22,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     ]);
 }
 
-$displayName = ya_business_string($config['display_name'] ?? $config['name'] ?? 'Yardımcı Asistan İşletmesi');
-$whatsapp = ya_business_string($config['whatsapp'] ?? $config['phone'] ?? '');
-$profileId = ya_business_string($config['profile_id'] ?? '');
+$publicContext = ya_business_public_context();
+$displayName = ya_business_string($publicContext['business_name'] ?? $config['display_name'] ?? $config['name'] ?? 'Yardımcı Asistan İşletmesi');
+$phone = ya_business_string($publicContext['phone'] ?? $config['phone'] ?? '');
+$whatsapp = ya_business_string($publicContext['whatsapp'] ?? $config['whatsapp'] ?? $phone);
+$email = ya_business_string($publicContext['email'] ?? $config['email'] ?? '');
+$address = ya_business_string($publicContext['address'] ?? $config['address'] ?? '');
+$profileId = ya_business_string($publicContext['profile_id'] ?? $config['profile_id'] ?? '');
 $runtimeCapabilities = ya_business_public_capabilities();
 $aiEnabled = $runtimeCapabilities === null || in_array('service.ai', $runtimeCapabilities, true);
-$whatsappEnabled = $runtimeCapabilities === null
-    ? $whatsapp !== ''
-    : in_array('service.whatsapp', $runtimeCapabilities, true);
+$whatsappEnabled = array_key_exists('whatsapp_enabled', $publicContext)
+    ? ($publicContext['whatsapp_enabled'] === true)
+    : ($runtimeCapabilities === null
+        ? $whatsapp !== ''
+        : in_array('service.whatsapp', $runtimeCapabilities, true));
 $requestsEnabled = $runtimeCapabilities !== null
     ? in_array('customer.requests', $runtimeCapabilities, true)
     : ya_business_profile_requests_enabled($profileId);
 if ($runtimeCapabilities !== null) {
-    $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, $config);
+    $publicSurfaces = ya_business_capability_public_surfaces($runtimeCapabilities, [
+        ...$config,
+        'address' => $address
+    ]);
 } elseif (array_key_exists('public_surfaces', $config)) {
     $publicSurfaces = ya_business_normalize_public_surfaces($config['public_surfaces']);
 } else {
@@ -52,11 +61,17 @@ ya_business_response(200, [
         'ai_enabled' => $aiEnabled,
         'whatsapp_enabled' => $whatsappEnabled,
         'requests_enabled' => $requestsEnabled,
-        'phone' => ya_business_string($config['phone'] ?? ''),
+        'phone' => $phone,
         'whatsapp' => $whatsapp,
-        'email' => ya_business_string($config['email'] ?? ''),
+        'email' => $email,
         'website' => ya_business_string($config['website'] ?? ''),
-        'address' => ya_business_string($config['address'] ?? ''),
+        'address' => $address,
+        'description' => ya_business_string($publicContext['description'] ?? ''),
+        'directions_note' => ya_business_string($publicContext['directions_note'] ?? ''),
+        'policy_note' => ya_business_string($publicContext['policy_note'] ?? ''),
+        'payment_note' => ya_business_string($publicContext['payment_note'] ?? ''),
+        'languages' => is_array($publicContext['languages'] ?? null) ? array_values($publicContext['languages']) : [],
+        'features' => is_array($publicContext['features'] ?? null) ? array_values($publicContext['features']) : [],
         'map_url' => ya_business_string($config['map_url'] ?? ''),
         'primary_color' => ya_business_color($config['primary_color'] ?? '', '#2f6f5e'),
         'accent_color' => ya_business_color($config['accent_color'] ?? '', '#e47863')
@@ -87,6 +102,17 @@ function ya_business_apply_cors(array $config): void
     header('Access-Control-Allow-Methods: GET, OPTIONS');
     header('Access-Control-Allow-Headers: Content-Type');
     header('Access-Control-Max-Age: 86400');
+}
+
+function ya_business_public_context(): array
+{
+    try {
+        $context = ya_storage_get_publication('business_context', []);
+        unset($context['_publication']);
+        return is_array($context) ? $context : [];
+    } catch (Throwable) {
+        return [];
+    }
 }
 
 function ya_business_public_capabilities(): ?array

@@ -84,7 +84,7 @@ YARDIMCI_ASISTAN_AI_MODEL=...
 YARDIMCI_ASISTAN_AI_API_KEY=...
 ```
 
-Knowledge dosyaları `knowledge/*.md` altından okunur. AI promptu kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı vermeyecek şekilde sınırlandırılır.
+Masaüstündeki firma adı, sektör tipi ve “Müşteriye Açık Bilgiler” alanları ayrıca güncel `business_context` yayını olarak hosting SQLite’ına gönderilir. Web AI bu bağlamı birincil kaynak kabul eder; `knowledge/*.md` dosyaları yalnız ek bilgi kaynağıdır ve sektör tipine göre filtrelenir. Böylece örneğin Market / Perakende profilinde oda, giriş-çıkış veya kahvaltı bilgileri AI bağlamına taşınmaz. AI promptu kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı vermeyecek şekilde sınırlandırılır.
 
 ## Canlı Oda Müsaitliği
 
@@ -224,6 +224,7 @@ update_request_status
 publish_menu
 publish_android_snapshot
 publish_ai_settings
+publish_business_context
 ```
 
 `publish_ai_settings` yalnız `POST` ve `X-YA-Sync-Secret` header'ı ile çalışır. API anahtarı hiçbir HTTP cevabına eklenmez.

@@ -65,8 +65,10 @@ if (mb_strlen($message) > 1200) {
     ]);
 }
 
-$knowledgeDocuments = ya_chat_load_knowledge(YA_KNOWLEDGE_DIR);
-$result = ya_chat_generate_reply($businessConfig, $aiConfig, $payload, $message, $knowledgeDocuments);
+$businessContext = ya_chat_load_business_context();
+$profileId = ya_chat_string($businessContext['profile_id'] ?? $businessConfig['profile_id'] ?? '');
+$knowledgeDocuments = ya_chat_load_knowledge(YA_KNOWLEDGE_DIR, $profileId);
+$result = ya_chat_generate_reply($businessConfig, $aiConfig, $payload, $message, $knowledgeDocuments, $businessContext);
 $conversationId = ya_chat_create_id('ai_conv_');
 $now = date(DATE_ATOM);
 $requestDraft = ya_chat_extract_request($businessConfig, $payload, $message, $now);
@@ -406,7 +408,7 @@ function ya_chat_report_decimal(float $value): string
     return rtrim(rtrim(number_format(round($value, 3), 3, '.', ''), '0'), '.') ?: '0';
 }
 
-function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $payload, string $message, array $knowledgeDocuments): array
+function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $payload, string $message, array $knowledgeDocuments, array $businessContext): array
 {
     $enabled = ya_chat_bool($aiConfig['enabled'] ?? false);
     $provider = ya_chat_string($aiConfig['provider'] ?? 'disabled') ?: 'disabled';
@@ -445,7 +447,7 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
         'model' => $model,
         'api_key' => $apiKey,
         'timeout_seconds' => ya_chat_int($aiConfig['timeout_seconds'] ?? 15, 15),
-        'messages' => ya_chat_build_messages($businessConfig, $payload, $message, $knowledgeDocuments)
+        'messages' => ya_chat_build_messages($businessConfig, $payload, $message, $knowledgeDocuments, $businessContext)
     ];
     $chatResult = $service === 'gemini'
         ? ya_chat_call_google_ai_studio($chatOptions)
@@ -464,13 +466,13 @@ function ya_chat_generate_reply(array $businessConfig, array $aiConfig, array $p
     ];
 }
 
-function ya_chat_build_messages(array $businessConfig, array $payload, string $message, array $knowledgeDocuments): array
+function ya_chat_build_messages(array $businessConfig, array $payload, string $message, array $knowledgeDocuments, array $businessContext): array
 {
     $history = $payload['history'] ?? [];
     $messages = [
         [
             'role' => 'system',
-            'content' => ya_chat_build_system_prompt($businessConfig, $knowledgeDocuments)
+            'content' => ya_chat_build_system_prompt($businessConfig, $knowledgeDocuments, $businessContext)
         ]
     ];
 
@@ -502,26 +504,83 @@ function ya_chat_build_messages(array $businessConfig, array $payload, string $m
     return $messages;
 }
 
-function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocuments): string
+function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocuments, array $businessContext): string
 {
-    $businessName = ya_chat_string($businessConfig['display_name'] ?? $businessConfig['name'] ?? 'İşletme');
+    $businessName = ya_chat_string(
+        $businessContext['business_name']
+            ?? $businessConfig['display_name']
+            ?? $businessConfig['name']
+            ?? 'İşletme'
+    );
     $knowledge = [];
     foreach ($knowledgeDocuments as $document) {
         $knowledge[] = '## ' . $document['title'] . "\n" . $document['content'];
     }
+    $currentContext = ya_chat_business_context_text($businessContext);
 
     return implode("\n", [
         $businessName . ' için web sitesinde müşteriye yardımcı olan kısa yanıtlı bir asistansın.',
         'Türkçe, samimi ve net cevap ver.',
         'Kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı verme.',
-        'Müsaitlik ve fiyat için işletme sahibinin kontrol edip dönüş yapacağını belirt.',
-        'Eksik tarih, saat, kişi sayısı, telefon veya tercih bilgisi varsa en fazla iki kısa soru sor.',
-        'Gerekirse talep formuna veya WhatsApp’a yönlendir.',
-        'Bilmediğin konuda tahmin yürütme; işletme sahibinin dönüş yapacağını söyle.',
+        'Müsaitlik veya bağlayıcı fiyat sorulursa yalnız mevcut güncel bilgiye dayan; yoksa işletme sahibinin kontrol edip dönüş yapacağını belirt.',
+        'Eksik bilgi varsa yalnız kullanıcının sorusu ve mevcut sektör için gerçekten gerekli olan en fazla iki kısa soru sor.',
+        'Gerekirse etkin kanallara yönlendir; WhatsApp kapalıysa WhatsApp önermemelisin.',
+        'Bilmediğin konuda tahmin yürütme; güncel işletme bağlamında bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.',
+        'Güncel işletme bağlamı, aşağıdaki ek bilgi dosyalarıyla çelişirse güncel işletme bağlamını esas al.',
         '',
-        'Firma bilgileri:',
-        $knowledge === [] ? 'Firma bilgi dosyası bulunamadı.' : implode("\n\n", $knowledge)
+        'Güncel işletme bağlamı:',
+        $currentContext !== '' ? $currentContext : 'Masaüstünden yayınlanmış güncel işletme bağlamı bulunamadı.',
+        '',
+        'Ek bilgi dosyaları:',
+        $knowledge === [] ? 'Bu sektör için ek bilgi dosyası bulunamadı.' : implode("\n\n", $knowledge)
     ]);
+}
+
+function ya_chat_business_context_text(array $context): string
+{
+    if ($context === []) {
+        return '';
+    }
+
+    $lines = [];
+    $fields = [
+        'profile_label' => 'Sektör',
+        'business_name' => 'İşletme adı',
+        'phone' => 'Telefon',
+        'email' => 'E-posta',
+        'address' => 'Adres',
+        'description' => 'İşletme açıklaması',
+        'directions_note' => 'Ulaşım',
+        'policy_note' => 'Politika',
+        'payment_note' => 'Ödeme',
+        'check_in_time' => 'Giriş saati',
+        'check_out_time' => 'Çıkış saati',
+        'breakfast_start_time' => 'Kahvaltı başlangıcı',
+        'breakfast_end_time' => 'Kahvaltı bitişi'
+    ];
+    foreach ($fields as $key => $label) {
+        $value = ya_chat_string($context[$key] ?? '');
+        if ($value !== '') {
+            $lines[] = $label . ': ' . $value;
+        }
+    }
+
+    if (ya_chat_bool($context['whatsapp_enabled'] ?? false)) {
+        $whatsapp = ya_chat_string($context['whatsapp'] ?? '');
+        if ($whatsapp !== '') {
+            $lines[] = 'WhatsApp: ' . $whatsapp;
+        }
+    }
+    $languages = array_values(array_filter(array_map('ya_chat_string', is_array($context['languages'] ?? null) ? $context['languages'] : [])));
+    if ($languages !== []) {
+        $lines[] = 'Konuşulan diller: ' . implode(', ', $languages);
+    }
+    $features = array_values(array_filter(array_map('ya_chat_string', is_array($context['features'] ?? null) ? $context['features'] : [])));
+    if ($features !== []) {
+        $lines[] = 'Sunulan özellikler: ' . implode(', ', $features);
+    }
+
+    return implode("\n", $lines);
 }
 
 function ya_chat_call_openai_compatible(array $options): array
@@ -869,9 +928,26 @@ function ya_chat_google_generate_content_url(string $baseUrl, string $model): st
     return rtrim((string) $apiBaseUrl, '/') . '/models/' . rawurlencode(preg_replace('#^models/#', '', trim($model))) . ':generateContent';
 }
 
-function ya_chat_load_knowledge(string $directory): array
+function ya_chat_load_business_context(): array
 {
-    $fileNames = ['firma.md', 'odalar.md', 'restoran.md', 'menu.md', 'sik-sorulan-sorular.md'];
+    try {
+        $context = ya_storage_get_publication('business_context', []);
+        unset($context['_publication']);
+        return is_array($context) ? $context : [];
+    } catch (Throwable) {
+        return [];
+    }
+}
+
+function ya_chat_load_knowledge(string $directory, string $profileId): array
+{
+    $fileNames = match ($profileId) {
+        'pension_restaurant' => ['firma.md', 'odalar.md', 'restoran.md', 'menu.md', 'sik-sorulan-sorular.md'],
+        'pension' => ['firma.md', 'odalar.md', 'sik-sorulan-sorular.md'],
+        'restaurant' => ['firma.md', 'restoran.md', 'menu.md', 'sik-sorulan-sorular.md'],
+        'market' => ['firma.md', 'sik-sorulan-sorular.md'],
+        default => ['firma.md', 'sik-sorulan-sorular.md']
+    };
     $documents = [];
     $usedChars = 0;
     $maxCharsPerFile = 2400;

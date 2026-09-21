@@ -165,6 +165,7 @@ function validateSource() {
 
   const syncEndpoint = readFileSync(join(sourceRoot, "api", "sync.php"), "utf8");
   assert.ok(syncEndpoint.includes("publish_ai_settings"), "api/sync.php AI ayar yayın aksiyonunu içermeli.");
+  assert.ok(syncEndpoint.includes("publish_business_context"), "api/sync.php güncel işletme AI bağlamı yayın aksiyonunu içermeli.");
   assert.ok(syncEndpoint.includes("HTTP_X_YA_SYNC_SECRET"), "AI ayar yayını header güvenlik anahtarını doğrulamalı.");
   assert.ok(syncEndpoint.includes("enqueue_android_action"), "api/sync.php Android action kuyruğunu içermeli.");
   assert.ok(syncEndpoint.includes("acknowledge_requests"), "api/sync.php cursor onayını içermeli.");

@@ -19,11 +19,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
 $payload = ya_sync_read_payload();
 $action = ya_sync_string($payload['action'] ?? $_GET['action'] ?? 'pull_requests');
 
-if ($action === 'publish_ai_settings' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+if (in_array($action, ['publish_ai_settings', 'publish_business_context'], true)
+    && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST, OPTIONS');
     ya_sync_response(405, [
         'ok' => false,
-        'message' => 'AI ayarlarını yayınlamak için POST isteği gerekli.'
+        'message' => 'Bu ayarı yayınlamak için POST isteği gerekli.'
     ]);
 }
 
@@ -87,6 +88,10 @@ try {
 
     if ($action === 'publish_ai_settings') {
         ya_sync_publish_ai_settings($payload);
+    }
+
+    if ($action === 'publish_business_context') {
+        ya_sync_publish_business_context($payload);
     }
 
     ya_sync_response(400, [
@@ -879,6 +884,78 @@ function ya_sync_publish_android_snapshot(array $payload): void
         'published_at' => $now,
         'updated_at' => $publishedSnapshot['updated_at'],
         'task_count' => count($publishedSnapshot['daily_tasks']),
+        'source_revision' => $publication['source_revision'],
+        'server_revision' => $publication['server_revision'],
+        'deduplicated' => $publication['deduplicated']
+    ]);
+}
+
+function ya_sync_publish_business_context(array $payload): void
+{
+    $candidate = $payload['business_context'] ?? null;
+    if (!is_array($candidate)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'Yayınlanacak işletme bağlamı bulunamadı.'
+        ]);
+    }
+
+    $profileId = ya_sync_string($candidate['profile_id'] ?? '');
+    if (!in_array($profileId, ['pension_restaurant', 'pension', 'restaurant', 'market'], true)) {
+        ya_sync_response(422, [
+            'ok' => false,
+            'message' => 'İşletme sektör tipi geçersiz.'
+        ]);
+    }
+
+    $clientId = ya_sync_require_client_id($payload);
+    $now = date(DATE_ATOM);
+    $languages = array_slice(array_map(
+        static fn (string $value): string => mb_substr($value, 0, 40),
+        ya_sync_string_array($candidate['languages'] ?? [])
+    ), 0, 12);
+    $features = array_slice(array_map(
+        static fn (string $value): string => mb_substr($value, 0, 120),
+        ya_sync_string_array($candidate['features'] ?? [])
+    ), 0, 20);
+
+    $publishedContext = [
+        'version' => 1,
+        'business_name' => mb_substr(ya_sync_string($candidate['business_name'] ?? ''), 0, 160),
+        'profile_id' => $profileId,
+        'profile_label' => mb_substr(ya_sync_string($candidate['profile_label'] ?? ''), 0, 120),
+        'phone' => mb_substr(ya_sync_string($candidate['phone'] ?? ''), 0, 80),
+        'whatsapp' => mb_substr(ya_sync_string($candidate['whatsapp'] ?? ''), 0, 80),
+        'whatsapp_enabled' => ya_sync_bool($candidate['whatsapp_enabled'] ?? false),
+        'email' => mb_substr(ya_sync_string($candidate['email'] ?? ''), 0, 160),
+        'address' => mb_substr(ya_sync_string($candidate['address'] ?? ''), 0, 500),
+        'description' => mb_substr(ya_sync_string($candidate['description'] ?? ''), 0, 1600),
+        'directions_note' => mb_substr(ya_sync_string($candidate['directions_note'] ?? ''), 0, 1200),
+        'policy_note' => mb_substr(ya_sync_string($candidate['policy_note'] ?? ''), 0, 1200),
+        'payment_note' => mb_substr(ya_sync_string($candidate['payment_note'] ?? ''), 0, 800),
+        'languages' => $languages,
+        'features' => $features,
+        'check_in_time' => mb_substr(ya_sync_string($candidate['check_in_time'] ?? ''), 0, 5),
+        'check_out_time' => mb_substr(ya_sync_string($candidate['check_out_time'] ?? ''), 0, 5),
+        'breakfast_start_time' => mb_substr(ya_sync_string($candidate['breakfast_start_time'] ?? ''), 0, 5),
+        'breakfast_end_time' => mb_substr(ya_sync_string($candidate['breakfast_end_time'] ?? ''), 0, 5),
+        'updated_at' => $now
+    ];
+
+    $publication = ya_storage_publish(
+        'business_context',
+        $publishedContext,
+        $clientId,
+        null,
+        '',
+        $now
+    );
+
+    ya_sync_response(200, [
+        'ok' => true,
+        'message' => 'İşletme AI bağlamı yayınlandı.',
+        'published_at' => $now,
+        'profile_id' => $profileId,
         'source_revision' => $publication['source_revision'],
         'server_revision' => $publication['server_revision'],
         'deduplicated' => $publication['deduplicated']
