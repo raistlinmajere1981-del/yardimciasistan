@@ -169,9 +169,18 @@ function readPersistedState(paths: UpdatePaths): PersistedUpdateState {
   const parsed = readJsonFile<Partial<PersistedUpdateState>>(paths.state);
   const defaults = defaultPersistedState();
   if (!parsed || parsed.version !== 1) return defaults;
+  const persistedCustomBaseUrl = typeof parsed.customBaseUrl === "string" ? parsed.customBaseUrl : "";
+  let customBaseUrl = persistedCustomBaseUrl;
+  try {
+    if (customBaseUrl && normalizeBaseUrl(customBaseUrl) === DEFAULT_UPDATE_BASE_URL) {
+      customBaseUrl = "";
+    }
+  } catch {
+    customBaseUrl = "";
+  }
   return {
     version: 1,
-    customBaseUrl: typeof parsed.customBaseUrl === "string" ? parsed.customBaseUrl : "",
+    customBaseUrl,
     autoCheckEnabled: parsed.autoCheckEnabled !== false,
     lastCheckedAt: typeof parsed.lastCheckedAt === "string" ? parsed.lastCheckedAt : "",
     latestVersion: typeof parsed.latestVersion === "string" ? parsed.latestVersion : "",
