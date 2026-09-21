@@ -874,13 +874,16 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
     };
     writeJsonAtomic(paths.installing, installingState);
 
-    // Match electron-builder/electron-updater's NSIS update invocation.
-    // --force-run lets the installer relaunch the application only after the
-    // update transaction has completed, avoiding a race where an external
-    // wrapper could reopen the old executable while NSIS is still replacing it.
+    // Per-machine NSIS installs live under Program Files and require elevation.
+    // electron-builder packages elevate.exe for this purpose; keep the same
+    // invocation contract as electron-updater and let NSIS relaunch the app
+    // only after the update transaction has completed.
+    const installerArgs = ["--updated", "/S", "--force-run"];
+    const elevationHelperPath = path.join(process.resourcesPath, "elevate.exe");
+    const useElevationHelper = fs.existsSync(elevationHelperPath);
     const child = spawn(
-      pending.installerPath,
-      ["--updated", "/S", "--force-run"],
+      useElevationHelper ? elevationHelperPath : pending.installerPath,
+      useElevationHelper ? [pending.installerPath, ...installerArgs] : installerArgs,
       {
         detached: true,
         stdio: "ignore",
