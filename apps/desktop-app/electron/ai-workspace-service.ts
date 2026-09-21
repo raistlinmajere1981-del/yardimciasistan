@@ -260,7 +260,8 @@ function buildAiWorkspaceMessages(input: {
     "Türkçe, kısa, açık ve uygulanabilir yaz.",
     "Kesin rezervasyon, müsaitlik veya bağlayıcı fiyat onayı verme.",
     "Olmayan bilgi üretme.",
-    "Güncel işletme bağlamında yer almayan sektör, hizmet veya müşteri bilgilerini varsayma."
+    "Güncel işletme bağlamında yer almayan sektör, hizmet veya müşteri bilgilerini varsayma.",
+    "Katalog eşleşmesi yoksa bunun ürünün satılmadığını kanıtlamadığını kabul et; yalnız doğrulanamadığını söyle."
   ];
   if (input.mode === "summary" && input.request) {
     return [

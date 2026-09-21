@@ -531,6 +531,7 @@ function ya_chat_build_system_prompt(array $businessConfig, array $knowledgeDocu
         'Bilmediğin konuda tahmin yürütme; güncel işletme bağlamında bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.',
         'Güncel işletme bağlamı, aşağıdaki ek bilgi dosyalarıyla çelişirse güncel işletme bağlamını esas al.',
         'Güncel ürün/menü eşleşmeleri verilmişse fiyat ve bulunabilirlik sorularında yalnız bu eşleşmeleri kullan; eşleşme yoksa ürün veya fiyat uydurma.',
+        'Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz. Eşleşme yoksa yalnız güncel katalogda doğrulayamadığını söyle; işletmenin satmadığı ürün veya ürün kategorileri hakkında çıkarım yapma.',
         '',
         'Güncel işletme bağlamı:',
         $currentContext !== '' ? $currentContext : 'Masaüstünden yayınlanmış güncel işletme bağlamı bulunamadı.',

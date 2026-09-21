@@ -61,6 +61,7 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         "Eksik bilgi varsa yalnız talebin türü için gerçekten gerekli olan bilgiyi müşteriden nazikçe iste.",
         "Güncel işletme bağlamı verilmişse onu esas al; bağlamda bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.",
         "Ürün/menü eşleşmeleri verilmişse fiyat ve bulunabilirlik sorularında yalnız bu güncel eşleşmeleri kullan; eşleşme yoksa ürün veya fiyat uydurma.",
+        "Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz; eşleşme yoksa yalnız güncel katalogda doğrulanamadığını belirt ve satılmayan ürün kategorileri hakkında çıkarım yapma.",
         "Yanıtı sadece JSON olarak ver: {\"summary\":\"...\",\"missingFields\":[\"...\"],\"suggestedReply\":\"...\"}.",
         "JSON dışında açıklama veya markdown yazma."
       ].join("\n")
