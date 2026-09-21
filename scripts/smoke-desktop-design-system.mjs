@@ -109,12 +109,26 @@ try {
   await sectorType.selectOption('market');
   await expect(page.getByText('Sunulan özellikler', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Giriş saati')).toHaveCount(0);
+  await expect(page.getByLabel('Kahvaltı başlangıcı')).toHaveCount(0);
   await expect(page.getByLabel('Ulaşım tarifi')).toBeVisible();
   await expect(page.getByLabel('Genel politika notu')).toBeVisible();
+  await expect(page.getByLabel('Genel politika notu')).toHaveAttribute('placeholder', /İade\/değişim/);
   await expect(page.getByLabel('Ödeme notu')).toBeVisible();
   await expect(page.getByLabel('Konuşulan diller')).toBeVisible();
+
+  await sectorType.selectOption('restaurant');
+  await expect(page.getByText('Sunulan özellikler', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Wi-Fi')).toBeVisible();
+  await expect(page.getByLabel('Bagaj emaneti')).toHaveCount(0);
+  await expect(page.getByLabel('Havalimanı transferi')).toHaveCount(0);
+  await expect(page.getByLabel('Giriş saati')).toHaveCount(0);
+  await expect(page.getByLabel('Kahvaltı başlangıcı')).toHaveCount(0);
+
   await sectorType.selectOption('pension_restaurant');
   await expect(page.getByLabel('Giriş saati')).toHaveValue('14:00');
+  await expect(page.getByLabel('Bagaj emaneti')).toBeVisible();
+  await expect(page.getByLabel('Havalimanı transferi')).toBeVisible();
+  await expect(page.getByLabel('Kahvaltı başlangıcı')).toBeVisible();
 
   const observations = [];
   await expect(page.getByLabel('Telefon', { exact: true })).toHaveValue('');
