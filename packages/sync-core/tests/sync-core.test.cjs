@@ -20,6 +20,7 @@ const {
   markRequestsSynced,
   pullAndroidActions,
   pushAiSettings,
+  pushBusinessContext,
   pushAndroidSnapshot,
   pushMenu,
   pullRequests,
@@ -885,4 +886,57 @@ test("sync requests explain missing and invalid web module endpoints", async (co
     assert.equal(result.status, 200);
     assert.match(result.message, /geçerli bir senkron yanıtı vermedi/);
   });
+});
+
+
+test("pushBusinessContext publishes only profile-aware public business facts", async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, headers: init.headers, body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({
+      ok: true,
+      message: "İşletme AI bağlamı yayınlandı.",
+      published_at: "2026-09-22T10:00:00+03:00",
+      profile_id: "market",
+      source_revision: 3,
+      server_revision: 7,
+      deduplicated: false
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const result = await pushBusinessContext({
+    baseUrl: "https://firma.example/yardimci-asistan",
+    syncSecret: "sync-secret",
+    clientId: "desktop-1",
+    context: {
+      version: 1,
+      businessName: "Nehir Tekel",
+      profileId: "market",
+      profileLabel: "Market / Perakende",
+      phone: "+903121112233",
+      whatsapp: "",
+      whatsappEnabled: false,
+      email: "info@example.test",
+      address: "Örnek Mahallesi",
+      description: "Mahalle marketi.",
+      directionsNote: "Ana caddeden ikinci sokak.",
+      policyNote: "İade koşulları fiş üzerinde belirtilir.",
+      paymentNote: "Nakit ve kart kabul edilir.",
+      languages: ["Türkçe"],
+      features: [],
+      checkInTime: "",
+      checkOutTime: "",
+      breakfastStartTime: "",
+      breakfastEndTime: ""
+    },
+    fetchImpl
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].body.action, "publish_business_context");
+  assert.equal(calls[0].body.client_id, "desktop-1");
+  assert.equal(calls[0].body.business_context.profile_id, "market");
+  assert.equal(calls[0].body.business_context.directions_note, "Ana caddeden ikinci sokak.");
+  assert.deepEqual(calls[0].body.business_context.features, []);
+  assert.equal("sync_secret" in calls[0].body, false);
 });

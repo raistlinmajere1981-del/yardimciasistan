@@ -50,7 +50,8 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         "Türkçe, kısa, sıcak ve işletme sahibinin gönderebileceği doğal bir metin yaz.",
         "Kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı verme.",
         "Müsaitlik ve fiyat bilgisinin işletme sahibi tarafından kontrol edilip dönüş yapılacağını belirt.",
-        "Eksik bilgi varsa müşteriden nazikçe iste.",
+        "Eksik bilgi varsa yalnız talebin türü için gerçekten gerekli olan bilgiyi müşteriden nazikçe iste.",
+        "Güncel işletme bağlamı verilmişse onu esas al; bağlamda bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.",
         "Yanıtı sadece JSON olarak ver: {\"summary\":\"...\",\"missingFields\":[\"...\"],\"suggestedReply\":\"...\"}.",
         "JSON dışında açıklama veya markdown yazma."
       ].join("\n")
@@ -66,6 +67,7 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         message: input.message,
         tone: input.tone ?? "warm",
         additionalInstructions: String(input.instructions ?? "").trim().slice(0, 800),
+        businessContext: input.businessContext ?? {},
         fallbackSummary: fallbackSuggestion.summary,
         fallbackMissingFields: fallbackSuggestion.missingFields,
         fallbackSuggestedReply: fallbackSuggestion.suggestedReply
@@ -163,11 +165,17 @@ function hasUnsafeApprovalLanguage(value: string): boolean {
 function getMissingFields(input: OwnerReplyInput): string[] {
   const missingFields: string[] = [];
 
-  if (!input.dateText.trim()) {
+  const reservationDetailsRequired = [
+    "pension_reservation",
+    "restaurant_reservation",
+    "breakfast_request"
+  ].includes(input.requestType);
+
+  if (reservationDetailsRequired && !input.dateText.trim()) {
     missingFields.push("tarih");
   }
 
-  if (!Number.isFinite(input.guestCount) || input.guestCount < 1) {
+  if (reservationDetailsRequired && (!Number.isFinite(input.guestCount) || input.guestCount < 1)) {
     missingFields.push("kişi sayısı");
   }
 

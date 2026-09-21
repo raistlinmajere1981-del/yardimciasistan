@@ -538,3 +538,61 @@ test("createChatCompletionsUrl accepts full endpoint or base URL", () => {
   assert.equal(createChatCompletionsUrl("https://api.example.test/v1"), "https://api.example.test/v1/chat/completions");
   assert.equal(createChatCompletionsUrl("https://api.example.test/v1/chat/completions"), "https://api.example.test/v1/chat/completions");
 });
+
+
+test("owner reply uses current business context and does not demand reservation fields for market-style info questions", () => {
+  const suggestion = createOwnerReplySuggestion({
+    businessName: "Nehir Tekel",
+    customerName: "Ali",
+    requestType: "location_question",
+    dateText: "",
+    guestCount: 0,
+    message: "Nasıl gelebilirim?",
+    businessContext: {
+      profileId: "market",
+      profileLabel: "Market / Perakende",
+      directionsNote: "Ana caddeden ikinci sokak."
+    }
+  });
+  assert.deepEqual(suggestion.missingFields, []);
+});
+
+test("owner reply prompt carries published business context and forbids sector assumptions", async () => {
+  let sentBody;
+  const result = await generateOwnerReplySuggestion({
+    businessName: "Nehir Tekel",
+    customerName: "Ali",
+    requestType: "general_info",
+    dateText: "",
+    guestCount: 0,
+    message: "Kart geçiyor mu?",
+    businessContext: {
+      profileId: "market",
+      profileLabel: "Market / Perakende",
+      paymentNote: "Nakit ve kart kabul edilir.",
+      checkInTime: ""
+    }
+  }, {
+    enabled: true,
+    provider: "openai_compatible",
+    baseUrl: "https://api.example.test/v1",
+    model: "demo-model",
+    apiKey: "secret"
+  }, async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({
+        summary: "Ödeme yöntemi sorusu",
+        missingFields: [],
+        suggestedReply: "Merhaba Ali, nakit ve kart kabul ediyoruz."
+      }) } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  });
+
+  assert.equal(result.fallback, false);
+  const system = sentBody.messages[0].content;
+  const user = JSON.parse(sentBody.messages[1].content);
+  assert.match(system, /bağlamda bulunmayan sektör/);
+  assert.equal(user.businessContext.profileId, "market");
+  assert.equal(user.businessContext.paymentNote, "Nakit ve kart kabul edilir.");
+});

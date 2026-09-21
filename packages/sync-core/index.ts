@@ -3,6 +3,7 @@ import {
   canConvertRequestToReservation,
   isOperationalTaskAvailable,
   isReservationTypeAvailable,
+  type BusinessAiContext,
   type BusinessCapability,
   type CustomerRequest,
   type ISODateTimeString,
@@ -59,6 +60,11 @@ export interface AiConnectionSettings {
 
 export interface PushAiSettingsOptions extends SyncCoreConfig {
   aiSettings: AiConnectionSettings;
+}
+
+export interface PushBusinessContextOptions extends SyncCoreConfig {
+  clientId: string;
+  context: BusinessAiContext;
 }
 
 export interface SyncedCustomerRequest extends CustomerRequest {
@@ -1231,12 +1237,23 @@ export interface PushAiSettingsSuccess {
   has_api_key: boolean;
 }
 
+export interface PushBusinessContextSuccess {
+  ok: true;
+  message: string;
+  published_at: ISODateTimeString;
+  profile_id: string;
+  source_revision?: number;
+  server_revision?: number;
+  deduplicated?: boolean;
+}
+
 export type PullRequestsResult = PullRequestsSuccess | SyncFailure;
 export type MarkRequestsSyncedResult = MarkRequestsSyncedSuccess | SyncFailure;
 export type AcknowledgeRequestsResult = AcknowledgeRequestsSuccess | SyncFailure;
 export type PushMenuResult = PushMenuSuccess | SyncFailure;
 export type PushAndroidSnapshotResult = PushAndroidSnapshotSuccess | SyncFailure;
 export type PushAiSettingsResult = PushAiSettingsSuccess | SyncFailure;
+export type PushBusinessContextResult = PushBusinessContextSuccess | SyncFailure;
 export type PullAndroidActionsResult = PullAndroidActionsSuccess | SyncFailure;
 export type MarkAndroidActionResultResult = MarkAndroidActionResultSuccess | SyncFailure;
 export type SyncCapabilitiesResult = SyncCapabilitiesSuccess | SyncFailure;
@@ -1379,6 +1396,34 @@ export async function markAndroidActionResult(options: MarkAndroidActionResultOp
     action_id: options.actionId,
     status: options.status,
     error_message: options.errorMessage ?? ""
+  });
+}
+
+export async function pushBusinessContext(options: PushBusinessContextOptions): Promise<PushBusinessContextResult> {
+  return syncRequest<PushBusinessContextSuccess>(options, {
+    action: "publish_business_context",
+    client_id: options.clientId,
+    business_context: {
+      version: options.context.version,
+      business_name: options.context.businessName,
+      profile_id: options.context.profileId,
+      profile_label: options.context.profileLabel,
+      phone: options.context.phone,
+      whatsapp: options.context.whatsapp,
+      whatsapp_enabled: options.context.whatsappEnabled,
+      email: options.context.email,
+      address: options.context.address,
+      description: options.context.description,
+      directions_note: options.context.directionsNote,
+      policy_note: options.context.policyNote,
+      payment_note: options.context.paymentNote,
+      languages: options.context.languages,
+      features: options.context.features,
+      check_in_time: options.context.checkInTime,
+      check_out_time: options.context.checkOutTime,
+      breakfast_start_time: options.context.breakfastStartTime,
+      breakfast_end_time: options.context.breakfastEndTime
+    }
   });
 }
 
