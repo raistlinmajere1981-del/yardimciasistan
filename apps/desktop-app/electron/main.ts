@@ -72,6 +72,7 @@ import {
 } from "./ai-secret-service";
 import { publishSavedAiSettings } from "./ai-settings-publish-service";
 import { publishBusinessAiContext } from "./business-ai-context-service";
+import { createBusinessAiCatalog } from "./business-ai-catalog-service";
 import { registerBusinessPublicProfileIpcHandlers } from "./business-public-profile-ipc";
 import { registerAiSecretIpcHandlers } from "./ipc/ai-secret-ipc";
 import { registerAiConnectionIpcHandlers } from "./ipc/ai-connection-ipc";
@@ -347,6 +348,7 @@ if (!hasSingleInstanceLock) {
       database: desktopDatabase,
       getSyncConfig: () => getWebSyncConfig(getDatabase().getSetupData()),
       createAndroidSnapshot: () => createAndroidOperationsSnapshot(getDatabase().getDashboardData()),
+      createAiCatalog: () => createBusinessAiCatalog(getDatabase()),
       onDashboardChanged: () => {
         markLocalCompanionSnapshotDirty();
         notifyDesktopDashboardChanged(getDatabase().getDashboardData());
@@ -766,6 +768,10 @@ async function saveInitialSetupFromRenderer(input: SaveInitialSetupInput): Promi
 
 export function markLocalCompanionSnapshotDirty(): number {
   return localCompanionServer?.markSnapshotDirty() ?? 0;
+}
+
+export function scheduleAutomaticSyncSoon() {
+  syncCoordinator?.scheduleSoon();
 }
 
 function finalizeAndroidDeviceMutation(result: DesktopAndroidDeviceMutationResult): DesktopAndroidDeviceMutationResult {

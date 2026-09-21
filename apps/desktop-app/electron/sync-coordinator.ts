@@ -1,5 +1,6 @@
 import {
   PhpHostingSyncTransport,
+  pushAiCatalog,
   type AndroidOperationsSnapshot,
   type AndroidSyncAction,
   type SyncCapabilitiesSuccess,
@@ -9,6 +10,7 @@ import {
 import {
   BUSINESS_CAPABILITIES,
   hasBusinessCapability,
+  type BusinessAiCatalog,
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 import {
@@ -60,6 +62,7 @@ export interface SyncCoordinatorOptions {
   database: DesktopDatabase;
   getSyncConfig: () => { baseUrl: string; syncSecret: string };
   createAndroidSnapshot: () => AndroidOperationsSnapshot;
+  createAiCatalog: () => BusinessAiCatalog;
   onDashboardChanged: () => void;
   onStatusChanged: (status: AutomaticSyncStatus) => void;
 }
@@ -82,11 +85,15 @@ export class SyncCoordinator {
   private nextPassiveRunAt = 0;
   private marketBarcodeFastPullActive = false;
   private availabilityHeartbeatSupported: boolean | null = null;
+  private aiCatalogSupported: boolean | null = null;
+  private lastAiCatalogPayload = "";
 
   constructor(private readonly options: SyncCoordinatorOptions) {}
 
   start() {
     this.stop();
+    this.aiCatalogSupported = null;
+    this.lastAiCatalogPayload = "";
     this.emitStatus();
     this.initialTimer = setTimeout(() => {
       this.initialTimer = null;
@@ -329,6 +336,11 @@ export class SyncCoordinator {
       errors.push(availabilityError);
     }
 
+    const aiCatalogError = await this.publishAiCatalogIfChanged(config, clientId);
+    if (aiCatalogError) {
+      errors.push(aiCatalogError);
+    }
+
     const publicationResult = await this.publishOutbox(transport);
     counts.publishedJobs = publicationResult.published;
     errors.push(...publicationResult.errors);
@@ -516,6 +528,53 @@ export class SyncCoordinator {
     } catch {
       return "Canlı müsaitlik yayını sırasında web modülüne ulaşılamadı.";
     }
+  }
+
+  private async publishAiCatalogIfChanged(
+    config: { baseUrl: string; syncSecret: string },
+    clientId: string
+  ): Promise<string> {
+    if (this.aiCatalogSupported === false) return "";
+
+    const catalog = this.options.createAiCatalog();
+    const payload = JSON.stringify(catalog);
+    if (payload === this.lastAiCatalogPayload) return "";
+
+    const runtimeFetch = globalThis.fetch;
+    const result = await pushAiCatalog({
+      ...config,
+      clientId,
+      catalog,
+      ...(runtimeFetch ? { fetchImpl: createSyncFetchWithTimeout(runtimeFetch) } : {})
+    });
+
+    if (result.ok) {
+      this.aiCatalogSupported = true;
+      this.lastAiCatalogPayload = payload;
+      this.options.database.recordSyncEvent({
+        direction: "push",
+        entityType: "ai_catalog",
+        ok: true,
+        recordCount: result.item_count,
+        message: result.message
+      });
+      return "";
+    }
+
+    if ([400, 404, 405].includes(result.status ?? 0)) {
+      this.aiCatalogSupported = false;
+      return "";
+    }
+
+    this.options.database.recordSyncEvent({
+      direction: "push",
+      entityType: "ai_catalog",
+      ok: false,
+      recordCount: 0,
+      message: result.message,
+      status: result.status
+    });
+    return result.message;
   }
 
   private async publishOutbox(transport: SyncTransport): Promise<{ published: number; errors: string[] }> {
