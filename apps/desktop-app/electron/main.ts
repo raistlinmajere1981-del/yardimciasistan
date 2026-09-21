@@ -275,10 +275,24 @@ function createMainWindow() {
     return { action: "deny" };
   });
 
-  window.once("ready-to-show", () => {
+  let mainWindowShown = false;
+  const showMainWindow = () => {
+    if (mainWindowShown || window.isDestroyed()) return;
+    mainWindowShown = true;
     window.maximize();
     window.show();
-  });
+    window.focus();
+  };
+
+  // ready-to-show can be missed on some Windows relaunch paths (notably the
+  // NSIS --force-run path after an update). did-finish-load and a short
+  // fallback keep the relaunched process from remaining alive with a hidden
+  // BrowserWindow.
+  window.once("ready-to-show", showMainWindow);
+  window.webContents.once("did-finish-load", showMainWindow);
+  const showFallback = setTimeout(showMainWindow, 3000);
+  showFallback.unref();
+  window.once("closed", () => clearTimeout(showFallback));
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     void window.loadURL(process.env.VITE_DEV_SERVER_URL);
