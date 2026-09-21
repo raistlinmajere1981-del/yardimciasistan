@@ -261,7 +261,11 @@ function validatePackage(manifest, businessConfig) {
   }
 
   const forbidden = manifest.files.filter((file) => {
-    return file.path.startsWith("node_modules/") || file.path.startsWith("dist/") || file.path.endsWith(".ts") || file.path.includes("/.env");
+    return file.path.startsWith("node_modules/")
+      || file.path.startsWith("dist/")
+      || file.path.endsWith(".ts")
+      || file.path.includes("/.env")
+      || (file.path.startsWith("data/") && file.path.includes(".legacy-backup-"));
   });
   assert.deepEqual(forbidden, [], `Web modül paketinde yayınlanmaması gereken dosya var: ${forbidden.map((file) => file.path).join(", ")}`);
 
@@ -320,6 +324,10 @@ function shouldCopySourcePath(sourcePath) {
 
   if (relativePath === "data/yardimci-asistan.sqlite"
       || relativePath.startsWith("data/yardimci-asistan.sqlite-")) {
+    return false;
+  }
+
+  if (relativePath.startsWith("data/") && relativePath.includes(".legacy-backup-")) {
     return false;
   }
 
