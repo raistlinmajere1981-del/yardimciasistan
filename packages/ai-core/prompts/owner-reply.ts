@@ -26,9 +26,17 @@ export function createOwnerReplySuggestion(input: OwnerReplyInput): OwnerReplySu
 
   const greeting = input.customerName ? `Merhaba ${input.customerName},` : "Merhaba,";
   const missingText = missingFields.length > 0 ? ` Net kontrol için ${missingFields.join(", ")} bilgisini de paylaşabilir misiniz?` : "";
+  const availabilityCheckRequired = [
+    "pension_reservation",
+    "restaurant_reservation",
+    "breakfast_request"
+  ].includes(input.requestType);
+  const responseBody = availabilityCheckRequired
+    ? `${input.businessName} için talebinizi aldık. Müsaitlik ve fiyat bilgisi işletme sahibi tarafından kontrol edilip size dönüş yapılacaktır.`
+    : `${input.businessName} için mesajınızı aldık. Gerekli bilgiyi kontrol edip size dönüş yapacağız.`;
   const suggestedReply = [
     greeting,
-    `${input.businessName} için talebinizi aldık. Müsaitlik ve fiyat bilgisi işletme sahibi tarafından kontrol edilip size dönüş yapılacaktır.${missingText}`,
+    `${responseBody}${missingText}`,
     "Teşekkür ederiz."
   ].join(" ");
 
@@ -49,7 +57,7 @@ export function buildOwnerReplyMessages(input: OwnerReplyInput, fallbackSuggesti
         `${input.businessName} için işletme sahibine WhatsApp cevap taslağı hazırlayan yardımcı asistansın.`,
         "Türkçe, kısa, sıcak ve işletme sahibinin gönderebileceği doğal bir metin yaz.",
         "Kesin rezervasyon, kesin müsaitlik veya bağlayıcı fiyat onayı verme.",
-        "Müsaitlik ve fiyat bilgisinin işletme sahibi tarafından kontrol edilip dönüş yapılacağını belirt.",
+        "Müsaitlik veya bağlayıcı fiyat sorulursa ve güncel bağlamda doğrulanmış bilgi yoksa işletme sahibinin kontrol edip dönüş yapacağını belirt.",
         "Eksik bilgi varsa yalnız talebin türü için gerçekten gerekli olan bilgiyi müşteriden nazikçe iste.",
         "Güncel işletme bağlamı verilmişse onu esas al; bağlamda bulunmayan sektör, hizmet, saat veya özellik bilgisini varsayma.",
         "Yanıtı sadece JSON olarak ver: {\"summary\":\"...\",\"missingFields\":[\"...\"],\"suggestedReply\":\"...\"}.",

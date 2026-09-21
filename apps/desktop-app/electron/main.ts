@@ -429,6 +429,9 @@ if (!hasSingleInstanceLock) {
     createMainWindow();
     syncCoordinator.start();
     birthdayScheduler.start();
+    if (!desktopDatabase.getSetupData().setupRequired) {
+      void publishBusinessAiContextFromMain();
+    }
     void localCompanionServer.start()
       .then(() => {
         reconcileLocalCompanionAdvertisement();
