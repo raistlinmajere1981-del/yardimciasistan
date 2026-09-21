@@ -15,8 +15,9 @@ const setupForm = readFileSync(join(root, "apps/desktop-app/src/components/setti
 const setupController = readFileSync(join(root, "apps/desktop-app/src/app/use-setup-controller.ts"), "utf8");
 const profileIds = getBusinessProfiles().map((profile) => profile.id);
 
-assert.deepEqual(profileIds, ["pension_restaurant", "pension", "restaurant", "cafe", "market"]);
-assert.equal(Object.keys(BUSINESS_PROFILES).length, 5);
+assert.deepEqual(profileIds, ["pension_restaurant", "pension", "restaurant", "market"]);
+assert.equal(Object.keys(BUSINESS_PROFILES).length, 4);
+assert.equal(normalizeBusinessType("cafe"), "restaurant");
 assert.equal(normalizeBusinessType("unknown"), "pension_restaurant");
 assert.equal("other" in BUSINESS_PROFILES, false);
 assert.match(setupForm, /value=\{form\.profileId\}/);
