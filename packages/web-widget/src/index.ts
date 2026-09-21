@@ -37,6 +37,7 @@ interface WidgetConfig {
   profileId: BusinessProfileId | "";
   publicSurfaces: PublicSurface[];
   aiEnabled: boolean;
+  whatsappEnabled: boolean;
   requestsEnabled: boolean;
   address: string;
   mapUrl: string;
@@ -95,6 +96,7 @@ interface PublicBusinessApiResponse {
     accent_color?: string;
     public_surfaces?: unknown[];
     ai_enabled?: boolean;
+    whatsapp_enabled?: boolean;
     requests_enabled?: boolean;
     address?: string;
     map_url?: string;
@@ -124,6 +126,7 @@ const defaultConfig: WidgetConfig = {
   profileId: "",
   publicSurfaces: [],
   aiEnabled: true,
+  whatsappEnabled: true,
   requestsEnabled: true,
   address: "",
   mapUrl: ""
@@ -249,6 +252,7 @@ export function normalizeTRMobilePhone(phone: string): { ok: true; whatsapp: str
 
 function render() {
   const root = getOrCreateRoot();
+  root.dataset.yaWhatsappEnabled = config.whatsappEnabled ? "1" : "0";
   root.innerHTML = state.isOpen ? panelTemplate() : buttonTemplate();
   if (state.isOpen) panelEntrancePending = false;
   bindEvents(root);
@@ -358,7 +362,7 @@ function homeTemplate() {
     }));
   }
 
-  if (config.whatsappPhone.trim()) {
+  if (config.whatsappEnabled && config.whatsappPhone.trim()) {
     actions.push(homeActionCard({
       view: "whatsapp",
       icon: "whatsapp",
@@ -561,7 +565,7 @@ function infoTemplate() {
             ${state.aiLoading ? '<span class="ya-widget-spinner" aria-hidden="true"></span>' : iconTemplate("sparkles")}
             <span>${state.aiLoading ? "Yanıt hazırlanıyor…" : "AI Yardımcıya Sor"}</span>
           </button>
-          ${config.whatsappPhone.trim()
+          ${config.whatsappEnabled && config.whatsappPhone.trim()
             ? `<button class="ya-widget-secondary-action" type="button" data-ya-ai-whatsapp>
                 ${iconTemplate("whatsapp")}
                 <span>WhatsApp'tan Yaz</span>
@@ -2936,6 +2940,9 @@ function getScriptConfig(): Partial<WidgetConfig> {
   if (dataset.aiEnabled === "true" || dataset.aiEnabled === "false") {
     scriptConfig.aiEnabled = dataset.aiEnabled === "true";
   }
+  if (dataset.whatsappEnabled === "true" || dataset.whatsappEnabled === "false") {
+    scriptConfig.whatsappEnabled = dataset.whatsappEnabled === "true";
+  }
   return scriptConfig;
 }
 
@@ -2971,6 +2978,10 @@ function profilePublicSurfaces(profileId: BusinessProfileId | ""): PublicSurface
 function currentPublicSurfaces(): ReadonlySet<PublicSurface> {
   const configured = normalizePublicSurfaces(config.publicSurfaces);
   return new Set(configured.length > 0 ? configured : profilePublicSurfaces(config.profileId));
+}
+
+function isWhatsAppEnabled(): boolean {
+  return config.whatsappEnabled && config.whatsappPhone.trim() !== "";
 }
 
 function isRequestTypeEnabled(requestType: RequestType): boolean {
@@ -3061,12 +3072,17 @@ async function hydrateBusinessContext(loadId: number) {
       address: String(business.address ?? "").trim() || config.address,
       mapUrl: String(business.map_url ?? "").trim() || config.mapUrl,
       aiEnabled: typeof business.ai_enabled === "boolean" ? business.ai_enabled : config.aiEnabled,
+      whatsappEnabled: typeof business.whatsapp_enabled === "boolean" ? business.whatsapp_enabled : config.whatsappEnabled,
       requestsEnabled: typeof business.requests_enabled === "boolean" ? business.requests_enabled : config.requestsEnabled,
       profileId: profileId || config.profileId,
       publicSurfaces: publicSurfaces.length > 0 ? publicSurfaces : config.publicSurfaces
     };
 
-    if ((state.view === "form" && !isRequestTypeEnabled(state.requestType)) || (state.view === "info" && !config.aiEnabled)) {
+    if (
+      (state.view === "form" && !isRequestTypeEnabled(state.requestType))
+      || (state.view === "info" && !config.aiEnabled)
+      || (state.view === "whatsapp" && !isWhatsAppEnabled())
+    ) {
       state = { ...state, view: "home", status: "", aiLoading: false, aiAnswer: "", questionDraft: "" };
     }
     injectStyles(config);
@@ -3089,7 +3105,11 @@ function resolveOpenOptions(options: WidgetOpenOptions): Partial<WidgetState> {
       ? { view: "form", requestType: "restaurant_reservation", context, questionDraft: "" }
       : { view: "home", context: null, questionDraft: "" };
   }
-  if (intent === "contact.whatsapp") return { view: "whatsapp", context, questionDraft: "" };
+  if (intent === "contact.whatsapp") {
+    return isWhatsAppEnabled()
+      ? { view: "whatsapp", context, questionDraft: "" }
+      : { view: "home", context: null, questionDraft: "" };
+  }
   if (intent === "directions") return { view: "directions", context, questionDraft: context?.question ?? "" };
   if (intent === "accommodation.info" || intent === "info") {
     if (!config.aiEnabled) return { view: "home", context: null, questionDraft: "" };

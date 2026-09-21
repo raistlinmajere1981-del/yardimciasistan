@@ -246,7 +246,7 @@ function renderSuccess(form: HTMLFormElement, whatsappMessage: string) {
   const actions = document.createElement("div");
   actions.className = "ya-widget-request-success-actions";
 
-  if (runtimeConfig.whatsappPhone.trim()) {
+  if (isWhatsAppAvailable()) {
     const whatsappButton = document.createElement("button");
     whatsappButton.type = "button";
     whatsappButton.className = "ya-widget-secondary-action";
@@ -274,7 +274,7 @@ function renderSuccess(form: HTMLFormElement, whatsappMessage: string) {
 }
 
 function showWhatsAppFallback(form: HTMLFormElement, message: string) {
-  if (!runtimeConfig.whatsappPhone.trim() || form.querySelector("[data-ya-request-fallback]")) return;
+  if (!isWhatsAppAvailable() || form.querySelector("[data-ya-request-fallback]")) return;
   const button = document.createElement("button");
   button.type = "button";
   button.className = "ya-widget-secondary-action ya-widget-request-fallback";
@@ -285,6 +285,11 @@ function showWhatsAppFallback(form: HTMLFormElement, message: string) {
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   });
   form.querySelector<HTMLButtonElement>('button[type="submit"]')?.insertAdjacentElement("afterend", button);
+}
+
+function isWhatsAppAvailable(): boolean {
+  const root = document.querySelector<HTMLElement>(ROOT_SELECTOR);
+  return root?.dataset.yaWhatsappEnabled !== "0" && runtimeConfig.whatsappPhone.trim() !== "";
 }
 
 function setFormBusy(form: HTMLFormElement, busy: boolean) {

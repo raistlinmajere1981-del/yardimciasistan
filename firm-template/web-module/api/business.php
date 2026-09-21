@@ -27,6 +27,9 @@ $whatsapp = ya_business_string($config['whatsapp'] ?? $config['phone'] ?? '');
 $profileId = ya_business_string($config['profile_id'] ?? '');
 $runtimeCapabilities = ya_business_public_capabilities();
 $aiEnabled = $runtimeCapabilities === null || in_array('service.ai', $runtimeCapabilities, true);
+$whatsappEnabled = $runtimeCapabilities === null
+    ? $whatsapp !== ''
+    : in_array('service.whatsapp', $runtimeCapabilities, true);
 $requestsEnabled = $runtimeCapabilities !== null
     ? in_array('customer.requests', $runtimeCapabilities, true)
     : ya_business_profile_requests_enabled($profileId);
@@ -47,6 +50,7 @@ ya_business_response(200, [
         'profile_id' => $profileId,
         'public_surfaces' => $publicSurfaces,
         'ai_enabled' => $aiEnabled,
+        'whatsapp_enabled' => $whatsappEnabled,
         'requests_enabled' => $requestsEnabled,
         'phone' => ya_business_string($config['phone'] ?? ''),
         'whatsapp' => $whatsapp,

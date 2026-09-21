@@ -62,6 +62,7 @@ try {
       snapshot: {
         business_capabilities: [
           "service.ai",
+          "service.whatsapp",
           "core.customers",
           "customer.requests",
           "accommodation.rooms",
@@ -82,6 +83,7 @@ try {
   const publicBusinessAfterSync = await publicBusinessAfterSyncResponse.json();
   expect(publicBusinessAfterSync.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
   expect(publicBusinessAfterSync.business.ai_enabled).toBe(true);
+  expect(publicBusinessAfterSync.business.whatsapp_enabled).toBe(true);
   expect(publicBusinessAfterSync.business.requests_enabled).toBe(true);
 
   browser = await launchChromiumForSmoke(chromium);
@@ -330,6 +332,7 @@ try {
   expect(aiDisabledBusinessResponse.status).toBe(200);
   const aiDisabledBusiness = await aiDisabledBusinessResponse.json();
   expect(aiDisabledBusiness.business.ai_enabled).toBe(false);
+  expect(aiDisabledBusiness.business.whatsapp_enabled).toBe(false);
   expect(aiDisabledBusiness.business.requests_enabled).toBe(true);
 
   const aiDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -337,6 +340,7 @@ try {
   await injectWidget(aiDisabledPage, baseUrl);
   await aiDisabledPage.getByRole("button", { name: "Yardımcı Asistan'ı aç" }).click();
   await expect(aiDisabledPage.locator('[data-ya-view="info"]')).toHaveCount(0);
+  await expect(aiDisabledPage.locator('[data-ya-view="whatsapp"]')).toHaveCount(0);
   await expect(aiDisabledPage.locator(".ya-widget-header strong")).toHaveText("Deniz Çiçeği Yardımcısı");
   await aiDisabledPage.close();
 
@@ -351,6 +355,7 @@ try {
       snapshot: {
         business_capabilities: [
           "service.ai",
+          "service.whatsapp",
           "core.customers",
           "accommodation.rooms",
           "accommodation.reservations",
@@ -370,6 +375,7 @@ try {
   const requestsDisabledBusiness = await requestsDisabledBusinessResponse.json();
   expect(requestsDisabledBusiness.business.requests_enabled).toBe(false);
   expect(requestsDisabledBusiness.business.ai_enabled).toBe(true);
+  expect(requestsDisabledBusiness.business.whatsapp_enabled).toBe(true);
   expect(requestsDisabledBusiness.business.public_surfaces).toEqual(["accommodation", "food_service", "menu", "qr_menu"]);
 
   const requestsDisabledPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
