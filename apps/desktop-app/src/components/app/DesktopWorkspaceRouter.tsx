@@ -493,31 +493,6 @@ export function DesktopWorkspaceRouter({
               onDelete={handleDeleteCustomer}
             />
           )}
-          waiting={(
-            <RequestsWorkspace
-              requests={surfaceData.requests.filter((request) => isRequestWaitingForReply(request.status))}
-              selectedRequest={surfaceData.requests.filter((request) => isRequestWaitingForReply(request.status)).find((request) => request.id === selectedRequestId) ?? surfaceData.requests.find((request) => isRequestWaitingForReply(request.status))}
-              aiEnabled={aiEnabled}
-              whatsappEnabled={whatsappEnabled}
-              enabledCapabilities={enabledCapabilities}
-              convertingRequestId={convertingRequestId}
-              suggestingRequestId={suggestingRequestId}
-              manualRequestForm={manualRequestForm}
-              manualRequestState={manualRequestState}
-              manualRequestMessage={manualRequestMessage}
-              showManualForm={false}
-              onSelectRequest={setSelectedRequestId}
-              onManualRequestFormChange={setManualRequestForm}
-              onCreateManualRequest={handleCreateManualRequest}
-              onCall={callCustomer}
-              onWhatsApp={openWhatsApp}
-              onConvert={handleConvertRequestToReservation}
-              onSuggest={handleCreateOwnerReplySuggestion}
-              onUpdateStatus={handleUpdateRequestStatus}
-              onOpenReservation={openRequestReservation}
-              onDelete={handleDeleteRequest}
-            />
-          )}
         />
       ) : activePage === "pension" ? (
         <PensionPage

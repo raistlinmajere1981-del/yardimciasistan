@@ -1,5 +1,5 @@
 import { useDialogFocus } from "../ui/useDialogFocus";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   CalendarCheck,
@@ -30,10 +30,12 @@ import {
 } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton } from "../ui/DataList";
+import { SegmentedControl } from "../ui/SegmentedControl";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
 type SyncState = "idle" | "loading" | "success" | "error";
 type RequestActionMode = "open" | "answered" | "rejected" | "converted" | "closed";
+type RequestFilter = "all" | "waiting";
 
 const manualRequestTypeOptions = [
   "general_info",
@@ -91,7 +93,6 @@ interface RequestsWorkspaceProps {
   manualRequestForm: ManualRequestFormState;
   manualRequestState: SyncState;
   manualRequestMessage: string;
-  showManualForm?: boolean;
   onSelectRequest: (requestId: string) => void;
   onManualRequestFormChange: (form: ManualRequestFormState) => void;
   onCreateManualRequest: () => void;
@@ -106,7 +107,7 @@ interface RequestsWorkspaceProps {
 
 export function RequestsWorkspace({
   requests,
-  selectedRequest,
+  selectedRequest: externallySelectedRequest,
   aiEnabled,
   whatsappEnabled,
   enabledCapabilities,
@@ -115,7 +116,6 @@ export function RequestsWorkspace({
   manualRequestForm,
   manualRequestState,
   manualRequestMessage,
-  showManualForm = true,
   onSelectRequest,
   onManualRequestFormChange,
   onCreateManualRequest,
@@ -128,7 +128,19 @@ export function RequestsWorkspace({
   onDelete
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
-  const dialogRef = useDialogFocus(showManualForm && manualFormOpen);
+  const [requestFilter, setRequestFilter] = useState<RequestFilter>("all");
+  const dialogRef = useDialogFocus(manualFormOpen);
+  const waitingRequests = requests.filter((request) => isRequestWaitingForReply(request.status));
+  const visibleRequests = requestFilter === "waiting" ? waitingRequests : requests;
+  const selectedRequest = visibleRequests.find((request) => request.id === externallySelectedRequest?.id)
+    ?? visibleRequests[0];
+
+  useEffect(() => {
+    if (selectedRequest && selectedRequest.id !== externallySelectedRequest?.id) {
+      onSelectRequest(selectedRequest.id);
+    }
+  }, [externallySelectedRequest?.id, onSelectRequest, selectedRequest?.id]);
+
   const selectedActionMode = selectedRequest ? getRequestActionMode(selectedRequest.status) : "open";
   const selectedRequestSupportsReservation = selectedRequest
     ? canConvertRequestToReservation(enabledCapabilities, selectedRequest.request_type)
@@ -147,18 +159,32 @@ export function RequestsWorkspace({
         <div className="card__header">
           <div>
             <p>Talepler</p>
-            <h2>{requests.length} kayıt</h2>
+            <h2>{visibleRequests.length} kayıt</h2>
           </div>
         </div>
+        <SegmentedControl
+          className="request-filter-tabs"
+          value={requestFilter}
+          ariaLabel="Talep filtresi"
+          onChange={setRequestFilter}
+          options={[
+            { id: "all", label: `Tümü · ${requests.length}` },
+            { id: "waiting", label: `Yanıt bekleyen · ${waitingRequests.length}` }
+          ]}
+        />
         <DataList className="record-workspace__items">
-          {requests.length === 0 ? (
+          {visibleRequests.length === 0 ? (
             <div className="empty-state">
               <Bell size={24} aria-hidden="true" />
-              <strong>Talep yok.</strong>
-              <p>Web{aiEnabled ? ", AI" : ""} ve manuel kayıtlar burada listelenir.</p>
+              <strong>{requestFilter === "waiting" ? "Yanıt bekleyen talep yok." : "Talep yok."}</strong>
+              <p>
+                {requestFilter === "waiting"
+                  ? "Yanıt gerektiren yeni veya açık talepler burada görünür."
+                  : <>Web{aiEnabled ? ", AI" : ""} ve manuel kayıtlar burada listelenir.</>}
+              </p>
             </div>
           ) : (
-            requests.map((request) => (
+            visibleRequests.map((request) => (
               <DataListButton
                 className="customer-request-row"
                 key={request.id}
@@ -174,22 +200,20 @@ export function RequestsWorkspace({
           )}
         </DataList>
 
-        {showManualForm && (
-          <ActionButton
-            variant="ghost"
-            type="button"
-            aria-expanded={manualFormOpen}
-            onClick={() => {
-              if (!isRequestTypeAvailable(enabledCapabilities, manualRequestForm.requestType)) {
-                onManualRequestFormChange({ ...manualRequestForm, requestType: "general_info" });
-              }
-              setManualFormOpen(true);
-            }}
-          >
-            <Plus size={17} aria-hidden="true" />
-            Elle Talep Ekle
-          </ActionButton>
-        )}
+        <ActionButton
+          variant="ghost"
+          type="button"
+          aria-expanded={manualFormOpen}
+          onClick={() => {
+            if (!isRequestTypeAvailable(enabledCapabilities, manualRequestForm.requestType)) {
+              onManualRequestFormChange({ ...manualRequestForm, requestType: "general_info" });
+            }
+            setManualFormOpen(true);
+          }}
+        >
+          <Plus size={17} aria-hidden="true" />
+          Elle Talep Ekle
+        </ActionButton>
       </aside>
 
       <section className="panel record-workspace__detail request-detail-panel">
@@ -299,7 +323,7 @@ export function RequestsWorkspace({
         )}
       </section>
 
-      {showManualForm && manualFormOpen && (
+      {manualFormOpen && (
         <div
           className="manual-request-backdrop overlay overlay--drawer"
           onMouseDown={(event) => {

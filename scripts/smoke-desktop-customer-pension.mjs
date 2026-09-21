@@ -99,7 +99,9 @@ try {
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[600,800]]) {
     await page.setViewportSize({ width, height });
     await page.locator('.sidebar').getByRole('button', { name: 'Müşteri İşleri', exact: true }).click();
+    await expect(page.locator('.customer-work-tabs').getByRole('tab')).toHaveCount(2);
     await page.getByRole('tab', { name: 'Talepler', exact: true }).click();
+    await expect(page.locator('.request-filter-tabs').getByRole('tab')).toHaveCount(2);
     await capture('requests');
     await page.getByRole('button', { name: 'Elle Talep Ekle', exact: true }).click();
     await capture('request-editor');
@@ -127,7 +129,8 @@ try {
     await expect(page.getByText('Müşteri bulunamadı.', { exact: true })).toBeVisible();
     await capture('customers-empty');
     await page.getByLabel('Ara', { exact: true }).fill('');
-    await page.getByRole('tab', { name: 'Yanıt Bekleyen', exact: true }).click();
+    await page.getByRole('tab', { name: 'Talepler', exact: true }).click();
+    await page.locator('.request-filter-tabs').getByRole('tab', { name: /Yanıt bekleyen · \d+/ }).click();
     await capture('waiting');
     await page.locator('.sidebar').getByRole('button', { name: 'Pansiyon', exact: true }).click();
     await page.locator('.content').evaluate(el => el.scrollTop = 0);

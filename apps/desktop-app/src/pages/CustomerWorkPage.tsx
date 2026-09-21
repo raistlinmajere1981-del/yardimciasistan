@@ -1,17 +1,16 @@
 import { useState, type ReactNode } from "react";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 
-export type CustomerWorkTab = "requests" | "customers" | "waiting";
+export type CustomerWorkTab = "requests" | "customers";
 
 interface CustomerWorkPageProps {
   requests: ReactNode;
   customers: ReactNode;
-  waiting: ReactNode;
 }
 
-export function CustomerWorkPage({ requests, customers, waiting }: CustomerWorkPageProps) {
+export function CustomerWorkPage({ requests, customers }: CustomerWorkPageProps) {
   const [activeTab, setActiveTab] = useState<CustomerWorkTab>("requests");
-  const content = activeTab === "requests" ? requests : activeTab === "customers" ? customers : waiting;
+  const content = activeTab === "requests" ? requests : customers;
 
   return (
     <section className="combined-page customer-work-page" aria-label="Müşteri işleri">
@@ -22,8 +21,7 @@ export function CustomerWorkPage({ requests, customers, waiting }: CustomerWorkP
         onChange={setActiveTab}
         options={[
           { id: "requests", label: "Talepler" },
-          { id: "customers", label: "Müşteriler" },
-          { id: "waiting", label: "Yanıt Bekleyen" }
+          { id: "customers", label: "Müşteriler" }
         ]}
       />
       <div className={`customer-work-content is-${activeTab}`}>{content}</div>
