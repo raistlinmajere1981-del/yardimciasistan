@@ -95,9 +95,16 @@ export const CORE_BUSINESS_CAPABILITIES: BusinessCapability[] = [
 
 const ACCOMMODATION_REQUIRED_CAPABILITIES: BusinessCapability[] = [
   C.ACCOMMODATION_ROOMS,
-  C.ACCOMMODATION_RESERVATIONS,
   C.ACCOMMODATION_STAYS,
   C.ACCOMMODATION_FOLIO
+];
+
+const ACCOMMODATION_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
+  C.ACCOMMODATION_RESERVATIONS
+];
+
+const ACCOMMODATION_DEFAULT_OPTIONAL_CAPABILITIES: BusinessCapability[] = [
+  C.ACCOMMODATION_RESERVATIONS
 ];
 
 const FOOD_SERVICE_REQUIRED_CAPABILITIES: BusinessCapability[] = [
@@ -225,29 +232,21 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
     "Pansiyon + Restoran/Kafe",
     "Konaklama ve yiyecek-içecek operasyonları aynı işletme omurgasında çalışır.",
     uniqueCapabilities(ACCOMMODATION_REQUIRED_CAPABILITIES, FOOD_SERVICE_REQUIRED_CAPABILITIES),
-    FOOD_SERVICE_OPTIONAL_CAPABILITIES,
-    FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES
+    uniqueCapabilities(ACCOMMODATION_OPTIONAL_CAPABILITIES, FOOD_SERVICE_OPTIONAL_CAPABILITIES),
+    uniqueCapabilities(ACCOMMODATION_DEFAULT_OPTIONAL_CAPABILITIES, FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES)
   ),
   pension: createBusinessProfile(
     "pension",
     "Pansiyon",
     "Konaklama, müşteri, finans, web ve saha operasyonları için hazır profil.",
     ACCOMMODATION_REQUIRED_CAPABILITIES,
-    [],
-    []
+    ACCOMMODATION_OPTIONAL_CAPABILITIES,
+    ACCOMMODATION_DEFAULT_OPTIONAL_CAPABILITIES
   ),
   restaurant: createBusinessProfile(
     "restaurant",
-    "Restoran",
+    "Restoran / Kafe",
     "Masa, sipariş, menü, stok, satış ve saha operasyonları için hazır profil.",
-    FOOD_SERVICE_REQUIRED_CAPABILITIES,
-    FOOD_SERVICE_OPTIONAL_CAPABILITIES,
-    FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES
-  ),
-  cafe: createBusinessProfile(
-    "cafe",
-    "Kafe",
-    "Restoran profilinin daha hafif kullanım biçimi; aynı yiyecek-içecek yeteneklerini kullanır.",
     FOOD_SERVICE_REQUIRED_CAPABILITIES,
     FOOD_SERVICE_OPTIONAL_CAPABILITIES,
     FOOD_SERVICE_DEFAULT_OPTIONAL_CAPABILITIES
@@ -263,6 +262,9 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
 };
 
 export function normalizeBusinessType(value: string): BusinessType {
+  if (value === "cafe") {
+    return "restaurant";
+  }
   return Object.prototype.hasOwnProperty.call(BUSINESS_PROFILES, value)
     ? value as BusinessType
     : "pension_restaurant";
