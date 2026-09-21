@@ -228,13 +228,12 @@ try {
   await page.getByRole("button", { name: "Ayarlar" }).click();
   const settings = page.locator(".setup-capabilities");
   const sectionNav = settings.getByRole("navigation", { name: "Ayar bölümleri" });
-  await expect(sectionNav.getByRole("link")).toHaveCount(5);
+  await expect(sectionNav.getByRole("link")).toHaveCount(4);
   for (const [name, target] of [
     ["İşletme", "settings-business"],
     ["İşletme düzeni", "settings-operations"],
     ["Servisler", "settings-connections"],
-    ["Uygulama", "settings-application"],
-    ["Özellikler", "settings-capabilities"]
+    ["Uygulama", "settings-application"]
   ]) {
     await expect(sectionNav.getByRole("link", { name, exact: true })).toHaveAttribute("href", `#${target}`);
     await expect(settings.locator(`#${target}`)).toBeVisible();
@@ -246,13 +245,9 @@ try {
   await expect(settings.getByRole("heading", { name: "Servisler", exact: true })).toBeVisible();
   await expect(settings.locator(".settings-service-card", { hasText: "Web Modülü" })).toBeVisible();
   await expect(settings.locator(".settings-service-card", { hasText: "AI Yardımcı" })).toBeVisible();
-  await expect(settings.locator(".settings-capability-group-card")).toHaveCount(4);
-  await expect(settings.getByRole("switch", { name: "Odalar: Açık" })).toBeVisible();
-  await expect(settings.getByRole("switch", { name: "Stok: Açık" })).toBeVisible();
-  await expect(settings.getByRole("switch", { name: "Barkod: Kapalı" })).toBeVisible();
-  const roomsCapability = settings.locator(".settings-capability-row", { hasText: "Odalar" });
-  await expect(roomsCapability.getByText("Bağımlı", { exact: true })).toBeVisible();
-  await expect(roomsCapability.getByRole("switch")).toBeDisabled();
+  await expect(settings.locator(".settings-profile-options")).toBeVisible();
+  await expect(settings.getByText("Ek özellikler")).toBeVisible();
+  await expect(settings.locator(".settings-profile-option")).toHaveCount(6);
   await expect(settings.getByText(/accommodation\.reservations|commerce\.inventory|retail\.barcode/)).toHaveCount(0);
   expect(await settings.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   const tableCategoryEditor = page.locator(".table-category-editor");
@@ -529,7 +524,7 @@ try {
   await expect(page.getByRole("tab", { name: "WhatsApp", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
 
-  expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
+  expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("block");
   await page.screenshot({ path: "artifacts/screenshots/desktop-whatsapp-workspace.png", fullPage: true });
   await page.getByRole("button", { name: "Müşteri Numarasına Git" }).click();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute(
@@ -1622,7 +1617,7 @@ try {
   expect(await compactPage.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
   await expect(compactPage.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toHaveCount(1);
   await expect(compactPage.locator(".setup-footer")).toHaveCount(0);
-  await expect(compactPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(5);
+  await expect(compactPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(4);
   await expect(compactPage.getByRole("heading", { name: "İşletme", exact: true })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "Müşteriye Açık Bilgiler" })).toBeVisible();
   await expect(compactPage.getByRole("heading", { name: "İşletme Düzeni" })).toBeVisible();

@@ -91,7 +91,7 @@ try {
     expect(metrics.overflows, `Content overflow at ${width}`).toEqual([]);
     if (width > 760) expect(metrics.timeRows, `Four time controls share a row at ${width}`).toBe(1);
     const nav = page.getByRole('navigation', { name: 'Ayar bölümleri' });
-    for (const [name, id] of [['İşletme','business'],['İşletme düzeni','operations'],['Servisler','connections'],['Uygulama','application'],['Özellikler','capabilities']]) {
+    for (const [name, id] of [['İşletme','business'],['İşletme düzeni','operations'],['Servisler','connections'],['Uygulama','application']]) {
       await nav.getByRole('link', { name, exact: true }).click();
       const section = page.locator(`#settings-${id}`);
       await expect(section).toBeInViewport();

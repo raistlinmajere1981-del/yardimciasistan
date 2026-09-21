@@ -109,6 +109,7 @@ function createSetupFixture() {
     appPasswordConfigured: false,
     businessName: "",
     profileId: "pension_restaurant",
+    profileOptions: [...getBusinessProfile("pension_restaurant").defaultOptionalCapabilities],
     phone: "",
     whatsapp: "",
     email: "",
@@ -684,8 +685,10 @@ function createPulledRequestFixture() {
 
 function createBusinessCapabilitySnapshotFixture(setupData) {
   const enabled = new Set(getBusinessProfile(setupData.profileId).defaultCapabilities);
-  if (setupData.servicePreferences?.whatsapp === false) enabled.delete(BUSINESS_CAPABILITIES.WHATSAPP);
-  if (setupData.servicePreferences?.android === false) enabled.delete(BUSINESS_CAPABILITIES.ANDROID);
+  if (setupData.servicePreferences?.whatsapp) enabled.add(BUSINESS_CAPABILITIES.WHATSAPP);
+  else enabled.delete(BUSINESS_CAPABILITIES.WHATSAPP);
+  if (setupData.servicePreferences?.android) enabled.add(BUSINESS_CAPABILITIES.ANDROID);
+  else enabled.delete(BUSINESS_CAPABILITIES.ANDROID);
   if (setupData.aiEnabled) enabled.add(BUSINESS_CAPABILITIES.AI);
   else enabled.delete(BUSINESS_CAPABILITIES.AI);
 
