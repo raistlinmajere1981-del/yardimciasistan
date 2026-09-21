@@ -51,3 +51,18 @@ test("AI catalog matcher finds menu items and never returns unavailable items", 
 test("AI catalog matcher does not dump arbitrary products for a generic question", () => {
   assert.deepEqual(selectRelevantBusinessAiCatalogItems(catalog, "ürünler neler?"), []);
 });
+
+
+test("AI catalog matcher can return a specifically requested unavailable product", () => {
+  const unavailableCatalog = {
+    ...catalog,
+    items: [...catalog.items, {
+      id: "p3", source: "catalog", name: "Fanta 330 ml", description: "",
+      category: "İçecek", brand: "Fanta", barcode: "5449000000999",
+      price: 44, currency: "TRY", unit: "piece", available: false, featured: false, tags: []
+    }]
+  };
+  const matches = selectRelevantBusinessAiCatalogItems(unavailableCatalog, "Fanta var mı?");
+  assert.equal(matches[0]?.id, "p3");
+  assert.equal(matches[0]?.available, false);
+});

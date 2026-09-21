@@ -35,11 +35,10 @@ export function createBusinessAiCatalog(database: DesktopDatabase): BusinessAiCa
 
     for (const item of menu.items) {
       if (items.length >= MAX_AI_CATALOG_ITEMS) break;
-      if (!item.is_available || !categories.has(item.category_id)) continue;
+      if (!categories.has(item.category_id)) continue;
       const availableByStock = item.stock_quantity === null
         || !item.hide_when_out_of_stock
         || item.stock_quantity >= item.stock_consumption_quantity;
-      if (!availableByStock) continue;
 
       items.push({
         id: item.id,
@@ -52,7 +51,7 @@ export function createBusinessAiCatalog(database: DesktopDatabase): BusinessAiCa
         price: Math.max(0, Number(item.price) || 0),
         currency: item.currency || "TRY",
         unit: "piece",
-        available: true,
+        available: item.is_available && availableByStock,
         featured: item.is_featured,
         tags: [...item.tags].slice(0, 20)
       });

@@ -45,7 +45,6 @@ export function selectRelevantBusinessAiCatalogItems(
   const hasBarcodeLikeQuery = /^\d{6,18}$/.test(compactQuery);
 
   const scored = catalog.items
-    .filter((item) => item.available)
     .map((item) => {
       const name = normalizeAiCatalogSearchText(item.name);
       const brand = normalizeAiCatalogSearchText(item.brand);
@@ -71,6 +70,7 @@ export function selectRelevantBusinessAiCatalogItems(
       }
 
       if (item.featured && score > 0) score += 1;
+      if (item.available && score > 0) score += 0.25;
       return { item, score };
     })
     .filter(({ score }) => score > 0)
