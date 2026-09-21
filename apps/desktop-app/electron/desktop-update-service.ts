@@ -711,8 +711,11 @@ export async function downloadDesktopUpdate(userDataPath: string): Promise<Deskt
   if (updateOperation?.kind === "download") return updateOperation.promise;
   if (updateOperation?.kind === "check") {
     await updateOperation.promise;
+    // Re-enter after the check settles so TypeScript and the runtime both
+    // observe the fresh global operation state. A concurrent caller may have
+    // started the download while this call was waiting.
+    return downloadDesktopUpdate(userDataPath);
   }
-  if (updateOperation?.kind === "download") return updateOperation.promise;
 
   const promise = downloadUpdate(userDataPath);
   updateOperation = { kind: "download", promise };
