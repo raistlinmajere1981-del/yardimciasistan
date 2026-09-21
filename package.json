@@ -78,6 +78,7 @@
     "pack:desktop:dir": "npm run build -w @yardimci-asistan/desktop-app && npm run pack:dir -w @yardimci-asistan/desktop-app",
     "pack:desktop:win": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app",
     "pack:desktop:win32": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win32 -w @yardimci-asistan/desktop-app",
+    "pack:desktop:windows": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform win32 && npm run build -w @yardimci-asistan/desktop-app && npm run pack:win -w @yardimci-asistan/desktop-app && npm run pack:win32 -w @yardimci-asistan/desktop-app",
     "pack:desktop:linux": "npm run android:release-apk && node scripts/prepare-desktop-android-resources.mjs --platform linux && npm run build -w @yardimci-asistan/desktop-app && npm run pack:linux -w @yardimci-asistan/desktop-app",
     "pack:web-module": "npm run build -w @yardimci-asistan/web-widget && node scripts/package-web-module.mjs",
     "pack:web-module:no-build": "node scripts/package-web-module.mjs",
