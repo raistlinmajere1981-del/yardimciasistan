@@ -83,6 +83,42 @@ try {
 
   browser = await launchChromiumForSmoke(chromium);
 
+  const fixedLauncherPage = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+  await fixedLauncherPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await injectWidget(fixedLauncherPage, baseUrl, { profileId: "pension", connectApi: false });
+  await fixedLauncherPage.evaluate(() => {
+    document.body.style.minHeight = "1800px";
+    const footer = document.createElement("footer");
+    footer.className = "site-footer";
+    footer.style.height = "320px";
+    footer.textContent = "Site footer";
+    document.body.appendChild(footer);
+    window.scrollTo(0, document.body.scrollHeight);
+  });
+  await fixedLauncherPage.waitForTimeout(80);
+  expect(await fixedLauncherPage.locator("#yardimci-asistan-widget").evaluate((node) =>
+    getComputedStyle(node).bottom
+  )).toBe("18px");
+  await fixedLauncherPage.close();
+
+  const footerAvoidancePage = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+  await footerAvoidancePage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
+  await injectWidget(footerAvoidancePage, baseUrl, { profileId: "pension", connectApi: false, avoidFooter: true });
+  await footerAvoidancePage.evaluate(() => {
+    document.body.style.minHeight = "1800px";
+    const footer = document.createElement("footer");
+    footer.className = "site-footer";
+    footer.style.height = "320px";
+    footer.textContent = "Site footer";
+    document.body.appendChild(footer);
+    window.scrollTo(0, document.body.scrollHeight);
+  });
+  await footerAvoidancePage.waitForTimeout(80);
+  expect(Number.parseFloat(await footerAvoidancePage.locator("#yardimci-asistan-widget").evaluate((node) =>
+    getComputedStyle(node).bottom
+  ))).toBeGreaterThan(18);
+  await footerAvoidancePage.close();
+
   const pensionPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await pensionPage.goto(`${baseUrl}/menu.html`, { waitUntil: "domcontentloaded" });
   await injectWidget(pensionPage, baseUrl, { profileId: "pension", connectApi: false });
@@ -344,7 +380,7 @@ async function pullRequests() {
 }
 
 async function injectWidget(page, widgetBaseUrl, options = {}) {
-  await page.evaluate(({ url, profileId, connectApi }) => {
+  await page.evaluate(({ url, profileId, connectApi, avoidFooter }) => {
     document.body.innerHTML = "<main>Firma sitesi</main>";
 
     const script = document.createElement("script");
@@ -353,6 +389,7 @@ async function injectWidget(page, widgetBaseUrl, options = {}) {
     script.dataset.whatsappPhone = "+90 531 696 9334";
     if (connectApi) script.dataset.apiBaseUrl = url;
     script.dataset.profileId = profileId;
+    if (avoidFooter === true) script.dataset.avoidFooter = "true";
     script.dataset.menuUrl = `${url}/menu.html`;
     script.dataset.logoUrl = `${url}/assets/yardimci-asistan-symbol.png`;
     script.dataset.primaryColor = "#2F6F5E";
@@ -366,7 +403,8 @@ async function injectWidget(page, widgetBaseUrl, options = {}) {
   }, {
     url: widgetBaseUrl,
     profileId: options.profileId ?? "pension_restaurant",
-    connectApi: options.connectApi !== false
+    connectApi: options.connectApi !== false,
+    avoidFooter: options.avoidFooter === true
   });
 }
 
