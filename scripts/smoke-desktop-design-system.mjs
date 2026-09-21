@@ -74,6 +74,18 @@ try {
   await expect(birthdaySettings.getByLabel('Gönderim saati')).toHaveValue('10:00');
   await expect(birthdaySettings.getByLabel('Manuel')).toBeChecked();
   await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
+
+  const sectorType = page.getByLabel('Sektör tipi');
+  await sectorType.selectOption('market');
+  await expect(page.getByText('Sunulan özellikler', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Giriş saati')).toHaveCount(0);
+  await expect(page.getByLabel('Ulaşım tarifi')).toBeVisible();
+  await expect(page.getByLabel('Genel politika notu')).toBeVisible();
+  await expect(page.getByLabel('Ödeme notu')).toBeVisible();
+  await expect(page.getByLabel('Konuşulan diller')).toBeVisible();
+  await sectorType.selectOption('pension_restaurant');
+  await expect(page.getByLabel('Giriş saati')).toHaveValue('14:00');
+
   const observations = [];
   await expect(page.getByLabel('Telefon', { exact: true })).toHaveValue('');
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[600,800]]) {

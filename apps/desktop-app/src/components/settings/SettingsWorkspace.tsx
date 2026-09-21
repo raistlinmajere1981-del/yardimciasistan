@@ -32,7 +32,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         enabledCapabilities={effectiveCapabilities}
         publicProfileSaveRef={publicProfileSaveRef}
         publicProfile={!props.setupData.setupRequired ? (
-          <BusinessPublicProfileSection businessAddress={props.form.address} saveHandleRef={publicProfileSaveRef} />
+          <BusinessPublicProfileSection
+            businessAddress={props.form.address}
+            profileId={props.form.profileId}
+            saveHandleRef={publicProfileSaveRef}
+          />
         ) : null}
       />
     </div>
