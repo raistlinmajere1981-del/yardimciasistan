@@ -403,7 +403,7 @@ test("createOwnerReplySuggestion keeps owner approval boundary", () => {
   assert.match(suggestion.suggestedReply, /işletme sahibi/);
 });
 
-test("createOwnerReplySuggestion asks for missing fields and avoids final approval language", () => {
+test("createOwnerReplySuggestion keeps generic price questions free of reservation-only fields", () => {
   const suggestion = createOwnerReplySuggestion({
     businessName: "Deniz Çiçeği Pansiyon",
     customerName: "Demo Masa",
@@ -414,8 +414,8 @@ test("createOwnerReplySuggestion asks for missing fields and avoids final approv
   });
 
   assert.match(suggestion.summary, /fiyat sorusu/);
-  assert.deepEqual(suggestion.missingFields, ["tarih", "kişi sayısı", "kısa not"]);
-  assert.match(suggestion.suggestedReply, /Müsaitlik ve fiyat bilgisi/);
+  assert.deepEqual(suggestion.missingFields, ["kısa not"]);
+  assert.match(suggestion.suggestedReply, /mesajınızı aldık/i);
   assert.doesNotMatch(suggestion.suggestedReply, /rezervasyonunuz onaylandı/i);
 });
 
