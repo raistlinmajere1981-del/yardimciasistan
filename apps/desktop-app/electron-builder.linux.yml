@@ -1,0 +1,6 @@
+extends: ./electron-builder.yml
+
+# Reuse the host Linux Electron distribution for local Linux packaging.
+# Windows cross-builds intentionally use the base config so electron-builder
+# resolves the target-specific Windows Electron package from its cache/download.
+electronDist: ../../node_modules/electron/dist
