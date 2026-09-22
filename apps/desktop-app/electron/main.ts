@@ -644,6 +644,7 @@ function registerIpcHandlers() {
 
   registerCustomerIpcHandlers({
     getDatabase,
+    assertUnlocked: assertAppSessionUnlocked,
     assertCapability: assertDesktopCapability,
     finalizeRecordDeletion: finalizeDesktopRecordDeletion,
     finalizeCustomerMutation: finalizeDesktopCustomerMutation

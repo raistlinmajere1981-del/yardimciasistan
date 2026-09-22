@@ -217,9 +217,20 @@ export function findConflictingRoomReservation(
   roomId: string,
   customerId: string,
   checkInDate: string,
-  checkOutDate: string
+  checkOutDate: string,
+  excludedReservationId?: string
 ): string {
   const candidateEnd = checkOutDate || "9999-12-31";
+  if (excludedReservationId !== undefined) {
+    const rows = db.prepare(`
+      SELECT title FROM reservations, json_each(reservations.room_ids_json) AS assigned
+      WHERE reservations.id != ? AND reservations.deleted_at = ''
+        AND reservations.status IN ('pending', 'approved') AND assigned.value = ?
+        AND start_date < ? AND ? < COALESCE(NULLIF(end_date, ''), '9999-12-31') LIMIT 1
+    `).get(excludedReservationId, roomId, candidateEnd, checkInDate) as { title: string } | undefined;
+    return rows ? rows.title || "başka bir müşteri" : "";
+  }
+
   for (const reservation of getReservations(db)) {
     if (
       reservation.customerId === customerId

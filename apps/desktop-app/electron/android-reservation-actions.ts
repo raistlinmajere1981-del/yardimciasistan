@@ -1,3 +1,4 @@
+import { enforceActiveStayRoomStatus } from "./room-state-service.js";
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
@@ -430,20 +431,6 @@ function roomStillReserved(db: DatabaseSync, roomId: string, excludedReservation
     WHERE id != ? AND status IN ('pending', 'approved') AND deleted_at = ''
   `).all(excludedReservationId) as Array<Record<string, unknown>>;
   return rows.some((row) => parseIds(row.room_ids_json).includes(roomId));
-}
-
-function enforceActiveStayRoomStatus(db: DatabaseSync, roomId: string, now: string) {
-  const active = db.prepare(`
-    SELECT status FROM customer_room_stays
-    WHERE room_id = ? AND status IN ('checked_in', 'planned') AND deleted_at = ''
-    ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END, check_in_date ASC
-    LIMIT 1
-  `).get(roomId) as Record<string, unknown> | undefined;
-  if (!active) return;
-  db.prepare(`
-    UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only'
-    WHERE id = ? AND deleted_at = ''
-  `).run(text(active.status) === "checked_in" ? "occupied" : "reserved", now, roomId);
 }
 
 function versionConflict(payload: Record<string, unknown>, actualValue: unknown, label: string): string {

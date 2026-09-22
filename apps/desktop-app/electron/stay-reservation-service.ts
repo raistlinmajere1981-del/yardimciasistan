@@ -1,7 +1,10 @@
 import type { DatabaseSync } from "node:sqlite";
+import { checkoutHospitalityStay } from "./hospitality-checkout.js";
+import { refreshRoomStatusFromStays, enforceActiveStayRoomStatus } from "./room-state-service.js";
 import { createId } from "@yardimci-asistan/shared";
 import type {
   AssignCustomerRoomInput,
+  CreateStayFromReservationInput,
   SaveManualReservationInput,
   UpdateCustomerRoomStayStatusInput,
   UpdateReservationStatusInput
@@ -21,6 +24,47 @@ import {
 import { normalizeLimitedText } from "./database/customer-utils.js";
 
 export function assignCustomerToRoom(db: DatabaseSync, input: AssignCustomerRoomInput): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
+  return createCustomerStay(db, input, "");
+}
+
+/** Explicit booking conversion: source fields are read from Reservation, never supplied by the caller. */
+export function createStayFromReservation(db: DatabaseSync, input: CreateStayFromReservationInput) {
+  db.exec("SAVEPOINT reservation_stay");
+  try {
+    const result = createReservationStayInTransaction(db, input);
+    if (!result.ok) db.exec("ROLLBACK TO reservation_stay");
+    db.exec("RELEASE reservation_stay");
+    return result;
+  } catch {
+    db.exec("ROLLBACK TO reservation_stay; RELEASE reservation_stay");
+    return { ok: false as const, message: "Rezervasyondan konaklama oluşturulamadı." };
+  }
+}
+
+function createReservationStayInTransaction(db: DatabaseSync, input: CreateStayFromReservationInput) {
+  const reservationId = String(input?.reservationId ?? "").trim();
+  const reservation = db.prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at = ''").get(reservationId) as Record<string, unknown> | undefined;
+  if (!reservation) return { ok: false as const, message: "Rezervasyon bulunamadı." };
+  if (reservation.reservation_type !== "room" || reservation.status !== "approved") {
+    return { ok: false as const, message: "Bu rezervasyondan konaklama oluşturulamaz." };
+  }
+  if (!normalizeDateInput(String(reservation.start_date ?? "")) || !normalizeDateInput(String(reservation.end_date ?? ""))
+    || String(reservation.end_date) <= String(reservation.start_date)) {
+    return { ok: false as const, message: "Rezervasyonun giriş ve çıkış tarihleri geçersiz." };
+  }
+  const roomIds = parseStringArray(reservation.room_ids_json);
+  const roomId = String(input?.roomId ?? (roomIds.length === 1 ? roomIds[0] : "")).trim();
+  if (!roomId || !roomIds.includes(roomId)) return { ok: false as const, message: "Rezervasyona atanmış bir oda seçilmeli." };
+  const duplicate = db.prepare("SELECT id FROM customer_room_stays WHERE reservation_id = ? AND room_id = ? AND status IN ('planned', 'checked_in') AND deleted_at = ''").get(reservationId, roomId);
+  if (duplicate) return { ok: false as const, message: "Bu rezervasyon ve oda için aktif konaklama zaten var." };
+  return createCustomerStay(db, {
+    customerId: String(reservation.customer_id), roomId,
+    checkInDate: String(reservation.start_date), checkOutDate: String(reservation.end_date),
+    guestCount: Number(reservation.guest_count), notes: String(reservation.notes), status: "planned"
+  }, reservationId);
+}
+
+function createCustomerStay(db: DatabaseSync, input: AssignCustomerRoomInput, reservationId: string): { ok: true; message: string; savedId: string } | { ok: false; message: string } {
   const customerId = String(input?.customerId ?? "").trim();
   const roomId = String(input?.roomId ?? "").trim();
   const checkInDate = normalizeDateInput(String(input?.checkInDate ?? ""));
@@ -59,14 +103,14 @@ export function assignCustomerToRoom(db: DatabaseSync, input: AssignCustomerRoom
   if (hasStoredOverlappingCustomerRoomStay(db, roomId, checkInDate, checkOutDate)) {
     return { ok: false, message: "Seçilen tarihlerde odanın başka bir aktif müşteri kaydı var." };
   }
-  const reservationConflict = findStoredConflictingRoomReservation(db, roomId, customerId, checkInDate, checkOutDate);
+  const reservationConflict = findStoredConflictingRoomReservation(db, roomId, customerId, checkInDate, checkOutDate, reservationId || undefined);
   if (reservationConflict) {
     return { ok: false, message: `Oda bu tarihlerde ${reservationConflict} rezervasyonuna bağlı.` };
   }
 
   const id = createId("stay_");
   const now = new Date().toISOString();
-  db.exec("BEGIN IMMEDIATE");
+  db.exec("SAVEPOINT customer_stay");
   try {
     db
       .prepare(`
@@ -74,29 +118,30 @@ export function assignCustomerToRoom(db: DatabaseSync, input: AssignCustomerRoom
             id, customer_id, room_id, reservation_id, status, check_in_date,
             check_out_date, guest_count, notes, source, checked_in_at,
             checked_out_at, created_at, updated_at, deleted_at, sync_status
-          ) VALUES (?, ?, ?, '', ?, ?, ?, ?, ?, 'manual', ?, '', ?, ?, '', 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, '', 'local_only')
         `)
       .run(
         id,
         customerId,
         roomId,
+        reservationId,
         status,
         checkInDate,
         checkOutDate,
         guestCount,
         notes,
+        reservationId ? "reservation" : "manual",
         status === "checked_in" ? now : "",
         now,
         now
       );
-    db
-      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(status === "checked_in" ? "occupied" : "reserved", now, roomId);
+    refreshRoomStatusFromStays(db, roomId, now, false);
     insertDatabaseEvent(db, {
       type: "customer.room_assigned",
       entityType: "customer_room_stay",
       entityId: id,
       payload: {
+        ...(reservationId ? { reservation_id: reservationId } : {}),
         customer_id: customerId,
         room_id: roomId,
         status,
@@ -105,9 +150,9 @@ export function assignCustomerToRoom(db: DatabaseSync, input: AssignCustomerRoom
       },
       now
     });
-    db.exec("COMMIT");
+    db.exec("RELEASE customer_stay");
   } catch {
-    db.exec("ROLLBACK");
+    db.exec("ROLLBACK TO customer_stay; RELEASE customer_stay");
     return { ok: false, message: "Müşteri oda kaydı oluşturulamadı." };
   }
 
@@ -137,6 +182,10 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
   if (!stay) {
     return { ok: false, message: "Konaklama kaydı bulunamadı." };
   }
+  if (status === "checked_out") {
+    try { return checkoutHospitalityStay(db, { stayId }); }
+    catch { return { ok: false, message: "Konaklama durumu güncellenemedi." }; }
+  }
   const previousStatus = String(stay.status ?? "");
   if (previousStatus === status) {
     return {
@@ -147,7 +196,7 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
   }
   const allowedTransitions: Record<string, string[]> = {
     planned: ["checked_in", "cancelled"],
-    checked_in: ["checked_out", "cancelled"],
+    checked_in: ["cancelled"],
     cancelled: ["planned"],
     checked_out: []
   };
@@ -174,17 +223,16 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
           UPDATE customer_room_stays
           SET status = ?,
               checked_in_at = CASE WHEN ? = 'checked_in' THEN ? ELSE checked_in_at END,
-              checked_out_at = CASE WHEN ? = 'checked_out' THEN ? ELSE checked_out_at END,
               updated_at = ?,
               sync_status = 'local_only'
           WHERE id = ?
         `)
-      .run(status, status, now, status, now, now, stayId);
+      .run(status, status, now, now, stayId);
     refreshRoomStatusFromStays(
       db,
       String(stay.room_id ?? ""),
       now,
-      status === "checked_out"
+      false
     );
     insertDatabaseEvent(db, {
       type: "customer.room_stay_status_changed",
@@ -208,69 +256,11 @@ export function updateCustomerRoomStayStatus(db: DatabaseSync, input: UpdateCust
     ok: true,
     message: status === "checked_in"
       ? "Müşteri odaya giriş yaptı."
-      : status === "checked_out"
-        ? "Müşteri çıkışı tamamlandı; oda temizlik durumuna alındı."
-        : status === "cancelled"
-          ? "Oda ataması iptal edildi."
-          : "Oda ataması yeniden planlandı.",
+      : status === "cancelled"
+        ? "Oda ataması iptal edildi."
+        : "Oda ataması yeniden planlandı.",
     savedId: stayId
   };
-}
-
-export function refreshRoomStatusFromStays(db: DatabaseSync, roomId: string, now: string, checkoutToCleaning: boolean) {
-  const active = db
-    .prepare(`
-        SELECT status
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND status IN ('checked_in', 'planned')
-          AND deleted_at = ''
-        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END, check_in_date ASC
-        LIMIT 1
-      `)
-    .get(roomId) as { status?: string } | undefined;
-  const room = db
-    .prepare("SELECT status FROM rooms WHERE id = ? AND deleted_at = ''")
-    .get(roomId) as { status?: string } | undefined;
-  if (!room) {
-    return;
-  }
-  const currentStatus = String(room.status ?? "");
-  let nextStatus = currentStatus;
-  if (active?.status === "checked_in") {
-    nextStatus = "occupied";
-  } else if (active?.status === "planned") {
-    nextStatus = "reserved";
-  } else if (checkoutToCleaning) {
-    nextStatus = "cleaning";
-  } else if (["occupied", "reserved"].includes(currentStatus)) {
-    nextStatus = "available";
-  }
-  if (nextStatus !== currentStatus) {
-    db
-      .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ?")
-      .run(nextStatus, now, roomId);
-  }
-}
-
-export function enforceActiveStayRoomStatus(db: DatabaseSync, roomId: string, now: string) {
-  const active = db
-    .prepare(`
-        SELECT status
-        FROM customer_room_stays
-        WHERE room_id = ?
-          AND status IN ('checked_in', 'planned')
-          AND deleted_at = ''
-        ORDER BY CASE status WHEN 'checked_in' THEN 0 ELSE 1 END, check_in_date ASC
-        LIMIT 1
-      `)
-    .get(roomId) as { status?: string } | undefined;
-  if (!active) {
-    return;
-  }
-  db
-    .prepare("UPDATE rooms SET status = ?, updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
-    .run(active.status === "checked_in" ? "occupied" : "reserved", now, roomId);
 }
 
 export function saveManualReservation(db: DatabaseSync, input: SaveManualReservationInput): { ok: true; message: string } | { ok: false; message: string } {
@@ -544,7 +534,7 @@ export function updateReservationStatus(db: DatabaseSync, input: UpdateReservati
 
     if (status === "approved") {
       for (const roomId of roomIds) {
-        db.prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''").run(now, roomId);
+        db.prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status IN ('available', 'reserved') AND deleted_at = ''").run(now, roomId);
       }
       for (const tableId of tableIds) {
         db

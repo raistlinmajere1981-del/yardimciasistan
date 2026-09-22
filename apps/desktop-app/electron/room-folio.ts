@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { checkoutHospitalityStay } from "./hospitality-checkout.js";
 
 export type RoomFolioPaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
 type RoomFolioItemKind = "menu" | "manual_charge" | "discount";
@@ -396,6 +397,8 @@ export class DesktopRoomFolioService {
           );
         }
 
+        // Stage 4 removal: legacy Folio UI still uses account opening as arrival.
+        // RoomWorkspace must call explicit checkInStay, then open the financial account.
         db.prepare(`
           UPDATE customer_room_stays
           SET status = 'checked_in', checked_in_at = CASE WHEN checked_in_at = '' THEN ? ELSE checked_in_at END,
@@ -711,58 +714,24 @@ export class DesktopRoomFolioService {
     return { ok: true, message: "Ödeme kaydı geri alındı.", data: this.getData(), folioId };
   }
 
+  /** Compatibility channel; allowOutstanding is retained on the wire but D-005 always permits departure. */
   checkout(input: CheckoutRoomFolioInput): DesktopRoomFolioMutationResult {
     const folioId = cleanText(input?.folioId, 180);
     if (!folioId) return { ok: false, message: "Oda adisyonu bulunamadı." };
     const db = this.openDatabase();
+    let message: string;
     try {
-      const folio = this.requireOpenFolio(db, folioId);
-      if (!folio) return { ok: false, message: "Açık oda adisyonu bulunamadı." };
-      const totals = this.getTotals(db, folioId);
-      if (totals.remainingMinor > 0 && !input.allowOutstanding) {
-        return { ok: false, message: `Çıkış için ${formatMinor(totals.remainingMinor)} kalan ödeme var.` };
-      }
-      const now = new Date().toISOString();
-      const checkoutDate = normalizeDate(folio.planned_check_out_date, true) || localDateKey(new Date());
-
-      db.exec("BEGIN");
-      try {
-        db.prepare(`
-          UPDATE room_folios
-          SET status = 'closed', closed_at = ?, updated_at = ?, sync_status = 'local_only'
-          WHERE id = ?
-        `).run(now, now, folioId);
-        db.prepare(`
-          UPDATE customer_room_stays
-          SET status = 'checked_out', check_out_date = ?, checked_out_at = ?, updated_at = ?, sync_status = 'local_only'
-          WHERE id = ?
-        `).run(checkoutDate, now, now, text(folio.stay_id));
-        const otherActive = db.prepare(`
-          SELECT COUNT(*) AS count
-          FROM customer_room_stays
-          WHERE room_id = ? AND status = 'checked_in' AND deleted_at = '' AND id != ?
-        `).get(text(folio.room_id), text(folio.stay_id)) as { count?: number } | undefined;
-        if (Number(otherActive?.count ?? 0) <= 0) {
-          db.prepare(`
-            UPDATE rooms SET status = 'available', updated_at = ?, sync_status = 'local_only' WHERE id = ?
-          `).run(now, text(folio.room_id));
-        }
-        db.exec("COMMIT");
-      } catch (error) {
-        db.exec("ROLLBACK");
-        throw error;
-      }
+      const result = checkoutHospitalityStay(db, { folioId });
+      if (!result.ok) return result;
+      message = result.remainingMinor > 0
+        ? "Çıkış yapıldı; kalan tutar açık oda hesabında korunuyor."
+        : "Çıkış yapıldı ve oda hesabı kapatıldı.";
     } catch (error) {
       return { ok: false, message: friendlyDatabaseError(error, "Çıkış işlemi tamamlanamadı.") };
     } finally {
       db.close();
     }
-    return {
-      ok: true,
-      message: input.allowOutstanding ? "Çıkış yapıldı; kalan tutar alacak olarak korunuyor." : "Çıkış yapıldı ve oda hesabı kapatıldı.",
-      data: this.getData(),
-      folioId
-    };
+    return { ok: true, message, data: this.getData(), folioId };
   }
 
   private mapFolio(db: DatabaseSync, row: Record<string, unknown>): DesktopRoomFolio {
@@ -1035,15 +1004,6 @@ function cleanText(value: unknown, maxLength: number): string {
 
 function text(value: unknown): string {
   return String(value ?? "");
-}
-
-function localDateKey(date: Date): string {
-  const offset = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
-}
-
-function formatMinor(value: number): string {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(value / 100);
 }
 
 function friendlyDatabaseError(error: unknown, fallback: string): string {

@@ -632,6 +632,11 @@ export interface SaveCustomerInput {
   address: string;
 }
 
+export interface CreateStayFromReservationInput {
+  reservationId: string;
+  roomId?: string;
+}
+
 export interface AssignCustomerRoomInput {
   customerId: string;
   roomId: string;

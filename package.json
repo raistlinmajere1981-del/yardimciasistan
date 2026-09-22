@@ -93,7 +93,8 @@
     "logs:latest": "node scripts/diagnostics-cli.mjs latest",
     "logs:errors": "node scripts/diagnostics-cli.mjs errors",
     "smoke:diagnostics": "node scripts/smoke-desktop-logging-contract.mjs && node scripts/smoke-diagnostics-cli.mjs",
-    "smoke:workspace-platform": "node scripts/smoke-workspace-platform.mjs"
+    "smoke:workspace-platform": "node scripts/smoke-workspace-platform.mjs",
+    "smoke:hospitality-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-hospitality-domain.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

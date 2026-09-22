@@ -1,3 +1,4 @@
+import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -19,6 +20,12 @@ const DEVICE_ID = "android-room-folio-smoke";
 
 try {
   database.initialize();
+  const setup = database.saveInitialSetup(createSmokeSetupInput({
+    businessName: "Android Folio Test", phone: "+905550003002", whatsapp: "+905550003002",
+    syncSecret: "android-folio-test-secret", servicePreferences: { whatsapp: false, android: true },
+    initialCounts: { rooms: 1, tables: 0 }
+  }));
+  assert.equal(setup.ok, true, setup.message);
   database.upsertAndroidDeviceSightings([{
     device_id: DEVICE_ID,
     device_name: "Room Folio Smoke",
@@ -86,6 +93,7 @@ try {
   assert.equal(deniedPayment.ok, false, "Kasiyer görevi olmadan oda tahsilatı reddedilmeli");
 
   const groupsUpdated = database.setAndroidDevicePermissionGroups(DEVICE_ID, {
+    ...device.permissionGroups,
     service_orders: true,
     cashier: true,
     rooms_tasks: true,
@@ -119,11 +127,12 @@ try {
   assert.equal(stale.ok, false, "Eski snapshot ile ikinci tahsilat kabul edilmemeli");
   assert.match(stale.message, /değişmiş|güncel/i);
 
-  const checkoutBlocked = database.applyAndroidAction(action("folio-checkout-blocked", "room_folio_checkout", {
+  const debtCheckout = database.applyAndroidAction(action("folio-checkout-blocked", "room_folio_checkout", {
     folio_id: folioId,
     expected_remaining_minor: folio.remainingMinor
   }));
-  assert.equal(checkoutBlocked.ok, false, "Borç varken mobil çıkış yapılamamalı");
+  assert.equal(debtCheckout.ok, true, "Borç misafirin çıkışını engellememeli");
+  assert.equal(roomFolio.getData().folios.find(item => item.id === folioId).status, "open");
 
   const finalPayment = database.applyAndroidAction(action("folio-payment-final", "room_folio_payment_add", {
     folio_id: folioId,
@@ -165,17 +174,17 @@ try {
   const verify = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
     assert.equal(verify.prepare("SELECT status FROM customer_room_stays WHERE id = ?").get("android_folio_stay").status, "checked_out");
-    assert.equal(verify.prepare("SELECT status FROM rooms WHERE id = ?").get(room.id).status, "available");
+    assert.equal(verify.prepare("SELECT status FROM rooms WHERE id = ?").get(room.id).status, "cleaning");
     const receipts = Number(verify.prepare(`
       SELECT COUNT(*) AS count FROM android_action_receipts
       WHERE action_type IN ('room_folio_payment_add', 'room_folio_checkout')
     `).get()?.count ?? 0);
-    assert.equal(receipts, 3, "İki ödeme ve bir çıkış receipt kaydı olmalı");
+    assert.equal(receipts, 4, "İki ödeme, misafir çıkışı ve finansal kapanış receipt kaydı olmalı");
     const events = Number(verify.prepare(`
       SELECT COUNT(*) AS count FROM events
-      WHERE actor_type = 'android' AND type IN ('room_folio.payment_added', 'room_folio.checked_out')
+      WHERE actor_type = 'android' AND type IN ('room_folio.payment_added', 'room_folio.checked_out', 'room_folio.closed')
     `).get()?.count ?? 0);
-    assert.equal(events, 3, "Android oda hesabı event kayıtları eksik");
+    assert.equal(events, 4, "Android oda hesabı event kayıtları eksik");
     assert.equal(String(verify.prepare("PRAGMA integrity_check").get().integrity_check), "ok");
   } finally {
     verify.close();

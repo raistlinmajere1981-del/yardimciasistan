@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import { BUSINESS_CAPABILITIES, type BusinessCapability } from "@yardimci-asistan/shared";
 import type {
   AssignCustomerRoomInput,
+  CreateStayFromReservationInput,
   DesktopCustomerMutationResult,
   DesktopDatabase,
   DesktopStatusUpdateResult,
@@ -11,6 +12,7 @@ import type {
 
 export function registerCustomerIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
+  assertUnlocked: () => void;
   assertCapability: (capability: BusinessCapability, message?: string) => void;
   finalizeRecordDeletion: (result: DesktopStatusUpdateResult) => DesktopStatusUpdateResult;
   finalizeCustomerMutation: (result: DesktopCustomerMutationResult) => DesktopCustomerMutationResult;
@@ -31,6 +33,28 @@ export function registerCustomerIpcHandlers(options: {
     assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
     assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama ataması bu işletmede etkin değil.");
     return finalizeCustomerMutation(getDatabase().assignCustomerToRoom(input));
+  });
+
+  ipcMain.handle("customer:createStayFromReservation", (_event, input: CreateStayFromReservationInput): DesktopCustomerMutationResult => {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama ataması bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS, "Pansiyon rezervasyonları bu işletmede etkin değil.");
+    return finalizeCustomerMutation(getDatabase().createStayFromReservation(input));
+  });
+
+  ipcMain.handle("customer:checkInStay", (_event, stayId: string): DesktopCustomerMutationResult => {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
+    return finalizeCustomerMutation(getDatabase().checkInStay(stayId));
+  });
+
+  ipcMain.handle("customer:checkoutStay", (_event, stayId: string): DesktopCustomerMutationResult => {
+    options.assertUnlocked();
+    assertCapability(BUSINESS_CAPABILITIES.CUSTOMERS, "Müşteri yönetimi bu işletmede etkin değil.");
+    assertCapability(BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS, "Konaklama yönetimi bu işletmede etkin değil.");
+    return finalizeCustomerMutation(getDatabase().checkoutStay(stayId));
   });
 
   ipcMain.handle(

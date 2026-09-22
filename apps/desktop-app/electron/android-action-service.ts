@@ -25,7 +25,8 @@ import { findActiveOrderForTables } from "./database/table-order-store.js";
 import {
   enforceActiveStayRoomStatus as enforceStoredActiveStayRoomStatus,
   refreshRoomStatusFromStays as refreshStoredRoomStatusFromStays
-} from "./stay-reservation-service.js";
+} from "./room-state-service.js";
+import { checkoutHospitalityStay } from "./hospitality-checkout.js";
 import { ensureCustomerForRequest as ensureStoredCustomerForRequest } from "./request-intake-service.js";
 import { normalizeCustomerInput, normalizeLimitedText } from "./database/customer-utils.js";
 import {
@@ -633,10 +634,18 @@ export function applyAndroidCustomerRoomStayStatus(
   if (versionConflict) {
     return versionConflict;
   }
+  const updatedAt = nextMutationTimestamp(stay.updated_at, now);
+  if (status === "checked_out") {
+    const result = checkoutHospitalityStay(db, { stayId }, {
+      now: updatedAt, android: { actionId: action.id, deviceId: action.device_id }
+    });
+    return result.ok ? { ok: true, message: "Konaklama durumu telefondan güncellendi." } : result;
+  }
+
   const previousStatus = String(stay.status ?? "");
   const allowedTransitions: Record<string, string[]> = {
     planned: ["checked_in", "cancelled"],
-    checked_in: ["checked_out", "cancelled"],
+    checked_in: ["cancelled"],
     cancelled: ["planned"],
     checked_out: []
   };
@@ -654,19 +663,18 @@ export function applyAndroidCustomerRoomStayStatus(
   ) {
     return { ok: false, message: "Odanın aynı tarihlerde başka bir aktif müşteri kaydı var." };
   }
-  const updatedAt = nextMutationTimestamp(stay.updated_at, now);
+
   db
     .prepare(`
         UPDATE customer_room_stays
         SET status = ?,
             checked_in_at = CASE WHEN ? = 'checked_in' THEN ? ELSE checked_in_at END,
-            checked_out_at = CASE WHEN ? = 'checked_out' THEN ? ELSE checked_out_at END,
             updated_at = ?,
             sync_status = 'local_only'
         WHERE id = ?
       `)
-    .run(status, status, updatedAt, status, updatedAt, updatedAt, stayId);
-  refreshStoredRoomStatusFromStays(db, String(stay.room_id ?? ""), updatedAt, status === "checked_out");
+    .run(status, status, updatedAt, updatedAt, stayId);
+  refreshStoredRoomStatusFromStays(db, String(stay.room_id ?? ""), updatedAt, false);
   insertAndroidActionEvent(db, action, "customer.room_stay_status_changed", "customer_room_stay", stayId, {
     customer_id: String(stay.customer_id ?? ""),
     room_id: String(stay.room_id ?? ""),
@@ -710,7 +718,7 @@ export function applyAndroidReservationStatus(
   if (status === "approved") {
     for (const roomId of roomIds) {
       db
-        .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND deleted_at = ''")
+        .prepare("UPDATE rooms SET status = 'reserved', updated_at = ?, sync_status = 'local_only' WHERE id = ? AND status IN ('available', 'reserved') AND deleted_at = ''")
         .run(updatedAt, roomId);
     }
     for (const tableId of tableIds) {

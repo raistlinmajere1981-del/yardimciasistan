@@ -55,6 +55,7 @@ import type {
   DesktopStockImageApplyResult,
   SaveCustomerInput,
   AssignCustomerRoomInput,
+  CreateStayFromReservationInput,
   UpdateCustomerRoomStayStatusInput,
   DesktopCustomerMutationResult,
   DesktopBirthdayPrepareResult,
@@ -213,6 +214,9 @@ export interface DesktopBridge {
   unregisterWhatsAppWebview: (webContentsId: number) => void;
   setWhatsAppUserActivity: (active: boolean) => void;
   assignCustomerRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
+  createStayFromReservation: (input: CreateStayFromReservationInput) => Promise<DesktopCustomerMutationResult>;
+  checkInStay: (stayId: string) => Promise<DesktopCustomerMutationResult>;
+  checkoutStay: (stayId: string) => Promise<DesktopCustomerMutationResult>;
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => Promise<DesktopCustomerMutationResult>;
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => Promise<DesktopIdentityImageAnalyzeResult>;
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => Promise<DesktopStatusUpdateResult>;
@@ -383,6 +387,9 @@ const bridge: DesktopBridge = {
   unregisterWhatsAppWebview: (webContentsId: number) => ipcRenderer.send("whatsapp:unregisterWebview", webContentsId),
   setWhatsAppUserActivity: (active: boolean) => ipcRenderer.send("whatsapp:userActivity", active),
   assignCustomerRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),
+  createStayFromReservation: (input: CreateStayFromReservationInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:createStayFromReservation", input),
+  checkInStay: (stayId: string) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkInStay", stayId),
+  checkoutStay: (stayId: string) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkoutStay", stayId),
   updateCustomerRoomStayStatus: (input: UpdateCustomerRoomStayStatusInput) => ipcRenderer.invoke("customer:updateRoomStayStatus", input),
   analyzeIdentityImage: (input: DesktopIdentityImageAnalyzeInput) => ipcRenderer.invoke("customer:analyzeIdentityImage", input),
   markWhatsAppMessageSent: (input: MarkWhatsAppMessageSentInput) => ipcRenderer.invoke("whatsapp:markMessageSent", input),

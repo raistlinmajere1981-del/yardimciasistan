@@ -223,8 +223,6 @@ try {
   });
   assert.equal(overpay.ok, false, "Payment greater than room-folio remaining must be rejected.");
 
-  const checkoutBlocked = service.checkout({ folioId: opened.folioId, allowOutstanding: false });
-  assert.equal(checkoutBlocked.ok, false, "Checkout must require explicit permission while balance remains.");
 
   const menuRemoved = service.removeItem(menuLine.id);
   assert.equal(menuRemoved.ok, true);
@@ -234,11 +232,11 @@ try {
     assert.equal(restoredMenu.stockQuantity, menuStockBefore);
   }
 
-  const checkedOut = service.checkout({ folioId: opened.folioId, allowOutstanding: true });
+  const checkedOut = service.checkout({ folioId: opened.folioId, allowOutstanding: false });
   assert.equal(checkedOut.ok, true);
   const closedFolio = checkedOut.data.folios.find((item) => item.id === opened.folioId);
   assert.ok(closedFolio);
-  assert.equal(closedFolio.status, "closed");
+  assert.equal(closedFolio.status, "open");
   assert.ok(closedFolio.remainingMinor > 0, "Outstanding receivable must remain after checkout.");
 
   const sqliteCheckout = new DatabaseSync(database.databasePath);
@@ -246,7 +244,7 @@ try {
   const roomAfter = sqliteCheckout.prepare(`SELECT status FROM rooms WHERE id = ?`).get(room.id);
   sqliteCheckout.close();
   assert.equal(stayAfter.status, "checked_out");
-  assert.equal(roomAfter.status, "available");
+  assert.equal(roomAfter.status, "cleaning");
 
   console.log("room-folio-service-smoke-ok");
 } finally {

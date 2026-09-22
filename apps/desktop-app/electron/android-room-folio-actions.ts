@@ -1,3 +1,4 @@
+import { checkoutHospitalityStay } from "./hospitality-checkout.js";
 import type { DatabaseSync } from "node:sqlite";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 
@@ -103,7 +104,7 @@ function addPayment(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFol
 }
 
 function checkout(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFolioMutationResult {
-  const { db, action, now, insertEvent } = options;
+  const { db, action, now } = options;
   const payload = actionPayload(action);
   const folioId = text(payload.folio_id);
   const expectedRemainingMinor = nonNegativeInteger(payload.expected_remaining_minor);
@@ -118,46 +119,13 @@ function checkout(options: ApplyAndroidRoomFolioActionOptions): AndroidRoomFolio
   if (current.remainingMinor !== expectedRemainingMinor) {
     return { ok: false, message: "Oda hesabı siz açtıktan sonra değişmiş. Güncel veriyi çekip tekrar deneyin." };
   }
-  if (current.remainingMinor > 0) {
-    return { ok: false, message: "Çıkış için önce kalan oda hesabını tahsil edin." };
-  }
-
-  const checkoutDate = validDate(current.plannedCheckOutDate)
-    ? current.plannedCheckOutDate
-    : localDateKey(new Date(now));
-
-  db.prepare(`
-    UPDATE room_folios
-    SET status = 'closed', closed_at = ?, updated_at = ?, sync_status = 'local_only'
-    WHERE id = ? AND status = 'open' AND deleted_at = ''
-  `).run(now, now, folioId);
-  db.prepare(`
-    UPDATE customer_room_stays
-    SET status = 'checked_out', check_out_date = ?, checked_out_at = ?, updated_at = ?, sync_status = 'local_only'
-    WHERE id = ? AND deleted_at = ''
-  `).run(checkoutDate, now, now, current.stayId);
-
-  const otherActive = db.prepare(`
-    SELECT COUNT(*) AS count
-    FROM customer_room_stays
-    WHERE room_id = ? AND status = 'checked_in' AND deleted_at = '' AND id != ?
-  `).get(current.roomId, current.stayId) as { count?: number } | undefined;
-  if (Number(otherActive?.count ?? 0) <= 0) {
-    db.prepare(`
-      UPDATE rooms
-      SET status = 'available', updated_at = ?, sync_status = 'local_only'
-      WHERE id = ? AND deleted_at = ''
-    `).run(now, current.roomId);
-  }
-
-  insertEvent("room_folio.checked_out", folioId, {
-    stay_id: current.stayId,
-    room_id: current.roomId,
-    checkout_date: checkoutDate,
-    source: "android",
-    device_id: text(action.device_id)
+  const result = checkoutHospitalityStay(db, { folioId }, {
+    now, android: { actionId: action.id, deviceId: action.device_id }
   });
-  return { ok: true, message: "Çıkış yapıldı ve oda hesabı kapatıldı." };
+  if (!result.ok) return result;
+  return { ok: true, message: result.remainingMinor > 0
+    ? "Çıkış yapıldı; kalan tutar açık oda hesabında korunuyor."
+    : "Çıkış yapıldı ve oda hesabı kapatıldı." };
 }
 
 function getOpenFolioTotals(db: DatabaseSync, folioId: string) {
@@ -224,15 +192,4 @@ function normalizeCurrency(value: unknown): string {
 function safeId(value: unknown): string {
   const normalized = text(value).replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 180);
   return normalized || "unknown";
-}
-
-function validDate(value: string): boolean {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value);
-}
-
-function localDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

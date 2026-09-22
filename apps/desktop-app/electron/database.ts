@@ -77,6 +77,7 @@ import type {
   DesktopStockImageApplyResult,
   SaveCustomerInput,
   AssignCustomerRoomInput,
+  CreateStayFromReservationInput,
   UpdateCustomerRoomStayStatusInput,
   DesktopCustomerMutationResult,
   RequestReservationConversionResult,
@@ -150,6 +151,7 @@ export type {
   DesktopStockImageApplyResult,
   SaveCustomerInput,
   AssignCustomerRoomInput,
+  CreateStayFromReservationInput,
   UpdateCustomerRoomStayStatusInput,
   DesktopCustomerMutationResult,
   DesktopIdentityImageAnalyzeInput,
@@ -682,6 +684,20 @@ export class DesktopDatabase {
       return result;
     }
     return { ...result, dashboardData: this.getDashboardData() };
+  }
+
+  createStayFromReservation(input: CreateStayFromReservationInput): DesktopCustomerMutationResult {
+    const result = createStoredStayFromReservation(this.db, input);
+    return result.ok ? { ...result, dashboardData: this.getDashboardData() } : result;
+  }
+
+  /** Explicit arrival; opening a financial account is a separate operation. */
+  checkInStay(stayId: string): DesktopCustomerMutationResult {
+    return this.updateCustomerRoomStayStatus({ stayId, status: "checked_in" });
+  }
+
+  checkoutStay(stayId: string): DesktopCustomerMutationResult {
+    return this.updateCustomerRoomStayStatus({ stayId, status: "checked_out" });
   }
 
   updateCustomerRoomStayStatus(input: UpdateCustomerRoomStayStatusInput): DesktopCustomerMutationResult {
@@ -2433,6 +2449,7 @@ import {
 
 import {
   assignCustomerToRoom as assignStoredCustomerToRoom,
+  createStayFromReservation as createStoredStayFromReservation,
   updateCustomerRoomStayStatus as updateStoredCustomerRoomStayStatus,
   saveManualReservation as saveStoredManualReservation,
   updateReservationStatus as updateStoredReservationStatus,
