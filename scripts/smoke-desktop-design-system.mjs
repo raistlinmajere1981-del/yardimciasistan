@@ -89,6 +89,15 @@ try {
         return { ok: true, message: 'Ayarlar kaydedildi.', setupData: { ...setup }, dashboardData: dashboard };
       },
       testWebConnection: async () => ({ ok: true, message: 'Bağlantı başarılı.' }),
+      testAiConnection: async input => {
+        window.__designCalls.push({ kind: 'ai-test', input });
+        return {
+          ok: true,
+          message: 'Google AI Studio bağlantısı çalışıyor.',
+          model: 'gemini-3.8-flash',
+          models: [{ id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' }]
+        };
+      },
       getSyncStatus: async () => ({ enabled: false, phase: 'idle', pendingJobs: 0, consecutiveFailures: 0, message: '', lastError: '' }),
       onSyncStatusChanged: () => () => {},
       onAppLockStateChanged: () => () => {},
@@ -223,6 +232,16 @@ try {
   await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
   await expect(page.getByText(/Uygulama şifresi:/, { exact: false })).toBeVisible();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
+
+  await page.getByLabel('Servis sağlayıcı').selectOption('gemini');
+  const googleCredential = page.getByLabel('Google AI Studio API anahtarı veya cURL');
+  await googleCredential.fill('auth-key-smoke-1234567890');
+  await page.getByRole('button', { name: 'Bağlantıyı Dene', exact: true }).click();
+  await expect(page.getByText('Google AI Studio bağlantısı çalışıyor.', { exact: true })).toBeVisible();
+  const aiTestInput = await page.evaluate(() => window.__designCalls.findLast(call => call.kind === 'ai-test')?.input);
+  expect(aiTestInput.apiKey).toBe('auth-key-smoke-1234567890');
+  expect(aiTestInput.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta');
+  expect(aiTestInput.model).toBe('');
   for (const theme of ['light','dark']) {
     await page.getByRole('radio', { name: /Kompakt ve Gelişmiş/ }).click();
     await page.getByLabel('Karanlık tema').setChecked(theme === 'dark');

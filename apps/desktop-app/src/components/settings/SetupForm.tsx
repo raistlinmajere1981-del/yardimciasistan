@@ -805,20 +805,20 @@ export function SetupForm({
                     <ExternalLink size={16} aria-hidden="true" />
                     Google AI Studio'yu Aç
                   </ActionButton>
-                  <small>Bağlantı anahtarı ayrıntısında “Copy cURL quickstart” seçeneğini kullanın.</small>
+                  <small>API Keys ekranından gerçek anahtarı kopyalayıp yapıştırın. İsterseniz anahtarı içeren cURL komutu da kullanılabilir.</small>
                 </div>
                 <div className="form-field form-field--long form-field--span setup-ai-curl-field">
-                  <span>Google AI Studio cURL bağlantısı</span>
+                  <span>Google AI Studio API anahtarı veya cURL</span>
                   <div className="field-control-group setup-secret-input">
                     <input
-                      aria-label="Google AI Studio cURL bağlantısı"
+                      aria-label="Google AI Studio API anahtarı veya cURL"
                       value={googleSecretValue}
                       onChange={(event) => replaceGoogleSecret(event.target.value)}
                       onFocus={(event) => {
                         if (googleUsesStoredApiKey) event.currentTarget.select();
                       }}
                       type={showGoogleCurl || googleUsesStoredApiKey ? "text" : "password"}
-                      placeholder={form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantıyı değiştirmek için yeni cURL yapıştırın" : "Copy cURL quickstart çıktısını buraya yapıştırın"}
+                      placeholder={form.aiStoredApiKeyConfigured ? "Kayıtlı anahtarı değiştirmek için yeni API anahtarı veya cURL yapıştırın" : "Google AI Studio API anahtarını yapıştırın"}
                       disabled={!form.aiEnabled || form.clearAiApiKey}
                       autoComplete="off"
                       spellCheck={false}
@@ -827,7 +827,7 @@ export function SetupForm({
                       {aiApiKeyRevealState === "loading" ? "Açılıyor" : showGoogleCurl ? "Gizle" : "Göster"}
                     </ActionButton>
                   </div>
-                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz." : "Komut yalnız bağlantı kontrolünde okunur; adres, anahtar ve örnek model otomatik hazırlanır."}</small>
+                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı anahtar maskelenir; Göster ile görüntüleyebilir veya yeni anahtar yapıştırabilirsiniz." : "Anahtar güvenli depoda saklanır. cURL yapıştırılırsa adres, anahtar ve varsa örnek model otomatik hazırlanır."}</small>
                   {aiApiKeyRevealMessage && <small className="setup-secret-error" role="status">{aiApiKeyRevealMessage}</small>}
                 </div>
                 {renderAiConnectionActions(true)}
