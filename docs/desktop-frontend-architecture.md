@@ -1,3 +1,10 @@
+> **Historical note — Application Platform v2 Stage 0**
+>
+> This document records the previous desktop frontend baseline; it is preserved as history.
+> For desktop interaction, workspace, drawer, Settings, or appearance decisions that conflict with the Application Platform v2 target architecture,
+> `docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md` is the target authority.
+> For domain behavior, use `docs/architecture/DOMAIN_DECISIONS_V1.md`.
+
 # Masaüstü Frontend Mimari Notları
 
 Bu belge, Yardımcı Asistan masaüstü arayüzünde yapılan kullanıcı dostu sadeleştirmelerden sonra korunması gereken teknik sınırları özetler.

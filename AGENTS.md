@@ -12,6 +12,29 @@ This file defines repository-wide working rules for coding agents. Prefer the na
 - Do not use force-push, history rewrites, stash/pop, or discard unrelated working-tree changes.
 - Treat existing unrelated changes as owned by another task unless explicitly instructed otherwise.
 
+## Application Platform v2
+
+Authoritative target architecture for new desktop feature/UI/platform work:
+
+- `docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md`
+- `docs/architecture/DOMAIN_DECISIONS_V1.md`
+- `docs/architecture/APPLICATION_PLATFORM_V2_ROADMAP.md`
+
+Rules:
+
+- Read the Constitution before new desktop UI/feature work.
+- Preserve the Page / Entity Workspace / Operation distinction.
+- Do not create a new feature-specific editor for the same entity.
+- Do not create a second independent implementation of the same business operation.
+- When an old UI doc or smoke test conflicts with the target architecture, the old presentation contract is not authoritative.
+- Do not change business/domain behavior without an explicit domain decision.
+- Keep new sector/settings/feature work compatible with the long-term extension model.
+- Do not build a generic sector/plugin framework before both pilots are complete.
+- Do not add new easy/pro or feature-specific theme branches on the appearance side.
+- Keep new Settings fields with clear domain ownership so they can move to the Settings Platform v2 registry model later.
+
+See the three architecture documents for details.
+
 ## Architecture
 
 ### Electron main process

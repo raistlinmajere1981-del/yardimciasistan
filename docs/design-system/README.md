@@ -1,3 +1,10 @@
+> **Historical note — Application Platform v2 Stage 0**
+>
+> This document records the previous desktop design-system baseline; it is preserved as history.
+> For desktop interaction, workspace, drawer, Settings, or appearance decisions that conflict with the Application Platform v2 target architecture,
+> `docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md` is the target authority.
+> For domain behavior, use `docs/architecture/DOMAIN_DECISIONS_V1.md`.
+
 # Desktop design system migration
 
 Başlangıç: `main`, `febf582a0a9ce935c3f525b0fef80b5bd54eaf4a`; çalışma ağacı temizdi. Refactor doğrudan `main` üzerinde hazırlandı; yeni branch oluşturulmadı. Bu çalışma renderer sunumunu, stylesheet organizasyonunu ve UI test sözleşmesini değiştirir. Database, IPC implementasyonu, sync, AI, availability ve uygulama tercihlerinin saklanması değiştirilmez.

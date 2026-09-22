@@ -1,3 +1,13 @@
+> **Historical note — Application Platform v2 Stage 0**
+>
+> This document records the previous desktop UI baseline and migration reports; it is preserved as history.
+> For desktop interaction, workspace, drawer, Settings, or appearance decisions that conflict with the Application Platform v2 target architecture,
+> `docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md` is the target authority.
+> For domain behavior, use `docs/architecture/DOMAIN_DECISIONS_V1.md`.
+>
+> In particular, the single long Settings page, the easy/pro theme approach, drawer-based entity editors,
+> and the old Pension page composition described here are not the new target and must not be read as target decisions.
+
 # Desktop UI migration — Final desktop baseline (Stage 3B)
 
 Aşama 1 başlangıcı: temiz `main`, `25ad66e88c700fe883e6ca01b50b8b7e6e279c2f`. Bu aşama ortak renderer kabuğu ve yüzey sözleşmesini taşır. Database, IPC, sync, AI, availability, capability kararları ve feature iş akışları değiştirilmez. `firm-template/web-module/widget.js` kapsam dışıdır. Commit/push yapılmaz.

@@ -4,6 +4,17 @@ Bu klasör Yardımcı Asistan v1 için ürün, mimari, UI, veri modeli, event si
 
 Kod yazmadan önce özellikle `CODEX_RULES.md` ve `TASKS.md` kontrol edilmelidir.
 
+## Application Platform v2
+
+Yeni desktop feature/UI/platform çalışmaları için otorite:
+
+- `architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md`:
+  uzun vadeli uygulama grameri ve ownership kuralları
+- `architecture/DOMAIN_DECISIONS_V1.md`:
+  özellikle benzer görünen fakat farklı domain operation'lar
+- `architecture/APPLICATION_PLATFORM_V2_ROADMAP.md`:
+  migration sırası ve stage exit kriterleri
+
 ## Kurulum Rehberleri
 
 - `ANDROID_DISTRIBUTION.md`: Debug/release ayrımı, kalıcı package kimliği, sürümleme, güvenli signing, USB debugging gerektirmeyen pilot APK kurulumu, AAB ve Play Store checklist'i.

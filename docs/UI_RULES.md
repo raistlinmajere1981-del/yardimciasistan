@@ -1,3 +1,10 @@
+> **Historical note — Application Platform v2 Stage 0**
+>
+> This document records general product design principles; it may describe the previous desktop UI baseline.
+> For desktop interaction, workspace, drawer, Settings, or appearance decisions that conflict with the Application Platform v2 target architecture,
+> `docs/architecture/APPLICATION_ARCHITECTURE_CONSTITUTION_V1.md` is the target authority.
+> For domain behavior, use `docs/architecture/DOMAIN_DECISIONS_V1.md`.
+
 # Yardımcı Asistan — UI Kuralları
 
 Bu doküman Yardımcı Asistan projesindeki tüm arayüzlerin ortak tasarım dilini tanımlar.
