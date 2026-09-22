@@ -32,7 +32,7 @@ try {
 
   await page.addInitScript(({ dashboard, setup, enabledCapabilities, preferenceStorageKey }) => {
     if (!localStorage.getItem(preferenceStorageKey)) {
-      localStorage.setItem(preferenceStorageKey, JSON.stringify({ theme: "light", mode: "pro", scale: 1 }));
+      localStorage.setItem(preferenceStorageKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
 
     const emptyCategory = {
@@ -321,8 +321,8 @@ try {
       name,
       width: viewport.width,
       height: viewport.height,
-      theme: await page.locator("html").getAttribute("data-theme"),
-      mode: await page.locator("html").getAttribute("data-mode"),
+      scheme: await page.locator("html").getAttribute("data-color-scheme"),
+      density: await page.locator("html").getAttribute("data-density"),
       ...metrics
     });
     writeFileSync(`${output}/viewports.json`, `${JSON.stringify(observations, null, 2)}\n`);
@@ -347,7 +347,7 @@ try {
     await page.setViewportSize({ width, height });
     await navigate("Restoran", "Restoran");
     await page.locator(".restaurant-tables-section").scrollIntoViewIfNeeded();
-    await capture(`restaurant-tables-light-pro`);
+    await capture(`restaurant-tables-light-compact`);
 
     const activeTable = page.locator(".restaurant-table-card").filter({ hasText: "Salon Masası 2" });
     await activeTable.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
@@ -356,7 +356,7 @@ try {
     const categoryTabs = orderDrawer.getByRole("tablist", { name: "Menü kategorileri" });
     await expect(categoryTabs).toBeVisible();
     await expect(categoryTabs.getByRole("tab", { name: "Tümü", exact: true })).toBeVisible();
-    await capture(`restaurant-order-light-pro`);
+    await capture(`restaurant-order-light-compact`);
     await closeDialog(orderDrawer, "Sipariş drawer'ını kapat");
 
     if (width === 1440 || width === 600) {
@@ -364,7 +364,7 @@ try {
       await page.getByRole("button", { name: "Odaya Yaz", exact: true }).click();
       const transferDialog = page.getByRole("dialog", { name: "Aktarımı onaylayın" });
       await expect(transferDialog).toBeVisible();
-      await capture(`restaurant-room-transfer-light-pro`);
+      await capture(`restaurant-room-transfer-light-compact`);
       await closeDialog(transferDialog, "Vazgeç");
     }
 
@@ -372,24 +372,24 @@ try {
     await page.locator(".menu-category-panel .menu-record").filter({ hasText: "Kahvaltı" }).click();
     await page.locator(".menu-product-panel .menu-record").filter({ hasText: "Menü Ürünü 1" }).click();
     await expect(page.getByRole("button", { name: "Ürünü Sil", exact: true })).toBeVisible();
-    await capture(`menu-editor-light-pro`);
+    await capture(`menu-editor-light-compact`);
 
     if (width === 1440 || width === 600) {
       await page.getByRole("button", { name: "Ürünü Sil", exact: true }).click();
       const deleteDialog = page.getByRole("dialog", { name: "Ürünü sil" });
       await expect(deleteDialog).toBeVisible();
-      await capture(`menu-delete-dialog-light-pro`);
+      await capture(`menu-delete-dialog-light-compact`);
       await closeDialog(deleteDialog, "Vazgeç");
 
       await page.getByRole("button", { name: "Ürün ekle", exact: true }).click();
-      await capture(`menu-new-item-light-pro`);
+      await capture(`menu-new-item-light-compact`);
       await page.locator(".menu-category-panel .menu-record").filter({ hasText: "Boş Kategori" }).click();
       await expect(page.getByText("Bu kategoride henüz ürün yok.", { exact: true })).toBeVisible();
-      await capture(`menu-empty-light-pro`);
+      await capture(`menu-empty-light-compact`);
       await page.getByRole("button", { name: "Önizle", exact: true }).click();
       const preview = page.getByRole("dialog", { name: "Yerel Menü Önizlemesi" });
       await expect(preview).toBeVisible();
-      await capture(`menu-preview-light-pro`);
+      await capture(`menu-preview-light-compact`);
       await closeDialog(preview, "Önizlemeyi kapat");
     }
   }
@@ -410,28 +410,28 @@ try {
     sourceTableOrderId: "stage2b-payment-order"
   });
 
-  async function setAppearance(theme, mode) {
-    await page.evaluate(({ nextTheme, nextMode, storageKey }) => {
-      localStorage.setItem(storageKey, JSON.stringify({ theme: nextTheme, mode: nextMode, scale: 1 }));
-    }, { nextTheme: theme, nextMode: mode, storageKey: preferencesKey });
+  async function setAppearance(scheme, density) {
+    await page.evaluate(({ nextScheme, nextDensity, storageKey }) => {
+      localStorage.setItem(storageKey, JSON.stringify({ version: 2, scheme: nextScheme, density: nextDensity, scale: 1, accent: "coral", font: "plex", motion: "system" }));
+    }, { nextScheme: scheme, nextDensity: density, storageKey: preferencesKey });
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    await expect(page.locator("html")).toHaveAttribute("data-mode", mode);
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", scheme);
+    await expect(page.locator("html")).toHaveAttribute("data-density", density);
   }
 
-  await setAppearance("dark", "pro");
+  await setAppearance("dark", "compact");
   await navigate("Restoran", "Restoran");
   await page.locator(".restaurant-tables-section").scrollIntoViewIfNeeded();
-  await capture("restaurant-tables-dark-pro");
+  await capture("restaurant-tables-dark-compact");
   await navigate("Menü", "Menü");
-  await capture("menu-editor-dark-pro");
+  await capture("menu-editor-dark-compact");
 
-  await setAppearance("light", "easy");
+  await setAppearance("light", "comfortable");
   await navigate("Restoran", "Restoran");
   await page.locator(".restaurant-tables-section").scrollIntoViewIfNeeded();
-  await capture("restaurant-tables-light-easy");
+  await capture("restaurant-tables-light-comfortable");
   await navigate("Menü", "Menü");
-  await capture("menu-editor-light-easy");
+  await capture("menu-editor-light-comfortable");
 
   expect(pageErrors).toEqual([]);
   console.log(`stage2b-restaurant-menu-ok: ${observations.length} surfaces -> ${output}`);

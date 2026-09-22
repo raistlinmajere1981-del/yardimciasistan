@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-13T19:54:50.021Z",
+  "generatedAt": "2026-09-22T12:47:31.186Z",
   "files": {
     "apps/desktop-app/src/App.tsx": {
       "rawColor": 0,
@@ -114,6 +114,14 @@
       "important": 0,
       "inlineStyle": 0
     },
+    "apps/desktop-app/src/components/diagnostics/DiagnosticsViewer.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
     "apps/desktop-app/src/components/finance/FinanceWorkspace.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
@@ -170,6 +178,14 @@
       "important": 0,
       "inlineStyle": 0
     },
+    "apps/desktop-app/src/components/market/MarketProductThumbnail.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
     "apps/desktop-app/src/components/market/MarketProductsWorkspace.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
@@ -203,6 +219,14 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/components/menu/MenuPreview.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/messages/MessageModeErrorBoundary.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -370,6 +394,14 @@
       "important": 0,
       "inlineStyle": 0
     },
+    "apps/desktop-app/src/components/settings/SettingsWorkspace.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
     "apps/desktop-app/src/components/settings/SetupForm.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
@@ -378,7 +410,7 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/components/settings/SetupWizard.tsx": {
+    "apps/desktop-app/src/components/settings/UpdateSettings.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -395,6 +427,14 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/components/ui/ActionButton.tsx": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/components/ui/DataList.tsx": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -506,6 +546,46 @@
       "important": 0,
       "inlineStyle": 0
     },
+    "apps/desktop-app/src/styles/appearance/accents.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/appearance/density.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/appearance/fonts.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/appearance/motion.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/appearance/schemes.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
     "apps/desktop-app/src/styles/components/badges.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
@@ -515,6 +595,22 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/components/buttons.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/cards.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/data-list.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -539,7 +635,7 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/components/feedback.css": {
-      "rawColor": 2,
+      "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 2,
       "hardcodedFontSize": 0,
@@ -547,6 +643,14 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/components/forms.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/header.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -563,22 +667,6 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/components/motion.css": {
-      "rawColor": 1,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/styles/components/operations.css": {
-      "rawColor": 3,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/styles/components/panels.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -586,8 +674,24 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/styles/components/records.css": {
-      "rawColor": 4,
+    "apps/desktop-app/src/styles/components/navigation.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/notifications.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/panels.css": {
+      "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
@@ -602,7 +706,15 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/styles/components/segmented-control.css": {
+    "apps/desktop-app/src/styles/components/status.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
+    "apps/desktop-app/src/styles/components/toolbars.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
@@ -653,15 +765,15 @@
     "apps/desktop-app/src/styles/layout/app-shell.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
-      "hardcodedShadow": 1,
+      "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/layout/page.css": {
-      "rawColor": 1,
+      "rawColor": 0,
       "hardcodedRadius": 0,
-      "hardcodedShadow": 1,
+      "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
@@ -675,15 +787,15 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/ai.css": {
-      "rawColor": 4,
+      "rawColor": 0,
       "hardcodedRadius": 0,
-      "hardcodedShadow": 2,
+      "hardcodedShadow": 1,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/calendar.css": {
-      "rawColor": 1,
+      "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
@@ -691,17 +803,17 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/customers.css": {
-      "rawColor": 3,
+      "rawColor": 0,
       "hardcodedRadius": 0,
-      "hardcodedShadow": 1,
+      "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/dashboard.css": {
-      "rawColor": 14,
-      "hardcodedRadius": 3,
-      "hardcodedShadow": 1,
+      "rawColor": 0,
+      "hardcodedRadius": 1,
+      "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
@@ -714,18 +826,26 @@
       "important": 0,
       "inlineStyle": 0
     },
+    "apps/desktop-app/src/styles/pages/diagnostics.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 2,
+      "hardcodedFontSize": 0,
+      "important": 0,
+      "inlineStyle": 0
+    },
     "apps/desktop-app/src/styles/pages/finance.css": {
-      "rawColor": 2,
-      "hardcodedRadius": 1,
+      "rawColor": 0,
+      "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/lock.css": {
-      "rawColor": 50,
-      "hardcodedRadius": 1,
-      "hardcodedShadow": 3,
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 2,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
@@ -739,17 +859,17 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/menu-preview.css": {
-      "rawColor": 46,
+      "rawColor": 44,
       "hardcodedRadius": 0,
-      "hardcodedShadow": 3,
+      "hardcodedShadow": 2,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/menu.css": {
-      "rawColor": 9,
-      "hardcodedRadius": 1,
-      "hardcodedShadow": 3,
+      "rawColor": 0,
+      "hardcodedRadius": 0,
+      "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
@@ -757,7 +877,7 @@
     "apps/desktop-app/src/styles/pages/messages.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
-      "hardcodedShadow": 3,
+      "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
@@ -778,24 +898,16 @@
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/styles/pages/requests.css": {
-      "rawColor": 1,
-      "hardcodedRadius": 1,
+    "apps/desktop-app/src/styles/pages/restaurant.css": {
+      "rawColor": 0,
+      "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
       "important": 0,
       "inlineStyle": 0
     },
-    "apps/desktop-app/src/styles/pages/restaurant.css": {
-      "rawColor": 14,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 1,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
     "apps/desktop-app/src/styles/pages/room-folio.css": {
-      "rawColor": 2,
+      "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,
       "hardcodedFontSize": 0,
@@ -803,38 +915,6 @@
       "inlineStyle": 0
     },
     "apps/desktop-app/src/styles/pages/settings.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/styles/pages/setup.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/styles/themes/dark.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/styles/themes/easy.css": {
-      "rawColor": 0,
-      "hardcodedRadius": 0,
-      "hardcodedShadow": 0,
-      "hardcodedFontSize": 0,
-      "important": 0,
-      "inlineStyle": 0
-    },
-    "apps/desktop-app/src/styles/themes/light.css": {
       "rawColor": 0,
       "hardcodedRadius": 0,
       "hardcodedShadow": 0,

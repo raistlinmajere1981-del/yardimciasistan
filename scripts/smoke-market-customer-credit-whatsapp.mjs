@@ -103,7 +103,7 @@ try {
     plugins: [{ name: "m83-smoke-page", configureServer(instance) {
       instance.middlewares.use("/m83-smoke", async (_request, response) => {
         response.setHeader("Content-Type", "text/html");
-        response.end(await instance.transformIndexHtml("/m83-smoke", `<!doctype html><html lang="tr" data-mode="pro" data-theme="light"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Veresiye paylaşımı</title><style>.smoke-shell {max-width:1400px;margin:auto;padding:24px}.smoke-shell > nav {display:flex;gap:12px;margin-bottom:16px}</style></head><body><div id="root"></div><script type="module" src="/@fs/${join(process.cwd(), "scripts/fixtures/customer-credit-whatsapp.tsx")}"></script></body></html>`));
+        response.end(await instance.transformIndexHtml("/m83-smoke", `<!doctype html><html lang="tr" data-color-scheme="light" data-density="compact" data-accent="coral" data-font="plex" data-motion="system"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Veresiye paylaşımı</title><style>.smoke-shell {max-width:1400px;margin:auto;padding:24px}.smoke-shell > nav {display:flex;gap:12px;margin-bottom:16px}</style></head><body><div id="root"></div><script type="module" src="/@fs/${join(process.cwd(), "scripts/fixtures/customer-credit-whatsapp.tsx")}"></script></body></html>`));
       });
     } }] });
   await server.listen();

@@ -208,15 +208,15 @@ try {
   }
   await page.evaluate(() => localStorage.removeItem('stage2a.empty-tasks'));
   await page.reload();
-  for (const [theme, mode] of [['light','pro'],['dark','pro'],['light','easy']]) {
+  for (const [scheme, density] of [['light','compact'],['dark','compact'],['light','comfortable']]) {
     await page.setViewportSize({ width: 1366, height: 768 });
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
-    await page.getByRole('radio', { name: /Kompakt ve Gelişmiş/ }).click();
-    await page.getByLabel('Karanlık tema').setChecked(theme === 'dark');
-    if (mode === 'easy') await page.getByRole('radio', { name: /Büyük ve Sade/ }).click();
+    await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
+    await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
+    if (density === 'comfortable') await page.getByRole('radio', { name: 'Rahat', exact: true }).click();
     for (const name of ['Müşteri İşleri', 'Pansiyon']) {
       await page.locator('.sidebar').getByRole('button', { name, exact: true }).click();
-      await capture(`${name}-${theme}-${mode}`);
+      await capture(`${name}-${scheme}-${density}`);
     }
   }
   expect(errors).toEqual([]);

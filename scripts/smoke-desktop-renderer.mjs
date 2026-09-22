@@ -206,12 +206,16 @@ try {
   });
 
   await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({
-    theme: "dark",
+    version: 2,
+    scheme: "dark",
+    density: "compact",
     scale: 1,
-    mode: "pro"
+    accent: "coral",
+    font: "plex",
+    motion: "system"
   });
   const notificationBell = page.getByRole("button", { name: /Bildirimler, \d+ uyarı/ });
   await expect(notificationBell).toBeVisible();
@@ -321,38 +325,50 @@ try {
   await expect(page.getByText("Firma Bilgileri", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Modüller", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Kapasite ve Yardımcı", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("radio", { name: /Büyük ve Sade Görünüm/ })).not.toBeChecked();
-  await expect(page.getByRole("radio", { name: "Kompakt ve Gelişmiş Görünüm" })).toBeChecked();
+  await expect(page.getByText("Büyük ve Sade Görünüm", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Kompakt ve Gelişmiş Görünüm", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("radio", { name: "Rahat", exact: true })).not.toBeChecked();
+  await expect(page.getByRole("radio", { name: "Kompakt", exact: true })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Mercan", exact: true })).toBeChecked();
   await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1");
-  await expect(page.getByLabel("Karanlık tema")).toBeChecked();
   await page.getByLabel("Arayüz ölçeği").selectOption("1.1");
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1.1");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "dark", scale: 1.1, mode: "pro" });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ version: 2, scheme: "dark", density: "compact", scale: 1.1, accent: "coral", font: "plex", motion: "system" });
+  await page.getByRole("radio", { name: "Mavi", exact: true }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-accent", "blue");
+  await expect(page.getByRole("radio", { name: "Mercan", exact: true })).not.toBeChecked();
+  await page.getByRole("radio", { name: "Mercan", exact: true }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("button", { name: "Ayarlar" }).click();
-  await expect(page.getByRole("radio", { name: "Kompakt ve Gelişmiş Görünüm" })).toBeChecked();
+  await expect(page.getByRole("radio", { name: "Kompakt", exact: true })).toBeChecked();
   await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1.1");
-  await expect(page.getByLabel("Karanlık tema")).toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   await page.screenshot({ path: "artifacts/screenshots/desktop-settings-dark.png", fullPage: true });
   await page.getByLabel("Arayüz ölçeği").selectOption("1");
-  await page.locator("label.appearance-theme-toggle").click();
-  await expect(page.getByLabel("Karanlık tema")).not.toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ theme: "light", scale: 1, mode: "pro" });
-  await page.locator("label.appearance-theme-toggle").click();
-  await expect(page.getByLabel("Karanlık tema")).toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.locator("label.appearance-theme-toggle").click();
-  await expect(page.getByLabel("Karanlık tema")).not.toBeChecked();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByRole("radio", { name: "Açık", exact: true }).check();
+  await expect(page.getByRole("radio", { name: "Açık", exact: true })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("yardimci-asistan.ui-preferences")))).toEqual({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" });
+  await page.getByRole("radio", { name: "Koyu", exact: true }).check();
+  await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
+  await page.getByRole("radio", { name: "Açık", exact: true }).check();
+  await expect(page.getByRole("radio", { name: "Açık", exact: true })).toBeChecked();
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
+  await page.getByRole("radio", { name: "Rahat", exact: true }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+  await page.getByRole("radio", { name: "Kompakt", exact: true }).check();
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(page.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
+  await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
   await page.getByRole("button", { name: "Ayarlar" }).click();
   await page.locator(".setup-ai-section").getByRole("checkbox").check();
   await expect(page.getByLabel("Servis sağlayıcı")).toBeEnabled();
@@ -578,7 +594,7 @@ try {
   await conversionPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
-      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     let currentDashboardData = dashboardData;
     window.__identityAnalysisCalls = [];
@@ -978,7 +994,7 @@ try {
     capabilitySnapshot: createBusinessCapabilitySnapshotFixture({ ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345" })
   });
   await conversionPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(conversionPage.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(conversionPage.locator("html")).toHaveAttribute("data-density", "compact");
   await conversionPage.getByRole("button", { name: "Ayarlar" }).click();
   await expect(conversionPage.getByRole("button", { name: "Yedek Al" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Yedek Al" }).click();
@@ -1150,7 +1166,7 @@ try {
   await compactPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
-      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     let tableOrders = [];
     let currentDashboardData = dashboardData;
@@ -1311,8 +1327,8 @@ try {
   });
   await compactPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
 
-  await expect(compactPage.locator("html")).toHaveAttribute("data-theme", "light");
-  await expect(compactPage.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(compactPage.locator("html")).toHaveAttribute("data-color-scheme", "light");
+  await expect(compactPage.locator("html")).toHaveAttribute("data-density", "compact");
   expect(await compactPage.evaluate(() => getComputedStyle(document.documentElement).zoom)).toBe("1");
 
   await compactPage.getByRole("button", { name: "Menüyü daralt" }).click();
@@ -1341,11 +1357,11 @@ try {
   expect(await compactPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await expect(dashboardPriorityRows.first().getByRole("heading")).toHaveText("Kompakt Misafir 1");
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-dashboard-1366x768.png" });
-  await compactPage.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
-  await expect(compactPage.locator("html")).toHaveAttribute("data-theme", "light");
+  await compactPage.evaluate(() => document.documentElement.setAttribute("data-color-scheme", "light"));
+  await expect(compactPage.locator("html")).toHaveAttribute("data-color-scheme", "light");
   expect(await compactPage.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-dashboard-light-1366x768.png" });
-  await compactPage.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+  await compactPage.evaluate(() => document.documentElement.setAttribute("data-color-scheme", "dark"));
 
   await compactPage.getByRole("button", { name: "Kompakt Misafir 1 rezervasyonunu incele" }).click();
   await expect(compactPage.getByRole("heading", { name: "Müşteri İşleri", exact: true })).toBeVisible();
@@ -1356,7 +1372,7 @@ try {
   await aiOnlyPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
-      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
@@ -1403,7 +1419,7 @@ try {
     })
   });
   await aiOnlyPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(aiOnlyPage.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(aiOnlyPage.locator("html")).toHaveAttribute("data-density", "compact");
   const aiOnlyRequestPriority = aiOnlyPage.locator(".dashboard-priority-item.priority-request").filter({ hasText: "Kompakt Misafir 1" });
   await aiOnlyRequestPriority.getByRole("button").click();
   await expect(aiOnlyPage.getByRole("heading", { name: "Mesajlar", exact: true })).toBeVisible();
@@ -1644,7 +1660,7 @@ try {
   await pullPage.addInitScript(({ setupData, dashboardData, pulledRequest, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
-      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     let currentDashboardData = dashboardData;
     window.yardimciDesktop = {
@@ -1737,7 +1753,7 @@ try {
     capabilitySnapshot: createBusinessCapabilitySnapshotFixture({ ...createSetupFixture(), setupRequired: false, syncSecret: "smoke-secret-12345" })
   });
   await pullPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(pullPage.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(pullPage.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(pullPage.locator(".dashboard-attention-card").first().locator("strong")).toHaveText("0");
   await pullPage.getByRole("button", { name: "Şimdi Eşitle", exact: true }).click();
   await expect(pullPage.getByText("1 talep alındı.")).toBeVisible();
@@ -1749,7 +1765,7 @@ try {
   await setupPage.addInitScript(({ setupData, dashboardData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
-      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "light", scale: 1, mode: "pro" }));
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     window.__aiConnectionTestCount = 0;
     const storedAiApiKeys = {
@@ -1899,7 +1915,7 @@ try {
     capabilitySnapshot: createBusinessCapabilitySnapshotFixture(createSetupFixture())
   });
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(setupPage.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(setupPage.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(setupPage.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();
   await expect(setupPage.getByRole("button", { name: "Ayarlar", exact: true })).toBeVisible();
   await expect(setupPage.locator(".setup-shell")).toHaveClass(/is-initial-setup/);

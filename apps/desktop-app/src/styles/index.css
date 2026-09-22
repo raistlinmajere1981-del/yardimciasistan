@@ -1,14 +1,18 @@
 /* One entry point. Every application stylesheet declares its cascade layer. */
 @layer reset, tokens, foundation, components, layout, pages, utilities;
 @layer components.legacy, components.primitives;
+/* User appearance preferences override every other layer. */
+@layer appearance;
 
 @import "./tokens/primitives.css" layer(tokens);
 @import "./tokens/semantic.css" layer(tokens);
 @import "./tokens/typography.css" layer(tokens);
 @import "./tokens/dimensions.css" layer(tokens);
-@import "./themes/light.css" layer(tokens);
-@import "./themes/dark.css" layer(tokens);
-@import "./themes/easy.css" layer(tokens);
+@import "./appearance/schemes.css" layer(appearance);
+@import "./appearance/density.css" layer(appearance);
+@import "./appearance/accents.css" layer(appearance);
+@import "./appearance/fonts.css" layer(appearance);
+@import "./appearance/motion.css" layer(appearance);
 @import "./foundation/reset.css" layer(reset);
 @import "./foundation/base.css" layer(foundation);
 @import "./foundation/typography.css" layer(foundation);

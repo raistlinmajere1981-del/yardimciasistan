@@ -1,0 +1,49 @@
+/* Color scheme selection. Light values live in tokens/semantic.css; this file
+   only switches schemes. `system` follows the OS via prefers-color-scheme so
+   no restart or JS listener is required. */
+
+:root[data-color-scheme="light"] {
+  color-scheme: light;
+}
+
+:root[data-color-scheme="dark"] {
+  color-scheme: dark;
+  --color-bg-app: var(--slate-950);
+  --color-bg-surface: var(--slate-900);
+  --color-bg-panel: var(--slate-900);
+  --color-bg-field: var(--slate-950);
+  --color-bg-hover: var(--slate-800);
+  --color-bg-disabled: var(--slate-800);
+  --color-text: var(--slate-50);
+  --color-text-muted: var(--slate-300);
+  --color-border: var(--slate-700);
+  --color-border-strong: var(--slate-500);
+  --color-danger: var(--red-400);
+  --color-warning: var(--amber-400);
+  --color-success: var(--green-400);
+  --color-info: var(--blue-400);
+}
+
+:root[data-color-scheme="system"] {
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-color-scheme="system"] {
+    color-scheme: dark;
+    --color-bg-app: var(--slate-950);
+    --color-bg-surface: var(--slate-900);
+    --color-bg-panel: var(--slate-900);
+    --color-bg-field: var(--slate-950);
+    --color-bg-hover: var(--slate-800);
+    --color-bg-disabled: var(--slate-800);
+    --color-text: var(--slate-50);
+    --color-text-muted: var(--slate-300);
+    --color-border: var(--slate-700);
+    --color-border-strong: var(--slate-500);
+    --color-danger: var(--red-400);
+    --color-warning: var(--amber-400);
+    --color-success: var(--green-400);
+    --color-info: var(--blue-400);
+  }
+}

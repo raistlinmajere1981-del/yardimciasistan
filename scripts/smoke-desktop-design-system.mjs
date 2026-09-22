@@ -315,11 +315,11 @@ try {
   expect(aiTestInput.apiKey).toBe('auth-key-smoke-1234567890');
   expect(aiTestInput.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta');
   expect(aiTestInput.model).toBe('');
-  for (const theme of ['light','dark']) {
-    await page.getByRole('radio', { name: /Kompakt ve Gelişmiş/ }).click();
-    await page.getByLabel('Karanlık tema').setChecked(theme === 'dark');
+  for (const scheme of ['light','dark']) {
+    await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
+    await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
     await page.locator('.content').evaluate(el => el.scrollTop = 0);
-    await page.screenshot({ animations: "disabled", path: `${output}/settings-pro-${theme}.png` });
+    await page.screenshot({ animations: "disabled", path: `${output}/settings-compact-${scheme}.png` });
   }
   // Focus ring remains visible with keyboard navigation.
   await page.getByRole('navigation', { name: 'Ayar bölümleri' }).getByRole('link').first().focus();

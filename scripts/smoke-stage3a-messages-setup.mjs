@@ -18,10 +18,10 @@ const viewports = [
   [900, 768],
   [600, 800]
 ];
-const themes = [
-  ["light", "pro"],
-  ["dark", "pro"],
-  ["light", "easy"]
+const appearances = [
+  ["light", "compact"],
+  ["dark", "compact"],
+  ["light", "comfortable"]
 ];
 const enabledCapabilities = Object.values(BUSINESS_CAPABILITIES);
 const request = {
@@ -75,7 +75,7 @@ try {
   messagesPage.on("pageerror", (error) => pageErrors.push(error.message));
   await installBridge(messagesPage, { setupData, dashboardData: dashboard, enabledCapabilities });
   await messagesPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(messagesPage.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(messagesPage.locator("html")).toHaveAttribute("data-density", "compact");
 
   await messagesPage.getByRole("button", { name: "Mesajlar", exact: true }).click();
   await expect(messagesPage.getByRole("heading", { name: "Mesajlar" })).toBeVisible();
@@ -149,29 +149,29 @@ try {
     await messagesPage.setViewportSize({ width, height });
     await messagesPage.getByRole("tab", { name: "Mesaj Hazırla", exact: true }).click();
     await assertNoOverflow(messagesPage, `messages ${width}`, observations.messages);
-    await messagesPage.screenshot({ animations: "disabled", path: `${output}/messages-${width}x${height}-light-pro.png` });
+    await messagesPage.screenshot({ animations: "disabled", path: `${output}/messages-${width}x${height}-light-compact.png` });
   }
   await messagesPage.getByRole("tab", { name: "WhatsApp", exact: true }).click();
   await messagesPage.setViewportSize({ width: 600, height: 800 });
   await assertNoOverflow(messagesPage, "messages web 600", observations.messages);
-  await messagesPage.screenshot({ animations: "disabled", path: `${output}/messages-web-600x800-light-pro.png` });
+  await messagesPage.screenshot({ animations: "disabled", path: `${output}/messages-web-600x800-light-compact.png` });
 
-  for (const [theme, mode] of themes.slice(1)) {
-    await setAppearance(messagesPage, theme, mode);
+  for (const [scheme, density] of appearances.slice(1)) {
+    await setAppearance(messagesPage, scheme, density);
     await messagesPage.getByRole("button", { name: "Mesajlar", exact: true }).click();
     for (const [width, height] of viewports) {
       await messagesPage.setViewportSize({ width, height });
       await expect(messagesPage.locator(".messages-page")).toBeVisible();
-      await assertNoOverflow(messagesPage, `messages ${theme}-${mode} ${width}`, observations.messages);
+      await assertNoOverflow(messagesPage, `messages ${scheme}-${density} ${width}`, observations.messages);
       if (width === 1440) {
-        await messagesPage.screenshot({ animations: "disabled", path: `${output}/messages-1440x1000-${theme}-${mode}.png` });
+        await messagesPage.screenshot({ animations: "disabled", path: `${output}/messages-1440x1000-${scheme}-${density}.png` });
       }
     }
   }
 
   // Settings remains an embedded consumer of SetupForm. Verify its shell and
   // section navigation after the onboarding-oriented form changes.
-  await setAppearance(messagesPage, "light", "pro");
+  await setAppearance(messagesPage, "light", "compact");
   await messagesPage.setViewportSize({ width: 1440, height: 1000 });
   await messagesPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
   await expect(messagesPage.locator(".setup-shell.is-embedded")).toBeVisible();
@@ -182,7 +182,7 @@ try {
     await messagesPage.setViewportSize({ width, height });
     await assertNoOverflow(messagesPage, `settings ${width}`, observations.settings);
     if (width === 1440 || width === 600) {
-      await messagesPage.screenshot({ animations: "disabled", path: `${output}/settings-${width}x${height}-light-pro.png` });
+      await messagesPage.screenshot({ animations: "disabled", path: `${output}/settings-${width}x${height}-light-compact.png` });
     }
   }
 
@@ -201,7 +201,7 @@ try {
     enabledCapabilities
   });
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
-  await expect(setupPage.locator("html")).toHaveAttribute("data-mode", "pro");
+  await expect(setupPage.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(setupPage.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();
   await expect(setupPage.locator(".setup-shell.is-embedded")).toBeVisible();
   await expect(setupPage.locator(".setup-shell")).toHaveClass(/is-initial-setup/);
@@ -231,17 +231,17 @@ try {
     await setupPage.setViewportSize({ width, height });
     await setupPage.evaluate(() => window.scrollTo(0, 0));
     await assertNoOverflow(setupPage, `setup ${width}`, observations.setup);
-    await setupPage.screenshot({ animations: "disabled", path: `${output}/setup-${width}x${height}-light-pro.png` });
+    await setupPage.screenshot({ animations: "disabled", path: `${output}/setup-${width}x${height}-light-compact.png` });
   }
-  for (const [theme, mode] of themes.slice(1)) {
-    await setAppearance(setupPage, theme, mode);
+  for (const [scheme, density] of appearances.slice(1)) {
+    await setAppearance(setupPage, scheme, density);
     for (const [width, height] of viewports) {
       await setupPage.setViewportSize({ width, height });
       await setupPage.evaluate(() => window.scrollTo(0, 0));
       await expect(setupPage.locator(".setup-shell.is-embedded")).toBeVisible();
-      await assertNoOverflow(setupPage, `setup ${theme}-${mode} ${width}`, observations.setup);
+      await assertNoOverflow(setupPage, `setup ${scheme}-${density} ${width}`, observations.setup);
       if (width === 1440) {
-        await setupPage.screenshot({ animations: "disabled", path: `${output}/setup-1440x1000-${theme}-${mode}.png` });
+        await setupPage.screenshot({ animations: "disabled", path: `${output}/setup-1440x1000-${scheme}-${density}.png` });
       }
     }
   }
@@ -257,7 +257,7 @@ try {
 async function installBridge(page, { setupData, dashboardData, enabledCapabilities }) {
   await page.addInitScript(({ setup, dashboard, capabilities, preferenceStorageKey }) => {
     if (!window.localStorage.getItem(preferenceStorageKey)) {
-      window.localStorage.setItem(preferenceStorageKey, JSON.stringify({ theme: "light", mode: "pro", scale: 1 }));
+      window.localStorage.setItem(preferenceStorageKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     const currentDashboardData = dashboard;
     const profile = {
@@ -358,13 +358,13 @@ async function installBridge(page, { setupData, dashboardData, enabledCapabiliti
   }, { setup: setupData, dashboard: dashboardData, capabilities: enabledCapabilities, preferenceStorageKey: preferencesKey });
 }
 
-async function setAppearance(page, theme, mode) {
-  await page.evaluate(([nextTheme, nextMode, key]) => {
-    localStorage.setItem(key, JSON.stringify({ theme: nextTheme, mode: nextMode, scale: 1 }));
-  }, [theme, mode, preferencesKey]);
+async function setAppearance(page, scheme, density) {
+  await page.evaluate(([nextScheme, nextDensity, key]) => {
+    localStorage.setItem(key, JSON.stringify({ version: 2, scheme: nextScheme, density: nextDensity, scale: 1, accent: "coral", font: "plex", motion: "system" }));
+  }, [scheme, density, preferencesKey]);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-  await expect(page.locator("html")).toHaveAttribute("data-mode", mode);
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", scheme);
+  await expect(page.locator("html")).toHaveAttribute("data-density", density);
 }
 
 async function assertNoOverflow(page, label, collection) {

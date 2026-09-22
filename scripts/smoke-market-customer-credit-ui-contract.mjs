@@ -104,7 +104,7 @@ try {
     plugins: [{ name: "m82-smoke-page", configureServer(instance) {
       instance.middlewares.use("/m82-smoke", async (_request, response) => {
         response.setHeader("Content-Type", "text/html");
-        response.end(await instance.transformIndexHtml("/m82-smoke", `<!doctype html><html lang="tr" data-mode="pro" data-theme="light"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Veresiye UI smoke</title>
+        response.end(await instance.transformIndexHtml("/m82-smoke", `<!doctype html><html lang="tr" data-color-scheme="light" data-density="compact" data-accent="coral" data-font="plex" data-motion="system"><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Veresiye UI smoke</title>
           <style>.smoke-shell { max-width:1400px; margin:auto; padding:24px; } .smoke-shell > nav { display:flex; gap:12px; margin-bottom:16px; }</style></head>
           <body><div id="root"></div><script type="module" src="/@fs/${join(process.cwd(), "scripts/fixtures/customer-credit-ui.tsx")}"></script></body></html>`));
       });

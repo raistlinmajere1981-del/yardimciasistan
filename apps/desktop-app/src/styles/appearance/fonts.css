@@ -1,0 +1,11 @@
+/* Controlled font presets applied through --font-sans. The Plex import stays in
+   main.tsx; no custom font files are supported. Feature components must not
+   override font-family. */
+
+:root[data-font="plex"] {
+  --font-sans: "IBM Plex Sans Variable", "Segoe UI", sans-serif;
+}
+
+:root[data-font="system"] {
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}

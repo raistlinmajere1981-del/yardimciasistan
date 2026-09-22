@@ -1,19 +1,41 @@
-type UiTheme = "light" | "dark";
-export type UiMode = "easy" | "pro";
+export type UiColorScheme = "system" | "light" | "dark";
+export type UiDensity = "comfortable" | "compact";
+export type UiAccent = "coral" | "blue" | "green";
+export type UiFont = "plex" | "system";
+export type UiMotion = "system" | "full" | "reduced";
 
 export interface UiPreferences {
-  theme: UiTheme;
+  version: 2;
+  scheme: UiColorScheme;
+  density: UiDensity;
   scale: number;
-  mode: UiMode;
+  accent: UiAccent;
+  font: UiFont;
+  motion: UiMotion;
 }
 
 export const UI_SCALE_OPTIONS = [0.8, 0.9, 1, 1.1, 1.2] as const;
+export const UI_SCHEME_OPTIONS: UiColorScheme[] = ["system", "light", "dark"];
+export const UI_DENSITY_OPTIONS: UiDensity[] = ["comfortable", "compact"];
+export const UI_ACCENT_OPTIONS: UiAccent[] = ["coral", "blue", "green"];
+export const UI_FONT_OPTIONS: UiFont[] = ["plex", "system"];
+export const UI_MOTION_OPTIONS: UiMotion[] = ["system", "full", "reduced"];
 
 const UI_PREFERENCES_STORAGE_KEY = "yardimci-asistan.ui-preferences";
 const DEFAULT_UI_PREFERENCES: UiPreferences = {
-  theme: "light",
+  version: 2,
+  scheme: "system",
+  density: "comfortable",
   scale: 1,
-  mode: "easy"
+  accent: "coral",
+  font: "plex",
+  motion: "system"
+};
+
+type LegacyUiPreferences = {
+  theme?: unknown;
+  mode?: unknown;
+  scale?: unknown;
 };
 
 export function readUiPreferences(): UiPreferences {
@@ -22,54 +44,107 @@ export function readUiPreferences(): UiPreferences {
   try {
     serialized = window.localStorage.getItem(UI_PREFERENCES_STORAGE_KEY);
   } catch {
-    return DEFAULT_UI_PREFERENCES;
+    return { ...DEFAULT_UI_PREFERENCES };
   }
 
   if (serialized === null) {
-    return DEFAULT_UI_PREFERENCES;
+    return { ...DEFAULT_UI_PREFERENCES };
   }
 
+  let stored: unknown;
   try {
-    const stored = JSON.parse(serialized) as Partial<UiPreferences> | null;
-
-    return {
-      theme: isUiTheme(stored?.theme) ? stored.theme : DEFAULT_UI_PREFERENCES.theme,
-      scale: isUiScale(stored?.scale) ? stored.scale : DEFAULT_UI_PREFERENCES.scale,
-      mode: isUiMode(stored?.mode) ? stored.mode : "pro"
-    };
+    stored = JSON.parse(serialized);
   } catch {
-    // Bozuk olsa bile var olan bir kayıt eski kullanıcı kabul edilir; görünüm sessizce değişmez.
-    return { ...DEFAULT_UI_PREFERENCES, mode: "pro" };
+    // Bozuk kayıt uygulamayı kırmamalı; sessizce varsayılanlara dönülür.
+    return { ...DEFAULT_UI_PREFERENCES };
   }
+
+  if (typeof stored !== "object" || stored === null) {
+    return { ...DEFAULT_UI_PREFERENCES };
+  }
+
+  const record = stored as Partial<UiPreferences> & LegacyUiPreferences;
+
+  // Legacy kayıtlardaki `mode` alanı yoksa eski davranış korunur:
+  // görünüm sessizce değişmemesi için compact kabul edilir.
+  const legacyDensity: UiDensity | undefined = record.mode === "easy"
+    ? "comfortable"
+    : record.mode === "pro" || (record.theme !== undefined && record.mode === undefined)
+      ? "compact"
+      : undefined;
+
+  return {
+    version: 2,
+    scheme: isUiColorScheme(record.scheme)
+      ? record.scheme
+      : record.theme === "light" || record.theme === "dark"
+        ? record.theme
+        : DEFAULT_UI_PREFERENCES.scheme,
+    density: isUiDensity(record.density)
+      ? record.density
+      : legacyDensity ?? DEFAULT_UI_PREFERENCES.density,
+    scale: isUiScale(record.scale) ? record.scale : DEFAULT_UI_PREFERENCES.scale,
+    accent: isUiAccent(record.accent) ? record.accent : DEFAULT_UI_PREFERENCES.accent,
+    font: isUiFont(record.font) ? record.font : DEFAULT_UI_PREFERENCES.font,
+    motion: isUiMotion(record.motion) ? record.motion : DEFAULT_UI_PREFERENCES.motion
+  };
 }
 
 export function applyUiPreferences(preferences: UiPreferences) {
-  document.documentElement.dataset.theme = preferences.theme;
-  document.documentElement.dataset.mode = preferences.mode;
-  document.documentElement.style.colorScheme = preferences.theme;
+  const root = document.documentElement;
+  root.dataset.colorScheme = preferences.scheme;
+  root.dataset.density = preferences.density;
+  root.dataset.accent = preferences.accent;
+  root.dataset.font = preferences.font;
+  root.dataset.motion = preferences.motion;
+  root.removeAttribute("data-theme");
+  root.removeAttribute("data-mode");
+  root.style.colorScheme = preferences.scheme === "system" ? "light dark" : preferences.scheme;
 
   if (window.yardimciDesktop?.setUiScale) {
-    document.documentElement.style.setProperty("--ui-scale", "1");
+    root.style.setProperty("--ui-scale", "1");
     window.yardimciDesktop.setUiScale(preferences.scale);
   } else {
-    document.documentElement.style.setProperty("--ui-scale", String(preferences.scale));
+    root.style.setProperty("--ui-scale", String(preferences.scale));
   }
 }
 
 export function saveUiPreferences(preferences: UiPreferences) {
   try {
-    window.localStorage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(preferences));
+    // Yeni kayıtlar yalnız v2 shape ile yazılır; legacy theme/mode alanları sürdürülmez.
+    const record: UiPreferences = {
+      version: 2,
+      scheme: preferences.scheme,
+      density: preferences.density,
+      scale: preferences.scale,
+      accent: preferences.accent,
+      font: preferences.font,
+      motion: preferences.motion
+    };
+    window.localStorage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(record));
   } catch {
     // Görünüm tercihi uygulanmaya devam eder; depolama kapalıysa yalnız bu oturumda geçerli olur.
   }
 }
 
-function isUiTheme(value: unknown): value is UiTheme {
-  return value === "light" || value === "dark";
+function isUiColorScheme(value: unknown): value is UiColorScheme {
+  return value === "system" || value === "light" || value === "dark";
 }
 
-function isUiMode(value: unknown): value is UiMode {
-  return value === "easy" || value === "pro";
+function isUiDensity(value: unknown): value is UiDensity {
+  return value === "comfortable" || value === "compact";
+}
+
+function isUiAccent(value: unknown): value is UiAccent {
+  return value === "coral" || value === "blue" || value === "green";
+}
+
+function isUiFont(value: unknown): value is UiFont {
+  return value === "plex" || value === "system";
+}
+
+function isUiMotion(value: unknown): value is UiMotion {
+  return value === "system" || value === "full" || value === "reduced";
 }
 
 function isUiScale(value: unknown): value is number {

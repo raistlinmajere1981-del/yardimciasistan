@@ -20,9 +20,9 @@ const viewports = [
   [600, 800]
 ];
 const themes = [
-  ["light", "pro"],
-  ["dark", "pro"],
-  ["light", "easy"]
+  ["light", "compact"],
+  ["dark", "compact"],
+  ["light", "comfortable"]
 ];
 
 const read = (file) => readFileSync(file, "utf8");
@@ -31,6 +31,7 @@ const lockCss = read("apps/desktop-app/src/styles/pages/lock.css");
 const indexCss = read("apps/desktop-app/src/styles/index.css");
 const baseCss = read("apps/desktop-app/src/styles/foundation/base.css");
 const motionCss = read("apps/desktop-app/src/styles/components/motion.css");
+const appearanceMotionCss = read("apps/desktop-app/src/styles/appearance/motion.css");
 const menuPreviewSource = read("apps/desktop-app/src/components/menu/MenuPreview.tsx");
 const menuPreviewCss = read("apps/desktop-app/src/styles/pages/menu-preview.css");
 const restaurantReservationsSource = read("apps/desktop-app/src/components/operations/RestaurantReservationsWorkspace.tsx");
@@ -48,8 +49,9 @@ assert.equal(existsSync("apps/desktop-app/src/styles/components/records.css"), f
 assert.equal(existsSync("apps/desktop-app/src/styles/components/operations.css"), false, "operations.css must be removed");
 assert.match(motionCss, /@keyframes\s+(?:app-lock-enter|app-lock-exit|app-lock-recovery-enter|stock-image-spin|ya-health-spin)/);
 assert(!/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\s*\(/i.test(lockCss), "lock.css must not contain raw colors");
-assert.match(baseCss, /prefers-reduced-motion:\s*reduce/);
-assert.match(lockCss, /prefers-reduced-motion:\s*reduce/);
+assert.match(appearanceMotionCss, /prefers-reduced-motion:\s*reduce/);
+assert(!/prefers-reduced-motion/.test(baseCss), "base.css must not carry its own reduced-motion copy; appearance/motion.css is authoritative");
+assert(!/prefers-reduced-motion/.test(lockCss), "lock.css must not carry a feature-specific reduced-motion copy; appearance/motion.css is authoritative");
 assert.match(menuPreviewSource, /local-menu-preview-dialog dialog dialog--wide dialog--preview/);
 assert.match(menuPreviewSource, /local-menu-preview-toolbar overlay-header/);
 assert.match(menuPreviewCss, /local-menu-preview-page/);
@@ -95,19 +97,19 @@ try {
   await expect(lockDialog.getByLabel("Web güvenlik anahtarı")).toBeFocused();
   await expect(lockDialog.getByRole("button", { name: "Şifreyi Sıfırla ve Aç", exact: true })).toBeVisible();
 
-  for (const [theme, mode] of themes) {
-    await setAppearance(page, theme, mode);
+  for (const [scheme, density] of themes) {
+    await setAppearance(page, scheme, density);
     for (const [width, height] of viewports) {
       await page.setViewportSize({ width, height });
       await expect(lockDialog).toBeVisible();
       const metrics = await getOverflowMetrics(page);
-      expect(metrics.documentOverflow, `${theme}-${mode} ${width}: document overflow`).toBe(false);
-      expect(metrics.surfaceOverflow, `${theme}-${mode} ${width}: lock surface overflow`).toEqual([]);
-      observations.push({ theme, mode, width, height, ...metrics });
+      expect(metrics.documentOverflow, `${scheme}-${density} ${width}: document overflow`).toBe(false);
+      expect(metrics.surfaceOverflow, `${scheme}-${density} ${width}: lock surface overflow`).toEqual([]);
+      observations.push({ scheme, density, width, height, ...metrics });
       if (width === 1440 || width === 600) {
         await page.screenshot({
           animations: "disabled",
-          path: `${output}/lock-${width}x${height}-${theme}-${mode}.png`
+          path: `${output}/lock-${width}x${height}-${scheme}-${density}.png`
         });
       }
     }
@@ -117,8 +119,8 @@ try {
     await lockDialog.getByRole("button", { name: "Şifremi Unuttum", exact: true }).click();
   }
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect.poll(() => page.locator(".app-lock-screen").evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
-  await expect.poll(() => page.locator(".app-lock-recovery-form").evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
+  await expect.poll(() => page.locator(".app-lock-screen").evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDuration))).toBeLessThan(0.001);
+  await expect.poll(() => page.locator(".app-lock-recovery-form").evaluate((element) => Number.parseFloat(getComputedStyle(element).animationDuration))).toBeLessThan(0.001);
   await page.screenshot({ animations: "disabled", path: `${output}/lock-reduced-motion-600x800.png` });
   expect(pageErrors).toEqual([]);
   writeFileSync(`${output}/observations.json`, JSON.stringify(observations, null, 2));
@@ -151,7 +153,7 @@ function collectCssFiles(relativeDir) {
 async function installLockedBridge(page) {
   await page.addInitScript(({ key }) => {
     if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, JSON.stringify({ theme: "light", mode: "pro", scale: 1 }));
+      localStorage.setItem(key, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     window.yardimciDesktop = {
       getAppLockStatus: async () => ({ locked: true, passwordConfigured: true, notificationCount: 7 }),
@@ -194,13 +196,13 @@ async function installLockedBridge(page) {
   }, { key: preferencesKey });
 }
 
-async function setAppearance(page, theme, mode) {
-  await page.evaluate(([nextTheme, nextMode, key]) => {
-    localStorage.setItem(key, JSON.stringify({ theme: nextTheme, mode: nextMode, scale: 1 }));
-  }, [theme, mode, preferencesKey]);
+async function setAppearance(page, scheme, density) {
+  await page.evaluate(([nextScheme, nextDensity, key]) => {
+    localStorage.setItem(key, JSON.stringify({ version: 2, scheme: nextScheme, density: nextDensity, scale: 1, accent: "coral", font: "plex", motion: "system" }));
+  }, [scheme, density, preferencesKey]);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-  await expect(page.locator("html")).toHaveAttribute("data-mode", mode);
+  await expect(page.locator("html")).toHaveAttribute("data-color-scheme", scheme);
+  await expect(page.locator("html")).toHaveAttribute("data-density", density);
 }
 
 async function getOverflowMetrics(page) {

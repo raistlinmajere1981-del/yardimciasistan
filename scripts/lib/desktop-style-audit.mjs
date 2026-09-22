@@ -42,7 +42,7 @@ export function desktopStyleAudit(files) {
     }
     if (!file.endsWith('.css')) continue;
     const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
-    const isToken = /\/styles\/(tokens|themes)\//.test(file);
+    const isToken = /\/styles\/(tokens|appearance)\//.test(file);
     const rawColor = isToken ? 0 : [...clean.matchAll(/#[\da-f]{3,8}\b|\b(?:rgba?|hsla?)\s*\(/gi)].length;
     const rawPx = isToken ? 0 : [...clean.matchAll(/\b\d+(?:\.\d+)?px\b/g)].length;
     const rawSpacing = isToken ? 0 : [...clean.matchAll(/(?:padding|margin|gap)(?:-[\w-]+)?\s*:[^;{}]*\dpx\b/g)].length;

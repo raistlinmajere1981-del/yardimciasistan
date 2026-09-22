@@ -46,7 +46,7 @@ function countMatches(text, regex) {
 }
 
 function cssMetrics(file, text) {
-  const isTokenFile = TOKEN_FILES.includes(file) || file.startsWith(`${STYLE_ROOT}/themes/`);
+  const isTokenFile = TOKEN_FILES.includes(file) || file.startsWith(`${STYLE_ROOT}/appearance/`);
   return {
     rawColor: isTokenFile
       ? 0

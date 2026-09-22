@@ -1,0 +1,12 @@
+/* Density is a semantic comfort choice, not a second layout implementation.
+   Compact is the default geometry owned by tokens/dimensions.css; comfortable
+   only widens type and control targets. The shared 4px spacing scale never
+   splits, and no feature selector may branch on data-density. */
+
+:root[data-density="comfortable"] {
+  --text-sm: 0.9375rem;
+  --text-base: 1rem;
+  --control-height-sm: 36px;
+  --control-height-md: 40px;
+  --control-height-lg: 48px;
+}

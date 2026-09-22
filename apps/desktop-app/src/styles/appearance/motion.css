@@ -1,0 +1,34 @@
+/* Motion preference. `system` follows the OS, `reduced` always minimizes
+   decorative motion, `full` keeps the application motion tokens regardless of
+   the OS request. Functional progress indicators keep moving so work state
+   stays visible. */
+
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms;
+  transition-duration: 0.01ms;
+  scroll-behavior: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-motion="system"] *,
+  :root[data-motion="system"] *::before,
+  :root[data-motion="system"] *::after {
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
+  }
+}
+
+:root[data-motion="reduced"] .is-spinning,
+:root[data-motion="reduced"] .stock-image-spinner {
+  animation-duration: 1500ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-motion="system"] .is-spinning,
+  :root[data-motion="system"] .stock-image-spinner {
+    animation-duration: 1500ms;
+  }
+}

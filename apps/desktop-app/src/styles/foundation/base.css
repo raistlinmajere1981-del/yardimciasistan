@@ -28,13 +28,5 @@ a {
   color: var(--color-accent);
 }
 
-@media (prefers-reduced-motion: reduce) {
-
-  *,
-*::before,
-*::after {
-    animation-duration: 0.01ms;
-    transition-duration: 0.01ms;
-    scroll-behavior: auto;
-  }
-}
+/* Reduced-motion handling is centralized in appearance/motion.css so the
+   motion preference (system/full/reduced) stays authoritative. */

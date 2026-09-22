@@ -32,7 +32,7 @@ try {
 
   await page.addInitScript(({ dashboard, setup, report, enabledCapabilities, preferenceStorageKey }) => {
     if (!localStorage.getItem(preferenceStorageKey)) {
-      localStorage.setItem(preferenceStorageKey, JSON.stringify({ theme: "light", mode: "pro", scale: 1 }));
+      localStorage.setItem(preferenceStorageKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
 
     const financeData = {
@@ -285,8 +285,8 @@ try {
       name,
       width: viewport.width,
       height: viewport.height,
-      theme: await page.locator("html").getAttribute("data-theme"),
-      mode: await page.locator("html").getAttribute("data-mode"),
+      scheme: await page.locator("html").getAttribute("data-color-scheme"),
+      density: await page.locator("html").getAttribute("data-density"),
       ...metrics
     });
     writeFileSync(`${output}/viewports.json`, `${JSON.stringify(observations, null, 2)}\n`);
@@ -316,12 +316,12 @@ try {
     // 1. Ana Ekran / Dashboard
     await navigate("Ana Ekran", "Bugün ne var?");
     await expect(page.locator(".dashboard-briefing")).toBeVisible();
-    await capture("dashboard-light-pro");
+    await capture("dashboard-light-compact");
 
     // 2. Kasa / Finans
     await navigate("Kasa", "Kasa");
     await expect(page.locator(".finance-workspace")).toBeVisible();
-    await capture("finance-light-pro");
+    await capture("finance-light-compact");
 
     // 3. Raporlar (Expand details from Kasa page)
     const toggle = page.locator(".cash-details-toggle");
@@ -329,7 +329,7 @@ try {
     await toggle.click();
     await expect(page.locator(".report-filter-panel")).toBeVisible();
     await expect(page.locator(".report-summary-metrics")).toBeVisible();
-    await capture("reports-expanded-light-pro");
+    await capture("reports-expanded-light-compact");
     // Collapse back
     await toggle.click();
 
@@ -339,58 +339,58 @@ try {
     // Test day/week mode toggle
     await page.locator(".operation-calendar-view-switch button").filter({ hasText: "Gün" }).click();
     await expect(page.locator(".operation-calendar-grid.is-day")).toBeVisible();
-    await capture("calendar-day-light-pro");
+    await capture("calendar-day-light-compact");
     await page.locator(".operation-calendar-view-switch button").filter({ hasText: "Hafta" }).click();
     await expect(page.locator(".operation-calendar-grid.is-week")).toBeVisible();
-    await capture("calendar-week-light-pro");
+    await capture("calendar-week-light-compact");
 
     // 5. Market Workspace
     await navigate("Market", "Market");
     await expect(page.locator(".market-page")).toBeVisible();
-    await capture("market-products-light-pro");
+    await capture("market-products-light-compact");
 
     // Switch to Stok tab in Market
     const inventoryTab = page.locator(".market-tabs button").filter({ hasText: "Fiziksel sayım" });
     if (await inventoryTab.isVisible()) {
       await inventoryTab.click();
       await expect(page.getByRole("heading", { name: "Fiziksel Sayım", level: 2 })).toBeVisible();
-      await capture("market-inventory-light-pro");
+      await capture("market-inventory-light-compact");
     }
   }
 
   // 6. Theme & density switches
-  async function setAppearance(theme, mode) {
-    await page.evaluate(({ nextTheme, nextMode, storageKey }) => {
-      localStorage.setItem(storageKey, JSON.stringify({ theme: nextTheme, mode: nextMode, scale: 1 }));
-    }, { nextTheme: theme, nextMode: mode, storageKey: preferencesKey });
+  async function setAppearance(scheme, density) {
+    await page.evaluate(({ nextScheme, nextDensity, storageKey }) => {
+      localStorage.setItem(storageKey, JSON.stringify({ version: 2, scheme: nextScheme, density: nextDensity, scale: 1, accent: "coral", font: "plex", motion: "system" }));
+    }, { nextScheme: scheme, nextDensity: density, storageKey: preferencesKey });
     await page.reload({ waitUntil: "domcontentloaded" });
-    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    await expect(page.locator("html")).toHaveAttribute("data-mode", mode);
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", scheme);
+    await expect(page.locator("html")).toHaveAttribute("data-density", density);
   }
 
   await page.setViewportSize({ width: 1440, height: 1000 });
 
   // Dark / Pro
-  await setAppearance("dark", "pro");
+  await setAppearance("dark", "compact");
   await navigate("Ana Ekran", "Bugün ne var?");
-  await capture("dashboard-dark-pro");
+  await capture("dashboard-dark-compact");
   await navigate("Kasa", "Kasa");
-  await capture("finance-dark-pro");
+  await capture("finance-dark-compact");
   await navigate("Market", "Market");
-  await capture("market-dark-pro");
+  await capture("market-dark-compact");
   await navigate("Takvim", "Takvim");
-  await capture("calendar-dark-pro");
+  await capture("calendar-dark-compact");
 
   // Light / Easy
-  await setAppearance("light", "easy");
+  await setAppearance("light", "comfortable");
   await navigate("Ana Ekran", "Bugün ne var?");
-  await capture("dashboard-light-easy");
+  await capture("dashboard-light-comfortable");
   await navigate("Kasa", "Kasa");
-  await capture("finance-light-easy");
+  await capture("finance-light-comfortable");
   await navigate("Market", "Market");
-  await capture("market-light-easy");
+  await capture("market-light-comfortable");
   await navigate("Takvim", "Takvim");
-  await capture("calendar-light-easy");
+  await capture("calendar-light-comfortable");
 
   expect(pageErrors).toEqual([]);
   console.log(`stage2c-core-workspaces-ok: ${observations.length} surfaces verified -> ${output}`);

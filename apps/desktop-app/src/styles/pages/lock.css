@@ -329,10 +329,3 @@
     padding: var(--space-5) var(--space-4);
   }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .app-lock-screen,
-  .app-lock-recovery-form {
-    animation: none;
-  }
-}

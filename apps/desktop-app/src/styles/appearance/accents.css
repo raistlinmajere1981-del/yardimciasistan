@@ -1,0 +1,69 @@
+/* Controlled accent presets. Only the accent token family is redirected here;
+   danger/warning/success/info keep their own meaning in every scheme.
+   Derived --color-accent-soft/--color-accent-border follow automatically from
+   tokens/semantic.css. No arbitrary color input is supported. */
+
+:root[data-accent="coral"] {
+  --color-accent: var(--coral-600);
+  --color-accent-hover: var(--coral-700);
+  --color-focus: var(--coral-600);
+  --color-on-accent: var(--neutral-0);
+}
+
+:root[data-accent="blue"] {
+  --color-accent: var(--blue-700);
+  --color-accent-hover: color-mix(in srgb, var(--blue-700) 82%, black);
+  --color-focus: var(--blue-700);
+  --color-on-accent: var(--neutral-0);
+}
+
+:root[data-accent="green"] {
+  --color-accent: var(--green-700);
+  --color-accent-hover: color-mix(in srgb, var(--green-700) 82%, black);
+  --color-focus: var(--green-700);
+  --color-on-accent: var(--neutral-0);
+}
+
+:root[data-accent="coral"][data-color-scheme="dark"] {
+  --color-accent: var(--coral-400);
+  --color-accent-hover: var(--coral-400);
+  --color-focus: var(--coral-400);
+  --color-on-accent: var(--slate-950);
+}
+
+:root[data-accent="blue"][data-color-scheme="dark"] {
+  --color-accent: var(--blue-400);
+  --color-accent-hover: color-mix(in srgb, var(--blue-400) 88%, white);
+  --color-focus: var(--blue-400);
+  --color-on-accent: var(--slate-950);
+}
+
+:root[data-accent="green"][data-color-scheme="dark"] {
+  --color-accent: var(--green-400);
+  --color-accent-hover: color-mix(in srgb, var(--green-400) 88%, white);
+  --color-focus: var(--green-400);
+  --color-on-accent: var(--slate-950);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="coral"][data-color-scheme="system"] {
+    --color-accent: var(--coral-400);
+    --color-accent-hover: var(--coral-400);
+    --color-focus: var(--coral-400);
+    --color-on-accent: var(--slate-950);
+  }
+
+  :root[data-accent="blue"][data-color-scheme="system"] {
+    --color-accent: var(--blue-400);
+    --color-accent-hover: color-mix(in srgb, var(--blue-400) 88%, white);
+    --color-focus: var(--blue-400);
+    --color-on-accent: var(--slate-950);
+  }
+
+  :root[data-accent="green"][data-color-scheme="system"] {
+    --color-accent: var(--green-400);
+    --color-accent-hover: color-mix(in srgb, var(--green-400) 88%, white);
+    --color-focus: var(--green-400);
+    --color-on-accent: var(--slate-950);
+  }
+}
