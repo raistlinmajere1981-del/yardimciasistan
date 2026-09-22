@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from "react";
-import { Eye, LockKeyhole, RefreshCw, Save, UploadCloud } from "lucide-react";
+import { Eye, LockKeyhole, RefreshCw, Save, ScrollText, UploadCloud } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage } from "../../app/navigation";
@@ -25,6 +25,7 @@ import { PageHeader } from "../layout/PageHeader";
 import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
+import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
 
 interface DesktopAppFrameProps {
   activePage: DesktopPage;
@@ -63,6 +64,7 @@ export function DesktopAppFrame({
 }: DesktopAppFrameProps) {
   const contentRef = useRef<HTMLElement>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsedPreference);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const { setupData } = setupController;
   const { lockApp } = appLockController;
   const {
@@ -120,8 +122,14 @@ export function DesktopAppFrame({
   }, [activePage, navigationItems, setActivePage]);
 
   function handleLockApp() {
+    setDiagnosticsOpen(false);
     closeMenuPreview();
     void lockApp();
+  }
+
+  function openDiagnostics() {
+    closeMenuPreview();
+    setDiagnosticsOpen(true);
   }
 
   function openDesktopNotification(item: DesktopNotificationItem) {
@@ -209,6 +217,16 @@ export function DesktopAppFrame({
               )}
               {notificationsEnabled && <NotificationCenter items={desktopNotifications} onOpen={openDesktopNotification} />}
               <button
+                className="diagnostics-trigger"
+                type="button"
+                aria-label="Uygulama loglarını aç"
+                title="Uygulama logları"
+                aria-pressed={diagnosticsOpen}
+                onClick={openDiagnostics}
+              >
+                <ScrollText size={18} aria-hidden="true" />
+              </button>
+              <button
                 className="app-lock-trigger"
                 type="button"
                 aria-label="Uygulamayı kilitle"
@@ -221,7 +239,9 @@ export function DesktopAppFrame({
           )}
         />
       )}
-      overlay={menuEnabled && menuPreviewOpen ? (
+      overlay={diagnosticsOpen ? (
+        <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />
+      ) : menuEnabled && menuPreviewOpen ? (
         <LocalMenuPreview
           menu={menuPreviewData}
           setupData={setupData}

@@ -41,6 +41,7 @@
 @import "./pages/devices.css" layer(pages);
 @import "./pages/finance.css" layer(pages);
 @import "./pages/lock.css" layer(pages);
+@import "./pages/diagnostics.css" layer(pages);
 @import "./pages/market.css" layer(pages);
 @import "./pages/menu.css" layer(pages);
 @import "./pages/messages.css" layer(pages);

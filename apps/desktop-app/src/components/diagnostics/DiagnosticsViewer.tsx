@@ -1,0 +1,404 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Clipboard, Pause, Play, RefreshCw, X } from "lucide-react";
+import type {
+  DesktopDiagnosticEvent,
+  DesktopDiagnosticLevel,
+  DesktopDiagnosticReadResult,
+  DesktopDiagnosticSessionSummary
+} from "../../../electron/diagnostics-contract";
+import { useDialogFocus } from "../ui/useDialogFocus";
+
+interface DiagnosticsViewerProps {
+  onClose: () => void;
+}
+
+const LEVELS: DesktopDiagnosticLevel[] = ["INFO", "WARN", "ERROR"];
+const LIVE_REFRESH_MS = 1000;
+const PAGE_SIZE = 2000;
+const CONTEXT_RADIUS = 30;
+
+export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
+  const dialogRef = useDialogFocus(true);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [sessions, setSessions] = useState<DesktopDiagnosticSessionSummary[]>([]);
+  const [sessionId, setSessionId] = useState("");
+  const [result, setResult] = useState<DesktopDiagnosticReadResult | null>(null);
+  const [levels, setLevels] = useState<DesktopDiagnosticLevel[]>(LEVELS);
+  const [scope, setScope] = useState("");
+  const [query, setQuery] = useState("");
+  const [paused, setPaused] = useState(false);
+  const [selectedSequence, setSelectedSequence] = useState<number | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [message, setMessage] = useState("Log oturumları yükleniyor...");
+  const [copyMessage, setCopyMessage] = useState("");
+
+  const selectedSession = sessions.find((session) => session.sessionId === sessionId) ?? null;
+  const isCurrentSession = Boolean(selectedSession?.current);
+
+  async function refreshSessions(preferredSessionId = sessionId) {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.listDiagnosticSessions) {
+      setState("error");
+      setMessage("Diagnostics köprüsü hazır değil.");
+      return;
+    }
+
+    try {
+      const nextSessions = await bridge.listDiagnosticSessions();
+      setSessions(nextSessions);
+      const nextSessionId = nextSessions.some((item) => item.sessionId === preferredSessionId)
+        ? preferredSessionId
+        : nextSessions.find((item) => item.current)?.sessionId ?? nextSessions[0]?.sessionId ?? "";
+      setSessionId(nextSessionId);
+      if (!nextSessionId) {
+        setResult(null);
+        setState("ready");
+        setMessage("Henüz log oturumu bulunmuyor.");
+      }
+    } catch {
+      setState("error");
+      setMessage("Log oturumları okunamadı.");
+    }
+  }
+
+  async function refreshEvents(targetSessionId = sessionId, quiet = false) {
+    if (!targetSessionId) return;
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.readDiagnosticSession) {
+      setState("error");
+      setMessage("Diagnostics okuma köprüsü hazır değil.");
+      return;
+    }
+
+    if (!quiet) {
+      setState("loading");
+      setMessage("Log kayıtları yükleniyor...");
+    }
+    try {
+      const nextResult = await bridge.readDiagnosticSession({
+        sessionId: targetSessionId,
+        limit: PAGE_SIZE
+      });
+      setResult(nextResult);
+      setState("ready");
+      setMessage(nextResult
+        ? `${nextResult.events.length} kayıt gösteriliyor${nextResult.hasMore ? " · daha eski kayıtlar mevcut" : ""}.`
+        : "Log oturumu okunamadı.");
+    } catch {
+      setState("error");
+      setMessage("Log kayıtları okunamadı.");
+    }
+  }
+
+  useEffect(() => {
+    void refreshSessions("");
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    setSelectedSequence(null);
+    setCopyMessage("");
+    void refreshEvents(sessionId);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!isCurrentSession || paused || !sessionId) return;
+    const timer = window.setInterval(() => {
+      void refreshEvents(sessionId, true);
+    }, LIVE_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [isCurrentSession, paused, sessionId]);
+
+  useEffect(() => {
+    if (!paused) {
+      listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "auto" });
+    }
+  }, [result?.events, paused]);
+
+  const scopes = useMemo(
+    () => [...new Set((result?.events ?? []).map((event) => event.scope))].sort((left, right) => left.localeCompare(right, "tr")),
+    [result?.events]
+  );
+
+  const visibleEvents = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase("tr-TR");
+    return (result?.events ?? []).filter((event) => {
+      if (!levels.includes(event.level)) return false;
+      if (scope && event.scope !== scope) return false;
+      if (!normalizedQuery) return true;
+      return JSON.stringify(event).toLocaleLowerCase("tr-TR").includes(normalizedQuery);
+    });
+  }, [levels, query, result?.events, scope]);
+
+  const selectedEvent = (result?.events ?? []).find((event) => event.sequence === selectedSequence) ?? null;
+
+  function toggleLevel(level: DesktopDiagnosticLevel) {
+    setLevels((current) => current.includes(level)
+      ? current.filter((candidate) => candidate !== level)
+      : [...current, level]);
+  }
+
+  async function copyText(text: string, successMessage: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyMessage(successMessage);
+    } catch {
+      setCopyMessage("Panoya kopyalanamadı.");
+    }
+  }
+
+  function formatExportHeader(session: DesktopDiagnosticSessionSummary) {
+    return [
+      "Yardımcı Asistan Diagnostics",
+      `Session: ${session.sessionId}`,
+      `Started: ${session.startedAt}`,
+      `Ended: ${session.endedAt || "active"}`,
+      `App: ${session.appVersion} · Electron ${session.electronVersion} · Node ${session.nodeVersion}`,
+      `Platform: ${session.platform} ${session.arch} · ${session.packaged ? "packaged" : "development"}`,
+      `Events: ${session.eventCount} · WARN ${session.warnCount} · ERROR ${session.errorCount}`,
+      "---"
+    ].join("\n");
+  }
+
+  function formatEvent(event: DesktopDiagnosticEvent) {
+    const parts = [
+      `${event.timestamp} #${event.sequence} [${event.level}] [${event.process}] [${event.scope}] ${event.event}`,
+      event.message
+    ];
+    if (event.operationId) parts.push(`operationId: ${event.operationId}`);
+    if (event.meta && Object.keys(event.meta).length) parts.push(`meta: ${JSON.stringify(event.meta)}`);
+    if (event.error) {
+      parts.push(`error: ${event.error.name}: ${event.error.message}`);
+      if (event.error.stack) parts.push(event.error.stack);
+    }
+    return parts.join("\n");
+  }
+
+  function exportEvents(session: DesktopDiagnosticSessionSummary, events: DesktopDiagnosticEvent[]) {
+    return [formatExportHeader(session), ...events.map(formatEvent)].join("\n\n");
+  }
+
+  async function readAllSessionEvents(targetSessionId: string): Promise<DesktopDiagnosticReadResult | null> {
+    const bridge = window.yardimciDesktop;
+    if (!bridge?.readDiagnosticSession) return null;
+
+    let beforeSequence: number | undefined;
+    let session: DesktopDiagnosticSessionSummary | null = null;
+    const pages: DesktopDiagnosticEvent[][] = [];
+    for (let page = 0; page < 100; page += 1) {
+      const next = await bridge.readDiagnosticSession({
+        sessionId: targetSessionId,
+        limit: PAGE_SIZE,
+        ...(beforeSequence ? { beforeSequence } : {})
+      });
+      if (!next) return null;
+      session = next.session;
+      pages.unshift(next.events);
+      if (!next.hasMore || next.events.length === 0) break;
+      const oldest = next.events[0]?.sequence;
+      if (!oldest || oldest <= 1 || oldest === beforeSequence) break;
+      beforeSequence = oldest;
+    }
+
+    return {
+      session: session!,
+      events: pages.flat(),
+      hasMore: false
+    };
+  }
+
+  async function handleCopyVisible() {
+    if (!result) return;
+    await copyText(exportEvents(result.session, visibleEvents), `${visibleEvents.length} görünür kayıt kopyalandı.`);
+  }
+
+  async function handleCopySession() {
+    if (!sessionId) return;
+    setCopyMessage("Tüm session hazırlanıyor...");
+    try {
+      const full = await readAllSessionEvents(sessionId);
+      if (!full) {
+        setCopyMessage("Session okunamadı.");
+        return;
+      }
+      await copyText(exportEvents(full.session, full.events), `Tüm session kopyalandı · ${full.events.length} kayıt.`);
+    } catch {
+      setCopyMessage("Tüm session kopyalanamadı.");
+    }
+  }
+
+  async function handleCopyContext() {
+    if (!sessionId || !selectedEvent) return;
+    setCopyMessage("Hata bağlamı hazırlanıyor...");
+    try {
+      const full = await readAllSessionEvents(sessionId);
+      if (!full) {
+        setCopyMessage("Session okunamadı.");
+        return;
+      }
+      const index = full.events.findIndex((event) => event.sequence === selectedEvent.sequence);
+      if (index < 0) {
+        setCopyMessage("Seçili kayıt session içinde bulunamadı.");
+        return;
+      }
+      const context = full.events.slice(
+        Math.max(0, index - CONTEXT_RADIUS),
+        Math.min(full.events.length, index + CONTEXT_RADIUS + 1)
+      );
+      await copyText(exportEvents(full.session, context), `Seçili kayıt çevresi kopyalandı · ${context.length} kayıt.`);
+    } catch {
+      setCopyMessage("Hata bağlamı kopyalanamadı.");
+    }
+  }
+
+  return (
+    <div className="overlay diagnostics-overlay" role="presentation">
+      <section
+        ref={dialogRef}
+        className="diagnostics-view"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="diagnostics-title"
+      >
+        <header className="diagnostics-header">
+          <div>
+            <h2 id="diagnostics-title">Uygulama Logları</h2>
+            <p>{selectedSession?.current ? "Aktif session" : "Geçmiş session"} · {message}</p>
+          </div>
+          <div className="diagnostics-header-actions">
+            <button
+              className="action-button action-button-secondary action-button-sm"
+              type="button"
+              onClick={() => {
+                void refreshSessions(sessionId);
+                void refreshEvents(sessionId);
+              }}
+            >
+              <RefreshCw size={15} aria-hidden="true" />
+              Yenile
+            </button>
+            {isCurrentSession && (
+              <button
+                className="action-button action-button-secondary action-button-sm"
+                type="button"
+                onClick={() => setPaused((current) => !current)}
+                aria-pressed={paused}
+              >
+                {paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
+                {paused ? "Canlı Takip" : "Duraklat"}
+              </button>
+            )}
+            <button className="overlay-close" type="button" data-dialog-close onClick={onClose} aria-label="Log görünümünü kapat">
+              <X size={17} aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+
+        <div className="diagnostics-toolbar">
+          <label>
+            <span>Session</span>
+            <select value={sessionId} onChange={(event) => setSessionId(event.target.value)}>
+              {sessions.map((session) => (
+                <option value={session.sessionId} key={session.sessionId}>
+                  {session.current ? "● " : ""}{new Date(session.startedAt).toLocaleString("tr-TR")} · {session.errorCount} hata
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Scope</span>
+            <select value={scope} onChange={(event) => setScope(event.target.value)}>
+              <option value="">Tümü</option>
+              {scopes.map((item) => <option value={item} key={item}>{item}</option>)}
+            </select>
+          </label>
+          <label className="diagnostics-search">
+            <span>Ara</span>
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="event, mesaj, operationId..." />
+          </label>
+          <div className="diagnostics-levels" aria-label="Log seviyeleri">
+            {LEVELS.map((level) => (
+              <button
+                className={`diagnostics-level is-${level.toLowerCase()}${levels.includes(level) ? " is-active" : ""}`}
+                type="button"
+                aria-pressed={levels.includes(level)}
+                onClick={() => toggleLevel(level)}
+                key={level}
+              >
+                {level}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="diagnostics-body">
+          <div className="diagnostics-event-list" ref={listRef} role="list" aria-label="Log kayıtları">
+            {state === "error" ? (
+              <div className="diagnostics-empty">{message}</div>
+            ) : visibleEvents.length === 0 ? (
+              <div className="diagnostics-empty">Bu filtrelerle eşleşen kayıt yok.</div>
+            ) : visibleEvents.map((event) => (
+              <button
+                className={`diagnostics-event is-${event.level.toLowerCase()}${selectedSequence === event.sequence ? " is-selected" : ""}`}
+                type="button"
+                role="listitem"
+                onClick={() => setSelectedSequence(event.sequence)}
+                key={event.sequence}
+              >
+                <time>{formatTime(event.timestamp)}</time>
+                <span className="diagnostics-event-level">{event.level}</span>
+                <span className="diagnostics-event-scope">{event.scope}</span>
+                <span className="diagnostics-event-name">{event.event}</span>
+                <span className="diagnostics-event-message">{event.message}</span>
+              </button>
+            ))}
+          </div>
+
+          <aside className="diagnostics-detail" aria-label="Seçili log kaydı">
+            {selectedEvent ? (
+              <>
+                <div className="diagnostics-detail-heading">
+                  <strong>{selectedEvent.event}</strong>
+                  <span>#{selectedEvent.sequence} · {selectedEvent.process} · {selectedEvent.scope}</span>
+                </div>
+                <p>{selectedEvent.message}</p>
+                {selectedEvent.operationId && <code>operationId: {selectedEvent.operationId}</code>}
+                {selectedEvent.meta && Object.keys(selectedEvent.meta).length > 0 && (
+                  <pre>{JSON.stringify(selectedEvent.meta, null, 2)}</pre>
+                )}
+                {selectedEvent.error && (
+                  <pre>{selectedEvent.error.stack || `${selectedEvent.error.name}: ${selectedEvent.error.message}`}</pre>
+                )}
+              </>
+            ) : (
+              <div className="diagnostics-empty">Detay ve bağlam kopyalama için bir kayıt seçin.</div>
+            )}
+          </aside>
+        </div>
+
+        <footer className="diagnostics-footer">
+          <div className="diagnostics-copy-actions">
+            <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopyVisible()} disabled={!result}>
+              <Clipboard size={15} aria-hidden="true" />
+              Görünenleri Kopyala
+            </button>
+            <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopySession()} disabled={!sessionId}>
+              Tüm Session'ı Kopyala
+            </button>
+            <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopyContext()} disabled={!selectedEvent}>
+              Bu Kaydın Bağlamını Kopyala
+            </button>
+          </div>
+          <span role="status" aria-live="polite">{copyMessage || `${visibleEvents.length} / ${result?.events.length ?? 0} kayıt görünür`}</span>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+function formatTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit", fractionalSecondDigits: 3 });
+}
