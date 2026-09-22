@@ -21,6 +21,7 @@ import {
   hasPersistedBusinessCapability
 } from "./business-capability-runtime";
 import {
+  desktopLog,
   desktopLogError,
   desktopLogInfo,
   desktopLogWarn,
@@ -51,25 +52,46 @@ const desktopDiagnosticSession = initializeDesktopLogging({
   packaged: app.isPackaged
 });
 if (desktopDiagnosticSession) {
-  desktopLogInfo("startup", `Desktop process starting (packaged=${app.isPackaged ? "yes" : "no"})`);
+  desktopLog.info({
+    scope: "startup",
+    event: "app.process.starting",
+    message: "Masaüstü uygulama işlemi başlatılıyor.",
+    meta: { packaged: app.isPackaged }
+  });
 }
 
 app.on("render-process-gone", (_event, webContents, details) => {
-  desktopLogError(
-    "renderer",
-    `Renderer process gone (id=${webContents.id}, reason=${details.reason}, exitCode=${details.exitCode})`
-  );
+  desktopLog.error({
+    scope: "renderer",
+    event: "renderer.process.gone",
+    message: "Renderer işlemi beklenmedik şekilde sonlandı.",
+    meta: {
+      webContentsId: webContents.id,
+      reason: details.reason,
+      exitCode: details.exitCode
+    }
+  });
 });
 
 app.on("child-process-gone", (_event, details) => {
-  desktopLogWarn(
-    "child-process",
-    `Child process gone (type=${details.type}, reason=${details.reason}, exitCode=${details.exitCode})`
-  );
+  desktopLog.warn({
+    scope: "child-process",
+    event: "child-process.gone",
+    message: "Alt işlem beklenmedik şekilde sonlandı.",
+    meta: {
+      type: details.type,
+      reason: details.reason,
+      exitCode: details.exitCode
+    }
+  });
 });
 
 app.on("before-quit", () => {
-  desktopLogInfo("shutdown", "Desktop application is quitting.");
+  desktopLog.info({
+    scope: "shutdown",
+    event: "app.shutdown.requested",
+    message: "Masaüstü uygulaması kapatılıyor."
+  });
   finalizeDesktopLogging("before-quit");
 });
 
@@ -198,7 +220,7 @@ if (!app.isPackaged && !process.env.YA_DESKTOP_DATA_DIR) {
 // installer staged by the previous run is applied before SQLite or the renderer
 // are opened, then the silent NSIS installer relaunches the updated app.
 if (applyPendingDesktopUpdateAtStartup(userDataPath())) {
-  desktopLogInfo("update", "Startup launcher handed control to the update installer.");
+  desktopLog.info({ scope: "update", event: "update.installer.handoff", message: "Başlangıç başlatıcısı denetimi güncelleme kurucusuna devretti." });
   process.exit(0);
 }
 

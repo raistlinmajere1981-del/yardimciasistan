@@ -33,8 +33,9 @@ fs.writeFileSync(path.join(sessionRoot, "events-001.jsonl"), [
 try {
   const listOutput = execFileSync(process.execPath, ["scripts/diagnostics-cli.mjs", "list", "--data-root", root], { encoding: "utf8" });
   assert.match(listOutput, new RegExp(sessionId));
-  assert.match(listOutput, /warn=1/);
-  assert.match(listOutput, /error=1/);
+  assert.match(listOutput, /uyarı=1/);
+  assert.match(listOutput, /hata=1/);
+  assert.match(listOutput, /kapalı/);
 
   const errorsOutput = execFileSync(process.execPath, ["scripts/diagnostics-cli.mjs", "errors", "--data-root", root], { encoding: "utf8" });
   assert.doesNotMatch(errorsOutput, /app\.session\.started/);

@@ -32,7 +32,7 @@ window.addEventListener("error", (event) => {
     level: "ERROR",
     scope: "renderer",
     event: "renderer.window-error",
-    message: event.message || "Renderer window error.",
+    message: event.message || "Renderer pencere hatası.",
     meta: {
       filename: event.filename || "",
       line: event.lineno || 0,
@@ -48,7 +48,7 @@ window.addEventListener("unhandledrejection", (event) => {
     level: "ERROR",
     scope: "renderer",
     event: "renderer.unhandled-rejection",
-    message: error.message || "Unhandled renderer promise rejection.",
+    message: error.message || "Renderer içinde işlenmeyen Promise reddi.",
     error
   });
 });

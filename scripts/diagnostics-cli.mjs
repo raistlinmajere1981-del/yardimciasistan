@@ -11,24 +11,24 @@ const dataRoot = path.resolve(
 const sessionsRoot = path.join(dataRoot, "logs", "sessions");
 
 if (!fs.existsSync(sessionsRoot)) {
-  fail(`Diagnostics session klasörü bulunamadı: ${sessionsRoot}`);
+  fail(`Tanılama oturum klasörü bulunamadı: ${sessionsRoot}`);
 }
 
 const sessions = readSessions(sessionsRoot);
 if (sessions.length === 0) {
-  fail("Diagnostics session bulunamadı.");
+  fail("Tanılama oturumu bulunamadı.");
 }
 
 if (command === "list") {
   for (const session of sessions) {
     console.log([
       session.sessionId,
-      session.current ? "current" : "closed",
+      session.current ? "aktif" : "kapalı",
       session.startedAt,
-      `events=${session.eventCount}`,
-      `warn=${session.warnCount}`,
-      `error=${session.errorCount}`,
-      session.endReason ? `end=${session.endReason}` : ""
+      `kayıt=${session.eventCount}`,
+      `uyarı=${session.warnCount}`,
+      `hata=${session.errorCount}`,
+      session.endReason ? `bitiş=${session.endReason}` : ""
     ].filter(Boolean).join("  "));
   }
   process.exit(0);
@@ -40,7 +40,7 @@ if (command !== "latest" && command !== "errors") {
 
 const sessionId = String(options.session || sessions[0].sessionId);
 const session = sessions.find((item) => item.sessionId === sessionId);
-if (!session) fail(`Session bulunamadı: ${sessionId}`);
+if (!session) fail(`Oturum bulunamadı: ${sessionId}`);
 
 const levels = command === "errors"
   ? new Set(["WARN", "ERROR"])
@@ -65,7 +65,7 @@ console.log(formatHeader(session));
 for (const event of events) {
   console.log(formatEvent(event));
 }
-console.log(`---\nshown=${events.length} sessionEvents=${session.eventCount} warn=${session.warnCount} error=${session.errorCount}`);
+console.log(`---\ngösterilen=${events.length} oturumKayıtları=${session.eventCount} uyarı=${session.warnCount} hata=${session.errorCount}`);
 
 function parseArgs(values) {
   const result = {};
@@ -124,11 +124,11 @@ function readEvents(sessionPath) {
 
 function formatHeader(session) {
   return [
-    "Yardımcı Asistan Diagnostics",
-    `Session: ${session.sessionId}`,
-    `Started: ${session.startedAt}`,
-    `Ended: ${session.endedAt || "active"}`,
-    `App: ${session.appVersion || "?"} · Electron ${session.electronVersion || "?"} · Node ${session.nodeVersion || "?"}`,
+    "Yardımcı Asistan Tanılama Kayıtları",
+    `Oturum: ${session.sessionId}`,
+    `Başlangıç: ${session.startedAt}`,
+    `Bitiş: ${session.endedAt || "aktif"}`,
+    `Uygulama: ${session.appVersion || "?"} · Electron ${session.electronVersion || "?"} · Node ${session.nodeVersion || "?"}`,
     `Platform: ${session.platform || "?"} ${session.arch || "?"}`,
     "---"
   ].join("\n");

@@ -138,9 +138,9 @@ try {
           totalBytes: 2048
         },
         events: [
-          { timestamp: '2026-09-22T01:00:01.000Z', sequence: 1, level: 'INFO', process: 'main', scope: 'startup', event: 'app.session.started', message: 'Diagnostics başladı.' },
+          { timestamp: '2026-09-22T01:00:01.000Z', sequence: 1, level: 'INFO', process: 'main', scope: 'startup', event: 'app.session.started', message: 'Tanılama başladı.' },
           { timestamp: '2026-09-22T01:00:02.000Z', sequence: 2, level: 'WARN', process: 'main', scope: 'sync', event: 'sync.retry', message: 'Eşitleme yeniden denenecek.' },
-          { timestamp: '2026-09-22T01:00:03.000Z', sequence: 3, level: 'ERROR', process: 'renderer', scope: 'market', event: 'market.failed', message: 'Smoke hata kaydı.', error: { name: 'Error', message: 'Smoke failure' } }
+          { timestamp: '2026-09-22T01:00:03.000Z', sequence: 3, level: 'ERROR', process: 'renderer', scope: 'market', event: 'market.failed', message: 'Smoke hata kaydı.', error: { name: 'Error', message: 'Smoke hatası' } }
         ],
         hasMore: false
       }),

@@ -103,7 +103,7 @@ function sanitizeError(error: unknown): DesktopDiagnosticError {
   if (error && typeof error === "object" && !Array.isArray(error)) {
     const record = error as Record<string, unknown>;
     const name = sanitizeText(String(record.name ?? "Error"), 120);
-    const message = sanitizeText(String(record.message ?? "Unknown renderer error"), MAX_MESSAGE_LENGTH);
+    const message = sanitizeText(String(record.message ?? "Bilinmeyen renderer hatası"), MAX_MESSAGE_LENGTH);
     const stack = typeof record.stack === "string" ? sanitizeText(record.stack, 16_000) : "";
     return {
       name,
@@ -280,7 +280,7 @@ function installProcessHooks() {
     desktopLog.error({
       scope: "process",
       event: "process.uncaught-exception",
-      message: `Uncaught exception monitor (${origin})`,
+      message: `Yakalanmamış istisna izlendi (${origin}).`,
       error
     });
   });
@@ -310,7 +310,7 @@ function installIpcErrorLogging() {
         desktopLog.error({
           scope: "ipc",
           event: "ipc.handler.failed",
-          message: "IPC handler failed.",
+          message: "IPC işleyicisi başarısız oldu.",
           meta: { channel },
           error
         });
@@ -420,7 +420,7 @@ export function initializeDesktopLogging(options: InitializeDesktopLoggingOption
     desktopLog.info({
       scope: "startup",
       event: "app.session.started",
-      message: "Desktop diagnostics session started.",
+      message: "Masaüstü tanılama oturumu başlatıldı.",
       meta: { logsPath: path.basename(logsPath) }
     });
     return toSummary(sessionManifest, sessionPath);

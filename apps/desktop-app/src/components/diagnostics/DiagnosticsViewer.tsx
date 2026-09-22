@@ -39,7 +39,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
     const bridge = window.yardimciDesktop;
     if (!bridge?.listDiagnosticSessions) {
       setState("error");
-      setMessage("Diagnostics köprüsü hazır değil.");
+      setMessage("Tanılama bağlantısı hazır değil.");
       return;
     }
 
@@ -66,7 +66,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
     const bridge = window.yardimciDesktop;
     if (!bridge?.readDiagnosticSession) {
       setState("error");
-      setMessage("Diagnostics okuma köprüsü hazır değil.");
+      setMessage("Tanılama okuma bağlantısı hazır değil.");
       return;
     }
 
@@ -149,13 +149,13 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
 
   function formatExportHeader(session: DesktopDiagnosticSessionSummary) {
     return [
-      "Yardımcı Asistan Diagnostics",
-      `Session: ${session.sessionId}`,
-      `Started: ${session.startedAt}`,
-      `Ended: ${session.endedAt || "active"}`,
-      `App: ${session.appVersion} · Electron ${session.electronVersion} · Node ${session.nodeVersion}`,
-      `Platform: ${session.platform} ${session.arch} · ${session.packaged ? "packaged" : "development"}`,
-      `Events: ${session.eventCount} · WARN ${session.warnCount} · ERROR ${session.errorCount}`,
+      "Yardımcı Asistan Tanılama Kayıtları",
+      `Oturum: ${session.sessionId}`,
+      `Başlangıç: ${session.startedAt}`,
+      `Bitiş: ${session.endedAt || "aktif"}`,
+      `Uygulama: ${session.appVersion} · Electron ${session.electronVersion} · Node ${session.nodeVersion}`,
+      `Platform: ${session.platform} ${session.arch} · ${session.packaged ? "paketlenmiş" : "geliştirme"}`,
+      `Kayıtlar: ${session.eventCount} · WARN ${session.warnCount} · ERROR ${session.errorCount}`,
       "---"
     ].join("\n");
   }
@@ -214,16 +214,16 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
 
   async function handleCopySession() {
     if (!sessionId) return;
-    setCopyMessage("Tüm session hazırlanıyor...");
+    setCopyMessage("Tüm oturum hazırlanıyor...");
     try {
       const full = await readAllSessionEvents(sessionId);
       if (!full) {
-        setCopyMessage("Session okunamadı.");
+        setCopyMessage("Oturum okunamadı.");
         return;
       }
-      await copyText(exportEvents(full.session, full.events), `Tüm session kopyalandı · ${full.events.length} kayıt.`);
+      await copyText(exportEvents(full.session, full.events), `Tüm oturum kopyalandı · ${full.events.length} kayıt.`);
     } catch {
-      setCopyMessage("Tüm session kopyalanamadı.");
+      setCopyMessage("Tüm oturum kopyalanamadı.");
     }
   }
 
@@ -233,12 +233,12 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
     try {
       const full = await readAllSessionEvents(sessionId);
       if (!full) {
-        setCopyMessage("Session okunamadı.");
+        setCopyMessage("Oturum okunamadı.");
         return;
       }
       const index = full.events.findIndex((event) => event.sequence === selectedEvent.sequence);
       if (index < 0) {
-        setCopyMessage("Seçili kayıt session içinde bulunamadı.");
+        setCopyMessage("Seçili kayıt oturum içinde bulunamadı.");
         return;
       }
       const context = full.events.slice(
@@ -263,7 +263,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
         <header className="diagnostics-header">
           <div>
             <h2 id="diagnostics-title">Uygulama Logları</h2>
-            <p>{selectedSession?.current ? "Aktif session" : "Geçmiş session"} · {message}</p>
+            <p>{selectedSession?.current ? "Aktif oturum" : "Geçmiş oturum"} · {message}</p>
           </div>
           <div className="diagnostics-header-actions">
             <button
@@ -296,7 +296,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
 
         <div className="diagnostics-toolbar">
           <label>
-            <span>Session</span>
+            <span>Oturum</span>
             <select value={sessionId} onChange={(event) => setSessionId(event.target.value)}>
               {sessions.map((session) => (
                 <option value={session.sessionId} key={session.sessionId}>
@@ -306,7 +306,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
             </select>
           </label>
           <label>
-            <span>Scope</span>
+            <span>Kapsam</span>
             <select value={scope} onChange={(event) => setScope(event.target.value)}>
               <option value="">Tümü</option>
               {scopes.map((item) => <option value={item} key={item}>{item}</option>)}
@@ -314,7 +314,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
           </label>
           <label className="diagnostics-search">
             <span>Ara</span>
-            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="event, mesaj, operationId..." />
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="olay, mesaj, işlem kimliği..." />
           </label>
           <div className="diagnostics-levels" aria-label="Log seviyeleri">
             {LEVELS.map((level) => (
@@ -383,7 +383,7 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
               Görünenleri Kopyala
             </button>
             <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopySession()} disabled={!sessionId}>
-              Tüm Session'ı Kopyala
+              Tüm Oturumu Kopyala
             </button>
             <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopyContext()} disabled={!selectedEvent}>
               Bu Kaydın Bağlamını Kopyala
