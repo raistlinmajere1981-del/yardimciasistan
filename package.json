@@ -63,6 +63,7 @@
     "smoke:android-device-token": "node scripts/smoke-android-device-token.mjs",
     "smoke:android-release-connection": "node scripts/smoke-android-release-connection.mjs",
     "smoke:ai-live": "npm run build -w @yardimci-asistan/ai-core && node scripts/smoke-live-ai.mjs",
+    "smoke:ai-contract": "npm test -w @yardimci-asistan/shared && npm test -w @yardimci-asistan/ai-core && node scripts/smoke-web-module-menu.mjs && node scripts/smoke-desktop-design-system.mjs",
     "smoke:automatic-sync": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-automatic-sync.mjs",
     "smoke:automatic-sync:no-build": "node scripts/smoke-automatic-sync.mjs",
     "smoke:stock-image-analysis": "node scripts/smoke-stock-image-analysis.mjs",
