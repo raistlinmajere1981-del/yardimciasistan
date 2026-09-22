@@ -367,14 +367,14 @@ try {
   await page.getByLabel("Servis sağlayıcı").selectOption("gemini");
   await expect(page.getByText("Google AI Studio hızlı kurulum", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Google AI Studio'yu Aç" })).toBeVisible();
-  await expect(page.getByLabel("Google AI Studio cURL bağlantısı")).toBeVisible();
+  await expect(page.getByLabel("Google AI Studio API anahtarı veya cURL")).toBeVisible();
   await expect(page.getByLabel("Model adı")).toHaveAttribute("placeholder", "Bağlantı kontrolünden sonra listelenir");
   await expect(page.getByLabel("Model adı")).toBeDisabled();
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeDisabled();
   await expect(page.locator(".setup-ai-section").getByRole("button", { name: "Google AI Studio'yu Aç" })).toBeEnabled();
   await expect(page.locator(".setup-ai-section").getByRole("button", { name: "Göster" })).toBeEnabled();
   await expect(page.locator(".setup-ai-section").getByRole("button", { name: "Bağlantıyı Dene" })).toBeDisabled();
-  await page.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
+  await page.getByLabel("Google AI Studio API anahtarı veya cURL").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await expect(page.getByRole("button", { name: "Bağlantıyı Dene" })).toBeEnabled();
   await page.getByRole("button", { name: "Ana Ekran", exact: true }).click();
   expect(await page.locator(".content").evaluate((element) => element.scrollTop)).toBe(0);
@@ -1919,7 +1919,7 @@ try {
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
   await expect(setupPage.getByText("OpenRouter bağlantısı çalışıyor.")).toBeVisible();
   await setupPage.getByLabel("Servis sağlayıcı").selectOption("gemini");
-  await setupPage.getByLabel("Google AI Studio cURL bağlantısı").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
+  await setupPage.getByLabel("Google AI Studio API anahtarı veya cURL").fill("curl https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent -H 'X-goog-api-key: AQ.smoke-key'");
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene" }).click();
   await expect(setupPage.getByText(/görsel girişi doğrulandı; 2 uygun Gemini modeli bulundu/)).toBeVisible();
   await expect(setupPage.getByText("2 görsel ve metin modeli hazır; kalıcı olması için ayarları kaydedin.")).toBeVisible();
@@ -1943,9 +1943,9 @@ try {
   await expect(setupPage.getByLabel("Servis sağlayıcı")).toHaveValue("gemini");
   await expect(setupPage.getByLabel("Model adı")).toHaveValue("gemini-3.1-flash-lite");
   await expect(setupPage.getByText("2 görsel ve metin modeli bu sağlayıcı altında kayıtlı.")).toBeVisible();
-  const storedGeminiKeyInput = setupPage.getByLabel("Google AI Studio cURL bağlantısı");
+  const storedGeminiKeyInput = setupPage.getByLabel("Google AI Studio API anahtarı veya cURL");
   await expect(storedGeminiKeyInput).toHaveValue("********************");
-  await expect(setupPage.getByText("Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilir veya yeni cURL yapıştırabilirsiniz.")).toBeVisible();
+  await expect(setupPage.getByText("Kayıtlı anahtar maskelenir; Göster ile görüntüleyebilir veya yeni anahtar yapıştırabilirsiniz.")).toBeVisible();
   await setupPage.getByRole("button", { name: "Göster" }).click();
   await expect(storedGeminiKeyInput).toHaveValue("AQ.smoke-key");
   await setupPage.getByRole("button", { name: "Gizle" }).click();
