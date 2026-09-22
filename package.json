@@ -92,7 +92,8 @@
     "logs:list": "node scripts/diagnostics-cli.mjs list",
     "logs:latest": "node scripts/diagnostics-cli.mjs latest",
     "logs:errors": "node scripts/diagnostics-cli.mjs errors",
-    "smoke:diagnostics": "node scripts/smoke-desktop-logging-contract.mjs && node scripts/smoke-diagnostics-cli.mjs"
+    "smoke:diagnostics": "node scripts/smoke-desktop-logging-contract.mjs && node scripts/smoke-diagnostics-cli.mjs",
+    "smoke:workspace-platform": "node scripts/smoke-workspace-platform.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

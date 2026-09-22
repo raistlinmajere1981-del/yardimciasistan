@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Clipboard, Pause, Play, RefreshCw, X } from "lucide-react";
+import { Clipboard, Pause, Play, RefreshCw } from "lucide-react";
 import type {
   DesktopDiagnosticEvent,
   DesktopDiagnosticLevel,
   DesktopDiagnosticReadResult,
   DesktopDiagnosticSessionSummary
 } from "../../../electron/diagnostics-contract";
-import { useDialogFocus } from "../ui/useDialogFocus";
+import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
+import type { WorkspacePresentation } from "../workspace/workspace-intent";
 
 interface DiagnosticsViewerProps {
   onClose: () => void;
@@ -18,7 +19,7 @@ const PAGE_SIZE = 2000;
 const CONTEXT_RADIUS = 30;
 
 export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
-  const dialogRef = useDialogFocus(true);
+  const [presentation, setPresentation] = useState<WorkspacePresentation>("centered");
   const listRef = useRef<HTMLDivElement>(null);
   const [sessions, setSessions] = useState<DesktopDiagnosticSessionSummary[]>([]);
   const [sessionId, setSessionId] = useState("");
@@ -252,48 +253,39 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
   }
 
   return (
-    <div className="overlay diagnostics-overlay" role="presentation">
-      <section
-        ref={dialogRef}
-        className="diagnostics-view"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="diagnostics-title"
-      >
-        <header className="diagnostics-header">
-          <div>
-            <h2 id="diagnostics-title">Uygulama Logları</h2>
-            <p>{selectedSession?.current ? "Aktif oturum" : "Geçmiş oturum"} · {message}</p>
-          </div>
-          <div className="diagnostics-header-actions">
-            <button
-              className="action-button action-button-secondary action-button-sm"
-              type="button"
-              onClick={() => {
-                void refreshSessions(sessionId);
-                void refreshEvents(sessionId);
-              }}
-            >
-              <RefreshCw size={15} aria-hidden="true" />
-              Yenile
-            </button>
-            {isCurrentSession && (
-              <button
-                className="action-button action-button-secondary action-button-sm"
-                type="button"
-                onClick={() => setPaused((current) => !current)}
-                aria-pressed={paused}
-              >
-                {paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
-                {paused ? "Canlı Takip" : "Duraklat"}
-              </button>
-            )}
-            <button className="overlay-close" type="button" data-dialog-close onClick={onClose} aria-label="Log görünümünü kapat">
-              <X size={17} aria-hidden="true" />
-            </button>
-          </div>
-        </header>
-
+    <WorkspaceFrame
+      title="Uygulama Logları"
+      context={<>{selectedSession?.current ? "Aktif oturum" : "Geçmiş oturum"} · {message}</>}
+      presentation={presentation}
+      onPresentationChange={setPresentation}
+      onClose={onClose}
+      closeLabel="Log görünümünü kapat"
+      bodyScroll="panes"
+      actions={<>
+        <button
+          className="action-button action-button-secondary action-button-sm"
+          type="button"
+          onClick={() => {
+            void refreshSessions(sessionId);
+            void refreshEvents(sessionId);
+          }}
+        >
+          <RefreshCw size={15} aria-hidden="true" />
+          Yenile
+        </button>
+        {isCurrentSession && (
+          <button
+            className="action-button action-button-secondary action-button-sm"
+            type="button"
+            onClick={() => setPaused((current) => !current)}
+            aria-pressed={paused}
+          >
+            {paused ? <Play size={15} aria-hidden="true" /> : <Pause size={15} aria-hidden="true" />}
+            {paused ? "Canlı Takip" : "Duraklat"}
+          </button>
+        )}
+      </>}
+      navigation={
         <div className="diagnostics-toolbar">
           <label>
             <span>Oturum</span>
@@ -330,53 +322,9 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
             ))}
           </div>
         </div>
-
-        <div className="diagnostics-body">
-          <div className="diagnostics-event-list" ref={listRef} role="list" aria-label="Log kayıtları">
-            {state === "error" ? (
-              <div className="diagnostics-empty">{message}</div>
-            ) : visibleEvents.length === 0 ? (
-              <div className="diagnostics-empty">Bu filtrelerle eşleşen kayıt yok.</div>
-            ) : visibleEvents.map((event) => (
-              <button
-                className={`diagnostics-event is-${event.level.toLowerCase()}${selectedSequence === event.sequence ? " is-selected" : ""}`}
-                type="button"
-                role="listitem"
-                onClick={() => setSelectedSequence(event.sequence)}
-                key={event.sequence}
-              >
-                <time>{formatTime(event.timestamp)}</time>
-                <span className="diagnostics-event-level">{event.level}</span>
-                <span className="diagnostics-event-scope">{event.scope}</span>
-                <span className="diagnostics-event-name">{event.event}</span>
-                <span className="diagnostics-event-message">{event.message}</span>
-              </button>
-            ))}
-          </div>
-
-          <aside className="diagnostics-detail" aria-label="Seçili log kaydı">
-            {selectedEvent ? (
-              <>
-                <div className="diagnostics-detail-heading">
-                  <strong>{selectedEvent.event}</strong>
-                  <span>#{selectedEvent.sequence} · {selectedEvent.process} · {selectedEvent.scope}</span>
-                </div>
-                <p>{selectedEvent.message}</p>
-                {selectedEvent.operationId && <code>operationId: {selectedEvent.operationId}</code>}
-                {selectedEvent.meta && Object.keys(selectedEvent.meta).length > 0 && (
-                  <pre>{JSON.stringify(selectedEvent.meta, null, 2)}</pre>
-                )}
-                {selectedEvent.error && (
-                  <pre>{selectedEvent.error.stack || `${selectedEvent.error.name}: ${selectedEvent.error.message}`}</pre>
-                )}
-              </>
-            ) : (
-              <div className="diagnostics-empty">Detay ve bağlam kopyalama için bir kayıt seçin.</div>
-            )}
-          </aside>
-        </div>
-
-        <footer className="diagnostics-footer">
+      }
+      footer={
+        <div className="diagnostics-footer">
           <div className="diagnostics-copy-actions">
             <button className="action-button action-button-secondary action-button-sm" type="button" onClick={() => void handleCopyVisible()} disabled={!result}>
               <Clipboard size={15} aria-hidden="true" />
@@ -390,9 +338,54 @@ export function DiagnosticsViewer({ onClose }: DiagnosticsViewerProps) {
             </button>
           </div>
           <span role="status" aria-live="polite">{copyMessage || `${visibleEvents.length} / ${result?.events.length ?? 0} kayıt görünür`}</span>
-        </footer>
-      </section>
-    </div>
+        </div>
+      }
+    >
+      <div className="diagnostics-body">
+        <div className="diagnostics-event-list" ref={listRef} role="list" aria-label="Log kayıtları">
+          {state === "error" ? (
+            <div className="diagnostics-empty">{message}</div>
+          ) : visibleEvents.length === 0 ? (
+            <div className="diagnostics-empty">Bu filtrelerle eşleşen kayıt yok.</div>
+          ) : visibleEvents.map((event) => (
+            <button
+              className={`diagnostics-event is-${event.level.toLowerCase()}${selectedSequence === event.sequence ? " is-selected" : ""}`}
+              type="button"
+              role="listitem"
+              onClick={() => setSelectedSequence(event.sequence)}
+              key={event.sequence}
+            >
+              <time>{formatTime(event.timestamp)}</time>
+              <span className="diagnostics-event-level">{event.level}</span>
+              <span className="diagnostics-event-scope">{event.scope}</span>
+              <span className="diagnostics-event-name">{event.event}</span>
+              <span className="diagnostics-event-message">{event.message}</span>
+            </button>
+          ))}
+        </div>
+
+        <aside className="diagnostics-detail" aria-label="Seçili log kaydı">
+          {selectedEvent ? (
+            <>
+              <div className="diagnostics-detail-heading">
+                <strong>{selectedEvent.event}</strong>
+                <span>#{selectedEvent.sequence} · {selectedEvent.process} · {selectedEvent.scope}</span>
+              </div>
+              <p>{selectedEvent.message}</p>
+              {selectedEvent.operationId && <code>operationId: {selectedEvent.operationId}</code>}
+              {selectedEvent.meta && Object.keys(selectedEvent.meta).length > 0 && (
+                <pre>{JSON.stringify(selectedEvent.meta, null, 2)}</pre>
+              )}
+              {selectedEvent.error && (
+                <pre>{selectedEvent.error.stack || `${selectedEvent.error.name}: ${selectedEvent.error.message}`}</pre>
+              )}
+            </>
+          ) : (
+            <div className="diagnostics-empty">Detay ve bağlam kopyalama için bir kayıt seçin.</div>
+          )}
+        </aside>
+      </div>
+    </WorkspaceFrame>
   );
 }
 

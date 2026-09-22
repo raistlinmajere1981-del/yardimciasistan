@@ -238,7 +238,12 @@ try {
   await expect(diagnosticsDialog.getByText('Smoke hata kaydı.', { exact: true })).toBeVisible();
   await diagnosticsDialog.getByRole('button', { name: 'INFO', exact: true }).click();
   await expect(diagnosticsDialog.getByText('app.session.started', { exact: true })).toHaveCount(0);
+  await diagnosticsDialog.getByLabel('Ara', { exact: true }).fill('market.failed');
+  await diagnosticsDialog.getByRole('button', { name: 'Çalışma alanını genişlet' }).click();
+  await expect(diagnosticsDialog.getByLabel('Ara', { exact: true })).toHaveValue('market.failed');
+  await diagnosticsDialog.getByRole('button', { name: 'Ortalanmış görünüme dön' }).click();
   await diagnosticsDialog.getByRole('button', { name: 'Log görünümünü kapat' }).click();
+  await expect(page.getByRole('button', { name: 'Uygulama loglarını aç', exact: true })).toBeFocused();
   await expect(diagnosticsDialog).toHaveCount(0);
 
   await expect(page.getByRole('button', { name: 'Ayarları Kaydet', exact: true })).toHaveCount(1);
@@ -325,6 +330,11 @@ try {
   await page.getByRole('navigation', { name: 'Ayar bölümleri' }).getByRole('link').first().focus();
   await page.keyboard.press('Tab');
   expect(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle)).not.toBe('none');
+  // Simulate an app-level lock request while the native modal makes shell controls inert.
+  await page.getByRole('button', { name: 'Uygulama loglarını aç', exact: true }).click();
+  await page.locator('.app-lock-trigger').evaluate(button => button.click());
+  await expect(page.getByRole('dialog', { name: 'Yardımcı Asistan kilit ekranı' })).toBeVisible();
+  await expect(diagnosticsDialog).toHaveCount(0);
   expect(errors).toEqual([]);
   writeFileSync(`${output}/viewports.json`, JSON.stringify(observations, null, 2));
   console.log('desktop-design-system-smoke-ok', JSON.stringify(observations));

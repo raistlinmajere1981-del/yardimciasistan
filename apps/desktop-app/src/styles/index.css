@@ -22,6 +22,7 @@
 @import "./components/cards.css" layer(components.primitives);
 @import "./components/data-list.css" layer(components.primitives);
 @import "./components/dialogs.css" layer(components.primitives);
+@import "./components/workspace.css" layer(components.primitives);
 @import "./components/navigation.css" layer(components.primitives);
 @import "./components/header.css" layer(components.primitives);
 @import "./components/notifications.css" layer(components.primitives);

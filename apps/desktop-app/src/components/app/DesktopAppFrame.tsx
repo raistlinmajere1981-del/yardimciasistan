@@ -26,6 +26,7 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
+import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
 
 interface DesktopAppFrameProps {
   activePage: DesktopPage;
@@ -46,7 +47,13 @@ interface DesktopAppFrameProps {
 
 const OFFLINE_SYNC_MESSAGE = "İnternet bağlantısı yok. Yerel işlemler devam ediyor; eşitleme bağlantı gelince yapılacak.";
 
-export function DesktopAppFrame({
+export function DesktopAppFrame(props: DesktopAppFrameProps) {
+  return <WorkspaceNavigationProvider page={props.activePage} onReturnPage={props.setActivePage}>
+    <DesktopAppFrameContent {...props} />
+  </WorkspaceNavigationProvider>;
+}
+
+function DesktopAppFrameContent({
   activePage,
   setActivePage,
   syncState,
@@ -239,19 +246,24 @@ export function DesktopAppFrame({
           )}
         />
       )}
-      overlay={diagnosticsOpen ? (
-        <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />
-      ) : menuEnabled && menuPreviewOpen ? (
-        <LocalMenuPreview
-          menu={menuPreviewData}
-          setupData={setupData}
-          webModuleUrl={dashboardData.webModuleUrl}
-          whatsappEnabled={whatsappEnabled}
-          qrMenuEnabled={qrMenuEnabled}
-          inventoryEnabled={inventoryEnabled}
-          onClose={closeMenuPreview}
-        />
-      ) : undefined}
+      overlay={(
+        <>
+          <WorkspaceHost />
+          {diagnosticsOpen ? (
+            <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />
+          ) : menuEnabled && menuPreviewOpen ? (
+            <LocalMenuPreview
+              menu={menuPreviewData}
+              setupData={setupData}
+              webModuleUrl={dashboardData.webModuleUrl}
+              whatsappEnabled={whatsappEnabled}
+              qrMenuEnabled={qrMenuEnabled}
+              inventoryEnabled={inventoryEnabled}
+              onClose={closeMenuPreview}
+            />
+          ) : undefined}
+        </>
+      )}
     >
       {children}
     </AppShell>

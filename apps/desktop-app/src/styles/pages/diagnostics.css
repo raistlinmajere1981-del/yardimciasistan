@@ -1,55 +1,16 @@
-.diagnostics-overlay {
-  padding: clamp(var(--space-2), 2vw, var(--space-5));
-}
-
-.diagnostics-view {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  width: min(96vw, 1500px);
-  height: min(92dvh, 1000px);
-  min-width: 0;
-  overflow: hidden;
-  color: var(--color-text);
-  background: var(--color-bg-panel);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-dialog);
-  box-shadow: var(--shadow-lg);
-}
-
-.diagnostics-header,
 .diagnostics-footer {
   display: flex;
+  flex: 1;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-bg-panel);
 }
-
-.diagnostics-header {
-  border-bottom: 1px solid var(--color-border);
-}
-
-.diagnostics-header h2 {
-  margin: 0;
-  font-size: var(--text-lg);
-}
-
-.diagnostics-header p,
 .diagnostics-footer > span {
-  margin: var(--space-1) 0 0;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
 }
-
-.diagnostics-header-actions,
-.diagnostics-copy-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
+.diagnostics-copy-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .diagnostics-toolbar {
   display: grid;
@@ -227,10 +188,6 @@
   text-align: center;
 }
 
-.diagnostics-footer {
-  border-top: 1px solid var(--color-border);
-}
-
 .diagnostics-footer > span {
   margin: 0;
   text-align: right;
@@ -288,12 +245,6 @@
 }
 
 @media (max-width: 700px) {
-  .diagnostics-view {
-    width: 100%;
-    height: calc(100dvh - var(--space-4));
-  }
-
-  .diagnostics-header,
   .diagnostics-footer {
     align-items: stretch;
     flex-direction: column;
