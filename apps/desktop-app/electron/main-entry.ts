@@ -23,6 +23,7 @@ import {
   desktopLogError,
   desktopLogInfo,
   desktopLogWarn,
+  finalizeDesktopLogging,
   initializeDesktopLogging
 } from "./desktop-logger";
 import {
@@ -43,8 +44,12 @@ function resolveRuntimeDataRoot(): string {
 
 const userDataPath = () => resolveRuntimeDataRoot();
 
-const desktopLogPath = initializeDesktopLogging(userDataPath());
-if (desktopLogPath) {
+const desktopDiagnosticSession = initializeDesktopLogging({
+  dataRoot: userDataPath(),
+  appVersion: app.getVersion(),
+  packaged: app.isPackaged
+});
+if (desktopDiagnosticSession) {
   desktopLogInfo("startup", `Desktop process starting (packaged=${app.isPackaged ? "yes" : "no"})`);
 }
 
@@ -64,6 +69,7 @@ app.on("child-process-gone", (_event, details) => {
 
 app.on("before-quit", () => {
   desktopLogInfo("shutdown", "Desktop application is quitting.");
+  finalizeDesktopLogging("before-quit");
 });
 
 type PendingMaintenanceKind = "restore" | "reset" | "";
