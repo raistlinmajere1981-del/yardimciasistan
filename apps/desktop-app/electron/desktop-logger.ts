@@ -100,6 +100,17 @@ function sanitizeError(error: unknown): DesktopDiagnosticError {
       ...(error.stack ? { stack: sanitizeText(error.stack, 16_000) } : {})
     };
   }
+  if (error && typeof error === "object" && !Array.isArray(error)) {
+    const record = error as Record<string, unknown>;
+    const name = sanitizeText(String(record.name ?? "Error"), 120);
+    const message = sanitizeText(String(record.message ?? "Unknown renderer error"), MAX_MESSAGE_LENGTH);
+    const stack = typeof record.stack === "string" ? sanitizeText(record.stack, 16_000) : "";
+    return {
+      name,
+      message,
+      ...(stack ? { stack } : {})
+    };
+  }
   return {
     name: "Error",
     message: sanitizeText(typeof error === "string" ? error : String(error), MAX_MESSAGE_LENGTH)

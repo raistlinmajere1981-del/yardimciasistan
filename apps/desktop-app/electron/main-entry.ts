@@ -15,6 +15,7 @@ import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
 import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 import { registerBusinessCapabilityIpcHandlers } from "./business-capability-ipc";
 import { registerCommerceIpcHandlers } from "./commerce-ipc";
+import { registerDiagnosticsIpcHandlers } from "./ipc/diagnostics-ipc";
 import {
   assertPersistedBusinessCapability,
   hasPersistedBusinessCapability
@@ -257,6 +258,7 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanion
       scheduleAutomaticSyncSoon();
     };
 
+    registerDiagnosticsIpcHandlers({ assertUnlocked: assertAppSessionUnlocked });
     registerDataMaintenanceIpcHandlers(userDataPath);
     registerDesktopUpdateIpcHandlers(userDataPath);
     startAutomaticDesktopUpdateChecks(userDataPath);

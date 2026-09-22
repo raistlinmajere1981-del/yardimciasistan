@@ -100,6 +100,12 @@ import type {
   UpdateAppPasswordInput
 } from "./app-lock";
 import type { WebConnectionTestInput, WebConnectionTestResult } from "./web-connection-test";
+import type {
+  DesktopDiagnosticReadInput,
+  DesktopDiagnosticReadResult,
+  DesktopDiagnosticSessionSummary,
+  DesktopDiagnosticWriteInput
+} from "./diagnostics-contract";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
 import type { BusinessPublicProfileSaveResult } from "./business-public-profile";
 import type { BusinessLocationGeocodeResponse } from "./business-location-geocode";
@@ -136,6 +142,10 @@ type AiApiKeyRevealResult =
 export interface DesktopBridge {
   setUiScale: (scale: number) => void;
   getAppLockStatus: () => Promise<AppLockStatus>;
+  getCurrentDiagnosticSession: () => Promise<DesktopDiagnosticSessionSummary | null>;
+  listDiagnosticSessions: () => Promise<DesktopDiagnosticSessionSummary[]>;
+  readDiagnosticSession: (input?: DesktopDiagnosticReadInput) => Promise<DesktopDiagnosticReadResult | null>;
+  writeDiagnosticEvent: (input: DesktopDiagnosticWriteInput) => Promise<unknown>;
   lockApp: () => Promise<AppLockActionResult>;
   unlockApp: (password: string) => Promise<AppLockActionResult>;
   updateAppPassword: (input: UpdateAppPasswordInput) => Promise<AppLockActionResult>;
@@ -268,6 +278,10 @@ async function invokeWhenUnlocked<T>(channel: string, ...args: unknown[]): Promi
 const bridge: DesktopBridge = {
   setUiScale: (scale: number) => webFrame.setZoomFactor(scale),
   getAppLockStatus: () => ipcRenderer.invoke("appLock:getStatus"),
+  getCurrentDiagnosticSession: () => invokeWhenUnlocked<DesktopDiagnosticSessionSummary | null>("diagnostics:getCurrentSession"),
+  listDiagnosticSessions: () => invokeWhenUnlocked<DesktopDiagnosticSessionSummary[]>("diagnostics:listSessions"),
+  readDiagnosticSession: (input = {}) => invokeWhenUnlocked<DesktopDiagnosticReadResult | null>("diagnostics:readSession", input),
+  writeDiagnosticEvent: (input: DesktopDiagnosticWriteInput) => ipcRenderer.invoke("diagnostics:writeRendererEvent", input),
   lockApp: () => ipcRenderer.invoke("appLock:lock"),
   unlockApp: (password: string) => ipcRenderer.invoke("appLock:unlock", password),
   updateAppPassword: (input: UpdateAppPasswordInput) => ipcRenderer.invoke("appLock:updatePassword", input),

@@ -1,0 +1,66 @@
+# Desktop diagnostics
+
+Yardımcı Asistan uses session-based structured diagnostics for desktop troubleshooting.
+
+## Storage
+
+Each desktop process start creates a new directory:
+
+```text
+data/logs/sessions/<session-id>/
+  session.json
+  events-001.jsonl
+  events-002.jsonl
+```
+
+A session begins when Electron main starts. A normal quit records `endedAt` and `endReason`; a session without an end marker can indicate a crash or hard stop.
+
+Event chunks rotate at 2 MiB. Retention keeps at most 30 sessions and approximately 50 MiB of session diagnostics. Old single-file logs are not part of the v2 contract.
+
+## Event contract
+
+Each JSONL line is one event with:
+
+- `timestamp`, `sequence`
+- `level`: `INFO`, `WARN`, or `ERROR`
+- `process`: `main` or `renderer`
+- stable `scope`
+- stable machine-readable `event`
+- human-readable `message`
+- optional `operationId`
+- optional sanitized `meta`
+- optional sanitized error name/message/stack
+
+Use stable event names so diagnostics can be filtered without matching prose. Prefer `domain.operation.state`, for example `sync.cycle.failed`.
+
+## Privacy and secrets
+
+Diagnostics are designed to be shareable with developers and coding agents, but they are not a data archive. Do not intentionally log customer message bodies, passwords, API keys, sync secrets, tokens, authorization headers, cookies, or unnecessary personal data.
+
+The logger applies recursive redaction and size limits as a second line of defense.
+
+## Runtime capture
+
+Electron main automatically captures:
+
+- process warnings
+- uncaught exception monitor events
+- uncaught IPC handler failures
+- `console.warn` and `console.error` as a compatibility bridge
+
+Renderer automatically captures:
+
+- `window.error`
+- unhandled promise rejections
+
+New application diagnostics should use the structured diagnostics API rather than relying on console mirroring.
+
+## Investigation workflow
+
+1. Start with the latest session.
+2. Filter to `ERROR` and `WARN`.
+3. Narrow by `scope` or `operationId`.
+4. Expand the surrounding events when a failure is part of a multi-step flow.
+5. Only add new diagnostics when the existing event chain cannot identify the failing boundary.
+
+The desktop LogView and terminal helper commands are layered on this same session contract; they should not introduce a separate logging format.

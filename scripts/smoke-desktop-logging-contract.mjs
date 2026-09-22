@@ -7,6 +7,10 @@ const logger = read("apps/desktop-app/electron/desktop-logger.ts");
 const entry = read("apps/desktop-app/electron/main-entry.ts");
 const dataPaths = read("apps/desktop-app/electron/data-paths.ts");
 const commerceIpc = read("apps/desktop-app/electron/commerce-ipc.ts");
+const diagnosticsIpc = read("apps/desktop-app/electron/ipc/diagnostics-ipc.ts");
+const preload = read("apps/desktop-app/electron/preload.ts");
+const rendererEntry = read("apps/desktop-app/src/main.tsx");
+const agents = read("AGENTS.md");
 
 assert.match(dataPaths, /DESKTOP_LOGS_DIR_NAME = "logs"/);
 assert.match(dataPaths, /DESKTOP_LOG_SESSIONS_DIR_NAME = "sessions"/);
@@ -35,6 +39,19 @@ const mainImportIndex = entry.indexOf('import("./main")');
 assert.ok(initializeIndex >= 0, "desktop logging initialization missing");
 assert.ok(mainImportIndex > initializeIndex, "desktop logging must initialize before main IPC registration");
 assert.match(entry, /finalizeDesktopLogging\("before-quit"\)/);
+assert.match(entry, /registerDiagnosticsIpcHandlers/);
+
+assert.match(diagnosticsIpc, /diagnostics:getCurrentSession/);
+assert.match(diagnosticsIpc, /diagnostics:listSessions/);
+assert.match(diagnosticsIpc, /diagnostics:readSession/);
+assert.match(diagnosticsIpc, /diagnostics:writeRendererEvent/);
+assert.match(diagnosticsIpc, /assertUnlocked/);
+assert.match(preload, /writeDiagnosticEvent/);
+assert.match(preload, /readDiagnosticSession/);
+assert.match(rendererEntry, /renderer\.window-error/);
+assert.match(rendererEntry, /renderer\.unhandled-rejection/);
+assert.match(agents, /Logging and diagnostics/);
+assert.match(agents, /data\/logs\/sessions/);
 
 assert.match(commerceIpc, /commerce:product:previewExternalImage/);
 assert.match(commerceIpc, /desktopLogWarn\("product-data"/);

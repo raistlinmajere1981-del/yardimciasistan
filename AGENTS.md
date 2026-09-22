@@ -80,6 +80,22 @@ Placement:
 
 Prefer names such as `object-utils.ts`, `date-utils.ts`, or another domain-specific filename over generic utility buckets.
 
+## Logging and diagnostics
+
+Desktop diagnostics are a repository contract, not an ad-hoc debugging aid.
+
+- Persistent desktop diagnostics live under `data/logs/sessions/<session-id>/` as `session.json` plus JSONL event chunks.
+- New persistent diagnostics must use the structured desktop diagnostics API. Do not add new long-lived `console.log/warn/error` calls for application behavior.
+- Every new record should have a stable `scope` and stable machine-readable `event` name such as `product-data.image-preview.failed`.
+- Use `INFO` for meaningful operation milestones, `WARN` for recoverable abnormal states, and `ERROR` for failed operations or lost functionality. Do not log every function entry/exit.
+- Pass caught `Error` values to the diagnostics API instead of manually flattening stack traces.
+- Never log API keys, passwords, sync secrets, authorization headers, cookies, tokens, customer message bodies, or other unnecessary customer PII. The logger redacts defensively, but callers must still avoid collecting sensitive data.
+- Use an `operationId` to correlate multi-step flows such as sync cycles, product lookup, Android actions, AI calls, backup/restore, and imports when one is already available or naturally created.
+- When investigating a desktop failure, inspect the latest session's WARN/ERROR events before adding speculative debug output.
+- Renderer diagnostics must go through the isolated preload bridge; renderer code must not access log files directly.
+- Diagnostic reads are locked behind the application session lock. Do not create alternate file-reading IPC paths that bypass that gate.
+- See `docs/diagnostics/logging.md` for the event format and investigation workflow.
+
 ## Generated artifacts
 
 Normal build/test commands must not leave tracked generated files modified.
