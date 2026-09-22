@@ -47,6 +47,11 @@ const mockAiServer = http.createServer(async (request, response) => {
     response.end(JSON.stringify({ error: { message: "Rate limit exceeded. Please try again later." } }));
     return;
   }
+  if (lastMessage.includes("servis sorunu testi")) {
+    response.writeHead(503, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ error: { message: "Provider temporarily unavailable." } }));
+    return;
+  }
   response.writeHead(200, { "Content-Type": "application/json" });
   response.end(JSON.stringify({
     choices: [
@@ -532,9 +537,153 @@ try {
     store: false
   });
 
+  const businessContextPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_business_context",
+      client_id: "desktop-web-ai-context-smoke",
+      business_context: {
+        version: 1,
+        business_name: "Nehir Tekel",
+        profile_id: "market",
+        profile_label: "Market / Perakende",
+        phone: "+903661112233",
+        whatsapp: "+905551112233",
+        whatsapp_enabled: false,
+        email: "info@example.test",
+        address: "Gebeş, Sahil Sokak No:45/1, Cide / Kastamonu",
+        description: "Mahalle marketi ve tekel bayisi.",
+        directions_note: "Cide sahil yolundan Gideros yönüne 5 km gidince solda.",
+        policy_note: "Veresiye satışımız yoktur.",
+        payment_note: "Nakit ve kredi/banka kartı kabul edilir.",
+        languages: ["Türkçe", "İngilizce"],
+        features: [],
+        check_in_time: "",
+        check_out_time: "",
+        breakfast_start_time: "",
+        breakfast_end_time: ""
+      }
+    }
+  });
+  expect(businessContextPublish.ok()).toBe(true);
+  expect(await businessContextPublish.json()).toMatchObject({
+    ok: true,
+    profile_id: "market"
+  });
+
+  const aiCatalogPublish = await page.request.post(`${baseUrl}/api/sync.php`, {
+    headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
+    data: {
+      action: "publish_ai_catalog",
+      client_id: "desktop-web-ai-catalog-smoke",
+      ai_catalog: {
+        version: 1,
+        updated_at: "2026-09-22T02:00:00+03:00",
+        items: [
+          {
+            id: "market_metro",
+            source: "catalog",
+            name: "Ülker Metro Klasik (50,4 g)",
+            description: "Çikolata kaplı bar",
+            category: "Atıştırmalık",
+            brand: "Ülker",
+            barcode: "8690504012345",
+            price: 10,
+            currency: "TRY",
+            unit: "piece",
+            available: false,
+            featured: false,
+            tags: ["çikolata"],
+            purchase_price: 4,
+            current_quantity: 99
+          },
+          {
+            id: "market_pepsi",
+            source: "catalog",
+            name: "Pepsi 330 ml",
+            description: "Gazlı içecek",
+            category: "İçecek",
+            brand: "Pepsi",
+            barcode: "8690632033556",
+            price: 42,
+            currency: "TRY",
+            unit: "piece",
+            available: true,
+            featured: false,
+            tags: []
+          }
+        ]
+      }
+    }
+  });
+  expect(aiCatalogPublish.ok()).toBe(true);
+  expect(await aiCatalogPublish.json()).toMatchObject({
+    ok: true,
+    item_count: 2
+  });
+
+  const publicBusinessResponse = await page.request.get(`${baseUrl}/api/business.php`);
+  expect(publicBusinessResponse.ok()).toBe(true);
+  expect(await publicBusinessResponse.json()).toMatchObject({
+    ok: true,
+    business: {
+      display_name: "Nehir Tekel",
+      profile_id: "market",
+      whatsapp_enabled: false,
+      address: "Gebeş, Sahil Sokak No:45/1, Cide / Kastamonu",
+      directions_note: "Cide sahil yolundan Gideros yönüne 5 km gidince solda.",
+      policy_note: "Veresiye satışımız yoktur.",
+      payment_note: "Nakit ve kredi/banka kartı kabul edilir.",
+      languages: ["Türkçe", "İngilizce"],
+      features: []
+    }
+  });
+
+  const metroChatResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: { message: "Metro var mı, fiyatı ne kadar?" }
+  });
+  expect(metroChatResponse.ok()).toBe(true);
+  const metroChatResult = await metroChatResponse.json();
+  expect(metroChatResult.fallback).toBe(false);
+  expect(metroChatResult.knowledge_files).toEqual(["firma", "sik-sorulan-sorular"]);
+  const metroAiRequest = mockAiRequests.at(-1);
+  const metroSystemPrompt = String(metroAiRequest.body.messages?.[0]?.content ?? "");
+  expect(metroSystemPrompt).toContain("Sektör: Market / Perakende");
+  expect(metroSystemPrompt).toContain("Ödeme: Nakit ve kredi/banka kartı kabul edilir.");
+  expect(metroSystemPrompt).toContain("Ülker Metro Klasik (50,4 g)");
+  expect(metroSystemPrompt).toContain("durum: şu anda mevcut değil");
+  expect(metroSystemPrompt).not.toContain("Pepsi 330 ml");
+  expect(metroSystemPrompt).not.toContain("purchase_price");
+  expect(metroSystemPrompt).not.toContain("current_quantity");
+  expect(metroSystemPrompt).not.toContain("Giriş saati:");
+  expect(metroSystemPrompt).not.toContain("Kahvaltı başlangıcı:");
+
+  const catalogMissResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: { message: "PlayStation 6 satıyor musunuz, fiyatı ne?" }
+  });
+  expect(catalogMissResponse.ok()).toBe(true);
+  const catalogMissResult = await catalogMissResponse.json();
+  expect(catalogMissResult.fallback).toBe(false);
+  const catalogMissPrompt = String(mockAiRequests.at(-1).body.messages?.[0]?.content ?? "");
+  expect(catalogMissPrompt).toContain("Bu soru için güncel ürün veya menü eşleşmesi bulunamadı.");
+  expect(catalogMissPrompt).toContain("Katalogda eşleşme olmaması ürünün kesinlikle satılmadığını kanıtlamaz.");
+  expect(catalogMissPrompt).not.toContain("Ülker Metro Klasik (50,4 g)");
+  expect(catalogMissPrompt).not.toContain("Pepsi 330 ml");
+
+  const marketIsolationResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: { message: "Odalarınız kaç kişilik ve giriş saati kaç?" }
+  });
+  expect(marketIsolationResponse.ok()).toBe(true);
+  const marketIsolationResult = await marketIsolationResponse.json();
+  expect(marketIsolationResult.knowledge_files).toEqual(["firma", "sik-sorulan-sorular"]);
+  const marketIsolationPrompt = String(mockAiRequests.at(-1).body.messages?.[0]?.content ?? "");
+  expect(marketIsolationPrompt).toContain("Sektör: Market / Perakende");
+  expect(marketIsolationPrompt).not.toContain("## Odalar");
+  expect(marketIsolationPrompt).not.toContain("Giriş saati:");
+
   const rateLimitedResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: {
-      message: "Sağlayıcı limit testi"
+      message: "Sağlayıcı limit testi, kart geçiyor mu?"
     }
   });
   expect(rateLimitedResponse.ok()).toBe(true);
@@ -545,8 +694,26 @@ try {
     retryable: true,
     provider_status: 429
   });
-  expect(rateLimitedResult.answer).toContain("istek sınırına ulaştı");
+  expect(rateLimitedResult.answer).toBe("Nakit ve kredi/banka kartı kabul edilir.");
+  expect(rateLimitedResult.answer).not.toMatch(/WhatsApp|müsaitlik|rezervasyon/i);
   expect(JSON.stringify(rateLimitedResult)).not.toContain(mockAiApiKey);
+
+  const unavailableResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
+    data: {
+      message: "Sağlayıcı servis sorunu testi, nasıl gelebilirim?"
+    }
+  });
+  expect(unavailableResponse.ok()).toBe(true);
+  const unavailableResult = await unavailableResponse.json();
+  expect(unavailableResult.fallback).toBe(true);
+  expect(unavailableResult.error).toMatchObject({
+    code: "provider_unavailable",
+    retryable: true,
+    provider_status: 503
+  });
+  expect(unavailableResult.answer).toContain("Gebeş, Sahil Sokak No:45/1");
+  expect(unavailableResult.answer).toContain("Cide sahil yolundan Gideros yönüne 5 km gidince solda.");
+  expect(unavailableResult.answer).not.toMatch(/WhatsApp|müsaitlik|rezervasyon/i);
 
   const aiRequestResponse = await page.request.post(`${baseUrl}/api/chat.php`, {
     data: {

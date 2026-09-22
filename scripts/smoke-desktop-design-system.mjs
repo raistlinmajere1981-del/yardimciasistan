@@ -235,6 +235,12 @@ try {
 
   await page.getByLabel('Servis sağlayıcı').selectOption('gemini');
   const googleCredential = page.getByLabel('Google AI Studio API anahtarı veya cURL');
+  const aiTestCallCountBeforePlaceholder = await page.evaluate(() => window.__designCalls.filter(call => call.kind === 'ai-test').length);
+  await googleCredential.fill('curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent" -H "x-goog-api-key: $GEMINI_API_KEY"');
+  await page.getByRole('button', { name: 'Bağlantıyı Dene', exact: true }).click();
+  await expect(page.getByText(/yer tutucu içeriyor/i)).toBeVisible();
+  expect(await page.evaluate(() => window.__designCalls.filter(call => call.kind === 'ai-test').length)).toBe(aiTestCallCountBeforePlaceholder);
+
   await googleCredential.fill('auth-key-smoke-1234567890');
   await page.getByRole('button', { name: 'Bağlantıyı Dene', exact: true }).click();
   await expect(page.getByText('Google AI Studio bağlantısı çalışıyor.', { exact: true })).toBeVisible();
