@@ -7,6 +7,12 @@ const logger = read("apps/desktop-app/electron/desktop-logger.ts");
 const entry = read("apps/desktop-app/electron/main-entry.ts");
 const dataPaths = read("apps/desktop-app/electron/data-paths.ts");
 const commerceIpc = read("apps/desktop-app/electron/commerce-ipc.ts");
+const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
+const dataMaintenance = read("apps/desktop-app/electron/data-maintenance.ts");
+const updateService = read("apps/desktop-app/electron/desktop-update-service.ts");
+const companionServer = read("apps/desktop-app/electron/local-companion-server.ts");
+const companionMdns = read("apps/desktop-app/electron/local-companion-mdns.ts");
+const main = read("apps/desktop-app/electron/main.ts");
 const diagnosticsIpc = read("apps/desktop-app/electron/ipc/diagnostics-ipc.ts");
 const preload = read("apps/desktop-app/electron/preload.ts");
 const rendererEntry = read("apps/desktop-app/src/main.tsx");
@@ -62,6 +68,38 @@ assert.doesNotMatch(diagnosticsViewer, />Session</);
 assert.doesNotMatch(diagnosticsViewer, />Scope</);
 
 assert.match(commerceIpc, /commerce:product:previewExternalImage/);
-assert.match(commerceIpc, /desktopLogWarn\("product-data"/);
+// Runtime diagnostics must use the structured API with stable events.
+assert.match(commerceIpc, /product-data\.image-preview\.failed/);
+assert.match(commerceIpc, /product-data\.image-archive\.failed/);
+assert.match(syncCoordinator, /product-data\.image-archive\.failed/);
+assert.match(dataMaintenance, /restore\.pending\.apply\.failed/);
+assert.match(dataMaintenance, /reset\.preferences\.clear\.failed/);
+assert.match(entry, /startup\.legacy-data\.relocation\.failed/);
+assert.match(entry, /restore\.republish\.failed/);
+assert.match(updateService, /update\.check\.failed/);
+assert.match(updateService, /update\.download\.failed/);
+assert.match(updateService, /update\.install\.failed/);
+assert.match(companionServer, /local-companion\.server\.started/);
+assert.match(companionServer, /local-companion\.auth\.rejected/);
+assert.match(companionMdns, /local-companion-mdns\.advertising\.started/);
+assert.match(main, /local-companion\.server\.start\.failed/);
+
+// Legacy wrappers are removed; no runtime call sites may remain.
+assert.doesNotMatch(logger, /desktopLogInfo|desktopLogWarn|desktopLogError/);
+assert.doesNotMatch(logger, /legacy\.(info|warn|error)/);
+for (const [name, source] of [
+  ["main-entry", entry],
+  ["commerce-ipc", commerceIpc],
+  ["sync-coordinator", syncCoordinator],
+  ["data-maintenance", dataMaintenance],
+  ["update-service", updateService],
+  ["local-companion-server", companionServer],
+  ["local-companion-mdns", companionMdns],
+  ["main", main]
+]) {
+  assert.doesNotMatch(source, /desktopLogInfo|desktopLogWarn|desktopLogError/, `${name} still uses legacy desktopLog wrappers`);
+  assert.doesNotMatch(source, /legacy\.(info|warn|error)/, `${name} still emits legacy events`);
+  assert.doesNotMatch(source, /console\.(log|info|warn|error)\s*\(/, `${name} still uses runtime console logging`);
+}
 
 console.log("desktop-logging-contract-ok");

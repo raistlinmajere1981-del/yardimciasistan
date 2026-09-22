@@ -8,6 +8,7 @@ import {
   type AndroidOperationsSnapshot,
   type AndroidSyncAction
 } from "@yardimci-asistan/sync-core";
+import { desktopLog } from "./desktop-logger";
 
 export const DEFAULT_LOCAL_COMPANION_PORT = 47_831;
 const MAX_JSON_BODY_BYTES = 128 * 1024;
@@ -60,9 +61,6 @@ export interface LocalCompanionServerOptions {
   authorize: (input: LocalCompanionAuthorizationInput) => boolean;
   enabled?: () => boolean;
   pair?: (input: LocalCompanionPairingRequest) => LocalCompanionPairingResponse;
-  logInfo?: (message: string) => void;
-  logWarn?: (message: string, error?: unknown) => void;
-  logError?: (message: string, error?: unknown) => void;
 }
 
 export interface LocalCompanionServerAddress {
@@ -267,7 +265,13 @@ export class LocalCompanionServer {
         this.server = null;
         throw error;
       }
-      this.options.logWarn?.(`Default local companion port ${port} is busy; selecting an available port.`, error);
+      desktopLog.warn({
+        scope: "local-companion",
+        event: "local-companion.port-busy",
+        message: "Varsayılan yerel companion portu meşgul; uygun bir port seçiliyor.",
+        meta: { port },
+        error
+      });
       await this.listen(server, host, 0);
     }
 
@@ -277,7 +281,12 @@ export class LocalCompanionServer {
       throw new Error("Local companion server did not expose a listening address.");
     }
     this.currentAddress = { host, port: address.port };
-    this.options.logInfo?.(`Local companion server listening on ${host}:${address.port}.`);
+    desktopLog.info({
+      scope: "local-companion",
+      event: "local-companion.server.started",
+      message: "Yerel companion sunucusu başlatıldı.",
+      meta: { host, port: address.port }
+    });
     return this.currentAddress;
   }
 
@@ -287,7 +296,11 @@ export class LocalCompanionServer {
     this.currentAddress = null;
     if (!server?.listening) return;
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    this.options.logInfo?.("Local companion server stopped.");
+    desktopLog.info({
+      scope: "local-companion",
+      event: "local-companion.server.stopped",
+      message: "Yerel companion sunucusu durduruldu."
+    });
   }
 
   private listen(server: Server, host: string, port: number): Promise<void> {
@@ -371,7 +384,12 @@ export class LocalCompanionServer {
           return;
         }
         this.markSnapshotDirty();
-        this.options.logInfo?.(`Local companion paired device ${deviceId} from ${remoteAddress}.`);
+        desktopLog.info({
+          scope: "local-companion",
+          event: "local-companion.device.paired",
+          message: "Yerel cihaz eşleştirildi.",
+          meta: { deviceId, remoteAddress }
+        });
         writeJson(response, 200, {
           ok: true,
           protocol_version: LOCAL_COMPANION_PROTOCOL_VERSION,
@@ -408,7 +426,12 @@ export class LocalCompanionServer {
         return;
       }
       if (!this.options.authorize({ deviceId, token, remoteAddress })) {
-        this.options.logWarn?.(`Rejected local companion authorization for device ${deviceId} from ${remoteAddress}.`);
+        desktopLog.warn({
+          scope: "local-companion",
+          event: "local-companion.auth.rejected",
+          message: "Yerel cihaz doğrulaması reddedildi.",
+          meta: { deviceId, remoteAddress }
+        });
         writeJson(response, 401, { ok: false, code: "local_auth_failed", message: "Yerel cihaz doğrulaması başarısız." });
         return;
       }
@@ -467,7 +490,13 @@ export class LocalCompanionServer {
         ? "Yerel companion isteği çok büyük."
         : "Yerel companion isteği işlenemedi.";
       const status = error instanceof Error && error.message === "request_body_too_large" ? 413 : 400;
-      this.options.logError?.(message, error);
+      desktopLog.error({
+        scope: "local-companion",
+        event: "local-companion.request.failed",
+        message,
+        meta: { status },
+        error
+      });
       if (!response.headersSent) {
         writeJson(response, status, { ok: false, code: "invalid_request", message });
       } else {

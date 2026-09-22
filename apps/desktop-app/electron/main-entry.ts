@@ -22,9 +22,6 @@ import {
 } from "./business-capability-runtime";
 import {
   desktopLog,
-  desktopLogError,
-  desktopLogInfo,
-  desktopLogWarn,
   finalizeDesktopLogging,
   initializeDesktopLogging
 } from "./desktop-logger";
@@ -209,10 +206,23 @@ if (!app.isPackaged && !process.env.YA_DESKTOP_DATA_DIR) {
     const legacyDatabasePath = resolveDatabasePath(legacyUserDataPath);
     const relocation = relocateLegacyDevDatabaseOnce(targetDatabasePath, legacyDatabasePath);
     if (relocation.relocated) {
-      console.log(`[data-paths] Eski geliştirme verisi taşındı: ${relocation.legacyDatabasePath} -> ${relocation.targetDatabasePath}`);
+      desktopLog.info({
+        scope: "startup",
+        event: "startup.legacy-data.relocated",
+        message: "Eski geliştirme verisi taşındı.",
+        meta: {
+          legacyDatabasePath: relocation.legacyDatabasePath,
+          targetDatabasePath: relocation.targetDatabasePath
+        }
+      });
     }
   } catch (error) {
-    console.error("[data-paths] Eski geliştirme verisi taşınamadı:", error);
+    desktopLog.error({
+      scope: "startup",
+      event: "startup.legacy-data.relocation.failed",
+      message: "Eski geliştirme verisi taşınamadı.",
+      error
+    });
   }
 }
 
@@ -233,7 +243,12 @@ if (pendingMaintenanceKind === "restore") {
   try {
     prepareRestoredStateForFullRepublish();
   } catch (error) {
-    console.error("[data-maintenance] Geri yükleme sonrası tam yayın hazırlanamadı:", error);
+    desktopLog.error({
+      scope: "restore",
+      event: "restore.republish.failed",
+      message: "Geri yükleme sonrası tam yayın hazırlanamadı.",
+      error
+    });
   }
 }
 const mainProcessReady = import("./main");

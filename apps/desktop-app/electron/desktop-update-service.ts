@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createUpdateSafetyBackup } from "./data-maintenance";
-import { desktopLogError, desktopLogInfo, desktopLogWarn } from "./desktop-logger";
+import { desktopLog } from "./desktop-logger";
 
 export const DEFAULT_UPDATE_BASE_URL = "https://yardimciasistan.alwaysdata.net/updates/stable";
 
@@ -462,7 +462,12 @@ async function performCheck(userDataPath: string, force: boolean): Promise<Deskt
     phase: "checking",
     message: "Güncellemeler kontrol ediliyor..."
   }));
-  desktopLogInfo("update", `Checking for updates from ${checking.effectiveBaseUrl}`);
+  desktopLog.info({
+    scope: "update",
+    event: "update.check.started",
+    message: "Güncellemeler kontrol ediliyor.",
+    meta: { baseUrl: checking.effectiveBaseUrl }
+  });
 
   try {
     const manifest = await fetchManifest(checking.effectiveBaseUrl);
@@ -485,12 +490,26 @@ async function performCheck(userDataPath: string, force: boolean): Promise<Deskt
       notes: manifest.notes,
       lastCheckedAt: now
     });
-    desktopLogInfo("update", available
-      ? `Update available: ${app.getVersion()} -> ${manifest.appVersion}`
-      : `No update available (current=${app.getVersion()}, remote=${manifest.appVersion})`);
+    desktopLog.info({
+      scope: "update",
+      event: "update.check.completed",
+      message: available
+        ? `Yardımcı Asistan ${manifest.appVersion} kullanılabilir.`
+        : "Yardımcı Asistan güncel.",
+      meta: {
+        currentVersion: app.getVersion(),
+        remoteVersion: manifest.appVersion,
+        available
+      }
+    });
     return publishStatus(status);
   } catch (error) {
-    desktopLogWarn("update", "Update check failed.", error);
+    desktopLog.warn({
+      scope: "update",
+      event: "update.check.failed",
+      message: "Güncelleme kontrol edilemedi.",
+      error
+    });
     return publishStatus(buildStatus(userDataPath, {
       phase: "error",
       message: error instanceof Error ? error.message : "Güncelleme kontrol edilemedi."
@@ -596,7 +615,12 @@ async function downloadUpdate(userDataPath: string): Promise<DesktopUpdateStatus
       notes: manifest.notes,
       totalBytes: manifest.artifact.size
     }));
-    desktopLogInfo("update", `Downloading update ${manifest.appVersion} from ${manifest.artifact.url}`);
+    desktopLog.info({
+      scope: "update",
+      event: "update.download.started",
+      message: `Yardımcı Asistan ${manifest.appVersion} indiriliyor.`,
+      meta: { targetVersion: manifest.appVersion, totalBytes: manifest.artifact.size }
+    });
 
     let fileDescriptor: number | null = null;
     try {
@@ -669,7 +693,12 @@ async function downloadUpdate(userDataPath: string): Promise<DesktopUpdateStatus
         latestVersion: manifest.appVersion,
         latestNotes: manifest.notes
       });
-      desktopLogInfo("update", `Update ${manifest.appVersion} downloaded and verified.`);
+      desktopLog.info({
+        scope: "update",
+        event: "update.download.completed",
+        message: `Yardımcı Asistan ${manifest.appVersion} indirildi ve doğrulandı.`,
+        meta: { targetVersion: manifest.appVersion }
+      });
       return publishStatus(buildStatus(userDataPath, {
         phase: "ready",
         message: `Yardımcı Asistan ${manifest.appVersion} indirildi. Sonraki açılışta kurulacak.`,
@@ -699,7 +728,12 @@ async function downloadUpdate(userDataPath: string): Promise<DesktopUpdateStatus
     } catch {
       // Best effort.
     }
-    desktopLogError("update", "Update download failed.", error);
+    desktopLog.error({
+      scope: "update",
+      event: "update.download.failed",
+      message: "Güncelleme indirilemedi.",
+      error
+    });
     return publishStatus(buildStatus(userDataPath, {
       phase: "error",
       message: error instanceof Error ? error.message : "Güncelleme indirilemedi."
@@ -837,12 +871,22 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
     if (compareVersions(currentVersion, installing.targetVersion) >= 0) {
       const message = `Yardımcı Asistan ${currentVersion} güncellemesi başarıyla kuruldu.`;
       recordInstallResult(paths, "success", installing.targetVersion, message);
-      desktopLogInfo("update", message);
+      desktopLog.info({
+        scope: "update",
+        event: "update.install.completed",
+        message,
+        meta: { targetVersion: installing.targetVersion }
+      });
       cleanupInstallArtifacts(paths, installing.installerPath);
     } else {
       const message = `Yardımcı Asistan ${installing.targetVersion} güncellemesi tamamlanamadı; mevcut ${currentVersion} sürümü açıldı.`;
       recordInstallResult(paths, "error", installing.targetVersion, message);
-      desktopLogWarn("update", message);
+      desktopLog.warn({
+        scope: "update",
+        event: "update.install.incomplete",
+        message,
+        meta: { targetVersion: installing.targetVersion, currentVersion }
+      });
       cleanupInstallArtifacts(paths, installing.installerPath);
     }
     return false;
@@ -859,7 +903,12 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
   if (!installSupported()) {
     const message = "Bekleyen güncelleme bu ortamda otomatik kurulamadı.";
     recordInstallResult(paths, "error", pending.targetVersion, message);
-    desktopLogWarn("update", message);
+    desktopLog.warn({
+      scope: "update",
+      event: "update.install.unsupported",
+      message,
+      meta: { targetVersion: pending.targetVersion }
+    });
     cleanupInstallArtifacts(paths, pending.installerPath);
     return false;
   }
@@ -892,15 +941,26 @@ export function applyPendingDesktopUpdateAtStartup(userDataPath: string): boolea
     );
     child.unref();
     removeIfExists(paths.pending);
-    desktopLogInfo(
-      "update",
-      `Update installer started for ${pending.targetVersion}${safetyBackup ? ` (backup=${safetyBackup.folderName})` : ""}.`
-    );
+    desktopLog.info({
+      scope: "update",
+      event: "update.install.started",
+      message: `Yardımcı Asistan ${pending.targetVersion} kurucusu başlatıldı.`,
+      meta: {
+        targetVersion: pending.targetVersion,
+        ...(safetyBackup ? { safetyBackupFolderName: safetyBackup.folderName } : {})
+      }
+    });
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Bekleyen güncelleme başlatılamadı.";
     recordInstallResult(paths, "error", pending.targetVersion, message);
-    desktopLogError("update", "Pending update could not be applied.", error);
+    desktopLog.error({
+      scope: "update",
+      event: "update.install.failed",
+      message: "Bekleyen güncelleme uygulanamadı.",
+      meta: { targetVersion: pending.targetVersion },
+      error
+    });
     cleanupInstallArtifacts(paths, pending.installerPath);
     return false;
   }
@@ -932,7 +992,12 @@ export function startAutomaticDesktopUpdateChecks(userDataPath: () => string) {
 
   const check = () => {
     void checkDesktopUpdate(userDataPath(), false).catch((error) => {
-      desktopLogWarn("update", "Automatic update check failed.", error);
+      desktopLog.warn({
+        scope: "update",
+        event: "update.check.failed",
+        message: "Otomatik güncelleme kontrolü başarısız oldu.",
+        error
+      });
     });
   };
 

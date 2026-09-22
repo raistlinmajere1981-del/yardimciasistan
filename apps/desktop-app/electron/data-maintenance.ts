@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { app, dialog, ipcMain, session, shell } from "electron";
+import { desktopLog } from "./desktop-logger";
 import {
   DESKTOP_DATABASE_FILE_NAME,
   resolveAssetsPath,
@@ -649,7 +650,12 @@ export function applyPendingDataMaintenanceAtStartup(userDataPath: string) {
     if (pending.kind === "restore") replaceDatabaseFromStagedRestore(paths);
     else resetDatabaseFiles(paths);
   } catch (error) {
-    console.error("[data-maintenance] Bekleyen işlem uygulanamadı:", error);
+    desktopLog.error({
+      scope: "restore",
+      event: "restore.pending.apply.failed",
+      message: "Bekleyen veri bakımı uygulanamadı.",
+      error
+    });
   } finally {
     if (pending) {
       removeIfExists(paths.markerPath);
@@ -760,7 +766,12 @@ async function prepareReset(userDataPath: string): Promise<DesktopDataMaintenanc
     try {
       await session.defaultSession.clearStorageData({ storages: ["localstorage"] });
     } catch (error) {
-      console.warn("[data-maintenance] Arayüz tercihleri temizlenemedi:", error);
+      desktopLog.warn({
+        scope: "reset",
+        event: "reset.preferences.clear.failed",
+        message: "Arayüz tercihleri temizlenemedi.",
+        error
+      });
     }
     scheduleRelaunch();
 

@@ -1,5 +1,6 @@
 import dgram, { type RemoteInfo, type Socket } from "node:dgram";
 import os from "node:os";
+import { desktopLog } from "./desktop-logger";
 
 const MDNS_ADDRESS = "224.0.0.251";
 const MDNS_PORT = 5353;
@@ -16,8 +17,6 @@ export interface LocalCompanionMdnsOptions {
   desktopId: () => string;
   protocolVersion: number;
   serviceType: string;
-  logInfo?: (message: string) => void;
-  logWarn?: (message: string, error?: unknown) => void;
 }
 
 function normalizedServiceType(value: string): string {
@@ -280,7 +279,11 @@ export class LocalCompanionMdnsAdvertiser {
 
     const interfaces = externalIpv4Interfaces();
     if (interfaces.length === 0) {
-      this.options.logWarn?.("Local companion mDNS skipped because no external IPv4 interface is available.");
+      desktopLog.warn({
+        scope: "local-companion-mdns",
+        event: "local-companion-mdns.network.unavailable",
+        message: "Harici IPv4 arayüzü bulunamadığı için mDNS duyurusu atlandı."
+      });
       return;
     }
 
@@ -289,7 +292,12 @@ export class LocalCompanionMdnsAdvertiser {
     this.port = port;
 
     socket.on("error", (error) => {
-      this.options.logWarn?.("Local companion mDNS socket error.", error);
+      desktopLog.warn({
+        scope: "local-companion-mdns",
+        event: "local-companion-mdns.socket.failed",
+        message: "Yerel companion mDNS soket hatası.",
+        error
+      });
     });
     socket.on("message", (message, remoteInfo: RemoteInfo) => {
       const serviceName = normalizedServiceType(this.options.serviceType).toLowerCase();
@@ -316,16 +324,22 @@ export class LocalCompanionMdnsAdvertiser {
         try {
           socket.addMembership(MDNS_ADDRESS, item.address);
         } catch (error) {
-          this.options.logWarn?.(
-            `Local companion mDNS could not join ${item.interfaceName} (${item.address}).`,
+          desktopLog.warn({
+            scope: "local-companion-mdns",
+            event: "local-companion-mdns.join.failed",
+            message: "Yerel companion mDNS grubuna katılamadı.",
+            meta: { interfaceName: item.interfaceName, address: item.address },
             error
-          );
+          });
         }
       }
 
-      this.options.logInfo?.(
-        `Local companion mDNS advertising ${this.options.serviceType} on port ${port}.`
-      );
+      desktopLog.info({
+        scope: "local-companion-mdns",
+        event: "local-companion-mdns.advertising.started",
+        message: "Yerel companion mDNS yayını başladı.",
+        meta: { serviceType: this.options.serviceType, port }
+      });
       this.announceTimers = [0, 350, 1200].map((delay) =>
         setTimeout(() => this.announce(), delay)
       );
@@ -361,7 +375,13 @@ export class LocalCompanionMdnsAdvertiser {
           addresses: [item.address]
         });
       } catch (error) {
-        this.options.logWarn?.("Local companion mDNS packet could not be built.", error);
+        desktopLog.warn({
+          scope: "local-companion-mdns",
+          event: "local-companion-mdns.packet.build.failed",
+          message: "Yerel companion mDNS paketi oluşturulamadı.",
+          meta: { interfaceName: item.interfaceName, address: item.address },
+          error
+        });
         continue;
       }
 
@@ -369,10 +389,13 @@ export class LocalCompanionMdnsAdvertiser {
         socket.setMulticastInterface(item.address);
         socket.send(packet, MDNS_PORT, MDNS_ADDRESS);
       } catch (error) {
-        this.options.logWarn?.(
-          `Local companion mDNS announcement failed on ${item.interfaceName} (${item.address}).`,
+        desktopLog.warn({
+          scope: "local-companion-mdns",
+          event: "local-companion-mdns.announce.failed",
+          message: "Yerel companion mDNS duyurusu başarısız oldu.",
+          meta: { interfaceName: item.interfaceName, address: item.address },
           error
-        );
+        });
       }
     }
   }

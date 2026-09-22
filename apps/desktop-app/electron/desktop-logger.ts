@@ -216,18 +216,6 @@ export const desktopLog = {
   }
 };
 
-export function desktopLogInfo(scope: string, message: string) {
-  return desktopLog.info({ scope, event: "legacy.info", message });
-}
-
-export function desktopLogWarn(scope: string, message: string, error?: unknown) {
-  return desktopLog.warn({ scope, event: "legacy.warn", message, error });
-}
-
-export function desktopLogError(scope: string, message: string, error?: unknown) {
-  return desktopLog.error({ scope, event: "legacy.error", message, error });
-}
-
 export function writeRendererDiagnostic(inputValue: unknown): DesktopDiagnosticEvent | null {
   if (!inputValue || typeof inputValue !== "object" || Array.isArray(inputValue)) return null;
   const input = inputValue as Partial<DesktopDiagnosticWriteInput>;

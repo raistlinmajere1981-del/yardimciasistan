@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, session, shell } from "electron";
 import path from "node:path";
 import { configureNetworkFamilyAttemptTimeout } from "./network-runtime";
-import { desktopLogError, desktopLogInfo, desktopLogWarn } from "./desktop-logger";
+import { desktopLog } from "./desktop-logger";
 import { LocalCompanionServer } from "./local-companion-server";
 import { LocalCompanionPairingService } from "./local-companion-pairing-service";
 import { projectLocalAndroidSnapshotForDevice } from "./local-android-device-projection";
@@ -410,10 +410,7 @@ if (!hasSingleInstanceLock) {
         androidSnapshotPublishPending = true;
         getSyncCoordinator().scheduleSoon();
         return result;
-      },
-      logInfo: (message) => desktopLogInfo("local-companion", message),
-      logWarn: (message, error) => desktopLogWarn("local-companion", message, error),
-      logError: (message, error) => desktopLogError("local-companion", message, error)
+      }
     });
 
     const birthdayDeliveryService = new BirthdayDeliveryService(desktopDatabase, birthdayDeliveryAdapter);
@@ -439,7 +436,12 @@ if (!hasSingleInstanceLock) {
         reconcileLocalCompanionAdvertisement();
       })
       .catch((error) => {
-        desktopLogError("local-companion", "Local companion server could not start.", error);
+        desktopLog.error({
+          scope: "local-companion",
+          event: "local-companion.server.start.failed",
+          message: "Yerel companion sunucusu başlatılamadı.",
+          error
+        });
       });
 
     app.on("activate", () => {
@@ -874,9 +876,7 @@ function reconcileLocalCompanionAdvertisement() {
     localCompanionMdnsAdvertiser = new LocalCompanionMdnsAdvertiser({
       desktopId: () => getDatabase().getSyncRuntimeStatus().clientId,
       protocolVersion: LOCAL_COMPANION_PROTOCOL_VERSION,
-      serviceType: LOCAL_COMPANION_SERVICE_TYPE,
-      logInfo: (message) => desktopLogInfo("local-companion-mdns", message),
-      logWarn: (message, error) => desktopLogWarn("local-companion-mdns", message, error)
+      serviceType: LOCAL_COMPANION_SERVICE_TYPE
     });
   }
   localCompanionMdnsAdvertiser.start(serverAddress.port);

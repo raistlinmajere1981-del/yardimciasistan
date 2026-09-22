@@ -18,6 +18,7 @@ import {
   type DesktopSyncRuntimeStatus
 } from "./database";
 import { findCatalogProductByBarcode } from "./commerce-store";
+import { desktopLog } from "./desktop-logger";
 import { archiveExternalProductImage } from "./product-data-service";
 import { createPublicRoomAvailabilityPublication } from "./public-room-availability-publication";
 
@@ -477,7 +478,13 @@ export class SyncCoordinator {
         imageUrl
       );
     } catch (error) {
-      console.warn("[product-data] Android ürün görseli yerel arşive alınamadı:", error);
+      desktopLog.warn({
+        scope: "product-data",
+        event: "product-data.image-archive.failed",
+        message: "Android ürün görseli yerel arşive alınamadı.",
+        meta: { barcode },
+        error
+      });
     }
   }
 

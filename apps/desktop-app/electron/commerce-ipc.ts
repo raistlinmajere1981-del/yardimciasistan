@@ -1,7 +1,7 @@
 import { ipcMain } from "electron";
 import { prepareCustomerCreditWhatsApp } from "./customer-credit-whatsapp";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
-import { desktopLogWarn } from "./desktop-logger";
+import { desktopLog } from "./desktop-logger";
 import {
   archiveExternalProductImage,
   previewExternalProductImage
@@ -90,7 +90,13 @@ export function registerCommerceIpcHandlers(options: {
         const imageAssetPath = await archiveExternalProductImage(databasePath(), saved.id, saved.dataSource, saved.imageSourceUrl);
         if (imageAssetPath) saved = { ...saved, imageAssetPath };
       } catch (error) {
-        console.warn("[product-data] Ürün görseli arşivlenemedi:", error);
+        desktopLog.warn({
+          scope: "product-data",
+          event: "product-data.image-archive.failed",
+          message: "Ürün görseli arşivlenemedi.",
+          meta: { productId: saved.id },
+          error
+        });
       }
     }
     return saved;
@@ -106,7 +112,13 @@ export function registerCommerceIpcHandlers(options: {
     try {
       return await previewExternalProductImage(provider, imageUrl);
     } catch (error) {
-      desktopLogWarn("product-data", "Ürün görseli önizlemesi alınamadı.", error);
+      desktopLog.warn({
+        scope: "product-data",
+        event: "product-data.image-preview.failed",
+        message: "Ürün görseli önizlemesi alınamadı.",
+        meta: { provider },
+        error
+      });
       return "";
     }
   });
