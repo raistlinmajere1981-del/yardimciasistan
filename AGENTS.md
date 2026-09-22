@@ -91,7 +91,7 @@ Desktop diagnostics are a repository contract, not an ad-hoc debugging aid.
 - Pass caught `Error` values to the diagnostics API instead of manually flattening stack traces.
 - Never log API keys, passwords, sync secrets, authorization headers, cookies, tokens, customer message bodies, or other unnecessary customer PII. The logger redacts defensively, but callers must still avoid collecting sensitive data.
 - Use an `operationId` to correlate multi-step flows such as sync cycles, product lookup, Android actions, AI calls, backup/restore, and imports when one is already available or naturally created.
-- When investigating a desktop failure, inspect the latest session's WARN/ERROR events before adding speculative debug output.
+- When investigating a desktop failure, inspect the latest session's WARN/ERROR events before adding speculative debug output. Start with `npm run logs:errors`; use `npm run logs:latest -- --scope <scope>` when the domain is known.
 - Renderer diagnostics must go through the isolated preload bridge; renderer code must not access log files directly.
 - Diagnostic reads are locked behind the application session lock. Do not create alternate file-reading IPC paths that bypass that gate.
 - See `docs/diagnostics/logging.md` for the event format and investigation workflow.

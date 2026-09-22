@@ -88,7 +88,11 @@
     "typecheck:electron": "tsc -p apps/desktop-app/tsconfig.electron.json --noEmit",
     "test": "npm run test --workspaces --if-present",
     "smoke:local-companion": "npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/desktop-app && node scripts/smoke-local-companion-server.mjs",
-    "prepare:desktop:android": "node scripts/prepare-desktop-android-resources.mjs --allow-debug --allow-missing"
+    "prepare:desktop:android": "node scripts/prepare-desktop-android-resources.mjs --allow-debug --allow-missing",
+    "logs:list": "node scripts/diagnostics-cli.mjs list",
+    "logs:latest": "node scripts/diagnostics-cli.mjs latest",
+    "logs:errors": "node scripts/diagnostics-cli.mjs errors",
+    "smoke:diagnostics": "node scripts/smoke-desktop-logging-contract.mjs && node scripts/smoke-diagnostics-cli.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

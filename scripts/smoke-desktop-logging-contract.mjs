@@ -11,6 +11,8 @@ const diagnosticsIpc = read("apps/desktop-app/electron/ipc/diagnostics-ipc.ts");
 const preload = read("apps/desktop-app/electron/preload.ts");
 const rendererEntry = read("apps/desktop-app/src/main.tsx");
 const agents = read("AGENTS.md");
+const diagnosticsViewer = read("apps/desktop-app/src/components/diagnostics/DiagnosticsViewer.tsx");
+const frame = read("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
 
 assert.match(dataPaths, /DESKTOP_LOGS_DIR_NAME = "logs"/);
 assert.match(dataPaths, /DESKTOP_LOG_SESSIONS_DIR_NAME = "sessions"/);
@@ -52,6 +54,10 @@ assert.match(rendererEntry, /renderer\.window-error/);
 assert.match(rendererEntry, /renderer\.unhandled-rejection/);
 assert.match(agents, /Logging and diagnostics/);
 assert.match(agents, /data\/logs\/sessions/);
+assert.match(diagnosticsViewer, /Tüm Session'ı Kopyala/);
+assert.match(diagnosticsViewer, /Bu Kaydın Bağlamını Kopyala/);
+assert.match(diagnosticsViewer, /LIVE_REFRESH_MS = 1000/);
+assert.match(frame, /Uygulama loglarını aç/);
 
 assert.match(commerceIpc, /commerce:product:previewExternalImage/);
 assert.match(commerceIpc, /desktopLogWarn\("product-data"/);

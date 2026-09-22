@@ -64,3 +64,18 @@ New application diagnostics should use the structured diagnostics API rather tha
 5. Only add new diagnostics when the existing event chain cannot identify the failing boundary.
 
 The desktop LogView and terminal helper commands are layered on this same session contract; they should not introduce a separate logging format.
+
+
+## Terminal helpers
+
+Coding agents and developers can inspect the same session data without opening the desktop UI:
+
+```fish
+npm run logs:list
+npm run logs:latest
+npm run logs:errors
+npm run logs:latest -- --scope sync
+npm run logs:latest -- --level ERROR --query timeout
+```
+
+Use `--session <id>` for a specific session and `--limit <n>` to change the displayed event count. Development defaults to `./data`; `YA_DESKTOP_DATA_DIR` or `--data-root` can point to another desktop data root.

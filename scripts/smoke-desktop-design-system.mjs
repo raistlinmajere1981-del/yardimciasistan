@@ -88,6 +88,63 @@ try {
         window.__designCalls.push({ kind: 'setup', input });
         return { ok: true, message: 'Ayarlar kaydedildi.', setupData: { ...setup }, dashboardData: dashboard };
       },
+      getCurrentDiagnosticSession: async () => ({
+        version: 1,
+        sessionId: '20260922T010000000Z-design',
+        startedAt: '2026-09-22T01:00:00.000Z',
+        appVersion: '0.1.7',
+        electronVersion: '43.1.1',
+        nodeVersion: '24.18.0',
+        platform: 'linux',
+        arch: 'x64',
+        packaged: false,
+        eventCount: 3,
+        warnCount: 1,
+        errorCount: 1,
+        current: true,
+        totalBytes: 2048
+      }),
+      listDiagnosticSessions: async () => [{
+        version: 1,
+        sessionId: '20260922T010000000Z-design',
+        startedAt: '2026-09-22T01:00:00.000Z',
+        appVersion: '0.1.7',
+        electronVersion: '43.1.1',
+        nodeVersion: '24.18.0',
+        platform: 'linux',
+        arch: 'x64',
+        packaged: false,
+        eventCount: 3,
+        warnCount: 1,
+        errorCount: 1,
+        current: true,
+        totalBytes: 2048
+      }],
+      readDiagnosticSession: async () => ({
+        session: {
+          version: 1,
+          sessionId: '20260922T010000000Z-design',
+          startedAt: '2026-09-22T01:00:00.000Z',
+          appVersion: '0.1.7',
+          electronVersion: '43.1.1',
+          nodeVersion: '24.18.0',
+          platform: 'linux',
+          arch: 'x64',
+          packaged: false,
+          eventCount: 3,
+          warnCount: 1,
+          errorCount: 1,
+          current: true,
+          totalBytes: 2048
+        },
+        events: [
+          { timestamp: '2026-09-22T01:00:01.000Z', sequence: 1, level: 'INFO', process: 'main', scope: 'startup', event: 'app.session.started', message: 'Diagnostics başladı.' },
+          { timestamp: '2026-09-22T01:00:02.000Z', sequence: 2, level: 'WARN', process: 'main', scope: 'sync', event: 'sync.retry', message: 'Eşitleme yeniden denenecek.' },
+          { timestamp: '2026-09-22T01:00:03.000Z', sequence: 3, level: 'ERROR', process: 'renderer', scope: 'market', event: 'market.failed', message: 'Smoke hata kaydı.', error: { name: 'Error', message: 'Smoke failure' } }
+        ],
+        hasMore: false
+      }),
+      writeDiagnosticEvent: async () => null,
       testWebConnection: async () => ({ ok: true, message: 'Bağlantı başarılı.' }),
       testAiConnection: async input => {
         window.__designCalls.push({ kind: 'ai-test', input });
@@ -174,6 +231,16 @@ try {
   await page.getByLabel('Boylam', { exact: true }).fill('28.33');
   // Test actual form semantics and unchanged bridge payloads.
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Uygulama loglarını aç', exact: true }).click();
+  const diagnosticsDialog = page.getByRole('dialog', { name: 'Uygulama Logları' });
+  await expect(diagnosticsDialog).toBeVisible();
+  await expect(diagnosticsDialog.getByText('market.failed', { exact: true })).toBeVisible();
+  await expect(diagnosticsDialog.getByText('Smoke hata kaydı.', { exact: true })).toBeVisible();
+  await diagnosticsDialog.getByRole('button', { name: 'INFO', exact: true }).click();
+  await expect(diagnosticsDialog.getByText('app.session.started', { exact: true })).toHaveCount(0);
+  await diagnosticsDialog.getByRole('button', { name: 'Log görünümünü kapat' }).click();
+  await expect(diagnosticsDialog).toHaveCount(0);
+
   await expect(page.getByRole('button', { name: 'Ayarları Kaydet', exact: true })).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Güncelleme Ayarlarını Kaydet', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Bilgileri Kaydet', exact: true })).toHaveCount(0);
