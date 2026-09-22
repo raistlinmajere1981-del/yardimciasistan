@@ -1,6 +1,6 @@
-import { useDialogFocus } from "../ui/useDialogFocus";
+import { FormDialog } from "../ui/FormDialog";
 import { useEffect, useState } from "react";
-import { Save, X } from "lucide-react";
+import { Save } from "lucide-react";
 import type {
   DesktopDashboardData,
   DesktopStatusUpdateResult,
@@ -54,41 +54,15 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
     setMessage("");
   }, [open, task]);
 
-  const dialogRef = useDialogFocus(open);
 
   if (!open) {
     return null;
   }
 
-  const areaLabel = scope === "pension" ? "Pansiyon" : "Restoran";
   const taskType = scope === "pension" ? "manual_pension" : "manual_restaurant";
 
   return (
-    <div
-      className="manual-request-backdrop overlay overlay--drawer"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && state !== "loading") onClose();
-      }}
-    >
-      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="daily-task-editor-title">
-        <header className="overlay-header overlay-header--sticky">
-          <div className="overlay-heading">
-            <p>{areaLabel} günlük işleri</p>
-            <h2 id="daily-task-editor-title">{task ? "Günlük işi düzenle" : "Yeni günlük iş ekle"}</h2>
-          </div>
-          <button
-            className="drawer-close-button"
-            type="button"
-            aria-label="Günlük iş formunu kapat"
-            onClick={onClose}
-            disabled={state === "loading"}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-
-        <form
-          className="form-stack overlay-form"
+    <FormDialog title={task ? "Günlük işi düzenle" : "Yeni günlük iş ekle"} onClose={onClose} closeBlocked={state === "loading"}
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
@@ -108,7 +82,16 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
             }
             onClose();
           }}
-        >
+      footer={<div className="form-actions">
+            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
+              Vazgeç
+            </ActionButton>
+            <ActionButton type="submit" disabled={state === "loading" || !form.title.trim()}>
+              <Save size={16} aria-hidden="true" />
+              {state === "loading" ? "Kaydediliyor" : "Kaydet"}
+            </ActionButton>
+          </div>}>
+
           <div className="form-grid">
             <label className="form-field--span form-field form-field--medium">
               İş / not başlığı
@@ -152,17 +135,7 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
 
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
-          <div className="overlay-footer overlay-footer--inset form-actions">
-            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
-              Vazgeç
-            </ActionButton>
-            <ActionButton type="submit" disabled={state === "loading" || !form.title.trim()}>
-              <Save size={16} aria-hidden="true" />
-              {state === "loading" ? "Kaydediliyor" : "Kaydet"}
-            </ActionButton>
-          </div>
-        </form>
-      </aside>
-    </div>
+
+    </FormDialog>
   );
 }

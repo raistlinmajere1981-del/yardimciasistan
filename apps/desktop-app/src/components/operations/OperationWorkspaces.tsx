@@ -8,10 +8,8 @@ import {
   Pencil,
   Plus,
   Trash2,
-  Users
 } from "lucide-react";
 import type {
-  AssignCustomerRoomInput,
   DesktopCustomerMutationResult,
   DesktopDashboardData,
   DesktopStatusUpdateResult,
@@ -20,29 +18,23 @@ import type {
   SaveManualReservationInput
 } from "../../../electron/database";
 import {
-  formatCustomerRoomStayStatus,
   formatStayDateRange
 } from "../../app/customer-model";
 import {
   formatDateForDisplay,
   formatReservationDate,
-  formatReservationStatus,
-  formatRoomStatus
+  formatReservationStatus
 } from "../../app/record-formatters";
-import { getRoomDisplayInfo } from "../../app/operations";
-import { CustomerRoomStayActions, RoomAssignmentDrawer } from "../customers/CustomersWorkspace";
+import { projectRoomState } from "@yardimci-asistan/shared";
+import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
+import { usePensionPage } from "../pension/pension-page-state";
+import { roomConditionLabel, roomToday } from "../pension/room-presentation";
+import { ReservationAssignmentDialog } from "../pension/ReservationRoomAssignment";
 import { DailyTaskEditor, type DailyTaskScope } from "./DailyTaskEditor";
 import { ManualReservationEditor } from "./ManualReservationEditor";
 import { ActionButton } from "../ui/ActionButton";
 import { DataListItem } from "../ui/DataList";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
-
-function getCustomerRoomStayTone(value: string): StatusTone {
-  if (value === "checked_in") return "ok";
-  if (value === "planned") return "wait";
-  if (value === "cancelled") return "danger";
-  return "neutral";
-}
 
 function getReservationStatusTone(status: string): StatusTone {
   if (["rejected", "cancelled"].includes(status)) return "danger";
@@ -108,7 +100,10 @@ interface DailyTasksWorkspaceProps {
 }
 
 export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateStatus }: DailyTasksWorkspaceProps) {
-  const [statusFilter, setStatusFilter] = useState("pending");
+  const pension = usePensionPage();
+  const [localStatus, setLocalStatus] = useState("pending");
+  const statusFilter = pension?.filters.taskStatus ?? localStatus;
+  const setStatusFilter = (value: string) => pension ? pension.setFilters(current => ({ ...current, taskStatus: value })) : setLocalStatus(value);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<DesktopDashboardData["dailyTasks"][number] | null>(null);
   const filteredTasks = useMemo(
@@ -137,7 +132,7 @@ export function DailyTasksWorkspace({ scope, tasks, onSave, onDelete, onUpdateSt
         <div className="form-row filter-row">
           <label className="form-field form-field--medium">
             Durum
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <select aria-label="Durum" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="pending">Bekleyen</option>
               <option value="done">Tamamlanan</option>
               <option value="cancelled">İptal</option>
@@ -266,8 +261,15 @@ export function ReservationsWorkspace({
   onUpdateStatus,
   onOpenWhatsApp
 }: ReservationsWorkspaceProps) {
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState("");
+  const pension = usePensionPage();
+  const navigation = useWorkspaceNavigation();
+  const [localStatus, setLocalStatus] = useState("all");
+  const [localDate, setLocalDate] = useState("");
+  const statusFilter = pension?.filters.reservationStatus ?? localStatus;
+  const dateFilter = pension?.filters.reservationDate ?? localDate;
+  const setStatusFilter = (value: string) => pension ? pension.setFilters(current => ({ ...current, reservationStatus: value })) : setLocalStatus(value);
+  const setDateFilter = (value: string) => pension ? pension.setFilters(current => ({ ...current, reservationDate: value })) : setLocalDate(value);
+  const [assignment, setAssignment] = useState<DesktopDashboardData["reservations"][number] | null>(null);
   const [manualEditorOpen, setManualEditorOpen] = useState(false);
   const [editingReservation, setEditingReservation] = useState<DesktopDashboardData["reservations"][number] | null>(null);
   const filteredReservations = useMemo(
@@ -301,7 +303,7 @@ export function ReservationsWorkspace({
         <div className="form-row filter-row">
           <label className="reservation-status-filter form-field form-field--short">
             <span className="reservation-control-label">Durum</span>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <select aria-label="Durum" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="all">Tümü</option>
               <option value="pending">Onay bekleyen</option>
               <option value="approved">Onaylandı</option>
@@ -370,6 +372,11 @@ export function ReservationsWorkspace({
                     <CheckCircle2 size={15} aria-hidden="true" />
                     Onayla
                   </ActionButton>
+                  {reservation.roomIds.length === 1 && rooms.some(room => room.id === reservation.roomIds[0]) && <ActionButton variant="secondary" size="sm" onClick={() => navigation.openWorkspace({
+                    entityType: "room", entityId: reservation.roomIds[0], mode: "stay", returnContext: { page: "pension", view: "reservations", entityId: reservation.id }
+                  }, { onReturn: context => { if (context.view) pension?.setMode(context.view); } })}>Odayı Aç</ActionButton>}
+                  {reservation.reservationType === "room" && ["pending", "approved"].includes(reservation.status) && reservation.roomIds.length <= 1 &&
+                    <ActionButton variant="secondary" size="sm" onClick={() => setAssignment(reservation)}>Oda Ata / Düzenle</ActionButton>}
                   {whatsappEnabled && (
                     <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onOpenWhatsApp(reservation)} disabled={!reservation.customerPhone}>
                       <MessageCircle size={15} aria-hidden="true" />
@@ -394,7 +401,7 @@ export function ReservationsWorkspace({
                               }}
                             >
                               <Pencil size={14} aria-hidden="true" />
-                              Düzenle / Oda Ata
+                              Düzenle
                             </ActionButton>
                           )}
                         <ActionButton variant="danger" size="sm" type="button" onClick={() => onUpdateStatus(reservation.id, "rejected")}>Reddet</ActionButton>
@@ -408,6 +415,7 @@ export function ReservationsWorkspace({
           ))
         )}
       </section>
+      {assignment && <ReservationAssignmentDialog reservation={assignment} rooms={rooms} onSave={onSaveManual} onClose={() => setAssignment(null)} />}
       <ManualReservationEditor
         open={manualEditorOpen}
         customers={customers}
@@ -427,161 +435,31 @@ export function ReservationsWorkspace({
 interface RoomsWorkspaceProps {
   rooms: DesktopDashboardData["rooms"];
   reservations: DesktopDashboardData["reservations"];
-  customers: DesktopDashboardData["customers"];
   stays: DesktopDashboardData["customerRoomStays"];
   reservationsEnabled: boolean;
   staysEnabled: boolean;
-  onUpdateStatus: (roomId: string, status: string) => void;
-  onAssignRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
-  onUpdateStayStatus: (
-    stayId: string,
-    status: "planned" | "checked_in" | "checked_out" | "cancelled"
-  ) => Promise<DesktopCustomerMutationResult>;
 }
 
-export function RoomsWorkspace({
-  rooms,
-  reservations,
-  customers,
-  stays,
-  reservationsEnabled,
-  staysEnabled,
-  onUpdateStatus,
-  onAssignRoom,
-  onUpdateStayStatus
-}: RoomsWorkspaceProps) {
-  const [assignmentRoomId, setAssignmentRoomId] = useState("");
-  return (
-    <>
-      <section className="room-grid" aria-label="Oda yönetimi">
-        {rooms.length === 0 && (
-          <div className="panel empty-state"><BedDouble size={28} aria-hidden="true" /><strong>Oda kaydı yok.</strong><p>Oda sayısını Temel Ayarlar bölümünden belirleyebilirsiniz.</p></div>
-        )}
-        {rooms.map((room) => {
-          const displayInfo = getRoomDisplayInfo(room, reservations);
-          const activeStay = stays.find((stay) => stay.roomId === room.id && ["planned", "checked_in"].includes(stay.status));
-          const knownRoomStatuses = ["available", "occupied", "cleaning", "maintenance"];
-          return <article className="card room-card" data-status={displayInfo.status} key={room.id}>
-            <div className="card__header">
-              <div>
-                <h2>{room.number ? `Oda ${room.number} — ${room.name}` : room.name}</h2>
-              </div>
-              <StatusBadge tone={getResourceStatusTone(displayInfo.status)}>{formatRoomStatus(displayInfo.status)}</StatusBadge>
-            </div>
-            <div className="list-row__meta">
-              <span>{room.capacity} kişi</span>
-              <span>{room.floor || "Kat bilgisi yok"}</span>
-              <span>{room.bedInfo || "Yatak bilgisi yok"}</span>
-            </div>
-            {staysEnabled && activeStay ? (
-              <div className="room-customer-assignment">
-                <strong>{activeStay.customerName}</strong>
-                <span>{formatCustomerRoomStayStatus(activeStay.status)} · {formatStayDateRange(activeStay)}</span>
-                <CustomerRoomStayActions stay={activeStay} onUpdateStatus={onUpdateStayStatus} />
-              </div>
-            ) : reservationsEnabled ? (
-              <p className="card__meta line-clamp-1"><strong>Rezervasyon:</strong> {displayInfo.reservationTitle}</p>
-            ) : null}
-            {(room.description || room.features.length > 0) && <p className="card__meta line-clamp-1">{room.description || room.features.join(", ")}</p>}
-            <div className="card__actions">
-              {staysEnabled && !activeStay && (
-                <ActionButton
-                  size="sm"
-                  type="button"
-                  onClick={() => setAssignmentRoomId(room.id)}
-                  disabled={customers.length === 0 || ["cleaning", "maintenance", "out_of_service"].includes(displayInfo.status)}
-                >
-                  <Users size={15} aria-hidden="true" />
-                  Müşteri Ata
-                </ActionButton>
-              )}
-              <label className="form-field form-field--medium">
-                <span>Durum</span>
-                <select
-                  aria-label={`${room.name} durumunu değiştir`}
-                  value={displayInfo.status}
-                  disabled={Boolean(activeStay)}
-                  onChange={(event) => onUpdateStatus(room.id, event.target.value)}
-                >
-                  {!knownRoomStatuses.includes(displayInfo.status) && (
-                    <option value={displayInfo.status}>{formatRoomStatus(displayInfo.status)}</option>
-                  )}
-                  <option value="available">Boş</option>
-                  <option value="occupied">Dolu</option>
-                  <option value="cleaning">Temizlik</option>
-                  <option value="maintenance">Bakım</option>
-                </select>
-              </label>
-            </div>
-          </article>;
-        })}
-      </section>
-      {staysEnabled && (
-        <RoomAssignmentDrawer
-          open={Boolean(assignmentRoomId)}
-          customers={customers}
-          rooms={rooms}
-          initialCustomerId=""
-          initialRoomId={assignmentRoomId}
-          onClose={() => setAssignmentRoomId("")}
-          onAssign={async (input) => {
-            const result = await onAssignRoom(input);
-            if (result.ok) setAssignmentRoomId("");
-            return result;
-          }}
-        />
-      )}
-    </>
-  );
-}
-
-export function CustomerRoomStaysWorkspace({
-  stays,
-  onUpdateStatus
-}: {
-  stays: DesktopDashboardData["customerRoomStays"];
-  onUpdateStatus: (
-    stayId: string,
-    status: "planned" | "checked_in" | "checked_out" | "cancelled"
-  ) => Promise<DesktopCustomerMutationResult>;
-}) {
-  const [filter, setFilter] = useState("active");
-  const visible = stays.filter((stay) =>
-    filter === "all"
-      || (filter === "active" && ["planned", "checked_in"].includes(stay.status))
-      || stay.status === filter
-  );
-  return (
-    <section className="record-stack" aria-label="Konaklama arşivi">
-      <div className="page-toolbar">
-        <div className="page-toolbar__start">
-          <StatusBadge tone="info">{stays.filter((stay) => stay.status === "checked_in").length} içeride</StatusBadge>
-          <StatusBadge tone="wait">{stays.filter((stay) => stay.status === "planned").length} planlı</StatusBadge>
-        </div>
-        <label className="form-field form-field--medium">Durum<select value={filter} onChange={(event) => setFilter(event.target.value)}>
-          <option value="active">Aktif kayıtlar</option>
-          <option value="checked_in">Giriş yaptı</option>
-          <option value="planned">Planlandı</option>
-          <option value="checked_out">Çıkış yaptı</option>
-          <option value="cancelled">İptal</option>
-          <option value="all">Tüm arşiv</option>
-        </select></label>
-      </div>
-      <div className="data-records">
-        {visible.length === 0 ? (
-          <div className="empty-state"><BedDouble size={24} aria-hidden="true" /><strong>Konaklama kaydı yok.</strong><p>Oda kartından veya müşteri kartından atama yapabilirsiniz.</p></div>
-        ) : visible.map((stay) => (
-          <DataListItem
-            className="customer-stay-row"
-            key={stay.id}
-            leading={<StatusBadge tone={getCustomerRoomStayTone(stay.status)}>{formatCustomerRoomStayStatus(stay.status)}</StatusBadge>}
-            title={`${stay.customerName} · ${stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}`}
-            meta={<><span>{formatStayDateRange(stay)}</span><span>{stay.guestCount} kişi</span></>}
-            description={stay.notes || "Konaklama notu yok."}
-            actions={<CustomerRoomStayActions stay={stay} onUpdateStatus={onUpdateStatus} />}
-          />
-        ))}
-      </div>
-    </section>
-  );
+export function RoomsWorkspace({ rooms, reservations, stays, reservationsEnabled, staysEnabled }: RoomsWorkspaceProps) {
+  const navigation = useWorkspaceNavigation();
+  const page = usePensionPage();
+  return <section className="room-grid" aria-label="Oda yönetimi">
+    {rooms.length === 0 && <p>Oda kaydı yok. Odaları Ayarlar bölümünden ekleyebilirsiniz.</p>}
+    {rooms.map(room => {
+      const state = projectRoomState(room, stays, reservations, roomToday());
+      const activeStay = stays.find(stay => state.occupancy.stayIds.includes(stay.id))
+        ?? stays.find(stay => state.planning.plannedStayIds.includes(stay.id));
+      return <button type="button" className="card room-card" key={room.id} data-status={state.operationalCondition}
+        aria-label={`${room.name} odasını aç`}
+        onClick={() => navigation.openWorkspace({ entityType: "room", entityId: room.id,
+          returnContext: { page: "pension", view: page?.mode ?? "rooms", entityId: room.id } }, { onReturn: context => { if (context.view) page?.setMode(context.view); } })}>
+        <strong>{room.number ? `Oda ${room.number} · ${room.name}` : room.name}</strong>
+        <span>{roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
+        <span>{state.occupancy.status === "occupied" ? "Misafir içeride" : "Oda boş"}</span>
+        {staysEnabled && activeStay && <span>{activeStay.customerName} · {formatStayDateRange(activeStay)}</span>}
+        {reservationsEnabled && <span>{state.planning.reservationIds.length} rezervasyon · {state.planning.plannedStayIds.length} planlı konaklama</span>}
+        <small>{room.capacity} kişi · {room.floor || "Kat belirtilmedi"}</small>
+      </button>;
+    })}
+  </section>;
 }

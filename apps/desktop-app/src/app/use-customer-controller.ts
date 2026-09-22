@@ -1,7 +1,6 @@
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type {
-  AssignCustomerRoomInput,
   CreateManualRequestInput,
   DesktopCustomerMutationResult,
   DesktopDashboardData,
@@ -206,51 +205,6 @@ export function useCustomerController({
     return result;
   }
 
-  async function handleAssignCustomerToRoom(input: AssignCustomerRoomInput): Promise<DesktopCustomerMutationResult> {
-    if (!window.yardimciDesktop) {
-      const result = { ok: false as const, message: "Oda ataması kaydedilemedi. Uygulamayı yeniden başlatın." };
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setSyncState("loading");
-    setStatusMessage("Müşteri oda kaydı oluşturuluyor...");
-    const result = await window.yardimciDesktop.assignCustomerRoom(input);
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-    return result;
-  }
-
-  async function handleUpdateCustomerRoomStayStatus(
-    stayId: string,
-    status: "planned" | "checked_in" | "checked_out" | "cancelled"
-  ): Promise<DesktopCustomerMutationResult> {
-    if (!window.yardimciDesktop) {
-      const result = { ok: false as const, message: "Konaklama kaydı güncellenemedi. Uygulamayı yeniden başlatın." };
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setSyncState("loading");
-    setStatusMessage("Konaklama durumu güncelleniyor...");
-    const result = await window.yardimciDesktop.updateCustomerRoomStayStatus({ stayId, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return result;
-    }
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-    return result;
-  }
-
   async function handleAnalyzeIdentityImage(file: File): Promise<DesktopIdentityImageAnalyzeResult> {
     if (!window.yardimciDesktop) {
       return { ok: false, message: "Kimlik görseli analizi kullanılamıyor." };
@@ -287,8 +241,6 @@ export function useCustomerController({
     handleDeleteRequest,
     handleDeleteCustomer,
     handleSaveCustomer,
-    handleAssignCustomerToRoom,
-    handleUpdateCustomerRoomStayStatus,
     handleAnalyzeIdentityImage
   };
 }

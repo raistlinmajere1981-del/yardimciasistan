@@ -1,55 +1,14 @@
-import type { DesktopDailyTask, DesktopReservation, DesktopRoom } from "../../electron/database";
-import { getOperationalTaskDomain, type OperationalTaskDomain } from "@yardimci-asistan/shared";
+import type { DesktopDailyTask, DesktopReservation, DesktopRoom, DesktopDashboardData } from "../../electron/database";
+import { projectRoomState, getOperationalTaskDomain, type OperationalTaskDomain } from "@yardimci-asistan/shared";
 
-const activeReservationStatuses = new Set(["pending", "approved"]);
-
-function localDateKey() {
+export function getRoomDisplayInfo(room: DesktopRoom, reservations: DesktopReservation[], stays: DesktopDashboardData["customerRoomStays"] = []) {
   const now = new Date();
-  const offset = now.getTimezoneOffset() * 60_000;
-  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
-}
-
-function reservationDateRank(reservation: DesktopReservation, today: string) {
-  const startDate = reservation.startDate || reservation.endDate;
-  const endDate = reservation.endDate || reservation.startDate;
-
-  if (startDate && endDate && startDate <= today && today <= endDate) {
-    return 0;
-  }
-  if (!startDate || startDate >= today) {
-    return 1;
-  }
-  return 2;
-}
-
-function findActiveRoomReservation(roomId: string, reservations: DesktopReservation[]) {
-  const today = localDateKey();
-  return reservations
-    .filter((reservation) => activeReservationStatuses.has(reservation.status) && reservation.roomIds.includes(roomId))
-    .sort((left, right) => {
-      const rankDifference = reservationDateRank(left, today) - reservationDateRank(right, today);
-      if (rankDifference !== 0) {
-        return rankDifference;
-      }
-      return (left.startDate || left.endDate || "9999-12-31").localeCompare(right.startDate || right.endDate || "9999-12-31");
-    })[0];
-}
-
-export function getRoomDisplayInfo(room: DesktopRoom, reservations: DesktopReservation[]) {
-  const reservation = findActiveRoomReservation(room.id, reservations);
-  if (reservation) {
-    return {
-      reservation,
-      reservationTitle: reservation.title || reservation.customerName || "Aktif rezervasyon",
-      status: room.status === "occupied" ? "occupied" : "reserved"
-    };
-  }
-
-  return {
-    reservation: undefined,
-    reservationTitle: room.status === "reserved" ? "Manuel rezerve" : "Aktif rezervasyon yok",
-    status: room.status
-  };
+  const today = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+  const state = projectRoomState(room, stays, reservations, today);
+  const reservation = reservations.find(item => state.planning.reservationIds.includes(item.id));
+  return { reservation, reservationTitle: reservation?.title || reservation?.customerName || "Aktif rezervasyon yok",
+    status: state.operationalCondition !== "ready" ? state.operationalCondition : state.occupancy.status === "occupied" ? "occupied"
+      : state.planning.reservationIds.length || state.planning.plannedStayIds.length ? "reserved" : "available" };
 }
 
 function relatedReservation(task: DesktopDailyTask, reservations: DesktopReservation[]) {

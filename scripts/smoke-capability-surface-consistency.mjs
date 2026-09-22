@@ -41,7 +41,7 @@ const navigationSource = source("apps/desktop-app/src/app/navigation.ts");
 const frameSource = source("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
 const menuManagerSource = source("apps/desktop-app/src/components/menu/MenuManager.tsx");
 const menuPreviewSource = source("apps/desktop-app/src/components/menu/MenuPreview.tsx");
-const roomFolioSource = source("apps/desktop-app/src/components/pension/RoomFolioWorkspace.tsx");
+const roomAccountSource = source("apps/desktop-app/src/components/pension/RoomAccount.tsx");
 const tableOrdersSource = source("apps/desktop-app/src/components/restaurant/TableOrdersWorkspace.tsx");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
 const financeIpcSource = source("apps/desktop-app/electron/finance-ipc.ts");
@@ -109,11 +109,11 @@ assert.match(frameSource, /qrMenuEnabled\s*&&[\s\S]{0,300}Web'e Yayınla/);
 assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
 assert.match(menuManagerSource, /inventoryEnabled\s*&&\s*<details className="menu-stock-editor"/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
-const normalizedRoomFolioSource = roomFolioSource.replace(/\s+/g, " ");
+const normalizedRoomAccountSource = roomAccountSource.replace(/\s+/g, " ");
 assert.match(
-  normalizedRoomFolioSource,
-  /menuEnabled\s*&&\s*<section className="panel record-stack"/,
-  "Room folio menu surface must remain gated by the food menu capability"
+  normalizedRoomAccountSource,
+  /menuEnabled\s*&&[\s\S]{0,200}add-menu-item/,
+  "Room account menu surface must remain gated by the food menu capability"
 );
 const normalizedTableOrdersSource = tableOrdersSource.replace(/\s+/g, " ");
 assert.match(

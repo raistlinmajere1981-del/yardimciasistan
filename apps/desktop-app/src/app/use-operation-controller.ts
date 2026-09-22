@@ -19,28 +19,6 @@ export function useOperationController({
   setSyncState,
   setStatusMessage
 }: UseOperationControllerOptions) {
-  async function handleUpdateRoomStatus(roomId: string, status: string) {
-    setSyncState("loading");
-    setStatusMessage("Oda durumu güncelleniyor...");
-
-    if (!window.yardimciDesktop) {
-      setSyncState("error");
-      setStatusMessage("Oda durumu güncellenemedi. Uygulamayı yeniden başlatın.");
-      return;
-    }
-
-    const result = await window.yardimciDesktop.updateRoomStatus({ roomId, status });
-    if (!result.ok) {
-      setSyncState("error");
-      setStatusMessage(result.message);
-      return;
-    }
-
-    setDashboardData(result.dashboardData);
-    setSyncState("success");
-    setStatusMessage(result.message);
-  }
-
   async function handleUpdateTableStatus(tableId: string, status: string) {
     setSyncState("loading");
     setStatusMessage("Masa durumu güncelleniyor...");
@@ -204,7 +182,6 @@ export function useOperationController({
   }
 
   return {
-    handleUpdateRoomStatus,
     handleUpdateTableStatus,
     handleSaveManualReservation,
     handleSaveManualRestaurantReservation,

@@ -75,6 +75,7 @@ try {
   `).run("android_folio_stay", "android_folio_customer", room.id, today, checkoutDate, now, now);
   sqlite.close();
 
+  assert.equal(database.checkInStay("android_folio_stay").ok, true);
   const opened = roomFolio.openFolio("android_folio_stay");
   assert.equal(opened.ok, true, opened.message);
   const folioId = opened.folioId;

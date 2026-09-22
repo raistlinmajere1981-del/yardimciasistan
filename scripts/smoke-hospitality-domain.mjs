@@ -95,7 +95,12 @@ try {
   for (const [index, viaFolio, amount] of [[4, false, 0], [5, true, 0], [6, false, 10000], [7, true, 10000]]) {
     db.prepare('UPDATE rooms SET nightly_price_minor = ? WHERE id = ?').run(amount, rooms[index].id);
     const stay = ok(manual(rooms[index].id));
+    const priorStatus = stayRow(stay.savedId).status;
+    const priorRoomStatus = roomStatus(rooms[index].id);
     const opened = ok(folios.openFolio(stay.savedId));
+    assert.equal(stayRow(stay.savedId).status, priorStatus, 'Opening an account cannot check in a guest');
+    assert.equal(roomStatus(rooms[index].id), priorRoomStatus, 'Opening an account cannot change room readiness');
+    ok(database.checkInStay(stay.savedId));
     const before = opened.data.folios.find(folio => folio.id === opened.folioId);
     const eventsBefore = db.prepare('SELECT COUNT(*) AS n FROM events').get().n;
     ok(viaFolio ? folios.checkout({ folioId: opened.folioId, allowOutstanding: false }) : database.checkoutStay(stay.savedId));

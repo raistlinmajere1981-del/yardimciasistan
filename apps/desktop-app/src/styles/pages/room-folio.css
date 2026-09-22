@@ -1,131 +1,9 @@
-/* Room account workflow layout. Controls, surfaces and dialogs use primitives. */
-
-.room-folio-workspace {
-  display: grid;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
-.room-folio-summary-grid, .room-folio-totals {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3);
-  margin-top: var(--space-3);
-}
-
-.room-folio-stay-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-md)), 1fr));
-  gap: var(--space-3);
-}
-
-.room-folio-stay-card {
-  display: grid;
-  align-content: start;
-  gap: var(--space-3);
-}
-
-.room-folio-stay-card.is-occupied {
-  border-color: var(--color-accent-border);
-}
-
-.room-folio-stay-card > button {
-  justify-self: start;
-}
-
-.room-folio-stay-card .card__header > div {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.room-folio-stay-card .card__header > b {
-  color: var(--color-info);
-  font-size: var(--text-sm);
-}
-
-.room-folio-stay-meta span {
-  display: inline-flex;
-  gap: var(--space-1);
-  align-items: center;
-}
-
-.room-folio-stay-money {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  padding-block: var(--space-2);
-  border-block: 1px solid var(--color-border);
-}
-
-.room-folio-stay-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.room-folio-stay-money span {
-  display: grid;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.room-folio-stay-price {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.room-price-help {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.room-price-card small {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
-
-.room-folio-stay-money strong {
-  color: var(--color-text);
-}
-
-.room-folio-drawer {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
-.room-folio-drawer-header span {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
-}
-
-.room-folio-account-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
-  gap: var(--space-4);
-  margin-top: var(--space-4);
-}
-
-.room-folio-category-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.room-folio-category-tabs .is-active {
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent-border);
-}
-
+/* Account body uses the Room Workspace scroll owner. */
+.room-folio-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
 .room-folio-menu-list, .room-folio-line-list {
   display: grid;
   align-content: start;
   gap: var(--space-2);
-  max-height: 50dvh;
-  overflow: auto;
 }
 
 .room-folio-menu-list article, .room-folio-line-list article {
@@ -155,16 +33,6 @@
 .room-folio-menu-list span, .room-folio-line-list span {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-}
-
-.room-folio-line-list .is-discount > b {
-  color: var(--color-success);
-}
-
-.room-folio-quantity {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .room-folio-totals > span {
@@ -211,43 +79,5 @@
   font-size: var(--text-sm);
 }
 
-.room-folio-payment-complete {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
 
-.room-folio-payment-complete > div {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.room-folio-confirm-copy {
-  margin-bottom: var(--space-4);
-}
-
-.room-folio-confirm-copy h3 {
-  font-size: var(--text-lg);
-}
-
-.room-folio-confirm-copy p {
-  color: var(--color-text-muted);
-}
-
-.room-price-card .field-control-group > button {
-  flex: 0 0 auto;
-}
-
-@media (max-width: 1100px) {
-
-  .room-folio-account-layout {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 760px) {
-
-  .room-folio-summary-grid, .room-folio-totals {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+@media (max-width: 760px) { .room-folio-totals { grid-template-columns: minmax(0, 1fr); } }

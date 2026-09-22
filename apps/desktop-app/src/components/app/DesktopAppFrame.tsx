@@ -26,6 +26,8 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
+import { RoomWorkspace } from "../pension/RoomWorkspace";
+import { projectDesktopDashboardData } from "../../app/capability-projection";
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
 
 interface DesktopAppFrameProps {
@@ -155,6 +157,7 @@ function DesktopAppFrameContent({
 
   return (
     <AppShell
+      contentScroll={activePage === "pension" ? "workspace" : "page"}
       contentRef={contentRef}
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(
@@ -248,7 +251,12 @@ function DesktopAppFrameContent({
       )}
       overlay={(
         <>
-          <WorkspaceHost />
+          <WorkspaceHost renderWorkspace={intent => <RoomWorkspace intent={intent}
+            data={projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? [])}
+            onDashboard={desktopSyncController.setDashboardData}
+            staysEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS)}
+            reservationsEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS)}
+            folioEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)} menuEnabled={menuEnabled} />} />
           {diagnosticsOpen ? (
             <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />
           ) : menuEnabled && menuPreviewOpen ? (

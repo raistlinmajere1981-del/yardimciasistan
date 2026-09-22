@@ -6,3 +6,8 @@
 .page-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-md)), 1fr)); }
 .page-grid > *, .page-section__body { min-width: 0; }
 .page-section__body { display: grid; gap: var(--space-4); }
+
+/* Operational pages opt into a bounded viewport with a feature-owned body scroll. */
+.content--workspace { display: flex; flex-direction: column; overflow: hidden; }
+.content--workspace > .page-header { flex: none; }
+.content--workspace > .page-content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }

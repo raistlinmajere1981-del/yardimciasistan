@@ -397,18 +397,6 @@ export class DesktopRoomFolioService {
           );
         }
 
-        // Stage 4 removal: legacy Folio UI still uses account opening as arrival.
-        // RoomWorkspace must call explicit checkInStay, then open the financial account.
-        db.prepare(`
-          UPDATE customer_room_stays
-          SET status = 'checked_in', checked_in_at = CASE WHEN checked_in_at = '' THEN ? ELSE checked_in_at END,
-              updated_at = ?, sync_status = 'local_only'
-          WHERE id = ?
-        `).run(now, now, stayId);
-        db.prepare(`
-          UPDATE rooms SET status = 'occupied', updated_at = ?, sync_status = 'local_only'
-          WHERE id = ?
-        `).run(now, text(stay.room_id));
         db.exec("COMMIT");
       } catch (error) {
         db.exec("ROLLBACK");
@@ -420,7 +408,7 @@ export class DesktopRoomFolioService {
       db.close();
     }
 
-    return { ok: true, message: "Oda adisyonu açıldı ve giriş yapıldı.", data: this.getData(), folioId };
+    return { ok: true, message: "Oda adisyonu açıldı.", data: this.getData(), folioId };
   }
 
   updateFolioDetails(input: UpdateRoomFolioDetailsInput): DesktopRoomFolioMutationResult {

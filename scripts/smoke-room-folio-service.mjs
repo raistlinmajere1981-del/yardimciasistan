@@ -132,6 +132,10 @@ try {
   assert.equal(service.voidPayment(deposit.id).ok, false, "Reservation deposits cannot be voided as direct payments.");
   assert.equal(service.openFolio("room_folio_smoke_stay").data.folios.find((item) => item.id === folio.id).payments.length, 1);
 
+  const beforeCheckIn = new DatabaseSync(database.databasePath);
+  assert.equal(beforeCheckIn.prepare("SELECT status FROM customer_room_stays WHERE id = ?").get("room_folio_smoke_stay").status, "planned", "Folio opening is financial only");
+  beforeCheckIn.close();
+  assert.equal(database.checkInStay("room_folio_smoke_stay").ok, true);
   const sqliteCheckIn = new DatabaseSync(database.databasePath);
   const checkedIn = sqliteCheckIn.prepare(`SELECT status FROM customer_room_stays WHERE id = ?`).get("room_folio_smoke_stay");
   const occupiedRoom = sqliteCheckIn.prepare(`SELECT status FROM rooms WHERE id = ?`).get(room.id);

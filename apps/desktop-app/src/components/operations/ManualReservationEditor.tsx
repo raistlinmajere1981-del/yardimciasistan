@@ -1,6 +1,6 @@
-import { useDialogFocus } from "../ui/useDialogFocus";
+import { FormDialog } from "../ui/FormDialog";
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, Save, X } from "lucide-react";
+import { CalendarPlus, Save } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
@@ -93,36 +93,11 @@ export function ManualReservationEditor({
     setMessage("");
   }, [customers, open, reservation]);
 
-  const dialogRef = useDialogFocus(open);
 
   if (!open) return null;
 
   return (
-    <div
-      className="manual-request-backdrop overlay overlay--drawer"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && state !== "loading") onClose();
-      }}
-    >
-      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-reservation-editor-title">
-        <header className="overlay-header overlay-header--sticky">
-          <div className="overlay-heading">
-            <p>Pansiyon rezervasyonları</p>
-            <h2 id="manual-reservation-editor-title">{isEditing ? "Rezervasyonu düzenle" : "Yeni rezervasyon ekle"}</h2>
-          </div>
-          <button
-            className="drawer-close-button"
-            type="button"
-            aria-label="Rezervasyon formunu kapat"
-            onClick={onClose}
-            disabled={state === "loading"}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-
-        <form
-          className="form-stack overlay-form"
+    <FormDialog title={isEditing ? "Rezervasyonu düzenle" : "Yeni rezervasyon ekle"} onClose={onClose} closeBlocked={state === "loading"}
           onSubmit={async (event) => {
             event.preventDefault();
             setState("loading");
@@ -143,7 +118,27 @@ export function ManualReservationEditor({
             }
             onClose();
           }}
-        >
+      footer={<div className="form-actions">
+            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
+              Vazgeç
+            </ActionButton>
+            <ActionButton
+              type="submit"
+              disabled={
+                state === "loading"
+                || !form.customerId
+                || !form.startDate
+                || !form.endDate
+                || form.guestCount < 1
+              }
+            >
+              {state === "loading" ? <CalendarPlus size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+              {state === "loading"
+                ? (isEditing ? "Güncelleniyor" : "Kaydediliyor")
+                : (isEditing ? "Değişiklikleri Kaydet" : "Rezervasyonu Kaydet")}
+            </ActionButton>
+          </div>}>
+
           <div className="form-grid">
             <label className="form-field--span form-field form-field--long">
               Müşteri
@@ -224,7 +219,7 @@ export function ManualReservationEditor({
             <label className="form-field--span form-field form-field--long">
               Oda
               <select
-                autoFocus={isEditing}
+                disabled={isEditing}
                 value={form.roomId}
                 onChange={(event) => setForm((current) => ({ ...current, roomId: event.target.value }))}
               >
@@ -235,7 +230,7 @@ export function ManualReservationEditor({
                   </option>
                 ))}
               </select>
-              <small>Oda değişikliğinde kapasite, aktif konaklama ve tarih çakışmaları yeniden kontrol edilir.</small>
+              <small>Mevcut rezervasyonun odasını listeden Oda Ata / Düzenle işlemiyle değiştirin.</small>
             </label>
 
             <label className="form-field--span form-field form-field--fluid">
@@ -259,28 +254,7 @@ export function ManualReservationEditor({
           )}
           {message && <p className={`form-status sync-${state}`}>{message}</p>}
 
-          <div className="overlay-footer overlay-footer--inset form-actions">
-            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
-              Vazgeç
-            </ActionButton>
-            <ActionButton
-              type="submit"
-              disabled={
-                state === "loading"
-                || !form.customerId
-                || !form.startDate
-                || !form.endDate
-                || form.guestCount < 1
-              }
-            >
-              {state === "loading" ? <CalendarPlus size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
-              {state === "loading"
-                ? (isEditing ? "Güncelleniyor" : "Kaydediliyor")
-                : (isEditing ? "Değişiklikleri Kaydet" : "Rezervasyonu Kaydet")}
-            </ActionButton>
-          </div>
-        </form>
-      </aside>
-    </div>
+
+    </FormDialog>
   );
 }

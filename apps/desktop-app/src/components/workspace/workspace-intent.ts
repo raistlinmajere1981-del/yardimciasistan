@@ -5,13 +5,14 @@ export interface WorkspaceIntent {
   entityType: "room";
   entityId: string;
   mode?: "summary" | "stay" | "account" | "history";
-  action?: "payment" | "assign-reservation";
+  action?: "payment" | "assign-reservation" | "create-stay";
+  customerId?: string;
   returnContext?: WorkspaceReturnContext;
 }
 
 export interface WorkspaceReturnContext {
   page?: DesktopPage;
-  view?: "rooms" | "reservations" | "daily-work";
+  view?: "rooms" | "reservations" | "daily-tasks";
   entityId?: string;
 }
 

@@ -34,7 +34,6 @@ import { AiWorkspace, WhatsAppWorkspace } from "../messages/MessageWorkspaces";
 import { MenuManager } from "../menu/MenuManager";
 import { RestaurantReservationsWorkspace } from "../operations/RestaurantReservationsWorkspace";
 import {
-  CustomerRoomStaysWorkspace,
   DailyTasksWorkspace,
   ReservationsWorkspace,
   RoomsWorkspace,
@@ -46,6 +45,7 @@ import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
 import { MessagesPage } from "../../pages/MessagesPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
+import { usePensionPageController } from "../pension/pension-page-state";
 import { PensionPage } from "../../pages/PensionPage";
 import { ReportsPage } from "../../pages/ReportsPage";
 import { RestaurantPage } from "../../pages/RestaurantPage";
@@ -177,12 +177,9 @@ export function DesktopWorkspaceRouter({
     handleDeleteRequest,
     handleDeleteCustomer,
     handleSaveCustomer,
-    handleAssignCustomerToRoom,
-    handleUpdateCustomerRoomStayStatus,
     handleAnalyzeIdentityImage
   } = customerController;
   const {
-    handleUpdateRoomStatus,
     handleUpdateTableStatus,
     handleSaveManualReservation,
     handleSaveManualRestaurantReservation,
@@ -206,6 +203,7 @@ export function DesktopWorkspaceRouter({
     handleRevokeAndroidDevice
   } = deviceController;
 
+  const pensionController = usePensionPageController();
   const C = BUSINESS_CAPABILITIES;
   const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
   const customersEnabled = runtimeHasCapability(businessCapabilities, C.CUSTOMERS);
@@ -421,7 +419,7 @@ export function DesktopWorkspaceRouter({
           tasksEnabled={tasksEnabled}
           calendarEnabled={runtimeHasCapability(businessCapabilities, C.CALENDAR)}
           reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
-          availableRoomCount={surfaceData.rooms.filter((room) => getRoomDisplayInfo(room, surfaceData.reservations).status === "available").length}
+          availableRoomCount={surfaceData.rooms.filter((room) => getRoomDisplayInfo(room, surfaceData.reservations, surfaceData.customerRoomStays).status === "available").length}
           onReplyRequest={openDashboardReply}
           onOpenCustomerWork={openDashboardCustomerWork}
           onOpenReservation={openDashboardReservation}
@@ -490,19 +488,14 @@ export function DesktopWorkspaceRouter({
               onSummarize={(requestId) => openAiTools("summary", requestId)}
               onSave={handleSaveCustomer}
               onAnalyzeIdentity={handleAnalyzeIdentityImage}
-              onAssignRoom={handleAssignCustomerToRoom}
-              onUpdateStayStatus={handleUpdateCustomerRoomStayStatus}
               onDelete={handleDeleteCustomer}
             />
           )}
         />
       ) : activePage === "pension" ? (
         <PensionPage
-          data={surfaceData}
+          controller={pensionController}
           reservationsEnabled={accommodationReservationsEnabled}
-          staysEnabled={accommodationStaysEnabled}
-          folioEnabled={accommodationFolioEnabled}
-          menuEnabled={foodMenuEnabled}
           tasksEnabled={tasksEnabled}
           reservations={accommodationReservationsEnabled ? (
             <ReservationsWorkspace
@@ -520,21 +513,11 @@ export function DesktopWorkspaceRouter({
             <RoomsWorkspace
               rooms={surfaceData.rooms}
               reservations={pensionReservations}
-              customers={surfaceData.customers}
               stays={surfaceData.customerRoomStays}
               reservationsEnabled={accommodationReservationsEnabled}
               staysEnabled={accommodationStaysEnabled}
-              onUpdateStatus={handleUpdateRoomStatus}
-              onAssignRoom={handleAssignCustomerToRoom}
-              onUpdateStayStatus={handleUpdateCustomerRoomStayStatus}
             />
           )}
-          stays={accommodationStaysEnabled ? (
-            <CustomerRoomStaysWorkspace
-              stays={surfaceData.customerRoomStays}
-              onUpdateStatus={handleUpdateCustomerRoomStayStatus}
-            />
-          ) : null}
           tasks={(
             <DailyTasksWorkspace
               scope="pension"

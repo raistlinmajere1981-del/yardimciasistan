@@ -1,9 +1,9 @@
+import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BedDouble, CreditCard, MessageCircle, Pencil, Phone, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import type {
-  AssignCustomerRoomInput,
   DesktopCustomerMutationResult,
   DesktopDashboardData,
   DesktopIdentityImageAnalyzeResult,
@@ -12,7 +12,6 @@ import type {
 } from "../../../electron/database";
 import {
   customerFormToInput,
-  defaultRoomAssignmentForm,
   formatCustomerGender,
   formatCustomerLastContactDate,
   formatCustomerRoomStayStatus,
@@ -21,8 +20,7 @@ import {
   formatStayDateRange,
   hasCustomerIdentityDetails,
   toCustomerForm,
-  type CustomerFormState,
-  type RoomAssignmentFormState
+  type CustomerFormState
 } from "../../app/customer-model";
 import {
   formatDateForDisplay,
@@ -30,7 +28,6 @@ import {
   formatRequestType,
   formatReservationDate,
   formatReservationStatus,
-  formatRoomStatus,
   formatShortDate
 } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
@@ -59,11 +56,6 @@ interface CustomersWorkspaceProps {
   onSummarize: (requestId: string) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
-  onAssignRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
-  onUpdateStayStatus: (
-    stayId: string,
-    status: "planned" | "checked_in" | "checked_out" | "cancelled"
-  ) => Promise<DesktopCustomerMutationResult>;
   onDelete: (customer: DesktopDashboardData["customers"][number]) => Promise<DesktopStatusUpdateResult | undefined>;
 }
 
@@ -84,15 +76,14 @@ export function CustomersWorkspace({
   onSummarize,
   onSave,
   onAnalyzeIdentity,
-  onAssignRoom,
-  onUpdateStayStatus,
   onDelete
 }: CustomersWorkspaceProps) {
   const [searchText, setSearchText] = useState("");
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? "");
   const [customerEditorOpen, setCustomerEditorOpen] = useState(false);
   const [customerBeingEdited, setCustomerBeingEdited] = useState<DesktopDashboardData["customers"][number] | null>(null);
-  const [assignmentCustomerId, setAssignmentCustomerId] = useState("");
+  const navigation = useWorkspaceNavigation();
+  const [entryRoomId, setEntryRoomId] = useState(rooms.find(room => room.isActive)?.id ?? "");
   const [deleteError, setDeleteError] = useState<{ customerId: string; message: string } | null>(null);
   const filteredCustomers = useMemo(
     () =>
@@ -283,15 +274,18 @@ export function CustomersWorkspace({
                 </ActionButton>
               )}
               {staysEnabled && (
+                <>
+                  <label className="form-field form-field--medium">Konaklama odası<select aria-label="Konaklama odası" value={entryRoomId} onChange={event => setEntryRoomId(event.target.value)}>{rooms.filter(room => room.isActive).map(room => <option key={room.id} value={room.id}>{room.name}</option>)}</select></label>
                 <ActionButton
                   size="sm"
                   type="button"
-                  onClick={() => setAssignmentCustomerId(selectedCustomer.id)}
-                  disabled={rooms.length === 0}
+                  onClick={() => navigation.openWorkspace({ entityType: "room", entityId: entryRoomId, mode: "stay", action: "create-stay", customerId: selectedCustomer.id, returnContext: { page: "customerWork", entityId: selectedCustomer.id } })}
+                  disabled={!entryRoomId}
                 >
                   <BedDouble size={16} aria-hidden="true" />
                   Odaya Ata
                 </ActionButton>
+                </>
               )}
               <ActionButton variant="danger" size="sm" type="button" onClick={async () => {
                 setDeleteError(null);
@@ -349,7 +343,7 @@ export function CustomersWorkspace({
                         <strong>{stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}</strong>
                         <span>{formatCustomerRoomStayStatus(stay.status)} · {formatStayDateRange(stay)}</span>
                         {stay.notes && <p>{stay.notes}</p>}
-                        <CustomerRoomStayActions stay={stay} onUpdateStatus={onUpdateStayStatus} />
+                        <ActionButton variant="secondary" size="sm" onClick={() => navigation.openWorkspace({ entityType: "room", entityId: stay.roomId, mode: "stay", returnContext: { page: "customerWork", entityId: selectedCustomer.id } })}>Odayı Aç</ActionButton>
                       </article>
                     ))
                   )}
@@ -381,23 +375,6 @@ export function CustomersWorkspace({
         }}
         onAnalyzeIdentity={onAnalyzeIdentity}
       />
-      {staysEnabled && (
-        <RoomAssignmentDrawer
-          open={Boolean(assignmentCustomerId)}
-          customers={customers}
-          rooms={rooms}
-          initialCustomerId={assignmentCustomerId}
-          initialRoomId=""
-          onClose={() => setAssignmentCustomerId("")}
-          onAssign={async (input) => {
-            const result = await onAssignRoom(input);
-            if (result.ok) {
-              setAssignmentCustomerId("");
-            }
-            return result;
-          }}
-        />
-      )}
     </section>
   );
 }
@@ -605,125 +582,6 @@ function CustomerEditorDrawer({
           </div>
         </form>
       </aside>
-    </div>
-  );
-}
-
-interface RoomAssignmentDrawerProps {
-  open: boolean;
-  customers: DesktopDashboardData["customers"];
-  rooms: DesktopDashboardData["rooms"];
-  initialCustomerId: string;
-  initialRoomId: string;
-  onClose: () => void;
-  onAssign: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
-}
-
-export function RoomAssignmentDrawer({
-  open,
-  customers,
-  rooms,
-  initialCustomerId,
-  initialRoomId,
-  onClose,
-  onAssign
-}: RoomAssignmentDrawerProps) {
-  const [form, setForm] = useState<RoomAssignmentFormState>(() => defaultRoomAssignmentForm(initialCustomerId, initialRoomId));
-  const [state, setState] = useState<SyncState>("idle");
-  const [message, setMessage] = useState("Atama, müşteri ve oda geçmişinde birlikte arşivlenir.");
-
-  useEffect(() => {
-    if (open) {
-      setForm(defaultRoomAssignmentForm(initialCustomerId || customers[0]?.id || "", initialRoomId || rooms[0]?.id || ""));
-      setState("idle");
-      setMessage("Atama, müşteri ve oda geçmişinde birlikte arşivlenir.");
-    }
-  }, [customers, initialCustomerId, initialRoomId, open, rooms]);
-
-  const dialogRef = useDialogFocus(open);
-
-  if (!open) return null;
-
-  return (
-    <div className="manual-request-backdrop overlay overlay--drawer room-assignment-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll room-assignment-drawer" role="dialog" aria-modal="true" aria-labelledby="room-assignment-title">
-        <header className="overlay-header overlay-header--sticky">
-          <div className="overlay-heading"><p>Müşteri · Oda</p><h2 id="room-assignment-title">Odaya müşteri ata</h2></div>
-          <button className="drawer-close-button" type="button" aria-label="Oda atama formunu kapat" onClick={onClose}><X size={18} aria-hidden="true" /></button>
-        </header>
-        <form className="form-stack overlay-form" onSubmit={async (event) => {
-          event.preventDefault();
-          setState("loading");
-          setMessage("Oda ataması kaydediliyor...");
-          const result = await onAssign({
-            customerId: form.customerId,
-            roomId: form.roomId,
-            checkInDate: form.checkInDate,
-            checkOutDate: form.checkOutDate,
-            guestCount: Number(form.guestCount),
-            notes: form.notes,
-            status: form.status
-          });
-          setState(result.ok ? "success" : "error");
-          setMessage(result.message);
-        }}>
-          <div className="form-grid">
-            <label className="form-field form-field--long">Müşteri<select required value={form.customerId} onChange={(event) => setForm({ ...form, customerId: event.target.value })}>
-              <option value="">Müşteri seçin</option>
-              {customers.map((customer) => <option value={customer.id} key={customer.id}>{customer.fullName}{customer.phone ? ` · ${customer.phone}` : ""}</option>)}
-            </select></label>
-            <label className="form-field form-field--long">Oda<select required value={form.roomId} onChange={(event) => setForm({ ...form, roomId: event.target.value })}>
-              <option value="">Oda seçin</option>
-              {rooms.filter((room) => room.isActive).map((room) => (
-                <option value={room.id} key={room.id}>
-                  {room.number ? `Oda ${room.number} · ` : ""}{room.name} · {room.capacity} kişi · {formatRoomStatus(room.status)}
-                </option>
-              ))}
-            </select></label>
-            <label className="form-field form-field--short">Giriş tarihi<input required lang="tr-TR" type="date" value={form.checkInDate} onChange={(event) => setForm({ ...form, checkInDate: event.target.value })} /></label>
-            <label className="form-field form-field--short">Çıkış tarihi<input lang="tr-TR" type="date" value={form.checkOutDate} onChange={(event) => setForm({ ...form, checkOutDate: event.target.value })} /></label>
-            <label className="form-field form-field--xs">Kişi sayısı<input min="1" max="50" type="number" value={form.guestCount} onChange={(event) => setForm({ ...form, guestCount: event.target.value })} /></label>
-            <label className="form-field form-field--medium">Başlangıç durumu<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as RoomAssignmentFormState["status"] })}>
-              <option value="planned">Planlandı / Rezerve</option>
-              <option value="checked_in">Giriş yaptı / Dolu</option>
-            </select></label>
-            <label className="form-field--span form-field form-field--fluid">Konaklama notu<textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
-          </div>
-          <div className="overlay-footer overlay-footer--inset">
-            <p className={`form-status sync-${state}`} role="status">{message}</p>
-            <div>
-              <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>
-              <ActionButton type="submit" disabled={state === "loading" || customers.length === 0 || rooms.length === 0}>
-                <BedDouble size={16} aria-hidden="true" />
-                {state === "loading" ? "Kaydediliyor" : "Odaya Ata"}
-              </ActionButton>
-            </div>
-          </div>
-        </form>
-      </aside>
-    </div>
-  );
-}
-
-export function CustomerRoomStayActions({
-  stay,
-  onUpdateStatus
-}: {
-  stay: DesktopDashboardData["customerRoomStays"][number];
-  onUpdateStatus: (
-    stayId: string,
-    status: "planned" | "checked_in" | "checked_out" | "cancelled"
-  ) => Promise<DesktopCustomerMutationResult>;
-}) {
-  if (stay.status === "checked_out") return null;
-  return (
-    <div className="action-row">
-      {stay.status === "planned" && <ActionButton size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "checked_in")}>Giriş Yap</ActionButton>}
-      {stay.status === "checked_in" && <ActionButton size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "checked_out")}>Çıkış Yap</ActionButton>}
-      {stay.status === "cancelled" && <ActionButton variant="secondary" size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "planned")}>Yeniden Planla</ActionButton>}
-      {["planned", "checked_in"].includes(stay.status) && <ActionButton variant="danger" size="sm" type="button" onClick={() => void onUpdateStatus(stay.id, "cancelled")}>İptal</ActionButton>}
     </div>
   );
 }

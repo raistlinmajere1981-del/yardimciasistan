@@ -100,6 +100,7 @@ try {
   `).run("room_transfer_smoke_stay", "room_transfer_smoke_customer", room.id, today, checkout, now, now);
   sqlite.close();
 
+  assert.equal(database.checkInStay("room_transfer_smoke_stay").ok, true);
   const openedFolio = folioService.openFolio("room_transfer_smoke_stay");
   assert.equal(openedFolio.ok, true);
   assert.ok(openedFolio.folioId);

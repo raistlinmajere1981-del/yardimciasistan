@@ -8,11 +8,11 @@ The Constitution remains authoritative. This document describes the implemented 
 
 `useWorkspaceNavigation()` exposes `current`, `openWorkspace(intent, options?)`, `closeWorkspace()`, `updateWorkspacePresentation(presentation)`, `updateWorkspaceMode(mode, action?)`, and `returnFocusRef`. Open/close return `false` when blocked. An open request rejects empty identity, unsafe replacement, or an existing unrelated modal. Opening defaults to centered and captures the invoking element and originating page. Mode/action updates do not change entity identity.
 
-Stage 2 has only a room intent: explicit `entityType: "room"`, `entityId`, optional `mode` (`summary`, `stay`, `account`, `history`), optional `action` (`payment`, `assign-reservation`). These are navigation labels, not implemented business operations. Add a discriminated variant only when another real entity consumer arrives.
+The platform currently has only a room intent: explicit `entityType: "room"`, `entityId`, optional `mode` (`summary`, `stay`, `account`, `history`), optional `action` (`payment`, `assign-reservation`). Stage 4 implements these room modes and operations and adds `create-stay` with an optional preselected `customerId`. Add a discriminated variant only when another real entity consumer arrives.
 
-`returnContext` carries a typed desktop page, optional pilot view (`rooms`, `reservations`, `daily-work`) and optional selected record. Open/close do not switch the feature page during normal use, so its filters and selection survive. If an external page change occurred, close requests the originating page. `options.onReturn(context)` lets the feature restore its own view/selection; navigation does not store drafts or scroll positions. The feature owns any persistence needed across an external page unmount.
+`returnContext` carries a typed desktop page, optional pilot view (`rooms`, `reservations`, `daily-tasks`) and optional selected record. Open/close do not switch the feature page during normal use, so its filters and selection survive. If an external page change occurred, close requests the originating page. `options.onReturn(context)` lets the feature restore its own view/selection; navigation does not store drafts or scroll positions. The feature owns any persistence needed across an external page unmount.
 
-The production host is mounted now and returns no DOM or effects while closed. No Room editor or entry point ships in this stage. Stage 4 supplies `renderWorkspace` at the existing host with a direct, explicit RoomWorkspace composition; there is no registry or fallback editor. Diagnostics uses only the presentation primitive, never an entity intent.
+The production host is mounted now and returns no DOM or effects while closed. Stage 4 now supplies `renderWorkspace` at the existing host with a direct, explicit RoomWorkspace composition; there is no registry or fallback editor. Diagnostics uses only the presentation primitive, never an entity intent.
 
 ## Frame, state lifetime and tabs
 
@@ -32,7 +32,7 @@ Pass navigation's `returnFocusRef` to the frame to retain the original trigger e
 
 `IconButton` requires an accessible label; variants are normal/selected/danger, sizes sm/md. `FormDialog` supplies form submit semantics for one bounded task, and `ConfirmDialog` starts focus on cancel and disables dismissal/actions while busy. Both mount only while open and share ModalSurface. Nested ModalSurface use is rejected. Workspace subflows and confirmations belong inside the current body; no modal stack API is provided. Legacy `useDialogFocus` is unchanged.
 
-## Future Room integration example
+## Room integration example
 
 ```tsx
 // Feature entry, under the existing provider:
@@ -59,7 +59,7 @@ const blocked = useWorkspaceCloseGuard({ busy, dirty });
 
 ## Stale async results
 
-No generic helper yet: Stage 2 has no entity request consumer, and Diagnostics data behavior is intentionally unchanged. The host entity key isolates local state on identity change. In the first Room implementation, every read effect must additionally invalidate itself on entity/mode change and unmount; overlapping refreshes require a generation check. Guard success **and** catch/finally updates. Abort the request when supported, but cancellation alone is not the correctness guard.
+Stage 4 adds `useRequestGeneration` for Room operation results and Folio reads/mutations. Each new request invalidates its predecessor; unmount invalidates the current generation. Diagnostics data behavior remains unchanged. The host entity key isolates local state on identity change. In the first Room implementation, every read effect must additionally invalidate itself on entity/mode change and unmount; overlapping refreshes require a generation check. Guard success **and** catch/finally updates. Abort the request when supported, but cancellation alone is not the correctness guard.
 
 ```tsx
 const generation = useRef(0);
@@ -80,3 +80,7 @@ The Room pilot must test delayed Room 101 responses after Room 102 is opened and
 ## Verification
 
 `npm run smoke:workspace-platform` serves a test-only harness from `scripts/fixtures` using the installed Vite/browser. It covers two entry points, identity replacement, return context, mounted state/draft, geometry, scrolling, tabs, subflows, guard, inert focus, Escape/backdrop, lock, appearance and the real Diagnostics consumer. The renderer design smoke also exercises Diagnostics through the real App/Frame and lock controller. No production fixture page or IPC change is involved.
+
+## Pension pilot
+
+The production Room consumer, page/controller ownership, operation boundaries and verification are documented in [Pension Workspace pilot](pension-workspace.md).

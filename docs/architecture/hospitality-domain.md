@@ -64,11 +64,11 @@ Finance SQL triggers, stock mutations, restaurant transfer idempotency, Customer
 - `planning`: separate reservation IDs and planned Stay IDs; both can coexist. Finished/cancelled/expired plans are excluded.
 - `persistedStatus` and `isActive` remain visible so callers do not mistake the projection for a schema split. Legacy occupied/reserved values contain no separate physical-condition fact and map to ready.
 
-`getRoomDisplayInfo` and its UI callers remain unchanged until Stage 4. The projection does not expand limited dashboard/history reads or claim complete Folio history.
+Stage 4 uses this projection in Room tiles and RoomWorkspace; the remaining dashboard `getRoomDisplayInfo` adapter delegates to it. The projection does not expand limited dashboard/history reads or claim complete Folio history.
 
 ## Stage 4 compatibility removal conditions
 
-1. **openFolio implicit check-in:** retained because the current Folio UI opens accounts to check guests in. Once RoomWorkspace calls explicit checkInStay followed by financial opening, remove the implicit Stay/Room SQL in openFolio. Do not introduce another implicit arrival entry.
+1. **openFolio implicit check-in: removed in Stage 4.** Production calls now originate in RoomWorkspace after explicit `checkInStay`, or retry financial opening for an already checked-in Stay. `openFolio` no longer mutates Stay/Room or claims arrival in its success message. All service/transfer/Android smoke fixtures now check in explicitly; account opening without arrival is tested.
 2. **Folio checkout name/allowOutstanding:** keep the public channel/payload for desktop and Android compatibility. `allowOutstanding` no longer controls departure permission under D-005. RoomWorkspace should distinguish guest checkout from a settled-account close action; the current adapter routes both safely.
 3. **Folio details ↔ Stay metadata and Room profile:** existing date/guest-count coupling and profile edit entry points were audited, not redesigned. RoomWorkspace must preserve D-007's single profile save model; nightly Folio overrides remain separate.
 4. **Legacy room display:** replace callers with the orthogonal projection during the RoomWorkspace migration, not in this domain stage.
