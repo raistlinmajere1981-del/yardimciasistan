@@ -1195,7 +1195,9 @@ function ya_chat_fallback_answer(
         }
     }
 
-    $asksPayment = preg_match('/\b(kart|kredi kart|banka kart|nakit|odeme|ödeme|pos|temassiz|temassız)\b/u', $normalized) === 1;
+    $asksPayment = ya_chat_contains_any($normalized, [
+        'kart', 'kredi kart', 'banka kart', 'nakit', 'odeme', 'pos', 'temassiz'
+    ]);
     if ($asksPayment) {
         $payment = ya_chat_string($businessContext['payment_note'] ?? '');
         if ($payment !== '') {
@@ -1203,7 +1205,9 @@ function ya_chat_fallback_answer(
         }
     }
 
-    $asksDirections = preg_match('/\b(nasil gel|nasıl gel|adres|konum|nerede|yol|tarif|ulaşim|ulasim|ulaşım)\b/u', $normalized) === 1;
+    $asksDirections = ya_chat_contains_any($normalized, [
+        'nasil gel', 'adres', 'konum', 'nerede', 'yol', 'tarif', 'ulasim'
+    ]);
     if ($asksDirections) {
         $directions = ya_chat_string($businessContext['directions_note'] ?? '');
         $address = ya_chat_string($businessContext['address'] ?? $businessConfig['address'] ?? '');
