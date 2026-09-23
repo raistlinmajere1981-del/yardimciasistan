@@ -30,6 +30,7 @@ export function ProductWorkspace({
   productDataEnabled,
   busy,
   onReload,
+  onProductSaved,
   onStateChange
 }: {
   intent: ProductWorkspaceIntent;
@@ -39,6 +40,7 @@ export function ProductWorkspace({
   productDataEnabled: boolean;
   busy: boolean;
   onReload: () => Promise<void>;
+  onProductSaved: (product: CatalogProduct) => void;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
   const navigation = useWorkspaceNavigation();
@@ -143,6 +145,7 @@ export function ProductWorkspace({
       }
     }
 
+    onProductSaved(saved);
     let catalogReloadFailed = false;
     try {
       await onReload();
