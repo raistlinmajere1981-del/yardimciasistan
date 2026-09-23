@@ -16,6 +16,7 @@ import type {
   CustomerController,
   DesktopSyncController,
   MenuController,
+  MarketController,
   MessagingController,
   SetupController
 } from "../../app/controller-types";
@@ -25,7 +26,7 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
-import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
+import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, productWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
 import { projectDesktopDashboardData } from "../../app/capability-projection";
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
 
@@ -40,6 +41,7 @@ interface DesktopAppFrameProps {
   menuController: MenuController;
   messagingController: MessagingController;
   customerController: CustomerController;
+  marketController: MarketController;
   children: ReactNode;
 }
 
@@ -62,6 +64,7 @@ function DesktopAppFrameContent({
   menuController,
   messagingController,
   customerController,
+  marketController,
   children
 }: DesktopAppFrameProps) {
   const contentRef = useRef<HTMLElement>(null);
@@ -255,6 +258,14 @@ function DesktopAppFrameContent({
             inventoryEnabled,
             onSave: menuController.saveItemForm,
             onDelete: menuController.deleteItemById
+          }} />
+          <WorkspaceHost definition={productWorkspaceDefinition} context={{
+            products: marketController.products,
+            categories: marketController.categories,
+            inventoryEnabled,
+            productDataEnabled: marketController.productDataEnabled,
+            onReload: marketController.reloadCatalog,
+            onStateChange: marketController.handleStateChange
           }} />
           <WorkspaceHost definition={roomWorkspaceDefinition} context={{
             data: workspaceData,
