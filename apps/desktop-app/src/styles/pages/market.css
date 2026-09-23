@@ -134,14 +134,14 @@
 }
 
 .market-product-create-form,
-.market-product-media,
-.market-product-stock-view {
+.market-product-media {
   min-width: 0;
 }
 
 .market-product-stock-view {
   display: grid;
   gap: var(--space-4);
+  min-width: 0;
 }
 
 .market-search-field {
