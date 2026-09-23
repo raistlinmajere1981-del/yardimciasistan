@@ -152,6 +152,7 @@ export function MarketQuickSaleWorkspace({
     draftLoadWarnings,
     reviewRecoveryDraft,
     setReviewRecoveryDraft,
+    clearReviewRecoveryDraft,
     lastSale,
     lastCreditCustomerName,
     submitting,
@@ -430,7 +431,7 @@ export function MarketQuickSaleWorkspace({
         try {
           await bridge.markCartDraftReviewed(draftToReview.id);
           await onCartDraftReviewed?.(draftToReview.id);
-          setReviewRecoveryDraft(null);
+          clearReviewRecoveryDraft(draftToReview.id);
           onStateChange("success", sale.status === "credit"
             ? "Veresiye satış kaydedildi ve telefon sepeti kapatıldı."
             : "Satış tamamlandı ve telefon sepeti kapatıldı.");
@@ -448,10 +449,11 @@ export function MarketQuickSaleWorkspace({
 
   async function closeRecoveryDraft() {
     if (!bridge || !reviewRecoveryDraft || submitting) return;
+    const recovery = reviewRecoveryDraft;
     try {
-      await bridge.markCartDraftReviewed(reviewRecoveryDraft.id);
-      await onCartDraftReviewed?.(reviewRecoveryDraft.id);
-      setReviewRecoveryDraft(null);
+      await bridge.markCartDraftReviewed(recovery.id);
+      await onCartDraftReviewed?.(recovery.id);
+      clearReviewRecoveryDraft(recovery.id);
       onStateChange("success", "Telefon sepeti kapatıldı.");
     } catch (error) {
       onStateChange("error", error instanceof Error ? error.message : "Telefon sepeti kapatılamadı.");

@@ -85,7 +85,7 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
   function openCartDraft(detail: CommerceSaleDraftDetail) {
     const request = quickSaleSession.requestCartDraft(detail.draft.id);
     if (!request) {
-      handleStateChange("error", "Satış işlenirken yeni telefon sepeti yüklenemez.");
+      handleStateChange("error", "Önce devam eden satışı veya kapanamayan telefon sepetini tamamlayın.");
       setActiveTab("quickSale");
       return;
     }

@@ -106,13 +106,17 @@ export function useMarketQuickSaleSession({
     setLastCreditCustomerName(sale.status === "credit" ? creditCustomerName : "");
   }, []);
 
+  const clearReviewRecoveryDraft = useCallback((draftId: string) => {
+    setReviewRecoveryDraft((current) => current?.id === draftId ? null : current);
+  }, []);
+
   const requestCartDraft = useCallback((draftId: string) => {
-    if (saleInFlight.current) return null;
+    if (saleInFlight.current || reviewRecoveryDraft) return null;
     const request = { requestId: ++draftRequestSequence.current, draftId };
     cartDraftRequestRef.current = request;
     setCartDraftRequest(request);
     return request;
-  }, []);
+  }, [reviewRecoveryDraft]);
 
   const clearCartDraftRequest = useCallback((draftId: string) => {
     const current = cartDraftRequestRef.current;
@@ -152,6 +156,7 @@ export function useMarketQuickSaleSession({
     draftLoadWarnings,
     reviewRecoveryDraft,
     setReviewRecoveryDraft,
+    clearReviewRecoveryDraft,
     lastSale,
     lastCreditCustomerName,
     submitting,
