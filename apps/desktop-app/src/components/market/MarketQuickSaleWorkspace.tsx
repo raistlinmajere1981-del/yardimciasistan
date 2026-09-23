@@ -156,6 +156,7 @@ export function MarketQuickSaleWorkspace({
     lastCreditCustomerName,
     submitting,
     loadedDraftRequestId,
+    addProduct: addSessionProduct,
     setQuantity,
     clearSale,
     startSale,
@@ -202,13 +203,13 @@ export function MarketQuickSaleWorkspace({
   const currency = cartLines[0]?.product.currency ?? "TRY";
 
   const addProduct = useCallback((product: CatalogProduct) => {
-    const result = session.addProduct(product);
+    const result = addSessionProduct(product);
     if (result === "currency_mismatch") {
       onStateChange("error", "Tek satışta birden fazla para birimi kullanılamaz.");
       return false;
     }
     return result === "added";
-  }, [onStateChange, session]);
+  }, [addSessionProduct, onStateChange]);
 
   const resolveBarcode = useCallback(async (barcode: string, source: string) => {
     if (!bridge) return "stale" as const;
