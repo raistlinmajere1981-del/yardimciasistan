@@ -1,6 +1,7 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopPage } from "../../app/navigation";
 import type { SyncState } from "../../app/runtime-state";
+import { useMarketController } from "../../app/use-market-controller";
 import type {
   AppLockController,
   CustomerController,
@@ -55,6 +56,10 @@ export function DesktopAppView({
   deviceController
 }: DesktopAppViewProps) {
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
+  const marketController = useMarketController({
+    businessCapabilities: desktopSyncController.businessCapabilities,
+    active: activePage === "market"
+  });
   const {
     phase: appAccessPhase,
     status: appLockStatus,
@@ -91,6 +96,7 @@ export function DesktopAppView({
       menuController={menuController}
       messagingController={messagingController}
       customerController={customerController}
+      marketController={marketController}
     >
       <DesktopWorkspaceRouter
         activePage={activePage}
@@ -103,6 +109,7 @@ export function DesktopAppView({
         menuController={menuController}
         messagingController={messagingController}
         customerController={customerController}
+        marketController={marketController}
         operationController={operationController}
         deviceController={deviceController}
         uiPreferences={uiPreferences}
