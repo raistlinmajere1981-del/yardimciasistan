@@ -101,6 +101,16 @@ try {
     partialResult.data.recentEntries.some((entry) => entry.sourceType === "pension_payment" && entry.amountMinor === 100000),
     "Pension payment must create an automatic finance income entry."
   );
+  const automaticPaymentEntry = partialResult.data.recentEntries.find(
+    (entry) => entry.sourceType === "pension_payment" && entry.amountMinor === 100000
+  );
+  assert.ok(automaticPaymentEntry);
+  const automaticDelete = service.deleteManualEntry(automaticPaymentEntry.id);
+  assert.equal(automaticDelete.ok, false, "Automatic finance entries must not be deletable through the manual-entry operation.");
+  assert.ok(
+    service.getData().recentEntries.some((entry) => entry.id === automaticPaymentEntry.id),
+    "Rejected automatic-entry deletion must leave the finance projection intact."
+  );
 
   const overpay = service.addPensionPayment({
     reservationId: "finance_service_reservation",
