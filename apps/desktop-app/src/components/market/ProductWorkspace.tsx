@@ -28,6 +28,7 @@ export function ProductWorkspace({
   categories,
   inventoryEnabled,
   productDataEnabled,
+  busy,
   onReload,
   onStateChange
 }: {
@@ -36,6 +37,7 @@ export function ProductWorkspace({
   categories: CatalogCategory[];
   inventoryEnabled: boolean;
   productDataEnabled: boolean;
+  busy: boolean;
   onReload: () => Promise<void>;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
 }) {
@@ -55,7 +57,7 @@ export function ProductWorkspace({
   const beginSaveRequest = useRequestGeneration();
   const dirty = JSON.stringify(form) !== JSON.stringify(baseline);
   const closeBlocked = useWorkspaceCloseGuard({
-    busy: resourceState === "loading" || saveState === "loading",
+    busy: busy || resourceState === "loading" || saveState === "loading",
     dirty
   });
 
@@ -116,7 +118,7 @@ export function ProductWorkspace({
   }, [loadProductResources, loadedProductId, product]);
 
   async function saveProduct() {
-    if (!bridge || !product || resourceState === "loading" || saveState === "loading") return;
+    if (!bridge || !product || busy || resourceState === "loading" || saveState === "loading") return;
     const isCurrent = beginSaveRequest();
     setSaveState("loading");
     setSaveMessage("Ürün kartı kaydediliyor...");
@@ -222,12 +224,12 @@ export function ProductWorkspace({
       footer={<>
         <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
         <div className="action-row">
-          <ActionButton variant="secondary" type="button" disabled={saveState === "loading" || !dirty} onClick={() => {
+          <ActionButton variant="secondary" type="button" disabled={busy || saveState === "loading" || !dirty} onClick={() => {
             setForm(baseline);
             setSaveState("idle");
             setSaveMessage("Kaydedilmemiş değişiklikler geri alındı.");
           }}>Değişiklikleri Geri Al</ActionButton>
-          <ActionButton type="button" disabled={saveState === "loading" || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
+          <ActionButton type="button" disabled={busy || saveState === "loading" || resourceState !== "success" || !dirty} onClick={() => void saveProduct()}>
             <Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}
           </ActionButton>
         </div>
@@ -240,7 +242,7 @@ export function ProductWorkspace({
             categories={categories}
             inventoryEnabled={inventoryEnabled}
             productDataEnabled={productDataEnabled}
-            disabled={resourceState !== "success" || saveState === "loading"}
+            disabled={busy || resourceState !== "success" || saveState === "loading"}
             mode="details"
             localImageDataUrl={localImageDataUrl}
             onChange={setForm}
@@ -276,7 +278,7 @@ export function ProductWorkspace({
           categories={categories}
           inventoryEnabled={inventoryEnabled}
           productDataEnabled={productDataEnabled}
-          disabled={resourceState !== "success" || saveState === "loading"}
+          disabled={busy || resourceState !== "success" || saveState === "loading"}
           mode="media"
           localImageDataUrl={localImageDataUrl}
           onChange={setForm}
