@@ -412,12 +412,13 @@ Rules:
 
 Each feature updates its tests at the same time.
 
-Implementation status (2026-09-23):
+Implementation status (2026-09-24):
 
 - Stage 8A — Customer Workspace: closed and verified.
 - Stage 8B — Market Workspace: closed and verified.
 - Stage 8C — Menu Item Workspace: closed and verified.
-- Next: Stage 8D — Finance.
+- Stage 8D — Finance Workspace: closed and verified.
+- Next: Stage 8E — Messages / AI.
 
 ---
 
