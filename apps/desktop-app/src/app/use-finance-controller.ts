@@ -364,17 +364,15 @@ export function useFinanceController({
     financeEpoch.current += 1;
     financeLoadGeneration.current += 1;
     setLoading(false);
-
-    if (!enabled || !financeEnabled) {
-      if (!financeEnabled) {
-        setData(EMPTY_FINANCE_DATA);
-        setMessage("");
-        setDraft(emptyDraft());
-      }
-      return;
+    if (!financeEnabled) {
+      setData(EMPTY_FINANCE_DATA);
+      setMessage("");
+      setDraft(emptyDraft());
     }
+  }, [enabled, financeEnabled]);
 
-    if (active) void refreshFinanceData();
+  useEffect(() => {
+    if (enabled && financeEnabled && active) void refreshFinanceData();
   }, [active, enabled, financeEnabled, refreshFinanceData]);
 
   useEffect(() => {
@@ -382,9 +380,11 @@ export function useFinanceController({
     setRoomLoading(false);
     if (!enabled || !accommodationFolioEnabled) {
       setRoomData(EMPTY_FINANCE_ROOM_DATA);
-      return;
     }
-    if (active) void refreshRoomData();
+  }, [accommodationFolioEnabled, enabled]);
+
+  useEffect(() => {
+    if (enabled && accommodationFolioEnabled && active) void refreshRoomData();
   }, [active, accommodationFolioEnabled, enabled, refreshRoomData]);
 
   useEffect(() => {
@@ -392,7 +392,7 @@ export function useFinanceController({
     if (incomeCategoryAllowed(draft.category, accommodationEnabled, foodServiceEnabled)) return;
     if (mutationInFlight.current) return;
     setDraft((current) => ({ ...current, category: "other_income" }));
-  }, [accommodationEnabled, draft.category, draft.mode, foodServiceEnabled]);
+  }, [accommodationEnabled, draft.category, draft.mode, foodServiceEnabled, mutationType]);
 
   return {
     data,
