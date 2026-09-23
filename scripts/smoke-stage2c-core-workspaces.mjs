@@ -35,7 +35,7 @@ try {
       localStorage.setItem(preferenceStorageKey, JSON.stringify({ version: 2, scheme: "light", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
 
-    const financeData = {
+    let financeData = {
       generatedAt: "2026-09-15T10:00:00Z",
       currency: "TRY",
       todayIncomeMinor: 150000,
@@ -45,36 +45,45 @@ try {
       recentEntries: [
         {
           id: "entry-1",
-          entryType: "income",
-          category: "sales",
+          direction: "income",
           amountMinor: 150000,
           currency: "TRY",
           paymentMethod: "cash",
-          note: "Günlük satış hasılatı",
-          source: "manual",
+          category: "other_income",
+          description: "Günlük satış hasılatı",
           occurredAt: "2026-09-15T09:30:00Z",
+          sourceType: "manual",
+          sourceId: "",
+          note: "",
           createdAt: "2026-09-15T09:30:00Z"
         },
         {
           id: "entry-2",
-          entryType: "expense",
-          category: "supplies",
+          direction: "expense",
           amountMinor: 45000,
           currency: "TRY",
-          paymentMethod: "bank_transfer",
-          note: "Mutfak toptan alışverişi",
-          source: "manual",
+          paymentMethod: "bank",
+          category: "stock",
+          description: "Mutfak toptan alışverişi",
           occurredAt: "2026-09-15T09:45:00Z",
+          sourceType: "manual",
+          sourceId: "",
+          note: "",
           createdAt: "2026-09-15T09:45:00Z"
         }
       ],
       pensionBalances: [
         {
-          customerId: "compact_customer_1",
+          reservationId: "compact_reservation_1",
+          title: "Deniz Manzaralı Oda",
           customerName: "Deniz Yılmaz",
-          roomNumber: "101",
-          balanceMinor: 25000,
-          currency: "TRY"
+          startDate: "2026-09-15",
+          endDate: "2026-09-17",
+          agreedTotalMinor: 100000,
+          paidTotalMinor: 75000,
+          remainingMinor: 25000,
+          currency: "TRY",
+          paymentStatus: "partial"
         }
       ]
     };
@@ -185,20 +194,34 @@ try {
         capabilities: enabledCapabilities.map((capability) => ({ capability, enabled: true, source: "profile" }))
       }),
       getFinanceData: async () => financeData,
-      recordFinanceManualEntry: async (entry) => {
+      saveManualFinanceEntry: async (entry) => {
         const id = `entry-${Date.now()}`;
-        financeData.recentEntries.unshift({
+        const created = {
           ...entry,
           id,
           currency: "TRY",
-          source: "manual",
+          sourceType: "manual",
+          sourceId: "",
+          note: "",
           createdAt: new Date().toISOString()
-        });
-        return { ok: true, message: "Kasa hareketi kaydedildi." };
+        };
+        const incomeDelta = entry.direction === "income" ? entry.amountMinor : 0;
+        const expenseDelta = entry.direction === "expense" ? entry.amountMinor : 0;
+        financeData = {
+          ...financeData,
+          todayIncomeMinor: financeData.todayIncomeMinor + incomeDelta,
+          todayExpenseMinor: financeData.todayExpenseMinor + expenseDelta,
+          todayNetMinor: financeData.todayNetMinor + incomeDelta - expenseDelta,
+          recentEntries: [created, ...financeData.recentEntries]
+        };
+        return { ok: true, message: "Kasa hareketi kaydedildi.", data: financeData };
       },
-      deleteFinanceManualEntry: async (entryId) => {
-        financeData.recentEntries = financeData.recentEntries.filter((e) => e.id !== entryId);
-        return { ok: true, message: "Kayıt silindi." };
+      deleteManualFinanceEntry: async (entryId) => {
+        financeData = {
+          ...financeData,
+          recentEntries: financeData.recentEntries.filter((entry) => entry.id !== entryId)
+        };
+        return { ok: true, message: "Kayıt silindi.", data: financeData };
       },
       getReportData: async () => report,
       generateReportAiComment: async ({ mode }) => ({
@@ -212,10 +235,13 @@ try {
         folios: [
           {
             id: "folio-101",
+            reservationId: "compact_reservation_1",
             status: "open",
             roomNumber: "101",
             roomName: "Deniz Manzaralı Oda",
-            customerName: "Deniz Yılmaz"
+            customerName: "Deniz Yılmaz",
+            plannedCheckOutDate: "2026-09-17",
+            remainingMinor: 25000
           }
         ],
         menuCategories: dashboard.menu.categories,
