@@ -18,6 +18,7 @@ import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
 import type { MarketQuickSaleSession } from "../../app/use-market-quick-sale-session";
+import { useRequestGeneration } from "../workspace/use-request-generation";
 
 type BarcodeMode = "keyboard-wedge" | "simulator";
 
@@ -141,6 +142,7 @@ export function MarketQuickSaleWorkspace({
   const [lastScanDevice, setLastScanDevice] = useState("");
   const localScanInFlight = useRef(false);
   const interactionBlocked = useRef(false);
+  const beginBarcodeRequest = useRequestGeneration();
   const {
     cart,
     cartRef,
@@ -209,51 +211,64 @@ export function MarketQuickSaleWorkspace({
   }, [onStateChange, session]);
 
   const resolveBarcode = useCallback(async (barcode: string, source: string) => {
-    if (!bridge) return;
+    if (!bridge) return "stale" as const;
+    const isCurrent = beginBarcodeRequest();
     setSearch("");
     setBarcodeMessage(`${source}: ${barcode} aranıyor…`);
     try {
       const product = await bridge.findProductByBarcode(barcode);
+      if (!isCurrent()) return "stale" as const;
       if (!product || !product.isActive) {
         if (typeof bridge.lookupExternalProductByBarcode === "function") {
           const lookup = await bridge.lookupExternalProductByBarcode(barcode, "automatic");
+          if (!isCurrent()) return "stale" as const;
           if (lookup.status === "found") {
             const message = `${lookup.product.name} bulundu; ürün kartı hazırlanıyor.`;
             setBarcodeMessage(message);
             onStateChange("success", message);
             onExternalProductFound?.(lookup.product);
-            return;
+            return "handoff" as const;
           }
         }
+        if (!isCurrent()) return "stale" as const;
         const message = `Barkod bulunamadı: ${barcode}`;
         setBarcodeMessage(message);
         onStateChange("error", message);
-        return;
+        return "not_found" as const;
       }
+      if (!isCurrent()) return "stale" as const;
       if (addProduct(product)) {
         setBarcodeMessage(`${product.name} sepete eklendi · ${source}`);
+        return "added" as const;
       }
+      return "stale" as const;
     } catch (error) {
+      if (!isCurrent()) return "stale" as const;
       const message = error instanceof Error ? error.message : "Barkod okunamadı.";
       setBarcodeMessage(message);
       onStateChange("error", message);
+      return "not_found" as const;
     }
-  }, [addProduct, bridge, onExternalProductFound, onStateChange]);
+  }, [addProduct, beginBarcodeRequest, bridge, onExternalProductFound, onStateChange]);
 
   const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
     if (!barcodeEnabled || busy || submitting || localScanInFlight.current) return;
+    const isCurrent = beginBarcodeRequest();
     localScanInFlight.current = true;
     setScanning(true);
     try {
       await resolveBarcode(scan.value, barcodeSourceLabel(scan));
     } finally {
       localScanInFlight.current = false;
-      setScanning(false);
+      if (isCurrent()) setScanning(false);
     }
-  }, [barcodeEnabled, busy, resolveBarcode, submitting]);
+  }, [barcodeEnabled, beginBarcodeRequest, busy, resolveBarcode, submitting]);
 
   useEffect(() => {
-    if (!barcodeEnabled) return;
+    if (!barcodeEnabled) {
+      beginBarcodeRequest();
+      return;
+    }
     const adapter = barcodeMode === "simulator" ? simulatorAdapter : keyboardAdapter;
     setBarcodeMessage(barcodeMode === "simulator"
       ? "Simülatör hazır; test barkodunu girin."
@@ -261,7 +276,7 @@ export function MarketQuickSaleWorkspace({
     return adapter.start((scan) => {
       void handleBarcodeScan(scan);
     });
-  }, [barcodeEnabled, barcodeMode, handleBarcodeScan, keyboardAdapter, simulatorAdapter]);
+  }, [barcodeEnabled, barcodeMode, beginBarcodeRequest, handleBarcodeScan, keyboardAdapter, simulatorAdapter]);
 
   useEffect(() => {
     if (!cartDraftRequest || loadedDraftRequestId.current === cartDraftRequest.requestId || !bridge) return;
@@ -270,17 +285,9 @@ export function MarketQuickSaleWorkspace({
     void bridge.loadCartDraftForQuickSale(cartDraftRequest.draftId)
       .then((result) => {
         if (cancelled) return;
-        loadedDraftRequestId.current = cartDraftRequest.requestId;
-        const warnings = result.skippedItems.map(
-          (item) => `${item.productName || item.productId} ürünü artık aktif olmadığı için sepete eklenmedi.`
-        );
-        replaceCart(result.items.map((item) => ({ product: item.product, quantity: item.quantity })));
-        setDiscountTotal("0");
-        setPaymentMethod("cash");
-        setCustomerId("");
-        setSourceDraft(result.draft);
-        setDraftLoadWarnings(warnings);
-        setLastSale(null);
+        beginBarcodeRequest();
+        const warnings = applyLoadedDraft(cartDraftRequest.requestId, result);
+        if (!warnings) return;
         void onCartDraftLoaded?.(result.draft.id);
         onStateChange(
           "success",
@@ -297,7 +304,7 @@ export function MarketQuickSaleWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [bridge, cartDraftRequest, onCartDraftLoaded, onStateChange, replaceCart]);
+  }, [applyLoadedDraft, beginBarcodeRequest, bridge, cartDraftRequest, loadedDraftRequestId, onCartDraftLoaded, onStateChange]);
 
   interactionBlocked.current = busy || submitting;
 
@@ -309,6 +316,7 @@ export function MarketQuickSaleWorkspace({
     const activeBridge = bridge;
     let disposed = false;
     let intervalId: ReturnType<typeof setInterval> | undefined;
+    const scanner = acquirePhoneScanner(activeBridge);
     setPhoneBarcodeReady(false);
 
     async function consume() {
@@ -316,27 +324,29 @@ export function MarketQuickSaleWorkspace({
       localScanInFlight.current = true;
       try {
         const events = await activeBridge.consumePendingBarcodeScans({ limit: 100 });
+        if (disposed) return;
         for (const event of events) {
+          if (disposed || interactionBlocked.current) break;
           setLastScanDevice(event.deviceId || "Bilinmeyen cihaz");
-          await resolveBarcode(event.barcode, `Telefon · ${event.deviceId || "Bilinmeyen cihaz"}`);
+          const outcome = await resolveBarcode(event.barcode, `Telefon · ${event.deviceId || "Bilinmeyen cihaz"}`);
+          if (disposed || outcome === "handoff" || outcome === "stale") break;
         }
       } catch (error) {
-        const message = error instanceof Error ? error.message : "Telefon barkodları alınamadı.";
-        onStateChange("error", message);
+        if (!disposed) {
+          const message = error instanceof Error ? error.message : "Telefon barkodları alınamadı.";
+          onStateChange("error", message);
+        }
       } finally {
         localScanInFlight.current = false;
       }
     }
 
-    void activeBridge.setBarcodeScanMode(true)
-      .then(() => {
-        if (disposed) {
-          return activeBridge.setBarcodeScanMode(false).then(() => undefined);
-        }
+    void scanner.ready
+      .then((ready) => {
+        if (disposed || !ready) return;
         setPhoneBarcodeReady(true);
         void consume();
         intervalId = setInterval(() => void consume(), 600);
-        return undefined;
       })
       .catch((error) => {
         if (disposed) return;
@@ -346,30 +356,11 @@ export function MarketQuickSaleWorkspace({
 
     return () => {
       disposed = true;
+      beginBarcodeRequest();
       if (intervalId) clearInterval(intervalId);
-      void activeBridge.setBarcodeScanMode(false).catch(() => undefined);
+      releasePhoneScanner(activeBridge, scanner.lease);
     };
-  }, [barcodeEnabled, bridge, onStateChange, resolveBarcode]);
-
-  function setQuantity(productId: string, quantityInput: number) {
-    const quantity = roundQuantity(quantityInput);
-    if (!Number.isFinite(quantity) || quantity <= 0) {
-      replaceCart(cartRef.current.filter((line) => line.product.id !== productId));
-      return;
-    }
-    replaceCart(cartRef.current.map((line) => line.product.id === productId
-      ? { ...line, quantity }
-      : line));
-  }
-
-  function clearSale() {
-    replaceCart([]);
-    setDiscountTotal("0");
-    setPaymentMethod("cash");
-    setCustomerId("");
-    setSourceDraft(null);
-    setDraftLoadWarnings([]);
-  }
+  }, [barcodeEnabled, beginBarcodeRequest, bridge, onStateChange, resolveBarcode]);
 
   function submitSimulatedBarcode() {
     const scan = simulatorAdapter.submit(simulatedBarcode);
