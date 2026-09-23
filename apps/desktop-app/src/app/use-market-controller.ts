@@ -7,6 +7,7 @@ import {
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import { runtimeHasCapability } from "./capabilities";
 import { reportAppStatus } from "./runtime-state";
+import { useMarketQuickSaleSession } from "./use-market-quick-sale-session";
 
 export type MarketAsyncState = "idle" | "loading" | "success" | "error";
 
@@ -21,6 +22,8 @@ export function useMarketController({
 }) {
   const bridge = window.yardimciDesktop?.commerce;
   const catalogEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CATALOG);
+  const customerCreditEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT);
+  const quickSaleSession = useMarketQuickSaleSession({ customerCreditEnabled });
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<MarketAsyncState>("idle");
@@ -119,6 +122,7 @@ export function useMarketController({
     categories,
     dataState,
     productDataEnabled,
+    quickSaleSession,
     reloadCatalog,
     upsertProduct,
     handleStateChange
