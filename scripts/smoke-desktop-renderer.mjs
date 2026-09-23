@@ -1017,8 +1017,9 @@ try {
   await conversionPage.getByRole("button", { name: "AI ile Yenile" }).click();
   await expect(conversionPage.getByText("Hazır mesaj yenilendi. Göndermeden önce kontrol edin.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
-  await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
-  await conversionPage.getByRole("button", { name: "Geçmişi Özetle" }).click();
+  await conversionPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
+  await conversionPage.locator(".customer-record-row").first().click();
+  await conversionPage.getByRole("dialog").getByRole("button", { name: "Geçmişi Özetle" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Mesajlar" })).toBeVisible();
   await expect(conversionPage.getByText("AI önerileri")).toBeVisible();
   await conversionPage.getByLabel("Ek talimat isteğe bağlı").fill("Kısa ve samimi yaz.");
@@ -1077,12 +1078,16 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Reddet", exact: true })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
-  await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
+  await conversionPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
   await expect(conversionPage.getByLabel("Müşteri yönetimi")).toBeVisible();
-  await expect(conversionPage.getByRole("heading", { name: "Smoke Misafir" })).toBeVisible();
-  await expect(conversionPage.getByRole("button", { name: "Müşteriyi Sil" })).toBeVisible();
+  await conversionPage.locator(".customer-record-row").first().click();
+  const smokeCustomerWorkspace = conversionPage.getByRole("dialog", { name: "Smoke Misafir" });
+  await expect(smokeCustomerWorkspace).toBeVisible();
+  await expect(smokeCustomerWorkspace.getByRole("button", { name: "Müşteriyi Sil" })).toBeVisible();
+  await smokeCustomerWorkspace.getByRole("tab", { name: "Geçmiş", exact: true }).click();
+  await expect(smokeCustomerWorkspace.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
+  await smokeCustomerWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await conversionPage.getByLabel("Ara", { exact: true }).fill("Smoke");
-  await expect(conversionPage.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Restoran" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Restoran" })).toBeVisible();
   await conversionPage.getByRole("button", { name: "Günlük İşler", exact: true }).click();
@@ -1131,7 +1136,7 @@ try {
   await conversionPage.getByRole("button", { name: "Filtreyi Temizle" }).click();
   await expect(conversionPage.getByRole("button", { name: "WhatsApp", exact: true }).first()).toBeVisible();
   await conversionPage.getByRole("button", { name: "Müşteri İşleri", exact: true }).click();
-  await conversionPage.getByRole("tab", { name: "Müşteriler" }).click();
+  await conversionPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
   await conversionPage.getByRole("button", { name: "Yeni Müşteri" }).click();
   const customerEditor = conversionPage.getByRole("dialog", { name: "Yeni müşteri ekle" });
   await expect(customerEditor).toBeVisible();
@@ -1147,9 +1152,11 @@ try {
   await customerEditor.getByLabel("Not", { exact: true }).fill("Resepsiyondan manuel oluşturulan müşteri kartı.");
   await customerEditor.getByRole("button", { name: "Müşteri Kartını Kaydet" }).click();
   await expect(customerEditor).toHaveCount(0);
-  await expect(conversionPage.getByRole("heading", { name: "Kimlik Smoke" })).toBeVisible();
-  await expect(conversionPage.getByText("U12345678", { exact: true })).toBeVisible();
+  const createdCustomer = conversionPage.getByRole("dialog", { name: "Kimlik Smoke" });
+  await expect(createdCustomer).toBeVisible();
+  await expect(createdCustomer.getByText("U12345678", { exact: true })).toBeVisible();
   await expect.poll(() => conversionPage.evaluate(() => window.__identityAnalysisCalls.length)).toBe(1);
+  await createdCustomer.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
 
   await conversionPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
   await conversionPage.getByRole("button", { name: "Odalar", exact: true }).click();
@@ -1449,7 +1456,7 @@ try {
   await expect(compactPage.getByRole("dialog", { name: "Yeni talep ekle" })).toHaveCount(0);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-customer-work-1366x768.png" });
 
-  await compactPage.getByRole("tab", { name: "Müşteriler" }).click();
+  await compactPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
   const compactCustomerRows = compactPage.locator(".customers-workspace .list-row--button");
   await expect(compactCustomerRows).toHaveCount(8);
 

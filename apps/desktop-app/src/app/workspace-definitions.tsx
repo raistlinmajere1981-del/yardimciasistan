@@ -1,8 +1,9 @@
 import type { ComponentProps } from "react";
 import { RoomWorkspace } from "../components/pension/RoomWorkspace";
 import { TableWorkspace } from "../components/restaurant/TableWorkspace";
+import { CustomerWorkspace } from "../components/customers/CustomerWorkspace";
 import type { WorkspaceDefinition } from "../components/workspace/workspace-definition";
-import type { RoomWorkspaceIntent, TableWorkspaceIntent } from "../components/workspace/workspace-intent";
+import type { CustomerWorkspaceIntent, RoomWorkspaceIntent, TableWorkspaceIntent } from "../components/workspace/workspace-intent";
 
 export const roomWorkspaceDefinition: WorkspaceDefinition<RoomWorkspaceIntent, Omit<ComponentProps<typeof RoomWorkspace>, "intent">> = {
   entityType: "room",
@@ -16,4 +17,10 @@ export const tableWorkspaceDefinition: WorkspaceDefinition<TableWorkspaceIntent,
   render: (intent, context) => <TableWorkspace {...context} intent={intent} />
 };
 
-export const workspaceDefinitions = [roomWorkspaceDefinition, tableWorkspaceDefinition] as const;
+export const customerWorkspaceDefinition: WorkspaceDefinition<CustomerWorkspaceIntent, Omit<ComponentProps<typeof CustomerWorkspace>, "intent">> = {
+  entityType: "customer",
+  defaultPresentation: "centered",
+  render: (intent, context) => <CustomerWorkspace {...context} intent={intent} />
+};
+
+export const workspaceDefinitions = [roomWorkspaceDefinition, tableWorkspaceDefinition, customerWorkspaceDefinition] as const;

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
+import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
 
 export type CustomerWorkTab = "requests" | "customers";
 
@@ -13,28 +14,18 @@ export function CustomerWorkPage({ requestsEnabled, requests, customers }: Custo
   const [activeTab, setActiveTab] = useState<CustomerWorkTab>(requestsEnabled ? "requests" : "customers");
 
   useEffect(() => {
-    if (!requestsEnabled && activeTab === "requests") {
-      setActiveTab("customers");
-    }
+    if (!requestsEnabled && activeTab === "requests") setActiveTab("customers");
   }, [activeTab, requestsEnabled]);
 
+  const views: readonly { id: CustomerWorkTab; label: string }[] = requestsEnabled
+    ? [{ id: "requests", label: "Talepler" }, { id: "customers", label: "Müşteriler" }]
+    : [{ id: "customers", label: "Müşteriler" }];
   const content = requestsEnabled && activeTab === "requests" ? requests : customers;
+  const bodyLabel = activeTab === "requests" && requestsEnabled ? "Talep yönetimi görünümü" : "Müşteri yönetimi görünümü";
 
-  return (
-    <section className="combined-page customer-work-page" aria-label="Müşteri işleri">
-      {requestsEnabled && (
-        <SegmentedControl
-          className="customer-work-tabs"
-          value={activeTab}
-          ariaLabel="Müşteri işleri bölümleri"
-          onChange={setActiveTab}
-          options={[
-            { id: "requests", label: "Talepler" },
-            { id: "customers", label: "Müşteriler" }
-          ]}
-        />
-      )}
-      <div className={`customer-work-content is-${requestsEnabled ? activeTab : "customers"}`}>{content}</div>
-    </section>
-  );
+  return <FeatureWorkspacePage
+    label="Müşteri işleri"
+    bodyLabel={bodyLabel}
+    toolbar={<FeatureViewSelector items={views} value={requestsEnabled ? activeTab : "customers"} onChange={setActiveTab} label="Müşteri işleri görünümü" />}
+  >{content}</FeatureWorkspacePage>;
 }

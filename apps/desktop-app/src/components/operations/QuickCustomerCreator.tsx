@@ -4,6 +4,7 @@ import type {
   DesktopCustomerMutationResult,
   SaveCustomerInput
 } from "../../../electron/database";
+import { customerFormToInput, toCustomerForm } from "../../app/customer-model";
 import { ActionButton } from "../ui/ActionButton";
 
 type QuickCustomerState = "idle" | "loading" | "success" | "error";
@@ -15,25 +16,11 @@ interface QuickCustomerCreatorProps {
 }
 
 function createQuickCustomerInput(fullName: string, phone: string): SaveCustomerInput {
-  return {
+  return customerFormToInput({
+    ...toCustomerForm(null),
     fullName: fullName.trim(),
-    phone: phone.trim(),
-    email: "",
-    notes: "",
-    tags: [],
-    identityType: "",
-    identityNumber: "",
-    nationality: "",
-    birthDate: "",
-    gender: "",
-    documentSerialNumber: "",
-    documentExpiryDate: "",
-    birthPlace: "",
-    motherName: "",
-    fatherName: "",
-    issuingAuthority: "",
-    address: ""
-  };
+    phone: phone.trim()
+  });
 }
 
 export function QuickCustomerCreator({ disabled = false, onSave, onCreated }: QuickCustomerCreatorProps) {

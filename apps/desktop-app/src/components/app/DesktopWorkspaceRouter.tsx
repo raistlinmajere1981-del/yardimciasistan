@@ -469,22 +469,10 @@ export function DesktopWorkspaceRouter({
           customers={(
             <CustomersWorkspace
               customers={surfaceData.customers}
-              requests={surfaceData.requests}
-              reservations={surfaceData.reservations}
-              rooms={surfaceData.rooms}
               stays={surfaceData.customerRoomStays}
               aiEnabled={aiEnabled}
-              whatsappEnabled={whatsappEnabled}
-              reservationsEnabled={accommodationReservationsEnabled || foodReservationsEnabled}
-              staysEnabled={accommodationStaysEnabled}
-              customerCreditEnabled={runtimeHasCapability(businessCapabilities, C.CUSTOMER_CREDIT)}
-              onPreparedCreditWhatsApp={messagingController.openPreparedCreditWhatsApp}
-              onCall={callCustomerRecord}
-              onWhatsApp={openCustomerWhatsApp}
-              onSummarize={(requestId) => openAiTools("summary", requestId)}
               onSave={handleSaveCustomer}
               onAnalyzeIdentity={handleAnalyzeIdentityImage}
-              onDelete={handleDeleteCustomer}
             />
           )}
         />

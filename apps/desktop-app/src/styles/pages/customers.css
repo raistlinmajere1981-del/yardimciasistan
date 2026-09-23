@@ -309,3 +309,33 @@
 .customer-credit-sale-summary dd {
   margin: 0;
 }
+
+
+/* Stage 8A: page is a launcher/projection; one customer is owned by Customer Workspace. */
+.customers-workspace {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--space-3);
+}
+.customers-workspace__items { min-height: 0; overflow: auto; }
+.customer-workspace-summary,
+.customer-workspace-form { display: grid; gap: var(--space-4); }
+.customer-stay-actions { align-items: end; }
+.customer-workspace-savebar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-bg-surface);
+}
+.customer-workspace-savebar > .form-status { margin: 0; }
+.customer-create-form { gap: var(--space-4); }
+@media (max-width: 760px) {
+  .customer-workspace-savebar { align-items: stretch; flex-direction: column; }
+}

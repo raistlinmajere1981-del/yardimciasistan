@@ -9,10 +9,16 @@ export function intentContracts(intent: WorkspaceIntent) {
     const customer: string | undefined = intent.customerId;
     return { action, customer };
   }
-  const action: "room-transfer" | undefined = intent.action;
-  // @ts-expect-error Table intent cannot acquire the Room-specific payload.
+  if (intent.entityType === "table") {
+    const action: "room-transfer" | undefined = intent.action;
+    // @ts-expect-error Table intent cannot acquire the Room-specific payload.
+    const _customer = intent.customerId;
+    return { action };
+  }
+  const mode: "summary" | "details" | "history" | "account" | undefined = intent.mode;
+  // @ts-expect-error Customer intent cannot acquire the Room-specific payload.
   const _customer = intent.customerId;
-  return { action };
+  return { mode };
 }
 
 export const validReturns: WorkspaceReturnContext[] = [
@@ -26,6 +32,8 @@ export const unknown: WorkspaceIntent = { entityType: "unknown", entityId: "1" }
 export const wrongAction: WorkspaceIntent = { entityType: "room", entityId: "1", action: "room-transfer" };
 // @ts-expect-error Room cannot request a Table mode.
 export const wrongMode: WorkspaceModeUpdate = { entityType: "room", mode: "order" };
+// @ts-expect-error Customer cannot request a Room action.
+export const wrongCustomerAction: WorkspaceIntent = { entityType: "customer", entityId: "1", action: "payment" };
 // @ts-expect-error Pension views cannot contain Floor.
 export const wrongPensionView: WorkspaceReturnContext = { page: "pension", view: "floor" };
 // @ts-expect-error Restaurant views cannot contain Rooms.

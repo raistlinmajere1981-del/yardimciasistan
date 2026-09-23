@@ -1,587 +1,94 @@
-import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
-import { useDialogFocus } from "../ui/useDialogFocus";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BedDouble, CreditCard, MessageCircle, Pencil, Phone, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react";
-import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
-import type {
-  DesktopCustomerMutationResult,
-  DesktopDashboardData,
-  DesktopIdentityImageAnalyzeResult,
-  DesktopStatusUpdateResult,
-  SaveCustomerInput
-} from "../../../electron/database";
-import {
-  customerFormToInput,
-  formatCustomerGender,
-  formatCustomerLastContactDate,
-  formatCustomerRoomStayStatus,
-  formatCustomerSource,
-  formatIdentityType,
-  formatStayDateRange,
-  hasCustomerIdentityDetails,
-  toCustomerForm,
-  type CustomerFormState
-} from "../../app/customer-model";
-import {
-  formatDateForDisplay,
-  formatRequestStatus,
-  formatRequestType,
-  formatReservationDate,
-  formatReservationStatus,
-  formatShortDate
-} from "../../app/record-formatters";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Save, Users } from "lucide-react";
+import type { DesktopCustomerMutationResult, DesktopDashboardData, DesktopIdentityImageAnalyzeResult, SaveCustomerInput } from "../../../electron/database";
+import { customerFormToInput, formatCustomerSource, toCustomerForm, type CustomerFormState } from "../../app/customer-model";
+import { formatShortDate } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton } from "../ui/DataList";
-import { StatusBadge } from "../ui/StatusBadge";
-import { CustomerCreditPanel } from "./CustomerCreditPanel";
-import { customerCreditError } from "../../app/customer-credit-ui";
-import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
+import { FormDialog } from "../ui/FormDialog";
+import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
+import { CustomerFormFields } from "./CustomerFormFields";
 
-type SyncState = "idle" | "loading" | "success" | "error";
+type SaveState = "idle" | "loading" | "error";
 
 interface CustomersWorkspaceProps {
   customers: DesktopDashboardData["customers"];
-  requests: SyncedCustomerRequest[];
-  reservations: DesktopDashboardData["reservations"];
-  rooms: DesktopDashboardData["rooms"];
   stays: DesktopDashboardData["customerRoomStays"];
   aiEnabled: boolean;
-  whatsappEnabled: boolean;
-  reservationsEnabled: boolean;
-  staysEnabled: boolean;
-  customerCreditEnabled?: boolean;
-  onPreparedCreditWhatsApp?: (message: PreparedWhatsAppMessage) => void;
-  onCall: (customer: DesktopDashboardData["customers"][number]) => void;
-  onWhatsApp: (customer: DesktopDashboardData["customers"][number]) => void;
-  onSummarize: (requestId: string) => void;
   onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
-  onDelete: (customer: DesktopDashboardData["customers"][number]) => Promise<DesktopStatusUpdateResult | undefined>;
 }
 
-export function CustomersWorkspace({
-  customers,
-  requests,
-  reservations,
-  rooms,
-  stays,
-  aiEnabled,
-  whatsappEnabled,
-  reservationsEnabled,
-  staysEnabled,
-  customerCreditEnabled = false,
-  onPreparedCreditWhatsApp,
-  onCall,
-  onWhatsApp,
-  onSummarize,
-  onSave,
-  onAnalyzeIdentity,
-  onDelete
-}: CustomersWorkspaceProps) {
-  const [searchText, setSearchText] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id ?? "");
-  const [customerEditorOpen, setCustomerEditorOpen] = useState(false);
-  const [customerBeingEdited, setCustomerBeingEdited] = useState<DesktopDashboardData["customers"][number] | null>(null);
+export function CustomersWorkspace({ customers, stays, aiEnabled, onSave, onAnalyzeIdentity }: CustomersWorkspaceProps) {
   const navigation = useWorkspaceNavigation();
-  const [entryRoomId, setEntryRoomId] = useState(rooms.find(room => room.isActive)?.id ?? "");
-  const [deleteError, setDeleteError] = useState<{ customerId: string; message: string } | null>(null);
-  const filteredCustomers = useMemo(
-    () =>
-      customers.filter((customer) => {
-        const customerStays = stays
-          .filter((stay) => stay.customerId === customer.id)
-          .map((stay) => `${stay.roomName} ${stay.roomNumber}`)
-          .join(" ");
-        const haystack = `${customer.fullName} ${customer.phone} ${customer.email} ${customer.identityNumber} ${customer.tags.join(" ")} ${customerStays}`.toLowerCase();
-        return haystack.includes(searchText.trim().toLowerCase());
-      }),
-    [customers, searchText, stays]
-  );
-  const selectedCustomer = filteredCustomers.find((customer) => customer.id === selectedCustomerId) ?? filteredCustomers[0] ?? null;
-  const selectedRequests = selectedCustomer
-    ? requests.filter((request) => request.customer_id === selectedCustomer.id || request.customer_phone === selectedCustomer.phone)
-    : [];
-  const selectedReservations = selectedCustomer
-    ? reservations.filter((reservation) => reservation.customerId === selectedCustomer.id || reservation.customerPhone === selectedCustomer.phone)
-    : [];
-  const selectedStays = selectedCustomer
-    ? stays.filter((stay) => stay.customerId === selectedCustomer.id)
-    : [];
+  const [searchText, setSearchText] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [pendingCustomerId, setPendingCustomerId] = useState("");
+  const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(null));
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveMessage, setSaveMessage] = useState("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
+
+  const filteredCustomers = useMemo(() => customers.filter((customer) => {
+    const customerStays = stays.filter((stay) => stay.customerId === customer.id).map((stay) => stay.roomName + " " + stay.roomNumber).join(" ");
+    const haystack = (customer.fullName + " " + customer.phone + " " + customer.email + " " + customer.identityNumber + " " + customer.tags.join(" ") + " " + customerStays).toLowerCase();
+    return haystack.includes(searchText.trim().toLowerCase());
+  }), [customers, searchText, stays]);
 
   useEffect(() => {
-    if (!selectedCustomerId && customers[0]) {
-      setSelectedCustomerId(customers[0].id);
+    if (createOpen || !pendingCustomerId) return;
+    if (navigation.openWorkspace({ entityType: "customer", entityId: pendingCustomerId, mode: "summary", returnContext: { page: "customerWork", entityId: pendingCustomerId } })) {
+      setPendingCustomerId("");
     }
-  }, [customers, selectedCustomerId]);
+  }, [createOpen, navigation, pendingCustomerId]);
 
-  return (
-    <section className="record-workspace customers-workspace" aria-label="Müşteri yönetimi">
-      <aside className="panel record-workspace__list">
-        <div className="card__header">
-          <div>
-            <p>Müşteriler</p>
-            <h2>{customers.length} kayıt</h2>
-          </div>
-          <ActionButton
-            size="sm"
-            type="button"
-            onClick={() => {
-              setCustomerBeingEdited(null);
-              setCustomerEditorOpen(true);
-            }}
-          >
-            <Plus size={15} aria-hidden="true" />
-            Yeni Müşteri
-          </ActionButton>
-        </div>
-        <label className="customer-search form-field form-field--medium">
-          <span>Ara</span>
-          <input
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            placeholder={staysEnabled ? "Ad, telefon, kimlik, etiket veya oda" : "Ad, telefon, kimlik veya etiket"}
-          />
-        </label>
-        <DataList className="record-workspace__items">
-          {filteredCustomers.length === 0 ? (
-            <div className="empty-state">
-              <Users size={24} aria-hidden="true" />
-              <strong>Müşteri bulunamadı.</strong>
-              <p>Arama metnini değiştirin.</p>
-            </div>
-          ) : (
-            filteredCustomers.map((customer) => (
-              <DataListButton
-                className="customer-record-row"
-                key={customer.id}
-                title={customer.fullName}
-                leading={<span className={`status-dot ${customer.requestCount > 0 ? "tone-info" : "tone-neutral"}`} aria-hidden="true" />}
-                description={`${customer.phone || "Telefon yok"} · ${formatCustomerSource(customer.source)}`}
-                trailing={formatShortDate(customer.lastContactAt || customer.updatedAt) ? <time dateTime={customer.lastContactAt || customer.updatedAt}>{formatShortDate(customer.lastContactAt || customer.updatedAt)}</time> : undefined}
-                selected={selectedCustomer?.id === customer.id}
-                aria-pressed={selectedCustomer?.id === customer.id}
-                onClick={() => setSelectedCustomerId(customer.id)}
-              />
-            ))
-          )}
-        </DataList>
-      </aside>
-
-      <section className="panel record-workspace__detail">
-        {selectedCustomer ? (
-          <>
-            <div className="card__header">
-              <div className="page-toolbar__copy">
-                <span className="status-badge info">{formatCustomerSource(selectedCustomer.source)}</span>
-                <h2>{selectedCustomer.fullName}</h2>
-              </div>
-              <div className="page-toolbar__actions">
-                {staysEnabled && <StatusBadge tone="info">{selectedCustomer.stayCount} konaklama</StatusBadge>}
-                <ActionButton
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  onClick={() => {
-                    setCustomerBeingEdited(selectedCustomer);
-                    setCustomerEditorOpen(true);
-                  }}
-                >
-                  <Pencil size={14} aria-hidden="true" />
-                  Düzenle
-                </ActionButton>
-              </div>
-            </div>
-            <dl className="data-list">
-              <div>
-                <dt>Telefon</dt>
-                <dd>{selectedCustomer.phone || "-"}</dd>
-              </div>
-              <div>
-                <dt>E-posta</dt>
-                <dd>{selectedCustomer.email || "-"}</dd>
-              </div>
-              <div>
-                <dt>Son temas</dt>
-                <dd title={selectedCustomer.lastContactAt || selectedCustomer.updatedAt || undefined}>{formatCustomerLastContactDate(selectedCustomer.lastContactAt || selectedCustomer.updatedAt)}</dd>
-              </div>
-              {reservationsEnabled && (
-                <div>
-                  <dt>Rezervasyon</dt>
-                  <dd>{selectedCustomer.reservationCount} kayıt</dd>
-                </div>
-              )}
-              <div>
-                <dt>Kimlik türü</dt>
-                <dd>{formatIdentityType(selectedCustomer.identityType)}</dd>
-              </div>
-              <div>
-                <dt>Kimlik no</dt>
-                <dd>{selectedCustomer.identityNumber || "-"}</dd>
-              </div>
-              <div>
-                <dt>Doğum tarihi</dt>
-                <dd>{formatDateForDisplay(selectedCustomer.birthDate) || "-"}</dd>
-              </div>
-              <div>
-                <dt>Uyruk</dt>
-                <dd>{selectedCustomer.nationality || "-"}</dd>
-              </div>
-            </dl>
-            {hasCustomerIdentityDetails(selectedCustomer) && (
-              <details className="disclosure customer-identity-details">
-                <summary>
-                  <CreditCard size={16} aria-hidden="true" />
-                  Kimlik kartı alanları
-                </summary>
-                <dl className="data-list">
-                  <div><dt>Cinsiyet</dt><dd>{formatCustomerGender(selectedCustomer.gender)}</dd></div>
-                  <div><dt>Seri / belge no</dt><dd>{selectedCustomer.documentSerialNumber || "-"}</dd></div>
-                  <div><dt>Son geçerlilik</dt><dd>{formatDateForDisplay(selectedCustomer.documentExpiryDate) || "-"}</dd></div>
-                  <div><dt>Doğum yeri</dt><dd>{selectedCustomer.birthPlace || "-"}</dd></div>
-                  <div><dt>Anne adı</dt><dd>{selectedCustomer.motherName || "-"}</dd></div>
-                  <div><dt>Baba adı</dt><dd>{selectedCustomer.fatherName || "-"}</dd></div>
-                  <div><dt>Veren makam</dt><dd>{selectedCustomer.issuingAuthority || "-"}</dd></div>
-                  <div className="identity-address"><dt>Adres</dt><dd>{selectedCustomer.address || "-"}</dd></div>
-                </dl>
-              </details>
-            )}
-            <div className="record-note customer-detail-note">
-              <span>Not</span>
-              <p className="record-note__body">{selectedCustomer.notes || "Müşteri notu yok."}</p>
-            </div>
-            {selectedCustomer.tags.length > 0 && (
-              <div className="page-toolbar__start">
-                {selectedCustomer.tags.map((tag) => (
-                  <StatusBadge tone="neutral" key={tag}>{tag}</StatusBadge>
-                ))}
-              </div>
-            )}
-            <div className="action-row customer-detail-actions">
-              <ActionButton variant="secondary" size="sm" type="button" onClick={() => onCall(selectedCustomer)} disabled={!selectedCustomer.phone}>
-                <Phone size={16} aria-hidden="true" />
-                Müşteriyi Ara
-              </ActionButton>
-              {whatsappEnabled && (
-                <ActionButton variant="whatsapp" size="sm" type="button" onClick={() => onWhatsApp(selectedCustomer)} disabled={!selectedCustomer.phone}>
-                  <MessageCircle size={16} aria-hidden="true" />
-                  WhatsApp'tan Yaz
-                </ActionButton>
-              )}
-              {aiEnabled && (
-                <ActionButton variant="ghost" size="sm" type="button" onClick={() => onSummarize(selectedRequests[0]?.id ?? "")} disabled={selectedRequests.length === 0}>
-                  <Sparkles size={16} aria-hidden="true" />
-                  Geçmişi Özetle
-                </ActionButton>
-              )}
-              {staysEnabled && (
-                <>
-                  <label className="form-field form-field--medium">Konaklama odası<select aria-label="Konaklama odası" value={entryRoomId} onChange={event => setEntryRoomId(event.target.value)}>{rooms.filter(room => room.isActive).map(room => <option key={room.id} value={room.id}>{room.name}</option>)}</select></label>
-                <ActionButton
-                  size="sm"
-                  type="button"
-                  onClick={() => navigation.openWorkspace({ entityType: "room", entityId: entryRoomId, mode: "stay", action: "create-stay", customerId: selectedCustomer.id, returnContext: { page: "customerWork", entityId: selectedCustomer.id } })}
-                  disabled={!entryRoomId}
-                >
-                  <BedDouble size={16} aria-hidden="true" />
-                  Odaya Ata
-                </ActionButton>
-                </>
-              )}
-              <ActionButton variant="danger" size="sm" type="button" onClick={async () => {
-                setDeleteError(null);
-                try {
-                  const result = await onDelete(selectedCustomer);
-                  if (result && !result.ok) setDeleteError({ customerId: selectedCustomer.id, message: result.message });
-                } catch (error) {
-                  setDeleteError({ customerId: selectedCustomer.id, message: customerCreditError(error, "Müşteri silinemedi. Yeniden deneyin.") });
-                }
-              }}>
-                <Trash2 size={16} aria-hidden="true" />
-                Müşteriyi Sil
-              </ActionButton>
-            </div>
-            {deleteError?.customerId === selectedCustomer.id && <p role="alert">{deleteError.message}</p>}
-            {customerCreditEnabled && <CustomerCreditPanel key={selectedCustomer.id} customerId={selectedCustomer.id} whatsappEnabled={whatsappEnabled} onPreparedWhatsApp={onPreparedCreditWhatsApp} />}
-            <div className="customer-history-grid">
-              <section>
-                <h3>Son Talepler</h3>
-                {selectedRequests.length === 0 ? (
-                  <p>Talep yok.</p>
-                ) : (
-                  selectedRequests.slice(0, 4).map((request) => (
-                    <article key={request.id}>
-                      <strong>{formatRequestType(request.request_type)}</strong>
-                      <span>{formatRequestStatus(request.status)} · {request.date_text || request.start_date || "-"}</span>
-                      {request.message && <p>{request.message}</p>}
-                    </article>
-                  ))
-                )}
-              </section>
-              {reservationsEnabled && (
-                <section>
-                  <h3>Rezervasyonlar</h3>
-                  {selectedReservations.length === 0 ? (
-                    <p>Rezervasyon yok.</p>
-                  ) : (
-                    selectedReservations.slice(0, 4).map((reservation) => (
-                      <article key={reservation.id}>
-                        <strong>{reservation.title}</strong>
-                        <span>{formatReservationStatus(reservation.status)} · {formatReservationDate(reservation)}</span>
-                      </article>
-                    ))
-                  )}
-                </section>
-              )}
-              {staysEnabled && (
-                <section className="customer-stay-history">
-                  <h3>Oda / Konaklama Geçmişi</h3>
-                  {selectedStays.length === 0 ? (
-                    <p>Oda kaydı yok.</p>
-                  ) : (
-                    selectedStays.map((stay) => (
-                      <article key={stay.id}>
-                        <strong>{stay.roomNumber ? `Oda ${stay.roomNumber}` : stay.roomName}</strong>
-                        <span>{formatCustomerRoomStayStatus(stay.status)} · {formatStayDateRange(stay)}</span>
-                        {stay.notes && <p>{stay.notes}</p>}
-                        <ActionButton variant="secondary" size="sm" onClick={() => navigation.openWorkspace({ entityType: "room", entityId: stay.roomId, mode: "stay", returnContext: { page: "customerWork", entityId: selectedCustomer.id } })}>Odayı Aç</ActionButton>
-                      </article>
-                    ))
-                  )}
-                </section>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="empty-state">
-            <Users size={28} aria-hidden="true" />
-            <strong>Müşteri seçin.</strong>
-            <p>İletişim ve geçmiş kayıtlar burada görünür.</p>
-          </div>
-        )}
-      </section>
-
-      <CustomerEditorDrawer
-        open={customerEditorOpen}
-        customer={customerBeingEdited}
-        aiEnabled={aiEnabled}
-        onClose={() => setCustomerEditorOpen(false)}
-        onSave={async (input) => {
-          const result = await onSave(input);
-          if (result.ok) {
-            setSelectedCustomerId(result.savedId);
-            setCustomerEditorOpen(false);
-          }
-          return result;
-        }}
-        onAnalyzeIdentity={onAnalyzeIdentity}
-      />
-    </section>
-  );
-}
-
-interface CustomerEditorDrawerProps {
-  open: boolean;
-  customer: DesktopDashboardData["customers"][number] | null;
-  aiEnabled: boolean;
-  onClose: () => void;
-  onSave: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
-  onAnalyzeIdentity: (file: File) => Promise<DesktopIdentityImageAnalyzeResult>;
-}
-
-function CustomerEditorDrawer({
-  open,
-  customer,
-  aiEnabled,
-  onClose,
-  onSave,
-  onAnalyzeIdentity
-}: CustomerEditorDrawerProps) {
-  const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(customer));
-  const [state, setState] = useState<SyncState>("idle");
-  const [message, setMessage] = useState("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
-  const identityFileRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setForm(toCustomerForm(customer));
-      setState("idle");
-      setMessage("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
-    }
-  }, [customer, open]);
-
-  const dialogRef = useDialogFocus(open);
-
-  if (!open) {
-    return null;
+  function openCreate() {
+    setForm(toCustomerForm(null));
+    setSaveState("idle");
+    setSaveMessage("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
+    setCreateOpen(true);
   }
 
-  const update = <K extends keyof CustomerFormState>(field: K, value: CustomerFormState[K]) => {
-    setForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const analyzeIdentity = async (file: File | undefined) => {
-    if (!file) {
-      return;
-    }
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setState("error");
-      setMessage("JPG, PNG veya WebP biçiminde bir kimlik görseli seçin.");
-      if (identityFileRef.current) identityFileRef.current.value = "";
-      return;
-    }
-    if (file.size <= 0 || file.size > 10 * 1024 * 1024) {
-      setState("error");
-      setMessage("Kimlik görseli boş olamaz ve en fazla 10 MB olabilir.");
-      if (identityFileRef.current) identityFileRef.current.value = "";
-      return;
-    }
-    setState("loading");
-    setMessage("Kimlik görseli AI ile okunuyor...");
-    let result: DesktopIdentityImageAnalyzeResult;
-    try {
-      result = await onAnalyzeIdentity(file);
-    } catch {
-      result = { ok: false, message: "Kimlik görseli okunamadı." };
-    }
-    if (identityFileRef.current) {
-      identityFileRef.current.value = "";
-    }
-    if (!result.ok) {
-      setState("error");
-      setMessage(result.message);
-      return;
-    }
-    const fields = result.analysis.fields;
-    setForm((current) => ({
-      ...current,
-      fullName: fields.full_name || current.fullName,
-      identityType: fields.identity_type || current.identityType,
-      identityNumber: fields.identity_number || current.identityNumber,
-      nationality: fields.nationality || current.nationality,
-      birthDate: fields.birth_date || current.birthDate,
-      gender: fields.gender || current.gender,
-      documentSerialNumber: fields.document_serial_number || current.documentSerialNumber,
-      documentExpiryDate: fields.document_expiry_date || current.documentExpiryDate,
-      birthPlace: fields.birth_place || current.birthPlace,
-      motherName: fields.mother_name || current.motherName,
-      fatherName: fields.father_name || current.fatherName,
-      issuingAuthority: fields.issuing_authority || current.issuingAuthority,
-      address: fields.address || current.address
-    }));
-    setState("success");
-    setMessage(
-      result.analysis.warnings.length > 0
-        ? `${result.message} Kontrol: ${result.analysis.warnings.join(" ")}`
-        : result.message
-    );
-  };
-
-  return (
-    <div className="manual-request-backdrop overlay overlay--drawer customer-editor-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll customer-editor-drawer" role="dialog" aria-modal="true" aria-labelledby="customer-editor-title">
-        <header className="overlay-header overlay-header--sticky">
-          <div className="overlay-heading">
-            <p>Müşteri kartı</p>
-            <h2 id="customer-editor-title">{customer ? "Müşteri bilgilerini düzenle" : "Yeni müşteri ekle"}</h2>
-          </div>
-          <button className="drawer-close-button" type="button" aria-label="Müşteri formunu kapat" onClick={onClose}>
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-        <form className="form-stack overlay-form customer-editor-form" onSubmit={async (event) => {
-          event.preventDefault();
-          setState("loading");
-          setMessage("Müşteri kartı kaydediliyor...");
-          const result = await onSave(customerFormToInput(form));
-          setState(result.ok ? "success" : "error");
-          setMessage(result.message);
-        }}>
-          <section className="panel form-stack">
-            <div className="page-toolbar">
-              <div className="page-toolbar__copy"><strong>Temel bilgiler</strong><small>İletişim ve kart görünümü</small></div>
-            </div>
-            <div className="form-grid">
-              <label className="form-field form-field--medium">Ad soyad<input required maxLength={160} value={form.fullName} onChange={(event) => update("fullName", event.target.value)} /></label>
-              <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
-              <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
-              <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
-              <label className="form-field--span form-field form-field--fluid">Not<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
-            </div>
-            <label className="form-check customer-birthday-toggle">
-              <input
-                checked={form.birthdayMessageEnabled}
-                onChange={(event) => update("birthdayMessageEnabled", event.target.checked)}
-                type="checkbox"
-              />
-              <span>
-                <strong>Doğum günü mesajı gönder</strong>
-                <small>Kapattığınız müşteriler doğum günü mesajlarına dahil edilmez.</small>
-              </span>
-            </label>
-          </section>
-          <section className="panel form-stack identity-form-section">
-            <div className="page-toolbar">
-              <div className="page-toolbar__copy"><strong>Kimlik kartı bilgileri</strong><small>Görsel yalnız analiz edilir; kimlik fotoğrafı saklanmaz.</small></div>
-              <div className="action-row">
-                <input
-                  ref={identityFileRef}
-                  hidden
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => void analyzeIdentity(event.target.files?.[0])}
-                />
-                <ActionButton
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  disabled={!aiEnabled || state === "loading"}
-                  onClick={() => identityFileRef.current?.click()}
-                >
-                  <Sparkles size={15} aria-hidden="true" />
-                  {state === "loading" ? "Okunuyor" : "Kimlikten AI ile Doldur"}
-                </ActionButton>
-              </div>
-            </div>
-            {!aiEnabled && <p className="identity-ai-note">Kimlik görseli analizi için Ayarlar bölümünden AI bağlantısını etkinleştirin.</p>}
-            <div className="form-grid">
-              <label className="form-field form-field--medium">Belge türü<select value={form.identityType} onChange={(event) => update("identityType", event.target.value)}>
-                <option value="">Seçilmedi</option>
-                <option value="tc_identity_card">T.C. Kimlik Kartı</option>
-                <option value="passport">Pasaport</option>
-                <option value="other">Diğer</option>
-              </select></label>
-              <label className="form-field form-field--medium">Kimlik / pasaport no<input value={form.identityNumber} onChange={(event) => update("identityNumber", event.target.value)} /></label>
-              <label className="form-field form-field--medium">Uyruk<input value={form.nationality} onChange={(event) => update("nationality", event.target.value)} /></label>
-              <label className="form-field form-field--short">Doğum tarihi<input lang="tr-TR" type="date" value={form.birthDate} onChange={(event) => update("birthDate", event.target.value)} /></label>
-              <label className="form-field form-field--medium">Cinsiyet<select value={form.gender} onChange={(event) => update("gender", event.target.value)}>
-                <option value="">Seçilmedi</option>
-                <option value="female">Kadın</option>
-                <option value="male">Erkek</option>
-                <option value="unspecified">Belirtilmemiş</option>
-              </select></label>
-              <label className="form-field form-field--medium">Seri / belge no<input value={form.documentSerialNumber} onChange={(event) => update("documentSerialNumber", event.target.value)} /></label>
-              <label className="form-field form-field--short">Son geçerlilik<input lang="tr-TR" type="date" value={form.documentExpiryDate} onChange={(event) => update("documentExpiryDate", event.target.value)} /></label>
-              <label className="form-field form-field--medium">Doğum yeri<input value={form.birthPlace} onChange={(event) => update("birthPlace", event.target.value)} /></label>
-              <label className="form-field form-field--medium">Anne adı<input value={form.motherName} onChange={(event) => update("motherName", event.target.value)} /></label>
-              <label className="form-field form-field--medium">Baba adı<input value={form.fatherName} onChange={(event) => update("fatherName", event.target.value)} /></label>
-              <label className="form-field form-field--medium">Veren makam<input value={form.issuingAuthority} onChange={(event) => update("issuingAuthority", event.target.value)} /></label>
-              <label className="form-field--span form-field form-field--fluid">Adres<textarea value={form.address} onChange={(event) => update("address", event.target.value)} /></label>
-            </div>
-          </section>
-          <div className="overlay-footer overlay-footer--inset">
-            <p className={`form-status sync-${state}`} role="status">{message}</p>
-            <div>
-              <ActionButton variant="secondary" type="button" onClick={onClose}>Vazgeç</ActionButton>
-              <ActionButton type="submit" disabled={state === "loading"}>
-                <Save size={16} aria-hidden="true" />
-                {state === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}
-              </ActionButton>
-            </div>
-          </div>
-        </form>
-      </aside>
+  return <section className="panel customers-workspace" aria-label="Müşteri yönetimi">
+    <div className="card__header">
+      <div><p>Müşteriler</p><h2>{customers.length} kayıt</h2></div>
+      <ActionButton size="sm" type="button" onClick={openCreate}><Plus size={15} aria-hidden="true" />Yeni Müşteri</ActionButton>
     </div>
-  );
+
+    <label className="customer-search form-field form-field--medium"><span>Ara</span><input value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder={stays.length > 0 ? "Ad, telefon, kimlik, etiket veya oda" : "Ad, telefon, kimlik veya etiket"} /></label>
+
+    <DataList className="customers-workspace__items">
+      {filteredCustomers.length === 0 ? <div className="empty-state"><Users size={24} aria-hidden="true" /><strong>Müşteri bulunamadı.</strong><p>Arama metnini değiştirin.</p></div> : filteredCustomers.map((customer) => <DataListButton
+        className="customer-record-row"
+        key={customer.id}
+        title={customer.fullName}
+        leading={<span className={"status-dot " + (customer.requestCount > 0 ? "tone-info" : "tone-neutral")} aria-hidden="true" />}
+        description={(customer.phone || "Telefon yok") + " · " + formatCustomerSource(customer.source)}
+        trailing={formatShortDate(customer.lastContactAt || customer.updatedAt) ? <time dateTime={customer.lastContactAt || customer.updatedAt}>{formatShortDate(customer.lastContactAt || customer.updatedAt)}</time> : undefined}
+        onClick={() => navigation.openWorkspace({ entityType: "customer", entityId: customer.id, mode: "summary", returnContext: { page: "customerWork", entityId: customer.id } })}
+      />)}
+    </DataList>
+
+    {createOpen && <FormDialog
+      title="Yeni müşteri ekle"
+      onClose={() => { if (saveState !== "loading") setCreateOpen(false); }}
+      closeBlocked={saveState === "loading"}
+      dismissOnBackdrop
+      onSubmit={async (event) => {
+        event.preventDefault();
+        setSaveState("loading");
+        setSaveMessage("Müşteri kartı kaydediliyor...");
+        const result = await onSave(customerFormToInput(form));
+        if (!result.ok) {
+          setSaveState("error");
+          setSaveMessage(result.message);
+          return;
+        }
+        setPendingCustomerId(result.savedId);
+        setCreateOpen(false);
+      }}
+      footer={<><p className={"form-status sync-" + saveState} role="status">{saveMessage}</p><div className="action-row"><ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={() => setCreateOpen(false)}>Vazgeç</ActionButton><ActionButton type="submit" disabled={saveState === "loading"}><Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}</ActionButton></div></>}
+    >
+      <div className="form-stack customer-create-form"><CustomerFormFields form={form} aiEnabled={aiEnabled} onChange={setForm} onAnalyzeIdentity={onAnalyzeIdentity} /></div>
+    </FormDialog>}
+  </section>;
 }

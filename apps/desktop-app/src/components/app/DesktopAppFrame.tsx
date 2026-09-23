@@ -25,7 +25,7 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
-import { roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
+import { customerWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
 import { projectDesktopDashboardData } from "../../app/capability-projection";
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
 
@@ -104,6 +104,7 @@ function DesktopAppFrameContent({
   const notificationsEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.NOTIFICATIONS);
   const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
   const inventoryEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.INVENTORY);
+  const workspaceData = projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? []);
   const syncDisplayMessage = automaticSyncStatus.phase === "offline"
     ? OFFLINE_SYNC_MESSAGE
     : syncState === "idle" ? automaticSyncStatus.message : statusMessage;
@@ -147,7 +148,7 @@ function DesktopAppFrameContent({
 
   return (
     <AppShell
-      contentScroll={["pension", "restaurant", "settings"].includes(activePage) ? "workspace" : "page"}
+      contentScroll={["customerWork", "pension", "restaurant", "settings"].includes(activePage) ? "workspace" : "page"}
       contentRef={contentRef}
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(
@@ -233,8 +234,23 @@ function DesktopAppFrameContent({
       )}
       overlay={(
         <>
+          <WorkspaceHost definition={customerWorkspaceDefinition} context={{
+            data: workspaceData,
+            aiEnabled,
+            whatsappEnabled,
+            reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS) || runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS),
+            staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
+            customerCreditEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),
+            onPreparedCreditWhatsApp: messagingController.openPreparedCreditWhatsApp,
+            onCall: messagingController.callCustomerRecord,
+            onWhatsApp: messagingController.openCustomerWhatsApp,
+            onSummarize: (requestId) => messagingController.openAiTools("summary", requestId),
+            onSave: customerController.handleSaveCustomer,
+            onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
+            onDelete: customerController.handleDeleteCustomer
+          }} />
           <WorkspaceHost definition={roomWorkspaceDefinition} context={{
-            data: projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? []),
+            data: workspaceData,
             onDashboard: desktopSyncController.setDashboardData,
             staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
             reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS),

@@ -18,7 +18,17 @@ export interface TableWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent;
+export type CustomerWorkspaceMode = "summary" | "details" | "history" | "account";
+
+export interface CustomerWorkspaceIntent {
+  entityType: "customer";
+  entityId: string;
+  mode?: CustomerWorkspaceMode;
+  action?: undefined;
+  returnContext?: WorkspaceReturnContext;
+}
+
+export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent | CustomerWorkspaceIntent;
 
 export type WorkspaceModeUpdate = {
   [Entity in WorkspaceIntent["entityType"]]: Pick<Extract<WorkspaceIntent, { entityType: Entity }>, "entityType" | "mode" | "action">
