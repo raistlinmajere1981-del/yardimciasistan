@@ -123,15 +123,18 @@ try {
       saleCalls: [],
       saleWaits: 0,
       reviewCalls: 0,
+      reviewWaits: 0,
       loadDraftCalls: 0
     };
     window.__m8bDeferFind = false;
     window.__m8bDeferExternal = false;
     window.__m8bDeferSale = false;
     window.__m8bFailReview = false;
+    window.__m8bDeferReview = false;
     window.__m8bResolveFind = null;
     window.__m8bResolveExternal = null;
     window.__m8bResolveSale = null;
+    window.__m8bResolveReview = null;
     window.__m8bBarcodeEvents = [];
 
     let saleSequence = 0;
@@ -176,6 +179,17 @@ try {
       markCartDraftReviewed: async () => {
         window.__m8bStats.reviewCalls += 1;
         if (window.__m8bFailReview) throw new Error("injected review failure");
+        if (window.__m8bDeferReview) {
+          window.__m8bStats.reviewWaits += 1;
+          return new Promise((resolveReview) => {
+            window.__m8bResolveReview = () => {
+              window.__m8bDeferReview = false;
+              window.__m8bResolveReview = null;
+              draftReviewed = true;
+              resolveReview({ ...draft, status: "reviewed", updatedAt: new Date().toISOString() });
+            };
+          });
+        }
         draftReviewed = true;
         return { ...draft, status: "reviewed", updatedAt: new Date().toISOString() };
       },
@@ -376,8 +390,21 @@ try {
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
   await expect(quick().locator(".market-sale-review-recovery")).toContainText("telefon sepeti kapatılamadı");
-  await page.evaluate(() => { window.__m8bFailReview = false; });
+  await page.evaluate(() => {
+    window.__m8bFailReview = false;
+    window.__m8bDeferReview = true;
+  });
+  const loadCallsBeforeRetry = await page.evaluate(() => window.__m8bStats.loadDraftCalls);
   await quick().getByRole("button", { name: "Taslağı Kapat", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__m8bStats.reviewWaits)).toBe(1);
+
+  // While the old recovery retry is pending, another phone draft handoff is blocked.
+  await tabs.getByRole("button", { name: /Telefon Sepetleri/ }).click();
+  await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
+  await expect(quick().locator(".market-sale-review-recovery")).toContainText("telefon sepeti kapatılamadı");
+  expect(await page.evaluate(() => window.__m8bStats.loadDraftCalls)).toBe(loadCallsBeforeRetry);
+
+  await page.evaluate(() => window.__m8bResolveReview?.());
   await expect(quick().locator(".market-sale-review-recovery")).toHaveCount(0);
   expect(await page.evaluate(() => window.__m8bStats.saleCalls.length)).toBe(saleCountBeforeRetry);
 
