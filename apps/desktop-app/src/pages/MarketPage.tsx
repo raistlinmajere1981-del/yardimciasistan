@@ -20,8 +20,7 @@ import {
 } from "../components/market/MarketProductsWorkspace";
 import { MarketPurchasingWorkspace } from "../components/market/MarketPurchasingWorkspace";
 import {
-  MarketQuickSaleWorkspace,
-  type CartDraftQuickSaleRequest
+  MarketQuickSaleWorkspace
 } from "../components/market/MarketQuickSaleWorkspace";
 
 interface MarketTabDefinition {
@@ -48,6 +47,7 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
     categories,
     dataState,
     productDataEnabled,
+    quickSaleSession,
     reloadCatalog,
     upsertProduct,
     handleStateChange
@@ -63,13 +63,8 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
   ], [catalogEnabled, inventoryEnabled, labelsEnabled, purchasingEnabled, salesEnabled, suppliersEnabled]);
   const availableTabs = tabs.filter((tab) => tab.enabled);
   const [activeTab, setActiveTab] = useState<MarketView>(() => availableTabs[0]?.id ?? "products");
-  const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
   const [productLookupRequest, setProductLookupRequest] = useState<ProductLookupFormRequest | null>(null);
-  const handoffRequestId = useRef(0);
-
-  const clearCartDraftRequest = useCallback((draftId: string) => {
-    setCartDraftRequest((current) => current?.draftId === draftId ? null : current);
-  }, []);
+  const productHandoffRequestId = useRef(0);
 
   useEffect(() => {
     if (!availableTabs.some((tab) => tab.id === activeTab)) {
@@ -88,14 +83,18 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
   }
 
   function openCartDraft(detail: CommerceSaleDraftDetail) {
-    handoffRequestId.current += 1;
-    setCartDraftRequest({ requestId: handoffRequestId.current, draftId: detail.draft.id });
+    const request = quickSaleSession.requestCartDraft(detail.draft.id);
+    if (!request) {
+      handleStateChange("error", "Satış işlenirken yeni telefon sepeti yüklenemez.");
+      setActiveTab("quickSale");
+      return;
+    }
     setActiveTab("quickSale");
   }
 
   const openExternalProduct = useCallback((product: ProductLookupCandidate) => {
-    handoffRequestId.current += 1;
-    setProductLookupRequest({ requestId: handoffRequestId.current, product });
+    productHandoffRequestId.current += 1;
+    setProductLookupRequest({ requestId: productHandoffRequestId.current, product });
     setActiveTab("products");
   }, []);
 
@@ -124,13 +123,14 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
           customerCreditEnabled={customerCreditEnabled}
           products={products}
           categories={categories}
+          session={quickSaleSession}
           barcodeEnabled={barcodeEnabled}
           busy={dataState === "loading"}
           onSaleCompleted={handleSaleCompleted}
           onStateChange={handleStateChange}
-          cartDraftRequest={cartDraftRequest}
-          onCartDraftLoaded={clearCartDraftRequest}
-          onCartDraftReviewed={clearCartDraftRequest}
+          cartDraftRequest={quickSaleSession.cartDraftRequest}
+          onCartDraftLoaded={quickSaleSession.clearCartDraftRequest}
+          onCartDraftReviewed={quickSaleSession.clearCartDraftRequest}
           onExternalProductFound={openExternalProduct}
         />
       ) : activeTab === "products" ? (
