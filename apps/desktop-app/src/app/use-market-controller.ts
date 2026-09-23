@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
   type CatalogCategory,
@@ -25,6 +25,10 @@ export function useMarketController({
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [dataState, setDataState] = useState<MarketAsyncState>("idle");
   const [productDataEnabled, setProductDataEnabled] = useState(false);
+  const enabledRef = useRef(enabled);
+  const reloadGeneration = useRef(0);
+  const pinnedProducts = useRef(new Map<string, CatalogProduct>());
+  enabledRef.current = enabled;
 
   const handleStateChange = useCallback((state: Exclude<MarketAsyncState, "idle">, message: string) => {
     setDataState(state);
@@ -32,6 +36,7 @@ export function useMarketController({
   }, []);
 
   const upsertProduct = useCallback((product: CatalogProduct) => {
+    pinnedProducts.current.set(product.id, product);
     setProducts((current) => {
       const existingIndex = current.findIndex((item) => item.id === product.id);
       if (existingIndex < 0) return [...current, product];
@@ -40,16 +45,24 @@ export function useMarketController({
   }, []);
 
   const reloadCatalog = useCallback(async () => {
-    if (!bridge || !catalogEnabled) {
-      setProducts([]);
-      setCategories([]);
+    if (!enabledRef.current || !bridge || !catalogEnabled) {
+      if (enabledRef.current) {
+        setProducts([]);
+        setCategories([]);
+      }
       return;
     }
+    const request = ++reloadGeneration.current;
     const [nextProducts, nextCategories] = await Promise.all([
       bridge.listProducts({ limit: 500 }),
       bridge.listCategories({ limit: 500 })
     ]);
-    setProducts(nextProducts);
+    if (!enabledRef.current || request !== reloadGeneration.current) return;
+
+    const nextIds = new Set(nextProducts.map((product) => product.id));
+    for (const product of nextProducts) pinnedProducts.current.delete(product.id);
+    const retainedProducts = [...pinnedProducts.current.values()].filter((product) => !nextIds.has(product.id));
+    setProducts([...nextProducts, ...retainedProducts]);
     setCategories(nextCategories);
   }, [bridge, catalogEnabled]);
 
@@ -76,8 +89,13 @@ export function useMarketController({
   }, [enabled]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      reloadGeneration.current += 1;
+      return;
+    }
     if (!catalogEnabled) {
+      reloadGeneration.current += 1;
+      pinnedProducts.current.clear();
       setProducts([]);
       setCategories([]);
       setDataState("idle");

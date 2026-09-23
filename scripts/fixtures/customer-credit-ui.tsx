@@ -8,6 +8,7 @@ import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/ap
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
+import { useMarketController } from "../../apps/desktop-app/src/app/use-market-controller";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
 import "../../apps/desktop-app/src/styles/index.css";
@@ -28,6 +29,10 @@ function Harness() {
   const [selectedWhatsAppRequestId, setSelectedWhatsAppRequestId] = useState("");
   const customers = useCustomerController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
     selectedWhatsAppRequestId, setSelectedWhatsAppRequestId });
+  const marketController = useMarketController({
+    businessCapabilities: snapshot,
+    active: page === "market"
+  });
   control.__m82Toggle = async (enabled) => { setSnapshot(await control.__m82Call("toggleCredit", [enabled])); };
 
   useEffect(() => subscribeAppStatus(({ state, message }) => {
@@ -43,7 +48,7 @@ function Harness() {
         <button type="button" onClick={() => setPage("customers")}>Müşteriler</button>
       </nav>
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
-      {page === "market" ? <MarketPage customers={dashboardData.customers} /> : <div className="customer-work-page">
+      {page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} /> : <div className="customer-work-page">
         <div className="customer-work-content is-customers">
           <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
           <CustomersWorkspace
