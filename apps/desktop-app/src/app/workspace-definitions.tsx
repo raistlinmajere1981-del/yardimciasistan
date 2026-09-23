@@ -2,8 +2,9 @@ import type { ComponentProps } from "react";
 import { RoomWorkspace } from "../components/pension/RoomWorkspace";
 import { TableWorkspace } from "../components/restaurant/TableWorkspace";
 import { CustomerWorkspace } from "../components/customers/CustomerWorkspace";
+import { MenuItemWorkspace } from "../components/menu/MenuItemWorkspace";
 import type { WorkspaceDefinition } from "../components/workspace/workspace-definition";
-import type { CustomerWorkspaceIntent, RoomWorkspaceIntent, TableWorkspaceIntent } from "../components/workspace/workspace-intent";
+import type { CustomerWorkspaceIntent, MenuItemWorkspaceIntent, RoomWorkspaceIntent, TableWorkspaceIntent } from "../components/workspace/workspace-intent";
 
 export const roomWorkspaceDefinition: WorkspaceDefinition<RoomWorkspaceIntent, Omit<ComponentProps<typeof RoomWorkspace>, "intent">> = {
   entityType: "room",
@@ -23,4 +24,10 @@ export const customerWorkspaceDefinition: WorkspaceDefinition<CustomerWorkspaceI
   render: (intent, context) => <CustomerWorkspace {...context} intent={intent} />
 };
 
-export const workspaceDefinitions = [roomWorkspaceDefinition, tableWorkspaceDefinition, customerWorkspaceDefinition] as const;
+export const menuItemWorkspaceDefinition: WorkspaceDefinition<MenuItemWorkspaceIntent, Omit<ComponentProps<typeof MenuItemWorkspace>, "intent">> = {
+  entityType: "menu-item",
+  defaultPresentation: "centered",
+  render: (intent, context) => <MenuItemWorkspace {...context} intent={intent} />
+};
+
+export const workspaceDefinitions = [roomWorkspaceDefinition, tableWorkspaceDefinition, customerWorkspaceDefinition, menuItemWorkspaceDefinition] as const;

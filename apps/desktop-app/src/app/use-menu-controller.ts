@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
-import type { DesktopDashboardData } from "../../electron/database";
+import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../electron/database";
 import { defaultDashboardData } from "./bootstrap-defaults";
 import type { SyncState } from "./runtime-state";
 import {
@@ -8,10 +8,8 @@ import {
   compareMenuRecords,
   emptyCategoryForm,
   emptyItemForm,
+  itemFormToSaveInput,
   nextSortOrder,
-  parseNullableFormNumber,
-  parsePositiveFormNumber,
-  splitCommaList,
   toCategoryForm,
   toItemForm,
   type CategoryFormState,
@@ -176,42 +174,15 @@ export function useMenuController({
     markMenuDirty();
   }
 
-  async function saveItem() {
-    setMenuEditState("loading");
-    setMenuEditMessage("Ürün kaydediliyor...");
-
+  async function saveItemForm(form: ItemFormState): Promise<DesktopMenuSaveResult> {
     const bridge = window.yardimciDesktop;
     if (!bridge) {
-      setMenuEditState("error");
-      setMenuEditMessage("Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın.");
-      return;
+      return { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
     }
 
-    const result = await bridge.saveMenuItem({
-      id: itemForm.id || undefined,
-      category_id: itemForm.category_id,
-      name: itemForm.name,
-      description: itemForm.description,
-      price: Number(itemForm.price),
-      currency: itemForm.currency,
-      image_url: itemForm.image_url,
-      is_available: itemForm.is_available,
-      is_featured: itemForm.is_featured,
-      allergens: splitCommaList(itemForm.allergens),
-      tags: splitCommaList(itemForm.tags),
-      stock_quantity: parseNullableFormNumber(itemForm.stock_quantity),
-      stock_min_quantity: parseNullableFormNumber(itemForm.stock_min_quantity),
-      stock_unit: itemForm.stock_unit,
-      stock_consumption_quantity: parsePositiveFormNumber(itemForm.stock_consumption_quantity, 1),
-      hide_when_out_of_stock: itemForm.hide_when_out_of_stock,
-      stock_note: itemForm.stock_note.trim() || null,
-      sort_order: Number(itemForm.sort_order)
-    });
-
+    const result = await bridge.saveMenuItem(itemFormToSaveInput(form));
     if (!result.ok) {
-      setMenuEditState("error");
-      setMenuEditMessage(result.message);
-      return;
+      return result;
     }
 
     const savedItem = result.dashboardData.menu.items.find((item) => item.id === result.savedId);
@@ -220,9 +191,17 @@ export function useMenuController({
     if (savedItem) {
       setItemForm(toItemForm(savedItem, result.dashboardData.menu.categories[0]?.id ?? ""));
     }
-    setMenuEditState("success");
-    setMenuEditMessage(result.message);
     markMenuDirty();
+    return result;
+  }
+
+  async function saveItem(): Promise<DesktopMenuSaveResult> {
+    setMenuEditState("loading");
+    setMenuEditMessage("Ürün kaydediliyor...");
+    const result = await saveItemForm(itemForm);
+    setMenuEditState(result.ok ? "success" : "error");
+    setMenuEditMessage(result.message);
+    return result;
   }
 
   async function deleteCategory(confirmed = false) {
@@ -260,22 +239,15 @@ export function useMenuController({
     markMenuDirty();
   }
 
-  async function deleteItem(confirmed = false) {
+  async function deleteItemById(itemId: string): Promise<DesktopStatusUpdateResult> {
     const bridge = window.yardimciDesktop;
-    if (!itemForm.id || !bridge) {
-      return;
-    }
-    if (!confirmed && !window.confirm(`“${itemForm.name}” ürünü menüden silinsin mi?`)) {
-      return;
+    if (!bridge) {
+      return { ok: false, message: "Masaüstü uygulaması hazır değil. Uygulamayı yeniden başlatın." };
     }
 
-    setMenuEditState("loading");
-    setMenuEditMessage("Ürün siliniyor...");
-    const result = await bridge.deleteMenuItem(itemForm.id);
+    const result = await bridge.deleteMenuItem(itemId);
     if (!result.ok) {
-      setMenuEditState("error");
-      setMenuEditMessage(result.message);
-      return;
+      return result;
     }
 
     const nextItem = [...result.dashboardData.menu.items]
@@ -284,10 +256,10 @@ export function useMenuController({
     setDashboardData(result.dashboardData);
     setSelectedItemId(nextItem?.id ?? "");
     setItemForm(toItemForm(nextItem, selectedCategoryId || result.dashboardData.menu.categories[0]?.id || ""));
-    setMenuEditState("success");
-    setMenuEditMessage(result.message);
     markMenuDirty();
+    return result;
   }
+
 
   function markMenuDirty() {
     setMenuPublishState("idle");
@@ -316,7 +288,8 @@ export function useMenuController({
     startNewItem,
     saveCategory,
     saveItem,
+    saveItemForm,
     deleteCategory,
-    deleteItem
+    deleteItemById
   };
 }

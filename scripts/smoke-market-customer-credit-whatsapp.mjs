@@ -147,17 +147,43 @@ try {
   }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path), methods: [...Object.keys(channels), ...scannerMethods] });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/m83-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
-  await page.getByRole("button", { name: /Ahmet Paylaşım/ }).click();
   const panel = page.getByRole("region", { name: "Veresiye hesabı", exact: true });
   const compose = page.getByRole("region", { name: "Borç durumunu paylaş", exact: true });
   const editor = compose.getByRole("textbox", { name: "Veresiye paylaşım mesajı" });
   const share = () => panel.getByRole("button", { name: "WhatsApp'ta Paylaş", exact: true }).click();
   const preparedCount = () => calls.filter((call) => call.method === "prepareCustomerCreditWhatsApp").length;
   const toggle = (capability, enabled) => page.evaluate(([capability, enabled]) => window.__m83Toggle(capability, enabled), [capability, enabled]);
-  const navigate = (name) => page.getByRole("navigation", { name: "Çalışma alanı" }).getByRole("button", { name, exact: true }).click();
-  const openAccount = async () => { await expect(panel.locator(".customer-credit-balances")).toBeVisible(); await panel.getByRole("button", { name: "Hesabı Aç", exact: true }).click(); };
-  await expect(panel.locator(".customer-credit-balances")).toContainText("₺500,00");
+  const customerWorkspace = () => page.getByRole("dialog").filter({ has: page.getByRole("tablist", { name: "Müşteri çalışma alanı" }) });
+  const closeCustomerWorkspace = async () => {
+    const workspace = customerWorkspace();
+    if (!await workspace.count()) return;
+    await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+    await expect(workspace).toHaveCount(0);
+  };
+  const navigate = async (name) => {
+    await closeCustomerWorkspace();
+    await page.getByRole("navigation", { name: "Çalışma alanı" }).getByRole("button", { name, exact: true }).click();
+  };
+  const ensureCustomerWorkspace = async () => {
+    let workspace = customerWorkspace();
+    if (!await workspace.count()) {
+      await page.getByRole("button", { name: /Ahmet Paylaşım/ }).click();
+      workspace = customerWorkspace();
+      await expect(workspace).toBeVisible();
+    }
+    return workspace;
+  };
+  const openAccount = async () => {
+    const workspace = await ensureCustomerWorkspace();
+    const accountTab = workspace.getByRole("tab", { name: "Hesap", exact: true });
+    await expect(accountTab).toBeVisible();
+    await accountTab.click();
+    await expect(panel.locator(".customer-credit-balances")).toBeVisible();
+    const expand = panel.getByRole("button", { name: "Hesabı Aç", exact: true });
+    if (await expand.count()) await expand.click();
+  };
   await openAccount();
+  await expect(panel.locator(".customer-credit-balances")).toContainText("₺500,00");
   assert.equal(preparedCount(), 0); assert.equal(external.length, 0);
   await context.setOffline(true);
 
@@ -204,7 +230,7 @@ try {
   // Existing request source remains selectable; request send control stays available.
   await page.locator(".message-mode-content:not(.is-hidden) .whatsapp-request-list .message-request-row").first().click();
   await expect(page.getByRole("button", { name: "Onayla ve Gönder", exact: true })).toHaveCount(1);
-  await navigate("Müşteriler"); await page.getByRole("button", { name: /Ahmet Paylaşım/ }).click(); await openAccount();
+  await navigate("Müşteriler"); await openAccount();
   await share(); await editor.fill("Kullanıcı düzenledi.");
   pay(10000);
   const beforeChanged = financialState();
@@ -294,6 +320,10 @@ try {
   assert.equal(preparedCount(), noAutoStart); assert.equal(external.length, noAutoExternal);
   await toggle("commerce.customer_credit", false);
   await expect(panel).toHaveCount(0);
+  const activeCustomerWorkspace = customerWorkspace();
+  if (await activeCustomerWorkspace.count()) {
+    await expect(activeCustomerWorkspace.getByRole("tab", { name: "Hesap", exact: true })).toHaveCount(0);
+  }
   const hiddenReads = calls.filter((call) => call.method === "getCustomerCreditAccount").length;
   await navigate("Market"); await navigate("Müşteriler");
   assert.equal(calls.filter((call) => call.method === "getCustomerCreditAccount").length, hiddenReads);

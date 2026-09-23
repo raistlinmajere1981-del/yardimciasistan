@@ -144,6 +144,25 @@ try {
   const port = server.httpServer.address().port;
   await page.goto(`http://127.0.0.1:${port}/m82-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
+  const closeCustomerWorkspace = async () => {
+    const workspace = page.getByRole("dialog").filter({ has: page.getByRole("tablist", { name: "Müşteri çalışma alanı" }) });
+    if (await workspace.count()) {
+      await workspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
+      await expect(workspace).toHaveCount(0);
+    }
+  };
+  const openCustomerWorkspace = async (name) => {
+    await closeCustomerWorkspace();
+    await page.getByRole("button", { name }).click();
+    const workspace = page.getByRole("dialog").filter({ has: page.getByRole("tablist", { name: "Müşteri çalışma alanı" }) });
+    await expect(workspace).toBeVisible();
+    return workspace;
+  };
+  const openCustomerAccount = async (name) => {
+    const workspace = await openCustomerWorkspace(name);
+    await workspace.getByRole("tab", { name: "Hesap", exact: true }).click();
+    return workspace;
+  };
   await expect(page.getByRole("heading", { name: "Hızlı Satış", exact: true })).toBeVisible();
   await expect(page.locator(".market-status")).toHaveCount(0);
   // Local UI remains functional after all browser networking is unavailable.
@@ -213,7 +232,7 @@ try {
   await expect(page.getByRole("region", { name: "Veresiye hesabı" })).toHaveCount(0);
   assert.equal(creditCalls().length, hiddenStart);
   await page.evaluate(() => window.__m82Toggle(true));
-  await page.getByRole("button", { name: /Ahmet Veresiye/ }).click();
+  let customerWorkspace = await openCustomerAccount(/Ahmet Veresiye/);
   const panel = page.getByRole("region", { name: "Veresiye hesabı" });
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");
   await expect(panel.locator(".customer-credit-balances")).toContainText("€20,00");
@@ -223,14 +242,19 @@ try {
   await page.evaluate(() => window.__m82Toggle(false));
   await expect(panel).toHaveCount(0);
   const hiddenPanelCalls = creditCalls().length;
-  await page.getByRole("button", { name: /Zeynep Hesap/ }).click();
-  await page.getByRole("button", { name: /Ahmet Veresiye/ }).click();
+  customerWorkspace = await openCustomerWorkspace(/Zeynep Hesap/);
+  await expect(customerWorkspace.getByRole("tab", { name: "Hesap", exact: true })).toHaveCount(0);
+  customerWorkspace = await openCustomerWorkspace(/Ahmet Veresiye/);
+  await expect(customerWorkspace.getByRole("tab", { name: "Hesap", exact: true })).toHaveCount(0);
   assert.equal(creditCalls().length, hiddenPanelCalls, "Changing customers while disabled must not fetch accounts.");
   await page.evaluate(() => window.__m82Toggle(true));
+  await customerWorkspace.getByRole("tab", { name: "Hesap", exact: true }).click();
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺530,00");
-  await page.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
+  await customerWorkspace.getByRole("tab", { name: "Özet", exact: true }).click();
+  await customerWorkspace.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
   await expect(topbarStatus).toContainText("Bu müşterinin açık veresiye borcu var.");
   await expect(page.getByRole("alert").filter({ hasText: "Bu müşterinin açık veresiye borcu var." })).toHaveCount(0);
+  await customerWorkspace.getByRole("tab", { name: "Hesap", exact: true }).click();
 
   await panel.getByRole("button", { name: "Tahsilat Al", exact: true }).click();
   let payment = panel.getByRole("form", { name: "Tahsilat", exact: true });
@@ -328,6 +352,7 @@ try {
 
   // Real M7 cart draft loads into the same cart and closes after a credit sale.
   const draft = runtime.createMarketCartDraft(path, { lines: [{ productId: product.id, quantity: 2 }], source: "android", createdByDevice: "Test Telefonu" });
+  await closeCustomerWorkspace();
   await page.getByRole("navigation", { name: "Çalışma alanı" }).getByRole("button", { name: "Market", exact: true }).click();
   await page.getByRole("button", { name: /Telefon Sepetleri/ }).click();
   await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
@@ -361,12 +386,12 @@ try {
   for (let index = 0; index < 201; index += 1) addDebt(other, 1);
 
   await page.getByRole("navigation", { name: "Çalışma alanı" }).getByRole("button", { name: "Müşteriler" }).click();
-  await page.getByRole("button", { name: /Ahmet Veresiye/ }).click();
-  await page.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
+  customerWorkspace = await openCustomerWorkspace(/Ahmet Veresiye/);
+  await customerWorkspace.getByRole("button", { name: "Müşteriyi Sil", exact: true }).click();
   await expect(page.getByRole("button", { name: /Ahmet Veresiye/ })).toHaveCount(0);
   assert.ok(runtime.getCustomerCreditAccount(path, customerId).customer.deletedAt);
   // Full balance is independent of the first 200 displayed movements.
-  await page.getByRole("button", { name: /Zeynep Hesap/ }).click();
+  customerWorkspace = await openCustomerAccount(/Zeynep Hesap/);
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺92,01");
   await panel.getByRole("button", { name: "Hesabı Aç", exact: true }).click();
   const history = panel.getByRole("region", { name: "Hesap hareketleri" });
@@ -396,7 +421,7 @@ try {
   const beforeHistory = runtime.getCustomerCreditAccount(path, historyCustomer);
   const ledgerBeforeHistory = raw.prepare("SELECT * FROM customer_credit_entries WHERE customer_id = ? ORDER BY id").all(historyCustomer);
   const initialHistoryCalls = calls.length;
-  await page.getByRole("button", { name: /Zümra Satış Geçmişi/ }).click();
+  customerWorkspace = await openCustomerAccount(/Zümra Satış Geçmişi/);
   await expect(panel.locator(".customer-credit-balances")).toContainText("₺4.155,00");
   await panel.getByRole("button", { name: "Hesabı Aç", exact: true }).click();
   await expect(history.locator(":scope > ul > li")).toHaveCount(200);

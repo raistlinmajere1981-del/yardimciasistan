@@ -1,11 +1,11 @@
-import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
+import { customerWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
 import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
-import { WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
+import { WorkspaceHost, WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
@@ -46,14 +46,27 @@ function Harness() {
       {page === "market" ? <MarketPage customers={dashboardData.customers} /> : <div className="customer-work-page">
         <div className="customer-work-content is-customers">
           <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
-          <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}
-            reservations={dashboardData.reservations} rooms={dashboardData.rooms} stays={dashboardData.customerRoomStays}
-            aiEnabled={false} whatsappEnabled={false} reservationsEnabled={false} staysEnabled={false}
-            customerCreditEnabled={snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT)}
-            onCall={() => undefined} onWhatsApp={() => undefined} onSummarize={() => undefined}
-            onSave={customers.handleSaveCustomer} onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
-            onAssignRoom={customers.handleAssignCustomerToRoom} onUpdateStayStatus={customers.handleUpdateCustomerRoomStayStatus}
-            onDelete={customers.handleDeleteCustomer} />
+          <CustomersWorkspace
+            customers={dashboardData.customers}
+            stays={dashboardData.customerRoomStays}
+            aiEnabled={false}
+            onSave={customers.handleSaveCustomer}
+            onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
+          />
+          <WorkspaceHost definition={customerWorkspaceDefinition} context={{
+            data: dashboardData,
+            aiEnabled: false,
+            whatsappEnabled: false,
+            reservationsEnabled: false,
+            staysEnabled: false,
+            customerCreditEnabled: snapshot.enabledCapabilities.includes(C.CUSTOMER_CREDIT),
+            onCall: () => undefined,
+            onWhatsApp: () => undefined,
+            onSummarize: () => undefined,
+            onSave: customers.handleSaveCustomer,
+            onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
+            onDelete: customers.handleDeleteCustomer
+          }} />
           </WorkspaceNavigationProvider>
         </div>
       </div>}

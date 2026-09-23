@@ -28,7 +28,17 @@ export interface CustomerWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent | CustomerWorkspaceIntent;
+export type MenuItemWorkspaceMode = "details" | "stock" | "media";
+
+export interface MenuItemWorkspaceIntent {
+  entityType: "menu-item";
+  entityId: string;
+  mode?: MenuItemWorkspaceMode;
+  action?: undefined;
+  returnContext?: WorkspaceReturnContext;
+}
+
+export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent | CustomerWorkspaceIntent | MenuItemWorkspaceIntent;
 
 export type WorkspaceModeUpdate = {
   [Entity in WorkspaceIntent["entityType"]]: Pick<Extract<WorkspaceIntent, { entityType: Entity }>, "entityType" | "mode" | "action">

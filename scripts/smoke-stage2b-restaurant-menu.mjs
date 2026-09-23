@@ -373,18 +373,28 @@ try {
     await navigate("Menü", "Menü");
     await page.locator(".menu-category-panel .menu-record").filter({ hasText: "Kahvaltı" }).click();
     await page.locator(".menu-product-panel .menu-record").filter({ hasText: "Menü Ürünü 1" }).click();
-    await expect(page.getByRole("button", { name: "Ürünü Sil", exact: true })).toBeVisible();
+    const menuItemWorkspace = page.getByRole("dialog", { name: "Menü Ürünü 1" });
+    await expect(menuItemWorkspace.getByRole("button", { name: "Ürünü Sil", exact: true })).toBeVisible();
     await capture(`menu-editor-light-compact`);
 
     if (width === 1440 || width === 600) {
-      await page.getByRole("button", { name: "Ürünü Sil", exact: true }).click();
-      const deleteDialog = page.getByRole("dialog", { name: "Ürünü sil" });
-      await expect(deleteDialog).toBeVisible();
+      await menuItemWorkspace.getByRole("button", { name: "Ürünü Sil", exact: true }).click();
+      await expect(menuItemWorkspace.getByText(/menüden silinecek\./)).toBeVisible();
       await capture(`menu-delete-dialog-light-compact`);
-      await closeDialog(deleteDialog, "Vazgeç");
+      await menuItemWorkspace.getByRole("button", { name: "Vazgeç", exact: true }).click();
+      await expect(menuItemWorkspace.getByText(/menüden silinecek\./)).toHaveCount(0);
+    }
 
+    await closeDialog(menuItemWorkspace, "Çalışma alanını kapat");
+
+    if (width === 1440 || width === 600) {
       await page.getByRole("button", { name: "Ürün ekle", exact: true }).click();
+      const newItemDialog = page.getByRole("dialog", { name: "Yeni menü ürünü" });
+      await expect(newItemDialog).toBeVisible();
       await capture(`menu-new-item-light-compact`);
+      await newItemDialog.getByRole("button", { name: "Vazgeç", exact: true }).click();
+      await expect(newItemDialog).toHaveCount(0);
+
       await page.locator(".menu-category-panel .menu-record").filter({ hasText: "Boş Kategori" }).click();
       await expect(page.getByText("Bu kategoride henüz ürün yok.", { exact: true })).toBeVisible();
       await capture(`menu-empty-light-compact`);

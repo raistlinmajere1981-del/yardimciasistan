@@ -1,5 +1,5 @@
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
-import type { DesktopDashboardData } from "../../../electron/database";
+import type { DesktopDashboardData, SaveMenuItemInput } from "../../../electron/database";
 import type { StatusTone } from "../ui/StatusBadge";
 
 export interface CategoryFormState {
@@ -102,6 +102,29 @@ export function emptyItemForm(categoryId: string, sortOrder: number): ItemFormSt
     hide_when_out_of_stock: false,
     stock_note: "",
     sort_order: String(sortOrder)
+  };
+}
+
+export function itemFormToSaveInput(form: ItemFormState): SaveMenuItemInput {
+  return {
+    ...(form.id ? { id: form.id } : {}),
+    category_id: form.category_id,
+    name: form.name,
+    description: form.description,
+    price: Number(form.price),
+    currency: form.currency,
+    image_url: form.image_url,
+    is_available: form.is_available,
+    is_featured: form.is_featured,
+    allergens: splitCommaList(form.allergens),
+    tags: splitCommaList(form.tags),
+    stock_quantity: parseNullableFormNumber(form.stock_quantity),
+    stock_min_quantity: parseNullableFormNumber(form.stock_min_quantity),
+    stock_unit: form.stock_unit,
+    stock_consumption_quantity: parsePositiveFormNumber(form.stock_consumption_quantity, 1),
+    hide_when_out_of_stock: form.hide_when_out_of_stock,
+    stock_note: form.stock_note.trim() || null,
+    sort_order: Number(form.sort_order)
   };
 }
 

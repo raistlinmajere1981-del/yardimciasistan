@@ -1,11 +1,11 @@
-import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
+import { customerWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
 import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
-import { WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
+import { WorkspaceHost, WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import { useMessagingController } from "../../apps/desktop-app/src/app/use-messaging-controller";
@@ -56,14 +56,28 @@ function Harness() {
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
         <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
-        <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}
-          reservations={dashboardData.reservations} rooms={dashboardData.rooms} stays={dashboardData.customerRoomStays}
-          aiEnabled={false} whatsappEnabled={whatsappEnabled} reservationsEnabled={false} staysEnabled={false}
-          customerCreditEnabled={customerCreditEnabled} onPreparedCreditWhatsApp={messaging.openPreparedCreditWhatsApp}
-          onCall={messaging.callCustomerRecord} onWhatsApp={messaging.openCustomerWhatsApp} onSummarize={() => undefined}
-          onSave={customers.handleSaveCustomer} onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
-          onAssignRoom={customers.handleAssignCustomerToRoom} onUpdateStayStatus={customers.handleUpdateCustomerRoomStayStatus}
-          onDelete={customers.handleDeleteCustomer} />
+        <CustomersWorkspace
+          customers={dashboardData.customers}
+          stays={dashboardData.customerRoomStays}
+          aiEnabled={false}
+          onSave={customers.handleSaveCustomer}
+          onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
+        />
+        <WorkspaceHost definition={customerWorkspaceDefinition} context={{
+          data: dashboardData,
+          aiEnabled: false,
+          whatsappEnabled,
+          reservationsEnabled: false,
+          staysEnabled: false,
+          customerCreditEnabled,
+          onPreparedCreditWhatsApp: messaging.openPreparedCreditWhatsApp,
+          onCall: messaging.callCustomerRecord,
+          onWhatsApp: messaging.openCustomerWhatsApp,
+          onSummarize: () => undefined,
+          onSave: customers.handleSaveCustomer,
+          onAnalyzeIdentity: customers.handleAnalyzeIdentityImage,
+          onDelete: customers.handleDeleteCustomer
+        }} />
         </WorkspaceNavigationProvider>
       </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} />
         : <MessagesPage safeMode={workspace("safe")} webMode={(onReturn) => workspace("web", onReturn)} aiTools={null}

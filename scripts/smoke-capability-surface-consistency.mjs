@@ -33,13 +33,14 @@ const {
 const androidCore = [C.ANDROID, C.CUSTOMERS, C.REQUESTS, C.TASKS, C.FINANCE, C.REPORTS, C.DEVICES];
 
 const requestsSource = source("apps/desktop-app/src/components/customers/RequestsWorkspace.tsx");
-const customersSource = source("apps/desktop-app/src/components/customers/CustomersWorkspace.tsx");
+const customerWorkspaceSource = source("apps/desktop-app/src/components/customers/CustomerWorkspace.tsx");
 const routerSource = source("apps/desktop-app/src/components/app/DesktopWorkspaceRouter.tsx");
 const mainSource = source("apps/desktop-app/electron/main.ts");
 const settingsSource = source("apps/desktop-app/src/components/settings/AndroidDevicesSection.tsx");
 const navigationSource = source("apps/desktop-app/src/app/navigation.ts");
 const frameSource = source("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
 const menuManagerSource = source("apps/desktop-app/src/components/menu/MenuManager.tsx");
+const menuItemFormFieldsSource = source("apps/desktop-app/src/components/menu/MenuItemFormFields.tsx");
 const menuPreviewSource = source("apps/desktop-app/src/components/menu/MenuPreview.tsx");
 const roomAccountSource = source("apps/desktop-app/src/components/pension/RoomAccount.tsx");
 const tableOrdersSource = source("apps/desktop-app/src/components/restaurant/TableOrderEditor.tsx");
@@ -63,7 +64,7 @@ const hostingSyncSource = source("firm-template/web-module/api/sync.php");
 
 // A — service.whatsapp controls both renderer affordances and hard boundaries.
 assert.match(requestsSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
-assert.match(customersSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
+assert.match(customerWorkspaceSource, /whatsappEnabled\s*&&[\s\S]{0,500}WhatsApp'tan Yaz/);
 assertHandlerGuard(whatsappIpcSource, "whatsapp:markMessageSent", "assertCapability(BUSINESS_CAPABILITIES.WHATSAPP");
 assertHandlerGuard(whatsappIpcSource, "whatsapp:deleteMessage", "assertCapability(BUSINESS_CAPABILITIES.WHATSAPP");
 assert.match(
@@ -107,7 +108,7 @@ assert.equal(customerProjection.summary.prepared_whatsapp_messages, 0);
 assert.equal(androidActionAllowedByCapabilities("message_delete", withoutCustomers), false);
 assert.match(frameSource, /qrMenuEnabled\s*&&[\s\S]{0,300}Web'e Yayınla/);
 assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
-assert.match(menuManagerSource, /inventoryEnabled\s*&&\s*<details className="menu-stock-editor"/);
+assert.match(menuItemFormFieldsSource, /showStock\s*=\s*inventoryEnabled\s*&&[\s\S]{0,160}mode === "stock"/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
 const normalizedRoomAccountSource = roomAccountSource.replace(/\s+/g, " ");
 assert.match(

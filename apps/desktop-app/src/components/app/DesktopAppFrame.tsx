@@ -25,7 +25,7 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
-import { customerWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
+import { customerWorkspaceDefinition, menuItemWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
 import { projectDesktopDashboardData } from "../../app/capability-projection";
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
 
@@ -148,7 +148,7 @@ function DesktopAppFrameContent({
 
   return (
     <AppShell
-      contentScroll={["customerWork", "pension", "restaurant", "settings"].includes(activePage) ? "workspace" : "page"}
+      contentScroll={["customerWork", "menu", "pension", "restaurant", "settings"].includes(activePage) ? "workspace" : "page"}
       contentRef={contentRef}
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(
@@ -248,6 +248,13 @@ function DesktopAppFrameContent({
             onSave: customerController.handleSaveCustomer,
             onAnalyzeIdentity: customerController.handleAnalyzeIdentityImage,
             onDelete: customerController.handleDeleteCustomer
+          }} />
+          <WorkspaceHost definition={menuItemWorkspaceDefinition} context={{
+            data: workspaceData,
+            qrMenuEnabled,
+            inventoryEnabled,
+            onSave: menuController.saveItemForm,
+            onDelete: menuController.deleteItemById
           }} />
           <WorkspaceHost definition={roomWorkspaceDefinition} context={{
             data: workspaceData,

@@ -147,6 +147,37 @@ try {
         };
       },
       cancelStockImageAnalysis: async () => true,
+      saveMenuItem: async (input) => {
+        const savedId = input.id || "menu-item-smoke-created";
+        const existing = currentDashboardData.menu.items.find((item) => item.id === savedId);
+        const savedItem = {
+          ...(existing || currentDashboardData.menu.items[0]),
+          ...input,
+          id: savedId,
+          created_at: existing?.created_at || "2026-07-18T09:00:00Z",
+          updated_at: "2026-07-18T12:00:00Z"
+        };
+        currentDashboardData = {
+          ...currentDashboardData,
+          menu: {
+            ...currentDashboardData.menu,
+            items: existing
+              ? currentDashboardData.menu.items.map((item) => item.id === savedId ? savedItem : item)
+              : [...currentDashboardData.menu.items, savedItem]
+          }
+        };
+        return { ok: true, message: "Ürün kaydedildi.", savedId, dashboardData: currentDashboardData };
+      },
+      deleteMenuItem: async (itemId) => {
+        currentDashboardData = {
+          ...currentDashboardData,
+          menu: {
+            ...currentDashboardData.menu,
+            items: currentDashboardData.menu.items.filter((item) => item.id !== itemId)
+          }
+        };
+        return { ok: true, message: "Ürün silindi.", dashboardData: currentDashboardData };
+      },
       applyStockImageImport: async (input) => {
         window.__stockImageApplyCalls.push(input);
         const additions = new Map();
@@ -409,7 +440,7 @@ try {
   await expect(page.locator(".page-header-copy > p")).toHaveText("Kategori ve ürünleri düzenleyip web menüsünü yayınlayın.");
   await expect(page.getByRole("heading", { name: "Kategoriler", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ürünler", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Ürün Detayı", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ürün ekle", exact: true })).toBeVisible();
   const stockImageTrigger = page.getByRole("button", { name: "AI ile Stok Ekle", exact: true });
   await expect(stockImageTrigger).toBeVisible();
   await stockImageTrigger.click();
@@ -456,18 +487,24 @@ try {
   await expect(page.locator(".menu-product-panel .menu-panel-heading .status-badge")).toHaveText(/\d+ kayıt/);
   await expect(page.locator(".menu-category-panel .menu-panel-heading p")).toHaveText("Menüdeki ürün gruplarını yönetin.");
   await expect(page.getByRole("button", { name: "Kategoriyi Kaydet" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ürünü Kaydet" })).toBeVisible();
   await page.locator(".menu-category-panel .menu-record").filter({ hasText: "Yerel Kahvaltı" }).first().click();
   await expect(page.getByRole("button", { name: "Kategoriyi Sil" })).toBeVisible();
   await page.locator(".menu-product-panel .menu-record").filter({ hasText: "Yerel Serpme Kahvaltı" }).first().click();
-  await expect(page.getByRole("button", { name: "Ürünü Sil" })).toBeVisible();
-  await page.getByRole("button", { name: "Ürünü Sil" }).click();
-  const menuDeleteDialog = page.getByRole("dialog", { name: "Ürünü sil" });
-  await expect(menuDeleteDialog).toBeVisible();
-  await expect(menuDeleteDialog.getByText(/ürünü menüden silinecek\./)).toBeVisible();
-  await menuDeleteDialog.getByRole("button", { name: "Vazgeç" }).click();
-  await expect(menuDeleteDialog).toHaveCount(0);
-  await page.getByLabel("Ürün adı").fill("Canlı Serpme Kahvaltı");
+  const menuItemWorkspace = page.getByRole("dialog", { name: "Yerel Serpme Kahvaltı" });
+  await expect(menuItemWorkspace).toBeVisible();
+  await expect(menuItemWorkspace.getByRole("tab", { name: "Bilgiler", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(menuItemWorkspace.getByRole("tab", { name: "Stok", exact: true })).toBeVisible();
+  await expect(menuItemWorkspace.getByRole("tab", { name: "Görsel", exact: true })).toBeVisible();
+  await menuItemWorkspace.getByRole("button", { name: "Ürünü Sil", exact: true }).click();
+  await expect(menuItemWorkspace.getByText(/menüden silinecek\./)).toBeVisible();
+  await menuItemWorkspace.getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await menuItemWorkspace.getByLabel("Ürün adı", { exact: true }).fill("Canlı Serpme Kahvaltı");
+  await expect(menuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true })).toBeDisabled();
+  await menuItemWorkspace.getByRole("button", { name: "Ürünü Kaydet", exact: true }).click();
+  const savedMenuItemWorkspace = page.getByRole("dialog", { name: "Canlı Serpme Kahvaltı" });
+  await expect(savedMenuItemWorkspace.getByText("Ürün kaydedildi.", { exact: true })).toBeVisible();
+  await expect(savedMenuItemWorkspace.getByRole("heading", { name: "Canlı Serpme Kahvaltı", exact: true })).toBeVisible();
+  await savedMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(page.getByRole("button", { name: "Önizle", exact: true })).toHaveCount(1);
   await page.getByRole("button", { name: "Önizle", exact: true }).click();
   const localMenuPreview = page.getByRole("dialog", { name: "Yerel Menü Önizlemesi" });
@@ -480,7 +517,6 @@ try {
   await page.screenshot({ path: "artifacts/screenshots/desktop-local-menu-preview.png", fullPage: true });
   await localMenuPreview.getByRole("button", { name: "Önizlemeyi kapat" }).click();
   await expect(localMenuPreview).toHaveCount(0);
-  await page.getByLabel("Ürün adı").fill("Yerel Serpme Kahvaltı");
   await expect(page.getByRole("button", { name: "Web'e Yayınla", exact: true })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Yayınla", exact: true })).toHaveCount(0);
   await expect(page.locator(".menu-category-panel").getByLabel("Sıra", { exact: true })).toBeVisible();
@@ -1619,7 +1655,12 @@ try {
   await compactPage.locator(".menu-category-panel .menu-record").filter({ hasText: "Kahvaltı" }).click();
   await expect(compactPage.locator(".menu-category-panel .menu-record[aria-pressed='true']")).toContainText("Kahvaltı");
   await expect(compactPage.locator(".menu-category-form")).toBeVisible();
-  await expect(compactPage.locator(".menu-item-details")).toBeVisible();
+  await compactPage.locator(".menu-product-panel .menu-record").first().click();
+  const compactMenuItemWorkspace = compactPage.getByRole("dialog");
+  await expect(compactMenuItemWorkspace).toBeVisible();
+  await compactMenuItemWorkspace.getByRole("tab", { name: "Görsel", exact: true }).click();
+  await expect(compactMenuItemWorkspace.locator(".menu-item-details")).toBeVisible();
+  await compactMenuItemWorkspace.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(compactPage.locator(".menu-management-grid .menu-record[aria-pressed='true']")).toHaveCount(2);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-menu-1366x768.png" });
 
