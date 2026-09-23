@@ -38,7 +38,17 @@ export interface MenuItemWorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
-export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent | CustomerWorkspaceIntent | MenuItemWorkspaceIntent;
+export type ProductWorkspaceMode = "details" | "stock" | "media";
+
+export interface ProductWorkspaceIntent {
+  entityType: "product";
+  entityId: string;
+  mode?: ProductWorkspaceMode;
+  action?: undefined;
+  returnContext?: WorkspaceReturnContext;
+}
+
+export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent | CustomerWorkspaceIntent | MenuItemWorkspaceIntent | ProductWorkspaceIntent;
 
 export type WorkspaceModeUpdate = {
   [Entity in WorkspaceIntent["entityType"]]: Pick<Extract<WorkspaceIntent, { entityType: Entity }>, "entityType" | "mode" | "action">
@@ -46,12 +56,14 @@ export type WorkspaceModeUpdate = {
 
 export type PensionView = "rooms" | "reservations" | "daily-tasks";
 export type RestaurantView = "floor" | "reservations" | "daily-tasks";
+export type MarketView = "quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels";
 
 /** View names belong to their originating page, independently of the entity opened. */
 export type WorkspaceReturnContext = (
   | { page: "pension"; view?: PensionView }
   | { page: "restaurant"; view?: RestaurantView }
-  | { page?: Exclude<DesktopPage, "pension" | "restaurant">; view?: never }
+  | { page: "market"; view?: MarketView }
+  | { page?: Exclude<DesktopPage, "pension" | "restaurant" | "market">; view?: never }
 ) & { entityId?: string };
 
 export type WorkspacePresentation = "centered" | "full-canvas";
