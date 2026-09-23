@@ -22,6 +22,7 @@ import type {
   DesktopSyncController,
   DeviceController,
   MenuController,
+  MarketController,
   MessagingController,
   OperationController,
   SetupController
@@ -60,6 +61,7 @@ interface DesktopWorkspaceRouterProps {
   menuController: MenuController;
   messagingController: MessagingController;
   customerController: CustomerController;
+  marketController: MarketController;
   operationController: OperationController;
   deviceController: DeviceController;
   uiPreferences: UiPreferences;
@@ -78,6 +80,7 @@ export function DesktopWorkspaceRouter({
   menuController,
   messagingController,
   customerController,
+  marketController,
   operationController,
   deviceController,
   uiPreferences,
@@ -583,7 +586,7 @@ export function DesktopWorkspaceRouter({
           inventoryEnabled={inventoryEnabled}
         />
       ) : activePage === "market" ? (
-        <MarketPage customers={dashboardData.customers} />
+        <MarketPage customers={dashboardData.customers} controller={marketController} />
       ) : activePage === "messages" ? null : (
         <SettingsWorkspace
           setupData={setupData}
