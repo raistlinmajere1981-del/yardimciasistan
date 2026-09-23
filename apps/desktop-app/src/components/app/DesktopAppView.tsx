@@ -2,6 +2,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopPage } from "../../app/navigation";
 import type { SyncState } from "../../app/runtime-state";
 import { useMarketController } from "../../app/use-market-controller";
+import { useFinanceController } from "../../app/use-finance-controller";
 import type {
   AppLockController,
   CustomerController,
@@ -67,6 +68,11 @@ export function DesktopAppView({
     active: appAccessPhase === "unlocked" && activePage === "market",
     enabled: appAccessPhase === "unlocked"
   });
+  const financeController = useFinanceController({
+    businessCapabilities: desktopSyncController.businessCapabilities,
+    active: appAccessPhase === "unlocked" && activePage === "reports",
+    enabled: appAccessPhase === "unlocked"
+  });
 
   useEffect(() => {
     applyUiPreferences(uiPreferences);
@@ -111,6 +117,7 @@ export function DesktopAppView({
         messagingController={messagingController}
         customerController={customerController}
         marketController={marketController}
+        financeController={financeController}
         operationController={operationController}
         deviceController={deviceController}
         uiPreferences={uiPreferences}
