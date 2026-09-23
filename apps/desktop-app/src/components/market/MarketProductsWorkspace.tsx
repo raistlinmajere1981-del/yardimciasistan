@@ -40,6 +40,7 @@ interface MarketProductsWorkspaceProps {
   busy: boolean;
   productDataEnabled?: boolean;
   onReload: () => Promise<void>;
+  onProductSaved: (product: CatalogProduct) => void;
   onStateChange: (state: "loading" | "success" | "error", message: string) => void;
   productLookupRequest?: ProductLookupFormRequest | null;
   onProductLookupLoaded?: (requestId: number) => void;
@@ -63,6 +64,7 @@ export function MarketProductsWorkspace({
   busy,
   productDataEnabled = false,
   onReload,
+  onProductSaved,
   onStateChange,
   productLookupRequest = null,
   onProductLookupLoaded
@@ -181,6 +183,7 @@ export function MarketProductsWorkspace({
       return;
     }
 
+    onProductSaved(saved);
     let catalogReloadFailed = false;
     try {
       await onReload();
