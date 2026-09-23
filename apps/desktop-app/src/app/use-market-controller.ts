@@ -31,6 +31,14 @@ export function useMarketController({
     reportAppStatus(state, message);
   }, []);
 
+  const upsertProduct = useCallback((product: CatalogProduct) => {
+    setProducts((current) => {
+      const existingIndex = current.findIndex((item) => item.id === product.id);
+      if (existingIndex < 0) return [...current, product];
+      return current.map((item, index) => index === existingIndex ? product : item);
+    });
+  }, []);
+
   const reloadCatalog = useCallback(async () => {
     if (!bridge || !catalogEnabled) {
       setProducts([]);
@@ -94,6 +102,7 @@ export function useMarketController({
     dataState,
     productDataEnabled,
     reloadCatalog,
+    upsertProduct,
     handleStateChange
   };
 }
