@@ -4,7 +4,6 @@ import type {
   CatalogCategory,
   CatalogProduct,
   CommerceSale,
-  CommerceSaleDraft,
   CommerceUnit,
   ProductLookupCandidate
 } from "@yardimci-asistan/shared";
@@ -14,14 +13,11 @@ import {
   type BarcodeScan
 } from "../../app/barcode-input";
 import type { DesktopCustomer } from "../../../electron/database";
+import type { DesktopCommerceBridge } from "../../../electron/commerce-ipc-contract";
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
-
-interface CartLine {
-  product: CatalogProduct;
-  quantity: number;
-}
+import type { MarketQuickSaleSession } from "../../app/use-market-quick-sale-session";
 
 type BarcodeMode = "keyboard-wedge" | "simulator";
 
@@ -30,6 +26,7 @@ interface MarketQuickSaleWorkspaceProps {
   customerCreditEnabled?: boolean;
   products: CatalogProduct[];
   categories: CatalogCategory[];
+  session: MarketQuickSaleSession;
   barcodeEnabled: boolean;
   busy: boolean;
   onSaleCompleted: (sale: CommerceSale) => Promise<void> | void;
@@ -40,10 +37,7 @@ interface MarketQuickSaleWorkspaceProps {
   onExternalProductFound?: (product: ProductLookupCandidate) => void;
 }
 
-export interface CartDraftQuickSaleRequest {
-  requestId: number;
-  draftId: string;
-}
+export type { CartDraftQuickSaleRequest } from "../../app/use-market-quick-sale-session";
 
 const unitLabels: Record<CommerceUnit, string> = {
   piece: "adet",
@@ -90,11 +84,43 @@ function barcodeSourceLabel(scan: BarcodeScan) {
   return "Kamera";
 }
 
+let phoneScannerLeaseSequence = 0;
+let phoneScannerOwner = 0;
+let phoneScannerModeQueue: Promise<void> = Promise.resolve();
+
+function acquirePhoneScanner(bridge: DesktopCommerceBridge) {
+  const lease = ++phoneScannerLeaseSequence;
+  phoneScannerOwner = lease;
+  const operation = phoneScannerModeQueue
+    .catch(() => undefined)
+    .then(async () => {
+      if (phoneScannerOwner !== lease) return;
+      await bridge.setBarcodeScanMode(true);
+    });
+  phoneScannerModeQueue = operation.catch(() => undefined);
+  return {
+    lease,
+    ready: operation.then(() => phoneScannerOwner === lease)
+  };
+}
+
+function releasePhoneScanner(bridge: DesktopCommerceBridge, lease: number) {
+  if (phoneScannerOwner === lease) phoneScannerOwner = 0;
+  const operation = phoneScannerModeQueue
+    .catch(() => undefined)
+    .then(async () => {
+      if (phoneScannerOwner !== 0) return;
+      await bridge.setBarcodeScanMode(false);
+    });
+  phoneScannerModeQueue = operation.catch(() => undefined);
+}
+
 export function MarketQuickSaleWorkspace({
   customers = [],
   customerCreditEnabled = false,
   products,
   categories,
+  session,
   barcodeEnabled,
   busy,
   onSaleCompleted,
@@ -107,36 +133,41 @@ export function MarketQuickSaleWorkspace({
   const bridge = window.yardimciDesktop?.commerce;
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [cart, setCart] = useState<CartLine[]>([]);
-  const [discountTotal, setDiscountTotal] = useState("0");
-  const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [lastSale, setLastSale] = useState<CommerceSale | null>(null);
-  const [customerId, setCustomerId] = useState("");
-  const [lastCreditCustomerName, setLastCreditCustomerName] = useState("");
-  const saleInFlight = useRef(false);
-  const [submitting, setSubmitting] = useState(false);
   const [barcodeMode, setBarcodeMode] = useState<BarcodeMode>("keyboard-wedge");
   const [simulatedBarcode, setSimulatedBarcode] = useState("");
   const [barcodeMessage, setBarcodeMessage] = useState("USB okuyucu hazır; barkodu okutun.");
   const [scanning, setScanning] = useState(false);
   const [phoneBarcodeReady, setPhoneBarcodeReady] = useState(false);
   const [lastScanDevice, setLastScanDevice] = useState("");
-  const [sourceDraft, setSourceDraft] = useState<CommerceSaleDraft | null>(null);
-  const [draftLoadWarnings, setDraftLoadWarnings] = useState<string[]>([]);
-  const [reviewRecoveryDraft, setReviewRecoveryDraft] = useState<CommerceSaleDraft | null>(null);
-  const cartRef = useRef<CartLine[]>([]);
   const localScanInFlight = useRef(false);
-  const loadedDraftRequestId = useRef<number | null>(null);
   const interactionBlocked = useRef(false);
+  const {
+    cart,
+    cartRef,
+    discountTotal,
+    setDiscountTotal,
+    paymentMethod,
+    setPaymentMethod,
+    customerId,
+    setCustomerId,
+    sourceDraft,
+    draftLoadWarnings,
+    reviewRecoveryDraft,
+    setReviewRecoveryDraft,
+    lastSale,
+    lastCreditCustomerName,
+    submitting,
+    loadedDraftRequestId,
+    replaceCart,
+    setQuantity,
+    clearSale,
+    startSale,
+    finishSale,
+    recordSale,
+    applyLoadedDraft
+  } = session;
   const isCredit = paymentMethod === "credit";
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
-
-  useEffect(() => {
-    if (!customerCreditEnabled) {
-      setPaymentMethod((current) => current === "credit" ? "cash" : current);
-      setCustomerId("");
-    }
-  }, [customerCreditEnabled]);
 
   const simulatorAdapter = useMemo(() => createBarcodeSimulatorAdapter(), []);
   const keyboardAdapter = useMemo(() => createKeyboardBarcodeInputAdapter(), []);
@@ -168,27 +199,14 @@ export function MarketQuickSaleWorkspace({
   const previewTotal = roundMoney(subtotal - discount);
   const currency = cartLines[0]?.product.currency ?? "TRY";
 
-  const replaceCart = useCallback((next: CartLine[]) => {
-    cartRef.current = next;
-    setCart(next);
-  }, []);
-
   const addProduct = useCallback((product: CatalogProduct) => {
-    const current = cartRef.current;
-    const currentCurrency = current[0]?.product.currency ?? "";
-    if (currentCurrency && product.currency !== currentCurrency) {
+    const result = session.addProduct(product);
+    if (result === "currency_mismatch") {
       onStateChange("error", "Tek satışta birden fazla para birimi kullanılamaz.");
       return false;
     }
-    const existing = current.find((line) => line.product.id === product.id);
-    const next = existing
-      ? current.map((line) => line.product.id === product.id
-        ? { ...line, product, quantity: roundQuantity(line.quantity + 1) }
-        : line)
-      : [...current, { product, quantity: 1 }];
-    replaceCart(next);
-    return true;
-  }, [onStateChange, replaceCart]);
+    return result === "added";
+  }, [onStateChange, session]);
 
   const resolveBarcode = useCallback(async (barcode: string, source: string) => {
     if (!bridge) return;
