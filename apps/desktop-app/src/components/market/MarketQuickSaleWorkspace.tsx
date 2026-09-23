@@ -138,6 +138,7 @@ export function MarketQuickSaleWorkspace({
   const [lastScanDevice, setLastScanDevice] = useState("");
   const localScanInFlight = useRef(false);
   const interactionBlocked = useRef(false);
+  const mountedRef = useRef(true);
   const beginBarcodeRequest = useRequestGeneration();
   const {
     cart,
@@ -164,6 +165,11 @@ export function MarketQuickSaleWorkspace({
   } = session;
   const isCredit = paymentMethod === "credit";
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
+  const draftLoading = Boolean(cartDraftRequest && loadedDraftRequestId.current !== cartDraftRequest.requestId);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+  }, []);
 
   const simulatorAdapter = useMemo(() => createBarcodeSimulatorAdapter(), []);
   const keyboardAdapter = useMemo(() => createKeyboardBarcodeInputAdapter(), []);
@@ -246,17 +252,16 @@ export function MarketQuickSaleWorkspace({
   }, [addProduct, beginBarcodeRequest, bridge, onExternalProductFound, onStateChange]);
 
   const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
-    if (!barcodeEnabled || busy || submitting || localScanInFlight.current) return;
-    const isCurrent = beginBarcodeRequest();
+    if (!barcodeEnabled || busy || submitting || draftLoading || localScanInFlight.current) return;
     localScanInFlight.current = true;
     setScanning(true);
     try {
       await resolveBarcode(scan.value, barcodeSourceLabel(scan));
     } finally {
       localScanInFlight.current = false;
-      if (isCurrent()) setScanning(false);
+      if (mountedRef.current) setScanning(false);
     }
-  }, [barcodeEnabled, beginBarcodeRequest, busy, resolveBarcode, submitting]);
+  }, [barcodeEnabled, busy, draftLoading, resolveBarcode, submitting]);
 
   useEffect(() => {
     if (!barcodeEnabled) {
@@ -292,6 +297,7 @@ export function MarketQuickSaleWorkspace({
       })
       .catch((error) => {
         if (!cancelled) {
+          void onCartDraftLoaded?.(cartDraftRequest.draftId);
           onStateChange("error", error instanceof Error ? error.message : "Telefon sepeti yüklenemedi.");
         }
       });
@@ -300,7 +306,7 @@ export function MarketQuickSaleWorkspace({
     };
   }, [applyLoadedDraft, beginBarcodeRequest, bridge, cartDraftRequest, loadedDraftRequestId, onCartDraftLoaded, onStateChange]);
 
-  interactionBlocked.current = busy || submitting;
+  interactionBlocked.current = busy || submitting || draftLoading;
 
   useEffect(() => {
     if (!barcodeEnabled || !bridge) {
@@ -447,7 +453,7 @@ export function MarketQuickSaleWorkspace({
     }
   }
 
-  const disabled = busy || submitting;
+  const disabled = busy || submitting || draftLoading;
 
   return (
     <div className="market-quick-sale-layout">
