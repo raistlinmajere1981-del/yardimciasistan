@@ -167,7 +167,7 @@ export function MarketProductsWorkspace({
   }
 
   async function createProduct() {
-    if (!bridge || saveState === "loading") return;
+    if (!bridge || busy || saveState === "loading") return;
     setSaveState("loading");
     setSaveMessage("Ürün kartı kaydediliyor...");
     let saved: CatalogProduct;
@@ -261,7 +261,7 @@ export function MarketProductsWorkspace({
           <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>
           <div className="action-row">
             <ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={() => setCreateOpen(false)}>Vazgeç</ActionButton>
-            <ActionButton type="submit" disabled={saveState === "loading" || !productForm.name.trim()}><Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}</ActionButton>
+            <ActionButton type="submit" disabled={busy || saveState === "loading" || !productForm.name.trim()}><Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Ürünü Kaydet"}</ActionButton>
           </div>
         </>}
       >
@@ -271,7 +271,7 @@ export function MarketProductsWorkspace({
             categories={categories}
             inventoryEnabled={inventoryEnabled}
             productDataEnabled={productDataEnabled}
-            disabled={saveState === "loading"}
+            disabled={busy || saveState === "loading"}
             mode="all"
             lookupSeed={productLookupRequest}
             onLookupSeedLoaded={onProductLookupLoaded}
