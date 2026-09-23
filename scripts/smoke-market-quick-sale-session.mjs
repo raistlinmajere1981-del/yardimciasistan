@@ -261,7 +261,7 @@ try {
   const tabs = page.getByRole("navigation", { name: "Market çalışma alanları" });
   const quick = () => page.locator(".market-quick-sale-layout");
   const productRow = () => quick().getByRole("button", { name: /Test Ürünü/ }).first();
-  const quantity = () => quick().getByLabel("Test Ürünü miktarı");
+  const quantity = () => quick().getByRole("spinbutton", { name: "Test Ürünü miktarı", exact: true });
   const payment = () => quick().getByLabel("Ödeme yöntemi");
   const discount = () => quick().getByLabel("İndirim");
 
