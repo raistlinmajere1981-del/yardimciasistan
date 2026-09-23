@@ -132,6 +132,7 @@ try {
     window.__m8bResolveFind = null;
     window.__m8bResolveExternal = null;
     window.__m8bResolveSale = null;
+    window.__m8bBarcodeEvents = [];
 
     let saleSequence = 0;
     let draftReviewed = false;
@@ -184,7 +185,9 @@ try {
       },
       consumePendingBarcodeScans: async () => {
         window.__m8bStats.consumeCalls += 1;
-        return [];
+        const events = window.__m8bBarcodeEvents;
+        window.__m8bBarcodeEvents = [];
+        return events;
       },
       findProductByBarcode: async (barcode) => {
         window.__m8bStats.findCalls += 1;
@@ -291,13 +294,18 @@ try {
   await expect(discount()).toHaveValue("5");
   await expect(payment()).toHaveValue("card");
 
-  // Unknown barcode handoff opens Product Create without losing the sale session.
-  await quick().locator(".market-barcode-panel select").selectOption("simulator");
-  await quick().locator(".market-barcode-simulator input").fill("999999");
-  await quick().getByRole("button", { name: "Barkodu Gönder" }).click();
+  // A phone batch stops after an unknown barcode handoff; later events never touch the hidden cart.
+  const findBeforeBatch = await page.evaluate(() => window.__m8bStats.findCalls);
+  await page.evaluate(() => {
+    window.__m8bBarcodeEvents = [
+      { id: "scan-unknown", deviceId: "Telefon-1", barcode: "999999" },
+      { id: "scan-known", deviceId: "Telefon-1", barcode: "8690000000001" }
+    ];
+  });
   const createDialog = page.getByRole("dialog", { name: "Yeni ürün ekle" });
-  await expect(createDialog).toBeVisible();
+  await expect(createDialog).toBeVisible({ timeout: 2500 });
   await expect(createDialog.getByLabel("Ürün adı")).toHaveValue("Open Food Ürünü");
+  expect(await page.evaluate(() => window.__m8bStats.findCalls)).toBe(findBeforeBatch + 1);
   await createDialog.getByRole("button", { name: "Vazgeç", exact: true }).click();
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
   await expect(quantity()).toHaveValue("2");
@@ -355,11 +363,11 @@ try {
   await tabs.getByRole("button", { name: /Telefon Sepetleri/ }).click();
   await expect(page.getByText("Session smoke")).toBeVisible();
   await page.getByRole("button", { name: "Hızlı Satış'a Yükle" }).click();
-  await expect(quick().getByRole("complementary", { name: "Telefon sepeti kaynağı" })).toContainText("Test Telefonu");
+  await expect(quick().locator('[aria-label="Telefon sepeti kaynağı"]')).toContainText("Test Telefonu");
   await expect(quantity()).toHaveValue("2");
   await tabs.getByRole("button", { name: /Ürünler/ }).click();
   await tabs.getByRole("button", { name: /Hızlı Satış/ }).click();
-  await expect(quick().getByRole("complementary", { name: "Telefon sepeti kaynağı" })).toContainText("Session smoke");
+  await expect(quick().locator('[aria-label="Telefon sepeti kaynağı"]')).toContainText("Session smoke");
 
   await page.evaluate(() => { window.__m8bFailReview = true; });
   await quick().getByRole("button", { name: "Ödemeyi Al ve Satışı Tamamla" }).click();
