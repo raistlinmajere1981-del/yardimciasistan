@@ -152,6 +152,7 @@ function assertSourceContracts() {
   const page = read("apps/desktop-app/src/pages/MarketPage.tsx");
   const inbox = read("apps/desktop-app/src/components/market/MarketCompanionInboxWorkspace.tsx");
   const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
+  const quickSaleSession = read("apps/desktop-app/src/app/use-market-quick-sale-session.ts");
   const store = read("apps/desktop-app/electron/market-companion-store.ts");
 
   assert.match(page, /Telefon Sepetleri/);
@@ -159,7 +160,7 @@ function assertSourceContracts() {
   assert.match(inbox, /Hızlı Satış'a Yükle/);
   assert.match(inbox, /Sepeti Kapat/);
   assert.doesNotMatch(inbox, /Ürün Kartına Aktar|ürün önerileri/i);
-  assert.match(quickSale, /ürünü artık aktif olmadığı için sepete eklenmedi\./);
+  assert.match(quickSaleSession, /ürünü artık aktif olmadığı için sepete eklenmedi\./);
   assert.match(quickSale, /Satış tamamlandı ancak telefon sepeti kapatılamadı\./);
   assert.match(quickSale, /markCartDraftReviewed/);
   assert.match(store, /product\.sale_price AS product_sale_price/);
