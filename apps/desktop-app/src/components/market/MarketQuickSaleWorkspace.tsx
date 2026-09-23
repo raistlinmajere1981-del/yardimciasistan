@@ -63,10 +63,6 @@ function paymentMethodLabel(value: string) {
   return paymentMethodLabels[value] ?? value;
 }
 
-function roundQuantity(value: number) {
-  return Math.round((value + Number.EPSILON) * 10000) / 10000;
-}
-
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -145,7 +141,6 @@ export function MarketQuickSaleWorkspace({
   const beginBarcodeRequest = useRequestGeneration();
   const {
     cart,
-    cartRef,
     discountTotal,
     setDiscountTotal,
     paymentMethod,
@@ -160,7 +155,6 @@ export function MarketQuickSaleWorkspace({
     lastCreditCustomerName,
     submitting,
     loadedDraftRequestId,
-    replaceCart,
     setQuantity,
     clearSale,
     startSale,
@@ -368,7 +362,7 @@ export function MarketQuickSaleWorkspace({
   }
 
   async function completeSale() {
-    if (saleInFlight.current || busy) return;
+    if (busy) return;
     if (!bridge) {
       onStateChange("error", "Satış kaydı kullanılamıyor. Uygulamayı yeniden başlatın.");
       return;
@@ -382,9 +376,13 @@ export function MarketQuickSaleWorkspace({
       return;
     }
 
+    beginBarcodeRequest();
+    if (!startSale()) return;
+
     const draftToReview = sourceDraft;
-    saleInFlight.current = true;
-    setSubmitting(true);
+    const creditCustomerId = isCredit ? selectedCustomer!.id : "";
+    const creditCustomerName = isCredit ? selectedCustomer!.fullName : "";
+    const salePaymentMethod = paymentMethod;
     let sale: CommerceSale;
     try {
       const saleInput = {
@@ -396,47 +394,49 @@ export function MarketQuickSaleWorkspace({
         source: "desktop-market-quick-sale"
       };
       sale = isCredit
-        ? await bridge.createCustomerCreditSale({ ...saleInput, customerId: selectedCustomer!.id })
-        : await bridge.createPaidSale({ ...saleInput, paymentMethod });
+        ? await bridge.createCustomerCreditSale({ ...saleInput, customerId: creditCustomerId })
+        : await bridge.createPaidSale({ ...saleInput, paymentMethod: salePaymentMethod });
     } catch (error) {
       onStateChange("error", customerCreditError(error, "Satış tamamlanamadı."));
-      saleInFlight.current = false;
-      setSubmitting(false);
+      finishSale();
       return;
     }
 
-    setLastSale(sale);
-    setLastCreditCustomerName(sale.status === "credit" ? selectedCustomer?.fullName ?? "" : "");
-    if (sale.status === "credit") notifyCustomerCreditChanged(customerId);
+    recordSale(sale, creditCustomerName);
+    if (sale.status === "credit") notifyCustomerCreditChanged(creditCustomerId);
     clearSale();
+
     try {
-      await onSaleCompleted(sale);
-    } catch {
-      onStateChange("success", sale.status === "credit"
-        ? "Veresiye satış kaydedildi ancak katalog görünümü yenilenemedi."
-        : "Satış tamamlandı ancak katalog görünümü yenilenemedi.");
-    }
-    if (draftToReview) {
       try {
-        await bridge.markCartDraftReviewed(draftToReview.id);
-        await onCartDraftReviewed?.(draftToReview.id);
-        setReviewRecoveryDraft(null);
-        onStateChange("success", sale.status === "credit"
-          ? "Veresiye satış kaydedildi ve telefon sepeti kapatıldı."
-          : "Satış tamamlandı ve telefon sepeti kapatıldı.");
+        await onSaleCompleted(sale);
       } catch {
-        setReviewRecoveryDraft(draftToReview);
         onStateChange("success", sale.status === "credit"
-          ? "Veresiye satış kaydedildi ancak telefon sepeti kapatılamadı."
-          : "Satış tamamlandı ancak telefon sepeti kapatılamadı.");
+          ? "Veresiye satış kaydedildi ancak katalog görünümü yenilenemedi."
+          : "Satış tamamlandı ancak katalog görünümü yenilenemedi.");
       }
+
+      if (draftToReview) {
+        try {
+          await bridge.markCartDraftReviewed(draftToReview.id);
+          await onCartDraftReviewed?.(draftToReview.id);
+          setReviewRecoveryDraft(null);
+          onStateChange("success", sale.status === "credit"
+            ? "Veresiye satış kaydedildi ve telefon sepeti kapatıldı."
+            : "Satış tamamlandı ve telefon sepeti kapatıldı.");
+        } catch {
+          setReviewRecoveryDraft(draftToReview);
+          onStateChange("success", sale.status === "credit"
+            ? "Veresiye satış kaydedildi ancak telefon sepeti kapatılamadı."
+            : "Satış tamamlandı ancak telefon sepeti kapatılamadı.");
+        }
+      }
+    } finally {
+      finishSale();
     }
-    saleInFlight.current = false;
-    setSubmitting(false);
   }
 
   async function closeRecoveryDraft() {
-    if (!bridge || !reviewRecoveryDraft) return;
+    if (!bridge || !reviewRecoveryDraft || submitting) return;
     try {
       await bridge.markCartDraftReviewed(reviewRecoveryDraft.id);
       await onCartDraftReviewed?.(reviewRecoveryDraft.id);
