@@ -21,6 +21,7 @@ import type {
   CustomerController,
   DesktopSyncController,
   DeviceController,
+  FinanceController,
   MenuController,
   MarketController,
   MessagingController,
@@ -62,6 +63,7 @@ interface DesktopWorkspaceRouterProps {
   messagingController: MessagingController;
   customerController: CustomerController;
   marketController: MarketController;
+  financeController: FinanceController;
   operationController: OperationController;
   deviceController: DeviceController;
   uiPreferences: UiPreferences;
@@ -81,6 +83,7 @@ export function DesktopWorkspaceRouter({
   messagingController,
   customerController,
   marketController,
+  financeController,
   operationController,
   deviceController,
   uiPreferences,
@@ -573,6 +576,7 @@ export function DesktopWorkspaceRouter({
         <ReportsPage
           aiEnabled={aiEnabled}
           financeEnabled={runtimeHasCapability(businessCapabilities, C.FINANCE)}
+          financeController={financeController}
           reportsEnabled={runtimeHasCapability(businessCapabilities, C.REPORTS)}
           requestsEnabled={requestsEnabled}
           tasksEnabled={tasksEnabled}
