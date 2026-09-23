@@ -31,8 +31,8 @@ try {
       CATALOG: "commerce.catalog",
       SALES: "commerce.sales",
       RETAIL_BARCODE: "retail.barcode",
-      CUSTOMERS: "customer.records",
-      FINANCE: "finance.ledger",
+      CUSTOMERS: "core.customers",
+      FINANCE: "core.finance",
       CUSTOMER_CREDIT: "commerce.customer_credit"
     };
     const now = "2026-09-23T18:00:00.000Z";
@@ -231,7 +231,13 @@ try {
       createCustomerCreditSale: async (input) => {
         window.__m8bStats.saleCalls.push(input);
         return makeSale(input, "credit");
-      }
+      },
+      getCustomerCreditAccount: async () => ({
+        customer: { id: "customer-1", fullName: "Test Müşterisi", phone: "+905551112233", deletedAt: "" },
+        balances: [],
+        entries: [],
+        hasMoreEntries: false
+      })
     };
 
     window.yardimciDesktop = {
