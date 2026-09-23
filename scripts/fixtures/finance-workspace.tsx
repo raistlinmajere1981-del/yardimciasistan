@@ -52,7 +52,9 @@ function Harness() {
         <button type="button" onClick={() => setPage("other")}>Diğer</button>
       </nav>
       {page === "finance"
-        ? <FinanceWorkspace controller={controller} />
+        ? controller.financeEnabled
+          ? <FinanceWorkspace controller={controller} />
+          : <section aria-label="Finance kapalı"><h1>Kasa kapalı</h1></section>
         : <section aria-label="Diğer sayfa"><h1>Diğer</h1></section>}
     </main>
   );
