@@ -6,3 +6,5 @@ export type MessagingController = ReturnType<(typeof import("./use-messaging-con
 export type CustomerController = ReturnType<(typeof import("./use-customer-controller"))["useCustomerController"]>;
 export type OperationController = ReturnType<(typeof import("./use-operation-controller"))["useOperationController"]>;
 export type DeviceController = ReturnType<(typeof import("./use-device-controller"))["useDeviceController"]>;
+
+export type MarketController = ReturnType<(typeof import("./use-market-controller"))["useMarketController"]>;
