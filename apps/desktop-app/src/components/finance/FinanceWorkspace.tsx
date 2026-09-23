@@ -7,6 +7,7 @@ import { MetricCard } from "../ui/MetricCard";
 import { Panel } from "../ui/Panel";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useDialogFocus } from "../ui/useDialogFocus";
+import { useRequestGeneration } from "../workspace/use-request-generation";
 
 const RECENT_ENTRY_PREVIEW_COUNT = 12;
 
@@ -55,6 +56,7 @@ export function FinanceWorkspace({ controller }: { controller: FinanceController
   const [pendingDelete, setPendingDelete] = useState<DesktopFinanceEntry | null>(null);
   const [showAllEntries, setShowAllEntries] = useState(false);
   const deleteDialogRef = useDialogFocus(Boolean(pendingDelete));
+  const beginPresentationRequest = useRequestGeneration();
 
   const incomeCategories = useMemo(() => {
     const options: CategoryOption[] = [...INCOME_CATEGORIES];
@@ -122,11 +124,20 @@ export function FinanceWorkspace({ controller }: { controller: FinanceController
     return rows;
   }, [accommodationFolioEnabled, data.outstandingPensionMinor, data.pensionBalances, roomData.folios]);
 
+  async function submitEntry() {
+    const isCurrent = beginPresentationRequest();
+    const saved = await saveEntry();
+    if (isCurrent() && saved) setShowAllEntries(false);
+  }
+
   async function confirmDeleteEntry() {
     const entry = pendingDelete;
     if (!entry || entry.sourceType !== "manual") return;
+    const isCurrent = beginPresentationRequest();
     await deleteManualEntry(entry);
-    setPendingDelete((current) => current?.id === entry.id ? null : current);
+    if (isCurrent()) {
+      setPendingDelete((current) => current?.id === entry.id ? null : current);
+    }
   }
 
   return (
@@ -222,9 +233,7 @@ export function FinanceWorkspace({ controller }: { controller: FinanceController
               />
             </label>
             <div className="finance-entry-form__submit">
-              <ActionButton variant="primary" onClick={() => void saveEntry().then((saved) => {
-                if (saved) setShowAllEntries(false);
-              })} disabled={saving}>
+              <ActionButton variant="primary" onClick={() => void submitEntry()} disabled={saving}>
                 {saving ? "Kaydediliyor…" : "Kaydet"}
               </ActionButton>
             </div>
