@@ -39,6 +39,7 @@ export function useMarketController({
   }, []);
 
   const upsertProduct = useCallback((product: CatalogProduct) => {
+    reloadGeneration.current += 1;
     pinnedProducts.current.set(product.id, product);
     setProducts((current) => {
       const existingIndex = current.findIndex((item) => item.id === product.id);
