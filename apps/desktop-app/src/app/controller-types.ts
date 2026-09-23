@@ -8,3 +8,5 @@ export type OperationController = ReturnType<(typeof import("./use-operation-con
 export type DeviceController = ReturnType<(typeof import("./use-device-controller"))["useDeviceController"]>;
 
 export type MarketController = ReturnType<(typeof import("./use-market-controller"))["useMarketController"]>;
+
+export type FinanceController = ReturnType<(typeof import("./use-finance-controller"))["useFinanceController"]>;
