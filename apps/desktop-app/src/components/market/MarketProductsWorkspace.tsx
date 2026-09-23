@@ -92,7 +92,7 @@ export function MarketProductsWorkspace({
     setSaveState("idle");
     setSaveMessage("Bulunan ürün bilgilerini kontrol edip kaydedin.");
     setCreateOpen(true);
-  }, [inventoryEnabled, productLookupRequest?.requestId]);
+  }, [inventoryEnabled, productLookupRequest]);
 
   useEffect(() => {
     if (createOpen || !pendingProductId) return;
