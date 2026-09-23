@@ -886,6 +886,8 @@ try {
           rooms: dashboardData.rooms.map((room) => room.id === roomId ? { ...room, status } : room)
         }
       }),
+      listTableOrders: async () => [],
+      getActiveTableOrder: async () => null,
       updateTableStatus: async ({ tableId, status }) => ({
         ok: true,
         message: "Masa durumu güncellendi.",
@@ -1085,16 +1087,21 @@ try {
   await expect(conversionPage.getByText("Balkonlu oda için bilgi almak istiyorum.")).toBeVisible();
   await conversionPage.getByRole("button", { name: "Restoran" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Restoran" })).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Günlük İşler", exact: true }).click();
   await expect(conversionPage.getByText("Oda 101 giriş hazırlığı")).toHaveCount(0);
   await expect(conversionPage.getByText("Bahçe masası kontrolü")).toBeVisible();
-  const smokeTableCard = conversionPage.getByLabel("Masa yönetimi").locator(".restaurant-table-card").filter({ hasText: "Smoke Bahçe Masası" });
-  const smokeTableStatus = smokeTableCard.getByRole("combobox", { name: "Smoke Bahçe Masası durumunu değiştir" });
-  await expect(smokeTableStatus).toHaveValue("available");
   await conversionPage.getByRole("button", { name: "Tamamla" }).first().click();
   await expect(conversionPage.getByText("Günlük iş durumu güncellendi.")).toBeVisible();
+  await conversionPage.getByRole("button", { name: "Masalar", exact: true }).click();
+  await conversionPage.getByRole("button", { name: "Smoke Bahçe Masası masasını aç" }).click();
+  const smokeTableWorkspace = conversionPage.getByRole("dialog", { name: "Smoke Bahçe Masası" });
+  await smokeTableWorkspace.getByText("Diğer", { exact: true }).click();
+  const smokeTableStatus = smokeTableWorkspace.getByRole("combobox", { name: "Smoke Bahçe Masası durumunu değiştir" });
+  await expect(smokeTableStatus).toHaveValue("available");
   await smokeTableStatus.selectOption("bill_waiting");
-  await expect(conversionPage.getByText("Masa durumu güncellendi.")).toBeVisible();
+  await expect(smokeTableWorkspace.getByText("Masa durumu güncellendi.")).toBeVisible();
   await expect(smokeTableStatus).toHaveValue("bill_waiting");
+  await smokeTableWorkspace.getByRole("button", { name: "Floor'a dön" }).click();
   await conversionPage.getByRole("button", { name: "Pansiyon" }).click();
   await expect(conversionPage.getByRole("heading", { name: "Pansiyon" })).toBeVisible();
   const roomCard = conversionPage.getByRole("button", { name: "Smoke Balkonlu Oda odasını aç" });
@@ -1468,43 +1475,32 @@ try {
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-pension-1366x768.png" });
 
   await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
-  await expect(compactPage.getByRole("heading", { name: "Bugün", exact: true })).toBeVisible();
-  await expect(compactPage.getByRole("heading", { name: "Masalar", exact: true })).toBeVisible();
-  await expect(compactPage.getByRole("heading", { name: "Yapılacak İşler" })).toBeVisible();
+  await expect(compactPage.getByRole("region", { name: "Floor", exact: true })).toBeVisible();
   const compactTableCards = compactPage.locator(".restaurant-table-card");
   await expect(compactPage.locator(".table-area-heading h3")).toHaveText(["Bahçe", "Salon"]);
-  for (const [tableName, status] of [
-    ["Bahçe Masası 1", "available"],
-    ["Salon Masası 2", "occupied"],
-    ["Bahçe Masası 3", "reserved"],
-    ["Salon Masası 4", "bill_waiting"]
-  ]) {
-    const tableCard = compactTableCards.filter({ hasText: tableName });
-    await expect(tableCard.getByRole("combobox", { name: `${tableName} durumunu değiştir` })).toHaveValue(status);
-  }
+  await expect(compactPage.getByRole("button", { name: "Günlük İşler", exact: true })).toBeVisible();
+  await compactPage.getByRole("button", { name: "Günlük İşler", exact: true }).click();
   await expect(compactPage.locator(".task-record-row").first().locator(".list-row__actions > button")).toHaveCount(1);
   await compactPage.locator(".task-record-row").first().locator("summary").click();
   await expect(compactPage.locator(".task-record-row").first().getByRole("button", { name: "İptal Et" })).toBeVisible();
-  await compactPage.locator(".task-record-row").first().locator("summary").click();
-  expect(await compactPage.locator(".restaurant-tables-section").evaluate((panel) => getComputedStyle(panel).borderTopWidth)).toBe("1px");
-  await compactPage.getByRole("button", { name: "Pansiyon", exact: true }).click();
-  await compactPage.getByRole("button", { name: "Restoran", exact: true }).click();
-  await expect(compactPage.getByRole("heading", { name: "Yapılacak İşler" })).toBeVisible();
+  await compactPage.getByRole("button", { name: "Masalar", exact: true }).click();
+  expect(await compactPage.getByRole("region", { name: "Floor", exact: true }).evaluate(element => getComputedStyle(element).overflowY)).toBe("auto");
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-restaurant-1366x768.png" });
 
   const tableManagement = compactPage.locator(".restaurant-table-area-list");
   const firstOrderCard = tableManagement.locator(".restaurant-table-card").filter({ hasText: "Bahçe Masası 1" });
   const secondOrderCard = tableManagement.locator(".restaurant-table-card").filter({ hasText: "Salon Masası 2" });
   const reservedOrderCard = tableManagement.locator(".restaurant-table-card").filter({ hasText: "Bahçe Masası 3" });
-  await firstOrderCard.getByRole("button", { name: "Sipariş Aç", exact: true }).click();
-  const firstOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Bahçe Masası 1" });
+  await firstOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const firstOrderDrawer = compactPage.getByRole("dialog", { name: "Bahçe Masası 1" });
   await expect(firstOrderDrawer).toBeVisible();
-  await firstOrderDrawer.getByRole("button", { name: "Sipariş drawer'ını kapat" }).click();
+  await firstOrderDrawer.getByRole("button", { name: "Floor'a dön" }).click();
   await expect(firstOrderDrawer).toHaveCount(0);
 
-  await secondOrderCard.getByRole("button", { name: "Sipariş Aç", exact: true }).click();
-  const secondOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Salon Masası 2" });
+  await secondOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const secondOrderDrawer = compactPage.getByRole("dialog", { name: "Salon Masası 2" });
   await expect(secondOrderDrawer).toBeVisible();
+  await secondOrderDrawer.getByRole("button", { name: "Sipariş Başlat" }).click();
   await compactPage.waitForTimeout(220);
   await expect(secondOrderDrawer).toBeVisible();
   await secondOrderDrawer.getByRole("button", { name: "Menü Ürünü 1 ürününü siparişe ekle" }).click();
@@ -1523,75 +1519,84 @@ try {
   await expect(secondOrderCard.locator(".restaurant-table-card__order-state .status-badge")).toHaveText("Açık");
   await expect(secondOrderCard.locator(".restaurant-table-card__summary")).toContainText("1 ürün");
   await expect(secondOrderCard.locator(".restaurant-table-card__summary")).toContainText("90");
-  await expect(secondOrderCard.getByRole("button", { name: "Siparişi Aç", exact: true })).toBeVisible();
-  await expect(secondOrderCard.getByRole("button", { name: "Hesap İste", exact: true })).toBeVisible();
+  await expect(secondOrderCard.getByRole("button", { name: /masasını aç/ })).toBeVisible();
+  await expect(secondOrderCard.getByRole("button", { name: "Hesap İste", exact: true })).toHaveCount(0);
   await expect(secondOrderCard.getByRole("button", { name: "Ödendi / Kapat", exact: true })).toHaveCount(0);
 
-  await secondOrderCard.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
-  const polishedOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Salon Masası 2" });
+  await secondOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const polishedOrderDrawer = compactPage.getByRole("dialog", { name: "Salon Masası 2" });
+  await polishedOrderDrawer.getByRole("tab", { name: "Hesap", exact: true }).click();
   const polishedOrderStatus = polishedOrderDrawer.getByLabel("Sipariş durumu");
   await expect(polishedOrderStatus).toBeVisible();
   await expect(polishedOrderDrawer.getByRole("button", { name: "Ödendi / Kapat" })).toBeVisible();
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-table-order-drawer-polish-1366x768.png" });
   await polishedOrderStatus.selectOption("preparing");
   await expect(polishedOrderStatus).toHaveValue("preparing");
-  await polishedOrderDrawer.getByRole("button", { name: "Sipariş drawer'ını kapat" }).click();
+  await polishedOrderDrawer.getByRole("button", { name: "Floor'a dön" }).click();
   await expect(polishedOrderDrawer).toHaveCount(0);
   await expect(secondOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Dolu");
   await expect(secondOrderCard.locator(".restaurant-table-card__order-state .status-badge")).toHaveText("Hazırlanıyor");
 
-  await secondOrderCard.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
-  const paymentOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Salon Masası 2" });
+  await secondOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const paymentOrderDrawer = compactPage.getByRole("dialog", { name: "Salon Masası 2" });
+  await paymentOrderDrawer.getByRole("tab", { name: "Hesap", exact: true }).click();
   await paymentOrderDrawer.getByLabel("Sipariş durumu").selectOption("payment");
   await expect(paymentOrderDrawer.getByLabel("Sipariş durumu")).toHaveValue("payment");
-  await paymentOrderDrawer.getByRole("button", { name: "Sipariş drawer'ını kapat" }).click();
+  await paymentOrderDrawer.getByRole("button", { name: "Floor'a dön" }).click();
   await expect(paymentOrderDrawer).toHaveCount(0);
   await expect(secondOrderCard.locator(".restaurant-table-card__order-state .status-badge")).toHaveText("Hesap bekliyor");
   await expect(secondOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Hesap");
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-table-order-polish-1366x768.png" });
-  await secondOrderCard.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
-  const paidOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Salon Masası 2" });
+  await secondOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const paidOrderDrawer = compactPage.getByRole("dialog", { name: "Salon Masası 2" });
+  await paidOrderDrawer.getByRole("tab", { name: "Hesap", exact: true }).click();
   await paidOrderDrawer.getByRole("button", { name: "Ödendi / Kapat", exact: true }).click();
   await expect(paidOrderDrawer).toHaveCount(0);
   await expect(secondOrderCard.locator(".restaurant-table-card__order-state")).toHaveCount(0);
-  await expect(secondOrderCard.getByRole("button", { name: "Sipariş Aç", exact: true })).toBeVisible();
+  await expect(secondOrderCard.getByRole("button", { name: /masasını aç/ })).toBeVisible();
   await expect(secondOrderCard.locator(".status-badge")).toHaveText("Boş");
-  await expect(secondOrderCard.getByRole("combobox", { name: "Salon Masası 2 durumunu değiştir" })).toHaveValue("available");
+  await expect(secondOrderCard.getByRole("combobox")).toHaveCount(0);
 
   await expect(reservedOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Rezerve");
-  await reservedOrderCard.getByRole("button", { name: "Sipariş Aç", exact: true }).click();
-  const reservedOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Bahçe Masası 3" });
+  await reservedOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const reservedOrderDrawer = compactPage.getByRole("dialog", { name: "Bahçe Masası 3" });
   await expect(reservedOrderDrawer).toBeVisible();
+  await reservedOrderDrawer.getByRole("button", { name: "Sipariş Başlat" }).click();
+  await reservedOrderDrawer.getByRole("tab", { name: "Hesap", exact: true }).click();
   await expect(reservedOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Dolu");
   await reservedOrderDrawer.getByLabel("Sipariş durumu").selectOption("preparing");
-  await reservedOrderDrawer.getByRole("button", { name: "Sipariş drawer'ını kapat" }).click();
+  await reservedOrderDrawer.getByRole("button", { name: "Floor'a dön" }).click();
   await expect(reservedOrderDrawer).toHaveCount(0);
   await expect(reservedOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Dolu");
   await expect(reservedOrderCard.locator(".restaurant-table-card__order-state .status-badge")).toHaveText("Hazırlanıyor");
-  await reservedOrderCard.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
-  const reservedPaymentDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Bahçe Masası 3" });
+  await reservedOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const reservedPaymentDrawer = compactPage.getByRole("dialog", { name: "Bahçe Masası 3" });
+  await reservedPaymentDrawer.getByRole("tab", { name: "Hesap", exact: true }).click();
   await reservedPaymentDrawer.getByLabel("Sipariş durumu").selectOption("payment");
-  await reservedPaymentDrawer.getByRole("button", { name: "Sipariş drawer'ını kapat" }).click();
+  await reservedPaymentDrawer.getByRole("button", { name: "Floor'a dön" }).click();
   await expect(reservedPaymentDrawer).toHaveCount(0);
   await expect(reservedOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Hesap");
   await expect(reservedOrderCard.locator(".restaurant-table-card__order-state .status-badge")).toHaveText("Hesap bekliyor");
-  await reservedOrderCard.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
-  const reservedPaidDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Bahçe Masası 3" });
+  await reservedOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const reservedPaidDrawer = compactPage.getByRole("dialog", { name: "Bahçe Masası 3" });
+  await reservedPaidDrawer.getByRole("tab", { name: "Hesap", exact: true }).click();
   await reservedPaidDrawer.getByRole("button", { name: "Ödendi / Kapat", exact: true }).click();
   await expect(reservedPaidDrawer).toHaveCount(0);
   await expect(reservedOrderCard.locator(".restaurant-table-card__order-state")).toHaveCount(0);
   await expect(reservedOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Boş");
-  await expect(reservedOrderCard.getByRole("combobox", { name: "Bahçe Masası 3 durumunu değiştir" })).toHaveValue("available");
+  await expect(reservedOrderCard.getByRole("combobox")).toHaveCount(0);
 
-  await expect(firstOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Dolu");
-  await firstOrderCard.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
-  const cancelledOrderDrawer = compactPage.getByRole("dialog", { name: "Masa Siparişi — Bahçe Masası 1" });
+  await expect(firstOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Boş");
+  await firstOrderCard.getByRole("button", { name: /masasını aç/ }).click();
+  const cancelledOrderDrawer = compactPage.getByRole("dialog", { name: "Bahçe Masası 1" });
+  await cancelledOrderDrawer.getByRole("button", { name: "Sipariş Başlat" }).click();
   await cancelledOrderDrawer.getByText("Diğer", { exact: true }).click();
   await cancelledOrderDrawer.getByRole("button", { name: "Adisyonu İptal Et", exact: true }).click();
+  await cancelledOrderDrawer.getByRole("button", { name: "İptali Onayla" }).click();
   await expect(cancelledOrderDrawer).toHaveCount(0);
   await expect(firstOrderCard.locator(".restaurant-table-card__order-state")).toHaveCount(0);
   await expect(firstOrderCard.locator(".restaurant-table-card__header .status-badge")).toHaveText("Boş");
-  await expect(firstOrderCard.getByRole("combobox", { name: "Bahçe Masası 1 durumunu değiştir" })).toHaveValue("available");
+  await expect(firstOrderCard.getByRole("combobox")).toHaveCount(0);
 
   await compactPage.getByRole("button", { name: "Menü", exact: true }).click();
   await expect(compactPage.getByRole("button", { name: "Menü", exact: true })).toHaveAttribute("aria-current", "page");

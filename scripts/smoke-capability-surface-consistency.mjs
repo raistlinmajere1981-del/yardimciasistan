@@ -42,7 +42,7 @@ const frameSource = source("apps/desktop-app/src/components/app/DesktopAppFrame.
 const menuManagerSource = source("apps/desktop-app/src/components/menu/MenuManager.tsx");
 const menuPreviewSource = source("apps/desktop-app/src/components/menu/MenuPreview.tsx");
 const roomAccountSource = source("apps/desktop-app/src/components/pension/RoomAccount.tsx");
-const tableOrdersSource = source("apps/desktop-app/src/components/restaurant/TableOrdersWorkspace.tsx");
+const tableOrdersSource = source("apps/desktop-app/src/components/restaurant/TableOrderEditor.tsx");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
 const financeIpcSource = source("apps/desktop-app/electron/finance-ipc.ts");
 const customerIpcSource = source("apps/desktop-app/electron/ipc/customer-ipc.ts");
@@ -414,7 +414,7 @@ for (const file of [
   "apps/desktop-app/src/components/customers/CustomersWorkspace.tsx",
   "apps/desktop-app/src/components/customers/RequestsWorkspace.tsx",
   "apps/desktop-app/src/components/finance/FinanceWorkspace.tsx",
-  "apps/desktop-app/src/components/restaurant/RestaurantRoomTransferPanel.tsx",
+  "apps/desktop-app/src/components/restaurant/TableWorkspace.tsx",
   "apps/desktop-app/src/pages/DashboardPage.tsx",
   "apps/desktop-app/src/pages/OperationCalendarPage.tsx",
   "apps/desktop-app/src/pages/PensionPage.tsx",

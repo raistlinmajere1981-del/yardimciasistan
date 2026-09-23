@@ -180,9 +180,9 @@ export function DesktopWorkspaceRouter({
     handleAnalyzeIdentityImage
   } = customerController;
   const {
-    handleUpdateTableStatus,
     handleSaveManualReservation,
     handleSaveManualRestaurantReservation,
+    handleUpdateTableStatus,
     handleUpdateReservationStatus,
     handleSaveDailyTask,
     handleDeleteDailyTask,
@@ -531,16 +531,17 @@ export function DesktopWorkspaceRouter({
       ) : activePage === "restaurant" ? (
         <RestaurantPage
           data={surfaceData}
-          accommodationReservationsEnabled={accommodationReservationsEnabled}
           reservationsEnabled={foodReservationsEnabled}
+          customersEnabled={customersEnabled}
+          onUpdateTableStatus={handleUpdateTableStatus}
           ordersEnabled={foodOrdersEnabled}
           menuEnabled={foodMenuEnabled}
           roomFolioTransferEnabled={foodOrdersEnabled && accommodationFolioEnabled}
           tasksEnabled={tasksEnabled}
           onDashboardDataChanged={setDashboardData}
-          onUpdateTableStatus={handleUpdateTableStatus}
           reservations={foodReservationsEnabled ? (
             <RestaurantReservationsWorkspace
+              customersEnabled={customersEnabled}
               reservations={surfaceData.reservations}
               accommodationReservationsEnabled={accommodationReservationsEnabled}
               customers={surfaceData.customers}

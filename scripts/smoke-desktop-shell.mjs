@@ -96,10 +96,10 @@ try {
       }
       if (name === 'Restoran') {
         const card = page.locator('.restaurant-table-card').filter({ hasText: 'Bahçe Masası 1' });
-        await card.getByRole('button', { name: 'Sipariş Aç', exact: true }).click();
-        const dialog = page.locator('.restaurant-order-drawer');
-        await checkOverlay(dialog, 'order-drawer');
-        await dialog.getByRole('button', { name: "Sipariş drawer'ını kapat", exact: true }).click();
+        await card.getByRole('button', { name: /masasını aç/ }).click();
+        const dialog = page.getByRole('dialog', { name: 'Bahçe Masası 1' });
+        await checkOverlay(dialog, 'table-workspace');
+        await dialog.getByRole('button', { name: "Floor'a dön", exact: true }).click();
         await expect(dialog).toHaveCount(0);
       }
       if (name === 'Menü') {

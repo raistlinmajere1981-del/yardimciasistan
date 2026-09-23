@@ -346,26 +346,28 @@ try {
   for (const [width, height] of [[1440, 1000], [1366, 768], [1024, 768], [900, 768], [600, 800]]) {
     await page.setViewportSize({ width, height });
     await navigate("Restoran", "Restoran");
-    await page.locator(".restaurant-tables-section").scrollIntoViewIfNeeded();
+    await page.locator(".restaurant-workspace-body").scrollIntoViewIfNeeded();
     await capture(`restaurant-tables-light-compact`);
 
     const activeTable = page.locator(".restaurant-table-card").filter({ hasText: "Salon Masası 2" });
-    await activeTable.getByRole("button", { name: "Siparişi Aç", exact: true }).click();
-    const orderDrawer = page.getByRole("dialog", { name: "Masa Siparişi — Salon Masası 2" });
+    await activeTable.getByRole("button", { name: /masasını aç/ }).click();
+    const orderDrawer = page.getByRole("dialog", { name: "Salon Masası 2" });
     await expect(orderDrawer).toBeVisible();
     const categoryTabs = orderDrawer.getByRole("tablist", { name: "Menü kategorileri" });
     await expect(categoryTabs).toBeVisible();
     await expect(categoryTabs.getByRole("tab", { name: "Tümü", exact: true })).toBeVisible();
     await capture(`restaurant-order-light-compact`);
-    await closeDialog(orderDrawer, "Sipariş drawer'ını kapat");
+    await closeDialog(orderDrawer, "Floor'a dön");
 
     if (width === 1440 || width === 600) {
-      await page.locator(".restaurant-room-transfer").scrollIntoViewIfNeeded();
+      await page.getByRole("button", { name: "Salon Masası 4 masasını aç" }).click();
+      await page.getByRole("dialog").getByRole("tab", { name: "Hesap", exact: true }).click();
       await page.getByRole("button", { name: "Odaya Yaz", exact: true }).click();
-      const transferDialog = page.getByRole("dialog", { name: "Aktarımı onaylayın" });
+      const transferDialog = page.getByRole("dialog", { name: "Salon Masası 4" });
       await expect(transferDialog).toBeVisible();
       await capture(`restaurant-room-transfer-light-compact`);
-      await closeDialog(transferDialog, "Vazgeç");
+      await transferDialog.getByRole("button", { name: "Vazgeç", exact: true }).click();
+      await closeDialog(transferDialog, "Floor'a dön");
     }
 
     await navigate("Menü", "Menü");
@@ -396,9 +398,11 @@ try {
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await navigate("Restoran", "Restoran");
-  await page.locator(".restaurant-room-transfer").scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Salon Masası 4 masasını aç" }).click();
+  await page.getByRole("dialog").getByRole("tab", { name: "Hesap", exact: true }).click();
   await page.getByRole("button", { name: "Odaya Yaz", exact: true }).click();
-  const confirmation = page.getByRole("dialog", { name: "Aktarımı onaylayın" });
+  const confirmation = page.getByRole("dialog", { name: "Salon Masası 4" });
+  await confirmation.getByLabel("Oda hesabı", { exact: true }).selectOption("stage2b-folio");
   await expect(confirmation).toBeVisible();
   await confirmation.getByRole("button", { name: "Aktarımı Onayla", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__stage2bTransfers.at(-1))).toMatchObject({
@@ -421,14 +425,14 @@ try {
 
   await setAppearance("dark", "compact");
   await navigate("Restoran", "Restoran");
-  await page.locator(".restaurant-tables-section").scrollIntoViewIfNeeded();
+  await page.locator(".restaurant-workspace-body").scrollIntoViewIfNeeded();
   await capture("restaurant-tables-dark-compact");
   await navigate("Menü", "Menü");
   await capture("menu-editor-dark-compact");
 
   await setAppearance("light", "comfortable");
   await navigate("Restoran", "Restoran");
-  await page.locator(".restaurant-tables-section").scrollIntoViewIfNeeded();
+  await page.locator(".restaurant-workspace-body").scrollIntoViewIfNeeded();
   await capture("restaurant-tables-light-comfortable");
   await navigate("Menü", "Menü");
   await capture("menu-editor-light-comfortable");

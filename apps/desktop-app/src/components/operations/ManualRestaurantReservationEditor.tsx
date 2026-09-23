@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Save, UtensilsCrossed, X } from "lucide-react";
+import { Save, UtensilsCrossed } from "lucide-react";
 import type {
   DesktopCustomerMutationResult,
   DesktopDashboardData,
@@ -8,7 +8,7 @@ import type {
   SaveManualRestaurantReservationInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
-import { useDialogFocus } from "../ui/useDialogFocus";
+import { FormDialog } from "../ui/FormDialog";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
 
 type EditorState = "idle" | "loading" | "error";
@@ -59,6 +59,8 @@ export function ManualRestaurantReservationEditor({
   const [form, setForm] = useState<RestaurantReservationFormState>(() => createInitialForm(customers));
   const [state, setState] = useState<EditorState>("idle");
   const [message, setMessage] = useState("");
+  const [customerSaving, setCustomerSaving] = useState(false);
+  const busy = state === "loading" || customerSaving;
   const activeTables = useMemo(() => tables.filter((table) => table.isActive), [tables]);
   const selectedCustomer = customers.find((customer) => customer.id === form.customerId);
 
@@ -67,63 +69,49 @@ export function ManualRestaurantReservationEditor({
     setForm(createInitialForm(customers));
     setState("idle");
     setMessage("");
-  }, [customers, open]);
-
-  const dialogRef = useDialogFocus(open);
+    // Reset only on a new open lifetime; quick customer creation must preserve the draft.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 
   return (
-    <div
-      className="restaurant-reservation-backdrop overlay overlay--drawer"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && state !== "loading") onClose();
-      }}
-    >
-      <aside ref={dialogRef} className="restaurant-reservation-drawer drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-restaurant-reservation-title">
-        <header className="restaurant-reservation-drawer-header overlay-header overlay-header--sticky">
-          <div className="restaurant-reservation-heading">
-            <p>Restoran rezervasyonları</p>
-            <h2 id="manual-restaurant-reservation-title">Yeni masa rezervasyonu</h2>
-          </div>
-          <button
-            className="drawer-close-button"
-            type="button"
-            aria-label="Restoran rezervasyon formunu kapat"
-            onClick={onClose}
-            disabled={state === "loading"}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-
-        <form
-          className="form-stack overlay-form restaurant-reservation-form"
+    <FormDialog title="Yeni masa rezervasyonu" onClose={onClose} closeBlocked={busy}
+      footer={<>
+        <ActionButton variant="secondary" onClick={onClose} disabled={busy}>Vazgeç</ActionButton>
+        <ActionButton type="submit" disabled={busy || !form.customerId || !form.date || !form.time || form.guestCount < 1}>
+          {state === "loading" ? <UtensilsCrossed size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
+          {state === "loading" ? "Kaydediliyor" : "Rezervasyonu Kaydet"}
+        </ActionButton>
+      </>}
           onSubmit={async (event) => {
             event.preventDefault();
+            if (busy) return;
             setState("loading");
             setMessage("Restoran rezervasyonu kaydediliyor...");
-            const result = await onSave({
-              customerId: form.customerId,
-              tableId: form.tableId || undefined,
-              date: form.date,
-              time: form.time,
-              guestCount: form.guestCount,
-              notes: form.notes
-            });
-            if (!result.ok) {
-              setState("error");
-              setMessage(result.message);
-              return;
-            }
-            onClose();
+            try {
+              const result = await onSave({
+                customerId: form.customerId,
+                tableId: form.tableId || undefined,
+                date: form.date,
+                time: form.time,
+                guestCount: form.guestCount,
+                notes: form.notes
+              });
+              if (!result.ok) {
+                setState("error");
+                setMessage(result.message);
+                return;
+              }
+              onClose();
+            } catch { setState("error"); setMessage("Restoran rezervasyonu kaydedilemedi."); }
           }}
         >
           <div className="form-grid restaurant-reservation-form-grid">
             <label className="form-field form-field--long form-field--span">
               Müşteri
               <select
-                autoFocus
+                aria-label="Müşteri"
                 required
                 value={form.customerId}
                 onChange={(event) => setForm((current) => ({ ...current, customerId: event.target.value }))}
@@ -143,8 +131,13 @@ export function ManualRestaurantReservationEditor({
 
             <div className="form-field--span">
               <QuickCustomerCreator
-                disabled={state === "loading"}
-                onSave={onSaveCustomer}
+                disabled={busy}
+                onSave={async input => {
+                  setCustomerSaving(true);
+                  try { return await onSaveCustomer(input); }
+                  catch { return { ok: false, message: "Müşteri kaydedilemedi." }; }
+                  finally { setCustomerSaving(false); }
+                }}
                 onCreated={(customerId) => setForm((current) => ({ ...current, customerId }))}
               />
             </div>
@@ -186,6 +179,7 @@ export function ManualRestaurantReservationEditor({
             <label className="form-field form-field--medium form-field--span">
               Masa
               <select
+                aria-label="Masa"
                 value={form.tableId}
                 onChange={(event) => setForm((current) => ({ ...current, tableId: event.target.value }))}
               >
@@ -202,6 +196,7 @@ export function ManualRestaurantReservationEditor({
             <label className="form-field form-field--fluid form-field--span">
               Not
               <textarea
+                aria-label="Not"
                 maxLength={2000}
                 value={form.notes}
                 onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
@@ -215,20 +210,6 @@ export function ManualRestaurantReservationEditor({
           )}
           {message && <p className={state === "error" ? "status-message status-message--danger" : "form-status"} role="status">{message}</p>}
 
-          <footer className="overlay-footer overlay-footer--inset restaurant-reservation-actions">
-            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
-              Vazgeç
-            </ActionButton>
-            <ActionButton
-              type="submit"
-              disabled={state === "loading" || !form.customerId || !form.date || !form.time || form.guestCount < 1}
-            >
-              {state === "loading" ? <UtensilsCrossed size={16} aria-hidden="true" /> : <Save size={16} aria-hidden="true" />}
-              {state === "loading" ? "Kaydediliyor" : "Rezervasyonu Kaydet"}
-            </ActionButton>
-          </footer>
-        </form>
-      </aside>
-    </div>
+    </FormDialog>
   );
 }

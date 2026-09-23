@@ -374,7 +374,7 @@ export function ReservationsWorkspace({
                   </ActionButton>
                   {reservation.roomIds.length === 1 && rooms.some(room => room.id === reservation.roomIds[0]) && <ActionButton variant="secondary" size="sm" onClick={() => navigation.openWorkspace({
                     entityType: "room", entityId: reservation.roomIds[0], mode: "stay", returnContext: { page: "pension", view: "reservations", entityId: reservation.id }
-                  }, { onReturn: context => { if (context.view) pension?.setMode(context.view); } })}>Odayı Aç</ActionButton>}
+                  }, { onReturn: context => { if (context.view && context.view !== "floor") pension?.setMode(context.view); } })}>Odayı Aç</ActionButton>}
                   {reservation.reservationType === "room" && ["pending", "approved"].includes(reservation.status) && reservation.roomIds.length <= 1 &&
                     <ActionButton variant="secondary" size="sm" onClick={() => setAssignment(reservation)}>Oda Ata / Düzenle</ActionButton>}
                   {whatsappEnabled && (
@@ -452,7 +452,7 @@ export function RoomsWorkspace({ rooms, reservations, stays, reservationsEnabled
       return <button type="button" className="card room-card" key={room.id} data-status={state.operationalCondition}
         aria-label={`${room.name} odasını aç`}
         onClick={() => navigation.openWorkspace({ entityType: "room", entityId: room.id,
-          returnContext: { page: "pension", view: page?.mode ?? "rooms", entityId: room.id } }, { onReturn: context => { if (context.view) page?.setMode(context.view); } })}>
+          returnContext: { page: "pension", view: page?.mode ?? "rooms", entityId: room.id } }, { onReturn: context => { if (context.view && context.view !== "floor") page?.setMode(context.view); } })}>
         <strong>{room.number ? `Oda ${room.number} · ${room.name}` : room.name}</strong>
         <span>{roomConditionLabel[state.operationalCondition]}{!room.isActive && " · Etkin değil"}</span>
         <span>{state.occupancy.status === "occupied" ? "Misafir içeride" : "Oda boş"}</span>

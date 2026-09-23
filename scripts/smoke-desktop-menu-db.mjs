@@ -48,6 +48,16 @@ try {
   seedOperationalSmokeData(database.databasePath);
   seedSmokeMenu(database);
 
+  if (process.argv.includes("--table-orders-only")) {
+    const category = database.saveMenuCategory({ name: "Order pilot", description: "", is_active: true, sort_order: 1 });
+    assert.equal(category.ok, true);
+    const item = database.saveMenuItem({ category_id: category.savedId, name: "Smoke Ürün", description: "", price: 42,
+      currency: "TRY", image_url: "", is_available: true, is_featured: false, allergens: [], tags: [], sort_order: 1 });
+    assert.equal(item.ok, true);
+    assertTableOrderFlow(database, { appPath, dataDir, categoryId: category.savedId, menuItemId: item.savedId });
+    assertStockTrackingFlow(database, category.savedId);
+    console.log("table-order-domain-smoke-ok: existing order and stock assertions");
+  } else {
   assert.ok(database.getDashboardData().menu.items.length > 0);
   const initialTrackedItems = database.getDashboardData().menu.items.filter((item) => item.stock_quantity !== null);
   assert.equal(initialTrackedItems.length, 10, "The smoke menu must expose ten stock-tracked test items.");
@@ -549,6 +559,7 @@ try {
   assert.equal(database.countEventsByType("sync.failed"), failedSyncCount + 1);
 
   console.log(`desktop-menu-db-ok: setup ${categoryResult.savedId} ${itemResult.savedId}`);
+  }
 } finally {
   database.close();
 }

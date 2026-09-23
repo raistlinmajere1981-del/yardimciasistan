@@ -6,7 +6,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { WorkspaceTabs, WorkspaceTabList, WorkspaceTabPanel } from "../workspace/WorkspaceTabs";
-import type { WorkspaceIntent } from "../workspace/workspace-intent";
+import type { RoomWorkspaceIntent as WorkspaceIntent } from "../workspace/workspace-intent";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 import { ReservationRoomAssignment, assignReservationRoom } from "./ReservationRoomAssignment";
 import { RoomAccount, RoomAccountOperation, accountFlowTitle, type AccountOperation } from "./RoomAccount";

@@ -42,7 +42,7 @@ export function WorkspaceNavigationProvider({ page, onReturnPage, children }: {
       if (!sameEntity) onReturn.current = options?.onReturn;
       setCurrent({
         intent: { ...intent, returnContext: sameEntity ? current.intent.returnContext : { page, ...intent.returnContext } },
-        presentation: sameEntity ? current.presentation : "centered"
+        presentation: sameEntity ? current.presentation : intent.entityType === "table" ? "full-canvas" : "centered"
       });
       return true;
     },
@@ -59,7 +59,7 @@ export function WorkspaceNavigationProvider({ page, onReturnPage, children }: {
       setCurrent((state) => state ? { ...state, presentation } : state);
     },
     updateWorkspaceMode(mode, action) {
-      setCurrent((state) => state ? { ...state, intent: { ...state.intent, mode, action } } : state);
+      setCurrent((state) => state ? { ...state, intent: { ...state.intent, mode, action } as WorkspaceIntent } : state);
     },
     registerCloseGuard(check) {
       guard.current = check;

@@ -1,7 +1,7 @@
 import type { DesktopPage } from "../../app/navigation";
 
-// Only the first pilot's entry contract. Add discriminated variants with real consumers.
-export interface WorkspaceIntent {
+// Explicit pilot intents; no entity registry.
+export interface RoomWorkspaceIntent {
   entityType: "room";
   entityId: string;
   mode?: "summary" | "stay" | "account" | "history";
@@ -10,9 +10,19 @@ export interface WorkspaceIntent {
   returnContext?: WorkspaceReturnContext;
 }
 
+export interface TableWorkspaceIntent {
+  entityType: "table";
+  entityId: string;
+  mode?: "order" | "customer" | "account" | "history";
+  action?: "room-transfer";
+  returnContext?: WorkspaceReturnContext;
+}
+
+export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent;
+
 export interface WorkspaceReturnContext {
   page?: DesktopPage;
-  view?: "rooms" | "reservations" | "daily-tasks";
+  view?: "rooms" | "reservations" | "daily-tasks" | "floor";
   entityId?: string;
 }
 

@@ -20,6 +20,7 @@ interface RestaurantReservationsWorkspaceProps {
   customers: DesktopDashboardData["customers"];
   tables: DesktopDashboardData["tables"];
   whatsappEnabled: boolean;
+  customersEnabled?: boolean;
   onSave: (input: SaveManualRestaurantReservationInput) => Promise<DesktopStatusUpdateResult>;
   onSaveCustomer: (input: SaveCustomerInput) => Promise<DesktopCustomerMutationResult>;
   onUpdateStatus: (reservationId: string, status: string) => void;
@@ -53,6 +54,7 @@ export function RestaurantReservationsWorkspace({
   customers,
   tables,
   whatsappEnabled,
+  customersEnabled = true,
   onSave,
   onSaveCustomer,
   onUpdateStatus,
@@ -83,10 +85,10 @@ export function RestaurantReservationsWorkspace({
         <div className="restaurant-reservation-summary" aria-label="Restoran rezervasyon özeti">
           <StatusBadge tone="info">{activeReservations.length} aktif rezervasyon</StatusBadge>
           <StatusBadge tone="warning">{activeReservations.filter((reservation) => reservation.status === "pending").length} onay bekleyen</StatusBadge>
-          <ActionButton size="sm" type="button" onClick={() => setEditorOpen(true)}>
+          {customersEnabled && <ActionButton size="sm" type="button" onClick={() => setEditorOpen(true)}>
             <Plus size={15} aria-hidden="true" />
             Yeni Rezervasyon
-          </ActionButton>
+          </ActionButton>}
         </div>
         <ActionButton variant="ghost" size="sm" type="button" onClick={() => setShowAll((current) => !current)}>
           {showAll ? "Aktifleri Göster" : "Geçmişi Göster"}

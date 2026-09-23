@@ -19,26 +19,27 @@ export function useOperationController({
   setSyncState,
   setStatusMessage
 }: UseOperationControllerOptions) {
-  async function handleUpdateTableStatus(tableId: string, status: string) {
+  async function handleUpdateTableStatus(tableId: string, status: string): Promise<DesktopStatusUpdateResult> {
     setSyncState("loading");
     setStatusMessage("Masa durumu güncelleniyor...");
 
     if (!window.yardimciDesktop) {
       setSyncState("error");
       setStatusMessage("Masa durumu güncellenemedi. Uygulamayı yeniden başlatın.");
-      return;
+      return { ok: false, message: "Masa durumu güncellenemedi. Uygulamayı yeniden başlatın." };
     }
 
     const result = await window.yardimciDesktop.updateTableStatus({ tableId, status });
     if (!result.ok) {
       setSyncState("error");
       setStatusMessage(result.message);
-      return;
+      return result;
     }
 
     setDashboardData(result.dashboardData);
     setSyncState("success");
     setStatusMessage(result.message);
+    return result;
   }
 
   async function handleSaveManualReservation(input: SaveManualReservationInput): Promise<DesktopStatusUpdateResult> {

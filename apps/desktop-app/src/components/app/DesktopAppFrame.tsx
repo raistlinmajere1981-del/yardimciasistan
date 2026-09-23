@@ -157,7 +157,7 @@ function DesktopAppFrameContent({
 
   return (
     <AppShell
-      contentScroll={activePage === "pension" ? "workspace" : "page"}
+      contentScroll={["pension", "restaurant"].includes(activePage) ? "workspace" : "page"}
       contentRef={contentRef}
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(
@@ -251,12 +251,12 @@ function DesktopAppFrameContent({
       )}
       overlay={(
         <>
-          <WorkspaceHost renderWorkspace={intent => <RoomWorkspace intent={intent}
+          <WorkspaceHost renderWorkspace={intent => intent.entityType === "room" ? <RoomWorkspace intent={intent}
             data={projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? [])}
             onDashboard={desktopSyncController.setDashboardData}
             staysEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS)}
             reservationsEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS)}
-            folioEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)} menuEnabled={menuEnabled} />} />
+            folioEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)} menuEnabled={menuEnabled} /> : null} />
           {diagnosticsOpen ? (
             <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />
           ) : menuEnabled && menuPreviewOpen ? (
