@@ -106,16 +106,22 @@ export function useMarketController({
       return;
     }
     if (!active) return;
+    let disposed = false;
     setDataState("loading");
     void reloadCatalog()
       .then(() => {
+        if (disposed || !enabledRef.current) return;
         setDataState("success");
         reportAppStatus("success", "Market verileri güncel.");
       })
       .catch((error) => {
+        if (disposed || !enabledRef.current) return;
         setDataState("error");
         reportAppStatus("error", error instanceof Error ? error.message : "Market verileri yüklenemedi.");
       });
+    return () => {
+      disposed = true;
+    };
   }, [active, catalogEnabled, enabled, reloadCatalog]);
 
   return {
