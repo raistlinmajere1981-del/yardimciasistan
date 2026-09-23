@@ -127,6 +127,7 @@ export function ProductWorkspace({
     let saved: CatalogProduct;
     try {
       saved = await bridge.saveProduct(productFormToSaveInput(form));
+      if (!isCurrent()) return;
     } catch (error) {
       if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
@@ -145,6 +146,7 @@ export function ProductWorkspace({
       }
     }
 
+    if (!isCurrent()) return;
     onProductSaved(saved);
     let catalogReloadFailed = false;
     try {
