@@ -73,8 +73,8 @@ export function formatPhoneForWhatsApp(phone: string): string {
 }
 
 function normalizePhoneCharacters(input: string): string {
-  if (!input || !/^[+\d\s().\/-]+$/.test(input)) return "";
-  const compact = input.replace(/[\s().\/-]/g, "");
+  if (!input || !/^[+\d\s()./-]+$/.test(input)) return "";
+  const compact = input.replace(/[\s()./-]/g, "");
   return compact.startsWith("00") ? `+${compact.slice(2)}` : compact;
 }
 

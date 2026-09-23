@@ -82,9 +82,7 @@
 .icon-button:disabled { opacity: 0.5; cursor: not-allowed; }
 .form-dialog { width: var(--dialog-width-md); }
 .form-dialog form { display: flex; flex-direction: column; max-height: calc(100dvh / var(--ui-scale) - var(--space-4)); }
-.confirm-dialog { width: var(--dialog-width-sm); }
-.confirm-dialog[open] { display: flex; flex-direction: column; }
-.form-dialog .workspace-frame__body, .confirm-dialog .workspace-frame__body { padding: var(--space-4); }
+.form-dialog .workspace-frame__body { padding: var(--space-4); }
 
 /* Feature page toolbar is fixed; only the selected operational view scrolls. */
 .feature-workspace-page { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }

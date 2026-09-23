@@ -10,7 +10,6 @@ import { WorkspaceTabs, WorkspaceTabList, WorkspaceTabPanel } from "../../apps/d
 import { useRequestGeneration } from "../../apps/desktop-app/src/components/workspace/use-request-generation";
 import type { WorkspaceIntent } from "../../apps/desktop-app/src/components/workspace/workspace-intent";
 import { FormDialog } from "../../apps/desktop-app/src/components/ui/FormDialog";
-import { ConfirmDialog } from "../../apps/desktop-app/src/components/ui/ConfirmDialog";
 import { DiagnosticsViewer } from "../../apps/desktop-app/src/components/diagnostics/DiagnosticsViewer";
 import { applyUiPreferences } from "../../apps/desktop-app/src/ui-preferences";
 import "../../apps/desktop-app/src/styles/index.css";
@@ -50,7 +49,7 @@ function FixtureWorkspace() {
 function Unlocked() {
   const nav = useWorkspaceNavigation();
   const contentRef = useRef<HTMLElement>(null);
-  const [surface, setSurface] = useState<"form" | "confirm" | "diagnostics" | null>(null);
+  const [surface, setSurface] = useState<"form" | "diagnostics" | null>(null);
   const [filter, setFilter] = useState("original filter");
   const open = (id: string) => nav.openWorkspace({ entityType: "room", entityId: id, mode: "account", returnContext: { page: "pension", view: "rooms", entityId: "selection" } }, { onReturn: context => { test.returned = context; } });
   test.openOther = () => open("102");
@@ -66,13 +65,11 @@ function Unlocked() {
       <WorkspaceHost definition={{ ...tableWorkspaceDefinition, render: () => <FixtureWorkspace /> }} context={{}} />
       {surface === "diagnostics" && <DiagnosticsViewer onClose={() => setSurface(null)} />}
       {surface === "form" && <FormDialog title="Bounded task" onClose={() => setSurface(null)} onSubmit={e => { e.preventDefault(); setSurface(null); }} footer={<button type="submit">Save task</button>}><label>Task name<input /></label></FormDialog>}
-      {surface === "confirm" && <ConfirmDialog title="Confirm task" confirmLabel="Confirm" onConfirm={() => setSurface(null)} onCancel={() => setSurface(null)}>A consequential decision</ConfirmDialog>}
     </>}>
     <label>Feature filter<input value={filter} onChange={e => setFilter(e.target.value)} /></label>
     <button onClick={() => open("101")}>Entry one</button>
     <button onClick={() => open("101")}>Entry two</button>
     <button onClick={() => setSurface("form")}>Open form</button>
-    <button onClick={() => setSurface("confirm")}>Open confirm</button>
     <button onClick={() => setSurface("diagnostics")}>Open diagnostics</button>
   </AppShell>;
 }
@@ -86,7 +83,7 @@ function Harness() {
   const [locked, setLocked] = useState(false);
   test.lock = () => setLocked(true);
   if (nested) return <ExpectedModalBoundary><WorkspaceFrame title="Outer" presentation="centered" onClose={() => {}}>
-    <ConfirmDialog title="Forbidden nested task" confirmLabel="Confirm" onConfirm={() => {}} onCancel={() => {}}>Nested</ConfirmDialog>
+    <FormDialog title="Forbidden nested task" onClose={() => {}} onSubmit={e => e.preventDefault()} footer={<button type="submit">Confirm</button>}>Nested</FormDialog>
   </WorkspaceFrame></ExpectedModalBoundary>;
   return locked ? <><button onClick={() => setNested(true)}>Test nested contract</button><button onClick={() => setLocked(false)}>Unlock</button></> : <WorkspaceNavigationProvider definitions={new URLSearchParams(location.search).has("swap") ? workspaceDefinitions.map(item => ({ ...item, defaultPresentation: item.defaultPresentation === "centered" ? "full-canvas" : "centered" })) : workspaceDefinitions} page="pension"><Unlocked /></WorkspaceNavigationProvider>;
 }

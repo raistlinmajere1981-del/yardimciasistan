@@ -209,11 +209,6 @@ try {
   await page.getByLabel('Task name').fill('task');
   await page.getByRole('button', { name: 'Save task' }).click();
   await expect(page.getByRole('button', { name: 'Open form' })).toBeFocused();
-  await page.getByRole('button', { name: 'Open confirm' }).click();
-  await expect(page.getByRole('alertdialog')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Vazgeç' })).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('alertdialog')).toHaveCount(0);
 
   // Real proof consumer: filters, detail, copy, live polling, session selection and geometry.
   await page.getByRole('button', { name: 'Open diagnostics' }).click();

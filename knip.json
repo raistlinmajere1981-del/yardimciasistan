@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip/schema.json",
   "tags": ["-compiledSmoke"],
-  "ignoreBinaries": ["adb", "php", "scrcpy"],
   "workspaces": {
     ".": {
       "entry": [

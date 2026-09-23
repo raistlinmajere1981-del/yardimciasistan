@@ -636,7 +636,6 @@ RoomCard
 TableCard
 CustomerCard
 EmptyState
-ConfirmDialog
 ToastMessage
 ```
 

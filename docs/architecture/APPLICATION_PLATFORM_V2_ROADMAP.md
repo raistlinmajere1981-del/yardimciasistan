@@ -105,7 +105,7 @@ Likely:
 - `WorkspaceTabs`
 - `IconButton`
 - `FormDialog`
-- in-workspace confirmation treatment or `ConfirmDialog` for non-nested use
+- in-workspace confirmation treatment (the standalone `ConfirmDialog` primitive was later removed as unused; confirmations stay inline)
 - workspace presentation: centered / full-canvas
 - focus restoration and busy-close rules
 - viewport workspace layout contract

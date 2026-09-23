@@ -60,7 +60,7 @@ let processHooksInstalled = false;
 function sanitizeText(value: string, maxLength = MAX_STRING_LENGTH): string {
   return value
     .replace(/(authorization\s*[:=]\s*bearer\s+)[^\s,;]+/gi, "$1[redacted]")
-    .replace(/\bbearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer [redacted]")
+    .replace(/\bbearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]")
     .replace(/((?:sync[_ -]?secret|api[_ -]?key|password|token|authorization|cookie)\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]")
     .replace(/safe-storage:v1:[A-Za-z0-9+/=]+/gi, "safe-storage:v1:[redacted]")
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
