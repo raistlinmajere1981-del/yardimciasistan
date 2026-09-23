@@ -19,12 +19,14 @@ import type {
   DesktopReportStockMovement
 } from "../../electron/database";
 import { FinanceWorkspace } from "../components/finance/FinanceWorkspace";
+import type { FinanceController } from "../app/controller-types";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Panel } from "../components/ui/Panel";
 
 interface ReportsPageProps {
   aiEnabled: boolean;
   financeEnabled: boolean;
+  financeController: FinanceController;
   reportsEnabled: boolean;
   requestsEnabled: boolean;
   tasksEnabled: boolean;
@@ -55,6 +57,7 @@ const REPORT_PRESETS: Array<{ preset: Exclude<DesktopReportPreset, "custom">; la
 export function ReportsPage({
   aiEnabled,
   financeEnabled,
+  financeController,
   reportsEnabled,
   requestsEnabled,
   tasksEnabled,
@@ -204,11 +207,7 @@ export function ReportsPage({
 
   return (
     <section className={`reports-page${detailsOpen ? "" : " reports-details-collapsed"}`} aria-label={financeEnabled && reportsEnabled ? "Kasa ve işletme raporları" : financeEnabled ? "Kasa" : "İşletme raporları"}>
-      {financeEnabled && <FinanceWorkspace
-        accommodationEnabled={accommodationEnabled}
-        accommodationFolioEnabled={accommodationFolioEnabled}
-        foodServiceEnabled={foodServiceEnabled}
-      />}
+      {financeEnabled && <FinanceWorkspace controller={financeController} />}
 
       {reportsEnabled && <>
       <button
