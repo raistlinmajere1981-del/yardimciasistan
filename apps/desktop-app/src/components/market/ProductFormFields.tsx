@@ -1,5 +1,5 @@
 import { Image as ImageIcon, Sparkles } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   normalizeBarcodeIdentity,
   type CatalogCategory,
@@ -57,7 +57,7 @@ export function ProductFormFields({
     setPreviewDataUrl(localImageDataUrl);
   }, [localImageDataUrl]);
 
-  async function previewExternal(candidate: ProductLookupCandidate) {
+  const previewExternal = useCallback(async (candidate: ProductLookupCandidate) => {
     const isCurrent = beginPreviewRequest();
     setPreviewDataUrl("");
     setPreviewLoading(Boolean(candidate.imageUrl));
@@ -73,7 +73,7 @@ export function ProductFormFields({
     } finally {
       if (isCurrent()) setPreviewLoading(false);
     }
-  }
+  }, [beginPreviewRequest, bridge]);
 
   useEffect(() => {
     if (!lookupSeed || loadedSeedId.current === lookupSeed.requestId) return;
@@ -85,9 +85,7 @@ export function ProductFormFields({
       "success",
       `${lookupSeed.product.name} bilgileri Open Food Facts'tan bulundu. Satış fiyatı ve diğer yerel alanları kontrol edip kaydedin.`
     );
-    // Seed application is explicitly keyed by requestId.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lookupSeed?.requestId]);
+  }, [categories, form, lookupSeed, onChange, onLookupSeedLoaded, onStateChange, previewExternal]);
 
   async function lookupProductInfo() {
     if (!bridge || !form.barcode.trim() || lookupBusy) return;
