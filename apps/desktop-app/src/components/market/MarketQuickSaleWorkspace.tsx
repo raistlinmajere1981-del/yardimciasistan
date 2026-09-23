@@ -17,7 +17,7 @@ import type { DesktopCommerceBridge } from "../../../electron/commerce-ipc-contr
 import { CustomerPicker } from "../customers/CustomerPicker";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
-import type { MarketQuickSaleSession } from "../../app/use-market-quick-sale-session";
+import type { CartDraftQuickSaleRequest, MarketQuickSaleSession } from "../../app/use-market-quick-sale-session";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
 type BarcodeMode = "keyboard-wedge" | "simulator";
@@ -168,8 +168,11 @@ export function MarketQuickSaleWorkspace({
   const selectedCustomer = customers.find((customer) => customer.id === customerId);
   const draftLoading = Boolean(cartDraftRequest && loadedDraftRequestId.current !== cartDraftRequest.requestId);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const simulatorAdapter = useMemo(() => createBarcodeSimulatorAdapter(), []);
