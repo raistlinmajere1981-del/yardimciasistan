@@ -4,6 +4,7 @@ import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
 import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
+import { WorkspaceNavigationProvider } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import { MarketPage } from "../../apps/desktop-app/src/pages/MarketPage";
@@ -43,6 +44,7 @@ function Harness() {
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "market" ? <MarketPage customers={dashboardData.customers} /> : <div className="customer-work-page">
         <div className="customer-work-content is-customers">
+          <WorkspaceNavigationProvider page="customerWork">
           <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}
             reservations={dashboardData.reservations} rooms={dashboardData.rooms} stays={dashboardData.customerRoomStays}
             aiEnabled={false} whatsappEnabled={false} reservationsEnabled={false} staysEnabled={false}
@@ -51,6 +53,7 @@ function Harness() {
             onSave={customers.handleSaveCustomer} onAnalyzeIdentity={customers.handleAnalyzeIdentityImage}
             onAssignRoom={customers.handleAssignCustomerToRoom} onUpdateStayStatus={customers.handleUpdateCustomerRoomStayStatus}
             onDelete={customers.handleDeleteCustomer} />
+          </WorkspaceNavigationProvider>
         </div>
       </div>}
     </main>

@@ -127,8 +127,8 @@ export function RoomAccountOperation({ operation, folio, controller, onDone }: {
       </> : operation.kind === "account-details" ? <>
         <div className="form-row">
           <label className="form-field form-field--xs">Kişi sayısı<input type="number" required min={1} max={50} value={guestCount} onChange={event => setGuestCount(Number(event.target.value))} /></label>
-          <label className="form-field form-field--short">Giriş tarihi<input type="date" required value={start} onChange={event => setStart(event.target.value)} /></label>
-          <label className="form-field form-field--short">Çıkış tarihi<input type="date" min={start} value={end} onChange={event => setEnd(event.target.value)} /></label>
+          <label className="form-field form-field--short">Giriş tarihi<input lang="tr-TR" type="date" required value={start} onChange={event => setStart(event.target.value)} /></label>
+          <label className="form-field form-field--short">Çıkış tarihi<input lang="tr-TR" type="date" min={start} value={end} onChange={event => setEnd(event.target.value)} /></label>
           <label className="form-field form-field--short">Gecelik fiyat<input required inputMode="decimal" value={nightly} onChange={event => setNightly(event.target.value)} /></label>
         </div>
         <p>Bu hesaba ait fiyat değişir. Odanın varsayılan fiyatı Ayarlar → Oda Yönetimi bölümündedir.</p>

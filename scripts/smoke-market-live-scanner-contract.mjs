@@ -15,7 +15,7 @@ const {
   resolveAndroidActionPermission
 } = require("../packages/sync-core/dist/index.js");
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
-const { applyBusinessProfileCapabilities } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
+const { applyBusinessProfileCapabilities, setBusinessCapability } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 const {
   applyRuntimeInventoryMovement,
   consumePendingMarketBarcodeScans,
@@ -33,16 +33,18 @@ const MARKET_GROUPS = {
   market_operations: true
 };
 const marketCapabilities = getBusinessProfile("market").defaultCapabilities;
+// ANDROID is opt-in since the sector feature selection simplification.
+const marketCapabilitiesWithAndroid = [...marketCapabilities, C.ANDROID];
 
 assert.equal(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_operations.includes("market.scan_to_desktop"), true);
-assert.equal(androidEffectivePermissionsForGroups(MARKET_GROUPS, marketCapabilities).includes("market.scan_to_desktop"), true);
+assert.equal(androidEffectivePermissionsForGroups(MARKET_GROUPS, marketCapabilitiesWithAndroid).includes("market.scan_to_desktop"), true);
 assert.equal(resolveAndroidActionPermission("market_barcode_scan"), "market.scan_to_desktop");
-assert.equal(androidActionAllowedByCapabilities("market_barcode_scan", marketCapabilities), true);
+assert.equal(androidActionAllowedByCapabilities("market_barcode_scan", marketCapabilitiesWithAndroid), true);
 for (const missing of [C.CATALOG, C.SALES, C.RETAIL_BARCODE]) {
   assert.equal(
     androidActionAllowedByCapabilities(
       "market_barcode_scan",
-      marketCapabilities.filter((capability) => capability !== missing)
+      marketCapabilitiesWithAndroid.filter((capability) => capability !== missing)
     ),
     false,
     `market_barcode_scan must require ${missing}`
@@ -83,6 +85,8 @@ try {
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   applyBusinessProfileCapabilities(database.databasePath, "market", { preserveUserOverrides: false });
+  // ANDROID is opt-in since the sector feature selection simplification.
+  setBusinessCapability(database.databasePath, { capability: "service.android", enabled: true });
   database.upsertAndroidDeviceSightings([{
     device_id: DEVICE_ID,
     device_name: "Kasa Barkod Telefonu",

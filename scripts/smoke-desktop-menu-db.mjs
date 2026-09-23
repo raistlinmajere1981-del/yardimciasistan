@@ -395,7 +395,10 @@ try {
   });
   assert.equal(reservationStatusResult.ok, true);
   assert.ok(reservationStatusResult.dashboardData.reservations.some((reservation) => reservation.id === "reservation_smoke_001" && reservation.status === "approved"));
-  assert.ok(reservationStatusResult.dashboardData.rooms.some((room) => room.id === "room_101" && room.status === "reserved"));
+  // D-003/D-004: approving a reservation must not overwrite the operational
+  // cleaning state. The planning link stays on the reservation itself.
+  assert.ok(reservationStatusResult.dashboardData.rooms.some((room) => room.id === "room_101" && room.status === "cleaning"));
+  assert.ok(reservationStatusResult.dashboardData.reservations.some((reservation) => reservation.id === "reservation_smoke_001" && reservation.roomIds.includes("room_101")));
 
   const reopenRequestForSuggestion = database.updateRequestStatus({
     requestId: "request_smoke_001",
@@ -992,7 +995,12 @@ function assertAndroidActionFlow(database, menuItemId, convertibleRequestId) {
   }));
   assert.equal(cancelledReservationResult.ok, true);
   assert.equal(database.getDashboardData().reservations.find((reservation) => reservation.id === "reservation_smoke_001")?.status, "cancelled");
-  assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "available");
+  // D-003/D-004: cancelling the planning link must not clear operational cleaning.
+  assert.equal(database.getDashboardData().rooms.find((room) => room.id === "room_101")?.status, "cleaning");
+
+  // Complete cleaning explicitly; the planning state applies once the room is available again.
+  const cleanedRoomResult = database.updateRoomStatus({ roomId: "room_101", status: "available" });
+  assert.equal(cleanedRoomResult.ok, true);
 
   const approvedReservationResult = database.applyAndroidAction(androidAction("android_action_reservation_approve_001", "reservation_approve", {
     reservation_id: "reservation_smoke_001"

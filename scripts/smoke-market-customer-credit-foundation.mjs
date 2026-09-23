@@ -55,11 +55,16 @@ try {
   const businessId = raw.prepare("SELECT id FROM business WHERE deleted_at = '' ORDER BY created_at LIMIT 1").get().id;
   assert.equal(C.CUSTOMER_CREDIT, "commerce.customer_credit");
   assert.deepEqual(getBusinessCapabilityDependencies(C.CUSTOMER_CREDIT), [C.CUSTOMERS, C.SALES, C.FINANCE]);
-  assert.ok(getBusinessProfile("market").defaultCapabilities.includes(C.CUSTOMER_CREDIT));
+  // CUSTOMER_CREDIT is an optional (provider-driven) capability, not a default:
+  // offered to market profiles, enabled explicitly by the operator.
+  assert.ok(getBusinessProfile("market").optionalCapabilities.includes(C.CUSTOMER_CREDIT));
+  assert.ok(!getBusinessProfile("market").defaultCapabilities.includes(C.CUSTOMER_CREDIT));
   for (const profile of ["pension", "restaurant", "cafe", "pension_restaurant"]) {
     assert.ok(!getBusinessProfile(profile).defaultCapabilities.includes(C.CUSTOMER_CREDIT));
   }
   applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
+  // The market profile offers CUSTOMER_CREDIT as an option; enable it explicitly.
+  setBusinessCapability(databasePath, { capability: C.CUSTOMER_CREDIT, enabled: true });
   // All operations below succeed without the connected services.
   for (const capability of [C.WHATSAPP, C.SYNC, C.ANDROID]) {
     raw.prepare("UPDATE business_capabilities SET is_enabled = 0 WHERE business_id = ? AND capability_id = ?").run(businessId, capability);

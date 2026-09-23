@@ -174,8 +174,8 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
                   <option value="">Müşteri seçin</option>{data.customers.map(item => <option value={item.id} key={item.id}>{item.fullName}</option>)}
                 </select></label>
                 <div className="form-row">
-                  <label className="form-field form-field--short">Giriş tarihi<input required type="date" value={draft.checkInDate} onChange={event => setDraft({ ...draft, checkInDate: event.target.value })} /></label>
-                  <label className="form-field form-field--short">Çıkış tarihi<input type="date" min={draft.checkInDate} value={draft.checkOutDate} onChange={event => setDraft({ ...draft, checkOutDate: event.target.value })} /></label>
+                  <label className="form-field form-field--short">Giriş tarihi<input lang="tr-TR" required type="date" value={draft.checkInDate} onChange={event => setDraft({ ...draft, checkInDate: event.target.value })} /></label>
+                  <label className="form-field form-field--short">Çıkış tarihi<input lang="tr-TR" type="date" min={draft.checkInDate} value={draft.checkOutDate} onChange={event => setDraft({ ...draft, checkOutDate: event.target.value })} /></label>
                   <label className="form-field form-field--xs">Kişi sayısı<input required type="number" min={1} max={50} value={draft.guestCount} onChange={event => setDraft({ ...draft, guestCount: event.target.value })} /></label>
                 </div>
                 <label className="form-field form-field--fluid">Konaklama notu<textarea value={draft.notes} onChange={event => setDraft({ ...draft, notes: event.target.value })} /></label>

@@ -63,10 +63,13 @@ const MARKET_GROUPS = {
 };
 
 const marketCapabilities = getBusinessProfile("market").defaultCapabilities;
-assert.deepEqual(androidAvailablePermissionGroupIds(marketCapabilities), ["market_operations"]);
+// ANDROID is opt-in since the sector feature selection simplification:
+// the operator enables it on top of the market defaults.
+const marketCapabilitiesWithAndroid = [...marketCapabilities, C.ANDROID];
+assert.deepEqual(androidAvailablePermissionGroupIds(marketCapabilitiesWithAndroid), ["market_operations"]);
 assert.deepEqual(ANDROID_PERMISSION_GROUP_PERMISSIONS.market_operations, MARKET_PERMISSIONS);
 assert.deepEqual(
-  androidEffectivePermissionsForGroups(MARKET_GROUPS, marketCapabilities),
+  androidEffectivePermissionsForGroups(MARKET_GROUPS, marketCapabilitiesWithAndroid),
   MARKET_PERMISSIONS
 );
 for (const permission of [
@@ -92,7 +95,7 @@ for (const [actionType, permission] of [
   ["market_barcode_scan", "market.scan_to_desktop"]
 ]) {
   assert.equal(resolveAndroidActionPermission(actionType), permission);
-  assert.equal(androidActionAllowedByCapabilities(actionType, marketCapabilities), true);
+  assert.equal(androidActionAllowedByCapabilities(actionType, marketCapabilitiesWithAndroid), true);
 }
 
 const dataRoot = mkdtempSync(join(tmpdir(), "yardimci-market-android-foundation-"));
@@ -135,6 +138,8 @@ try {
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   applyBusinessProfileCapabilities(database.databasePath, "market", { preserveUserOverrides: false });
+  // ANDROID is opt-in since the sector feature selection simplification.
+  setBusinessCapability(database.databasePath, { capability: "service.android", enabled: true });
   database.upsertAndroidDeviceSightings([{
     device_id: DEVICE_ID,
     device_name: "Market El Terminali Smoke",
@@ -435,7 +440,7 @@ try {
     assert.equal("purchase_price" in projectedProduct, false);
     assert.equal("description" in projectedProduct, false);
 
-    const fullProjection = projectAndroidMarketSnapshot(sourceSnapshot, new Set(marketCapabilities));
+    const fullProjection = projectAndroidMarketSnapshot(sourceSnapshot, new Set(marketCapabilitiesWithAndroid));
     assert.equal(fullProjection.product_data.enabled, true);
     assert.equal(fullProjection.product_data.provider, "open_food_facts");
     assert.equal(fullProjection.products.find((item) => item.id === product.id)?.barcode, product.barcode);
@@ -492,7 +497,7 @@ try {
     assert.equal(withoutSales.summary.today_sales_total, 0);
     assert.deepEqual(withoutSales.cart_drafts, []);
     assert.deepEqual(
-      projectAndroidMarketSnapshot(sourceSnapshot, new Set(marketCapabilities.filter((capability) => capability !== C.ANDROID))),
+      projectAndroidMarketSnapshot(sourceSnapshot, new Set(marketCapabilitiesWithAndroid.filter((capability) => capability !== C.ANDROID))),
       emptyAndroidMarketSnapshot("TRY")
     );
 
@@ -508,7 +513,7 @@ try {
       androidEffectivePermissionsForRole(
         "admin",
         ANDROID_PERMISSIONS,
-        marketCapabilities.filter((capability) => capability !== C.RETAIL_PURCHASING)
+        marketCapabilitiesWithAndroid.filter((capability) => capability !== C.RETAIL_PURCHASING)
       ).includes("market.receiving"),
       false
     );
@@ -578,7 +583,7 @@ function receiptById(sqlite, id) {
 
 function capabilitySetWithout(...removed) {
   const blocked = new Set(removed);
-  return new Set(marketCapabilities.filter((capability) => !blocked.has(capability)));
+  return new Set(marketCapabilitiesWithAndroid.filter((capability) => !blocked.has(capability)));
 }
 
 function assertCurrentMarketGate() {

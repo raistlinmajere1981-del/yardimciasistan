@@ -241,7 +241,9 @@ try {
         listCustomerCreditAccounts: async () => [],
         getCustomerCreditAccount: async () => ({ balances: [], entries: [] }),
         listCompanionProductDrafts: async () => [],
-        listCompanionCartDrafts: async () => []
+        listCompanionCartDrafts: async () => [],
+        setBarcodeScanMode: async () => true,
+        consumePendingBarcodeScans: async () => []
       },
       getAiWorkspaceHistory: async () => [],
       getSyncStatus: async () => ({

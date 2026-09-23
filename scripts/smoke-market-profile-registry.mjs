@@ -22,13 +22,19 @@ assert.equal(profileIds.includes("unknown_profile"), false);
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.RETAIL_BARCODE), true);
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.RETAIL_PURCHASING), true);
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.RETAIL_SUPPLIERS), true);
-assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.RETAIL_LABELS), true);
+// RETAIL_LABELS is an optional (opt-in) capability, not a default — same
+// option-driven model as CUSTOMER_CREDIT.
+assert.equal(BUSINESS_PROFILES.market.optionalCapabilities.includes(C.RETAIL_LABELS), true);
+assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.RETAIL_LABELS), false);
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.ACCOMMODATION_ROOMS), false);
 assert.equal(BUSINESS_PROFILES.market.defaultCapabilities.includes(C.FOOD_TABLES), false);
 assert.match(setupForm, /getBusinessProfiles\(\)\.map/);
 assert.match(setupForm, /value=\{form\.profileId\}/);
-assert.match(capabilitySettings, /title:\s*"Market"/);
-for (const capability of ["RETAIL_BARCODE", "RETAIL_PURCHASING", "RETAIL_SUPPLIERS", "RETAIL_LABELS"]) {
+// Settings exposes sector options through the profile-driven option editor
+// (optionalCapabilities), not a hardcoded per-sector title.
+assert.match(capabilitySettings, /optionalCapabilities/);
+assert.match(capabilitySettings, /Ek özellikler/);
+for (const capability of ["RETAIL_PURCHASING", "RETAIL_SUPPLIERS", "RETAIL_LABELS"]) {
   assert.match(capabilitySettings, new RegExp(`C\\.${capability}`));
 }
 
