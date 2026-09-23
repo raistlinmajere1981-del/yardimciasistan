@@ -2,14 +2,13 @@ import { Archive, Boxes, ShoppingBasket, Smartphone, Tags, Truck, type LucideIco
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
-  type CatalogCategory,
-  type CatalogProduct,
   type CommerceSaleDraftDetail,
   type CommerceSale,
   type ProductLookupCandidate
 } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../app/capabilities";
-import { reportAppStatus } from "../app/runtime-state";
+import type { MarketController } from "../app/controller-types";
+import type { MarketView } from "../components/workspace/workspace-intent";
 import type { DesktopCustomer } from "../../electron/database";
 import { useBusinessCapabilityRuntime } from "../app/business-capability-context";
 import { MarketInventoryWorkspace } from "../components/market/MarketInventoryWorkspace";
@@ -25,20 +24,16 @@ import {
   type CartDraftQuickSaleRequest
 } from "../components/market/MarketQuickSaleWorkspace";
 
-type MarketTab = "quickSale" | "products" | "phoneCarts" | "inventory" | "purchasing" | "labels";
-type AsyncState = "idle" | "loading" | "success" | "error";
-
 interface MarketTabDefinition {
-  id: MarketTab;
+  id: MarketView;
   label: string;
   description: string;
   icon: LucideIcon;
   enabled: boolean;
 }
 
-export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
+export function MarketPage({ customers, controller }: { customers: DesktopCustomer[]; controller: MarketController }) {
   const { snapshot } = useBusinessCapabilityRuntime();
-  const bridge = window.yardimciDesktop?.commerce;
   const C = BUSINESS_CAPABILITIES;
   const catalogEnabled = runtimeHasCapability(snapshot, C.CATALOG);
   const inventoryEnabled = runtimeHasCapability(snapshot, C.INVENTORY);
@@ -48,6 +43,14 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
   const purchasingEnabled = runtimeHasCapability(snapshot, C.RETAIL_PURCHASING);
   const suppliersEnabled = runtimeHasCapability(snapshot, C.RETAIL_SUPPLIERS);
   const labelsEnabled = runtimeHasCapability(snapshot, C.RETAIL_LABELS);
+  const {
+    products,
+    categories,
+    dataState,
+    productDataEnabled,
+    reloadCatalog,
+    handleStateChange
+  } = controller;
 
   const tabs = useMemo<MarketTabDefinition[]>(() => [
     { id: "quickSale", label: "Hızlı Satış", description: "Kasada hızlı ürün ekleme ve ödeme", icon: ShoppingBasket, enabled: catalogEnabled && salesEnabled },
@@ -58,38 +61,14 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
     { id: "labels", label: "Etiketler", description: "Ürün ve raf etiketi hazırlama", icon: Tags, enabled: labelsEnabled }
   ], [catalogEnabled, inventoryEnabled, labelsEnabled, purchasingEnabled, salesEnabled, suppliersEnabled]);
   const availableTabs = tabs.filter((tab) => tab.enabled);
-  const [activeTab, setActiveTab] = useState<MarketTab>(() => availableTabs[0]?.id ?? "products");
-  const [products, setProducts] = useState<CatalogProduct[]>([]);
-  const [categories, setCategories] = useState<CatalogCategory[]>([]);
-  const [dataState, setDataState] = useState<AsyncState>("idle");
-  const [productDataEnabled, setProductDataEnabled] = useState(false);
+  const [activeTab, setActiveTab] = useState<MarketView>(() => availableTabs[0]?.id ?? "products");
   const [cartDraftRequest, setCartDraftRequest] = useState<CartDraftQuickSaleRequest | null>(null);
   const [productLookupRequest, setProductLookupRequest] = useState<ProductLookupFormRequest | null>(null);
   const handoffRequestId = useRef(0);
 
-  const handleStateChange = useCallback((state: Exclude<AsyncState, "idle">, nextMessage: string) => {
-    setDataState(state);
-    reportAppStatus(state, nextMessage);
-  }, []);
-
-  // Keep the pending cart load alive across status-message renders.
   const clearCartDraftRequest = useCallback((draftId: string) => {
     setCartDraftRequest((current) => current?.draftId === draftId ? null : current);
   }, []);
-
-  const reloadCatalog = useCallback(async () => {
-    if (!bridge || !catalogEnabled) {
-      setProducts([]);
-      setCategories([]);
-      return;
-    }
-    const [nextProducts, nextCategories] = await Promise.all([
-      bridge.listProducts({ limit: 500 }),
-      bridge.listCategories({ limit: 500 })
-    ]);
-    setProducts(nextProducts);
-    setCategories(nextCategories);
-  }, [bridge, catalogEnabled]);
 
   useEffect(() => {
     if (!availableTabs.some((tab) => tab.id === activeTab)) {
@@ -97,45 +76,14 @@ export function MarketPage({ customers }: { customers: DesktopCustomer[] }) {
     }
   }, [activeTab, availableTabs]);
 
-  useEffect(() => {
-    let disposed = false;
-    const setupRequest = window.yardimciDesktop?.getSetupData?.();
-    if (!setupRequest) {
-      setProductDataEnabled(false);
-      return () => {
-        disposed = true;
-      };
-    }
-    void setupRequest
-      .then((setup) => {
-        if (!disposed) setProductDataEnabled(setup.productData.enabled);
-      })
-      .catch(() => {
-        if (!disposed) setProductDataEnabled(false);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!catalogEnabled) return;
-    setDataState("loading");
-    void reloadCatalog()
-      .then(() => {
-        setDataState("success");
-        reportAppStatus("success", "Market verileri güncel.");
-      })
-      .catch((error) => {
-        setDataState("error");
-        reportAppStatus("error", error instanceof Error ? error.message : "Market verileri yüklenemedi.");
-      });
-  }, [catalogEnabled, reloadCatalog]);
-
   async function handleSaleCompleted(sale: CommerceSale) {
     await reloadCatalog();
-    setDataState("success");
-    reportAppStatus("success", sale.status === "credit" ? "Veresiye satış kaydedildi." : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`);
+    handleStateChange(
+      "success",
+      sale.status === "credit"
+        ? "Veresiye satış kaydedildi."
+        : `Satış tamamlandı: ${sale.total.toFixed(2)} ${sale.currency}.`
+    );
   }
 
   function openCartDraft(detail: CommerceSaleDraftDetail) {
