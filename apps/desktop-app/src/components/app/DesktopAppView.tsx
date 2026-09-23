@@ -56,16 +56,17 @@ export function DesktopAppView({
   deviceController
 }: DesktopAppViewProps) {
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
-  const marketController = useMarketController({
-    businessCapabilities: desktopSyncController.businessCapabilities,
-    active: activePage === "market"
-  });
   const {
     phase: appAccessPhase,
     status: appLockStatus,
     unlockApp,
     resetAppPassword
   } = appLockController;
+  const marketController = useMarketController({
+    businessCapabilities: desktopSyncController.businessCapabilities,
+    active: appAccessPhase === "unlocked" && activePage === "market",
+    enabled: appAccessPhase === "unlocked"
+  });
 
   useEffect(() => {
     applyUiPreferences(uiPreferences);
