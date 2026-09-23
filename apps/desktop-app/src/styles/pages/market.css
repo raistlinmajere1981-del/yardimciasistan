@@ -129,6 +129,21 @@
   gap: var(--space-3);
 }
 
+.market-category-layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.market-product-create-form,
+.market-product-media,
+.market-product-stock-view {
+  min-width: 0;
+}
+
+.market-product-stock-view {
+  display: grid;
+  gap: var(--space-4);
+}
+
 .market-search-field {
   display: flex;
   align-items: center;
