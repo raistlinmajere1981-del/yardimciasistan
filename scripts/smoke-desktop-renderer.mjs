@@ -1079,7 +1079,7 @@ try {
   await expect(conversionPage.getByRole("button", { name: "Rezervasyona Çevir" })).toHaveCount(0);
   await expect(conversionPage.getByRole("button", { name: "Yeniden Aç" })).toBeVisible();
   await conversionPage.getByRole("navigation", { name: "Müşteri işleri görünümü" }).getByRole("button", { name: "Müşteriler" }).click();
-  await expect(conversionPage.getByLabel("Müşteri yönetimi")).toBeVisible();
+  await expect(conversionPage.getByLabel("Müşteri yönetimi", { exact: true })).toBeVisible();
   await conversionPage.locator(".customer-record-row").first().click();
   const smokeCustomerWorkspace = conversionPage.getByRole("dialog", { name: "Smoke Misafir" });
   await expect(smokeCustomerWorkspace).toBeVisible();
