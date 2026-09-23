@@ -266,6 +266,7 @@ function DesktopAppFrameContent({
             productDataEnabled: marketController.productDataEnabled,
             busy: marketController.dataState === "loading",
             onReload: marketController.reloadCatalog,
+            onProductSaved: marketController.upsertProduct,
             onStateChange: marketController.handleStateChange
           }} />
           <WorkspaceHost definition={roomWorkspaceDefinition} context={{
