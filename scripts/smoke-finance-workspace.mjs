@@ -303,8 +303,11 @@ try {
   await deleteDialog.getByRole("button", { name: "Kaydı Kaldır" }).click();
   await expect.poll(() => page.evaluate(() => window.__financeStats.deleteWaits)).toBe(1);
   const deleteCallsBeforeRepeat = await page.evaluate(() => window.__financeStats.deleteCalls);
-  await nav.getByRole("button", { name: "Diğer" }).click();
-  await nav.getByRole("button", { name: "Kasa" }).click();
+  // The confirmation overlay intentionally intercepts pointer navigation while it is mounted.
+  // Simulate an external/router page transition to exercise controller lifetime across unmount/remount.
+  await page.evaluate(() => window.__financeHarness.setPage("other"));
+  await expect(page.getByRole("heading", { name: "Diğer" })).toBeVisible();
+  await page.evaluate(() => window.__financeHarness.setPage("finance"));
   await expect(finance().getByRole("button", { name: "Gelir Ekle", exact: true })).toBeDisabled();
   await page.evaluate(() => {
     const controller = window.__financeHarness.controller;
