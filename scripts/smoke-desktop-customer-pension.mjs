@@ -40,7 +40,28 @@ try {
     window.yardimciDesktop = {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
       commerce: { listProducts: async () => [], listCategories: async () => [], getCustomerCreditAccount: async id => ({ customer: { ...dashboard.customers.find(customer => customer.id === id), businessId: 'fixture', deletedAt: '' }, balances: [{ currency: 'TRY', amountMinor: 45000 }], entries: [] }) },
-      saveCustomer: async input => record('customer', input),
+      saveCustomer: async input => {
+        window.__designCalls.push({ kind: 'customer', input });
+        const savedId = input.id || 'stage2-customer';
+        const existing = dashboard.customers.find(customer => customer.id === savedId);
+        const template = existing || dashboard.customers[0];
+        const savedCustomer = {
+          ...template,
+          ...input,
+          id: savedId,
+          source: existing?.source || 'manual',
+          requestCount: existing?.requestCount || 0,
+          reservationCount: existing?.reservationCount || 0,
+          stayCount: existing?.stayCount || 0,
+          lastContactAt: existing?.lastContactAt || '',
+          createdAt: existing?.createdAt || '2026-09-14T09:00:00Z',
+          updatedAt: '2026-09-14T09:00:00Z'
+        };
+        dashboard.customers = existing
+          ? dashboard.customers.map(customer => customer.id === savedId ? savedCustomer : customer)
+          : [...dashboard.customers, savedCustomer];
+        return { ok: true, message: 'Kaydedildi.', dashboardData: dashboard, savedId };
+      },
       saveManualReservation: async input => record('reservation', input),
       assignCustomerRoom: async input => record('assignment', input),
       saveRoomPublicDetails: async input => record('room', input),
