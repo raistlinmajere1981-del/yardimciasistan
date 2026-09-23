@@ -49,6 +49,7 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
     dataState,
     productDataEnabled,
     reloadCatalog,
+    upsertProduct,
     handleStateChange
   } = controller;
 
@@ -139,6 +140,7 @@ export function MarketPage({ customers, controller }: { customers: DesktopCustom
           busy={dataState === "loading"}
           productDataEnabled={productDataEnabled}
           onReload={reloadCatalog}
+          onProductSaved={upsertProduct}
           onStateChange={handleStateChange}
           productLookupRequest={productLookupRequest}
           onProductLookupLoaded={clearProductLookupRequest}
