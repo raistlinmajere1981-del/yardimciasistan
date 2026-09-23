@@ -180,6 +180,7 @@ export function MarketProductsWorkspace({
       saved = await bridge.saveProduct(productFormToSaveInput(productForm));
       if (!isCurrent()) return;
     } catch (error) {
+      if (!isCurrent()) return;
       const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
       setSaveState("error");
       setSaveMessage(message);
