@@ -17,6 +17,7 @@ import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
+import { useRequestGeneration } from "../workspace/use-request-generation";
 import { MarketProductThumbnail } from "./MarketProductThumbnail";
 import { ProductFormFields } from "./ProductFormFields";
 
@@ -80,6 +81,7 @@ export function MarketProductsWorkspace({
   const [saveState, setSaveState] = useState<"idle" | "loading" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState("Ürün adı yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
   const [pendingProductId, setPendingProductId] = useState("");
+  const beginCreateRequest = useRequestGeneration();
 
   const filteredProducts = useMemo(() => products.filter((product) => {
     const needle = search.trim().toLocaleLowerCase("tr-TR");
@@ -170,11 +172,13 @@ export function MarketProductsWorkspace({
 
   async function createProduct() {
     if (!bridge || busy || saveState === "loading") return;
+    const isCurrent = beginCreateRequest();
     setSaveState("loading");
     setSaveMessage("Ürün kartı kaydediliyor...");
     let saved: CatalogProduct;
     try {
       saved = await bridge.saveProduct(productFormToSaveInput(productForm));
+      if (!isCurrent()) return;
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ürün kaydedilemedi.";
       setSaveState("error");
@@ -183,6 +187,7 @@ export function MarketProductsWorkspace({
       return;
     }
 
+    if (!isCurrent()) return;
     onProductSaved(saved);
     let catalogReloadFailed = false;
     try {
@@ -190,6 +195,7 @@ export function MarketProductsWorkspace({
     } catch {
       catalogReloadFailed = true;
     }
+    if (!isCurrent()) return;
     const message = `${saved.name} kaydedildi.${saved.imageAssetPath ? " Ürün görseli yerel arşive eklendi." : ""}${catalogReloadFailed ? " Katalog görünümü yenilenemedi." : ""}`;
     onStateChange("success", message);
     setPendingProductId(saved.id);
