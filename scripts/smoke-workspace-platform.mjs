@@ -1,7 +1,17 @@
+import ts from 'typescript';
 import { chromium, expect } from '@playwright/test';
 import { createServer } from 'vite';
 import { resolve } from 'node:path';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
+
+const configPath = resolve('apps/desktop-app/tsconfig.json');
+const config = ts.readConfigFile(configPath, ts.sys.readFile);
+const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, resolve('apps/desktop-app'));
+const program = ts.createProgram([...parsed.fileNames, resolve('scripts/fixtures/workspace-platform-types.ts')], { ...parsed.options, noEmit: true });
+const diagnostics = [...parsed.errors, ...ts.getPreEmitDiagnostics(program)];
+if (diagnostics.length) throw new Error(ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+  getCanonicalFileName: name => name, getCurrentDirectory: ts.sys.getCurrentDirectory, getNewLine: () => '\n'
+}));
 
 const server = await createServer({ root: resolve('apps/desktop-app'), configFile: resolve('apps/desktop-app/vite.renderer.config.ts'), server: { port: 0, strictPort: false } });
 await server.listen();
@@ -12,7 +22,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.route('**/workspace-platform-test', async route => {
+  await page.route('**/workspace-platform-test*', async route => {
     const html = await server.transformIndexHtml('/workspace-platform-test', '<html><body><div id="root"></div><script type="module" src="/@fs/' + resolve('scripts/fixtures/workspace-platform.tsx') + '"></script></body></html>');
     await route.fulfill({ contentType: 'text/html', body: html });
   });
@@ -30,10 +40,43 @@ try {
   await page.goto(`${baseUrl}workspace-platform-test`);
   await expect(page.getByRole('button', { name: 'Entry one' })).toBeVisible();
   expect(await page.locator('dialog').count()).toBe(0);
+  // Unknown input is rejected even with no current workspace; defaults come from composition.
+  expect(await page.evaluate(() => window.openUnknown())).toBe(false);
+  expect(await page.locator('dialog').count()).toBe(0);
+  expect(await page.evaluate(() => window.openTable())).toBe(true);
+  await expect(page.getByRole('dialog', { name: 'Table 1' })).toBeVisible();
+  expect(await page.evaluate(() => window.presentation)).toBe('full-canvas');
+  // Generation validity applies to any completion path; unmount invalidates the last one.
+  expect(await page.evaluate(() => {
+    const old = window.beginGeneration();
+    window.lastGeneration = window.beginGeneration();
+    return [old(), window.lastGeneration()];
+  })).toEqual([false, true]);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(await page.evaluate(() => window.lastGeneration())).toBe(false);
+  expect(await page.evaluate(() => window.returned)).toEqual({ page: 'restaurant', view: 'floor' });
+  const swapped = await browser.newPage();
+  await swapped.route('**/workspace-platform-test*', async route => {
+    const html = await server.transformIndexHtml('/workspace-platform-test', '<html><body><div id="root"></div><script type="module" src="/@fs/' + resolve('scripts/fixtures/workspace-platform.tsx') + '"></script></body></html>');
+    await route.fulfill({ contentType: 'text/html', body: html });
+  });
+  await swapped.goto(`${baseUrl}workspace-platform-test?swap`);
+  await swapped.getByRole('button', { name: 'Entry one' }).click();
+  await expect.poll(() => swapped.evaluate(() => window.presentation)).toBe('full-canvas');
+  await swapped.keyboard.press('Escape');
+  await expect(swapped.getByRole('dialog')).toHaveCount(0);
+  await swapped.evaluate(() => window.openTable());
+  await expect.poll(() => swapped.evaluate(() => window.presentation)).toBe('centered');
+  await swapped.close();
   await page.getByLabel('Feature filter').fill('preserved filter');
   await page.getByRole('button', { name: 'Entry one' }).click();
   let dialog = page.getByRole('dialog', { name: 'Room 101' });
   await expect(dialog).toBeVisible();
+  expect(await page.evaluate(() => window.presentation)).toBe('centered');
+  expect(await page.evaluate(() => window.openUnknown())).toBe(false);
+  await page.evaluate(() => window.wrongMode());
+  await expect(dialog.getByRole('tab', { name: 'Account', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(dialog.getByRole('heading', { name: 'Room 101' })).toBeFocused();
   expect(await dialog.evaluate(el => el.matches(':modal'))).toBe(true);
   const centered = await dialog.boundingBox();
@@ -61,6 +104,10 @@ try {
   await expect(dialog.getByLabel('Draft')).toHaveValue('persistent draft');
   expect(await draftHandle.evaluate(el => el.isConnected)).toBe(true);
   expect(await page.evaluate(() => window.mounts)).toBe(mounts);
+  expect(await page.evaluate(() => window.openSame())).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.presentation)).toBe('full-canvas');
+  await expect(dialog.getByLabel('Draft')).toHaveValue('persistent draft');
+  expect(await draftHandle.evaluate(el => el.isConnected)).toBe(true);
   const canvas = await dialog.boundingBox();
   const shellHeader = await page.locator('.page-header').boundingBox();
   const content = await page.locator('main').boundingBox();

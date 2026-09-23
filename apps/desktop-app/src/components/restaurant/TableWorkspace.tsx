@@ -84,7 +84,7 @@ export function TableWorkspace({ intent, data, orders, ordersEnabled, menuEnable
       return true;
     });
   }
-  if (!table) return <WorkspaceFrame title="Masa kullanılamıyor" presentation="full-canvas" onClose={() => navigation.closeWorkspace()}
+  if (!table) return <WorkspaceFrame title="Masa kullanılamıyor" presentation={navigation.current!.presentation} onClose={() => navigation.closeWorkspace()}
     returnFocusRef={navigation.returnFocusRef}><p>Masa kaydı bulunamadı.</p></WorkspaceFrame>;
   const tableStatus = getTableStatusAction(table.status) || table.status;
   const relatedReservations = reservationsEnabled ? data.reservations.filter(item => item.tableIds.includes(table.id)
@@ -94,7 +94,7 @@ export function TableWorkspace({ intent, data, orders, ordersEnabled, menuEnable
   const duration = order ? Math.max(0, Math.floor((clock - new Date(order.openedAt).getTime()) / 60_000)) : 0;
   const disabled = controller.busy || controller.loading || !controller.loaded || transferCommitted;
   return <WorkspaceTabs value={activeMode}>
-    <WorkspaceFrame title={table.name} presentation="full-canvas" closeLabel="Floor'a dön"
+    <WorkspaceFrame title={table.name} presentation={navigation.current!.presentation} closeLabel="Floor'a dön"
       onClose={() => void requestReturn()} closeBlocked={controller.busy} returnFocusRef={navigation.returnFocusRef}
       bodyScroll={activeMode === "order" && !flow ? "panes" : "body"}
       context={<div className="table-workspace-context">

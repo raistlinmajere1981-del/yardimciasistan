@@ -1,6 +1,7 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import type { WorkspaceDefinition, WorkspaceDefinitionMetadata } from "./workspace-definition";
 import type { DesktopPage } from "../../app/navigation";
-import type { WorkspaceIntent, WorkspacePresentation, WorkspaceReturnContext } from "./workspace-intent";
+import type { WorkspaceIntent, WorkspaceModeUpdate, WorkspacePresentation, WorkspaceReturnContext } from "./workspace-intent";
 
 interface WorkspaceState {
   intent: WorkspaceIntent;
@@ -15,14 +16,15 @@ interface WorkspaceNavigation {
   openWorkspace: (intent: WorkspaceIntent, options?: OpenWorkspaceOptions) => boolean;
   closeWorkspace: () => boolean;
   updateWorkspacePresentation: (presentation: WorkspacePresentation) => void;
-  updateWorkspaceMode: (mode: WorkspaceIntent["mode"], action?: WorkspaceIntent["action"]) => void;
+  updateWorkspaceMode: (update: WorkspaceModeUpdate) => void;
   registerCloseGuard: (guard: () => boolean) => () => void;
 }
 const NavigationContext = createContext<WorkspaceNavigation | null>(null);
 
 /** Mounted inside the unlocked Frame: locking destroys navigation and entity drafts together. */
-export function WorkspaceNavigationProvider({ page, onReturnPage, children }: {
+export function WorkspaceNavigationProvider({ page, definitions, onReturnPage, children }: {
   page: DesktopPage;
+  definitions: readonly WorkspaceDefinitionMetadata[];
   onReturnPage?: (page: DesktopPage) => void;
   children: ReactNode;
 }) {
@@ -34,7 +36,8 @@ export function WorkspaceNavigationProvider({ page, onReturnPage, children }: {
     current,
     returnFocusRef,
     openWorkspace(intent, options) {
-      if (!intent.entityId.trim() || (guard.current && !guard.current())) return false;
+      const definition = definitions.find(item => item.entityType === intent.entityType);
+      if (!definition || !intent.entityId.trim() || (guard.current && !guard.current())) return false;
       // A page entry cannot create a second modal over another task/legacy overlay.
       if (!current && document.querySelector('dialog[open], [aria-modal="true"]')) return false;
       if (!current) returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -42,7 +45,7 @@ export function WorkspaceNavigationProvider({ page, onReturnPage, children }: {
       if (!sameEntity) onReturn.current = options?.onReturn;
       setCurrent({
         intent: { ...intent, returnContext: sameEntity ? current.intent.returnContext : { page, ...intent.returnContext } },
-        presentation: sameEntity ? current.presentation : intent.entityType === "table" ? "full-canvas" : "centered"
+        presentation: sameEntity ? current.presentation : definition.defaultPresentation
       });
       return true;
     },
@@ -58,8 +61,8 @@ export function WorkspaceNavigationProvider({ page, onReturnPage, children }: {
     updateWorkspacePresentation(presentation) {
       setCurrent((state) => state ? { ...state, presentation } : state);
     },
-    updateWorkspaceMode(mode, action) {
-      setCurrent((state) => state ? { ...state, intent: { ...state.intent, mode, action } as WorkspaceIntent } : state);
+    updateWorkspaceMode({ entityType, mode, action }) {
+      setCurrent((state) => state?.intent.entityType === entityType ? { ...state, intent: { ...state.intent, mode, action } as WorkspaceIntent } : state);
     },
     registerCloseGuard(check) {
       guard.current = check;
@@ -82,11 +85,17 @@ export function useWorkspaceCloseGuard({ busy, dirty }: { busy: boolean; dirty: 
   return busy || dirty;
 }
 
-/** The pilot supplies one explicit renderer here; there is intentionally no entity registry. */
-export function WorkspaceHost({ renderWorkspace }: { renderWorkspace?: (intent: WorkspaceIntent) => ReactNode }) {
+/** Each host receives a static definition and context from its existing lifetime owner. */
+export function WorkspaceHost<I extends WorkspaceIntent, Context>({ definition, context }: {
+  definition: WorkspaceDefinition<I, Context>;
+  context: NoInfer<Context>;
+}) {
   const { current } = useWorkspaceNavigation();
-  if (!current || !renderWorkspace) return null;
-  return <WorkspaceInstance key={`${current.intent.entityType}:${current.intent.entityId}`}>{renderWorkspace(current.intent)}</WorkspaceInstance>;
+  if (!current || current.intent.entityType !== definition.entityType) return null;
+  // The discriminator check establishes the leaf type; TS cannot correlate generic I here.
+  return <WorkspaceInstance key={`${current.intent.entityType}:${current.intent.entityId}`}>
+    {definition.render(current.intent as I, context)}
+  </WorkspaceInstance>;
 }
 
 function WorkspaceInstance({ children }: { children: ReactNode }) {

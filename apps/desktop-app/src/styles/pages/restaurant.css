@@ -1,7 +1,3 @@
-/* Floor and Table use bounded workspace bodies; the shell header stays fixed. */
-.restaurant-page { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.restaurant-page > .page-toolbar { flex: none; }
-.restaurant-workspace-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .table-workspace-context { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 .table-workspace-feedback { display: flex; align-items: center; gap: var(--space-3); }
 .table-workspace-feedback p { margin: 0; }

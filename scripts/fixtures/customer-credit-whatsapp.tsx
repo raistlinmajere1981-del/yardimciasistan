@@ -1,3 +1,4 @@
+import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C, type BusinessCapability } from "@yardimci-asistan/shared";
@@ -54,7 +55,7 @@ function Harness() {
       <nav aria-label="Çalışma alanı">{["customers", "market", "messages"].map((id) => <button type="button" key={id} onClick={() => setPage(id)}>{id === "customers" ? "Müşteriler" : id === "market" ? "Market" : "Mesajlar"}</button>)}</nav>
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "customers" ? <div className="customer-work-page"><div className="customer-work-content is-customers">
-        <WorkspaceNavigationProvider page="customerWork">
+        <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
         <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}
           reservations={dashboardData.reservations} rooms={dashboardData.rooms} stays={dashboardData.customerRoomStays}
           aiEnabled={false} whatsappEnabled={whatsappEnabled} reservationsEnabled={false} staysEnabled={false}

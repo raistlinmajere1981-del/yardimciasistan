@@ -3,8 +3,11 @@ import type { DesktopDashboardData, DesktopTableOrder, DesktopStatusUpdateResult
 import { ActionButton } from "../components/ui/ActionButton";
 import { StatusBadge } from "../components/ui/StatusBadge";
 import { WorkspaceHost, useWorkspaceNavigation } from "../components/workspace/WorkspaceNavigation";
-import { TableWorkspace } from "../components/restaurant/TableWorkspace";
+import { tableWorkspaceDefinition } from "../app/workspace-definitions";
 import { formatMoney, getOrderCurrency, getOrderBadge, formatTableStatus, getResourceStatusTone, getTableStatusAction } from "../components/restaurant/table-presentation";
+import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
+import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
+import type { RestaurantView } from "../components/workspace/workspace-intent";
 
 interface RestaurantPageProps {
   data: DesktopDashboardData;
@@ -18,7 +21,7 @@ interface RestaurantPageProps {
 export function RestaurantPage({ data, reservationsEnabled, ordersEnabled, menuEnabled, customersEnabled,
   roomFolioTransferEnabled, tasksEnabled, reservations, tasks, onDashboardDataChanged, onUpdateTableStatus }: RestaurantPageProps) {
   const navigation = useWorkspaceNavigation();
-  const [view, setView] = useState("floor");
+  const [view, setView] = useState<RestaurantView>("floor");
   const [group, setGroup] = useState("all");
   const [status, setStatus] = useState("all");
   const [orders, setOrders] = useState<DesktopTableOrder[]>([]);
@@ -45,13 +48,13 @@ export function RestaurantPage({ data, reservationsEnabled, ordersEnabled, menuE
     revision.current++;
     setOrders(current => current.some(item => item.id === order.id) ? current.map(item => item.id === order.id ? order : item) : [order, ...current]);
   }
-  const views = [{ id: "floor", label: "Masalar" }, ...(reservationsEnabled ? [{ id: "reservations", label: "Rezervasyonlar" }] : []),
-    ...(tasksEnabled ? [{ id: "daily-tasks", label: "Günlük İşler" }] : [])];
+  const views: { id: RestaurantView; label: string }[] = [{ id: "floor", label: "Masalar" }, ...(reservationsEnabled ? [{ id: "reservations" as const, label: "Rezervasyonlar" }] : []),
+    ...(tasksEnabled ? [{ id: "daily-tasks" as const, label: "Günlük İşler" }] : [])];
   const activeView = views.some(item => item.id === view) ? view : "floor";
-  return <section className="restaurant-page" aria-label="Restoran yönetimi">
-    <div className="page-toolbar">
-      <nav className="action-row" aria-label="Restoran görünümü">{views.map(item => <ActionButton key={item.id}
-        variant={activeView === item.id ? "primary" : "secondary"} aria-pressed={activeView === item.id} onClick={() => setView(item.id)}>{item.label}</ActionButton>)}</nav>
+  return <>
+    <FeatureWorkspacePage label="Restoran yönetimi" bodyLabel={activeView === "floor" ? "Floor" : activeView === "reservations" ? "Rezervasyonlar" : "Günlük İşler"}
+      toolbar={<>
+      <FeatureViewSelector items={views} value={activeView} onChange={setView} label="Restoran görünümü" />
       {activeView === "floor" && <>
         <label className="form-field">Masa grubu<select value={group} onChange={event => setGroup(event.target.value)}>
           <option value="all">Tüm gruplar</option>{groups.map(name => <option key={name} value={name}>{name}</option>)}
@@ -61,8 +64,7 @@ export function RestaurantPage({ data, reservationsEnabled, ordersEnabled, menuE
           {reservationsEnabled && <option value="reserved">Rezerve</option>}{ordersEnabled && <option value="bill_waiting">Hesap</option>}
         </select></label>
       </>}
-    </div>
-    <section className="restaurant-workspace-body" aria-label={activeView === "floor" ? "Floor" : activeView === "reservations" ? "Rezervasyonlar" : "Günlük İşler"}>
+    </>}>
       {activeView === "floor" ? <div className="restaurant-table-area-list" aria-label="Masa yönetimi">
         {message && <p role="status">{message}</p>}
         {data.tables.length === 0 && <p>Masa kaydı yok. Masa kategorilerini Temel Ayarlar bölümünden belirleyebilirsiniz.</p>}
@@ -85,9 +87,9 @@ export function RestaurantPage({ data, reservationsEnabled, ordersEnabled, menuE
           })}</div>
         </section>)}
       </div> : activeView === "reservations" ? reservations : tasks}
-    </section>
-    <WorkspaceHost renderWorkspace={intent => intent.entityType === "table" ? <TableWorkspace intent={intent} data={data} orders={orders}
-      ordersEnabled={ordersEnabled} menuEnabled={menuEnabled} customersEnabled={customersEnabled} reservationsEnabled={reservationsEnabled}
-      roomFolioTransferEnabled={roomFolioTransferEnabled} onUpdateTableStatus={onUpdateTableStatus} onOrderChanged={orderChanged} onDashboardDataChanged={onDashboardDataChanged} /> : null} />
-  </section>;
+    </FeatureWorkspacePage>
+    <WorkspaceHost definition={tableWorkspaceDefinition} context={{ data, orders,
+      ordersEnabled, menuEnabled, customersEnabled, reservationsEnabled, roomFolioTransferEnabled,
+      onUpdateTableStatus, onOrderChanged: orderChanged, onDashboardDataChanged }} />
+  </>;
 }

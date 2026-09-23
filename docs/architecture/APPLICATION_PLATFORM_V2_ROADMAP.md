@@ -285,6 +285,11 @@ Recommended reasoning: **GPT-6 Astra High** for the first pass, then normal mode
 
 # Stage 6 — Extract proven platform APIs
 
+Status: **Implemented** — static workspace definitions, metadata-based presentation defaults,
+typed return context/mode updates and shared feature page geometry/view navigation.
+See [extraction audit](platform-extraction-audit.md) and [workspace APIs](workspace-platform.md).
+Flow, feedback policy and domain operations intentionally remain local.
+
 Only now generalize what Pension and Restaurant truly share.
 
 Candidates:

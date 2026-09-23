@@ -1,18 +1,67 @@
-# Workspace platform (Stage 2)
+# Workspace platform — proven APIs (Stage 6)
 
-The Constitution remains authoritative. This document describes the implemented renderer API.
+The Constitution remains authoritative. The [extraction audit](platform-extraction-audit.md)
+records A/B/C/D decisions from both completed pilots.
 
-## Ownership and integration
+## Static definitions and composition
 
-`App` still owns `activePage`. `DesktopAppFrame` mounts `WorkspaceNavigationProvider` and a single `WorkspaceHost` alongside the existing diagnostics/menu overlay composition. The provider exists only inside the unlocked Frame. Lock removes the host, navigation state and drafts; unlock starts closed.
+`app/workspace-definitions.tsx` binds each entity discriminator, default presentation
+and typed renderer in one static definition:
 
-`useWorkspaceNavigation()` exposes `current`, `openWorkspace(intent, options?)`, `closeWorkspace()`, `updateWorkspacePresentation(presentation)`, `updateWorkspaceMode(mode, action?)`, and `returnFocusRef`. Open/close return `false` when blocked. An open request rejects empty identity, unsafe replacement, or an existing unrelated modal. Opening defaults to centered and captures the invoking element and originating page. Mode/action updates do not change entity identity.
+- `roomWorkspaceDefinition`: RoomWorkspaceIntent → RoomWorkspace, `centered`.
+- `tableWorkspaceDefinition`: TableWorkspaceIntent → TableWorkspace, `full-canvas`.
 
-The platform currently has only a room intent: explicit `entityType: "room"`, `entityId`, optional `mode` (`summary`, `stay`, `account`, `history`), optional `action` (`payment`, `assign-reservation`). Stage 4 implements these room modes and operations and adds `create-stay` with an optional preselected `customerId`. Add a discriminated variant only when another real entity consumer arrives.
+`WorkspaceDefinition<I, Context>` keeps renderer input narrowed to its intent leaf;
+context is the existing component props without intent. `workspaceDefinitions` supplies
+metadata to `WorkspaceNavigationProvider`; the navigation module imports no domain
+component and has no entity-specific presentation branch. Unknown/unregistered entity
+input returns false before state/focus/return callbacks change. This is static
+application composition, without runtime registration, discovery or plugin loading.
 
-`returnContext` carries a typed desktop page, optional pilot view (`rooms`, `reservations`, `daily-tasks`) and optional selected record. Open/close do not switch the feature page during normal use, so its filters and selection survive. If an external page change occurred, close requests the originating page. `options.onReturn(context)` lets the feature restore its own view/selection; navigation does not store drafts or scroll positions. The feature owns any persistence needed across an external page unmount.
+`WorkspaceHost definition={...} context={...}` checks the discriminator before rendering
+and keys only by entity type/id. There is one checked type assertion at this generic
+boundary because TypeScript cannot correlate the generic leaf with that comparison.
+AppFrame supplies Room context without importing RoomWorkspace; RestaurantPage supplies
+Table context without importing TableWorkspace. Their host locations intentionally stay:
+Room is accessible across pages; Table orders/projection callbacks live in RestaurantPage.
+Moving Table to a global store would change ownership without proven need.
 
-The production host is mounted now and returns no DOM or effects while closed. Stage 4 now supplies `renderWorkspace` at the existing host with a direct, explicit RoomWorkspace composition; there is no registry or fallback editor. Diagnostics uses only the presentation primitive, never an entity intent.
+## Navigation, intents and return context
+
+`App` owns activePage. The provider exists inside the unlocked Frame. Lock removes
+navigation, hosts and drafts; unlock starts closed. Diagnostics uses presentation
+primitives, never an entity intent.
+
+`useWorkspaceNavigation()` exposes current, openWorkspace(intent, options?),
+closeWorkspace(), updateWorkspacePresentation(presentation),
+updateWorkspaceMode({ entityType, mode, action? }) and returnFocusRef. Open/close return
+false when blocked. Empty identity, guarded replacement and unrelated open modals are
+rejected. Mode/action updates for a different entity type are ignored.
+
+RoomWorkspaceIntent | TableWorkspaceIntent remains an explicit discriminated union.
+Room customerId, leaf mode/action unions and operation semantics remain distinct; no
+string bag or generic base was introduced. Mode updates preserve the same discrimination.
+
+On a new entity, navigation resolves defaultPresentation from the supplied metadata.
+The provider owns runtime presentation state. Same-entity opens preserve presentation,
+original return context/callback and the mounted draft. Room exposes its existing
+expand toggle; Table retains its full-canvas default and no user toggle.
+
+WorkspaceReturnContext discriminates by page: PensionView is rooms/reservations/daily-tasks;
+RestaurantView is floor/reservations/daily-tasks. Other desktop pages carry optional
+entityId without a view. A view requires its page. An omitted page defaults to the current
+page. Close restores the original page if necessary and calls options.onReturn(context).
+Features retain filters/selection and their existing lifetime owners; navigation does
+not persist exact scroll positions or drafts.
+
+## Feature page anatomy
+
+FeatureWorkspacePage owns a fixed toolbar slot, one active named body region and bounded
+flex/scroll geometry. FeatureViewSelector owns navigation + aria-pressed buttons and a
+feature-provided accessible label. Pages supply typed items/value/onChange; capability
+filtering, fallback view, filters and active-body selection remain local. Pension's
+controller still survives router page switches; Restaurant state still lives in its page.
+Page views remain distinct from WorkspaceTabs and legacy SegmentedControl.
 
 ## Frame, state lifetime and tabs
 
@@ -26,7 +75,7 @@ Diagnostics retains deliberate independent log-list/detail scrolling through `bo
 
 `ModalSurface` uses native `showModal()` for inert background and a single modal boundary. Initial focus is the title (or `initialFocusRef`); Tab stays within the surface. Geometry changes never rerun focus initialization. Escape is prevented at the native cancel event and routed through the same close request as the close button. Backdrop dismissal is opt-in; Diagnostics keeps it disabled.
 
-In an entity consumer, call `useWorkspaceCloseGuard({ busy, dirty })` and pass its result as `closeBlocked` to the frame. Navigation also checks the guard before close or entity replacement. The feature must show the save/discard or busy explanation inline and clear its local state before requesting close; the platform never discards or executes a business mutation. Security lock unmounts regardless of the guard.
+In an entity consumer, call `useWorkspaceCloseGuard({ busy, dirty })` and pass its result as `closeBlocked` to the frame. Navigation also checks the guard before close or entity replacement. Room shows save/discard or busy feedback inline. Table routes a user close through its note flush and requests navigation close after the guard clears; the platform never discards or executes a business mutation. Security lock unmounts regardless of the guard.
 
 Pass navigation's `returnFocusRef` to the frame to retain the original trigger even after changing entities. Callers can instead supply a meaningful return target ref. A disconnected trigger falls back to the shell content focus target. Native focus restoration and our fallback run only at close, not presentation changes.
 
@@ -41,8 +90,8 @@ openWorkspace({
   returnContext: { page: "pension", view: "rooms", entityId: room.id }
 }, { onReturn: restoreRoomSelection });
 
-// Existing Frame host, once RoomWorkspace is implemented:
-<WorkspaceHost renderWorkspace={intent => <RoomWorkspace intent={intent} />} />
+// Application composition supplies the existing Room props as context:
+<WorkspaceHost definition={roomWorkspaceDefinition} context={roomContext} />
 
 // Inside RoomWorkspace (draft/busy/dirty are local):
 const navigation = useWorkspaceNavigation();
@@ -59,28 +108,36 @@ const blocked = useWorkspaceCloseGuard({ busy, dirty });
 
 ## Stale async results
 
-Stage 4 adds `useRequestGeneration` for Room operation results and Folio reads/mutations. Each new request invalidates its predecessor; unmount invalidates the current generation. Diagnostics data behavior remains unchanged. The host entity key isolates local state on identity change. In the first Room implementation, every read effect must additionally invalidate itself on entity/mode change and unmount; overlapping refreshes require a generation check. Guard success **and** catch/finally updates. Abort the request when supported, but cancellation alone is not the correctness guard.
+`useRequestGeneration()` is proven by RoomWorkspace mutations, useRoomFolioController
+reads/mutations, useTableOrderController reads and TableRoomTransfer folio reads. Its unchanged API returns begin();
+begin returns isCurrent(). A new generation invalidates older requests; unmount
+invalidates the current one, including success, catch and finally paths. Each independent
+request lifetime owns its own hook instance. The entity key isolates local state.
 
-```tsx
-const generation = useRef(0);
-useEffect(() => {
-  const request = ++generation.current;
-  let active = true;
-  void readRoom(entityId).then(result => {
-    if (active && request === generation.current) setResult(result);
-  }).catch(error => {
-    if (active && request === generation.current) setError(error);
-  });
-  return () => { active = false; };
-}, [entityId]);
-```
+Table mutations deliberately retain serialized run/flushNotes, alive and order identity
+checks. They are not latest-request-wins operations. Restaurant's initial order projection
+also intentionally merges late missing orders. Neither belongs inside this helper.
+No cancellation framework, mutation routing or feedback policy was added.
 
-The Room pilot must test delayed Room 101 responses after Room 102 is opened and out-of-order same-entity refreshes. Extract a helper once those actual request lifetimes demonstrate shared semantics.
+## Deliberately local
+
+Existing WorkspaceFrame identity/context/action/footer slots, ActionButton/IconButton,
+ModalSurface focus/close behavior and capability-filtered WorkspaceTabs arrays suffice.
+No new action registry, capability engine, entity header API, flow hook or feedback
+wrapper: Room's explicit dirty/discard/flow coordination differs from Table's auto-save,
+note flush, return-after-close and committed-transfer retry. Domain messages stay local.
+
+Platform owns navigation/definitions/host, presentation, frame/tabs, page geometry and
+view selection, focus/close guard and generation validity. Pension owns Room projection,
+Stay/Reservation/Folio, cleaning and RoomAccount. Restaurant owns TableOrder, menu/order
+editing, note flush, close and room-folio transfer UI. Persistence/IPC are unchanged.
+Generic repositories/editors/operations, plugin SDK, command/event bus, global store and
+universal form/async controllers are not justified by these two pilots.
 
 ## Verification
 
-`npm run smoke:workspace-platform` serves a test-only harness from `scripts/fixtures` using the installed Vite/browser. It covers two entry points, identity replacement, return context, mounted state/draft, geometry, scrolling, tabs, subflows, guard, inert focus, Escape/backdrop, lock, appearance and the real Diagnostics consumer. The renderer design smoke also exercises Diagnostics through the real App/Frame and lock controller. No production fixture page or IPC change is involved.
+`npm run smoke:workspace-platform` serves a test-only harness from `scripts/fixtures` using the installed Vite/browser. It compiles positive/negative intent, return-context and definition contracts. Browser tests inject reversed metadata defaults to prove navigation is domain-independent, reject unknown input, verify same-entity presentation preservation, generation/unmount invalidation and both return contexts. It also covers two entry points, identity replacement, return context, mounted state/draft, geometry, scrolling, tabs, subflows, guard, inert focus, Escape/backdrop, lock, appearance and the real Diagnostics consumer. The renderer design smoke also exercises Diagnostics through the real App/Frame and lock controller. No production fixture page or IPC change is involved.
 
-## Pension pilot
+## Pilot verification
 
-The production Room consumer, page/controller ownership, operation boundaries and verification are documented in [Pension Workspace pilot](pension-workspace.md).
+`smoke:pension-workspace` and `smoke:restaurant-workspace` render the real consumers through the production definitions, covering page-view versus tab semantics, operations, stale results, focus and capability variants. See [Pension Workspace pilot](pension-workspace.md) and [Restaurant Workspace pilot](restaurant-workspace.md).

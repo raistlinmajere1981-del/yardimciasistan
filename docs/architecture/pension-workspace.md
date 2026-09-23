@@ -4,7 +4,7 @@ Stage 4 production consumer of the workspace platform for Pension/Rooms. Constit
 
 ## Pension page modes
 
-`apps/desktop-app/src/pages/PensionPage.tsx` renders one active viewport body selected by a local toolbar: `Odalar`, `Rezervasyonlar`, `Günlük İşler`. Only the active body scrolls (`.pension-workspace-body`); the page no longer stacks all operation panels vertically. `DesktopWorkspaceRouter.tsx` supplies `RoomsWorkspace`, `ReservationsWorkspace` and `DailyTasksWorkspace` from `components/operations/OperationWorkspaces.tsx`.
+`apps/desktop-app/src/pages/PensionPage.tsx` renders one active viewport body selected by a local toolbar: `Odalar`, `Rezervasyonlar`, `Günlük İşler`. Only the active body scrolls (`FeatureWorkspacePage` body); the page no longer stacks all operation panels vertically. `DesktopWorkspaceRouter.tsx` supplies `RoomsWorkspace`, `ReservationsWorkspace` and `DailyTasksWorkspace` from `components/operations/OperationWorkspaces.tsx`.
 
 ## State ownership
 
@@ -12,7 +12,7 @@ Stage 4 production consumer of the workspace platform for Pension/Rooms. Constit
 
 ## Room Workspace tabs
 
-`components/pension/RoomWorkspace.tsx` mounted by `DesktopAppFrame` through `WorkspaceHost renderWorkspace`. Tabs: `Özet`, `Konaklama`, `Hesap` (only when `ACCOMMODATION_FOLIO` is enabled), `Geçmiş`. History is explicitly near-term records, not full history (D-008). All subflows render inside the same workspace body; there is no nested modal.
+`components/pension/RoomWorkspace.tsx` mounted by `DesktopAppFrame` through the static `roomWorkspaceDefinition` and `WorkspaceHost`. Tabs: `Özet`, `Konaklama`, `Hesap` (only when `ACCOMMODATION_FOLIO` is enabled), `Geçmiş`. History is explicitly near-term records, not full history (D-008). All subflows render inside the same workspace body; there is no nested modal.
 
 ## Canonical operations
 
@@ -36,4 +36,4 @@ Intents carry `returnContext: { page, view, entityId? }` with views `rooms`, `re
 
 ## Intentionally deferred items
 
-Unlimited/paginated folio history, RoomStatus schema split (projection only), per-room financial allocation for multi-room bookings, a second receivables ledger, generic sector/plugin framework, exact scroll restoration, and the Restaurant pilot. `Customer Credit` remains a separate ledger and is not mixed into the folio flow.
+Unlimited/paginated folio history, RoomStatus schema split (projection only), per-room financial allocation for multi-room bookings, a second receivables ledger, generic sector/plugin framework, exact scroll restoration. `Customer Credit` remains a separate ledger and is not mixed into the folio flow.

@@ -148,7 +148,7 @@ export function RoomWorkspace({ intent, data, onDashboard, staysEnabled, reserva
       onClose={() => navigation.closeWorkspace()} closeBlocked={blocked} returnFocusRef={navigation.returnFocusRef}
       navigation={<WorkspaceTabList tabs={tabs} label="Oda çalışma alanı" onChange={value => {
         if (flow || busy || account.busy) { setMessage("Önce açık işlemi tamamlayın veya Vazgeç ile geri dönün."); return; }
-        setTab(value); navigation.updateWorkspaceMode(value);
+        setTab(value); navigation.updateWorkspaceMode({ entityType: "room", mode: value });
       }} />}
       footer={flow && <div className="action-row"><ActionButton variant="secondary" disabled={busy || account.busy} onClick={finish}>{dirty ? "Değişiklikleri Bırak" : "Vazgeç"}</ActionButton>
         <span role="status">{busy || account.busy ? "İşlem sürüyor…" : dirty ? "Kaydedilmemiş değişiklikler var." : "İşlem bu çalışma alanında tamamlanır."}</span></div>}>

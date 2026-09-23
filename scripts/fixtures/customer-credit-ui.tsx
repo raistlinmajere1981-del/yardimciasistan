@@ -1,3 +1,4 @@
+import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
@@ -44,7 +45,7 @@ function Harness() {
       <p data-testid="topbar-status" data-state={syncState} role="status">{statusMessage}</p>
       {page === "market" ? <MarketPage customers={dashboardData.customers} /> : <div className="customer-work-page">
         <div className="customer-work-content is-customers">
-          <WorkspaceNavigationProvider page="customerWork">
+          <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="customerWork">
           <CustomersWorkspace customers={dashboardData.customers} requests={dashboardData.requests}
             reservations={dashboardData.reservations} rooms={dashboardData.rooms} stays={dashboardData.customerRoomStays}
             aiEnabled={false} whatsappEnabled={false} reservationsEnabled={false} staysEnabled={false}

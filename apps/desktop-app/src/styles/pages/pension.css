@@ -1,7 +1,3 @@
-/* Pension owns the remaining viewport; only its active workspace scrolls. */
-.pension-page { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-3); }
-.pension-page > .page-toolbar { flex: none; }
-.pension-workspace-body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .room-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--field-width-md)), 1fr)); gap: var(--space-3); }
 .room-card { display: grid; align-content: start; gap: var(--space-2); text-align: start; color: var(--color-text); cursor: pointer; border-inline-start: var(--space-1) solid var(--color-border-strong); }
 .room-card[data-status="ready"] { border-inline-start-color: var(--color-success); }

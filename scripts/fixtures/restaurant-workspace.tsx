@@ -1,3 +1,4 @@
+import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
@@ -16,7 +17,7 @@ function Fixture() {
   if (locked) return <p>Kilitli</p>;
   const save = async input => { const result = await window.yardimciDesktop.saveManualRestaurantReservation(input); if (result.ok) setData(result.dashboardData); return result; };
   const saveCustomer = async input => { const result = await window.yardimciDesktop.saveCustomer(input); if (result.ok) setData(result.dashboardData); return result; };
-  return <WorkspaceNavigationProvider page="restaurant">
+  return <WorkspaceNavigationProvider definitions={workspaceDefinitions} page="restaurant">
     <AppShell contentScroll="workspace" contentRef={content}
       sidebar={<aside className="sidebar"><button>Restoran</button></aside>}
       header={<header className="page-header"><h1>Restoran</h1></header>}>

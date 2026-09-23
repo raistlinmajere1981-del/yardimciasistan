@@ -1,6 +1,6 @@
 import type { DesktopPage } from "../../app/navigation";
 
-// Explicit pilot intents; no entity registry.
+// Explicit entity intents; mode/action and extra payloads remain leaf-owned.
 export interface RoomWorkspaceIntent {
   entityType: "room";
   entityId: string;
@@ -20,10 +20,18 @@ export interface TableWorkspaceIntent {
 
 export type WorkspaceIntent = RoomWorkspaceIntent | TableWorkspaceIntent;
 
-export interface WorkspaceReturnContext {
-  page?: DesktopPage;
-  view?: "rooms" | "reservations" | "daily-tasks" | "floor";
-  entityId?: string;
-}
+export type WorkspaceModeUpdate = {
+  [Entity in WorkspaceIntent["entityType"]]: Pick<Extract<WorkspaceIntent, { entityType: Entity }>, "entityType" | "mode" | "action">
+}[WorkspaceIntent["entityType"]];
+
+export type PensionView = "rooms" | "reservations" | "daily-tasks";
+export type RestaurantView = "floor" | "reservations" | "daily-tasks";
+
+/** View names belong to their originating page, independently of the entity opened. */
+export type WorkspaceReturnContext = (
+  | { page: "pension"; view?: PensionView }
+  | { page: "restaurant"; view?: RestaurantView }
+  | { page?: Exclude<DesktopPage, "pension" | "restaurant">; view?: never }
+) & { entityId?: string };
 
 export type WorkspacePresentation = "centered" | "full-canvas";

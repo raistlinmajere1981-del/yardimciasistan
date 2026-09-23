@@ -1,6 +1,8 @@
 import { createContext, useContext, useState } from "react";
 
-export type PensionMode = "rooms" | "reservations" | "daily-tasks";
+import type { PensionView } from "../workspace/workspace-intent";
+
+export type PensionMode = PensionView;
 export interface PensionFilters { reservationStatus: string; reservationDate: string; taskStatus: string }
 
 /** Page controller stays mounted in the router, preserving return context across page changes. */

@@ -26,6 +26,9 @@ try {
     return page;
   }
   const page = await open();
+  const viewNavigation = page.getByRole('navigation', { name: 'Pansiyon görünümü' });
+  await expect(viewNavigation.getByRole('button', { name: 'Odalar', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(viewNavigation.getByRole('tab')).toHaveCount(0);
   const button = name => page.getByRole('button', { name, exact: true });
   const dialog = page.getByRole('dialog');
   const tab = name => dialog.getByRole('tab', { name, exact: true });

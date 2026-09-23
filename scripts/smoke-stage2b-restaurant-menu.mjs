@@ -346,7 +346,7 @@ try {
   for (const [width, height] of [[1440, 1000], [1366, 768], [1024, 768], [900, 768], [600, 800]]) {
     await page.setViewportSize({ width, height });
     await navigate("Restoran", "Restoran");
-    await page.locator(".restaurant-workspace-body").scrollIntoViewIfNeeded();
+    await page.getByRole("region", { name: "Floor", exact: true }).scrollIntoViewIfNeeded();
     await capture(`restaurant-tables-light-compact`);
 
     const activeTable = page.locator(".restaurant-table-card").filter({ hasText: "Salon Masası 2" });
@@ -425,14 +425,14 @@ try {
 
   await setAppearance("dark", "compact");
   await navigate("Restoran", "Restoran");
-  await page.locator(".restaurant-workspace-body").scrollIntoViewIfNeeded();
+  await page.getByRole("region", { name: "Floor", exact: true }).scrollIntoViewIfNeeded();
   await capture("restaurant-tables-dark-compact");
   await navigate("Menü", "Menü");
   await capture("menu-editor-dark-compact");
 
   await setAppearance("light", "comfortable");
   await navigate("Restoran", "Restoran");
-  await page.locator(".restaurant-workspace-body").scrollIntoViewIfNeeded();
+  await page.getByRole("region", { name: "Floor", exact: true }).scrollIntoViewIfNeeded();
   await capture("restaurant-tables-light-comfortable");
   await navigate("Menü", "Menü");
   await capture("menu-editor-light-comfortable");

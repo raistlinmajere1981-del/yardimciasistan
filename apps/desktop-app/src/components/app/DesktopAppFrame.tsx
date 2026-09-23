@@ -26,7 +26,7 @@ import { Sidebar } from "../layout/Sidebar";
 import { LocalMenuPreview } from "../menu/MenuPreview";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { DiagnosticsViewer } from "../diagnostics/DiagnosticsViewer";
-import { RoomWorkspace } from "../pension/RoomWorkspace";
+import { roomWorkspaceDefinition, workspaceDefinitions } from "../../app/workspace-definitions";
 import { projectDesktopDashboardData } from "../../app/capability-projection";
 import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/WorkspaceNavigation";
 
@@ -50,7 +50,7 @@ interface DesktopAppFrameProps {
 const OFFLINE_SYNC_MESSAGE = "İnternet bağlantısı yok. Yerel işlemler devam ediyor; eşitleme bağlantı gelince yapılacak.";
 
 export function DesktopAppFrame(props: DesktopAppFrameProps) {
-  return <WorkspaceNavigationProvider page={props.activePage} onReturnPage={props.setActivePage}>
+  return <WorkspaceNavigationProvider definitions={workspaceDefinitions} page={props.activePage} onReturnPage={props.setActivePage}>
     <DesktopAppFrameContent {...props} />
   </WorkspaceNavigationProvider>;
 }
@@ -251,12 +251,13 @@ function DesktopAppFrameContent({
       )}
       overlay={(
         <>
-          <WorkspaceHost renderWorkspace={intent => intent.entityType === "room" ? <RoomWorkspace intent={intent}
-            data={projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? [])}
-            onDashboard={desktopSyncController.setDashboardData}
-            staysEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS)}
-            reservationsEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS)}
-            folioEnabled={runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO)} menuEnabled={menuEnabled} /> : null} />
+          <WorkspaceHost definition={roomWorkspaceDefinition} context={{
+            data: projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? []),
+            onDashboard: desktopSyncController.setDashboardData,
+            staysEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_STAYS),
+            reservationsEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS),
+            folioEnabled: runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO), menuEnabled
+          }} />
           {diagnosticsOpen ? (
             <DiagnosticsViewer onClose={() => setDiagnosticsOpen(false)} />
           ) : menuEnabled && menuPreviewOpen ? (

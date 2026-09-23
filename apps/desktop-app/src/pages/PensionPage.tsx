@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { PensionPageContext, type usePensionPageController, type PensionMode } from "../components/pension/pension-page-state";
-import { ActionButton } from "../components/ui/ActionButton";
+import { FeatureWorkspacePage } from "../components/workspace/FeatureWorkspacePage";
+import { FeatureViewSelector } from "../components/workspace/FeatureViewSelector";
 
 interface PensionPageProps {
   controller: ReturnType<typeof usePensionPageController>;
@@ -20,16 +21,9 @@ export function PensionPage({ controller, reservationsEnabled, tasksEnabled, res
   ];
   const activeMode = modes.find(item => item.id === mode && item.enabled)?.id ?? "rooms";
   return <PensionPageContext.Provider value={{ ...controller, mode: activeMode }}>
-    <section className="pension-page" aria-label="Pansiyon yönetimi">
-      <nav className="page-toolbar" aria-label="Pansiyon görünümü">
-        <div className="action-row">{modes.filter(item => item.enabled).map(item =>
-          <ActionButton key={item.id} variant={activeMode === item.id ? "primary" : "secondary"}
-            aria-pressed={activeMode === item.id} onClick={() => setMode(item.id)}>{item.label}</ActionButton>
-        )}</div>
-      </nav>
-      <div className="pension-workspace-body" role="region" aria-label={modes.find(item => item.id === activeMode)?.label}>
-        {activeMode === "rooms" ? rooms : activeMode === "reservations" ? reservations : tasks}
-      </div>
-    </section>
+    <FeatureWorkspacePage label="Pansiyon yönetimi" bodyLabel={modes.find(item => item.id === activeMode)!.label}
+      toolbar={<FeatureViewSelector items={modes.filter(item => item.enabled)} value={activeMode} onChange={setMode} label="Pansiyon görünümü" />}>
+      {activeMode === "rooms" ? rooms : activeMode === "reservations" ? reservations : tasks}
+    </FeatureWorkspacePage>
   </PensionPageContext.Provider>;
 }

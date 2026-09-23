@@ -25,6 +25,9 @@ try {
     return page;
   }
   const page = await open(), dialog = page.getByRole('dialog');
+  const viewNavigation = page.getByRole('navigation', { name: 'Restoran görünümü' });
+  await expect(viewNavigation.getByRole('button', { name: 'Masalar', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(viewNavigation.getByRole('tab')).toHaveCount(0);
   const button = name => page.getByRole('button', { name, exact: true });
   const tab = name => dialog.getByRole('tab', { name, exact: true });
   const state = () => page.evaluate(() => window.fixtureState());
