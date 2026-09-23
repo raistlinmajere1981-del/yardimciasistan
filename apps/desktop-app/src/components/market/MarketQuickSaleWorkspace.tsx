@@ -155,6 +155,7 @@ export function MarketQuickSaleWorkspace({
     lastSale,
     lastCreditCustomerName,
     submitting,
+    saleInFlight,
     loadedDraftRequestId,
     addProduct: addSessionProduct,
     setQuantity,
@@ -215,17 +216,17 @@ export function MarketQuickSaleWorkspace({
   }, [addSessionProduct, onStateChange]);
 
   const resolveBarcode = useCallback(async (barcode: string, source: string) => {
-    if (!bridge) return "stale" as const;
+    if (!bridge || saleInFlight.current) return "stale" as const;
     const isCurrent = beginBarcodeRequest();
     setSearch("");
     setBarcodeMessage(`${source}: ${barcode} aranıyor…`);
     try {
       const product = await bridge.findProductByBarcode(barcode);
-      if (!isCurrent()) return "stale" as const;
+      if (!isCurrent() || saleInFlight.current) return "stale" as const;
       if (!product || !product.isActive) {
         if (typeof bridge.lookupExternalProductByBarcode === "function") {
           const lookup = await bridge.lookupExternalProductByBarcode(barcode, "automatic");
-          if (!isCurrent()) return "stale" as const;
+          if (!isCurrent() || saleInFlight.current) return "stale" as const;
           if (lookup.status === "found") {
             const message = `${lookup.product.name} bulundu; ürün kartı hazırlanıyor.`;
             setBarcodeMessage(message);
@@ -234,29 +235,29 @@ export function MarketQuickSaleWorkspace({
             return "handoff" as const;
           }
         }
-        if (!isCurrent()) return "stale" as const;
+        if (!isCurrent() || saleInFlight.current) return "stale" as const;
         const message = `Barkod bulunamadı: ${barcode}`;
         setBarcodeMessage(message);
         onStateChange("error", message);
         return "not_found" as const;
       }
-      if (!isCurrent()) return "stale" as const;
+      if (!isCurrent() || saleInFlight.current) return "stale" as const;
       if (addProduct(product)) {
         setBarcodeMessage(`${product.name} sepete eklendi · ${source}`);
         return "added" as const;
       }
       return "stale" as const;
     } catch (error) {
-      if (!isCurrent()) return "stale" as const;
+      if (!isCurrent() || saleInFlight.current) return "stale" as const;
       const message = error instanceof Error ? error.message : "Barkod okunamadı.";
       setBarcodeMessage(message);
       onStateChange("error", message);
       return "not_found" as const;
     }
-  }, [addProduct, beginBarcodeRequest, bridge, onExternalProductFound, onStateChange]);
+  }, [addProduct, beginBarcodeRequest, bridge, onExternalProductFound, onStateChange, saleInFlight]);
 
   const handleBarcodeScan = useCallback(async (scan: BarcodeScan) => {
-    if (!barcodeEnabled || busy || submitting || draftLoading || localScanInFlight.current) return;
+    if (!barcodeEnabled || busy || submitting || saleInFlight.current || draftLoading || localScanInFlight.current) return;
     localScanInFlight.current = true;
     setScanning(true);
     try {
@@ -265,7 +266,7 @@ export function MarketQuickSaleWorkspace({
       localScanInFlight.current = false;
       if (mountedRef.current) setScanning(false);
     }
-  }, [barcodeEnabled, busy, draftLoading, resolveBarcode, submitting]);
+  }, [barcodeEnabled, busy, draftLoading, resolveBarcode, saleInFlight, submitting]);
 
   useEffect(() => {
     if (!barcodeEnabled) {
@@ -310,7 +311,7 @@ export function MarketQuickSaleWorkspace({
     };
   }, [applyLoadedDraft, beginBarcodeRequest, bridge, cartDraftRequest, loadedDraftRequestId, onCartDraftLoaded, onStateChange]);
 
-  interactionBlocked.current = busy || submitting || draftLoading;
+  interactionBlocked.current = busy || submitting || saleInFlight.current || draftLoading;
 
   useEffect(() => {
     if (!barcodeEnabled || !bridge) {
