@@ -134,8 +134,6 @@ export function DesktopWorkspaceRouter({
     messagesAiOpen,
     openWhatsApp,
     callCustomer,
-    callCustomerRecord,
-    openCustomerWhatsApp,
     openReservationWhatsApp,
     prepareBirthdayWhatsApp,
     birthdayPreparingId,
@@ -165,7 +163,6 @@ export function DesktopWorkspaceRouter({
     handleConvertRequestToReservation,
     handleUpdateRequestStatus,
     handleDeleteRequest,
-    handleDeleteCustomer,
     handleSaveCustomer,
     handleAnalyzeIdentityImage
   } = customerController;
