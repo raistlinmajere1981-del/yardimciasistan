@@ -9,6 +9,7 @@ import { WorkspaceHost, WorkspaceNavigationProvider } from "../../apps/desktop-a
 import { subscribeAppStatus } from "../../apps/desktop-app/src/app/runtime-state";
 import { useCustomerController } from "../../apps/desktop-app/src/app/use-customer-controller";
 import { useMessagingController } from "../../apps/desktop-app/src/app/use-messaging-controller";
+import { useMarketController } from "../../apps/desktop-app/src/app/use-market-controller";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
 import { WhatsAppWorkspace } from "../../apps/desktop-app/src/components/messages/MessageWorkspaces";
 import { MessagesPage } from "../../apps/desktop-app/src/pages/MessagesPage";
@@ -34,6 +35,10 @@ function Harness() {
     onOpenMessages: () => setPage("messages") });
   const customers = useCustomerController({ dashboardData, setDashboardData, setSyncState, setStatusMessage,
     selectedWhatsAppRequestId: messaging.selectedWhatsAppRequestId, setSelectedWhatsAppRequestId: messaging.setSelectedWhatsAppRequestId });
+  const marketController = useMarketController({
+    businessCapabilities: snapshot,
+    active: page === "market"
+  });
   control.__m83Toggle = async (capability, enabled) => setSnapshot(await control.__m83Call("toggle", [capability, enabled]));
 
   useEffect(() => subscribeAppStatus(({ state, message }) => {
@@ -79,7 +84,7 @@ function Harness() {
           onDelete: customers.handleDeleteCustomer
         }} />
         </WorkspaceNavigationProvider>
-      </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} />
+      </div></div> : page === "market" ? <MarketPage customers={dashboardData.customers} controller={marketController} />
         : <MessagesPage safeMode={workspace("safe")} webMode={(onReturn) => workspace("web", onReturn)} aiTools={null}
           aiEnabled={false} whatsappEnabled={whatsappEnabled} aiOpen={false} active />}
     </main>
