@@ -12,10 +12,12 @@ export type MarketAsyncState = "idle" | "loading" | "success" | "error";
 
 export function useMarketController({
   businessCapabilities,
-  active
+  active,
+  enabled = true
 }: {
   businessCapabilities: BusinessCapabilitySnapshot | null;
   active: boolean;
+  enabled?: boolean;
 }) {
   const bridge = window.yardimciDesktop?.commerce;
   const catalogEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.CATALOG);
@@ -44,6 +46,7 @@ export function useMarketController({
   }, [bridge, catalogEnabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     let disposed = false;
     const setupRequest = window.yardimciDesktop?.getSetupData?.();
     if (!setupRequest) {
@@ -62,9 +65,10 @@ export function useMarketController({
     return () => {
       disposed = true;
     };
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!catalogEnabled) {
       setProducts([]);
       setCategories([]);
@@ -82,7 +86,7 @@ export function useMarketController({
         setDataState("error");
         reportAppStatus("error", error instanceof Error ? error.message : "Market verileri yüklenemedi.");
       });
-  }, [active, catalogEnabled, reloadCatalog]);
+  }, [active, catalogEnabled, enabled, reloadCatalog]);
 
   return {
     products,
