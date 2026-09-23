@@ -264,6 +264,7 @@ function DesktopAppFrameContent({
             categories: marketController.categories,
             inventoryEnabled,
             productDataEnabled: marketController.productDataEnabled,
+            busy: marketController.dataState === "loading",
             onReload: marketController.reloadCatalog,
             onStateChange: marketController.handleStateChange
           }} />
