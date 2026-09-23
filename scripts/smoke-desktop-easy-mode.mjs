@@ -66,6 +66,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord)).toBeNull();
+    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
@@ -116,9 +117,11 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "light");
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("light");
 
+    await page.getByRole("tab", { name: "İşletme", exact: true }).click();
     await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
-    expect(await page.locator(".setup-form-surface").evaluate((surface) => surface.scrollWidth <= surface.clientWidth + 1)).toBe(true);
+    expect(await page.locator(".settings-category-body").evaluate((surface) => surface.scrollWidth <= surface.clientWidth + 1)).toBe(true);
 
     await expect.poll(() => readStoredPreferences(page)).toEqual({
       version: 2,
@@ -173,6 +176,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     await expect(page.locator("html")).toHaveAttribute("data-accent", "coral");
 
     await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
@@ -212,13 +216,15 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
 
     await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();
-    await expect(page.locator(".setup-shell.is-embedded")).toBeVisible();
+    await expect(page.locator(".settings-workspace")).toBeVisible();
+    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
     await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
     await expect(page.getByLabel("Arayüz ölçeği")).toBeVisible();
 
-    await expect(page.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(4);
+    await expect(page.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab")).toHaveCount(4);
+    await page.getByRole("tab", { name: "İşletme", exact: true }).click();
     await expect(page.getByLabel("Firma adı", { exact: true })).toBeVisible();
     expect(await page.locator(".setup-capabilities").evaluate((surface) => surface.scrollWidth <= surface.clientWidth + 1)).toBe(true);
     expect(pageErrors).toEqual([]);
@@ -240,6 +246,7 @@ async function verifyPartialPreferenceRecord(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(JSON.parse(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord))).toEqual(partialPreferences);
+    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
@@ -275,6 +282,7 @@ async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
     expect(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord)).toBe(malformedPreferences);
+    await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");

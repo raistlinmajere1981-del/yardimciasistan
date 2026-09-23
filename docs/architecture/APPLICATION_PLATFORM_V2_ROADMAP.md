@@ -314,6 +314,12 @@ Room and Table implementations become simpler because shared code was extracted�
 
 # Stage 7 — Settings Platform v2
 
+Status: **Implementation complete; external verification pending** — four category
+workspaces, static settings metadata, category-owned Setup drafts/save, independent
+resource lifecycles, immediate appearance and explicit actions. See the
+[Settings audit](settings-platform-audit.md) and [Settings platform](settings-platform.md).
+Only targeted checks run in the implementation session; broad gates are a separate handoff.
+
 Goal: make future settings growth cheap and predictable.
 
 ## Architecture

@@ -189,13 +189,14 @@ try {
   await expect(page.getByRole("heading", { name: "Bugün ne var?" })).toBeVisible();
 
   await page.getByRole("button", { name: "Ayarlar", exact: true }).click();
+  await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Bilgileri Kaydet", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Oda Bilgilerini Kaydet", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Şifreyi (Belirle|Değiştir)/, exact: true })).toHaveCount(0);
   await page.getByLabel("Şifre belirleyin").fill("yeni-şifre-42");
   await page.getByLabel("Yeni şifre tekrar").fill("yeni-şifre-42");
-  await page.getByRole("button", { name: "Ayarları Kaydet", exact: true }).click();
+  await page.getByRole("button", { name: "Şifreyi Kaydet", exact: true }).click();
   await expect(page.getByText("Uygulama açılış şifresi belirlendi.", { exact: true })).toBeVisible();
   await expect(page.getByText("Şifre açık", { exact: true })).toBeVisible();
 
@@ -214,10 +215,11 @@ try {
   await lockDialog.getByLabel("Uygulama şifresi").fill("yeni-şifre-42");
   await lockDialog.getByRole("button", { name: "Kilidi Aç" }).click();
   await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
+  await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
   await page.getByLabel("Mevcut şifre").fill("yeni-şifre-42");
   await page.getByLabel("Yeni şifre", { exact: true }).fill("değişen-şifre-84");
   await page.getByLabel("Yeni şifre tekrar").fill("değişen-şifre-84");
-  await page.getByRole("button", { name: "Ayarları Kaydet", exact: true }).click();
+  await page.getByRole("button", { name: "Şifreyi Kaydet", exact: true }).click();
   await expect(page.getByText("Uygulama açılış şifresi değiştirildi.", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Uygulamayı kilitle" }).click();
@@ -228,6 +230,7 @@ try {
   await lockDialog.getByRole("button", { name: "Kilidi Aç" }).click();
   await expect(page.getByRole("heading", { name: "Ayarlar" })).toBeVisible();
 
+  await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
   await page.getByLabel("Mevcut şifre").fill("değişen-şifre-84");
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Şifreyi Kaldır" }).click();
@@ -254,6 +257,7 @@ function createSetupData() {
     appPasswordConfigured: true,
     businessName: "Kilit Smoke İşletmesi",
     profileId: "market",
+    profileOptions: [],
     phone: "+905321234567",
     whatsapp: "+905321234567",
     email: "",
@@ -271,6 +275,12 @@ function createSetupData() {
     aiApiKeyConfigured: false,
     aiLastPublishedAt: "",
     aiProfiles: [],
+    productData: {
+      enabled: false,
+      provider: "open_food_facts",
+      autoSearchUnknownBarcode: false,
+      includeImages: false
+    },
     servicePreferences: {
       whatsapp: false,
       android: false

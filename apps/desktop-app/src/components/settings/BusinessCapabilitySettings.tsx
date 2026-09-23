@@ -44,7 +44,7 @@ export function BusinessProfileOptionEditor({
   };
 
   return (
-    <fieldset className="settings-profile-options">
+    <fieldset id="settings-options" tabIndex={-1} className="settings-profile-options">
       <legend>Ek özellikler</legend>
       {options.length === 0 ? (
         <p>Bu sektör için ek özellik bulunmuyor.</p>
@@ -54,6 +54,7 @@ export function BusinessProfileOptionEditor({
             <label className="settings-profile-option" key={capability}>
               <input
                 type="checkbox"
+                value={capability}
                 checked={selected.has(capability)}
                 onChange={(event) => setOption(capability, event.target.checked)}
               />

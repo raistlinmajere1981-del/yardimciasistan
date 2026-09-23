@@ -169,14 +169,14 @@ try {
     }
   }
 
-  // Settings remains an embedded consumer of SetupForm. Verify its shell and
+  // Settings renders one active category. Verify its shell and
   // section navigation after the onboarding-oriented form changes.
   await setAppearance(messagesPage, "light", "compact");
   await messagesPage.setViewportSize({ width: 1440, height: 1000 });
   await messagesPage.getByRole("button", { name: "Ayarlar", exact: true }).click();
-  await expect(messagesPage.locator(".setup-shell.is-embedded")).toBeVisible();
+  await expect(messagesPage.locator(".settings-workspace")).toBeVisible();
   await expect(messagesPage.locator(".setup-footer")).toHaveCount(0);
-  await expect(messagesPage.getByRole("navigation", { name: "Ayar bölümleri" })).toBeVisible();
+  await expect(messagesPage.getByRole("tablist", { name: "Ayar kategorileri" })).toBeVisible();
   await assertFormSizeContract(messagesPage, "settings");
   for (const [width, height] of viewports) {
     await messagesPage.setViewportSize({ width, height });
@@ -203,17 +203,17 @@ try {
   await setupPage.goto(baseUrl, { waitUntil: "domcontentloaded" });
   await expect(setupPage.locator("html")).toHaveAttribute("data-density", "compact");
   await expect(setupPage.getByRole("heading", { name: "Ayarlar", exact: true, level: 1 })).toBeVisible();
-  await expect(setupPage.locator(".setup-shell.is-embedded")).toBeVisible();
-  await expect(setupPage.locator(".setup-shell")).toHaveClass(/is-initial-setup/);
+  await expect(setupPage.locator(".settings-workspace")).toBeVisible();
+  await expect(setupPage.getByRole("tabpanel")).toHaveCount(1);
   await expect(setupPage.locator(".setup-hero")).toHaveCount(0);
-  await expect(setupPage.getByRole("navigation", { name: "Ayar bölümleri" })).toBeVisible();
-  await expect(setupPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link", { name: "İşletme", exact: true })).toHaveAttribute("href", "#settings-business");
-  await expect(setupPage.getByRole("navigation", { name: "Ayar bölümleri" }).getByRole("link")).toHaveCount(4);
+  await expect(setupPage.getByRole("tablist", { name: "Ayar kategorileri" })).toBeVisible();
+  await expect(setupPage.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab", { name: "İşletme", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(setupPage.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab")).toHaveCount(4);
   await expect(setupPage.getByRole("navigation", { name: "Kurulum bölümleri" })).toHaveCount(0);
   await expect(setupPage.locator(".setup-progress")).toHaveCount(0);
-  await expect(setupPage.locator(".setup-form-surface .setup-section")).toHaveCount(3);
+  await expect(setupPage.locator(".settings-category-body .setup-section")).toHaveCount(1);
   await expect(setupPage.locator(".setup-footer")).toHaveCount(0);
-  await expect(setupPage.getByRole("button", { name: "Ayarları Kaydet", exact: true })).toBeVisible();
+  await expect(setupPage.getByRole("button", { name: "Kaydet", exact: true })).toBeVisible();
   await expect(setupPage.getByRole("button", { name: "Kurulumu Kaydet", exact: true })).toHaveCount(0);
   await expect(setupPage.getByRole("textbox", { name: "Firma adı", exact: true })).toHaveValue("");
   await expect(setupPage.getByRole("textbox", { name: "Firma adı", exact: true })).toHaveAttribute("placeholder", "İşletme adı");
@@ -223,9 +223,13 @@ try {
   await expect(setupPage.getByRole("textbox", { name: "WhatsApp", exact: true })).toHaveAttribute("placeholder", "+90 5xx xxx xx xx");
   await expect(setupPage.getByLabel("Adres", { exact: true })).toHaveAttribute("placeholder", "İşletme adresi");
   await assertFormSizeContract(setupPage, "setup");
+  await setupPage.getByRole("tab", { name: /^Servisler/ }).click();
+  await expect(setupPage.getByRole("tab", { name: /^Servisler/ })).toHaveAttribute("aria-selected", "true");
   await setupPage.getByRole("button", { name: "Bağlantıyı Dene", exact: true }).first().click();
   await expect(setupPage.getByText("OpenAI bağlantısı çalışıyor.", { exact: true })).toBeVisible();
   await expect(setupPage.locator(".setup-ai-actions .setup-connection-message").last()).toHaveAttribute("role", "status");
+  await setupPage.getByRole("tab", { name: /^İşletme(?: ·|$)/ }).click();
+  await expect(setupPage.getByRole("tab", { name: /^İşletme(?: ·|$)/ })).toHaveAttribute("aria-selected", "true");
 
   for (const [width, height] of viewports) {
     await setupPage.setViewportSize({ width, height });
@@ -238,7 +242,7 @@ try {
     for (const [width, height] of viewports) {
       await setupPage.setViewportSize({ width, height });
       await setupPage.evaluate(() => window.scrollTo(0, 0));
-      await expect(setupPage.locator(".setup-shell.is-embedded")).toBeVisible();
+      await expect(setupPage.locator(".settings-workspace")).toBeVisible();
       await assertNoOverflow(setupPage, `setup ${scheme}-${density} ${width}`, observations.setup);
       if (width === 1440) {
         await setupPage.screenshot({ animations: "disabled", path: `${output}/setup-1440x1000-${scheme}-${density}.png` });
@@ -374,8 +378,8 @@ async function assertNoOverflow(page, label, collection) {
       ".messages-page",
       ".message-mode-content:not(.is-hidden)",
       ".whatsapp-workspace",
-      ".setup-shell.is-embedded",
-      ".setup-form-surface",
+      ".settings-workspace",
+      ".settings-category-body",
       ".setup-section",
       ".setup-capabilities",
       ".form-grid",
@@ -396,6 +400,12 @@ async function assertNoOverflow(page, label, collection) {
 }
 
 async function assertFormSizeContract(page, label) {
+  await page.getByRole("tab", { name: /^Servisler/ }).click();
+  const serviceFields = await page.evaluate(() => ({
+    timeout: [...document.querySelectorAll(".setup-ai-section .form-field--short")].map(e => ({ width: e.getBoundingClientRect().width })),
+    url: [...document.querySelectorAll(".settings-web-section .form-field--long")].map(e => ({ width: e.getBoundingClientRect().width }))
+  }));
+  await page.getByRole("tab", { name: /^İşletme(?: ·|$)/ }).click();
   const result = await page.evaluate(() => {
     const fields = (selector) => [...document.querySelectorAll(selector)].map((element) => ({
       className: element.className,
@@ -409,6 +419,7 @@ async function assertFormSizeContract(page, label) {
       url: fields(".settings-web-section .form-field--long")
     };
   });
+  Object.assign(result, serviceFields);
   expect(result.businessName.length, `${label}: long business field`).toBeGreaterThan(0);
   expect(result.sector.length, `${label}: medium sector field`).toBeGreaterThan(0);
   expect(result.phone.length, `${label}: short phone field`).toBeGreaterThan(0);

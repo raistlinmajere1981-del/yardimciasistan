@@ -1,14 +1,13 @@
-import { useCallback, useImperativeHandle, useRef, useState, type FormEvent, type MutableRefObject } from "react";
+import { useCallback, useRef, useState, type FormEvent } from "react";
 import { KeyRound, RotateCcw, ShieldCheck, ShieldOff, Trash2 } from "lucide-react";
-import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
+import type { SettingsOperationResult } from "../../app/settings-save";
 
 interface PasswordSettingsProps {
   configured: boolean;
   onConfiguredChange: (configured: boolean) => void;
-  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
 }
 
-export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef }: PasswordSettingsProps) {
+export function usePasswordSettings({ configured, onConfiguredChange }: PasswordSettingsProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -62,11 +61,6 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
     return null;
   }, [busyAction, configured, currentPassword, hasPasswordDraft, newPassword, passwordConfirmation, showError]);
 
-  const focus = useCallback(() => {
-    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    (configured ? currentPasswordRef : newPasswordRef).current?.focus();
-  }, [configured]);
-
   const savePasswordDraft = useCallback(async (): Promise<SettingsOperationResult> => {
     const validationMessage = validatePasswordDraft();
     if (validationMessage) return { ok: false, message: validationMessage };
@@ -105,12 +99,6 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
       ? { ok: true, changed: true, message: result.message }
       : { ok: false, message: result.message };
   }, [clearPasswordFields, currentPassword, hasPasswordDraft, newPassword, onConfiguredChange, showError, validatePasswordDraft]);
-
-  useImperativeHandle(saveHandleRef, () => ({
-    validate: validatePasswordDraft,
-    save: savePasswordDraft,
-    focus
-  }), [focus, savePasswordDraft, validatePasswordDraft]);
 
   async function removePassword() {
     if (busyAction || !configured) return;
@@ -186,9 +174,14 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
     }
   }
 
+  return { configured, currentPassword, setCurrentPassword, newPassword, setNewPassword, passwordConfirmation, setPasswordConfirmation, webSecurityKey, setWebSecurityKey, recoveryOpen, setRecoveryOpen, busyAction, message, messageTone, sectionRef, currentPasswordRef, newPasswordRef, hasPasswordDraft, savePasswordDraft, removePassword, resetPassword };
+}
+
+export function PasswordSettings({ controller }: { controller: ReturnType<typeof usePasswordSettings> }) {
+  const { configured, currentPassword, setCurrentPassword, newPassword, setNewPassword, passwordConfirmation, setPasswordConfirmation, webSecurityKey, setWebSecurityKey, recoveryOpen, setRecoveryOpen, busyAction, message, messageTone, sectionRef, currentPasswordRef, newPasswordRef, hasPasswordDraft, savePasswordDraft, removePassword, resetPassword } = controller;
   return (
     <>
-      <div ref={sectionRef} className="settings-application-subsection settings-password-section">
+      <div ref={sectionRef} id="settings-password" tabIndex={-1} className="settings-application-subsection settings-password-section">
         <div className="settings-subsection-heading settings-password-title">
           <div>
             <h3>Uygulama Şifresi</h3>
@@ -198,7 +191,7 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
             {configured ? "Şifre açık" : "İsteğe bağlı"}
           </span>
         </div>
-        <form className="password-settings-form" onSubmit={(event) => event.preventDefault()}>
+        <form className="password-settings-form" onSubmit={(event) => { event.preventDefault(); void savePasswordDraft(); }}>
           {configured && (
             <label className="form-field form-field--medium">
               Mevcut şifre
@@ -240,6 +233,9 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
                 disabled={Boolean(busyAction)}
               />
             </label>
+          </div>
+          <div className="form-actions">
+            <button className="action-button" type="submit" disabled={!hasPasswordDraft || Boolean(busyAction)}>{busyAction === "save" ? "Kaydediliyor…" : "Şifreyi Kaydet"}</button>
           </div>
           {configured && <div className="form-actions password-settings-actions">
               <button className="setup-secondary password-remove-button action-button action-button-danger" type="button" onClick={removePassword} disabled={Boolean(busyAction)}>
@@ -283,7 +279,7 @@ export function PasswordSettings({ configured, onConfiguredChange, saveHandleRef
         )}
 
         {message && (
-          <p className={`password-settings-message is-${messageTone}`} role="status" aria-live="polite">
+          <p className={`password-settings-message is-${messageTone}`} role={messageTone === "error" ? "alert" : "status"} aria-live="polite">
             {message}
           </p>
         )}

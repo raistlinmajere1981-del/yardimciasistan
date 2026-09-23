@@ -6,7 +6,7 @@ const sourceRoot = join(process.cwd(), "apps", "desktop-app", "src");
 const mainSource = readFileSync(join(process.cwd(), "apps", "desktop-app", "electron", "main.ts"), "utf8");
 const htmlSource = readFileSync(join(process.cwd(), "apps", "desktop-app", "index.html"), "utf8");
 const setupModelSource = readFileSync(join(sourceRoot, "app", "setup-model.ts"), "utf8");
-const setupFormSource = readFileSync(join(sourceRoot, "components", "settings", "SetupForm.tsx"), "utf8");
+const setupFormSource = readFileSync(join(sourceRoot, "components", "settings", "BusinessSettingsSection.tsx"), "utf8");
 
 const localeSwitch = 'app.commandLine.appendSwitch("lang", "tr-TR")';
 assert.ok(mainSource.includes(localeSwitch), "Electron tr-TR locale switch is missing");

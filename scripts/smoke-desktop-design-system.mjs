@@ -160,10 +160,11 @@ try {
       onAppLockStateChanged: () => () => {},
       openExternal: async () => true
     };
-  }, { setup: { ...createSetupFixture(), setupRequired: false }, dashboard: createDashboardFixture() });
+  }, { setup: { ...createSetupFixture(), setupRequired: false, businessName: "Smoke İşletmesi", syncSecret: "design-fixture-secret", whatsapp: "+905550000000" }, dashboard: createDashboardFixture() });
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Ayarlar', exact: true }).click();
   await expect(page.getByLabel('Giriş saati')).toHaveValue('14:00');
+  await page.getByRole("tab", { name: "Servisler", exact: true }).click();
   const birthdaySettings = page.locator('.setup-birthday-settings');
   await expect(birthdaySettings.getByRole('heading', { name: 'Doğum Günü Mesajları', exact: true })).toBeVisible();
   await expect(birthdaySettings.getByLabel('Doğum günü mesajlarını kullan')).toBeChecked();
@@ -171,8 +172,11 @@ try {
   await expect(birthdaySettings.getByLabel('Manuel')).toBeChecked();
   await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
 
+  await page.getByRole("tab", { name: "İşletme", exact: true }).click();
   const sectorType = page.getByLabel('Sektör tipi');
   await sectorType.selectOption('market');
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await expect(page.getByText('Sunulan özellikler', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Giriş saati')).toHaveCount(0);
   await expect(page.getByLabel('Kahvaltı başlangıcı')).toHaveCount(0);
@@ -183,6 +187,8 @@ try {
   await expect(page.getByLabel('Konuşulan diller')).toBeVisible();
 
   await sectorType.selectOption('restaurant');
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await expect(page.getByText('Sunulan özellikler', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Wi-Fi')).toBeVisible();
   await expect(page.getByLabel('Bagaj emaneti')).toHaveCount(0);
@@ -191,6 +197,8 @@ try {
   await expect(page.getByLabel('Kahvaltı başlangıcı')).toHaveCount(0);
 
   await sectorType.selectOption('pension_restaurant');
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await expect(page.getByLabel('Giriş saati')).toHaveValue('14:00');
   await expect(page.getByLabel('Bagaj emaneti')).toBeVisible();
   await expect(page.getByLabel('Havalimanı transferi')).toBeVisible();
@@ -201,30 +209,21 @@ try {
   for (const [width, height] of [[1440,1000],[1366,768],[1024,768],[900,768],[760,768],[600,800]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(() => document.fonts.ready);
-    await page.locator('.content').evaluate(el => el.scrollTop = 0);
-    await page.screenshot({ animations: "disabled", path: `${output}/settings-${width}-top.png` });
-    const metrics = await page.evaluate(() => {
-      const box = selector => { const e = document.querySelector(selector); const b = e.getBoundingClientRect(); return { width: b.width, height: b.height }; };
-      const overflows = [...document.querySelectorAll('.content, .setup-capabilities, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className);
-      return { overflows, documentOverflow: document.documentElement.scrollWidth > innerWidth + 1, phone: box('.settings-identity-section .form-field--short input'), time: box('#settings-connections input[type="time"]'), map: box('.business-location-map-viewport'), button: box('.page-header-tools button'), timeRows: new Set([...document.querySelectorAll('#settings-connections input[type="time"]')].map(el => Math.round(el.getBoundingClientRect().top))).size };
-    });
-    observations.push({ width, height, ...metrics });
-    expect(metrics.documentOverflow, `Document overflow at ${width}`).toBe(false);
-    expect(metrics.overflows, `Content overflow at ${width}`).toEqual([]);
-    if (width > 760) expect(metrics.timeRows, `Four time controls share a row at ${width}`).toBe(1);
-    const nav = page.getByRole('navigation', { name: 'Ayar bölümleri' });
-    for (const [name, id] of [['İşletme','business'],['İşletme düzeni','operations'],['Servisler','connections'],['Uygulama','application']]) {
-      await nav.getByRole('link', { name, exact: true }).click();
-      const section = page.locator(`#settings-${id}`);
-      await expect(section).toBeInViewport();
-      if (width > 760) {
-        const visibleHeading = section.locator('h2').first();
-        const [headBox, navBox] = await Promise.all([visibleHeading.boundingBox(), nav.boundingBox()]);
-        expect(headBox.y, `${name} obscured by nav at ${width}`).toBeGreaterThanOrEqual(navBox.y + navBox.height);
-      }
-      if (['connections','application','capabilities'].includes(id)) await page.screenshot({ animations: "disabled", path: `${output}/settings-${width}-${id}.png` });
+    for (const name of ['İşletme', 'İşletme Düzeni', 'Servisler', 'Uygulama']) {
+      await page.getByRole('tab', { name, exact: true }).click();
+      await expect(page.getByRole('tabpanel')).toHaveCount(1);
+      const metrics = await page.evaluate(() => ({
+        documentOverflow: document.documentElement.scrollWidth > innerWidth + 1 || document.documentElement.scrollHeight > innerHeight + 1,
+        overflows: [...document.querySelectorAll('.content, .setup-capabilities, .settings-category-body, .setup-section, .form-grid, .form-row')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.className)
+      }));
+      observations.push({ width, height, category: name, ...metrics });
+      expect(metrics.documentOverflow, `Document overflow at ${width}/${name}`).toBe(false);
+      expect(metrics.overflows, `Content overflow at ${width}/${name}`).toEqual([]);
+      await expect(page.getByRole('tablist')).toBeInViewport();
+      await page.screenshot({ animations: 'disabled', path: `${output}/settings-${width}-${name}.png` });
     }
   }
+  await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
   await page.locator('.business-location-map-viewport').scrollIntoViewIfNeeded();
   await page.screenshot({ animations: "disabled", path: `${output}/settings-map.png` });
   await page.getByLabel('Enlem', { exact: true }).fill('37.06');
@@ -246,65 +245,64 @@ try {
   await expect(page.getByRole('button', { name: 'Uygulama loglarını aç', exact: true })).toBeFocused();
   await expect(diagnosticsDialog).toHaveCount(0);
 
-  await expect(page.getByRole('button', { name: 'Ayarları Kaydet', exact: true })).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Güncelleme Ayarlarını Kaydet', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Bilgileri Kaydet', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Oda Bilgilerini Kaydet', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /Şifreyi (Belirle|Değiştir)/, exact: true })).toHaveCount(0);
+  // Each resource/action has its own lifecycle. Setup save never invokes these APIs.
+  await page.evaluate(() => { window.__designCalls = []; });
   await page.getByLabel('İşletme açıklaması').fill('Güncellenen açıklama');
   await page.getByLabel('Firma adı', { exact: true }).fill('Güncellenen Smoke İşletmesi');
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  expect(await page.evaluate(() => window.__designCalls.map(c => c.kind))).toEqual(['setup']);
+  await page.getByRole('button', { name: 'Müşteri Bilgilerini Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
+  expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
+  await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
   await birthdaySettings.getByLabel('Gönderim saati').fill('09:30');
   await birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' }).fill('İyi ki doğdun {ad}! {işletme}');
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'setup').at(-1).input.birthdaySettings)).toEqual({
+    enabled: true, mode: 'manual', sendTime: '09:30', messageTemplate: 'İyi ki doğdun {ad}! {işletme}'
+  });
+  await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
   await page.getByLabel('Oda 101 adı', { exact: true }).fill('Güncellenen Oda');
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
+  await page.getByRole('button', { name: 'Oda Bilgilerini Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'room')?.input.name)).toBe('Güncellenen Oda');
+  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
+  await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toHaveCount(0);
   await page.getByLabel('Şifre belirleyin', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('design-test-password');
   await page.getByRole('textbox', { name: /Güncelleme sunucusu/ }).fill('https://updates.example.test/custom');
-  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
-  expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
-  expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup').input.birthdaySettings)).toEqual({
-    enabled: true,
-    mode: 'manual',
-    sendTime: '09:30',
-    messageTemplate: 'İyi ki doğdun {ad}! {işletme}'
-  });
-  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'room')?.input.name)).toBe('Güncellenen Oda');
-  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
+  await page.getByRole('button', { name: 'Güncelleme Tercihlerini Kaydet', exact: true }).click();
+  await page.getByRole('button', { name: 'Şifreyi Kaydet', exact: true }).click();
   const saveOrder = await page.evaluate(() => window.__designCalls.map(call => call.kind));
   expect(saveOrder.slice(0, 2)).toEqual(['setup', 'public']);
   expect(saveOrder.at(-1)).toBe('password');
   expect(saveOrder.filter(kind => kind === 'room').length).toBe(2);
   expect(saveOrder.filter(kind => kind === 'update').length).toBe(1);
-  expect(await page.evaluate(() => window.__designCalls.find(call => call.kind === 'update')?.input)).toEqual({
-    customBaseUrl: 'https://updates.example.test/custom',
-    autoCheckEnabled: true
-  });
+  expect(await page.evaluate(() => window.__designCalls.find(call => call.kind === 'update')?.input)).toEqual({ customBaseUrl: 'https://updates.example.test/custom', autoCheckEnabled: true });
   await expect(page.getByText('Şifre kaydedildi.', { exact: true })).toBeVisible();
-  await expect(page.getByText('Ayarlar kaydedildi.', { exact: true })).toBeVisible();
   const callCountAfterSave = await page.evaluate(() => window.__designCalls.length);
-  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
-
+  await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await page.getByLabel('Enlem', { exact: true }).fill('91');
-  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
-  await expect(page.getByText(/Müşteri bilgileri:/, { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Müşteri Bilgilerini Kaydet', exact: true }).click();
+  await expect(page.locator('#settings-public-profile').getByRole('alert').first()).toBeVisible();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
   await page.getByLabel('Enlem', { exact: true }).fill('37.06');
-
+  await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('-1');
-  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
-  await expect(page.getByText(/Oda yönetimi:/, { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Oda Bilgilerini Kaydet', exact: true }).click();
+  await expect(page.locator('#settings-rooms').getByRole('alert')).toContainText('Fiyatları kontrol edin.');
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
-
+  await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
   await page.getByLabel('Mevcut şifre', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre', { exact: true }).fill('short');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('short');
-  await page.getByRole('button', { name: 'Ayarları Kaydet', exact: true }).click();
-  await expect(page.getByText(/Uygulama şifresi:/, { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Şifreyi Kaydet', exact: true }).click();
+  await expect(page.locator('#settings-password').getByRole('alert')).toBeVisible();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
-
+  await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
   await page.getByLabel('Servis sağlayıcı').selectOption('gemini');
   const googleCredential = page.getByLabel('Google AI Studio API anahtarı veya cURL');
   const aiTestCallCountBeforePlaceholder = await page.evaluate(() => window.__designCalls.filter(call => call.kind === 'ai-test').length);
@@ -320,6 +318,7 @@ try {
   expect(aiTestInput.apiKey).toBe('auth-key-smoke-1234567890');
   expect(aiTestInput.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta');
   expect(aiTestInput.model).toBe('');
+  await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
   for (const scheme of ['light','dark']) {
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
@@ -327,7 +326,7 @@ try {
     await page.screenshot({ animations: "disabled", path: `${output}/settings-compact-${scheme}.png` });
   }
   // Focus ring remains visible with keyboard navigation.
-  await page.getByRole('navigation', { name: 'Ayar bölümleri' }).getByRole('link').first().focus();
+  await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab').first().focus();
   await page.keyboard.press('Tab');
   expect(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle)).not.toBe('none');
   // Simulate an app-level lock request while the native modal makes shell controls inert.

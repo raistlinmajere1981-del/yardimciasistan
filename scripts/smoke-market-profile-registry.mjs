@@ -12,7 +12,7 @@ const {
 } = require("../packages/shared/dist/index.js");
 
 const root = process.cwd();
-const setupForm = readFileSync(join(root, "apps/desktop-app/src/components/settings/SetupForm.tsx"), "utf8");
+const setupForm = readFileSync(join(root, "apps/desktop-app/src/components/settings/BusinessSettingsSection.tsx"), "utf8");
 const capabilitySettings = readFileSync(join(root, "apps/desktop-app/src/components/settings/BusinessCapabilitySettings.tsx"), "utf8");
 const profileIds = getBusinessProfiles().map((profile) => profile.id);
 

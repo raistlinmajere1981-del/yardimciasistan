@@ -97,7 +97,8 @@
     "smoke:hospitality-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-hospitality-domain.mjs",
     "smoke:pension-workspace": "node scripts/smoke-pension-workspace.mjs",
     "smoke:restaurant-workspace": "node scripts/smoke-restaurant-workspace.mjs",
-    "smoke:table-order-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-desktop-menu-db.mjs --table-orders-only"
+    "smoke:table-order-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-desktop-menu-db.mjs --table-orders-only",
+    "smoke:settings-platform": "node scripts/smoke-settings-platform.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",

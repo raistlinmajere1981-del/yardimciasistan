@@ -126,6 +126,8 @@ try {
   }
   for (const [scheme, density] of [['light','compact'],['dark','compact'],['light','comfortable']]) {
     await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
+    await page.getByRole('tablist', { name: 'Ayar kategorileri' }).getByRole('tab', { name: 'Uygulama', exact: true }).click();
+    await expect(page.getByRole('tab', { name: 'Uygulama', exact: true })).toHaveAttribute('aria-selected', 'true');
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
     await page.getByRole('radio', { name: scheme === 'dark' ? 'Koyu' : 'Açık', exact: true }).click();
     if (density === 'comfortable') await page.getByRole('radio', { name: 'Rahat', exact: true }).click();

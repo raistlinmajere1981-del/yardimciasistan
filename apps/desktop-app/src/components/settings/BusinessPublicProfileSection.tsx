@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BUSINESS_CAPABILITIES,
   BUSINESS_PUBLIC_PROFILE_LIMITS,
@@ -10,8 +10,7 @@ import {
   type SaveBusinessPublicProfileInput
 } from "@yardimci-asistan/shared";
 import type { BusinessLocationGeocodeCandidate } from "../../../electron/business-location-geocode";
-import { reportAppStatus } from "../../app/runtime-state";
-import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
+import type { SettingsOperationResult } from "../../app/settings-save";
 import { BusinessLocationMapPicker } from "./BusinessLocationMapPicker";
 
 interface BusinessPublicProfileDraft {
@@ -32,7 +31,7 @@ interface BusinessPublicProfileDraft {
 interface BusinessPublicProfileSectionProps {
   businessAddress: string;
   enabledCapabilities: BusinessCapability[];
-  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
+  enabled: boolean;
 }
 
 type AddressLookupState = "idle" | "loading" | "success" | "error";
@@ -52,10 +51,13 @@ const EMPTY_DRAFT: BusinessPublicProfileDraft = {
   languages: ""
 };
 
-export function BusinessPublicProfileSection({ businessAddress, enabledCapabilities, saveHandleRef }: BusinessPublicProfileSectionProps) {
+export function useBusinessPublicProfileSettings({ businessAddress, enabledCapabilities, enabled }: BusinessPublicProfileSectionProps) {
   const [draft, setDraft] = useState<BusinessPublicProfileDraft>(EMPTY_DRAFT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const saveInFlight = useRef(false);
+  const [feedback, setFeedback] = useState({ error: false, message: "" });
+  const reportProfileStatus = useCallback((state: string, message: string) => setFeedback({ error: state === "error", message }), []);
   const [coordinateError, setCoordinateError] = useState("");
   const [addressLookupState, setAddressLookupState] = useState<AddressLookupState>("idle");
   const [addressLookupMessage, setAddressLookupMessage] = useState("");
@@ -65,13 +67,14 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
   const latitudeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     const load = async () => {
       const bridge = window.yardimciDesktop;
       if (!bridge?.getBusinessPublicProfile) {
         if (active) {
           setLoading(false);
-          reportAppStatus("error", "Müşteriye açık işletme bilgileri bu sürümde kullanılamıyor.");
+          reportProfileStatus("error", "Müşteriye açık işletme bilgileri bu sürümde kullanılamıyor.");
         }
         return;
       }
@@ -83,7 +86,7 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
         initialDraftRef.current = nextDraft;
       } catch {
         if (active) {
-          reportAppStatus("error", "Müşteriye açık işletme bilgileri yüklenemedi.");
+          reportProfileStatus("error", "Müşteriye açık işletme bilgileri yüklenemedi.");
         }
       } finally {
         if (active) setLoading(false);
@@ -93,7 +96,7 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
     return () => {
       active = false;
     };
-  }, []);
+  }, [enabled, reportProfileStatus]);
 
   useEffect(() => {
     setAddressLookupState("idle");
@@ -192,7 +195,7 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
   const selectAddressCandidate = (candidate: BusinessLocationGeocodeCandidate) => {
     selectMapPoint(candidate.latitude, candidate.longitude);
     setAddressLookupState("success");
-    setAddressLookupMessage("Seçilen adres haritada işaretlendi. Gerekirse pini elle düzeltip sağ üstteki Ayarları Kaydet düğmesine basın.");
+    setAddressLookupMessage("Seçilen adres haritada işaretlendi. Gerekirse pini elle düzeltip Müşteri Bilgilerini Kaydet düğmesine basın.");
   };
 
   const buildInput = useCallback((): { ok: true; input: SaveBusinessPublicProfileInput } | { ok: false; message: string } => {
@@ -236,56 +239,72 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
       && JSON.stringify(initialDraftRef.current) !== JSON.stringify(draft)
   ), [draft]);
 
-  const focus = useCallback(() => {
-    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    latitudeInputRef.current?.focus();
-  }, []);
-
   const save = useCallback(async (): Promise<SettingsOperationResult> => {
     const validationMessage = validateDraft();
-    if (validationMessage) return { ok: false, message: validationMessage };
+    if (validationMessage) { reportProfileStatus("error", validationMessage); return { ok: false, message: validationMessage }; }
     if (!hasDraftChanges()) return { ok: true, changed: false };
 
     const bridge = window.yardimciDesktop;
     if (!bridge?.saveBusinessPublicProfile) {
       const message = "Müşteriye açık işletme bilgileri kaydedilemiyor. Uygulamayı yeniden başlatın.";
-      reportAppStatus("error", message);
+      reportProfileStatus("error", message);
       return { ok: false, message };
     }
 
     const inputResult = buildInput();
     if (!inputResult.ok) return { ok: false, message: inputResult.message };
 
+    if (saveInFlight.current) return { ok: false, message: "Müşteriye açık bilgiler kaydediliyor." };
+    saveInFlight.current = true;
     setSaving(true);
     try {
       const result = await bridge.saveBusinessPublicProfile(inputResult.input);
       if (!result.ok) {
-        reportAppStatus("error", result.message);
+        reportProfileStatus("error", result.message);
         return { ok: false, message: result.message };
       }
       const nextDraft = toDraft(result.profile);
       setDraft(nextDraft);
       initialDraftRef.current = nextDraft;
       setCoordinateError("");
-      reportAppStatus("success", result.message);
+      reportProfileStatus("success", result.message);
       return { ok: true, changed: true, message: result.message };
     } catch {
       const message = "Müşteriye açık işletme bilgileri kaydedilemedi.";
-      reportAppStatus("error", message);
+      reportProfileStatus("error", message);
       return { ok: false, message };
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
-  }, [buildInput, hasDraftChanges, validateDraft]);
+  }, [buildInput, hasDraftChanges, validateDraft, reportProfileStatus]);
 
-  useImperativeHandle(saveHandleRef, () => ({ validate: validateDraft, save, focus }), [focus, save, validateDraft]);
+  const dirty = hasDraftChanges();
+  function discard() {
+    if (saving || !initialDraftRef.current) return;
+    setDraft(initialDraftRef.current);
+    setCoordinateError("");
+    setFeedback({ error: false, message: "Müşteriye açık bilgiler geri alındı." });
+  }
+  return { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, save, feedback, dirty, discard };
+}
+
+export function BusinessPublicProfileSection({ controller }: { controller: ReturnType<typeof useBusinessPublicProfileSettings> }) {
+  const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, save, feedback, dirty, discard } = controller;
 
   return (
-    <section ref={sectionRef} className="business-public-profile-section settings-business-subsection" aria-busy={loading || saving}>
+    <section ref={sectionRef} id="settings-public-profile" tabIndex={-1} className="business-public-profile-section settings-business-subsection" aria-busy={loading || saving}>
       <div className="settings-subsection-heading">
         <h3>Müşteriye Açık Bilgiler</h3>
       </div>
 
+      <div className="form-actions">
+        <button className="action-button" type="button" disabled={!dirty || saving || loading} onClick={() => void save()}>Müşteri Bilgilerini Kaydet</button>
+        <button className="action-button action-button-secondary" type="button" disabled={!dirty || saving} onClick={discard}>Müşteri Bilgilerini Geri Al</button>
+        {dirty && <span>Kaydedilmemiş değişiklikler</span>}
+      </div>
+      {feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}
+      <fieldset className="settings-resource-fields" disabled={loading || saving}>
       {loading ? (
         <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
       ) : (
@@ -307,7 +326,7 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
             </div>
 
             {addressLookupMessage && (
-              <small className={`business-public-profile-address-status is-${addressLookupState}`} role="status">
+              <small className={`business-public-profile-address-status is-${addressLookupState}`} role={addressLookupState === "error" ? "alert" : "status"}>
                 {addressLookupMessage}
               </small>
             )}
@@ -468,6 +487,7 @@ export function BusinessPublicProfileSection({ businessAddress, enabledCapabilit
           </label>
         </div>
       )}
+      </fieldset>
     </section>
   );
 }

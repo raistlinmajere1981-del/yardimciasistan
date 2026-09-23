@@ -30,3 +30,5 @@ export * from "./utils/market-companion";
 export * from "./utils/money";
 export * from "./utils/phone";
 export * from "./utils/validation";
+
+export { normalizeTableCategoryInputs, normalizeTableCategoryName, tableCategoryKey, type NormalizedTableCategoryInput } from "./utils/table-category-settings";

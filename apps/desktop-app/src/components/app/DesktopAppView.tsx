@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopPage } from "../../app/navigation";
 import type { SyncState } from "../../app/runtime-state";
 import type {
@@ -17,7 +17,6 @@ import {
   saveUiPreferences,
   type UiPreferences
 } from "../../ui-preferences";
-import type { SettingsSaveHandle, SettingsSaveState } from "../../app/settings-save";
 import { AppLockScreen } from "../security/AppLockScreen";
 import { DesktopAppFrame } from "./DesktopAppFrame";
 import { DesktopWorkspaceRouter } from "./DesktopWorkspaceRouter";
@@ -56,9 +55,6 @@ export function DesktopAppView({
   deviceController
 }: DesktopAppViewProps) {
   const [uiPreferences, setUiPreferences] = useState<UiPreferences>(readUiPreferences);
-  const settingsSaveRef = useRef<SettingsSaveHandle | null>(null);
-  const [settingsSaveState, setSettingsSaveState] = useState<SettingsSaveState>("idle");
-  const [settingsSaveMessage, setSettingsSaveMessage] = useState("Ayarlar düzenlenebilir.");
   const {
     phase: appAccessPhase,
     status: appLockStatus,
@@ -70,11 +66,6 @@ export function DesktopAppView({
     applyUiPreferences(uiPreferences);
     saveUiPreferences(uiPreferences);
   }, [uiPreferences]);
-
-  const handleSettingsSaveStateChange = useCallback((state: SettingsSaveState, message: string) => {
-    setSettingsSaveState(state);
-    setSettingsSaveMessage(message);
-  }, []);
 
   if (appAccessPhase !== "unlocked") {
     return (
@@ -95,9 +86,6 @@ export function DesktopAppView({
       syncState={syncState}
       statusMessage={statusMessage}
       setupController={setupController}
-      settingsSaveRef={settingsSaveRef}
-      settingsSaveState={settingsSaveState}
-      settingsSaveMessage={settingsSaveMessage}
       appLockController={appLockController}
       desktopSyncController={desktopSyncController}
       menuController={menuController}
@@ -119,8 +107,6 @@ export function DesktopAppView({
         deviceController={deviceController}
         uiPreferences={uiPreferences}
         setUiPreferences={setUiPreferences}
-        settingsSaveRef={settingsSaveRef}
-        onSettingsSaveStateChange={handleSettingsSaveStateChange}
         onDashboardRefresh={desktopSyncController.loadDashboardData}
       />
     </DesktopAppFrame>

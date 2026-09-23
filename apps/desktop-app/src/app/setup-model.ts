@@ -120,7 +120,7 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,
     productDataIncludeImages: setupData.productData.includeImages,
-    roomCount: String(Math.max(0, setupData.initialCounts.rooms || 2)),
+    roomCount: String(Math.max(0, setupData.initialCounts.rooms || (setupData.setupRequired ? 2 : 0))),
     tableCategories: toTableCategoryForm(setupData),
     birthdaySettings: normalizeBirthdaySettings(setupData.birthdaySettings)
   };
@@ -245,4 +245,52 @@ function generateSyncSecret() {
   }
 
   return `ya-${Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInput {
+  return {
+      businessName: setupForm.businessName,
+      profileId: setupForm.profileId,
+      profileOptions: setupForm.profileOptions,
+      phone: setupForm.phone,
+      whatsapp: setupForm.whatsapp,
+      email: setupForm.email,
+      address: setupForm.address,
+      webModuleUrl: setupForm.webModuleUrl,
+      syncSecret: setupForm.syncSecret,
+      autoSyncEnabled: setupForm.autoSyncEnabled,
+      localNetworkEnabled: setupForm.localNetworkEnabled,
+      aiEnabled: setupForm.aiEnabled,
+      aiProvider: setupForm.aiProvider,
+      aiService: setupForm.aiService,
+      aiProjectName: setupForm.aiProjectName,
+      aiBaseUrl: setupForm.aiBaseUrl,
+      aiModel: setupForm.aiModel,
+      aiModelOptions: setupForm.aiModelOptions,
+      aiApiKey: setupForm.aiApiKey,
+      clearAiApiKey: setupForm.clearAiApiKey,
+      aiProfiles: createSaveAiServiceProfiles(setupForm),
+      aiTimeoutSeconds: Number(setupForm.aiTimeoutSeconds),
+      productData: {
+        enabled: setupForm.productDataEnabled,
+        provider: setupForm.productDataProvider,
+        autoSearchUnknownBarcode: setupForm.productDataAutoSearch,
+        includeImages: setupForm.productDataIncludeImages
+      },
+      servicePreferences: {
+        whatsapp: setupForm.whatsappEnabled,
+        android: setupForm.androidEnabled
+      },
+      initialCounts: {
+        rooms: Number(setupForm.roomCount),
+        tables: setupForm.tableCategories.reduce((total, category) => total + Number(category.tableCount || 0), 0)
+      },
+      tableCategories: setupForm.tableCategories.map((category) => ({
+        sourceName: category.sourceName,
+        name: category.name,
+        tableCount: Number(category.tableCount)
+      })),
+      birthdaySettings: setupForm.birthdaySettings
+    };
+
 }

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from "react";
-import { Eye, LockKeyhole, RefreshCw, Save, ScrollText, UploadCloud } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Eye, LockKeyhole, RefreshCw, ScrollText, UploadCloud } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage } from "../../app/navigation";
@@ -19,7 +19,6 @@ import type {
   MessagingController,
   SetupController
 } from "../../app/controller-types";
-import type { SettingsSaveHandle, SettingsSaveState } from "../../app/settings-save";
 import { AppShell } from "../layout/AppShell";
 import { PageHeader } from "../layout/PageHeader";
 import { Sidebar } from "../layout/Sidebar";
@@ -36,9 +35,6 @@ interface DesktopAppFrameProps {
   syncState: SyncState;
   statusMessage: string;
   setupController: SetupController;
-  settingsSaveRef: MutableRefObject<SettingsSaveHandle | null>;
-  settingsSaveState: SettingsSaveState;
-  settingsSaveMessage: string;
   appLockController: AppLockController;
   desktopSyncController: DesktopSyncController;
   menuController: MenuController;
@@ -61,9 +57,6 @@ function DesktopAppFrameContent({
   syncState,
   statusMessage,
   setupController,
-  settingsSaveRef,
-  settingsSaveState,
-  settingsSaveMessage,
   appLockController,
   desktopSyncController,
   menuController,
@@ -151,13 +144,10 @@ function DesktopAppFrameContent({
     setActivePage(destination);
   }
 
-  async function handleSaveSettings() {
-    await settingsSaveRef.current?.save();
-  }
 
   return (
     <AppShell
-      contentScroll={["pension", "restaurant"].includes(activePage) ? "workspace" : "page"}
+      contentScroll={["pension", "restaurant", "settings"].includes(activePage) ? "workspace" : "page"}
       contentRef={contentRef}
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(
@@ -199,15 +189,7 @@ function DesktopAppFrameContent({
                     ? (selectedWhatsAppRequest ? `${selectedWhatsAppRequest.customer_name} için hazır cevap` : "Mesaj için talep seçin")
                     : (aiEnabled ? "AI araçları kullanıma hazır." : "Mesaj araçları bu işletmede etkin değil.")}</span>
                 </div>
-              ) : activePage === "settings" ? (
-                <div className={`sync-pill sync-${settingsSaveState}`}>
-                  <span role="status" aria-live="polite">{settingsSaveMessage}</span>
-                  <button className="action-button action-button-sm" type="button" onClick={() => void handleSaveSettings()} disabled={settingsSaveState === "loading"}>
-                    <Save size={16} aria-hidden="true" />
-                    {settingsSaveState === "loading" ? "Kaydediliyor..." : "Ayarları Kaydet"}
-                  </button>
-                </div>
-              ) : (
+              ) : activePage === "settings" ? null : (
                 <div className={`sync-pill sync-${syncState === "idle" ? automaticSyncTone(automaticSyncStatus) : syncState}`}>
                   <span role="status" aria-live="polite">
                     {syncDisplayMessage}

@@ -1,26 +1,24 @@
 import { Download, RefreshCw, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopUpdateStatus } from "../../../electron/desktop-update-service";
-import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
+import type { SettingsOperationResult } from "../../app/settings-save";
 import { ActionButton } from "../ui/ActionButton";
 
 type UpdateAction = "load" | "save" | "check" | "download" | "restart" | "reset" | null;
 
-interface UpdateSettingsProps {
-  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
-}
-
-export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
+export function useUpdateSettings(enabled: boolean) {
   const [status, setStatus] = useState<DesktopUpdateStatus | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [autoCheckEnabled, setAutoCheckEnabled] = useState(true);
   const [action, setAction] = useState<UpdateAction>("load");
   const [localMessage, setLocalMessage] = useState("");
+  const [error, setError] = useState(false);
   const preferencesDirtyRef = useRef(false);
   const sectionRef = useRef<HTMLElement>(null);
   const baseUrlInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.getUpdateStatus) {
       setAction(null);
@@ -38,6 +36,7 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
         setLocalMessage("");
       })
       .catch(() => {
+        setError(true);
         if (!active) return;
         setLocalMessage("Güncelleme durumu okunamadı.");
       })
@@ -58,7 +57,7 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
       active = false;
       unsubscribe?.();
     };
-  }, []);
+  }, [enabled]);
 
   const busy = action !== null || status?.phase === "checking" || status?.phase === "downloading";
   const updateAvailable = status?.phase === "available";
@@ -77,14 +76,10 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
     return null;
   }, [busy]);
 
-  const focus = useCallback(() => {
-    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    baseUrlInputRef.current?.focus();
-  }, []);
-
   const savePreferences = useCallback(async (): Promise<SettingsOperationResult> => {
     const validationMessage = validatePreferences();
     if (validationMessage) {
+      setError(true);
       setLocalMessage(validationMessage);
       return { ok: false, message: validationMessage };
     }
@@ -97,6 +92,7 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
       return { ok: false, message };
     }
 
+    setError(false);
     setAction("save");
     setLocalMessage("Güncelleme ayarları kaydediliyor...");
     try {
@@ -105,16 +101,18 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
         autoCheckEnabled
       });
       setStatus(result.status);
-      setBaseUrl(result.status.customBaseUrl || result.status.defaultBaseUrl);
-      setAutoCheckEnabled(result.status.autoCheckEnabled);
       if (!result.ok) {
+        setError(true);
         setLocalMessage(result.message);
         return { ok: false, message: result.message };
       }
+      setBaseUrl(result.status.customBaseUrl || result.status.defaultBaseUrl);
+      setAutoCheckEnabled(result.status.autoCheckEnabled);
       preferencesDirtyRef.current = false;
       setLocalMessage(result.message);
       return { ok: true, changed: true, message: result.message };
     } catch {
+      setError(true);
       const message = "Güncelleme ayarları kaydedilemedi.";
       setLocalMessage(message);
       return { ok: false, message };
@@ -123,16 +121,11 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
     }
   }, [autoCheckEnabled, baseUrl, validatePreferences]);
 
-  useImperativeHandle(saveHandleRef, () => ({
-    validate: validatePreferences,
-    save: savePreferences,
-    focus
-  }), [focus, savePreferences, validatePreferences]);
-
   async function resetToDefault() {
     if (busy) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.saveUpdatePreferences) return;
+    setError(false);
     setAction("reset");
     setLocalMessage("Varsayılan güncelleme sunucusuna dönülüyor...");
     try {
@@ -141,10 +134,13 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
         autoCheckEnabled
       });
       setStatus(result.status);
-      setBaseUrl(result.status.defaultBaseUrl);
-      preferencesDirtyRef.current = false;
+      if (result.ok) {
+        setBaseUrl(result.status.defaultBaseUrl);
+        preferencesDirtyRef.current = false;
+      } else setError(true);
       setLocalMessage(result.message);
     } catch {
+      setError(true);
       setLocalMessage("Varsayılan güncelleme sunucusuna dönülemedi.");
     } finally {
       setAction(null);
@@ -155,11 +151,13 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
     if (busy) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.checkForUpdates) return;
+    setError(false);
     setAction("check");
     setLocalMessage("");
     try {
       setStatus(await bridge.checkForUpdates(true));
     } catch {
+      setError(true);
       setLocalMessage("Güncelleme kontrolü başlatılamadı.");
     } finally {
       setAction(null);
@@ -170,11 +168,13 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
     if (busy) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.downloadUpdate) return;
+    setError(false);
     setAction("download");
     setLocalMessage("");
     try {
       setStatus(await bridge.downloadUpdate());
     } catch {
+      setError(true);
       setLocalMessage("Güncelleme indirilemedi.");
     } finally {
       setAction(null);
@@ -185,6 +185,7 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
     if (busy) return;
     const bridge = window.yardimciDesktop;
     if (!bridge?.restartAndInstallUpdate) return;
+    setError(false);
     setAction("restart");
     setLocalMessage("Uygulama güncelleme için yeniden başlatılıyor...");
     try {
@@ -193,13 +194,28 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
       setLocalMessage(result.message);
       if (!result.ok) setAction(null);
     } catch {
+      setError(true);
       setAction(null);
       setLocalMessage("Güncelleme yeniden başlatması başlatılamadı.");
     }
   }
 
+  const dirty = preferencesDirtyRef.current;
+  function discard() {
+    if (busy || !status) return;
+    setBaseUrl(status.customBaseUrl || status.defaultBaseUrl);
+    setAutoCheckEnabled(status.autoCheckEnabled);
+    preferencesDirtyRef.current = false;
+    setError(false);
+    setLocalMessage("Güncelleme tercihleri geri alındı.");
+  }
+  return { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, markPreferencesDirty, savePreferences, resetToDefault, checkNow, downloadNow, restartAndInstall, dirty, discard };
+}
+
+export function UpdateSettings({ controller }: { controller: ReturnType<typeof useUpdateSettings> }) {
+  const { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, markPreferencesDirty, savePreferences, resetToDefault, checkNow, downloadNow, restartAndInstall, dirty, discard } = controller;
   return (
-    <section ref={sectionRef} className="settings-application-subsection settings-update-section">
+    <section ref={sectionRef} id="settings-updates" tabIndex={-1} className="settings-application-subsection settings-update-section">
       <div className="settings-subsection-heading">
         <div>
           <h3>Güncellemeler</h3>
@@ -218,6 +234,7 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
         <label className="form-field form-field--long">
           Güncelleme sunucusu
           <input
+            disabled={busy}
             ref={baseUrlInputRef}
             value={baseUrl}
             onChange={(event) => {
@@ -236,6 +253,7 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
           <span>Otomatik kontrol</span>
           <label className="form-check setup-checkline">
             <input
+              disabled={busy}
               checked={autoCheckEnabled}
               onChange={(event) => {
                 markPreferencesDirty();
@@ -249,6 +267,11 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
       </div>
 
       <div className="form-actions">
+        <ActionButton type="button" disabled={!dirty || busy} onClick={() => void savePreferences()}>Güncelleme Tercihlerini Kaydet</ActionButton>
+        <ActionButton variant="secondary" type="button" disabled={!dirty || busy} onClick={discard}>Güncelleme Tercihlerini Geri Al</ActionButton>
+        {dirty && <span>Kaydedilmemiş değişiklikler</span>}
+      </div>
+      <div id="settings-update-actions" tabIndex={-1} className="form-actions">
         <ActionButton
           variant="ghost"
           type="button"
@@ -327,7 +350,7 @@ export function UpdateSettings({ saveHandleRef }: UpdateSettingsProps) {
       </div>
 
       {localMessage && (
-        <p className={`menu-status sync-${status?.phase === "error" ? "error" : "idle"}`} role="status" aria-live="polite">
+        <p className={`menu-status sync-${status?.phase === "error" ? "error" : "idle"}`} role={error || status?.phase === "error" ? "alert" : "status"} aria-live="polite">
           {localMessage}
         </p>
       )}

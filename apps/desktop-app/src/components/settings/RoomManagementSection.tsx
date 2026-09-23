@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BUSINESS_CAPABILITIES, type SaveRoomPublicDetailsInput } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData } from "../../../electron/database";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { runtimeHasCapability } from "../../app/capabilities";
-import { reportAppStatus } from "../../app/runtime-state";
-import type { SettingsOperationResult, SettingsSaveSectionHandle } from "../../app/settings-save";
+import type { SettingsOperationResult } from "../../app/settings-save";
 import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 
 interface RoomDraftData {
@@ -22,19 +21,14 @@ interface RoomDraftState {
 }
 
 interface RoomManagementSectionProps {
-  roomCount: string;
   dashboardRoomCount: number;
-  onRoomCountChange: (value: string) => void;
   onDashboardRefresh?: () => Promise<unknown>;
-  saveHandleRef?: MutableRefObject<SettingsSaveSectionHandle | null>;
+
 }
 
-export function RoomManagementSection({
-  roomCount,
+export function useRoomManagementSettings({
   dashboardRoomCount,
-  onRoomCountChange,
   onDashboardRefresh,
-  saveHandleRef
 }: RoomManagementSectionProps) {
   const capabilityRuntime = useBusinessCapabilityRuntime();
   const roomsEnabled = runtimeHasCapability(
@@ -43,8 +37,13 @@ export function RoomManagementSection({
   );
   const [rooms, setRooms] = useState<RoomDraftState[]>([]);
   const [loading, setLoading] = useState(true);
+  const saveInFlight = useRef(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
+  const reportRoomStatus = (state: "loading" | "success" | "error", text: string) => {
+    setSaveState(state === "loading" ? "saving" : state);
+    setMessage(text);
+  };
   const [editingRoom, setEditingRoom] = useState<DesktopDashboardData["rooms"][number] | null>(null);
   const savedRoomsRef = useRef<RoomDraftState[]>([]);
   const roomDraftRef = useRef<RoomDraftState[]>([]);
@@ -142,34 +141,12 @@ export function RoomManagementSection({
     return invalidMessage || null;
   }, [invalidMessage, loading]);
 
-  const focus = useCallback(() => {
-    sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    firstRoomNameRef.current?.focus();
-  }, []);
-
   const saveRooms = useCallback(async (): Promise<SettingsOperationResult> => {
     const bridge = window.yardimciDesktop;
     if (!roomsEnabled) return { ok: true, changed: false };
 
     if (roomLoadPromiseRef.current && !roomsLoadedRef.current) {
       await roomLoadPromiseRef.current;
-    }
-    if (Number(roomCount) !== dashboardRoomCount) {
-      if (!bridge?.getRoomFolioData) {
-        const message = "Oda bilgileri bu ortamda kullanılamıyor.";
-        setSaveState("error");
-        setMessage(message);
-        return { ok: false, message };
-      }
-      try {
-        const data = await bridge.getRoomFolioData();
-        applyServerRooms(data.rooms.map(toDraft));
-      } catch {
-        const message = "Oda bilgileri yüklenemedi.";
-        setSaveState("error");
-        setMessage(message);
-        return { ok: false, message };
-      }
     }
     const currentRooms = roomDraftRef.current;
     const validationMessage = roomsLoadedRef.current
@@ -189,6 +166,8 @@ export function RoomManagementSection({
       return { ok: false, message };
     }
 
+    if (saveInFlight.current) return { ok: false, message: "Oda bilgileri kaydediliyor." };
+    saveInFlight.current = true;
     setSaveState("saving");
     setMessage("Kaydediliyor…");
     try {
@@ -213,15 +192,16 @@ export function RoomManagementSection({
       setSaveState("error");
       setMessage(message);
       return { ok: false, message };
+    } finally {
+      saveInFlight.current = false;
     }
-  }, [applyServerRooms, dashboardRoomCount, onDashboardRefresh, roomCount, roomsEnabled, validateRooms]);
+  }, [applyServerRooms, dashboardRoomCount, onDashboardRefresh, roomsEnabled, validateRooms]);
 
-  useImperativeHandle(saveHandleRef, () => ({ validate: validateRooms, save: saveRooms, focus }), [focus, saveRooms, validateRooms]);
 
   const openRoomDetails = async (roomId: string) => {
     const bridge = window.yardimciDesktop;
     if (!bridge?.getDashboardData) {
-      reportAppStatus("error", "Oda detayları bu ortamda kullanılamıyor.");
+      reportRoomStatus("error", "Oda detayları bu ortamda kullanılamıyor.");
       return;
     }
 
@@ -229,12 +209,12 @@ export function RoomManagementSection({
       const dashboard = await bridge.getDashboardData();
       const room = dashboard.rooms.find((item) => item.id === roomId) ?? null;
       if (!room) {
-        reportAppStatus("error", "Oda bulunamadı.");
+        reportRoomStatus("error", "Oda bulunamadı.");
         return;
       }
       setEditingRoom(room);
     } catch {
-      reportAppStatus("error", "Oda detayları yüklenemedi.");
+      reportRoomStatus("error", "Oda detayları yüklenemedi.");
     }
   };
 
@@ -242,17 +222,17 @@ export function RoomManagementSection({
     const bridge = window.yardimciDesktop;
     if (!bridge?.setRoomNightlyPrice || !bridge.getRoomFolioData) {
       const result = { ok: false, message: "Oda bilgileri bu ortamda kullanılamıyor." };
-      reportAppStatus("error", result.message);
+      reportRoomStatus("error", result.message);
       return result;
     }
 
-    reportAppStatus("loading", "Oda bilgileri kaydediliyor...");
+    reportRoomStatus("loading", "Oda bilgileri kaydediliyor...");
     try {
       const fresh = await bridge.getRoomFolioData();
       const profile = fresh.rooms.find((room) => room.id === input.roomId);
       if (!profile) {
         const result = { ok: false, message: "Oda bulunamadı." };
-        reportAppStatus("error", result.message);
+        reportRoomStatus("error", result.message);
         return result;
       }
 
@@ -268,7 +248,7 @@ export function RoomManagementSection({
       });
 
       if (!result.ok) {
-        reportAppStatus("error", result.message);
+        reportRoomStatus("error", result.message);
         return { ok: false, message: result.message };
       }
 
@@ -280,46 +260,50 @@ export function RoomManagementSection({
         : room);
       roomDraftRef.current = nextRooms;
       setRooms(nextRooms);
-      reportAppStatus("success", result.message);
+      reportRoomStatus("success", result.message);
       return { ok: true, message: result.message };
     } catch (error) {
       const message = error instanceof Error && error.message
         ? error.message
         : "Oda bilgileri kaydedilemedi.";
-      reportAppStatus("error", message);
+      reportRoomStatus("error", message);
       return { ok: false, message };
     }
   };
 
+  const dirty = JSON.stringify(rooms) !== JSON.stringify(savedRoomsRef.current);
+  function discard() {
+    if (saveInFlight.current) return;
+    applyServerRooms(savedRoomsRef.current, false);
+    setSaveState("idle");
+    setMessage("Oda değişiklikleri geri alındı.");
+  }
+  return { roomsEnabled, rooms, loading, saveState, message, editingRoom, setEditingRoom, sectionRef, firstRoomNameRef, updateRoom, saveRooms, openRoomDetails, saveRoomPublicDetails, dirty, discard };
+}
+
+export function RoomManagementSection({ controller }: { controller: ReturnType<typeof useRoomManagementSettings> }) {
+  const { roomsEnabled, rooms, loading, saveState, message, editingRoom, setEditingRoom, sectionRef, firstRoomNameRef, updateRoom, saveRooms, openRoomDetails, saveRoomPublicDetails, dirty, discard } = controller;
   if (!roomsEnabled) {
     return null;
   }
 
   return (
-    <section ref={sectionRef} className="setup-section room-management-settings">
+    <section ref={sectionRef} id="settings-rooms" tabIndex={-1} className="setup-section room-management-settings">
       <div className="setup-section-title room-management-heading">
         <div>
           <p>Pansiyon</p>
           <h2>Oda Yönetimi</h2>
         </div>
         <div className="room-management-toolbar">
-          <label className="room-management-count-control">
-            <span>Oda sayısı</span>
-            <input
-              className="room-management-count-input"
-              inputMode="numeric"
-              min="0"
-              step="1"
-              type="number"
-              value={roomCount}
-              onChange={(event) => onRoomCountChange(event.target.value)}
-            />
-          </label>
-          <span className={`room-management-save-state${saveState === "success" ? " is-success" : saveState === "error" ? " is-error" : ""}`} role="status">
+          <button className="action-button" type="button" disabled={!dirty || loading || saveState === "saving"} onClick={() => void saveRooms()}>Oda Bilgilerini Kaydet</button>
+          <button className="action-button action-button-secondary" type="button" disabled={!dirty || saveState === "saving"} onClick={discard}>Oda Değişikliklerini Geri Al</button>
+          {dirty && <span>Kaydedilmemiş değişiklikler</span>}
+          <span className={`room-management-save-state${saveState === "success" ? " is-success" : saveState === "error" ? " is-error" : ""}`} role={saveState === "error" ? "alert" : "status"}>
             {message}
           </span>
         </div>
       </div>
+      <fieldset disabled={saveState === "saving"} className="settings-resource-fields">
       <div className="room-management-list" aria-label="Oda adı ve fiyatları">
         {loading ? (
           <div className="room-management-loading">Odalar hazırlanıyor…</div>
@@ -366,6 +350,7 @@ export function RoomManagementSection({
         )}
       </div>
 
+      </fieldset>
       <RoomPublicDetailsEditor
         open={Boolean(editingRoom)}
         room={editingRoom}

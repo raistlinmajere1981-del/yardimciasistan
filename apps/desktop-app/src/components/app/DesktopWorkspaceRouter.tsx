@@ -27,7 +27,6 @@ import type {
   SetupController
 } from "../../app/controller-types";
 import type { UiPreferences } from "../../ui-preferences";
-import type { SettingsSaveHandle, SettingsSaveState } from "../../app/settings-save";
 import { CustomersWorkspace } from "../customers/CustomersWorkspace";
 import { RequestsWorkspace, getRequestStatusTone, isRequestWaitingForReply } from "../customers/RequestsWorkspace";
 import { AiWorkspace, WhatsAppWorkspace } from "../messages/MessageWorkspaces";
@@ -65,8 +64,6 @@ interface DesktopWorkspaceRouterProps {
   deviceController: DeviceController;
   uiPreferences: UiPreferences;
   setUiPreferences: Dispatch<SetStateAction<UiPreferences>>;
-  settingsSaveRef: MutableRefObject<SettingsSaveHandle | null>;
-  onSettingsSaveStateChange: (state: SettingsSaveState, message: string) => void;
   onDashboardRefresh: () => Promise<unknown>;
 }
 
@@ -85,17 +82,10 @@ export function DesktopWorkspaceRouter({
   deviceController,
   uiPreferences,
   setUiPreferences,
-  settingsSaveRef,
-  onSettingsSaveStateChange,
   onDashboardRefresh
 }: DesktopWorkspaceRouterProps) {
   const {
     setupData,
-    setupForm,
-    setSetupForm,
-    aiConnectionTestState,
-    aiConnectionTestMessage,
-    testAiConnection: handleTestAiConnection,
     saveSetup
   } = setupController;
   const { setPasswordConfigured: handleAppPasswordConfiguredChange } = appLockController;
@@ -325,9 +315,15 @@ export function DesktopWorkspaceRouter({
     setStatusMessage("Bu rezervasyonun bağlı müşteri talebi bulunamadı.");
   }
 
-  async function handleSaveSetup() {
-    const result = await saveSetup(setDashboardData);
-    await loadBusinessCapabilities();
+  async function handleSaveSetup(input: import("../../../electron/database").SaveInitialSetupInput) {
+    const result = await saveSetup(input, setDashboardData);
+    if (result.ok) {
+      try {
+        await loadBusinessCapabilities();
+      } catch {
+        return { ...result, refreshWarning: "Ayarlar kaydedildi; işletme yetenekleri yenilenemedi. Sayfayı yeniden açın." };
+      }
+    }
     return result;
   }
 
@@ -607,7 +603,6 @@ export function DesktopWorkspaceRouter({
         <MarketPage customers={dashboardData.customers} />
       ) : activePage === "messages" ? null : (
         <SettingsWorkspace
-          form={setupForm}
           setupData={setupData}
           dashboardData={surfaceData}
           androidDeviceState={androidDeviceState}
@@ -615,10 +610,6 @@ export function DesktopWorkspaceRouter({
           androidInstallState={androidInstallState}
           androidInstallMessage={androidInstallMessage}
           androidInstallSnapshot={androidInstallSnapshot}
-          aiConnectionTestState={aiConnectionTestState}
-          aiConnectionTestMessage={aiConnectionTestMessage}
-          onFormChange={setSetupForm}
-          onTestAiConnection={handleTestAiConnection}
           onRefreshAndroidInstallDevices={refreshAndroidInstallDevices}
           onInstallAndroidApp={handleInstallAndroidApp}
           onSetAndroidDeviceRole={handleSetAndroidDeviceRole}
@@ -630,8 +621,6 @@ export function DesktopWorkspaceRouter({
           onAppPasswordConfiguredChange={handleAppPasswordConfiguredChange}
           uiPreferences={uiPreferences}
           onUiPreferencesChange={setUiPreferences}
-          settingsSaveRef={settingsSaveRef}
-          onSettingsSaveStateChange={onSettingsSaveStateChange}
           onDashboardRefresh={onDashboardRefresh}
         />
       )}

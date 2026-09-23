@@ -11,8 +11,8 @@ const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.
 const { readBusinessCapabilitySnapshot } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 
 const root = process.cwd();
-const setupForm = readFileSync(join(root, "apps/desktop-app/src/components/settings/SetupForm.tsx"), "utf8");
-const setupController = readFileSync(join(root, "apps/desktop-app/src/app/use-setup-controller.ts"), "utf8");
+const setupForm = readFileSync(join(root, "apps/desktop-app/src/components/settings/BusinessSettingsSection.tsx"), "utf8");
+const setupController = readFileSync(join(root, "apps/desktop-app/src/app/setup-model.ts"), "utf8");
 const profileIds = getBusinessProfiles().map((profile) => profile.id);
 
 assert.deepEqual(profileIds, ["pension_restaurant", "pension", "restaurant", "market"]);
