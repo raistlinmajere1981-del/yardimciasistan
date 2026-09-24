@@ -88,3 +88,12 @@ Historical migration evidence remains available in Git history; it is no longer 
 ## Non-goals
 
 Stage 10 does not change business/domain semantics, database schema, Finance/Market/Messages lifetime ownership or introduce the Dashboard/operation registries deliberately deferred in Stage 9.
+
+
+## Stage 10E — Export surface and compatibility cleanup
+
+- renderer/application internal helpers no longer expose unused public exports
+- Electron internal constants/types/helpers were narrowed where no external contract exists
+- the old development database relocation path and relocation marker were removed entirely; this repository does not preserve legacy local-data migration compatibility
+- `smoke-data-paths.mjs` now tests current public path behavior instead of migration-only helpers
+- dead `formatRoomStatus` was removed; `matchingProductCategoryId` remains as a private same-file helper
