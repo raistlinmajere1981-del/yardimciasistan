@@ -54,7 +54,7 @@ const marketPermissions = [
   "market.product.view",
   "market.stock_count",
   "market.receiving",
-  "market.product_draft",
+  "market.product_create",
   "market.cart_draft",
   "market.scan_to_desktop"
 ];
@@ -1928,7 +1928,7 @@ async function waitForNotificationAbsence(text, timeoutMs) {
 async function waitForCachedSnapshotText(text, timeoutMs) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    if (readPreferenceValueIfPresent("operations_cache_v1").includes(text)) {
+    if (readPreferenceValueIfPresent("operations_cache_v2").includes(text)) {
       return;
     }
     await delay(500);
