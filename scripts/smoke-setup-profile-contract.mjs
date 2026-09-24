@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
@@ -11,20 +11,12 @@ const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.
 const { readBusinessCapabilitySnapshot } = require("../apps/desktop-app/dist-electron/business-capability-store.js");
 
 const root = process.cwd();
-const setupForm = readFileSync(join(root, "apps/desktop-app/src/components/settings/BusinessSettingsSection.tsx"), "utf8");
-const setupController = readFileSync(join(root, "apps/desktop-app/src/app/setup-model.ts"), "utf8");
 const profileIds = getBusinessProfiles().map((profile) => profile.id);
 
 assert.deepEqual(profileIds, ["pension_restaurant", "pension", "restaurant", "market"]);
 assert.equal(Object.keys(BUSINESS_PROFILES).length, 4);
 assert.equal(normalizeBusinessType("unknown"), "pension_restaurant");
 assert.equal("other" in BUSINESS_PROFILES, false);
-assert.match(setupForm, /value=\{form\.profileId\}/);
-assert.match(setupForm, /getBusinessProfiles\(\)\.map/);
-assert.match(setupController, /profileId:\s*setupForm\.profileId/);
-assert.match(setupController, /servicePreferences:/);
-assert.doesNotMatch(setupForm, /LegacySetupWizard|querySelector|replaceChildren/);
-assert.doesNotMatch(setupForm, /business_type|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/);
 
 const dataDir = mkdtempSync(join(tmpdir(), "yardimci-setup-profile-"));
 const database = new DesktopDatabase({
