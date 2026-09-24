@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MessagesPage } from "../../apps/desktop-app/src/pages/MessagesPage";
+import "../../apps/desktop-app/src/styles/index.css";
 
 const control = window as typeof window & {
   __m8eTakeoverSetActive?: (active: boolean) => void;

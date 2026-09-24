@@ -242,6 +242,7 @@ try {
   await expect.poll(() => page.evaluate(() => window.__m8eFlags.customersEnabled && window.__m8eFlags.whatsappEnabled && window.__m8eFlags.aiEnabled)).toBe(true);
   await page.evaluate(() => {
     window.__m8eController.setSelectedWhatsAppRequestId("req-a");
+    window.__m8eController.changeAiWorkspaceMode("reply");
     window.__m8eController.changeAiWorkspaceRequest("req-b");
   });
   await page.evaluate(() => { void window.__m8eController.handleRewriteWhatsAppMessage("A rewrite"); });
