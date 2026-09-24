@@ -62,7 +62,6 @@ try {
     aiApiKey: "",
     clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: false },
-    initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
   };
 
