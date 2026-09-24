@@ -20,7 +20,7 @@ export function formatDateRange(start: string, end: string): string {
   return end ? `${startText} – ${endText}` : startText;
 }
 
-export function formatDate(value: string): string {
+function formatDate(value: string): string {
   if (!value) return "—";
   const date = new Date(`${value}T12:00:00`);
   if (!Number.isFinite(date.getTime())) return value;
