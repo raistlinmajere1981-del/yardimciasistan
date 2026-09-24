@@ -420,7 +420,9 @@ Implementation status (2026-09-24):
 - Stage 8D — Finance Workspace: closed and verified.
 - Stage 8E — Messages / AI: closed and verified.
 - Stage 8F — Dashboard: closed and verified.
-- Next: Stage 8G — Calendar.
+- Stage 8G — Calendar: closed and verified.
+- Stage 8 feature migration: complete.
+- Next: Stage 9 — Sector / Feature contribution model.
 
 ---
 
