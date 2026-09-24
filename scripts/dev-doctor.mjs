@@ -33,7 +33,6 @@ checkFile("packages/web-widget/package.json", true);
 checkFile("firm-template/web-module/api/request.php", true);
 checkFile("firm-template/web-module/api/menu.php", true);
 checkFile("firm-template/web-module/api/chat.php", true);
-checkFile("firm-template/web-module/menu.html", true);
 
 checkJson("package.json", true);
 checkJson("firm-template/web-module/config/business.json", true);
