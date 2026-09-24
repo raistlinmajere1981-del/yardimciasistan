@@ -730,42 +730,6 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
-      getBusinessPublicProfile: async () => structuredClone(compactProfile),
-      saveBusinessPublicProfile: async (input) => {
-        compactProfile = structuredClone(input);
-        return { ok: true, message: "Müşteri bilgileri kaydedildi.", profile: structuredClone(compactProfile) };
-      },
-      getBusinessLayout: async () => structuredClone(compactLayout),
-      saveBusinessLayout: async (input) => {
-        if (input.rooms) {
-          compactLayout = {
-            ...compactLayout,
-            rooms: input.rooms.map((room, index) => ({
-              id: room.id || `compact-layout-room-${index + 1}`,
-              name: room.name,
-              number: room.number,
-              capacity: room.capacity,
-              bedInfo: room.bedInfo,
-              floor: room.floor,
-              features: [...room.features],
-              description: room.description,
-              priceNote: room.priceNote,
-              nightlyPriceMinor: room.nightlyPriceMinor,
-              currency: room.currency,
-              sortOrder: index + 1,
-              canRemove: true,
-              removeBlockReason: ""
-            }))
-          };
-        }
-        if (input.tableCategories) {
-          compactLayout = {
-            ...compactLayout,
-            tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
-          };
-        }
-        return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(compactLayout) };
-      },
       getSyncStatus: async () => ({
         enabled: true,
         clientId: "renderer-smoke",
@@ -1451,6 +1415,42 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getBusinessPublicProfile: async () => structuredClone(compactProfile),
+      saveBusinessPublicProfile: async (input) => {
+        compactProfile = structuredClone(input);
+        return { ok: true, message: "Müşteri bilgileri kaydedildi.", profile: structuredClone(compactProfile) };
+      },
+      getBusinessLayout: async () => structuredClone(compactLayout),
+      saveBusinessLayout: async (input) => {
+        if (input.rooms) {
+          compactLayout = {
+            ...compactLayout,
+            rooms: input.rooms.map((room, index) => ({
+              id: room.id || `compact-layout-room-${index + 1}`,
+              name: room.name,
+              number: room.number,
+              capacity: room.capacity,
+              bedInfo: room.bedInfo,
+              floor: room.floor,
+              features: [...room.features],
+              description: room.description,
+              priceNote: room.priceNote,
+              nightlyPriceMinor: room.nightlyPriceMinor,
+              currency: room.currency,
+              sortOrder: index + 1,
+              canRemove: true,
+              removeBlockReason: ""
+            }))
+          };
+        }
+        if (input.tableCategories) {
+          compactLayout = {
+            ...compactLayout,
+            tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
+          };
+        }
+        return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(compactLayout) };
+      },
       getSyncStatus: async () => ({
         enabled: true,
         clientId: "renderer-smoke",
