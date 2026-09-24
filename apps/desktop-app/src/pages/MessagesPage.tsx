@@ -73,6 +73,7 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
     void (async () => {
       let lastMessage = "WhatsApp Web henüz hazır değil.";
       for (let attempt = 0; attempt < 10; attempt += 1) {
+        if (disposed || takeoverSequence.current !== sequence) return;
         const result = await request();
         if (disposed || takeoverSequence.current !== sequence) return;
         lastMessage = result.message;
@@ -82,6 +83,7 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
+        if (disposed || takeoverSequence.current !== sequence) return;
       }
       if (!disposed && takeoverSequence.current === sequence) {
         setWebTakeoverState("error");

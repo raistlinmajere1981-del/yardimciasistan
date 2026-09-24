@@ -82,11 +82,15 @@ export function useMessagingController({
     }
     const generation = ++birthdayOperationGenerationRef.current;
     const whatsappEpoch = whatsappCapabilityEpochRef.current;
+    birthdayOperationOwnerRef.current = generation;
     setBirthdayPreparingId(customerId);
     try {
       await prepareBirthdayWhatsAppInternal(customerId, generation, whatsappEpoch);
     } finally {
-      if (birthdayOperationGenerationRef.current === generation) setBirthdayPreparingId("");
+      if (birthdayOperationOwnerRef.current === generation) {
+        birthdayOperationOwnerRef.current = null;
+        setBirthdayPreparingId("");
+      }
     }
   }
 
@@ -271,6 +275,7 @@ export function useMessagingController({
   const requestAiOperationSequenceRef = useRef(0);
   const requestAiOperationOwnersRef = useRef(new Map<string, { id: number; kind: "suggestion" | "rewrite" }>());
   const birthdayOperationGenerationRef = useRef(0);
+  const birthdayOperationOwnerRef = useRef<number | null>(null);
 
   const surfaceAiWorkspaceMode: AiWorkspaceMode = customersEnabled ? aiWorkspaceMode : "daily";
 
@@ -359,6 +364,14 @@ export function useMessagingController({
 
   useEffect(() => {
     if (customersEnabled) return;
+    const birthdayWasActive = birthdayOperationOwnerRef.current !== null;
+    birthdayOperationGenerationRef.current += 1;
+    birthdayOperationOwnerRef.current = null;
+    if (birthdayWasActive) {
+      setBirthdayPreparingId("");
+      setSyncState("idle");
+      setStatusMessage("Müşteri yönetimi kapatıldığı için doğum günü mesajı hazırlığı durduruldu.");
+    }
     workspaceRevisionRef.current += 1;
     workspaceGenerateOwnerRef.current = null;
     historyLoadGenerationRef.current += 1;
@@ -385,9 +398,16 @@ export function useMessagingController({
 
   useEffect(() => {
     if (whatsappEnabled) return;
+    const birthdayWasActive = birthdayOperationOwnerRef.current !== null;
     whatsappSelectionRevisionRef.current += 1;
     rewriteGenerationRef.current += 1;
     birthdayOperationGenerationRef.current += 1;
+    birthdayOperationOwnerRef.current = null;
+    if (birthdayWasActive) {
+      setBirthdayPreparingId("");
+      setSyncState("idle");
+      setStatusMessage("WhatsApp kapatıldığı için doğum günü mesajı hazırlığı durduruldu.");
+    }
     for (const [requestId, owner] of requestAiOperationOwnersRef.current) {
       if (owner.kind === "rewrite") requestAiOperationOwnersRef.current.delete(requestId);
     }
@@ -624,6 +644,7 @@ export function useMessagingController({
     if (workspaceGenerateOwnerRef.current !== null) return;
 
     const generation = ++workspaceGenerateSequenceRef.current;
+    workspaceRevisionRef.current += 1;
     const revision = workspaceRevisionRef.current;
     const aiEpoch = aiCapabilityEpochRef.current;
     const mode = customersEnabledRef.current ? aiWorkspaceMode : "daily";
@@ -650,6 +671,7 @@ export function useMessagingController({
         return;
       }
 
+      workspaceRevisionRef.current += 1;
       setAiWorkspaceEntry(result.entry);
       setAiWorkspaceContent(result.entry.content);
       setAiWorkspaceHistory((history) => [result.entry, ...history.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
@@ -856,6 +878,7 @@ export function useMessagingController({
         setDashboardData(saveResult.dashboardData);
       }
       if (workspaceRevision === workspaceRevisionRef.current) {
+        workspaceRevisionRef.current += 1;
         setAiWorkspaceMode("reply");
         setAiWorkspaceRequestId(target.id);
         setAiWorkspaceInstructions(instructions);
