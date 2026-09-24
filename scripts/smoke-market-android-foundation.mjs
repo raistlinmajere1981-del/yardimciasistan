@@ -178,7 +178,7 @@ try {
       assert.equal(
         scalar(sqlite, "SELECT COUNT(*) AS value FROM sqlite_master WHERE type = 'table' AND name = ?", table),
         1,
-        `${table} migration tablosu bulunamadı`
+        `${table} güncel şema tablosu bulunamadı`
       );
     }
 
