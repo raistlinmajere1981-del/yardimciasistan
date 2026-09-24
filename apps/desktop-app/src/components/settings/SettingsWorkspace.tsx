@@ -133,6 +133,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         const setupResult = await drafts.save("business");
         if (!setupResult.ok) return setupResult;
         changed ||= setupResult.changed;
+        if (setupResult.changed) await layout.refresh();
       }
       if (profile.dirty) {
         const profileResult = await profile.save();
