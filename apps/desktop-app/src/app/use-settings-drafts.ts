@@ -3,7 +3,7 @@ import type { DesktopSetupData, SaveInitialSetupInput } from "../../electron/dat
 import { createSetupInput, toSetupForm, type SetupFormState } from "./setup-model";
 import { copyCategory, isCategoryDirty, mergeSettingsCategory, stagedSettingsCategories, unavailableSettingsFields, validateSettingsCategory } from "./settings-draft-model";
 import { settingsCategories, type StagedSettingsCategoryId } from "./settings-registry";
-import type { SettingsSaveState, SettingsSetupSaveResult } from "./settings-save";
+import type { SettingsOperationResult, SettingsSaveState, SettingsSetupSaveResult } from "./settings-save";
 
 type CategoryFeedback = { state: SettingsSaveState; message: string };
 export function useSettingsDrafts(setupData: DesktopSetupData, persist: (input: SaveInitialSetupInput) => Promise<SettingsSetupSaveResult>) {
@@ -71,33 +71,55 @@ export function useSettingsDrafts(setupData: DesktopSetupData, persist: (input: 
     setFeedback(current => ({ ...current, [category]: { state: "idle", message: "" } }));
   }
 
-  async function save(category: StagedSettingsCategoryId) {
-    if (saving.current || !dirty[category]) return;
+  async function save(category: StagedSettingsCategoryId): Promise<SettingsOperationResult> {
+    if (saving.current) return { ok: false, message: "Ayarlar kaydediliyor." };
+    if (!dirty[category]) return { ok: true, changed: false };
+
     saving.current = true;
     setBusy(true);
     const title = settingsCategories.find(item => item.id === category)!.title;
-    const report = (state: SettingsSaveState, message: string) => setFeedback(current => ({ ...current, [category]: { state, message } }));
+    const report = (state: SettingsSaveState, message: string) => setFeedback(current => ({
+      ...current,
+      [category]: { state, message }
+    }));
     report("loading", `${title} kaydediliyor…`);
+
     try {
-      // Use the existing read API immediately before full-save merge. Other pending categories are never serialized.
       const latest = await window.yardimciDesktop?.getSetupData?.();
       if (latest) refresh(latest);
+
       const submitted = draftRef.current;
       const merged = mergeSettingsCategory(canonical.current, submitted, category);
       const error = !merged.businessName.trim() && category !== "business"
         ? "Önce İşletme kategorisindeki firma adını kaydedin."
         : validateSettingsCategory(merged, category);
-      if (error) { report("error", error); return; }
+      if (error) {
+        report("error", error);
+        return { ok: false, message: error };
+      }
+
       const result = await persist(createSetupInput(merged));
-      if (!result.ok) { report("error", result.message); return; }
+      if (!result.ok) {
+        report("error", result.message);
+        return { ok: false, message: result.message };
+      }
+
       refresh(result.setupData, category, submitted);
       source.current = result.setupData;
-      const warning = result.refreshWarning || (merged.aiEnabled && (result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false) ? result.message : "");
+      const warning = result.refreshWarning
+        || (merged.aiEnabled && (result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false)
+          ? result.message
+          : "");
       const retained = isCategoryDirty(draftRef.current, baseline.current, category);
-      report(warning ? "error" : "success", warning ? `${title}: ${warning}`
-        : `${title} kaydedildi.${retained ? " Kaydedilmeyen yerel değişiklikler korunuyor." : ""}`);
+      const message = warning
+        ? `${title}: ${warning}`
+        : `${title} kaydedildi.${retained ? " Kaydedilmeyen yerel değişiklikler korunuyor." : ""}`;
+      report(warning ? "error" : "success", message);
+      return { ok: true, changed: true, message };
     } catch (error) {
-      report("error", error instanceof Error ? error.message : `${title} kaydedilemedi.`);
+      const message = error instanceof Error ? error.message : `${title} kaydedilemedi.`;
+      report("error", message);
+      return { ok: false, message };
     } finally {
       saving.current = false;
       setBusy(false);
