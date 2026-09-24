@@ -8,7 +8,6 @@ Firma hostinginde çalışacak mini API ve gömülebilir widget dosyaları burad
 
 ```text
 widget.js
-menu.html
 assets/
 api/
   request.php
@@ -336,18 +335,16 @@ anahtar operasyon ekranlarında gösterilmez.
 
 Gerçek firma kurulumunda `change-this-secret` mutlaka değiştirilmelidir.
 
-## QR Menü Sayfası
+## QR Menü Yayını
 
-Müşteriye açık QR menü sayfası:
+Web modülü bağımsız bir müşteri sayfası üretmez. QR menünün public sayfası firma
+sitesinin kendi şablonunda tutulur ve menü içeriğini `api/menu.php` üzerinden okur.
+Böylece firma sitesi kendi header/footer, tema ve alan adı yapısını korurken Yardımcı
+Asistan yalnız menü verisinin yayın sahibi olur.
 
-```text
-menu.html
-```
-
-Sayfa menü verisini sadece `api/menu.php` üzerinden okur. Menü yayını current
-SQLite storage'dan okunur; eski JSON menü dosyası içe aktarılmaz.
-Pasif kategoriler ve mevcut olmayan ürünler API cevabına dahil edilmez. Sayfa
-görünürken ETag ile yaklaşık 15 saniyede bir güncelliği kontrol eder.
+Menü yayını current SQLite storage'dan okunur; eski JSON menü dosyası içe aktarılmaz.
+Pasif kategoriler ve mevcut olmayan ürünler API cevabına dahil edilmez. Site tarafındaki
+QR menü görünümü ETag kullanarak güncelliği periyodik kontrol edebilir.
 
 Lokal smoke testi:
 
