@@ -88,8 +88,8 @@ curl -X POST 'https://firma.example/yardimci-asistan/api/sync.php' \
   --data '{"action":"capabilities"}'
 ```
 
-Başarılı cevapta `protocol_version: 2`, `storage: "sqlite"`, `schema_version: 3` ve
-`features` içinde `android_device_sightings` ile `android_device_permissions` bulunmalıdır.
+Başarılı cevapta `protocol_version: 2`, `storage: "sqlite"` ve `features` içinde
+`android_device_sightings` ile `android_device_permissions` bulunmalıdır.
 Masaüstü Android modülü açıkken bu capability'ler eksikse senkronu başarılı saymaz. Canlı
 hostingde HTTPS kullanın; sync anahtarını URL query parametresine veya loglara yazmayın.
 
