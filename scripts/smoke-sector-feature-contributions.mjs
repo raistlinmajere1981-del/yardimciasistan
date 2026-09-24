@@ -14,7 +14,7 @@ const source = (path) => readFileSync(join(root, path), "utf8");
 const configPath = resolve("apps/desktop-app/tsconfig.json");
 const config = ts.readConfigFile(configPath, ts.sys.readFile);
 const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, resolve("apps/desktop-app"));
-const typeFixture = resolve("scripts/fixtures/sector-feature-contribution.tsx");
+const typeFixture = resolve("apps/desktop-app/scripts/sector-feature-contribution-fixture.ts");
 const program = ts.createProgram([...parsed.fileNames, typeFixture], { ...parsed.options, noEmit: true });
 const diagnostics = [...parsed.errors, ...ts.getPreEmitDiagnostics(program)];
 if (diagnostics.length) {
@@ -63,7 +63,7 @@ const settingsWorkspace = source("apps/desktop-app/src/components/settings/Setti
 const workspaceDefinitions = source("apps/desktop-app/src/app/workspace-definitions.tsx");
 const roomDefinition = source("apps/desktop-app/src/components/pension/room-workspace-definition.tsx");
 const tableDefinition = source("apps/desktop-app/src/components/restaurant/table-workspace-definition.tsx");
-const featureFixture = source("scripts/fixtures/sector-feature-contribution.tsx");
+const featureFixture = source("apps/desktop-app/scripts/sector-feature-contribution-fixture.ts");
 
 assert.match(navigation, /export const navigationContributions/);
 assert.match(navigation, /buildNavigationFromContributions/);
@@ -102,7 +102,7 @@ try {
   await page.route("**/sector-feature-contribution-test", async (route) => {
     const html = await server.transformIndexHtml(
       "/sector-feature-contribution-test",
-      '<html><body><div id="root"></div><script type="module" src="/@fs/' + resolve("scripts/fixtures/sector-feature-contribution.tsx") + '"></script></body></html>'
+      '<html><body><div id="root"></div><script type="module" src="/@fs/' + resolve("apps/desktop-app/scripts/sector-feature-contribution-fixture.ts") + '"></script></body></html>'
     );
     await route.fulfill({ contentType: "text/html", body: html });
   });
