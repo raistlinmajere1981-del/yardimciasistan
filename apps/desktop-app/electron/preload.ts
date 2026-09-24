@@ -90,7 +90,6 @@ import type {
   CheckoutRoomFolioInput,
   DesktopRoomFolioData,
   DesktopRoomFolioMutationResult,
-  SetRoomNightlyPriceInput,
   UpdateRoomFolioDetailsInput,
   UpdateRoomFolioItemQuantityInput
 } from "./room-folio";
@@ -175,7 +174,6 @@ export interface DesktopBridge {
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => Promise<DesktopFinanceMutationResult>;
   addPensionPayment: (input: AddPensionPaymentInput) => Promise<DesktopFinanceMutationResult>;
   getRoomFolioData: () => Promise<DesktopRoomFolioData>;
-  setRoomNightlyPrice: (input: SetRoomNightlyPriceInput) => Promise<DesktopRoomFolioMutationResult>;
   openRoomFolio: (stayId: string) => Promise<DesktopRoomFolioMutationResult>;
   updateRoomFolioDetails: (input: UpdateRoomFolioDetailsInput) => Promise<DesktopRoomFolioMutationResult>;
   addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => Promise<DesktopRoomFolioMutationResult>;
@@ -308,7 +306,6 @@ const bridge: DesktopBridge = {
   setReservationAgreedTotal: (input: SetReservationAgreedTotalInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:setReservationTotal", input),
   addPensionPayment: (input: AddPensionPaymentInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:addPensionPayment", input),
   getRoomFolioData: () => invokeWhenUnlocked<DesktopRoomFolioData>("roomFolio:getData"),
-  setRoomNightlyPrice: (input: SetRoomNightlyPriceInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:setRoomNightlyPrice", input),
   openRoomFolio: (stayId: string) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:open", stayId),
   updateRoomFolioDetails: (input: UpdateRoomFolioDetailsInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:updateDetails", input),
   addRoomFolioMenuItem: (input: AddRoomFolioMenuItemInput) => invokeWhenUnlocked<DesktopRoomFolioMutationResult>("roomFolio:addMenuItem", input),
