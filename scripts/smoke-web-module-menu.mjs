@@ -87,13 +87,9 @@ try {
   browser = await launchChromiumForSmoke(chromium);
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
-  await page.goto(`${baseUrl}/menu.html`);
-  await expect(page.getByRole("heading", { name: `${businessConfig.display_name} Menü` })).toBeVisible();
   const emptyResponse = await page.request.get(`${baseUrl}/api/menu.php`);
   expect(emptyResponse.status()).toBe(200);
   expect(await emptyResponse.json()).toMatchObject({ ok: true, categories: [], items: [], source_revision: 0 });
-  await expect(page.locator(".empty-state")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Kahvaltı" })).toHaveCount(0);
 
   const fixturePublish = await page.request.post(`${baseUrl}/api/sync.php`, {
     headers: { "X-YA-Sync-Secret": businessConfig.sync_secret },
@@ -125,16 +121,6 @@ try {
   });
   expect(firstMenuResponse.status()).toBe(200);
   expect(firstMenuResponse.headers().etag).not.toBe(emptyResponse.headers().etag);
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByRole("button", { name: "Kahvaltı" })).toBeVisible();
-  await expect(page.getByText("Serpme Kahvaltı")).toBeVisible();
-  await expect(page.getByRole("img", { name: "Serpme Kahvaltı (2 Kişilik)" })).toBeVisible();
-
-  await page.getByRole("button", { name: "İçecekler" }).click();
-  await expect(page.getByRole("heading", { name: "İçecekler" })).toBeVisible();
-  await expect(page.getByText("Türk Kahvesi")).toBeVisible();
-  await expect(page.getByText("Serpme Kahvaltı")).toHaveCount(0);
-
   const response = await page.request.get(`${baseUrl}/api/menu.php`);
   expect(response.ok()).toBe(true);
   const initialEtag = response.headers().etag;
@@ -245,11 +231,6 @@ try {
   expect(changedMenuResponse.status()).toBe(200);
   expect(changedMenuResponse.headers().etag).not.toBe(initialEtag);
 
-  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByRole("button", { name: "Smoke Test" })).toBeVisible();
-  await expect(page.getByText("Smoke Kahvesi")).toBeVisible();
-  await expect(page.getByText("Gizli Stok Ürünü")).toHaveCount(0);
-  await expect(page.getByText("Görünür Stok Ürünü")).toBeVisible();
   const stockMenuResponse = await page.request.get(`${baseUrl}/api/menu.php`);
   const stockMenu = await stockMenuResponse.json();
   expect(stockMenu.items.some((item) => item.id === "item_smoke_hidden_stock")).toBe(false);
@@ -781,7 +762,7 @@ return ${toPhpArray({
   expect(geminiRequest.body.systemInstruction.parts[0].text).toContain("kesin müsaitlik");
   expect(geminiRequest.body.contents.at(-1)).toMatchObject({ role: "user" });
 
-  console.log(`web-module-menu-ok: ${baseUrl}/menu.html`);
+  console.log(`web-module-menu-api-ok: ${baseUrl}/api/menu.php`);
 } catch (error) {
   if (serverOutput.trim()) {
     console.error(serverOutput.trim());

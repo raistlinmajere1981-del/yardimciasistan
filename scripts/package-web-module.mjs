@@ -16,7 +16,6 @@ const zipPath = join(outputRoot, "yardimci-asistan.zip");
 const requiredFiles = [
   "README.md",
   "widget.js",
-  "menu.html",
   "api/request.php",
   "api/sync.php",
   "api/menu.php",
