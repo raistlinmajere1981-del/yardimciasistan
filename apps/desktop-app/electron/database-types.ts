@@ -78,7 +78,7 @@ export interface DesktopTableCategory {
   tableCount: number;
 }
 
-export interface SaveTableCategoryInput {
+interface SaveTableCategoryInput {
   sourceName?: string;
   name: string;
   tableCount: number;
@@ -396,7 +396,7 @@ export interface AiApiKeyWrite {
   encryptedValue?: string;
 }
 
-export interface DesktopProductDataSettings {
+interface DesktopProductDataSettings {
   enabled: boolean;
   provider: ProductDataProviderId;
   autoSearchUnknownBarcode: boolean;
