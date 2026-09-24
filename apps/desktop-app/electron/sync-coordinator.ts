@@ -34,10 +34,9 @@ const REQUIRED_ANDROID_SYNC_FEATURES = ["android_device_sightings", "android_dev
 
 /** @compiledSmoke Used via dist-electron by scripts/smoke-automatic-sync.mjs. */
 export function supportsAndroidDevicePermissionSync(
-  capabilities: Pick<SyncCapabilitiesSuccess, "schema_version" | "features">
+  capabilities: Pick<SyncCapabilitiesSuccess, "features">
 ): boolean {
-  return capabilities.schema_version >= 2
-    && Array.isArray(capabilities.features)
+  return Array.isArray(capabilities.features)
     && REQUIRED_ANDROID_SYNC_FEATURES.every((feature) => capabilities.features.includes(feature));
 }
 
