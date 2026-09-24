@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -14,10 +15,9 @@ try {
     whatsapp: "+905550001000",
     syncSecret: "customer-room-secret-123",
     servicePreferences: { whatsapp: false, android: true },
-    initialCounts: { rooms: 2, tables: 0 },
-    tableCategories: []
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+  seedSmokeBusinessLayout(database.databasePath, { roomCount: 2 });
 
   const schemaCheck = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
