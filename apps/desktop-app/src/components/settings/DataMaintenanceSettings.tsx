@@ -243,7 +243,7 @@ export function DataMaintenanceSettings() {
                 <div className="backup-row-meta">
                   <span>{formatBytes(backup.sizeBytes)}</span>
                   <span>{backup.imageCount > 0 ? `${backup.imageCount} menü görseli` : "Menü görseli yok"}</span>
-                  <span>{(backup.assetFileCount ?? 0) > 0 ? `${backup.assetFileCount} ürün/asset görseli` : "Ürün görseli yok"}</span>
+                  <span>{backup.assetFileCount > 0 ? `${backup.assetFileCount} ürün/asset görseli` : "Ürün görseli yok"}</span>
                 </div>
               </div>
               <div className="form-actions backup-row-actions">
