@@ -7,7 +7,7 @@ import {
   copyFileSync,
   mkdirSync,
   mkdtempSync,
-  readdirSync,
+  existsSync,
   rmSync
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -19,22 +19,16 @@ const { SyncCoordinator } = require("../apps/desktop-app/dist-electron/sync-coor
 const syncClientIdPattern = /^desktop-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const repoRoot = process.cwd();
 const appPath = join(repoRoot, "apps", "desktop-app");
-const migrationPath = join(appPath, "db", "migrations");
+const schemaPath = join(appPath, "db", "schema.sql");
 const tempRoot = mkdtempSync(join(tmpdir(), "yardimci-database-baseline-"));
 const cleanUserDataPath = join(tempRoot, "clean-user-data");
 const cleanBackupPath = join(tempRoot, "clean-backups");
 const restoredUserDataPath = join(tempRoot, "restored-user-data");
 const restoredBackupPath = join(tempRoot, "restored-backups");
-const invalidUserDataPath = join(tempRoot, "invalid-user-data");
-const invalidBackupPath = join(tempRoot, "invalid-backups");
 const backupFilePath = join(tempRoot, "current-baseline.sqlite");
 
 try {
-  assert.deepEqual(
-    readdirSync(migrationPath).filter((file) => file.endsWith(".sql")),
-    ["001_baseline.sql"],
-    "Desktop migration klasörü tek canonical baseline taşımalı."
-  );
+  assert.equal(existsSync(schemaPath), true, "Desktop current schema.sql bulunmalı.");
 
   const firstDatabase = openDatabase(cleanUserDataPath, cleanBackupPath);
   firstDatabase.initialize();
@@ -101,8 +95,6 @@ try {
   sourceDatabase.exec(`VACUUM INTO '${sqlString(backupFilePath)}'`);
   sourceDatabase.close();
   assertCurrentDatabaseFile(backupFilePath, { market: true });
-  assertAlreadyInitializedBaseline(backupFilePath, "", undefined);
-  assertAlreadyInitializedBaseline(backupFilePath, clientId, clientId);
 
   mkdirSync(restoredUserDataPath, { recursive: true });
   copyFileSync(backupFilePath, join(restoredUserDataPath, "yardimci-asistan.sqlite"));
@@ -129,15 +121,8 @@ try {
   assert.notEqual(concurrentIds[0], clientId);
   assert.deepEqual(await initializeConcurrently(concurrentDataPath), concurrentIds);
 
-  createInvalidDatabase();
-  let invalidDatabase;
-  assert.throws(() => {
-    invalidDatabase = openDatabase(invalidUserDataPath, invalidBackupPath);
-    invalidDatabase.initialize();
-  }, /baseline|migration|eski|temiz kurulum/i, "Eski migration işaretli veritabanı reddedilmeli.");
-  invalidDatabase?.close();
 
-  console.log("database-baseline-smoke-ok: stable local UUID, concurrent startup, Market setup, offline transport, current baseline identity initialization, backup restore and legacy database rejection verified");
+  console.log("database-baseline-smoke-ok: current schema, stable local UUID, concurrent startup, Market setup, offline transport and backup restore verified");
 } finally {
   rmSync(tempRoot, { recursive: true, force: true });
 }
@@ -208,30 +193,6 @@ function assertCurrentBaseline(database, options = {}) {
   }
 }
 
-function assertAlreadyInitializedBaseline(sourcePath, storedClientId, expectedClientId) {
-  const userDataPath = join(tempRoot, storedClientId ? "existing-identity" : "missing-identity");
-  mkdirSync(userDataPath);
-  const databasePath = join(userDataPath, "yardimci-asistan.sqlite");
-  copyFileSync(sourcePath, databasePath);
-  const raw = new DatabaseSync(databasePath);
-  // Model the current, already-applied 001_baseline.sql before this local identity fix.
-  raw.exec("DROP TABLE desktop_sync_identity");
-  raw.prepare("UPDATE settings SET sync_client_id = ?").run(storedClientId);
-  raw.close();
-  const database = openDatabase(userDataPath, cleanBackupPath);
-  try {
-    database.initialize();
-    const clientId = database.getSyncRuntimeStatus().clientId;
-    assert.match(clientId, syncClientIdPattern);
-    if (expectedClientId) assert.equal(clientId, expectedClientId);
-    assertCurrentBaseline(database, { setupRequired: false, market: true });
-    database.initialize();
-    assert.equal(database.getSyncRuntimeStatus().clientId, clientId);
-  } finally {
-    database.close();
-  }
-}
-
 async function initializeConcurrently(userDataPath) {
   const workers = Array.from({ length: 3 }, () => new Worker(
     new URL("./fixtures/initialize-desktop-database.mjs", import.meta.url),
@@ -251,8 +212,10 @@ async function initializeConcurrently(userDataPath) {
 }
 
 function assertCurrentDatabase(database, options = {}) {
-  const migrationRows = database.prepare("SELECT id FROM schema_migrations ORDER BY id").all();
-  assert.deepEqual(migrationRows.map((row) => row.id), ["001_baseline.sql"]);
+  assert.equal(
+    database.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get().count,
+    0
+  );
   assert.equal(database.prepare("PRAGMA quick_check").get().quick_check, "ok");
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
 
@@ -306,17 +269,6 @@ function assertCurrentDatabaseFile(filePath, options = {}) {
   } finally {
     database.close();
   }
-}
-
-function createInvalidDatabase() {
-  mkdirSync(invalidUserDataPath, { recursive: true });
-  const database = new DatabaseSync(join(invalidUserDataPath, "yardimci-asistan.sqlite"));
-  database.exec(`
-    CREATE TABLE schema_migrations (id TEXT PRIMARY KEY, applied_at TEXT NOT NULL);
-    CREATE TABLE business (id TEXT PRIMARY KEY, deleted_at TEXT NOT NULL DEFAULT '');
-    INSERT INTO schema_migrations (id, applied_at) VALUES ('039_customer_credit_ledger.sql', '2026-09-09T00:00:00.000Z');
-  `);
-  database.close();
 }
 
 function tableColumns(database, table) {
