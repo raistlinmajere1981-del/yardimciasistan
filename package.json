@@ -104,7 +104,8 @@
     "smoke:restaurant-workspace": "node scripts/smoke-restaurant-workspace.mjs",
     "smoke:table-order-domain": "npm run build -w @yardimci-asistan/shared && tsc -p apps/desktop-app/tsconfig.electron.json && node scripts/smoke-desktop-menu-db.mjs --table-orders-only",
     "smoke:settings-platform": "node scripts/smoke-settings-platform.mjs",
-    "smoke:sector-feature-contributions": "node scripts/smoke-sector-feature-contributions.mjs"
+    "smoke:sector-feature-contributions": "node scripts/smoke-sector-feature-contributions.mjs",
+    "smoke:business-layout": "node scripts/smoke-business-layout.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",
