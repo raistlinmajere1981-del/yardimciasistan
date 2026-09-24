@@ -158,7 +158,6 @@ export interface AddRoomFolioPaymentInput {
 
 export interface CheckoutRoomFolioInput {
   folioId: string;
-  allowOutstanding: boolean;
 }
 
 export type DesktopRoomFolioMutationResult =
@@ -702,7 +701,6 @@ export class DesktopRoomFolioService {
     return { ok: true, message: "Ödeme kaydı geri alındı.", data: this.getData(), folioId };
   }
 
-  /** Compatibility channel; allowOutstanding is retained on the wire but D-005 always permits departure. */
   checkout(input: CheckoutRoomFolioInput): DesktopRoomFolioMutationResult {
     const folioId = cleanText(input?.folioId, 180);
     if (!folioId) return { ok: false, message: "Oda adisyonu bulunamadı." };
