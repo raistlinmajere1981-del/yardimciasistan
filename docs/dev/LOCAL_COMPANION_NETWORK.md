@@ -120,7 +120,7 @@ Yeni modelde action kimliği transporttan bağımsız olmalıdır. Action bir i�
 eşleşmesine bağlı kalır; teslim kanalı local veya hosting olabilir. Aynı action ID'nin
 tekrar teslimi masaüstü receipt/idempotency katmanında güvenli kalmalıdır.
 
-Bu geliştirme öncesi Android çalışma verisi korunmak zorunda değildir. `pending_android_actions_v1` okunmaz; yeni model temiz `pending_android_actions_v2` baseline'ı ile başlar. Gerekirse test/kurulum verisi sıfırlanabilir.
+Android çalışma verisi current transport-neutral outbox anahtarıyla başlar. Tarihsel çalışma verisi için migration/fallback yoktur; gerekirse test/kurulum verisi sıfırlanabilir.
 
 ### Android OperationCache revision
 
