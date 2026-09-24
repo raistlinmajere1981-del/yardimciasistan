@@ -3,17 +3,17 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 export const DESKTOP_DATABASE_FILE_NAME = "yardimci-asistan.sqlite";
-export const DESKTOP_MAINTENANCE_DIR_NAME = "maintenance";
-export const DESKTOP_PENDING_MAINTENANCE_FILE = "pending-data-maintenance.json";
-export const DESKTOP_STAGED_RESTORE_FILE = "restore.sqlite";
-export const DESKTOP_STAGED_RESTORE_ASSETS_DIR = "restore-assets";
-export const DESKTOP_ASSETS_DIR_NAME = "assets";
-export const DESKTOP_PRODUCTS_DIR_NAME = "products";
-export const DESKTOP_TEMPORARY_DIR_NAME = "tmp";
-export const DESKTOP_LOGS_DIR_NAME = "logs";
-export const DESKTOP_LOG_SESSIONS_DIR_NAME = "sessions";
-export const DESKTOP_LOG_FILE_NAME = "yardimci-asistan.log";
-export const DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX = ".relocated-to-data-root.json";
+const DESKTOP_MAINTENANCE_DIR_NAME = "maintenance";
+const DESKTOP_PENDING_MAINTENANCE_FILE = "pending-data-maintenance.json";
+const DESKTOP_STAGED_RESTORE_FILE = "restore.sqlite";
+const DESKTOP_STAGED_RESTORE_ASSETS_DIR = "restore-assets";
+const DESKTOP_ASSETS_DIR_NAME = "assets";
+const DESKTOP_PRODUCTS_DIR_NAME = "products";
+const DESKTOP_TEMPORARY_DIR_NAME = "tmp";
+const DESKTOP_LOGS_DIR_NAME = "logs";
+const DESKTOP_LOG_SESSIONS_DIR_NAME = "sessions";
+const DESKTOP_LOG_FILE_NAME = "yardimci-asistan.log";
+const DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX = ".relocated-to-data-root.json";
 
 export interface DataRootResolutionInput {
   envDataDir?: string;
@@ -29,7 +29,7 @@ export interface BackupRootResolutionInput {
   execDir?: string;
 }
 
-export interface DesktopDataPaths {
+interface DesktopDataPaths {
   dataRoot: string;
   databasePath: string;
   assetsPath: string;
@@ -48,7 +48,7 @@ function readEnvOverride(value: string | undefined): string {
   return String(value ?? "").trim();
 }
 
-export function resolveRepoRootFromAppPath(appPath: string): string | null {
+function resolveRepoRootFromAppPath(appPath: string): string | null {
   const candidate = path.resolve(appPath, "..", "..");
   try {
     if (!fs.existsSync(path.join(candidate, "package.json"))) return null;
@@ -119,7 +119,7 @@ export function resolveProductAssetsPath(dataRoot: string): string {
   return path.join(resolveAssetsPath(dataRoot), DESKTOP_PRODUCTS_DIR_NAME);
 }
 
-export function resolveTemporaryPath(dataRoot: string): string {
+function resolveTemporaryPath(dataRoot: string): string {
   return path.join(dataRoot, DESKTOP_TEMPORARY_DIR_NAME);
 }
 
@@ -235,7 +235,7 @@ export interface LegacyRelocationPlan {
   markerPath: string;
 }
 
-export function resolveLegacyDevRelocationMarkerPath(legacyDatabasePath: string): string {
+function resolveLegacyDevRelocationMarkerPath(legacyDatabasePath: string): string {
   return `${path.resolve(legacyDatabasePath)}${DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX}`;
 }
 
