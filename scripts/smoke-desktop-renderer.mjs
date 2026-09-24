@@ -725,6 +725,42 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getBusinessPublicProfile: async () => structuredClone(compactProfile),
+      saveBusinessPublicProfile: async (input) => {
+        compactProfile = structuredClone(input);
+        return { ok: true, message: "Müşteri bilgileri kaydedildi.", profile: structuredClone(compactProfile) };
+      },
+      getBusinessLayout: async () => structuredClone(compactLayout),
+      saveBusinessLayout: async (input) => {
+        if (input.rooms) {
+          compactLayout = {
+            ...compactLayout,
+            rooms: input.rooms.map((room, index) => ({
+              id: room.id || `compact-layout-room-${index + 1}`,
+              name: room.name,
+              number: room.number,
+              capacity: room.capacity,
+              bedInfo: room.bedInfo,
+              floor: room.floor,
+              features: [...room.features],
+              description: room.description,
+              priceNote: room.priceNote,
+              nightlyPriceMinor: room.nightlyPriceMinor,
+              currency: room.currency,
+              sortOrder: index + 1,
+              canRemove: true,
+              removeBlockReason: ""
+            }))
+          };
+        }
+        if (input.tableCategories) {
+          compactLayout = {
+            ...compactLayout,
+            tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
+          };
+        }
+        return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(compactLayout) };
+      },
       getSyncStatus: async () => ({
         enabled: true,
         clientId: "renderer-smoke",
@@ -1356,6 +1392,46 @@ try {
         updatedAt: now
       };
     };
+    let compactProfile = {
+      description: "Kompakt smoke açıklaması",
+      latitude: null,
+      longitude: null,
+      directionsNote: "",
+      checkInTime: "14:00",
+      checkOutTime: "11:00",
+      breakfastStartTime: "08:00",
+      breakfastEndTime: "10:00",
+      features: [],
+      policyNote: "",
+      paymentNote: "",
+      languages: ["Türkçe"]
+    };
+    let compactLayout = {
+      capabilities: {
+        rooms: capabilitySnapshot.enabledCapabilities.includes("accommodation.rooms"),
+        tables: capabilitySnapshot.enabledCapabilities.includes("food_service.tables")
+      },
+      rooms: currentDashboardData.rooms.map((room, index) => ({
+        id: room.id,
+        name: room.name,
+        number: room.number ?? "",
+        capacity: room.capacity ?? 2,
+        bedInfo: room.bedInfo ?? "",
+        floor: room.floor ?? "",
+        features: room.features ?? [],
+        description: room.description ?? "",
+        priceNote: room.priceNote ?? "",
+        nightlyPriceMinor: room.nightlyPriceMinor ?? 0,
+        currency: room.currency ?? "TRY",
+        sortOrder: index + 1,
+        canRemove: true,
+        removeBlockReason: ""
+      })),
+      tableCategories: [...new Set(currentDashboardData.tables.map((table) => table.area || "Genel"))].map((name) => ({
+        name,
+        tableCount: currentDashboardData.tables.filter((table) => (table.area || "Genel") === name).length
+      }))
+    };
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
@@ -1771,7 +1847,8 @@ try {
   await expect(compactPage.locator(".setup-footer")).toHaveCount(0);
   await expect(compactPage.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab")).toHaveCount(4);
   await expect(compactPage.getByRole("heading", { name: "İşletme", exact: true })).toBeVisible();
-  await expect(compactPage.getByRole("heading", { name: "Müşteriye Açık Bilgiler" })).toBeVisible();
+  await expect(compactPage.locator("#settings-public-profile")).toBeVisible();
+  await expect(compactPage.getByLabel("İşletme açıklaması")).toBeVisible();
   await compactPage.getByRole("tab", { name: "İşletme Düzeni", exact: true }).click();
   await expect(compactPage.getByRole("heading", { name: "İşletme Düzeni", level: 2 })).toBeVisible();
   await compactPage.getByRole("tab", { name: "Uygulama", exact: true }).click();
