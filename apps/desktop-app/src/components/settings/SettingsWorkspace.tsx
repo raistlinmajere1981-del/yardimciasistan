@@ -43,45 +43,54 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const updates = useUpdateSettings(initialized);
   const password = usePasswordSettings({ configured: props.setupData.appPasswordConfigured, onConfiguredChange: props.onAppPasswordConfiguredChange ?? (() => undefined) });
   const category = settingsCategories.find(item => item.id === active)!;
-  const staged = active === "application" ? null : active;
+  const setupCategory = active === "business" || active === "services" ? active : null;
+  const categoryHasSave = active !== "application";
   const hasStagedSection = active === "operations"
     ? layout.draft.capabilities.rooms || layout.draft.capabilities.tables
     : settingsSections.some(section => section.category === active && section.persistence === "staged" && isSettingsSectionVisible(section, capabilities, initialized, runtimeCapabilities));
-  const feedback = staged === "operations"
+  const feedback = active === "operations"
     ? (layout.message ? { state: layout.state, message: layout.message } : undefined)
-    : staged ? drafts.feedback[staged] : undefined;
+    : setupCategory ? drafts.feedback[setupCategory] : undefined;
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities);
   const dirty = { business: drafts.dirty.business || profile.dirty, operations: layout.dirty, services: drafts.dirty.services, application: updates.dirty };
-  const stagedDirty = staged ? dirty[staged] : false;
-  const stagedBusy = staged === "operations"
+  const stagedDirty = categoryHasSave ? dirty[active] : false;
+  const stagedBusy = active === "operations"
     ? layout.loading || layout.saving
-    : drafts.busy || (staged === "business" && profile.saving);
-  const stagedSaving = staged === "operations"
+    : drafts.busy || (active === "business" && profile.saving);
+  const stagedSaving = active === "operations"
     ? layout.saving
-    : feedback?.state === "loading" || (staged === "business" && profile.saving);
+    : feedback?.state === "loading" || (active === "business" && profile.saving);
 
   async function saveStagedCategory() {
-    if (!staged || !stagedDirty) return;
-    if (staged === "business") {
+    if (!categoryHasSave || !stagedDirty) return;
+    if (active === "business") {
       if (drafts.dirty.business) await drafts.save("business");
       if (profile.dirty) await profile.save();
       return;
     }
-    if (staged === "operations") {
+    if (active === "operations") {
       await layout.save();
       return;
     }
-    await drafts.save(staged);
+    if (active === "services") {
+      await drafts.save("services");
+    }
   }
 
   function discardStagedCategory() {
-    if (!staged || stagedBusy) return;
-    if (staged === "operations") {
+    if (!categoryHasSave || stagedBusy) return;
+    if (active === "operations") {
       layout.discard();
       return;
     }
-    drafts.discard(staged);
-    if (staged === "business") profile.discard();
+    if (active === "business") {
+      drafts.discard("business");
+      profile.discard();
+      return;
+    }
+    if (active === "services") {
+      drafts.discard("services");
+    }
   }
 
   useEffect(() => {
@@ -130,7 +139,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           {initialized && <div id="settings-maintenance" tabIndex={-1}><DataMaintenanceSettings /></div>}
         </div>}
       </div>
-      {staged && hasStagedSection && <footer className="settings-category-actions">
+      {categoryHasSave && hasStagedSection && <footer className="settings-category-actions">
         <div>{stagedDirty && <span>Kaydedilmemiş kategori değişiklikleri</span>}
           {feedback?.message && <p role={feedback.state === "error" ? "alert" : "status"}>{feedback.message}</p>}
         </div>
