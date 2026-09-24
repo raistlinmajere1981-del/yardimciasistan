@@ -1,11 +1,10 @@
-import { workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
+import { customerWorkspaceDefinition, roomWorkspaceDefinition, workspaceDefinitions } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
 import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { usePensionPageController } from "../../apps/desktop-app/src/components/pension/pension-page-state";
 import { PensionPage } from "../../apps/desktop-app/src/pages/PensionPage";
-import { customerWorkspaceDefinition, roomWorkspaceDefinition } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { RoomsWorkspace, ReservationsWorkspace, DailyTasksWorkspace } from "../../apps/desktop-app/src/components/operations/OperationWorkspaces";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
 import "../../apps/desktop-app/src/styles/index.css";
