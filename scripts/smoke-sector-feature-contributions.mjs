@@ -1,6 +1,6 @@
-import assert from "node:assert/strict";
+import assert from "node:assert/strict";\nimport { chromium, expect } from "@playwright/test";\nimport { createServer } from "vite";
 import { readFileSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve, join } from "node:path";\nimport { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";\nimport { installPensionWorkspaceFixture } from "./test-helpers/pension-workspace-fixture.mjs";\nimport { createCompactUiFixture } from "./lib/desktop-renderer-fixtures.mjs";
 import ts from "typescript";
 
 const root = process.cwd();
@@ -9,7 +9,7 @@ const source = (path) => readFileSync(join(root, path), "utf8");
 const configPath = resolve("apps/desktop-app/tsconfig.json");
 const config = ts.readConfigFile(configPath, ts.sys.readFile);
 const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, resolve("apps/desktop-app"));
-const typeFixture = resolve("scripts/fixtures/sector-feature-contribution-types.ts");
+const typeFixture = resolve("scripts/fixtures/sector-feature-contribution.tsx");
 const program = ts.createProgram([...parsed.fileNames, typeFixture], { ...parsed.options, noEmit: true });
 const diagnostics = [...parsed.errors, ...ts.getPreEmitDiagnostics(program)];
 if (diagnostics.length) {
@@ -57,7 +57,7 @@ const settingsContributions = source("apps/desktop-app/src/app/settings-section-
 const settingsWorkspace = source("apps/desktop-app/src/components/settings/SettingsWorkspace.tsx");
 const workspaceDefinitions = source("apps/desktop-app/src/app/workspace-definitions.tsx");
 const roomDefinition = source("apps/desktop-app/src/components/pension/room-workspace-definition.tsx");
-const tableDefinition = source("apps/desktop-app/src/components/restaurant/table-workspace-definition.tsx");
+const tableDefinition = source("apps/desktop-app/src/components/restaurant/table-workspace-definition.tsx");\nconst featureFixture = source("scripts/fixtures/sector-feature-contribution.tsx");
 
 assert.match(navigation, /export const navigationContributions/);
 assert.match(navigation, /buildNavigationFromContributions/);
