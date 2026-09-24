@@ -87,15 +87,15 @@ try {
 
   // Dashboard actions remain launchers/canonical operation callbacks.
   const requestRow = page.locator(".dashboard-priority-item.priority-request").first();
-  await requestRow.getByRole("button", { name: "Yanıtla", exact: true }).click();
+  await requestRow.getByRole("button", { name: /talebini yanıtla$/ }).click();
   await expect.poll(() => page.evaluate(() => window.__m8fActions.some((item) => item.kind === "reply"))).toBe(true);
 
   const taskRow = page.locator(".dashboard-priority-item.priority-task").first();
-  await taskRow.getByRole("button", { name: "Tamamla", exact: true }).click();
+  await taskRow.getByRole("button", { name: /işini tamamla$/ }).click();
   await expect.poll(() => page.evaluate(() => window.__m8fActions.some((item) => item.kind === "task-complete"))).toBe(true);
 
   const reservationRow = page.locator(".dashboard-priority-item.priority-reservation").first();
-  await reservationRow.getByRole("button", { name: "İncele", exact: true }).click();
+  await reservationRow.getByRole("button", { name: /rezervasyonunu incele$/ }).click();
   await expect.poll(() => page.evaluate(() => window.__m8fActions.some((item) => item.kind === "reservation"))).toBe(true);
 
   await page.getByRole("button", { name: "Tüm talepler", exact: true }).click();
