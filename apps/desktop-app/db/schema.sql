@@ -65,7 +65,7 @@ CREATE TABLE business (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   display_name TEXT NOT NULL,
-  profile_id TEXT NOT NULL CHECK (profile_id IN ('pension_restaurant', 'pension', 'restaurant', 'cafe', 'market')),
+  profile_id TEXT NOT NULL CHECK (profile_id IN ('pension_restaurant', 'pension', 'restaurant', 'market')),
   phone TEXT NOT NULL DEFAULT '',
   whatsapp TEXT NOT NULL DEFAULT '',
   email TEXT NOT NULL DEFAULT '',
