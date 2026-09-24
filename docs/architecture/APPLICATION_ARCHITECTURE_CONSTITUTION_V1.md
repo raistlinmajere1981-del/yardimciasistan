@@ -378,13 +378,15 @@ Do not pretend backup, update check, device revoke or password reset are ordinar
 
 ### Dirty state
 
-Dirty state is category-scoped. A user may switch tabs without being interrupted. Unsaved drafts stay alive and the dirty tab is visibly marked. Leaving Settings with dirty staged changes requires one clear decision.
+Dirty state is category-scoped and at most one category may remain dirty: the active category. A requested tab/search transition from a dirty category is guarded before focus, query state or the visible category changes. The user chooses to save and continue, discard and continue, or stay. Leaving Settings through application navigation uses the same guard.
+
+A failed save does not complete the transition. While a category save is in flight, that category's staged controls and transition actions are locked. Settings does not preserve a second hidden dirty category or rebase edits made during an in-flight save.
 
 ### Save
 
 Default: save the active category only. A global “save everything” action is not the primary contract.
 
-A full backend patch API is desirable long-term, but UI category separation may initially merge the active category into the last persisted baseline and call the existing full save contract, provided unsaved drafts from other categories cannot leak into the payload.
+Business and Services may still merge their owned fields into the latest persisted Setup snapshot before calling the existing full Setup save contract. Operations instead owns the transactional `BusinessLayout` resource for rooms and table categories. Application update preferences use the category footer; Appearance stays immediate and operational commands remain actions.
 
 ### Search
 
