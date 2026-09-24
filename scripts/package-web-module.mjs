@@ -190,7 +190,7 @@ function validateSource() {
   assert.ok(androidBootstrapEndpoint.includes("ya_android_auth_issue_token"), "USB kurulum bileti kişisel cihaz tokenına dönüşmeli.");
 
   const androidTokenEndpoint = readFileSync(join(sourceRoot, "api", "android-device-token.php"), "utf8");
-  assert.ok(androidTokenEndpoint.includes("device_approval_required"), "Onaysız telefon legacy bootstrap ile cihaz tokenı alamamalı.");
+  assert.ok(androidTokenEndpoint.includes("device_approval_required"), "Onaysız telefon bootstrap akışıyla cihaz tokenı alamamalı.");
   assert.ok(androidTokenEndpoint.includes("ya_android_auth_issue_token"), "Onaylı telefon kişisel token almalı.");
 
   const stockImageEndpoint = readFileSync(join(sourceRoot, "api", "stock-image-analysis.php"), "utf8");
@@ -270,8 +270,7 @@ function validatePackage(manifest, businessConfig) {
     return file.path.startsWith("node_modules/")
       || file.path.startsWith("dist/")
       || file.path.endsWith(".ts")
-      || file.path.includes("/.env")
-      || (file.path.startsWith("data/") && file.path.includes(".legacy-backup-"));
+      || file.path.includes("/.env");
   });
   assert.deepEqual(forbidden, [], `Web modül paketinde yayınlanmaması gereken dosya var: ${forbidden.map((file) => file.path).join(", ")}`);
 
@@ -333,9 +332,6 @@ function shouldCopySourcePath(sourcePath) {
     return false;
   }
 
-  if (relativePath.startsWith("data/") && relativePath.includes(".legacy-backup-")) {
-    return false;
-  }
 
   return !relativePath.startsWith("data/.ai-settings.");
 }
