@@ -440,11 +440,6 @@ final class OperationData {
     Set<String> allowed = new HashSet<>(Arrays.asList(ALL_PERMISSIONS));
     for (int index = 0; index < profilePermissions.length(); index += 1) {
       String permission = profilePermissions.optString(index, "").trim();
-      // Transitional alias for snapshots published before direct product creation
-      // replaced the old product-draft permission.
-      if ("market.product_draft".equals(permission)) {
-        permission = "market.product_create";
-      }
       if (allowed.contains(permission)) {
         permissions.add(permission);
       }
