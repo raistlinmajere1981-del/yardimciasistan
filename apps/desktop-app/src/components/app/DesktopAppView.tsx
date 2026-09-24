@@ -1,5 +1,6 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DesktopPage } from "../../app/navigation";
+import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
 import type { SyncState } from "../../app/runtime-state";
 import { useMarketController } from "../../app/use-market-controller";
 import { useFinanceController } from "../../app/use-finance-controller";
@@ -25,7 +26,8 @@ import { DesktopWorkspaceRouter } from "./DesktopWorkspaceRouter";
 
 interface DesktopAppViewProps {
   activePage: DesktopPage;
-  setActivePage: Dispatch<SetStateAction<DesktopPage>>;
+  requestPageChange: RequestPageChange;
+  registerPageLeaveGuard: RegisterPageLeaveGuard;
   syncState: SyncState;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   statusMessage: string;
@@ -42,7 +44,8 @@ interface DesktopAppViewProps {
 
 export function DesktopAppView({
   activePage,
-  setActivePage,
+  requestPageChange,
+  registerPageLeaveGuard,
   syncState,
   setSyncState,
   statusMessage,
@@ -94,7 +97,7 @@ export function DesktopAppView({
   return (
     <DesktopAppFrame
       activePage={activePage}
-      setActivePage={setActivePage}
+      requestPageChange={requestPageChange}
       syncState={syncState}
       statusMessage={statusMessage}
       setupController={setupController}
@@ -107,7 +110,8 @@ export function DesktopAppView({
     >
       <DesktopWorkspaceRouter
         activePage={activePage}
-        setActivePage={setActivePage}
+        requestPageChange={requestPageChange}
+        registerPageLeaveGuard={registerPageLeaveGuard}
         syncState={syncState}
         setSyncState={setSyncState}
         setStatusMessage={setStatusMessage}
