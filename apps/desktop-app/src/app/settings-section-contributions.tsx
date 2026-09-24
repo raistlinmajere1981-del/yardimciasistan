@@ -11,10 +11,10 @@ import {
 import type { SetupFormState } from "./setup-model";
 import { LayoutSettingsSection } from "../components/settings/LayoutSettingsSection";
 
-export type CategoryField<C extends StagedSettingsCategoryId> = (typeof settingsFieldOwners)[C][number];
+type CategoryField<C extends StagedSettingsCategoryId> = (typeof settingsFieldOwners)[C][number];
 export type CategoryDraft<C extends StagedSettingsCategoryId> = Pick<SetupFormState, CategoryField<C>>;
 
-export interface StagedSectionProps<C extends StagedSettingsCategoryId> {
+interface StagedSectionProps<C extends StagedSettingsCategoryId> {
   readonly draft: Readonly<CategoryDraft<C>>;
   readonly busy: boolean;
   readonly configurationCapabilities: readonly BusinessCapability[];
@@ -44,7 +44,7 @@ const layoutSettingsContribution: SettingsSectionContribution<"operations"> = {
   )
 };
 
-export const stagedSettingsContributions = {
+const stagedSettingsContributions = {
   business: [],
   operations: [layoutSettingsContribution],
   services: []
