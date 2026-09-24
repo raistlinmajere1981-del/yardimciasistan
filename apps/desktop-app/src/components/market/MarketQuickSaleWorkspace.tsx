@@ -38,7 +38,6 @@ interface MarketQuickSaleWorkspaceProps {
   onExternalProductFound?: (product: ProductLookupCandidate) => void;
 }
 
-export type { CartDraftQuickSaleRequest } from "../../app/use-market-quick-sale-session";
 
 const unitLabels: Record<CommerceUnit, string> = {
   piece: "adet",
