@@ -84,8 +84,8 @@ Rules:
 Rules:
 - Prefer facade methods from `apps/desktop-app/electron/database.ts`.
 - Do not bypass the facade with new store imports unless the existing architecture explicitly requires it.
-- Do not add schema creation outside `apps/desktop-app/db/migrations/001_baseline.sql`.
-- Treat migration-baseline work as a separate migration task; do not mix it into unrelated refactors.
+- Do not add desktop schema creation outside `apps/desktop-app/db/schema.sql`.
+- The desktop database supports only the current schema. Do not add historical migration chains or compatibility upgrades without an explicit new requirement.
 
 ## Shared utilities
 
