@@ -223,6 +223,7 @@ try {
       }), "Telefon görev alanları varsayılana döndürüldü."),
       revokeAndroidDevice: async (deviceId) => mutateDevice(deviceId, (device) => ({ ...device, isActive: false, revokedAt: new Date().toISOString() }), "Telefon kaldırıldı ve erişimi kapatıldı."),
       getAiWorkspaceHistory: async () => [],
+      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
       markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
       openExternal: async (url) => {
         window.__openedExternalUrls.push(url);
