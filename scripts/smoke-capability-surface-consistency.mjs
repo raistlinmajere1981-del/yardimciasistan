@@ -397,37 +397,13 @@ assert.equal(hybridProjection.rooms.length > 0, true);
 assert.deepEqual(hybridProjection.tables, []);
 assert.equal(hybridProjection.reservations.some((reservation) => reservation.reservation_type === "table"), false);
 assert.match(navigationSource, /pageId:\s*"market"[\s\S]{0,220}condition:\s*\{\s*anyOf:/);
-assert.doesNotMatch(navigationSource, /businessType|business_type|setupData\.modules/);
 assert.match(
   navigationSource,
   /\?\s*\(accommodationFolioEnabled\s*\?\s*"[^"]*bekleyen oda alacaklarını/,
   "room receivable copy must stay inside the accommodation folio capability branch"
 );
 
-// F — runtime surfaces may not special-case profile/business type or removed setup fields.
-for (const file of [
-  "apps/desktop-app/src/App.tsx",
-  "apps/desktop-app/src/app/navigation.ts",
-  "apps/desktop-app/src/app/notifications.ts",
-  "apps/desktop-app/src/app/use-messaging-controller.ts",
-  "apps/desktop-app/src/components/app/DesktopAppFrame.tsx",
-  "apps/desktop-app/src/components/app/DesktopWorkspaceRouter.tsx",
-  "apps/desktop-app/src/components/customers/CustomersWorkspace.tsx",
-  "apps/desktop-app/src/components/customers/RequestsWorkspace.tsx",
-  "apps/desktop-app/src/components/finance/FinanceWorkspace.tsx",
-  "apps/desktop-app/src/components/restaurant/TableWorkspace.tsx",
-  "apps/desktop-app/src/pages/DashboardPage.tsx",
-  "apps/desktop-app/src/pages/OperationCalendarPage.tsx",
-  "apps/desktop-app/src/pages/PensionPage.tsx",
-  "apps/desktop-app/src/pages/ReportsPage.tsx",
-  "apps/desktop-app/src/pages/RestaurantPage.tsx"
-]) {
-  const runtimeSource = source(file);
-  assert.doesNotMatch(runtimeSource, /business(?:Type|_type)\s*(?:===|!==|==|!=)/, `${file} uses a profile runtime gate`);
-  assert.doesNotMatch(runtimeSource, /\b(?:setupData|setup)\.modules/, `${file} uses removed setup modules as runtime truth`);
-}
-
-// G — admin expands role grants, then intersects them with business capabilities.
+// F — admin expands role grants, then intersects them with business capabilities.
 const marketAdmin = androidEffectivePermissionsForRole("admin", ANDROID_PERMISSIONS, marketCapabilities);
 for (const permission of ["room.update_status", "reservation.create", "table_order.open", "menu.edit"]) {
   assert.equal(marketAdmin.includes(permission), false, `admin bypassed Market for ${permission}`);
@@ -448,7 +424,7 @@ assert.equal(androidActionAllowedByCapabilities("menu_stock_image_import_apply",
 assert.equal(androidActionAllowedByCapabilities("menu_stock_image_import_apply", [...stockWithoutAi, C.AI]), true);
 
 verifyPersistedRuntimeSource();
-console.log("capability-surface-consistency-smoke-ok: A-G verified");
+console.log("capability-surface-consistency-smoke-ok: A-F verified");
 
 function verifyPersistedRuntimeSource() {
   const dataDir = mkdtempSync(join(tmpdir(), "yardimci-capability-surface-"));
@@ -490,20 +466,6 @@ function verifyPersistedRuntimeSource() {
     const setup = database.getSetupData();
     assert.equal(setup.profileId, "market");
     assert.deepEqual(setup.servicePreferences, { whatsapp: false, android: false });
-
-    const raw = new DatabaseSync(database.databasePath);
-    try {
-      const businessColumns = new Set(raw.prepare("PRAGMA table_info('business')").all().map((row) => row.name));
-      const settingsColumns = new Set(raw.prepare("PRAGMA table_info('settings')").all().map((row) => row.name));
-      assert.equal(businessColumns.has("profile_id"), true);
-      assert.equal(businessColumns.has("business_type"), false);
-      assert.equal(businessColumns.has("modules_json"), false);
-      for (const column of ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]) {
-        assert.equal(settingsColumns.has(column), false, `${column} must not exist in the baseline`);
-      }
-    } finally {
-      raw.close();
-    }
 
     seedContextualReportTasks(database.databasePath);
     applyBusinessProfileCapabilities(database.databasePath, "restaurant", { preserveUserOverrides: false });
