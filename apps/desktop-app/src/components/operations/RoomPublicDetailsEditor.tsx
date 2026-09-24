@@ -8,12 +8,21 @@ import {
   type RoomPublicFeatureId,
   type SaveRoomPublicDetailsInput
 } from "@yardimci-asistan/shared";
-import type { DesktopDashboardData } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 
 type EditorState = "idle" | "loading" | "error";
 
-type RoomRecord = DesktopDashboardData["rooms"][number];
+export interface RoomPublicDetailsEditorRoom {
+  id: string;
+  name: string;
+  number: string;
+  capacity: number;
+  bedInfo: string;
+  floor: string;
+  features: RoomPublicFeatureId[];
+  description: string;
+  priceNote: string;
+}
 
 interface RoomPublicDetailsSaveResult {
   ok: boolean;
@@ -22,7 +31,7 @@ interface RoomPublicDetailsSaveResult {
 
 interface RoomPublicDetailsEditorProps {
   open: boolean;
-  room: RoomRecord | null;
+  room: RoomPublicDetailsEditorRoom | null;
   onClose: () => void;
   onSave: (input: SaveRoomPublicDetailsInput) => Promise<RoomPublicDetailsSaveResult>;
 }
@@ -38,7 +47,7 @@ interface RoomPublicDetailsFormState {
   priceNote: string;
 }
 
-function toForm(room: RoomRecord | null): RoomPublicDetailsFormState {
+function toForm(room: RoomPublicDetailsEditorRoom | null): RoomPublicDetailsFormState {
   return {
     name: room?.name ?? "",
     number: room?.number ?? "",
