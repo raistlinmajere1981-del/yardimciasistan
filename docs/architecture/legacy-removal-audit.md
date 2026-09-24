@@ -52,6 +52,9 @@ Source-text cleanup in this slice:
 - removed the source-only `smoke-market-workspace-contract.mjs`; Market browser/session/domain tests remain
 - reduced `smoke-sector-feature-contributions.mjs` to executable type/condition/browser contracts instead of regex assertions over production source files
 
+- removed `smoke-desktop-frontend-architecture.mjs`; its durable rules moved to the AST-based `architecture-audit.mjs`
+- architecture audit now blocks direct Page imports from App/View/Frame and imperative renderer DOM patching (`MutationObserver`, append/replace/remove/insert calls, `innerHTML` assignment) without line-count or deleted-file-name guards
+
 Mixed runtime/security checks such as capability-surface consistency remain until their source assertions can be separated without losing hard-boundary coverage.
 
 ### Slice 10C — Dead UI/CSS cleanup

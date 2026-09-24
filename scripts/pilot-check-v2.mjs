@@ -38,7 +38,6 @@ const core = [
   js("android-token", "Android cihaz token güvenliği", "smoke-android-device-token.mjs"),
   js("android-secret", "Release Android bağlantısında ortak anahtar sızıntısı", "smoke-android-release-connection.mjs"),
   js("android-permissions", "Android onay ve izin matrisi", "smoke-android-permission-matrix.mjs"),
-  js("architecture", "Masaüstü frontend mimari sınırları", "smoke-desktop-frontend-architecture.mjs"),
   js("locale", "Masaüstü tr-TR yerelleştirme sözleşmesi", "smoke-desktop-locale.mjs"),
   js("location-geocode", "İşletme adresi arama varyantları", "smoke-business-location-geocode.mjs"),
   js("birthday-automatic", "Doğum günü otomatik zamanlayıcı ve teslimat", "smoke-birthday-automatic.mjs"),

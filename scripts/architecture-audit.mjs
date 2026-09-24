@@ -81,12 +81,27 @@ function auditFile(file) {
   const isDesktopRenderer = normalizedFile.startsWith("apps/desktop-app/src/");
   const isDesktopPreload = normalizedFile === "apps/desktop-app/electron/preload.ts";
   const isPackageSource = normalizedFile.startsWith("packages/");
+  const isDesktopCompositionRoot = new Set([
+    "apps/desktop-app/src/App.tsx",
+    "apps/desktop-app/src/components/app/DesktopAppView.tsx",
+    "apps/desktop-app/src/components/app/DesktopAppFrame.tsx"
+  ]).has(normalizedFile);
 
   function visit(node) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const specifier = node.moduleSpecifier.text;
       const resolved = resolveRelativeImport(file, specifier);
       const typeOnly = importClauseIsTypeOnly(node.importClause);
+
+      if (isDesktopCompositionRoot && resolved?.includes("/apps/desktop-app/src/pages/")) {
+        report(
+          file,
+          node,
+          sourceFile,
+          "desktop-composition-root-no-page-import",
+          "App/View/Frame katmanı doğrudan Page import etmemeli; Page kompozisyonu DesktopWorkspaceRouter içinde kalmalı."
+        );
+      }
 
       if (
         isDesktopRenderer
@@ -143,6 +158,47 @@ function auditFile(file) {
           "packages/* uygulama katmanından export yapamaz."
         );
       }
+    }
+
+    if (isDesktopRenderer && ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "MutationObserver") {
+      report(
+        file,
+        node,
+        sourceFile,
+        "renderer-no-dom-observer",
+        "Renderer React ağacını MutationObserver ile sonradan yamamamalı."
+      );
+    }
+
+    if (
+      isDesktopRenderer
+      && ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression)
+      && new Set(["replaceChildren", "appendChild", "insertBefore", "removeChild"]).has(node.expression.name.text)
+    ) {
+      report(
+        file,
+        node,
+        sourceFile,
+        "renderer-no-imperative-dom-mutation",
+        `Renderer React ağacını ${node.expression.name.text} ile doğrudan mutasyona uğratmamalı.`
+      );
+    }
+
+    if (
+      isDesktopRenderer
+      && ts.isBinaryExpression(node)
+      && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+      && ts.isPropertyAccessExpression(node.left)
+      && node.left.name.text === "innerHTML"
+    ) {
+      report(
+        file,
+        node,
+        sourceFile,
+        "renderer-no-innerhtml-assignment",
+        "Renderer React ağacına innerHTML ataması yapmamalı."
+      );
     }
 
     if (
