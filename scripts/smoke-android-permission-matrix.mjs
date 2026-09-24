@@ -1,3 +1,4 @@
+import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -39,10 +40,9 @@ try {
     aiApiKey: "",
     clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: true },
-    initialCounts: { rooms: 1, tables: 0 },
-    tableCategories: []
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+  seedSmokeBusinessLayout(database.databasePath, { roomCount: 1 });
 
   const room = database.getDashboardData().rooms.find((item) => item.isActive);
   assert.ok(room, "Permission smoke needs an active room.");
