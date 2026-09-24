@@ -56,14 +56,15 @@ Primary candidates include obsolete drawer/editor selectors, migration-only CSS 
 
 ### Slice 10D — Documentation reset
 
-Active documentation to reconcile:
+Completed:
 
-- `AGENTS.md`
-- `docs/UI_RULES.md`
-- `docs/desktop-frontend-architecture.md`
-- `docs/design-system/README.md`
+- `AGENTS.md` now describes the completed Stage 9 static contribution model and Appearance v2.
+- `docs/UI_RULES.md` was rewritten as current cross-surface UI guidance with Page/Workspace/Operation/Projection rules.
+- `docs/desktop-frontend-architecture.md` was rewritten around the live App → View → Frame → Router/controller composition.
+- `docs/design-system/README.md` was rewritten around the live token/appearance/component/layout tree.
+- `docs/design-system/DESKTOP_UI_MIGRATION.md` was removed instead of being kept as a competing historical specification.
 
-`docs/design-system/DESKTOP_UI_MIGRATION.md` is migration history. Either archive it explicitly or reduce it to a historical pointer; it must not compete with the Constitution/Stage 6–9 platform documents as current guidance.
+Historical migration evidence remains available in Git history; it is no longer active repository guidance.
 
 ## Non-goals
 
