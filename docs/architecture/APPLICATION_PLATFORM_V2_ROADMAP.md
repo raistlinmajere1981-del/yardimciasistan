@@ -419,7 +419,8 @@ Implementation status (2026-09-24):
 - Stage 8C — Menu Item Workspace: closed and verified.
 - Stage 8D — Finance Workspace: closed and verified.
 - Stage 8E — Messages / AI: closed and verified.
-- Next: Stage 8F — Dashboard.
+- Stage 8F — Dashboard: closed and verified.
+- Next: Stage 8G — Calendar.
 
 ---
 
