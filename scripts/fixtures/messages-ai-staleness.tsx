@@ -52,6 +52,7 @@ function Harness() {
       <p data-testid="workspace-content">{controller.aiWorkspaceContent}</p>
       <p data-testid="workspace-state">{controller.aiWorkspaceState}</p>
       <p data-testid="reply-state">{controller.aiState}</p>
+      <p data-testid="birthday-preparing">{controller.birthdayPreparingId}</p>
     </main>
   );
 }

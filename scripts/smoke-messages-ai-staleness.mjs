@@ -59,10 +59,12 @@ try {
       generateCalls: 0,
       saveCalls: 0,
       suggestionCalls: 0,
-      historyCalls: 0
+      historyCalls: 0,
+      birthdayPrepareCalls: 0
     };
     window.__m8ePendingGenerate = [];
     window.__m8ePendingSuggestion = [];
+    window.__m8ePendingBirthday = [];
 
     const createEntry = (input, index) => ({
       id: `ai-entry-${index}`,
@@ -87,6 +89,12 @@ try {
         message: "AI sonucu hazır.",
         entry: { ...createEntry(pending.input, index), ...override }
       });
+    };
+
+    window.__m8eResolveBirthday = (index, result = { ok: false, message: "stale birthday result" }) => {
+      const pending = window.__m8ePendingBirthday[index];
+      if (!pending) throw new Error(`Missing birthday preparation ${index}`);
+      pending.resolve(result);
     };
 
     window.__m8eResolveSuggestion = (index, label) => {
@@ -128,6 +136,13 @@ try {
           window.__m8ePendingSuggestion[index] = { requestId, resolve: resolveSuggestion };
         });
       },
+      prepareBirthdayWhatsApp: async (customerId) => {
+        const index = window.__m8eStats.birthdayPrepareCalls++;
+        return new Promise((resolveBirthday) => {
+          window.__m8ePendingBirthday[index] = { customerId, resolve: resolveBirthday };
+        });
+      },
+      getDashboardData: async () => clone(window.__m8eDashboard || dashboard),
       markWhatsAppMessageSent: async () => ({ ok: true, message: "ok", dashboardData: clone(window.__m8eDashboard || dashboard) }),
       deleteWhatsAppMessage: async () => ({ ok: true, message: "ok", dashboardData: clone(window.__m8eDashboard || dashboard) }),
       openExternal: async () => true
@@ -221,6 +236,41 @@ try {
   await expect(page.getByTestId("workspace-request")).toHaveText("");
   await expect(page.getByTestId("workspace-content")).toHaveText("");
   expect(await page.evaluate(() => window.__m8eController.aiWorkspaceHistory.every((entry) => !entry.requestId))).toBe(true);
+
+  // A pending rewrite must not overwrite a newer independent Workspace generation.
+  await page.evaluate(() => window.__m8eSetFlags({ customersEnabled: true, whatsappEnabled: true, aiEnabled: true }));
+  await expect.poll(() => page.evaluate(() => window.__m8eFlags.customersEnabled && window.__m8eFlags.whatsappEnabled && window.__m8eFlags.aiEnabled)).toBe(true);
+  await page.evaluate(() => {
+    window.__m8eController.setSelectedWhatsAppRequestId("req-a");
+    window.__m8eController.changeAiWorkspaceRequest("req-b");
+  });
+  await page.evaluate(() => { void window.__m8eController.handleRewriteWhatsAppMessage("A rewrite"); });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(7);
+  await page.evaluate(() => { void window.__m8eController.handleGenerateAiWorkspace(); });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(8);
+  await page.evaluate(() => window.__m8eResolveGenerate(7));
+  await expect(page.getByTestId("workspace-request")).toHaveText("req-b");
+  await expect(page.getByTestId("workspace-content")).toContainText("req-b #7");
+  const savesBeforeLateRewrite = await page.evaluate(() => window.__m8eStats.saveCalls);
+  await page.evaluate(() => window.__m8eResolveGenerate(6));
+  await expect.poll(() => page.evaluate((before) => window.__m8eStats.saveCalls > before, savesBeforeLateRewrite)).toBe(true);
+  await page.waitForTimeout(30);
+  await expect(page.getByTestId("workspace-request")).toHaveText("req-b");
+  await expect(page.getByTestId("workspace-content")).toContainText("req-b #7");
+
+  // WHATSAPP off/on must release a pending birthday preparation owner and loading UI.
+  await page.evaluate(() => { void window.__m8eController.prepareBirthdayWhatsApp("customer-a"); });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.birthdayPrepareCalls)).toBe(1);
+  await expect(page.getByTestId("birthday-preparing")).toHaveText("customer-a");
+  await expect(page.getByTestId("sync-state")).toHaveText("loading");
+  await page.evaluate(() => window.__m8eSetFlags({ whatsappEnabled: false }));
+  await expect(page.getByTestId("birthday-preparing")).toHaveText("");
+  await expect(page.getByTestId("sync-state")).toHaveText("idle");
+  await page.evaluate(() => window.__m8eResolveBirthday(0));
+  await page.waitForTimeout(30);
+  await page.evaluate(() => window.__m8eSetFlags({ whatsappEnabled: true }));
+  await expect(page.getByTestId("birthday-preparing")).toHaveText("");
+  await expect(page.getByTestId("sync-state")).toHaveText("idle");
 
   expect(pageErrors).toEqual([]);
   console.log("messages-ai-staleness-smoke-ok");
