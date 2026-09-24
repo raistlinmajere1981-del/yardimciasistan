@@ -125,7 +125,7 @@ export function productFormToSaveInput(form: ProductFormState) {
   };
 }
 
-export function matchingProductCategoryId(categories: CatalogCategory[], hint: string) {
+function matchingProductCategoryId(categories: CatalogCategory[], hint: string) {
   const hints = hint
     .split(",")
     .map((value) => value.trim().toLocaleLowerCase("tr-TR"))
