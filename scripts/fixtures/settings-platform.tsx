@@ -11,9 +11,28 @@ import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell"
 import { readUiPreferences, applyUiPreferences, saveUiPreferences } from "../../apps/desktop-app/src/ui-preferences";
 import "../../apps/desktop-app/src/styles/index.css";
 
-let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret", initialCounts: { rooms: 1, tables: 2 }, tableCategories: [{ name: "Salon", tableCount: 2 }] };
+let canonical = { ...defaultSetupData, setupRequired: false, businessName: "İlk Firma", syncSecret: "settings-platform-secret" };
 let profile = { description: "İlk açıklama", latitude: null, longitude: null, directionsNote: "", checkInTime: "14:00", checkOutTime: "11:00", breakfastStartTime: "08:00", breakfastEndTime: "10:00", features: [], policyNote: "", paymentNote: "", languages: ["Türkçe"] };
-let rooms = [{ id: "room-1", number: "101", name: "Oda 101", nightlyPriceMinor: 150000, currency: "TRY", capacity: 2, bedInfo: "Çift kişilik", features: [], description: "", floor: "", priceNote: "" }];
+let layout = {
+  capabilities: { rooms: true, tables: true },
+  rooms: [{
+    id: "room-1",
+    number: "101",
+    name: "Oda 101",
+    nightlyPriceMinor: 150000,
+    currency: "TRY",
+    capacity: 2,
+    bedInfo: "Çift kişilik",
+    features: [],
+    description: "",
+    floor: "",
+    priceNote: "",
+    sortOrder: 1,
+    canRemove: true,
+    removeBlockReason: ""
+  }],
+  tableCategories: [{ name: "Salon", tableCount: 2 }]
+};
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
 window.settingsCalls = [];
 window.failSetup = false;
@@ -23,14 +42,48 @@ window.yardimciDesktop = {
     window.settingsCalls.push({ kind: "setup", input });
     if (window.delaySetup) await new Promise(resolve => { window.finishSetup = resolve; });
     if (window.failSetup) return { ok: false, message: "Test kayıt hatası" };
-    canonical = { ...canonical, ...input, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured, tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount })) };
+    canonical = { ...canonical, ...input, setupRequired: false, aiApiKeyConfigured: Boolean(input.aiApiKey) || canonical.aiApiKeyConfigured };
     return { ok: true, message: "Kaydedildi", setupData: structuredClone(canonical), dashboardData: defaultDashboardData };
   },
   getBusinessPublicProfile: async () => profile,
   saveBusinessPublicProfile: async input => { window.settingsCalls.push({ kind: "profile", input }); if (window.failProfile) return { ok: false, message: "Profil hatası" }; profile = input; return { ok: true, message: "Müşteri bilgileri kaydedildi", profile }; },
-  getDashboardData: async () => ({ ...defaultDashboardData, rooms }),
-  getRoomFolioData: async () => ({ rooms, activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
-  setRoomNightlyPrice: async input => { window.settingsCalls.push({ kind: "room", input }); rooms = rooms.map(room => ({ ...room, name: input.name, nightlyPriceMinor: input.amountMinor })); return { ok: true, message: "Oda kaydedildi" }; },
+  getDashboardData: async () => defaultDashboardData,
+  getBusinessLayout: async () => structuredClone(layout),
+  saveBusinessLayout: async input => {
+    window.settingsCalls.push({ kind: "layout", input });
+    if (window.failLayout) return { ok: false, message: "Düzen hatası" };
+
+    if (input.rooms) {
+      let nextId = 1;
+      layout = {
+        ...layout,
+        rooms: input.rooms.map((room, index) => ({
+          id: room.id || `room-new-${nextId++}`,
+          name: room.name,
+          number: room.number,
+          capacity: room.capacity,
+          bedInfo: room.bedInfo,
+          floor: room.floor,
+          features: [...room.features],
+          description: room.description,
+          priceNote: room.priceNote,
+          nightlyPriceMinor: room.nightlyPriceMinor,
+          currency: room.currency,
+          sortOrder: index + 1,
+          canRemove: true,
+          removeBlockReason: ""
+        }))
+      };
+    }
+    if (input.tableCategories) {
+      layout = {
+        ...layout,
+        tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
+      };
+    }
+
+    return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(layout) };
+  },
   getUpdateStatus: async () => updateStatus,
   onUpdateStatusChanged: () => () => {},
   saveUpdatePreferences: async input => { window.settingsCalls.push({ kind: "update-preferences", input }); if (window.failUpdate) return { ok: false, message: "Güncelleme tercih hatası", status: updateStatus }; updateStatus = { ...updateStatus, ...input }; return { ok: true, message: "Güncelleme tercihleri kaydedildi", status: updateStatus }; },
