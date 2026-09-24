@@ -43,6 +43,37 @@ try {
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
+      getBusinessLayout: async () => ({
+        capabilities: { rooms: true, tables: true },
+        rooms: dashboard.rooms.map((room, index) => ({
+          id: room.id,
+          name: room.name,
+          number: room.number,
+          capacity: room.capacity,
+          bedInfo: room.bedInfo,
+          floor: room.floor,
+          features: [],
+          description: room.description,
+          priceNote: room.priceNote,
+          nightlyPriceMinor: 0,
+          currency: 'TRY',
+          sortOrder: index + 1,
+          canRemove: true,
+          removeBlockReason: ''
+        })),
+        tableCategories: [...new Set(dashboard.tables.map(table => table.area))].map(name => ({
+          name,
+          tableCount: dashboard.tables.filter(table => table.area === name).length
+        }))
+      }),
+      saveBusinessLayout: async input => {
+        window.__designCalls.push({ kind: 'layout', input });
+        return {
+          ok: true,
+          message: 'İşletme düzeni kaydedildi.',
+          layout: await window.yardimciDesktop.getBusinessLayout()
+        };
+      },
       getRoomFolioData: async () => ({ rooms: [], activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
       listLocalBackups: async () => ({ ok: true, backups: [{ id: 'design-backup', createdAt: '2026-09-13T09:00:00Z', kind: 'manual', sizeBytes: 2048000, imageCount: 3 }] }),
       updateAppPassword: async input => { window.__designCalls.push({ kind: 'password', input }); return { ok: true, message: 'Şifre kaydedildi.', status: { passwordConfigured: true } }; },
@@ -137,6 +168,20 @@ try {
     await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
     await page.screenshot({ path: `${output}/shell-${scheme}-${density}.png` });
   }
+  // Leaving Settings from the real sidebar must use the same dirty-category guard.
+  await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).click();
+  await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
+  await page.getByLabel('Firma adı', { exact: true }).fill('Sidebar guard taslağı');
+  await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
+  const leaveDialog = page.getByRole('dialog', { name: /İşletme değişiklikleri bekliyor/ });
+  await expect(leaveDialog).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ayarlar', level: 1, exact: true })).toBeVisible();
+  await leaveDialog.getByRole('button', { name: 'Burada kal', exact: true }).click();
+  await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('Sidebar guard taslağı');
+  await page.locator('.sidebar').getByRole('button', { name: 'Ana Ekran', exact: true }).click();
+  await leaveDialog.getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Bugün ne var?', level: 1, exact: true })).toBeVisible();
+
   await page.locator('.sidebar').getByRole('button', { name: 'Ayarlar', exact: true }).focus();
   await page.keyboard.press('Tab');
   expect(await page.evaluate(() => getComputedStyle(document.activeElement).outlineStyle)).not.toBe('none');
