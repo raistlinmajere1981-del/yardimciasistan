@@ -5,7 +5,6 @@ import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { DesktopDatabase } from "./database";
 import { applyPendingDataMaintenanceAtStartup, registerDataMaintenanceIpcHandlers, resolveProjectBackupPath } from "./data-maintenance";
 import {
-  relocateLegacyDevDatabaseOnce,
   resolveDatabasePath,
   resolveDataRoot,
   resolvePendingMaintenanceMarkerPath
@@ -196,36 +195,6 @@ installDevelopmentRelaunchBridge();
 
 // Development varsayılanı artık repo-root/data. Eski Electron userData
 // konumunda kalan tek seferlik geliştirme verisini güvenli şekilde taşı;
-// hedef doluysa overwrite etme, WAL açıkken kör copy yapma, hata halinde
-// kaynağı silme. YA_DESKTOP_DATA_DIR varken test izolasyonunu korumak için
-// otomatik taşıma yapma.
-if (!app.isPackaged && !process.env.YA_DESKTOP_DATA_DIR) {
-  try {
-    const legacyUserDataPath = app.getPath("userData");
-    const targetDatabasePath = resolveDatabasePath(userDataPath());
-    const legacyDatabasePath = resolveDatabasePath(legacyUserDataPath);
-    const relocation = relocateLegacyDevDatabaseOnce(targetDatabasePath, legacyDatabasePath);
-    if (relocation.relocated) {
-      desktopLog.info({
-        scope: "startup",
-        event: "startup.legacy-data.relocated",
-        message: "Eski geliştirme verisi taşındı.",
-        meta: {
-          legacyDatabasePath: relocation.legacyDatabasePath,
-          targetDatabasePath: relocation.targetDatabasePath
-        }
-      });
-    }
-  } catch (error) {
-    desktopLog.error({
-      scope: "startup",
-      event: "startup.legacy-data.relocation.failed",
-      message: "Eski geliştirme verisi taşınamadı.",
-      error
-    });
-  }
-}
-
 // The packaged Windows process doubles as the lightweight launcher. A verified
 // installer staged by the previous run is applied before SQLite or the renderer
 // are opened, then the silent NSIS installer relaunches the updated app.
