@@ -131,7 +131,7 @@ amount         adisyon toplamı
 
 Kullanıcı aynı tutarı ayrıca `Gelir Ekle` ekranından girmek zorunda değildir.
 
-İlk finans migration'ı kurulurken daha önce ödenmiş ve tutarı sıfırdan büyük adisyonlar da kasa tablosuna bir kez taşınır.
+Current finans şeması, ödenmiş ve tutarı sıfırdan büyük adisyonlar için otomatik kasa kaydını trigger sözleşmesiyle üretir.
 
 Ödenmiş bir adisyon yeniden açılır veya iptal durumuna alınırsa bağlı otomatik kasa hareketi görünür toplamdan çıkarılır. Adisyon tekrar ödenirse aynı kaynak kaydı yeniden etkinleştirilir; ikinci gelir oluşturulmaz.
 
@@ -211,7 +211,7 @@ toplam kadar ödeme                  -> paid
 
 ## Pansiyon ödeme özeti
 
-Migration `pension_payment_totals` görünümünü oluşturur.
+Current schema `pension_payment_totals` görünümünü içerir.
 
 Her rezervasyon için:
 
@@ -300,7 +300,7 @@ Bekleyen pansiyon alacağı
 
 Finans akışı iki seviyede korunur:
 
-- `smoke-finance-db.mjs`: migration, trigger, restoran otomatik geliri ve pansiyon ödeme tablosunu doğrular.
+- `smoke-finance-db.mjs`: current schema, trigger, restoran otomatik geliri ve pansiyon ödeme tablosunu doğrular.
 - `smoke-finance-service.mjs`: masaüstü Kasa servisinin manuel gelir/gider, tutar belirleme, kısmi/tam ödeme ve fazla ödeme engeli davranışını doğrular.
 
 ## Sonraki geliştirme adımları
