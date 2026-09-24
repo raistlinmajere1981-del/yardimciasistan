@@ -1,13 +1,13 @@
-import { BedDouble } from "lucide-react";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { CapabilityCondition } from "../../apps/desktop-app/src/app/capability-condition";
 import type { NavigationContribution } from "../../apps/desktop-app/src/app/navigation";
 import type { SettingsSectionContribution } from "../../apps/desktop-app/src/app/settings-section-contributions";
+import { pensionNavigationContribution } from "../../apps/desktop-app/src/components/pension/pension-navigation";
 import { roomWorkspaceDefinition } from "../../apps/desktop-app/src/components/pension/room-workspace-definition";
 
 const testNavigationContribution = {
   pageId: "pension",
-  icon: BedDouble,
+  icon: pensionNavigationContribution.icon,
   order: 35,
   condition: { allOf: [C.ACCOMMODATION_ROOMS] },
   contentScroll: "workspace",
