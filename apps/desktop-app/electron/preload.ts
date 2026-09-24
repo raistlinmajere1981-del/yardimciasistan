@@ -109,6 +109,11 @@ import type {
 } from "./diagnostics-contract";
 import type { BusinessCapabilitySnapshot } from "./business-capability-store";
 import type { BusinessPublicProfileSaveResult } from "./business-public-profile";
+import type {
+  BusinessLayoutSaveResult,
+  BusinessLayoutSnapshot,
+  SaveBusinessLayoutInput
+} from "./business-layout";
 import type { BusinessLocationGeocodeResponse } from "./business-location-geocode";
 import type { DesktopCommerceBridge } from "./commerce-ipc-contract";
 import type { MarketBarcodeFastPullState } from "./commerce-ipc-contract";
@@ -188,6 +193,8 @@ export interface DesktopBridge {
   onSyncStatusChanged: (listener: (status: AutomaticSyncStatus) => void) => () => void;
   getSetupData: () => Promise<DesktopSetupData>;
   saveInitialSetup: (input: SaveInitialSetupInput) => Promise<DesktopSetupSaveResult>;
+  getBusinessLayout: () => Promise<BusinessLayoutSnapshot>;
+  saveBusinessLayout: (input: SaveBusinessLayoutInput) => Promise<BusinessLayoutSaveResult>;
   getBusinessPublicProfile: () => Promise<BusinessPublicProfile>;
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => Promise<BusinessPublicProfileSaveResult>;
   geocodeBusinessAddress: (address: string) => Promise<BusinessLocationGeocodeResponse>;
@@ -327,6 +334,8 @@ const bridge: DesktopBridge = {
   },
   getSetupData: () => ipcRenderer.invoke("setup:getData"),
   saveInitialSetup: (input: SaveInitialSetupInput) => invokeWhenUnlocked<DesktopSetupSaveResult>("setup:saveInitial", input),
+  getBusinessLayout: () => invokeWhenUnlocked<BusinessLayoutSnapshot>("businessLayout:get"),
+  saveBusinessLayout: (input: SaveBusinessLayoutInput) => invokeWhenUnlocked<BusinessLayoutSaveResult>("businessLayout:save", input),
   getBusinessPublicProfile: () => invokeWhenUnlocked<BusinessPublicProfile>("businessPublicProfile:get"),
   saveBusinessPublicProfile: (input: SaveBusinessPublicProfileInput) => invokeWhenUnlocked<BusinessPublicProfileSaveResult>("businessPublicProfile:save", input),
   geocodeBusinessAddress: (address: string) => invokeWhenUnlocked<BusinessLocationGeocodeResponse>("businessLocation:geocodeAddress", address),
