@@ -46,6 +46,7 @@ import { DashboardPage } from "../../pages/DashboardPage";
 import { MarketPage } from "../../pages/MarketPage";
 import { MessagesPage } from "../../pages/MessagesPage";
 import { OperationCalendarPage } from "../../pages/OperationCalendarPage";
+import { useCalendarPageController } from "../calendar/calendar-page-state";
 import { usePensionPageController } from "../pension/pension-page-state";
 import { PensionPage } from "../../pages/PensionPage";
 import { ReportsPage } from "../../pages/ReportsPage";
@@ -200,6 +201,7 @@ export function DesktopWorkspaceRouter({
   } = deviceController;
 
   const pensionController = usePensionPageController();
+  const calendarController = useCalendarPageController();
   const C = BUSINESS_CAPABILITIES;
   const enabledCapabilities = businessCapabilities?.enabledCapabilities ?? [];
   const customersEnabled = runtimeHasCapability(businessCapabilities, C.CUSTOMERS);
@@ -442,6 +444,7 @@ export function DesktopWorkspaceRouter({
         />
       ) : activePage === "calendar" ? (
         <OperationCalendarPage
+          controller={calendarController}
           data={surfaceData}
           accommodationReservationsEnabled={accommodationReservationsEnabled}
           foodReservationsEnabled={foodReservationsEnabled}

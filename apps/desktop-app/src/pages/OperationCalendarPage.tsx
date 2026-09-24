@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -12,9 +12,9 @@ import {
 import type { DesktopDashboardData } from "../../electron/database";
 import { getReservationDomain } from "@yardimci-asistan/shared";
 import { ActionButton } from "../components/ui/ActionButton";
+import { calendarLocalDateKey, type useCalendarPageController } from "../components/calendar/calendar-page-state";
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
 
-type CalendarViewMode = "day" | "week";
 type ReservationRecord = DesktopDashboardData["reservations"][number];
 type DailyTaskRecord = DesktopDashboardData["dailyTasks"][number];
 
@@ -39,6 +39,7 @@ type CalendarItem =
     };
 
 interface OperationCalendarPageProps {
+  controller: ReturnType<typeof useCalendarPageController>;
   data: DesktopDashboardData;
   accommodationReservationsEnabled: boolean;
   foodReservationsEnabled: boolean;
@@ -50,6 +51,7 @@ interface OperationCalendarPageProps {
 const hiddenReservationStatuses = new Set(["rejected", "cancelled"]);
 
 export function OperationCalendarPage({
+  controller,
   data,
   accommodationReservationsEnabled,
   foodReservationsEnabled,
@@ -57,8 +59,7 @@ export function OperationCalendarPage({
   onOpenReservation,
   onCompleteTask
 }: OperationCalendarPageProps) {
-  const [viewMode, setViewMode] = useState<CalendarViewMode>("week");
-  const [selectedDate, setSelectedDate] = useState(() => toLocalDateKey(new Date()));
+  const { viewMode, setViewMode, selectedDate, setSelectedDate } = controller;
 
   const visibleDates = useMemo(
     () => (viewMode === "day" ? [selectedDate] : buildWeekDates(selectedDate)),
@@ -130,7 +131,7 @@ export function OperationCalendarPage({
             <ActionButton variant="secondary" size="sm" type="button" aria-label="Önceki dönem" onClick={() => moveRange(-1)}>
               <ChevronLeft size={16} aria-hidden="true" />
             </ActionButton>
-            <ActionButton variant="secondary" size="sm" type="button" onClick={() => setSelectedDate(toLocalDateKey(new Date()))}>
+            <ActionButton variant="secondary" size="sm" type="button" onClick={() => setSelectedDate(calendarLocalDateKey(new Date()))}>
               Bugün
             </ActionButton>
             <ActionButton variant="secondary" size="sm" type="button" aria-label="Sonraki dönem" onClick={() => moveRange(1)}>
@@ -153,7 +154,7 @@ export function OperationCalendarPage({
 
       <div className={`operation-calendar-grid ${viewMode === "day" ? "is-day" : "is-week"}`}>
         {dayEntries.map(({ date, items }) => {
-          const isToday = date === toLocalDateKey(new Date());
+          const isToday = date === calendarLocalDateKey(new Date());
           return (
             <article className={`operation-calendar-day panel ${isToday ? "is-today" : ""}`} key={date}>
               <header className="operation-calendar-day-header">
@@ -361,13 +362,6 @@ function formatReservationTables(reservation: ReservationRecord, tables: Desktop
   return tableNames.length > 0 ? tableNames.join(", ") : "Masa atanmadı";
 }
 
-function toLocalDateKey(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function parseLocalDate(dateKey: string) {
   const [year, month, day] = dateKey.split("-").map(Number);
   return new Date(year, Math.max(0, month - 1), day, 12, 0, 0, 0);
@@ -376,7 +370,7 @@ function parseLocalDate(dateKey: string) {
 function addDays(dateKey: string, amount: number) {
   const date = parseLocalDate(dateKey);
   date.setDate(date.getDate() + amount);
-  return toLocalDateKey(date);
+  return calendarLocalDateKey(date);
 }
 
 function buildWeekDates(dateKey: string) {
