@@ -11,9 +11,7 @@ import type { DesktopSetupData } from "./database-types.js";
 import { getAiServiceProfiles as getStoredAiServiceProfiles } from "./database/ai-profile-store.js";
 import { getTableCategories as getStoredTableCategories } from "./database/table-store.js";
 import {
-  normalizeStoredAiBaseUrl,
   normalizeStoredAiService,
-  normalizeStoredAiTimeout,
   normalizeStoredTimestamp
 } from "./database/ai-settings-utils.js";
 import { normalizeBoolean } from "./database/request-utils.js";
@@ -60,11 +58,11 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
     aiEnabled: enabledCapabilities.has(BUSINESS_CAPABILITIES.AI),
     aiProvider: String(settings?.ai_provider ?? "openai_compatible") || "openai_compatible",
     aiService,
-    aiProjectName: activeAiProfile?.projectName ?? String(settings?.ai_project_name ?? ""),
-    aiModel: activeAiProfile?.model ?? String(settings?.ai_model ?? ""),
-    aiBaseUrl: activeAiProfile?.baseUrl || normalizeStoredAiBaseUrl(settings?.ai_base_url),
-    aiTimeoutSeconds: activeAiProfile?.timeoutSeconds ?? normalizeStoredAiTimeout(settings?.ai_timeout_seconds),
-    aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? Boolean(String(settings?.ai_api_key_encrypted ?? "").trim()),
+    aiProjectName: activeAiProfile?.projectName ?? "",
+    aiModel: activeAiProfile?.model ?? "",
+    aiBaseUrl: activeAiProfile?.baseUrl ?? "",
+    aiTimeoutSeconds: activeAiProfile?.timeoutSeconds ?? 30,
+    aiApiKeyConfigured: activeAiProfile?.apiKeyConfigured ?? false,
     aiLastPublishedAt: normalizeStoredTimestamp(settings?.ai_last_published_at),
     aiProfiles,
     productData: {
