@@ -1023,6 +1023,7 @@ try {
       }),
       saveMenuCategory: async () => ({ ok: false, message: "smoke" }),
       saveMenuItem: async () => ({ ok: false, message: "smoke" }),
+      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
       openExternal: async () => true
     };
   }, {
@@ -1374,6 +1375,7 @@ try {
         );
       },
       getAiWorkspaceHistory: async () => [],
+      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
       markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
       openExternal: async () => true
     };
