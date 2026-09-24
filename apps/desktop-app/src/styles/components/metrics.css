@@ -93,13 +93,10 @@
 }
 
 .metric-card p {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-.metric-card p {
   grid-area: detail;
+  margin: 0;
   overflow: hidden;
+  color: var(--color-text-muted);
   font-size: var(--text-xs);
   line-height: 1.25;
   text-overflow: ellipsis;

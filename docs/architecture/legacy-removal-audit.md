@@ -66,6 +66,9 @@ Completed so far:
 - renamed the surviving low-priority shared component cascade sublayer from `components.legacy` to `components.support` without changing its precedence relative to `components.primitives`
 - design audit now rejects obsolete `[data-theme]` and `[data-mode]` CSS selectors if they return
 - source-only migration contracts were removed before deleting implementation code
+- removed the fully unused `components/resources.css` stylesheet after verifying its selectors had no live renderer component references
+- reduced `components/feedback.css` to the live `info-list` and `status-dot` contracts; obsolete command/suggestion/tag selectors were removed
+- merged duplicate `.metric-card p` declarations in `components/metrics.css`
 
 Continue to use Knip, design audit, import ownership and direct usage review together. Do not delete a component/style solely because its name sounds old; delete only when current imports/behavior prove it is dead.
 

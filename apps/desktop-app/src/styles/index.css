@@ -34,7 +34,6 @@
 @import "./components/metrics.css" layer(components.support);
 @import "./components/motion.css" layer(components.support);
 @import "./components/panels.css" layer(components.primitives);
-@import "./components/resources.css" layer(components.support);
 
 @import "./layout/app-shell.css" layer(layout);
 @import "./layout/page.css" layer(layout);
