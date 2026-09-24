@@ -6,6 +6,10 @@ import process from "node:process";
 
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
+const {
+  getBusinessLayout,
+  saveBusinessLayout
+} = require("../apps/desktop-app/dist-electron/business-layout.js");
 
 const appPath = join(process.cwd(), "apps", "desktop-app");
 const dataDir = join(process.cwd(), "artifacts", "table-categories-db-smoke", String(Date.now()));
@@ -19,9 +23,7 @@ const database = new DesktopDatabase({
 try {
   database.initialize();
 
-  assert.deepEqual(database.getSetupData().tableCategories, []);
-
-  const seedSave = database.saveInitialSetup({
+  const setupSave = database.saveInitialSetup({
     businessName: "Kategori Smoke Restoranı",
     profileId: "restaurant",
     phone: "+905551112233",
@@ -44,11 +46,12 @@ try {
     servicePreferences: {
       whatsapp: false,
       android: false
-    },
-    initialCounts: {
-      rooms: 0,
-      tables: 14
-    },
+    }
+  });
+  assert.equal(setupSave.ok, true, setupSave.ok ? "" : setupSave.message);
+  assert.deepEqual(getBusinessLayout(database.databasePath).tableCategories, []);
+
+  const seedSave = saveBusinessLayout(database.databasePath, {
     tableCategories: [
       { name: "Bahçe", tableCount: 5 },
       { name: "Salon", tableCount: 4 },
@@ -57,69 +60,41 @@ try {
     ]
   });
   assert.equal(seedSave.ok, true, seedSave.ok ? "" : seedSave.message);
-  assert.deepEqual(database.getSetupData().tableCategories, [
+  assert.deepEqual(seedSave.layout.tableCategories, [
     { name: "Bahçe", tableCount: 5 },
     { name: "Salon", tableCount: 4 },
     { name: "Teras", tableCount: 3 },
     { name: "Avlu", tableCount: 2 }
   ]);
 
-  const setupInput = {
-    businessName: "Kategori Smoke Restoranı",
-    profileId: "restaurant",
-    phone: "+905551112233",
-    whatsapp: "+905551112233",
-    email: "kategori@example.test",
-    address: "Test adresi",
-    webModuleUrl: "https://yardimciasistan.example.test",
-    syncSecret: "kategori-smoke-secret",
-    autoSyncEnabled: true,
-    aiEnabled: false,
-    aiProvider: "openai_compatible",
-    aiService: "openai",
-    aiProjectName: "",
-    aiModel: "",
-    aiModelOptions: [],
-    aiBaseUrl: "https://api.openai.com/v1",
-    aiTimeoutSeconds: 30,
-    aiApiKey: "",
-    clearAiApiKey: false,
-    servicePreferences: {
-      whatsapp: false,
-      android: false
-    },
-    initialCounts: {
-      rooms: 0,
-      tables: 8
-    },
-    tableCategories: [
-      { sourceName: "Bahçe", name: "İç Salon", tableCount: 3 },
-      { sourceName: "Salon", name: "Üst Kat", tableCount: 2 },
-      { sourceName: "Avlu", name: "Avlu", tableCount: 2 },
-      { sourceName: "", name: "Sahil", tableCount: 1 }
-    ]
-  };
+  const categoryInput = [
+    { sourceName: "Bahçe", name: "İç Salon", tableCount: 3 },
+    { sourceName: "Salon", name: "Üst Kat", tableCount: 2 },
+    { sourceName: "Avlu", name: "Avlu", tableCount: 2 },
+    { sourceName: "", name: "Sahil", tableCount: 1 }
+  ];
 
-  const categorySave = database.saveInitialSetup(setupInput);
-  assert.equal(categorySave.ok, true);
-  assert.deepEqual(categorySave.setupData.tableCategories, [
+  const categorySave = saveBusinessLayout(database.databasePath, {
+    tableCategories: categoryInput
+  });
+  assert.equal(categorySave.ok, true, categorySave.ok ? "" : categorySave.message);
+  assert.deepEqual(categorySave.layout.tableCategories, [
     { name: "İç Salon", tableCount: 3 },
     { name: "Üst Kat", tableCount: 2 },
     { name: "Avlu", tableCount: 2 },
     { name: "Sahil", tableCount: 1 }
   ]);
-  assert.equal(categorySave.dashboardData.tables.length, 8);
+  assert.equal(database.getDashboardData().tables.length, 8);
   assert.deepEqual(
-    categorySave.dashboardData.tables.map((table) => table.area),
+    database.getDashboardData().tables.map((table) => table.area),
     ["İç Salon", "İç Salon", "İç Salon", "Üst Kat", "Üst Kat", "Avlu", "Avlu", "Sahil"]
   );
   assert.deepEqual(
-    categorySave.dashboardData.tables.slice(0, 3).map((table) => table.name),
+    database.getDashboardData().tables.slice(0, 3).map((table) => table.name),
     ["İç Salon 1", "İç Salon 2", "İç Salon 3"]
   );
 
-  const duplicateCategorySave = database.saveInitialSetup({
-    ...setupInput,
+  const duplicateCategorySave = saveBusinessLayout(database.databasePath, {
     tableCategories: [
       { sourceName: "İç Salon", name: "Salon", tableCount: 2 },
       { sourceName: "Üst Kat", name: "salon", tableCount: 2 }
@@ -139,10 +114,12 @@ try {
     area: table.area,
     sortOrder: table.sortOrder
   }));
-  const noOpSave = database.saveInitialSetup(setupInput);
-  assert.equal(noOpSave.ok, true);
+  const noOpSave = saveBusinessLayout(database.databasePath, {
+    tableCategories: categoryInput
+  });
+  assert.equal(noOpSave.ok, true, noOpSave.ok ? "" : noOpSave.message);
   assert.deepEqual(
-    noOpSave.dashboardData.tables.map((table) => ({
+    database.getDashboardData().tables.map((table) => ({
       id: table.id,
       name: table.name,
       area: table.area,
@@ -151,29 +128,25 @@ try {
     beforeNoOpSave
   );
 
-  const unsafeReduction = database.saveInitialSetup({
-    ...setupInput,
-    initialCounts: { rooms: 0, tables: 0 },
+  const unsafeReduction = saveBusinessLayout(database.databasePath, {
     tableCategories: []
   });
   assert.equal(unsafeReduction.ok, false);
   assert.match(unsafeReduction.message, /aktif adisyon veya rezervasyona bağlı/iu);
   assert.equal(database.getDashboardData().tables.length, 8);
 
-  const safeReduction = database.saveInitialSetup({
-    ...setupInput,
-    initialCounts: { rooms: 0, tables: 1 },
+  const safeReduction = saveBusinessLayout(database.databasePath, {
     tableCategories: [
       { sourceName: "Avlu", name: "Servis Alanı", tableCount: 1 }
     ]
   });
-  assert.equal(safeReduction.ok, true);
-  assert.deepEqual(safeReduction.setupData.tableCategories, [
+  assert.equal(safeReduction.ok, true, safeReduction.ok ? "" : safeReduction.message);
+  assert.deepEqual(safeReduction.layout.tableCategories, [
     { name: "Servis Alanı", tableCount: 1 }
   ]);
-  assert.equal(safeReduction.dashboardData.tables.length, 1);
-  assert.equal(safeReduction.dashboardData.tables[0].id, protectedTable.id);
-  assert.equal(safeReduction.dashboardData.tables[0].area, "Servis Alanı");
+  assert.equal(database.getDashboardData().tables.length, 1);
+  assert.equal(database.getDashboardData().tables[0].id, protectedTable.id);
+  assert.equal(database.getDashboardData().tables[0].area, "Servis Alanı");
   assert.equal(database.getActiveTableOrder(protectedTable.id)?.id, openedOrder.order.id);
 
   console.log("Masa kategorisi veritabanı smoke testi başarılı.");
