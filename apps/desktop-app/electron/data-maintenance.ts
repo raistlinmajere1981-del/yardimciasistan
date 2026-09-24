@@ -55,8 +55,8 @@ export type DesktopDataMaintenanceResult =
     };
 
 type PendingDataMaintenance =
-  | { version: 1; kind: "restore"; createdAt: string }
-  | { version: 1; kind: "reset"; createdAt: string };
+  | { kind: "restore"; createdAt: string }
+  | { kind: "reset"; createdAt: string };
 
 interface DataMaintenancePaths {
   userDataPath: string;
@@ -70,9 +70,7 @@ interface DataMaintenancePaths {
 }
 
 interface BackupManifest {
-  format: "yardimci-asistan-backup";
-  version: 3;
-  schema: "001_baseline.sql";
+  format: "yardimci-asistan-backup-v2";
   createdAt: string;
   kind: DesktopBackupKind;
   databaseFile: string;
@@ -162,17 +160,12 @@ function validateYardimciDatabase(filePath: string) {
     const requiredRows = database.prepare(`
       SELECT name
       FROM sqlite_master
-      WHERE type = 'table' AND name IN ('business', 'settings', 'menu_items', 'business_capabilities', 'schema_migrations')
+      WHERE type = 'table' AND name IN ('business', 'settings', 'menu_items', 'business_capabilities', 'desktop_sync_identity', 'android_local_credentials')
     `).all() as Array<{ name?: unknown }>;
     const requiredTables = new Set(requiredRows.map((row) => String(row.name ?? "")));
-    if (!["business", "settings", "menu_items", "business_capabilities", "schema_migrations"]
+    if (!["business", "settings", "menu_items", "business_capabilities", "desktop_sync_identity", "android_local_credentials"]
       .every((table) => requiredTables.has(table))) {
       throw new Error("Seçilen dosya Yardımcı Asistan yedeği olarak doğrulanamadı.");
-    }
-
-    const migrations = database.prepare("SELECT id FROM schema_migrations ORDER BY id").all() as Array<{ id?: unknown }>;
-    if (migrations.length !== 1 || String(migrations[0]?.id ?? "") !== "001_baseline.sql") {
-      throw new Error("Yedek 001_baseline.sql güncel şemasını taşımıyor.");
     }
 
     const columns = (table: string) => new Set(
@@ -297,9 +290,7 @@ function readBackupManifest(folderPath: string): BackupManifest | null {
   if (!fs.existsSync(manifestPath)) return null;
   try {
     const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as Partial<BackupManifest>;
-    if (parsed.format !== "yardimci-asistan-backup"
-      || parsed.version !== 3
-      || parsed.schema !== "001_baseline.sql"
+    if (parsed.format !== "yardimci-asistan-backup-v2"
       || parsed.databaseFile !== BACKUP_DATABASE_FILE) return null;
     return parsed as BackupManifest;
   } catch {
@@ -385,9 +376,7 @@ function createBackupPackageFromDatabase(options: {
     const imageFiles = extractQrMenuImages(outputDatabasePath, path.join(tempFolderPath, QR_IMAGE_DIRECTORY));
     const assetFileCount = copyDurableAssets(options.paths.assetsPath, path.join(tempFolderPath, ASSET_DIRECTORY));
     const manifest: BackupManifest = {
-      format: "yardimci-asistan-backup",
-      version: 3,
-      schema: "001_baseline.sql",
+      format: "yardimci-asistan-backup-v2",
       createdAt,
       kind: options.kind,
       databaseFile: BACKUP_DATABASE_FILE,
@@ -574,7 +563,7 @@ function writePendingOperation(paths: DataMaintenancePaths, operation: PendingDa
 function readPendingOperation(paths: DataMaintenancePaths): PendingDataMaintenance | null {
   if (!fs.existsSync(paths.markerPath)) return null;
   const parsed = JSON.parse(fs.readFileSync(paths.markerPath, "utf8")) as Partial<PendingDataMaintenance>;
-  if (parsed.version !== 1 || (parsed.kind !== "restore" && parsed.kind !== "reset")) {
+  if (parsed.kind !== "restore" && parsed.kind !== "reset") {
     throw new Error("Bekleyen veri bakım kaydı geçersiz.");
   }
   return parsed as PendingDataMaintenance;
