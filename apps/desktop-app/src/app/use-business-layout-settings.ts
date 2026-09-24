@@ -29,7 +29,7 @@ export interface BusinessLayoutRoomDraft {
   removeBlockReason: string;
 }
 
-export interface BusinessLayoutTableCategoryDraft {
+interface BusinessLayoutTableCategoryDraft {
   key: string;
   sourceName: string;
   name: string;
@@ -395,14 +395,14 @@ function comparableDraft(value: BusinessLayoutDraft): string {
   });
 }
 
-export function minorToInput(value: number) {
+function minorToInput(value: number) {
   return new Intl.NumberFormat("tr-TR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(Math.max(0, value) / 100);
 }
 
-export function parseMoneyToMinor(value: string) {
+function parseMoneyToMinor(value: string) {
   const normalized = value.trim().replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
   if (!normalized) return 0;
   const amount = Number(normalized);
