@@ -136,12 +136,12 @@ koda veya paketlere gömülmez.
 Desktop app SQLite şema dosyası:
 
 ```text
-apps/desktop-app/db/migrations/001_baseline.sql
+apps/desktop-app/db/schema.sql
 ```
 
 Uygulama açılışında SQLite dosyası otomatik oluşturulur. Testlerde gerçek kullanıcı klasörüne yazmamak için `YA_DESKTOP_DATA_DIR` ortam değişkeni kullanılabilir.
 
-İlk açılışta tek current baseline migration uygulanır. Temiz kurulumda gerçek kullanıcı verisi olmadan başlar; hazır demo işletme/veri yüklenmez.
+İlk açılışta güncel `schema.sql` doğrudan uygulanır. Tarihsel veritabanı upgrade zinciri desteklenmez; temiz kurulum gerçek kullanıcı verisi olmadan başlar ve hazır demo işletme/veri yüklenmez.
 
 Linux'ta Electron pencere açılışını sanal ekranla kontrol etmek için:
 
@@ -206,8 +206,7 @@ dosyaya yazılmamalı, sadece ortam değişkeni olarak verilmelidir.
 
 Desktop uygulamada normal bağlantı kaynağı Ayarlar ekranıdır. Servis, bağlantı adresi,
 model, anahtar ve zaman aşımı SQLite + işletim sistemi güvenli saklama alanında tutulur;
-anahtar renderer'a geri okunmaz. Eski env tabanlı masaüstü kurulumları, henüz yerel
-şifreli anahtar yoksa fallback olarak çalışmaya devam eder. AI kapalıyken desktop
+anahtar renderer'a geri okunmaz. AI servis profillerinin tek kalıcı kaynağı `ai_service_profiles` tablosudur; eski Settings/env anahtar fallback'i yoktur. AI kapalıyken desktop
 güvenli yerel taslak üretir; provider hata dönerse manuel WhatsApp akışı devam eder.
 
 Anahtar frontend dosyalarına yazılmamalıdır.
