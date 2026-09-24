@@ -69,6 +69,7 @@ Completed so far:
 - removed the fully unused `components/resources.css` stylesheet after verifying its selectors had no live renderer component references
 - reduced `components/feedback.css` to the live `info-list` and `status-dot` contracts; obsolete command/suggestion/tag selectors were removed
 - merged duplicate `.metric-card p` declarations in `components/metrics.css`
+- removed `components/motion.css`; its live keyframes now live with Menu stock-image, Lock and utility owners, while no-owner motion scaffolding disappeared
 
 Continue to use Knip, design audit, import ownership and direct usage review together. Do not delete a component/style solely because its name sounds old; delete only when current imports/behavior prove it is dead.
 

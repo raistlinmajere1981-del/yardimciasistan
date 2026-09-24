@@ -32,7 +32,6 @@
 @import "./components/feedback.css" layer(components.support);
 @import "./components/forms.css" layer(components.primitives);
 @import "./components/metrics.css" layer(components.support);
-@import "./components/motion.css" layer(components.support);
 @import "./components/panels.css" layer(components.primitives);
 
 @import "./layout/app-shell.css" layer(layout);
