@@ -239,15 +239,14 @@ export function useMessagingController({
     aiCapabilityValuesRef.current = { aiEnabled, customersEnabled };
   }
 
-  const whatsappCapabilityValuesRef = useRef({ whatsappEnabled, customersEnabled, customerCreditEnabled });
+  const whatsappCapabilityValuesRef = useRef({ whatsappEnabled, customersEnabled });
   const whatsappCapabilityEpochRef = useRef(0);
   if (
     whatsappCapabilityValuesRef.current.whatsappEnabled !== whatsappEnabled
     || whatsappCapabilityValuesRef.current.customersEnabled !== customersEnabled
-    || whatsappCapabilityValuesRef.current.customerCreditEnabled !== customerCreditEnabled
   ) {
     whatsappCapabilityEpochRef.current += 1;
-    whatsappCapabilityValuesRef.current = { whatsappEnabled, customersEnabled, customerCreditEnabled };
+    whatsappCapabilityValuesRef.current = { whatsappEnabled, customersEnabled };
   }
 
   const aiEnabledRef = useRef(aiEnabled);
@@ -412,29 +411,31 @@ export function useMessagingController({
   }, [aiWorkspaceRequestId, customersEnabled, dashboardData.requests]);
 
   const selectedWhatsAppRequest = useMemo(
-    () => surfacePreparedWhatsAppMessage ? undefined : dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId) ?? dashboardData.requests[0],
-    [dashboardData.requests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
+    () => !customersEnabled || surfacePreparedWhatsAppMessage
+      ? undefined
+      : dashboardData.requests.find((request) => request.id === selectedWhatsAppRequestId) ?? dashboardData.requests[0],
+    [customersEnabled, dashboardData.requests, selectedWhatsAppRequestId, surfacePreparedWhatsAppMessage]
   );
 
   const selectedWhatsAppMessage = useMemo(
-    () => surfacePreparedWhatsAppMessage ? surfacePreparedWhatsAppMessage.message : whatsappEnabled && selectedWhatsAppRequest
+    () => surfacePreparedWhatsAppMessage ? surfacePreparedWhatsAppMessage.message : customersEnabled && whatsappEnabled && selectedWhatsAppRequest
       ? buildOwnerReplyWhatsAppMessage(
           (aiEnabled ? selectedWhatsAppRequest.ai_suggested_reply : "")
           || selectedWhatsAppRequest.whatsapp_message
         )
       : "",
-    [aiEnabled, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
+    [aiEnabled, customersEnabled, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
   );
 
   const selectedWhatsAppUrl = useMemo(
-    () => surfacePreparedWhatsAppMessage ? createWhatsAppWebUrl(surfacePreparedWhatsAppMessage.phone, surfacePreparedWhatsAppMessage.message) : whatsappEnabled && selectedWhatsAppRequest
+    () => surfacePreparedWhatsAppMessage ? createWhatsAppWebUrl(surfacePreparedWhatsAppMessage.phone, surfacePreparedWhatsAppMessage.message) : customersEnabled && whatsappEnabled && selectedWhatsAppRequest
       ? createWhatsAppWebUrl(selectedWhatsAppRequest.customer_phone, selectedWhatsAppMessage)
       : "",
-    [selectedWhatsAppMessage, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
+    [customersEnabled, selectedWhatsAppMessage, selectedWhatsAppRequest, whatsappEnabled, surfacePreparedWhatsAppMessage]
   );
 
   function openWhatsApp(request: SyncedCustomerRequest) {
-    if (!whatsappEnabled) {
+    if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
       return;
     }
@@ -451,7 +452,7 @@ export function useMessagingController({
   }
 
   function openCustomerWhatsApp(customer: DesktopDashboardData["customers"][number]) {
-    if (!whatsappEnabled) {
+    if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
       return;
     }
@@ -465,7 +466,7 @@ export function useMessagingController({
   }
 
   function openReservationWhatsApp(reservation: DesktopDashboardData["reservations"][number]) {
-    if (!whatsappEnabled) {
+    if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
       return;
     }
@@ -479,7 +480,7 @@ export function useMessagingController({
   }
 
   function openSelectedWhatsAppExternal() {
-    if (!whatsappEnabled) {
+    if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
       return;
     }
@@ -493,7 +494,7 @@ export function useMessagingController({
 
   async function handleWhatsAppMessageSent(requestId: string, message: string) {
     if (preparedWhatsAppMessage) return { ok: false as const, message: "Veresiye paylaşımı için gönderim kaydı tutulmaz." };
-    if (!whatsappEnabled) {
+    if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       return { ok: false as const, message: "WhatsApp bu işletmede etkin değil." };
     }
     if (!window.yardimciDesktop) {
@@ -503,15 +504,21 @@ export function useMessagingController({
       };
     }
 
+    const whatsappEpoch = whatsappCapabilityEpochRef.current;
     const result = await window.yardimciDesktop.markWhatsAppMessageSent({ requestId, message });
-    if (result.ok) {
+    if (
+      result.ok
+      && whatsappEpoch === whatsappCapabilityEpochRef.current
+      && customersEnabledRef.current
+      && whatsappEnabledRef.current
+    ) {
       setDashboardData(result.dashboardData);
     }
     return result;
   }
 
   async function handleDeleteWhatsAppMessage(request: SyncedCustomerRequest) {
-    if (!whatsappEnabled) {
+    if (!customersEnabledRef.current || !whatsappEnabledRef.current) {
       setStatusMessage("WhatsApp bu işletmede etkin değil.");
       return;
     }
