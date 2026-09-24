@@ -25,9 +25,17 @@ try {
     const enabledCapabilities = ['core.customers','core.requests','core.business_profile','accommodation.rooms','accommodation.reservations','food_service.tables','food_service.menu','food_service.orders','service.whatsapp','service.android','service.ai'];
     let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'] };
     let rooms = [
-      { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', nightlyPriceMinor: 240000 },
-      { id: 'room_design_102', name: 'Smoke Aile Odası', number: '102', nightlyPriceMinor: 320000 }
+      { id: 'room_design_101', name: 'Smoke Balkonlu Oda', number: '101', capacity: 2, bedInfo: '1 çift kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 240000, currency: 'TRY', sortOrder: 1, canRemove: true, removeBlockReason: '' },
+      { id: 'room_design_102', name: 'Smoke Aile Odası', number: '102', capacity: 4, bedInfo: '1 çift + 2 tek kişilik yatak', floor: '1', features: [], description: '', priceNote: '', nightlyPriceMinor: 320000, currency: 'TRY', sortOrder: 2, canRemove: true, removeBlockReason: '' }
     ];
+    let businessLayout = {
+      capabilities: { rooms: true, tables: true },
+      rooms,
+      tableCategories: [...new Set(dashboard.tables.map(table => table.area || 'Genel'))].map(name => ({
+        name,
+        tableCount: dashboard.tables.filter(table => (table.area || 'Genel') === name).length
+      }))
+    };
     let updateStatus = {
       phase: 'idle',
       message: 'Güncelleme sistemi hazır.',
@@ -53,12 +61,37 @@ try {
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
-      getRoomFolioData: async () => ({ rooms, activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
-      setRoomNightlyPrice: async input => {
-        rooms = rooms.map(room => room.id === input.roomId ? { ...room, name: input.name, nightlyPriceMinor: input.amountMinor } : room);
-        window.__designCalls.push({ kind: 'room', input });
-        return { ok: true, message: 'Oda bilgileri kaydedildi.' };
+      getBusinessLayout: async () => structuredClone(businessLayout),
+      saveBusinessLayout: async input => {
+        if (input.rooms) {
+          rooms = input.rooms.map((room, index) => ({
+            id: room.id || `room_design_new_${index + 1}`,
+            name: room.name,
+            number: room.number,
+            capacity: room.capacity,
+            bedInfo: room.bedInfo,
+            floor: room.floor,
+            features: [...room.features],
+            description: room.description,
+            priceNote: room.priceNote,
+            nightlyPriceMinor: room.nightlyPriceMinor,
+            currency: room.currency,
+            sortOrder: index + 1,
+            canRemove: true,
+            removeBlockReason: ''
+          }));
+        }
+        businessLayout = {
+          ...businessLayout,
+          rooms,
+          tableCategories: input.tableCategories
+            ? input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
+            : businessLayout.tableCategories
+        };
+        window.__designCalls.push({ kind: 'layout', input });
+        return { ok: true, message: 'İşletme düzeni kaydedildi.', layout: structuredClone(businessLayout) };
       },
+      getRoomFolioData: async () => ({ rooms, activeStays: [], folios: [], menuCategories: [], menuItems: [] }),
       listLocalBackups: async () => ({ ok: true, backups: [{ id: 'design-backup', createdAt: '2026-09-13T09:00:00Z', kind: 'manual', sizeBytes: 2048000, imageCount: 3 }] }),
       updateAppPassword: async input => { window.__designCalls.push({ kind: 'password', input }); return { ok: true, message: 'Şifre kaydedildi.', status: { passwordConfigured: true } }; },
       getUpdateStatus: async () => updateStatus,
@@ -82,7 +115,6 @@ try {
           whatsapp: input.whatsapp,
           email: input.email,
           address: input.address,
-          initialCounts: input.initialCounts,
           setupRequired: false
         });
         window.__designCalls.push({ kind: 'setup', input });
