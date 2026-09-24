@@ -1,6 +1,6 @@
 /* One entry point. Every application stylesheet declares its cascade layer. */
 @layer reset, tokens, foundation, components, layout, pages, utilities;
-@layer components.legacy, components.primitives;
+@layer components.support, components.primitives;
 /* User appearance preferences override every other layer. */
 @layer appearance;
 
@@ -29,12 +29,12 @@
 @import "./components/toolbars.css" layer(components.primitives);
 @import "./components/status.css" layer(components.primitives);
 @import "./components/disclosures.css" layer(components.primitives);
-@import "./components/feedback.css" layer(components.legacy);
+@import "./components/feedback.css" layer(components.support);
 @import "./components/forms.css" layer(components.primitives);
-@import "./components/metrics.css" layer(components.legacy);
-@import "./components/motion.css" layer(components.legacy);
+@import "./components/metrics.css" layer(components.support);
+@import "./components/motion.css" layer(components.support);
 @import "./components/panels.css" layer(components.primitives);
-@import "./components/resources.css" layer(components.legacy);
+@import "./components/resources.css" layer(components.support);
 
 @import "./layout/app-shell.css" layer(layout);
 @import "./layout/page.css" layer(layout);

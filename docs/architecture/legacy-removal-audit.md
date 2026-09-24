@@ -59,9 +59,15 @@ Mixed runtime/security checks such as capability-surface consistency remain unti
 
 ### Slice 10C — Dead UI/CSS cleanup
 
-Use Knip, design audit, import ownership and direct usage review together. Do not delete a component/style solely because its name sounds old.
+In progress.
 
-Primary candidates include obsolete drawer/editor selectors, migration-only CSS guards and components superseded by canonical Workspaces.
+Completed so far:
+
+- renamed the surviving low-priority shared component cascade sublayer from `components.legacy` to `components.support` without changing its precedence relative to `components.primitives`
+- design audit now rejects obsolete `[data-theme]` and `[data-mode]` CSS selectors if they return
+- source-only migration contracts were removed before deleting implementation code
+
+Continue to use Knip, design audit, import ownership and direct usage review together. Do not delete a component/style solely because its name sounds old; delete only when current imports/behavior prove it is dead.
 
 ### Slice 10D — Documentation reset
 
