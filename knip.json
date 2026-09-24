@@ -1,6 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip/schema.json",
-  "tags": ["-compiledSmoke"],
+  "tags": [
+    "-compiledSmoke"
+  ],
   "workspaces": {
     ".": {
       "entry": [
@@ -15,30 +17,42 @@
         "electron/main-entry.ts",
         "electron/commerce-store.ts",
         "electron/commerce-runtime.ts",
-        "scripts/**/*.{js,mjs,cjs,ts}"
+        "scripts/**/*.{js,mjs,cjs,ts,tsx}"
       ],
       "project": [
         "src/**/*.{ts,tsx}",
         "electron/**/*.ts",
-        "scripts/**/*.{js,mjs,cjs,ts}",
+        "scripts/**/*.{js,mjs,cjs,ts,tsx}",
         "*.config.ts"
       ]
     },
     "packages/shared": {
-      "project": ["**/*.ts"]
+      "project": [
+        "**/*.ts"
+      ]
     },
     "packages/ai-core": {
-      "project": ["**/*.ts"]
+      "project": [
+        "**/*.ts"
+      ]
     },
     "packages/sync-core": {
-      "project": ["**/*.ts"]
+      "project": [
+        "**/*.ts"
+      ]
     },
     "packages/whatsapp-bridge": {
-      "project": ["**/*.ts"]
+      "project": [
+        "**/*.ts"
+      ]
     },
     "packages/web-widget": {
-      "entry": ["src/index.ts"],
-      "project": ["src/**/*.ts"]
+      "entry": [
+        "src/index.ts"
+      ],
+      "project": [
+        "src/**/*.ts"
+      ]
     }
   }
 }

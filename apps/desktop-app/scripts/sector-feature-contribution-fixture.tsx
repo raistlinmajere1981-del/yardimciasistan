@@ -1,4 +1,4 @@
-import { createElement as h, useState } from "react";
+import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../electron/business-capability-store";
@@ -6,19 +6,12 @@ import type { DesktopDashboardData } from "../electron/database";
 import { defaultSetupData } from "../src/app/bootstrap-defaults";
 import type { CapabilityCondition } from "../src/app/capability-condition";
 import { buildNavigationFromContributions, type NavigationContribution } from "../src/app/navigation";
-import {
-  StagedSettingsContributionSlot,
-  type SettingsSectionContribution
-} from "../src/app/settings-section-contributions";
+import { StagedSettingsContributionSlot, type SettingsSectionContribution } from "../src/app/settings-section-contributions";
 import { toSetupForm } from "../src/app/setup-model";
 import { pensionNavigationContribution } from "../src/components/pension/pension-navigation";
 import { roomWorkspaceDefinition } from "../src/components/pension/room-workspace-definition";
 import { AppShell } from "../src/components/layout/AppShell";
-import {
-  WorkspaceHost,
-  WorkspaceNavigationProvider,
-  useWorkspaceNavigation
-} from "../src/components/workspace/WorkspaceNavigation";
+import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../src/components/workspace/WorkspaceNavigation";
 import "../src/styles/index.css";
 
 const fixtureWindow = window as unknown as {
@@ -55,15 +48,15 @@ const testSettingsContribution: SettingsSectionContribution<"operations"> = {
     persistence: "staged",
     condition: { allOf: [C.ACCOMMODATION_ROOMS] }
   },
-  render: ({ draft, onChange }) => h(
-    "label",
-    { className: "form-field form-field--short" },
-    "Test oda sayısı",
-    h("input", {
-      "aria-label": "Test oda sayısı",
-      value: draft.roomCount,
-      onChange: (event) => onChange({ roomCount: event.currentTarget.value })
-    })
+  render: ({ draft, onChange }) => (
+    <label className="form-field form-field--short">
+      Test oda sayısı
+      <input
+        aria-label="Test oda sayısı"
+        value={draft.roomCount}
+        onChange={(event) => onChange({ roomCount: event.target.value })}
+      />
+    </label>
   )
 };
 
@@ -93,63 +86,56 @@ function ContributionFixture() {
   const items = buildNavigationFromContributions(runtimeSnapshot, [testFeatureComposition.navigation]);
   fixtureWindow.fixtureRoomCount = () => form.roomCount;
 
-  return h(
-    AppShell,
-    {
-      contentScroll: "workspace",
-      sidebar: h("aside", { className: "sidebar" }, "Stage 9 fixture"),
-      header: h("header", { className: "page-header" }, h("h1", null, "Test Feature")),
-      overlay: h(WorkspaceHost, {
-        definition: testFeatureComposition.workspace,
-        context: { data, onDashboard: setData, ...fixtureWindow.fixtureCapabilities }
-      })
-    },
-    h(
-      "section",
-      { "aria-label": "Test feature katkıları", className: "form-stack" },
-      h(
-        "nav",
-        { "aria-label": "Test feature navigation" },
-        ...items.map((item) => h("button", { type: "button", key: item.id }, item.label))
-      ),
-      h(StagedSettingsContributionSlot, {
-        category: "operations",
-        form,
-        onFormChange: setForm,
-        busy: false,
-        configurationCapabilities: [C.ACCOMMODATION_ROOMS],
-        initialized: true,
-        runtimeSnapshot,
-        contributions: testFeatureComposition.settings
-      }),
-      h(
-        "button",
-        {
-          type: "button",
-          onClick: () => navigation.openWorkspace({
-            entityType: "room",
-            entityId: "room-101",
-            mode: "summary",
-            returnContext: { page: "pension", view: "rooms" }
-          })
-        },
-        "Test oda çalışma alanını aç"
-      ),
-      h("output", { "aria-label": "Test oda sayısı sonucu" }, form.roomCount)
-    )
-  );
+  return <AppShell
+    contentScroll="workspace"
+    sidebar={<aside className="sidebar">Stage 9 fixture</aside>}
+    header={<header className="page-header"><h1>Test Feature</h1></header>}
+    overlay={<WorkspaceHost
+      definition={testFeatureComposition.workspace}
+      context={{ data, onDashboard: setData, ...fixtureWindow.fixtureCapabilities }}
+    />}
+  >
+    <section aria-label="Test feature katkıları" className="form-stack">
+      <nav aria-label="Test feature navigation">
+        {items.map((item) => <button type="button" key={item.id}>{item.label}</button>)}
+      </nav>
+      <StagedSettingsContributionSlot
+        category="operations"
+        form={form}
+        onFormChange={setForm}
+        busy={false}
+        configurationCapabilities={[C.ACCOMMODATION_ROOMS]}
+        initialized
+        runtimeSnapshot={runtimeSnapshot}
+        contributions={testFeatureComposition.settings}
+      />
+      <button
+        type="button"
+        onClick={() => navigation.openWorkspace({
+          entityType: "room",
+          entityId: "room-101",
+          mode: "summary",
+          returnContext: { page: "pension", view: "rooms" }
+        })}
+      >
+        Test oda çalışma alanını aç
+      </button>
+      <output aria-label="Test oda sayısı sonucu">{form.roomCount}</output>
+    </section>
+  </AppShell>;
 }
 
 function Fixture() {
-  return h(
-    WorkspaceNavigationProvider,
-    { definitions: [testFeatureComposition.workspace], page: "pension" },
-    h(ContributionFixture)
-  );
+  return <WorkspaceNavigationProvider
+    definitions={[testFeatureComposition.workspace]}
+    page="pension"
+  >
+    <ContributionFixture />
+  </WorkspaceNavigationProvider>;
 }
 
 void invalidOperationsPatch;
 void invalidEmptyCondition;
 void invalidRecursiveCondition;
 
-createRoot(document.getElementById("root")!).render(h(Fixture));
+createRoot(document.getElementById("root")!).render(<Fixture />);
