@@ -32,6 +32,8 @@ export class WhatsAppDeliveryLock {
 }
 
 export class WhatsAppDeliveryAdapter implements BirthdayDeliveryAdapter {
+  private activeAutomaticRun: Promise<BirthdayDeliveryAdapterResult> | null = null;
+
   constructor(
     private readonly driver: WhatsAppWebviewDriver,
     private readonly lock: WhatsAppDeliveryLock
