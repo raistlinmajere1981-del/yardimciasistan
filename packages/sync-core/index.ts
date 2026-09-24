@@ -1224,7 +1224,6 @@ export interface SyncCapabilitiesSuccess {
   message: string;
   protocol_version: number;
   storage: string;
-  schema_version: number;
   features: string[];
   server_time: ISODateTimeString;
   server_revision: number;
