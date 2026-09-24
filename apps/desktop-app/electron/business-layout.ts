@@ -219,7 +219,7 @@ function hasCapability(db: DatabaseSync, capability: BusinessCapability): boolea
 
 function listRooms(db: DatabaseSync): BusinessLayoutRoom[] {
   const rows = db.prepare(
-    "SELECT id, name, number, capacity, bed_info, floor, features_json, description, price_note, " +
+    "SELECT id, name, number, capacity, bed_info, floor, status, features_json, description, price_note, " +
     "nightly_price_minor, price_currency, sort_order " +
     "FROM rooms WHERE deleted_at = '' AND is_active = 1 " +
     "ORDER BY sort_order ASC, number ASC, name ASC"
