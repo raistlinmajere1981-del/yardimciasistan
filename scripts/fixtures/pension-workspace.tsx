@@ -5,7 +5,7 @@ import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell"
 import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import { usePensionPageController } from "../../apps/desktop-app/src/components/pension/pension-page-state";
 import { PensionPage } from "../../apps/desktop-app/src/pages/PensionPage";
-import { roomWorkspaceDefinition } from "../../apps/desktop-app/src/app/workspace-definitions";
+import { customerWorkspaceDefinition, roomWorkspaceDefinition } from "../../apps/desktop-app/src/app/workspace-definitions";
 import { RoomsWorkspace, ReservationsWorkspace, DailyTasksWorkspace } from "../../apps/desktop-app/src/components/operations/OperationWorkspaces";
 import { CustomersWorkspace } from "../../apps/desktop-app/src/components/customers/CustomersWorkspace";
 import "../../apps/desktop-app/src/styles/index.css";
@@ -22,6 +22,20 @@ function Fixture() {
       sidebar={<aside className="sidebar"><button onClick={() => setPage("pension")}>Pansiyon</button><button onClick={() => setPage("customerWork")}>Müşteriler</button></aside>}
       header={<header className="page-header"><h1>{page === "pension" ? "Pansiyon" : "Müşteriler"}</h1></header>}
       overlay={<><Controls refresh={() => setData(current => ({ ...current, rooms: current.rooms.map(room => ({ ...room, updatedAt: String(Math.random()) })) }))} />
+        <WorkspaceHost definition={customerWorkspaceDefinition} context={{
+          data,
+          aiEnabled: false,
+          whatsappEnabled: false,
+          reservationsEnabled: capabilities.reservationsEnabled,
+          staysEnabled: capabilities.staysEnabled,
+          customerCreditEnabled: false,
+          onCall: () => {},
+          onWhatsApp: () => {},
+          onSummarize: () => {},
+          onSave: async () => ({ ok: false, message: "fixture" }),
+          onAnalyzeIdentity: async () => ({ ok: false, message: "fixture" }),
+          onDelete: async () => undefined
+        }} />
         <WorkspaceHost definition={roomWorkspaceDefinition} context={{ data, onDashboard: setData, ...capabilities }} /></>}>
       {page === "pension" ? <PensionPage controller={pension} reservationsEnabled={capabilities.reservationsEnabled} tasksEnabled reservations={
         <ReservationsWorkspace reservations={data.reservations} rooms={data.rooms} customers={data.customers} whatsappEnabled={false}

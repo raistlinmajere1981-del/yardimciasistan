@@ -152,14 +152,17 @@ try {
   await button('Çalışma alanını kapat').click(); await expect(button('Pilot 102 odasını aç')).toBeFocused();
   await expect(button('Odalar')).toHaveAttribute('aria-pressed', 'true');
   await button('Müşteriler').click();
-  await page.getByLabel('Konaklama odası').selectOption('room-102');
+  const customerEntry = page.locator('.customer-record-row').first();
+  await customerEntry.click();
+  await expect(dialog.getByRole('heading', { level: 2 })).toContainText('Kompakt Misafir 1');
+  await dialog.getByLabel('Konaklama odası').selectOption('room-102');
   await button('Odaya Ata').click();
   await expect(dialog.getByLabel('Müşteri', { exact: true })).toBeDisabled();
   await dialog.getByLabel('Giriş tarihi').fill('2031-01-01');
   await dialog.getByLabel('Çıkış tarihi').fill('2031-01-02');
   await button('Kaydet').click();
   expect((await page.evaluate(() => window.fixtureState())).dashboard.customerRoomStays[1].reservationId).toBe('');
-  await button('Çalışma alanını kapat').click(); await expect(button('Odaya Ata')).toBeFocused();
+  await button('Çalışma alanını kapat').click(); await expect(customerEntry).toBeFocused();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Müşteriler');
   await expect(page.locator('.room-folio-drawer, .room-assignment-drawer, .pension-archive-details')).toHaveCount(0);
   // Delayed reads: old entity success/error/finally and same-entity out-of-order refresh cannot win.
