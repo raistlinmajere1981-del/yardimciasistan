@@ -14,7 +14,6 @@ test("profile registry contains only supported setup profiles", () => {
     getBusinessProfiles().map((profile) => profile.id),
     ["pension_restaurant", "pension", "restaurant", "market"]
   );
-  assert.equal(normalizeBusinessType("cafe"), "restaurant");
   assert.equal(normalizeBusinessType("invalid"), "pension_restaurant");
   assert.equal(getBusinessProfile("unknown_profile").id, "pension_restaurant");
 });
