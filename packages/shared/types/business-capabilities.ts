@@ -267,9 +267,6 @@ export const BUSINESS_PROFILES: Record<BusinessType, BusinessProfileDefinition> 
 };
 
 export function normalizeBusinessType(value: string): BusinessType {
-  if (value === "cafe") {
-    return "restaurant";
-  }
   return Object.prototype.hasOwnProperty.call(BUSINESS_PROFILES, value)
     ? value as BusinessType
     : "pension_restaurant";
