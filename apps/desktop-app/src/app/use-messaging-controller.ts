@@ -110,6 +110,12 @@ export function useMessagingController({
         || !whatsappEnabledRef.current
       ) return;
     } catch (error) {
+      if (
+        generation !== birthdayOperationGenerationRef.current
+        || whatsappEpoch !== whatsappCapabilityEpochRef.current
+        || !customersEnabledRef.current
+        || !whatsappEnabledRef.current
+      ) return;
       setSyncState("error");
       setStatusMessage(error instanceof Error ? error.message : "Doğum günü mesajı hazırlanamadı.");
       return;
@@ -130,6 +136,12 @@ export function useMessagingController({
         || !whatsappEnabledRef.current
       ) return;
     } catch {
+      if (
+        generation !== birthdayOperationGenerationRef.current
+        || whatsappEpoch !== whatsappCapabilityEpochRef.current
+        || !customersEnabledRef.current
+        || !whatsappEnabledRef.current
+      ) return;
       setSyncState("error");
       setStatusMessage("Mesaj hazırlandı ancak ekran yenilenemedi. Doğum günü listesini yenileyip tekrar deneyin.");
       return;
@@ -141,7 +153,14 @@ export function useMessagingController({
       return;
     }
 
-    await handleBirthdayAction(result.action, result.candidate);
+    await handleBirthdayAction(
+      result.action,
+      result.candidate,
+      () => generation === birthdayOperationGenerationRef.current
+        && whatsappEpoch === whatsappCapabilityEpochRef.current
+        && customersEnabledRef.current
+        && whatsappEnabledRef.current
+    );
     if (
       generation === birthdayOperationGenerationRef.current
       && whatsappEpoch === whatsappCapabilityEpochRef.current
@@ -152,8 +171,10 @@ export function useMessagingController({
 
   async function handleBirthdayAction(
     action: Extract<WhatsAppAction, { ok: true }>,
-    candidate: { customerId: string; customerName: string; phone: string; message: string }
+    candidate: { customerId: string; customerName: string; phone: string; message: string },
+    canContinue: () => boolean
   ) {
+    if (!canContinue()) return;
     if (action.mode === "webview") {
       openPreparedWhatsApp({
         source: "birthday",
@@ -169,8 +190,10 @@ export function useMessagingController({
     if (action.mode === "manual_copy") {
       try {
         await navigator.clipboard.writeText(action.message);
+        if (!canContinue()) return;
         setStatusMessage("Mesaj hazırlandı ve panoya kopyalandı; gönderim sizin kontrolünüzde.");
       } catch {
+        if (!canContinue()) return;
         openPreparedWhatsApp({
           source: "birthday",
           customerId: candidate.customerId,
@@ -185,6 +208,7 @@ export function useMessagingController({
 
     if (action.mode === "wa_link") {
       const opened = await window.yardimciDesktop?.openExternal(action.url);
+      if (!canContinue()) return;
       if (opened === false) {
         setStatusMessage("WhatsApp açılamadı. Mesajı kopyalayıp elle paylaşabilirsiniz.");
         return;
@@ -302,7 +326,7 @@ export function useMessagingController({
         setAiWorkspaceMessage("AI geçmişi yüklenemedi.");
       }
     });
-  }, [aiEnabled, messagesActive, messagesAiOpen]);
+  }, [aiEnabled, customersEnabled, messagesActive, messagesAiOpen]);
 
   useEffect(() => {
     if (messagesActive && aiEnabled && !whatsappEnabled) {
@@ -323,7 +347,7 @@ export function useMessagingController({
     setSuggestingRequestId("");
     setAiState("idle");
     setAiMessage("AI bu işletmede etkin değil.");
-    setAiWorkspaceMode("reply");
+    setAiWorkspaceMode(customersEnabledRef.current ? "reply" : "daily");
     setAiWorkspaceRequestId("");
     setAiWorkspaceInstructions("");
     setAiWorkspaceEntry(null);
