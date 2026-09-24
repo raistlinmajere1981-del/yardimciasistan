@@ -49,7 +49,7 @@ The removed files primarily reproduced migration-era screenshots, overflow matri
 Source-text cleanup in this slice:
 
 - removed the source-only `smoke-operation-calendar.mjs`; `smoke-calendar-workspace.mjs` is the current behavior contract
-- removed the source-only `smoke-market-workspace-contract.mjs`; Market browser/session/domain tests remain
+- removed the source-only `smoke-market-workspace-contract.mjs`; Market browser/session/domain tests remain, and the stale `check-modular-foundation.mjs` reference was removed rather than replaced with another source-shape smoke
 - reduced `smoke-sector-feature-contributions.mjs` to executable type/condition/browser contracts instead of regex assertions over production source files
 
 - removed `smoke-desktop-frontend-architecture.mjs`; its durable rules moved to the AST-based `architecture-audit.mjs`
