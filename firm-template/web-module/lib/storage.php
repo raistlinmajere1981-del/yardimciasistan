@@ -4,10 +4,9 @@ declare(strict_types=1);
 const YA_STORAGE_BASE_DIR = __DIR__ . '/..';
 const YA_STORAGE_DATA_DIR = YA_STORAGE_BASE_DIR . '/data';
 const YA_STORAGE_DATABASE_FILE = YA_STORAGE_DATA_DIR . '/yardimci-asistan.sqlite';
-const YA_STORAGE_SCHEMA_VERSION = 3;
 
 /**
- * Opens and migrates the hosting-side SQLite store.
+ * Opens the current hosting-side SQLite store.
  *
  * @throws RuntimeException when PDO SQLite is unavailable or the store cannot be opened.
  */
@@ -40,10 +39,6 @@ function ya_storage_open(): PDO
         if ($journalMode !== 'wal') {
             $database->exec('PRAGMA journal_mode = DELETE');
         }
-        $storedSchemaVersion = ya_storage_existing_schema_version($database);
-        if ($storedSchemaVersion !== 0 && $storedSchemaVersion !== YA_STORAGE_SCHEMA_VERSION) {
-            throw new RuntimeException('unsupported_storage_schema');
-        }
         ya_storage_create_schema($database);
         if (is_file(YA_STORAGE_DATABASE_FILE)) {
             @chmod(YA_STORAGE_DATABASE_FILE, 0600);
@@ -64,7 +59,6 @@ function ya_storage_capabilities(): array
     return [
         'protocol_version' => 2,
         'storage' => 'sqlite',
-        'schema_version' => YA_STORAGE_SCHEMA_VERSION,
         'features' => [
             'request_cursor',
             'request_acknowledgement',
@@ -557,20 +551,6 @@ function ya_storage_update_state(array $changes): void
     }
 }
 
-function ya_storage_existing_schema_version(PDO $database): int
-{
-    $hasMetaTable = (int) $database
-        ->query("SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'sync_meta'")
-        ->fetchColumn();
-    if ($hasMetaTable === 0) {
-        return 0;
-    }
-
-    $statement = $database->prepare("SELECT value FROM sync_meta WHERE key = 'schema_version'");
-    $statement->execute();
-    return (int) ($statement->fetchColumn() ?: 0);
-}
-
 function ya_storage_create_schema(PDO $database): void
 {
     $database->exec(<<<'SQL'
@@ -639,10 +619,6 @@ function ya_storage_create_schema(PDO $database): void
           last_seen_at TEXT NOT NULL
         );
     SQL);
-    $database->prepare(<<<'SQL'
-        INSERT INTO sync_meta (key, value) VALUES ('schema_version', :version)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    SQL)->execute([':version' => (string) YA_STORAGE_SCHEMA_VERSION]);
 }
 
 function ya_storage_mark_request_row_synced(PDO $database, string $requestId, string $now): int
