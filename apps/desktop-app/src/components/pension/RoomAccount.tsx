@@ -102,7 +102,7 @@ export function RoomAccountOperation({ operation, folio, controller, onDone }: {
       await run(() => bridge.voidRoomFolioPayment(operation.paymentId!));
     } else if (operation.kind === "close-account") {
       if (folio.remainingMinor > 0) { setError("Açık borç varken hesap kapatılamaz. Önce ödeme alın."); return; }
-      await run(() => bridge.checkoutRoomFolio({ folioId: folio.id, allowOutstanding: false }));
+      await run(() => bridge.checkoutRoomFolio({ folioId: folio.id }));
     } else if (operation.kind === "account-details") {
       if (parseMoneyToMinor(nightly) < 0 || (manual && parseMoneyToMinor(total) < 0)) { setError("Konaklama tutarlarını kontrol edin."); return; }
       await run(() => bridge.updateRoomFolioDetails({ folioId: folio.id, guestCount, checkInDate: start, plannedCheckOutDate: end,
