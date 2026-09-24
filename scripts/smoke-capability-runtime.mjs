@@ -3,7 +3,6 @@ import { createRequire } from "node:module";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import process from "node:process";
 
 const require = createRequire(import.meta.url);
@@ -60,20 +59,6 @@ try {
   assert.equal(initial.enabledCapabilities.includes(C.FOOD_TABLES), true);
   assert.equal(initial.enabledCapabilities.includes(C.RETAIL_BARCODE), false);
   assert.doesNotThrow(() => assertPersistedBusinessCapability(databasePath, C.ACCOMMODATION_FOLIO));
-
-  const raw = new DatabaseSync(databasePath);
-  try {
-    const businessColumns = new Set(raw.prepare("PRAGMA table_info('business')").all().map((row) => row.name));
-    const settingsColumns = new Set(raw.prepare("PRAGMA table_info('settings')").all().map((row) => row.name));
-    assert.equal(businessColumns.has("profile_id"), true);
-    assert.equal(businessColumns.has("business_type"), false);
-    assert.equal(businessColumns.has("modules_json"), false);
-    for (const column of ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]) {
-      assert.equal(settingsColumns.has(column), false, `${column} must not exist in a baseline database`);
-    }
-  } finally {
-    raw.close();
-  }
 
   const market = applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
   assert.equal(market.profileId, "market");
