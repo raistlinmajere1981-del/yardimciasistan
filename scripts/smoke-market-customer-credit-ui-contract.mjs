@@ -50,8 +50,8 @@ try {
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const path = database.databasePath;
-  // A cafe with explicit retail capabilities proves there is no profile gate.
-  applyBusinessProfileCapabilities(path, "cafe", { preserveUserOverrides: false });
+  // A restaurant with explicit retail capabilities proves there is no profile gate.
+  applyBusinessProfileCapabilities(path, "restaurant", { preserveUserOverrides: false });
   setBusinessCapability(path, { capability: "commerce.customer_credit", enabled: true });
   setBusinessCapability(path, { capability: "retail.barcode", enabled: true });
   setBusinessCapability(path, { capability: "service.whatsapp", enabled: false });
