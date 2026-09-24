@@ -422,11 +422,15 @@ Implementation status (2026-09-24):
 - Stage 8F — Dashboard: closed and verified.
 - Stage 8G — Calendar: closed and verified.
 - Stage 8 feature migration: complete.
-- Next: Stage 9 — Sector / Feature contribution model.
+- Stage 9 — Sector / Feature contribution model: closed and verified.
+- Next: Stage 10 — Legacy removal and documentation reset.
 
 ---
 
 # Stage 9 — Sector / Feature contribution model
+
+Status: **closed and verified** on `refactor/feature-contribution-model-v2`.
+See [Sector / Feature Contribution Model](sector-feature-contribution-model.md).
 
 Only after the previous stages prove the shape.
 
@@ -449,6 +453,10 @@ The initial goal is internal modularity so a new sector does not require editing
 ## Exit criteria
 
 A test sector/feature can contribute navigation + settings + one workspace without copying another sector's page code.
+
+**Verified:** the Stage 9 browser fixture composes a navigation contribution, a capability-gated staged Settings contribution and the canonical Room Workspace through the extracted static seams. It does not copy PensionPage, SettingsWorkspace, LayoutSettingsSection or RoomsWorkspace.
+
+Dashboard contributions and executable/domain-operation registration were deliberately not generalized because the existing pilots did not prove a safe shared contract.
 
 Recommended reasoning: **GPT-6 Astra High or Extra High only if cross-repo dependency analysis warrants it**.
 

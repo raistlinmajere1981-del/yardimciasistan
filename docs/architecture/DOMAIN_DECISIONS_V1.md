@@ -251,9 +251,11 @@ Existing saved preferences may be migrated once.
 
 Pension and Restaurant are the evidence-gathering pilots.
 
-Only after both use the new architecture should common registration APIs be extracted for navigation, settings sections, entity workspaces, dashboard contributions and capability composition.
+Stage 9 satisfied this threshold and extracted only the seams proved by those pilots: static typed navigation contributions, narrow staged Settings contributions and feature-owned entity workspace definitions with a static aggregate. Runtime capability snapshots remain the gate and Business Profiles remain capability presets.
 
-This prevents a speculative framework that encodes the wrong abstractions.
+Dashboard contribution registration and executable/domain-operation registration were not extracted because the pilots did not prove a safe common contract. No dynamic plugin registry, service locator, dependency container or generic command bus was introduced.
+
+This preserves the original intent: common composition is extracted only after evidence, without turning the desktop into a speculative plugin framework.
 
 ---
 

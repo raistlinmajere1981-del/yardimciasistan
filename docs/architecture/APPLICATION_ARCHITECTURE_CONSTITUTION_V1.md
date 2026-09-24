@@ -328,9 +328,11 @@ Capabilities remain the behavior gate. UI visibility alone is never the security
 
 A new sector should preferably compose existing capabilities and domain modules before inventing sector-specific copies.
 
-Long-term extension points may include navigation contribution, dashboard contribution, settings contribution, entity workspace contribution and operation/capability contribution.
+Stage 9 extracted evidence-backed **static typed** contribution seams for navigation, staged Settings sections and entity workspace definitions. These are internal composition APIs, not runtime discovery or a public plugin contract. Persisted runtime capabilities remain the behavior/visibility gate; business profiles remain presets rather than permanent sector locks.
 
-However, **do not implement a generic plugin/sector registry before Pension and Restaurant pilots expose the real shared requirements**. Extract after evidence, not before it.
+Dashboard contributions and executable/domain-operation registration remain explicit. Do not add a generic service locator, dependency container, command bus, controller factory or dynamic plugin registry merely to make the contribution model look uniform.
+
+The Pension and Restaurant pilots remain the evidence threshold: extract after evidence, not before it.
 
 ---
 
