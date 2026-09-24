@@ -22,7 +22,7 @@ const fixtureWindow = window as unknown as {
     folioEnabled: boolean;
     menuEnabled: boolean;
   };
-  fixtureRoomCount: () => string;
+  fixtureWebModuleUrl: () => string;
 };
 
 const testNavigationContribution = {
@@ -39,28 +39,28 @@ const testNavigationContribution = {
   }
 } satisfies NavigationContribution;
 
-const testSettingsContribution: SettingsSectionContribution<"operations"> = {
+const testSettingsContribution: SettingsSectionContribution<"services"> = {
   definition: {
-    id: "settings-test-room-contribution",
-    category: "operations",
-    title: "Test Oda Katkısı",
-    keywords: "test oda contribution",
+    id: "settings-test-service-contribution",
+    category: "services",
+    title: "Test Servis Katkısı",
+    keywords: "test service contribution",
     persistence: "staged",
     condition: { allOf: [C.ACCOMMODATION_ROOMS] }
   },
   render: ({ draft, onChange }) => (
     <label className="form-field form-field--short">
-      Test oda sayısı
+      Test web adresi
       <input
-        aria-label="Test oda sayısı"
-        value={draft.roomCount}
-        onChange={(event) => onChange({ roomCount: event.target.value })}
+        aria-label="Test web adresi"
+        value={draft.webModuleUrl}
+        onChange={(event) => onChange({ webModuleUrl: event.target.value })}
       />
     </label>
   )
 };
 
-// @ts-expect-error Operations contributions cannot write Business-owned fields.
+// @ts-expect-error Services contributions cannot write Business-owned fields.
 const invalidOperationsPatch: Parameters<Parameters<typeof testSettingsContribution.render>[0]["onChange"]>[0] = { businessName: "cross-category-write" };
 // @ts-expect-error Capability groups are deliberately non-empty.
 const invalidEmptyCondition: CapabilityCondition = { allOf: [] };
@@ -75,7 +75,7 @@ export const testFeatureComposition = {
 
 function ContributionFixture() {
   const navigation = useWorkspaceNavigation();
-  const [form, setForm] = useState(() => ({ ...toSetupForm(defaultSetupData), roomCount: "2" }));
+  const [form, setForm] = useState(() => ({ ...toSetupForm(defaultSetupData), webModuleUrl: "https://fixture.example.test" }));
   const [data, setData] = useState(fixtureWindow.fixtureDashboard);
   const runtimeSnapshot: BusinessCapabilitySnapshot = {
     businessId: "stage-9-fixture",
@@ -84,7 +84,7 @@ function ContributionFixture() {
     enabledCapabilities: [C.ACCOMMODATION_ROOMS]
   };
   const items = buildNavigationFromContributions(runtimeSnapshot, [testFeatureComposition.navigation]);
-  fixtureWindow.fixtureRoomCount = () => form.roomCount;
+  fixtureWindow.fixtureWebModuleUrl = () => form.webModuleUrl;
 
   return <AppShell
     contentScroll="workspace"
@@ -100,7 +100,7 @@ function ContributionFixture() {
         {items.map((item) => <button type="button" key={item.id}>{item.label}</button>)}
       </nav>
       <StagedSettingsContributionSlot
-        category="operations"
+        category="services"
         form={form}
         onFormChange={setForm}
         busy={false}
@@ -120,7 +120,7 @@ function ContributionFixture() {
       >
         Test oda çalışma alanını aç
       </button>
-      <output aria-label="Test oda sayısı sonucu">{form.roomCount}</output>
+      <output aria-label="Test web adresi sonucu">{form.webModuleUrl}</output>
     </section>
   </AppShell>;
 }
