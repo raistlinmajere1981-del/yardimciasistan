@@ -14,6 +14,7 @@ reporting. Each tag names its current consuming smoke:
 | `MINIMUM_NETWORK_FAMILY_ATTEMPT_TIMEOUT_MS` | `smoke-web-connection-test.mjs` |
 | `supportsAndroidDevicePermissionSync` | `smoke-automatic-sync.mjs` |
 | `createSyncFetchWithTimeout` | `smoke-sync-timeout.mjs` |
+| `buildLocalCompanionMdnsResponse` | `smoke-local-companion-server.mjs` |
 
 These are current test APIs, not compatibility promises. Remove a tag and
 reassess the export if its consumer is removed. Do not tag unused helpers or
