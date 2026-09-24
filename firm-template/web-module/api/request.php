@@ -123,7 +123,7 @@ function ya_request_feature_enabled(array $businessConfig): bool
     }
 
     $profileId = ya_string($businessConfig['profile_id'] ?? '');
-    return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant', 'cafe'], true);
+    return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant'], true);
 }
 
 function ya_merge_business_public_context(array $config): array
