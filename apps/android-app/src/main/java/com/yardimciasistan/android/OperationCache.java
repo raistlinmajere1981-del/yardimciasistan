@@ -83,10 +83,8 @@ final class OperationCache {
         .remove(KEY_CACHE)
         .remove(KEY_REVISIONS)
         .remove(profileKey())
-        .remove("operations_cache_v1")
-        .remove("operations_device_profile_v1_" + deviceId)
         .commit()) {
-      throw new CacheException("Eski Android verisi telefon önbelleğinden temizlenemedi.");
+      throw new CacheException("Android verisi telefon önbelleğinden temizlenemedi.");
     }
   }
 
