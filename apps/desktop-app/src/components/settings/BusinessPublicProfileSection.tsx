@@ -290,19 +290,10 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
 }
 
 export function BusinessPublicProfileSection({ controller }: { controller: ReturnType<typeof useBusinessPublicProfileSettings> }) {
-  const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, save, feedback, dirty, discard } = controller;
+  const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, feedback } = controller;
 
   return (
     <section ref={sectionRef} id="settings-public-profile" tabIndex={-1} className="business-public-profile-section settings-business-subsection" aria-busy={loading || saving}>
-      <div className="settings-subsection-heading">
-        <h3>Müşteriye Açık Bilgiler</h3>
-      </div>
-
-      <div className="form-actions">
-        <button className="action-button" type="button" disabled={!dirty || saving || loading} onClick={() => void save()}>Müşteri Bilgilerini Kaydet</button>
-        <button className="action-button action-button-secondary" type="button" disabled={!dirty || saving} onClick={discard}>Müşteri Bilgilerini Geri Al</button>
-        {dirty && <span>Kaydedilmemiş değişiklikler</span>}
-      </div>
       {feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}
       <fieldset className="settings-resource-fields" disabled={loading || saving}>
       {loading ? (
