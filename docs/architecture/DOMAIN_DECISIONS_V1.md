@@ -208,21 +208,24 @@ They must not be merged into one balance or one payment mutation without an expl
 
 ---
 
-## D-013 — Settings uses category-scoped drafts and save
+## D-013 — Settings uses one active category draft and guarded transitions
 
 **Status:** ACCEPTED
 
 Target behavior:
 
-- only active category is presented
-- dirty state is category-specific
-- switching category preserves drafts
-- dirty category gets a visible indicator
-- save/discard applies to the active staged category
-- leaving Settings with dirty drafts requires one clear decision
-- immediate actions remain immediate and are not fake staged settings
+- only the active category is presented and only that category may remain dirty
+- dirty state is category-specific and visibly marked
+- switching category while dirty requires one explicit decision: save and continue, discard and continue, or stay
+- Settings search uses the same guarded transition contract
+- leaving Settings through application navigation while dirty uses the same decision contract
+- a failed save keeps the user in the current category and preserves the remaining draft
+- save/discard applies only to the active category
+- controls are locked while the owning category save is in flight; late edits are not rebased across a save
+- Appearance remains immediate; password, device, update-check/install and maintenance commands remain actions rather than fake staged settings
+- Operations owns one transactional `BusinessLayout` draft for rooms and table categories instead of Setup-owned room/table fields
 
-A future backend category-patch API is preferred but not required for the first UI split.
+A future backend category-patch API may still narrow Setup persistence, but multi-category dirty preservation is not part of the Settings contract.
 
 ---
 
