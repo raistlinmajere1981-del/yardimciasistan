@@ -10,7 +10,7 @@ import type {
 import type { DesktopRoomFolioData } from "../../electron/room-folio";
 import { runtimeHasCapability } from "./capabilities";
 
-export const EMPTY_FINANCE_DATA: DesktopFinanceData = {
+const EMPTY_FINANCE_DATA: DesktopFinanceData = {
   generatedAt: "",
   currency: "TRY",
   todayIncomeMinor: 0,
@@ -21,7 +21,7 @@ export const EMPTY_FINANCE_DATA: DesktopFinanceData = {
   pensionBalances: []
 };
 
-export const EMPTY_FINANCE_ROOM_DATA: DesktopRoomFolioData = {
+const EMPTY_FINANCE_ROOM_DATA: DesktopRoomFolioData = {
   generatedAt: "",
   rooms: [],
   activeStays: [],
