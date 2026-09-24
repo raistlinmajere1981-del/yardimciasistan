@@ -4,6 +4,7 @@ import { useBusinessCapabilityRuntime } from "../../app/business-capability-cont
 import { StagedSettingsContributionSlot } from "../../app/settings-section-contributions";
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
 import { useSettingsAiTest } from "../../app/use-settings-ai-test";
+import { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { isSettingsSectionVisible, searchSettings, settingsCapabilities, settingsCategories, settingsSections, type SettingsCategoryId } from "../../app/settings-registry";
 import type { SettingsSetupSaveResult } from "../../app/settings-save";
 import type { UiPreferences } from "../../ui-preferences";
@@ -12,7 +13,8 @@ import { BusinessSettingsSection } from "./BusinessSettingsSection";
 import { ServicesSettingsSection, type ServicesSettingsProps } from "./ServicesSettingsSection";
 import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
 import { BusinessPublicProfileSection, useBusinessPublicProfileSettings } from "./BusinessPublicProfileSection";
-import { RoomManagementSection, useRoomManagementSettings } from "./RoomManagementSection";
+import { RoomManagementSection } from "./RoomManagementSection";
+import { LayoutSettingsSection } from "./LayoutSettingsSection";
 import { PasswordSettings, usePasswordSettings } from "../security/PasswordSettings";
 import { UpdateSettings, useUpdateSettings } from "./UpdateSettings";
 import { DataMaintenanceSettings } from "./DataMaintenanceSettings";
@@ -37,18 +39,26 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const capabilities = settingsCapabilities(drafts.canonical);
   const initialized = !props.setupData.setupRequired;
   const profile = useBusinessPublicProfileSettings({ businessAddress: drafts.canonical.address, enabledCapabilities: capabilities, enabled: initialized });
-  const rooms = useRoomManagementSettings({ dashboardRoomCount: props.dashboardData?.rooms.length ?? 0, onDashboardRefresh: props.onDashboardRefresh });
+  const layout = useBusinessLayoutSettings({ enabled: initialized, onDashboardRefresh: props.onDashboardRefresh });
   const updates = useUpdateSettings(initialized);
   const password = usePasswordSettings({ configured: props.setupData.appPasswordConfigured, onConfiguredChange: props.onAppPasswordConfiguredChange ?? (() => undefined) });
   const category = settingsCategories.find(item => item.id === active)!;
   const staged = active === "application" ? null : active;
-  const hasStagedSection = settingsSections.some(section => section.category === active && section.persistence === "staged" && isSettingsSectionVisible(section, capabilities, initialized, runtimeCapabilities));
-  const feedback = staged ? drafts.feedback[staged] : undefined;
+  const hasStagedSection = active === "operations"
+    ? layout.draft.capabilities.rooms || layout.draft.capabilities.tables
+    : settingsSections.some(section => section.category === active && section.persistence === "staged" && isSettingsSectionVisible(section, capabilities, initialized, runtimeCapabilities));
+  const feedback = staged === "operations"
+    ? (layout.message ? { state: layout.state, message: layout.message } : undefined)
+    : staged ? drafts.feedback[staged] : undefined;
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities);
-  const dirty = { business: drafts.dirty.business || profile.dirty, operations: drafts.dirty.operations || rooms.dirty, services: drafts.dirty.services, application: updates.dirty };
+  const dirty = { business: drafts.dirty.business || profile.dirty, operations: layout.dirty, services: drafts.dirty.services, application: updates.dirty };
   const stagedDirty = staged ? dirty[staged] : false;
-  const stagedBusy = drafts.busy || (staged === "business" && profile.saving);
-  const stagedSaving = feedback?.state === "loading" || (staged === "business" && profile.saving);
+  const stagedBusy = staged === "operations"
+    ? layout.loading || layout.saving
+    : drafts.busy || (staged === "business" && profile.saving);
+  const stagedSaving = staged === "operations"
+    ? layout.saving
+    : feedback?.state === "loading" || (staged === "business" && profile.saving);
 
   async function saveStagedCategory() {
     if (!staged || !stagedDirty) return;
@@ -57,11 +67,19 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       if (profile.dirty) await profile.save();
       return;
     }
+    if (staged === "operations") {
+      await layout.save();
+      return;
+    }
     await drafts.save(staged);
   }
 
   function discardStagedCategory() {
     if (!staged || stagedBusy) return;
+    if (staged === "operations") {
+      layout.discard();
+      return;
+    }
     drafts.discard(staged);
     if (staged === "business") profile.discard();
   }
@@ -95,9 +113,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           {initialized && <BusinessPublicProfileSection controller={profile} />}
         </>}
         {active === "operations" && <>
-          <StagedSettingsContributionSlot category="operations" form={drafts.form} onFormChange={drafts.setDraft} busy={drafts.busy} configurationCapabilities={capabilities} initialized={initialized} runtimeSnapshot={runtimeCapabilities} />
-          {initialized && <RoomManagementSection controller={rooms} />}
-          {!hasStagedSection && <p>Bu sektör için oda veya masa düzeni bulunmuyor.</p>}
+          {initialized && <LayoutSettingsSection controller={layout} />}
+          {initialized && <RoomManagementSection controller={layout} />}
+          {!hasStagedSection && !layout.loading && <p>Bu sektör için oda veya masa düzeni bulunmuyor.</p>}
         </>}
         {active === "services" && <>
           <fieldset className="settings-resource-fields" disabled={drafts.busy}>
