@@ -261,11 +261,6 @@ export function normalizeInternationalPhone(phone: string): { ok: true; whatsapp
   return { ok: true, whatsapp: normalizedPhone.whatsapp, e164: normalizedPhone.e164, national: normalizedPhone.national, display: formatPhoneForDisplay(phone) };
 }
 
-/** @deprecated Use normalizeInternationalPhone. */
-export function normalizeTRMobilePhone(phone: string) {
-  return normalizeInternationalPhone(phone);
-}
-
 function normalizeBridgeMode(mode: WhatsAppBridgeMode): Exclude<WhatsAppBridgeMode, "official_api"> {
   return mode === "official_api" ? "official_api_future" : mode;
 }
