@@ -33,7 +33,7 @@ export function SettingsUnsavedChangesDialog(props: {
           <h2 id="settings-unsaved-title">{props.categoryTitle} değişiklikleri bekliyor</h2>
         </div>
         <p id="settings-unsaved-description">
-          Başka bir ayar kategorisine geçmeden önce bu değişikliklerle ne yapılacağını seçin.
+          Bu ayar alanından ayrılmadan önce değişikliklerle ne yapılacağını seçin.
         </p>
         <div className="form-actions settings-unsaved-actions">
           <ActionButton type="button" disabled={props.busy} onClick={props.onSaveAndContinue}>
