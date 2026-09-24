@@ -78,10 +78,10 @@ try {
         canRemove: true,
         removeBlockReason: ""
       })),
-      tableCategories: [...new Set(currentDashboardData.tables.map((table) => table.area || "Genel"))].map((name) => ({
-        name,
-        tableCount: currentDashboardData.tables.filter((table) => (table.area || "Genel") === name).length
-      }))
+      tableCategories: [
+        { name: "Bahçe", tableCount: 1 },
+        { name: "Salon", tableCount: 1 }
+      ]
     };
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
