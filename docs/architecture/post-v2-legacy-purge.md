@@ -98,3 +98,6 @@ the archive for retired implementation shapes.
 
 
 - removed Android storage tests that seeded retired v1 outbox/cache keys; remaining tests exercise only the current transport-neutral outbox and per-source revision cache
+
+
+- removed obsolete `ui_design_plan.md` and `docs/dev/kolay-kullanim-envanteri.md`; both documented retired easy/pro, data-theme and migration-era UI structure and had no live repository references
