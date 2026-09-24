@@ -25,7 +25,7 @@ const cleanUserDataPath = join(tempRoot, "clean-user-data");
 const cleanBackupPath = join(tempRoot, "clean-backups");
 const restoredUserDataPath = join(tempRoot, "restored-user-data");
 const restoredBackupPath = join(tempRoot, "restored-backups");
-const backupFilePath = join(tempRoot, "current-baseline.sqlite");
+const backupFilePath = join(tempRoot, "current-schema.sqlite");
 
 try {
   assert.equal(existsSync(schemaPath), true, "Desktop current schema.sql bulunmalı.");
@@ -39,13 +39,13 @@ try {
   const freshRaw = new DatabaseSync(firstDatabase.databasePath);
   assert.equal(freshRaw.prepare("SELECT COUNT(*) AS count FROM settings").get().count, 0);
   freshRaw.close();
-  assertCurrentBaseline(firstDatabase, { setupRequired: true });
+  assertCurrentSchema(firstDatabase, { setupRequired: true });
   firstDatabase.close();
 
   const reopenedDatabase = openDatabase(cleanUserDataPath, cleanBackupPath);
   reopenedDatabase.initialize();
   assert.equal(reopenedDatabase.getSyncRuntimeStatus().clientId, clientId);
-  assertCurrentBaseline(reopenedDatabase, { setupRequired: true });
+  assertCurrentSchema(reopenedDatabase, { setupRequired: true });
   reopenedDatabase.close();
 
   const selectedMarketDatabase = openDatabase(cleanUserDataPath, cleanBackupPath);
@@ -83,7 +83,7 @@ try {
   assert.equal(selectedMarketDatabase.getSetupData().profileId, "market");
   assert.equal(selectedMarketDatabase.getSyncRuntimeStatus().clientId, clientId);
   await assertSyncReachesTransport(selectedMarketDatabase);
-  assertCurrentBaseline(selectedMarketDatabase, { setupRequired: false, market: true });
+  assertCurrentSchema(selectedMarketDatabase, { setupRequired: false, market: true });
   selectedMarketDatabase.close();
 
   const afterSetupRestart = openDatabase(cleanUserDataPath, cleanBackupPath);
@@ -101,7 +101,7 @@ try {
   const restoredDatabase = openDatabase(restoredUserDataPath, restoredBackupPath);
   restoredDatabase.initialize();
   assert.equal(restoredDatabase.getSyncRuntimeStatus().clientId, clientId);
-  assertCurrentBaseline(restoredDatabase, { setupRequired: false, market: true });
+  assertCurrentSchema(restoredDatabase, { setupRequired: false, market: true });
   restoredDatabase.close();
 
   const secondDatabase = openDatabase(join(tempRoot, "second-fresh"), cleanBackupPath);
@@ -163,7 +163,7 @@ async function assertSyncReachesTransport(database) {
   }
 }
 
-function assertCurrentBaseline(database, options = {}) {
+function assertCurrentSchema(database, options = {}) {
   const raw = new DatabaseSync(database.databasePath);
   try {
     assertCurrentDatabase(raw, options);
@@ -231,8 +231,21 @@ function assertCurrentDatabase(database, options = {}) {
   for (const column of ["business_type", "modules_json"]) {
     assert.equal(businessColumns.has(column), false);
   }
-  for (const column of ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]) {
-    assert.equal(settingsColumns.has(column), false);
+  for (const column of [
+    "rooms_enabled",
+    "tables_enabled",
+    "qr_menu_enabled",
+    "ai_enabled",
+    "whatsapp_enabled",
+    "android_enabled",
+    "sync_client_id",
+    "ai_model",
+    "ai_project_name",
+    "ai_base_url",
+    "ai_timeout_seconds",
+    "ai_api_key_encrypted"
+  ]) {
+    assert.equal(settingsColumns.has(column), false, `settings should not contain legacy column ${column}`);
   }
   for (const column of [
     "product_data_enabled",
