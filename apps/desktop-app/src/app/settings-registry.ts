@@ -24,9 +24,9 @@ export interface SettingsSectionDefinition {
 export const layoutSettingsDefinition = {
   id: "settings-operations",
   category: "operations",
-  title: "İşletme Düzeni",
-  keywords: "oda sayısı masa kategorileri salon bahçe",
-  persistence: "staged",
+  title: "Masa kategorileri",
+  keywords: "masa kategorileri salon bahçe işletme düzeni",
+  persistence: "resource",
   visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ACCOMMODATION_ROOMS) || caps.includes(C.FOOD_TABLES)
 } satisfies SettingsSectionDefinition;
 
