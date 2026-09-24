@@ -310,7 +310,21 @@ export class DesktopDatabase {
       }
 
       const settingsColumns = this.db.prepare("PRAGMA table_info(settings)").all() as Array<{ name?: string }>;
-      if (!settingsColumns.some((column) => column.name === "local_network_enabled")) {
+      const settingsColumnNames = new Set(settingsColumns.map((column) => String(column.name ?? "")));
+      const hasMigrationLedger = Boolean(this.db.prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations' LIMIT 1"
+      ).get());
+      const legacySettingsColumns = [
+        "sync_client_id",
+        "ai_model",
+        "ai_project_name",
+        "ai_base_url",
+        "ai_timeout_seconds",
+        "ai_api_key_encrypted"
+      ];
+      if (!settingsColumnNames.has("local_network_enabled")
+          || hasMigrationLedger
+          || legacySettingsColumns.some((column) => settingsColumnNames.has(column))) {
         throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
       }
 
@@ -1037,11 +1051,7 @@ export class DesktopDatabase {
     const existingAiProfile = this.db
       .prepare("SELECT * FROM ai_service_profiles WHERE service = ? LIMIT 1")
       .get(profileService) as Record<string, unknown> | undefined;
-    const existingEncryptedAiApiKey = String(
-      existingAiProfile?.api_key_encrypted
-        ?? (normalizeStoredAiService(existingSettings?.ai_service) === profileService ? existingSettings?.ai_api_key_encrypted : "")
-        ?? ""
-    ).trim();
+    const existingEncryptedAiApiKey = String(existingAiProfile?.api_key_encrypted ?? "").trim();
     const aiApiKeyResolution = resolveEncryptedAiApiKey({
       rawKeyProvided: rawAiApiKeyProvided,
       clearRequested: Boolean(input.clearAiApiKey),
@@ -1247,13 +1257,14 @@ export class DesktopDatabase {
     const aiWasEnabled = this.getEnabledBusinessCapabilities().includes(BUSINESS_CAPABILITIES.AI);
     const aiSettingsChanged =
       !existingSettings ||
+      !existingAiProfile ||
       aiWasEnabled !== input.aiEnabled ||
       String(existingSettings.ai_provider ?? "") !== storedAiProvider ||
       String(existingSettings.ai_service ?? "") !== storedAiService ||
-      String(existingSettings.ai_project_name ?? "") !== aiProjectName ||
-      String(existingSettings.ai_model ?? "") !== aiModel ||
-      normalizeStoredAiBaseUrl(existingSettings.ai_base_url) !== storedAiBaseUrl ||
-      normalizeStoredAiTimeout(existingSettings.ai_timeout_seconds) !== storedAiTimeoutSeconds ||
+      String(existingAiProfile.project_name ?? "").trim() !== aiProjectName ||
+      String(existingAiProfile.model ?? "").trim() !== aiModel ||
+      (normalizeAiBaseUrl(existingAiProfile.base_url) || AI_SERVICE_DEFAULT_BASE_URLS[storedAiService]) !== storedAiBaseUrl ||
+      normalizeStoredAiTimeout(existingAiProfile.timeout_seconds) !== storedAiTimeoutSeconds ||
       existingEncryptedAiApiKey !== storedEncryptedAiApiKey;
     const aiLastPublishedAt = aiSettingsChanged ? "" : normalizeStoredTimestamp(existingSettings?.ai_last_published_at);
     this.db.exec("BEGIN");
@@ -1307,12 +1318,7 @@ export class DesktopDatabase {
             sync_secret,
             auto_sync_enabled,
             ai_provider,
-            ai_model,
             ai_service,
-            ai_project_name,
-            ai_base_url,
-            ai_timeout_seconds,
-            ai_api_key_encrypted,
             ai_last_published_at,
             whatsapp_mode,
             birthday_enabled,
@@ -1327,19 +1333,14 @@ export class DesktopDatabase {
             created_at,
             updated_at,
             sync_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'local_only')
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'webview', ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, 'local_only')
           ON CONFLICT(id) DO UPDATE SET
             business_id = excluded.business_id,
             web_module_url = excluded.web_module_url,
             sync_secret = excluded.sync_secret,
             auto_sync_enabled = excluded.auto_sync_enabled,
             ai_provider = excluded.ai_provider,
-            ai_model = excluded.ai_model,
             ai_service = excluded.ai_service,
-            ai_project_name = excluded.ai_project_name,
-            ai_base_url = excluded.ai_base_url,
-            ai_timeout_seconds = excluded.ai_timeout_seconds,
-            ai_api_key_encrypted = excluded.ai_api_key_encrypted,
             ai_last_published_at = excluded.ai_last_published_at,
             birthday_enabled = excluded.birthday_enabled,
             birthday_mode = excluded.birthday_mode,
@@ -1361,12 +1362,7 @@ export class DesktopDatabase {
           syncSecret,
           input.autoSyncEnabled === false ? 0 : 1,
           storedAiProvider,
-          aiModel,
           storedAiService,
-          aiProjectName,
-          storedAiBaseUrl,
-          storedAiTimeoutSeconds,
-          storedEncryptedAiApiKey,
           aiLastPublishedAt,
           birthdaySettings.enabled ? 1 : 0,
           birthdaySettings.mode,
@@ -2226,7 +2222,6 @@ import {
   getAiServiceDisplayName,
   normalizeAiModelOptions,
   normalizeAiBaseUrl,
-  normalizeStoredAiBaseUrl,
   normalizeAiTimeout,
   normalizeStoredAiTimeout,
   normalizeStoredTimestamp,
