@@ -1,13 +1,13 @@
 import type { BusinessCapability } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 
-export type NonEmpty<T> = readonly [T, ...T[]];
+type NonEmpty<T> = readonly [T, ...T[]];
 
-export interface AllCapabilities {
+interface AllCapabilities {
   readonly allOf: NonEmpty<BusinessCapability>;
 }
 
-export interface AnyCapabilities {
+interface AnyCapabilities {
   readonly anyOf: NonEmpty<BusinessCapability | AllCapabilities>;
 }
 
