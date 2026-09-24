@@ -21,7 +21,7 @@ export interface SettingsSectionDefinition {
   condition?: CapabilityCondition;
   visible?: (capabilities: readonly BusinessCapability[], initialized: boolean) => boolean;
 }
-export const layoutSettingsDefinition = {
+const layoutSettingsDefinition = {
   id: "settings-operations",
   category: "operations",
   title: "Masa kategorileri",
