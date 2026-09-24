@@ -346,7 +346,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
                 initialized={initialized}
                 runtimeSnapshot={runtimeCapabilities}
               />
-              {initialized && <BusinessPublicProfileSection controller={profile} />}
+              {initialized && (
+                <BusinessPublicProfileSection
+                  controller={profile}
+                  disabled={drafts.busy || guardBusy}
+                />
+              )}
             </>
           )}
 
