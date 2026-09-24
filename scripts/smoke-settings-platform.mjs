@@ -215,6 +215,10 @@ try {
   await expect.poll(() => page.evaluate(() => window.settingsPageLeaveCompleted)).toBe(true);
   await expect(page.getByLabel('Web eşitleme adresi')).not.toHaveValue('https://leave-guard.example.test');
 
+  // The fixture records page-leave completion without actually unmounting Settings,
+  // so return to Business explicitly before continuing in-page scenarios.
+  await select('İşletme');
+
   // Business public profile participates in the same category save and stops transition on failure.
   await page.getByLabel('İşletme açıklaması').fill('Profil Taslağı');
   await page.evaluate(() => { window.failProfile = true; });
