@@ -205,7 +205,7 @@ const settingsContribution = {
   }
 } satisfies NavigationContribution;
 
-export const navigationContributions = [
+const navigationContributions = [
   dashboardContribution,
   customerWorkContribution,
   calendarContribution,
