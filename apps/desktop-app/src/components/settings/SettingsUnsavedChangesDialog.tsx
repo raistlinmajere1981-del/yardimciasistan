@@ -15,14 +15,14 @@ export function SettingsUnsavedChangesDialog(props: {
 
   return (
     <div
-      className="manual-request-backdrop overlay overlay--dialog"
+      className="manual-request-backdrop overlay"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !props.busy) props.onStay();
       }}
     >
       <section
         ref={dialogRef}
-        className="dialog-card settings-unsaved-dialog"
+        className="dialog dialog--compact settings-unsaved-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-unsaved-title"
