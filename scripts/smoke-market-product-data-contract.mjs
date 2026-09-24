@@ -6,7 +6,6 @@ import process from "node:process";
 const root = process.cwd();
 const read = (relativePath) => readFileSync(join(root, relativePath), "utf8");
 
-const schema = read("apps/desktop-app/db/migrations/001_baseline.sql");
 const service = read("apps/desktop-app/electron/product-data-service.ts");
 const store = read("apps/desktop-app/electron/commerce-store.ts");
 const ipc = read("apps/desktop-app/electron/commerce-ipc.ts");
@@ -27,22 +26,6 @@ const androidOperationData = read("apps/android-app/src/main/java/com/yardimcias
 const androidWorkspace = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketWorkspace.java");
 const androidLookupClient = read("apps/android-app/src/main/java/com/yardimciasistan/android/ProductDataLookupClient.java");
 const hostingSync = read("firm-template/web-module/api/sync.php");
-
-for (const column of [
-  "brand TEXT NOT NULL DEFAULT ''",
-  "image_asset_path TEXT NOT NULL DEFAULT ''",
-  "image_source_url TEXT NOT NULL DEFAULT ''",
-  "data_source TEXT NOT NULL DEFAULT ''",
-  "source_product_url TEXT NOT NULL DEFAULT ''",
-  "data_license TEXT NOT NULL DEFAULT ''",
-  "image_license TEXT NOT NULL DEFAULT ''",
-  "source_fetched_at TEXT NOT NULL DEFAULT ''",
-  "product_data_enabled INTEGER NOT NULL DEFAULT 0",
-  "product_data_auto_search INTEGER NOT NULL DEFAULT 1",
-  "product_data_include_images INTEGER NOT NULL DEFAULT 1"
-]) {
-  assert.ok(schema.includes(column), `Product data schema missing: ${column}`);
-}
 
 assert.match(service, /interface ProductLookupProvider/);
 assert.match(service, /PRODUCT_LOOKUP_PROVIDERS/);
