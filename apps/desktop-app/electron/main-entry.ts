@@ -193,8 +193,6 @@ function prepareRestoredStateForFullRepublish() {
 
 installDevelopmentRelaunchBridge();
 
-// Development varsayılanı artık repo-root/data. Eski Electron userData
-// konumunda kalan tek seferlik geliştirme verisini güvenli şekilde taşı;
 // The packaged Windows process doubles as the lightweight launcher. A verified
 // installer staged by the previous run is applied before SQLite or the renderer
 // are opened, then the silent NSIS installer relaunches the updated app.
