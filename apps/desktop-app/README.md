@@ -42,7 +42,7 @@ Bu iskelet şu parçaları içerir:
 - `packages/sync-core` üzerinden web taleplerini çekmeye hazır IPC akışı.
 - Tek `SyncCoordinator` üzerinden 15 saniyelik cursor tabanlı talep/Android action pull akışı.
 - SQLite trigger'larıyla beslenen kalıcı menü ve Android snapshot outbox'ı; idempotent sürümlü yayın ve 5–300 saniyelik artan retry.
-- SQLite için ilk migration ve demo seed SQL dosyaları.
+- SQLite için tek güncel `db/schema.sql` şema kaynağı; tarihsel migration zinciri yoktur.
 - Talepler, müşteriler, basit raporlar, günlük işler, odalar, masalar ve rezervasyonlar için yan menüden açılan günlük yönetim ekranları, manuel talep oluşturma formu ve local status update IPC akışları.
 - QR menü kategori/ürün yönetimi, local SQLite kaydı ve web modülüne yayınlama akışı.
 - Menü ekranında webcam veya JPG/PNG/WebP dosyasından çalışan `AI ile Stok Ekle` akışı. Görsel döndürülüp analiz edildikten sonra yalnız stok takibi açık ürünler için adet/gram birimine uygun öneri taslağı gösterilir; açık kilogram miktarı gram ürünü için güvenli biçimde dönüştürülür. Kullanıcı satırları düzenlemeden ve açıkça onaylamadan stok değişmez. Uygulama görseli kalıcı saklamaz, yalnız SHA-256 özeti ve onay/audit kayıtlarını tutar.
