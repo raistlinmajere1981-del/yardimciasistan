@@ -162,7 +162,7 @@ try {
   await expect(dialog.getByRole('heading', { level: 2 })).toHaveText('Salon 1');
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   await button("Floor'a dön").click();
-  // Single canonical UI close caller; legacy surfaces are gone.
+  // Single canonical UI close caller; duplicate surfaces are absent.
   await expect(page.locator('.restaurant-order-drawer, .restaurant-room-transfer__dialog')).toHaveCount(0);
   const controller = readFileSync('apps/desktop-app/src/components/restaurant/use-table-order-controller.ts', 'utf8');
   expect(controller.match(/bridge\(\)\.closeTableOrder\(/g)).toHaveLength(1);
