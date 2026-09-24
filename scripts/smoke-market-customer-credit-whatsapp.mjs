@@ -143,7 +143,11 @@ try {
   await page.addInitScript(({ dashboard, snapshot, methods }) => {
     window.__m83Initial = { dashboard, snapshot };
     const invoke = (method) => (...args) => window.__m83Call(method, args);
-    window.yardimciDesktop = { commerce: Object.fromEntries(methods.map((method) => [method, invoke(method)])), openExternal: invoke("openExternal") };
+    window.yardimciDesktop = {
+      commerce: Object.fromEntries(methods.map((method) => [method, invoke(method)])),
+      openExternal: invoke("openExternal"),
+      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." })
+    };
   }, { dashboard: database.getDashboardData(), snapshot: readBusinessCapabilitySnapshot(path), methods: [...Object.keys(channels), ...scannerMethods] });
   await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/m83-smoke`, { timeout: 60000 });
   const topbarStatus = page.getByTestId("topbar-status");
