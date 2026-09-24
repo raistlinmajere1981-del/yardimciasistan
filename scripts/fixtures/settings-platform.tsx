@@ -34,6 +34,21 @@ let layout = {
   tableCategories: [{ name: "Salon", tableCount: 2 }]
 };
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
+let pageLeaveGuard: ((destination: "dashboard", continueNavigation: () => void) => boolean) | null = null;
+window.settingsPageLeaveCompleted = false;
+window.requestSettingsPageLeave = () => {
+  window.settingsPageLeaveCompleted = false;
+  if (!pageLeaveGuard) {
+    window.settingsPageLeaveCompleted = true;
+    return true;
+  }
+  const allowed = pageLeaveGuard("dashboard", () => {
+    window.settingsPageLeaveCompleted = true;
+  });
+  if (allowed) window.settingsPageLeaveCompleted = true;
+  return allowed;
+};
+
 window.settingsCalls = [];
 window.failSetup = false;
 window.yardimciDesktop = {
@@ -125,7 +140,17 @@ function Fixture() {
   return <BusinessCapabilityRuntimeProvider value={{ snapshot: { profileId: setup.setupData.profileId, enabledCapabilities: capabilities }, state: "success", message: "", setCapability: async () => undefined, clearOverride: async () => undefined }}>
     <AppShell contentScroll="workspace" sidebar={<aside className="sidebar">Test</aside>} header={<header className="page-header"><h1>Ayarlar</h1></header>}>
       {ready && <SettingsWorkspace setupData={setup.setupData} dashboardData={defaultDashboardData}
-        onSave={input => setup.saveSetup(input, setDashboard)} uiPreferences={preferences} onUiPreferencesChange={setPreferences} onAppPasswordConfiguredChange={setup.setPasswordConfigured} />}
+        onSave={input => setup.saveSetup(input, setDashboard)}
+        uiPreferences={preferences}
+        onUiPreferencesChange={setPreferences}
+        onAppPasswordConfiguredChange={setup.setPasswordConfigured}
+        registerPageLeaveGuard={(guard) => {
+          pageLeaveGuard = guard as typeof pageLeaveGuard;
+          return () => {
+            if (pageLeaveGuard === guard) pageLeaveGuard = null;
+          };
+        }}
+      />}
     </AppShell>
   </BusinessCapabilityRuntimeProvider>;
 }
