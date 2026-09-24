@@ -1,6 +1,6 @@
-import { BUSINESS_CAPABILITIES as C, validateBirthdaySettings } from "@yardimci-asistan/shared";
+import { validateBirthdaySettings } from "@yardimci-asistan/shared";
 import type { SetupFormState } from "./setup-model";
-import { settingsCapabilities, type StagedSettingsCategoryId } from "./settings-registry";
+import type { StagedSettingsCategoryId } from "./settings-registry";
 
 // Setup persistence now owns only Business and Services. Operations has its own BusinessLayout draft.
 export const settingsFieldOwners = {
@@ -35,32 +35,12 @@ export function copyCategory(
   };
 }
 
-export function unavailableSettingsFields(
-  canonical: SetupFormState,
-  category: StagedSettingsCategoryId
-): (keyof SetupFormState)[] {
-  const fields: (keyof SetupFormState)[] = [];
-  if (category === "services" && !settingsCapabilities(canonical).includes(C.CATALOG)) {
-    fields.push(
-      "productDataEnabled",
-      "productDataProvider",
-      "productDataAutoSearch",
-      "productDataIncludeImages"
-    );
-  }
-  return fields;
-}
-
 export function mergeSettingsCategory(
   canonical: SetupFormState,
   draft: SetupFormState,
   category: StagedSettingsCategoryId
 ): SetupFormState {
-  const merged = copyCategory(canonical, draft, category);
-  for (const key of unavailableSettingsFields(canonical, category)) {
-    Object.assign(merged, { [key]: canonical[key] });
-  }
-  return merged;
+  return copyCategory(canonical, draft, category);
 }
 
 export function validateSettingsCategory(
