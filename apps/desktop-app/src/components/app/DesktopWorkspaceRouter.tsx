@@ -9,6 +9,7 @@ import type { DesktopDashboardData } from "../../../electron/database";
 import { runtimeHasCapability } from "../../app/capabilities";
 import { projectDesktopDashboardData } from "../../app/capability-projection";
 import type { DesktopPage } from "../../app/navigation";
+import type { RegisterPageLeaveGuard, RequestPageChange } from "../../app/page-navigation-guard";
 import { getRoomDisplayInfo, isAccommodationTask, isRestaurantTask } from "../../app/operations";
 import {
   formatRequestStatus,
@@ -54,7 +55,8 @@ import { RestaurantPage } from "../../pages/RestaurantPage";
 
 interface DesktopWorkspaceRouterProps {
   activePage: DesktopPage;
-  setActivePage: Dispatch<SetStateAction<DesktopPage>>;
+  requestPageChange: RequestPageChange;
+  registerPageLeaveGuard: RegisterPageLeaveGuard;
   syncState: SyncState;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
@@ -75,7 +77,8 @@ interface DesktopWorkspaceRouterProps {
 
 export function DesktopWorkspaceRouter({
   activePage,
-  setActivePage,
+  requestPageChange,
+  registerPageLeaveGuard,
   syncState,
   setSyncState,
   setStatusMessage,
@@ -244,7 +247,7 @@ export function DesktopWorkspaceRouter({
     if (request) {
       setSelectedRequestId(request.id);
     }
-    setActivePage("customerWork");
+    requestPageChange("customerWork");
   }
 
   function openDashboardReply(request: SyncedCustomerRequest) {
@@ -281,11 +284,11 @@ export function DesktopWorkspaceRouter({
     });
     if ((domain === "food_service" || (domain === "generic" && !accommodationReservationsEnabled))
         && foodReservationsEnabled) {
-      setActivePage("restaurant");
+      requestPageChange("restaurant");
       return;
     }
     if (accommodationReservationsEnabled) {
-      setActivePage("pension");
+      requestPageChange("pension");
       return;
     }
     setSyncState("error");
@@ -312,11 +315,11 @@ export function DesktopWorkspaceRouter({
     });
     if ((domain === "food_service" || (domain === "generic" && !accommodationReservationsEnabled))
         && foodReservationsEnabled) {
-      setActivePage("restaurant");
+      requestPageChange("restaurant");
       return;
     }
     if (accommodationReservationsEnabled) {
-      setActivePage("pension");
+      requestPageChange("pension");
       return;
     }
     setSyncState("error");
@@ -623,6 +626,7 @@ export function DesktopWorkspaceRouter({
           uiPreferences={uiPreferences}
           onUiPreferencesChange={setUiPreferences}
           onDashboardRefresh={onDashboardRefresh}
+          registerPageLeaveGuard={registerPageLeaveGuard}
         />
       )}
       <div className={activePage === "messages" ? "persistent-messages-page" : "persistent-messages-page is-hidden"} aria-hidden={activePage !== "messages"}>
