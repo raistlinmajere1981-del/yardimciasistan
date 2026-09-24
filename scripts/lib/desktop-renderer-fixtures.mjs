@@ -138,14 +138,6 @@ function createSetupFixture() {
       whatsapp: true,
       android: true
     },
-    initialCounts: {
-      rooms: 2,
-      tables: 2
-    },
-    tableCategories: [
-      { name: "Bahçe", tableCount: 1 },
-      { name: "Salon", tableCount: 1 }
-    ],
     birthdaySettings: {
       enabled: true,
       mode: "manual",
