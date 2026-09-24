@@ -101,10 +101,6 @@ export function normalizeAiBaseUrl(value: unknown): string {
   }
 }
 
-export function normalizeStoredAiBaseUrl(value: unknown): string {
-  return normalizeAiBaseUrl(value) || DEFAULT_AI_BASE_URL;
-}
-
 export function normalizeAiTimeout(value: unknown): number | null {
   const timeout = Number(value);
   return Number.isInteger(timeout) && timeout >= 5 && timeout <= 120 ? timeout : null;
