@@ -208,6 +208,7 @@ function queriedNames(packet: Buffer): string[] {
   return names;
 }
 
+/** @compiledSmoke smoke-local-companion-server.mjs */
 export function buildLocalCompanionMdnsResponse(input: {
   desktopId: string;
   protocolVersion: number;
