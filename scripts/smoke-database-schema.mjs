@@ -57,7 +57,7 @@ try {
     email: "market@example.test",
     address: "Smoke adresi",
     webModuleUrl: "https://example.test/yardimci-asistan",
-    syncSecret: "baseline-smoke-secret-12345",
+    syncSecret: "schema-smoke-secret-12345",
     autoSyncEnabled: true,
     aiEnabled: false,
     aiProvider: "openai_compatible",
@@ -141,7 +141,7 @@ async function assertSyncReachesTransport(database) {
   const calls = [];
   globalThis.fetch = async (url, init) => {
     calls.push({ url: String(url), body: JSON.parse(init.body) });
-    throw new TypeError("baseline smoke: offline");
+    throw new TypeError("schema smoke: offline");
   };
   try {
     const setup = database.getSetupData();
