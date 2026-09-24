@@ -13,7 +13,8 @@ export function useUpdateSettings(enabled: boolean) {
   const [action, setAction] = useState<UpdateAction>("load");
   const [localMessage, setLocalMessage] = useState("");
   const [error, setError] = useState(false);
-  const preferencesDirtyRef = useRef(false);
+  const baselineBaseUrlRef = useRef("");
+  const baselineAutoCheckRef = useRef(true);
   const sectionRef = useRef<HTMLElement>(null);
   const baseUrlInputRef = useRef<HTMLInputElement>(null);
 
@@ -31,8 +32,11 @@ export function useUpdateSettings(enabled: boolean) {
       .then((nextStatus) => {
         if (!active) return;
         setStatus(nextStatus);
-        setBaseUrl(nextStatus.customBaseUrl || nextStatus.defaultBaseUrl);
+        const nextBaseUrl = nextStatus.customBaseUrl || nextStatus.defaultBaseUrl;
+        setBaseUrl(nextBaseUrl);
         setAutoCheckEnabled(nextStatus.autoCheckEnabled);
+        baselineBaseUrlRef.current = nextBaseUrl;
+        baselineAutoCheckRef.current = nextStatus.autoCheckEnabled;
         setLocalMessage("");
       })
       .catch(() => {
@@ -47,9 +51,14 @@ export function useUpdateSettings(enabled: boolean) {
     const unsubscribe = bridge.onUpdateStatusChanged?.((nextStatus) => {
       if (!active) return;
       setStatus(nextStatus);
-      if (!preferencesDirtyRef.current) {
-        setBaseUrl(nextStatus.customBaseUrl || nextStatus.defaultBaseUrl);
+      const currentDirty = baseUrl !== baselineBaseUrlRef.current
+        || autoCheckEnabled !== baselineAutoCheckRef.current;
+      if (!currentDirty) {
+        const nextBaseUrl = nextStatus.customBaseUrl || nextStatus.defaultBaseUrl;
+        setBaseUrl(nextBaseUrl);
         setAutoCheckEnabled(nextStatus.autoCheckEnabled);
+        baselineBaseUrlRef.current = nextBaseUrl;
+        baselineAutoCheckRef.current = nextStatus.autoCheckEnabled;
       }
     });
 
@@ -57,24 +66,20 @@ export function useUpdateSettings(enabled: boolean) {
       active = false;
       unsubscribe?.();
     };
-  }, [enabled]);
+  }, [autoCheckEnabled, baseUrl, enabled]);
 
   const busy = action !== null || status?.phase === "checking" || status?.phase === "downloading";
   const updateAvailable = status?.phase === "available";
   const updateReady = status?.phase === "ready";
 
-  function markPreferencesDirty() {
-    preferencesDirtyRef.current = true;
-  }
-
   const validatePreferences = useCallback(() => {
-    if (!preferencesDirtyRef.current) return null;
+    if (baseUrl === baselineBaseUrlRef.current && autoCheckEnabled === baselineAutoCheckRef.current) return null;
     if (busy) return "Güncelleme işlemi devam ediyor.";
     if (!window.yardimciDesktop?.saveUpdatePreferences) {
       return "Güncelleme ayarları kaydedilemiyor. Uygulamayı yeniden başlatın.";
     }
     return null;
-  }, [busy]);
+  }, [autoCheckEnabled, baseUrl, busy]);
 
   const savePreferences = useCallback(async (): Promise<SettingsOperationResult> => {
     const validationMessage = validatePreferences();
@@ -83,7 +88,9 @@ export function useUpdateSettings(enabled: boolean) {
       setLocalMessage(validationMessage);
       return { ok: false, message: validationMessage };
     }
-    if (!preferencesDirtyRef.current) return { ok: true, changed: false };
+    if (baseUrl === baselineBaseUrlRef.current && autoCheckEnabled === baselineAutoCheckRef.current) {
+      return { ok: true, changed: false };
+    }
 
     const bridge = window.yardimciDesktop;
     if (!bridge?.saveUpdatePreferences) {
@@ -106,9 +113,11 @@ export function useUpdateSettings(enabled: boolean) {
         setLocalMessage(result.message);
         return { ok: false, message: result.message };
       }
-      setBaseUrl(result.status.customBaseUrl || result.status.defaultBaseUrl);
+      const nextBaseUrl = result.status.customBaseUrl || result.status.defaultBaseUrl;
+      setBaseUrl(nextBaseUrl);
       setAutoCheckEnabled(result.status.autoCheckEnabled);
-      preferencesDirtyRef.current = false;
+      baselineBaseUrlRef.current = nextBaseUrl;
+      baselineAutoCheckRef.current = result.status.autoCheckEnabled;
       setLocalMessage(result.message);
       return { ok: true, changed: true, message: result.message };
     } catch {
@@ -121,30 +130,11 @@ export function useUpdateSettings(enabled: boolean) {
     }
   }, [autoCheckEnabled, baseUrl, validatePreferences]);
 
-  async function resetToDefault() {
-    if (busy) return;
-    const bridge = window.yardimciDesktop;
-    if (!bridge?.saveUpdatePreferences) return;
+  function resetToDefault() {
+    if (busy || !status) return;
     setError(false);
-    setAction("reset");
-    setLocalMessage("Varsayılan güncelleme sunucusuna dönülüyor...");
-    try {
-      const result = await bridge.saveUpdatePreferences({
-        customBaseUrl: "",
-        autoCheckEnabled
-      });
-      setStatus(result.status);
-      if (result.ok) {
-        setBaseUrl(result.status.defaultBaseUrl);
-        preferencesDirtyRef.current = false;
-      } else setError(true);
-      setLocalMessage(result.message);
-    } catch {
-      setError(true);
-      setLocalMessage("Varsayılan güncelleme sunucusuna dönülemedi.");
-    } finally {
-      setAction(null);
-    }
+    setBaseUrl(status.defaultBaseUrl);
+    setLocalMessage("Varsayılan güncelleme sunucusu taslağa uygulandı.");
   }
 
   async function checkNow() {
@@ -200,20 +190,43 @@ export function useUpdateSettings(enabled: boolean) {
     }
   }
 
-  const dirty = preferencesDirtyRef.current;
+  const dirty = baseUrl !== baselineBaseUrlRef.current
+    || autoCheckEnabled !== baselineAutoCheckRef.current;
+
   function discard() {
-    if (busy || !status) return;
-    setBaseUrl(status.customBaseUrl || status.defaultBaseUrl);
-    setAutoCheckEnabled(status.autoCheckEnabled);
-    preferencesDirtyRef.current = false;
+    if (busy) return;
+    setBaseUrl(baselineBaseUrlRef.current);
+    setAutoCheckEnabled(baselineAutoCheckRef.current);
     setError(false);
     setLocalMessage("Güncelleme tercihleri geri alındı.");
   }
-  return { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, markPreferencesDirty, savePreferences, resetToDefault, checkNow, downloadNow, restartAndInstall, dirty, discard };
+
+  return {
+    status,
+    baseUrl,
+    setBaseUrl,
+    autoCheckEnabled,
+    setAutoCheckEnabled,
+    action,
+    localMessage,
+    error,
+    sectionRef,
+    baseUrlInputRef,
+    busy,
+    updateAvailable,
+    updateReady,
+    savePreferences,
+    resetToDefault,
+    checkNow,
+    downloadNow,
+    restartAndInstall,
+    dirty,
+    discard
+  };
 }
 
 export function UpdateSettings({ controller }: { controller: ReturnType<typeof useUpdateSettings> }) {
-  const { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, markPreferencesDirty, savePreferences, resetToDefault, checkNow, downloadNow, restartAndInstall, dirty, discard } = controller;
+  const { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, resetToDefault, checkNow, downloadNow, restartAndInstall, dirty } = controller;
   return (
     <section ref={sectionRef} id="settings-updates" tabIndex={-1} className="settings-application-subsection settings-update-section">
       <div className="settings-subsection-heading">
@@ -238,7 +251,6 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
             ref={baseUrlInputRef}
             value={baseUrl}
             onChange={(event) => {
-              markPreferencesDirty();
               setBaseUrl(event.target.value);
             }}
             placeholder={status?.defaultBaseUrl || "https://.../updates/stable"}
@@ -256,7 +268,6 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
               disabled={busy}
               checked={autoCheckEnabled}
               onChange={(event) => {
-                markPreferencesDirty();
                 setAutoCheckEnabled(event.target.checked);
               }}
               type="checkbox"
@@ -266,16 +277,11 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
         </div>
       </div>
 
-      <div className="form-actions">
-        <ActionButton type="button" disabled={!dirty || busy} onClick={() => void savePreferences()}>Güncelleme Tercihlerini Kaydet</ActionButton>
-        <ActionButton variant="secondary" type="button" disabled={!dirty || busy} onClick={discard}>Güncelleme Tercihlerini Geri Al</ActionButton>
-        {dirty && <span>Kaydedilmemiş değişiklikler</span>}
-      </div>
       <div id="settings-update-actions" tabIndex={-1} className="form-actions">
         <ActionButton
           variant="ghost"
           type="button"
-          onClick={() => void resetToDefault()}
+          onClick={resetToDefault}
           disabled={busy || !status}
         >
           <RotateCcw size={16} aria-hidden="true" />
