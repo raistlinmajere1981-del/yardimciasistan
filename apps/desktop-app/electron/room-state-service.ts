@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-/** Persistence compatibility until operational condition gets its own column. */
+/** Persisted room status still carries occupancy/planning while operational condition is projected separately. */
 export function refreshRoomStatusFromStays(db: DatabaseSync, roomId: string, now: string, checkoutToCleaning: boolean, activeOnly = false) {
   const active = db.prepare(`
     SELECT status FROM customer_room_stays
