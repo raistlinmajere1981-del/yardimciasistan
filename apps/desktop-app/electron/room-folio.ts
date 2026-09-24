@@ -114,12 +114,6 @@ export interface DesktopRoomFolioData {
   menuItems: DesktopRoomFolioMenuItem[];
 }
 
-export interface SetRoomNightlyPriceInput {
-  roomId: string;
-  amountMinor: number;
-  currency?: string;
-}
-
 export interface UpdateRoomFolioDetailsInput {
   folioId: string;
   guestCount: number;
@@ -269,29 +263,6 @@ export class DesktopRoomFolioService {
     } finally {
       db.close();
     }
-  }
-
-  setRoomNightlyPrice(input: SetRoomNightlyPriceInput): DesktopRoomFolioMutationResult {
-    const roomId = cleanText(input?.roomId, 180);
-    const amountMinor = nonNegativeAmount(input?.amountMinor);
-    if (!roomId || amountMinor === null) {
-      return { ok: false, message: "Oda fiyatı geçersiz." };
-    }
-    const db = this.openDatabase();
-    try {
-      const now = new Date().toISOString();
-      const result = db.prepare(`
-        UPDATE rooms
-        SET nightly_price_minor = ?, price_currency = ?, updated_at = ?, sync_status = 'local_only'
-        WHERE id = ? AND deleted_at = '' AND is_active = 1
-      `).run(amountMinor, normalizeCurrency(input?.currency), now, roomId);
-      if (Number(result.changes) <= 0) {
-        return { ok: false, message: "Oda bulunamadı." };
-      }
-    } finally {
-      db.close();
-    }
-    return { ok: true, message: "Gecelik oda fiyatı güncellendi.", data: this.getData() };
   }
 
   openFolio(stayIdValue: string): DesktopRoomFolioMutationResult {
