@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
+import type { BusinessCapabilitySnapshot } from "../../apps/desktop-app/electron/business-capability-store";
+import type { DesktopDashboardData } from "../../apps/desktop-app/electron/database";
 import { defaultSetupData } from "../../apps/desktop-app/src/app/bootstrap-defaults";
 import type { CapabilityCondition } from "../../apps/desktop-app/src/app/capability-condition";
 import { buildNavigationFromContributions, type NavigationContribution } from "../../apps/desktop-app/src/app/navigation";
@@ -11,6 +13,17 @@ import { roomWorkspaceDefinition } from "../../apps/desktop-app/src/components/p
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
 import { WorkspaceHost, WorkspaceNavigationProvider, useWorkspaceNavigation } from "../../apps/desktop-app/src/components/workspace/WorkspaceNavigation";
 import "../../apps/desktop-app/src/styles/index.css";
+
+const fixtureWindow = window as unknown as {
+  fixtureDashboard: DesktopDashboardData;
+  fixtureCapabilities: {
+    staysEnabled: boolean;
+    reservationsEnabled: boolean;
+    folioEnabled: boolean;
+    menuEnabled: boolean;
+  };
+  fixtureRoomCount: () => string;
+};
 
 const testNavigationContribution = {
   pageId: "pension",
@@ -63,13 +76,15 @@ export const testFeatureComposition = {
 function ContributionFixture() {
   const navigation = useWorkspaceNavigation();
   const [form, setForm] = useState(() => ({ ...toSetupForm(defaultSetupData), roomCount: "2" }));
-  const [data, setData] = useState(window.fixtureDashboard);
-  const runtimeSnapshot = {
+  const [data, setData] = useState(fixtureWindow.fixtureDashboard);
+  const runtimeSnapshot: BusinessCapabilitySnapshot = {
+    businessId: "stage-9-fixture",
     profileId: "pension",
+    capabilities: [],
     enabledCapabilities: [C.ACCOMMODATION_ROOMS]
   };
   const items = buildNavigationFromContributions(runtimeSnapshot, [testFeatureComposition.navigation]);
-  window.fixtureRoomCount = () => form.roomCount;
+  fixtureWindow.fixtureRoomCount = () => form.roomCount;
 
   return <AppShell
     contentScroll="workspace"
@@ -77,7 +92,7 @@ function ContributionFixture() {
     header={<header className="page-header"><h1>Test Feature</h1></header>}
     overlay={<WorkspaceHost
       definition={testFeatureComposition.workspace}
-      context={{ data, onDashboard: setData, ...window.fixtureCapabilities }}
+      context={{ data, onDashboard: setData, ...fixtureWindow.fixtureCapabilities }}
     />}
   >
     <section aria-label="Test feature katkıları" className="form-stack">
