@@ -1851,11 +1851,11 @@ try {
   await expect(compactPage.getByRole("button", { name: "Kaydet", exact: true })).toHaveCount(1);
   await expect(compactPage.locator(".setup-footer")).toHaveCount(0);
   await expect(compactPage.getByRole("tablist", { name: "Ayar kategorileri" }).getByRole("tab")).toHaveCount(4);
-  await expect(compactPage.getByRole("heading", { name: "İşletme", exact: true })).toBeVisible();
+  await expect(compactPage.locator("#settings-business")).toBeVisible();
   await expect(compactPage.locator("#settings-public-profile")).toBeVisible();
   await expect(compactPage.getByLabel("İşletme açıklaması")).toBeVisible();
   await compactPage.getByRole("tab", { name: "İşletme Düzeni", exact: true }).click();
-  await expect(compactPage.getByRole("heading", { name: "İşletme Düzeni", level: 2 })).toBeVisible();
+  await expect(compactPage.locator("#settings-operations")).toBeVisible();
   await compactPage.getByRole("tab", { name: "Uygulama", exact: true }).click();
   await expect(compactPage.getByRole("heading", { name: "Uygulama Şifresi" })).toBeVisible();
   await compactPage.getByRole("tab", { name: "Servisler", exact: true }).click();
