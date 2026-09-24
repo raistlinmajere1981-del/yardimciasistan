@@ -54,6 +54,7 @@ import { RestaurantPage } from "../../pages/RestaurantPage";
 interface DesktopWorkspaceRouterProps {
   activePage: DesktopPage;
   setActivePage: Dispatch<SetStateAction<DesktopPage>>;
+  syncState: SyncState;
   setSyncState: Dispatch<SetStateAction<SyncState>>;
   setStatusMessage: Dispatch<SetStateAction<string>>;
   setupController: SetupController;
@@ -74,6 +75,7 @@ interface DesktopWorkspaceRouterProps {
 export function DesktopWorkspaceRouter({
   activePage,
   setActivePage,
+  syncState,
   setSyncState,
   setStatusMessage,
   setupController,
@@ -414,7 +416,7 @@ export function DesktopWorkspaceRouter({
           data={surfaceData}
           setupData={setupData}
           automaticSyncStatus={automaticSyncStatus}
-          syncBusy={automaticSyncStatus.phase === "syncing"}
+          syncBusy={syncState === "loading" || automaticSyncStatus.phase === "syncing"}
           features={runtimeFeatures}
           aiEnabled={aiEnabled}
           customersEnabled={customersEnabled}

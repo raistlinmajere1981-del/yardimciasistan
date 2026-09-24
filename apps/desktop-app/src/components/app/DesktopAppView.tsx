@@ -108,6 +108,7 @@ export function DesktopAppView({
       <DesktopWorkspaceRouter
         activePage={activePage}
         setActivePage={setActivePage}
+        syncState={syncState}
         setSyncState={setSyncState}
         setStatusMessage={setStatusMessage}
         setupController={setupController}
