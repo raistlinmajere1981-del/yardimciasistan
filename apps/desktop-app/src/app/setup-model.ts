@@ -11,13 +11,6 @@ import {
   type BusinessCapability
 } from "@yardimci-asistan/shared";
 
-interface TableCategoryFormState {
-  key: string;
-  sourceName: string;
-  name: string;
-  tableCount: string;
-}
-
 export interface AiServiceFormDraft {
   projectName: string;
   googleCurl: string;
@@ -61,8 +54,6 @@ export interface SetupFormState {
   productDataProvider: "open_food_facts";
   productDataAutoSearch: boolean;
   productDataIncludeImages: boolean;
-  roomCount: string;
-  tableCategories: TableCategoryFormState[];
   birthdaySettings: BirthdaySettings;
 }
 
@@ -120,43 +111,12 @@ export function toSetupForm(setupData: DesktopSetupData): SetupFormState {
     productDataProvider: setupData.productData.provider,
     productDataAutoSearch: setupData.productData.autoSearchUnknownBarcode,
     productDataIncludeImages: setupData.productData.includeImages,
-    roomCount: String(Math.max(0, setupData.initialCounts.rooms || (setupData.setupRequired ? 2 : 0))),
-    tableCategories: toTableCategoryForm(setupData),
     birthdaySettings: normalizeBirthdaySettings(setupData.birthdaySettings)
   };
 }
 
 export function createProfileOptionDefaults(profileId: string): BusinessCapability[] {
   return [...getBusinessProfile(profileId).defaultOptionalCapabilities];
-}
-
-let tableCategoryFormSequence = 0;
-
-export function nextTableCategoryFormKey() {
-  tableCategoryFormSequence += 1;
-  return `table-category-${tableCategoryFormSequence}`;
-}
-
-function toTableCategoryForm(setupData: DesktopSetupData): TableCategoryFormState[] {
-  const savedCategories = Array.isArray(setupData.tableCategories) ? setupData.tableCategories : [];
-  if (savedCategories.length > 0) {
-    return savedCategories.map((category) => ({
-      key: nextTableCategoryFormKey(),
-      sourceName: category.name,
-      name: category.name,
-      tableCount: String(Math.max(1, category.tableCount))
-    }));
-  }
-
-  const tableCount = Math.max(0, Number(setupData.initialCounts?.tables ?? 0));
-  return tableCount > 0
-    ? [{
-        key: nextTableCategoryFormKey(),
-        sourceName: "Genel",
-        name: "Genel",
-        tableCount: String(tableCount)
-      }]
-    : [];
 }
 
 function createAiServiceFormDrafts(setupData: DesktopSetupData): Partial<Record<DesktopAiService, AiServiceFormDraft>> {
@@ -281,15 +241,6 @@ export function createSetupInput(setupForm: SetupFormState): SaveInitialSetupInp
         whatsapp: setupForm.whatsappEnabled,
         android: setupForm.androidEnabled
       },
-      initialCounts: {
-        rooms: Number(setupForm.roomCount),
-        tables: setupForm.tableCategories.reduce((total, category) => total + Number(category.tableCount || 0), 0)
-      },
-      tableCategories: setupForm.tableCategories.map((category) => ({
-        sourceName: category.sourceName,
-        name: category.name,
-        tableCount: Number(category.tableCount)
-      })),
       birthdaySettings: setupForm.birthdaySettings
     };
 
