@@ -95,3 +95,6 @@ the archive for retired implementation shapes.
 
 
 - removed deprecated `normalizeTRMobilePhone`; desktop credit sharing and the web widget now use the international phone normalizer directly
+
+
+- removed Android storage tests that seeded retired v1 outbox/cache keys; remaining tests exercise only the current transport-neutral outbox and per-source revision cache
