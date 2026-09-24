@@ -46,6 +46,25 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const feedback = staged ? drafts.feedback[staged] : undefined;
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities);
   const dirty = { business: drafts.dirty.business || profile.dirty, operations: drafts.dirty.operations || rooms.dirty, services: drafts.dirty.services, application: updates.dirty };
+  const stagedDirty = staged ? dirty[staged] : false;
+  const stagedBusy = drafts.busy || (staged === "business" && (profile.loading || profile.saving));
+  const stagedSaving = feedback?.state === "loading" || (staged === "business" && profile.saving);
+
+  async function saveStagedCategory() {
+    if (!staged || !stagedDirty) return;
+    if (staged === "business") {
+      if (drafts.dirty.business) await drafts.save("business");
+      if (profile.dirty) await profile.save();
+      return;
+    }
+    await drafts.save(staged);
+  }
+
+  function discardStagedCategory() {
+    if (!staged || stagedBusy) return;
+    drafts.discard(staged);
+    if (staged === "business") profile.discard();
+  }
 
   useEffect(() => {
     if (!focusTarget) return;
@@ -94,11 +113,11 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         </div>}
       </div>
       {staged && hasStagedSection && <footer className="settings-category-actions">
-        <div>{drafts.dirty[staged] && <span>Kaydedilmemiş kategori değişiklikleri</span>}
+        <div>{stagedDirty && <span>Kaydedilmemiş kategori değişiklikleri</span>}
           {feedback?.message && <p role={feedback.state === "error" ? "alert" : "status"}>{feedback.message}</p>}
         </div>
-        <ActionButton type="button" disabled={drafts.busy || !drafts.dirty[staged]} onClick={() => void drafts.save(staged)}>{feedback?.state === "loading" ? "Kaydediliyor…" : "Kaydet"}</ActionButton>
-        <ActionButton variant="secondary" type="button" disabled={drafts.busy || !drafts.dirty[staged]} onClick={() => drafts.discard(staged)}>Değişiklikleri Geri Al</ActionButton>
+        <ActionButton type="button" disabled={stagedBusy || !stagedDirty} onClick={() => void saveStagedCategory()}>{stagedSaving ? "Kaydediliyor…" : "Kaydet"}</ActionButton>
+        <ActionButton variant="secondary" type="button" disabled={stagedBusy || !stagedDirty} onClick={discardStagedCategory}>Değişiklikleri Geri Al</ActionButton>
       </footer>}
     </section>
   </div>;
