@@ -1,6 +1,5 @@
 import fs from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
 export const DESKTOP_DATABASE_FILE_NAME = "yardimci-asistan.sqlite";
 const DESKTOP_MAINTENANCE_DIR_NAME = "maintenance";
@@ -9,11 +8,8 @@ const DESKTOP_STAGED_RESTORE_FILE = "restore.sqlite";
 const DESKTOP_STAGED_RESTORE_ASSETS_DIR = "restore-assets";
 const DESKTOP_ASSETS_DIR_NAME = "assets";
 const DESKTOP_PRODUCTS_DIR_NAME = "products";
-const DESKTOP_TEMPORARY_DIR_NAME = "tmp";
 const DESKTOP_LOGS_DIR_NAME = "logs";
 const DESKTOP_LOG_SESSIONS_DIR_NAME = "sessions";
-const DESKTOP_LOG_FILE_NAME = "yardimci-asistan.log";
-const DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX = ".relocated-to-data-root.json";
 
 export interface DataRootResolutionInput {
   envDataDir?: string;
@@ -27,21 +23,6 @@ export interface BackupRootResolutionInput {
   isPackaged: boolean;
   appPath?: string;
   execDir?: string;
-}
-
-interface DesktopDataPaths {
-  dataRoot: string;
-  databasePath: string;
-  assetsPath: string;
-  productAssetsPath: string;
-  maintenancePath: string;
-  markerPath: string;
-  stagedRestorePath: string;
-  stagedRestoreAssetsPath: string;
-  backupPath: string;
-  temporaryPath: string;
-  logsPath: string;
-  logFilePath: string;
 }
 
 function readEnvOverride(value: string | undefined): string {
@@ -115,12 +96,8 @@ export function resolveAssetsPath(dataRoot: string): string {
   return path.join(dataRoot, DESKTOP_ASSETS_DIR_NAME);
 }
 
-export function resolveProductAssetsPath(dataRoot: string): string {
+function resolveProductAssetsPath(dataRoot: string): string {
   return path.join(resolveAssetsPath(dataRoot), DESKTOP_PRODUCTS_DIR_NAME);
-}
-
-function resolveTemporaryPath(dataRoot: string): string {
-  return path.join(dataRoot, DESKTOP_TEMPORARY_DIR_NAME);
 }
 
 export function resolveLogsPath(dataRoot: string): string {
@@ -129,27 +106,6 @@ export function resolveLogsPath(dataRoot: string): string {
 
 export function resolveDesktopLogSessionsPath(dataRoot: string): string {
   return path.join(resolveLogsPath(dataRoot), DESKTOP_LOG_SESSIONS_DIR_NAME);
-}
-
-export function resolveDesktopLogFilePath(dataRoot: string): string {
-  return path.join(resolveLogsPath(dataRoot), DESKTOP_LOG_FILE_NAME);
-}
-
-export function buildDesktopDataPaths(dataRoot: string, backupPath: string): DesktopDataPaths {
-  return {
-    dataRoot,
-    databasePath: resolveDatabasePath(dataRoot),
-    assetsPath: resolveAssetsPath(dataRoot),
-    productAssetsPath: resolveProductAssetsPath(dataRoot),
-    maintenancePath: resolveMaintenancePath(dataRoot),
-    markerPath: resolvePendingMaintenanceMarkerPath(dataRoot),
-    stagedRestorePath: resolveStagedRestorePath(dataRoot),
-    stagedRestoreAssetsPath: resolveStagedRestoreAssetsPath(dataRoot),
-    backupPath,
-    temporaryPath: resolveTemporaryPath(dataRoot),
-    logsPath: resolveLogsPath(dataRoot),
-    logFilePath: resolveDesktopLogFilePath(dataRoot)
-  };
 }
 
 const PRODUCT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
@@ -174,7 +130,7 @@ function assertSafeProductFileName(fileName: string): string {
   return normalized;
 }
 
-export function isPathWithinRoot(root: string, candidate: string): boolean {
+function isPathWithinRoot(root: string, candidate: string): boolean {
   const relative = path.relative(path.resolve(root), path.resolve(candidate));
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
 }
@@ -214,87 +170,3 @@ export function resolveProductAssetAbsoluteFromRelative(dataRoot: string, relati
   return absolute;
 }
 
-export function listDurableBackupSources(dataRoot: string): string[] {
-  const sources: string[] = [resolveDatabasePath(dataRoot)];
-  const assetsPath = resolveAssetsPath(dataRoot);
-  try {
-    if (fs.existsSync(assetsPath) && fs.statSync(assetsPath).isDirectory()) {
-      sources.push(assetsPath);
-    }
-  } catch {
-    // Best effort; backup source discovery must not fail the backup itself.
-  }
-  return sources;
-}
-
-export interface LegacyRelocationPlan {
-  relocate: boolean;
-  reason: "target-exists" | "legacy-missing" | "same-path" | "legacy-only" | "already-relocated";
-  targetDatabasePath: string;
-  legacyDatabasePath: string;
-  markerPath: string;
-}
-
-function resolveLegacyDevRelocationMarkerPath(legacyDatabasePath: string): string {
-  return `${path.resolve(legacyDatabasePath)}${DESKTOP_LEGACY_RELOCATION_MARKER_SUFFIX}`;
-}
-
-function writeLegacyDevRelocationMarker(plan: LegacyRelocationPlan) {
-  const payload = JSON.stringify({
-    version: 1,
-    legacyDatabasePath: plan.legacyDatabasePath,
-    targetDatabasePath: plan.targetDatabasePath,
-    completedAt: new Date().toISOString()
-  }, null, 2);
-  fs.writeFileSync(plan.markerPath, `${payload}\n`, { encoding: "utf8", mode: 0o600 });
-}
-
-export function planLegacyDevRelocation(targetDatabasePath: string, legacyDatabasePath: string): LegacyRelocationPlan {
-  const target = path.resolve(targetDatabasePath);
-  const legacy = path.resolve(legacyDatabasePath);
-  const markerPath = resolveLegacyDevRelocationMarkerPath(legacy);
-  if (target === legacy) {
-    return { relocate: false, reason: "same-path", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
-  }
-  if (fs.existsSync(markerPath)) {
-    return { relocate: false, reason: "already-relocated", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
-  }
-  if (fs.existsSync(target)) {
-    return { relocate: false, reason: "target-exists", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
-  }
-  if (!fs.existsSync(legacy)) {
-    return { relocate: false, reason: "legacy-missing", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
-  }
-  return { relocate: true, reason: "legacy-only", targetDatabasePath: target, legacyDatabasePath: legacy, markerPath };
-}
-
-export function relocateLegacyDevDatabaseOnce(targetDatabasePath: string, legacyDatabasePath: string): LegacyRelocationPlan & { relocated: boolean } {
-  const plan = planLegacyDevRelocation(targetDatabasePath, legacyDatabasePath);
-  if (!plan.relocate) {
-    // Older builds could already have copied the legacy DB before the marker
-    // existed. Once a development target DB is present, record that the
-    // relocation phase is complete so an intentional future reset does not
-    // silently resurrect the legacy database.
-    if (plan.reason === "target-exists"
-        && fs.existsSync(plan.legacyDatabasePath)
-        && !fs.existsSync(plan.markerPath)) {
-      writeLegacyDevRelocationMarker(plan);
-    }
-    return { ...plan, relocated: false };
-  }
-
-  fs.mkdirSync(path.dirname(plan.targetDatabasePath), { recursive: true });
-  const source = new DatabaseSync(plan.legacyDatabasePath);
-  try {
-    source.exec("PRAGMA busy_timeout = 5000;");
-    source.exec(`VACUUM INTO '${plan.targetDatabasePath.replace(/'/g, "''")}'`);
-  } finally {
-    source.close();
-  }
-
-  if (!fs.existsSync(plan.targetDatabasePath)) {
-    throw new Error("Eski geliştirme verisi yeni konuma kopyalanamadı.");
-  }
-  writeLegacyDevRelocationMarker(plan);
-  return { ...plan, relocated: true };
-}
