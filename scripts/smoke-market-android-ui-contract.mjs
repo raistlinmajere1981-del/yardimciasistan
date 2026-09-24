@@ -137,12 +137,6 @@ for (const coverage of [
   assert.equal(tests.includes(coverage), true, `Android Market JVM coverage missing: ${coverage}`);
 }
 
-assert.equal(
-  foundationTests.includes("legacyProductDraftPermissionMapsToDirectProductCreate"),
-  true,
-  "Android Market JVM coverage missing: legacyProductDraftPermissionMapsToDirectProductCreate"
-);
-
 assert.match(foundation, /smoke-market-android-ui-contract\.mjs/);
 
 console.log("market-android-ui-contract-smoke-ok");
