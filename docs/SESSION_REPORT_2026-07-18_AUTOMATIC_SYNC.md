@@ -8,10 +8,10 @@ dönüştürülmesi.
 **Sonuç:** Geliştirme, test ve Alwaysdata canlı geliştirme ortamına dağıtım
 tamamlandı.
 
-> **Baseline cleanup notu (2026-09-09):** Bu tarihsel raporun ilk bölümleri
-> JSON tabanlı hosting ve çoklu migration dönemi için yazılmıştır. Güncel
-> uygulama `001_baseline.sql` ile temiz SQLite kurar; eski JSON çalışma verisi,
-> eski migration zinciri ve gövde içi sync kimlik doğrulaması desteklenmez.
+> **ARŞİV / tarihsel rapor:** Bu belge 2026-07-18 oturumunun o günkü mimarisini
+> kaydeder ve güncel implementation contract değildir. Güncel masaüstü şeması
+> `apps/desktop-app/db/schema.sql`, güncel sync kimliği `desktop_sync_identity`,
+> güncel backup formatı ise `yardimci-asistan-backup-v2` sözleşmesidir.
 
 ## 1. Yönetici Özeti
 
@@ -238,8 +238,7 @@ npm run smoke:automatic-sync
 - `firm-template/web-module/api/sync.php`: protokol v2 API uç noktası.
 - `apps/desktop-app/electron/sync-coordinator.ts`: masaüstü otomatik senkron
   koordinatörü.
-- `apps/desktop-app/db/migrations/001_baseline.sql`: güncel runtime/outbox,
-  otomatik kuyruk trigger'ları ve kalıcı yayın revision şeması.
+- Güncel karşılık: `apps/desktop-app/db/schema.sql` current runtime/outbox ve kalıcı yayın revision şemasını taşır.
 - `packages/sync-core/index.ts`: taşıma arayüzü ve PHP adaptörü.
 - `apps/android-app/src/main/java/com/yardimciasistan/android/OperationCache.java`:
   Android offline cache.
