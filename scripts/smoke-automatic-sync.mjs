@@ -1,3 +1,4 @@
+import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -100,9 +101,12 @@ try {
     clearAiApiKey: false,
     aiModelOptions: [],
     servicePreferences: { whatsapp: true, android: true },
-    initialCounts: { rooms: 2, tables: 2 }
   }, { mode: "keep" });
   assert.equal(setupResult.ok, true);
+  seedSmokeBusinessLayout(database.databasePath, {
+    roomCount: 2,
+    tableCategories: [{ name: "Salon", tableCount: 2 }]
+  });
   // Keep the business capability enabled while the hosted provider remains
   // disabled below; this exercises capability and provider gates separately.
   setBusinessCapability(database.databasePath, {
