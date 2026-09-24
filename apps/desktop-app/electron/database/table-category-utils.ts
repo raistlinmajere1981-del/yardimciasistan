@@ -1,5 +1,5 @@
 import { normalizeTableCategoryName, tableCategoryKey } from "@yardimci-asistan/shared";
-export { normalizeTableCategoryInputs, normalizeTableCategoryName, tableCategoryKey, type NormalizedTableCategoryInput } from "@yardimci-asistan/shared";
+export { normalizeTableCategoryName, tableCategoryKey, type NormalizedTableCategoryInput } from "@yardimci-asistan/shared";
 
 function normalizeTableCategoryLabel(value: unknown): string {
   return String(value ?? "").trim().replace(/\s+/g, " ");
