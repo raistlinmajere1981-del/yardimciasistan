@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -15,9 +16,9 @@ try {
     whatsapp: "+905550002021",
     syncSecret: "manual-reservation-secret",
     servicePreferences: { whatsapp: true, android: true },
-    initialCounts: { rooms: 3, tables: 0 }
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+  seedSmokeBusinessLayout(database.databasePath, { roomCount: 3 });
   const quickCustomer = database.saveCustomer({
     fullName: "Hızlı Rezervasyon Müşterisi",
     phone: "+905551112233",
