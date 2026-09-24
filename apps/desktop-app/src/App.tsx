@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { BusinessCapabilityRuntimeProvider } from "./app/business-capability-context";
 import { runtimeHasCapability } from "./app/capabilities";
 import { buildDesktopNotifications } from "./app/notifications";
 import type { DesktopPage } from "./app/navigation";
+import type { PageLeaveGuard } from "./app/page-navigation-guard";
 import { subscribeAppStatus, type SyncState } from "./app/runtime-state";
 import { useAppLock } from "./app/use-app-lock";
 import { useCustomerController } from "./app/use-customer-controller";
@@ -19,6 +20,25 @@ function App() {
   const [activePage, setActivePage] = useState<DesktopPage>("dashboard");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [statusMessage, setStatusMessage] = useState("Webden yeni talep yok.");
+  const pageLeaveGuardRef = useRef<PageLeaveGuard | null>(null);
+
+  const registerPageLeaveGuard = useCallback((guard: PageLeaveGuard) => {
+    pageLeaveGuardRef.current = guard;
+    return () => {
+      if (pageLeaveGuardRef.current === guard) {
+        pageLeaveGuardRef.current = null;
+      }
+    };
+  }, []);
+
+  const requestPageChange = useCallback((destination: DesktopPage) => {
+    if (destination === activePage) return;
+    const guard = pageLeaveGuardRef.current;
+    if (guard && !guard(destination, () => setActivePage(destination))) {
+      return;
+    }
+    setActivePage(destination);
+  }, [activePage]);
 
   useEffect(() => subscribeAppStatus(({ state, message }) => {
     setSyncState(state);
@@ -59,7 +79,7 @@ function App() {
     customersEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMERS),
     whatsappEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.WHATSAPP),
     customerCreditEnabled: runtimeHasCapability(desktopSyncController.businessCapabilities, BUSINESS_CAPABILITIES.CUSTOMER_CREDIT),
-    onOpenMessages: () => setActivePage("messages")
+    onOpenMessages: () => requestPageChange("messages")
   });
   const customerController = useCustomerController({
     dashboardData: desktopSyncController.dashboardData,
@@ -94,7 +114,8 @@ function App() {
     >
       <DesktopAppView
         activePage={activePage}
-        setActivePage={setActivePage}
+        requestPageChange={requestPageChange}
+        registerPageLeaveGuard={registerPageLeaveGuard}
         syncState={syncState}
         setSyncState={setSyncState}
         statusMessage={statusMessage}
