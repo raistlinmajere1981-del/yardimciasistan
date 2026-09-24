@@ -197,7 +197,7 @@ export function getTableOrderById(db: DatabaseSync, orderId: string): DesktopTab
   return row ? mapTableOrderRow(db, row) : null;
 }
 
-export function mapTableOrderRow(db: DatabaseSync, row: Record<string, unknown>): DesktopTableOrder {
+function mapTableOrderRow(db: DatabaseSync, row: Record<string, unknown>): DesktopTableOrder {
   const id = String(row.id ?? "");
   return {
     id,
@@ -217,7 +217,7 @@ export function mapTableOrderRow(db: DatabaseSync, row: Record<string, unknown>)
   };
 }
 
-export function getTableOrderItems(db: DatabaseSync, orderId: string): DesktopTableOrderItem[] {
+function getTableOrderItems(db: DatabaseSync, orderId: string): DesktopTableOrderItem[] {
   const rows = db
     .prepare(`
         SELECT *
