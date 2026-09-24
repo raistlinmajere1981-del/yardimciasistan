@@ -39,7 +39,6 @@ const server = http.createServer((request, response) => {
         message: "Senkron özellikleri alındı.",
         protocol_version: 2,
         storage: "sqlite",
-        schema_version: 2,
         features: [],
         server_time: new Date().toISOString(),
         server_revision: 1
