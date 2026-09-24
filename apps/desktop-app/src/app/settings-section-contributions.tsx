@@ -4,12 +4,10 @@ import type { BusinessCapabilitySnapshot } from "../../electron/business-capabil
 import { settingsFieldOwners } from "./settings-draft-model";
 import {
   isSettingsSectionVisible,
-  layoutSettingsDefinition,
   type SettingsSectionDefinition,
   type StagedSettingsCategoryId
 } from "./settings-registry";
 import type { SetupFormState } from "./setup-model";
-import { LayoutSettingsSection } from "../components/settings/LayoutSettingsSection";
 
 type CategoryField<C extends StagedSettingsCategoryId> = (typeof settingsFieldOwners)[C][number];
 export type CategoryDraft<C extends StagedSettingsCategoryId> = Pick<SetupFormState, CategoryField<C>>;
@@ -33,20 +31,9 @@ type StagedSettingsContributions = {
   readonly [C in StagedSettingsCategoryId]: readonly SettingsSectionContribution<C>[];
 };
 
-const layoutSettingsContribution: SettingsSectionContribution<"operations"> = {
-  definition: layoutSettingsDefinition,
-  render: ({ draft, configurationCapabilities, onChange }) => (
-    <LayoutSettingsSection
-      form={draft}
-      onFormChange={onChange}
-      enabledCapabilities={configurationCapabilities}
-    />
-  )
-};
-
 const stagedSettingsContributions = {
   business: [],
-  operations: [layoutSettingsContribution],
+  operations: [],
   services: []
 } satisfies StagedSettingsContributions;
 
