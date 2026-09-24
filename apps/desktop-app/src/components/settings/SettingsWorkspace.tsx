@@ -80,10 +80,12 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
           {initialized && <RoomManagementSection controller={rooms} />}
           {!hasStagedSection && <p>Bu sektör için oda veya masa düzeni bulunmuyor.</p>}
         </>}
-        {active === "services" && <fieldset className="settings-resource-fields" disabled={drafts.busy}>
-          <ServicesSettingsSection {...props} {...ai} onTestAiConnection={() => void ai.testAiConnection()} form={drafts.form} onFormChange={drafts.setDraft} enabledCapabilities={capabilities} />
-        </fieldset>
-          <StagedSettingsContributionSlot category="services" form={drafts.form} onFormChange={drafts.setDraft} busy={drafts.busy} configurationCapabilities={capabilities} initialized={initialized} runtimeSnapshot={runtimeCapabilities} />}
+        {active === "services" && <>
+          <fieldset className="settings-resource-fields" disabled={drafts.busy}>
+            <ServicesSettingsSection {...props} {...ai} onTestAiConnection={() => void ai.testAiConnection()} form={drafts.form} onFormChange={drafts.setDraft} enabledCapabilities={capabilities} />
+          </fieldset>
+          <StagedSettingsContributionSlot category="services" form={drafts.form} onFormChange={drafts.setDraft} busy={drafts.busy} configurationCapabilities={capabilities} initialized={initialized} runtimeSnapshot={runtimeCapabilities} />
+        </>}
         {active === "application" && <div id="settings-application" className="settings-application-workspace">
           <AppearanceSettingsSection uiPreferences={props.uiPreferences} onUiPreferencesChange={props.onUiPreferencesChange} />
           {initialized && <UpdateSettings controller={updates} />}

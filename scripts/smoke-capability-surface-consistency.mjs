@@ -396,7 +396,7 @@ const hybridProjection = projectAndroidOperationsSnapshot(fullSnapshot, pensionR
 assert.equal(hybridProjection.rooms.length > 0, true);
 assert.deepEqual(hybridProjection.tables, []);
 assert.equal(hybridProjection.reservations.some((reservation) => reservation.reservation_type === "table"), false);
-assert.match(navigationSource, /hasRetailWorkspaceCapability/);
+assert.match(navigationSource, /pageId:\s*"market"[\s\S]{0,220}condition:\s*\{\s*anyOf:/);
 assert.doesNotMatch(navigationSource, /businessType|business_type|setupData\.modules/);
 assert.match(
   navigationSource,

@@ -231,9 +231,9 @@ export function buildNavigationFromContributions(
   capabilities: BusinessCapabilitySnapshot | null | undefined,
   contributions: readonly NavigationContribution[]
 ): NavigationItem[] {
-  return contributions
+  return [...contributions]
     .filter((contribution) => matchesCapabilityCondition(capabilities, contribution.condition))
-    .toSorted((left, right) => left.order - right.order)
+    .sort((left, right) => left.order - right.order)
     .map((contribution) => {
       const presentation = resolvePresentation(contribution, capabilities);
       return { id: contribution.pageId, label: presentation.label, icon: contribution.icon };

@@ -20,13 +20,16 @@ const marketSource = [marketPage, marketController, marketProducts, productField
 const preload = read("apps/desktop-app/electron/preload.ts");
 
 assert.match(navigation, /\| "market" \|/, "DesktopPage must include the market route.");
-assert.match(navigation, /hasRetailWorkspaceCapability/, "Market navigation must have an explicit retail capability gate.");
+const marketNavigationStart = navigation.indexOf('pageId: "market"');
+assert.notEqual(marketNavigationStart, -1, "Market navigation contribution must exist.");
+const marketNavigation = navigation.slice(marketNavigationStart, marketNavigationStart + 700);
+assert.match(marketNavigation, /condition:\s*\{\s*anyOf:/, "Market navigation must use an explicit capability condition.");
 for (const capability of ["RETAIL_BARCODE", "RETAIL_PURCHASING", "RETAIL_SUPPLIERS", "RETAIL_LABELS"]) {
-  assert.match(navigation, new RegExp(`C\\.${capability}`), `Market navigation must consider ${capability}.`);
+  assert.match(marketNavigation, new RegExp(`C\\.${capability}`), `Market navigation must consider ${capability}.`);
 }
 assert.doesNotMatch(
-  navigation,
-  /if \(runtimeHasCapability\(capabilities, C\.CATALOG\)\)[\s\S]{0,120}id: "market"/,
+  marketNavigation,
+  /C\.CATALOG[^\n]*condition|condition[^\n]*C\.CATALOG/,
   "Shared catalog capability alone must not expose the Market workspace."
 );
 assert.match(workspaceRouter, /activePage === "market"/, "DesktopWorkspaceRouter must route the Market page.");
