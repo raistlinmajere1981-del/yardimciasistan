@@ -10,9 +10,9 @@ Workspace / Operation contracts and static Room/Table composition are unchanged.
 | Category | Canonical sections | Persistence |
 | --- | --- | --- |
 | İşletme | Identity/contact, sector + optional capabilities; public business profile | Setup staged; separate profile resource |
-| İşletme Düzeni | Room count, table categories; room profiles/default nightly prices | Setup staged; separate room resource |
+| İşletme Düzeni | Room collection/profile/default nightly prices, table categories | Transactional BusinessLayout staged resource |
 | Servisler | WhatsApp/birthdays, Android/local network, product data, web sync, AI profiles | Setup staged; connection/device actions remain commands |
-| Uygulama | Appearance, update preferences, password/security, updates and backups | Immediate appearance; independent update preferences; explicit commands |
+| Uygulama | Appearance, update preferences, password/security, updates and backups | Immediate appearance; staged update preferences; explicit commands |
 
 `app/settings-registry.ts` contains static TypeScript category and section definitions:
 id (also the focus target), category, title, keywords, persistence kind and a narrow
@@ -39,27 +39,34 @@ A persisted zero room count stays zero; the existing two-room suggestion applies
 to an incomplete first setup. First-run generated sync secret remains stable across
 bootstrap refreshes.
 
-A category save:
+A Business or Services category save:
 
-1. Locks the single whole-setup writer (including cross-category double submission).
+1. Locks that category's staged controls and Settings transitions.
 2. Reads the latest canonical setup using existing getSetupData.
-3. Merges only the active category's supported fields over that canonical snapshot.
-4. Validates that category; other categories contribute only persisted values.
+3. Merges only the active category's owned fields over that canonical snapshot.
+4. Validates that category; other Setup fields contribute only persisted values.
 5. Calls the existing setup:saveInitial API through the app controller, preserving
    backend capability/security gates, encrypted keys, normalization and side effects.
-6. Advances canonical state and only the submitted category baseline. Pending edits
-   in other categories survive. Failure preserves the submitted draft.
+6. On success replaces the Setup draft/baseline with the committed snapshot. Because
+   Settings permits at most one dirty category, no second hidden dirty Setup draft is
+   preserved or rebased. Failure preserves the active draft.
+
+Operations bypasses setup:saveInitial entirely. getBusinessLayout/saveBusinessLayout
+owns the room collection and table categories and commits both in one database
+transaction.
 
 Birthday validation and table-category validation reuse existing rules. The pure
 browser-safe table-category validator moved to shared; the Electron module re-exports
 it and retains desktop reconciliation. Database-dependent validation (protected tables,
 secret persistence, etc.) remains in the backend. No IPC or schema change.
 
-Clean categories follow canonical refresh. Dirty categories keep their baseline and
-local draft. Explicit discard copies only that category from latest canonical. Category
-switching never saves or discards. Edits arriving during a pending request are retained.
-A backend local commit with a web-publication or capability-refresh warning advances
-canonical state and reports that warning, without pretending local persistence failed.
+Clean Setup categories follow canonical refresh. The single active dirty category is
+not overwritten by an external refresh; explicit discard resolves it against the latest
+canonical snapshot. Category/search/page transitions never silently save or discard:
+they open the common save/discard/stay decision. Controls are locked while persistence
+is in flight, so edits made during a save are not retained through a rebase. A backend
+local commit with a web-publication or capability-refresh warning advances canonical
+state and reports that warning without pretending local persistence failed.
 
 Sector selection retains the existing defaultOptional reprojection on an explicit
 sector change. Same-sector refresh never reapplies defaults: Customer Credit and Android
@@ -83,12 +90,15 @@ the owning category indicator but never to Setup payload/save validation.
 
 - Public Profile: getBusinessPublicProfile/saveBusinessPublicProfile, own validation,
   dirty, save/discard, saving lock and local result. No profile fields copied into Setup.
-- Rooms: getRoomFolioData/setRoomNightlyPrice, existing name/default-price batch and
-  RoomPublicDetailsEditor operation. D-007 stays intact; Folio nightly override is not
-  part of this editor. Room count has one Setup field in İşletme Düzeni. Resource
-  refresh preserves pending room edits.
-- Update URL/auto-check: independent saveUpdatePreferences resource with its own
-  save/discard; status updates follow canonical values only while clean.
+- Operations layout: getBusinessLayout/saveBusinessLayout owns rooms and table
+  categories as one staged collection. RoomPublicDetailsEditor edits the same local
+  collection draft; it no longer performs a separate database save. Room removal is
+  staged and backend-protected, then archived transactionally on save. Folio-specific
+  nightly price override remains a separate financial concept.
+- Update URL/auto-check: saveUpdatePreferences remains its backend resource, but its
+  draft participates in the Application category footer. Returning to the persisted
+  value clears dirty state; Varsayılana Dön stages the default instead of persisting
+  immediately.
 - Password change/remove/reset, update check/download/restart/default reset,
   device role/permissions/install/revoke and maintenance commands are explicit actions.
   No category Save invokes them. Errors/results belong to their respective sections.
@@ -112,20 +122,21 @@ workspace content, avoiding document overflow. Legacy anchor primary navigation 
 CSS were removed; stable IDs remain solely for search/focus.
 
 Search uses Turkish case-normalized metadata matching without dependencies/fuzzy engine
-or customer/secret values. Keyboard-usable result buttons select a category and focus/
-scroll its section after mount. They never render a second form or reset drafts. Section
-errors use role=alert and operation results use role=status. Native time fields retain
-lang=tr-TR. Settings is not a modal; the existing bounded room-details dialog is a single
-layer, not a modal inside another modal.
+or customer/secret values. Keyboard-usable result buttons request the same guarded
+category transition as tabs; query/focus state changes only after the transition is
+accepted. App-level page navigation also consults the Settings leave guard before the
+page owner changes. Section errors use role=alert and operation results use role=status.
+Native time fields retain lang=tr-TR. Settings is not a modal; the existing bounded
+room-details dialog and the unsaved-changes decision are each single-layer dialogs.
 
 ## Lifetime and deliberate limits
 
-Guarantee: draft lifetime is the mounted Settings page, including category/search switches.
-Leaving Settings or locking destroys this local lifetime. A global navigation blocker,
-draft persistence across app navigation/restart, generic rebase/CRDT, global state library,
-settings DSL/form generator/plugin discovery and backend category-patch/versioning APIs
-are deliberately absent. A full-save read/merge is not a cross-process atomic patch.
-These are follow-up decisions, not hidden additions to Stage 7.
+Guarantee: draft lifetime is the mounted Settings page. Category/search switches and
+page navigation cannot destroy a dirty active draft without an explicit save/discard/stay
+decision. Draft persistence across restart, generic rebase/CRDT, a global state library,
+settings DSL/form generator/plugin discovery and backend Setup category-patch/versioning
+APIs remain deliberately absent. A full Setup save read/merge is not a cross-process
+atomic patch; BusinessLayout is separately transactional.
 
 ## Verification contract
 
