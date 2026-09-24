@@ -29,10 +29,6 @@ export interface AiServiceProfileUpsert {
 }
 
 export function getAiServiceProfiles(db: DatabaseSync): DesktopAiServiceProfile[] {
-  const settings = db
-    .prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1")
-    .get() as Record<string, unknown> | undefined;
-  const activeService = normalizeStoredAiService(settings?.ai_service);
   const rows = db
     .prepare("SELECT * FROM ai_service_profiles ORDER BY service")
     .all() as Array<Record<string, unknown>>;
@@ -47,28 +43,27 @@ export function getAiServiceProfiles(db: DatabaseSync): DesktopAiServiceProfile[
 
   return AI_SERVICE_IDS.map((service) => {
     const row = rowsByService.get(service);
-    const useActiveSettings = !row && service === activeService;
-    const model = String(row?.model ?? (useActiveSettings ? settings?.ai_model : "") ?? "").trim();
-    const baseUrl = normalizeAiBaseUrl(row?.base_url ?? (useActiveSettings ? settings?.ai_base_url : ""))
-      || AI_SERVICE_DEFAULT_BASE_URLS[service];
+    const model = String(row?.model ?? "").trim();
+    const baseUrl = normalizeAiBaseUrl(row?.base_url) || AI_SERVICE_DEFAULT_BASE_URLS[service];
     return {
       service,
-      projectName: String(row?.project_name ?? (useActiveSettings ? settings?.ai_project_name : "") ?? "").trim(),
+      projectName: String(row?.project_name ?? "").trim(),
       baseUrl,
       model,
       modelOptions: normalizeAiModelOptions(row?.model_options_json, model),
-      timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? (useActiveSettings ? settings?.ai_timeout_seconds : DEFAULT_AI_TIMEOUT_SECONDS)),
-      apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? (useActiveSettings ? settings?.ai_api_key_encrypted : "") ?? "").trim()),
-      updatedAt: normalizeStoredTimestamp(row?.updated_at ?? (useActiveSettings ? settings?.updated_at : ""))
+      timeoutSeconds: normalizeStoredAiTimeout(row?.timeout_seconds ?? DEFAULT_AI_TIMEOUT_SECONDS),
+      apiKeyConfigured: Boolean(String(row?.api_key_encrypted ?? "").trim()),
+      updatedAt: normalizeStoredTimestamp(row?.updated_at)
     };
   });
 }
 
 export function getEncryptedAiApiKey(db: DatabaseSync, service?: DesktopAiService | string): string {
-  const settings = db
-    .prepare("SELECT ai_service, ai_api_key_encrypted FROM settings WHERE deleted_at = '' LIMIT 1")
-    .get() as { ai_service?: string; ai_api_key_encrypted?: string } | undefined;
-  const requestedService = service === undefined ? normalizeStoredAiService(settings?.ai_service) : normalizeAiService(service);
+  const requestedService = service === undefined
+    ? normalizeStoredAiService(
+        (db.prepare("SELECT ai_service FROM settings WHERE deleted_at = '' LIMIT 1").get() as { ai_service?: string } | undefined)?.ai_service
+      )
+    : normalizeAiService(service);
 
   if (!requestedService) {
     return "";
@@ -77,13 +72,7 @@ export function getEncryptedAiApiKey(db: DatabaseSync, service?: DesktopAiServic
   const profile = db
     .prepare("SELECT api_key_encrypted FROM ai_service_profiles WHERE service = ? LIMIT 1")
     .get(requestedService) as { api_key_encrypted?: string } | undefined;
-  if (profile) {
-    return String(profile.api_key_encrypted ?? "").trim();
-  }
-
-  return normalizeStoredAiService(settings?.ai_service) === requestedService
-    ? String(settings?.ai_api_key_encrypted ?? "").trim()
-    : "";
+  return String(profile?.api_key_encrypted ?? "").trim();
 }
 
 export function markAiSettingsPublished(db: DatabaseSync, timestamp: string): void {
