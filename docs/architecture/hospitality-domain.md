@@ -1,6 +1,6 @@
 # Hospitality domain hardening — Stage 3
 
-D-001 through D-008 remain the authority. No schema, renderer presentation or transport payload migration is included.
+D-001 through D-008 remain the authority. No schema or transport redesign is included.
 
 ## Initial call graph and behavior
 
@@ -8,7 +8,7 @@ D-001 through D-008 remain the authority. No schema, renderer presentation or tr
 | --- | --- | --- | --- | --- | --- |
 | Manual assignment | `useCustomerController` → preload `assignCustomerRoom` → `customer:assignRoom` → DesktopDatabase → stay-reservation-service; Android `customer_room_assign` → android-action-service | reserved / occupied | Creates manual Stay, empty reservation ID | Unchanged | Unchanged |
 | Stay status | `useCustomerController` → preload/`customer:updateRoomStayStatus` → facade → stay-reservation-service; Android `customer_room_stay_status` → android-action-service | Arrival occupied; departure cleaning unless another active Stay | Lifecycle/timestamps | Unchanged | Previously unchanged even on departure |
-| Reservation assignment/status | `useOperationController` → reservation IPC → facade → stay-reservation-service; Android reservation actions/status | Legacy reservation status updates | Does not create Stay | Assignment/status mutation | Unchanged |
+| Reservation assignment/status | `useOperationController` → reservation IPC → facade → stay-reservation-service; Android reservation actions/status | Reservation status updates | Does not create Stay | Assignment/status mutation | Unchanged |
 | Request conversion | desktop/Android → request-intake-service | Unchanged; new reservation has no assigned room | Does not create Stay | Creates reservation from request | Reservation financial initialization remains existing behavior |
 | Open Folio | `RoomFolioWorkspace` → preload/room-folio-ipc → DesktopRoomFolioService.openFolio | occupied | Implicit check-in | Unchanged | Creates account and imports existing reservation deposit once |
 | Update Folio details | same Folio chain | Unchanged | Also updates dates/guest count | Unchanged | Updates account pricing/dates; room profile price is separate |
@@ -33,7 +33,7 @@ New IPC handlers check the session lock on the main side, then existing customer
 
 Linked creation accepts only an **approved room reservation**. A single assigned room can be inferred; multi-room bookings require an explicit member room. Customer, dates, guest count, notes and reservation ID come from that booking; the new Stay is **planned**. Room activation/operational restriction/capacity, overlapping Stay and duplicate active reservation-room guards apply. Other active reservations are checked directly without the dashboard's 80-row limit; only the source reservation is excluded, including when another booking belongs to the same customer. The reservation itself is never updated.
 
-Manual `assignCustomerToRoom` remains separate, retaining its empty reservation ID and existing validation/messages, including its legacy same-customer reservation conflict exemption. Both public paths share insertion/validation internally. Linked conversion encloses source reads and insertion in a savepoint. No schema/index change is needed.
+Manual `assignCustomerToRoom` remains separate, retaining its empty reservation ID and existing validation/messages, including its same-customer reservation conflict exemption. Both public paths share insertion/validation internally. Linked conversion encloses source reads and insertion in a savepoint. No schema/index change is needed.
 
 Multi-room bookings have no per-room guest allocation model: the booking guest count is conservatively checked against the selected room, without invented distribution. Folio reservation-total/deposit initialization is unchanged; a per-room financial allocation policy is outside this stage and must not be inferred from the linked Stay API.
 
@@ -62,16 +62,16 @@ Finance SQL triggers, stock mutations, restaurant transfer idempotency, Customer
 - `operationalCondition`: ready / cleaning / maintenance / out_of_service, derived only from persisted Room status.
 - `occupancy`: actual checked-in Stay IDs and occupied/vacant, independent of reservation dates.
 - `planning`: separate reservation IDs and planned Stay IDs; both can coexist. Finished/cancelled/expired plans are excluded.
-- `persistedStatus` and `isActive` remain visible so callers do not mistake the projection for a schema split. Legacy occupied/reserved values contain no separate physical-condition fact and map to ready.
+- `persistedStatus` and `isActive` remain visible so callers do not mistake the projection for a schema split. Persisted occupied/reserved values contain no separate physical-condition fact and map to ready.
 
 Stage 4 uses this projection in Room tiles and RoomWorkspace; the remaining dashboard `getRoomDisplayInfo` adapter delegates to it. The projection does not expand limited dashboard/history reads or claim complete Folio history.
 
-## Stage 4 compatibility removal conditions
+## Stage 4 remaining domain cleanup
 
 1. **openFolio implicit check-in: removed in Stage 4.** Production calls now originate in RoomWorkspace after explicit `checkInStay`, or retry financial opening for an already checked-in Stay. `openFolio` no longer mutates Stay/Room or claims arrival in its success message. All service/transfer/Android smoke fixtures now check in explicitly; account opening without arrival is tested.
 2. **Folio checkout payload:** current desktop checkout carries only the Folio identity; D-005 governs departure with remaining debt. RoomWorkspace distinguishes guest checkout from a settled-account close action, while Android checkout independently carries its stale-balance guard.
 3. **Folio details ↔ Stay metadata and Room profile:** existing date/guest-count coupling and profile edit entry points were audited, not redesigned. RoomWorkspace must preserve D-007's single profile save model; nightly Folio overrides remain separate.
-4. **Legacy room display:** replace callers with the orthogonal projection during the RoomWorkspace migration, not in this domain stage.
+4. **Room display adapter:** replace remaining callers with the orthogonal projection as RoomWorkspace converges on the canonical projection.
 
 ## Verification
 
