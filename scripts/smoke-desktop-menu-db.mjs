@@ -135,10 +135,6 @@ try {
     servicePreferences: {
       whatsapp: true,
       android: true
-    },
-    initialCounts: {
-      rooms: 3,
-      tables: 3
     }
   };
   const setupResult = database.saveInitialSetup(setupInput, {
