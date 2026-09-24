@@ -12,7 +12,7 @@ import { ActionButton } from "../ui/ActionButton";
 
 type EditorState = "idle" | "loading" | "error";
 
-export interface RoomPublicDetailsEditorRoom {
+interface RoomPublicDetailsEditorRoom {
   id: string;
   name: string;
   number: string;
