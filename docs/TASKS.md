@@ -48,9 +48,9 @@ commerce foundation smoke
 commerce runtime smoke
 ```
 
-Temiz kurulum yalnız `apps/desktop-app/db/migrations/001_baseline.sql` kullanır. Eski
-profil/module sütunları ve migration yükseltme yolları desteklenmez; backup/restore
-current-baseline manifesti ve SQLite şemasıyla doğrulanır.
+Temiz kurulum yalnız `apps/desktop-app/db/schema.sql` kullanır. Tarihsel
+profil/module şekilleri veya schema upgrade zinciri desteklenmez; backup/restore
+güncel `yardimci-asistan-backup-v2` manifesti ve SQLite şemasıyla doğrulanır.
 
 ---
 
