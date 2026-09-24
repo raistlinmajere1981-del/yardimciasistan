@@ -314,11 +314,11 @@ Room and Table implementations become simpler because shared code was extracted�
 
 # Stage 7 — Settings Platform v2
 
-Status: **Implementation complete; external verification pending** — four category
-workspaces, static settings metadata, category-owned Setup drafts/save, independent
-resource lifecycles, immediate appearance and explicit actions. See the
-[Settings audit](settings-platform-audit.md) and [Settings platform](settings-platform.md).
-Only targeted checks run in the implementation session; broad gates are a separate handoff.
+Status: **closed and verified** — four category workspaces, static settings metadata,
+category-owned Setup drafts/save, independent resource lifecycles, immediate appearance
+and explicit actions. See the [Settings audit](settings-platform-audit.md) and
+[Settings platform](settings-platform.md). Subsequent Stage 8–10 pilot and strict gates
+have repeatedly exercised this platform.
 
 Goal: make future settings growth cheap and predictable.
 
@@ -423,7 +423,8 @@ Implementation status (2026-09-24):
 - Stage 8G — Calendar: closed and verified.
 - Stage 8 feature migration: complete.
 - Stage 9 — Sector / Feature contribution model: closed and verified.
-- Next: Stage 10 — Legacy removal and documentation reset.
+- Stage 10 — Legacy removal and documentation reset: closed and verified.
+- Application Platform v2 staged migration: complete.
 
 ---
 
@@ -464,13 +465,28 @@ Recommended reasoning: **GPT-6 Astra High or Extra High only if cross-repo depen
 
 # Stage 10 — Legacy removal and documentation reset
 
-Status: **in progress** on `refactor/legacy-doc-reset-v2`. See [Stage 10 legacy removal audit](legacy-removal-audit.md).
+Status: **closed and verified** on `refactor/legacy-doc-reset-v2`.
+See [Stage 10 legacy removal audit](legacy-removal-audit.md) and the current
+[Feature Development Guide](../FEATURE_DEVELOPMENT.md).
 
 Remove old easy/pro concepts, obsolete theme selectors/files, obsolete drawer-specific entity editors, historical UI contracts that conflict with v2, dead CSS, old source-text smoke assumptions and compatibility adapters whose replacement is complete.
 
 Update AGENTS, UI rules, frontend architecture, design-system documentation and feature development guide.
 
 Keep historical migration reports only if explicitly marked archival.
+
+## Exit result
+
+- Appearance v2 is the only runtime appearance model; easy/pro and old theme/mode compatibility are gone.
+- Migration-era Stage 2/3 browser smokes and source-shape-only Calendar/Market/frontend contracts were removed or replaced by current behavior/AST audits.
+- Active UI, frontend and design-system guidance now describes the live v2 architecture.
+- Dead shared CSS and migration-era cascade naming were removed.
+- Internal renderer/Electron export surfaces were narrowed; `knip:exports` is clean.
+- Legacy development-database relocation compatibility and its logging/test contracts were removed.
+- Current pilot automation passes without skipped/failed checks.
+
+The staged Platform v2 migration is complete. Future work should extend the current
+contracts rather than reintroduce migration compatibility.
 
 ---
 

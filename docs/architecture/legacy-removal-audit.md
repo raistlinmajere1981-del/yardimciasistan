@@ -1,6 +1,6 @@
 # Stage 10 — Legacy removal audit
 
-Status: in progress on `refactor/legacy-doc-reset-v2`.
+Status: **closed and verified** on `refactor/legacy-doc-reset-v2`.
 
 Stage 10 removes completed migration scaffolding and resets active documentation around Application Platform v2. Existing local user settings/data do not require migration compatibility for this cleanup; obsolete persisted shapes may safely fall back to current defaults.
 
@@ -59,7 +59,7 @@ Mixed runtime/security checks such as capability-surface consistency remain unti
 
 ### Slice 10C — Dead UI/CSS cleanup
 
-In progress.
+Completed.
 
 Completed so far:
 
@@ -100,3 +100,21 @@ Stage 10 does not change business/domain semantics, database schema, Finance/Mar
 
 
 - logging contract no longer requires the removed `startup.legacy-data.relocation.failed` compatibility event; current startup/restore/update/local-companion diagnostics remain covered.
+
+
+## Closure verification
+
+Final Stage 10 verification reported locally:
+
+```text
+Pilot Check: 46 passed / 0 failed / 0 skipped
+npm run knip:exports
+  → Excellent, Knip found no issues.
+```
+
+Earlier Stage 10 checkpoints also passed the strict architecture/design/Knip gates and
+desktop renderer/browser contracts after each relevant cleanup slice. The final pilot run
+includes the current TypeScript/build preflight and the modular foundation chain.
+
+Stage 10 is closed. Application Platform v2 no longer carries migration compatibility as
+an active architectural concern.
