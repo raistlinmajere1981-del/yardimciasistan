@@ -15,9 +15,11 @@ assert.ok(existsSync(backupPath) && statSync(backupPath).isDirectory(), "Windows
 const database = new DatabaseSync(databasePath);
 try {
   assert.equal(String(scalar(database, "PRAGMA integrity_check")), "ok");
-  const migrationCount = Number(scalar(database, "SELECT COUNT(*) FROM schema_migrations"));
-  assert.equal(migrationCount, 1, `Current baseline dışında migration uygulandı: ${migrationCount}`);
-  assert.equal(scalar(database, "SELECT id FROM schema_migrations"), "001_baseline.sql");
+  assert.equal(
+    Number(scalar(database, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'")),
+    0,
+    "Current-only veritabanında schema_migrations tablosu olmamalı."
+  );
   for (const table of ["business", "settings", "rooms", "tables", "menu_categories", "menu_items"]) {
     assert.equal(
       Number(scalar(database, `SELECT COUNT(*) FROM ${table}`)),
