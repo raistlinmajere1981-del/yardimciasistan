@@ -333,8 +333,8 @@ yapmayın. SQLite dosyasını önceden elle oluşturmanız gerekmez.
 Apache hostinglerde `config/`, `data/` ve `knowledge/` klasörlerinde gelen `.htaccess` dosyaları doğrudan tarayıcı erişimini kapatır. Nginx veya özel panel kullanılan hostinglerde aynı engelleme sunucu ayarından yapılmalıdır.
 
 Güncel web modülü eski JSON çalışma dosyalarını içe aktarmaz. İlk API çağrısı current
-SQLite storage'ı `schema_version = 3` ile oluşturur; kurulumdan önce eski veriler
-gerekiyorsa ayrı bir dışa aktarma/temiz veri hazırlama işlemi yapılmalıdır.
+SQLite storage'ı doğrudan oluşturur. Kurulumdan önce eski veriler gerekiyorsa ayrı bir
+dışa aktarma/temiz veri hazırlama işlemi yapılmalıdır.
 
 ## 8. Hızlı Test
 
