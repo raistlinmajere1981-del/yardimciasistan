@@ -24,7 +24,7 @@ try {
   // Stable local tiles: the visual test does not depend on OSM/network availability.
   await page.route(/^https:\/\/(?:[^/]+\.)?tile\.openstreetmap\.org\//, route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256"><rect width="256" height="256" fill="#edece6"/><path d="M0 40L256 200M40 0L180 256" stroke="#fff" stroke-width="10"/></svg>' }));
   await page.addInitScript(({ setup, dashboard, report, allCapabilities }) => {
-    localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ theme: 'light', mode: 'easy', scale: 1 }));
+    localStorage.setItem('yardimci-asistan.ui-preferences', JSON.stringify({ version: 2, scheme: 'light', density: 'comfortable', scale: 1, accent: 'coral', font: 'plex', motion: 'system' }));
     const enabledCapabilities = allCapabilities;
     let profile = { description: 'Akyaka’da aile işletmesi pansiyon ve kafe.', latitude: 37.05, longitude: 28.32, directionsNote: '', checkInTime: '14:00', checkOutTime: '11:00', breakfastStartTime: '08:00', breakfastEndTime: '10:00', features: [], policyNote: '', paymentNote: '', languages: ['Türkçe', 'English'] };
     window.__designCalls = [];

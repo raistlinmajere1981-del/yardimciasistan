@@ -30,7 +30,7 @@ try {
   await page.addInitScript(({ setupData, dashboardData, reportData, capabilitySnapshot }) => {
     const uiPreferencesKey = "yardimci-asistan.ui-preferences";
     if (window.localStorage.getItem(uiPreferencesKey) === null) {
-      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ theme: "dark", scale: 1 }));
+      window.localStorage.setItem(uiPreferencesKey, JSON.stringify({ version: 2, scheme: "dark", density: "compact", scale: 1, accent: "coral", font: "plex", motion: "system" }));
     }
     let currentDashboardData = dashboardData;
     const mutateDevice = (deviceId, mutation, message) => {
