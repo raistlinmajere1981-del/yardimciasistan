@@ -246,4 +246,4 @@ Pansiyon/restoran omurgası, capability-first modüler altyapı ve Market/perake
 
 Yeni geliştirme paketlerinden önce `node scripts/check-modular-foundation.mjs` yeşil olmalıdır. Güncel capability kararları, Market/Android sınırları, Product Data ve durable asset modeli [Modüler İşletme Temeli ve Market Handoff](docs/MODULAR_BUSINESS_FOUNDATION.md) içinde kayıtlıdır.
 
-Güncel baseline yalnız `profile_id` ve `business_capabilities` sözleşmesini taşır. Eski profil alanları, module projection'ları ve geçiş migration'ları desteklenmez; temiz kurulum `001_baseline.sql` ile başlar. Eski bir veritabanı veya backup açılmaya çalışılırsa runner/backup doğrulaması açık hata verir.
+Güncel masaüstü veritabanı `apps/desktop-app/db/schema.sql` ile doğrudan oluşturulur. `profile_id` ve `business_capabilities` current sözleşmedir; tarihsel schema upgrade zinciri yoktur. Backup/restore yalnız güncel `yardimci-asistan-backup-v2` formatını kabul eder.
