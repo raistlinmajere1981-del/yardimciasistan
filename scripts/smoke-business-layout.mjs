@@ -43,14 +43,45 @@ try {
     aiTimeoutSeconds: 30,
     aiApiKey: "",
     clearAiApiKey: false,
-    servicePreferences: { whatsapp: false, android: false },
-    initialCounts: { rooms: 2, tables: 3 },
+    servicePreferences: { whatsapp: false, android: false }
+  });
+  assert.equal(setup.ok, true, setup.ok ? "" : setup.message);
+
+  const seeded = saveBusinessLayout(database.databasePath, {
+    rooms: [
+      {
+        clientKey: "seed-room-1",
+        name: "Oda 101",
+        number: "101",
+        capacity: 2,
+        bedInfo: "1 çift kişilik yatak",
+        floor: "",
+        features: [],
+        description: "",
+        priceNote: "",
+        nightlyPriceMinor: 10000,
+        currency: "TRY"
+      },
+      {
+        clientKey: "seed-room-2",
+        name: "Oda 102",
+        number: "102",
+        capacity: 2,
+        bedInfo: "1 çift kişilik yatak",
+        floor: "",
+        features: [],
+        description: "",
+        priceNote: "",
+        nightlyPriceMinor: 10000,
+        currency: "TRY"
+      }
+    ],
     tableCategories: [
       { name: "Salon", tableCount: 2 },
       { name: "Teras", tableCount: 1 }
     ]
   });
-  assert.equal(setup.ok, true, setup.ok ? "" : setup.message);
+  assert.equal(seeded.ok, true, seeded.ok ? "" : seeded.message);
 
   const initial = getBusinessLayout(database.databasePath);
   assert.deepEqual(initial.capabilities, { rooms: true, tables: true });
