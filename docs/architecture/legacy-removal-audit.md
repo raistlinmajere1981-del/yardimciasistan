@@ -23,13 +23,30 @@ Stage 10 removes completed migration scaffolding and resets active documentation
 
 ### Slice 10B — Migration-era smoke cleanup
 
-Candidates:
+Removed:
 
+- `smoke-stage2b-restaurant-menu.mjs`
+- `smoke-stage2c-core-workspaces.mjs`
 - `smoke-stage3a-messages-setup.mjs`
 - `smoke-stage3b-final-legacy-surfaces.mjs`
-- source-text assertions embedded in platform/feature smokes
 
-Useful behavior coverage must be moved or retained before deleting a migration-era smoke. Prefer current domain/workspace names in `pilot:check`.
+Their useful behavior is already protected by current contracts:
+
+- Menu editor/preview and core renderer flows → `smoke-desktop-renderer.mjs`
+- Restaurant workspace/order/transfer lifecycle → `smoke-restaurant-workspace.mjs`
+- Room-folio transfer accounting semantics → `smoke-room-folio-table-order-transfer.mjs`
+- Dashboard projection/launchers → `smoke-dashboard-workspace.mjs`
+- Calendar projection/context → `smoke-calendar-workspace.mjs`
+- Finance ownership → `smoke-finance-workspace.mjs` plus finance domain smokes
+- Market workspace/session contracts → Market workspace/session smokes
+- Messages persistent guest + AI ownership → Messages lifecycle/staleness smokes
+- Settings/first-setup category behavior → `smoke-settings-platform.mjs`
+- Lock/shell/accessibility → desktop lock/shell smokes
+- CSS/token/legacy-style restrictions → strict design audit
+
+The removed files primarily reproduced migration-era screenshots, overflow matrices and old DOM/CSS structure. `pilot:check` now names current behavior contracts instead of historical migration stages.
+
+Remaining Stage 10 work includes source-text assertions embedded in otherwise-current smokes.
 
 ### Slice 10C — Dead UI/CSS cleanup
 

@@ -62,14 +62,10 @@ const core = [
   jsb("renderer", "Masaüstü renderer browser smoke", "smoke-desktop-renderer.mjs"),
   jsb("customer-pension-ui", "Müşteri/Pansiyon formları, oda hesabı ve responsive UI", "smoke-desktop-customer-pension.mjs"),
   jsb("design-system", "Desktop tasarım sistemi ve responsive Ayarlar", "smoke-desktop-design-system.mjs"),
-  jsb("stage2b", "Restoran menü ve transfer yüzeyleri", "smoke-stage2b-restaurant-menu.mjs"),
-  jsb("stage2c", "Çekirdek çalışma alanları yüzeyleri", "smoke-stage2c-core-workspaces.mjs"),
   jsb("messages-ai-staleness", "Mesajlar AI asenkron sahiplik", "smoke-messages-ai-staleness.mjs"),
   jsb("messages-takeover", "Mesajlar WhatsApp devralma yaşam döngüsü", "smoke-messages-takeover-lifecycle.mjs"),
   jsb("dashboard-workspace", "Ana Ekran projection ve launcher sınırları", "smoke-dashboard-workspace.mjs"),
   jsb("calendar-workspace", "Takvim projection, launcher ve sayfa context sınırları", "smoke-calendar-workspace.mjs"),
-  jsb("stage3a", "Mesajlar ve kurulum yüzeyleri", "smoke-stage3a-messages-setup.mjs"),
-  jsb("stage3b", "Kilit ve legacy yüzey migration guard", "smoke-stage3b-final-legacy-surfaces.mjs"),
   js("sector-contributions", "Sektör/özellik statik katkı sözleşmeleri", "smoke-sector-feature-contributions.mjs"),
   js("modular-foundation", "Modüler commerce/capability sözleşmeleri", "check-modular-foundation.mjs")
 ];
