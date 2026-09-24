@@ -1,5 +1,5 @@
 import { Bot, DatabaseBackup, LockKeyhole, RefreshCw, Smartphone, Wifi } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
 import type { AutomaticSyncStatus } from "../../../electron/sync-coordinator";
 import { ActionButton } from "../ui/ActionButton";
@@ -7,10 +7,14 @@ import { Panel } from "../ui/Panel";
 
 interface SystemHealthPanelProps {
   data: DesktopDashboardData;
+  setup: DesktopSetupData;
+  syncStatus: AutomaticSyncStatus;
+  syncing: boolean;
   features: {
     android: boolean;
   };
   aiEnabled: boolean;
+  onSyncNow: () => void | Promise<unknown>;
 }
 
 type HealthTone = "ok" | "warn" | "danger" | "info" | "muted";
@@ -24,37 +28,20 @@ interface HealthItem {
   icon: typeof Wifi;
 }
 
-export function SystemHealthPanel({ data, features, aiEnabled }: SystemHealthPanelProps) {
-  const [setup, setSetup] = useState<DesktopSetupData | null>(null);
-  const [syncStatus, setSyncStatus] = useState<AutomaticSyncStatus | null>(null);
-  const [syncing, setSyncing] = useState(false);
-
-  useEffect(() => {
-    const bridge = window.yardimciDesktop;
-    if (!bridge) return;
-    let active = true;
-
-    void bridge.getSetupData().then((nextSetup) => {
-      if (active) setSetup(nextSetup);
-    }).catch(() => undefined);
-    void bridge.getSyncStatus().then((status) => {
-      if (active) setSyncStatus(status);
-    }).catch(() => undefined);
-
-    const unsubscribe = bridge.onSyncStatusChanged((status) => {
-      if (active) setSyncStatus(status);
-    });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, []);
-
+export function SystemHealthPanel({
+  data,
+  setup,
+  syncStatus,
+  syncing,
+  features,
+  aiEnabled,
+  onSyncNow
+}: SystemHealthPanelProps) {
   const items = useMemo<HealthItem[]>(() => {
     const activeDevices = data.androidDevices.filter((device) => device.isActive && !device.revokedAt).length;
     const pendingDevices = data.androidDevices.filter((device) => !device.isActive && !device.revokedAt).length;
-    const webUrl = setup?.webModuleUrl || data.webModuleUrl;
-    const webItem = buildWebHealth(webUrl, setup?.autoSyncEnabled ?? syncStatus?.enabled ?? false, syncStatus);
+    const webUrl = setup.webModuleUrl || data.webModuleUrl;
+    const webItem = buildWebHealth(webUrl, setup.autoSyncEnabled ?? syncStatus.enabled, syncStatus);
 
     const items: HealthItem[] = [webItem];
     if (features.android) {
@@ -73,8 +60,8 @@ export function SystemHealthPanel({ data, features, aiEnabled }: SystemHealthPan
       items.push({
         key: "ai",
         label: "AI",
-        value: setup?.aiApiKeyConfigured ? "Hazır" : "Anahtar gerekli",
-        detail: setup?.aiApiKeyConfigured
+        value: setup.aiApiKeyConfigured ? "Hazır" : "Anahtar gerekli",
+        detail: setup.aiApiKeyConfigured
           ? `${setup.aiService || "AI"} · ${setup.aiModel || "model seçili"}`
           : "AI açık ancak servis anahtarı henüz tamamlanmamış.",
         tone: setup?.aiApiKeyConfigured ? "ok" : "warn",
@@ -85,11 +72,11 @@ export function SystemHealthPanel({ data, features, aiEnabled }: SystemHealthPan
       {
         key: "lock",
         label: "Uygulama kilidi",
-        value: setup?.appPasswordConfigured ? "Etkin" : "Parola yok",
-        detail: setup?.appPasswordConfigured
+        value: setup.appPasswordConfigured ? "Etkin" : "Parola yok",
+        detail: setup.appPasswordConfigured
           ? "Masaüstü uygulaması parola ile korunuyor."
           : "Pilot kullanımda ortak bilgisayar için uygulama parolası önerilir.",
-        tone: setup?.appPasswordConfigured ? "ok" : "warn",
+        tone: setup.appPasswordConfigured ? "ok" : "warn",
         icon: LockKeyhole
       },
       {
@@ -106,24 +93,6 @@ export function SystemHealthPanel({ data, features, aiEnabled }: SystemHealthPan
 
   const attentionCount = items.filter((item) => item.tone === "warn" || item.tone === "danger").length;
 
-  async function runSyncNow() {
-    const bridge = window.yardimciDesktop;
-    if (!bridge || syncing) return;
-    setSyncing(true);
-    try {
-      const result = await bridge.runSyncNow();
-      setSyncStatus(result.status);
-    } catch {
-      setSyncStatus((current) => current ? {
-        ...current,
-        phase: "error",
-        message: "Web bağlantısı kontrol edilemedi. Biraz sonra yeniden deneyin."
-      } : current);
-    } finally {
-      setSyncing(false);
-    }
-  }
-
   return (
     <Panel className="system-health-panel" padding="compact" aria-labelledby="system-health-title">
       <div className="system-health-heading">
@@ -135,7 +104,7 @@ export function SystemHealthPanel({ data, features, aiEnabled }: SystemHealthPan
           <span className={attentionCount > 0 ? "system-health-summary is-warning" : "system-health-summary is-ok"}>
             {attentionCount > 0 ? `${attentionCount} konu kontrol edilmeli` : "Temel sistemler hazır"}
           </span>
-          <ActionButton variant="ghost" size="sm" onClick={() => void runSyncNow()} disabled={syncing || !setup?.autoSyncEnabled}>
+          <ActionButton variant="ghost" size="sm" onClick={() => void onSyncNow()} disabled={syncing || !setup.autoSyncEnabled}>
             <RefreshCw size={14} aria-hidden="true" className={syncing ? "is-spinning" : undefined} />
             {syncing ? "Kontrol ediliyor" : "Şimdi eşitle"}
           </ActionButton>

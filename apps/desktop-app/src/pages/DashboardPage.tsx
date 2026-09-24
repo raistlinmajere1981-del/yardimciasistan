@@ -12,7 +12,8 @@ import {
   Sparkles,
   UtensilsCrossed
 } from "lucide-react";
-import type { DesktopDashboardData } from "../../electron/database";
+import type { DesktopDashboardData, DesktopSetupData } from "../../electron/database";
+import type { AutomaticSyncStatus } from "../../electron/sync-coordinator";
 import {
   buildDashboardView,
   formatDashboardDate,
@@ -29,6 +30,9 @@ type DashboardRequest = DesktopDashboardData["requests"][number];
 
 interface DashboardPageProps {
   data: DesktopDashboardData;
+  setupData: DesktopSetupData;
+  automaticSyncStatus: AutomaticSyncStatus;
+  syncBusy: boolean;
   features: {
     rooms: boolean;
     tables: boolean;
@@ -48,6 +52,7 @@ interface DashboardPageProps {
   onCompleteTask: (taskId: string) => void;
   onOpenDailyAi: () => void;
   onPrepareBirthday: (customerId: string) => void;
+  onSyncNow: () => void | Promise<unknown>;
   birthdayPreparingId?: string;
   formatRequestType: (value: string) => string;
   formatRequestStatus: (value: string) => string;
@@ -59,6 +64,9 @@ interface DashboardPageProps {
 
 export function DashboardPage({
   data,
+  setupData,
+  automaticSyncStatus,
+  syncBusy,
   features,
   aiEnabled,
   customersEnabled,
@@ -73,6 +81,7 @@ export function DashboardPage({
   onCompleteTask,
   onOpenDailyAi,
   onPrepareBirthday,
+  onSyncNow,
   birthdayPreparingId = "",
   formatRequestType,
   formatRequestStatus,
@@ -173,7 +182,15 @@ export function DashboardPage({
         </div>
       </section>
 
-      <SystemHealthPanel data={data} features={features} aiEnabled={aiEnabled} />
+      <SystemHealthPanel
+        data={data}
+        setup={setupData}
+        syncStatus={automaticSyncStatus}
+        syncing={syncBusy}
+        features={features}
+        aiEnabled={aiEnabled}
+        onSyncNow={onSyncNow}
+      />
 
       <section className="dashboard-workspace">
         <Panel className="dashboard-priority-panel" aria-labelledby="dashboard-priority-title">

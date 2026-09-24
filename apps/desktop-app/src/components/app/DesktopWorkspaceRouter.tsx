@@ -99,7 +99,9 @@ export function DesktopWorkspaceRouter({
     dashboardData,
     setDashboardData,
     businessCapabilities,
-    loadBusinessCapabilities
+    loadBusinessCapabilities,
+    automaticSyncStatus,
+    pullRequests
   } = desktopSyncController;
   const {
     menuEditState,
@@ -410,6 +412,9 @@ export function DesktopWorkspaceRouter({
       {activePage === "dashboard" ? (
         <DashboardPage
           data={surfaceData}
+          setupData={setupData}
+          automaticSyncStatus={automaticSyncStatus}
+          syncBusy={automaticSyncStatus.phase === "syncing"}
           features={runtimeFeatures}
           aiEnabled={aiEnabled}
           customersEnabled={customersEnabled}
@@ -424,6 +429,7 @@ export function DesktopWorkspaceRouter({
           onCompleteTask={(taskId) => handleUpdateDailyTaskStatus(taskId, "done")}
           onOpenDailyAi={() => openAiTools("daily")}
           onPrepareBirthday={prepareBirthdayWhatsApp}
+          onSyncNow={pullRequests}
           birthdayPreparingId={birthdayPreparingId}
           formatRequestType={formatRequestType}
           formatRequestStatus={formatRequestStatus}
