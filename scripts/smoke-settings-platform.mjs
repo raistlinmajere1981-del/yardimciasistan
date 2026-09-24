@@ -200,6 +200,21 @@ try {
   await guard().getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
   await expect(tab('İşletme')).toHaveAttribute('aria-selected', 'true');
 
+  // Leaving Settings through app navigation uses the same active-category guard.
+  await select('Servisler');
+  await page.getByLabel('Web eşitleme adresi').fill('https://leave-guard.example.test');
+  expect(await page.evaluate(() => window.requestSettingsPageLeave())).toBe(false);
+  await expect(guard()).toBeVisible();
+  expect(await page.evaluate(() => window.settingsPageLeaveCompleted)).toBe(false);
+  await guard().getByRole('button', { name: 'Burada kal', exact: true }).click();
+  expect(await page.evaluate(() => window.settingsPageLeaveCompleted)).toBe(false);
+  await expect(page.getByLabel('Web eşitleme adresi')).toHaveValue('https://leave-guard.example.test');
+
+  expect(await page.evaluate(() => window.requestSettingsPageLeave())).toBe(false);
+  await guard().getByRole('button', { name: 'Değişiklikleri geri al ve geç', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.settingsPageLeaveCompleted)).toBe(true);
+  await expect(page.getByLabel('Web eşitleme adresi')).not.toHaveValue('https://leave-guard.example.test');
+
   // Business public profile participates in the same category save and stops transition on failure.
   await page.getByLabel('İşletme açıklaması').fill('Profil Taslağı');
   await page.evaluate(() => { window.failProfile = true; });
