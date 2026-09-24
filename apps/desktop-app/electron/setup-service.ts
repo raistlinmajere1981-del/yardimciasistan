@@ -8,7 +8,6 @@ import {
 } from "@yardimci-asistan/shared";
 import type { DesktopSetupData } from "./database-types.js";
 import { getAiServiceProfiles as getStoredAiServiceProfiles } from "./database/ai-profile-store.js";
-import { getTableCategories as getStoredTableCategories } from "./database/table-store.js";
 import {
   normalizeStoredAiService,
   normalizeStoredTimestamp
@@ -68,11 +67,6 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
       whatsapp: enabledCapabilities.has(BUSINESS_CAPABILITIES.WHATSAPP),
       android: enabledCapabilities.has(BUSINESS_CAPABILITIES.ANDROID)
     },
-    initialCounts: {
-      rooms: getScalarCount(db, "SELECT COUNT(*) as count FROM rooms WHERE deleted_at = ''"),
-      tables: getScalarCount(db, "SELECT COUNT(*) as count FROM tables WHERE deleted_at = ''")
-    },
-    tableCategories: getStoredTableCategories(db),
     birthdaySettings: normalizeBirthdaySettings({
       enabled: normalizeBoolean(settings?.birthday_enabled, true),
       mode: settings?.birthday_mode === "automatic" ? "automatic" : "manual",
@@ -82,7 +76,3 @@ export function getSetupData(db: DatabaseSync, enabledCapabilities: ReadonlySet<
   };
 }
 
-function getScalarCount(db: DatabaseSync, sql: string): number {
-  const row = db.prepare(sql).get() as { count?: number } | undefined;
-  return Number(row?.count ?? 0);
-}
