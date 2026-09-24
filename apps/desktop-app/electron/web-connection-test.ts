@@ -13,7 +13,6 @@ export type WebConnectionTestResult =
       ok: true;
       message: string;
       protocolVersion: number;
-      schemaVersion: number;
       storage: string;
     }
   | { ok: false; message: string };
@@ -71,7 +70,6 @@ export async function testWebConnection(
     ok: true,
     message: "Web bağlantısı hazır. Güvenlik anahtarı ve SQLite senkron protokolü doğrulandı.",
     protocolVersion: result.protocol_version,
-    schemaVersion: result.schema_version,
     storage: result.storage
   };
 }
