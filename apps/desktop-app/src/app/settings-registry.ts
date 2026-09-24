@@ -4,7 +4,7 @@ import { matchesCapabilityCondition, type CapabilityCondition } from "./capabili
 import type { SetupFormState } from "./setup-model";
 
 export type SettingsCategoryId = "business" | "operations" | "services" | "application";
-export type StagedSettingsCategoryId = Exclude<SettingsCategoryId, "application">;
+export type StagedSettingsCategoryId = "business" | "services";
 export interface SettingsCategoryDefinition { id: SettingsCategoryId; title: string; description: string }
 export const settingsCategories: readonly SettingsCategoryDefinition[] = [
   { id: "business", title: "İşletme", description: "İşletme kimliği, sektör ve müşteriye açık bilgiler." },
