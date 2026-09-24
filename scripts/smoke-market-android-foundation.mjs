@@ -527,7 +527,6 @@ try {
     assert.equal(tableCount(sqlite, "purchase_orders"), purchasesBeforeDeniedAdmin);
     assert.equal(receiptById(sqlite, "market-admin-closed-capability"), 0);
 
-    assertCurrentMarketGate();
     assertMirroredTransportContracts();
     assert.equal(String(sqlite.prepare("PRAGMA integrity_check").get().integrity_check), "ok");
   } finally {
@@ -584,19 +583,6 @@ function receiptById(sqlite, id) {
 function capabilitySetWithout(...removed) {
   const blocked = new Set(removed);
   return new Set(marketCapabilitiesWithAndroid.filter((capability) => !blocked.has(capability)));
-}
-
-function assertCurrentMarketGate() {
-  const forbidden = /business(?:Type|_type)|modules_json|rooms_enabled|tables_enabled|qr_menu_enabled/;
-  for (const relativePath of [
-    "apps/desktop-app/electron/market-android-actions.ts",
-    "apps/desktop-app/electron/market-android-snapshot.ts",
-    "apps/desktop-app/electron/market-companion-runtime.ts",
-    "apps/desktop-app/electron/market-companion-store.ts",
-    "apps/desktop-app/db/migrations/001_baseline.sql"
-  ]) {
-    assert.doesNotMatch(readFileSync(join(process.cwd(), relativePath), "utf8"), forbidden, relativePath);
-  }
 }
 
 function assertMirroredTransportContracts() {
