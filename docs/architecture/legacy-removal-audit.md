@@ -97,3 +97,6 @@ Stage 10 does not change business/domain semantics, database schema, Finance/Mar
 - the old development database relocation path and relocation marker were removed entirely; this repository does not preserve legacy local-data migration compatibility
 - `smoke-data-paths.mjs` now tests current public path behavior instead of migration-only helpers
 - dead `formatRoomStatus` was removed; `matchingProductCategoryId` remains as a private same-file helper
+
+
+- logging contract no longer requires the removed `startup.legacy-data.relocation.failed` compatibility event; current startup/restore/update/local-companion diagnostics remain covered.
