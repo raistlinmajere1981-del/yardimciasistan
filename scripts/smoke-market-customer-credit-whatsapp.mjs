@@ -51,7 +51,7 @@ try {
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   const path = database.databasePath;
-  applyBusinessProfileCapabilities(path, "cafe", { preserveUserOverrides: false });
+  applyBusinessProfileCapabilities(path, "restaurant", { preserveUserOverrides: false });
   for (const capability of ["commerce.customer_credit", "retail.barcode", "service.whatsapp"]) setBusinessCapability(path, { capability, enabled: true });
   setBusinessCapability(path, { capability: "service.android", enabled: false });
   raw = new DatabaseSync(path);
