@@ -74,3 +74,9 @@ These are current contracts, not legacy migration support:
 Do not introduce historical database migration chains, old-shape fallbacks, alias mappings
 or backup-format compatibility without a new explicit product requirement. Git history is
 the archive for retired implementation shapes.
+
+
+### Follow-up cleanup after verification
+
+- removed the stale Market live-scanner smoke dependency on the retired migration SQL file; runtime SQLite coverage already verifies scan-event persistence/idempotency
+- removed dead `normalizeStoredAiBaseUrl`; AI profile reads now use the canonical service-profile/default-url path
