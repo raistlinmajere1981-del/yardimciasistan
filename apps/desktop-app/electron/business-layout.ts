@@ -33,7 +33,7 @@ export interface BusinessLayoutRoom {
   removeBlockReason: string;
 }
 
-export interface BusinessLayoutTableCategory {
+interface BusinessLayoutTableCategory {
   name: string;
   tableCount: number;
 }
@@ -47,7 +47,7 @@ export interface BusinessLayoutSnapshot {
   };
 }
 
-export interface BusinessLayoutRoomInput {
+interface BusinessLayoutRoomInput {
   id?: string;
   clientKey?: string;
   name: string;
@@ -62,7 +62,7 @@ export interface BusinessLayoutRoomInput {
   currency: string;
 }
 
-export interface BusinessLayoutTableCategoryInput {
+interface BusinessLayoutTableCategoryInput {
   sourceName?: string;
   name: string;
   tableCount: number;
