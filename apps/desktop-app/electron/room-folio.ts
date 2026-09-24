@@ -32,7 +32,7 @@ interface DesktopRoomFolioMenuItem {
   stockUnit: string;
 }
 
-export interface DesktopRoomFolioItem {
+interface DesktopRoomFolioItem {
   id: string;
   folioId: string;
   kind: RoomFolioItemKind;
@@ -87,7 +87,7 @@ export interface DesktopRoomFolio {
   payments: DesktopRoomFolioPayment[];
 }
 
-export interface DesktopRoomFolioStay {
+interface DesktopRoomFolioStay {
   id: string;
   customerId: string;
   customerName: string;
