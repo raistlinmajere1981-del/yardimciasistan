@@ -58,14 +58,19 @@ try {
   }
 
   // External canonical refresh must not overwrite the one active dirty draft.
+  // The keyboard scenario above intentionally ends on Application, so activate Business first.
+  await select('İşletme');
   await page.getByLabel('Firma adı', { exact: true }).fill('Yerel Taslak');
   await page.evaluate(() => window.refreshSettings({ businessName: 'Dış Kaynak Firma' }));
   await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('Yerel Taslak');
   await discard();
   await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('Dış Kaynak Firma');
 
+  // Restore the fixture baseline before the remaining independent scenarios.
+  await page.evaluate(() => window.refreshSettings({ businessName: 'İlk Firma' }));
+  await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('İlk Firma');
+
   // Dirty category: stay, discard-and-go and save-and-go all share one guard.
-  await select('İşletme');
   await page.getByLabel('Firma adı', { exact: true }).fill('Bekleyen Firma');
   await expect(tab('İşletme')).toContainText('Değişiklik var');
 
