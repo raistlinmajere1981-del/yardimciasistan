@@ -326,11 +326,6 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
         aria-labelledby={`settings-tab-${active}`}
         tabIndex={0}
       >
-        <header className="settings-category-header">
-          <h2>{category.title}</h2>
-          <p>{category.description}</p>
-        </header>
-
         <div className="settings-category-body" role="region" aria-label={`${category.title} ayar içeriği`}>
           {active === "business" && (
             <>
