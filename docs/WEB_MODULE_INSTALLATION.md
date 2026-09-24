@@ -24,7 +24,6 @@ Hosting panelinde sitenin herkese açık klasörünü bulun. Bu klasör çoğu h
 public_html/
   yardimci-asistan/
     widget.js
-    menu.html
     assets/
       yardimci-asistan-symbol.png
     api/
@@ -231,17 +230,19 @@ En güvenli yöntem WordPress yönetim panelinde tema ayarları veya bir "header
 
 Tema dosyasından eklemek gerekiyorsa kod `footer.php` içinde `</body>` öncesine konur. Tema güncellemelerinde kaybolmaması için child theme kullanın.
 
-## 5. QR Menü Linki
+## 5. QR Menü Sayfası
 
-Müşteriye açık QR menü sayfası:
+Web modülü artık ayrı bir `menu.html` sayfası taşımaz. Müşteriye açık QR menü
+sayfasını firmanın mevcut web sitesi kendi şablonunda sunar. Bu sayfa yalnız menü
+içeriğini şu API'den okur:
 
 ```text
-https://firma.com/yardimci-asistan/menu.html
+https://firma.com/yardimci-asistan/api/menu.php
 ```
 
-QR kod bu adrese üretilebilir. Menü verisi `api/menu.php` üzerinden okunur; PC
-uygulamasındaki değişiklik kalıcı outbox üzerinden hosting SQLite'ına otomatik yayınlanır.
-Sayfa görünürken ETag ile yaklaşık 15 saniyede bir güncel yayın kontrol edilir.
+QR kod firmanın bu menüyü yerleştirdiği site sayfasına yönlendirilir. PC uygulamasındaki
+değişiklik kalıcı outbox üzerinden hosting SQLite'ına otomatik yayınlanır. Site tarafı
+ETag ile menü yayınının güncelliğini periyodik kontrol edebilir.
 
 Android companion için PC uygulamasından yayınlanan talepler, müşteriler,
 rezervasyonlar, odalar, masalar, menü, aktif adisyonlar, günlük işler ve hazır
@@ -338,12 +339,13 @@ dışa aktarma/temiz veri hazırlama işlemi yapılmalıdır.
 
 ## 8. Hızlı Test
 
-Kurulumdan sonra şu adresleri kontrol edin:
+Kurulumdan sonra web modülünün menü API'sini kontrol edin:
 
 ```text
-https://firma.com/yardimci-asistan/menu.html
 https://firma.com/yardimci-asistan/api/menu.php
 ```
+
+Firmanın QR menü sayfası ayrı olarak kendi site rotasında kontrol edilir.
 
 Senkron deposunu test etmek için güvenlik anahtarını header'da gönderin:
 
