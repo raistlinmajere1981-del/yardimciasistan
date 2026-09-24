@@ -76,7 +76,6 @@ try {
       includeImages: true
     },
     servicePreferences: { whatsapp: false, android: true },
-    initialCounts: { rooms: 0, tables: 0 },
     tableCategories: []
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
