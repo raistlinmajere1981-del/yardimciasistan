@@ -5,12 +5,10 @@ export type NonEmpty<T> = readonly [T, ...T[]];
 
 export interface AllCapabilities {
   readonly allOf: NonEmpty<BusinessCapability>;
-  readonly anyOf?: never;
 }
 
 export interface AnyCapabilities {
   readonly anyOf: NonEmpty<BusinessCapability | AllCapabilities>;
-  readonly allOf?: never;
 }
 
 export type CapabilityCondition = AllCapabilities | AnyCapabilities;
@@ -27,7 +25,7 @@ export function matchesCapabilityCondition(
 ): boolean {
   if (!condition) return true;
   const enabled = new Set<BusinessCapability>(snapshot?.enabledCapabilities ?? []);
-  if ("allOf" in condition && condition.allOf) {
+  if ("allOf" in condition) {
     return condition.allOf.every((capability) => enabled.has(capability));
   }
   return condition.anyOf.some((candidate) =>
