@@ -82,10 +82,10 @@ try {
 
   await expect(page.getByRole("navigation", { name: "Test feature navigation" }).getByRole("button", { name: "Test Konaklama" })).toBeVisible();
 
-  await expect(page.getByLabel("Test oda sayısı", { exact: true })).toHaveValue("2");
-  await page.getByLabel("Test oda sayısı", { exact: true }).fill("7");
-  await expect(page.getByLabel("Test oda sayısı sonucu")).toHaveText("7");
-  expect(await page.evaluate(() => window.fixtureRoomCount())).toBe("7");
+  await expect(page.getByLabel("Test web adresi", { exact: true })).toHaveValue("https://fixture.example.test");
+  await page.getByLabel("Test web adresi", { exact: true }).fill("https://changed.example.test");
+  await expect(page.getByLabel("Test web adresi sonucu")).toHaveText("https://changed.example.test");
+  expect(await page.evaluate(() => window.fixtureWebModuleUrl())).toBe("https://changed.example.test");
 
   const launcher = page.getByRole("button", { name: "Test oda çalışma alanını aç" });
   await launcher.click();
