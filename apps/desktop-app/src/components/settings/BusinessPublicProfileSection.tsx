@@ -289,13 +289,19 @@ export function useBusinessPublicProfileSettings({ businessAddress, enabledCapab
   return { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, save, feedback, dirty, discard };
 }
 
-export function BusinessPublicProfileSection({ controller }: { controller: ReturnType<typeof useBusinessPublicProfileSettings> }) {
+export function BusinessPublicProfileSection({
+  controller,
+  disabled = false
+}: {
+  controller: ReturnType<typeof useBusinessPublicProfileSettings>;
+  disabled?: boolean;
+}) {
   const { draft, loading, saving, coordinateError, addressLookupState, addressLookupMessage, addressCandidates, sectionRef, latitudeInputRef, selectedFeatures, mapLatitude, mapLongitude, hasCompleteMapPoint, normalizedBusinessAddress, accommodationDetailsEnabled, foodDetailsEnabled, publicFeatureCatalog, showPublicFeatures, showBreakfastTimes, policyPlaceholder, update, selectMapPoint, toggleFeature, lookupBusinessAddress, selectAddressCandidate, feedback } = controller;
 
   return (
     <section ref={sectionRef} id="settings-public-profile" tabIndex={-1} className="business-public-profile-section settings-business-subsection" aria-busy={loading || saving}>
       {feedback.message && <p role={feedback.error ? "alert" : "status"}>{feedback.message}</p>}
-      <fieldset className="settings-resource-fields" disabled={loading || saving}>
+      <fieldset className="settings-resource-fields" disabled={loading || saving || disabled}>
       {loading ? (
         <div className="business-public-profile-loading loading-state loading-state--panel" role="status">İşletme bilgileri yükleniyor...</div>
       ) : (
