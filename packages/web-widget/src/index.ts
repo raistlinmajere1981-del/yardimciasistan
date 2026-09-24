@@ -1,7 +1,7 @@
 import {
   buildCustomerRequestWhatsAppMessage,
   createWhatsAppUrl,
-  normalizeTRMobilePhone as normalizeBridgeTRMobilePhone
+  normalizeInternationalPhone as normalizeBridgeInternationalPhone
 } from "@yardimci-asistan/whatsapp-bridge";
 
 type RequestType = "pension_reservation" | "restaurant_reservation" | "general_info";
@@ -235,8 +235,8 @@ export function buildWhatsAppMessage(
   }, businessName);
 }
 
-export function normalizeTRMobilePhone(phone: string): { ok: true; whatsapp: string } | { ok: false; error: string } {
-  const result = normalizeBridgeTRMobilePhone(phone);
+export function normalizeInternationalPhone(phone: string): { ok: true; whatsapp: string } | { ok: false; error: string } {
+  const result = normalizeBridgeInternationalPhone(phone);
   if (!result.ok) {
     return {
       ok: false,
@@ -1241,7 +1241,7 @@ function handleFormSubmit(event: Event) {
   }
   const formData = new FormData(form);
   const customerPhone = String(formData.get("customer_phone") ?? "");
-  const normalizedPhone = normalizeTRMobilePhone(customerPhone);
+  const normalizedPhone = normalizeInternationalPhone(customerPhone);
 
   if (!normalizedPhone.ok) {
     setStatus(normalizedPhone.error);
