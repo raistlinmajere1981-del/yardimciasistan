@@ -25,11 +25,21 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
     <section id="settings-operations" tabIndex={-1} className="setup-section settings-daily-section">
       <fieldset className="settings-resource-fields" disabled={loading || saving}>
         <div className="table-category-editor">
-          <div className="table-category-heading">
+          <div className="setup-section-title table-category-heading">
             <div>
-              <strong>Masa kategorileri</strong>
+              <h2>Masa kategorileri</h2>
+              <p>{tableCountTotal} masa</p>
             </div>
-            <span>{tableCountTotal} masa</span>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              className="table-category-add"
+              type="button"
+              onClick={addTableCategory}
+            >
+              <Plus size={15} aria-hidden="true" />
+              Kategori Ekle
+            </ActionButton>
           </div>
 
           {draft.tableCategories.length > 0 && (
@@ -73,16 +83,6 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
             </div>
           )}
 
-          <ActionButton
-            variant="secondary"
-            size="sm"
-            className="table-category-add"
-            type="button"
-            onClick={addTableCategory}
-          >
-            <Plus size={15} aria-hidden="true" />
-            Kategori Ekle
-          </ActionButton>
         </div>
       </fieldset>
     </section>
