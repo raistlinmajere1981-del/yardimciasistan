@@ -78,12 +78,6 @@ export interface DesktopTableCategory {
   tableCount: number;
 }
 
-interface SaveTableCategoryInput {
-  sourceName?: string;
-  name: string;
-  tableCount: number;
-}
-
 export interface DesktopReservation {
   id: string;
   requestId: string;
@@ -432,11 +426,6 @@ export interface DesktopSetupData {
     whatsapp: boolean;
     android: boolean;
   };
-  initialCounts: {
-    rooms: number;
-    tables: number;
-  };
-  tableCategories: DesktopTableCategory[];
   birthdaySettings: BirthdaySettings;
 }
 
@@ -468,11 +457,6 @@ export interface SaveInitialSetupInput {
     whatsapp: boolean;
     android: boolean;
   };
-  initialCounts: {
-    rooms: number;
-    tables: number;
-  };
-  tableCategories?: SaveTableCategoryInput[];
   birthdaySettings?: BirthdaySettings;
 }
 
