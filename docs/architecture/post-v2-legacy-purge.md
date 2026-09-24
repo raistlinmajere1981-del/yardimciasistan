@@ -80,3 +80,6 @@ the archive for retired implementation shapes.
 
 - removed the stale Market live-scanner smoke dependency on the retired migration SQL file; runtime SQLite coverage already verifies scan-event persistence/idempotency
 - removed dead `normalizeStoredAiBaseUrl`; AI profile reads now use the canonical service-profile/default-url path
+
+
+- removed the Product Data contract smoke dependency on the retired migration SQL and its duplicate schema-string assertions; current product/settings columns are covered by `smoke-database-schema.mjs`.
