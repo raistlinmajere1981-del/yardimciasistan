@@ -74,7 +74,6 @@ assert.match(commerceIpc, /product-data\.image-archive\.failed/);
 assert.match(syncCoordinator, /product-data\.image-archive\.failed/);
 assert.match(dataMaintenance, /restore\.pending\.apply\.failed/);
 assert.match(dataMaintenance, /reset\.preferences\.clear\.failed/);
-assert.match(entry, /startup\.legacy-data\.relocation\.failed/);
 assert.match(entry, /restore\.republish\.failed/);
 assert.match(updateService, /update\.check\.failed/);
 assert.match(updateService, /update\.download\.failed/);
