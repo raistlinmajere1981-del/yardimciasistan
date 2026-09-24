@@ -1,98 +1,140 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import type { DesktopSetupData, SaveInitialSetupInput } from "../../electron/database";
 import { createSetupInput, toSetupForm, type SetupFormState } from "./setup-model";
-import { copyCategory, isCategoryDirty, mergeSettingsCategory, stagedSettingsCategories, unavailableSettingsFields, validateSettingsCategory } from "./settings-draft-model";
+import {
+  copyCategory,
+  isCategoryDirty,
+  mergeSettingsCategory,
+  stagedSettingsCategories,
+  validateSettingsCategory
+} from "./settings-draft-model";
 import { settingsCategories, type StagedSettingsCategoryId } from "./settings-registry";
-import type { SettingsOperationResult, SettingsSaveState, SettingsSetupSaveResult } from "./settings-save";
+import type {
+  SettingsOperationResult,
+  SettingsSaveState,
+  SettingsSetupSaveResult
+} from "./settings-save";
 
 type CategoryFeedback = { state: SettingsSaveState; message: string };
-export function useSettingsDrafts(setupData: DesktopSetupData, persist: (input: SaveInitialSetupInput) => Promise<SettingsSetupSaveResult>) {
+
+export function useSettingsDrafts(
+  setupData: DesktopSetupData,
+  persist: (input: SaveInitialSetupInput) => Promise<SettingsSetupSaveResult>
+) {
   const [initial] = useState(() => toSetupForm(setupData));
   const [form, setForm] = useState(initial);
-  const draftRef = useRef(form);
-  const canonical = useRef(initial);
-  const baseline = useRef(initial);
-  const saving = useRef(false);
+  const draftRef = useRef(initial);
+  const canonicalRef = useRef(initial);
+  const baselineRef = useRef(initial);
+  const sourceRef = useRef(setupData);
+  const savingRef = useRef(false);
   const [feedback, setFeedback] = useState<Partial<Record<StagedSettingsCategoryId, CategoryFeedback>>>({});
   const [busy, setBusy] = useState(false);
-  const source = useRef(setupData);
 
   const setDraft = useCallback((next: SetStateAction<SetupFormState>) => {
-    const value = typeof next === "function" ? next(draftRef.current) : next;
     const previous = draftRef.current;
+    const value = typeof next === "function" ? next(previous) : next;
     draftRef.current = value;
     setForm(value);
-    setFeedback(current => Object.fromEntries(Object.entries(current).filter(([category]) =>
-      !isCategoryDirty(value, previous, category as StagedSettingsCategoryId)
-    )));
+
+    setFeedback((current) => {
+      let changed = false;
+      const nextFeedback = { ...current };
+      for (const category of stagedSettingsCategories) {
+        if (isCategoryDirty(value, previous, category) && nextFeedback[category]) {
+          delete nextFeedback[category];
+          changed = true;
+        }
+      }
+      return changed ? nextFeedback : current;
+    });
   }, []);
 
-  const refresh = useCallback((next: DesktopSetupData, savedCategory?: StagedSettingsCategoryId, submitted?: SetupFormState) => {
+  const applyExternalSnapshot = useCallback((next: DesktopSetupData) => {
     const fresh = toSetupForm(next);
-    // The generated first-run secret is an initialization value, not a new draft on each bootstrap.
-    if (next.setupRequired && (!next.syncSecret || next.syncSecret === "change-this-secret")) fresh.syncSecret = canonical.current.syncSecret;
-    let draft = draftRef.current;
-    let base = baseline.current;
+
+    // First-run generated sync secret is initialization state, not a new draft on each bootstrap.
+    if (next.setupRequired && (!next.syncSecret || next.syncSecret === "change-this-secret")) {
+      fresh.syncSecret = canonicalRef.current.syncSecret;
+    }
+
+    let nextDraft = draftRef.current;
+    let nextBaseline = baselineRef.current;
+
     for (const category of stagedSettingsCategories) {
-      const unchangedSinceSubmit = submitted && !isCategoryDirty(draft, submitted, category);
-      if (!isCategoryDirty(draft, base, category) || (savedCategory === category && unchangedSinceSubmit)) {
-        draft = copyCategory(draft, fresh, category);
-        base = copyCategory(base, fresh, category);
-      } else if (savedCategory === category) {
-        // Edits made while a request was in flight remain pending against its committed result.
-        base = copyCategory(base, fresh, category);
+      if (!isCategoryDirty(nextDraft, nextBaseline, category)) {
+        nextDraft = copyCategory(nextDraft, fresh, category);
+        nextBaseline = copyCategory(nextBaseline, fresh, category);
       }
     }
-    if (savedCategory) {
-      // Fields excluded by the persisted sector were not saved: keep their pending values and baseline.
-      for (const key of unavailableSettingsFields(canonical.current, savedCategory)) {
-        Object.assign(draft, { [key]: draftRef.current[key] });
-        Object.assign(base, { [key]: baseline.current[key] });
-      }
-    }
-    canonical.current = fresh;
-    baseline.current = base;
-    draftRef.current = draft;
-    setForm(draft);
+
+    canonicalRef.current = fresh;
+    baselineRef.current = nextBaseline;
+    draftRef.current = nextDraft;
+    setForm(nextDraft);
+  }, []);
+
+  const replaceWithCommittedSnapshot = useCallback((next: DesktopSetupData) => {
+    const fresh = toSetupForm(next);
+    canonicalRef.current = fresh;
+    baselineRef.current = fresh;
+    draftRef.current = fresh;
+    setForm(fresh);
   }, []);
 
   useEffect(() => {
-    if (source.current === setupData) return;
-    source.current = setupData;
-    refresh(setupData);
-  }, [setupData, refresh]);
+    if (sourceRef.current === setupData) return;
+    sourceRef.current = setupData;
+    applyExternalSnapshot(setupData);
+  }, [applyExternalSnapshot, setupData]);
 
-  const dirty = Object.fromEntries(stagedSettingsCategories.map(category => [category, isCategoryDirty(form, baseline.current, category)])) as Record<StagedSettingsCategoryId, boolean>;
+  const dirty = Object.fromEntries(
+    stagedSettingsCategories.map((category) => [
+      category,
+      isCategoryDirty(form, baselineRef.current, category)
+    ])
+  ) as Record<StagedSettingsCategoryId, boolean>;
 
   function discard(category: StagedSettingsCategoryId) {
-    if (saving.current) return;
-    baseline.current = copyCategory(baseline.current, canonical.current, category);
-    setDraft(copyCategory(draftRef.current, canonical.current, category));
-    setFeedback(current => ({ ...current, [category]: { state: "idle", message: "" } }));
+    if (savingRef.current) return;
+
+    const next = copyCategory(draftRef.current, canonicalRef.current, category);
+    baselineRef.current = copyCategory(baselineRef.current, canonicalRef.current, category);
+    draftRef.current = next;
+    setForm(next);
+    setFeedback((current) => ({
+      ...current,
+      [category]: { state: "idle", message: "" }
+    }));
   }
 
   async function save(category: StagedSettingsCategoryId): Promise<SettingsOperationResult> {
-    if (saving.current) return { ok: false, message: "Ayarlar kaydediliyor." };
+    if (savingRef.current) return { ok: false, message: "Ayarlar kaydediliyor." };
     if (!dirty[category]) return { ok: true, changed: false };
 
-    saving.current = true;
+    savingRef.current = true;
     setBusy(true);
-    const title = settingsCategories.find(item => item.id === category)!.title;
-    const report = (state: SettingsSaveState, message: string) => setFeedback(current => ({
-      ...current,
-      [category]: { state, message }
-    }));
+
+    const title = settingsCategories.find((item) => item.id === category)!.title;
+    const report = (state: SettingsSaveState, message: string) => {
+      setFeedback((current) => ({
+        ...current,
+        [category]: { state, message }
+      }));
+    };
+
     report("loading", `${title} kaydediliyor…`);
 
     try {
       const latest = await window.yardimciDesktop?.getSetupData?.();
-      if (latest) refresh(latest);
+      const latestCanonical = latest ? toSetupForm(latest) : canonicalRef.current;
+      canonicalRef.current = latestCanonical;
 
-      const submitted = draftRef.current;
-      const merged = mergeSettingsCategory(canonical.current, submitted, category);
-      const error = !merged.businessName.trim() && category !== "business"
+      const merged = mergeSettingsCategory(latestCanonical, draftRef.current, category);
+      const error = category !== "business" && !merged.businessName.trim()
         ? "Önce İşletme kategorisindeki firma adını kaydedin."
         : validateSettingsCategory(merged, category);
+
       if (error) {
         report("error", error);
         return { ok: false, message: error };
@@ -104,16 +146,18 @@ export function useSettingsDrafts(setupData: DesktopSetupData, persist: (input: 
         return { ok: false, message: result.message };
       }
 
-      refresh(result.setupData, category, submitted);
-      source.current = result.setupData;
+      sourceRef.current = result.setupData;
+      replaceWithCommittedSnapshot(result.setupData);
+
       const warning = result.refreshWarning
         || (merged.aiEnabled && (result.aiWebSync?.ok === false || result.businessContextWebSync?.ok === false)
           ? result.message
           : "");
-      const retained = isCategoryDirty(draftRef.current, baseline.current, category);
+
       const message = warning
         ? `${title}: ${warning}`
-        : `${title} kaydedildi.${retained ? " Kaydedilmeyen yerel değişiklikler korunuyor." : ""}`;
+        : `${title} kaydedildi.`;
+
       report(warning ? "error" : "success", message);
       return { ok: true, changed: true, message };
     } catch (error) {
@@ -121,9 +165,19 @@ export function useSettingsDrafts(setupData: DesktopSetupData, persist: (input: 
       report("error", message);
       return { ok: false, message };
     } finally {
-      saving.current = false;
+      savingRef.current = false;
       setBusy(false);
     }
   }
-  return { form, setDraft, dirty, feedback, busy, save, discard, canonical: canonical.current };
+
+  return {
+    form,
+    setDraft,
+    dirty,
+    feedback,
+    busy,
+    save,
+    discard,
+    canonical: canonicalRef.current
+  };
 }
