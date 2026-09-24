@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CustomerCreditAccountDetail } from "@yardimci-asistan/shared";
-import { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint, normalizeTRMobilePhone } from "@yardimci-asistan/whatsapp-bridge";
+import { buildCustomerCreditWhatsAppMessage, customerCreditWhatsAppFingerprint, normalizeInternationalPhone } from "@yardimci-asistan/whatsapp-bridge";
 import { customerCreditError, notifyCustomerCreditChanged } from "../../app/customer-credit-ui";
 import { reportAppStatus } from "../../app/runtime-state";
 import type { PreparedWhatsAppMessage } from "../../app/whatsapp-handoff";
