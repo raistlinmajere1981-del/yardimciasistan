@@ -80,11 +80,6 @@ export const defaultSetupData: DesktopSetupData = {
     whatsapp: false,
     android: false
   },
-  initialCounts: {
-    rooms: 0,
-    tables: 0
-  },
-  tableCategories: [],
   birthdaySettings: {
     enabled: true,
     mode: "manual",
