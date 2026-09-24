@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import { createTemporaryDesktopDatabase } from "./test-helpers/desktop-database.mjs";
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
@@ -13,9 +14,11 @@ try {
     whatsapp: "+905550002022",
     syncSecret: "restaurant-reservation-secret",
     servicePreferences: { whatsapp: true, android: true },
-    initialCounts: { rooms: 0, tables: 2 }
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+  seedSmokeBusinessLayout(database.databasePath, {
+    tableCategories: [{ name: "Rezervasyon Salonu", tableCount: 2 }]
+  });
 
   const customerResult = database.saveCustomer({
     fullName: "Restoran Test Müşterisi",
