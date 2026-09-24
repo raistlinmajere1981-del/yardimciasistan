@@ -58,11 +58,10 @@ Tam örnek:
 %APPDATA%/Yardımcı Asistan/yardimci-asistan.sqlite
 ```
 
-Migration ve seed dosyaları uygulama paketinden okunur:
+Güncel SQLite şeması uygulama paketinden okunur:
 
 ```text
-apps/desktop-app/db/migrations/
-apps/desktop-app/db/seeds/
+apps/desktop-app/db/schema.sql
 ```
 
 ## Yedekleme Klasörü
@@ -128,7 +127,7 @@ Bu komut desktop build alır, `dist/desktop/linux-unpacked` paket dizinini üret
 - `dist-electron/preload.js`
 - `dist-electron/database.js`
 - `dist-renderer/index.html`
-- `db/migrations/001_baseline.sql`
+- `db/schema.sql`
 
 Paket demo profili içermez; temiz kurulumda işletme/oda/masa/menü kaydı sıfırdır.
 
@@ -165,4 +164,4 @@ npm run smoke:desktop-package
 npm run smoke:desktop:linux
 ```
 
-`smoke-desktop-menu-db` setup state, manuel yedek dosyası, yedeğin SQLite olarak açılabilirliğini, `PRAGMA integrity_check` sonucunu ve kaydetme akışını kontrol eder. `smoke-desktop-renderer` ilk kurulum ekranını ve ana paneldeki `Yedek Al` komutunu tarayıcı önizlemesinde fake preload köprüsüyle açar. `smoke-desktop-package` paket içeriğinin kurulum için gerekli dosyaları taşıdığını doğrular; ayrıca `linux-unpacked` uygulamasını Xvfb altında `YA_DESKTOP_DATA_DIR` ile açarak paketli uygulamanın SQLite veri dosyasını ve `backups/` klasörünü oluşturduğunu, migration/seed verisini okuyabildiğini kontrol eder.
+`smoke-desktop-menu-db` setup state, manuel yedek dosyası, yedeğin SQLite olarak açılabilirliğini, `PRAGMA integrity_check` sonucunu ve kaydetme akışını kontrol eder. `smoke-desktop-renderer` ilk kurulum ekranını ve ana paneldeki `Yedek Al` komutunu tarayıcı önizlemesinde fake preload köprüsüyle açar. `smoke-desktop-package` paket içeriğinin kurulum için gerekli dosyaları taşıdığını doğrular; ayrıca `linux-unpacked` uygulamasını Xvfb altında `YA_DESKTOP_DATA_DIR` ile açarak paketli uygulamanın SQLite veri dosyasını ve `backups/` klasörünü oluşturduğunu, güncel `db/schema.sql` kaynağını okuyabildiğini kontrol eder.
