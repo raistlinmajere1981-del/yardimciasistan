@@ -106,7 +106,8 @@
     "smoke:settings-platform": "node scripts/smoke-settings-platform.mjs",
     "smoke:sector-feature-contributions": "node scripts/smoke-sector-feature-contributions.mjs",
     "smoke:business-layout": "node scripts/smoke-business-layout.mjs",
-    "smoke:table-categories-db": "node scripts/smoke-table-categories-db.mjs"
+    "smoke:table-categories-db": "node scripts/smoke-table-categories-db.mjs",
+    "smoke:setup-profile-contract": "node scripts/smoke-setup-profile-contract.mjs"
   },
   "devDependencies": {
     "@electron/asar": "^4.3.0",
