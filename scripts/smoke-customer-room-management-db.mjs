@@ -19,18 +19,18 @@ try {
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
 
-  const migrationCheck = new DatabaseSync(database.databasePath, { readOnly: true });
+  const schemaCheck = new DatabaseSync(database.databasePath, { readOnly: true });
   try {
-    const customerColumns = migrationCheck.prepare("PRAGMA table_info(customers)").all().map((row) => row.name);
+    const customerColumns = schemaCheck.prepare("PRAGMA table_info(customers)").all().map((row) => row.name);
     assert.ok(customerColumns.includes("identity_number"));
     assert.ok(customerColumns.includes("document_expiry_date"));
     assert.equal(
-      migrationCheck.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'customer_room_stays'").get().count,
+      schemaCheck.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'customer_room_stays'").get().count,
       1
     );
-    assert.equal(String(migrationCheck.prepare("PRAGMA integrity_check").get().integrity_check), "ok");
+    assert.equal(String(schemaCheck.prepare("PRAGMA integrity_check").get().integrity_check), "ok");
   } finally {
-    migrationCheck.close();
+    schemaCheck.close();
   }
 
   const first = database.saveCustomer(customerInput({
