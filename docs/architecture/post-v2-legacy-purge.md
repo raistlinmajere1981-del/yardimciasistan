@@ -92,3 +92,6 @@ the archive for retired implementation shapes.
 - removed v1 OperationCache cleanup keys; current cache clearing only owns current keys
 - fixed restored-state republish preparation by removing the stale write to the deleted `settings.sync_client_id` column
 - Android device UI cache verification now reads the current `operations_cache_v2` key
+
+
+- removed deprecated `normalizeTRMobilePhone`; desktop credit sharing and the web widget now use the international phone normalizer directly
