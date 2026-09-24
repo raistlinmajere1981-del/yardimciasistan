@@ -53,7 +53,7 @@ Multi-room bookings have no per-room guest allocation model: the booking guest c
 
 A departure emits one existing caller-family event (`customer.room_stay_status_changed` or `room_folio.checked_out`). Financial-only closure emits one `room_folio.closed` event, not another Stay transition. Android actor/action identity is retained; receipt deduplication and stale snapshot/version guards remain in their existing owners. Idempotent no-op departure retries produce no extra domain event.
 
-Finance SQL triggers, stock mutations, restaurant transfer idempotency, Customer Credit and all schema/baseline definitions are unchanged. No second finance entry or new receivables ledger is created.
+Finance SQL triggers, stock mutations, restaurant transfer idempotency, Customer Credit and the current schema are unchanged. No second finance entry or new receivables ledger is created.
 
 ## Projection for Stage 4
 
@@ -69,7 +69,7 @@ Stage 4 uses this projection in Room tiles and RoomWorkspace; the remaining dash
 ## Stage 4 compatibility removal conditions
 
 1. **openFolio implicit check-in: removed in Stage 4.** Production calls now originate in RoomWorkspace after explicit `checkInStay`, or retry financial opening for an already checked-in Stay. `openFolio` no longer mutates Stay/Room or claims arrival in its success message. All service/transfer/Android smoke fixtures now check in explicitly; account opening without arrival is tested.
-2. **Folio checkout name/allowOutstanding:** keep the public channel/payload for desktop and Android compatibility. `allowOutstanding` no longer controls departure permission under D-005. RoomWorkspace should distinguish guest checkout from a settled-account close action; the current adapter routes both safely.
+2. **Folio checkout payload:** current desktop checkout carries only the Folio identity; D-005 governs departure with remaining debt. RoomWorkspace distinguishes guest checkout from a settled-account close action, while Android checkout independently carries its stale-balance guard.
 3. **Folio details ↔ Stay metadata and Room profile:** existing date/guest-count coupling and profile edit entry points were audited, not redesigned. RoomWorkspace must preserve D-007's single profile save model; nightly Folio overrides remain separate.
 4. **Legacy room display:** replace callers with the orthogonal projection during the RoomWorkspace migration, not in this domain stage.
 
