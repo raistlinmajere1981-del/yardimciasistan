@@ -4,7 +4,7 @@ import process from "node:process";
 const checks = [
   ["npm", ["run", "build:packages"]],
   ["npm", ["run", "build", "-w", "@yardimci-asistan/desktop-app"]],
-  ["node", ["scripts/smoke-database-baseline.mjs"]],
+  ["node", ["scripts/smoke-database-schema.mjs"]],
   ["node", ["scripts/smoke-data-paths.mjs"]],
   ["node", ["scripts/smoke-desktop-logging-contract.mjs"]],
   ["node", ["scripts/smoke-birthday-foundation.mjs"]],
