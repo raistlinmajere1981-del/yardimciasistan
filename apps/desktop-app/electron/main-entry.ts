@@ -137,17 +137,17 @@ function prepareRestoredStateForFullRepublish() {
   const restoredDatabasePath = resolveDatabasePath(restoredUserDataPath);
   if (!fs.existsSync(restoredDatabasePath)) return;
 
-  // The restore boundary already validated the current baseline schema. Open
+  // The restore boundary already validated the current database schema. Open
   // it once so the normal startup path can rebuild any durable runtime state.
-  const migrated = new DesktopDatabase({
+  const restoredDatabase = new DesktopDatabase({
     appPath: app.getAppPath(),
     userDataPath: restoredUserDataPath,
     backupPath: resolveProjectBackupPath()
   });
   try {
-    migrated.initialize();
+    restoredDatabase.initialize();
   } finally {
-    migrated.close();
+    restoredDatabase.close();
   }
 
   // A restore can rewind the local outbox source revision while hosting still
@@ -221,7 +221,7 @@ const mainProcessReady = import("./main");
 
 // Ana Electron süreci mevcut main.ts içinde kurulmaya devam eder. Finans, oda
 // hesabı, commerce, capability yönetimi, veri bakımı ve yan etkisiz web bağlantı
-// testi IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı migration'larından
+// testi IPC yüzeyleri ayrı tutulur; kayıtlar ana veritabanı initialization adımından
 // sonra yapılır.
 void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanionSnapshotDirty, scheduleAutomaticSyncSoon }) => {
   await app.whenReady();
