@@ -24,7 +24,7 @@ export interface DesktopBackupListItem {
   folderPath: string;
   databaseFileName: string;
   imageCount: number;
-  assetFileCount?: number;
+  assetFileCount: number;
   sizeBytes: number;
 }
 
@@ -79,7 +79,7 @@ interface BackupManifest {
     count: number;
     files: Array<{ menuItemId: string; menuItemName: string; fileName: string; mimeType: string }>;
   };
-  assets?: {
+  assets: {
     directory: string;
     fileCount: number;
   };
@@ -291,7 +291,14 @@ function readBackupManifest(folderPath: string): BackupManifest | null {
   try {
     const parsed = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as Partial<BackupManifest>;
     if (parsed.format !== "yardimci-asistan-backup-v2"
-      || parsed.databaseFile !== BACKUP_DATABASE_FILE) return null;
+      || parsed.databaseFile !== BACKUP_DATABASE_FILE
+      || !parsed.qrMenuImages
+      || parsed.qrMenuImages.directory !== QR_IMAGE_DIRECTORY
+      || !Number.isSafeInteger(parsed.qrMenuImages.count)
+      || !Array.isArray(parsed.qrMenuImages.files)
+      || !parsed.assets
+      || parsed.assets.directory !== ASSET_DIRECTORY
+      || !Number.isSafeInteger(parsed.assets.fileCount)) return null;
     return parsed as BackupManifest;
   } catch {
     return null;
@@ -308,21 +315,15 @@ function readBackupItem(folderPath: string): DesktopBackupListItem | null {
 
   const manifest = readBackupManifest(folderPath);
   if (!manifest) return null;
-  const databaseStat = fs.statSync(databasePath);
-  const imageDirectory = path.join(folderPath, QR_IMAGE_DIRECTORY);
-  const fallbackImageCount = fs.existsSync(imageDirectory)
-    ? fs.readdirSync(imageDirectory, { withFileTypes: true }).filter((entry) => entry.isFile()).length
-    : 0;
-
   return {
     id,
-    createdAt: manifest?.createdAt || databaseStat.mtime.toISOString(),
+    createdAt: manifest.createdAt,
     kind: manifest.kind,
     folderName: id,
     folderPath,
-    databaseFileName: manifest?.databaseFile || BACKUP_DATABASE_FILE,
-    imageCount: manifest?.qrMenuImages?.count ?? fallbackImageCount,
-    assetFileCount: manifest?.assets?.fileCount ?? directoryFileCount(path.join(folderPath, ASSET_DIRECTORY)),
+    databaseFileName: manifest.databaseFile,
+    imageCount: manifest.qrMenuImages.count,
+    assetFileCount: manifest.assets.fileCount,
     sizeBytes: directorySize(folderPath)
   };
 }
