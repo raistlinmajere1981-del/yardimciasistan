@@ -1,6 +1,6 @@
 # Post-v2 Legacy Purge
 
-Status: **in progress** on `refactor/post-v2-legacy-purge`.
+Status: **closed and verified** on `refactor/post-v2-legacy-purge`.
 
 This cleanup starts after Application Platform v2 Stage 10. The repository is treated as
 the only working copy and historical local user data/settings do not require migration
@@ -75,15 +75,12 @@ Do not introduce historical database migration chains, old-shape fallbacks, alia
 or backup-format compatibility without a new explicit product requirement. Git history is
 the archive for retired implementation shapes.
 
-
 ### Follow-up cleanup after verification
 
 - removed the stale Market live-scanner smoke dependency on the retired migration SQL file; runtime SQLite coverage already verifies scan-event persistence/idempotency
 - removed dead `normalizeStoredAiBaseUrl`; AI profile reads now use the canonical service-profile/default-url path
 
-
 - removed the Product Data contract smoke dependency on the retired migration SQL and its duplicate schema-string assertions; current product/settings columns are covered by `smoke-database-schema.mjs`.
-
 
 ### Local-AI exhaustive audit cleanup
 
@@ -93,11 +90,27 @@ the archive for retired implementation shapes.
 - fixed restored-state republish preparation by removing the stale write to the deleted `settings.sync_client_id` column
 - Android device UI cache verification now reads the current `operations_cache_v2` key
 
-
 - removed deprecated `normalizeTRMobilePhone`; desktop credit sharing and the web widget now use the international phone normalizer directly
-
 
 - removed Android storage tests that seeded retired v1 outbox/cache keys; remaining tests exercise only the current transport-neutral outbox and per-source revision cache
 
-
 - removed obsolete `ui_design_plan.md` and `docs/dev/kolay-kullanim-envanteri.md`; both documented retired easy/pro, data-theme and migration-era UI structure and had no live repository references
+
+
+## Closure verification
+
+Final local verification:
+
+```text
+npm run typecheck      → PASS
+npm run pilot:check    → 46 passed / 0 failed / 0 skipped
+npm run knip:exports   → PASS, no issues
+npm run check:linux    → PASS
+```
+
+The repository is now treated as current-only for desktop database schema, backup format,
+hosting storage capabilities, AI profile persistence, business profile ids and Android
+companion storage/permissions. Historical implementation shapes remain available through
+Git history rather than runtime compatibility code.
+
+Post-v2 legacy purge is closed.
