@@ -116,13 +116,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
   const feedback = active === "operations"
     ? (layout.message ? { state: layout.state, message: layout.message } : undefined)
-    : active === "application"
-      ? (updates.localMessage
-          ? { state: updates.error ? "error" as const : "success" as const, message: updates.localMessage }
-          : undefined)
-      : setupCategory
-        ? drafts.feedback[setupCategory]
-        : undefined;
+    : setupCategory
+      ? drafts.feedback[setupCategory]
+      : undefined;
 
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities);
 
