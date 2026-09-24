@@ -11,7 +11,7 @@
     "build": "npm run build:packages && npm run build:apps",
     "build:apps": "npm run build -w @yardimci-asistan/desktop-app && npm run build -w @yardimci-asistan/android-app",
     "build:packages": "npm run build -w @yardimci-asistan/shared && npm run build -w @yardimci-asistan/whatsapp-bridge && npm run build -w @yardimci-asistan/ai-core && npm run build -w @yardimci-asistan/sync-core && npm run build -w @yardimci-asistan/web-widget",
-    "check": "npm run typecheck && npm test && npm run build && node scripts/smoke-database-baseline.mjs && npm run e2e && node scripts/smoke-desktop-appearance.mjs",
+    "check": "npm run typecheck && npm test && npm run build && node scripts/smoke-database-schema.mjs && npm run e2e && node scripts/smoke-desktop-appearance.mjs",
     "check:linux": "npm run doctor && npm run lint:php && npm run smoke:local-lab && npm run smoke:web-form-api && npm run smoke:web-module && npm run smoke:android-device-approval-hosting && npm run smoke:android-device-token && npm run smoke:android-release-connection && npm run check && npm run pack:web-module:no-build && npm run smoke:web-widget-branding:no-build && npm run smoke:web-widget-module:no-build && npm run smoke:automatic-sync:no-build && npm run smoke:android-hosting:no-build && npm run smoke:room-folio-transfer:no-build && npm run smoke:desktop-renderer && npm run smoke:desktop-lock && npm run smoke:desktop-package:no-build && npm run smoke:desktop:linux:no-build",
     "architecture:audit": "node scripts/architecture-audit.mjs",
     "design:audit": "node scripts/design-system-audit.mjs",
