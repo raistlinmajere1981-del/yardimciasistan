@@ -311,21 +311,10 @@ export class DesktopDatabase {
 
       const settingsColumns = this.db.prepare("PRAGMA table_info(settings)").all() as Array<{ name?: string }>;
       const settingsColumnNames = new Set(settingsColumns.map((column) => String(column.name ?? "")));
-      const hasMigrationLedger = Boolean(this.db.prepare(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations' LIMIT 1"
-      ).get());
-      const legacySettingsColumns = [
-        "sync_client_id",
-        "ai_model",
-        "ai_project_name",
-        "ai_base_url",
-        "ai_timeout_seconds",
-        "ai_api_key_encrypted"
-      ];
-      if (!settingsColumnNames.has("local_network_enabled")
-          || hasMigrationLedger
-          || legacySettingsColumns.some((column) => settingsColumnNames.has(column))) {
-        throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
+      for (const columnName of ["local_network_enabled", "ai_service", "ai_last_published_at", "product_data_enabled"]) {
+        if (!settingsColumnNames.has(columnName)) {
+          throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
+        }
       }
 
       this.ensureSyncClientId();
