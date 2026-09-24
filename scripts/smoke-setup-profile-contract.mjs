@@ -62,7 +62,6 @@ try {
     aiApiKey: "",
     clearAiApiKey: false,
     servicePreferences: { whatsapp: false, android: false },
-    tableCategories: []
   };
 
   const missingWhatsAppResult = database.saveInitialSetup({
