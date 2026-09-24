@@ -111,7 +111,7 @@ export function useUpdateSettings(enabled: boolean) {
     setLocalMessage("Güncelleme ayarları kaydediliyor...");
     try {
       const result = await bridge.saveUpdatePreferences({
-        customBaseUrl: baseUrl,
+        customBaseUrl: status && baseUrl.trim() === status.defaultBaseUrl.trim() ? "" : baseUrl,
         autoCheckEnabled
       });
       setStatus(result.status);
@@ -135,7 +135,7 @@ export function useUpdateSettings(enabled: boolean) {
     } finally {
       setAction(null);
     }
-  }, [autoCheckEnabled, baseUrl, validatePreferences]);
+  }, [autoCheckEnabled, baseUrl, status, validatePreferences]);
 
   function resetToDefault() {
     if (busy || !status) return;
