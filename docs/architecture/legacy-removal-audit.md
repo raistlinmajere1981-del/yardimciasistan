@@ -46,7 +46,13 @@ Their useful behavior is already protected by current contracts:
 
 The removed files primarily reproduced migration-era screenshots, overflow matrices and old DOM/CSS structure. `pilot:check` now names current behavior contracts instead of historical migration stages.
 
-Remaining Stage 10 work includes source-text assertions embedded in otherwise-current smokes.
+Source-text cleanup in this slice:
+
+- removed the source-only `smoke-operation-calendar.mjs`; `smoke-calendar-workspace.mjs` is the current behavior contract
+- removed the source-only `smoke-market-workspace-contract.mjs`; Market browser/session/domain tests remain
+- reduced `smoke-sector-feature-contributions.mjs` to executable type/condition/browser contracts instead of regex assertions over production source files
+
+Mixed runtime/security checks such as capability-surface consistency remain until their source assertions can be separated without losing hard-boundary coverage.
 
 ### Slice 10C — Dead UI/CSS cleanup
 

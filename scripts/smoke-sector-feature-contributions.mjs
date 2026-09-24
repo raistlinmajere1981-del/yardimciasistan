@@ -1,15 +1,12 @@
 import assert from "node:assert/strict";
 import { chromium, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { resolve, join } from "node:path";
+import { resolve } from "node:path";
 import { createServer } from "vite";
 import ts from "typescript";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
 import { installPensionWorkspaceFixture } from "./test-helpers/pension-workspace-fixture.mjs";
 import { createCompactUiFixture } from "./lib/desktop-renderer-fixtures.mjs";
-
-const root = process.cwd();
-const source = (path) => readFileSync(join(root, path), "utf8");
 
 const configPath = resolve("apps/desktop-app/tsconfig.json");
 const config = ts.readConfigFile(configPath, ts.sys.readFile);
@@ -25,7 +22,9 @@ if (diagnostics.length) {
   }));
 }
 
-const conditionSource = source("apps/desktop-app/src/app/capability-condition.ts");
+// CapabilityCondition is a small pure contract; execute its implementation directly
+// rather than asserting the source shape of navigation/settings/workspace modules.
+const conditionSource = readFileSync(resolve("apps/desktop-app/src/app/capability-condition.ts"), "utf8");
 const conditionModule = await import(`data:text/javascript;base64,${Buffer.from(ts.transpileModule(
   conditionSource,
   { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }
@@ -55,37 +54,6 @@ for (const customers of [false, true]) {
   }
 }
 
-const navigation = source("apps/desktop-app/src/app/navigation.ts");
-const frame = source("apps/desktop-app/src/components/app/DesktopAppFrame.tsx");
-const settingsRegistry = source("apps/desktop-app/src/app/settings-registry.ts");
-const settingsContributions = source("apps/desktop-app/src/app/settings-section-contributions.tsx");
-const settingsWorkspace = source("apps/desktop-app/src/components/settings/SettingsWorkspace.tsx");
-const workspaceDefinitions = source("apps/desktop-app/src/app/workspace-definitions.tsx");
-const roomDefinition = source("apps/desktop-app/src/components/pension/room-workspace-definition.tsx");
-const tableDefinition = source("apps/desktop-app/src/components/restaurant/table-workspace-definition.tsx");
-const featureFixture = source("apps/desktop-app/scripts/sector-feature-contribution-fixture.tsx");
-
-assert.match(navigation, /export const navigationContributions/);
-assert.match(navigation, /buildNavigationFromContributions/);
-assert.match(navigation, /getPageContentScroll/);
-assert.doesNotMatch(navigation, /businessType|business_type|profileId\s*===/);
-assert.match(frame, /contentScroll=\{getPageContentScroll\(activePage\)\}/);
-assert.match(frame, /activePage === "messages"/, "Persistent Messages header behavior must stay explicit.");
-assert.match(settingsRegistry, /condition\?: CapabilityCondition/);
-assert.match(settingsRegistry, /layoutSettingsDefinition/);
-assert.match(settingsContributions, /definition: layoutSettingsDefinition/);
-assert.match(settingsContributions, /settingsFieldOwners\[category\]/);
-assert.equal((settingsWorkspace.match(/<StagedSettingsContributionSlot category=/g) ?? []).length, 3);
-assert.match(workspaceDefinitions, /components\/pension\/room-workspace-definition/);
-assert.match(workspaceDefinitions, /components\/restaurant\/table-workspace-definition/);
-assert.match(roomDefinition, /defaultPresentation: "centered"/);
-assert.match(tableDefinition, /defaultPresentation: "full-canvas"/);
-assert.doesNotMatch(settingsContributions, /execute|dispatch|serviceLocator|dependencyContainer/i);
-assert.match(featureFixture, /buildNavigationFromContributions/);
-assert.match(featureFixture, /StagedSettingsContributionSlot/);
-assert.match(featureFixture, /definition=\{testFeatureComposition\.workspace\}/);
-assert.doesNotMatch(featureFixture, /PensionPage|SettingsWorkspace|LayoutSettingsSection|RoomsWorkspace/);
-
 const server = await createServer({
   root: resolve("apps/desktop-app"),
   configFile: resolve("apps/desktop-app/vite.renderer.config.ts"),
@@ -113,6 +81,7 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}sector-feature-contribution-test`);
 
   await expect(page.getByRole("navigation", { name: "Test feature navigation" }).getByRole("button", { name: "Test Konaklama" })).toBeVisible();
+
   await expect(page.getByLabel("Test oda sayısı", { exact: true })).toHaveValue("2");
   await page.getByLabel("Test oda sayısı", { exact: true }).fill("7");
   await expect(page.getByLabel("Test oda sayısı sonucu")).toHaveText("7");
@@ -126,8 +95,8 @@ try {
   await expect(dialog.getByRole("tab", { name: "Özet", exact: true })).toHaveAttribute("aria-selected", "true");
   await dialog.getByRole("button", { name: "Çalışma alanını kapat", exact: true }).click();
   await expect(launcher).toBeFocused();
-  expect(errors).toEqual([]);
 
+  expect(errors).toEqual([]);
   console.log("sector-feature-contributions-smoke-ok: typed conditions, navigation, staged settings, canonical workspace");
 } finally {
   await browser?.close();

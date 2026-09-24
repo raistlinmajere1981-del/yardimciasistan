@@ -52,7 +52,6 @@ const core = [
   js("daily-tasks", "Günlük iş yönetimi", "smoke-daily-task-management.mjs"),
   js("pension-reservation", "Doğrudan pansiyon rezervasyonu", "smoke-manual-reservation.mjs"),
   js("restaurant-reservation", "Doğrudan restoran rezervasyonu", "smoke-manual-restaurant-reservation.mjs"),
-  js("calendar", "Operasyon takvimi", "smoke-operation-calendar.mjs"),
   js("stock-image", "Stok görseli veri uygulama katmanı", "smoke-stock-image-import-db.mjs"),
   js("reports", "Rapor veri modeli", "smoke-reports-db.mjs"),
   js("finance-db", "Finans veri bütünlüğü", "smoke-finance-db.mjs"),
