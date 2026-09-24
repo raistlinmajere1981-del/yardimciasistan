@@ -181,7 +181,7 @@ function ya_business_normalize_public_surfaces(mixed $value): array
 
 function ya_business_profile_requests_enabled(string $profileId): bool
 {
-    return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant', 'cafe'], true);
+    return in_array($profileId, ['pension_restaurant', 'pension', 'restaurant'], true);
 }
 
 function ya_business_profile_public_surfaces(string $profileId): array
@@ -189,7 +189,7 @@ function ya_business_profile_public_surfaces(string $profileId): array
     return match ($profileId) {
         'pension_restaurant' => ['accommodation', 'food_service', 'menu', 'qr_menu', 'directions'],
         'pension' => ['accommodation', 'directions'],
-        'restaurant', 'cafe' => ['food_service', 'menu', 'qr_menu', 'directions'],
+        'restaurant' => ['food_service', 'menu', 'qr_menu', 'directions'],
         'market' => ['catalog', 'directions'],
         default => []
     };
