@@ -6,7 +6,7 @@ import path from "node:path";
 import { createUpdateSafetyBackup } from "./data-maintenance";
 import { desktopLog } from "./desktop-logger";
 
-export const DEFAULT_UPDATE_BASE_URL = "https://yardimciasistan.alwaysdata.net/updates/stable";
+const DEFAULT_UPDATE_BASE_URL = "https://yardimciasistan.alwaysdata.net/updates/stable";
 
 const UPDATE_DIRECTORY_NAME = "updates";
 const UPDATE_STATE_FILE = "settings.json";
@@ -18,7 +18,7 @@ const UPDATE_POLL_INTERVAL_MS = 60 * 60 * 1000;
 const UPDATE_HTTP_TIMEOUT_MS = 25_000;
 const UPDATE_DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 
-export type DesktopUpdatePhase =
+type DesktopUpdatePhase =
   | "idle"
   | "checking"
   | "available"
@@ -517,7 +517,7 @@ async function performCheck(userDataPath: string, force: boolean): Promise<Deskt
   }
 }
 
-export async function checkDesktopUpdate(userDataPath: string, force = false): Promise<DesktopUpdateStatus> {
+async function checkDesktopUpdate(userDataPath: string, force = false): Promise<DesktopUpdateStatus> {
   if (updateOperation) return updateOperation.promise;
   const promise = performCheck(userDataPath, force);
   updateOperation = { kind: "check", promise };
@@ -741,7 +741,7 @@ async function downloadUpdate(userDataPath: string): Promise<DesktopUpdateStatus
   }
 }
 
-export async function downloadDesktopUpdate(userDataPath: string): Promise<DesktopUpdateStatus> {
+async function downloadDesktopUpdate(userDataPath: string): Promise<DesktopUpdateStatus> {
   if (updateOperation?.kind === "download") return updateOperation.promise;
   if (updateOperation?.kind === "check") {
     await updateOperation.promise;
@@ -760,7 +760,7 @@ export async function downloadDesktopUpdate(userDataPath: string): Promise<Deskt
   return promise;
 }
 
-export function saveDesktopUpdatePreferences(
+function saveDesktopUpdatePreferences(
   userDataPath: string,
   input: DesktopUpdatePreferencesInput
 ): DesktopUpdateActionResult {
@@ -795,7 +795,7 @@ export function saveDesktopUpdatePreferences(
   }
 }
 
-export function restartForPendingDesktopUpdate(userDataPath: string): DesktopUpdateActionResult {
+function restartForPendingDesktopUpdate(userDataPath: string): DesktopUpdateActionResult {
   const paths = resolveUpdatePaths(userDataPath);
   const pending = readPendingUpdate(paths);
   if (!pending) {
