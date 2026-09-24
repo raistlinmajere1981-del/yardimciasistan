@@ -57,6 +57,13 @@ try {
     await expect(tab(selected)).toHaveAttribute('aria-selected', 'true');
   }
 
+  // External canonical refresh must not overwrite the one active dirty draft.
+  await page.getByLabel('Firma adı', { exact: true }).fill('Yerel Taslak');
+  await page.evaluate(() => window.refreshSettings({ businessName: 'Dış Kaynak Firma' }));
+  await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('Yerel Taslak');
+  await discard();
+  await expect(page.getByLabel('Firma adı', { exact: true })).toHaveValue('Dış Kaynak Firma');
+
   // Dirty category: stay, discard-and-go and save-and-go all share one guard.
   await select('İşletme');
   await page.getByLabel('Firma adı', { exact: true }).fill('Bekleyen Firma');
