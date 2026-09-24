@@ -13,7 +13,7 @@ const TARGET_IMAGE_BYTES = 420 * 1024;
 const MAX_OUTPUT_IMAGE_BYTES = 700 * 1024;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-export type MenuItemFieldMode = "all" | "details" | "stock" | "media";
+type MenuItemFieldMode = "all" | "details" | "stock" | "media";
 
 interface MenuItemFormFieldsProps {
   mode: MenuItemFieldMode;
