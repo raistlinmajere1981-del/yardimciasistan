@@ -8,7 +8,7 @@ import { createAndroidBootstrapTicket } from "./android-bootstrap-ticket.js";
 const PACKAGE_NAME = "com.yardimciasistan.android";
 const ACTIVITY_NAME = ".MainActivity";
 
-export type DesktopAndroidInstallAction =
+type DesktopAndroidInstallAction =
   | "install"
   | "update"
   | "current"
