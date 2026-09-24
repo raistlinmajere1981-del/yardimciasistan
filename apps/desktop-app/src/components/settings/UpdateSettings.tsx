@@ -15,8 +15,15 @@ export function useUpdateSettings(enabled: boolean) {
   const [error, setError] = useState(false);
   const baselineBaseUrlRef = useRef("");
   const baselineAutoCheckRef = useRef(true);
+  const currentBaseUrlRef = useRef("");
+  const currentAutoCheckRef = useRef(true);
   const sectionRef = useRef<HTMLElement>(null);
   const baseUrlInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    currentBaseUrlRef.current = baseUrl;
+    currentAutoCheckRef.current = autoCheckEnabled;
+  }, [autoCheckEnabled, baseUrl]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -51,8 +58,8 @@ export function useUpdateSettings(enabled: boolean) {
     const unsubscribe = bridge.onUpdateStatusChanged?.((nextStatus) => {
       if (!active) return;
       setStatus(nextStatus);
-      const currentDirty = baseUrl !== baselineBaseUrlRef.current
-        || autoCheckEnabled !== baselineAutoCheckRef.current;
+      const currentDirty = currentBaseUrlRef.current !== baselineBaseUrlRef.current
+        || currentAutoCheckRef.current !== baselineAutoCheckRef.current;
       if (!currentDirty) {
         const nextBaseUrl = nextStatus.customBaseUrl || nextStatus.defaultBaseUrl;
         setBaseUrl(nextBaseUrl);
@@ -66,7 +73,7 @@ export function useUpdateSettings(enabled: boolean) {
       active = false;
       unsubscribe?.();
     };
-  }, [autoCheckEnabled, baseUrl, enabled]);
+  }, [enabled]);
 
   const busy = action !== null || status?.phase === "checking" || status?.phase === "downloading";
   const updateAvailable = status?.phase === "available";
@@ -226,7 +233,7 @@ export function useUpdateSettings(enabled: boolean) {
 }
 
 export function UpdateSettings({ controller }: { controller: ReturnType<typeof useUpdateSettings> }) {
-  const { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, resetToDefault, checkNow, downloadNow, restartAndInstall, dirty } = controller;
+  const { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, resetToDefault, checkNow, downloadNow, restartAndInstall } = controller;
   return (
     <section ref={sectionRef} id="settings-updates" tabIndex={-1} className="settings-application-subsection settings-update-section">
       <div className="settings-subsection-heading">
