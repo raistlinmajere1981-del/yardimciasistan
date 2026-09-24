@@ -1019,7 +1019,6 @@ export class DesktopDatabase {
     const aiModel = input.aiModel.trim();
     const aiBaseUrl = normalizeAiBaseUrl(input.aiBaseUrl);
     const aiTimeoutSeconds = normalizeAiTimeout(input.aiTimeoutSeconds);
-    const tableCategoryResolution = normalizeTableCategoryInputs(input.tableCategories);
     const rawAiApiKeyProvided = Boolean(String(input.aiApiKey ?? "").trim());
     const existingSettings = this.db.prepare("SELECT * FROM settings WHERE deleted_at = '' LIMIT 1").get() as Record<string, unknown> | undefined;
     const productDataSettings = {
@@ -1055,25 +1054,11 @@ export class DesktopDatabase {
       };
     }
 
-    if (!tableCategoryResolution.ok) {
-      return tableCategoryResolution;
-    }
-
     if (input.birthdaySettings) {
       const birthdaySettingsError = validateBirthdaySettings(input.birthdaySettings);
       if (birthdaySettingsError) {
         return { ok: false, message: birthdaySettingsError };
       }
-    }
-
-    if (
-      tableCategoryResolution.categories
-      && this.getProtectedTableIds().size > tableCategoryResolution.categories.reduce((total, category) => total + category.tableCount, 0)
-    ) {
-      return {
-        ok: false,
-        message: "Aktif adisyon veya rezervasyona bağlı masalar nedeniyle toplam masa sayısı bu kadar azaltılamaz."
-      };
     }
 
     if (input.servicePreferences.whatsapp && !input.whatsapp.trim()) {
@@ -1393,13 +1378,6 @@ export class DesktopDatabase {
           createdAt: profile.createdAt || now,
           now
         });
-      }
-
-      ensureStoredInitialRooms(this.db, normalizeInteger(input.initialCounts.rooms), now);
-      if (tableCategoryResolution.categories) {
-        reconcileStoredTableCategories(this.db, tableCategoryResolution.categories, now, this.getProtectedTableIds());
-      } else {
-        ensureStoredInitialTables(this.db, normalizeInteger(input.initialCounts.tables), now);
       }
 
       replaceStoredBusinessCapabilities(this.db, {
@@ -1770,76 +1748,6 @@ export class DesktopDatabase {
     return Number(row?.count ?? 0);
   }
 
-  private parseStringArray(value: unknown): string[] {
-    try {
-      const parsed = JSON.parse(String(value ?? "[]")) as unknown;
-      if (!Array.isArray(parsed)) {
-        return [];
-      }
-
-      return parsed.map((item) => String(item).trim()).filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-
-  private getProtectedTableIds(): Set<string> {
-    const protectedIds = new Set<string>();
-    const activeOrders = this.db
-      .prepare(`
-        SELECT table_id
-        FROM table_orders
-        WHERE status IN ('open', 'preparing', 'served', 'payment')
-      `)
-      .all() as Array<{ table_id?: string }>;
-    for (const order of activeOrders) {
-      const tableId = String(order.table_id ?? "").trim();
-      if (tableId) {
-        protectedIds.add(tableId);
-      }
-    }
-
-    const activeReservations = this.db
-      .prepare(`
-        SELECT table_ids_json
-        FROM reservations
-        WHERE deleted_at = ''
-          AND status IN ('pending', 'approved')
-      `)
-      .all() as Array<{ table_ids_json?: string }>;
-    for (const reservation of activeReservations) {
-      for (const tableId of this.parseStringArray(reservation.table_ids_json)) {
-        protectedIds.add(tableId);
-      }
-    }
-
-    const unavailableTables = this.db
-      .prepare(`
-        SELECT id
-        FROM tables
-        WHERE deleted_at = ''
-          AND (
-            status != 'available'
-            OR current_customer_id != ''
-            OR current_reservation_id != ''
-          )
-      `)
-      .all() as Array<{ id?: string }>;
-    for (const table of unavailableTables) {
-      const tableId = String(table.id ?? "").trim();
-      if (tableId) {
-        protectedIds.add(tableId);
-      }
-    }
-
-    const currentTableIds = new Set(
-      (this.db.prepare("SELECT id FROM tables WHERE deleted_at = ''").all() as Array<{ id?: string }>)
-        .map((table) => String(table.id ?? "").trim())
-        .filter(Boolean)
-    );
-    return new Set([...protectedIds].filter((tableId) => currentTableIds.has(tableId)));
-  }
-
   private authorizeAndroidActionInTransaction(action: AndroidSyncAction): AndroidActionMutationResult {
     return authorizeStoredAndroidAction(this.db, action, this.getEnabledBusinessCapabilities());
   }
@@ -2198,10 +2106,6 @@ export class DesktopDatabase {
 }
 
 import {
-  normalizeTableCategoryInputs,
-} from "./database/table-category-utils.js";
-
-import {
   DEFAULT_AI_BASE_URL,
   GOOGLE_AI_STUDIO_BASE_URL,
   DEFAULT_AI_TIMEOUT_SECONDS,
@@ -2413,9 +2317,6 @@ import {
 
 import {
   getSetupData as getStoredSetupData,
-  ensureInitialRooms as ensureStoredInitialRooms,
-  ensureInitialTables as ensureStoredInitialTables,
-  reconcileTableCategories as reconcileStoredTableCategories,
 } from "./setup-service.js";
 
 import {
