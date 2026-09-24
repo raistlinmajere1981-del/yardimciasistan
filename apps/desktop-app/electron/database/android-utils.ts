@@ -109,11 +109,7 @@ export function effectiveAndroidPermissions(
     const parsed = JSON.parse(String(value ?? "[]")) as unknown;
     if (Array.isArray(parsed)) {
       storedPermissions = [...new Set(parsed
-        .map((permission) => {
-          const normalized = String(permission).trim();
-          // Keep persisted device grants usable after the Market product permission rename.
-          return normalized === "market.product_draft" ? "market.product_create" : normalized;
-        })
+        .map((permission) => String(permission).trim())
         .filter((permission): permission is AndroidPermission => ANDROID_PERMISSION_SET.has(permission)))];
     }
   } catch {
