@@ -36,6 +36,29 @@ try {
     if (localStorage.getItem("stage2a.empty-tasks")) dashboard.dailyTasks = [];
     const folio = { id: 'stage2-folio', stayId: stay.id, roomId: stay.roomId, roomName: stay.roomName, roomNumber: '101', customerId: stay.customerId, customerName: stay.customerName, reservationId: '', status: 'open', guestCount: 2, checkInDate: stay.checkInDate, plannedCheckOutDate: stay.checkOutDate, nights: 2, nightlyPriceMinor: 150000, currency: 'TRY', lodgingTotalMinor: 300000, lodgingManualOverride: false, extrasTotalMinor: 0, chargeTotalMinor: 300000, paidTotalMinor: 50000, remainingMinor: 250000, creditMinor: 0, openedAt: stay.createdAt, closedAt: '', note: '', items: [], payments: [{ id: 'stage2-payment', amountMinor: 50000, paymentMethod: 'cash', paidAt: stay.createdAt, origin: 'direct' }] };
     const folioData = { generatedAt: stay.createdAt, rooms: dashboard.rooms.map(room => ({ ...room, nightlyPriceMinor: 150000, currency: 'TRY' })), activeStays: [stay], folios: [folio], menuCategories: [{ id: 'tea', name: 'İçecekler' }], menuItems: [{ id: 'tea-item', categoryId: 'tea', categoryName: 'İçecekler', name: 'Çay', description: '', priceMinor: 5000, currency: 'TRY', stockQuantity: null, stockConsumptionQuantity: 1, stockUnit: 'adet' }] };
+    let businessLayout = {
+      capabilities: { rooms: true, tables: true },
+      rooms: dashboard.rooms.map((room, index) => ({
+        id: room.id,
+        name: room.name,
+        number: room.number ?? "",
+        capacity: room.capacity ?? 2,
+        bedInfo: room.bedInfo ?? "",
+        floor: room.floor ?? "",
+        features: room.features ?? [],
+        description: room.description ?? "",
+        priceNote: room.priceNote ?? "",
+        nightlyPriceMinor: 150000,
+        currency: "TRY",
+        sortOrder: index + 1,
+        canRemove: room.status !== "occupied" && room.status !== "reserved",
+        removeBlockReason: room.status === "occupied" || room.status === "reserved" ? "Oda durumu aktif kullanım gösteriyor." : ""
+      })),
+      tableCategories: [...new Set(dashboard.tables.map(table => table.area || "Genel"))].map(name => ({
+        name,
+        tableCount: dashboard.tables.filter(table => (table.area || "Genel") === name).length
+      }))
+    };
     const record = (kind, input) => { window.__designCalls.push({ kind, input }); return { ok: true, message: 'Kaydedildi.', dashboardData: dashboard, savedId: input.id || 'stage2-customer' }; };
     window.yardimciDesktop = {
       getBootstrapData: async () => ({ appName: 'Yardımcı Asistan', version: '0.1.2', platform: 'linux', setup, databasePath: dashboard.databasePath, backupPath: dashboard.backupPath, syncSettings: { webModuleUrl: setup.webModuleUrl, hasSyncSecret: true } }),
@@ -74,6 +97,38 @@ try {
       getBusinessCapabilitySnapshot: async () => ({ businessId: 'design-fixture', profileId: setup.profileId, enabledCapabilities, capabilities: enabledCapabilities.map(capability => ({ capability, enabled: true, source: 'profile' })) }),
       getBusinessPublicProfile: async () => profile,
       saveBusinessPublicProfile: async input => { profile = input; window.__designCalls.push({ kind: 'public', input }); return { ok: true, message: 'Bilgiler kaydedildi.', profile }; },
+      getBusinessLayout: async () => structuredClone(businessLayout),
+      saveBusinessLayout: async input => {
+        if (input.rooms) {
+          businessLayout = {
+            ...businessLayout,
+            rooms: input.rooms.map((room, index) => ({
+              id: room.id || `stage2-layout-room-${index + 1}`,
+              name: room.name,
+              number: room.number,
+              capacity: room.capacity,
+              bedInfo: room.bedInfo,
+              floor: room.floor,
+              features: [...room.features],
+              description: room.description,
+              priceNote: room.priceNote,
+              nightlyPriceMinor: room.nightlyPriceMinor,
+              currency: room.currency,
+              sortOrder: index + 1,
+              canRemove: true,
+              removeBlockReason: ""
+            }))
+          };
+        }
+        if (input.tableCategories) {
+          businessLayout = {
+            ...businessLayout,
+            tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
+          };
+        }
+        window.__designCalls.push({ kind: "layout", input });
+        return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(businessLayout) };
+      },
       getRoomFolioData: async () => folioData,
       openRoomFolio: async () => ({ ok: true, message: 'Hesap açıldı.', data: folioData, folioId: folio.id }),
       updateRoomFolio: async input => { window.__designCalls.push({ kind: 'folio', input }); return { ok: true, message: 'Kaydedildi.', data: folioData, folioId: folio.id }; },
