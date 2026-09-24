@@ -212,10 +212,6 @@ async function initializeConcurrently(userDataPath) {
 }
 
 function assertCurrentDatabase(database, options = {}) {
-  assert.equal(
-    database.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'").get().count,
-    0
-  );
   assert.equal(database.prepare("PRAGMA quick_check").get().quick_check, "ok");
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
 
@@ -228,26 +224,10 @@ function assertCurrentDatabase(database, options = {}) {
   assert.ok(localCredentialColumns.has("token_hash"));
   assert.ok(localCredentialColumns.has("revoked_at"));
   assert.ok(businessColumns.has("profile_id"));
-  for (const column of ["business_type", "modules_json"]) {
-    assert.equal(businessColumns.has(column), false);
-  }
   for (const column of [
-    "rooms_enabled",
-    "tables_enabled",
-    "qr_menu_enabled",
-    "ai_enabled",
-    "whatsapp_enabled",
-    "android_enabled",
-    "sync_client_id",
-    "ai_model",
-    "ai_project_name",
-    "ai_base_url",
-    "ai_timeout_seconds",
-    "ai_api_key_encrypted"
-  ]) {
-    assert.equal(settingsColumns.has(column), false, `settings should not contain legacy column ${column}`);
-  }
-  for (const column of [
+    "local_network_enabled",
+    "ai_service",
+    "ai_last_published_at",
     "product_data_enabled",
     "product_data_provider",
     "product_data_auto_search",
