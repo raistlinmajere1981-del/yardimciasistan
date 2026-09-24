@@ -24,7 +24,7 @@ interface WidgetOpenOptions {
   intent?: WidgetIntent;
   context?: WidgetContext;
 }
-type BusinessProfileId = "pension_restaurant" | "pension" | "restaurant" | "cafe" | "market";
+type BusinessProfileId = "pension_restaurant" | "pension" | "restaurant" | "market";
 type PublicSurface = "accommodation" | "food_service" | "menu" | "qr_menu" | "catalog" | "directions";
 
 interface WidgetConfig {
@@ -2952,7 +2952,7 @@ function removeEmptyValues(values: Partial<WidgetConfig>): Partial<WidgetConfig>
 
 function normalizeBusinessProfileId(value: unknown): BusinessProfileId | "" {
   const profileId = String(value ?? "").trim();
-  return ["pension_restaurant", "pension", "restaurant", "cafe", "market"].includes(profileId)
+  return ["pension_restaurant", "pension", "restaurant", "market"].includes(profileId)
     ? profileId as BusinessProfileId
     : "";
 }
@@ -2970,7 +2970,7 @@ function normalizePublicSurfaces(value: unknown): PublicSurface[] {
 function profilePublicSurfaces(profileId: BusinessProfileId | ""): PublicSurface[] {
   if (profileId === "pension_restaurant") return ["accommodation", "food_service", "menu", "qr_menu", "directions"];
   if (profileId === "pension") return ["accommodation", "directions"];
-  if (profileId === "restaurant" || profileId === "cafe") return ["food_service", "menu", "qr_menu", "directions"];
+  if (profileId === "restaurant") return ["food_service", "menu", "qr_menu", "directions"];
   if (profileId === "market") return ["catalog", "directions"];
   return [];
 }
