@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -26,9 +27,12 @@ try {
     whatsapp: "+905550002020",
     syncSecret: "menu-smoke-secret",
     servicePreferences: { whatsapp: true, android: true },
-    initialCounts: { rooms: 3, tables: 3 }
   }));
   assert.equal(initialSetupResult.ok, true, initialSetupResult.ok ? "" : initialSetupResult.message);
+  seedSmokeBusinessLayout(database.databasePath, {
+    roomCount: 3,
+    tableCategories: [{ name: "Salon", tableCount: 3 }]
+  });
   // Test-only fixture: give the created rooms/tables stable smoke IDs so the
   // status-transition flows below can address them without demo seed data.
   {
