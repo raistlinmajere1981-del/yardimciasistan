@@ -3,7 +3,7 @@ import { Eye, LockKeyhole, RefreshCw, ScrollText, UploadCloud } from "lucide-rea
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage } from "../../app/navigation";
-import { buildNavigation, getPageMeta } from "../../app/navigation";
+import { buildNavigation, getPageContentScroll, getPageMeta } from "../../app/navigation";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "../../app/notifications";
 import {
   automaticSyncTone,
@@ -151,7 +151,7 @@ function DesktopAppFrameContent({
 
   return (
     <AppShell
-      contentScroll={["customerWork", "menu", "pension", "restaurant", "settings"].includes(activePage) ? "workspace" : "page"}
+      contentScroll={getPageContentScroll(activePage)}
       contentRef={contentRef}
       sidebarCollapsed={sidebarCollapsed}
       sidebar={(

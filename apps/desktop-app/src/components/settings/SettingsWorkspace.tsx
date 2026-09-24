@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { SaveInitialSetupInput } from "../../../electron/database";
+import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
+import { StagedSettingsContributionSlot } from "../../app/settings-section-contributions";
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
 import { useSettingsAiTest } from "../../app/use-settings-ai-test";
-import { searchSettings, settingsCapabilities, settingsCategories, settingsSections, type SettingsCategoryId } from "../../app/settings-registry";
+import { isSettingsSectionVisible, searchSettings, settingsCapabilities, settingsCategories, settingsSections, type SettingsCategoryId } from "../../app/settings-registry";
 import type { SettingsSetupSaveResult } from "../../app/settings-save";
 import type { UiPreferences } from "../../ui-preferences";
 import { SettingsCategoryTabs } from "./SettingsCategoryTabs";
 import { BusinessSettingsSection } from "./BusinessSettingsSection";
-import { LayoutSettingsSection } from "./LayoutSettingsSection";
 import { ServicesSettingsSection, type ServicesSettingsProps } from "./ServicesSettingsSection";
 import { AppearanceSettingsSection } from "./AppearanceSettingsSection";
 import { BusinessPublicProfileSection, useBusinessPublicProfileSettings } from "./BusinessPublicProfileSection";
@@ -30,6 +31,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const [query, setQuery] = useState("");
   const [focusTarget, setFocusTarget] = useState("");
   const root = useRef<HTMLDivElement>(null);
+  const { snapshot: runtimeCapabilities } = useBusinessCapabilityRuntime();
   const drafts = useSettingsDrafts(props.setupData, props.onSave);
   const ai = useSettingsAiTest(drafts.form, drafts.setDraft);
   const capabilities = settingsCapabilities(drafts.canonical);
@@ -40,9 +42,9 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const password = usePasswordSettings({ configured: props.setupData.appPasswordConfigured, onConfiguredChange: props.onAppPasswordConfiguredChange ?? (() => undefined) });
   const category = settingsCategories.find(item => item.id === active)!;
   const staged = active === "application" ? null : active;
-  const hasStagedSection = settingsSections.some(section => section.category === active && section.persistence === "staged" && (!section.visible || section.visible(capabilities, initialized)));
+  const hasStagedSection = settingsSections.some(section => section.category === active && section.persistence === "staged" && isSettingsSectionVisible(section, capabilities, initialized, runtimeCapabilities));
   const feedback = staged ? drafts.feedback[staged] : undefined;
-  const results = searchSettings(query, capabilities, initialized);
+  const results = searchSettings(query, capabilities, initialized, runtimeCapabilities);
   const dirty = { business: drafts.dirty.business || profile.dirty, operations: drafts.dirty.operations || rooms.dirty, services: drafts.dirty.services, application: updates.dirty };
 
   useEffect(() => {
@@ -70,16 +72,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
       <div className="settings-category-body" role="region" aria-label={`${category.title} ayar içeriği`}>
         {active === "business" && <>
           <fieldset className="settings-resource-fields" disabled={drafts.busy}><BusinessSettingsSection form={drafts.form} onFormChange={drafts.setDraft} /></fieldset>
+          <StagedSettingsContributionSlot category="business" form={drafts.form} onFormChange={drafts.setDraft} busy={drafts.busy} configurationCapabilities={capabilities} initialized={initialized} runtimeSnapshot={runtimeCapabilities} />
           {initialized && <BusinessPublicProfileSection controller={profile} />}
         </>}
         {active === "operations" && <>
-          <fieldset className="settings-resource-fields" disabled={drafts.busy}><LayoutSettingsSection form={drafts.form} onFormChange={drafts.setDraft} enabledCapabilities={capabilities} /></fieldset>
+          <StagedSettingsContributionSlot category="operations" form={drafts.form} onFormChange={drafts.setDraft} busy={drafts.busy} configurationCapabilities={capabilities} initialized={initialized} runtimeSnapshot={runtimeCapabilities} />
           {initialized && <RoomManagementSection controller={rooms} />}
           {!hasStagedSection && <p>Bu sektör için oda veya masa düzeni bulunmuyor.</p>}
         </>}
         {active === "services" && <fieldset className="settings-resource-fields" disabled={drafts.busy}>
           <ServicesSettingsSection {...props} {...ai} onTestAiConnection={() => void ai.testAiConnection()} form={drafts.form} onFormChange={drafts.setDraft} enabledCapabilities={capabilities} />
-        </fieldset>}
+        </fieldset>
+          <StagedSettingsContributionSlot category="services" form={drafts.form} onFormChange={drafts.setDraft} busy={drafts.busy} configurationCapabilities={capabilities} initialized={initialized} runtimeSnapshot={runtimeCapabilities} />}
         {active === "application" && <div id="settings-application" className="settings-application-workspace">
           <AppearanceSettingsSection uiPreferences={props.uiPreferences} onUiPreferencesChange={props.onUiPreferencesChange} />
           {initialized && <UpdateSettings controller={updates} />}

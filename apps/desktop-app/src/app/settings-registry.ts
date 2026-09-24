@@ -1,4 +1,6 @@
 import { BUSINESS_CAPABILITIES as C, getBusinessProfileSelectionCapabilities, type BusinessCapability } from "@yardimci-asistan/shared";
+import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
+import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 import type { SetupFormState } from "./setup-model";
 
 export type SettingsCategoryId = "business" | "operations" | "services" | "application";
@@ -16,13 +18,23 @@ export interface SettingsSectionDefinition {
   title: string;
   keywords: string;
   persistence: "staged" | "immediate" | "action" | "resource";
+  condition?: CapabilityCondition;
   visible?: (capabilities: readonly BusinessCapability[], initialized: boolean) => boolean;
 }
+export const layoutSettingsDefinition = {
+  id: "settings-operations",
+  category: "operations",
+  title: "İşletme Düzeni",
+  keywords: "oda sayısı masa kategorileri salon bahçe",
+  persistence: "staged",
+  visible: (caps: readonly BusinessCapability[]) => caps.includes(C.ACCOMMODATION_ROOMS) || caps.includes(C.FOOD_TABLES)
+} satisfies SettingsSectionDefinition;
+
 export const settingsSections: readonly SettingsSectionDefinition[] = [
   { id: "settings-business", category: "business", title: "İşletme", keywords: "firma adı sektör tipi telefon whatsapp e-posta adres", persistence: "staged" },
   { id: "settings-options", category: "business", title: "Ek özellikler", keywords: "yetenek talepler oda masa rezervasyonları qr menü stok veresiye müşteri hesabı satın alma tedarikçi etiket", persistence: "staged" },
   { id: "settings-public-profile", category: "business", title: "Müşteriye Açık Bilgiler", keywords: "public profile harita konum açıklama özellikler giriş çıkış kahvaltı dil ödeme", persistence: "resource", visible: (_, initialized) => initialized },
-  { id: "settings-operations", category: "operations", title: "İşletme Düzeni", keywords: "oda sayısı masa kategorileri salon bahçe", persistence: "staged", visible: caps => caps.includes(C.ACCOMMODATION_ROOMS) || caps.includes(C.FOOD_TABLES) },
+  layoutSettingsDefinition,
   { id: "settings-rooms", category: "operations", title: "Oda Yönetimi", keywords: "oda adı varsayılan gecelik fiyat kapasite yatak detay", persistence: "resource", visible: (caps, initialized) => initialized && caps.includes(C.ACCOMMODATION_ROOMS) },
   { id: "settings-whatsapp", category: "services", title: "WhatsApp", keywords: "doğum günü mesaj saat otomatik manuel", persistence: "staged" },
   { id: "settings-android", category: "services", title: "Android", keywords: "companion yerel ağ local network telefon bağlantı", persistence: "staged" },
@@ -44,11 +56,26 @@ export function settingsCapabilities(form: SetupFormState): BusinessCapability[]
     ...(form.whatsappEnabled ? [C.WHATSAPP] : []), ...(form.androidEnabled ? [C.ANDROID] : []), ...(form.aiEnabled ? [C.AI] : [])];
 }
 
-export function searchSettings(query: string, capabilities: readonly BusinessCapability[], initialized: boolean) {
+export function isSettingsSectionVisible(
+  section: SettingsSectionDefinition,
+  configurationCapabilities: readonly BusinessCapability[],
+  initialized: boolean,
+  runtimeSnapshot?: BusinessCapabilitySnapshot | null
+): boolean {
+  if (section.condition && !matchesCapabilityCondition(runtimeSnapshot, section.condition)) return false;
+  return !section.visible || section.visible(configurationCapabilities, initialized);
+}
+
+export function searchSettings(
+  query: string,
+  capabilities: readonly BusinessCapability[],
+  initialized: boolean,
+  runtimeSnapshot?: BusinessCapabilitySnapshot | null
+) {
   const terms = query.trim().toLocaleLowerCase("tr-TR").split(/\s+/).filter(Boolean);
   if (!terms.length) return [];
   return settingsSections.filter(section => {
-    if (section.visible && !section.visible(capabilities, initialized)) return false;
+    if (!isSettingsSectionVisible(section, capabilities, initialized, runtimeSnapshot)) return false;
     const category = settingsCategories.find(item => item.id === section.category)!;
     const text = `${category.title} ${section.title} ${section.keywords}`.toLocaleLowerCase("tr-TR");
     return terms.every(term => text.includes(term));

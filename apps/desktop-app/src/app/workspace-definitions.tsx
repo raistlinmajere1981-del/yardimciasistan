@@ -1,23 +1,14 @@
 import type { ComponentProps } from "react";
-import { RoomWorkspace } from "../components/pension/RoomWorkspace";
-import { TableWorkspace } from "../components/restaurant/TableWorkspace";
 import { CustomerWorkspace } from "../components/customers/CustomerWorkspace";
-import { MenuItemWorkspace } from "../components/menu/MenuItemWorkspace";
 import { ProductWorkspace } from "../components/market/ProductWorkspace";
+import { MenuItemWorkspace } from "../components/menu/MenuItemWorkspace";
+import { roomWorkspaceDefinition } from "../components/pension/room-workspace-definition";
+import { tableWorkspaceDefinition } from "../components/restaurant/table-workspace-definition";
 import type { WorkspaceDefinition } from "../components/workspace/workspace-definition";
-import type { CustomerWorkspaceIntent, MenuItemWorkspaceIntent, ProductWorkspaceIntent, RoomWorkspaceIntent, TableWorkspaceIntent } from "../components/workspace/workspace-intent";
+import type { CustomerWorkspaceIntent, MenuItemWorkspaceIntent, ProductWorkspaceIntent } from "../components/workspace/workspace-intent";
 
-export const roomWorkspaceDefinition: WorkspaceDefinition<RoomWorkspaceIntent, Omit<ComponentProps<typeof RoomWorkspace>, "intent">> = {
-  entityType: "room",
-  defaultPresentation: "centered",
-  render: (intent, context) => <RoomWorkspace {...context} intent={intent} />
-};
-
-export const tableWorkspaceDefinition: WorkspaceDefinition<TableWorkspaceIntent, Omit<ComponentProps<typeof TableWorkspace>, "intent">> = {
-  entityType: "table",
-  defaultPresentation: "full-canvas",
-  render: (intent, context) => <TableWorkspace {...context} intent={intent} />
-};
+export { roomWorkspaceDefinition } from "../components/pension/room-workspace-definition";
+export { tableWorkspaceDefinition } from "../components/restaurant/table-workspace-definition";
 
 export const customerWorkspaceDefinition: WorkspaceDefinition<CustomerWorkspaceIntent, Omit<ComponentProps<typeof CustomerWorkspace>, "intent">> = {
   entityType: "customer",
@@ -37,4 +28,10 @@ export const productWorkspaceDefinition: WorkspaceDefinition<ProductWorkspaceInt
   render: (intent, context) => <ProductWorkspace {...context} intent={intent} />
 };
 
-export const workspaceDefinitions = [roomWorkspaceDefinition, tableWorkspaceDefinition, customerWorkspaceDefinition, menuItemWorkspaceDefinition, productWorkspaceDefinition] as const;
+export const workspaceDefinitions = [
+  roomWorkspaceDefinition,
+  tableWorkspaceDefinition,
+  customerWorkspaceDefinition,
+  menuItemWorkspaceDefinition,
+  productWorkspaceDefinition
+] as const;

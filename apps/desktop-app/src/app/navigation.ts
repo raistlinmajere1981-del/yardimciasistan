@@ -1,5 +1,4 @@
 import {
-  BedDouble,
   CalendarDays,
   Home,
   Menu as MenuIcon,
@@ -7,13 +6,15 @@ import {
   Settings,
   Store,
   Users,
-  UtensilsCrossed,
   WalletCards,
   type LucideIcon
 } from "lucide-react";
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES as C } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
+import { pensionNavigationContribution } from "../components/pension/pension-navigation";
+import { restaurantNavigationContribution } from "../components/restaurant/restaurant-navigation";
 import { runtimeHasCapability } from "./capabilities";
+import { matchesCapabilityCondition, type CapabilityCondition } from "./capability-condition";
 
 export type DesktopPage = "dashboard" | "customerWork" | "calendar" | "pension" | "restaurant" | "market" | "menu" | "messages" | "reports" | "settings";
 
@@ -23,105 +24,136 @@ export interface NavigationItem {
   icon: LucideIcon;
 }
 
-const baseItems: NavigationItem[] = [
-  { id: "dashboard", label: "Ana Ekran", icon: Home }
-];
-
-function hasRetailWorkspaceCapability(
-  capabilities: BusinessCapabilitySnapshot | null | undefined
-): boolean {
-  const C = BUSINESS_CAPABILITIES;
-  return [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS]
-    .some((capability) => runtimeHasCapability(capabilities, capability));
+export interface NavigationPresentation {
+  label: string;
+  eyebrow: string;
+  title: string;
+  description: string;
 }
 
-export function buildNavigation(capabilities: BusinessCapabilitySnapshot | null | undefined): NavigationItem[] {
-  const items = [...baseItems];
-  const C = BUSINESS_CAPABILITIES;
-  const customersEnabled = runtimeHasCapability(capabilities, C.CUSTOMERS);
-
-  if (customersEnabled) {
-    items.push({ id: "customerWork", label: "Müşteri İşleri", icon: Users });
-  }
-
-  if (runtimeHasCapability(capabilities, C.CALENDAR)) {
-    items.push({ id: "calendar", label: "Takvim", icon: CalendarDays });
-  }
-
-  if (runtimeHasCapability(capabilities, C.ACCOMMODATION_ROOMS)) {
-    items.push({ id: "pension", label: "Pansiyon", icon: BedDouble });
-  }
-
-  if (runtimeHasCapability(capabilities, C.FOOD_TABLES)) {
-    items.push({ id: "restaurant", label: "Restoran", icon: UtensilsCrossed });
-  }
-
-  if (hasRetailWorkspaceCapability(capabilities)) {
-    items.push({ id: "market", label: "Market", icon: Store });
-  }
-
-  if (runtimeHasCapability(capabilities, C.FOOD_MENU)) {
-    items.push({ id: "menu", label: "Menü", icon: MenuIcon });
-  }
-
-  if ((customersEnabled && runtimeHasCapability(capabilities, C.WHATSAPP))
-      || runtimeHasCapability(capabilities, C.AI)) {
-    items.push({ id: "messages", label: "Mesajlar", icon: MessageCircle });
-  }
-
-  const financeEnabled = runtimeHasCapability(capabilities, C.FINANCE);
-  const reportsEnabled = runtimeHasCapability(capabilities, C.REPORTS);
-  if (financeEnabled || reportsEnabled) {
-    items.push({ id: "reports", label: financeEnabled ? "Kasa" : "Raporlar", icon: WalletCards });
-  }
-  items.push({ id: "settings", label: "Ayarlar", icon: Settings });
-  return items;
+export interface NavigationContribution {
+  pageId: DesktopPage;
+  icon: LucideIcon;
+  order: number;
+  condition?: CapabilityCondition;
+  presentation: NavigationPresentation | ((capabilities: BusinessCapabilitySnapshot | null | undefined) => NavigationPresentation);
+  contentScroll: "page" | "workspace";
 }
 
-export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapabilitySnapshot | null) {
-  const customersEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.CUSTOMERS);
-  const requestsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.REQUESTS);
-  const tasksEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.TASKS);
-  const aiEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.AI);
-  const reservationsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS)
-    || runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS);
-  const whatsappEnabled = customersEnabled
-    && runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.WHATSAPP);
-  const qrMenuEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.QR_MENU);
-  const accommodationFolioEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO);
-  const accommodationReservationsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.ACCOMMODATION_RESERVATIONS);
-  const foodReservationsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.FOOD_RESERVATIONS);
-  const foodOrdersEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.FOOD_ORDERS);
-  const financeEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.FINANCE);
-  const reportsEnabled = runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.REPORTS);
-  const dashboardTopics = [
-    requestsEnabled ? "yeni talepler" : "",
-    tasksEnabled ? "günlük işler" : "",
-    reservationsEnabled ? "bekleyen rezervasyonlar" : ""
-  ].filter(Boolean);
-  const restaurantTopics = [
-    "masa durumlarını",
-    foodReservationsEnabled ? "rezervasyonları" : "",
-    foodOrdersEnabled ? "siparişleri" : "",
-    tasksEnabled ? "servis işlerini" : ""
-  ].filter(Boolean);
-  const marketTopics = [
-    runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.CATALOG) ? "ürünleri" : "",
-    runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.INVENTORY) ? "stokları" : "",
-    runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.SALES) ? "satışları" : "",
-    runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.RETAIL_PURCHASING)
-      || runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.RETAIL_SUPPLIERS) ? "tedariki" : "",
-    runtimeHasCapability(capabilities, BUSINESS_CAPABILITIES.RETAIL_LABELS) ? "etiketleri" : ""
-  ].filter(Boolean);
-  const meta: Record<DesktopPage, { eyebrow: string; title: string; description: string }> = {
-    dashboard: { eyebrow: "Günlük özet", title: "Bugün ne var?", description: dashboardTopics.length > 0 ? `${dashboardTopics.join(", ")} ve işletme durumunuz.` : "Etkin işletme operasyonlarının özeti." },
-    customerWork: { eyebrow: "Müşteri operasyonu", title: "Müşteri İşleri", description: requestsEnabled ? "Talepleri ve müşteri kayıtlarını yönetin." : "Müşteri kayıtlarını yönetin." },
-    calendar: { eyebrow: "Operasyon planı", title: "Takvim", description: reservationsEnabled && tasksEnabled ? "Etkin rezervasyon alanlarını ve günlük işleri gün veya hafta bazında görün." : reservationsEnabled ? "Etkin rezervasyon alanlarını gün veya hafta bazında görün." : tasksEnabled ? "Günlük işleri gün veya hafta bazında görün." : "Etkin takvim alanlarını gün veya hafta bazında görün." },
-    pension: { eyebrow: "Konaklama", title: "Pansiyon", description: accommodationReservationsEnabled && tasksEnabled ? "Rezervasyonları, odaları ve günlük işleri izleyin." : accommodationReservationsEnabled ? "Rezervasyonları ve odaları izleyin." : tasksEnabled ? "Odaları ve günlük işleri izleyin." : "Odaların güncel durumunu izleyin." },
-    restaurant: { eyebrow: "Servis", title: "Restoran", description: `${restaurantTopics.join(", ")} takip edin.` },
-    market: { eyebrow: "Perakende operasyonu", title: "Market", description: marketTopics.length > 0 ? `${marketTopics.join(", ")} tek çalışma alanında yönetin.` : "Etkin perakende araçlarını tek çalışma alanında yönetin." },
-    menu: { eyebrow: "İçerik", title: "Menü", description: qrMenuEnabled ? "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın." : "Kategori ve ürünleri yerel menünüz için düzenleyin." },
-    messages: {
+const dashboardContribution = {
+  pageId: "dashboard",
+  icon: Home,
+  order: 0,
+  contentScroll: "page",
+  presentation: (capabilities) => {
+    const topics = [
+      runtimeHasCapability(capabilities, C.REQUESTS) ? "yeni talepler" : "",
+      runtimeHasCapability(capabilities, C.TASKS) ? "günlük işler" : "",
+      runtimeHasCapability(capabilities, C.ACCOMMODATION_RESERVATIONS)
+        || runtimeHasCapability(capabilities, C.FOOD_RESERVATIONS) ? "bekleyen rezervasyonlar" : ""
+    ].filter(Boolean);
+    return {
+      label: "Ana Ekran",
+      eyebrow: "Günlük özet",
+      title: "Bugün ne var?",
+      description: topics.length > 0 ? `${topics.join(", ")} ve işletme durumunuz.` : "Etkin işletme operasyonlarının özeti."
+    };
+  }
+} satisfies NavigationContribution;
+
+const customerWorkContribution = {
+  pageId: "customerWork",
+  icon: Users,
+  order: 10,
+  condition: { allOf: [C.CUSTOMERS] },
+  contentScroll: "workspace",
+  presentation: (capabilities) => ({
+    label: "Müşteri İşleri",
+    eyebrow: "Müşteri operasyonu",
+    title: "Müşteri İşleri",
+    description: runtimeHasCapability(capabilities, C.REQUESTS)
+      ? "Talepleri ve müşteri kayıtlarını yönetin."
+      : "Müşteri kayıtlarını yönetin."
+  })
+} satisfies NavigationContribution;
+
+const calendarContribution = {
+  pageId: "calendar",
+  icon: CalendarDays,
+  order: 20,
+  condition: { allOf: [C.CALENDAR] },
+  contentScroll: "page",
+  presentation: (capabilities) => {
+    const reservationsEnabled = runtimeHasCapability(capabilities, C.ACCOMMODATION_RESERVATIONS)
+      || runtimeHasCapability(capabilities, C.FOOD_RESERVATIONS);
+    const tasksEnabled = runtimeHasCapability(capabilities, C.TASKS);
+    return {
+      label: "Takvim",
+      eyebrow: "Operasyon planı",
+      title: "Takvim",
+      description: reservationsEnabled && tasksEnabled
+        ? "Etkin rezervasyon alanlarını ve günlük işleri gün veya hafta bazında görün."
+        : reservationsEnabled
+          ? "Etkin rezervasyon alanlarını gün veya hafta bazında görün."
+          : tasksEnabled
+            ? "Günlük işleri gün veya hafta bazında görün."
+            : "Etkin takvim alanlarını gün veya hafta bazında görün."
+    };
+  }
+} satisfies NavigationContribution;
+
+const marketContribution = {
+  pageId: "market",
+  icon: Store,
+  order: 50,
+  condition: { anyOf: [C.RETAIL_BARCODE, C.RETAIL_PURCHASING, C.RETAIL_SUPPLIERS, C.RETAIL_LABELS] },
+  contentScroll: "page",
+  presentation: (capabilities) => {
+    const topics = [
+      runtimeHasCapability(capabilities, C.CATALOG) ? "ürünleri" : "",
+      runtimeHasCapability(capabilities, C.INVENTORY) ? "stokları" : "",
+      runtimeHasCapability(capabilities, C.SALES) ? "satışları" : "",
+      runtimeHasCapability(capabilities, C.RETAIL_PURCHASING)
+        || runtimeHasCapability(capabilities, C.RETAIL_SUPPLIERS) ? "tedariki" : "",
+      runtimeHasCapability(capabilities, C.RETAIL_LABELS) ? "etiketleri" : ""
+    ].filter(Boolean);
+    return {
+      label: "Market",
+      eyebrow: "Perakende operasyonu",
+      title: "Market",
+      description: topics.length > 0 ? `${topics.join(", ")} tek çalışma alanında yönetin.` : "Etkin perakende araçlarını tek çalışma alanında yönetin."
+    };
+  }
+} satisfies NavigationContribution;
+
+const menuContribution = {
+  pageId: "menu",
+  icon: MenuIcon,
+  order: 60,
+  condition: { allOf: [C.FOOD_MENU] },
+  contentScroll: "workspace",
+  presentation: (capabilities) => ({
+    label: "Menü",
+    eyebrow: "İçerik",
+    title: "Menü",
+    description: runtimeHasCapability(capabilities, C.QR_MENU)
+      ? "Kategori ve ürünleri düzenleyip web menüsünü yayınlayın."
+      : "Kategori ve ürünleri yerel menünüz için düzenleyin."
+  })
+} satisfies NavigationContribution;
+
+const messagesContribution = {
+  pageId: "messages",
+  icon: MessageCircle,
+  order: 70,
+  condition: { anyOf: [C.AI, { allOf: [C.CUSTOMERS, C.WHATSAPP] }] },
+  contentScroll: "page",
+  presentation: (capabilities) => {
+    const customersEnabled = runtimeHasCapability(capabilities, C.CUSTOMERS);
+    const whatsappEnabled = customersEnabled && runtimeHasCapability(capabilities, C.WHATSAPP);
+    const aiEnabled = runtimeHasCapability(capabilities, C.AI);
+    return {
+      label: "Mesajlar",
       eyebrow: "Mesaj merkezi",
       title: "Mesajlar",
       description: whatsappEnabled
@@ -129,8 +161,22 @@ export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapability
         : aiEnabled && customersEnabled
           ? "AI ile müşteri yanıtları ve günlük değerlendirmeler hazırlayın."
           : "AI ile günlük işletme değerlendirmeleri hazırlayın."
-    },
-    reports: {
+    };
+  }
+} satisfies NavigationContribution;
+
+const reportsContribution = {
+  pageId: "reports",
+  icon: WalletCards,
+  order: 80,
+  condition: { anyOf: [C.FINANCE, C.REPORTS] },
+  contentScroll: "page",
+  presentation: (capabilities) => {
+    const financeEnabled = runtimeHasCapability(capabilities, C.FINANCE);
+    const reportsEnabled = runtimeHasCapability(capabilities, C.REPORTS);
+    const accommodationFolioEnabled = runtimeHasCapability(capabilities, C.ACCOMMODATION_FOLIO);
+    return {
+      label: financeEnabled ? "Kasa" : "Raporlar",
       eyebrow: financeEnabled ? "Günlük para takibi" : "İşletme analizi",
       title: financeEnabled ? "Kasa" : "Raporlar",
       description: financeEnabled && reportsEnabled
@@ -142,9 +188,73 @@ export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapability
               ? "Bugünün para giriş çıkışını ve bekleyen oda alacaklarını takip edin."
               : "Bugünün para giriş çıkışını takip edin.")
           : "İşletme operasyonlarının dönemsel sonuçlarını takip edin."
-    },
-    settings: { eyebrow: "Yapılandırma", title: "Ayarlar", description: "İşletme, görünüm ve bağlantı tercihlerini düzenleyin." }
-  };
+    };
+  }
+} satisfies NavigationContribution;
 
-  return meta[page];
+const settingsContribution = {
+  pageId: "settings",
+  icon: Settings,
+  order: 90,
+  contentScroll: "workspace",
+  presentation: {
+    label: "Ayarlar",
+    eyebrow: "Yapılandırma",
+    title: "Ayarlar",
+    description: "İşletme, görünüm ve bağlantı tercihlerini düzenleyin."
+  }
+} satisfies NavigationContribution;
+
+export const navigationContributions = [
+  dashboardContribution,
+  customerWorkContribution,
+  calendarContribution,
+  pensionNavigationContribution,
+  restaurantNavigationContribution,
+  marketContribution,
+  menuContribution,
+  messagesContribution,
+  reportsContribution,
+  settingsContribution
+] as const satisfies readonly NavigationContribution[];
+
+function resolvePresentation(
+  contribution: NavigationContribution,
+  capabilities: BusinessCapabilitySnapshot | null | undefined
+): NavigationPresentation {
+  return typeof contribution.presentation === "function"
+    ? contribution.presentation(capabilities)
+    : contribution.presentation;
+}
+
+export function buildNavigationFromContributions(
+  capabilities: BusinessCapabilitySnapshot | null | undefined,
+  contributions: readonly NavigationContribution[]
+): NavigationItem[] {
+  return contributions
+    .filter((contribution) => matchesCapabilityCondition(capabilities, contribution.condition))
+    .toSorted((left, right) => left.order - right.order)
+    .map((contribution) => {
+      const presentation = resolvePresentation(contribution, capabilities);
+      return { id: contribution.pageId, label: presentation.label, icon: contribution.icon };
+    });
+}
+
+export function buildNavigation(capabilities: BusinessCapabilitySnapshot | null | undefined): NavigationItem[] {
+  return buildNavigationFromContributions(capabilities, navigationContributions);
+}
+
+export function getPageMeta(page: DesktopPage, capabilities?: BusinessCapabilitySnapshot | null) {
+  const contribution = navigationContributions.find((item) => item.pageId === page);
+  if (!contribution) throw new Error(`Navigation contribution is missing for ${page}.`);
+  const presentation = resolvePresentation(contribution, capabilities);
+  return {
+    eyebrow: presentation.eyebrow,
+    title: presentation.title,
+    description: presentation.description
+  };
+}
+
+export function getPageContentScroll(page: DesktopPage): "page" | "workspace" {
+  return navigationContributions.find((item) => item.pageId === page)?.contentScroll ?? "page";
 }

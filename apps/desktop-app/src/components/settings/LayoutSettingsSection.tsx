@@ -1,12 +1,19 @@
 import { Plus, Trash2 } from "lucide-react";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
 import { nextTableCategoryFormKey, type SetupFormState } from "../../app/setup-model";
-import type { SetupFieldsProps } from "./setup-fields";
 import { ActionButton } from "../ui/ActionButton";
 
-export function LayoutSettingsSection({ form, onFormChange, enabledCapabilities }: SetupFieldsProps & { enabledCapabilities: BusinessCapability[] }) {
-  const update = <Key extends keyof SetupFormState,>(key: Key, value: SetupFormState[Key]) => {
-    onFormChange({ ...form, [key]: value });
+type LayoutSettingsForm = Pick<SetupFormState, "roomCount" | "tableCategories">;
+
+interface LayoutSettingsSectionProps {
+  form: Readonly<LayoutSettingsForm>;
+  onFormChange: (patch: Partial<LayoutSettingsForm>) => void;
+  enabledCapabilities: readonly BusinessCapability[];
+}
+
+export function LayoutSettingsSection({ form, onFormChange, enabledCapabilities }: LayoutSettingsSectionProps) {
+  const update = <Key extends keyof LayoutSettingsForm,>(key: Key, value: LayoutSettingsForm[Key]) => {
+    onFormChange({ [key]: value } as Partial<LayoutSettingsForm>);
   };
   const updateTableCategory = (key: string, field: "name" | "tableCount", value: string) => {
     update("tableCategories", form.tableCategories.map((category) =>
