@@ -7,6 +7,7 @@ import { settingsCapabilities } from "../../apps/desktop-app/src/app/settings-re
 import { toSetupForm } from "../../apps/desktop-app/src/app/setup-model";
 import { BusinessCapabilityRuntimeProvider } from "../../apps/desktop-app/src/app/business-capability-context";
 import { SettingsWorkspace } from "../../apps/desktop-app/src/components/settings/SettingsWorkspace";
+import type { PageLeaveGuard } from "../../apps/desktop-app/src/app/page-navigation-guard";
 import { AppShell } from "../../apps/desktop-app/src/components/layout/AppShell";
 import { readUiPreferences, applyUiPreferences, saveUiPreferences } from "../../apps/desktop-app/src/ui-preferences";
 import "../../apps/desktop-app/src/styles/index.css";
@@ -34,7 +35,7 @@ let layout = {
   tableCategories: [{ name: "Salon", tableCount: 2 }]
 };
 let updateStatus = { phase: "idle", message: "Hazır", currentVersion: "1", defaultBaseUrl: "https://example.test/updates", customBaseUrl: "", autoCheckEnabled: true, notes: [], installSupported: false };
-let pageLeaveGuard: ((destination: "dashboard", continueNavigation: () => void) => boolean) | null = null;
+let pageLeaveGuard: PageLeaveGuard | null = null;
 window.settingsPageLeaveCompleted = false;
 window.requestSettingsPageLeave = () => {
   window.settingsPageLeaveCompleted = false;
@@ -145,7 +146,7 @@ function Fixture() {
         onUiPreferencesChange={setPreferences}
         onAppPasswordConfiguredChange={setup.setPasswordConfigured}
         registerPageLeaveGuard={(guard) => {
-          pageLeaveGuard = guard as typeof pageLeaveGuard;
+          pageLeaveGuard = guard;
           return () => {
             if (pageLeaveGuard === guard) pageLeaveGuard = null;
           };
