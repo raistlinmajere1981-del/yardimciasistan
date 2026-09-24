@@ -358,13 +358,13 @@ try {
   const tableCategoryEditor = page.locator(".table-category-editor");
   await expect(tableCategoryEditor.getByText("Masa kategorileri", { exact: true })).toBeVisible();
   await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
-  await expect(tableCategoryEditor.locator(".table-category-heading > span")).toHaveText("2 masa");
+  await expect(tableCategoryEditor.locator(".table-category-heading > div > p")).toHaveText("2 masa");
   await expect(tableCategoryEditor.locator(".table-category-row").nth(0).getByRole("textbox")).toHaveValue("Bahçe");
   await expect(tableCategoryEditor.locator(".table-category-row").nth(1).getByRole("textbox")).toHaveValue("Salon");
   await tableCategoryEditor.getByRole("button", { name: "Kategori Ekle" }).click();
   await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(3);
   await tableCategoryEditor.locator(".table-category-row").nth(2).getByRole("textbox").fill("Teras");
-  await expect(tableCategoryEditor.locator(".table-category-heading > span")).toHaveText("3 masa");
+  await expect(tableCategoryEditor.locator(".table-category-heading > div > p")).toHaveText("3 masa");
   await tableCategoryEditor.getByRole("button", { name: "Teras satırını kaldır" }).click();
   await expect(tableCategoryEditor.locator(".table-category-row")).toHaveCount(2);
   await sectionNav.getByRole("tab", { name: "Servisler", exact: true }).click();
