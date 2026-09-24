@@ -47,7 +47,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const results = searchSettings(query, capabilities, initialized, runtimeCapabilities);
   const dirty = { business: drafts.dirty.business || profile.dirty, operations: drafts.dirty.operations || rooms.dirty, services: drafts.dirty.services, application: updates.dirty };
   const stagedDirty = staged ? dirty[staged] : false;
-  const stagedBusy = drafts.busy || (staged === "business" && (profile.loading || profile.saving));
+  const stagedBusy = drafts.busy || (staged === "business" && profile.saving);
   const stagedSaving = feedback?.state === "loading" || (staged === "business" && profile.saving);
 
   async function saveStagedCategory() {
