@@ -43,6 +43,46 @@ try {
     window.__stockImageApplyCalls = [];
     window.__reportRanges = [];
     window.__reportAiCalls = [];
+    let businessProfile = {
+      description: "Smoke işletme açıklaması",
+      latitude: null,
+      longitude: null,
+      directionsNote: "",
+      checkInTime: "14:00",
+      checkOutTime: "11:00",
+      breakfastStartTime: "08:00",
+      breakfastEndTime: "10:00",
+      features: [],
+      policyNote: "",
+      paymentNote: "",
+      languages: ["Türkçe"]
+    };
+    let businessLayout = {
+      capabilities: {
+        rooms: capabilitySnapshot.enabledCapabilities.includes("accommodation.rooms"),
+        tables: capabilitySnapshot.enabledCapabilities.includes("food_service.tables")
+      },
+      rooms: currentDashboardData.rooms.map((room, index) => ({
+        id: room.id,
+        name: room.name,
+        number: room.number ?? "",
+        capacity: room.capacity ?? 2,
+        bedInfo: room.bedInfo ?? "",
+        floor: room.floor ?? "",
+        features: room.features ?? [],
+        description: room.description ?? "",
+        priceNote: room.priceNote ?? "",
+        nightlyPriceMinor: room.nightlyPriceMinor ?? 0,
+        currency: room.currency ?? "TRY",
+        sortOrder: index + 1,
+        canRemove: true,
+        removeBlockReason: ""
+      })),
+      tableCategories: [...new Set(currentDashboardData.tables.map((table) => table.area || "Genel"))].map((name) => ({
+        name,
+        tableCount: currentDashboardData.tables.filter((table) => (table.area || "Genel") === name).length
+      }))
+    };
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
@@ -57,6 +97,42 @@ try {
       }),
       getDashboardData: async () => currentDashboardData,
       getSetupData: async () => setupData,
+      getBusinessPublicProfile: async () => structuredClone(businessProfile),
+      saveBusinessPublicProfile: async (input) => {
+        businessProfile = structuredClone(input);
+        return { ok: true, message: "Müşteri bilgileri kaydedildi.", profile: structuredClone(businessProfile) };
+      },
+      getBusinessLayout: async () => structuredClone(businessLayout),
+      saveBusinessLayout: async (input) => {
+        if (input.rooms) {
+          businessLayout = {
+            ...businessLayout,
+            rooms: input.rooms.map((room, index) => ({
+              id: room.id || `renderer-room-${index + 1}`,
+              name: room.name,
+              number: room.number,
+              capacity: room.capacity,
+              bedInfo: room.bedInfo,
+              floor: room.floor,
+              features: [...room.features],
+              description: room.description,
+              priceNote: room.priceNote,
+              nightlyPriceMinor: room.nightlyPriceMinor,
+              currency: room.currency,
+              sortOrder: index + 1,
+              canRemove: true,
+              removeBlockReason: ""
+            }))
+          };
+        }
+        if (input.tableCategories) {
+          businessLayout = {
+            ...businessLayout,
+            tableCategories: input.tableCategories.map(({ name, tableCount }) => ({ name, tableCount }))
+          };
+        }
+        return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(businessLayout) };
+      },
       onSyncStatusChanged: () => () => {},
       getReportData: async (range) => {
         window.__reportRanges.push(range);
@@ -271,7 +347,8 @@ try {
     await expect(sectionNav.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
   }
   await sectionNav.getByRole("tab", { name: "İşletme", exact: true }).click();
-  await expect(settings.getByRole("heading", { name: "Müşteriye Açık Bilgiler" })).toBeVisible();
+  await expect(settings.locator("#settings-public-profile")).toBeVisible();
+  await expect(settings.getByLabel("İşletme açıklaması")).toBeVisible();
   await expect(settings.locator(".settings-profile-options")).toBeVisible();
   await expect(settings.getByText("Ek özellikler")).toBeVisible();
   await expect(settings.locator(".settings-profile-option")).toHaveCount(6);
