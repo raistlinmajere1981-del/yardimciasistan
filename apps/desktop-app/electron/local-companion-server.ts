@@ -10,22 +10,22 @@ import {
 } from "@yardimci-asistan/sync-core";
 import { desktopLog } from "./desktop-logger";
 
-export const DEFAULT_LOCAL_COMPANION_PORT = 47_831;
+const DEFAULT_LOCAL_COMPANION_PORT = 47_831;
 const MAX_JSON_BODY_BYTES = 128 * 1024;
 
-export interface LocalCompanionAuthorizationInput {
+interface LocalCompanionAuthorizationInput {
   deviceId: string;
   token: string;
   remoteAddress: string;
 }
 
-export interface LocalCompanionActionResult {
+interface LocalCompanionActionResult {
   ok: boolean;
   message: string;
   alreadyApplied?: boolean;
 }
 
-export interface LocalCompanionPairingRequest {
+interface LocalCompanionPairingRequest {
   pairingTicket: string;
   deviceId: string;
   deviceName: string;
@@ -33,7 +33,7 @@ export interface LocalCompanionPairingRequest {
   remoteAddress: string;
 }
 
-export type LocalCompanionPairingResponse =
+type LocalCompanionPairingResponse =
   | {
       ok: true;
       token: string;
@@ -47,7 +47,7 @@ export type LocalCompanionPairingResponse =
       statusCode: number;
     };
 
-export interface LocalCompanionBusinessInfo {
+interface LocalCompanionBusinessInfo {
   displayName: string;
   phone: string;
   whatsapp: string;
@@ -80,7 +80,7 @@ function normalizedRemoteAddress(value: string | undefined): string {
   return zoneIndex >= 0 ? raw.slice(0, zoneIndex) : raw;
 }
 
-export function isLocalNetworkAddress(value: string | undefined): boolean {
+function isLocalNetworkAddress(value: string | undefined): boolean {
   const address = normalizedRemoteAddress(value);
   if (!address) return false;
   if (address === "::1") return true;
