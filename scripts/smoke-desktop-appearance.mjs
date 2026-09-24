@@ -42,10 +42,10 @@ async function runSmoke() {
 
     await verifyFreshSetup(browser, baseUrl);
     await verifyEmbeddedSettings(browser, baseUrl);
-    await verifyPartialPreferenceRecord(browser, baseUrl);
+    await verifyLegacyPreferenceRecordIsDiscarded(browser, baseUrl);
     await verifyMalformedPreferenceRecord(browser, baseUrl);
 
-    console.log(`desktop-easy-mode-ok: ${baseUrl}`);
+    console.log(`desktop-appearance-ok: ${baseUrl}`);
   } catch (error) {
     if (serverOutput.trim()) {
       console.error(serverOutput.trim());
@@ -65,7 +65,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
   try {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
-    expect(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord)).toBeNull();
+    expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBeNull();
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
@@ -134,7 +134,7 @@ async function verifyFreshSetup(activeBrowser, rendererUrl) {
     });
     mkdirSync(screenshotDirectory, { recursive: true });
     await page.screenshot({
-      path: join(screenshotDirectory, "desktop-easy-mode-first-setup.png"),
+      path: join(screenshotDirectory, "desktop-appearance-first-setup.png"),
       fullPage: true
     });
 
@@ -236,36 +236,35 @@ async function verifyEmbeddedSettings(activeBrowser, rendererUrl) {
   }
 }
 
-async function verifyPartialPreferenceRecord(activeBrowser, rendererUrl) {
-  const partialPreferences = { theme: "dark", scale: 1.1 };
-  const context = await createIsolatedContext(activeBrowser, partialPreferences);
+async function verifyLegacyPreferenceRecordIsDiscarded(activeBrowser, rendererUrl) {
+  const legacyPreferences = { theme: "dark", mode: "easy", scale: 1.1 };
+  const context = await createIsolatedContext(activeBrowser, legacyPreferences);
   const page = await context.newPage();
   const pageErrors = trackPageErrors(page);
 
   try {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
-    expect(JSON.parse(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord))).toEqual(partialPreferences);
+    expect(JSON.parse(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord))).toEqual(legacyPreferences);
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
-    await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
-    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "dark");
-    await expect(page.getByRole("radio", { name: "Kompakt", exact: true })).toBeChecked();
-    await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1.1");
-    await expect(page.getByRole("radio", { name: "Koyu", exact: true })).toBeChecked();
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe("dark");
+    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+    await expect(page.locator("html")).toHaveAttribute("data-color-scheme", "system");
+    await expect(page.getByRole("radio", { name: "Rahat", exact: true })).toBeChecked();
+    await expect(page.getByLabel("Arayüz ölçeği")).toHaveValue("1");
+    await expect(page.getByRole("radio", { name: "Sistem", exact: true }).first()).toBeChecked();
     await expect.poll(() => readStoredPreferences(page)).toEqual({
       version: 2,
-      scheme: "dark",
-      density: "compact",
-      scale: 1.1,
+      scheme: "system",
+      density: "comfortable",
+      scale: 1,
       accent: "coral",
       font: "plex",
       motion: "system"
     });
     expect(pageErrors).toEqual([]);
   } catch (error) {
-    await reportScenarioFailure("partial preferences", page, pageErrors);
+    await reportScenarioFailure("legacy preference record", page, pageErrors);
     throw error;
   } finally {
     await context.close();
@@ -281,7 +280,7 @@ async function verifyMalformedPreferenceRecord(activeBrowser, rendererUrl) {
   try {
     await page.goto(rendererUrl, { waitUntil: "domcontentloaded" });
 
-    expect(await page.evaluate(() => window.__easyModeSmokeInitialPreferenceRecord)).toBe(malformedPreferences);
+    expect(await page.evaluate(() => window.__appearanceSmokeInitialPreferenceRecord)).toBe(malformedPreferences);
     await page.getByRole("tab", { name: "Uygulama", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Görünüm", exact: true })).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
@@ -317,16 +316,16 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
         typeof preferenceSeed === "string" ? preferenceSeed : JSON.stringify(preferenceSeed)
       );
     }
-    window.__easyModeSmokeInitialPreferenceRecord = localStorage.getItem(preferenceKey);
+    window.__appearanceSmokeInitialPreferenceRecord = localStorage.getItem(preferenceKey);
     window.yardimciDesktop = {
       getBusinessCapabilitySnapshot: async () => capabilitySnapshot,
       getBootstrapData: async () => ({
         appName: "Yardımcı Asistan",
-        version: "easy-mode-smoke",
+        version: "appearance-smoke",
         platform: "linux",
         syncSettings: { webModuleUrl: setupData.webModuleUrl, hasSyncSecret: true },
         databasePath: dashboardData.databasePath,
-        userDataPath: "/tmp/yardimci-asistan-easy-mode-smoke",
+        userDataPath: "/tmp/yardimci-asistan-appearance-smoke",
         backupPath: dashboardData.backupPath,
         setup: setupData
       }),
@@ -342,7 +341,7 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
       }),
       getSyncStatus: async () => ({
         enabled: true,
-        clientId: "easy-mode-smoke",
+        clientId: "appearance-smoke",
         requestCursor: 0,
         acknowledgedCursor: 0,
         lastAttemptAt: "",
@@ -357,7 +356,7 @@ async function createIsolatedContext(activeBrowser, initialPreferences, setupReq
       onSyncStatusChanged: () => () => {}
     };
   }, {
-    capabilitySnapshot: createCapabilitySnapshotFixture(setupData, "easy-mode-smoke-business"),
+    capabilitySnapshot: createCapabilitySnapshotFixture(setupData, "appearance-smoke-business"),
     dashboardData: createEmptyDashboardFixture(),
     setupData,
     preferenceKey: UI_PREFERENCES_KEY,
@@ -378,7 +377,7 @@ function createSetupFixture(setupRequired = true) {
     email: "smoke@example.test",
     address: "Smoke adresi",
     webModuleUrl: "https://example.test/yardimci-asistan",
-    syncSecret: "easy-mode-smoke-secret",
+    syncSecret: "appearance-smoke-secret",
     autoSyncEnabled: true,
     localNetworkEnabled: true,
     aiEnabled: false,
@@ -417,8 +416,8 @@ function createSetupFixture(setupRequired = true) {
 
 function createEmptyDashboardFixture() {
   return {
-    databasePath: "/tmp/yardimci-asistan-easy-mode-smoke.sqlite",
-    backupPath: "/tmp/yardimci-asistan-easy-mode-smoke-backups",
+    databasePath: "/tmp/yardimci-asistan-appearance-smoke.sqlite",
+    backupPath: "/tmp/yardimci-asistan-appearance-smoke-backups",
     webModuleUrl: "https://example.test/yardimci-asistan",
     requests: [],
     rooms: [],

@@ -32,12 +32,6 @@ const DEFAULT_UI_PREFERENCES: UiPreferences = {
   motion: "system"
 };
 
-type LegacyUiPreferences = {
-  theme?: unknown;
-  mode?: unknown;
-  scale?: unknown;
-};
-
 export function readUiPreferences(): UiPreferences {
   let serialized: string | null;
 
@@ -63,26 +57,15 @@ export function readUiPreferences(): UiPreferences {
     return { ...DEFAULT_UI_PREFERENCES };
   }
 
-  const record = stored as Partial<UiPreferences> & LegacyUiPreferences;
-
-  // Legacy kayıtlardaki `mode` alanı yoksa eski davranış korunur:
-  // görünüm sessizce değişmemesi için compact kabul edilir.
-  const legacyDensity: UiDensity | undefined = record.mode === "easy"
-    ? "comfortable"
-    : record.mode === "pro" || (record.theme !== undefined && record.mode === undefined)
-      ? "compact"
-      : undefined;
+  const record = stored as Partial<UiPreferences>;
+  if (record.version !== 2) {
+    return { ...DEFAULT_UI_PREFERENCES };
+  }
 
   return {
     version: 2,
-    scheme: isUiColorScheme(record.scheme)
-      ? record.scheme
-      : record.theme === "light" || record.theme === "dark"
-        ? record.theme
-        : DEFAULT_UI_PREFERENCES.scheme,
-    density: isUiDensity(record.density)
-      ? record.density
-      : legacyDensity ?? DEFAULT_UI_PREFERENCES.density,
+    scheme: isUiColorScheme(record.scheme) ? record.scheme : DEFAULT_UI_PREFERENCES.scheme,
+    density: isUiDensity(record.density) ? record.density : DEFAULT_UI_PREFERENCES.density,
     scale: isUiScale(record.scale) ? record.scale : DEFAULT_UI_PREFERENCES.scale,
     accent: isUiAccent(record.accent) ? record.accent : DEFAULT_UI_PREFERENCES.accent,
     font: isUiFont(record.font) ? record.font : DEFAULT_UI_PREFERENCES.font,
@@ -97,8 +80,6 @@ export function applyUiPreferences(preferences: UiPreferences) {
   root.dataset.accent = preferences.accent;
   root.dataset.font = preferences.font;
   root.dataset.motion = preferences.motion;
-  root.removeAttribute("data-theme");
-  root.removeAttribute("data-mode");
   root.style.colorScheme = preferences.scheme === "system" ? "light dark" : preferences.scheme;
 
   if (window.yardimciDesktop?.setUiScale) {
@@ -111,7 +92,6 @@ export function applyUiPreferences(preferences: UiPreferences) {
 
 export function saveUiPreferences(preferences: UiPreferences) {
   try {
-    // Yeni kayıtlar yalnız v2 shape ile yazılır; legacy theme/mode alanları sürdürülmez.
     const record: UiPreferences = {
       version: 2,
       scheme: preferences.scheme,

@@ -464,6 +464,8 @@ Recommended reasoning: **GPT-6 Astra High or Extra High only if cross-repo depen
 
 # Stage 10 — Legacy removal and documentation reset
 
+Status: **in progress** on `refactor/legacy-doc-reset-v2`. See [Stage 10 legacy removal audit](legacy-removal-audit.md).
+
 Remove old easy/pro concepts, obsolete theme selectors/files, obsolete drawer-specific entity editors, historical UI contracts that conflict with v2, dead CSS, old source-text smoke assumptions and compatibility adapters whose replacement is complete.
 
 Update AGENTS, UI rules, frontend architecture, design-system documentation and feature development guide.

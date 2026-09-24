@@ -29,8 +29,8 @@ Rules:
 - When an old UI doc or smoke test conflicts with the target architecture, the old presentation contract is not authoritative.
 - Do not change business/domain behavior without an explicit domain decision.
 - Keep new sector/settings/feature work compatible with the long-term extension model.
-- Do not build a generic sector/plugin framework before both pilots are complete.
-- Do not add new easy/pro or feature-specific theme branches on the appearance side.
+- Stage 9 provides static typed navigation, staged Settings and entity-workspace contribution seams. Keep them internal/static; do not add runtime plugin discovery, a service locator or a generic operation bus without new evidence.
+- Appearance v2 is the only desktop appearance model: scheme + density + scale + accent + font + motion. Do not add legacy easy/pro, data-theme/data-mode or feature-specific theme branches.
 - Keep new Settings fields with clear domain ownership so they can move to the Settings Platform v2 registry model later.
 
 See the three architecture documents for details.
