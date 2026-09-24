@@ -33,7 +33,6 @@ type StagedSettingsContributions = {
 
 const stagedSettingsContributions = {
   business: [],
-  operations: [],
   services: []
 } satisfies StagedSettingsContributions;
 
