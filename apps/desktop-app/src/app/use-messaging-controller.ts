@@ -879,12 +879,15 @@ export function useMessagingController({
       }
       if (workspaceRevision === workspaceRevisionRef.current) {
         workspaceRevisionRef.current += 1;
+        workspaceGenerateOwnerRef.current = null;
         setAiWorkspaceMode("reply");
         setAiWorkspaceRequestId(target.id);
         setAiWorkspaceInstructions(instructions);
         setAiWorkspaceEntry(result.entry);
         setAiWorkspaceContent(result.entry.content);
         setAiWorkspaceHistory((history) => [result.entry, ...history.filter((entry) => entry.id !== result.entry.id)].slice(0, 16));
+        setAiWorkspaceState("success");
+        setAiWorkspaceMessage("Hazır mesaj yenilendi. Göndermeden önce kontrol edin.");
       }
       if (replyFeedbackOwnerRef.current === feedbackOwner) {
         setAiState("success");

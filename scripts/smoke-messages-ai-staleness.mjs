@@ -259,6 +259,28 @@ try {
   await expect(page.getByTestId("workspace-request")).toHaveText("req-b");
   await expect(page.getByTestId("workspace-content")).toContainText("req-b #7");
 
+  // If Workspace generate starts first and a later rewrite wins the Workspace surface,
+  // the stale generate must not leave Workspace stuck in loading.
+  await page.evaluate(() => {
+    window.__m8eController.changeAiWorkspaceMode("reply");
+    window.__m8eController.changeAiWorkspaceRequest("req-b");
+    window.__m8eController.setSelectedWhatsAppRequestId("req-a");
+  });
+  await page.evaluate(() => { void window.__m8eController.handleGenerateAiWorkspace(); });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(9);
+  await expect(page.getByTestId("workspace-state")).toHaveText("loading");
+  await page.evaluate(() => { void window.__m8eController.handleRewriteWhatsAppMessage("A later rewrite"); });
+  await expect.poll(() => page.evaluate(() => window.__m8eStats.generateCalls)).toBe(10);
+  await page.evaluate(() => window.__m8eResolveGenerate(9));
+  await expect(page.getByTestId("workspace-request")).toHaveText("req-a");
+  await expect(page.getByTestId("workspace-content")).toContainText("req-a #9");
+  await expect(page.getByTestId("workspace-state")).toHaveText("success");
+  await page.evaluate(() => window.__m8eResolveGenerate(8));
+  await page.waitForTimeout(30);
+  await expect(page.getByTestId("workspace-request")).toHaveText("req-a");
+  await expect(page.getByTestId("workspace-content")).toContainText("req-a #9");
+  await expect(page.getByTestId("workspace-state")).toHaveText("success");
+
   // WHATSAPP off/on must release a pending birthday preparation owner and loading UI.
   await page.evaluate(() => { void window.__m8eController.prepareBirthdayWhatsApp("customer-a"); });
   await expect.poll(() => page.evaluate(() => window.__m8eStats.birthdayPrepareCalls)).toBe(1);
