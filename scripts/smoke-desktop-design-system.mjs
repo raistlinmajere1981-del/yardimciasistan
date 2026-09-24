@@ -277,15 +277,15 @@ try {
   await expect(page.getByRole('button', { name: 'Uygulama loglarını aç', exact: true })).toBeFocused();
   await expect(diagnosticsDialog).toHaveCount(0);
 
-  // Each resource/action has its own lifecycle. Setup save never invokes these APIs.
+  // Staged resources now participate in their owning category save surface.
   await page.evaluate(() => { window.__designCalls = []; });
   await page.getByLabel('İşletme açıklaması').fill('Güncellenen açıklama');
   await page.getByLabel('Firma adı', { exact: true }).fill('Güncellenen Smoke İşletmesi');
   await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
-  expect(await page.evaluate(() => window.__designCalls.map(c => c.kind))).toEqual(['setup']);
-  await page.getByRole('button', { name: 'Müşteri Bilgilerini Kaydet', exact: true }).click();
+  expect(await page.evaluate(() => window.__designCalls.map(c => c.kind))).toEqual(['setup', 'public']);
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'public')?.input.description)).toBe('Güncellenen açıklama');
   expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
+
   await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
   await birthdaySettings.getByLabel('Gönderim saati').fill('09:30');
   await birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' }).fill('İyi ki doğdun {ad}! {işletme}');
@@ -293,40 +293,45 @@ try {
   expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'setup').at(-1).input.birthdaySettings)).toEqual({
     enabled: true, mode: 'manual', sendTime: '09:30', messageTemplate: 'İyi ki doğdun {ad}! {işletme}'
   });
+
   await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
   await page.getByLabel('Oda 101 adı', { exact: true }).fill('Güncellenen Oda');
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
-  await page.getByRole('button', { name: 'Oda Bilgilerini Kaydet', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'room')?.input.name)).toBe('Güncellenen Oda');
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'layout')?.input.rooms?.[0]?.name)).toBe('Güncellenen Oda');
   await expect.poll(() => page.evaluate(() => window.__designCalls.find(c => c.kind === 'setup')?.input.businessName)).toBe('Güncellenen Smoke İşletmesi');
+
   await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await page.getByLabel('Şifre belirleyin', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre tekrar', { exact: true }).fill('design-test-password');
   await page.getByRole('textbox', { name: /Güncelleme sunucusu/ }).fill('https://updates.example.test/custom');
-  await page.getByRole('button', { name: 'Güncelleme Tercihlerini Kaydet', exact: true }).click();
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await page.getByRole('button', { name: 'Şifreyi Kaydet', exact: true }).click();
   const saveOrder = await page.evaluate(() => window.__designCalls.map(call => call.kind));
   expect(saveOrder.slice(0, 2)).toEqual(['setup', 'public']);
   expect(saveOrder.at(-1)).toBe('password');
-  expect(saveOrder.filter(kind => kind === 'room').length).toBe(2);
+  expect(saveOrder.filter(kind => kind === 'layout').length).toBe(1);
   expect(saveOrder.filter(kind => kind === 'update').length).toBe(1);
   expect(await page.evaluate(() => window.__designCalls.find(call => call.kind === 'update')?.input)).toEqual({ customBaseUrl: 'https://updates.example.test/custom', autoCheckEnabled: true });
   await expect(page.getByText('Şifre kaydedildi.', { exact: true })).toBeVisible();
+
   const callCountAfterSave = await page.evaluate(() => window.__designCalls.length);
   await page.getByRole('tab', { name: 'İşletme', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
   await page.getByLabel('Enlem', { exact: true }).fill('91');
-  await page.getByRole('button', { name: 'Müşteri Bilgilerini Kaydet', exact: true }).click();
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect(page.locator('#settings-public-profile').getByRole('alert').first()).toBeVisible();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
-  await page.getByLabel('Enlem', { exact: true }).fill('37.06');
+  await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
+
   await page.getByRole('tab', { name: 'İşletme Düzeni', exact: true }).click();
   await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('-1');
-  await page.getByRole('button', { name: 'Oda Bilgilerini Kaydet', exact: true }).click();
-  await expect(page.locator('#settings-rooms').getByRole('alert')).toContainText('Fiyatları kontrol edin.');
+  await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Oda fiyatlarını kontrol edin.' })).toBeVisible();
   expect(await page.evaluate(() => window.__designCalls.length)).toBe(callCountAfterSave);
-  await page.getByLabel('Oda 101 gecelik fiyatı', { exact: true }).fill('2750');
+  await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
+
   await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
   await page.getByLabel('Mevcut şifre', { exact: true }).fill('design-test-password');
   await page.getByLabel('Yeni şifre', { exact: true }).fill('short');
@@ -350,6 +355,7 @@ try {
   expect(aiTestInput.apiKey).toBe('auth-key-smoke-1234567890');
   expect(aiTestInput.baseUrl).toBe('https://generativelanguage.googleapis.com/v1beta');
   expect(aiTestInput.model).toBe('');
+  await page.getByRole('button', { name: 'Değişiklikleri Geri Al', exact: true }).click();
   await page.getByRole('tab', { name: 'Uygulama', exact: true }).click();
   for (const scheme of ['light','dark']) {
     await page.getByRole('radio', { name: 'Kompakt', exact: true }).click();
