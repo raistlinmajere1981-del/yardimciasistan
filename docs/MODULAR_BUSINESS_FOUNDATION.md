@@ -73,7 +73,6 @@ Yeni workspace veya servis görünürlüğü için profil kimliği kontrolü ekl
 - `pension_restaurant`
 - `pension`
 - `restaurant`
-- `cafe`
 - `market`
 
 `market` minimum günlük perakende akışı tamamlandığı için normal kurulum seçicisinde kullanılabilir durumdadır. Kurulum seçicisi `getBusinessProfiles()` registry çıktısını kullanır; yeni profil açılışları ikinci bir hardcoded sektör listesine bağlanmamalıdır.
@@ -339,13 +338,13 @@ market-android-foundation-smoke-ok
 
 Market kodu bu kuralları gevşetmemelidir.
 
-## 11. Baseline cleanup sonucu
+## 11. Güncel şema sonucu
 
-Güncel temiz kurulum şeması yalnız `apps/desktop-app/db/migrations/001_baseline.sql` dosyasından oluşur. `business` tablosunda profil kimliği dışında module projeksiyonu bulunmaz; capability runtime yalnız `business_capabilities` tablosundan okunur.
+Güncel temiz kurulum şeması yalnız `apps/desktop-app/db/schema.sql` dosyasından gelir. `business` tablosunda profil kimliği dışında module projeksiyonu bulunmaz; capability runtime yalnız `business_capabilities` tablosundan okunur.
 
-Eski kurulum wizard'ı, setup contract/runtime adapter'ları, profil availability katmanı ve Android masa-sipariş alias'ları kaldırılmıştır. Güncel capability IPC kanalı korunur; renderer yalnız persisted capability snapshot'ını kullanır. Eski veritabanı migration zinciri ve cleanup öncesi backup'lar bilinçli olarak desteklenmez.
+Güncel capability IPC kanalı korunur; renderer yalnız persisted capability snapshot'ını kullanır. Tarihsel veritabanı upgrade zinciri ve eski backup formatları desteklenmez.
 
-Baseline nesne eşdeğerliği ve kabul edilen farklar `artifacts/baseline-cleanup/schema-equivalence.md` içindedir. Current database, backup manifest ve restore doğrulaması `001_baseline.sql` kimliğini zorunlu kılar.
+Current database doğrudan `schema.sql` sözleşmesini kullanır. Backup/restore yalnız güncel `yardimci-asistan-backup-v2` manifestini kabul eder.
 
 ## 12. Market MVP tamamlanma durumu
 
