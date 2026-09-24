@@ -74,15 +74,9 @@ try {
   await waitForUrl(`${baseUrl}/api/menu.php`);
   database.initialize();
   assert.equal(supportsAndroidDevicePermissionSync({
-    schema_version: 1,
-    features: ["android_device_sightings", "android_device_permissions"]
-  }), false);
-  assert.equal(supportsAndroidDevicePermissionSync({
-    schema_version: 2,
     features: ["android_device_sightings"]
   }), false);
   assert.equal(supportsAndroidDevicePermissionSync({
-    schema_version: 2,
     features: ["android_device_sightings", "android_device_permissions"]
   }), true);
   const setupResult = database.saveInitialSetup({
@@ -1180,7 +1174,6 @@ function assertCapabilitiesShape() {
     message: "Senkron özellikleri alındı.",
     protocol_version: 2,
     storage: "sqlite",
-    schema_version: 3,
     features: [
       "request_cursor",
       "request_acknowledgement",
