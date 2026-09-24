@@ -41,7 +41,7 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
       reportAppStatus("success", "Bu müşterinin açık veresiye borcu kalmamış.");
       return false;
     }
-    if (!normalizeTRMobilePhone(next.customer.phone).ok) throw new Error("Bu müşterinin geçerli bir telefon numarası yok.");
+    if (!normalizeInternationalPhone(next.customer.phone).ok) throw new Error("Bu müşterinin geçerli bir telefon numarası yok.");
     return true;
   }
 
@@ -116,7 +116,7 @@ export function CustomerCreditWhatsAppShare({ account, disabled, readFresh, onPr
     } finally { inFlight.current = false; if (alive.current) setBusy(false); }
   }
 
-  const phone = draft && normalizeTRMobilePhone(draft.account.customer.phone);
+  const phone = draft && normalizeInternationalPhone(draft.account.customer.phone);
   return <section className="form-stack customer-credit-share" aria-label="Veresiye WhatsApp paylaşımı">
     <button ref={trigger} type="button" className="action-button action-button-ghost action-button-sm" disabled={disabled || busy || !account.balances.some((balance) => balance.amountMinor > 0)} onClick={() => void share()}>WhatsApp'ta Paylaş</button>
     {draft && <div className="form-stack customer-credit-compose" role="region" aria-label="Borç durumunu paylaş" onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); close(); } }}>
