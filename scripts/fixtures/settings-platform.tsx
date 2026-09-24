@@ -48,7 +48,16 @@ window.yardimciDesktop = {
   getBusinessPublicProfile: async () => profile,
   saveBusinessPublicProfile: async input => { window.settingsCalls.push({ kind: "profile", input }); if (window.failProfile) return { ok: false, message: "Profil hatası" }; profile = input; return { ok: true, message: "Müşteri bilgileri kaydedildi", profile }; },
   getDashboardData: async () => defaultDashboardData,
-  getBusinessLayout: async () => structuredClone(layout),
+  getBusinessLayout: async () => {
+    const enabled = getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions);
+    return structuredClone({
+      ...layout,
+      capabilities: {
+        rooms: enabled.includes("accommodation.rooms"),
+        tables: enabled.includes("food_service.tables")
+      }
+    });
+  },
   saveBusinessLayout: async input => {
     window.settingsCalls.push({ kind: "layout", input });
     if (window.failLayout) return { ok: false, message: "Düzen hatası" };
@@ -82,7 +91,18 @@ window.yardimciDesktop = {
       };
     }
 
-    return { ok: true, message: "İşletme düzeni kaydedildi.", layout: structuredClone(layout) };
+    const enabled = getBusinessProfileSelectionCapabilities(canonical.profileId, canonical.profileOptions);
+    return {
+      ok: true,
+      message: "İşletme düzeni kaydedildi.",
+      layout: structuredClone({
+        ...layout,
+        capabilities: {
+          rooms: enabled.includes("accommodation.rooms"),
+          tables: enabled.includes("food_service.tables")
+        }
+      })
+    };
   },
   getUpdateStatus: async () => updateStatus,
   onUpdateStatusChanged: () => () => {},
