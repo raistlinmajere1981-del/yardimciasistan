@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Eye, LockKeyhole, RefreshCw, ScrollText, UploadCloud } from "lucide-react";
 import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
 import { runtimeHasCapability } from "../../app/capabilities";
 import type { DesktopPage } from "../../app/navigation";
+import type { RequestPageChange } from "../../app/page-navigation-guard";
 import { buildNavigation, getPageContentScroll, getPageMeta } from "../../app/navigation";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "../../app/notifications";
 import {
@@ -32,7 +33,7 @@ import { WorkspaceHost, WorkspaceNavigationProvider } from "../workspace/Workspa
 
 interface DesktopAppFrameProps {
   activePage: DesktopPage;
-  setActivePage: Dispatch<SetStateAction<DesktopPage>>;
+  requestPageChange: RequestPageChange;
   syncState: SyncState;
   statusMessage: string;
   setupController: SetupController;
@@ -48,14 +49,14 @@ interface DesktopAppFrameProps {
 const OFFLINE_SYNC_MESSAGE = "İnternet bağlantısı yok. Yerel işlemler devam ediyor; eşitleme bağlantı gelince yapılacak.";
 
 export function DesktopAppFrame(props: DesktopAppFrameProps) {
-  return <WorkspaceNavigationProvider definitions={workspaceDefinitions} page={props.activePage} onReturnPage={props.setActivePage}>
+  return <WorkspaceNavigationProvider definitions={workspaceDefinitions} page={props.activePage} onReturnPage={props.requestPageChange}>
     <DesktopAppFrameContent {...props} />
   </WorkspaceNavigationProvider>;
 }
 
 function DesktopAppFrameContent({
   activePage,
-  setActivePage,
+  requestPageChange,
   syncState,
   statusMessage,
   setupController,
@@ -123,9 +124,9 @@ function DesktopAppFrameContent({
 
   useEffect(() => {
     if (!navigationItems.some((item) => item.id === activePage)) {
-      setActivePage("dashboard");
+      requestPageChange("dashboard");
     }
-  }, [activePage, navigationItems, setActivePage]);
+  }, [activePage, navigationItems, requestPageChange]);
 
   function handleLockApp() {
     setDiagnosticsOpen(false);
@@ -145,7 +146,7 @@ function DesktopAppFrameContent({
     const destination = navigationItems.some((navigationItem) => navigationItem.id === item.destination)
       ? item.destination
       : "dashboard";
-    setActivePage(destination);
+    requestPageChange(destination);
   }
 
 
@@ -160,7 +161,7 @@ function DesktopAppFrameContent({
           activePage={activePage}
           businessName={setupData.businessName}
           collapsed={sidebarCollapsed}
-          onNavigate={setActivePage}
+          onNavigate={requestPageChange}
           onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
         />
       )}
