@@ -13,6 +13,7 @@ import { registerFinanceIpcHandlers } from "./finance-ipc";
 import { registerRoomFolioIpcHandlers } from "./room-folio-ipc";
 import { registerWebConnectionIpcHandlers } from "./web-connection-ipc";
 import { registerBusinessCapabilityIpcHandlers } from "./business-capability-ipc";
+import { registerBusinessLayoutIpcHandlers } from "./business-layout-ipc";
 import { registerCommerceIpcHandlers } from "./commerce-ipc";
 import { registerDiagnosticsIpcHandlers } from "./ipc/diagnostics-ipc";
 import {
@@ -272,6 +273,12 @@ void mainProcessReady.then(async ({ assertAppSessionUnlocked, markLocalCompanion
       // Capability changes must always publish the hosted manifest, including
       // the tombstone created while service.android is being switched off.
       onMutation: () => publishCommittedMutation(true)
+    });
+
+    registerBusinessLayoutIpcHandlers({
+      databasePath,
+      assertUnlocked: assertAppSessionUnlocked,
+      onMutation: publishCommittedMutation
     });
 
     registerFinanceIpcHandlers({
