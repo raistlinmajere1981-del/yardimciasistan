@@ -66,6 +66,7 @@ const core = [
   jsb("stage2c", "Çekirdek çalışma alanları yüzeyleri", "smoke-stage2c-core-workspaces.mjs"),
   jsb("messages-ai-staleness", "Mesajlar AI asenkron sahiplik", "smoke-messages-ai-staleness.mjs"),
   jsb("messages-takeover", "Mesajlar WhatsApp devralma yaşam döngüsü", "smoke-messages-takeover-lifecycle.mjs"),
+  jsb("dashboard-workspace", "Ana Ekran projection ve launcher sınırları", "smoke-dashboard-workspace.mjs"),
   jsb("stage3a", "Mesajlar ve kurulum yüzeyleri", "smoke-stage3a-messages-setup.mjs"),
   jsb("stage3b", "Kilit ve legacy yüzey migration guard", "smoke-stage3b-final-legacy-surfaces.mjs"),
   js("modular-foundation", "Modüler commerce/capability sözleşmeleri", "check-modular-foundation.mjs")
