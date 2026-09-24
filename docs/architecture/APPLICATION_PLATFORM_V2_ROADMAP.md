@@ -541,3 +541,15 @@ Application Platform v2 is mature when:
 - presentation changes do not destroy drafts
 - tests protect behavior rather than obsolete DOM geometry
 - domain boundaries remain visible instead of being hidden by a unified-looking UI
+
+
+## Post-v2 legacy purge
+
+Status: **closed and verified** on `refactor/post-v2-legacy-purge`.
+
+After the staged Platform v2 migration, a repository-wide current-only cleanup removed
+historical database migration runners, backup/schema compatibility, hosting schema-version
+gates, retired profile/permission aliases, v1 Android storage migration cases, duplicate AI
+settings persistence and obsolete migration-era UI documentation.
+
+See [Post-v2 Legacy Purge](post-v2-legacy-purge.md).
