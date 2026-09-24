@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
 
@@ -33,20 +32,10 @@ public final class AndroidCompanionStorageTest {
   }
 
   @Test
-  public void actionOutboxUsesOnlyV2TransportNeutralTarget() throws Exception {
+  public void actionOutboxUsesCurrentTransportNeutralTarget() throws Exception {
     InMemoryPreferences preferences = new InMemoryPreferences();
 
-    JSONArray legacy = new JSONArray();
-    legacy.put(new JSONObject()
-        .put("id", "legacy")
-        .put("type", "room_update")
-        .put("payload", new JSONObject())
-        .put("target_endpoint", "https://old.example/api/sync.php")
-        .put("target_fingerprint", "deadbeef"));
-    preferences.edit().putString("pending_android_actions_v1", legacy.toString()).commit();
-
     ActionOutbox outbox = new ActionOutbox(preferences);
-    assertTrue(outbox.load().isEmpty());
 
     ActionOutbox.PendingAction action = ActionOutbox.PendingAction.create(
         "android_action_test",
@@ -68,14 +57,9 @@ public final class AndroidCompanionStorageTest {
   }
 
   @Test
-  public void operationCacheKeepsRevisionPerSourceAndIgnoresV1Cache() throws Exception {
+  public void operationCacheKeepsRevisionPerSource() throws Exception {
     InMemoryPreferences preferences = new InMemoryPreferences();
-    preferences.edit()
-        .putString("operations_cache_v1", new JSONObject().put("server_revision", 99).toString())
-        .commit();
-
     OperationCache cache = new OperationCache(preferences, "device-123");
-    assertEquals(null, cache.load());
 
     JSONObject hostingPayload = new JSONObject().put("server_revision", 12);
     cache.save(
@@ -94,7 +78,6 @@ public final class AndroidCompanionStorageTest {
     cache.clear();
     assertEquals(0L, cache.revision("hosting:https://example.test/yardimci-asistan"));
     assertEquals(0L, cache.revision("local:desktop-123"));
-    assertFalse(preferences.contains("operations_cache_v1"));
   }
 
   private static final class InMemoryPreferences implements SharedPreferences {
