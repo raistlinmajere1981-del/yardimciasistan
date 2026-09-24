@@ -176,7 +176,6 @@ Firma bilgilerini temsil eder.
 pension_restaurant
 pension
 restaurant
-cafe
 market
 ```
 
@@ -1034,9 +1033,8 @@ sync_clients
 `web_requests.seq` talep cursor'udur. `publications` menü ve Android snapshot için
 kaynak istemci/revision ile sunucu revision'ını tutar. `publication_receipts`
 idempotency anahtarlarının sonucunu, `sync_clients` masaüstü acknowledgement cursor'unu
-tutar. Eski JSON dosyaları yalnız ilk açılıştaki migration girdisi ve
-SQLite schema_version = 3 güncel hosting storage sözleşmesidir; eski JSON çalışma
-dosyaları otomatik içe aktarılmaz.
+tutar. Hosting çalışma verisi SQLite üzerinde tutulur. Eski JSON çalışma dosyaları otomatik
+içe aktarılmaz; hosting senkron sözleşmesi güncel protocol/features yüzeyinden doğrulanır.
 
 AI konuşma geçmişi `ai-conversations.json`, sunucu AI anahtarı ise doğrudan webden
 erişimi engellenmiş `ai-settings.local.php` içinde kalır.
