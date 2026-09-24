@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { BirthdayDeliveryService } = require("../apps/desktop-app/dist-electron/birthday-delivery-service.js");
 const { BirthdayScheduler } = require("../apps/desktop-app/dist-electron/birthday-scheduler.js");
-const { WhatsAppDeliveryLock } = require("../apps/desktop-app/dist-electron/whatsapp-delivery-adapter.js");
+const { WhatsAppDeliveryAdapter, WhatsAppDeliveryLock } = require("../apps/desktop-app/dist-electron/whatsapp-delivery-adapter.js");
 
 const root = process.cwd();
 const fixedDay = "2027-06-18";
@@ -296,6 +296,46 @@ test("scheduler in-flight guard and webview lock prevent automatic/user collisio
   } finally {
     fixture.close();
   }
+});
+
+test("user takeover permanently invalidates an active automatic owner before restoring the guest", async () => {
+  const lock = new WhatsAppDeliveryLock();
+  const steps = [];
+  let releaseDriver;
+  const driver = {
+    isAvailable: () => true,
+    send: async (_input, hooks) => {
+      steps.push("automatic-started");
+      await new Promise((resolve) => { releaseDriver = resolve; });
+      if (!hooks.canContinue()) {
+        steps.push("automatic-cancelled");
+        return { ok: false, kind: "waiting", retryable: true, message: "cancelled" };
+      }
+      steps.push("automatic-continued");
+      return { ok: true, message: "sent" };
+    },
+    prepareForUserControl: async () => {
+      steps.push("user-restored");
+      return { ok: true, message: "ready" };
+    }
+  };
+  const adapter = new WhatsAppDeliveryAdapter(driver, lock);
+  const delivery = adapter.send(
+    { customerId: "customer", normalizedPhone: "905551112233", message: "Doğum günü", birthdayYear: 2027, birthdayDate: fixedDay, mode: "automatic" },
+    { onPrepared: () => undefined, beforeSend: () => ({ ok: true }) }
+  );
+  assert.equal(typeof releaseDriver, "function");
+
+  const takeover = adapter.takeoverUserControl();
+  // Even if the renderer later releases userBusy, the old automatic token must stay invalid.
+  lock.setUserBusy(false);
+  releaseDriver();
+
+  const [deliveryResult, takeoverResult] = await Promise.all([delivery, takeover]);
+  assert.equal(deliveryResult.ok, false);
+  assert.equal(deliveryResult.kind, "waiting");
+  assert.equal(takeoverResult.ok, true);
+  assert.deepEqual(steps, ["automatic-started", "automatic-cancelled", "user-restored"]);
 });
 
 test("automatic disabled state keeps birthday information without producing candidates", () => {
