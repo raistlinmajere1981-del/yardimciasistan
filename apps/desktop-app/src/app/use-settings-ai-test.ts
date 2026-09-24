@@ -18,6 +18,16 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     );
   }, [beginTest, setupForm.aiService, setupForm.aiStoredApiKeyConfigured]);
 
+  function invalidate() {
+    beginTest();
+    setAiConnectionTestState("idle");
+    setAiConnectionTestMessage(
+      setupForm.aiStoredApiKeyConfigured
+        ? "Bu sağlayıcının kayıtlı bağlantısı kullanılabilir."
+        : "Bağlantı henüz denenmedi."
+    );
+  }
+
   async function testAiConnection() {
     const isCurrent = beginTest();
     setAiConnectionTestState("loading");
@@ -90,5 +100,5 @@ export function useSettingsAiTest(setupForm: SetupFormState, setSetupForm: Dispa
     }
   }
 
-  return { aiConnectionTestState, aiConnectionTestMessage, testAiConnection };
+  return { aiConnectionTestState, aiConnectionTestMessage, testAiConnection, invalidate };
 }
