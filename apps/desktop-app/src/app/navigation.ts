@@ -130,7 +130,7 @@ const menuContribution = {
   pageId: "menu",
   icon: MenuIcon,
   order: 60,
-  condition: { allOf: [C.FOOD_MENU] },
+  condition: { allOf: [C.FOOD_MENU, C.QR_MENU] },
   contentScroll: "workspace",
   presentation: (capabilities) => ({
     label: "Menü",
