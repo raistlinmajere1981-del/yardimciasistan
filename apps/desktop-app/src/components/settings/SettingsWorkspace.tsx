@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { SaveInitialSetupInput } from "../../../electron/database";
+import type { DesktopPage } from "../../app/navigation";
+import type { RegisterPageLeaveGuard } from "../../app/page-navigation-guard";
 import { useBusinessCapabilityRuntime } from "../../app/business-capability-context";
 import { StagedSettingsContributionSlot } from "../../app/settings-section-contributions";
 import { useSettingsDrafts } from "../../app/use-settings-drafts";
@@ -40,20 +42,30 @@ export type SettingsWorkspaceProps = Omit<
   onAppPasswordConfiguredChange?: (configured: boolean) => void;
   uiPreferences: UiPreferences;
   onUiPreferencesChange: (preferences: UiPreferences) => void;
+  registerPageLeaveGuard?: RegisterPageLeaveGuard;
 };
 
 interface PendingCategoryTransition {
+  kind: "category";
   category: SettingsCategoryId;
   focusTarget: string;
   clearQuery: boolean;
   focusTabAfterGuard: boolean;
 }
 
+interface PendingPageTransition {
+  kind: "page";
+  destination: DesktopPage;
+  continueNavigation: () => void;
+}
+
+type PendingTransition = PendingCategoryTransition | PendingPageTransition;
+
 export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   const [active, setActive] = useState<SettingsCategoryId>("business");
   const [query, setQuery] = useState("");
   const [focusTarget, setFocusTarget] = useState("");
-  const [pendingTransition, setPendingTransition] = useState<PendingCategoryTransition | null>(null);
+  const [pendingTransition, setPendingTransition] = useState<PendingTransition | null>(null);
   const [guardBusy, setGuardBusy] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const { snapshot: runtimeCapabilities } = useBusinessCapabilityRuntime();
@@ -181,17 +193,18 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
     }
   }
 
-  function requestCategoryTransition(transition: PendingCategoryTransition): boolean {
+  function requestCategoryTransition(transition: Omit<PendingCategoryTransition, "kind">): boolean {
+    const categoryTransition: PendingCategoryTransition = { kind: "category", ...transition };
     if (transition.category === active) {
       if (transition.clearQuery) setQuery("");
       if (transition.focusTarget) setFocusTarget(transition.focusTarget);
       return true;
     }
     if (!dirty[active]) {
-      commitTransition(transition);
+      commitTransition(categoryTransition);
       return true;
     }
-    setPendingTransition(transition);
+    setPendingTransition(categoryTransition);
     return false;
   }
 
@@ -215,26 +228,51 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
   }
 
   async function saveAndContinue() {
-    if (!pendingTransition || guardBusy) return;
+    if (!pendingTransition || guardBusy || categoryBusy) return;
     setGuardBusy(true);
     try {
       const result = await saveCategory(active);
       if (!result.ok) return;
       const transition = pendingTransition;
       setPendingTransition(null);
-      commitTransition(transition, true);
+      if (transition.kind === "category") {
+        commitTransition(transition, true);
+      } else {
+        if (active === "services") ai.invalidate();
+        transition.continueNavigation();
+      }
     } finally {
       setGuardBusy(false);
     }
   }
 
   function discardAndContinue() {
-    if (!pendingTransition || guardBusy) return;
+    if (!pendingTransition || guardBusy || categoryBusy) return;
     discardCategory(active);
     const transition = pendingTransition;
     setPendingTransition(null);
-    commitTransition(transition, true);
+    if (transition.kind === "category") {
+      commitTransition(transition, true);
+    } else {
+      if (active === "services") ai.invalidate();
+      transition.continueNavigation();
+    }
   }
+
+  useEffect(() => {
+    if (!props.registerPageLeaveGuard) return;
+
+    return props.registerPageLeaveGuard((destination, continueNavigation) => {
+      if (!dirty[active]) return true;
+      if (pendingTransition || guardBusy) return false;
+      setPendingTransition({
+        kind: "page",
+        destination,
+        continueNavigation
+      });
+      return false;
+    });
+  }, [active, guardBusy, pendingTransition, props.registerPageLeaveGuard, dirty.business, dirty.operations, dirty.services, dirty.application]);
 
   useEffect(() => {
     if (!focusTarget) return;
@@ -390,7 +428,7 @@ export function SettingsWorkspace(props: SettingsWorkspaceProps) {
 
       <SettingsUnsavedChangesDialog
         open={Boolean(pendingTransition)}
-        busy={guardBusy}
+        busy={guardBusy || categoryBusy}
         categoryTitle={category.title}
         onSaveAndContinue={() => { void saveAndContinue(); }}
         onDiscardAndContinue={discardAndContinue}
