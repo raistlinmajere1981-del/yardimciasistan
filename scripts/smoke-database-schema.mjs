@@ -76,7 +76,6 @@ try {
       includeImages: true
     },
     servicePreferences: { whatsapp: false, android: true },
-    tableCategories: []
   });
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
   assert.equal(selectedMarketDatabase.getSetupData().profileId, "market");
