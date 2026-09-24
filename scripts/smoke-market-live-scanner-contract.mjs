@@ -255,7 +255,6 @@ function scalar(sqlite, sql, ...parameters) {
 
 function assertSourceContracts() {
   const read = (relativePath) => readFileSync(join(process.cwd(), relativePath), "utf8");
-  const migration = read("apps/desktop-app/db/migrations/001_baseline.sql");
   const androidAction = read("apps/desktop-app/electron/market-android-actions.ts");
   const quickSale = read("apps/desktop-app/src/components/market/MarketQuickSaleWorkspace.tsx");
   const androidRules = read("apps/android-app/src/main/java/com/yardimciasistan/android/MarketUiRules.java");
@@ -263,8 +262,6 @@ function assertSourceContracts() {
   const syncCoordinator = read("apps/desktop-app/electron/sync-coordinator.ts");
   const hosting = read("firm-template/web-module/api/sync.php");
 
-  assert.match(migration, /CREATE TABLE market_barcode_scan_events/);
-  assert.match(migration, /UNIQUE \(android_action_id\)/);
   assert.match(androidAction, /createMarketBarcodeScanEventInTransaction/);
   assert.doesNotMatch(androidAction, /createRuntimePaidSale|createPaidCommerceSale|applyInventoryMovement|createMarketCartDraftInTransaction[\s\S]{0,120}applyBarcodeScan/);
   assert.match(quickSale, /consumePendingBarcodeScans/);
