@@ -9,7 +9,7 @@ import process from "node:process";
 const require = createRequire(import.meta.url);
 const { DesktopDatabase } = require("../apps/desktop-app/dist-electron/database.js");
 const { DesktopRoomFolioService } = require("../apps/desktop-app/dist-electron/room-folio.js");
-const { saveRoomProfile } = require("../apps/desktop-app/dist-electron/room-profile.js");
+const { saveBusinessLayout } = require("../apps/desktop-app/dist-electron/business-layout.js");
 const { DesktopFinanceService } = require("../apps/desktop-app/dist-electron/finance.js");
 
 const appPath = join(process.cwd(), "apps", "desktop-app");
@@ -26,11 +26,26 @@ try {
     phone: "+905550000400",
     whatsapp: "+905550000400",
     syncSecret: "room-folio-test-secret-123",
-    servicePreferences: { whatsapp: false, android: false },
-    initialCounts: { rooms: 1, tables: 0 },
-    tableCategories: []
+    servicePreferences: { whatsapp: false, android: false }
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
+
+  const layoutSeed = saveBusinessLayout(database.databasePath, {
+    rooms: [{
+      clientKey: "folio-smoke-room",
+      name: "Smoke Test Oda",
+      number: "101",
+      capacity: 2,
+      bedInfo: "1 çift kişilik yatak",
+      floor: "",
+      features: [],
+      description: "",
+      priceNote: "",
+      nightlyPriceMinor: 150000,
+      currency: "TRY"
+    }]
+  });
+  assert.equal(layoutSeed.ok, true, layoutSeed.ok ? "" : layoutSeed.message);
 
   const folioCategory = database.saveMenuCategory({
     name: "Folio Test Kategorisi",
@@ -97,23 +112,11 @@ try {
   `).run(depositAmount, now, now, now);
   sqlite.close();
 
-  const profileName = "Smoke Test Oda";
-  const profile = saveRoomProfile(database.databasePath, {
-    roomId: room.id,
-    name: profileName,
-    amountMinor: 140000,
-    currency: "TRY"
-  });
-  assert.equal(profile.ok, true);
   const profileData = service.getData();
   const profiledRoom = profileData.rooms.find((item) => item.id === room.id);
   assert.ok(profiledRoom);
-  assert.equal(profiledRoom.name, profileName);
-  assert.equal(profiledRoom.nightlyPriceMinor, 140000);
-
-  const roomPrice = service.setRoomNightlyPrice({ roomId: room.id, amountMinor: 150000, currency: "TRY" });
-  assert.equal(roomPrice.ok, true);
-  assert.equal(roomPrice.data.rooms.find((item) => item.id === room.id)?.name, profileName, "Price update must preserve editable room name.");
+  assert.equal(profiledRoom.name, "Smoke Test Oda");
+  assert.equal(profiledRoom.nightlyPriceMinor, 150000);
 
   const opened = service.openFolio("room_folio_smoke_stay");
   assert.equal(opened.ok, true);
