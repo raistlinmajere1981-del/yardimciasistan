@@ -12,49 +12,58 @@ const section = (text, start, end) => {
 };
 
 const roomManagementSource = source("apps/desktop-app/src/components/settings/RoomManagementSection.tsx");
+const businessLayoutSource = source("apps/desktop-app/electron/business-layout.ts");
 const roomFolioIpcSource = source("apps/desktop-app/electron/room-folio-ipc.ts");
 const roomProfileSource = source("apps/desktop-app/electron/room-profile.ts");
 
 assert.match(
   roomManagementSource,
-  /runtimeHasCapability\([\s\S]{0,180}BUSINESS_CAPABILITIES\.ACCOMMODATION_ROOMS/,
-  "room settings must use the persisted accommodation.rooms capability"
-);
-const roomLoadEffect = section(roomManagementSource, "useEffect(() => {", "const invalidMessage");
-assert.match(
-  roomLoadEffect,
-  /if \(!roomsEnabled\) \{[\s\S]*return \(\) => \{ active = false; \};\s*\}/,
-  "room settings must exit before bridge reads while accommodation.rooms is disabled"
-);
-assert.ok(
-  roomLoadEffect.indexOf("if (!roomsEnabled)") < roomLoadEffect.indexOf("getRoomFolioData"),
-  "the rooms capability gate must run before the historical bridge read"
+  /const roomsEnabled = draft\.capabilities\.rooms/,
+  "room settings must consume the persisted BusinessLayout room capability"
 );
 assert.match(
   roomManagementSource,
-  /if \(!roomsEnabled\) \{\s*return null;\s*\}/,
+  /if \(!roomsEnabled\) return null;/,
   "room settings must disappear when accommodation.rooms is disabled"
+);
+
+const layoutProjection = section(
+  businessLayoutSource,
+  "function getBusinessLayoutFromDb",
+  "function hasCapability"
+);
+assert.match(
+  layoutProjection,
+  /hasCapability\(db, BUSINESS_CAPABILITIES\.ACCOMMODATION_ROOMS\)/
+);
+assert.match(
+  layoutProjection,
+  /rooms: roomsEnabled \? listRooms\(db\) : \[\]/
+);
+
+const layoutSave = section(
+  businessLayoutSource,
+  "export function saveBusinessLayout",
+  "function openDatabase"
+);
+assert.match(
+  layoutSave,
+  /roomResolution\.rooms !== undefined && !roomsEnabled/
+);
+assert.match(
+  layoutSave,
+  /Oda yönetimi bu işletme profilinde etkin değil\./,
+  "room layout writes must fail closed when the persisted room capability is disabled"
 );
 
 const getDataHandler = section(
   roomFolioIpcSource,
   'ipcMain.handle("roomFolio:getData"',
-  'ipcMain.handle("roomFolio:setRoomNightlyPrice"'
+  'ipcMain.handle("roomFolio:open"'
 );
 assert.match(getDataHandler, /if \(!hasFolioCapability\(\)\)/);
 assert.match(getDataHandler, /assertRoomAccess\(\)/);
 assert.match(getDataHandler, /return roomProfileData\(\)/);
-
-const roomPriceHandler = section(
-  roomFolioIpcSource,
-  'ipcMain.handle("roomFolio:setRoomNightlyPrice"',
-  'ipcMain.handle("roomFolio:open"'
-);
-assert.match(
-  roomPriceHandler,
-  /assertRoomAccess\(\)/,
-  "room profile writes must require accommodation.rooms instead of accommodation.folio"
-);
 
 const roomProjection = section(roomFolioIpcSource, "const roomProfileData", "const folioData");
 for (const emptyDomain of ["activeStays: []", "folios: []", "menuCategories: []", "menuItems: []"]) {
@@ -64,6 +73,11 @@ assert.match(
   roomProfileSource,
   /export function listRoomProfiles[\s\S]{0,700}FROM rooms[\s\S]{0,220}deleted_at = '' AND is_active = 1/,
   "room profile reads must come directly from active room records"
+);
+assert.doesNotMatch(
+  roomFolioIpcSource,
+  /roomFolio:setRoomNightlyPrice/,
+  "room profile writes must belong to BusinessLayout, not RoomFolio"
 );
 
 console.log("room-management-capability-contract-smoke-ok");
