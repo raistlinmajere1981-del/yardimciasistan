@@ -83,3 +83,12 @@ the archive for retired implementation shapes.
 
 
 - removed the Product Data contract smoke dependency on the retired migration SQL and its duplicate schema-string assertions; current product/settings columns are covered by `smoke-database-schema.mjs`.
+
+
+### Local-AI exhaustive audit cleanup
+
+- removed `market.product_draft -> market.product_create` compatibility aliases from desktop, Android and hosting permission normalization
+- removed Android JVM/smoke coverage that required the retired permission alias; device UI fixtures now use `market.product_create`
+- removed v1 OperationCache cleanup keys; current cache clearing only owns current keys
+- fixed restored-state republish preparation by removing the stale write to the deleted `settings.sync_client_id` column
+- Android device UI cache verification now reads the current `operations_cache_v2` key
