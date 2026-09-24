@@ -1,4 +1,5 @@
 import { createSmokeSetupInput } from "./test-helpers/desktop-setup.mjs";
+import { seedSmokeBusinessLayout } from "./test-helpers/business-layout.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { mkdirSync } from "node:fs";
@@ -35,11 +36,12 @@ try {
     whatsapp: "+905550000300",
     syncSecret: "reports-test-secret-123",
     servicePreferences: { whatsapp: false, android: false },
-    initialCounts: { rooms: 0, tables: 3 },
-    tableCategories: [{ name: "Rapor Salonu", tableCount: 3 }]
   }));
   assert.equal(setupResult.ok, true, setupResult.ok ? "" : setupResult.message);
-  const reportTables = setupResult.dashboardData.tables;
+  seedSmokeBusinessLayout(database.databasePath, {
+    tableCategories: [{ name: "Rapor Salonu", tableCount: 3 }]
+  });
+  const reportTables = database.getDashboardData().tables;
   assert.equal(reportTables.length, 3);
 
   const reportCategory = database.saveMenuCategory({
