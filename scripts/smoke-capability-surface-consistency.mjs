@@ -107,6 +107,11 @@ assert.deepEqual(customerProjection.messages, []);
 assert.equal(customerProjection.summary.prepared_whatsapp_messages, 0);
 assert.equal(androidActionAllowedByCapabilities("message_delete", withoutCustomers), false);
 assert.match(frameSource, /qrMenuEnabled\s*&&[\s\S]{0,300}Web'e Yayınla/);
+assert.match(
+  navigationSource,
+  /pageId:\s*"menu"[\s\S]{0,320}condition:\s*\{\s*allOf:\s*\[C\.FOOD_MENU,\s*C\.QR_MENU\]\s*\}/,
+  "desktop Menu navigation must disappear when QR menu is disabled"
+);
 assert.match(menuManagerSource, /stockImageImportEnabled\s*&&[\s\S]{0,180}<StockImageImportWorkspace/);
 assert.match(menuItemFormFieldsSource, /showStock\s*=\s*inventoryEnabled\s*&&[\s\S]{0,160}mode === "stock"/);
 assert.match(menuPreviewSource, /whatsappEnabled\s*&&\s*setupData\.whatsapp/);
