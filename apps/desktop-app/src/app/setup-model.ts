@@ -216,7 +216,7 @@ export function isAiServiceProfileStored(form: SetupFormState, service: DesktopA
     : Boolean(form.aiServiceDrafts[service]?.storedApiKeyConfigured);
 }
 
-export function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInitialSetupInput["aiProfiles"]> {
+function createSaveAiServiceProfiles(form: SetupFormState): NonNullable<SaveInitialSetupInput["aiProfiles"]> {
   return aiServicePresets.map((preset) => {
     const draft = preset.id === form.aiService
       ? toAiServiceFormDraft(form)
