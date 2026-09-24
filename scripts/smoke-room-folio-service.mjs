@@ -236,7 +236,7 @@ try {
     assert.equal(restoredMenu.stockQuantity, menuStockBefore);
   }
 
-  const checkedOut = service.checkout({ folioId: opened.folioId, allowOutstanding: false });
+  const checkedOut = service.checkout({ folioId: opened.folioId });
   assert.equal(checkedOut.ok, true);
   const closedFolio = checkedOut.data.folios.find((item) => item.id === opened.folioId);
   assert.ok(closedFolio);
