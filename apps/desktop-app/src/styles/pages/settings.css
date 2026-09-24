@@ -274,9 +274,7 @@
 }
 
 .table-category-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
+  align-items: start;
 }
 
 .table-category-heading > div {
@@ -284,6 +282,12 @@
   gap: var(--space-1);
 }
 
+.table-category-heading h2,
+.table-category-heading p {
+  margin: 0;
+}
+
+.table-category-heading p,
 .table-category-heading small,
 .table-category-note,
 .table-category-empty {
@@ -323,7 +327,7 @@
 .room-management-list-head,
 .room-management-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.25fr) minmax(8rem, 0.75fr) auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -366,7 +370,13 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
   font-size: var(--text-xs);
+}
+
+.room-management-price-wrap span {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .room-management-footer {
