@@ -160,10 +160,10 @@ function validateYardimciDatabase(filePath: string) {
     const requiredRows = database.prepare(`
       SELECT name
       FROM sqlite_master
-      WHERE type = 'table' AND name IN ('business', 'settings', 'menu_items', 'business_capabilities', 'desktop_sync_identity', 'android_local_credentials')
+      WHERE type = 'table' AND name IN ('business', 'settings', 'menu_items', 'business_capabilities', 'desktop_sync_identity', 'android_local_credentials', 'ai_service_profiles')
     `).all() as Array<{ name?: unknown }>;
     const requiredTables = new Set(requiredRows.map((row) => String(row.name ?? "")));
-    if (!["business", "settings", "menu_items", "business_capabilities", "desktop_sync_identity", "android_local_credentials"]
+    if (!["business", "settings", "menu_items", "business_capabilities", "desktop_sync_identity", "android_local_credentials", "ai_service_profiles"]
       .every((table) => requiredTables.has(table))) {
       throw new Error("Seçilen dosya Yardımcı Asistan yedeği olarak doğrulanamadı.");
     }
@@ -175,11 +175,9 @@ function validateYardimciDatabase(filePath: string) {
     const businessColumns = columns("business");
     const settingsColumns = columns("settings");
     if (!businessColumns.has("profile_id")
-      || businessColumns.has("business_type")
-      || businessColumns.has("modules_json")
-      || ["rooms_enabled", "tables_enabled", "qr_menu_enabled", "ai_enabled", "whatsapp_enabled", "android_enabled"]
-        .some((column) => settingsColumns.has(column))) {
-      throw new Error("Yedek eski profil veya capability alanlarını içeriyor.");
+      || !["local_network_enabled", "ai_service", "ai_last_published_at", "product_data_enabled"]
+        .every((column) => settingsColumns.has(column))) {
+      throw new Error("Yedek güncel Yardımcı Asistan veri şemasını taşımıyor.");
     }
 
     const foreignKeyViolations = database.prepare("PRAGMA foreign_key_check").all();
