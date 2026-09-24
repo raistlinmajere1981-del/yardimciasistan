@@ -276,66 +276,42 @@ export class DesktopDatabase {
   }
 
   initialize() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        id TEXT PRIMARY KEY,
-        applied_at TEXT NOT NULL
-      );
-    `);
-
-    const migrations = this.readSqlFiles("db/migrations");
-    if (migrations.length !== 1 || migrations[0]?.name !== "001_baseline.sql") {
-      throw new Error("Yalnız 001_baseline.sql güncel temiz kurulum şeması olarak desteklenir.");
+    const schemaPath = path.join(this.options.appPath, "db", "schema.sql");
+    if (!fs.existsSync(schemaPath)) {
+      throw new Error("Güncel masaüstü veritabanı şeması bulunamadı.");
     }
+    const schemaSql = fs.readFileSync(schemaPath, "utf8");
 
-    // Serialize baseline checks and local identity creation across connections.
+    // Serialize first-schema creation and local identity creation across connections.
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      const appliedMigrations = this.db
-        .prepare("SELECT id FROM schema_migrations ORDER BY id")
-        .all() as Array<{ id?: unknown }>;
-      const unsupportedMigrations = appliedMigrations
-        .map((row) => String(row.id ?? ""))
-        .filter((id) => id !== "001_baseline.sql");
-      if (unsupportedMigrations.length > 0) {
-        throw new Error("Bu veritabanı güncel baseline şemasıyla oluşturulmamış; eski migration zinciri desteklenmiyor.");
-      }
-
       const existingDomainObject = this.db
         .prepare(`
           SELECT 1
           FROM sqlite_master
           WHERE name NOT LIKE 'sqlite_%'
-            AND name <> 'schema_migrations'
             AND type IN ('table', 'index', 'view', 'trigger')
           LIMIT 1
         `)
         .get();
-      const baselineApplied = appliedMigrations.some((row) => String(row.id ?? "") === "001_baseline.sql");
-      if (!baselineApplied && existingDomainObject) {
-        throw new Error("Mevcut veritabanı baseline migration işareti taşımıyor; temiz kurulum gerekli.");
+
+      if (!existingDomainObject) {
+        this.db.exec(schemaSql);
       }
 
-      for (const migration of migrations) {
-        const alreadyApplied = this.db.prepare("SELECT id FROM schema_migrations WHERE id = ?").get(migration.name);
-        if (alreadyApplied) {
-          continue;
+      const requiredTables = ["android_local_credentials", "desktop_sync_identity", "settings"];
+      for (const tableName of requiredTables) {
+        const present = this.db.prepare(
+          "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1"
+        ).get(tableName);
+        if (!present) {
+          throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
         }
-
-        this.db.exec(migration.sql);
-        this.db.prepare("INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)").run(migration.name, new Date().toISOString());
       }
 
-      const currentBaselineReady = this.db.prepare(`
-        SELECT 1
-        FROM sqlite_master
-        WHERE type = 'table' AND name = 'android_local_credentials'
-        LIMIT 1
-      `).get();
       const settingsColumns = this.db.prepare("PRAGMA table_info(settings)").all() as Array<{ name?: string }>;
-      const localNetworkColumnReady = settingsColumns.some((column) => column.name === "local_network_enabled");
-      if (!currentBaselineReady || !localNetworkColumnReady) {
-        throw new Error("Veritabanı güncel geliştirme baseline şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
+      if (!settingsColumns.some((column) => column.name === "local_network_enabled")) {
+        throw new Error("Veritabanı güncel masaüstü şemasını taşımıyor; temiz veri sıfırlaması gerekli.");
       }
 
       this.ensureSyncClientId();
@@ -2225,41 +2201,15 @@ export class DesktopDatabase {
 
 
   private ensureSyncClientId() {
-    // Also initialize this local metadata for databases already marked 001_baseline.sql.
-    // Retain any identity issued by that baseline's settings-based initialization.
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS desktop_sync_identity (
-        id TEXT PRIMARY KEY CHECK (id = 'primary'),
-        client_id TEXT NOT NULL UNIQUE CHECK (length(trim(client_id)) > 0)
-      );
-    `);
     this.db
       .prepare(`
         INSERT INTO desktop_sync_identity (id, client_id)
-        VALUES ('primary', COALESCE(
-          (SELECT NULLIF(trim(sync_client_id), '') FROM settings WHERE deleted_at = '' LIMIT 1),
-          ?
-        ))
+        VALUES ('primary', ?)
         ON CONFLICT(id) DO NOTHING
       `)
       .run(`desktop-${randomUUID()}`);
   }
 
-  private readSqlFiles(relativeDir: string) {
-    const directory = path.join(this.options.appPath, relativeDir);
-    if (!fs.existsSync(directory)) {
-      return [];
-    }
-
-    return fs
-      .readdirSync(directory)
-      .filter((file) => file.endsWith(".sql"))
-      .sort()
-      .map((file) => ({
-        name: file,
-        sql: fs.readFileSync(path.join(directory, file), "utf8")
-      }));
-  }
 }
 
 import {
