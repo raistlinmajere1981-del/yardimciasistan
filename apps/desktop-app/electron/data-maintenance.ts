@@ -713,7 +713,7 @@ async function prepareRestore(userDataPath: string, backupId: string): Promise<D
       fs.cpSync(sourceAssetsPath, paths.stagedRestoreAssetsPath, { recursive: true, force: true, errorOnExist: false });
     }
 
-    writePendingOperation(paths, { version: 1, kind: "restore", createdAt: new Date().toISOString() });
+    writePendingOperation(paths, { kind: "restore", createdAt: new Date().toISOString() });
     scheduleRelaunch();
 
     return {
@@ -751,7 +751,7 @@ async function prepareReset(userDataPath: string): Promise<DesktopDataMaintenanc
 
   try {
     const safetyBackup = createSafetyBackup(paths);
-    writePendingOperation(paths, { version: 1, kind: "reset", createdAt: new Date().toISOString() });
+    writePendingOperation(paths, { kind: "reset", createdAt: new Date().toISOString() });
     try {
       await session.defaultSession.clearStorageData({ storages: ["localstorage"] });
     } catch (error) {
