@@ -46,7 +46,7 @@ const requiredEntries = [
   "/dist-electron/database.js",
   "/dist-electron/app-lock.js",
   "/dist-renderer/index.html",
-  "/db/migrations/001_baseline.sql"
+  "/db/schema.sql"
 ];
 
 for (const entry of requiredEntries) {
@@ -127,8 +127,10 @@ function assertPackagedDatabase(databasePath) {
 
   try {
     assert.equal(String(scalar(database, "PRAGMA integrity_check")), "ok");
-    assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM schema_migrations")), 1);
-    assert.equal(scalar(database, "SELECT id FROM schema_migrations"), "001_baseline.sql");
+    assert.equal(
+      Number(scalar(database, "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'")),
+      0
+    );
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM business WHERE deleted_at = ''")), 0);
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM settings WHERE deleted_at = ''")), 0);
     assert.equal(Number(scalar(database, "SELECT COUNT(*) FROM rooms WHERE deleted_at = ''")), 0);
