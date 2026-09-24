@@ -59,7 +59,7 @@ try {
   // offered to market profiles, enabled explicitly by the operator.
   assert.ok(getBusinessProfile("market").optionalCapabilities.includes(C.CUSTOMER_CREDIT));
   assert.ok(!getBusinessProfile("market").defaultCapabilities.includes(C.CUSTOMER_CREDIT));
-  for (const profile of ["pension", "restaurant", "cafe", "pension_restaurant"]) {
+  for (const profile of ["pension", "restaurant", "pension_restaurant"]) {
     assert.ok(!getBusinessProfile(profile).defaultCapabilities.includes(C.CUSTOMER_CREDIT));
   }
   applyBusinessProfileCapabilities(databasePath, "market", { preserveUserOverrides: false });
@@ -316,18 +316,18 @@ try {
     raw.prepare("UPDATE business_capabilities SET is_enabled = 1 WHERE business_id = ? AND capability_id = ?").run(businessId, dependency);
   }
   assert.throws(() => setBusinessCapability(databasePath, { capability: C.SALES, enabled: false }), /customer_credit/);
-  applyBusinessProfileCapabilities(databasePath, "cafe", { preserveUserOverrides: false });
+  applyBusinessProfileCapabilities(databasePath, "restaurant", { preserveUserOverrides: false });
   assert.throws(() => account(), /etkin değil/i);
   setBusinessCapability(databasePath, { capability: C.CUSTOMER_CREDIT, enabled: true });
   adjustment(customerId, 1);
-  assert.equal(debt(), 10001, "Hybrid cafe works through capability, without a profile gate.");
+  assert.equal(debt(), 10001, "Hybrid restaurant works through capability, without a profile gate.");
   runtime.createCustomerCreditSale(databasePath, cart);
   pay(1, { customerId });
 
   // Execute actual compiled IPC handlers against a mocked Electron boundary.
   verifyIpc(databasePath, customerId, cart, account, raw);
 
-  const backupFilePath = join(dataDir, "current-baseline.sqlite");
+  const backupFilePath = join(dataDir, "current-schema.sqlite");
   const backupSource = new DatabaseSync(databasePath);
   try {
     backupSource.exec(`VACUUM INTO '${backupFilePath.replace(/'/g, "''")}'`);
