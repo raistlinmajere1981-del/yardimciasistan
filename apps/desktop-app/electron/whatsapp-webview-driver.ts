@@ -4,6 +4,7 @@ import {
   createWhatsAppInspectionScript,
   createWhatsAppSendScript,
   createWhatsAppWebUrl,
+  WHATSAPP_WEB_HOME_URL,
   type WhatsAppDomResult
 } from "@yardimci-asistan/whatsapp-bridge";
 import type { BirthdayDeliveryAdapterHooks, BirthdayDeliveryAdapterInput, BirthdayDeliveryAdapterResult } from "./birthday-delivery-service.js";
@@ -11,12 +12,26 @@ import type { BirthdayDeliveryAdapterHooks, BirthdayDeliveryAdapterInput, Birthd
 const DRIVER_TIMEOUT_MS = 15_000;
 const DRIVER_POLL_MS = 350;
 
+interface WhatsAppAutomaticDriverHooks extends BirthdayDeliveryAdapterHooks {
+  canContinue: () => boolean;
+}
+
+function automaticCancelledResult(): BirthdayDeliveryAdapterResult {
+  return {
+    ok: false,
+    kind: "waiting",
+    retryable: true,
+    message: "WhatsApp kullanıcı kontrolüne geçti; otomatik gönderim yeniden değerlendirilecek."
+  };
+}
+
 export class WhatsAppWebviewDriver {
   private guest: WebContents | null = null;
 
   attach(webContentsId: number): boolean {
     const candidate = webContents.fromId(webContentsId);
     if (!candidate || candidate.isDestroyed() || candidate.getType() !== "webview") return false;
+    if (this.guest === candidate) return false;
     this.detach();
     this.guest = candidate;
     candidate.once("destroyed", () => {
@@ -35,11 +50,29 @@ export class WhatsAppWebviewDriver {
     return Boolean(this.guest && !this.guest.isDestroyed());
   }
 
-  async send(input: BirthdayDeliveryAdapterInput, hooks: BirthdayDeliveryAdapterHooks): Promise<BirthdayDeliveryAdapterResult> {
+  async prepareForUserControl(): Promise<{ ok: boolean; message: string }> {
+    const guest = this.guest;
+    if (!guest || guest.isDestroyed()) {
+      return { ok: false, message: "WhatsApp Web henüz hazır değil. Biraz sonra tekrar deneyin." };
+    }
+    try {
+      await guest.loadURL(WHATSAPP_WEB_HOME_URL);
+      if (guest.isDestroyed() || !guest.getURL().startsWith(WHATSAPP_WEB_HOME_URL)) {
+        return { ok: false, message: "WhatsApp Web güvenli kullanıcı ekranına alınamadı." };
+      }
+      return { ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." };
+    } catch {
+      return { ok: false, message: "WhatsApp Web kullanıcı kontrolüne hazırlanamadı. Yeniden deneyin." };
+    }
+  }
+
+  async send(input: BirthdayDeliveryAdapterInput, hooks: WhatsAppAutomaticDriverHooks): Promise<BirthdayDeliveryAdapterResult> {
     const guest = this.guest;
     if (!guest || guest.isDestroyed()) {
       return { ok: false, kind: "waiting", retryable: true, message: "WhatsApp webview bekleniyor." };
     }
+
+    if (!hooks.canContinue()) return automaticCancelledResult();
 
     const targetUrl = createWhatsAppWebUrl(input.normalizedPhone, input.message);
     if (!targetUrl) {
@@ -51,27 +84,32 @@ export class WhatsAppWebviewDriver {
     } catch {
       return { ok: false, kind: "waiting", retryable: true, message: "WhatsApp Web sayfası yüklenemedi; sonraki değerlendirmede yeniden denenecek." };
     }
+    if (!hooks.canContinue()) return automaticCancelledResult();
 
-    const inspection = await this.waitForInspection(guest, input.message, input.normalizedPhone);
+    const inspection = await this.waitForInspection(guest, input.message, input.normalizedPhone, hooks.canContinue);
     if (!inspection.ok) return inspection.result;
 
     let ready = inspection.dom;
     if (ready.code === "message_mismatch") {
+      if (!hooks.canContinue()) return automaticCancelledResult();
       const filled = await this.executeResult(guest, createWhatsAppFillMessageScript(input.message));
       if (!filled.ok) {
         return { ok: false, kind: "failed", retryable: true, message: filled.message };
       }
-      const afterFill = await this.waitForInspection(guest, input.message, input.normalizedPhone, 3_000);
+      if (!hooks.canContinue()) return automaticCancelledResult();
+      const afterFill = await this.waitForInspection(guest, input.message, input.normalizedPhone, hooks.canContinue, 3_000);
       if (!afterFill.ok) return afterFill.result;
       ready = afterFill.dom;
     }
 
+    if (!hooks.canContinue()) return automaticCancelledResult();
     hooks.onPrepared();
     const beforeSend = hooks.beforeSend();
     if (!beforeSend.ok) {
       return { ok: false, kind: beforeSend.kind, retryable: beforeSend.kind === "waiting", message: beforeSend.message };
     }
 
+    if (!hooks.canContinue()) return automaticCancelledResult();
     const sent = await this.executeResult(
       guest,
       createWhatsAppSendScript(input.message, ready.chatTitle ?? "", input.normalizedPhone)
@@ -91,6 +129,7 @@ export class WhatsAppWebviewDriver {
     guest: WebContents,
     message: string,
     phone: string,
+    canContinue: () => boolean,
     timeoutMs = DRIVER_TIMEOUT_MS
   ): Promise<{ ok: true; dom: WhatsAppDomResult } | { ok: false; result: BirthdayDeliveryAdapterResult }> {
     const deadline = Date.now() + timeoutMs;
@@ -100,10 +139,16 @@ export class WhatsAppWebviewDriver {
       message: "WhatsApp Web henüz hazır değil."
     };
     while (Date.now() < deadline) {
+      if (!canContinue()) {
+        return { ok: false, result: automaticCancelledResult() };
+      }
       if (guest.isDestroyed()) {
         return { ok: false, result: { ok: false, kind: "waiting", retryable: true, message: "WhatsApp webview kapandı." } };
       }
       const result = await this.executeResult(guest, createWhatsAppInspectionScript(message, phone));
+      if (!canContinue()) {
+        return { ok: false, result: automaticCancelledResult() };
+      }
       last = result;
       if (result.ok) return { ok: true, dom: result };
       if (result.code === "message_mismatch") return { ok: true, dom: result };

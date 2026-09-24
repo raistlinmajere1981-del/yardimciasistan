@@ -39,9 +39,10 @@ export function registerWhatsAppWebviewIpcEvents(options: {
   attachWebview: (webContentsId: number) => boolean;
   detachWebview: (webContentsId: number) => void;
   setUserBusy: (busy: boolean) => void;
+  takeoverWebview: () => Promise<{ ok: boolean; message: string }>;
   evaluateBirthdayNow: () => void;
 }) {
-  const { isTrustedRendererUrl, attachWebview, detachWebview, setUserBusy, evaluateBirthdayNow } = options;
+  const { isTrustedRendererUrl, attachWebview, detachWebview, setUserBusy, takeoverWebview, evaluateBirthdayNow } = options;
 
   ipcMain.on("whatsapp:registerWebview", (event, webContentsId: unknown) => {
     if (!isTrustedRendererUrl(event.sender.getURL())) return;
@@ -62,5 +63,12 @@ export function registerWhatsAppWebviewIpcEvents(options: {
     if (!isTrustedRendererUrl(event.sender.getURL())) return;
     setUserBusy(active === true);
     if (active !== true) evaluateBirthdayNow();
+  });
+
+  ipcMain.handle("whatsapp:takeoverWebview", async (event) => {
+    if (!isTrustedRendererUrl(event.sender.getURL())) {
+      return { ok: false, message: "WhatsApp Web devralma isteği reddedildi." };
+    }
+    return takeoverWebview();
   });
 }

@@ -213,6 +213,7 @@ export interface DesktopBridge {
   registerWhatsAppWebview: (webContentsId: number) => void;
   unregisterWhatsAppWebview: (webContentsId: number) => void;
   setWhatsAppUserActivity: (active: boolean) => void;
+  takeoverWhatsAppWebview: () => Promise<{ ok: boolean; message: string }>;
   assignCustomerRoom: (input: AssignCustomerRoomInput) => Promise<DesktopCustomerMutationResult>;
   createStayFromReservation: (input: CreateStayFromReservationInput) => Promise<DesktopCustomerMutationResult>;
   checkInStay: (stayId: string) => Promise<DesktopCustomerMutationResult>;
@@ -386,6 +387,7 @@ const bridge: DesktopBridge = {
   registerWhatsAppWebview: (webContentsId: number) => ipcRenderer.send("whatsapp:registerWebview", webContentsId),
   unregisterWhatsAppWebview: (webContentsId: number) => ipcRenderer.send("whatsapp:unregisterWebview", webContentsId),
   setWhatsAppUserActivity: (active: boolean) => ipcRenderer.send("whatsapp:userActivity", active),
+  takeoverWhatsAppWebview: () => ipcRenderer.invoke("whatsapp:takeoverWebview"),
   assignCustomerRoom: (input: AssignCustomerRoomInput) => ipcRenderer.invoke("customer:assignRoom", input),
   createStayFromReservation: (input: CreateStayFromReservationInput) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:createStayFromReservation", input),
   checkInStay: (stayId: string) => invokeWhenUnlocked<DesktopCustomerMutationResult>("customer:checkInStay", stayId),

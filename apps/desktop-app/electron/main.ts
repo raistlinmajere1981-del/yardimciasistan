@@ -655,6 +655,7 @@ function registerIpcHandlers() {
     attachWebview: (id) => birthdayWebviewDriver.attach(id),
     detachWebview: (id) => birthdayWebviewDriver.detach(id),
     setUserBusy: (busy) => whatsappDeliveryLock.setUserBusy(busy),
+    takeoverWebview: () => birthdayDeliveryAdapter.takeoverUserControl(),
     evaluateBirthdayNow: () => {
       void birthdayScheduler?.evaluateNow();
     }
