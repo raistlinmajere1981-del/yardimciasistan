@@ -158,7 +158,6 @@ function prepareRestoredStateForFullRepublish() {
   const raw = new DatabaseSync(restoredDatabasePath);
   const now = new Date().toISOString();
   try {
-    raw.prepare("UPDATE settings SET sync_client_id = '', updated_at = ?").run(now);
     raw.prepare(`
       UPDATE sync_runtime
       SET last_attempt_at = '', last_success_at = '', last_error = '',
