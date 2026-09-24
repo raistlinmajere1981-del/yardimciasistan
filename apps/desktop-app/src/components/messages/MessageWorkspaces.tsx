@@ -290,6 +290,7 @@ interface WhatsAppWorkspaceProps {
 
 type WhatsAppWebViewElement = HTMLElement & {
   reload?: () => void;
+  loadURL?: (url: string) => Promise<void>;
   getURL?: () => string;
   getWebContentsId?: () => number;
   executeJavaScript?: (code: string, userGesture?: boolean) => Promise<unknown>;
@@ -316,6 +317,7 @@ function asWhatsAppDomResult(value: unknown): WhatsAppDomResult {
 
 export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMessage, selectedUrl, aiEnabled, aiState, aiMessage, getRequestStatusTone, onSelectRequest, onOpenExternal, onReturnToSafe, onCall, onRewrite, onMessageSent, onDeleteMessage, preparedMessage }: WhatsAppWorkspaceProps) {
   const webViewRef = useRef<WhatsAppWebViewElement | null>(null);
+  const registeredGuestIdRef = useRef<number | null>(null);
   const [copyMessage, setCopyMessage] = useState("Hazır mesaj bekliyor.");
   const [sendState, setSendState] = useState<SyncState>("idle");
   const [sendMessage, setSendMessage] = useState("");
@@ -336,10 +338,6 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
     const webView = webViewRef.current;
     if (!webView) return;
 
-    // getWebContentsId throws while the guest has not attached yet (and can
-    // throw again once it is destroyed). A throw here must never escape the
-    // effect: without an error boundary it unmounts the whole renderer and
-    // leaves a blank window behind the app background.
     const readGuestId = (): number | null => {
       try {
         const id = webView.getWebContentsId?.();
@@ -348,23 +346,27 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
         return null;
       }
     };
-    const registerWebview = () => {
-      const id = readGuestId();
-      if (id === null) return;
-      try {
-        window.yardimciDesktop?.registerWhatsAppWebview?.(id);
-      } catch {
-        // Registration is best-effort automation wiring; the visible page
-        // must keep working even if the bridge call fails.
-      }
-    };
-    const unregisterWebview = () => {
-      const id = readGuestId();
+    const unregisterRegisteredWebview = () => {
+      const id = registeredGuestIdRef.current;
       if (id === null) return;
       try {
         window.yardimciDesktop?.unregisterWhatsAppWebview?.(id);
       } catch {
         // Ignore bridge failures during teardown.
+      } finally {
+        if (registeredGuestIdRef.current === id) registeredGuestIdRef.current = null;
+      }
+    };
+    const registerWebview = () => {
+      const id = readGuestId();
+      if (id === null || registeredGuestIdRef.current === id) return;
+      unregisterRegisteredWebview();
+      try {
+        window.yardimciDesktop?.registerWhatsAppWebview?.(id);
+        registeredGuestIdRef.current = id;
+      } catch {
+        // Registration is best-effort automation wiring; the visible page
+        // must keep working even if the bridge call fails.
       }
     };
     const handleLoad = () => {
@@ -372,7 +374,6 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
     };
     const handleFail = (event: Event) => {
       const detail = event as Event & { errorCode?: number; errorDescription?: string };
-      // -3 (ERR_ABORTED) fires on ordinary src swaps, not real failures.
       if (detail?.errorCode === -3) return;
       setWebViewError(
         typeof detail?.errorDescription === "string" && detail.errorDescription
@@ -386,7 +387,7 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
 
     webView.addEventListener("did-attach", registerWebview);
     webView.addEventListener("dom-ready", registerWebview);
-    webView.addEventListener("did-detach", unregisterWebview);
+    webView.addEventListener("did-detach", unregisterRegisteredWebview);
     webView.addEventListener("did-finish-load", handleLoad);
     webView.addEventListener("did-fail-load", handleFail);
     webView.addEventListener("crashed", handleCrash);
@@ -395,14 +396,14 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
     return () => {
       webView.removeEventListener("did-attach", registerWebview);
       webView.removeEventListener("dom-ready", registerWebview);
-      webView.removeEventListener("did-detach", unregisterWebview);
+      webView.removeEventListener("did-detach", unregisterRegisteredWebview);
       webView.removeEventListener("did-finish-load", handleLoad);
       webView.removeEventListener("did-fail-load", handleFail);
       webView.removeEventListener("crashed", handleCrash);
       webView.removeEventListener("unresponsive", handleCrash);
-      unregisterWebview();
+      unregisterRegisteredWebview();
     };
-  }, [view, webViewUrl]);
+  }, [view]);
 
   useEffect(() => {
     if (!selectedRequest && !preparedMessage) {
@@ -442,14 +443,23 @@ export function WhatsAppWorkspace({ view, requests, selectedRequest, selectedMes
   }
 
   function goToCustomerNumber() {
-    if (!webViewPayload) {
-      return;
-    }
+    if (!webViewPayload) return;
 
     setSendState("idle");
     setSendMessage("WhatsApp Web sohbeti ve hazır metin yükleniyor.");
     setWebViewError("");
     setWebViewUrl(webViewPayload.url);
+
+    const webView = webViewRef.current;
+    if (!webView?.loadURL) return;
+    try {
+      if (webView.getURL?.() === webViewPayload.url) return;
+    } catch {
+      // A detached guest will be handled by the load attempt below.
+    }
+    void webView.loadURL(webViewPayload.url).catch(() => {
+      setWebViewError("WhatsApp Web müşteri sohbetine yönlendirilemedi. Yeniden deneyin.");
+    });
   }
 
   function reloadWebView() {

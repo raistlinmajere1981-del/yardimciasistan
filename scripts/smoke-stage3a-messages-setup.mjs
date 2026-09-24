@@ -343,6 +343,7 @@ async function installBridge(page, { setupData, dashboardData, enabledCapabiliti
       onSyncStatusChanged: () => () => {},
       onAppLockStateChanged: () => () => {},
       openExternal: async () => true,
+      takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
       setUiScale: () => undefined,
       saveInitialSetup: async () => ({ ok: true, message: "Ayarlar kaydedildi.", setupData: setupResult(setup), dashboardData: currentDashboardData }),
       createManualBackup: async () => ({ ok: true, message: "Yedek oluşturuldu.", dashboardData: currentDashboardData }),
