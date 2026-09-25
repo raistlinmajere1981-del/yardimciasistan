@@ -7,6 +7,7 @@ import type {
   SaveDailyTaskInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { DatePicker, TimePicker } from "../ui/DateTimePicker";
 
 export type DailyTaskScope = "pension" | "restaurant";
 
@@ -104,24 +105,22 @@ export function DailyTaskEditor({ open, scope, task, onClose, onSave }: DailyTas
                 placeholder={scope === "pension" ? "Örn. Oda 4 klimayı kontrol et" : "Örn. Akşam servisi için masa düzenini hazırla"}
               />
             </label>
-            <label className="form-field form-field--short">
-              Tarih
-              <input
-                type="date"
-                lang="tr-TR"
+            <div className="form-field form-field--short">
+              <span>Tarih</span>
+              <DatePicker
+                ariaLabel="Tarih"
                 value={form.dueDate}
-                onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
+                onChange={(value) => setForm((current) => ({ ...current, dueDate: value }))}
               />
-            </label>
-            <label className="form-field form-field--short">
-              Saat
-              <input
-                type="time"
-                lang="tr-TR"
+            </div>
+            <div className="form-field form-field--short">
+              <span>Saat</span>
+              <TimePicker
+                ariaLabel="Saat"
                 value={form.dueTime}
-                onChange={(event) => setForm((current) => ({ ...current, dueTime: event.target.value }))}
+                onChange={(value) => setForm((current) => ({ ...current, dueTime: value }))}
               />
-            </label>
+            </div>
             <label className="form-field--span form-field form-field--fluid">
               Not
               <textarea
