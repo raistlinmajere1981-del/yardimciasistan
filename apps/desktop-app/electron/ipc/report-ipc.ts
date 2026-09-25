@@ -7,6 +7,11 @@ import type {
   GenerateDesktopReportAiResult
 } from "../database";
 import { generateDesktopReportAiComment } from "../report-ai-service";
+import {
+  type GenerateDesktopFinanceAiInput,
+  type GenerateDesktopFinanceAiResult
+} from "../finance";
+import { generateDesktopFinanceAiComment } from "../finance-ai-service";
 
 export function registerReportIpcHandlers(options: {
   getDatabase: () => DesktopDatabase;
@@ -34,6 +39,16 @@ export function registerReportIpcHandlers(options: {
       assertCapability(BUSINESS_CAPABILITIES.REPORTS, "Raporlar bu işletmede etkin değil.");
       assertCapability(BUSINESS_CAPABILITIES.AI, "AI rapor yorumu bu işletmede etkin değil.");
       return generateDesktopReportAiComment(getDatabase(), input);
+    }
+  );
+
+  ipcMain.handle(
+    "finance:generateAiComment",
+    async (_event, input: GenerateDesktopFinanceAiInput): Promise<GenerateDesktopFinanceAiResult> => {
+      assertUnlocked();
+      assertCapability(BUSINESS_CAPABILITIES.FINANCE, "Kasa bu işletmede etkin değil.");
+      assertCapability(BUSINESS_CAPABILITIES.AI, "AI kasa yorumu bu işletmede etkin değil.");
+      return generateDesktopFinanceAiComment(getDatabase(), input);
     }
   );
 }
