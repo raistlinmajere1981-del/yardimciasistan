@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
@@ -79,6 +79,7 @@ export function MenuManager({
   const [dragging, setDragging] = useState<{ kind: "category" | "item"; id: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
   const [reorderBusy, setReorderBusy] = useState(false);
+  const suppressRowClickRef = useRef(false);
 
   const sortedCategories = useMemo(
     () => [...dashboardData.menu.categories].sort(compareMenuRecords),
@@ -131,6 +132,7 @@ export function MenuManager({
     }
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", id);
+    suppressRowClickRef.current = false;
     setDragging({ kind, id });
     setDropTarget(null);
   }
@@ -174,8 +176,12 @@ export function MenuManager({
   }
 
   function finishDrag() {
+    suppressRowClickRef.current = true;
     setDragging(null);
     setDropTarget(null);
+    window.setTimeout(() => {
+      suppressRowClickRef.current = false;
+    }, 0);
   }
 
   return (
@@ -227,7 +233,9 @@ export function MenuManager({
                   onDragOver={(event) => handleDragOver(event, category.id)}
                   onDrop={(event) => void handleDrop(event, "category", category.id)}
                   onDragEnd={finishDrag}
-                  onClick={() => onSelectCategory(category)}
+                  onClick={() => {
+                    if (!suppressRowClickRef.current) onSelectCategory(category);
+                  }}
                   aria-pressed={selectedCategoryId === category.id}
                   selected={selectedCategoryId === category.id}
                   title={category.name}
@@ -298,7 +306,7 @@ export function MenuManager({
             <div className="panel-heading menu-panel-heading">
               <div className="menu-heading-copy">
                 <h2>Ürünler</h2>
-                <span>{selectedCategoryName}{selectedCategoryId ? " · Sıralamak için sürükleyin" : ""}</span>
+                <span>{selectedCategoryName}{selectedCategoryId ? " · Sıralamak için sürükleyin" : " · Sıralama için kategori seçin"}</span>
               </div>
               <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
             </div>
@@ -316,7 +324,9 @@ export function MenuManager({
                     onDragOver={(event) => selectedCategoryId && handleDragOver(event, item.id)}
                     onDrop={(event) => selectedCategoryId && void handleDrop(event, "item", item.id)}
                     onDragEnd={finishDrag}
-                    onClick={() => openItem(item)}
+                    onClick={() => {
+                      if (!suppressRowClickRef.current) openItem(item);
+                    }}
                     aria-pressed={selectedItemId === item.id}
                     selected={selectedItemId === item.id}
                     title={item.name}
