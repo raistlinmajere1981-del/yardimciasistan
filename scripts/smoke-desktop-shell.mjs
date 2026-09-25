@@ -122,7 +122,7 @@ try {
         await page.getByRole('button', { name: 'Elle Talep Ekle', exact: true }).click();
         const dialog = page.getByRole('dialog', { name: 'Yeni talep ekle', exact: true });
         await checkOverlay(dialog, 'request-drawer');
-        await dialog.getByRole('button', { name: 'Elle talep formunu kapat', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Formu kapat', exact: true }).click();
         await expect(dialog).toHaveCount(0);
       }
       if (name === 'Restoran') {

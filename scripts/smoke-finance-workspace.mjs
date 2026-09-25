@@ -31,6 +31,20 @@ try {
     const now = "2026-09-23T18:00:00.000Z";
     const clone = (value) => JSON.parse(JSON.stringify(value));
     let sequence = 1;
+    let categorySequence = 1;
+    const defaultCategories = [
+      { id: "other_income", direction: "income", name: "Diğer gelir", isSystem: false, isActive: true, sortOrder: 10 },
+      { id: "pension", direction: "income", name: "Pansiyon", isSystem: true, isActive: true, sortOrder: 90 },
+      { id: "restaurant", direction: "income", name: "Restoran", isSystem: true, isActive: true, sortOrder: 100 },
+      { id: "stock", direction: "expense", name: "Market / Stok", isSystem: false, isActive: true, sortOrder: 10 },
+      { id: "utilities", direction: "expense", name: "Elektrik - Su", isSystem: false, isActive: true, sortOrder: 20 },
+      { id: "rent", direction: "expense", name: "Kira", isSystem: false, isActive: true, sortOrder: 30 },
+      { id: "staff", direction: "expense", name: "Personel", isSystem: false, isActive: true, sortOrder: 40 },
+      { id: "maintenance", direction: "expense", name: "Bakım", isSystem: false, isActive: true, sortOrder: 50 },
+      { id: "transport", direction: "expense", name: "Yakıt - Ulaşım", isSystem: false, isActive: true, sortOrder: 60 },
+      { id: "official", direction: "expense", name: "Vergi / Resmi", isSystem: false, isActive: true, sortOrder: 70 },
+      { id: "other_expense", direction: "expense", name: "Diğer gider", isSystem: false, isActive: true, sortOrder: 80 }
+    ];
     let financeData = {
       generatedAt: now,
       currency: "TRY",
@@ -68,7 +82,8 @@ try {
           createdAt: now
         }
       ],
-      pensionBalances: []
+      pensionBalances: [],
+      categories: clone(defaultCategories)
     };
     const roomData = {
       generatedAt: now,
@@ -229,6 +244,35 @@ try {
             resolveDelete(applyDelete(entryId));
           };
         });
+      },
+      saveFinanceCategory: async (input) => {
+        const name = String(input?.name ?? "").trim().slice(0, 80);
+        const direction = input?.direction === "income" || input?.direction === "expense" ? input.direction : null;
+        if (!direction || !name) return { ok: false, message: "Tür adı gerekli." };
+        const created = {
+          id: `custom-${direction}-${categorySequence++}`,
+          direction,
+          name,
+          isSystem: false,
+          isActive: true,
+          sortOrder: 200 + categorySequence
+        };
+        financeData = {
+          ...financeData,
+          generatedAt: new Date().toISOString(),
+          categories: [...financeData.categories, created]
+        };
+        return { ok: true, message: "Yeni tür eklendi.", data: clone(financeData) };
+      },
+      deleteFinanceCategory: async (categoryId) => {
+        financeData = {
+          ...financeData,
+          generatedAt: new Date().toISOString(),
+          categories: financeData.categories.map((category) => (
+            category.id === categoryId ? { ...category, isActive: false } : category
+          ))
+        };
+        return { ok: true, message: "Tür listeden kaldırıldı.", data: clone(financeData) };
       }
     };
   }, { capabilities: BUSINESS_CAPABILITIES });
@@ -237,7 +281,13 @@ try {
 
   const nav = page.getByRole("navigation", { name: "Finance test navigation" });
   const finance = () => page.locator(".finance-workspace");
-  const entryPanel = () => page.locator(".finance-entry-panel");
+  const entryDialog = () => page.locator("dialog.form-dialog");
+  const incomeDialog = () => page.getByRole("dialog", { name: "Gelir ekle" });
+  const expenseDialog = () => page.getByRole("dialog", { name: "Gider ekle" });
+  const tutarIn = (dialog) => dialog.locator("label:has(span:text-is('Tutar')) input");
+  const turSelect = (dialog) => dialog.locator("label:has(span:text-is('Tür')) select");
+  const aciklamaIn = (dialog) => dialog.locator("label:has(span:text-is('Açıklama')) input");
+  const odemeSelect = (dialog) => dialog.locator("label:has(span:text-is('Ödeme şekli')) select");
 
   await expect(finance()).toBeVisible();
   await expect(page.getByText("Otomatik restoran geliri", { exact: true })).toBeVisible();
@@ -246,18 +296,20 @@ try {
 
   // Draft survives page unmount/remount.
   await finance().getByRole("button", { name: "Gelir Ekle", exact: true }).click();
-  await entryPanel().getByLabel("Tutar").fill("123,45");
-  await entryPanel().getByLabel("Tür").selectOption("pension");
-  await entryPanel().getByLabel("Açıklama").fill("Navigation draft");
-  await entryPanel().getByText("Ödeme şekli ve tarih", { exact: true }).click();
-  await entryPanel().getByLabel("Ödeme şekli").selectOption("card");
-  await nav.getByRole("button", { name: "Diğer" }).click();
+  await expect(incomeDialog()).toBeVisible();
+  await tutarIn(incomeDialog()).fill("123,45");
+  await turSelect(incomeDialog()).selectOption("pension");
+  await aciklamaIn(incomeDialog()).fill("Navigation draft");
+  await odemeSelect(incomeDialog()).selectOption("card");
+  // Entry dialog is a modal surface and intentionally intercepts pointer navigation.
+  // Simulate an external/router page transition to exercise draft lifetime across unmount/remount.
+  await page.evaluate(() => window.__financeHarness.setPage("other"));
   await expect(page.getByRole("heading", { name: "Diğer" })).toBeVisible();
-  await nav.getByRole("button", { name: "Kasa" }).click();
-  await expect(entryPanel().getByLabel("Tutar")).toHaveValue("123,45");
-  await expect(entryPanel().getByLabel("Tür")).toHaveValue("pension");
-  await expect(entryPanel().getByLabel("Açıklama")).toHaveValue("Navigation draft");
-  await expect(entryPanel().getByLabel("Ödeme şekli")).toHaveValue("card");
+  await page.evaluate(() => window.__financeHarness.setPage("finance"));
+  await expect(tutarIn(incomeDialog())).toHaveValue("123,45");
+  await expect(turSelect(incomeDialog())).toHaveValue("pension");
+  await expect(aciklamaIn(incomeDialog())).toHaveValue("Navigation draft");
+  await expect(odemeSelect(incomeDialog())).toHaveValue("card");
 
   // Synchronous controller lock survives navigation; one manual insert only.
   await page.evaluate(() => { window.__financeDeferSave = true; });
@@ -268,28 +320,29 @@ try {
   });
   await expect.poll(() => page.evaluate(() => window.__financeStats.saveWaits)).toBe(1);
   expect(await page.evaluate(() => window.__financeStats.saveCalls)).toBe(1);
-  await nav.getByRole("button", { name: "Diğer" }).click();
+  await page.evaluate(() => window.__financeHarness.setPage("other"));
   await page.evaluate(() => window.__financeResolveSave?.());
   await expect.poll(() => page.evaluate(() => window.__financeHarness.controller.saving)).toBe(false);
-  await nav.getByRole("button", { name: "Kasa" }).click();
+  await page.evaluate(() => window.__financeHarness.setPage("finance"));
   await expect(page.getByText("Navigation draft", { exact: true })).toBeVisible();
-  await expect(entryPanel()).toHaveCount(0);
-  await expect(page.getByText("Gelir kasaya eklendi.", { exact: true })).toBeVisible();
+  await expect(entryDialog()).toHaveCount(0);
   expect(await page.evaluate(() => window.__financeStats.saveCalls)).toBe(1);
 
   // A stale Finance load cannot overwrite a newer committed mutation; Folio refresh failure is non-fatal.
+  // Entry buttons are disabled while a load is in flight, so open the draft first and then start the stale load.
+  await finance().getByRole("button", { name: "Gider Ekle", exact: true }).click();
+  await expect(expenseDialog()).toBeVisible();
+  await tutarIn(expenseDialog()).fill("50");
+  await aciklamaIn(expenseDialog()).fill("Stale korumalı gider");
   await page.evaluate(() => {
     window.__financeDeferLoad = true;
     void window.__financeHarness.controller.refreshFinanceData();
   });
   await expect.poll(() => page.evaluate(() => window.__financeStats.loadWaits)).toBe(1);
-  await finance().getByRole("button", { name: "Gider Ekle", exact: true }).click();
-  await entryPanel().getByLabel("Tutar").fill("50");
-  await entryPanel().getByLabel("Açıklama").fill("Stale korumalı gider");
   await page.evaluate(() => { window.__financeFailRoom = true; });
-  await entryPanel().getByRole("button", { name: "Kaydet", exact: true }).click();
+  await expenseDialog().getByRole("button", { name: "Gideri Kaydet", exact: true }).click();
   await expect(page.getByText("Stale korumalı gider", { exact: true })).toBeVisible();
-  await expect(page.getByText("Gider kasaya eklendi.", { exact: true })).toBeVisible();
+  await expect(entryDialog()).toHaveCount(0);
   await page.evaluate(() => window.__financeResolveLoad?.());
   await page.waitForTimeout(50);
   await expect(page.getByText("Stale korumalı gider", { exact: true })).toBeVisible();
@@ -324,23 +377,26 @@ try {
 
   // Folio capability changes only its projection; Finance draft survives and invalid category normalizes.
   await finance().getByRole("button", { name: "Gelir Ekle", exact: true }).click();
-  await entryPanel().getByLabel("Tutar").fill("77");
-  await entryPanel().getByLabel("Tür").selectOption("pension");
+  await expect(incomeDialog()).toBeVisible();
+  await tutarIn(incomeDialog()).fill("77");
+  await turSelect(incomeDialog()).selectOption("pension");
   await page.evaluate((capability) => window.__financeHarness.setCapability(capability, false), BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO);
-  await expect(entryPanel().getByLabel("Tutar")).toHaveValue("77");
-  await expect(entryPanel().getByLabel("Tür")).toHaveValue("other_income");
+  await expect(tutarIn(incomeDialog())).toHaveValue("77");
+  await expect(turSelect(incomeDialog())).toHaveValue("other_income");
   await expect(page.getByText("Bekleyen Alacak", { exact: true })).toHaveCount(0);
   await page.evaluate((capability) => window.__financeHarness.setCapability(capability, true), BUSINESS_CAPABILITIES.ACCOMMODATION_FOLIO);
-  await expect(entryPanel().getByLabel("Tutar")).toHaveValue("77");
-  await entryPanel().getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await expect(tutarIn(incomeDialog())).toHaveValue("77");
+  await incomeDialog().getByRole("button", { name: "Vazgeç", exact: true }).click();
+  await expect(entryDialog()).toHaveCount(0);
 
   // Finance capability epoch invalidates old presentation result without unlocking duplicate save.
   await finance().getByRole("button", { name: "Gelir Ekle", exact: true }).click();
-  await entryPanel().getByLabel("Tutar").fill("88");
-  await entryPanel().getByLabel("Açıklama").fill("Capability save");
+  await expect(incomeDialog()).toBeVisible();
+  await tutarIn(incomeDialog()).fill("88");
+  await aciklamaIn(incomeDialog()).fill("Capability save");
   const savesBeforeCapabilityTest = await page.evaluate(() => window.__financeStats.saveCalls);
   await page.evaluate(() => { window.__financeDeferSave = true; });
-  await entryPanel().getByRole("button", { name: "Kaydet", exact: true }).click();
+  await incomeDialog().getByRole("button", { name: "Geliri Kaydet", exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__financeStats.saveCalls)).toBe(savesBeforeCapabilityTest + 1);
   await page.evaluate((capability) => window.__financeHarness.setCapability(capability, false), BUSINESS_CAPABILITIES.FINANCE);
   await expect(page.getByRole("heading", { name: "Kasa kapalı" })).toBeVisible();
