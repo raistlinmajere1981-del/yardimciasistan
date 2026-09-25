@@ -20,6 +20,7 @@ export function BusinessSettingsSection({ form, onFormChange }: SetupFieldsProps
           <div className="settings-panel-header">
             <div>
               <h2>İşletme Bilgileri</h2>
+              <p>Temel işletme bilgilerini ve kullanılacak özellikleri yönetin.</p>
             </div>
           </div>
           <div className="settings-panel-body">
