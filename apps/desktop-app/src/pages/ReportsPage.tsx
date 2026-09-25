@@ -81,7 +81,7 @@ export function ReportsPage({
   const [aiMode, setAiMode] = useState<DesktopReportAiMode | "">("");
   const [aiContent, setAiContent] = useState("");
   const [aiMessage, setAiMessage] = useState("Bir yorum türü seçtiğinizde AI yalnız hazırlanmış rapor sonucunu kullanır.");
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"cash" | "reports">("cash");
 
   useEffect(() => {
     let active = true;
@@ -165,14 +165,6 @@ export function ReportsPage({
     });
   }
 
-  function toggleDetails(toggle: HTMLButtonElement) {
-    const nextOpen = !detailsOpen;
-    setDetailsOpen(nextOpen);
-    if (nextOpen) {
-      window.requestAnimationFrame(() => toggle.scrollIntoView({ behavior: "smooth", block: "start" }));
-    }
-  }
-
   async function generateAiComment(mode: DesktopReportAiMode) {
     setAiMode(mode);
     setAiContent("");
@@ -206,23 +198,92 @@ export function ReportsPage({
     return true;
   });
 
-  return (
-    <section className={`reports-page${detailsOpen ? "" : " reports-details-collapsed"}`} aria-label={financeEnabled && reportsEnabled ? "Kasa ve işletme raporları" : financeEnabled ? "Kasa" : "İşletme raporları"}>
-      {financeEnabled && <FinanceWorkspace controller={financeController} />}
-
-      {reportsEnabled && <>
-      <button
-        className="reports-detail-divider cash-details-toggle"
-        type="button"
-        aria-expanded={detailsOpen}
-        aria-label={detailsOpen ? "Detaylı raporları gizle" : "Geçmiş ve detaylı raporları aç"}
-        onClick={(event) => toggleDetails(event.currentTarget)}
-      >
+  const financeAiPanel = aiEnabled && reportsEnabled ? (
+    <Panel className="finance-ai-panel report-ai-panel" padding="compact">
+      <div className="report-section-title">
         <div>
-          <span>Detaylı raporlar</span>
-          <strong>{detailsOpen ? "Detaylı Raporları Gizle" : "Geçmiş ve Detaylı Raporları Aç"}</strong>
+          <p>İsteğe bağlı</p>
+          <h2>AI Kasa Yorumu</h2>
         </div>
-      </button>
+        <Sparkles size={19} aria-hidden="true" />
+      </div>
+      <div className="finance-ai-period">
+        <span>{formatReportPeriod(report.period)}</span>
+        <div className="report-date-presets finance-ai-presets" role="group" aria-label="AI yorum dönemi">
+          {[
+            { preset: "today" as const, label: "Bugün" },
+            { preset: "last7" as const, label: "7 Gün" },
+            { preset: "last30" as const, label: "30 Gün" }
+          ].map((option) => (
+            <button
+              className={range.preset === option.preset ? "is-active" : ""}
+              type="button"
+              aria-pressed={range.preset === option.preset}
+              onClick={() => selectPreset(option.preset)}
+              key={option.preset}
+            >
+              {option.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => {
+              selectCustom();
+              setActiveView("reports");
+            }}
+          >
+            Tarih Aralığı
+          </button>
+        </div>
+      </div>
+      <div className="report-ai-actions finance-ai-actions">
+        {AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
+          <button
+            className={aiMode === action.mode ? "is-active" : ""}
+            type="button"
+            disabled={aiMode === action.mode && aiMessage.includes("hazırlanıyor")}
+            onClick={() => void generateAiComment(action.mode)}
+            key={action.mode}
+          >
+            {action.label}
+          </button>
+        ))}
+      </div>
+      <p className="report-ai-status" role="status">{aiMessage}</p>
+      {aiContent && <div className="report-ai-result finance-ai-result">{aiContent}</div>}
+    </Panel>
+  ) : null;
+
+  return (
+    <section className="reports-page" aria-label={financeEnabled && reportsEnabled ? "Kasa ve işletme raporları" : financeEnabled ? "Kasa" : "İşletme raporları"}>
+      {financeEnabled && reportsEnabled && (
+        <div className="reports-view-tabs" role="tablist" aria-label="Kasa görünümü">
+          <button
+            role="tab"
+            aria-selected={activeView === "cash"}
+            className={activeView === "cash" ? "is-active" : ""}
+            type="button"
+            onClick={() => setActiveView("cash")}
+          >
+            Kasa
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeView === "reports"}
+            className={activeView === "reports" ? "is-active" : ""}
+            type="button"
+            onClick={() => setActiveView("reports")}
+          >
+            Detaylı Raporlar
+          </button>
+        </div>
+      )}
+
+      {financeEnabled && (!reportsEnabled || activeView === "cash") && (
+        <FinanceWorkspace controller={financeController} aside={financeAiPanel} />
+      )}
+
+      {reportsEnabled && (!financeEnabled || activeView === "reports") && <div className="reports-detail-view">
 
       <Panel className="report-filter-panel" padding="compact">
         <div className="report-filter-heading">
@@ -446,31 +507,7 @@ export function ReportsPage({
         )}
       </Panel>
 
-      {aiEnabled && <Panel className="report-section-panel report-ai-panel">
-        <div className="report-section-title">
-          <div>
-            <p>İsteğe bağlı</p>
-            <h2>AI İşletme Yorumu</h2>
-          </div>
-          <Sparkles size={20} aria-hidden="true" />
-        </div>
-        <div className="report-ai-actions">
-          {AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
-            <button
-              className={aiMode === action.mode ? "is-active" : ""}
-              type="button"
-              disabled={aiMode === action.mode && aiMessage.includes("hazırlanıyor")}
-              onClick={() => void generateAiComment(action.mode)}
-              key={action.mode}
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
-        <p className="report-ai-status" role="status">{aiMessage}</p>
-        {aiContent && <div className="report-ai-result">{aiContent}</div>}
-      </Panel>}
-      </>}
+      </div>}
     </section>
   );
 }
