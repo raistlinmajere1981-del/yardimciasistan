@@ -18,6 +18,9 @@ export function projectDesktopDashboardData(
   const foodReservationsEnabled = enabled.has(C.FOOD_RESERVATIONS);
   const foodOrdersEnabled = enabled.has(C.FOOD_ORDERS);
   const requestsEnabled = enabled.has(C.REQUESTS) && enabled.has(C.CUSTOMERS);
+  const tasksEnabled = enabled.has(C.TASKS);
+  const reservationAttentionEnabled = accommodationReservationsEnabled || foodReservationsEnabled;
+  const stockAttentionEnabled = enabled.has(C.FOOD_MENU) && enabled.has(C.INVENTORY);
   const stays = enabled.has(C.ACCOMMODATION_STAYS) ? source.customerRoomStays : [];
   const activeStayRoomIds = new Set(
     stays
@@ -82,6 +85,42 @@ export function projectDesktopDashboardData(
   const paymentWaitingTableOrders = foodOrdersEnabled
     ? source.paymentWaitingTableOrders
     : [];
+  const sourceAttention = source.attention ?? {
+    pendingRequests: 0,
+    pendingReservations: 0,
+    paymentWaitingTables: 0,
+    overdueTasks: 0,
+    incompleteTasks: 0,
+    outOfStockItems: 0,
+    lowStockItems: 0,
+    totalCount: 0,
+    items: []
+  };
+  const attentionItems = sourceAttention.items.filter((item) => {
+    if (item.kind === "pending_request") return requestsEnabled;
+    if (item.kind === "pending_reservation") return reservationAttentionEnabled;
+    if (item.kind === "payment_waiting") return foodOrdersEnabled;
+    if (item.kind === "overdue_task" || item.kind === "open_task") return tasksEnabled;
+    if (item.kind === "out_of_stock" || item.kind === "low_stock") return stockAttentionEnabled;
+    return false;
+  });
+  const attention = {
+    pendingRequests: requestsEnabled ? sourceAttention.pendingRequests : 0,
+    pendingReservations: reservationAttentionEnabled ? sourceAttention.pendingReservations : 0,
+    paymentWaitingTables: foodOrdersEnabled ? sourceAttention.paymentWaitingTables : 0,
+    overdueTasks: tasksEnabled ? sourceAttention.overdueTasks : 0,
+    incompleteTasks: tasksEnabled ? sourceAttention.incompleteTasks : 0,
+    outOfStockItems: stockAttentionEnabled ? sourceAttention.outOfStockItems : 0,
+    lowStockItems: stockAttentionEnabled ? sourceAttention.lowStockItems : 0,
+    totalCount: 0,
+    items: attentionItems
+  };
+  attention.totalCount = attention.pendingRequests
+    + attention.pendingReservations
+    + attention.paymentWaitingTables
+    + attention.incompleteTasks
+    + attention.outOfStockItems
+    + attention.lowStockItems;
 
   return {
     ...source,
@@ -96,6 +135,7 @@ export function projectDesktopDashboardData(
     androidActionFailures: enabled.has(C.ANDROID) ? source.androidActionFailures : [],
     paymentWaitingTableOrders,
     menu,
+    attention,
     summary: {
       ...source.summary,
       newRequests: requestsEnabled ? source.summary.newRequests : 0,
