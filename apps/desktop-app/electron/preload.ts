@@ -81,6 +81,8 @@ import type {
   AddPensionPaymentInput,
   DesktopFinanceData,
   DesktopFinanceMutationResult,
+  GenerateDesktopFinanceAiInput,
+  GenerateDesktopFinanceAiResult,
   SaveFinanceCategoryInput,
   SaveManualFinanceEntryInput,
   SetReservationAgreedTotalInput
@@ -170,6 +172,7 @@ export interface DesktopBridge {
   getDashboardData: () => Promise<DesktopDashboardData>;
   getReportData: (input: DesktopReportRangeInput) => Promise<DesktopReportQueryResult>;
   generateReportAiComment: (input: GenerateDesktopReportAiInput) => Promise<GenerateDesktopReportAiResult>;
+  generateFinanceAiComment: (input: GenerateDesktopFinanceAiInput) => Promise<GenerateDesktopFinanceAiResult>;
   getFinanceData: (limit?: number) => Promise<DesktopFinanceData>;
   saveManualFinanceEntry: (input: SaveManualFinanceEntryInput) => Promise<DesktopFinanceMutationResult>;
   deleteManualFinanceEntry: (entryId: string) => Promise<DesktopFinanceMutationResult>;
@@ -306,6 +309,7 @@ const bridge: DesktopBridge = {
   getDashboardData: () => ipcRenderer.invoke("dashboard:getData"),
   getReportData: (input: DesktopReportRangeInput) => ipcRenderer.invoke("report:getData", input),
   generateReportAiComment: (input: GenerateDesktopReportAiInput) => ipcRenderer.invoke("report:generateAiComment", input),
+  generateFinanceAiComment: (input: GenerateDesktopFinanceAiInput) => ipcRenderer.invoke("finance:generateAiComment", input),
   getFinanceData: (limit?: number) => invokeWhenUnlocked<DesktopFinanceData>("finance:getData", limit),
   saveManualFinanceEntry: (input: SaveManualFinanceEntryInput) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:saveManualEntry", input),
   deleteManualFinanceEntry: (entryId: string) => invokeWhenUnlocked<DesktopFinanceMutationResult>("finance:deleteManualEntry", entryId),
