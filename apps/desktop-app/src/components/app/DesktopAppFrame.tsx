@@ -7,7 +7,6 @@ import type { RequestPageChange } from "../../app/page-navigation-guard";
 import { buildNavigation, getPageContentScroll, getPageMeta } from "../../app/navigation";
 import { buildDesktopNotifications, type DesktopNotificationItem } from "../../app/notifications";
 import {
-  automaticSyncTone,
   readSidebarCollapsedPreference,
   saveSidebarCollapsedPreference,
   type SyncState
@@ -109,9 +108,20 @@ function DesktopAppFrameContent({
   const qrMenuEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.QR_MENU);
   const inventoryEnabled = runtimeHasCapability(businessCapabilities, BUSINESS_CAPABILITIES.INVENTORY);
   const workspaceData = projectDesktopDashboardData(dashboardData, businessCapabilities?.enabledCapabilities ?? []);
-  const syncDisplayMessage = automaticSyncStatus.phase === "offline"
+  const automaticSyncNeedsAttention = automaticSyncStatus.phase === "offline" || automaticSyncStatus.phase === "error";
+  const automaticSyncDisplayMessage = automaticSyncStatus.phase === "offline"
     ? OFFLINE_SYNC_MESSAGE
-    : syncState === "idle" ? automaticSyncStatus.message : statusMessage;
+    : automaticSyncNeedsAttention
+      ? automaticSyncStatus.message
+      : automaticSyncStatus.phase === "disabled"
+        ? "Otomatik senkron kapalı."
+        : automaticSyncStatus.lastSuccessAt
+          ? "Tüm veriler güncel."
+          : "Otomatik senkron hazır.";
+  const syncDisplayMessage = syncState === "idle" ? automaticSyncDisplayMessage : statusMessage;
+  const syncDisplayState = syncState === "idle"
+    ? (automaticSyncNeedsAttention ? "error" : "idle")
+    : syncState;
 
   useEffect(() => {
     saveSidebarCollapsedPreference(sidebarCollapsed);
@@ -195,20 +205,22 @@ function DesktopAppFrameContent({
                     : (aiEnabled ? "AI araçları kullanıma hazır." : "Mesaj araçları bu işletmede etkin değil.")}</span>
                 </div>
               ) : activePage === "settings" ? null : (
-                <div className={`sync-pill sync-${syncState === "idle" ? automaticSyncTone(automaticSyncStatus) : syncState}`}>
+                <div className={`sync-pill sync-${syncDisplayState}`}>
                   <span role="status" aria-live="polite">
                     {syncDisplayMessage}
-                    {automaticSyncStatus.pendingJobs > 0 ? ` · ${automaticSyncStatus.pendingJobs} eşitleme bekliyor` : ""}
+                    {automaticSyncNeedsAttention && automaticSyncStatus.pendingJobs > 0
+                      ? ` · ${automaticSyncStatus.pendingJobs} eşitleme bekliyor`
+                      : ""}
                   </span>
                   <button
                     className="action-button action-button-sm"
                     type="button"
-                    title={automaticSyncStatus.message}
+                    title={automaticSyncNeedsAttention ? automaticSyncStatus.message : "Web ve cihaz verilerini şimdi eşitle"}
                     onClick={handlePullRequests}
-                    disabled={automaticSyncStatus.phase === "syncing" || syncState === "loading"}
+                    disabled={syncState === "loading"}
                   >
                     <RefreshCw size={16} aria-hidden="true" />
-                    {automaticSyncStatus.phase === "syncing" ? "Eşitleniyor" : "Şimdi Eşitle"}
+                    {syncState === "loading" ? "Eşitleniyor" : "Şimdi Eşitle"}
                   </button>
                 </div>
               )}
