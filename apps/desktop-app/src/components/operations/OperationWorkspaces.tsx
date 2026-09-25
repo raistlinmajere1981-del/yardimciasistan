@@ -1,4 +1,5 @@
 import { useConfirmDialog } from "../ui/useConfirmDialog";
+import { DatePicker } from "../ui/DateTimePicker";
 import { useMemo, useState } from "react";
 import {
   BedDouble,
@@ -315,20 +316,14 @@ export function ReservationsWorkspace({
               <option value="completed">Tamamlandı</option>
             </select>
           </label>
-          <label className="reservation-date-filter form-field form-field--short">
-            <span className="reservation-filter-label">
-              <span>Tarih</span>
-            <small className="date-field-hint" id="reservation-date-hint">GG.AA.YYYY</small>
-          </span>
-            <input
-              lang="tr-TR"
-              type="date"
+          <div className="reservation-date-filter form-field form-field--short">
+            <span className="reservation-filter-label">Tarih</span>
+            <DatePicker
+              ariaLabel="Tarih"
               value={dateFilter}
-              aria-label="Tarih"
-              aria-describedby="reservation-date-hint"
-              onChange={(event) => setDateFilter(event.target.value)}
+              onChange={setDateFilter}
             />
-          </label>
+          </div>
           <ActionButton
             variant="ghost"
             size="sm"
