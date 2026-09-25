@@ -4,6 +4,7 @@ import { createId } from "@yardimci-asistan/shared";
 import type { PublishedQrMenu } from "@yardimci-asistan/sync-core";
 import type { AndroidSyncAction } from "@yardimci-asistan/sync-core";
 import type {
+  ReorderMenuRecordsInput,
   SaveMenuCategoryInput
 } from "../database-types.js";
 import { normalizeInteger } from "./request-utils.js";
@@ -149,6 +150,62 @@ export function saveMenuCategory(db: DatabaseSync, input: SaveMenuCategoryInput)
     ok: true,
     message: "Kategori kaydedildi.",
     savedId: id
+  };
+}
+
+export function reorderMenuRecords(
+  db: DatabaseSync,
+  input: ReorderMenuRecordsInput
+): { ok: true; message: string } | { ok: false; message: string } {
+  const orderedIds = input.orderedIds.map((id) => String(id ?? "").trim()).filter(Boolean);
+  if (new Set(orderedIds).size !== orderedIds.length) {
+    return { ok: false, message: "Sıralama listesinde yinelenen kayıt var." };
+  }
+
+  const table = input.kind === "categories" ? "menu_categories" : "menu_items";
+  const categoryId = String(input.categoryId ?? "").trim();
+  if (input.kind === "items" && !categoryId) {
+    return { ok: false, message: "Ürün sıralaması için kategori seçilmemiş." };
+  }
+
+  const currentRows = input.kind === "categories"
+    ? db.prepare("SELECT id FROM menu_categories WHERE deleted_at = '' ORDER BY sort_order ASC, name ASC").all() as Array<{ id?: string }>
+    : db.prepare("SELECT id FROM menu_items WHERE deleted_at = '' AND category_id = ? ORDER BY sort_order ASC, name ASC").all(categoryId) as Array<{ id?: string }>;
+  const currentIds = currentRows.map((row) => String(row.id ?? "")).filter(Boolean);
+
+  if (
+    currentIds.length !== orderedIds.length
+    || currentIds.some((id) => !orderedIds.includes(id))
+  ) {
+    return {
+      ok: false,
+      message: input.kind === "categories"
+        ? "Kategori listesi değişti. Sıralamayı yeniden deneyin."
+        : "Ürün listesi değişti. Sıralamayı yeniden deneyin."
+    };
+  }
+
+  if (currentIds.every((id, index) => id === orderedIds[index])) {
+    return { ok: true, message: "Sıralama zaten güncel." };
+  }
+
+  const now = new Date().toISOString();
+  const update = db.prepare(`UPDATE ${table} SET sort_order = ?, updated_at = ?, sync_status = 'pending' WHERE id = ? AND deleted_at = ''`);
+
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    orderedIds.forEach((id, index) => {
+      update.run((index + 1) * 10, now, id);
+    });
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+
+  return {
+    ok: true,
+    message: input.kind === "categories" ? "Kategori sırası güncellendi." : "Ürün sırası güncellendi."
   };
 }
 
