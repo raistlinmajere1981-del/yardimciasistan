@@ -97,27 +97,11 @@
   gap: var(--space-3);
 }
 
-.report-custom-dates label {
-  display: grid;
-  gap: var(--space-1);
+.report-custom-date-field {
+  --field-width: 100%;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
-}
-
-.report-custom-dates input {
-  width: 100%;
-  min-height: var(--control-height-md);
-  padding: var(--space-1) var(--space-10) var(--space-1) var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg-field);
-  color: var(--color-text);
-}
-
-.report-custom-dates small {
-  color: var(--color-text-muted);
-  font-weight: var(--weight-normal);
 }
 
 .report-error {
