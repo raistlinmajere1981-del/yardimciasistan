@@ -2,7 +2,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useState } from "react";
 import { Save, Trash2 } from "lucide-react";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
-import { toItemForm, type ItemFormState } from "./menu-model";
+import { formatCurrency, toItemForm, type ItemFormState } from "./menu-model";
 import { MenuItemFormFields } from "./MenuItemFormFields";
 import type { MenuItemWorkspaceIntent } from "../workspace/workspace-intent";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
@@ -111,7 +111,7 @@ export function MenuItemWorkspace({
   return (
     <WorkspaceFrame
         title={item.name}
-        context={categoryName + " · " + item.price + " " + item.currency}
+        context={categoryName + " · " + formatCurrency(item.price, item.currency)}
         actions={<StatusBadge tone={item.is_available ? "success" : "neutral"}>{item.is_available ? "Mevcut" : "Kapalı"}</StatusBadge>}
         presentation={presentation}
         onPresentationChange={navigation.updateWorkspacePresentation}
