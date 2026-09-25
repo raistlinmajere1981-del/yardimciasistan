@@ -14,6 +14,7 @@ import { getReservationDomain } from "@yardimci-asistan/shared";
 import { ActionButton } from "../components/ui/ActionButton";
 import { calendarLocalDateKey, type useCalendarPageController } from "../components/calendar/calendar-page-state";
 import { StatusBadge, type StatusTone } from "../components/ui/StatusBadge";
+import { DatePicker } from "../components/ui/DateTimePicker";
 
 type ReservationRecord = DesktopDashboardData["reservations"][number];
 type DailyTaskRecord = DesktopDashboardData["dailyTasks"][number];
@@ -137,10 +138,16 @@ export function OperationCalendarPage({
             <ActionButton variant="secondary" size="sm" type="button" aria-label="Sonraki dönem" onClick={() => moveRange(1)}>
               <ChevronRight size={16} aria-hidden="true" />
             </ActionButton>
-            <label className="operation-calendar-date-picker">
+            <div className="operation-calendar-date-picker form-field">
               <span>Tarih</span>
-              <input type="date" lang="tr-TR" value={selectedDate} onChange={(event) => event.target.value && setSelectedDate(event.target.value)} />
-            </label>
+              <DatePicker
+                ariaLabel="Takvim tarihi"
+                value={selectedDate}
+                presets={[]}
+                clearable={false}
+                onChange={(value) => value && setSelectedDate(value)}
+              />
+            </div>
           </div>
         </div>
       </div>
