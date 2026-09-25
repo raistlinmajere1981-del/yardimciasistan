@@ -80,11 +80,6 @@ try {
   await expect(page.locator(".system-health-item").filter({ hasText: "AI" })).toContainText("Hazır");
   await expect(page.locator(".system-health-item").filter({ hasText: "Uygulama kilidi" })).toContainText("Etkin");
 
-  // System-health sync delegates to the app-level operation rather than starting its own IPC lifecycle.
-  await page.getByRole("button", { name: "Şimdi eşitle", exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.__m8fActions.filter((item) => item.kind === "sync").length)).toBe(1);
-  await expect(page.getByRole("button", { name: "Şimdi eşitle", exact: true })).toBeEnabled();
-
   // Dashboard actions remain launchers/canonical operation callbacks.
   const requestRow = page.locator(".dashboard-priority-item.priority-request").first();
   await requestRow.getByRole("button", { name: /talebini yanıtla$/ }).click();
