@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import type { AutomaticSyncStatus } from "../../apps/desktop-app/electron/sync-coordinator";
 import type { DesktopDashboardData, DesktopSetupData } from "../../apps/desktop-app/electron/database";
@@ -17,32 +16,14 @@ const control = window as typeof window & {
 };
 
 function Harness() {
-  const [syncStatus, setSyncStatus] = useState(control.__m8fInitial.syncStatus);
-  const [syncing, setSyncing] = useState(false);
   const actions = control.__m8fActions ??= [];
   const record = (kind: string, id?: string) => actions.push({ kind, id });
-
-  const onSyncNow = async () => {
-    record("sync");
-    setSyncing(true);
-    await Promise.resolve();
-    setSyncStatus((current) => ({
-      ...current,
-      phase: "success",
-      message: "Dashboard fixture eşitlemesi tamamlandı.",
-      lastSuccessAt: "2026-09-24T10:00:00+03:00",
-      consecutiveFailures: 0,
-      lastError: ""
-    }));
-    setSyncing(false);
-  };
 
   return (
     <DashboardPage
       data={control.__m8fInitial.dashboard}
       setupData={control.__m8fInitial.setup}
-      automaticSyncStatus={syncStatus}
-      syncBusy={syncing}
+      automaticSyncStatus={control.__m8fInitial.syncStatus}
       features={{ rooms: true, tables: true, whatsapp: true, android: true }}
       aiEnabled
       customersEnabled
@@ -57,7 +38,6 @@ function Harness() {
       onCompleteTask={(taskId) => record("task-complete", taskId)}
       onOpenDailyAi={() => record("daily-ai")}
       onPrepareBirthday={(customerId) => record("birthday", customerId)}
-      onSyncNow={onSyncNow}
       formatRequestType={(value) => value}
       formatRequestStatus={(value) => value}
       getRequestStatusTone={() => "neutral"}
