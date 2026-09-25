@@ -11,7 +11,7 @@ Status: closed and verified on `refactor/finance-workspace-v2`.
 - Automatic finance entries remain read-only projections in Finance Workspace; they must be corrected through their source transaction.
 - The existing `reports` route remains the host surface and is presented as `Kasa` when Finance is enabled.
 - Kasa and Detaylı Raporlar are sibling tabs; detailed reporting is no longer a hidden/collapsible panel below the daily cash workspace.
-- AI report actions live in the daily Kasa side rail so they remain reachable without scrolling through detailed reports.
+- Kasa and Detaylı Raporlar have separate AI scopes. Kasa AI reads only the authoritative current Finance snapshot (today's cash movement and current outstanding receivables) and has no report-period selector. Detailed-report AI lives with the report-period controls and reads only the selected-period report payload.
 - Finance categories are persisted in `finance_categories`. System source categories are protected; user categories can be added or deactivated directly inside the income/expense dialogs.
 
 ## Persistent controller lifetime
