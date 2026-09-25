@@ -144,7 +144,6 @@ export function MenuItemFormFields({
               <label className="form-check"><input checked={form.is_available} onChange={(event) => onChange({ ...form, is_available: event.target.checked })} type="checkbox" />Mevcut</label>
               <label className="form-check"><input checked={form.is_featured} onChange={(event) => onChange({ ...form, is_featured: event.target.checked })} type="checkbox" />Öne çıkar</label>
             </div>
-            <label className="form-field form-field--xs">Sıra<input value={form.sort_order} onChange={(event) => onChange({ ...form, sort_order: event.target.value })} inputMode="numeric" /></label>
             <label className="form-field form-field--short">Para birimi<select value={form.currency} onChange={(event) => onChange({ ...form, currency: event.target.value })}><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></label>
             <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => onChange({ ...form, tags: event.target.value })} placeholder="popüler, kahvaltı" /></label>
             <label className="form-field form-field--medium">Alerjenler<input value={form.allergens} onChange={(event) => onChange({ ...form, allergens: event.target.value })} placeholder="gluten, süt" /></label>
