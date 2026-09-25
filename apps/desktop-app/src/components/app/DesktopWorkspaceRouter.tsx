@@ -124,6 +124,8 @@ export function DesktopWorkspaceRouter({
     startNewItem,
     saveCategory: handleSaveCategory,
     saveItem: handleSaveItem,
+    reorderCategories: handleReorderMenuCategories,
+    reorderItems: handleReorderMenuItems,
     deleteCategory: handleDeleteMenuCategory
   } = menuController;
   const {
@@ -582,6 +584,8 @@ export function DesktopWorkspaceRouter({
           onNewItem={startNewItem}
           onSaveCategory={handleSaveCategory}
           onSaveItem={handleSaveItem}
+          onReorderCategories={handleReorderMenuCategories}
+          onReorderItems={handleReorderMenuItems}
           onDeleteCategory={handleDeleteMenuCategory}
           onDashboardDataChanged={setDashboardData}
         />
