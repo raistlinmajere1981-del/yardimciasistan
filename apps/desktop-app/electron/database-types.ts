@@ -348,7 +348,7 @@ export type DesktopReportQueryResult =
   | { ok: true; data: DesktopReportData }
   | { ok: false; message: string };
 
-export type DesktopReportAiMode = "summary" | "attention" | "sales" | "recommendations";
+export type DesktopReportAiMode = "summary" | "sales" | "recommendations";
 
 export interface GenerateDesktopReportAiInput {
   mode: DesktopReportAiMode;
