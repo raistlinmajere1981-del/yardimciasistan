@@ -1247,8 +1247,8 @@ try {
   await expect(reservationWorkspace.getByLabel("Durum")).toBeVisible();
   await expect(reservationWorkspace.getByText("GG.AA.YYYY", { exact: true })).toBeVisible();
   await expect(reservationWorkspace.locator(".localized-date-display")).toHaveCount(0);
-  await reservationWorkspace.getByLabel("Tarih").fill("2026-07-18");
-  await expect(reservationWorkspace.getByLabel("Tarih")).toHaveValue("2026-07-18");
+  await chooseDate(reservationWorkspace, "Tarih", "2026-07-18");
+  await expect(reservationWorkspace.getByRole("button", { name: "Tarih", exact: true })).toHaveAttribute("data-picker-value", "2026-07-18");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
   await reservationWorkspace.getByLabel("Durum").selectOption("pending");
   await expect(conversionPage.getByText(/1\s*görünen kayıt/)).toBeVisible();
