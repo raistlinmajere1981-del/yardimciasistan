@@ -22,10 +22,9 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
   }, 0);
 
   return (
-    <section id="settings-operations" tabIndex={-1} className="setup-section settings-daily-section">
-      <fieldset className="settings-resource-fields" disabled={loading || saving}>
-        <div className="table-category-editor">
-          <div className="setup-section-title table-category-heading">
+    <section id="settings-operations" tabIndex={-1} className="settings-panel settings-daily-section">
+      <fieldset className="settings-resource-fields table-category-editor" disabled={loading || saving}>
+          <div className="settings-panel-header table-category-heading">
             <div>
               <h2>Masa kategorileri</h2>
               <p>{tableCountTotal} masa</p>
@@ -42,6 +41,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
             </ActionButton>
           </div>
 
+          <div className="settings-panel-body">
           {draft.tableCategories.length > 0 && (
             <div className="table-category-list">
               {draft.tableCategories.map((category, index) => (
@@ -82,8 +82,7 @@ export function LayoutSettingsSection({ controller }: { controller: BusinessLayo
               ))}
             </div>
           )}
-
-        </div>
+          </div>
       </fieldset>
     </section>
   );
