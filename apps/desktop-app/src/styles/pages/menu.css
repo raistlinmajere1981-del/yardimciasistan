@@ -177,6 +177,7 @@
 
 .menu-item-field-description {
   grid-column: 1 / span 8;
+  grid-row: 2;
 }
 
 .menu-item-field-description textarea {
@@ -186,33 +187,38 @@
 .menu-item-image-editor {
   display: grid;
   grid-column: 9 / span 4;
-  grid-row: 2 / span 2;
+  grid-row: 2 / span 3;
   align-self: start;
   gap: var(--space-2);
   min-width: 0;
 }
 
 .menu-item-image-label {
+  width: 100%;
   color: var(--color-text);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
+  text-align: center;
+}
+
+.menu-item-field-tags {
+  grid-column: 1 / span 4;
+  grid-row: 3;
+}
+
+.menu-item-field-allergens {
+  grid-column: 5 / span 4;
+  grid-row: 3;
 }
 
 .menu-item-field-status {
   display: flex;
   grid-column: 1 / span 8;
+  grid-row: 4;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-4);
   min-height: var(--control-height-md);
-}
-
-.menu-item-field-tags {
-  grid-column: 1 / span 6;
-}
-
-.menu-item-field-allergens {
-  grid-column: 7 / span 6;
 }
 
 .menu-item-stock-section.is-disabled {
