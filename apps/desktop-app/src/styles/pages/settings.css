@@ -84,6 +84,10 @@
   margin-bottom: 0;
 }
 
+.settings-panel-body > * + * {
+  margin-top: var(--space-4);
+}
+
 .settings-service-card.is-enabled {
   border-color: var(--color-accent-border);
 }
@@ -748,6 +752,7 @@
 .settings-category-body > * + *,
 .settings-category-body .settings-resource-fields > * + * { margin-top: var(--space-4); }
 .settings-resource-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.settings-resource-fields.settings-panel-body { padding: var(--space-4); }
 .settings-category-actions {
   display: flex;
   align-items: center;
