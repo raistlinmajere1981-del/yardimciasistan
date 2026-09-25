@@ -4,6 +4,15 @@ import { DatabaseSync } from "node:sqlite";
 export type FinanceDirection = "income" | "expense";
 export type FinancePaymentMethod = "cash" | "card" | "bank" | "other" | "unspecified";
 
+export interface DesktopFinanceCategory {
+  id: string;
+  direction: FinanceDirection;
+  name: string;
+  isSystem: boolean;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 export interface DesktopFinanceEntry {
   id: string;
   direction: FinanceDirection;
@@ -41,6 +50,13 @@ export interface DesktopFinanceData {
   outstandingPensionMinor: number;
   recentEntries: DesktopFinanceEntry[];
   pensionBalances: DesktopPensionBalance[];
+  categories: DesktopFinanceCategory[];
+}
+
+export interface SaveFinanceCategoryInput {
+  id?: string;
+  direction: FinanceDirection;
+  name: string;
 }
 
 export interface SaveManualFinanceEntryInput {
@@ -72,8 +88,26 @@ export type DesktopFinanceMutationResult =
   | { ok: false; message: string };
 
 const PAYMENT_METHODS = new Set<FinancePaymentMethod>(["cash", "card", "bank", "other", "unspecified"]);
-const INCOME_CATEGORIES = new Set(["restaurant", "pension", "other_income"]);
-const EXPENSE_CATEGORIES = new Set(["stock", "utilities", "staff", "maintenance", "transport", "official", "other_expense"]);
+
+const DEFAULT_FINANCE_CATEGORIES: ReadonlyArray<{
+  id: string;
+  direction: FinanceDirection;
+  name: string;
+  isSystem: boolean;
+  sortOrder: number;
+}> = [
+  { id: "other_income", direction: "income", name: "Diğer gelir", isSystem: false, sortOrder: 10 },
+  { id: "pension", direction: "income", name: "Pansiyon", isSystem: true, sortOrder: 90 },
+  { id: "restaurant", direction: "income", name: "Restoran", isSystem: true, sortOrder: 100 },
+  { id: "stock", direction: "expense", name: "Market / Stok", isSystem: false, sortOrder: 10 },
+  { id: "utilities", direction: "expense", name: "Elektrik - Su", isSystem: false, sortOrder: 20 },
+  { id: "rent", direction: "expense", name: "Kira", isSystem: false, sortOrder: 30 },
+  { id: "staff", direction: "expense", name: "Personel", isSystem: false, sortOrder: 40 },
+  { id: "maintenance", direction: "expense", name: "Bakım", isSystem: false, sortOrder: 50 },
+  { id: "transport", direction: "expense", name: "Yakıt - Ulaşım", isSystem: false, sortOrder: 60 },
+  { id: "official", direction: "expense", name: "Vergi / Resmi", isSystem: false, sortOrder: 70 },
+  { id: "other_expense", direction: "expense", name: "Diğer gider", isSystem: false, sortOrder: 80 }
+];
 
 export class DesktopFinanceService {
   constructor(private readonly databasePath: string) {}
@@ -81,6 +115,7 @@ export class DesktopFinanceService {
   getData(limit = 40): DesktopFinanceData {
     const db = this.openDatabase();
     try {
+      ensureFinanceCategories(db);
       const safeLimit = Math.max(1, Math.min(100, Math.trunc(Number(limit) || 40)));
       const today = db.prepare(`
         SELECT
@@ -163,6 +198,12 @@ export class DesktopFinanceService {
         LIMIT 100
       `).all() as Array<Record<string, unknown>>;
 
+      const categoryRows = db.prepare(`
+        SELECT id, direction, name, is_system, is_active, sort_order
+        FROM finance_categories
+        ORDER BY direction ASC, sort_order ASC, name COLLATE NOCASE ASC
+      `).all() as Array<Record<string, unknown>>;
+
       const todayIncomeMinor = nonNegativeInteger(today?.income_minor);
       const todayExpenseMinor = nonNegativeInteger(today?.expense_minor);
       return {
@@ -173,7 +214,8 @@ export class DesktopFinanceService {
         todayNetMinor: todayIncomeMinor - todayExpenseMinor,
         outstandingPensionMinor: nonNegativeInteger(outstanding?.outstanding_minor),
         recentEntries: recentRows.map(mapFinanceEntry),
-        pensionBalances: pensionRows.map(mapPensionBalance)
+        pensionBalances: pensionRows.map(mapPensionBalance),
+        categories: categoryRows.map(mapFinanceCategory)
       };
     } finally {
       db.close();
@@ -188,7 +230,7 @@ export class DesktopFinanceService {
     }
 
     const paymentMethod = normalizePaymentMethod(input?.paymentMethod);
-    const category = normalizeCategory(direction, input?.category);
+    const category = cleanText(input?.category, 180);
     const description = cleanText(input?.description, 160) || (direction === "income" ? "Manuel gelir" : "Manuel gider");
     const note = cleanText(input?.note, 500);
     const occurredAt = normalizeTimestamp(input?.occurredAt) || new Date().toISOString();
@@ -197,6 +239,17 @@ export class DesktopFinanceService {
 
     const db = this.openDatabase();
     try {
+      ensureFinanceCategories(db);
+      const categoryRow = db.prepare(`
+        SELECT id
+        FROM finance_categories
+        WHERE id = ? AND direction = ? AND is_active = 1
+        LIMIT 1
+      `).get(category, direction);
+      if (!categoryRow) {
+        return { ok: false, message: "Seçilen gelir / gider türü artık kullanılamıyor." };
+      }
+
       db.prepare(`
         INSERT INTO finance_entries (
           id, direction, amount_minor, currency, payment_method, category, description,
@@ -214,6 +267,95 @@ export class DesktopFinanceService {
       message: direction === "income" ? "Gelir kasaya eklendi." : "Gider kasaya eklendi.",
       data: this.getData()
     };
+  }
+
+  saveCategory(input: SaveFinanceCategoryInput): DesktopFinanceMutationResult {
+    const direction = input?.direction === "income" || input?.direction === "expense" ? input.direction : null;
+    const name = cleanText(input?.name, 80);
+    if (!direction || !name) {
+      return { ok: false, message: "Gelir / gider türü adı gerekli." };
+    }
+
+    const db = this.openDatabase();
+    try {
+      ensureFinanceCategories(db);
+      const requestedId = cleanText(input?.id, 180);
+      if (requestedId) {
+        const existing = db.prepare(`
+          SELECT is_system FROM finance_categories WHERE id = ? AND direction = ?
+        `).get(requestedId, direction) as { is_system?: number } | undefined;
+        if (!existing) return { ok: false, message: "Gelir / gider türü bulunamadı." };
+        if (Number(existing.is_system ?? 0) === 1) {
+          return { ok: false, message: "Sistem türleri değiştirilemez." };
+        }
+        db.prepare(`
+          UPDATE finance_categories
+          SET name = ?, is_active = 1, updated_at = ?
+          WHERE id = ? AND direction = ?
+        `).run(name, new Date().toISOString(), requestedId, direction);
+      } else {
+        const duplicate = db.prepare(`
+          SELECT id FROM finance_categories
+          WHERE direction = ? AND lower(name) = lower(?) AND is_active = 1
+          LIMIT 1
+        `).get(direction, name);
+        if (duplicate) return { ok: false, message: "Bu tür zaten listede." };
+
+        const maxRow = db.prepare(`
+          SELECT COALESCE(MAX(sort_order), 0) AS max_order
+          FROM finance_categories WHERE direction = ?
+        `).get(direction) as { max_order?: number } | undefined;
+        const now = new Date().toISOString();
+        db.prepare(`
+          INSERT INTO finance_categories (
+            id, direction, name, is_system, is_active, sort_order, created_at, updated_at
+          ) VALUES (?, ?, ?, 0, 1, ?, ?, ?)
+        `).run(
+          `finance_category_${randomUUID()}`,
+          direction,
+          name,
+          Math.max(0, Math.trunc(Number(maxRow?.max_order ?? 0))) + 10,
+          now,
+          now
+        );
+      }
+    } finally {
+      db.close();
+    }
+
+    return {
+      ok: true,
+      message: input?.id ? "Tür güncellendi." : "Yeni tür eklendi.",
+      data: this.getData()
+    };
+  }
+
+  deleteCategory(categoryIdValue: string): DesktopFinanceMutationResult {
+    const categoryId = cleanText(categoryIdValue, 180);
+    if (!categoryId) return { ok: false, message: "Kaldırılacak tür bulunamadı." };
+
+    const db = this.openDatabase();
+    try {
+      ensureFinanceCategories(db);
+      const existing = db.prepare(`
+        SELECT is_system, is_active FROM finance_categories WHERE id = ?
+      `).get(categoryId) as { is_system?: number; is_active?: number } | undefined;
+      if (!existing || Number(existing.is_active ?? 0) !== 1) {
+        return { ok: false, message: "Gelir / gider türü bulunamadı." };
+      }
+      if (Number(existing.is_system ?? 0) === 1) {
+        return { ok: false, message: "Sistem türleri kaldırılamaz." };
+      }
+      db.prepare(`
+        UPDATE finance_categories
+        SET is_active = 0, updated_at = ?
+        WHERE id = ?
+      `).run(new Date().toISOString(), categoryId);
+    } finally {
+      db.close();
+    }
+
+    return { ok: true, message: "Tür listeden kaldırıldı.", data: this.getData() };
   }
 
   deleteManualEntry(entryIdValue: string): DesktopFinanceMutationResult {
@@ -346,6 +488,17 @@ export class DesktopFinanceService {
   }
 }
 
+function mapFinanceCategory(row: Record<string, unknown>): DesktopFinanceCategory {
+  return {
+    id: String(row.id ?? ""),
+    direction: row.direction === "expense" ? "expense" : "income",
+    name: String(row.name ?? ""),
+    isSystem: Number(row.is_system ?? 0) === 1,
+    isActive: Number(row.is_active ?? 0) === 1,
+    sortOrder: Math.max(0, Math.trunc(Number(row.sort_order ?? 0)))
+  };
+}
+
 function mapFinanceEntry(row: Record<string, unknown>): DesktopFinanceEntry {
   return {
     id: String(row.id ?? ""),
@@ -383,13 +536,6 @@ function normalizePaymentMethod(value: unknown): FinancePaymentMethod {
   return PAYMENT_METHODS.has(candidate) ? candidate : "unspecified";
 }
 
-function normalizeCategory(direction: FinanceDirection, value: unknown): string {
-  const candidate = String(value ?? "").trim();
-  const allowed = direction === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
-  if (allowed.has(candidate)) return candidate;
-  return direction === "income" ? "other_income" : "other_expense";
-}
-
 function normalizePositiveAmount(value: unknown): number | null {
   const amount = Number(value);
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > 999_999_999_999) return null;
@@ -421,4 +567,38 @@ function normalizeTimestamp(value: unknown): string {
 
 function cleanText(value: unknown, maxLength: number): string {
   return String(value ?? "").trim().slice(0, maxLength);
+}
+
+
+function ensureFinanceCategories(db: DatabaseSync) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS finance_categories (
+      id TEXT PRIMARY KEY,
+      direction TEXT NOT NULL CHECK (direction IN ('income', 'expense')),
+      name TEXT NOT NULL,
+      is_system INTEGER NOT NULL DEFAULT 0 CHECK (is_system IN (0, 1)),
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+  `);
+
+  const now = new Date().toISOString();
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO finance_categories (
+      id, direction, name, is_system, is_active, sort_order, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+  `);
+  for (const category of DEFAULT_FINANCE_CATEGORIES) {
+    insert.run(
+      category.id,
+      category.direction,
+      category.name,
+      category.isSystem ? 1 : 0,
+      category.sortOrder,
+      now,
+      now
+    );
+  }
 }
