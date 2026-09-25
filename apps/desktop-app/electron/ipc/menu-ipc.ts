@@ -4,6 +4,7 @@ import type {
   DesktopDatabase,
   DesktopMenuSaveResult,
   DesktopStatusUpdateResult,
+  ReorderMenuRecordsInput,
   SaveMenuCategoryInput,
   SaveMenuItemInput
 } from "../database";
@@ -25,6 +26,11 @@ export function registerMenuIpcHandlers(options: {
     assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
     assertMenuItemSubfeatureMutation(input);
     return getDatabase().saveMenuItem(input);
+  });
+
+  ipcMain.handle("menu:reorder", (_event, input: ReorderMenuRecordsInput): DesktopStatusUpdateResult => {
+    assertCapability(BUSINESS_CAPABILITIES.FOOD_MENU, "Menü yönetimi bu işletmede etkin değil.");
+    return getDatabase().reorderMenuRecords(input);
   });
 
   ipcMain.handle("menu:deleteCategory", (_event, categoryId: unknown): DesktopStatusUpdateResult => {
