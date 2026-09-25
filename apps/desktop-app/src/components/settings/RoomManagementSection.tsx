@@ -23,8 +23,8 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
     <section id="settings-rooms" tabIndex={-1} className="settings-panel room-management-settings">
       <div className="settings-panel-header room-management-heading">
         <div>
-          <p>Pansiyon</p>
           <h2>Oda Yönetimi</h2>
+          <p>Pansiyon</p>
         </div>
         <ActionButton
           variant="secondary"
