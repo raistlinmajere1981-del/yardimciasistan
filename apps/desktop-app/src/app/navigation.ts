@@ -170,7 +170,7 @@ const reportsContribution = {
   icon: WalletCards,
   order: 80,
   condition: { anyOf: [C.FINANCE, C.REPORTS] },
-  contentScroll: "page",
+  contentScroll: "workspace",
   presentation: (capabilities) => {
     const financeEnabled = runtimeHasCapability(capabilities, C.FINANCE);
     const reportsEnabled = runtimeHasCapability(capabilities, C.REPORTS);
