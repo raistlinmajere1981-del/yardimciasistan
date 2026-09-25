@@ -4,6 +4,7 @@ import {
   type AddPensionPaymentInput,
   type DesktopFinanceData,
   type DesktopFinanceMutationResult,
+  type SaveFinanceCategoryInput,
   type SaveManualFinanceEntryInput,
   type SetReservationAgreedTotalInput
 } from "./finance";
@@ -44,6 +45,19 @@ export function registerFinanceIpcHandlers(options: {
   ipcMain.handle("finance:deleteManualEntry", (_event, entryId: string): DesktopFinanceMutationResult => {
     assertAccess();
     return finalize(service().deleteManualEntry(entryId));
+  });
+
+  ipcMain.handle(
+    "finance:saveCategory",
+    (_event, input: SaveFinanceCategoryInput): DesktopFinanceMutationResult => {
+      assertAccess();
+      return finalize(service().saveCategory(input));
+    }
+  );
+
+  ipcMain.handle("finance:deleteCategory", (_event, categoryId: string): DesktopFinanceMutationResult => {
+    assertAccess();
+    return finalize(service().deleteCategory(categoryId));
   });
 
   ipcMain.handle(
