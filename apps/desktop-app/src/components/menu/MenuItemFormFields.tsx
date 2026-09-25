@@ -49,7 +49,8 @@ export function MenuItemFormFields({
 
   const showDetails = mode === "all" || mode === "details";
   const showStock = inventoryEnabled && (mode === "all" || mode === "stock");
-  const showMedia = mode === "all" || mode === "media";
+  const showInlineMedia = mode === "all";
+  const showStandaloneMedia = mode === "media";
   const previewSource = resolveMenuPreviewImageUrl(form.image_url, dashboardData.webModuleUrl);
   const visiblePreviewSource = previewSource && previewSource !== failedPreviewSource ? previewSource : "";
 
@@ -83,15 +84,56 @@ export function MenuItemFormFields({
     });
   }
 
+  function renderImageControls(compact = false) {
+    return (
+      <div className={compact ? "menu-media-preview-tools is-compact" : "menu-media-preview-tools"}>
+        <figure className="menu-image-inline-preview" aria-label="Mevcut ürün görseli önizlemesi">
+          <div className="menu-image-preview-frame">
+            {visiblePreviewSource
+              ? <img src={visiblePreviewSource} alt="Mevcut ürün görseli" onError={() => setFailedPreviewSource(previewSource)} />
+              : <span className="menu-image-preview-empty">{form.image_url ? "Önizleme yok" : "Görsel yok"}</span>}
+          </div>
+        </figure>
+
+        <div className="menu-media-actions">
+          <ActionButton
+            variant="secondary"
+            size="sm"
+            type="button"
+            aria-busy={imageBusy}
+            onClick={() => imageInputRef.current?.click()}
+            disabled={imageBusy}
+          >
+            {imageBusy ? "Hazırlanıyor…" : "Dosya seç"}
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="sm"
+            type="button"
+            onClick={clearImage}
+            disabled={imageBusy || !form.image_url}
+          >
+            Temizle
+          </ActionButton>
+        </div>
+
+        <span className="menu-media-file-name" title={imageLabel}>{imageBusy ? "Görsel hazırlanıyor…" : imageLabel}</span>
+        <input ref={imageInputRef} className="menu-image-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" tabIndex={-1} aria-hidden="true" onChange={(event) => void handleImageFile(event.target.files?.[0])} />
+        {imageError && <small className="menu-image-error" role="status">{imageError}</small>}
+      </div>
+    );
+  }
+
   return (
     <div className="form-stack menu-item-form">
       {showDetails && (
         <section className="panel form-stack menu-item-details-section">
-          <div className="page-toolbar">
+          <div className={showInlineMedia ? "page-toolbar menu-item-details-toolbar has-media" : "page-toolbar menu-item-details-toolbar"}>
             <div className="page-toolbar__copy">
               <strong>Ürün bilgileri</strong>
               <small>Menüde görünen temel bilgiler ve sınıflandırma.</small>
             </div>
+            {showInlineMedia && renderImageControls(true)}
           </div>
           <div className="form-grid">
             <label className="form-field form-field--long form-field--span">Ürün adı<input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} placeholder="Serpme Kahvaltı" /></label>
@@ -144,45 +186,14 @@ export function MenuItemFormFields({
         </section>
       )}
 
-      {showMedia && (
+      {showStandaloneMedia && (
         <section className="panel menu-item-media-section">
           <div className="menu-media-header">
             <div className="page-toolbar__copy">
               <strong>Görsel</strong>
               <small>Menü kartında kullanılacak görsel.</small>
             </div>
-
-            <div className="menu-media-preview-tools">
-              <figure className="menu-image-inline-preview" aria-label="Mevcut ürün görseli önizlemesi">
-                <div className="menu-image-preview-frame">{visiblePreviewSource ? <img src={visiblePreviewSource} alt="Mevcut ürün görseli" onError={() => setFailedPreviewSource(previewSource)} /> : <span className="menu-image-preview-empty">{form.image_url ? "Önizleme yok" : "Görsel yok"}</span>}</div>
-              </figure>
-
-              <div className="menu-media-actions">
-                <ActionButton
-                  variant="secondary"
-                  size="sm"
-                  type="button"
-                  aria-busy={imageBusy}
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={imageBusy}
-                >
-                  {imageBusy ? "Hazırlanıyor…" : "Dosya seç"}
-                </ActionButton>
-                <ActionButton
-                  variant="ghost"
-                  size="sm"
-                  type="button"
-                  onClick={clearImage}
-                  disabled={imageBusy || !form.image_url}
-                >
-                  Temizle
-                </ActionButton>
-              </div>
-
-              <span className="menu-media-file-name" title={imageLabel}>{imageBusy ? "Görsel hazırlanıyor…" : imageLabel}</span>
-              <input ref={imageInputRef} className="menu-image-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" tabIndex={-1} aria-hidden="true" onChange={(event) => void handleImageFile(event.target.files?.[0])} />
-              {imageError && <small className="menu-image-error" role="status">{imageError}</small>}
-            </div>
+            {renderImageControls()}
           </div>
         </section>
       )}
