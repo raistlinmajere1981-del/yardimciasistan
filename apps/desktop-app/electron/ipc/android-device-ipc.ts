@@ -15,13 +15,15 @@ export function registerAndroidDeviceIpcHandlers(options: {
   finalizeDeviceMutation: (result: DesktopAndroidDeviceMutationResult) => DesktopAndroidDeviceMutationResult;
   listInstallDevices: () => DesktopAndroidInstallationSnapshot;
   installOnDevice: (serial: string) => Promise<DesktopAndroidInstallResult>;
+  provisionOnDevice: (serial: string) => Promise<DesktopAndroidInstallResult>;
 }) {
   const {
     getDatabase,
     assertCapability,
     finalizeDeviceMutation,
     listInstallDevices,
-    installOnDevice
+    installOnDevice,
+    provisionOnDevice
   } = options;
 
   ipcMain.handle("androidDevice:setRole", (_event, deviceId: unknown, role: unknown): DesktopAndroidDeviceMutationResult => {
@@ -60,5 +62,10 @@ export function registerAndroidDeviceIpcHandlers(options: {
   ipcMain.handle("androidDevice:install", async (_event, serial: unknown): Promise<DesktopAndroidInstallResult> => {
     assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android kurulumu bu işletmede etkin değil.");
     return installOnDevice(String(serial ?? ""));
+  });
+
+  ipcMain.handle("androidDevice:provision", async (_event, serial: unknown): Promise<DesktopAndroidInstallResult> => {
+    assertCapability(BUSINESS_CAPABILITIES.ANDROID, "Android bağlantısı bu işletmede etkin değil.");
+    return provisionOnDevice(String(serial ?? ""));
   });
 }
