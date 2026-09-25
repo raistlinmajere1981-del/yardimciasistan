@@ -12,7 +12,6 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FormDialog } from "../ui/FormDialog";
 import { MetricCard } from "../ui/MetricCard";
 import { Panel } from "../ui/Panel";
-import { StatusBadge } from "../ui/StatusBadge";
 import { useRequestGeneration } from "../workspace/use-request-generation";
 
 const RECENT_ENTRY_PREVIEW_COUNT = 6;
