@@ -24,6 +24,7 @@ export interface ServicesSettingsProps {
   onTestAiConnection: () => void;
   onRefreshAndroidInstallDevices?: () => void;
   onInstallAndroidApp?: (serial: string) => void;
+  onProvisionAndroidApp?: (serial: string) => void;
   onSetAndroidDeviceRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetAndroidDevicePermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetAndroidDeviceActive?: (deviceId: string, active: boolean) => void;
@@ -47,6 +48,7 @@ export function ServicesSettingsSection({
   onTestAiConnection,
   onRefreshAndroidInstallDevices,
   onInstallAndroidApp,
+  onProvisionAndroidApp,
   onSetAndroidDeviceRole,
   onSetAndroidDevicePermissionGroups,
   onSetAndroidDeviceActive,
@@ -178,6 +180,7 @@ export function ServicesSettingsSection({
                   installSnapshot={androidInstallSnapshot}
                   onRefreshInstallDevices={onRefreshAndroidInstallDevices}
                   onInstallApp={onInstallAndroidApp}
+                  onProvisionApp={onProvisionAndroidApp}
                   onSetRole={onSetAndroidDeviceRole}
                   onSetPermissionGroups={onSetAndroidDevicePermissionGroups}
                   onSetActive={onSetAndroidDeviceActive}
