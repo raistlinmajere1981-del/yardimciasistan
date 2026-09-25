@@ -1,5 +1,5 @@
 import { useConfirmDialog } from "../ui/useConfirmDialog";
-import { RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
+import { Link2, RefreshCw, ShieldCheck, Smartphone } from "lucide-react";
 import { androidAvailablePermissionGroupIds, type AndroidPermissionGroupId, type AndroidPermissionGroups } from "@yardimci-asistan/sync-core";
 import { BUSINESS_CAPABILITIES, hasBusinessCapability, type BusinessCapability } from "@yardimci-asistan/shared";
 import type { DesktopAndroidDevice } from "../../../electron/database";
@@ -35,6 +35,7 @@ interface AndroidDevicesSectionProps {
   installSnapshot: DesktopAndroidInstallationSnapshot | null;
   onRefreshInstallDevices?: () => void;
   onInstallApp?: (serial: string) => void;
+  onProvisionApp?: (serial: string) => void;
   onSetRole?: (deviceId: string, role: "admin" | "staff") => void;
   onSetPermissionGroups?: (deviceId: string, groups: AndroidPermissionGroups) => void;
   onSetActive?: (deviceId: string, active: boolean) => void;
@@ -52,6 +53,7 @@ export function AndroidDevicesSection({
   installSnapshot,
   onRefreshInstallDevices,
   onInstallApp,
+  onProvisionApp,
   onSetRole,
   onSetPermissionGroups,
   onSetActive,
@@ -146,6 +148,30 @@ export function AndroidDevicesSection({
                   >
                     {actionLabel}
                   </ActionButton>
+                  {device.appInstalled && device.state === "device" && (
+                    <ActionButton
+                      variant="secondary"
+                      size="sm"
+                      className="setup-secondary"
+                      type="button"
+                      title="Telefondaki kayıtlı işletme bağlantısını bu masaüstünün mevcut web bağlantısıyla değiştirir."
+                      onClick={async () => {
+                        if (!onProvisionApp) return;
+                        const deviceName = device.model || "Android cihaz";
+                        const accepted = await confirm({
+                          title: "Telefonu işletmeye bağla",
+                          description: `${deviceName} üzerindeki mevcut işletme bağlantısı bu masaüstünün web bağlantısıyla değiştirilecek. Devam edilsin mi?`,
+                          tone: "warning",
+                          confirmLabel: "Bağla"
+                        });
+                        if (accepted) onProvisionApp(device.serial);
+                      }}
+                      disabled={!onProvisionApp || installState === "loading"}
+                    >
+                      <Link2 size={15} aria-hidden="true" />
+                      İşletmeye Bağla
+                    </ActionButton>
+                  )}
                 </div>
               </article>
             );
