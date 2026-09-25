@@ -22,6 +22,7 @@ import { FinanceWorkspace } from "../components/finance/FinanceWorkspace";
 import type { FinanceController } from "../app/controller-types";
 import { MetricCard } from "../components/ui/MetricCard";
 import { Panel } from "../components/ui/Panel";
+import { DatePicker } from "../components/ui/DateTimePicker";
 
 interface ReportsPageProps {
   aiEnabled: boolean;
@@ -254,30 +255,26 @@ export function ReportsPage({
         </div>
         {range.preset === "custom" && (
           <div className="report-custom-dates">
-            <label>
-              Başlangıç tarihi
-              <input
-                aria-label="Başlangıç tarihi"
-                lang="tr-TR"
-                type="date"
+            <div className="form-field report-custom-date-field">
+              <span>Başlangıç tarihi</span>
+              <DatePicker
+                ariaLabel="Başlangıç tarihi"
                 value={customStart}
                 max={customEnd || undefined}
-                onChange={(event) => updateCustomRange(event.target.value, customEnd)}
+                presets={[]}
+                onChange={(value) => updateCustomRange(value, customEnd)}
               />
-              <small>GG.AA.YYYY</small>
-            </label>
-            <label>
-              Bitiş tarihi
-              <input
-                aria-label="Bitiş tarihi"
-                lang="tr-TR"
-                type="date"
+            </div>
+            <div className="form-field report-custom-date-field">
+              <span>Bitiş tarihi</span>
+              <DatePicker
+                ariaLabel="Bitiş tarihi"
                 value={customEnd}
                 min={customStart || undefined}
-                onChange={(event) => updateCustomRange(customStart, event.target.value)}
+                presets={[]}
+                onChange={(value) => updateCustomRange(customStart, value)}
               />
-              <small>GG.AA.YYYY</small>
-            </label>
+            </div>
           </div>
         )}
         {reportMessage && <p className="report-error" role="alert">{reportMessage}</p>}
