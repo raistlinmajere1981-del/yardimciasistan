@@ -85,12 +85,21 @@ export function MenuManager({
     () => [...dashboardData.menu.categories].sort(compareMenuRecords),
     [dashboardData.menu.categories]
   );
-  const visibleItems = useMemo(
-    () => dashboardData.menu.items
-      .filter((item) => !selectedCategoryId || item.category_id === selectedCategoryId)
-      .sort(compareMenuRecords),
-    [dashboardData.menu.items, selectedCategoryId]
-  );
+  const visibleItems = useMemo(() => {
+    const items = dashboardData.menu.items
+      .filter((item) => !selectedCategoryId || item.category_id === selectedCategoryId);
+
+    if (selectedCategoryId) {
+      return items.sort(compareMenuRecords);
+    }
+
+    const categoryOrder = new Map(sortedCategories.map((category, index) => [category.id, index]));
+    return items.sort((left, right) => {
+      const categoryDifference = (categoryOrder.get(left.category_id) ?? Number.MAX_SAFE_INTEGER)
+        - (categoryOrder.get(right.category_id) ?? Number.MAX_SAFE_INTEGER);
+      return categoryDifference || compareMenuRecords(left, right);
+    });
+  }, [dashboardData.menu.items, selectedCategoryId, sortedCategories]);
   const selectedCategoryName = selectedCategoryId
     ? findMenuCategoryName(selectedCategoryId, dashboardData.menu.categories)
     : "Tüm kategoriler";
@@ -139,6 +148,14 @@ export function MenuManager({
 
   function handleDragOver(event: DragEvent<HTMLButtonElement>, id: string) {
     if (!dragging || dragging.id === id) return;
+    if (dragging.kind === "item") {
+      const sourceItem = dashboardData.menu.items.find((item) => item.id === dragging.id);
+      const targetItem = dashboardData.menu.items.find((item) => item.id === id);
+      if (!sourceItem || !targetItem || sourceItem.category_id !== targetItem.category_id) {
+        setDropTarget(null);
+        return;
+      }
+    }
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     const rect = event.currentTarget.getBoundingClientRect();
@@ -155,9 +172,24 @@ export function MenuManager({
       return;
     }
 
+    const sourceItem = kind === "item"
+      ? dashboardData.menu.items.find((item) => item.id === dragging.id)
+      : undefined;
+    const targetItem = kind === "item"
+      ? dashboardData.menu.items.find((item) => item.id === targetId)
+      : undefined;
+    if (kind === "item" && (!sourceItem || !targetItem || sourceItem.category_id !== targetItem.category_id)) {
+      setDragging(null);
+      setDropTarget(null);
+      return;
+    }
+
     const sourceIds = kind === "category"
       ? sortedCategories.map((record) => record.id)
-      : visibleItems.map((record) => record.id);
+      : dashboardData.menu.items
+        .filter((record) => record.category_id === sourceItem?.category_id)
+        .sort(compareMenuRecords)
+        .map((record) => record.id);
     const orderedIds = moveId(sourceIds, dragging.id, targetId, dropTarget?.id === targetId ? dropTarget.position : "before");
     setDragging(null);
     setDropTarget(null);
@@ -167,8 +199,8 @@ export function MenuManager({
     try {
       if (kind === "category") {
         await onReorderCategories(orderedIds);
-      } else if (selectedCategoryId) {
-        await onReorderItems(selectedCategoryId, orderedIds);
+      } else if (sourceItem) {
+        await onReorderItems(sourceItem.category_id, orderedIds);
       }
     } finally {
       setReorderBusy(false);
@@ -306,7 +338,7 @@ export function MenuManager({
             <div className="panel-heading menu-panel-heading">
               <div className="menu-heading-copy">
                 <h2>Ürünler</h2>
-                <span>{selectedCategoryName}{selectedCategoryId ? " · Sıralamak için sürükleyin" : " · Sıralama için kategori seçin"}</span>
+                <span>{selectedCategoryName}{selectedCategoryId ? " · Sıralamak için sürükleyin" : " · Ürünleri kendi kategorisi içinde sürükleyin"}</span>
               </div>
               <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
             </div>
@@ -317,12 +349,12 @@ export function MenuManager({
                 const stockBadge = getMenuStockBadge(item);
                 return (
                   <DataListButton
-                    className={`menu-record${selectedCategoryId ? " menu-sortable-record" : ""}${dragging?.kind === "item" && dragging.id === item.id ? " is-dragging" : ""}${dropTarget?.id === item.id ? ` is-drop-${dropTarget.position}` : ""}`}
+                    className={`menu-record menu-sortable-record${dragging?.kind === "item" && dragging.id === item.id ? " is-dragging" : ""}${dropTarget?.id === item.id ? ` is-drop-${dropTarget.position}` : ""}`}
                     key={item.id}
-                    draggable={Boolean(selectedCategoryId) && !reorderBusy}
-                    onDragStart={(event) => selectedCategoryId && handleDragStart(event, "item", item.id)}
-                    onDragOver={(event) => selectedCategoryId && handleDragOver(event, item.id)}
-                    onDrop={(event) => selectedCategoryId && void handleDrop(event, "item", item.id)}
+                    draggable={!reorderBusy}
+                    onDragStart={(event) => handleDragStart(event, "item", item.id)}
+                    onDragOver={(event) => handleDragOver(event, item.id)}
+                    onDrop={(event) => void handleDrop(event, "item", item.id)}
                     onDragEnd={finishDrag}
                     onClick={() => {
                       if (!suppressRowClickRef.current) openItem(item);
@@ -330,8 +362,8 @@ export function MenuManager({
                     aria-pressed={selectedItemId === item.id}
                     selected={selectedItemId === item.id}
                     title={item.name}
-                    leading={selectedCategoryId ? <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" /> : undefined}
-                    meta={formatCurrency(item.price, item.currency) + " · " + (item.is_available ? "Mevcut" : "Kapalı") + (item.is_featured ? " · Öne çıkan" : "")}
+                    leading={<GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />}
+                    meta={(selectedCategoryId ? "" : findMenuCategoryName(item.category_id, dashboardData.menu.categories) + " · ") + formatCurrency(item.price, item.currency) + " · " + (item.is_available ? "Mevcut" : "Kapalı") + (item.is_featured ? " · Öne çıkan" : "")}
                     trailing={(
                       <span className="menu-product-row__trailing">
                         {inventoryEnabled && stockBadge && <StatusBadge tone={stockBadge.tone}>{stockBadge.label}</StatusBadge>}
