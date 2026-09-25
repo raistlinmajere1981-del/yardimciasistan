@@ -26,7 +26,7 @@ export function CustomersWorkspace({ customers, stays, aiEnabled, onSave, onAnal
   const [pendingCustomerId, setPendingCustomerId] = useState("");
   const [form, setForm] = useState<CustomerFormState>(() => toCustomerForm(null));
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [saveMessage, setSaveMessage] = useState("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
+  const [saveMessage, setSaveMessage] = useState("");
 
   const filteredCustomers = useMemo(() => customers.filter((customer) => {
     const customerStays = stays.filter((stay) => stay.customerId === customer.id).map((stay) => stay.roomName + " " + stay.roomNumber).join(" ");
@@ -44,7 +44,7 @@ export function CustomersWorkspace({ customers, stays, aiEnabled, onSave, onAnal
   function openCreate() {
     setForm(toCustomerForm(null));
     setSaveState("idle");
-    setSaveMessage("Ad soyad yeterlidir; diğer alanlar daha sonra tamamlanabilir.");
+    setSaveMessage("");
     setCreateOpen(true);
   }
 
@@ -86,7 +86,7 @@ export function CustomersWorkspace({ customers, stays, aiEnabled, onSave, onAnal
         setPendingCustomerId(result.savedId);
         setCreateOpen(false);
       }}
-      footer={<><p className={"form-status sync-" + saveState} role="status">{saveMessage}</p><div className="action-row"><ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={() => setCreateOpen(false)}>Vazgeç</ActionButton><ActionButton type="submit" disabled={saveState === "loading"}><Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}</ActionButton></div></>}
+      footer={<>{saveMessage && <p className={"form-status sync-" + saveState} role="status">{saveMessage}</p>}<div className="action-row"><ActionButton variant="secondary" type="button" disabled={saveState === "loading"} onClick={() => setCreateOpen(false)}>Vazgeç</ActionButton><ActionButton type="submit" disabled={saveState === "loading"}><Save size={16} aria-hidden="true" />{saveState === "loading" ? "Kaydediliyor" : "Müşteri Kartını Kaydet"}</ActionButton></div></>}
     >
       <div className="form-stack customer-create-form"><CustomerFormFields form={form} aiEnabled={aiEnabled} onChange={setForm} onAnalyzeIdentity={onAnalyzeIdentity} /></div>
     </FormDialog>}
