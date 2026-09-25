@@ -448,7 +448,9 @@ try {
   await expect(page.locator(".confirm-dialog")).toContainText("android-smok…ce-001");
   await page.locator(".confirm-dialog").getByRole("button", { name: "Sil", exact: true }).click();
   await expect(androidDeviceSection.getByText("Telefon kaldırıldı ve erişimi kapatıldı.", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.locator(".android-device-list")).toHaveCount(0);
+  const managedAndroidDeviceList = androidDeviceSection.locator(".android-device-list:not(.android-install-device-list)");
+  await expect(managedAndroidDeviceList).toHaveCount(0);
+  await expect(androidDeviceSection.locator(".android-install-device-list")).toHaveCount(1);
   await expect(androidDeviceSection.getByText("0 cihaz", { exact: true })).toBeVisible();
   const removedDevices = androidDeviceSection.locator(".android-removed-devices");
   await expect(removedDevices.getByText("Kaldırılan cihazlar", { exact: true })).toBeVisible();
@@ -459,8 +461,8 @@ try {
   await expect(page.locator(".confirm-dialog")).toContainText("android-smok…ce-001");
   await expect(page.locator(".confirm-dialog")).toContainText("Yönetici rolü");
   await page.locator(".confirm-dialog").getByRole("button", { name: "Geri Yükle", exact: true }).click();
-  await expect(androidDeviceSection.locator(".android-device-list").getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
-  await expect(androidDeviceSection.locator(".android-device-list").getByText("Yönetici", { exact: true })).toBeVisible();
+  await expect(managedAndroidDeviceList.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
+  await expect(managedAndroidDeviceList.getByText("Yönetici", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Etkin yeteneklerde tüm izinler", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("1 cihaz", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.locator(".android-removed-devices")).toHaveCount(0);
