@@ -244,7 +244,7 @@ export function useFinanceController({
     setLoading(false);
     setMutationType(type);
     return lock;
-  }, [accommodationEnabled, data.categories, foodServiceEnabled]);
+  }, []);
 
   const releaseMutation = useCallback((lock: FinanceMutationLock) => {
     if (mutationInFlight.current?.id !== lock.id) return;
@@ -274,7 +274,7 @@ export function useFinanceController({
     });
     setMessage("");
     return true;
-  }, []);
+  }, [accommodationEnabled, data.categories, foodServiceEnabled]);
 
   const closeEntry = useCallback(() => {
     if (mutationInFlight.current) return false;
