@@ -93,14 +93,11 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
           <label className="form-field form-field--short">Telefon<input inputMode="tel" value={form.phone} onChange={(event) => update("phone", event.target.value)} placeholder="+90 5xx… / +44…" /></label>
           <label className="form-field form-field--medium">E-posta<input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} /></label>
           <label className="form-field form-field--medium">Etiketler<input value={form.tags} onChange={(event) => update("tags", event.target.value)} placeholder="düzenli müşteri, özel not" /></label>
-          <label className="form-field--span form-field form-field--fluid">Not<textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
+          <label className="form-field--span form-field form-field--fluid">Not<input value={form.notes} onChange={(event) => update("notes", event.target.value)} /></label>
         </div>
         <label className="form-check customer-birthday-toggle">
           <input checked={form.birthdayMessageEnabled} onChange={(event) => update("birthdayMessageEnabled", event.target.checked)} type="checkbox" />
-          <span>
-            <strong>Doğum günü mesajı gönder</strong>
-            <small>Kapattığınız müşteriler doğum günü mesajlarına dahil edilmez.</small>
-          </span>
+          <strong>Doğum günü mesajı gönder</strong>
         </label>
       </section>
 
@@ -108,7 +105,6 @@ export function CustomerFormFields({ form, aiEnabled, onChange, onAnalyzeIdentit
         <div className="page-toolbar">
           <div className="page-toolbar__copy">
             <strong>Kimlik kartı bilgileri</strong>
-            <small>Görsel yalnız analiz edilir; kimlik fotoğrafı saklanmaz.</small>
           </div>
           <div className="action-row">
             <input ref={identityFileRef} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void analyzeIdentity(event.target.files?.[0])} />
