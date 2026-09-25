@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { DesktopRoomFolio, DesktopRoomFolioMutationResult, RoomFolioPaymentMethod } from "../../../electron/room-folio";
 import { ActionButton } from "../ui/ActionButton";
+import { MoneyInput } from "../ui/MoneyInput";
 import { minorMoney, minorToInput, parseMoneyToMinor, paymentMethodLabel, formatDateTime, formatDateRange } from "./folio-format";
 import type { RoomFolioController } from "./use-room-folio-controller";
 
@@ -95,7 +96,7 @@ export function RoomAccountOperation({ operation, folio, controller, onDone }: {
     setError("");
     const value = parseMoneyToMinor(amount);
     if (operation.kind === "payment" || operation.kind === "add-charge") {
-      if (value <= 0) { setError("Geçerli bir tutar girin."); return; }
+      if (value === null || value <= 0) { setError("Geçerli bir tutar girin."); return; }
       if (operation.kind === "payment") await run(() => bridge.addRoomFolioPayment({ folioId: folio.id, amountMinor: value, paymentMethod: method }));
       else await run(() => bridge.addRoomFolioManualItem({ folioId: folio.id, kind, label: label.trim(), amountMinor: value }));
     } else if (operation.kind === "void-payment" && operation.paymentId) {
@@ -104,9 +105,11 @@ export function RoomAccountOperation({ operation, folio, controller, onDone }: {
       if (folio.remainingMinor > 0) { setError("Açık borç varken hesap kapatılamaz. Önce ödeme alın."); return; }
       await run(() => bridge.checkoutRoomFolio({ folioId: folio.id }));
     } else if (operation.kind === "account-details") {
-      if (parseMoneyToMinor(nightly) < 0 || (manual && parseMoneyToMinor(total) < 0)) { setError("Konaklama tutarlarını kontrol edin."); return; }
+      const nightlyMinor = parseMoneyToMinor(nightly);
+      const totalMinor = parseMoneyToMinor(total);
+      if (nightlyMinor === null || nightlyMinor < 0 || (manual && totalMinor === null)) { setError("Konaklama tutarlarını kontrol edin."); return; }
       await run(() => bridge.updateRoomFolioDetails({ folioId: folio.id, guestCount, checkInDate: start, plannedCheckOutDate: end,
-        nightlyPriceMinor: parseMoneyToMinor(nightly), lodgingManualOverride: manual, lodgingTotalMinor: manual ? parseMoneyToMinor(total) : undefined }));
+        nightlyPriceMinor: nightlyMinor, lodgingManualOverride: manual, lodgingTotalMinor: manual ? totalMinor ?? undefined : undefined }));
     }
   }
   return <form className="form-stack" onSubmit={event => { event.preventDefault(); void submit(); }}>
@@ -129,11 +132,11 @@ export function RoomAccountOperation({ operation, folio, controller, onDone }: {
           <label className="form-field form-field--xs">Kişi sayısı<input type="number" required min={1} max={50} value={guestCount} onChange={event => setGuestCount(Number(event.target.value))} /></label>
           <label className="form-field form-field--short">Giriş tarihi<input lang="tr-TR" type="date" required value={start} onChange={event => setStart(event.target.value)} /></label>
           <label className="form-field form-field--short">Çıkış tarihi<input lang="tr-TR" type="date" min={start} value={end} onChange={event => setEnd(event.target.value)} /></label>
-          <label className="form-field form-field--short">Gecelik fiyat<input required inputMode="decimal" value={nightly} onChange={event => setNightly(event.target.value)} /></label>
+          <label className="form-field form-field--short">Gecelik fiyat<MoneyInput required value={nightly} onChange={setNightly} /></label>
         </div>
         <p>Bu hesaba ait fiyat değişir. Odanın varsayılan fiyatı Ayarlar → Oda Yönetimi bölümündedir.</p>
         <label className="form-check"><input type="checkbox" checked={manual} onChange={event => setManual(event.target.checked)} />Konaklama toplamını elle belirle</label>
-        {manual && <label className="form-field form-field--short">Konaklama toplamı<input inputMode="decimal" value={total} onChange={event => setTotal(event.target.value)} /></label>}
+        {manual && <label className="form-field form-field--short">Konaklama toplamı<MoneyInput value={total} onChange={setTotal} /></label>}
       </> : operation.kind === "void-payment" ? <p>Seçilen tahsilat oda hesabından ve kasa kayıtlarından geri alınacak.</p>
         : operation.kind === "close-account" ? <p>{folio.remainingMinor > 0 ? `${minorMoney(folio.remainingMinor)} açık borç var. Önce ödeme alın.` : "Hesap kapatılacak. Misafirin çıkış tarihi ve odanın temizlik durumu değişmeyecek."}</p>
         : <>
@@ -141,7 +144,7 @@ export function RoomAccountOperation({ operation, folio, controller, onDone }: {
             <label className="form-field form-field--medium">Kalem türü<select aria-label="Kalem türü" value={kind} onChange={event => setKind(event.target.value as typeof kind)}><option value="manual_charge">Ek ücret</option><option value="discount">İndirim</option></select></label>
             <label className="form-field form-field--long">Açıklama<input required value={label} onChange={event => setLabel(event.target.value)} /></label>
           </>}
-          <label className="form-field form-field--short">{operation.kind === "payment" ? "Ödeme tutarı" : "Tutar"}<input required inputMode="decimal" value={amount} onChange={event => setAmount(event.target.value)} /></label>
+          <label className="form-field form-field--short">{operation.kind === "payment" ? "Ödeme tutarı" : "Tutar"}<MoneyInput required value={amount} onChange={setAmount} /></label>
           {operation.kind === "payment" && <label className="form-field form-field--medium">Ödeme yöntemi<select aria-label="Ödeme yöntemi" value={method} onChange={event => setMethod(event.target.value as RoomFolioPaymentMethod)}>
             <option value="cash">Nakit</option><option value="card">Kart</option><option value="bank">Banka</option><option value="other">Diğer</option>
           </select></label>}

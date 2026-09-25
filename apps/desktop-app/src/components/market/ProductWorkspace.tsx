@@ -10,6 +10,7 @@ import {
   emptyProductForm,
   productFormToSaveInput,
   toProductForm,
+  validateProductFormPrices,
   type ProductFormState
 } from "../../app/product-model";
 import type { ProductWorkspaceIntent, ProductWorkspaceMode } from "../workspace/workspace-intent";
@@ -121,6 +122,13 @@ export function ProductWorkspace({
 
   async function saveProduct() {
     if (!bridge || !product || busy || resourceState === "loading" || saveState === "loading") return;
+    const priceError = validateProductFormPrices(form);
+    if (priceError) {
+      setSaveState("error");
+      setSaveMessage(priceError);
+      onStateChange("error", priceError);
+      return;
+    }
     const isCurrent = beginSaveRequest();
     setSaveState("loading");
     setSaveMessage("Ürün kartı kaydediliyor...");

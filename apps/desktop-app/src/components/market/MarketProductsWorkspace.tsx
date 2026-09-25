@@ -9,6 +9,7 @@ import {
 import {
   emptyProductForm,
   productFormToSaveInput,
+  validateProductFormPrices,
   type ProductFormState
 } from "../../app/product-model";
 import { runtimeHasCapability } from "../../app/capabilities";
@@ -172,6 +173,13 @@ export function MarketProductsWorkspace({
 
   async function createProduct() {
     if (!bridge || busy || saveState === "loading") return;
+    const priceError = validateProductFormPrices(productForm);
+    if (priceError) {
+      setSaveState("error");
+      setSaveMessage(priceError);
+      onStateChange("error", priceError);
+      return;
+    }
     const isCurrent = beginCreateRequest();
     setSaveState("loading");
     setSaveMessage("Ürün kartı kaydediliyor...");

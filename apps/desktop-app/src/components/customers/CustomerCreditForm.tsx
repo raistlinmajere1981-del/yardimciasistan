@@ -3,6 +3,7 @@ import type { CustomerCreditAccountDetail, CustomerCreditPaymentMethod } from "@
 import { customerCreditError, customerCreditPaymentLabels, formatCreditMoney, notifyCustomerCreditChanged, parseCreditAmount } from "../../app/customer-credit-ui";
 import { reportAppStatus } from "../../app/runtime-state";
 import { ActionButton } from "../ui/ActionButton";
+import { MoneyInput } from "../ui/MoneyInput";
 
 export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, onSavingChange }: {
   account: CustomerCreditAccountDetail;
@@ -89,7 +90,7 @@ export function CustomerCreditForm({ account, mode, loading, onClose, onSaved, o
         </label>}
         <div className="form-row">
           <label className="form-field form-field--short">Tutar
-            <input ref={amountInput} inputMode="decimal" placeholder="0,00" value={amount} onChange={(event) => setAmount(event.target.value)} required />
+            <MoneyInput ref={amountInput} value={amount} onChange={setAmount} required autoFocus />
           </label>
           <label className="form-field form-field--medium">Para birimi
             {reducingDebt ? <select aria-label="Para birimi" value={currency} onChange={(event) => setCurrency(event.target.value)} required>

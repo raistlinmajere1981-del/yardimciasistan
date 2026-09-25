@@ -1,4 +1,5 @@
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
+import { formatMajorToInput, parseMoneyToMajor } from "@yardimci-asistan/shared";
 import type { DesktopDashboardData, SaveMenuItemInput } from "../../../electron/database";
 import type { StatusTone } from "../ui/StatusBadge";
 
@@ -66,7 +67,7 @@ export function toItemForm(item: PublishedMenuItem | undefined, fallbackCategory
     category_id: item.category_id,
     name: item.name,
     description: item.description,
-    price: String(item.price),
+    price: formatMajorToInput(item.price),
     currency: item.currency,
     image_url: item.image_url,
     is_available: item.is_available,
@@ -90,7 +91,7 @@ export function emptyItemForm(categoryId: string, sortOrder: number): ItemFormSt
     category_id: categoryId,
     name: "",
     description: "",
-    price: "0",
+    price: "",
     currency: "TRY",
     image_url: "",
     is_available: true,
@@ -108,13 +109,20 @@ export function emptyItemForm(categoryId: string, sortOrder: number): ItemFormSt
   };
 }
 
+/** Null when the price field is blank or not a valid non-negative amount. */
+export function validateItemFormPrice(form: ItemFormState): string | null {
+  const major = parseMoneyToMajor(form.price);
+  if (major === null || major < 0) return "Fiyat için geçerli bir tutar girin (örn. 125,50).";
+  return null;
+}
+
 export function itemFormToSaveInput(form: ItemFormState): SaveMenuItemInput {
   return {
     ...(form.id ? { id: form.id } : {}),
     category_id: form.category_id,
     name: form.name,
     description: form.description,
-    price: Number(form.price),
+    price: parseMoneyToMajor(form.price) ?? 0,
     currency: form.currency,
     image_url: form.image_url,
     is_available: form.is_available,
@@ -210,7 +218,8 @@ export function formatCurrency(value: number, currency: string) {
   return new Intl.NumberFormat("tr-TR", {
     style: "currency",
     currency,
-    maximumFractionDigits: 0
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(value);
 }
 
@@ -241,13 +250,13 @@ export function buildMenuPreviewData(
   const draftItemId = itemForm.id || "__draft_item__";
   const existingItem = menu.items.find((item) => item.id === itemForm.id);
   const shouldIncludeDraftItem = Boolean(itemForm.id || itemForm.name.trim());
-  const parsedPrice = Number(itemForm.price);
+  const parsedPrice = parseMoneyToMajor(itemForm.price);
   const draftItem: PublishedMenuItem = {
     id: draftItemId,
     category_id: itemForm.category_id || (shouldIncludeDraftCategory ? draftCategoryId : categories[0]?.id ?? ""),
     name: itemForm.name.trim() || "Adsız ürün",
     description: itemForm.description,
-    price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+    price: parsedPrice ?? 0,
     currency: itemForm.currency,
     image_url: itemForm.image_url,
     is_available: itemForm.is_available,

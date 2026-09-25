@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BUSINESS_CAPABILITIES } from "@yardimci-asistan/shared";
+import { BUSINESS_CAPABILITIES, parseMoneyToMinor } from "@yardimci-asistan/shared";
 import type { BusinessCapabilitySnapshot } from "../../electron/business-capability-store";
 import type {
   DesktopFinanceCategory,
@@ -64,16 +64,6 @@ function emptyDraft(): FinanceEntryDraft {
     description: "",
     date: todayDateInput()
   };
-}
-
-function parseMoneyToMinor(value: string): number {
-  const compact = value.trim().replace(/\s/g, "");
-  if (!compact) return 0;
-  let normalized = compact;
-  if (compact.includes(",")) normalized = compact.replace(/\./g, "").replace(",", ".");
-  else if ((compact.match(/\./g) ?? []).length > 1) normalized = compact.replace(/\./g, "");
-  const amount = Number(normalized);
-  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : -1;
 }
 
 function dateInputToTimestamp(value: string): string {
@@ -291,7 +281,7 @@ export function useFinanceController({
   const saveEntry = useCallback(async () => {
     if (!draft.mode || !bridge?.saveManualFinanceEntry) return false;
     const amountMinor = parseMoneyToMinor(draft.amount);
-    if (amountMinor <= 0) {
+    if (amountMinor === null || amountMinor <= 0) {
       setMessage("Geçerli bir tutar girin.");
       return false;
     }

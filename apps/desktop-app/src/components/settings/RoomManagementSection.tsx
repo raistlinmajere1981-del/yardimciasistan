@@ -4,6 +4,7 @@ import type { SaveRoomPublicDetailsInput } from "@yardimci-asistan/shared";
 import type { useBusinessLayoutSettings } from "../../app/use-business-layout-settings";
 import { RoomPublicDetailsEditor } from "../operations/RoomPublicDetailsEditor";
 import { ActionButton } from "../ui/ActionButton";
+import { MoneyInput } from "../ui/MoneyInput";
 
 type BusinessLayoutController = ReturnType<typeof useBusinessLayoutSettings>;
 
@@ -75,13 +76,12 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
                       onChange={(event) => updateRoom(room.key, { name: event.target.value })}
                     />
                     <div className="room-management-price-wrap">
-                      <input
+                      <MoneyInput
                         className="room-management-price"
-                        inputMode="decimal"
                         value={room.price}
-                        placeholder="0,00"
+                        placeholder="Örn. 1.250,00"
                         aria-label={`${identity} gecelik fiyatı`}
-                        onChange={(event) => updateRoom(room.key, { price: event.target.value })}
+                        onChange={(price) => updateRoom(room.key, { price })}
                       />
                       <span>₺ / gece</span>
                     </div>

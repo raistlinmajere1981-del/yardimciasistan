@@ -1,18 +1,6 @@
 import type { RoomFolioPaymentMethod } from "../../../electron/room-folio";
-export function parseMoneyToMinor(value: string): number {
-  const normalized = value.trim().replace(/\s/g, "").replace(/₺/g, "").replace(/\./g, "").replace(",", ".");
-  if (!normalized) return 0;
-  const amount = Number(normalized);
-  return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : -1;
-}
 
-export function minorToInput(value: number): string {
-  return new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 100);
-}
-
-export function minorMoney(value: number): string {
-  return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(value / 100);
-}
+export { formatMinorCurrency as minorMoney, formatMinorToInput as minorToInput, parseMoneyToMinor } from "@yardimci-asistan/shared";
 
 export function formatDateRange(start: string, end: string): string {
   const startText = formatDate(start);

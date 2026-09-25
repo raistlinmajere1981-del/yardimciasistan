@@ -1,5 +1,7 @@
 import {
+  formatMajorToInput,
   normalizeBarcodeIdentity,
+  parseMoneyToMajor,
   type CatalogCategory,
   type CatalogProduct,
   type CommerceUnit,
@@ -51,8 +53,8 @@ export function emptyProductForm(inventoryEnabled = true): ProductFormState {
     sku: "",
     barcode: "",
     description: "",
-    salePrice: "0",
-    purchasePrice: "0",
+    salePrice: "",
+    purchasePrice: "",
     currency: "TRY",
     unit: "piece",
     taxRate: "0",
@@ -82,8 +84,8 @@ export function toProductForm(
     sku: product.sku,
     barcode: product.barcode,
     description: product.description,
-    salePrice: String(product.salePrice),
-    purchasePrice: String(product.purchasePrice),
+    salePrice: formatMajorToInput(product.salePrice),
+    purchasePrice: formatMajorToInput(product.purchasePrice),
     currency: product.currency,
     unit: product.unit,
     taxRate: String(product.taxRate),
@@ -99,6 +101,15 @@ export function toProductForm(
   };
 }
 
+/** Null when both price fields hold valid non-negative amounts. */
+export function validateProductFormPrices(form: ProductFormState): string | null {
+  const salePrice = parseMoneyToMajor(form.salePrice);
+  if (salePrice === null || salePrice < 0) return "Satış fiyatı için geçerli bir tutar girin (örn. 125,50).";
+  const purchasePrice = parseMoneyToMajor(form.purchasePrice);
+  if (purchasePrice === null || purchasePrice < 0) return "Alış fiyatı için geçerli bir tutar girin (örn. 125,50).";
+  return null;
+}
+
 export function productFormToSaveInput(form: ProductFormState) {
   return {
     id: form.id || undefined,
@@ -108,8 +119,8 @@ export function productFormToSaveInput(form: ProductFormState) {
     sku: form.sku,
     barcode: normalizeBarcodeIdentity(form.barcode, 80),
     description: form.description,
-    salePrice: Number(form.salePrice),
-    purchasePrice: Number(form.purchasePrice),
+    salePrice: parseMoneyToMajor(form.salePrice) ?? 0,
+    purchasePrice: parseMoneyToMajor(form.purchasePrice) ?? 0,
     currency: form.currency,
     unit: form.unit,
     taxRate: Number(form.taxRate),
