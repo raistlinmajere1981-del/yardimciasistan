@@ -9,6 +9,7 @@ import type {
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
 import { FormDialog } from "../ui/FormDialog";
+import { DatePicker, TimePicker } from "../ui/DateTimePicker";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
 
 type EditorState = "idle" | "loading" | "error";
@@ -142,27 +143,23 @@ export function ManualRestaurantReservationEditor({
               />
             </div>
 
-            <label className="form-field form-field--short">
-              Tarih
-              <input
-                type="date"
-                lang="tr-TR"
-                required
+            <div className="form-field form-field--short">
+              <span>Tarih</span>
+              <DatePicker
+                ariaLabel="Tarih"
                 value={form.date}
-                onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
+                onChange={(value) => setForm((current) => ({ ...current, date: value }))}
               />
-            </label>
+            </div>
 
-            <label className="form-field form-field--xs">
-              Saat
-              <input
-                type="time"
-                lang="tr-TR"
-                required
+            <div className="form-field form-field--xs">
+              <span>Saat</span>
+              <TimePicker
+                ariaLabel="Saat"
                 value={form.time}
-                onChange={(event) => setForm((current) => ({ ...current, time: event.target.value }))}
+                onChange={(value) => setForm((current) => ({ ...current, time: value }))}
               />
-            </label>
+            </div>
 
             <label className="form-field form-field--xs">
               Kişi sayısı
