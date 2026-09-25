@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw, Trash2 } from "lucide-react";
 import { aiServicePresets, createDefaultAiServiceDraft, isAiServiceProfileStored, normalizeAiService, toAiServiceFormDraft, type SetupFormState } from "../../app/setup-model";
 import type { ServicesSettingsProps } from "./ServicesSettingsSection";
 import { ActionButton } from "../ui/ActionButton";
@@ -151,16 +151,35 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
           </div>
           <div className="settings-service-card-body">
           <div className="form-grid">
-            <label className="form-field form-field--medium setup-ai-service-field">
-              Servis sağlayıcı
-              <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
-                {aiServicePresets.map((preset) => (
-                  <option value={preset.id} key={preset.id}>
-                    {preset.label}{isAiServiceProfileStored(form, preset.id) ? " · kayıtlı" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="setup-ai-provider-row form-field--span">
+              <label className="form-field form-field--medium setup-ai-service-field">
+                Servis sağlayıcı
+                <select value={form.aiService} onChange={(event) => updateAiService(event.target.value)} disabled={!form.aiEnabled}>
+                  {aiServicePresets.map((preset) => (
+                    <option value={preset.id} key={preset.id}>
+                      {preset.label}{isAiServiceProfileStored(form, preset.id) ? " · kayıtlı" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {form.aiStoredApiKeyConfigured && (
+                <ActionButton
+                  variant="danger"
+                  size="sm"
+                  className="setup-ai-delete-key"
+                  type="button"
+                  disabled={form.clearAiApiKey}
+                  onClick={() => onFormChange({
+                    ...form,
+                    clearAiApiKey: true,
+                    aiEnabled: false
+                  })}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  {form.clearAiApiKey ? "Anahtar silinecek" : "Kayıtlı Anahtarı Sil"}
+                </ActionButton>
+              )}
+            </div>
             {form.aiService === "gemini" ? (
               <>
                 <div className="setup-field setup-ai-studio-help">
@@ -168,7 +187,6 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                     <ExternalLink size={16} aria-hidden="true" />
                     Google AI Studio'yu Aç
                   </ActionButton>
-                  <small>API Keys ekranından gerçek anahtarı kopyalayıp yapıştırın. İsterseniz anahtarı içeren cURL komutu da kullanılabilir.</small>
                 </div>
                 <div className="form-field form-field--long form-field--span setup-ai-curl-field">
                   <span>Google AI Studio API anahtarı veya cURL</span>
@@ -190,7 +208,9 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
                       {aiApiKeyRevealState === "loading" ? "Açılıyor" : showGoogleCurl ? "Gizle" : "Göster"}
                     </ActionButton>
                   </div>
-                  <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı anahtar maskelenir; Göster ile görüntüleyebilir veya yeni anahtar yapıştırabilirsiniz." : "Anahtar güvenli depoda saklanır. cURL yapıştırılırsa adres, anahtar ve varsa örnek model otomatik hazırlanır."}</small>
+                  {!form.aiStoredApiKeyConfigured && (
+                    <small>Anahtar güvenli depoda saklanır. cURL yapıştırılırsa adres, anahtar ve varsa örnek model otomatik hazırlanır.</small>
+                  )}
                   {aiApiKeyRevealMessage && <small className="setup-secret-error" role="alert">{aiApiKeyRevealMessage}</small>}
                 </div>
                 {renderAiConnectionActions(true)}
@@ -247,20 +267,6 @@ export function AiSettingsSection({ form, onFormChange, onTestAiConnection, aiCo
               <small>{form.aiStoredApiKeyConfigured ? "Kayıtlı bağlantı anahtarı maskelenir; Göster ile görüntüleyebilirsiniz." : "Bu sağlayıcı için anahtar henüz kayıtlı değil."}</small>
               {aiApiKeyRevealMessage && <small className="setup-secret-error" role="alert">{aiApiKeyRevealMessage}</small>}
             </div>}
-            {form.aiStoredApiKeyConfigured && (
-              <label className="form-check setup-checkline form-field--span setup-danger-checkline">
-                <input
-                  checked={form.clearAiApiKey}
-                  onChange={(event) => onFormChange({
-                    ...form,
-                    clearAiApiKey: event.target.checked,
-                    aiEnabled: event.target.checked ? false : form.aiEnabled
-                  })}
-                  type="checkbox"
-                />
-                Bu sağlayıcının kayıtlı anahtarını sil ve AI yardımcıyı kapat
-              </label>
-            )}
           </div>
           {form.aiService !== "gemini" && renderAiConnectionActions(false)}
           </div>
