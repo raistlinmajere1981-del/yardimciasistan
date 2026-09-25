@@ -112,7 +112,7 @@ export function MessagesPage({ safeMode, webMode, aiTools, aiEnabled, whatsappEn
   const webReady = active && mode === "web" && webTakeoverState === "ready";
 
   return (
-    <section className="combined-page messages-page" aria-label="Mesajlar">
+    <section className={`combined-page messages-page${mode === "web" ? " messages-page--web" : ""}`} aria-label="Mesajlar">
       {whatsappEnabled && (
         <div className="page-toolbar message-toolbar">
           <div className="page-toolbar__start">

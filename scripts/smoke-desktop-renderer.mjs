@@ -711,6 +711,7 @@ try {
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
 
   expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("block");
+  await expectWhatsAppToFillWorkspace(page);
   await page.screenshot({ path: "artifacts/screenshots/desktop-whatsapp-workspace.png", fullPage: true });
   await page.getByRole("button", { name: "Müşteri Numarasına Git" }).click();
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute(
@@ -1892,6 +1893,7 @@ try {
   await expect(compactWebControlBar.getByRole("button", { name: "Müşteri Numarasına Git" })).toBeVisible();
   await expect(compactWebControlBar.getByRole("button", { name: "Dışarıda Aç" })).toBeVisible();
   await expect(compactWebControlBar.getByRole("button", { name: "Güvenli Moda Dön" })).toBeVisible();
+  await expectWhatsAppToFillWorkspace(compactPage);
   await compactPage.screenshot({ path: "artifacts/screenshots/desktop-compact-whatsapp-web-1366x768.png" });
   await compactWebControlBar.getByRole("button", { name: "Güvenli Moda Dön" }).click();
   await expect(compactPage.getByRole("tab", { name: "Mesaj Hazırla" })).toHaveAttribute("aria-selected", "true");
@@ -2351,6 +2353,29 @@ try {
   throw error;
 } finally {
   server.kill();
+}
+
+async function expectWhatsAppToFillWorkspace(page) {
+  const geometry = await page.locator(".whatsapp-webview").evaluate((webview) => {
+    const frame = webview.parentElement;
+    const panel = webview.closest(".whatsapp-live-panel");
+    const content = webview.closest(".page-content");
+    const shell = webview.closest(".content");
+    return {
+      panelBottom: panel.getBoundingClientRect().bottom,
+      contentBottom: content.getBoundingClientRect().bottom - parseFloat(getComputedStyle(content).paddingBottom),
+      webviewHeight: webview.getBoundingClientRect().height,
+      frameHeight: frame.clientHeight,
+      webviewWidth: webview.getBoundingClientRect().width,
+      frameWidth: frame.clientWidth,
+      outerOverflow: shell.scrollHeight - shell.clientHeight
+    };
+  });
+  expect(Math.abs(geometry.panelBottom - geometry.contentBottom)).toBeLessThanOrEqual(1);
+  expect(geometry.webviewHeight).toBeGreaterThan(0);
+  expect(Math.abs(geometry.webviewHeight - geometry.frameHeight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(geometry.webviewWidth - geometry.frameWidth)).toBeLessThanOrEqual(1);
+  expect(geometry.outerOverflow).toBeLessThanOrEqual(1);
 }
 
 function getFreePort() {
