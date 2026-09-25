@@ -267,7 +267,6 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
             autoCapitalize="none"
             autoCorrect="off"
           />
-          <small>Normalde varsayılan adres kullanılır. Sunucu taşınırsa bu alan bir kez değiştirilebilir.</small>
         </label>
 
         <div className="setup-field">
@@ -354,9 +353,6 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
           {status?.message || "Güncelleme durumu okunuyor..."}
           {status?.lastCheckedAt ? ` · Son kontrol: ${formatDateTime(status.lastCheckedAt)}` : ""}
         </small>
-        {!status?.installSupported && status && (
-          <small>Bu geliştirme ortamında güncelleme kontrolü denenebilir; kurulum yalnız paketlenmiş Windows uygulamasında yapılır.</small>
-        )}
         {status?.lastResult && (
           <small>
             Son kurulum: {status.lastResult.kind === "success" ? "başarılı" : "başarısız"} · {status.lastResult.version}
