@@ -80,7 +80,7 @@ const customerWorkContribution = {
 const calendarContribution = {
   pageId: "calendar",
   icon: CalendarDays,
-  order: 20,
+  order: 75,
   condition: { allOf: [C.CALENDAR] },
   contentScroll: "page",
   presentation: (capabilities) => {
