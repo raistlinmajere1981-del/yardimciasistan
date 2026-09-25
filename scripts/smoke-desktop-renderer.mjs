@@ -710,7 +710,7 @@ try {
   await expect(page.getByRole("tab", { name: "WhatsApp", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".whatsapp-webview")).toHaveAttribute("data-persistence-marker", "webview-kept-alive");
 
-  expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("block");
+  expect(await page.locator(".whatsapp-webview").evaluate((element) => getComputedStyle(element).display)).toBe("flex");
   await expectWhatsAppToFillWorkspace(page);
   await page.screenshot({ path: "artifacts/screenshots/desktop-whatsapp-workspace.png", fullPage: true });
   await page.getByRole("button", { name: "Müşteri Numarasına Git" }).click();
