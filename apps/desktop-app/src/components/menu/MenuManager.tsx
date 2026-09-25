@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus, Save, Star, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
+import { GripVertical, Plus, Save, Star, Trash2 } from "lucide-react";
 import type { PublishedMenuCategory, PublishedMenuItem } from "@yardimci-asistan/sync-core";
-import type { DesktopDashboardData, DesktopMenuSaveResult } from "../../../electron/database";
+import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
 import { StockImageImportWorkspace } from "../restaurant/StockImageImportWorkspace";
 import {
   compareMenuRecords,
@@ -42,6 +42,8 @@ interface MenuManagerProps {
   onNewItem: () => void;
   onSaveCategory: () => void;
   onSaveItem: () => Promise<DesktopMenuSaveResult | undefined>;
+  onReorderCategories: (orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
+  onReorderItems: (categoryId: string, orderedIds: string[]) => Promise<DesktopStatusUpdateResult>;
   onDeleteCategory: (confirmed?: boolean) => void;
   onDashboardDataChanged: (data: DesktopDashboardData) => void;
 }
@@ -65,6 +67,8 @@ export function MenuManager({
   onNewItem,
   onSaveCategory,
   onSaveItem,
+  onReorderCategories,
+  onReorderItems,
   onDeleteCategory,
   onDashboardDataChanged
 }: MenuManagerProps) {
@@ -72,6 +76,9 @@ export function MenuManager({
   const [pendingCategoryDelete, setPendingCategoryDelete] = useState(false);
   const [itemCreateOpen, setItemCreateOpen] = useState(false);
   const [pendingItemId, setPendingItemId] = useState("");
+  const [dragging, setDragging] = useState<{ kind: "category" | "item"; id: string } | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ id: string; position: "before" | "after" } | null>(null);
+  const [reorderBusy, setReorderBusy] = useState(false);
 
   const sortedCategories = useMemo(
     () => [...dashboardData.menu.categories].sort(compareMenuRecords),
@@ -117,6 +124,60 @@ export function MenuManager({
     setItemCreateOpen(true);
   }
 
+  function handleDragStart(event: DragEvent<HTMLButtonElement>, kind: "category" | "item", id: string) {
+    if (reorderBusy) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", id);
+    setDragging({ kind, id });
+    setDropTarget(null);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLButtonElement>, id: string) {
+    if (!dragging || dragging.id === id) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const rect = event.currentTarget.getBoundingClientRect();
+    const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+    setDropTarget({ id, position });
+  }
+
+  async function handleDrop(event: DragEvent<HTMLButtonElement>, kind: "category" | "item", targetId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!dragging || dragging.kind !== kind || dragging.id === targetId || reorderBusy) {
+      setDragging(null);
+      setDropTarget(null);
+      return;
+    }
+
+    const sourceIds = kind === "category"
+      ? sortedCategories.map((record) => record.id)
+      : visibleItems.map((record) => record.id);
+    const orderedIds = moveId(sourceIds, dragging.id, targetId, dropTarget?.id === targetId ? dropTarget.position : "before");
+    setDragging(null);
+    setDropTarget(null);
+    if (!orderedIds || orderedIds.every((id, index) => id === sourceIds[index])) return;
+
+    setReorderBusy(true);
+    try {
+      if (kind === "category") {
+        await onReorderCategories(orderedIds);
+      } else if (selectedCategoryId) {
+        await onReorderItems(selectedCategoryId, orderedIds);
+      }
+    } finally {
+      setReorderBusy(false);
+    }
+  }
+
+  function finishDrag() {
+    setDragging(null);
+    setDropTarget(null);
+  }
+
   return (
     <>
       <FeatureWorkspacePage
@@ -145,7 +206,7 @@ export function MenuManager({
             <div className="panel-heading menu-panel-heading">
               <div>
                 <h2>Kategoriler</h2>
-                <p>Menüdeki ürün gruplarını yönetin.</p>
+                <p>Menüdeki ürün gruplarını yönetin. Sıralamak için kayıtları sürükleyin.</p>
               </div>
               <div className="page-toolbar__actions">
                 <StatusBadge tone="info">{dashboardData.menu.categories.length} kayıt</StatusBadge>
@@ -159,12 +220,18 @@ export function MenuManager({
             <DataList className="menu-record-list menu-category-list">
               {sortedCategories.map((category) => (
                 <DataListButton
-                  className="menu-record"
+                  className={`menu-record menu-sortable-record${dragging?.kind === "category" && dragging.id === category.id ? " is-dragging" : ""}${dropTarget?.id === category.id ? ` is-drop-${dropTarget.position}` : ""}`}
                   key={category.id}
+                  draggable={!reorderBusy}
+                  onDragStart={(event) => handleDragStart(event, "category", category.id)}
+                  onDragOver={(event) => handleDragOver(event, category.id)}
+                  onDrop={(event) => void handleDrop(event, "category", category.id)}
+                  onDragEnd={finishDrag}
                   onClick={() => onSelectCategory(category)}
                   aria-pressed={selectedCategoryId === category.id}
                   selected={selectedCategoryId === category.id}
                   title={category.name}
+                  leading={<GripVertical className="menu-drag-handle" size={16} aria-hidden="true" />}
                   meta={dashboardData.menu.items.filter((item) => item.category_id === category.id).length + " ürün"}
                   trailing={(
                     <StatusBadge tone={category.is_active ? "success" : "neutral"}>
@@ -202,16 +269,6 @@ export function MenuManager({
                 />
                 {qrMenuEnabled ? "Yayında göster" : "Menüde etkin"}
               </label>
-              <div className="form-row">
-                <label className="form-field form-field--xs">
-                  Sıra
-                  <input
-                    value={categoryForm.sort_order}
-                    onChange={(event) => onCategoryFormChange({ ...categoryForm, sort_order: event.target.value })}
-                    inputMode="numeric"
-                  />
-                </label>
-              </div>
               <div className="form-actions menu-form-actions">
                 {categoryForm.id && (
                   <ActionButton
@@ -241,7 +298,7 @@ export function MenuManager({
             <div className="panel-heading menu-panel-heading">
               <div className="menu-heading-copy">
                 <h2>Ürünler</h2>
-                <span>{selectedCategoryName}</span>
+                <span>{selectedCategoryName}{selectedCategoryId ? " · Sıralamak için sürükleyin" : ""}</span>
               </div>
               <StatusBadge tone="info">{dashboardData.menu.items.length} kayıt</StatusBadge>
             </div>
@@ -252,12 +309,18 @@ export function MenuManager({
                 const stockBadge = getMenuStockBadge(item);
                 return (
                   <DataListButton
-                    className="menu-record"
+                    className={`menu-record${selectedCategoryId ? " menu-sortable-record" : ""}${dragging?.kind === "item" && dragging.id === item.id ? " is-dragging" : ""}${dropTarget?.id === item.id ? ` is-drop-${dropTarget.position}` : ""}`}
                     key={item.id}
+                    draggable={Boolean(selectedCategoryId) && !reorderBusy}
+                    onDragStart={(event) => selectedCategoryId && handleDragStart(event, "item", item.id)}
+                    onDragOver={(event) => selectedCategoryId && handleDragOver(event, item.id)}
+                    onDrop={(event) => selectedCategoryId && void handleDrop(event, "item", item.id)}
+                    onDragEnd={finishDrag}
                     onClick={() => openItem(item)}
                     aria-pressed={selectedItemId === item.id}
                     selected={selectedItemId === item.id}
                     title={item.name}
+                    leading={selectedCategoryId ? <GripVertical className="menu-drag-handle" size={16} aria-hidden="true" /> : undefined}
                     meta={formatCurrency(item.price, item.currency) + " · " + (item.is_available ? "Mevcut" : "Kapalı") + (item.is_featured ? " · Öne çıkan" : "")}
                     trailing={(
                       <span className="menu-product-row__trailing">
@@ -333,4 +396,22 @@ export function MenuManager({
 
     </>
   );
+}
+
+
+function moveId(
+  ids: string[],
+  sourceId: string,
+  targetId: string,
+  position: "before" | "after"
+): string[] | null {
+  const sourceIndex = ids.indexOf(sourceId);
+  const targetIndex = ids.indexOf(targetId);
+  if (sourceIndex < 0 || targetIndex < 0 || sourceId === targetId) return null;
+
+  const next = ids.filter((id) => id !== sourceId);
+  const targetIndexAfterRemoval = next.indexOf(targetId);
+  const insertIndex = position === "after" ? targetIndexAfterRemoval + 1 : targetIndexAfterRemoval;
+  next.splice(Math.max(0, insertIndex), 0, sourceId);
+  return next;
 }
