@@ -44,6 +44,7 @@ try {
     window.__stockImageApplyCalls = [];
     window.__reportRanges = [];
     window.__reportAiCalls = [];
+    window.__androidProvisionCalls = [];
     let businessProfile = {
       description: "Smoke işletme açıklaması",
       latitude: null,
@@ -299,6 +300,46 @@ try {
         permissionGroups: { service_orders: true, cashier: false, rooms_tasks: true, customer_reservation: false }
       }), "Telefon görev alanları varsayılana döndürüldü."),
       revokeAndroidDevice: async (deviceId) => mutateDevice(deviceId, (device) => ({ ...device, isActive: false, revokedAt: new Date().toISOString() }), "Telefon kaldırıldı ve erişimi kapatıldı."),
+      listAndroidInstallDevices: async () => ({
+        ok: true,
+        adbAvailable: true,
+        apkAvailable: true,
+        bundledVersionName: "0.1.1-debug",
+        bundledVersionCode: 2,
+        devices: [{
+          serial: "SMOKE-USB-1",
+          state: "device",
+          model: "Smoke USB Telefonu",
+          appInstalled: true,
+          installedVersionName: "0.1.1-debug",
+          installedVersionCode: 2,
+          bundledVersionName: "0.1.1-debug",
+          bundledVersionCode: 2,
+          action: "current",
+          message: "Yardımcı Asistan 0.1.1-debug güncel."
+        }],
+        message: "1 USB Android cihazı bulundu."
+      }),
+      installAndroidApp: async () => ({ ok: true, message: "Android uygulaması güncellendi." }),
+      provisionAndroidApp: async (serial) => {
+        window.__androidProvisionCalls.push(serial);
+        return {
+          ok: true,
+          message: "Telefon mevcut işletmeye yeniden bağlanıyor.",
+          device: {
+            serial,
+            state: "device",
+            model: "Smoke USB Telefonu",
+            appInstalled: true,
+            installedVersionName: "0.1.1-debug",
+            installedVersionCode: 2,
+            bundledVersionName: "0.1.1-debug",
+            bundledVersionCode: 2,
+            action: "current",
+            message: "Yardımcı Asistan 0.1.1-debug güncel."
+          }
+        };
+      },
       getAiWorkspaceHistory: async () => [],
       takeoverWhatsAppWebview: async () => ({ ok: true, message: "WhatsApp Web kullanıcı kontrolüne hazır." }),
       markWhatsAppMessageSent: async () => ({ ok: false, message: "smoke" }),
@@ -372,6 +413,14 @@ try {
   const androidDeviceSection = page.locator(".settings-android-devices-section");
   await expect(androidDeviceSection.getByRole("heading", { name: "Telefon Kurulumu" })).toBeVisible();
   await expect(androidDeviceSection.getByRole("button", { name: "USB Cihazları Yenile" })).toBeVisible();
+  await expect(androidDeviceSection.getByText("Smoke USB Telefonu", { exact: true })).toBeVisible();
+  await expect(androidDeviceSection.getByRole("button", { name: "İşletmeye Bağla", exact: true })).toBeEnabled();
+  await androidDeviceSection.getByRole("button", { name: "İşletmeye Bağla", exact: true }).click();
+  const androidProvisionDialog = page.getByRole("dialog", { name: "Telefonu işletmeye bağla" });
+  await expect(androidProvisionDialog).toBeVisible();
+  await androidProvisionDialog.getByRole("button", { name: "Bağla", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__androidProvisionCalls)).toEqual(["SMOKE-USB-1"]);
+  await expect(androidDeviceSection.getByText("Telefon mevcut işletmeye yeniden bağlanıyor.", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByRole("heading", { name: "Cihazlar ve Yetkiler" })).toBeVisible();
   await expect(androidDeviceSection.getByText("Smoke Personel Telefonu", { exact: true })).toBeVisible();
   await expect(androidDeviceSection.getByText("Personel", { exact: true })).toBeVisible();
