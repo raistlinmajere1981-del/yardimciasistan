@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
   Banknote,
   Calculator,
   CalendarCheck,
@@ -187,15 +186,6 @@ export function ReportsPage({
   const maxDailyRevenue = Math.max(0, ...report.restaurant.dailyRevenue.map((day) => day.revenue));
   const reservationsEnabled = accommodationReservationsEnabled || foodReservationsEnabled;
   const stockEnabled = foodMenuEnabled && inventoryEnabled;
-  const visibleAttentionItems = report.attention.items.filter((item) => {
-    if (item.kind === "pending_request") return requestsEnabled;
-    if (item.kind === "overdue_task" || item.kind === "open_task") return tasksEnabled;
-    if (item.kind === "pending_reservation") return reservationsEnabled;
-    if (item.kind === "payment_waiting") return foodOrdersEnabled;
-    if (["out_of_stock", "low_stock"].includes(item.kind)) return stockEnabled;
-    return true;
-  });
-
   const financeAiPanel = aiEnabled && reportsEnabled ? (
     <Panel className="finance-ai-panel report-ai-panel" padding="compact">
       <div className="report-section-title">
@@ -482,28 +472,6 @@ export function ReportsPage({
         </div>
         <MovementTable movements={report.stock.recentMovements} />
       </Panel>}
-
-      <Panel className="report-section-panel report-attention-panel">
-        <div className="report-section-title">
-          <div>
-            <p>Dikkat Gerektirenler</p>
-            <h2>Anlık Durum</h2>
-          </div>
-          <span className="report-live-label">Tarih filtresinden bağımsız</span>
-        </div>
-        {visibleAttentionItems.length === 0 ? (
-          <ReportEmpty message="Şu anda dikkat gerektiren açık kayıt yok." />
-        ) : (
-          <div className="report-attention-list">
-            {visibleAttentionItems.map((item, index) => (
-              <article key={`${item.kind}-${item.title}-${index}`}>
-                <AlertTriangle size={17} aria-hidden="true" />
-                <div><strong>{item.title}</strong><p>{item.detail}</p></div>
-              </article>
-            ))}
-          </div>
-        )}
-      </Panel>
 
       </div>}
     </section>
