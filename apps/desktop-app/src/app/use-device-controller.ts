@@ -73,6 +73,35 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     }
   }
 
+  async function handleProvisionAndroidApp(serial: string) {
+    if (!androidEnabled) {
+      setAndroidInstallSnapshot(null);
+      setAndroidInstallState("idle");
+      setAndroidInstallMessage("Android bağlantısını kullanmak için önce Android servisini açıp ayarları kaydedin.");
+      return;
+    }
+    if (!window.yardimciDesktop?.provisionAndroidApp) {
+      setAndroidInstallState("error");
+      setAndroidInstallMessage("Android bağlantı aracı hazır değil. Uygulamayı yeniden başlatın.");
+      return;
+    }
+    setAndroidInstallState("loading");
+    setAndroidInstallMessage("Telefon mevcut işletmeye bağlanıyor...");
+    try {
+      const result = await window.yardimciDesktop.provisionAndroidApp(serial);
+      setAndroidInstallState(result.ok ? "success" : "error");
+      setAndroidInstallMessage(result.message);
+      await refreshAndroidInstallDevices();
+      if (result.ok) {
+        setAndroidInstallState("success");
+        setAndroidInstallMessage(result.message);
+      }
+    } catch {
+      setAndroidInstallState("error");
+      setAndroidInstallMessage("Telefon işletmeye bağlanamadı.");
+    }
+  }
+
   useEffect(() => {
     if (!androidEnabled) {
       setAndroidInstallSnapshot(null);
@@ -189,6 +218,7 @@ export function useDeviceController({ setDashboardData, androidEnabled }: UseDev
     androidInstallSnapshot,
     refreshAndroidInstallDevices,
     handleInstallAndroidApp,
+    handleProvisionAndroidApp,
     handleSetAndroidDeviceRole,
     handleSetAndroidDevicePermissionGroups,
     handleSetAndroidDeviceActive,
