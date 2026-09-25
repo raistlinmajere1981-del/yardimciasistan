@@ -139,7 +139,6 @@ export function OperationCalendarPage({
               <ChevronRight size={16} aria-hidden="true" />
             </ActionButton>
             <div className="operation-calendar-date-picker form-field">
-              <span>Tarih</span>
               <DatePicker
                 ariaLabel="Takvim tarihi"
                 value={selectedDate}
