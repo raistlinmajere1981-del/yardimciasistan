@@ -322,7 +322,6 @@ export function FinanceWorkspace({
               <div className="finance-category-manager">
                 <div className="finance-category-manager__heading">
                   <strong>{draft.mode === "income" ? "Gelir türleri" : "Gider türleri"}</strong>
-                  <span>Bu formdan ekleyip kaldırabilirsiniz.</span>
                 </div>
                 <div className="finance-category-add">
                   <input
