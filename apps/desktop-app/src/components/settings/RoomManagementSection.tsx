@@ -20,8 +20,8 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
   if (!roomsEnabled) return null;
 
   return (
-    <section id="settings-rooms" tabIndex={-1} className="setup-section room-management-settings">
-      <div className="setup-section-title room-management-heading">
+    <section id="settings-rooms" tabIndex={-1} className="settings-panel room-management-settings">
+      <div className="settings-panel-header room-management-heading">
         <div>
           <p>Pansiyon</p>
           <h2>Oda Yönetimi</h2>
@@ -38,7 +38,7 @@ export function RoomManagementSection({ controller }: { controller: BusinessLayo
         </ActionButton>
       </div>
 
-      <fieldset disabled={saving || loading} className="settings-resource-fields">
+      <fieldset disabled={saving || loading} className="settings-resource-fields settings-panel-body">
         <div className="room-management-list" aria-label="Oda adı ve fiyatları">
           {loading ? (
             <div className="room-management-loading">Odalar hazırlanıyor…</div>
