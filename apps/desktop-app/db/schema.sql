@@ -335,6 +335,17 @@ CREATE TABLE finance_entries (
   sync_status TEXT NOT NULL DEFAULT 'local_only'
 );
 
+CREATE TABLE finance_categories (
+  id TEXT PRIMARY KEY,
+  direction TEXT NOT NULL CHECK (direction IN ('income', 'expense')),
+  name TEXT NOT NULL,
+  is_system INTEGER NOT NULL DEFAULT 0 CHECK (is_system IN (0, 1)),
+  is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE inventory_balances (
   product_id TEXT NOT NULL,
   location_id TEXT NOT NULL,
