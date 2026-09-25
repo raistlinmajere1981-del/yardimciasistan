@@ -554,7 +554,8 @@
 }
 
 .appearance-controls {
-  max-width: var(--reading-max-width);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: none;
 }
 
 .password-settings-form {
@@ -647,7 +648,8 @@
 }
 
 @media (max-width: 1100px) {
-  .business-public-profile-feature-grid {
+  .business-public-profile-feature-grid,
+  .appearance-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -764,7 +766,8 @@
 .settings-category-body [tabindex="-1"]:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 @media (max-width: 760px) {
   .settings-category-tabs [role="tab"] { flex-basis: auto; }
-  .settings-category-body .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .settings-category-body .form-grid,
+  .appearance-controls { grid-template-columns: minmax(0, 1fr); }
   .settings-category-body .form-row { flex-wrap: wrap; }
   .settings-category-body .form-field { min-width: 0; max-width: 100%; }
   .settings-profile-option-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
