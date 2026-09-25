@@ -288,12 +288,12 @@ export function ReportsPage({
       <Panel className="report-filter-panel" padding="compact">
         <div className="report-filter-heading">
           <div>
-            <p className="panel-eyebrow">Ortak tarih filtresi</p>
+            <p className="panel-eyebrow">Rapor dönemi</p>
             <h2>{formatReportPeriod(report.period)}</h2>
           </div>
           {loading && <span className="report-loading loading-state" role="status">Rapor hazırlanıyor…</span>}
         </div>
-        <div className="report-date-presets" role="group" aria-label="Rapor tarih aralığı">
+        <div className="report-date-presets" role="group" aria-label="Detaylı rapor tarih aralığı">
           {REPORT_PRESETS.map((option) => (
             <button
               className={range.preset === option.preset ? "is-active" : ""}
