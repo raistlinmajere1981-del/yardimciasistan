@@ -50,20 +50,6 @@ export interface ReportAiPayload {
     manual_movement_count: number;
     image_movement_count: number;
   };
-  attention: {
-    pending_requests: number;
-    pending_reservations: number;
-    payment_waiting_tables: number;
-    overdue_tasks: number;
-    incomplete_tasks: number;
-    out_of_stock_items: number;
-    low_stock_items: number;
-    items: Array<{
-      kind: string;
-      title: string;
-      detail: string;
-    }>;
-  };
 }
 
 export function buildReportAiPayload(report: DesktopReportData): ReportAiPayload {
@@ -113,20 +99,6 @@ export function buildReportAiPayload(report: DesktopReportData): ReportAiPayload
       })),
       manual_movement_count: report.stock.manualMovementCount,
       image_movement_count: report.stock.imageMovementCount
-    },
-    attention: {
-      pending_requests: report.attention.pendingRequests,
-      pending_reservations: report.attention.pendingReservations,
-      payment_waiting_tables: report.attention.paymentWaitingTables,
-      overdue_tasks: report.attention.overdueTasks,
-      incomplete_tasks: report.attention.incompleteTasks,
-      out_of_stock_items: report.attention.outOfStockItems,
-      low_stock_items: report.attention.lowStockItems,
-      items: report.attention.items.map((item) => ({
-        kind: item.kind,
-        title: item.title,
-        detail: item.detail
-      }))
     }
   };
 }
@@ -138,7 +110,6 @@ export function buildReportAiMessages(
 ) {
   const modeInstruction: Record<DesktopReportAiMode, string> = {
     summary: "Seçilen dönemin genel durumunu 3–5 kısa cümle veya maddeyle özetle.",
-    attention: "Dikkat gerektirenleri müşteri talepleri, rezervasyonlar, hesap bekleyen masalar, işler ve stok sırasıyla önceliklendir.",
     sales: "Yalnız restoran cirosunu, ortalama hesabı, en çok satılan ürünleri ve günlük değişimleri yorumla.",
     recommendations: "Mevcut verilere dayanan en fazla 3 kısa ve uygulanabilir işletme önerisi ver."
   };
@@ -168,8 +139,12 @@ export function buildReportAiMessages(
 
 export function reportHasEnoughData(payload: ReportAiPayload): boolean {
   return Object.values(payload.summary).some((value) => value > 0)
-    || payload.attention.items.length > 0
-    || payload.restaurant.top_items.length > 0;
+    || payload.restaurant.top_items.length > 0
+    || payload.pension_and_requests.incoming_reservations > 0
+    || payload.pension_and_requests.new_requests > 0
+    || payload.stock.top_consumed.length > 0
+    || payload.stock.manual_movement_count > 0
+    || payload.stock.image_movement_count > 0;
 }
 
 export function sanitizeReportAiAnswer(
