@@ -22,6 +22,7 @@ export interface ItemFormState {
   is_featured: boolean;
   allergens: string;
   tags: string;
+  stock_tracking_enabled: boolean;
   stock_quantity: string;
   stock_min_quantity: string;
   stock_unit: "piece" | "gram";
@@ -72,6 +73,7 @@ export function toItemForm(item: PublishedMenuItem | undefined, fallbackCategory
     is_featured: item.is_featured,
     allergens: item.allergens.join(", "),
     tags: item.tags.join(", "),
+    stock_tracking_enabled: item.stock_quantity != null,
     stock_quantity: item.stock_quantity == null ? "" : String(item.stock_quantity),
     stock_min_quantity: item.stock_min_quantity == null ? "" : String(item.stock_min_quantity),
     stock_unit: item.stock_unit === "gram" ? "gram" : "piece",
@@ -95,7 +97,8 @@ export function emptyItemForm(categoryId: string, sortOrder: number): ItemFormSt
     is_featured: false,
     allergens: "",
     tags: "",
-    stock_quantity: "",
+    stock_tracking_enabled: true,
+    stock_quantity: "0",
     stock_min_quantity: "",
     stock_unit: "piece",
     stock_consumption_quantity: "1",
@@ -118,12 +121,12 @@ export function itemFormToSaveInput(form: ItemFormState): SaveMenuItemInput {
     is_featured: form.is_featured,
     allergens: splitCommaList(form.allergens),
     tags: splitCommaList(form.tags),
-    stock_quantity: parseNullableFormNumber(form.stock_quantity),
-    stock_min_quantity: parseNullableFormNumber(form.stock_min_quantity),
+    stock_quantity: form.stock_tracking_enabled ? (parseNullableFormNumber(form.stock_quantity) ?? 0) : null,
+    stock_min_quantity: form.stock_tracking_enabled ? parseNullableFormNumber(form.stock_min_quantity) : null,
     stock_unit: form.stock_unit,
     stock_consumption_quantity: parsePositiveFormNumber(form.stock_consumption_quantity, 1),
-    hide_when_out_of_stock: form.hide_when_out_of_stock,
-    stock_note: form.stock_note.trim() || null,
+    hide_when_out_of_stock: form.stock_tracking_enabled ? form.hide_when_out_of_stock : false,
+    stock_note: form.stock_tracking_enabled ? (form.stock_note.trim() || null) : null,
     sort_order: Number(form.sort_order)
   };
 }
@@ -251,12 +254,12 @@ export function buildMenuPreviewData(
     is_featured: itemForm.is_featured,
     allergens: splitCommaList(itemForm.allergens),
     tags: splitCommaList(itemForm.tags),
-    stock_quantity: parseNullableFormNumber(itemForm.stock_quantity),
-    stock_min_quantity: parseNullableFormNumber(itemForm.stock_min_quantity),
+    stock_quantity: itemForm.stock_tracking_enabled ? (parseNullableFormNumber(itemForm.stock_quantity) ?? 0) : null,
+    stock_min_quantity: itemForm.stock_tracking_enabled ? parseNullableFormNumber(itemForm.stock_min_quantity) : null,
     stock_unit: itemForm.stock_unit,
     stock_consumption_quantity: parsePositiveFormNumber(itemForm.stock_consumption_quantity, 1),
-    hide_when_out_of_stock: itemForm.hide_when_out_of_stock,
-    stock_note: itemForm.stock_note.trim() || null,
+    hide_when_out_of_stock: itemForm.stock_tracking_enabled ? itemForm.hide_when_out_of_stock : false,
+    stock_note: itemForm.stock_tracking_enabled ? (itemForm.stock_note.trim() || null) : null,
     sort_order: Number.isFinite(Number(itemForm.sort_order)) ? Number(itemForm.sort_order) : 0,
     created_at: existingItem?.created_at ?? now,
     updated_at: now
