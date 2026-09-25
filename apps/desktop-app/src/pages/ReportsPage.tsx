@@ -291,80 +291,81 @@ export function ReportsPage({
           </div>
           {loading && <span className="report-loading loading-state" role="status">Rapor hazırlanıyor…</span>}
         </div>
-        <div className="report-date-presets" role="group" aria-label="Detaylı rapor tarih aralığı">
-          {REPORT_PRESETS.map((option) => (
-            <button
-              className={range.preset === option.preset ? "is-active" : ""}
-              type="button"
-              aria-pressed={range.preset === option.preset}
-              onClick={() => selectPreset(option.preset)}
-              key={option.preset}
-            >
-              {option.label}
-            </button>
-          ))}
-          <button
-            className={range.preset === "custom" ? "is-active" : ""}
-            type="button"
-            aria-pressed={range.preset === "custom"}
-            onClick={selectCustom}
-          >
-            Tarih Aralığı
-          </button>
+        <div className="report-control-row">
+          <div className="report-period-controls">
+            <div className="report-date-presets" role="group" aria-label="Detaylı rapor tarih aralığı">
+              {REPORT_PRESETS.map((option) => (
+                <button
+                  className={range.preset === option.preset ? "is-active" : ""}
+                  type="button"
+                  aria-pressed={range.preset === option.preset}
+                  onClick={() => selectPreset(option.preset)}
+                  key={option.preset}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <button
+                className={range.preset === "custom" ? "is-active" : ""}
+                type="button"
+                aria-pressed={range.preset === "custom"}
+                onClick={selectCustom}
+              >
+                Tarih Aralığı
+              </button>
+            </div>
+
+            {range.preset === "custom" && (
+              <div className="report-custom-dates report-custom-dates-inline">
+                <div className="form-field report-custom-date-field">
+                  <span>Başlangıç tarihi</span>
+                  <DatePicker
+                    ariaLabel="Başlangıç tarihi"
+                    value={customStart}
+                    max={customEnd || undefined}
+                    presets={[]}
+                    onChange={(value) => updateCustomRange(value, customEnd)}
+                  />
+                </div>
+                <div className="form-field report-custom-date-field">
+                  <span>Bitiş tarihi</span>
+                  <DatePicker
+                    ariaLabel="Bitiş tarihi"
+                    value={customEnd}
+                    min={customStart || undefined}
+                    presets={[]}
+                    onChange={(value) => updateCustomRange(customStart, value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {aiEnabled && (
+            <div className="report-ai-actions report-filter-ai-actions" role="group" aria-label="AI rapor yorumu">
+              {REPORT_AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
+                <button
+                  className={reportAiMode === action.mode ? "is-active" : ""}
+                  type="button"
+                  disabled={loading || (reportAiMode === action.mode && reportAiMessage.includes("hazırlanıyor"))}
+                  onClick={() => void generateReportAiComment(action.mode)}
+                  key={action.mode}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        {range.preset === "custom" && (
-          <div className="report-custom-dates">
-            <div className="form-field report-custom-date-field">
-              <span>Başlangıç tarihi</span>
-              <DatePicker
-                ariaLabel="Başlangıç tarihi"
-                value={customStart}
-                max={customEnd || undefined}
-                presets={[]}
-                onChange={(value) => updateCustomRange(value, customEnd)}
-              />
-            </div>
-            <div className="form-field report-custom-date-field">
-              <span>Bitiş tarihi</span>
-              <DatePicker
-                ariaLabel="Bitiş tarihi"
-                value={customEnd}
-                min={customStart || undefined}
-                presets={[]}
-                onChange={(value) => updateCustomRange(customStart, value)}
-              />
-            </div>
+
+        {reportMessage && <p className="report-error" role="alert">{reportMessage}</p>}
+        {aiEnabled && (reportAiMode || reportAiContent) && (
+          <div className="report-filter-ai-feedback">
+            <p className="report-ai-status" role="status">{reportAiMessage}</p>
+            {reportAiContent && <div className="report-ai-result">{reportAiContent}</div>}
           </div>
         )}
-        {reportMessage && <p className="report-error" role="alert">{reportMessage}</p>}
       </Panel>
-
-      {aiEnabled && (
-        <Panel className="report-section-panel report-ai-panel period-report-ai-panel" padding="compact">
-          <div className="report-section-title">
-            <div>
-              <p>Seçilen dönem</p>
-              <h2>AI Rapor Yorumu</h2>
-            </div>
-            <span>{formatPeriodLabel(range.startDate, range.endDate)}</span>
-          </div>
-          <div className="report-ai-actions" role="group" aria-label="AI rapor yorumu">
-            {REPORT_AI_ACTIONS.filter((action) => action.mode !== "sales" || foodOrdersEnabled).map((action) => (
-              <button
-                className={reportAiMode === action.mode ? "is-active" : ""}
-                type="button"
-                disabled={loading || (reportAiMode === action.mode && reportAiMessage.includes("hazırlanıyor"))}
-                onClick={() => void generateReportAiComment(action.mode)}
-                key={action.mode}
-              >
-                {action.label}
-              </button>
-            ))}
-          </div>
-          <p className="report-ai-status" role="status">{reportAiMessage}</p>
-          {reportAiContent && <div className="report-ai-result">{reportAiContent}</div>}
-        </Panel>
-      )}
 
       <section aria-labelledby="report-summary-title">
         <div className="report-section-title">
