@@ -235,10 +235,11 @@ export function useUpdateSettings(enabled: boolean) {
 export function UpdateSettings({ controller }: { controller: ReturnType<typeof useUpdateSettings> }) {
   const { status, baseUrl, setBaseUrl, autoCheckEnabled, setAutoCheckEnabled, action, localMessage, error, sectionRef, baseUrlInputRef, busy, updateAvailable, updateReady, resetToDefault, checkNow, downloadNow, restartAndInstall } = controller;
   return (
-    <section ref={sectionRef} id="settings-updates" tabIndex={-1} className="settings-application-subsection settings-update-section">
-      <div className="settings-subsection-heading">
+    <section ref={sectionRef} id="settings-updates" tabIndex={-1} className="settings-application-subsection settings-update-section settings-panel">
+      <div className="settings-panel-header">
         <div>
           <h3>Güncellemeler</h3>
+          <p>Güncelleme kaynağı ve otomatik kontrol tercihleri.</p>
         </div>
         {status && (
           <span>
@@ -250,6 +251,7 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
         )}
       </div>
 
+      <div className="settings-panel-body">
       <div className="form-grid">
         <label className="form-field form-field--long">
           Güncelleme sunucusu
@@ -367,6 +369,7 @@ export function UpdateSettings({ controller }: { controller: ReturnType<typeof u
           {localMessage}
         </p>
       )}
+      </div>
     </section>
   );
 }
