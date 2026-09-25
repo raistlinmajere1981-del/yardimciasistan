@@ -16,7 +16,13 @@ export function BusinessSettingsSection({ form, onFormChange }: SetupFieldsProps
   };
 
   return (
-        <div id="settings-business" tabIndex={-1} className="setup-section settings-identity-section">
+        <section id="settings-business" tabIndex={-1} className="setup-section settings-panel settings-identity-section">
+          <div className="settings-panel-header">
+            <div>
+              <h2>İşletme Bilgileri</h2>
+            </div>
+          </div>
+          <div className="settings-panel-body">
           <div className="form-row">
             <label className="form-field form-field--long">
               Firma adı
@@ -56,8 +62,8 @@ export function BusinessSettingsSection({ form, onFormChange }: SetupFieldsProps
               <input value={form.address} onChange={(event) => update("address", event.target.value)} placeholder="İşletme adresi" />
             </label>
           </div>
-
-        </div>
+          </div>
+        </section>
 
   );
 }
