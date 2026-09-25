@@ -3,6 +3,7 @@ import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import { getLocalViteExecutable } from "./test-helpers/local-vite.mjs";
 import { launchChromiumForSmoke } from "./test-helpers/playwright-browser.mjs";
+import { chooseDate, chooseTime } from "./test-helpers/date-time-picker.mjs";
 import { readFileSync } from "node:fs";
 import http from "node:http";
 
@@ -1176,8 +1177,8 @@ try {
   await manualRequestDrawer.getByLabel("Kişi sayısı").fill("3");
   await manualRequestDrawer.getByLabel("Not", { exact: true }).fill("Telefonla alınan bahçe masası talebi.");
   await manualRequestDrawer.getByText("Detaylı bilgi", { exact: true }).click();
-  await manualRequestDrawer.getByLabel("Giriş tarihi").fill("2026-07-18");
-  await manualRequestDrawer.getByLabel("Saat").fill("21:00");
+  await chooseDate(manualRequestDrawer, "Giriş tarihi", "2026-07-18");
+  await chooseTime(manualRequestDrawer, "Saat", "21:00");
   await manualRequestDrawer.getByRole("button", { name: "Manuel Talep Kaydet" }).click();
   await expect(conversionPage.getByLabel("Talep yönetimi").getByText("Manuel talep kaydedildi.")).toBeVisible();
   await manualRequestDrawer.getByRole("button", { name: "Elle talep formunu kapat" }).click();
@@ -1267,7 +1268,7 @@ try {
   });
   await expect(customerEditor.getByLabel("Ad soyad")).toHaveValue("Kimlik Smoke");
   await expect(customerEditor.getByLabel("Kimlik / pasaport no")).toHaveValue("U12345678");
-  await expect(customerEditor.getByLabel("Doğum tarihi")).toHaveValue("1991-04-23");
+  await expect(customerEditor.getByRole("button", { name: "Doğum tarihi", exact: true })).toHaveAttribute("data-picker-value", "1991-04-23");
   await customerEditor.getByLabel("Telefon").fill("+905551112244");
   await customerEditor.getByLabel("Not", { exact: true }).fill("Resepsiyondan manuel oluşturulan müşteri kartı.");
   await customerEditor.getByRole("button", { name: "Müşteri Kartını Kaydet" }).click();
@@ -1286,8 +1287,8 @@ try {
   await stayWorkspace.getByRole("tab", { name: "Konaklama", exact: true }).click();
   await stayWorkspace.getByRole("button", { name: "Manuel Konaklama Oluştur", exact: true }).click();
   await stayWorkspace.getByLabel("Müşteri", { exact: true }).selectOption("customer_manual_card_smoke_001");
-  await stayWorkspace.getByLabel("Giriş tarihi").fill("2026-08-01");
-  await stayWorkspace.getByLabel("Çıkış tarihi").fill("2026-08-03");
+  await chooseDate(stayWorkspace, "Giriş tarihi", "2026-08-01");
+  await chooseDate(stayWorkspace, "Çıkış tarihi", "2026-08-03");
   await stayWorkspace.getByLabel("Kişi sayısı").fill("2");
   await stayWorkspace.getByLabel("Konaklama notu").fill("Manuel resepsiyon ataması.");
   await stayWorkspace.getByRole("button", { name: "Kaydet", exact: true }).click();
