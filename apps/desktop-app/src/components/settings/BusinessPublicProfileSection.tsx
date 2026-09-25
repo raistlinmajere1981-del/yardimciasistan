@@ -12,6 +12,7 @@ import {
 import type { BusinessLocationGeocodeCandidate } from "../../../electron/business-location-geocode";
 import type { SettingsOperationResult } from "../../app/settings-save";
 import { BusinessLocationMapPicker } from "./BusinessLocationMapPicker";
+import { TimePicker } from "../ui/DateTimePicker";
 
 interface BusinessPublicProfileDraft {
   description: string;
