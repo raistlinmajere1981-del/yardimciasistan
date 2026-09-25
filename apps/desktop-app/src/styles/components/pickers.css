@@ -189,7 +189,7 @@
 
 .date-picker-grid button.is-selected,
 .time-picker-list button.is-selected {
-  color: var(--color-accent-contrast);
+  color: var(--color-on-accent);
   background: var(--color-accent);
   border-color: var(--color-accent);
   font-weight: var(--weight-semibold);
