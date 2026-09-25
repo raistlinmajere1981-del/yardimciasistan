@@ -175,11 +175,45 @@
 
 /* Date presets & filter controls */
 
+.report-control-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.report-period-controls {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: var(--space-2);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .report-date-presets,
 .report-ai-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.report-filter-ai-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.report-filter-ai-feedback {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.report-filter-ai-feedback .report-ai-result {
+  max-height: 180px;
+  overflow: auto;
 }
 
 .report-date-presets button,
@@ -212,8 +246,13 @@
 
 .report-custom-dates {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 260px));
-  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(180px, 220px));
+  gap: var(--space-2);
+}
+
+.report-custom-dates-inline {
+  flex: 0 1 auto;
+  align-items: end;
 }
 
 .report-custom-date-field {
@@ -522,15 +561,6 @@
   color: var(--color-accent);
 }
 
-.period-report-ai-panel .report-ai-actions {
-  align-items: center;
-}
-
-.period-report-ai-panel .report-ai-status {
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
-}
-
 .report-ai-status {
   margin: 0;
   color: var(--color-text-muted);
@@ -564,6 +594,16 @@
 /* Responsive queries */
 
 @media (max-width: 1180px) {
+  .report-control-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-filter-ai-actions {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
   .finance-ai-panel {
     grid-template-columns: minmax(170px, 0.6fr) minmax(0, 1fr);
   }
@@ -584,6 +624,15 @@
 }
 
 @media (max-width: 980px) {
+  .report-period-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .report-custom-dates-inline {
+    width: 100%;
+  }
+
   .finance-ai-panel {
     grid-template-columns: 1fr;
   }
