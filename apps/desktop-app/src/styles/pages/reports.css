@@ -600,7 +600,11 @@
 }
 
 @media (max-width: 760px) {
-  .reports-page .cash-details-toggle {
-    padding-right: var(--space-10);
+  .reports-view-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .finance-ai-actions {
+    grid-template-columns: 1fr;
   }
 }
