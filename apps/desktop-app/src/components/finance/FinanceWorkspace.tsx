@@ -10,6 +10,7 @@ import type {
 import { ActionButton } from "../ui/ActionButton";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { FormDialog } from "../ui/FormDialog";
+import { DatePicker } from "../ui/DateTimePicker";
 import { MetricCard } from "../ui/MetricCard";
 import { Panel } from "../ui/Panel";
 import { useRequestGeneration } from "../workspace/use-request-generation";
@@ -400,17 +401,16 @@ export function FinanceWorkspace({
                     disabled={saving}
                   />
                 </label>
-                <label className="form-field form-field--short">
+                <div className="form-field form-field--short">
                   <span>İşlem tarihi</span>
-                  <input
-                    inputMode="numeric"
+                  <DatePicker
+                    ariaLabel="İşlem tarihi"
                     value={draft.date}
-                    onChange={(event) => updateDraft({ date: autoFormatDateInput(event.target.value) })}
-                    placeholder="GG.AA.YYYY"
-                    maxLength={10}
+                    presets={[]}
                     disabled={saving}
+                    onChange={(date) => updateDraft({ date })}
                   />
-                </label>
+                </div>
               </div>
             </section>
           </div>
@@ -496,9 +496,3 @@ function categoryLabel(category: string, categories: DesktopFinanceCategory[]): 
   return categories.find((item) => item.id === category)?.name ?? "Kasa hareketi";
 }
 
-function autoFormatDateInput(value: string): string {
-  const digits = value.replace(/\D/g, "").slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}.${digits.slice(4)}`;
-}
