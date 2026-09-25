@@ -628,6 +628,16 @@ function registerIpcHandlers() {
         };
       }
       return androidInstallationService.install(serial);
+    },
+    provisionOnDevice: async (serial) => {
+      const publication = await publishCurrentAndroidSnapshot();
+      if (!publication.ok) {
+        return {
+          ok: false,
+          message: `Android bağlantısı için web yayını hazırlanamadı. ${publication.message}`
+        };
+      }
+      return androidInstallationService.provision(serial);
     }
   });
 
