@@ -209,6 +209,7 @@ export interface DesktopBridge {
   revokeAndroidDevice: (deviceId: string) => Promise<DesktopAndroidDeviceMutationResult>;
   listAndroidInstallDevices: () => Promise<DesktopAndroidInstallationSnapshot>;
   installAndroidApp: (serial: string) => Promise<DesktopAndroidInstallResult>;
+  provisionAndroidApp: (serial: string) => Promise<DesktopAndroidInstallResult>;
   createManualRequest: (input: CreateManualRequestInput) => Promise<CreateManualRequestResult>;
   convertRequestToReservation: (requestId: string) => Promise<RequestReservationConversionResult>;
   updateRequestStatus: (input: UpdateRequestStatusInput) => Promise<DesktopStatusUpdateResult>;
@@ -385,6 +386,7 @@ const bridge: DesktopBridge = {
   revokeAndroidDevice: (deviceId: string) => ipcRenderer.invoke("androidDevice:revoke", deviceId),
   listAndroidInstallDevices: () => ipcRenderer.invoke("androidDevice:listInstallDevices"),
   installAndroidApp: (serial: string) => ipcRenderer.invoke("androidDevice:install", serial),
+  provisionAndroidApp: (serial: string) => ipcRenderer.invoke("androidDevice:provision", serial),
   createManualRequest: (input: CreateManualRequestInput) => ipcRenderer.invoke("request:createManual", input),
   convertRequestToReservation: (requestId: string) => ipcRenderer.invoke("request:convertToReservation", requestId),
   updateRequestStatus: (input: UpdateRequestStatusInput) => ipcRenderer.invoke("request:updateStatus", input),
