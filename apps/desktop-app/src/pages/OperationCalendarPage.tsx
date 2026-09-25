@@ -62,10 +62,11 @@ export function OperationCalendarPage({
 }: OperationCalendarPageProps) {
   const { viewMode, setViewMode, selectedDate, setSelectedDate } = controller;
 
-  const visibleDates = useMemo(
-    () => (viewMode === "day" ? [selectedDate] : buildWeekDates(selectedDate)),
-    [selectedDate, viewMode]
-  );
+  const visibleDates = useMemo(() => {
+    if (viewMode === "day") return [selectedDate];
+    if (viewMode === "week") return buildWeekDates(selectedDate);
+    return buildMonthDates(selectedDate);
+  }, [selectedDate, viewMode]);
   const dayEntries = useMemo(
     () => visibleDates.map((date) => ({
       date,
@@ -79,17 +80,23 @@ export function OperationCalendarPage({
     [accommodationReservationsEnabled, data, foodReservationsEnabled, visibleDates]
   );
   const summary = useMemo(() => {
-    const items = dayEntries.flatMap((entry) => entry.items);
+    const summaryEntries = viewMode === "month"
+      ? dayEntries.filter((entry) => isSameMonth(entry.date, selectedDate))
+      : dayEntries;
+    const items = summaryEntries.flatMap((entry) => entry.items);
     return {
       arrivals: items.filter((item) => item.kind === "arrival").length,
       departures: items.filter((item) => item.kind === "departure").length,
       restaurant: items.filter((item) => item.kind === "restaurant").length,
       pendingTasks: items.filter((item) => item.kind === "task" && item.task.status === "pending").length
     };
-  }, [dayEntries]);
+  }, [dayEntries, selectedDate, viewMode]);
 
   const moveRange = (direction: -1 | 1) => {
-    setSelectedDate((current) => addDays(current, direction * (viewMode === "week" ? 7 : 1)));
+    setSelectedDate((current) => {
+      if (viewMode === "month") return addMonths(current, direction);
+      return addDays(current, direction * (viewMode === "week" ? 7 : 1));
+    });
   };
 
   return (
@@ -100,7 +107,7 @@ export function OperationCalendarPage({
             <CalendarDays size={22} />
           </div>
           <div>
-            <strong>{formatRangeTitle(visibleDates)}</strong>
+            <strong>{viewMode === "month" ? formatMonthTitle(selectedDate) : formatRangeTitle(visibleDates)}</strong>
             <span>{(accommodationReservationsEnabled || foodReservationsEnabled) && tasksEnabled
               ? "Etkin rezervasyon alanları ve günlük işler tek görünümde."
               : accommodationReservationsEnabled || foodReservationsEnabled
@@ -126,6 +133,14 @@ export function OperationCalendarPage({
               onClick={() => setViewMode("week")}
             >
               Hafta
+            </button>
+            <button
+              className={viewMode === "month" ? "is-active" : ""}
+              type="button"
+              aria-pressed={viewMode === "month"}
+              onClick={() => setViewMode("month")}
+            >
+              Ay
             </button>
           </div>
           <div className="operation-calendar-range-controls">
@@ -158,39 +173,89 @@ export function OperationCalendarPage({
         {tasksEnabled && <StatusBadge tone="wait">{summary.pendingTasks} bekleyen iş</StatusBadge>}
       </div>
 
-      <div className={`operation-calendar-grid ${viewMode === "day" ? "is-day" : "is-week"}`}>
-        {dayEntries.map(({ date, items }) => {
-          const isToday = date === calendarLocalDateKey(new Date());
-          return (
-            <article className={`operation-calendar-day panel ${isToday ? "is-today" : ""}`} key={date}>
-              <header className="operation-calendar-day-header">
-                <div>
-                  <span>{formatWeekday(date)}</span>
-                  <strong>{formatCalendarDate(date)}</strong>
-                </div>
-                <StatusBadge tone={isToday ? "ok" : "neutral"}>{isToday ? "Bugün" : `${items.length} kayıt`}</StatusBadge>
-              </header>
+      {viewMode === "month" ? (
+        <div className="operation-calendar-month-shell">
+          <div className="operation-calendar-month-weekdays" aria-hidden="true">
+            {["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"].map((weekday) => <span key={weekday}>{weekday}</span>)}
+          </div>
+          <div className="operation-calendar-grid is-month">
+            {dayEntries.map(({ date, items }) => {
+              const isToday = date === calendarLocalDateKey(new Date());
+              const outsideMonth = !isSameMonth(date, selectedDate);
+              return (
+                <article
+                  className={`operation-calendar-month-day panel ${isToday ? "is-today" : ""} ${outsideMonth ? "is-outside-month" : ""}`}
+                  data-date={date}
+                  key={date}
+                >
+                  <button
+                    className="operation-calendar-month-day-button"
+                    type="button"
+                    aria-label={`${formatLongDate(date)} gününü aç`}
+                    onClick={() => {
+                      setSelectedDate(date);
+                      setViewMode("day");
+                    }}
+                  >
+                    <span>{formatMonthDayNumber(date)}</span>
+                    {isToday && <StatusBadge tone="ok">Bugün</StatusBadge>}
+                  </button>
+                  <div className="operation-calendar-month-items">
+                    {items.length === 0 ? (
+                      <span className="operation-calendar-month-empty">—</span>
+                    ) : (
+                      <>
+                        {items.slice(0, 3).map((item) => (
+                          <div className={`operation-calendar-month-item item-${item.kind}`} key={item.key}>
+                            <span className="operation-calendar-month-item-dot" aria-hidden="true" />
+                            <span>{item.time || getCalendarItemLabel(item)}</span>
+                            <strong>{item.title}</strong>
+                          </div>
+                        ))}
+                        {items.length > 3 && <span className="operation-calendar-month-more">+{items.length - 3} kayıt</span>}
+                      </>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className={`operation-calendar-grid ${viewMode === "day" ? "is-day" : "is-week"}`}>
+          {dayEntries.map(({ date, items }) => {
+            const isToday = date === calendarLocalDateKey(new Date());
+            return (
+              <article className={`operation-calendar-day panel ${isToday ? "is-today" : ""}`} key={date}>
+                <header className="operation-calendar-day-header">
+                  <div>
+                    <span>{formatWeekday(date)}</span>
+                    <strong>{formatCalendarDate(date)}</strong>
+                  </div>
+                  <StatusBadge tone={isToday ? "ok" : "neutral"}>{isToday ? "Bugün" : `${items.length} kayıt`}</StatusBadge>
+                </header>
 
-              <div className="operation-calendar-day-body">
-                {items.length === 0 ? (
-                  <div className="operation-calendar-empty">Planlanan kayıt yok.</div>
-                ) : (
-                  items.map((item) => (
-                    <CalendarItemRow
-                      key={item.key}
-                      item={item}
-                      rooms={data.rooms}
-                      tables={data.tables}
-                      onOpenReservation={onOpenReservation}
-                      onCompleteTask={onCompleteTask}
-                    />
-                  ))
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </div>
+                <div className="operation-calendar-day-body">
+                  {items.length === 0 ? (
+                    <div className="operation-calendar-empty">Planlanan kayıt yok.</div>
+                  ) : (
+                    items.map((item) => (
+                      <CalendarItemRow
+                        key={item.key}
+                        item={item}
+                        rooms={data.rooms}
+                        tables={data.tables}
+                        onOpenReservation={onOpenReservation}
+                        onCompleteTask={onCompleteTask}
+                      />
+                    ))
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -387,9 +452,48 @@ function buildWeekDates(dateKey: string) {
   return Array.from({ length: 7 }, (_, index) => addDays(monday, index));
 }
 
+function addMonths(dateKey: string, amount: number) {
+  const date = parseLocalDate(dateKey);
+  const day = date.getDate();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + amount);
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0, 12).getDate();
+  date.setDate(Math.min(day, lastDay));
+  return calendarLocalDateKey(date);
+}
+
+function buildMonthDates(dateKey: string) {
+  const selected = parseLocalDate(dateKey);
+  const first = new Date(selected.getFullYear(), selected.getMonth(), 1, 12);
+  const last = new Date(selected.getFullYear(), selected.getMonth() + 1, 0, 12);
+  const firstKey = calendarLocalDateKey(first);
+  const lastKey = calendarLocalDateKey(last);
+  const firstWeekday = first.getDay();
+  const lastWeekday = last.getDay();
+  const startOffset = firstWeekday === 0 ? -6 : 1 - firstWeekday;
+  const endOffset = lastWeekday === 0 ? 0 : 7 - lastWeekday;
+  const start = addDays(firstKey, startOffset);
+  const end = addDays(lastKey, endOffset);
+  const totalDays = Math.round((parseLocalDate(end).getTime() - parseLocalDate(start).getTime()) / 86_400_000) + 1;
+  return Array.from({ length: totalDays }, (_, index) => addDays(start, index));
+}
+
+function isSameMonth(leftDateKey: string, rightDateKey: string) {
+  return leftDateKey.slice(0, 7) === rightDateKey.slice(0, 7);
+}
+
 function formatRangeTitle(dates: string[]) {
   if (dates.length === 1) return formatLongDate(dates[0]);
   return `${formatShortRangeDate(dates[0])} – ${formatLongDate(dates[dates.length - 1])}`;
+}
+
+function formatMonthTitle(dateKey: string) {
+  const value = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(parseLocalDate(dateKey));
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatMonthDayNumber(dateKey: string) {
+  return new Intl.DateTimeFormat("tr-TR", { day: "numeric" }).format(parseLocalDate(dateKey));
 }
 
 function formatWeekday(dateKey: string) {
