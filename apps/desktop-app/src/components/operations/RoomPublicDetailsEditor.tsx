@@ -1,6 +1,5 @@
-import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useMemo, useState } from "react";
-import { Save, X } from "lucide-react";
+import { Save } from "lucide-react";
 import {
   ROOM_PUBLIC_DETAIL_LIMITS,
   ROOM_PUBLIC_FEATURE_CATALOG,
@@ -9,6 +8,7 @@ import {
   type SaveRoomPublicDetailsInput
 } from "@yardimci-asistan/shared";
 import { ActionButton } from "../ui/ActionButton";
+import { FormDialog } from "../ui/FormDialog";
 
 type EditorState = "idle" | "loading" | "error";
 
@@ -80,63 +80,70 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
   const validCapacity = Number.isInteger(capacity) && capacity > 0 && capacity <= 100;
   const canSave = Boolean(room && form.name.trim() && validCapacity && state !== "loading");
 
-  const dialogRef = useDialogFocus(open);
-
   if (!open || !room) {
     return null;
   }
 
   return (
-    <div
-      className="manual-request-backdrop overlay overlay--drawer"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && state !== "loading") onClose();
+    <FormDialog
+      title="Oda bilgilerini düzenle"
+      onClose={() => {
+        if (state !== "loading") onClose();
       }}
-    >
-      <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="room-public-details-editor-title">
-        <header className="overlay-header overlay-header--sticky">
-          <div className="overlay-heading">
-            <p>Müşteriye açık oda bilgileri</p>
-            <h2 id="room-public-details-editor-title">Oda bilgilerini düzenle</h2>
+      closeBlocked={state === "loading"}
+      dismissOnBackdrop
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (!canSave) return;
+
+        setState("loading");
+        const result = await onSave({
+          roomId: room.id,
+          name: form.name.trim(),
+          number: form.number.trim(),
+          capacity,
+          bedInfo: form.bedInfo.trim(),
+          floor: form.floor.trim(),
+          features: normalizeRoomPublicFeatures(form.features),
+          description: form.description.trim(),
+          priceNote: form.priceNote.trim()
+        });
+
+        if (!result.ok) {
+          setState("error");
+          return;
+        }
+
+        onClose();
+      }}
+      footer={(
+        <>
+          {!validCapacity && (
+            <p id="room-capacity-error" role="alert" className="form-status sync-error">
+              Kapasite 1 ile 100 arasında olmalı.
+            </p>
+          )}
+          <div className="action-row room-public-details-actions">
+            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
+              Vazgeç
+            </ActionButton>
+            <ActionButton type="submit" disabled={!canSave}>
+              <Save size={16} aria-hidden="true" />
+              {state === "loading" ? "Kaydediliyor" : "Kaydet"}
+            </ActionButton>
           </div>
-          <button
-            className="drawer-close-button"
-            type="button"
-            aria-label="Oda bilgileri formunu kapat"
-            onClick={onClose}
-            disabled={state === "loading"}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
+        </>
+      )}
+    >
+      <div className="form-stack customer-create-form room-public-details-form">
+        <section className="panel form-stack">
+          <div className="page-toolbar">
+            <div className="page-toolbar__copy">
+              <strong>Temel bilgiler</strong>
+              <small>Oda kimliği, kapasite ve yatak düzeni</small>
+            </div>
+          </div>
 
-        <form
-          className="form-stack overlay-form"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            if (!canSave) return;
-
-            setState("loading");
-            const result = await onSave({
-              roomId: room.id,
-              name: form.name.trim(),
-              number: form.number.trim(),
-              capacity,
-              bedInfo: form.bedInfo.trim(),
-              floor: form.floor.trim(),
-              features: normalizeRoomPublicFeatures(form.features),
-              description: form.description.trim(),
-              priceNote: form.priceNote.trim()
-            });
-
-            if (!result.ok) {
-              setState("error");
-              return;
-            }
-
-            onClose();
-          }}
-        >
           <div className="form-grid">
             <label className="form-field form-field--medium">
               Oda adı
@@ -190,8 +197,17 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
               />
             </label>
           </div>
+        </section>
 
-          <fieldset className="form-field--span">
+        <section className="panel form-stack">
+          <div className="page-toolbar">
+            <div className="page-toolbar__copy">
+              <strong>Müşteriye açık bilgiler</strong>
+              <small>Oda özellikleri ve açıklamalar</small>
+            </div>
+          </div>
+
+          <fieldset className="room-public-features">
             <legend>Oda özellikleri</legend>
             <div className="page-toolbar__start">
               {ROOM_PUBLIC_FEATURE_CATALOG.map((feature) => (
@@ -230,20 +246,8 @@ export function RoomPublicDetailsEditor({ open, room, onClose, onSave }: RoomPub
               />
             </label>
           </div>
-
-          {!validCapacity && <p id="room-capacity-error" role="alert" className="form-status sync-error">Kapasite 1 ile 100 arasında olmalı.</p>}
-
-          <div className="overlay-footer overlay-footer--inset form-actions">
-            <ActionButton variant="secondary" type="button" onClick={onClose} disabled={state === "loading"}>
-              Vazgeç
-            </ActionButton>
-            <ActionButton type="submit" disabled={!canSave}>
-              <Save size={16} aria-hidden="true" />
-              {state === "loading" ? "Kaydediliyor" : "Kaydet"}
-            </ActionButton>
-          </div>
-        </form>
-      </aside>
-    </div>
+        </section>
+      </div>
+    </FormDialog>
   );
 }
