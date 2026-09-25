@@ -159,47 +159,11 @@ export class AndroidInstallationService {
       return { ok: false, message: "ADB başarı bildirdi ancak Android uygulaması telefonda doğrulanamadı." };
     }
 
-    const launchArgs = [
-      "-s",
-      normalizedSerial,
-      "shell",
-      "am",
-      "start",
-      "-n",
-      `${PACKAGE_NAME}/${ACTIVITY_NAME}`
-    ];
-
-    if (!alreadyInstalled) {
-      const connection = this.options.getConnection();
-      const baseUrl = String(connection.baseUrl ?? "").trim().replace(/\/+$/, "");
-      const syncSecret = String(connection.syncSecret ?? "").trim();
-      if (!/^https?:\/\//i.test(baseUrl) || syncSecret.length < 12) {
-        return {
-          ok: false,
-          message: "APK kuruldu ancak işletme bağlantısı hazırlanamadı. Önce Web bağlantı ayarlarını kaydedin."
-        };
-      }
-
-      let ticket: string;
-      try {
-        ticket = createAndroidBootstrapTicket({
-          syncSecret,
-          desktopId: this.options.getDesktopId()
-        });
-      } catch (error) {
-        return {
-          ok: false,
-          message: error instanceof Error ? error.message : "Android kurulum bileti oluşturulamadı."
-        };
-      }
-      launchArgs.push("--es", "ya_provision_url", baseUrl, "--es", "ya_provision_ticket", ticket);
-    }
-
-    const launchResult = await this.runAdbAsync(adb, launchArgs);
-    if (launchResult.status !== 0) {
+    const provisioning = await this.provisionInstalledApp(adb, normalizedSerial);
+    if (!provisioning.ok) {
       return {
         ok: false,
-        message: "Uygulama kuruldu ancak telefonda otomatik açılamadı. Uygulamayı telefondan bir kez açın."
+        message: `APK ${alreadyInstalled ? "güncellendi" : "kuruldu"} ancak işletme bağlantısı hazırlanamadı. ${provisioning.message}`
       };
     }
 
@@ -207,9 +171,105 @@ export class AndroidInstallationService {
     return {
       ok: true,
       message: alreadyInstalled
-        ? `Yardımcı Asistan ${androidPackage.versionName} telefonda güncellendi ve açıldı.`
+        ? `Yardımcı Asistan ${androidPackage.versionName} telefonda güncellendi; mevcut işletme bağlantısı yeniden hazırlanıyor.`
         : "Yardımcı Asistan telefona kuruldu; işletme bağlantısı otomatik hazırlanıyor.",
       device: refreshed
+    };
+  }
+
+  async provision(serial: string): Promise<DesktopAndroidInstallResult> {
+    const normalizedSerial = String(serial ?? "").trim();
+    if (!normalizedSerial) {
+      return { ok: false, message: "Bağlantı için Android cihaz seri numarası gerekli." };
+    }
+
+    const adb = this.resolveAdbExecutable();
+    const devicesResult = this.runAdb(adb, ["devices", "-l"], true);
+    if (devicesResult.errorCode === "ENOENT") {
+      return { ok: false, message: "ADB bulunamadı. Desktop Android Platform-Tools kaynağını kontrol edin." };
+    }
+
+    const device = this.parseDevices(devicesResult.stdout).find((item) => item.serial === normalizedSerial);
+    if (!device) {
+      return { ok: false, message: "Seçilen Android cihaz artık USB üzerinden görünmüyor." };
+    }
+    if (device.state === "unauthorized") {
+      return {
+        ok: false,
+        message: "Telefon USB hata ayıklama onayı bekliyor. Telefonun kilidini açıp bu bilgisayara izin verin."
+      };
+    }
+    if (device.state !== "device") {
+      return { ok: false, message: `Android cihazı bağlantı için hazır değil: ${device.state}.` };
+    }
+    if (!this.isPackageInstalled(adb, normalizedSerial)) {
+      return { ok: false, message: "Yardımcı Asistan telefonda kurulu değil. Önce uygulamayı kurun." };
+    }
+
+    const provisioning = await this.provisionInstalledApp(adb, normalizedSerial);
+    if (!provisioning.ok) {
+      return provisioning;
+    }
+
+    return {
+      ok: true,
+      message: "Telefon mevcut işletmeye yeniden bağlanıyor. Birkaç saniye içinde cihaz yönetiminde görünmelidir.",
+      device: this.inspectDevice(adb, device, this.resolveAndroidPackage())
+    };
+  }
+
+  private async provisionInstalledApp(
+    adb: string,
+    serial: string
+  ): Promise<DesktopAndroidInstallResult> {
+    const connection = this.options.getConnection();
+    const baseUrl = String(connection.baseUrl ?? "").trim().replace(/\/+$/, "");
+    const syncSecret = String(connection.syncSecret ?? "").trim();
+    if (!/^https?:\/\//i.test(baseUrl) || syncSecret.length < 12) {
+      return {
+        ok: false,
+        message: "Önce Web bağlantı ayarlarını kaydedin."
+      };
+    }
+
+    let ticket: string;
+    try {
+      ticket = createAndroidBootstrapTicket({
+        syncSecret,
+        desktopId: this.options.getDesktopId()
+      });
+    } catch (error) {
+      return {
+        ok: false,
+        message: error instanceof Error ? error.message : "Android kurulum bileti oluşturulamadı."
+      };
+    }
+
+    const launchResult = await this.runAdbAsync(adb, [
+      "-s",
+      serial,
+      "shell",
+      "am",
+      "start",
+      "-n",
+      `${PACKAGE_NAME}/${ACTIVITY_NAME}`,
+      "--es",
+      "ya_provision_url",
+      baseUrl,
+      "--es",
+      "ya_provision_ticket",
+      ticket
+    ]);
+    if (launchResult.status !== 0) {
+      return {
+        ok: false,
+        message: "Telefon uygulaması bağlantı bilgileriyle açılamadı. Uygulamayı telefondan açıp yeniden deneyin."
+      };
+    }
+
+    return {
+      ok: true,
+      message: "İşletme bağlantısı telefona gönderildi."
     };
   }
 
