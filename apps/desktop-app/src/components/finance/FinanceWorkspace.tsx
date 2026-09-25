@@ -122,9 +122,7 @@ export function FinanceWorkspace({
   }, [accommodationFolioEnabled, data.outstandingPensionMinor, data.pensionBalances, roomData.folios]);
 
   async function submitEntry() {
-    const isCurrent = beginPresentationRequest();
     await saveEntry();
-    isCurrent();
   }
 
   async function addCategory() {
