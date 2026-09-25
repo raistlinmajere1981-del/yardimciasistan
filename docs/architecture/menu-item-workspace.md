@@ -20,6 +20,8 @@ Stok (capability-gated)
 
 There are no separate Bilgiler / Stok / Görsel tabs. The entire item draft stays mounted in one workspace, so users can edit product details, image and stock without changing modes. Centered/full-canvas presentation preserves the same draft. Dirty or saving state blocks close and entity replacement.
 
+The one-page editor uses an asymmetric 12-column layout at workspace widths: core identity fields form a compact top row, description owns the wider reading area, image controls occupy the right rail, and stock metrics share one operational row. Container queries collapse the same canonical form cleanly inside the narrower new-item dialog without duplicating form markup.
+
 The new-item flow reuses the same field components and canonical form conversion. After the first save, the dialog unmounts before the created entity opens in Menu Item Workspace, preserving the single-modal contract.
 
 Stock tracking is an explicit form state rather than an implicit “quantity is blank” convention. New items start with stock tracking enabled and a zero quantity; disabling tracking collapses the stock panel and persists the canonical untracked state with a null stock quantity.
