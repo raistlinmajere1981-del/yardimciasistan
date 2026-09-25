@@ -278,7 +278,7 @@ export function ReportsPage({
       )}
 
       {financeEnabled && (!reportsEnabled || activeView === "cash") && (
-        <FinanceWorkspace controller={financeController} aside={financeAiPanel} />
+        <FinanceWorkspace controller={financeController} topPanel={financeAiPanel} />
       )}
 
       {reportsEnabled && (!financeEnabled || activeView === "reports") && <div className="reports-detail-view">
