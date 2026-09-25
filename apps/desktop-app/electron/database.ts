@@ -70,6 +70,7 @@ import type {
   DesktopSetupSaveResult,
   SaveMenuCategoryInput,
   SaveMenuItemInput,
+  ReorderMenuRecordsInput,
   DesktopMenuStockMovement,
   DesktopMenuSaveResult,
   CreateStockImageImportInput,
@@ -142,6 +143,7 @@ export type {
   DesktopSetupSaveResult,
   SaveMenuCategoryInput,
   SaveMenuItemInput,
+  ReorderMenuRecordsInput,
   DesktopMenuStockMovement,
   DesktopMenuSaveResult,
   CreateStockImageImportInput,
@@ -1740,6 +1742,14 @@ export class DesktopDatabase {
     return { ...result, dashboardData: this.getDashboardData() };
   }
 
+  reorderMenuRecords(input: ReorderMenuRecordsInput): DesktopStatusUpdateResult {
+    const result = reorderStoredMenuRecords(this.db, input);
+    if (!result.ok) {
+      return result;
+    }
+    return { ...result, dashboardData: this.getDashboardData() };
+  }
+
   close() {
     this.db.close();
   }
@@ -2189,6 +2199,7 @@ import {
   getPublishedMenu as getStoredPublishedMenu,
   getQrMenuPublication as getStoredQrMenuPublication,
   saveMenuCategory as saveStoredMenuCategory,
+  reorderMenuRecords as reorderStoredMenuRecords,
   deleteMenuCategoryInTransaction as deleteStoredMenuCategoryInTransaction,
   deleteMenuItemInTransaction as deleteStoredMenuItemInTransaction,
 } from "./database/menu-store.js";
