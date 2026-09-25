@@ -1,7 +1,11 @@
 .finance-workspace {
-  display: grid;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .finance-title-row {
@@ -38,22 +42,34 @@
   gap: var(--space-3);
 }
 
+.finance-top-panel {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
 .finance-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.75fr) minmax(300px, 0.85fr);
-  align-items: start;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 2fr) minmax(320px, 0.95fr);
+  align-items: stretch;
   gap: var(--space-4);
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .finance-main-grid.is-single-column {
   grid-template-columns: 1fr;
 }
 
-.finance-side-column {
-  display: grid;
-  gap: var(--space-4);
+.finance-recent-panel,
+.finance-outstanding-panel {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .finance-section-heading {
@@ -75,8 +91,14 @@
 .finance-entry-list,
 .finance-outstanding-list {
   display: grid;
+  flex: 1 1 auto;
+  align-content: start;
   gap: var(--space-2);
+  min-height: 0;
   margin-top: var(--space-3);
+  padding-right: var(--space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .finance-entry-item,
@@ -167,10 +189,6 @@
   width: var(--control-height-sm);
 }
 
-.finance-history-toggle {
-  margin-top: var(--space-3);
-}
-
 .finance-room-note {
   display: flex;
   align-items: flex-start;
@@ -187,18 +205,19 @@
   color: var(--color-accent);
 }
 
-.finance-compact-empty {
+.finance-compact-empty,
+.finance-recent-panel > .empty-state {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 0;
   margin: var(--space-3) 0 0;
   padding: var(--space-4);
+  place-items: center;
   color: var(--color-text-muted);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   text-align: center;
   font-size: var(--text-sm);
-}
-
-.finance-feedback {
-  margin: 0;
 }
 
 .finance-entry-dialog {
@@ -265,7 +284,7 @@
 
 @media (max-width: 1180px) {
   .finance-main-grid {
-    grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.9fr);
+    grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.9fr);
   }
 }
 
@@ -276,16 +295,19 @@
 
   .finance-main-grid {
     grid-template-columns: 1fr;
+    align-content: start;
+    overflow-y: auto;
   }
 
-  .finance-side-column {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .finance-recent-panel,
+  .finance-outstanding-panel {
+    min-height: 280px;
+    height: auto;
   }
 }
 
 @media (max-width: 760px) {
-  .finance-summary-grid,
-  .finance-side-column {
+  .finance-summary-grid {
     grid-template-columns: 1fr;
   }
 
