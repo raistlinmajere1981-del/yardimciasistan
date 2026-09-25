@@ -2,6 +2,7 @@ import { chromium, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { getLocalViteExecutable } from './test-helpers/local-vite.mjs';
 import { launchChromiumForSmoke } from './test-helpers/playwright-browser.mjs';
+import { chooseTime } from './test-helpers/date-time-picker.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createSetupFixture, createDashboardFixture } from './lib/desktop-renderer-fixtures.mjs';
@@ -195,12 +196,12 @@ try {
   }, { setup: { ...createSetupFixture(), setupRequired: false, businessName: "Smoke İşletmesi", syncSecret: "design-fixture-secret", whatsapp: "+905550000000" }, dashboard: createDashboardFixture() });
   await page.goto(baseUrl);
   await page.getByRole('button', { name: 'Ayarlar', exact: true }).click();
-  await expect(page.getByLabel('Giriş saati')).toHaveValue('14:00');
+  await expect(page.getByRole('button', { name: 'Giriş saati', exact: true })).toHaveAttribute('data-picker-value', '14:00');
   await page.getByRole("tab", { name: "Servisler", exact: true }).click();
   const birthdaySettings = page.locator('.setup-birthday-settings');
   await expect(birthdaySettings.getByRole('heading', { name: 'Doğum Günü Mesajları', exact: true })).toBeVisible();
   await expect(birthdaySettings.getByLabel('Doğum günü mesajlarını kullan')).toBeChecked();
-  await expect(birthdaySettings.getByLabel('Gönderim saati')).toHaveValue('10:00');
+  await expect(birthdaySettings.getByRole('button', { name: 'Gönderim saati', exact: true })).toHaveAttribute('data-picker-value', '10:00');
   await expect(birthdaySettings.getByLabel('Manuel')).toBeChecked();
   await expect(birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' })).toHaveValue('Doğum gününüz kutlu olsun {ad}! 🎉 {işletme} olarak sağlıklı ve güzel bir yıl dileriz.');
 
@@ -231,7 +232,7 @@ try {
   await sectorType.selectOption('pension_restaurant');
   await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Kaydet', exact: true })).toBeDisabled();
-  await expect(page.getByLabel('Giriş saati')).toHaveValue('14:00');
+  await expect(page.getByRole('button', { name: 'Giriş saati', exact: true })).toHaveAttribute('data-picker-value', '14:00');
   await expect(page.getByLabel('Bagaj emaneti')).toBeVisible();
   await expect(page.getByLabel('Havalimanı transferi')).toBeVisible();
   await expect(page.getByLabel('Kahvaltı başlangıcı')).toBeVisible();
@@ -287,7 +288,7 @@ try {
   expect(await page.evaluate(() => window.__designCalls.find(c => c.kind === 'public').input.latitude)).toBe(37.06);
 
   await page.getByRole('tab', { name: 'Servisler', exact: true }).click();
-  await birthdaySettings.getByLabel('Gönderim saati').fill('09:30');
+  await chooseTime(birthdaySettings, 'Gönderim saati', '09:30');
   await birthdaySettings.getByRole('textbox', { name: 'Mesaj {ad} ve {işletme} yer' }).fill('İyi ki doğdun {ad}! {işletme}');
   await page.getByRole('button', { name: 'Kaydet', exact: true }).click();
   expect(await page.evaluate(() => window.__designCalls.filter(c => c.kind === 'setup').at(-1).input.birthdaySettings)).toEqual({
