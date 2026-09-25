@@ -485,6 +485,12 @@ export interface SaveMenuCategoryInput {
   sort_order: number;
 }
 
+export interface ReorderMenuRecordsInput {
+  kind: "categories" | "items";
+  orderedIds: string[];
+  categoryId?: string;
+}
+
 export interface SaveMenuItemInput {
   id?: string;
   category_id: string;
