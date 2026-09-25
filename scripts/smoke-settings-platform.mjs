@@ -193,6 +193,8 @@ try {
   await page.getByRole('button', { name: 'Detaylar', exact: true }).click();
   const roomDialog = page.getByRole('dialog', { name: 'Oda bilgilerini düzenle' });
   await expect(roomDialog).toBeVisible();
+  await expect(roomDialog).toHaveClass(/form-dialog/);
+  await expect(roomDialog.locator('.panel')).toHaveCount(2);
   await roomDialog.getByLabel('Oda numarası').fill('A1');
   await roomDialog.getByLabel('Kapasite').fill('3');
   await roomDialog.getByRole('button', { name: 'Kaydet', exact: true }).click();
