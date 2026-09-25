@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DesktopDashboardData } from "../../../electron/database";
 import {
-  formatStockQuantity,
   resolveMenuPreviewImageUrl,
   stockUnitShortLabel,
   type ItemFormState
@@ -76,6 +75,14 @@ export function MenuItemFormFields({
     setImageError("");
   }
 
+  function setStockTracking(enabled: boolean) {
+    onChange({
+      ...form,
+      stock_tracking_enabled: enabled,
+      stock_quantity: enabled && !form.stock_quantity.trim() ? "0" : form.stock_quantity
+    });
+  }
+
   return (
     <div className="form-stack menu-item-form">
       {showDetails && (
@@ -104,44 +111,79 @@ export function MenuItemFormFields({
       )}
 
       {showStock && (
-        <section className="panel form-stack menu-item-stock-section">
-          <div className="page-toolbar">
-            <div className="page-toolbar__copy"><strong>Stok</strong><small>Miktar boşsa takip edilmez; 0 stokta yok demektir.</small></div>
-            <span className="menu-stock-summary-value">{form.stock_quantity === "" ? "Takip edilmiyor" : formatStockQuantity(Number(form.stock_quantity), form.stock_unit)}</span>
+        <section className={`panel menu-item-stock-section ${form.stock_tracking_enabled ? "is-enabled" : "is-disabled"}`}>
+          <div className="page-toolbar menu-stock-toolbar">
+            <div className="page-toolbar__copy">
+              <strong>Stok</strong>
+              {form.stock_tracking_enabled && <small>Stok miktarı, uyarı seviyesi ve satışta düşülecek miktarı takip edin.</small>}
+            </div>
+            <label className="form-check menu-stock-toggle">
+              <input
+                checked={form.stock_tracking_enabled}
+                onChange={(event) => setStockTracking(event.target.checked)}
+                type="checkbox"
+              />
+              Stok takibi
+            </label>
           </div>
-          <div className="form-row">
-            <label className="form-field form-field--short">Stok miktarı<input value={form.stock_quantity} onChange={(event) => onChange({ ...form, stock_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Takip edilmiyor" /></label>
-            <label className="form-field form-field--medium">Stok birimi<select value={form.stock_unit} onChange={(event) => onChange({ ...form, stock_unit: event.target.value === "gram" ? "gram" : "piece" })}><option value="piece">Adet</option><option value="gram">Gram</option></select></label>
-          </div>
-          <div className="form-row">
-            <label className="form-field form-field--short">Minimum stok uyarısı ({stockUnitShortLabel(form.stock_unit)})<input value={form.stock_min_quantity} onChange={(event) => onChange({ ...form, stock_min_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Örn. 5" /></label>
-            <label className="form-field form-field--short">Bir satışta düşülecek ({stockUnitShortLabel(form.stock_unit)})<input value={form.stock_consumption_quantity} onChange={(event) => onChange({ ...form, stock_consumption_quantity: event.target.value })} inputMode="decimal" type="number" min="0.001" step="any" placeholder="Örn. 1" /></label>
-          </div>
-          {qrMenuEnabled && <label className="form-check"><input checked={form.hide_when_out_of_stock} onChange={(event) => onChange({ ...form, hide_when_out_of_stock: event.target.checked })} type="checkbox" />Stok bitince QR menüden gizle</label>}
-          <label className="form-field form-field--fluid">Stok notu<textarea value={form.stock_note} onChange={(event) => onChange({ ...form, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" /></label>
-          {form.stock_quantity !== "" && <ActionButton variant="ghost" size="sm" type="button" onClick={() => onChange({ ...form, stock_quantity: "" })}>Stok takibini bırak</ActionButton>}
+
+          {form.stock_tracking_enabled && (
+            <div className="menu-stock-fields form-stack">
+              <div className="form-row">
+                <label className="form-field form-field--short">Stok miktarı<input value={form.stock_quantity} onChange={(event) => onChange({ ...form, stock_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="0" /></label>
+                <label className="form-field form-field--medium">Stok birimi<select value={form.stock_unit} onChange={(event) => onChange({ ...form, stock_unit: event.target.value === "gram" ? "gram" : "piece" })}><option value="piece">Adet</option><option value="gram">Gram</option></select></label>
+              </div>
+              <div className="form-row">
+                <label className="form-field form-field--short">Minimum stok uyarısı ({stockUnitShortLabel(form.stock_unit)})<input value={form.stock_min_quantity} onChange={(event) => onChange({ ...form, stock_min_quantity: event.target.value })} inputMode="decimal" type="number" min="0" step="any" placeholder="Örn. 5" /></label>
+                <label className="form-field form-field--short">Bir satışta düşülecek ({stockUnitShortLabel(form.stock_unit)})<input value={form.stock_consumption_quantity} onChange={(event) => onChange({ ...form, stock_consumption_quantity: event.target.value })} inputMode="decimal" type="number" min="0.001" step="any" placeholder="Örn. 1" /></label>
+              </div>
+              {qrMenuEnabled && <label className="form-check"><input checked={form.hide_when_out_of_stock} onChange={(event) => onChange({ ...form, hide_when_out_of_stock: event.target.checked })} type="checkbox" />Stok bitince QR menüden gizle</label>}
+              <label className="form-field form-field--fluid">Stok notu<textarea value={form.stock_note} onChange={(event) => onChange({ ...form, stock_note: event.target.value })} placeholder="İsteğe bağlı kısa stok notu" /></label>
+            </div>
+          )}
         </section>
       )}
 
       {showMedia && (
-        <section className="panel form-stack menu-item-media-section">
-          <div className="page-toolbar"><div className="page-toolbar__copy"><strong>Görsel</strong><small>Menü kartında kullanılacak görsel.</small></div></div>
-          <div className="menu-item-details">
-            <div className="menu-image-picker-label">
-              <span className="menu-image-field-title">Görsel</span>
-              <button className="menu-image-picker-control" type="button" aria-label="Ürün görseli seç" aria-busy={imageBusy} title="Görsel seçmek veya değiştirmek için tıklayın. Görseli kaldırmak için Delete tuşuna basın." onClick={() => imageInputRef.current?.click()} onKeyDown={(event) => { if ((event.key === "Delete" || event.key === "Backspace") && form.image_url) { event.preventDefault(); clearImage(); } }}>
-                <span>{imageBusy ? "Görsel hazırlanıyor…" : imageLabel}</span>
-                <strong>{imageBusy ? "Hazırlanıyor" : "Dosya seç"}</strong>
-              </button>
+        <section className="panel menu-item-media-section">
+          <div className="menu-media-header">
+            <div className="page-toolbar__copy">
+              <strong>Görsel</strong>
+              <small>Menü kartında kullanılacak görsel.</small>
+            </div>
+
+            <div className="menu-media-preview-tools">
+              <figure className="menu-image-inline-preview" aria-label="Mevcut ürün görseli önizlemesi">
+                <div className="menu-image-preview-frame">{visiblePreviewSource ? <img src={visiblePreviewSource} alt="Mevcut ürün görseli" onError={() => setFailedPreviewSource(previewSource)} /> : <span className="menu-image-preview-empty">{form.image_url ? "Önizleme yok" : "Görsel yok"}</span>}</div>
+              </figure>
+
+              <div className="menu-media-actions">
+                <ActionButton
+                  variant="secondary"
+                  size="sm"
+                  type="button"
+                  aria-busy={imageBusy}
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={imageBusy}
+                >
+                  {imageBusy ? "Hazırlanıyor…" : "Dosya seç"}
+                </ActionButton>
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  type="button"
+                  onClick={clearImage}
+                  disabled={imageBusy || !form.image_url}
+                >
+                  Temizle
+                </ActionButton>
+              </div>
+
+              <span className="menu-media-file-name" title={imageLabel}>{imageBusy ? "Görsel hazırlanıyor…" : imageLabel}</span>
               <input ref={imageInputRef} className="menu-image-file-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" tabIndex={-1} aria-hidden="true" onChange={(event) => void handleImageFile(event.target.files?.[0])} />
               {imageError && <small className="menu-image-error" role="status">{imageError}</small>}
             </div>
-            <figure className="menu-image-inline-preview" aria-label="Mevcut ürün görseli önizlemesi">
-              <div className="menu-image-preview-frame">{visiblePreviewSource ? <img src={visiblePreviewSource} alt="Mevcut ürün görseli" onError={() => setFailedPreviewSource(previewSource)} /> : <span className="menu-image-preview-empty">{form.image_url ? "Önizleme yok" : "Görsel yok"}</span>}</div>
-              <figcaption>Mevcut görsel</figcaption>
-            </figure>
           </div>
-          {form.image_url && <ActionButton variant="secondary" size="sm" type="button" onClick={clearImage}>Görseli Kaldır</ActionButton>}
         </section>
       )}
     </div>
