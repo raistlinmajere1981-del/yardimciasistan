@@ -30,6 +30,7 @@ import {
 } from "../../app/record-formatters";
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton } from "../ui/DataList";
+import { DatePicker, TimePicker, addDays } from "../ui/DateTimePicker";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
@@ -382,22 +383,37 @@ export function RequestsWorkspace({
               <details className="form-details">
                 <summary>Detaylı bilgi</summary>
                 <div className="form-grid">
-                  <label className="form-field form-field--short">
-                    Giriş tarihi
-                    <input lang="tr-TR" type="date" value={manualRequestForm.startDate} onChange={(event) => updateManualRequestForm("startDate", event.target.value)} />
-                    <small className="date-field-hint">GG.AA.YYYY</small>
-                  </label>
-                  <label className="form-field form-field--short">
-                    Çıkış tarihi
-                    <input lang="tr-TR" type="date" value={manualRequestForm.endDate} onChange={(event) => updateManualRequestForm("endDate", event.target.value)} />
-                    <small className="date-field-hint">GG.AA.YYYY</small>
-                  </label>
+                  <div className="form-field form-field--short">
+                    <span>Giriş tarihi</span>
+                    <DatePicker
+                      ariaLabel="Giriş tarihi"
+                      value={manualRequestForm.startDate}
+                      onChange={(value) => updateManualRequestForm("startDate", value)}
+                    />
+                  </div>
+                  <div className="form-field form-field--short">
+                    <span>Çıkış tarihi</span>
+                    <DatePicker
+                      ariaLabel="Çıkış tarihi"
+                      value={manualRequestForm.endDate}
+                      min={manualRequestForm.startDate || undefined}
+                      presets={manualRequestForm.startDate ? [1, 2, 7, 10].map((days) => ({
+                        label: `${days} gün`,
+                        value: addDays(manualRequestForm.startDate, days)
+                      })) : []}
+                      onChange={(value) => updateManualRequestForm("endDate", value)}
+                    />
+                  </div>
                 </div>
                 <div className="form-grid">
-                  <label className="form-field form-field--short">
-                    Saat
-                    <input lang="tr-TR" type="time" value={manualRequestForm.time} onChange={(event) => updateManualRequestForm("time", event.target.value)} />
-                  </label>
+                  <div className="form-field form-field--short">
+                    <span>Saat</span>
+                    <TimePicker
+                      ariaLabel="Saat"
+                      value={manualRequestForm.time}
+                      onChange={(value) => updateManualRequestForm("time", value)}
+                    />
+                  </div>
                   <label className="form-field form-field--medium">
                     Öncelik
                     <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
