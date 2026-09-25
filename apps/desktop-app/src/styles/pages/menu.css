@@ -367,43 +367,43 @@
   }
 
   .menu-item-field-category {
-    grid-column: 1;
+    grid-column: 1 / span 2;
     grid-row: 2;
   }
 
   .menu-item-field-price {
-    grid-column: 2;
-    grid-row: 2;
-  }
-
-  .menu-item-field-currency {
     grid-column: 1;
     grid-row: 3;
   }
 
-  .menu-item-field-status {
+  .menu-item-field-currency {
     grid-column: 2;
     grid-row: 3;
   }
 
+  .menu-item-field-status {
+    grid-column: 1 / span 2;
+    grid-row: 4;
+  }
+
   .menu-item-image-editor {
     grid-column: 3 / span 2;
-    grid-row: 1 / span 3;
+    grid-row: 1 / span 4;
   }
 
   .menu-item-field-description {
     grid-column: 1 / -1;
-    grid-row: 4;
+    grid-row: 5;
   }
 
   .menu-item-field-tags {
     grid-column: 1 / span 2;
-    grid-row: 5;
+    grid-row: 6;
   }
 
   .menu-item-field-allergens {
     grid-column: 3 / span 2;
-    grid-row: 5;
+    grid-row: 6;
   }
 
   .menu-item-image-editor .menu-media-preview-tools.is-compact {
@@ -415,7 +415,7 @@
   }
 }
 
-@container menu-item-form (max-width: 480px) {
+@container menu-item-form (max-width: 380px) {
   .menu-item-editor-grid {
     grid-template-columns: minmax(0, 1fr);
   }
