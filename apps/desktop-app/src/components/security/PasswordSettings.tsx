@@ -181,16 +181,18 @@ export function PasswordSettings({ controller }: { controller: ReturnType<typeof
   const { configured, currentPassword, setCurrentPassword, newPassword, setNewPassword, passwordConfirmation, setPasswordConfirmation, webSecurityKey, setWebSecurityKey, recoveryOpen, setRecoveryOpen, busyAction, message, messageTone, sectionRef, currentPasswordRef, newPasswordRef, hasPasswordDraft, savePasswordDraft, removePassword, resetPassword } = controller;
   return (
     <>
-      <div ref={sectionRef} id="settings-password" tabIndex={-1} className="settings-application-subsection settings-password-section">
-        <div className="settings-subsection-heading settings-password-title">
+      <div ref={sectionRef} id="settings-password" tabIndex={-1} className="settings-application-subsection settings-password-section settings-panel">
+        <div className="settings-panel-header settings-password-title">
           <div>
             <h3>Uygulama Şifresi</h3>
+            <p>Uygulamayı yerel erişime karşı kilitleyin.</p>
           </div>
           <span className={configured ? "password-status is-enabled" : "password-status"}>
             {configured ? <ShieldCheck size={16} aria-hidden="true" /> : <ShieldOff size={16} aria-hidden="true" />}
             {configured ? "Şifre açık" : "İsteğe bağlı"}
           </span>
         </div>
+        <div className="settings-panel-body">
         <form className="password-settings-form" onSubmit={(event) => { event.preventDefault(); void savePasswordDraft(); }}>
           {configured && (
             <label className="form-field form-field--medium">
@@ -283,6 +285,7 @@ export function PasswordSettings({ controller }: { controller: ReturnType<typeof
             {message}
           </p>
         )}
+        </div>
       </div>
     </>
   );
