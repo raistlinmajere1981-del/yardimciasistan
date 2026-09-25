@@ -18,7 +18,7 @@ export async function generateDesktopReportAiComment(
   input: GenerateDesktopReportAiInput
 ): Promise<GenerateDesktopReportAiResult> {
   const mode = input?.mode;
-  if (!["summary", "attention", "sales", "recommendations"].includes(mode)) {
+  if (!["summary", "sales", "recommendations"].includes(mode)) {
     return { ok: false, message: "Geçerli bir AI yorum türü seçin." };
   }
   if (mode === "sales" && !hasBusinessCapability(database.getEnabledBusinessCapabilities(), BUSINESS_CAPABILITIES.FOOD_ORDERS)) {
