@@ -292,7 +292,9 @@ export function MenuManager({
           }}
           footer={(
             <>
-              <p className={"form-status sync-" + menuEditState} role="status">{menuEditMessage}</p>
+              {menuEditMessage && menuEditMessage !== "Yeni ürün." && (
+                <p className={"form-status sync-" + menuEditState} role="status">{menuEditMessage}</p>
+              )}
               <div className="action-row">
                 <ActionButton
                   variant="secondary"
