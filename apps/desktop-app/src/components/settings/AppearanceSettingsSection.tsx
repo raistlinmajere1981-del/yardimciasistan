@@ -41,11 +41,14 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
   onUiPreferencesChange: (preferences: UiPreferences) => void;
 }) {
   return (
-          <section id="settings-appearance" tabIndex={-1} className="settings-application-subsection appearance-settings">
-            <div className="settings-subsection-heading">
-              <h3>Görünüm</h3>
-              <p>Görünüm seçimleri anında uygulanır ve bu cihazda saklanır; Ayarları Kaydet gerekmez.</p>
+          <section id="settings-appearance" tabIndex={-1} className="settings-application-subsection settings-panel appearance-settings">
+            <div className="settings-panel-header">
+              <div>
+                <h3>Görünüm</h3>
+                <p>Seçimler anında uygulanır ve bu cihazda saklanır.</p>
+              </div>
             </div>
+          <div className="settings-panel-body">
           <div className="form-grid appearance-controls">
             <fieldset className="appearance-field">
               <legend>Renk düzeni</legend>
@@ -143,6 +146,7 @@ export function AppearanceSettingsSection({ uiPreferences, onUiPreferencesChange
                 ))}
               </div>
             </fieldset>
+          </div>
           </div>
           </section>
 
