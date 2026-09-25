@@ -9,6 +9,7 @@ import type {
   SaveManualReservationInput
 } from "../../../electron/database";
 import { ActionButton } from "../ui/ActionButton";
+import { DatePicker, addDays } from "../ui/DateTimePicker";
 import { QuickCustomerCreator } from "./QuickCustomerCreator";
 
 type EditorState = "idle" | "loading" | "error";
@@ -178,30 +179,30 @@ export function ManualReservationEditor({
               </div>
             )}
 
-            <label className="form-field form-field--short">
-              Giriş tarihi
-              <input
-                type="date"
-                lang="tr-TR"
-                required
+            <div className="form-field form-field--short">
+              <span>Giriş tarihi</span>
+              <DatePicker
+                ariaLabel="Giriş tarihi"
                 disabled={!detailsEditable}
                 value={form.startDate}
-                onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))}
+                onChange={(value) => setForm((current) => ({ ...current, startDate: value }))}
               />
-            </label>
+            </div>
 
-            <label className="form-field form-field--short">
-              Çıkış tarihi
-              <input
-                type="date"
-                lang="tr-TR"
-                required
+            <div className="form-field form-field--short">
+              <span>Çıkış tarihi</span>
+              <DatePicker
+                ariaLabel="Çıkış tarihi"
                 disabled={!detailsEditable}
                 min={form.startDate || undefined}
                 value={form.endDate}
-                onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))}
+                presets={form.startDate ? [1, 2, 7, 10].map((days) => ({
+                  label: `${days} gün`,
+                  value: addDays(form.startDate, days)
+                })) : []}
+                onChange={(value) => setForm((current) => ({ ...current, endDate: value }))}
               />
-            </label>
+            </div>
 
             <label className="form-field form-field--xs">
               Kişi sayısı
