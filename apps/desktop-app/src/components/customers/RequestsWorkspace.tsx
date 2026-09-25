@@ -1,4 +1,3 @@
-import { useDialogFocus } from "../ui/useDialogFocus";
 import { useEffect, useState } from "react";
 import {
   Bell,
@@ -11,8 +10,7 @@ import {
   RefreshCw,
   Save,
   Sparkles,
-  Trash2,
-  X
+  Trash2
 } from "lucide-react";
 import type { SyncedCustomerRequest } from "@yardimci-asistan/sync-core";
 import {
@@ -31,6 +29,7 @@ import {
 import { ActionButton } from "../ui/ActionButton";
 import { DataList, DataListButton } from "../ui/DataList";
 import { DatePicker, TimePicker, addDays } from "../ui/DateTimePicker";
+import { FormDialog } from "../ui/FormDialog";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { StatusBadge, type StatusTone } from "../ui/StatusBadge";
 
@@ -130,7 +129,6 @@ export function RequestsWorkspace({
 }: RequestsWorkspaceProps) {
   const [manualFormOpen, setManualFormOpen] = useState(false);
   const [requestFilter, setRequestFilter] = useState<RequestFilter>("all");
-  const dialogRef = useDialogFocus(manualFormOpen);
   const waitingRequests = requests.filter((request) => isRequestWaitingForReply(request.status));
   const visibleRequests = requestFilter === "waiting" ? waitingRequests : requests;
   const selectedRequest = visibleRequests.find((request) => request.id === externallySelectedRequest?.id)
@@ -325,31 +323,42 @@ export function RequestsWorkspace({
       </section>
 
       {manualFormOpen && (
-        <div
-          className="manual-request-backdrop overlay overlay--drawer"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setManualFormOpen(false);
-            }
+        <FormDialog
+          title="Yeni talep ekle"
+          onClose={() => {
+            if (manualRequestState !== "loading") setManualFormOpen(false);
           }}
-        >
-          <aside ref={dialogRef} className="drawer drawer--form drawer--scroll" role="dialog" aria-modal="true" aria-labelledby="manual-request-title">
-            <header className="overlay-header overlay-header--sticky">
-              <div className="overlay-heading">
-                <p>Manuel kayıt</p>
-                <h2 id="manual-request-title">Yeni talep ekle</h2>
+          closeBlocked={manualRequestState === "loading"}
+          dismissOnBackdrop
+          onSubmit={(event) => {
+            event.preventDefault();
+            onCreateManualRequest();
+          }}
+          footer={(
+            <>
+              {manualRequestState !== "idle" && manualRequestMessage && (
+                <p className={`form-status sync-${manualRequestState}`} role="status">{manualRequestMessage}</p>
+              )}
+              <div className="action-row manual-request-dialog-actions">
+                <ActionButton variant="secondary" type="button" disabled={manualRequestState === "loading"} onClick={() => setManualFormOpen(false)}>
+                  Vazgeç
+                </ActionButton>
+                <ActionButton type="submit" disabled={manualRequestState === "loading"}>
+                  <Save size={16} aria-hidden="true" />
+                  {manualRequestState === "loading" ? "Kaydediliyor" : "Manuel Talep Kaydet"}
+                </ActionButton>
               </div>
-              <button className="drawer-close-button" type="button" aria-label="Elle talep formunu kapat" onClick={() => setManualFormOpen(false)}>
-                <X size={18} aria-hidden="true" />
-              </button>
-            </header>
-            <form
-              className="form-stack overlay-form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                onCreateManualRequest();
-              }}
-            >
+            </>
+          )}
+        >
+          <div className="form-stack customer-create-form manual-request-create-form">
+            <section className="panel form-stack">
+              <div className="page-toolbar">
+                <div className="page-toolbar__copy">
+                  <strong>Temel bilgiler</strong>
+                  <small>Müşteri ve talep özeti</small>
+                </div>
+              </div>
               <div className="form-grid">
                 <label className="form-field form-field--medium">
                   Talep türü
@@ -380,61 +389,55 @@ export function RequestsWorkspace({
                   <textarea value={manualRequestForm.message} onChange={(event) => updateManualRequestForm("message", event.target.value)} placeholder="Talep detayı" />
                 </label>
               </div>
-              <details className="form-details">
-                <summary>Detaylı bilgi</summary>
-                <div className="form-grid">
-                  <div className="form-field form-field--short">
-                    <span>Giriş tarihi</span>
-                    <DatePicker
-                      ariaLabel="Giriş tarihi"
-                      value={manualRequestForm.startDate}
-                      onChange={(value) => updateManualRequestForm("startDate", value)}
-                    />
-                  </div>
-                  <div className="form-field form-field--short">
-                    <span>Çıkış tarihi</span>
-                    <DatePicker
-                      ariaLabel="Çıkış tarihi"
-                      value={manualRequestForm.endDate}
-                      min={manualRequestForm.startDate || undefined}
-                      presets={manualRequestForm.startDate ? [1, 2, 7, 10].map((days) => ({
-                        label: `${days} gün`,
-                        value: addDays(manualRequestForm.startDate, days)
-                      })) : []}
-                      onChange={(value) => updateManualRequestForm("endDate", value)}
-                    />
-                  </div>
-                </div>
-                <div className="form-grid">
-                  <div className="form-field form-field--short">
-                    <span>Saat</span>
-                    <TimePicker
-                      ariaLabel="Saat"
-                      value={manualRequestForm.time}
-                      onChange={(value) => updateManualRequestForm("time", value)}
-                    />
-                  </div>
-                  <label className="form-field form-field--medium">
-                    Öncelik
-                    <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
-                      {manualPriorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </label>
-                </div>
-              </details>
-              <div className="overlay-footer overlay-footer--inset">
-                <p className={`form-status sync-${manualRequestState}`} role="status">{manualRequestMessage}</p>
-                <div>
-                  <ActionButton variant="secondary" type="button" onClick={() => setManualFormOpen(false)}>Vazgeç</ActionButton>
-                  <ActionButton type="submit" disabled={manualRequestState === "loading"}>
-                    <Save size={16} aria-hidden="true" />
-                    {manualRequestState === "loading" ? "Kaydediliyor" : "Manuel Talep Kaydet"}
-                  </ActionButton>
+            </section>
+
+            <section className="panel form-stack">
+              <div className="page-toolbar">
+                <div className="page-toolbar__copy">
+                  <strong>Detaylı bilgi</strong>
+                  <small>Tarih, saat ve öncelik</small>
                 </div>
               </div>
-            </form>
-          </aside>
-        </div>
+              <div className="form-grid">
+                <div className="form-field form-field--short">
+                  <span>Giriş tarihi</span>
+                  <DatePicker
+                    ariaLabel="Giriş tarihi"
+                    value={manualRequestForm.startDate}
+                    onChange={(value) => updateManualRequestForm("startDate", value)}
+                  />
+                </div>
+                <div className="form-field form-field--short">
+                  <span>Çıkış tarihi</span>
+                  <DatePicker
+                    ariaLabel="Çıkış tarihi"
+                    value={manualRequestForm.endDate}
+                    min={manualRequestForm.startDate || undefined}
+                    presets={manualRequestForm.startDate ? [1, 2, 7, 10].map((days) => ({
+                      label: `${days} gün`,
+                      value: addDays(manualRequestForm.startDate, days)
+                    })) : []}
+                    onChange={(value) => updateManualRequestForm("endDate", value)}
+                  />
+                </div>
+                <div className="form-field form-field--short">
+                  <span>Saat</span>
+                  <TimePicker
+                    ariaLabel="Saat"
+                    value={manualRequestForm.time}
+                    onChange={(value) => updateManualRequestForm("time", value)}
+                  />
+                </div>
+                <label className="form-field form-field--medium">
+                  Öncelik
+                  <select value={manualRequestForm.priority} onChange={(event) => updateManualRequestForm("priority", event.target.value)}>
+                    {manualPriorityOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+              </div>
+            </section>
+          </div>
+        </FormDialog>
       )}
     </section>
   );
