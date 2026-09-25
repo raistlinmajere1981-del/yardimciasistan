@@ -336,6 +336,10 @@
 }
 .customer-workspace-savebar > .form-status { margin: 0; }
 .customer-create-form { gap: var(--space-4); }
+
+.manual-request-dialog-actions {
+  margin-left: auto;
+}
 @media (max-width: 760px) {
   .customer-workspace-savebar { align-items: stretch; flex-direction: column; }
 }
