@@ -119,9 +119,8 @@ export function DashboardPage({
     + birthdayAttentionCount
     + paymentWaitingCount
     + stockAttentionCount;
-  const visiblePriorityItems = dashboard.priorityItems.slice(0, 6);
-  const hiddenPriorityCount = Math.max(0, dashboard.priorityItems.length - visiblePriorityItems.length);
-  const visibleScheduleItems = dashboard.scheduleItems.slice(0, 4);
+  const visiblePriorityItems = dashboard.priorityItems;
+  const visibleScheduleItems = dashboard.scheduleItems;
   const hasCapacityMetrics = features.rooms || features.tables || (features.whatsapp && customersEnabled);
   const capacityVisible = hasCapacityMetrics || aiEnabled;
 
@@ -242,9 +241,6 @@ export function DashboardPage({
             </ol>
           )}
 
-          {hiddenPriorityCount > 0 && (
-            <p className="dashboard-list-footnote">En önemli 6 kayıt gösteriliyor. {hiddenPriorityCount} kayıt daha ilgili sayfalarda bekliyor.</p>
-          )}
         </Panel>
 
         {(operationalAttentionItems.length > 0 || calendarEnabled || capacityVisible || (customersEnabled && birthdayOverview.enabled && birthdayOverview.candidates.length > 0)) && <aside className="dashboard-side" aria-label="Takvim ve işletme durumu">
@@ -272,41 +268,6 @@ export function DashboardPage({
               </div>
             </Panel>
           )}
-
-          {calendarEnabled && <Panel className="dashboard-timeline-panel" padding="compact">
-            <div className="dashboard-section-heading page-toolbar compact">
-              <div>
-                <p>Takvim</p>
-                <h2>Sıradaki zamanlar</h2>
-              </div>
-              <StatusBadge tone={visibleScheduleItems.some((item) => item.kind !== "request" && item.urgency === "overdue") ? "danger" : "neutral"}>
-                {dashboard.scheduleItems.length}
-              </StatusBadge>
-            </div>
-
-            {visibleScheduleItems.length === 0 ? (
-              <p className="dashboard-side-empty">{reservationsEnabled && tasksEnabled
-                ? "Planlanmış açık iş veya rezervasyon yok."
-                : reservationsEnabled ? "Planlanmış rezervasyon yok."
-                  : tasksEnabled ? "Planlanmış açık iş yok." : "Takvimde gösterilecek kayıt yok."}</p>
-            ) : (
-              <ol className="dashboard-timeline-list">
-                {visibleScheduleItems.map((item) => (
-                  <li key={`schedule:${item.key}`}>
-                    <span className={`dashboard-timeline-dot urgency-${item.kind === "request" ? "upcoming" : item.urgency}`} aria-hidden="true" />
-                    <div>
-                      <strong>{getPriorityTitle(item)}</strong>
-                      <span>{getScheduleDate(item, dashboard.today)}</span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-
-            {dashboard.scheduleItems.length > visibleScheduleItems.length && (
-              <p className="dashboard-side-note">{dashboard.scheduleItems.length - visibleScheduleItems.length} planlı kayıt daha var.</p>
-            )}
-          </Panel>}
 
           {capacityVisible && <Panel className="dashboard-capacity-panel" padding="compact">
             <div className="dashboard-section-heading page-toolbar compact">
@@ -355,33 +316,38 @@ export function DashboardPage({
               ) : (
                 <p className="dashboard-birthday-summary">Bugün doğum günü olan müşterileri kontrol edip WhatsApp mesajını hazırlayın.</p>
               )}
-              {!features.whatsapp && <p className="dashboard-birthday-summary is-unavailable">WhatsApp etkin değil</p>}
-              <ul className="dashboard-birthday-list">
-                {birthdayOverview.candidates.slice(0, 6).map((candidate) => (
-                  <li key={candidate.customerId}>
-                    <div className="dashboard-birthday-customer">
-                      <strong>{candidate.customerName || "Müşterimiz"}</strong>
-                      <span>{candidate.phone || "Telefon yok"}</span>
-                    </div>
-                    <div className="dashboard-birthday-actions">
-                      <StatusBadge tone={birthdayStatusTone(candidate.eligibility)}>{birthdayStatusLabel(candidate.eligibility)}</StatusBadge>
-                      {features.whatsapp && birthdayOverview.mode === "manual" && (candidate.eligibility === "due" || candidate.eligibility === "prepared") && (
-                        <ActionButton
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => onPrepareBirthday(candidate.customerId)}
-                          disabled={birthdayPreparingId === candidate.customerId}
-                        >
-                          {birthdayPreparingId === candidate.customerId ? "Hazırlanıyor" : candidate.eligibility === "prepared" ? "Tekrar hazırla" : "WhatsApp’a Hazırla"}
-                        </ActionButton>
-                      )}
+
+          {calendarEnabled && <Panel className="dashboard-timeline-panel" padding="compact">
+            <div className="dashboard-section-heading page-toolbar compact">
+              <div>
+                <p>Takvim</p>
+                <h2>Sıradaki zamanlar</h2>
+              </div>
+              <StatusBadge tone={visibleScheduleItems.some((item) => item.kind !== "request" && item.urgency === "overdue") ? "danger" : "neutral"}>
+                {dashboard.scheduleItems.length}
+              </StatusBadge>
+            </div>
+
+            {visibleScheduleItems.length === 0 ? (
+              <p className="dashboard-side-empty">{reservationsEnabled && tasksEnabled
+                ? "Planlanmış açık iş veya rezervasyon yok."
+                : reservationsEnabled ? "Planlanmış rezervasyon yok."
+                  : tasksEnabled ? "Planlanmış açık iş yok." : "Takvimde gösterilecek kayıt yok."}</p>
+            ) : (
+              <ol className="dashboard-timeline-list">
+                {visibleScheduleItems.map((item) => (
+                  <li key={`schedule:${item.key}`}>
+                    <span className={`dashboard-timeline-dot urgency-${item.kind === "request" ? "upcoming" : item.urgency}`} aria-hidden="true" />
+                    <div>
+                      <strong>{getPriorityTitle(item)}</strong>
+                      <span>{getScheduleDate(item, dashboard.today)}</span>
                     </div>
                   </li>
                 ))}
-              </ul>
-              {birthdayOverview.candidates.length > 6 && <p className="dashboard-side-note">{birthdayOverview.candidates.length - 6} müşteri daha var.</p>}
-            </Panel>
-          )}
+              </ol>
+            )}
+
+          </Panel>}
         </aside>}
       </section>
     </div>
