@@ -1,20 +1,17 @@
-import { Bot, DatabaseBackup, LockKeyhole, RefreshCw, Smartphone, Wifi } from "lucide-react";
+import { Bot, DatabaseBackup, LockKeyhole, Smartphone, Wifi } from "lucide-react";
 import { useMemo } from "react";
 import type { DesktopDashboardData, DesktopSetupData } from "../../../electron/database";
 import type { AutomaticSyncStatus } from "../../../electron/sync-coordinator";
-import { ActionButton } from "../ui/ActionButton";
 import { Panel } from "../ui/Panel";
 
 interface SystemHealthPanelProps {
   data: DesktopDashboardData;
   setup: DesktopSetupData;
   syncStatus: AutomaticSyncStatus;
-  syncing: boolean;
   features: {
     android: boolean;
   };
   aiEnabled: boolean;
-  onSyncNow: () => void | Promise<unknown>;
 }
 
 type HealthTone = "ok" | "warn" | "danger" | "info" | "muted";
@@ -32,10 +29,8 @@ export function SystemHealthPanel({
   data,
   setup,
   syncStatus,
-  syncing,
   features,
-  aiEnabled,
-  onSyncNow
+  aiEnabled
 }: SystemHealthPanelProps) {
   const items = useMemo<HealthItem[]>(() => {
     const activeDevices = data.androidDevices.filter((device) => device.isActive && !device.revokedAt).length;
@@ -91,23 +86,12 @@ export function SystemHealthPanel({
     return items;
   }, [aiEnabled, data.androidDevices, data.backupPath, data.webModuleUrl, features.android, setup, syncStatus]);
 
-  const attentionCount = items.filter((item) => item.tone === "warn" || item.tone === "danger").length;
-
   return (
     <Panel className="system-health-panel" padding="compact" aria-labelledby="system-health-title">
       <div className="system-health-heading">
         <div>
           <p>Sistem sağlığı</p>
           <h2 id="system-health-title">Bağlantılar ve koruma</h2>
-        </div>
-        <div className="system-health-heading-actions">
-          <span className={attentionCount > 0 ? "system-health-summary is-warning" : "system-health-summary is-ok"}>
-            {attentionCount > 0 ? `${attentionCount} konu kontrol edilmeli` : "Temel sistemler hazır"}
-          </span>
-          <ActionButton variant="ghost" size="sm" onClick={() => void onSyncNow()} disabled={syncing || !setup.autoSyncEnabled}>
-            <RefreshCw size={14} aria-hidden="true" className={syncing ? "is-spinning" : undefined} />
-            {syncing ? "Kontrol ediliyor" : "Şimdi eşitle"}
-          </ActionButton>
         </div>
       </div>
       <div className="system-health-grid">
