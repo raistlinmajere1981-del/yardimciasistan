@@ -19,6 +19,10 @@ Draft state is local to the entity workspace. Changing tabs or centered/full-can
 
 The new-item flow reuses the same field components and canonical form conversion. After the first save, the dialog unmounts before the created entity opens in Menu Item Workspace, preserving the single-modal contract.
 
+Stock tracking is an explicit form state rather than an implicit “quantity is blank” convention. New items start with stock tracking enabled and a zero quantity; disabling tracking collapses the stock panel and persists the canonical untracked state with a null stock quantity.
+
+The media section keeps the current preview at the top-right of the panel with adjacent file-select and clear actions. Image preparation and persistence still use the existing canonical menu image field.
+
 ## Operations
 
 The menu controller exposes domain-oriented item operations:
