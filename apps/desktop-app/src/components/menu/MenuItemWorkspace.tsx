@@ -4,10 +4,9 @@ import { Save, Trash2 } from "lucide-react";
 import type { DesktopDashboardData, DesktopMenuSaveResult, DesktopStatusUpdateResult } from "../../../electron/database";
 import { toItemForm, type ItemFormState } from "./menu-model";
 import { MenuItemFormFields } from "./MenuItemFormFields";
-import type { MenuItemWorkspaceIntent, MenuItemWorkspaceMode } from "../workspace/workspace-intent";
+import type { MenuItemWorkspaceIntent } from "../workspace/workspace-intent";
 import { useWorkspaceCloseGuard, useWorkspaceNavigation } from "../workspace/WorkspaceNavigation";
 import { WorkspaceFrame } from "../workspace/WorkspaceFrame";
-import { WorkspaceTabList, WorkspaceTabPanel, WorkspaceTabs } from "../workspace/WorkspaceTabs";
 import { ActionButton } from "../ui/ActionButton";
 import { StatusBadge } from "../ui/StatusBadge";
 
@@ -63,11 +62,6 @@ export function MenuItemWorkspace({
     );
   }
 
-  const tabs: readonly { id: MenuItemWorkspaceMode; label: string }[] = inventoryEnabled
-    ? [{ id: "details", label: "Bilgiler" }, { id: "stock", label: "Stok" }, { id: "media", label: "Görsel" }]
-    : [{ id: "details", label: "Bilgiler" }, { id: "media", label: "Görsel" }];
-  const requestedMode = intent.mode || "details";
-  const mode = tabs.some((tab) => tab.id === requestedMode) ? requestedMode : "details";
   const categoryName = data.menu.categories.find((category) => category.id === item.category_id)?.name || "Kategori yok";
 
   async function save() {
@@ -115,12 +109,10 @@ export function MenuItemWorkspace({
   }
 
   return (
-    <WorkspaceTabs value={mode}>
-      <WorkspaceFrame
+    <WorkspaceFrame
         title={item.name}
         context={categoryName + " · " + item.price + " " + item.currency}
         actions={<StatusBadge tone={item.is_available ? "success" : "neutral"}>{item.is_available ? "Mevcut" : "Kapalı"}</StatusBadge>}
-        navigation={<WorkspaceTabList label="Menü ürünü çalışma alanı" tabs={tabs} onChange={(nextMode) => navigation.updateWorkspaceMode({ entityType: "menu-item", mode: nextMode })} />}
         presentation={presentation}
         onPresentationChange={navigation.updateWorkspacePresentation}
         onClose={navigation.closeWorkspace}
@@ -154,18 +146,16 @@ export function MenuItemWorkspace({
           </>
         )}
       >
-        <WorkspaceTabPanel value="details">
-          <MenuItemFormFields mode="details" form={form} dashboardData={data} qrMenuEnabled={qrMenuEnabled} inventoryEnabled={inventoryEnabled} onChange={setForm} />
-        </WorkspaceTabPanel>
-        {inventoryEnabled && (
-          <WorkspaceTabPanel value="stock">
-            <MenuItemFormFields mode="stock" form={form} dashboardData={data} qrMenuEnabled={qrMenuEnabled} inventoryEnabled={inventoryEnabled} onChange={setForm} />
-          </WorkspaceTabPanel>
-        )}
-        <WorkspaceTabPanel value="media">
-          <MenuItemFormFields mode="media" form={form} dashboardData={data} qrMenuEnabled={qrMenuEnabled} inventoryEnabled={inventoryEnabled} onChange={setForm} />
-        </WorkspaceTabPanel>
-      </WorkspaceFrame>
-    </WorkspaceTabs>
+      <div className="menu-item-workspace-form">
+        <MenuItemFormFields
+          mode="all"
+          form={form}
+          dashboardData={data}
+          qrMenuEnabled={qrMenuEnabled}
+          inventoryEnabled={inventoryEnabled}
+          onChange={setForm}
+        />
+      </div>
+    </WorkspaceFrame>
   );
 }
