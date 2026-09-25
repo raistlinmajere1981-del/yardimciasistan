@@ -316,6 +316,33 @@ export function DashboardPage({
               ) : (
                 <p className="dashboard-birthday-summary">Bugün doğum günü olan müşterileri kontrol edip WhatsApp mesajını hazırlayın.</p>
               )}
+              {!features.whatsapp && <p className="dashboard-birthday-summary is-unavailable">WhatsApp etkin değil</p>}
+              <ul className="dashboard-birthday-list">
+                {birthdayOverview.candidates.slice(0, 6).map((candidate) => (
+                  <li key={candidate.customerId}>
+                    <div className="dashboard-birthday-customer">
+                      <strong>{candidate.customerName || "Müşterimiz"}</strong>
+                      <span>{candidate.phone || "Telefon yok"}</span>
+                    </div>
+                    <div className="dashboard-birthday-actions">
+                      <StatusBadge tone={birthdayStatusTone(candidate.eligibility)}>{birthdayStatusLabel(candidate.eligibility)}</StatusBadge>
+                      {features.whatsapp && birthdayOverview.mode === "manual" && (candidate.eligibility === "due" || candidate.eligibility === "prepared") && (
+                        <ActionButton
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onPrepareBirthday(candidate.customerId)}
+                          disabled={birthdayPreparingId === candidate.customerId}
+                        >
+                          {birthdayPreparingId === candidate.customerId ? "Hazırlanıyor" : candidate.eligibility === "prepared" ? "Tekrar hazırla" : "WhatsApp’a Hazırla"}
+                        </ActionButton>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {birthdayOverview.candidates.length > 6 && <p className="dashboard-side-note">{birthdayOverview.candidates.length - 6} müşteri daha var.</p>}
+            </Panel>
+          )}
 
           {calendarEnabled && <Panel className="dashboard-timeline-panel" padding="compact">
             <div className="dashboard-section-heading page-toolbar compact">
@@ -346,7 +373,6 @@ export function DashboardPage({
                 ))}
               </ol>
             )}
-
           </Panel>}
         </aside>}
       </section>
