@@ -97,9 +97,20 @@ export function DashboardPage({
   const birthdayAttentionCount = customersEnabled && birthdayOverview.enabled
     ? birthdayOverview.dueCount + birthdayOverview.invalidPhoneCount + birthdayOverview.waitingCount + birthdayOverview.failedCount
     : 0;
-  const paymentWaitingCount = data.attention.paymentWaitingTables;
-  const stockAttentionCount = data.attention.outOfStockItems + data.attention.lowStockItems;
-  const operationalAttentionItems = data.attention.items.filter((item) =>
+  const operationalAttention = data.attention ?? {
+    pendingRequests: 0,
+    pendingReservations: 0,
+    paymentWaitingTables: 0,
+    overdueTasks: 0,
+    incompleteTasks: 0,
+    outOfStockItems: 0,
+    lowStockItems: 0,
+    totalCount: 0,
+    items: []
+  };
+  const paymentWaitingCount = operationalAttention.paymentWaitingTables;
+  const stockAttentionCount = operationalAttention.outOfStockItems + operationalAttention.lowStockItems;
+  const operationalAttentionItems = operationalAttention.items.filter((item) =>
     item.kind === "payment_waiting" || item.kind === "out_of_stock" || item.kind === "low_stock"
   );
   const attentionCount = waitingRequestCount
@@ -109,7 +120,7 @@ export function DashboardPage({
     + paymentWaitingCount
     + stockAttentionCount;
   const visiblePriorityItems = dashboard.priorityItems.slice(0, 6);
-  const hiddenPriorityCount = Math.max(0, attentionCount - visiblePriorityItems.length);
+  const hiddenPriorityCount = Math.max(0, dashboard.priorityItems.length - visiblePriorityItems.length);
   const visibleScheduleItems = dashboard.scheduleItems.slice(0, 4);
   const hasCapacityMetrics = features.rooms || features.tables || (features.whatsapp && customersEnabled);
   const capacityVisible = hasCapacityMetrics || aiEnabled;
@@ -192,7 +203,7 @@ export function DashboardPage({
             <AttentionCard tone="wait" icon={ReceiptText} value={paymentWaitingCount} label="masa hesap bekliyor" />
           )}
           {stockAttentionCount > 0 && (
-            <AttentionCard tone={data.attention.outOfStockItems > 0 ? "danger" : "wait"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
+            <AttentionCard tone={operationalAttention.outOfStockItems > 0 ? "danger" : "wait"} icon={PackageMinus} value={stockAttentionCount} label="stok uyarısı var" />
           )}
         </div>
       </section>
